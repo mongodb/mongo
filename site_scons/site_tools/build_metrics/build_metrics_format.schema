@@ -33,6 +33,29 @@
                 "arithmetic_mean": {"type": "number"},
                 "start_mem": { "$ref": "#/$defs/memory" }
             }
+        },
+        "build_tasks" : {
+            "type": "array",
+            "task": {
+                "type": "object",
+                "properties": {
+                    "array_index": {"type": "integer"},
+                    "start_time": {"$ref": "#/$defs/timestamp"},
+                    "end_time" : {"$ref": "#/$defs/timestamp"},
+                    "cpu_time" : {"type" : "integer"},
+                    "builder" : {"type" : "str"},
+                    "mem_usage": {"$ref": "#/$defs/memory"},
+                    "inputs" : {
+                        "type": "array",
+                        "input": { "type": "str"}
+                    },
+                    "outputs" : {
+                        "type": "array",
+                        "output": { "type": "str"}
+                    },
+                    "action": {"type" : "str"}
+                }
+            }
         }
     }
 }

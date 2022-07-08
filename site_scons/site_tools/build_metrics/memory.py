@@ -2,7 +2,7 @@ import threading
 import time
 import psutil
 import sys
-from .util import timestamp_now, get_build_metric_dict
+from .util import timestamp_now
 from .protocol import BuildMetricsCollector
 
 
@@ -11,8 +11,7 @@ class MemoryMonitor(BuildMetricsCollector):
 
     def __init__(self, starting_memory_adjustment=0):
         self._stop = False
-        metrics = get_build_metric_dict()
-        metrics['system_memory'] = {
+        self.system_memory_metrics = {
             "mem_over_time": [],
             "start_mem": used_memory() - starting_memory_adjustment,
         }
@@ -24,20 +23,19 @@ class MemoryMonitor(BuildMetricsCollector):
         self._stop = True
         self._record_data_point()
 
-        metrics = get_build_metric_dict()
-        sys_mem = metrics["system_memory"]
-
         mean = 0
         max_ = 0
         count = 1
-        for val in sys_mem["mem_over_time"]:
+        for val in self.system_memory_metrics["mem_over_time"]:
             max_ = max(val["memory"], max_)
             # iterative mean calculation algorithm from https://stackoverflow.com/a/1934266
             mean += (val["memory"] - mean) / count
             count += 1
 
-        sys_mem["arithmetic_mean"] = mean
-        sys_mem["max"] = max_
+        self.system_memory_metrics["arithmetic_mean"] = mean
+        self.system_memory_metrics["max"] = max_
+
+        return 'system_memory', self.system_memory_metrics
 
     def memory_monitor(self):
         while not self._stop:
@@ -51,8 +49,7 @@ class MemoryMonitor(BuildMetricsCollector):
         used_mem = used_memory()
         now_time = timestamp_now()
 
-        metrics = get_build_metric_dict()
-        metrics["system_memory"]["mem_over_time"].append(
+        self.system_memory_metrics["mem_over_time"].append(
             {"timestamp": now_time, "memory": used_mem})
 
 

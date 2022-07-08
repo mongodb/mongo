@@ -30,28 +30,20 @@ import time
 from jsonschema import validate
 import psutil
 
-from .util import add_meta_data, get_build_metric_dict
-import build_metrics.memory
+from .util import add_meta_data, get_build_metric_dict, CaptureAtexits
+from .memory import MemoryMonitor
+from .per_action_metrics import PerActionMetrics
 
 _SEC_TO_NANOSEC_FACTOR = 1000000000.0
-
-
-# This section is an excerpt of the original
-# https://stackoverflow.com/a/63029332/1644736
-class CaptureAtexits:
-    def __init__(self):
-        self.captured = []
-
-    def __eq__(self, other):
-        self.captured.append(other)
-        return False
+_METRICS_COLLECTORS = []
 
 
 def finalize_build_metrics(env):
     metrics = get_build_metric_dict()
     metrics['end_time'] = time.time_ns()
     for m in _METRICS_COLLECTORS:
-        m.finalize()
+        key, value = m.finalize()
+        metrics[key] = value
 
     with open(os.path.join(os.path.dirname(__file__), "build_metrics_format.schema")) as f:
         validate(metrics, json.load(f))
@@ -62,9 +54,6 @@ def finalize_build_metrics(env):
     else:
         with open(build_metrics_file, 'w') as f:
             json.dump(metrics, f, indent=4, sort_keys=True)
-
-
-_METRICS_COLLECTORS = []
 
 
 def generate(env, **kwargs):
@@ -89,7 +78,10 @@ def generate(env, **kwargs):
     metrics['start_time'] = int(p.create_time() * _SEC_TO_NANOSEC_FACTOR)
     metrics['scons_command'] = " ".join([sys.executable] + sys.argv)
 
-    _METRICS_COLLECTORS = [memory.MemoryMonitor(psutil.Process().memory_info().vms)]
+    _METRICS_COLLECTORS = [
+        MemoryMonitor(psutil.Process().memory_info().vms),
+        PerActionMetrics(),
+    ]
 
 
 def exists(env):
