@@ -463,7 +463,7 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
                 WT_ERR(__wt_update_vector_push(&out_of_order_ts_updates, min_ts_upd));
                 out_of_order_ts_upd = min_ts_upd;
             } else if (upd->prepare_state != WT_PREPARE_INPROGRESS &&
-              (min_ts_upd == NULL || upd->start_ts < min_ts_upd->start_ts))
+              (min_ts_upd == NULL || upd->start_ts <= min_ts_upd->start_ts))
                 min_ts_upd = upd;
 
             WT_ERR(__wt_update_vector_push(&updates, upd));
