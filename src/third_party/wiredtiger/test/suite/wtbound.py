@@ -28,6 +28,63 @@
 
 import wiredtiger, wttest
 
+class bound():
+    def __init__(self, key, inclusive, enabled):
+        self.key = key
+        self.inclusive = inclusive
+        self.enabled = enabled
+
+    def to_string(self):
+        return "Enabled: " + str(self.enabled) + ", Key: " + str(self.key) + ", incl: " + self.inclusive_str()
+
+    def inclusive_str(self):
+        if (self.inclusive):
+            return "true"
+        else:
+            return "false"
+
+class bounds():
+    # Initialize with junk values.
+    lower = bound(-1, False, False)
+    upper = bound(-1, False, False)
+
+    def __init__(self, lower, upper):
+        self.lower = lower
+        self.upper = upper
+
+    def to_string(self):
+        return "Lower: [" + self.lower.to_string() + "], Upper: [" + self.upper.to_string() + "]"
+
+    def in_bounds_key(self, key):
+        if (self.lower.enabled):
+            if (key == self.lower.key):
+                if (not self.lower.inclusive):
+                    return False
+            elif (key < self.lower.key):
+                return False
+        if (self.upper.enabled):
+            if (key == self.upper.key):
+                if (not self.upper.inclusive):
+                    return False
+            elif (key > self.upper.key):
+                return False
+        return True
+
+    # This is used by for loops, so add one to the expected end range.
+    def end_range(self, key_count):
+        if (not self.upper.enabled):
+            return key_count
+        if (self.upper.inclusive):
+            return self.upper.key + 1
+        return self.upper.key
+
+    def start_range(self):
+        if (not self.lower.enabled):
+            return 0
+        if (self.lower.inclusive):
+            return self.lower.key
+        return self.lower.key + 1
+
 # Shared base class used by cursor bound tests.
 class bound_base(wttest.WiredTigerTestCase):
     start_key = 20

@@ -21,6 +21,70 @@ typedef struct {
 } WT_CURFILE_STATE;
 
 /*
+ * __btcur_bounds_contains_key --
+ *     Determine if a given key is within the bounds set on a cursor.
+ */
+static int
+__btcur_bounds_contains_key(
+  WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_ITEM *key, bool *key_out_of_boundsp, bool *upperp)
+{
+    *key_out_of_boundsp = false;
+
+    if (upperp != NULL)
+        *upperp = false;
+
+    WT_ASSERT(session, WT_CURSOR_BOUNDS_SET(cursor));
+    WT_ASSERT(session, key != NULL);
+
+    if (CUR2BT(cursor)->type != BTREE_ROW)
+        WT_RET(ENOTSUP);
+
+    if (F_ISSET(cursor, WT_CURSTD_BOUND_LOWER))
+        WT_RET(__wt_row_compare_bounds(session, cursor, key, false, key_out_of_boundsp));
+
+    if (!(*key_out_of_boundsp) && F_ISSET(cursor, WT_CURSTD_BOUND_UPPER)) {
+        WT_RET(__wt_row_compare_bounds(session, cursor, key, true, key_out_of_boundsp));
+        if (*key_out_of_boundsp && upperp != NULL)
+            *upperp = true;
+    }
+    return (0);
+}
+
+/*
+ * __btcur_bounds_search_near_reposition --
+ *     This function validates whether a given key is within the provided cursor bounds. If not the
+ *     search near key is updated to the nearest bound.
+ */
+static int
+__btcur_bounds_search_near_reposition(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt)
+{
+    WT_CURSOR *cursor;
+    bool key_out_of_bounds, upper;
+
+    cursor = &cbt->iface;
+    key_out_of_bounds = upper = false;
+
+    WT_ASSERT(session, WT_CURSOR_BOUNDS_SET(cursor));
+    if (CUR2BT(cbt)->type != BTREE_ROW)
+        WT_RET(ENOTSUP);
+
+    /*
+     * Suppose a caller calls with the search key set to the lower bound but also specifies that the
+     * lower bound isn't inclusive. We cannot know which key to set the lower bound to so we would
+     * set it to the lower bound. The same is true for the upper bound. We can optimize for this
+     * scenario by either disabling and re-enabling the flags or passing a boolean to the key within
+     * bounds calls. However for the time being we will leave it as is as it is unlikely to present
+     * a performance issue.
+     */
+    WT_RET(__btcur_bounds_contains_key(session, cursor, &cursor->key, &key_out_of_bounds, &upper));
+    if (key_out_of_bounds) {
+        __wt_cursor_set_raw_key(cursor, upper ? &cursor->upper_bound : &cursor->lower_bound);
+        WT_STAT_CONN_DATA_INCR(session, cursor_bounds_search_near_repositioned_cursor);
+    }
+    return (0);
+}
+
+/*
  * __cursor_state_save --
  *     Save the cursor's external state.
  */
@@ -178,11 +242,14 @@ __wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint64_t recno, bool *vali
     WT_BTREE *btree;
     WT_CELL *cell;
     WT_COL *cip;
+    WT_ITEM tmp_key;
     WT_PAGE *page;
     WT_SESSION_IMPL *session;
     WT_UPDATE *upd;
+    bool key_out_of_bounds;
 
     *valid = false;
+    key_out_of_bounds = false;
 
     btree = CUR2BT(cbt);
     page = cbt->ref->page;
@@ -234,6 +301,18 @@ __wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint64_t recno, bool *vali
      * update that's been deleted is not a valid key/value pair).
      */
     if (cbt->ins != NULL) {
+        if (WT_CURSOR_BOUNDS_SET(&cbt->iface) && btree->type == BTREE_ROW) {
+            /* Get the insert list key. */
+            if (key == NULL) {
+                tmp_key.data = WT_INSERT_KEY(cbt->ins);
+                tmp_key.size = WT_INSERT_KEY_SIZE(cbt->ins);
+            }
+            WT_RET(__btcur_bounds_contains_key(
+              session, &cbt->iface, key != NULL ? key : &tmp_key, &key_out_of_bounds, NULL));
+            /* The key value pair we were trying to return weren't within the given bounds. */
+            if (key_out_of_bounds)
+                return (0);
+        }
         WT_RET(__wt_txn_read_upd_list(session, cbt, cbt->ins->upd));
         if (cbt->upd_value->type != WT_UPDATE_INVALID) {
             if (cbt->upd_value->type == WT_UPDATE_TOMBSTONE)
@@ -330,6 +409,14 @@ __wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint64_t recno, bool *vali
             WT_RET(__wt_row_leaf_key(
               session, cbt->ref->page, &cbt->ref->page->pg_row[cbt->slot], cbt->tmp, true));
             key = cbt->tmp;
+        }
+
+        if (WT_CURSOR_BOUNDS_SET(&cbt->iface)) {
+            WT_RET(
+              __btcur_bounds_contains_key(session, &cbt->iface, key, &key_out_of_bounds, NULL));
+            /* The key value pair we were trying to return weren't within the given bounds. */
+            if (key_out_of_bounds)
+                return (0);
         }
 
         /* Check for an update. */
@@ -703,11 +790,8 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
      * exit.
      */
     if (btree->type == BTREE_ROW && WT_CURSOR_BOUNDS_SET(cursor)) {
-        WT_ERR(__wt_btcur_bounds_early_exit(session, cbt, true, &key_out_of_bounds));
-
-        if (!key_out_of_bounds)
-            WT_ERR(__wt_btcur_bounds_early_exit(session, cbt, false, &key_out_of_bounds));
-
+        WT_ERR(
+          __btcur_bounds_contains_key(session, cursor, &cursor->key, &key_out_of_bounds, NULL));
         if (key_out_of_bounds) {
             WT_STAT_CONN_DATA_INCR(session, cursor_bounds_search_early_exit);
             WT_ERR(WT_NOTFOUND);
@@ -828,6 +912,14 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
     WT_ERR(__wt_cursor_localkey(cursor));
     __cursor_novalue(cursor);
     __cursor_state_save(cursor, &state);
+
+    /*
+     * If the given cursor has bounds set we should search from those bounds. This is required when
+     * the search key is outside the bounds. Otherwise search near should behave as normal with an
+     * additional bounds check after the call to row/col search.
+     */
+    if (WT_CURSOR_BOUNDS_SET(cursor))
+        WT_ERR(__btcur_bounds_search_near_reposition(session, cbt));
 
     /*
      * If we have a row-store page pinned, search it; if we don't have a page pinned, or the search
@@ -2143,15 +2235,11 @@ __wt_btcur_bounds_row_position(
 
     WT_CURSOR *cursor;
     WT_ITEM *bound;
-    bool key_out_of_bounds, valid;
-    uint64_t bound_flag, bound_flag_inclusive;
+    bool valid;
 
-    key_out_of_bounds = false;
     *need_walkp = false;
     cursor = &cbt->iface;
     bound = next ? &cursor->lower_bound : &cursor->upper_bound;
-    bound_flag = next ? WT_CURSTD_BOUND_UPPER : WT_CURSTD_BOUND_LOWER;
-    bound_flag_inclusive = next ? WT_CURSTD_BOUND_LOWER_INCLUSIVE : WT_CURSTD_BOUND_UPPER_INCLUSIVE;
 
     if (next)
         WT_STAT_CONN_DATA_INCR(session, cursor_bounds_next_unpositioned);
@@ -2174,27 +2262,7 @@ __wt_btcur_bounds_row_position(
     /* If the record is valid, set the cursor's key to the record. */
     if (valid)
         WT_RET(__wt_key_return(cbt));
-
-    /*
-     * FIXME-WT-9324: When search_near_bounded is implemented then remove this. If search near
-     * returns a value, ensure it's within the bounds.
-     */
-    if (valid && cbt->compare == 0 && F_ISSET(cursor, bound_flag_inclusive))
-        return (0);
-    else if ((next ? cbt->compare > 0 : cbt->compare < 0) && valid) {
-        /*
-         * If cursor row search returns a non-exact key, check the returned key against the upper
-         * bound if doing a next, and the lower bound if doing a prev to ensure the key is within
-         * bounds. If not, there are no visible records, return WT_NOTFOUND.
-         */
-        if (F_ISSET(cursor, bound_flag)) {
-            WT_RET(__wt_row_compare_bounds(
-              session, cursor, S2BT(session)->collator, next, &key_out_of_bounds));
-            if (key_out_of_bounds)
-                return (WT_NOTFOUND);
-        }
-        return (0);
-    }
-    *need_walkp = true;
+    else
+        *need_walkp = true;
     return (0);
 }
