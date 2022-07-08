@@ -299,26 +299,6 @@ buildvariants:
   tasks:
   - name: tla_plus
 
-- name: enterprise-rhel80-ninja
-  display_name: "Ninja Build: RHEL 8.0"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
-  run_on:
-  - rhel80-small
-  stepback: false
-  expansions:
-    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
-    repo_edition: enterprise
-    has_packages: false
-  tasks:
-  - name: compile_ninja_next_TG
-    distros:
-    - rhel80-build
-  - name: compile_ninja_TG
-    distros:
-    - rhel80-build
-
 - &enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
   name: enterprise-rhel80-dynamic-v4gcc-debug-experimental
   display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain GCC DEBUG"
@@ -1338,8 +1318,10 @@ buildvariants:
   - enterprise
   run_on:
   - rhel80-small
+  stepback: false
   expansions:
-    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    repo_edition: enterprise
     has_packages: false
   tasks:
   - name: compile_ninja_next_TG
