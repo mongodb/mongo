@@ -130,6 +130,33 @@ TEST_F(OperationCPUTimerTest, TestTimerDetachAndAttachHandlers) {
     observer.join();
 }
 
+TEST_F(OperationCPUTimerTest, TestTimerElapsedAfterMultipleDetachAttach) {
+    // Do not try to use sub-millisecond precision. The way busyWait is implemented may cause this
+    // test to succeed when it should not.
+
+    auto timer = getTimer();
+    timer->start();
+    busyWait(Milliseconds(100));  // Elapse 100 ms.
+    timer->onThreadDetach();
+
+    busyWait(Milliseconds(500));
+
+    timer->onThreadAttach();
+    busyWait(Milliseconds(1));  // Elapse 1 ms.
+    timer->onThreadDetach();
+
+    busyWait(Milliseconds(500));
+
+    timer->onThreadAttach();
+    busyWait(Milliseconds(1));  // Elapse 1 ms.
+    timer->stop();
+
+    // Total elapsed while attached should be GTE 102 ms.
+    ASSERT_GTE(timer->getElapsed(), Milliseconds(102));
+    // But less than the 1000 ms (500ms x 2) elapsed while detached.
+    ASSERT_LT(timer->getElapsed(), Milliseconds(1000));
+}
+
 DEATH_TEST_F(OperationCPUTimerTest,
              AccessTimerForDetachedOperation,
              "Operation not attached to the current thread") {

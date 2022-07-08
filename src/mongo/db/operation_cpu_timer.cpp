@@ -143,7 +143,7 @@ void PosixTimer::onThreadDetach() {
 
     invariant(_threadId.has_value(), "Timer is not attached");
     _threadId.reset();
-    _elapsedBeforeInterrupted = _getThreadTime() - _startedOn.get();
+    _elapsedBeforeInterrupted += _getThreadTime() - _startedOn.get();
 
     hangCPUTimerAfterOnThreadDetach.pauseWhileSet();
 }
