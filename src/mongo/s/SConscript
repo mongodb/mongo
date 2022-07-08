@@ -138,16 +138,6 @@ env.Library(
 )
 
 env.Library(
-    target="load_balancer_feature_flag",
-    source=[
-        'load_balancer_feature_flag.idl',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/feature_flag',
-    ],
-)
-
-env.Library(
     target="load_balancer_support",
     source=[
         'load_balancer_support.cpp',
@@ -155,8 +145,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/idl/feature_flag',
-        'load_balancer_feature_flag',
         'mongos_server_parameters',
     ],
 )
@@ -236,9 +224,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_request',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/db/server_options',
-        '$BUILD_DIR/mongo/idl/feature_flag',
         '$BUILD_DIR/mongo/idl/idl_parser',
-        "load_balancer_feature_flag",
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',

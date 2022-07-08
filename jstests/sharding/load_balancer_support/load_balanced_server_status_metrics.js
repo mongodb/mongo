@@ -1,6 +1,4 @@
 /**
- * @tags: [requires_fcv_53]
- *
  * Tests that load-balanced connections are reported correctly in server status metrics.
  */
 
@@ -36,9 +34,6 @@
     var st = new ShardingTest({shards: 1, mongos: 1});
     let admin = st.s.getDB("admin");
 
-    assert(admin.adminCommand({getParameter: 1, featureFlagLoadBalancer: 1})
-               .featureFlagLoadBalancer.value,
-           'featureFlagLoadBalancer should be enabled for this test');
     assert.commandWorked(
         admin.adminCommand({configureFailPoint: 'clientIsFromLoadBalancer', mode: 'alwaysOn'}));
 

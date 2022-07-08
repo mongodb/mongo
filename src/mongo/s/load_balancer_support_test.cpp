@@ -31,10 +31,8 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/concurrency/locker_mongos_client_observer.h"
-#include "mongo/s/load_balancer_feature_flag_gen.h"
 #include "mongo/unittest/assert_that.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"

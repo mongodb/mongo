@@ -1,6 +1,4 @@
 /**
- * @tags: [requires_fcv_53]
- *
  * Test the extension to the mongos `hello` command by which clients
  * that have arrived through a load balancer affirm that they are
  * compatible with the way mongos handles load-balanced clients.
@@ -55,11 +53,6 @@
      * The ordinary baseline non-load-balanced case.
      */
     runInShardingTest((admin) => {
-        // Before getting started, confirm that the feature is enabled.
-        assert(admin.adminCommand({getParameter: 1, featureFlagLoadBalancer: 1})
-                   .featureFlagLoadBalancer.value,
-               'featureFlagLoadBalancer should be enabled for this test');
-
         jsTestLog("Initial hello command");
         assertNoServiceId(doHello(admin, {}));
         jsTestLog("Non-initial hello command");
