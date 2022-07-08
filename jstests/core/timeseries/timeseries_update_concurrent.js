@@ -5,6 +5,7 @@
  *   assumes_unsharded_collection, # TODO SERVER-60233: Remove this tag.
  *   does_not_support_stepdowns,
  *   does_not_support_transactions,
+ *   requires_multi_updates,
  *   # $currentOp can't run with a readConcern other than 'local'.
  *   assumes_read_concern_unchanged,
  *   # This test only synchronizes updates on the primary.
