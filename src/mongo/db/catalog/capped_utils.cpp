@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/catalog/capped_utils.h"
 
 #include "mongo/base/error_codes.h"
@@ -40,6 +37,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/catalog/rename_collection.h"
+#include "mongo/db/catalog/unique_collection_name.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -270,7 +268,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
 }
 
 void convertToCapped(OperationContext* opCtx, const NamespaceString& ns, long long size) {
-    StringData dbname = ns.db();
+    auto dbname = ns.dbName();
     StringData shortSource = ns.coll();
 
     AutoGetCollection coll(opCtx, ns, MODE_X);
@@ -295,17 +293,14 @@ void convertToCapped(OperationContext* opCtx, const NamespaceString& ns, long lo
     boost::optional<Lock::CollectionLock> collLock;
     const auto tempNs = [&] {
         while (true) {
-            auto tmpNameResult =
-                db->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%.convertToCapped." + shortSource);
-            uassertStatusOKWithContext(
-                tmpNameResult,
+            auto tmpName = uassertStatusOKWithContext(
+                makeUniqueCollectionName(opCtx, dbname, "tmp%%%%%.convertToCapped." + shortSource),
                 str::stream() << "Cannot generate temporary collection namespace to convert " << ns
                               << " to a capped collection");
 
-            collLock.emplace(opCtx, tmpNameResult.getValue(), MODE_X);
-            if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
-                    opCtx, tmpNameResult.getValue())) {
-                return std::move(tmpNameResult.getValue());
+            collLock.emplace(opCtx, tmpName, MODE_X);
+            if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, tmpName)) {
+                return tmpName;
             }
 
             // The temporary collection was created by someone else between the name being

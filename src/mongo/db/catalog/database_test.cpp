@@ -27,15 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <boost/optional/optional_io.hpp>
-#include <memory>
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/index_build_block.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/unique_collection_name.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -337,9 +335,9 @@ TEST_F(DatabaseTest,
         AutoGetDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
         auto db = autoDb.ensureDbExists(_opCtx.get());
         ASSERT_TRUE(db);
-        ASSERT_EQUALS(
-            ErrorCodes::FailedToParse,
-            db->makeUniqueCollectionNamespace(_opCtx.get(), "CollectionModelWithoutPercentSign"));
+        ASSERT_EQUALS(ErrorCodes::FailedToParse,
+                      makeUniqueCollectionName(
+                          _opCtx.get(), db->name(), "CollectionModelWithoutPercentSign"));
     });
 }
 
@@ -353,7 +351,7 @@ TEST_F(DatabaseTest, MakeUniqueCollectionNamespaceReplacesPercentSignsWithRandom
         pcre::Regex re(_nss.db() + "\\.tmp[0-9A-Za-z][0-9A-Za-z][0-9A-Za-z][0-9A-Za-z]",
                        pcre::ANCHORED | pcre::ENDANCHORED);
 
-        auto nss1 = unittest::assertGet(db->makeUniqueCollectionNamespace(_opCtx.get(), model));
+        auto nss1 = unittest::assertGet(makeUniqueCollectionName(_opCtx.get(), db->name(), model));
         if (!re.matchView(nss1.ns())) {
             FAIL((StringBuilder() << "First generated namespace \"" << nss1.ns()
                                   << "\" does not match regular expression \"" << re.pattern()
@@ -370,7 +368,7 @@ TEST_F(DatabaseTest, MakeUniqueCollectionNamespaceReplacesPercentSignsWithRandom
             wuow.commit();
         }
 
-        auto nss2 = unittest::assertGet(db->makeUniqueCollectionNamespace(_opCtx.get(), model));
+        auto nss2 = unittest::assertGet(makeUniqueCollectionName(_opCtx.get(), db->name(), model));
         if (!re.matchView(nss2.ns())) {
             FAIL((StringBuilder() << "Second generated namespace \"" << nss2.ns()
                                   << "\" does not match regular expression \"" << re.pattern()
@@ -406,10 +404,10 @@ TEST_F(
             wuow.commit();
         }
 
-        // makeUniqueCollectionNamespace() returns NamespaceExists because it will not be able to
+        // makeUniqueCollectionName() returns NamespaceExists because it will not be able to
         // generate a namespace that will not collide with an existings collection.
         ASSERT_EQUALS(ErrorCodes::NamespaceExists,
-                      db->makeUniqueCollectionNamespace(_opCtx.get(), model));
+                      makeUniqueCollectionName(_opCtx.get(), db->name(), model));
     });
 }
 

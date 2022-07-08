@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/process_interface/non_shardsvr_process_interface.h"
 
 #include "mongo/db/catalog/create_collection.h"

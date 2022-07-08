@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/catalog/rename_collection.h"
 
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
@@ -42,6 +39,7 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/list_indexes.h"
 #include "mongo/db/catalog/local_oplog_info.h"
+#include "mongo/db/catalog/unique_collection_name.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_state.h"
@@ -64,7 +62,6 @@
 #include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 
 namespace mongo {
 namespace {
@@ -159,7 +156,7 @@ Status renameTargetCollectionToTmp(OperationContext* opCtx,
     // The generated unique collection name is only guaranteed to exist if the database is
     // exclusively locked.
     invariant(opCtx->lockState()->isDbLockedForMode(targetDB->name().db(), LockMode::MODE_X));
-    auto tmpNameResult = targetDB->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%.rename");
+    auto tmpNameResult = makeUniqueCollectionName(opCtx, targetDB->name(), "tmp%%%%%.rename");
     if (!tmpNameResult.isOK()) {
         return tmpNameResult.getStatus().withContext(
             str::stream() << "Cannot generate a temporary collection name for the target "
@@ -553,7 +550,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
     // Note that this temporary collection name is used by MongoMirror and thus must not be changed
     // without consultation.
     auto tmpNameResult =
-        targetDB->makeUniqueCollectionNamespace(opCtx, "tmp%%%%%.renameCollection");
+        makeUniqueCollectionName(opCtx, target.dbName(), "tmp%%%%%.renameCollection");
     if (!tmpNameResult.isOK()) {
         return tmpNameResult.getStatus().withContext(
             str::stream() << "Cannot generate temporary collection name to rename " << source

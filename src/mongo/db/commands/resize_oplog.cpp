@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include <string>
 
 #include "mongo/db/auth/authorization_session.h"
@@ -86,8 +83,6 @@ public:
              const BSONObj& jsobj,
              BSONObjBuilder& result) {
         AutoGetCollection coll(opCtx, NamespaceString::kRsOplogNamespace, MODE_X);
-        Database* database = coll.getDb();
-        uassert(ErrorCodes::NamespaceNotFound, "database local does not exist", database);
         uassert(ErrorCodes::NamespaceNotFound, "oplog does not exist", coll);
         uassert(ErrorCodes::IllegalOperation, "oplog isn't capped", coll->isCapped());
 
