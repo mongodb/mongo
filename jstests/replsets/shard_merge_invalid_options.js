@@ -2,7 +2,7 @@
  * Tests that the donorStartMigration and recipientSyncData commands throw when a node has options
  * set that are incompatible with protocol shard merge.
  *
- * @tags: [requires_fcv_53, featureFlagShardMerge]
+ * @tags: [requires_fcv_53, featureFlagShardMerge, __TEMPORARILY_DISABLED__]
  * ]
  */
 

@@ -193,7 +193,6 @@ class MultiversionService:
         fcvs = self.mongo_releases.get_fcv_versions()
         lts = self.mongo_releases.get_lts_versions()
         eols = self.mongo_releases.get_eol_versions()
-        lower_bound_override = self.mongo_releases.generate_fcv_lower_bound_override
 
         # Highest release less than latest.
         last_continuous = fcvs[bisect_left(fcvs, latest) - 1]
@@ -201,13 +200,8 @@ class MultiversionService:
         # Highest LTS release less than latest.
         last_lts = lts[bisect_left(lts, latest) - 1]
 
-        # Normally, this list includes all FCVs greater than last LTS, up to latest.
-        # However, if we have 'generateFCVLowerBoundOverride' set in releases.yml, we will
-        # extend the lower bound to also include the previous value of lastLTS.
-        lts_cutoff = last_lts
-        if lower_bound_override is not None:
-            lts_cutoff = Version(lower_bound_override)
-        requires_fcv_tag_list = fcvs[bisect_right(fcvs, lts_cutoff):bisect_right(fcvs, latest)]
+        # All FCVs greater than last LTS, up to latest.
+        requires_fcv_tag_list = fcvs[bisect_right(fcvs, last_lts):bisect_right(fcvs, latest)]
         requires_fcv_tag_list_continuous = [latest]
 
         # All FCVs less than latest.

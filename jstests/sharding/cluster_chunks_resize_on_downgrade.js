@@ -2,7 +2,8 @@
  * Tests that chunks are re-split upon downgrade from v6.0.
  *
  * @tags: [
- *  requires_fcv_60
+ *  requires_fcv_60,
+ *  __TEMPORARILY_DISABLED__,
  * ]
  */
 

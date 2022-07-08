@@ -9,6 +9,7 @@
  *   requires_fcv_52,
  *   serverless,
  *   featureFlagShardMerge,
+ *   __TEMPORARILY_DISABLED__,
  * ]
  */
 

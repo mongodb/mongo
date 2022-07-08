@@ -2,7 +2,8 @@
  * Tests that the cluster cannot be downgraded when encrypted fields present
  *
  * @tags: [
- * requires_fcv_60
+ * requires_fcv_60,
+ * __TEMPORARILY_DISABLED__,
  * ]
  */
 
@@ -44,8 +45,8 @@ function runTest(targetFCV) {
     assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 }
 
-targetFCV(lastLTSFCV);
-targetFCV(lastContinuousFCV);
+runTest(lastLTSFCV);
+runTest(lastContinuousFCV);
 
 rst.stopSet();
 }());

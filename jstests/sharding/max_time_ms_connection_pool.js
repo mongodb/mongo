@@ -4,7 +4,7 @@
  * `executor/connection_pool.cpp` into MaxTimeMSError when MaxTimeMS option is set for a given
  * sharding command.
  *
- * @tags: [requires_fcv_60]
+ * @tags: [requires_fcv_60, __TEMPORARILY_DISABLED__]
  */
 
 (function() {

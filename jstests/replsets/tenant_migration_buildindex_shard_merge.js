@@ -11,6 +11,7 @@
  *   serverless,
  *   featureFlagShardMerge,
  *   requires_fcv_53,
+ *   __TEMPORARILY_DISABLED__,
  * ]
  */
 

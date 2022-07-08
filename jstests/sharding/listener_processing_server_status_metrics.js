@@ -1,5 +1,5 @@
 /**
- *  @tags: [requires_fcv_60, featureFlagConnHealthMetrics]
+ *  @tags: [requires_fcv_60, featureFlagConnHealthMetrics, __TEMPORARILY_DISABLED__]
  *
  * Tests that listener processing times for connections are properly reported in server status
  * metrics. With each new connection to the same host, the value of the metric should always

@@ -4,7 +4,8 @@
  *
  * @tags: [
  *  uses_parallel_shell,
- *  requires_fcv_60
+ *  requires_fcv_60,
+ *  __TEMPORARILY_DISABLED__,
  * ]
  */
 

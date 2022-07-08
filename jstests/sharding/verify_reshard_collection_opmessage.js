@@ -1,7 +1,7 @@
 /**
  * Test that an opMessage is created during reshardCollection command.
  *
- * @tags: [requires_fcv_60]
+ * @tags: [requires_fcv_60, __TEMPORARILY_DISABLED__]
  */
 (function() {
 "use strict";
