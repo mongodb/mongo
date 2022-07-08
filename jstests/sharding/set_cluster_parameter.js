@@ -150,14 +150,8 @@ const checkClusterParameters =
         newShard.startSet({shardsvr: ''});
         newShard.initiate();
 
-        // Failing _shardsvrSetclusterParameter with a retriable error will make the configsvr
-        // coordinator retry until completion.
         let shardsvrSetClusterParameterFailPoint =
-            configureFailPoint(st.rs0.getPrimary(), 'failCommand', {
-                failInternalCommands: true,
-                errorCode: ErrorCodes.PrimarySteppedDown,
-                failCommands: ["_shardsvrSetClusterParameter"]
-            });
+            configureFailPoint(st.rs0.getPrimary(), 'hangInShardsvrSetClusterParameter');
 
         let setClusterParameterThread = new Thread((mongosConnString, clusterParameter) => {
             let mongos = new Mongo(mongosConnString);
