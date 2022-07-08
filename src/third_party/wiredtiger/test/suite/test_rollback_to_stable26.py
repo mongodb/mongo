@@ -50,12 +50,17 @@ class test_rollback_to_stable26(test_rollback_to_stable_base):
         ('hs_remove', dict(hs_remove=True))
     ]
 
+    prepare_values = [
+        ('no_prepare', dict(prepare=False)),
+        ('prepare', dict(prepare=True))
+    ]
+
     prepare_remove_values = [
         ('no_prepare_remove', dict(prepare_remove=False)),
         ('prepare_remove', dict(prepare_remove=True))
     ]
 
-    scenarios = make_scenarios(key_format_values, hs_remove_values, prepare_remove_values)
+    scenarios = make_scenarios(key_format_values, hs_remove_values, prepare_values, prepare_remove_values)
 
     def conn_config(self):
         config = 'cache_size=10MB,statistics=(all),timing_stress_for_test=[history_store_checkpoint_delay]'
@@ -91,11 +96,11 @@ class test_rollback_to_stable26(test_rollback_to_stable_base):
         value_d = "ddddd" * 100
         value_e = "eeeee" * 100
 
-        self.large_updates(uri, value_a, ds, nrows, False, 20)
-        self.large_updates(uri, value_b, ds, nrows, False, 30)
+        self.large_updates(uri, value_a, ds, nrows, self.prepare, 20)
+        self.large_updates(uri, value_b, ds, nrows, self.prepare, 30)
 
         if self.hs_remove:
-            self.large_removes(uri, ds, nrows, False, 40)
+            self.large_removes(uri, ds, nrows, self.prepare, 40)
 
         prepare_session = self.conn.open_session()
         prepare_session.begin_transaction()
@@ -109,8 +114,8 @@ class test_rollback_to_stable26(test_rollback_to_stable_base):
         prepare_session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(50))
 
         # Verify data is visible and correct.
-        self.check(value_a, uri, nrows, 20)
-        self.check(value_b, uri, nrows, 30)
+        self.check(value_a, uri, nrows, 21 if self.prepare else 20)
+        self.check(value_b, uri, nrows, 31 if self.prepare else 30)
 
         self.evict_cursor(uri, nrows)
 
@@ -129,12 +134,12 @@ class test_rollback_to_stable26(test_rollback_to_stable_base):
             done.set()
             ckpt.join()
 
-        self.large_updates(uri, value_d, ds, nrows, False, 60)
+        self.large_updates(uri, value_d, ds, nrows, self.prepare, 60)
 
         # Check that the correct data.
-        self.check(value_a, uri, nrows, 20)
-        self.check(value_b, uri, nrows, 30)
-        self.check(value_d, uri, nrows, 60)
+        self.check(value_a, uri, nrows, 21 if self.prepare else 20)
+        self.check(value_b, uri, nrows, 31 if self.prepare else 30)
+        self.check(value_d, uri, nrows, 61 if self.prepare else 60)
 
         # Simulate a server crash and restart.
         simulate_crash_restart(self, ".", "RESTART")
@@ -150,17 +155,17 @@ class test_rollback_to_stable26(test_rollback_to_stable_base):
         self.assertEqual(hs_removed, nrows)
 
         # Check that the correct data.
-        self.check(value_a, uri, nrows, 20)
-        self.check(value_b, uri, nrows, 30)
+        self.check(value_a, uri, nrows, 21 if self.prepare else 20)
+        self.check(value_b, uri, nrows, 31 if self.prepare else 30)
 
-        self.large_updates(uri, value_e, ds, nrows, False, 60)
+        self.large_updates(uri, value_e, ds, nrows, self.prepare, 70)
 
         self.evict_cursor(uri, nrows)
 
         # Check that the correct data.
-        self.check(value_a, uri, nrows, 20)
-        self.check(value_b, uri, nrows, 30)
-        self.check(value_e, uri, nrows, 60)
+        self.check(value_a, uri, nrows, 21 if self.prepare else 20)
+        self.check(value_b, uri, nrows, 31 if self.prepare else 30)
+        self.check(value_e, uri, nrows, 71 if self.prepare else 70)
 
 if __name__ == '__main__':
     wttest.run()
