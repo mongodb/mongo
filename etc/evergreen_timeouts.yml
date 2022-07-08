@@ -69,6 +69,8 @@ overrides:
     exec_timeout: 150  # 2.5 hours
   - task: run_unittests
     exec_timeout: 60
+  - task: sharded_collections_jscore_passthrough
+    exec_timeout: 300 # 5 hours
 
   macos-debug-suggested:
   - task: run_unittests
@@ -79,6 +81,8 @@ overrides:
     exec_timeout: 60
   - task: sharding_update_v1_oplog_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
+  - task: sharded_collections_jscore_passthrough
+    exec_timeout: 300 # 5 hours
 
   rhel80-asan:
   - task: run_unittests
