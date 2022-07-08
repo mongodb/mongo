@@ -39,15 +39,6 @@
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/unittest/unittest.h"
 
-#define ASSERT_DOES_NOT_THROW(EXPRESSION)                                          \
-    try {                                                                          \
-        EXPRESSION;                                                                \
-    } catch (const AssertionException& e) {                                        \
-        str::stream err;                                                           \
-        err << "Threw an exception incorrectly: " << e.toString();                 \
-        ::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, err).stream(); \
-    }
-
 namespace mongo {
 namespace {
 

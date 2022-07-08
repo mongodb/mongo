@@ -150,6 +150,21 @@
     ASSERT_THROWS_WITH_CHECK(EXPRESSION, EXCEPTION_TYPE, ([](const EXCEPTION_TYPE&) {}))
 
 /**
+ * Verify that the evaluation of "EXPRESSION" does not throw any exceptions.
+ *
+ * If "EXPRESSION" throws an exception the test is considered a failure and further evaluation
+ * halts.
+ */
+#define ASSERT_DOES_NOT_THROW(EXPRESSION)                          \
+    try {                                                          \
+        EXPRESSION;                                                \
+    } catch (const AssertionException& e) {                        \
+        str::stream err;                                           \
+        err << "Threw an exception incorrectly: " << e.toString(); \
+        FAIL(err);                                                 \
+    }
+
+/**
  * Behaves like ASSERT_THROWS, above, but also fails if calling what() on the thrown exception
  * does not return a string equal to EXPECTED_WHAT.
  */
