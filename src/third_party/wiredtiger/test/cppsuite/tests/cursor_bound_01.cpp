@@ -291,6 +291,49 @@ class cursor_bound_01 : public test {
     }
 
     /*
+     * Validate the bound search call. If the key is within range, the range cursor should return
+     * back the search key.
+     *
+     * Prior to this function call, it's asserted that bounded cursor returns with either a valid
+     * key or with WT_NOTFOUND.
+     */
+    void
+    validate_bound_search(int range_ret, scoped_cursor &range_cursor, const std::string &search_key,
+      const bound &lower_bound, const bound &upper_bound)
+    {
+        auto lower_key = lower_bound.get_key();
+        auto upper_key = upper_bound.get_key();
+        auto lower_inclusive = lower_bound.get_inclusive();
+        auto upper_inclusive = upper_bound.get_inclusive();
+
+        const char *key;
+        testutil_check(range_cursor->get_key(range_cursor.get(), &key));
+        logger::log_msg(LOG_TRACE,
+          "bounded search found key: " + std::string(key) + " with lower bound: " + lower_key +
+            " upper bound: " + upper_key);
+
+        /*
+         * Assert that if bounded cursor returned with a key, the search key has to be within range.
+         */
+        auto above_lower_key = lower_key.empty() ||
+          custom_lexicographical_compare(lower_key, search_key, lower_inclusive);
+        auto below_upper_key = upper_key.empty() ||
+          custom_lexicographical_compare(search_key, upper_key, upper_inclusive);
+
+        /*
+         * If bounded cursor returns a valid key, search key must have been in bounds. If normal
+         * cursor returns a valid key, but bounded cursor returns WT_NOTFOUND, the search key must
+         * have been out of bounds.
+         */
+        if (range_ret == 0) {
+            testutil_assert(above_lower_key && below_upper_key);
+            /* Check that the returned key should be equal to the search key. */
+            testutil_assert(search_key.compare(key) == 0);
+        } else
+            testutil_assert(!(above_lower_key && below_upper_key));
+    }
+
+    /*
      * Validate the bound search_near call. There are three scenarios that needs to be validated
      * differently.
      *  Scenario 1: Range cursor has returned WT_NOTFOUND, this indicates that no records exist in
@@ -301,6 +344,9 @@ class cursor_bound_01 : public test {
      *  Scenario 3: Range cursor has returned a key and the search key is inside the range bounds.
      * Validate that the returned key is visible and that it is indeed the closest key that range
      * cursor could find.
+     *
+     * Prior to this function call, it's asserted that bounded cursor returns with either a
+     * valid key or with WT_NOTFOUND.
      */
     void
     validate_bound_search_near(int range_ret, int range_exact, scoped_cursor &range_cursor,
@@ -373,7 +419,7 @@ class cursor_bound_01 : public test {
             search_key + " and exact: " + std::to_string(range_exact));
         /* When exact = 0, the returned key should be equal to the search key. */
         if (range_exact == 0) {
-            testutil_assert(std::string(key).compare(search_key) == 0);
+            testutil_assert(search_key.compare(key) == 0);
         } else if (range_exact > 0) {
             /*
              * When exact > 0, the returned key should be greater than the search key and performing
@@ -668,6 +714,22 @@ class cursor_bound_01 : public test {
                 /* Verify the bound search_near result using the normal cursor. */
                 validate_bound_search_near(ret, exact, range_cursor, normal_cursor, srch_key,
                   bound_pair.first, bound_pair.second);
+
+                /*
+                 * If search near was successful, use the key it's currently positioned on as the
+                 * search key to validate bound search.
+                 */
+                if (ret == 0) {
+                    const char *range_srch_key;
+                    testutil_check(range_cursor->get_key(range_cursor.get(), &range_srch_key));
+
+                    range_cursor->set_key(range_cursor.get(), range_srch_key);
+                    ret = range_cursor->search(range_cursor.get());
+
+                    testutil_assert(ret == 0 || ret == WT_NOTFOUND);
+                    validate_bound_search(
+                      ret, range_cursor, srch_key, bound_pair.first, bound_pair.second);
+                }
 
                 tc->txn.add_op();
                 tc->txn.try_rollback();
