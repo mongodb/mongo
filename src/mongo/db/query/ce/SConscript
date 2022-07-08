@@ -7,42 +7,10 @@ env = env.Clone()
 env.Library(
     target="query_ce",
     source=[
-        'array_histogram.cpp',
-        'ce_histogram.cpp',
-        'ce_math.cpp',
         'ce_sampling.cpp',
-        'ce_estimation.cpp',
-        'collection_statistics.cpp',
-        'histogram.cpp',
-        'utils.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_abt',
         '$BUILD_DIR/mongo/db/query/optimizer/optimizer',
-    ],
-)
-
-env.Library(
-    target="ce_test_utils",
-    source=[
-        'ce_test_utils.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_values',
-        '$BUILD_DIR/mongo/db/exec/sbe/sbe_abt_test_util',
-        '$BUILD_DIR/mongo/db/query/optimizer/unit_test_utils',
-        "$BUILD_DIR/mongo/unittest/unittest",
-        'query_ce',
-    ],
-)
-
-env.CppUnitTest(
-    target="ce_histogram_test",
-    source=[
-        "ce_histogram_test.cpp",
-    ],
-    LIBDEPS=[
-        'ce_test_utils',
     ],
 )

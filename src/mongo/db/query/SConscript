@@ -259,7 +259,6 @@ env.Library(
 env.Library(
     target="query_knobs",
     source=[
-        'ce_mode_parameter.cpp',
         'plan_cache_size_parameter.cpp',
         'query_feature_flags.idl',
         'query_knobs.idl',
@@ -354,7 +353,6 @@ env.CppUnitTest(
         "canonical_query_encoder_test.cpp",
         "canonical_query_test.cpp",
         "canonical_query_test_util.cpp",
-        "ce_mode_parameter_test.cpp",
         "classic_stage_builder_test.cpp",
         "count_command_test.cpp",
         "cursor_response_test.cpp",
