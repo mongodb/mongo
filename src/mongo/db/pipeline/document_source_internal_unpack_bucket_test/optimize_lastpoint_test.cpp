@@ -70,7 +70,6 @@ void assertExpectedLastpointOpt(const boost::intrusive_ptr<ExpressionContext> ex
 }
 
 TEST_F(InternalUnpackBucketOptimizeLastpointTest, NonLastpointDoesNotParticipateInOptimization) {
-    RAIIServerParameterControllerForTest controller("featureFlagLastPointQuery", true);
     auto assertPipelineUnoptimized = [&](const std::vector<std::string>& stageStrs) {
         assertExpectedLastpointOpt(getExpCtx(), stageStrs, stageStrs, /* expectedSuccess */ false);
     };
@@ -184,7 +183,6 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest, NonLastpointDoesNotParticipate
 
 TEST_F(InternalUnpackBucketOptimizeLastpointTest,
        LastpointWithMetaSubfieldAscendingTimeDescending) {
-    RAIIServerParameterControllerForTest controller("featureFlagLastPointQuery", true);
     assertExpectedLastpointOpt(getExpCtx(),
                                /* inputPipelineStrs */
                                {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
@@ -232,7 +230,6 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest,
 
 TEST_F(InternalUnpackBucketOptimizeLastpointTest,
        LastpointWithMetaSubfieldDescendingTimeDescending) {
-    RAIIServerParameterControllerForTest controller("featureFlagLastPointQuery", true);
     assertExpectedLastpointOpt(getExpCtx(),
                                /* inputPipelineStrs */
                                {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
@@ -279,7 +276,6 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest,
 }
 
 TEST_F(InternalUnpackBucketOptimizeLastpointTest, LastpointWithMetaSubfieldAscendingTimeAscending) {
-    RAIIServerParameterControllerForTest controller("featureFlagLastPointQuery", true);
     assertExpectedLastpointOpt(getExpCtx(),
                                /* inputPipelineStrs */
                                {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
@@ -327,7 +323,6 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest, LastpointWithMetaSubfieldAscen
 
 TEST_F(InternalUnpackBucketOptimizeLastpointTest,
        LastpointWithMetaSubfieldDescendingTimeAscending) {
-    RAIIServerParameterControllerForTest controller("featureFlagLastPointQuery", true);
     assertExpectedLastpointOpt(getExpCtx(),
                                /* inputPipelineStrs */
                                {"{$_internalUnpackBucket: {exclude: [], timeField: 't', metaField: "
@@ -373,7 +368,6 @@ TEST_F(InternalUnpackBucketOptimizeLastpointTest,
 }
 
 TEST_F(InternalUnpackBucketOptimizeLastpointTest, LastpointWithComputedMetaProjectionFields) {
-    RAIIServerParameterControllerForTest controller("featureFlagLastPointQuery", true);
     // We might get such a case if $_internalUnpackBucket swaps with a $project. Verify that the
     // lastpoint optimization does not break in this scenario. Note that in the full pipeline we
     // would expect $_internalUnpackBucket to be preceded by a stage like $addFields. However,

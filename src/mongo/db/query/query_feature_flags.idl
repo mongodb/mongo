@@ -88,12 +88,6 @@ feature_flags:
       cpp_varname: gFeatureFlagCommonQueryFramework
       default: false
 
-    featureFlagLastPointQuery:
-      description : "Feature flag for optimizing Last Point queries on time-series collections"
-      cpp_varname: gfeatureFlagLastPointQuery
-      default: true
-      version: 6.0
-
     featureFlagSearchShardedFacets:
       description: "Enable use of $$SEARCH_META on sharded collections"
       cpp_varname: gFeatureFlagSearchShardedFacets

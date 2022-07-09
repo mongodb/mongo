@@ -1117,9 +1117,7 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
     }
 
     // Attempt to optimize last-point type queries.
-    if (feature_flags::gfeatureFlagLastPointQuery.isEnabled(
-            serverGlobalParams.featureCompatibility) &&
-        !_triedLastpointRewrite && optimizeLastpoint(itr, container)) {
+    if (!_triedLastpointRewrite && optimizeLastpoint(itr, container)) {
         _triedLastpointRewrite = true;
         // If we are able to rewrite the aggregation, give the resulting pipeline a chance to
         // perform further optimizations.
