@@ -62,7 +62,6 @@
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_remote.h"
-#include "mongo/s/committed_optime_metadata_hook.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
@@ -107,7 +106,6 @@ ShardingTestFixture::ShardingTestFixture()
     auto makeMetadataHookList = [&] {
         auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
         hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(service));
-        hookList->addHook(std::make_unique<rpc::CommittedOpTimeMetadataHook>(service));
         hookList->addHook(std::make_unique<rpc::ClientMetadataPropagationEgressHook>());
         return hookList;
     };

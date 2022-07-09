@@ -79,7 +79,6 @@
 #include "mongo/s/client/shard_remote.h"
 #include "mongo/s/client/sharding_connection_hook.h"
 #include "mongo/s/commands/kill_sessions_remote.h"
-#include "mongo/s/committed_optime_metadata_hook.h"
 #include "mongo/s/concurrency/locker_mongos_client_observer.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/grid.h"
@@ -435,8 +434,6 @@ Status initializeSharding(OperationContext* opCtx) {
             auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
             hookList->addHook(
                 std::make_unique<rpc::VectorClockMetadataHook>(opCtx->getServiceContext()));
-            hookList->addHook(
-                std::make_unique<rpc::CommittedOpTimeMetadataHook>(opCtx->getServiceContext()));
             hookList->addHook(std::make_unique<rpc::ClientMetadataPropagationEgressHook>());
             return hookList;
         },
@@ -689,7 +686,6 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
     auto unshardedHookList = std::make_unique<rpc::EgressMetadataHookList>();
     unshardedHookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(serviceContext));
     unshardedHookList->addHook(std::make_unique<rpc::ClientMetadataPropagationEgressHook>());
-    unshardedHookList->addHook(std::make_unique<rpc::CommittedOpTimeMetadataHook>(serviceContext));
 
     // Add sharding hooks to both connection pools - ShardingConnectionHook includes auth hooks
     globalConnPool.addHook(new ShardingConnectionHook(std::move(unshardedHookList)));

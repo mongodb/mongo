@@ -2091,8 +2091,6 @@ Future<DbResponse> receivedCommands(std::shared_ptr<HandleRequest::ExecutionCont
 
             auto opCtx = execContext->getOpCtx();
             BSONObjBuilder metadataBob;
-            execContext->behaviors->appendReplyMetadataOnError(opCtx, &metadataBob);
-
             BSONObjBuilder extraFieldsBuilder;
             appendClusterAndOperationTime(
                 opCtx, &extraFieldsBuilder, &metadataBob, LogicalTime::kUninitialized);

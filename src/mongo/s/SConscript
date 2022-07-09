@@ -260,7 +260,6 @@ env.Library(
         '$BUILD_DIR/mongo/transport/transport_layer_mock',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'catalog/sharding_catalog_client_impl',
-        'committed_optime_metadata_hook',
         'coreshard',
         'sharding_task_executor',
         'sharding_test_fixture_common',
@@ -327,17 +326,6 @@ env.Benchmark(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/s/sharding_api_d',
         'sharding_routing_table',
-    ],
-)
-
-env.Library(
-    target='committed_optime_metadata_hook',
-    source=[
-        'committed_optime_metadata_hook.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/rpc/metadata',
-        'coreshard',
     ],
 )
 
@@ -478,7 +466,6 @@ env.Library(
         'commands/cluster_commands_common',
         'commands/sharded_cluster_commands',
         'commands/sharded_cluster_sharding_commands',
-        'committed_optime_metadata_hook',
         'coreshard',
         'is_mongos',
         'mongos_server_parameters',
@@ -531,7 +518,6 @@ env.Library(
         'client/sharding_client',
         'commands/cluster_commands',
         'commands/cluster_commands_common',
-        'committed_optime_metadata_hook',
         'load_balancer_support',
         'mongos_initializers',
         'mongos_topology_coordinator',

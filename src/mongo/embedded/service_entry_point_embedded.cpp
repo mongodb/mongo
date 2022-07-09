@@ -150,9 +150,6 @@ public:
         return nullptr;
     }
 
-    void appendReplyMetadataOnError(OperationContext* opCtx,
-                                    BSONObjBuilder* metadataBob) const override {}
-
     void appendReplyMetadata(OperationContext* opCtx,
                              const OpMsgRequest& request,
                              BSONObjBuilder* metadataBob) const override {}

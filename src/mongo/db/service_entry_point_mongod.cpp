@@ -57,8 +57,6 @@
 
 namespace mongo {
 
-constexpr auto kLastCommittedOpTimeFieldName = "lastCommittedOpTime"_sd;
-
 class ServiceEntryPointMongod::Hooks final : public ServiceEntryPointCommon::Hooks {
 public:
     bool lockedForWriting() const override {
@@ -201,17 +199,6 @@ public:
         CurOp::get(opCtx)->debug().errInfo = getStatusFromCommandResult(replyObj);
     }
 
-    // Called from the error contexts where request may not be available.
-    void appendReplyMetadataOnError(OperationContext* opCtx,
-                                    BSONObjBuilder* metadataBob) const override {
-        const bool isConfig = serverGlobalParams.clusterRole == ClusterRole::ConfigServer;
-        if (ShardingState::get(opCtx)->enabled() || isConfig) {
-            auto lastCommittedOpTime =
-                repl::ReplicationCoordinator::get(opCtx)->getLastCommittedOpTime();
-            metadataBob->append(kLastCommittedOpTimeFieldName, lastCommittedOpTime.getTimestamp());
-        }
-    }
-
     void appendReplyMetadata(OperationContext* opCtx,
                              const OpMsgRequest& request,
                              BSONObjBuilder* metadataBob) const override {
@@ -240,10 +227,6 @@ public:
                         .writeToMetadata(metadataBob)
                         .transitional_ignore();
                 }
-
-                auto lastCommittedOpTime = replCoord->getLastCommittedOpTime();
-                metadataBob->append(kLastCommittedOpTimeFieldName,
-                                    lastCommittedOpTime.getTimestamp());
             }
         }
     }

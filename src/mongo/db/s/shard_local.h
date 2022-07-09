@@ -56,10 +56,6 @@ public:
 
     bool isRetriableError(ErrorCodes::Error code, RetryPolicy options) final;
 
-    void updateLastCommittedOpTime(LogicalTime lastCommittedOpTime) final;
-
-    LogicalTime getLastCommittedOpTime() const final;
-
     void runFireAndForgetCommand(OperationContext* opCtx,
                                  const ReadPreferenceSetting& readPref,
                                  const std::string& dbName,

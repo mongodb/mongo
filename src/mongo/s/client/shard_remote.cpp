@@ -145,20 +145,6 @@ void ShardRemote::updateReplSetMonitor(const HostAndPort& remoteHost,
     }
 }
 
-void ShardRemote::updateLastCommittedOpTime(LogicalTime lastCommittedOpTime) {
-    stdx::lock_guard<Latch> lk(_lastCommittedOpTimeMutex);
-
-    // A secondary may return a lastCommittedOpTime less than the latest seen so far.
-    if (lastCommittedOpTime > _lastCommittedOpTime) {
-        _lastCommittedOpTime = lastCommittedOpTime;
-    }
-}
-
-LogicalTime ShardRemote::getLastCommittedOpTime() const {
-    stdx::lock_guard<Latch> lk(_lastCommittedOpTimeMutex);
-    return _lastCommittedOpTime;
-}
-
 std::string ShardRemote::toString() const {
     return getId().toString() + ":" + _connString.toString();
 }

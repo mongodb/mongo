@@ -102,9 +102,6 @@ struct ServiceEntryPointCommon {
         MONGO_WARN_UNUSED_RESULT_FUNCTION virtual std::unique_ptr<PolymorphicScoped>
         scopedOperationCompletionShardingActions(OperationContext* opCtx) const = 0;
 
-        virtual void appendReplyMetadataOnError(OperationContext* opCtx,
-                                                BSONObjBuilder* metadataBob) const = 0;
-
         virtual void appendReplyMetadata(OperationContext* opCtx,
                                          const OpMsgRequest& request,
                                          BSONObjBuilder* metadataBob) const = 0;

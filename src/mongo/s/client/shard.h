@@ -261,23 +261,6 @@ public:
      */
     static bool shouldErrorBePropagated(ErrorCodes::Error code);
 
-    /**
-     * Updates this shard's lastCommittedOpTime timestamp, if the given value is greater than the
-     * currently stored value.
-     *
-     * This is only valid to call on ShardRemote instances.
-     */
-    virtual void updateLastCommittedOpTime(LogicalTime lastCommittedOpTime) = 0;
-
-    /**
-     * Returns the latest lastCommittedOpTime timestamp returned by the underlying shard. This
-     * represents the latest opTime timestamp known to be in this shard's majority committed
-     * snapshot.
-     *
-     * This is only valid to call on ShardRemote instances.
-     */
-    virtual LogicalTime getLastCommittedOpTime() const = 0;
-
 protected:
     Shard(const ShardId& id);
 

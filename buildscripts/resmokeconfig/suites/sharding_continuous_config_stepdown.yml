@@ -160,8 +160,6 @@ selector:
   # Test expects a specific chunk distribution after shardCollection and it can be broken when
   # a step down occurs.
   - jstests/sharding/regex_targeting.js
-  # Sets a failpoint on a config server secondary.
-  - jstests/sharding/shards_and_config_return_last_committed_optime.js
   # Calls movePrimary after data has been inserted into an unsharded collection, so will fail if
   # a stepdown causes the command to be sent again.
   - jstests/sharding/move_primary_clone_test.js
