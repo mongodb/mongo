@@ -1505,6 +1505,8 @@ functions:
       - "./src/evergreen/powercycle_exit.sh"
 
   "run packager.py":
+  - *get_version_expansions
+  - *apply_version_expansions
   - *f_expansions_write
   - command: subprocess.exec
     params:
@@ -6695,6 +6697,8 @@ tasks:
   commands:
   - command: manifest.load
   - func: "git get project and add git tag"
+  - func: "get version expansions"
+  - func: "apply version expansions"
   - func: "f_expansions_write"
   - func: "kill processes"
   - func: "cleanup environment"
@@ -7178,6 +7182,9 @@ tasks:
   - func: "set up venv"
   - func: "upload pip requirements"
   - func: "get buildnumber"
+  - func: "f_expansions_write"
+  - func: "get version expansions"
+  - func: "apply version expansions"
   - func: "f_expansions_write"
   - func: "generate compile expansions"
   - func: "apply compile expansions"
