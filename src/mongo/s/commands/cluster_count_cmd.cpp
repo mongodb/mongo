@@ -286,7 +286,7 @@ private:
         BSONElement l = cmd["limit"];
 
         if (s.isNumber()) {
-            num = num - s.numberLong();
+            num = num - s.safeNumberLong();
             if (num < 0) {
                 num = 0;
             }
