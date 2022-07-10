@@ -1,3 +1,9 @@
+/**
+ * Tests $geoIntersect basic functionality.
+ */
+(function() {
+"use strict";
+
 var t = db.geo_s2intersectinglines;
 t.drop();
 t.createIndex({geo: "2dsphere"});
@@ -158,3 +164,4 @@ assert.eq(result.count(), 1);
 // two $geoIntersects should as well.
 result = t.find({$and: [{a: {$geoIntersects: firstPoint}}, {a: {$geoIntersects: secondPoint}}]});
 assert.eq(result.count(), 1);
+})();
