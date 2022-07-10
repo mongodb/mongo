@@ -113,9 +113,10 @@ ABT FieldMapBuilder::generateABTForField(const FieldMapEntry& entry) const {
         // Recursively construct ABTs for the paths below each child entry.
         ABT childResult = generateABTForField(childEntry);
         if (!childResult.is<PathIdentity>()) {
-            maybeComposePath(
-                result,
-                make<PathField>(childEntry._fieldName, make<PathTraverse>(std::move(childResult))));
+            maybeComposePath(result,
+                             make<PathField>(childEntry._fieldName,
+                                             make<PathTraverse>(std::move(childResult),
+                                                                PathTraverse::kUnlimited)));
         }
     }
 

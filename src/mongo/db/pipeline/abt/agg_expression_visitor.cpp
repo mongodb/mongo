@@ -158,6 +158,9 @@ public:
 
         const Operations op = translateCmpOpFn(expr->getOp());
         if (op != Operations::Cmp3w) {
+            // TODO: SERVER-67306. Remove requirement that path is simple.
+            // Then we can re-use traverse between EvalPath/EvalFilter contexts.
+
             // If we have simple EvalPaths coming from the left or on the right, add a PathCompare,
             // and keep propagating the path.
             if (auto leftPtr = left.cast<EvalPath>(); leftPtr != nullptr &&
@@ -251,7 +254,7 @@ public:
             make<PathIdentity>(),
             [](const std::string& fieldName, const bool isLastElement, ABT input) {
                 if (!isLastElement) {
-                    input = make<PathTraverse>(std::move(input));
+                    input = make<PathTraverse>(std::move(input), PathTraverse::kUnlimited);
                 }
                 return make<PathGet>(fieldName, std::move(input));
             },
@@ -272,9 +275,11 @@ public:
         ABT input = _ctx.pop();
 
         _ctx.push<EvalPath>(
-            make<PathTraverse>(make<PathLambda>(make<LambdaAbstraction>(
-                varName,
-                make<If>(std::move(filter), make<Variable>(varName), Constant::nothing())))),
+            make<PathTraverse>(
+                make<PathLambda>(make<LambdaAbstraction>(
+                    varName,
+                    make<If>(std::move(filter), make<Variable>(varName), Constant::nothing()))),
+                PathTraverse::kUnlimited),
             std::move(input));
     }
 
@@ -780,6 +785,9 @@ private:
         ABTVector childPaths;
 
         for (size_t i = 0; i < arity; i++) {
+            // TODO: SERVER-67306. Remove requirement that path is simple.
+            // Then we can re-use traverse between EvalPath/EvalFilter contexts.
+
             ABT child = _ctx.pop();
             if (auto filterPtr = child.cast<EvalFilter>(); allFilters && filterPtr != nullptr &&
                 isSimplePath(filterPtr->getPath()) &&

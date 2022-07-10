@@ -2076,7 +2076,21 @@ public:
 
     ExplainPrinter transport(const PathTraverse& path, ExplainPrinter inResult) {
         ExplainPrinter printer("PathTraverse");
-        printer.separator(" []")
+        printer.separator(" [");
+
+        if constexpr (version < ExplainVersion::V3) {
+            if (path.getMaxDepth() == PathTraverse::kUnlimited) {
+                printer.print("inf");
+            } else {
+                printer.print(path.getMaxDepth());
+            }
+        } else if constexpr (version == ExplainVersion::V3) {
+            printer.fieldName("maxDepth", ExplainVersion::V3).print(path.getMaxDepth());
+        } else {
+            static_assert("Unknown version");
+        }
+
+        printer.separator("]")
             .setChildCount(1)
             .fieldName("input", ExplainVersion::V3)
             .print(inResult);

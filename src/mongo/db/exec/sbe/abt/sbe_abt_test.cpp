@@ -158,9 +158,11 @@ TEST_F(ABTSBE, Lower6) {
 
     auto tree = make<EvalPath>(
         make<PathField>("fieldA",
-                        make<PathTraverse>(make<PathComposeM>(
-                            make<PathField>("fieldB", make<PathDefault>(Constant::int64(0))),
-                            make<PathField>("fieldC", make<PathConstant>(Constant::int64(50)))))),
+                        make<PathTraverse>(
+                            make<PathComposeM>(
+                                make<PathField>("fieldB", make<PathDefault>(Constant::int64(0))),
+                                make<PathField>("fieldC", make<PathConstant>(Constant::int64(50)))),
+                            PathTraverse::kUnlimited)),
         make<Variable>("root"));
     auto env = VariableEnvironment::build(tree);
 
@@ -212,7 +214,8 @@ TEST_F(ABTSBE, Lower7) {
     accessor.reset(tagObj, valObj);
     auto tree = make<EvalFilter>(
         make<PathGet>("fieldA",
-                      make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(2)))),
+                      make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(2)),
+                                         PathTraverse::kSingleLevel)),
         make<Variable>("root"));
 
     auto env = VariableEnvironment::build(tree);

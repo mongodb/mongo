@@ -70,7 +70,8 @@ bool PathFusion::fuse(ABT& lhs, const ABT& rhs) {
     }
 
     if (auto lhsTraverse = lhs.cast<PathTraverse>(); lhsTraverse != nullptr) {
-        if (auto rhsTraverse = rhs.cast<PathTraverse>(); rhsTraverse != nullptr) {
+        if (auto rhsTraverse = rhs.cast<PathTraverse>();
+            rhsTraverse != nullptr && lhsTraverse->getMaxDepth() == rhsTraverse->getMaxDepth()) {
             return fuse(lhsTraverse->getPath(), rhsTraverse->getPath());
         }
 

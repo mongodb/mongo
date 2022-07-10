@@ -216,17 +216,30 @@ public:
 
 /**
  * A traverse path element - apply the inner path to every element of an array.
+ * Specifies a maximum depth of the traversal: how many nested arrays are we allowed to descend. "0"
+ * specifies unlimited depth.
  */
 class PathTraverse final : public Operator<PathTraverse, 1>, public PathSyntaxSort {
     using Base = Operator<PathTraverse, 1>;
 
 public:
-    PathTraverse(ABT inPath) : Base(std::move(inPath)) {
+    static constexpr size_t kUnlimited = 0;
+    static constexpr size_t kSingleLevel = 1;
+
+    PathTraverse(ABT inPath, const size_t maxDepth) : Base(std::move(inPath)), _maxDepth(maxDepth) {
         assertPathSort(getPath());
+
+        uassert(6743600,
+                "For now only 0 and 1 is supported for maxDepth",
+                maxDepth == kUnlimited || maxDepth == kSingleLevel);
     }
 
     bool operator==(const PathTraverse& other) const {
-        return getPath() == other.getPath();
+        return getPath() == other.getPath() && _maxDepth == other._maxDepth;
+    }
+
+    size_t getMaxDepth() const {
+        return _maxDepth;
     }
 
     const ABT& getPath() const {
@@ -236,6 +249,9 @@ public:
     ABT& getPath() {
         return get<0>();
     }
+
+private:
+    const size_t _maxDepth;
 };
 
 /**

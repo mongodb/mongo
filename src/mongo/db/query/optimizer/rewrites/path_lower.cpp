@@ -151,7 +151,13 @@ void EvalPathLowering::transport(ABT& n, const PathArr&) {
     _changed = true;
 }
 
-void EvalPathLowering::transport(ABT& n, const PathTraverse&, ABT& inner) {
+void EvalPathLowering::transport(ABT& n, const PathTraverse& p, ABT& inner) {
+    // TODO: SERVER-67306. Allow single-level traverse under EvalPath.
+
+    uassert(6624167,
+            "Currently we allow only multi-level traversal under EvalPath",
+            p.getMaxDepth() == PathTraverse::kUnlimited);
+
     const std::string& name = _prefixId.getNextId("valTraverse");
 
     n = make<LambdaAbstraction>(
@@ -325,7 +331,13 @@ void EvalFilterLowering::prepare(ABT& n, const PathTraverse& t) {
     }
 }
 
-void EvalFilterLowering::transport(ABT& n, const PathTraverse&, ABT& inner) {
+void EvalFilterLowering::transport(ABT& n, const PathTraverse& p, ABT& inner) {
+    // TODO: SERVER-67306. Allow multi-level traverse under EvalFilter.
+
+    uassert(6624166,
+            "Currently we allow only single-level traversal under EvalFilter",
+            p.getMaxDepth() == PathTraverse::kSingleLevel);
+
     const std::string& name = _prefixId.getNextId("valTraverse");
 
     ABT numberPath = Constant::boolean(false);
@@ -343,7 +355,7 @@ void EvalFilterLowering::transport(ABT& n, const PathTraverse&, ABT& inner) {
 }
 
 void EvalFilterLowering::transport(ABT& n, const PathField& p, ABT& inner) {
-    uasserted(6624140, "cannot lower arr in filter");
+    uasserted(6624140, "cannot lower field in filter");
 }
 
 void EvalFilterLowering::transport(ABT& n, const PathComposeM&, ABT& p1, ABT& p2) {

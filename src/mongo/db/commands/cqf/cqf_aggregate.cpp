@@ -164,7 +164,7 @@ static opt::unordered_map<std::string, optimizer::IndexDefinition> buildIndexSpe
             for (size_t i = fieldPath.size(); i-- > 0;) {
                 if (isMultiKey && elementMultiKeyInfo.find(i) != elementMultiKeyInfo.cend()) {
                     // This is a multikey element of the path.
-                    abtPath = make<PathTraverse>(std::move(abtPath));
+                    abtPath = make<PathTraverse>(std::move(abtPath), PathTraverse::kSingleLevel);
                 }
                 abtPath = make<PathGet>(fieldPath.at(i), std::move(abtPath));
             }

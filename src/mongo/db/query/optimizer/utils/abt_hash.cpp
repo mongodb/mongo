@@ -381,7 +381,7 @@ public:
     }
 
     size_t transport(const PathTraverse& path, size_t inResult) {
-        return computeHashSeq<38>(inResult);
+        return computeHashSeq<38>(inResult, std::hash<size_t>()(path.getMaxDepth()));
     }
 
     size_t transport(const PathField& path, size_t inResult) {

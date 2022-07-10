@@ -750,8 +750,9 @@ TEST(LogicalRewriter, FilterUnionReorderSingleProjection) {
 
     ABT filter = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "a", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)))),
+            make<PathGet>("a",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("pUnion")),
         std::move(unionNode));
     ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"pUnion"}},
@@ -769,7 +770,7 @@ TEST(LogicalRewriter, FilterUnionReorderSingleProjection) {
         "|   EvalFilter []\n"
         "|   |   Variable [pUnion]\n"
         "|   PathGet [a]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [1]\n"
         "Union []\n"
@@ -819,7 +820,7 @@ TEST(LogicalRewriter, FilterUnionReorderSingleProjection) {
         "|   |   EvalFilter []\n"
         "|   |   |   Variable [pUnion]\n"
         "|   |   PathGet [a]\n"
-        "|   |   PathTraverse []\n"
+        "|   |   PathTraverse [1]\n"
         "|   |   PathCompare [Eq]\n"
         "|   |   Const [1]\n"
         "|   Evaluation []\n"
@@ -836,7 +837,7 @@ TEST(LogicalRewriter, FilterUnionReorderSingleProjection) {
         "|   EvalFilter []\n"
         "|   |   Variable [pUnion]\n"
         "|   PathGet [a]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [1]\n"
         "Evaluation []\n"
@@ -882,14 +883,16 @@ TEST(LogicalRewriter, MultipleFilterUnionReorder) {
     // Create two filters, one for each of the two common projections.
     ABT filterUnion1 = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "a", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)))),
+            make<PathGet>("a",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("pUnion1")),
         std::move(unionNode));
     ABT filterUnion2 = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "a", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)))),
+            make<PathGet>("a",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("pUnion2")),
         std::move(filterUnion1));
     ABT rootNode = make<RootNode>(
@@ -910,14 +913,14 @@ TEST(LogicalRewriter, MultipleFilterUnionReorder) {
         "|   EvalFilter []\n"
         "|   |   Variable [pUnion2]\n"
         "|   PathGet [a]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [1]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [pUnion1]\n"
         "|   PathGet [a]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [1]\n"
         "Union []\n"
@@ -985,7 +988,7 @@ TEST(LogicalRewriter, MultipleFilterUnionReorder) {
         "|   |   EvalFilter []\n"
         "|   |   |   Variable [pUnion2]\n"
         "|   |   PathGet [a]\n"
-        "|   |   PathTraverse []\n"
+        "|   |   PathTraverse [1]\n"
         "|   |   PathCompare [Eq]\n"
         "|   |   Const [1]\n"
         "|   Evaluation []\n"
@@ -998,7 +1001,7 @@ TEST(LogicalRewriter, MultipleFilterUnionReorder) {
         "|   |   EvalFilter []\n"
         "|   |   |   Variable [pUnion1]\n"
         "|   |   PathGet [a]\n"
-        "|   |   PathTraverse []\n"
+        "|   |   PathTraverse [1]\n"
         "|   |   PathCompare [Eq]\n"
         "|   |   Const [1]\n"
         "|   Evaluation []\n"
@@ -1015,7 +1018,7 @@ TEST(LogicalRewriter, MultipleFilterUnionReorder) {
         "|   EvalFilter []\n"
         "|   |   Variable [pUnion2]\n"
         "|   PathGet [a]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [1]\n"
         "Evaluation []\n"
@@ -1028,7 +1031,7 @@ TEST(LogicalRewriter, MultipleFilterUnionReorder) {
         "|   EvalFilter []\n"
         "|   |   Variable [pUnion1]\n"
         "|   PathGet [a]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [1]\n"
         "Evaluation []\n"
@@ -1056,8 +1059,9 @@ TEST(LogicalRewriter, FilterUnionUnionPushdown) {
 
     ABT filter = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "a", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)))),
+            make<PathGet>("a",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("ptest")),
         std::move(parentUnionNode));
     ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"ptest"}},
@@ -1079,7 +1083,7 @@ TEST(LogicalRewriter, FilterUnionUnionPushdown) {
         "|   EvalFilter []\n"
         "|   |   Variable [ptest]\n"
         "|   PathGet [a]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [1]\n"
         "Union []\n"
@@ -1118,7 +1122,7 @@ TEST(LogicalRewriter, FilterUnionUnionPushdown) {
         "|   |           Source []\n"
         "|   Sargable [Complete]\n"
         "|   |   |   |   |   requirementsMap: \n"
-        "|   |   |   |   |       refProjection: ptest, path: 'PathGet [a] PathTraverse [] "
+        "|   |   |   |   |       refProjection: ptest, path: 'PathGet [a] PathTraverse [1] "
         "PathIdentity []', intervals: {{{[Const [1], Const [1]]}}}\n"
         "|   |   |   |   candidateIndexes: \n"
         "|   |   |   BindBlock:\n"
@@ -1134,7 +1138,7 @@ TEST(LogicalRewriter, FilterUnionUnionPushdown) {
         "|   |           Source []\n"
         "|   Sargable [Complete]\n"
         "|   |   |   |   |   requirementsMap: \n"
-        "|   |   |   |   |       refProjection: ptest, path: 'PathGet [a] PathTraverse [] "
+        "|   |   |   |   |       refProjection: ptest, path: 'PathGet [a] PathTraverse [1] "
         "PathIdentity []', intervals: {{{[Const [1], Const [1]]}}}\n"
         "|   |   |   |   candidateIndexes: \n"
         "|   |   |   BindBlock:\n"
@@ -1146,7 +1150,8 @@ TEST(LogicalRewriter, FilterUnionUnionPushdown) {
         "|               Source []\n"
         "Sargable [Complete]\n"
         "|   |   |   |   requirementsMap: \n"
-        "|   |   |   |       refProjection: ptest, path: 'PathGet [a] PathTraverse [] PathIdentity "
+        "|   |   |   |       refProjection: ptest, path: 'PathGet [a] PathTraverse [1] "
+        "PathIdentity "
         "[]', intervals: {{{[Const [1], Const [1]]}}}\n"
         "|   |   |   candidateIndexes: \n"
         "|   |   BindBlock:\n"

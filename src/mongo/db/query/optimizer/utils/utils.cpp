@@ -867,7 +867,8 @@ public:
     }
 
     ResultType operator()(const ABT& n, const PathTraverse& node, const ABT& other) {
-        if (auto otherTraverse = other.cast<PathTraverse>(); otherTraverse != nullptr) {
+        if (auto otherTraverse = other.cast<PathTraverse>();
+            otherTraverse != nullptr && otherTraverse->getMaxDepth() == node.getMaxDepth()) {
             return node.getPath().visit(*this, otherTraverse->getPath());
         }
         return {};

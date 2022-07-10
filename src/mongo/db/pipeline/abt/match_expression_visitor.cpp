@@ -190,7 +190,7 @@ public:
             // 'result' evaluates the comparison on the array elements, and 'nonTraversedResult'
             // evaluates the comparison on the array itself.
 
-            result = make<PathTraverse>(std::move(result));
+            result = make<PathTraverse>(std::move(result), PathTraverse::kSingleLevel);
             maybeComposePath<PathComposeA>(result, std::move(nonTraversedResult));
 
             result = generateFieldPath(FieldPath(expr->path().toString()), std::move(result));
@@ -386,7 +386,7 @@ public:
         // The path can be empty if we are within an $elemMatch. In this case elemMatch would insert
         // a traverse.
         if (!expr->path().empty()) {
-            result = make<PathTraverse>(std::move(result));
+            result = make<PathTraverse>(std::move(result), PathTraverse::kSingleLevel);
             if (expr->typeSet().hasType(BSONType::Array)) {
                 // If we are testing against array type, insert a comparison against the
                 // non-traversed path (the array itself if we have one).
@@ -431,7 +431,7 @@ private:
             // Make sure we consider only objects or arrays as elements of the array.
             maybeComposePath(result, make<PathComposeA>(make<PathObj>(), make<PathArr>()));
         }
-        result = make<PathTraverse>(std::move(result));
+        result = make<PathTraverse>(std::move(result), PathTraverse::kSingleLevel);
 
         // Make sure we consider only arrays fields on the path.
         maybeComposePath(result, make<PathArr>());
@@ -442,7 +442,7 @@ private:
                 std::move(result),
                 [&](const std::string& fieldName, const bool isLastElement, ABT input) {
                     if (!isLastElement) {
-                        input = make<PathTraverse>(std::move(input));
+                        input = make<PathTraverse>(std::move(input), PathTraverse::kSingleLevel);
                     }
                     return make<PathGet>(fieldName, std::move(input));
                 });
@@ -487,7 +487,7 @@ private:
             std::move(initial),
             [&](const std::string& fieldName, const bool isLastElement, ABT input) {
                 if (!isLastElement) {
-                    input = make<PathTraverse>(std::move(input));
+                    input = make<PathTraverse>(std::move(input), PathTraverse::kSingleLevel);
                 }
                 return make<PathGet>(fieldName, std::move(input));
             });
@@ -551,9 +551,10 @@ private:
                 // considered true if it evaluates to true for the array itself or for any of the
                 // array’s elements.
 
-                result = make<PathComposeA>(make<PathTraverse>(result), result);
+                result = make<PathComposeA>(make<PathTraverse>(result, PathTraverse::kSingleLevel),
+                                            result);
             } else {
-                result = make<PathTraverse>(std::move(result));
+                result = make<PathTraverse>(std::move(result), PathTraverse::kSingleLevel);
             }
 
             result = generateFieldPath(FieldPath(expr->path().toString()), std::move(result));

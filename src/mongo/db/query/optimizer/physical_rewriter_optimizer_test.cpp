@@ -457,15 +457,17 @@ TEST(PhysRewriter, DuplicateFilter) {
 
     ABT filterNode1 = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "a", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(0)))),
+            make<PathGet>("a",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(0)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(scanNode));
 
     ABT filterNode2 = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "a", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(0)))),
+            make<PathGet>("a",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(0)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(filterNode1));
 
@@ -494,7 +496,7 @@ TEST(PhysRewriter, DuplicateFilter) {
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [evalTemp_0]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [0]\n"
         "PhysicalScan [{'<root>': root, 'a': evalTemp_0}, c1]\n"
@@ -519,8 +521,9 @@ TEST(PhysRewriter, FilterCollation) {
 
     ABT filterNode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "a", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)))),
+            make<PathGet>("a",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(evalNode));
 
@@ -559,7 +562,7 @@ TEST(PhysRewriter, FilterCollation) {
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [evalTemp_0]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [1]\n"
         "PhysicalScan [{'a': evalTemp_0, 'b': pb}, c1]\n"
@@ -626,8 +629,9 @@ TEST(PhysRewriter, FilterEvalCollation) {
 
     ABT filterNode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "a", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(10)))),
+            make<PathGet>("a",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(10)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(scanNode));
 
@@ -668,7 +672,7 @@ TEST(PhysRewriter, FilterEvalCollation) {
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [pa]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [10]\n"
         "PhysicalScan [{'<root>': root, 'a': pa}, c1]\n"
@@ -687,8 +691,9 @@ TEST(PhysRewriter, FilterIndexing) {
 
     ABT filterNode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "a", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)))),
+            make<PathGet>("a",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(scanNode));
 
@@ -726,7 +731,7 @@ TEST(PhysRewriter, FilterIndexing) {
             "|               Source []\n"
             "Sargable [Index]\n"
             "|   |   |   |   requirementsMap: \n"
-            "|   |   |   |       refProjection: root, path: 'PathGet [a] PathTraverse [] "
+            "|   |   |   |       refProjection: root, path: 'PathGet [a] PathTraverse [1] "
             "PathIdentity []', intervals: {{{[Const [1], Const [1]]}}}\n"
             "|   |   |   candidateIndexes: \n"
             "|   |   |       candidateId: 1, index1, {}, {}, {{{[Const [1], Const [1]]}}}\n"
@@ -807,7 +812,7 @@ TEST(PhysRewriter, FilterIndexing) {
             "Filter []\n"
             "|   EvalFilter []\n"
             "|   |   Variable [evalTemp_0]\n"
-            "|   PathTraverse []\n"
+            "|   PathTraverse [1]\n"
             "|   PathCompare [Eq]\n"
             "|   Const [1]\n"
             "PhysicalScan [{'<root>': root, 'a': evalTemp_0}, c1]\n"
@@ -839,8 +844,9 @@ TEST(PhysRewriter, FilterIndexing1) {
 
     ABT filterNode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "a", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)))),
+            make<PathGet>("a",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("p1")),
         std::move(evalNode));
 
@@ -871,7 +877,7 @@ TEST(PhysRewriter, FilterIndexing1) {
         "|   EvalFilter []\n"
         "|   |   Variable [p1]\n"
         "|   PathGet [a]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [1]\n"
         "Evaluation []\n"
@@ -899,10 +905,13 @@ TEST(PhysRewriter, FilterIndexing2) {
 
     ABT filterNode = make<FilterNode>(
         make<EvalFilter>(make<PathGet>("a",
-                                       make<PathTraverse>(make<PathGet>(
-                                           "b",
-                                           make<PathTraverse>(make<PathCompare>(
-                                               Operations::Eq, Constant::int64(1)))))),
+                                       make<PathTraverse>(
+                                           make<PathGet>("b",
+                                                         make<PathTraverse>(
+                                                             make<PathCompare>(Operations::Eq,
+                                                                               Constant::int64(1)),
+                                                             PathTraverse::kSingleLevel)),
+                                           PathTraverse::kSingleLevel)),
                          make<Variable>("root")),
         std::move(scanNode));
 
@@ -964,7 +973,8 @@ TEST(PhysRewriter, FilterIndexing2NonSarg) {
         std::move(scanNode));
 
     ABT filterNode1 = make<FilterNode>(
-        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1))),
+        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                            PathTraverse::kSingleLevel),
                          make<Variable>("pa")),
         std::move(evalNode1));
 
@@ -977,8 +987,10 @@ TEST(PhysRewriter, FilterIndexing2NonSarg) {
     // Non-sargable filter.
     ABT filterNode2 = make<FilterNode>(
         make<EvalFilter>(
-            make<PathTraverse>(make<PathLambda>(make<LambdaAbstraction>(
-                "var", make<FunctionCall>("someFunction", makeSeq(make<Variable>("var")))))),
+            make<PathTraverse>(
+                make<PathLambda>(make<LambdaAbstraction>(
+                    "var", make<FunctionCall>("someFunction", makeSeq(make<Variable>("var"))))),
+                PathTraverse::kSingleLevel),
             make<Variable>("pb")),
         std::move(evalNode2));
 
@@ -1025,7 +1037,7 @@ TEST(PhysRewriter, FilterIndexing2NonSarg) {
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [pb]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathLambda []\n"
         "|   LambdaAbstraction [var]\n"
         "|   FunctionCall [someFunction]\n"
@@ -1059,7 +1071,8 @@ TEST(PhysRewriter, FilterIndexing3) {
         std::move(scanNode));
 
     ABT filterNode = make<FilterNode>(
-        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1))),
+        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                            PathTraverse::kSingleLevel),
                          make<Variable>("pa")),
         std::move(evalNode));
 
@@ -1113,7 +1126,8 @@ TEST(PhysRewriter, FilterIndexing3MultiKey) {
         std::move(scanNode));
 
     ABT filterNode = make<FilterNode>(
-        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1))),
+        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                            PathTraverse::kSingleLevel),
                          make<Variable>("pa")),
         std::move(evalNode));
 
@@ -1181,28 +1195,32 @@ TEST(PhysRewriter, FilterIndexing4) {
         std::move(scanNode));
 
     ABT filterANode = make<FilterNode>(
-        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Lt, Constant::int64(1))),
+        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Lt, Constant::int64(1)),
+                                            PathTraverse::kSingleLevel),
                          make<Variable>("pa")),
         std::move(evalNode));
 
     ABT filterBNode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "b", make<PathTraverse>(make<PathCompare>(Operations::Lt, Constant::int64(1)))),
+            make<PathGet>("b",
+                          make<PathTraverse>(make<PathCompare>(Operations::Lt, Constant::int64(1)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(filterANode));
 
     ABT filterCNode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "c", make<PathTraverse>(make<PathCompare>(Operations::Lt, Constant::int64(1)))),
+            make<PathGet>("c",
+                          make<PathTraverse>(make<PathCompare>(Operations::Lt, Constant::int64(1)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(filterBNode));
 
     ABT filterDNode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "d", make<PathTraverse>(make<PathCompare>(Operations::Lt, Constant::int64(1)))),
+            make<PathGet>("d",
+                          make<PathTraverse>(make<PathCompare>(Operations::Lt, Constant::int64(1)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(filterCNode));
 
@@ -1283,7 +1301,8 @@ TEST(PhysRewriter, FilterIndexing5) {
         std::move(scanNode));
 
     ABT filterANode = make<FilterNode>(
-        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Gt, Constant::int64(0))),
+        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Gt, Constant::int64(0)),
+                                            PathTraverse::kSingleLevel),
                          make<Variable>("pa")),
         std::move(evalANode));
 
@@ -1293,7 +1312,8 @@ TEST(PhysRewriter, FilterIndexing5) {
         std::move(filterANode));
 
     ABT filterBNode = make<FilterNode>(
-        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Gt, Constant::int64(0))),
+        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Gt, Constant::int64(0)),
+                                            PathTraverse::kSingleLevel),
                          make<Variable>("pb")),
         std::move(evalBNode));
 
@@ -1364,7 +1384,8 @@ TEST(PhysRewriter, FilterIndexing6) {
         std::move(scanNode));
 
     ABT filterANode = make<FilterNode>(
-        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(0))),
+        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(0)),
+                                            PathTraverse::kSingleLevel),
                          make<Variable>("pa")),
         std::move(evalANode));
 
@@ -1374,7 +1395,8 @@ TEST(PhysRewriter, FilterIndexing6) {
         std::move(filterANode));
 
     ABT filterBNode = make<FilterNode>(
-        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Gt, Constant::int64(0))),
+        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Gt, Constant::int64(0)),
+                                            PathTraverse::kSingleLevel),
                          make<Variable>("pb")),
         std::move(evalBNode));
 
@@ -1437,8 +1459,9 @@ TEST(PhysRewriter, FilterIndexingStress) {
 
         result = make<FilterNode>(
             make<EvalFilter>(make<PathGet>(os.str(),
-                                           make<PathTraverse>(make<PathCompare>(
-                                               Operations::Eq, Constant::int64(0)))),
+                                           make<PathTraverse>(make<PathCompare>(Operations::Eq,
+                                                                                Constant::int64(0)),
+                                                              PathTraverse::kSingleLevel)),
                              make<Variable>("root")),
             std::move(result));
     }
@@ -1534,10 +1557,12 @@ TEST(PhysRewriter, FilterIndexingVariable) {
     // "a" > param_0 AND "a" >= param_1 (observe param_1 comparison is inclusive).
     ABT filterNode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>("a",
-                          make<PathTraverse>(make<PathComposeM>(
-                              make<PathCompare>(Operations::Gt, getQueryParamFn(0)),
-                              make<PathCompare>(Operations::Gte, getQueryParamFn(1))))),
+            make<PathGet>(
+                "a",
+                make<PathTraverse>(
+                    make<PathComposeM>(make<PathCompare>(Operations::Gt, getQueryParamFn(0)),
+                                       make<PathCompare>(Operations::Gte, getQueryParamFn(1))),
+                    PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(scanNode));
 
@@ -1619,12 +1644,15 @@ TEST(PhysRewriter, FilterReorder) {
         ProjectionName projName = prefixId.getNextId("field");
         hints.emplace(
             PartialSchemaKey{"root",
-                             make<PathGet>(projName, make<PathTraverse>(make<PathIdentity>()))},
+                             make<PathGet>(projName,
+                                           make<PathTraverse>(make<PathIdentity>(),
+                                                              PathTraverse::kSingleLevel))},
             0.1 * (kFilterCount - i));
         result = make<FilterNode>(
             make<EvalFilter>(make<PathGet>(std::move(projName),
-                                           make<PathTraverse>(make<PathCompare>(
-                                               Operations::Eq, Constant::int64(i)))),
+                                           make<PathTraverse>(make<PathCompare>(Operations::Eq,
+                                                                                Constant::int64(i)),
+                                                              PathTraverse::kSingleLevel)),
                              make<Variable>("root")),
             std::move(result));
     }
@@ -1658,31 +1686,31 @@ TEST(PhysRewriter, FilterReorder) {
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [evalTemp_0]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [0]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [evalTemp_1]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [1]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [evalTemp_2]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [2]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [evalTemp_3]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [3]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [evalTemp_4]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [4]\n"
         "PhysicalScan [{'<root>': root, 'field_0': evalTemp_0, 'field_1': evalTemp_1, "
@@ -2197,7 +2225,8 @@ TEST(PhysRewriter, CompoundIndex1) {
         std::move(scanNode));
 
     ABT filterANode = make<FilterNode>(
-        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1))),
+        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                            PathTraverse::kSingleLevel),
                          make<Variable>("pa")),
         std::move(evalANode));
 
@@ -2207,21 +2236,24 @@ TEST(PhysRewriter, CompoundIndex1) {
         std::move(filterANode));
 
     ABT filterBNode = make<FilterNode>(
-        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(2))),
+        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(2)),
+                                            PathTraverse::kSingleLevel),
                          make<Variable>("pb")),
         std::move(evalBNode));
 
     ABT filterCNode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "c", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(3)))),
+            make<PathGet>("c",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(3)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(filterBNode));
 
     ABT filterDNode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "d", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(4)))),
+            make<PathGet>("d",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(4)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(filterCNode));
 
@@ -2274,7 +2306,8 @@ TEST(PhysRewriter, CompoundIndex2) {
         std::move(scanNode));
 
     ABT filterANode = make<FilterNode>(
-        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1))),
+        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                            PathTraverse::kSingleLevel),
                          make<Variable>("pa")),
         std::move(evalANode));
 
@@ -2284,21 +2317,24 @@ TEST(PhysRewriter, CompoundIndex2) {
         std::move(filterANode));
 
     ABT filterBNode = make<FilterNode>(
-        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(2))),
+        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(2)),
+                                            PathTraverse::kSingleLevel),
                          make<Variable>("pb")),
         std::move(evalBNode));
 
     ABT filterCNode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "c", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(3)))),
+            make<PathGet>("c",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(3)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(filterBNode));
 
     ABT filterDNode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "d", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(4)))),
+            make<PathGet>("d",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(4)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(filterCNode));
 
@@ -2358,7 +2394,8 @@ TEST(PhysRewriter, CompoundIndex3) {
         std::move(scanNode));
 
     ABT filterANode = make<FilterNode>(
-        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1))),
+        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                            PathTraverse::kSingleLevel),
                          make<Variable>("pa")),
         std::move(evalANode));
 
@@ -2368,21 +2405,24 @@ TEST(PhysRewriter, CompoundIndex3) {
         std::move(filterANode));
 
     ABT filterBNode = make<FilterNode>(
-        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(2))),
+        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(2)),
+                                            PathTraverse::kSingleLevel),
                          make<Variable>("pb")),
         std::move(evalBNode));
 
     ABT filterCNode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "c", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(3)))),
+            make<PathGet>("c",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(3)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(filterBNode));
 
     ABT filterDNode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "d", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(4)))),
+            make<PathGet>("d",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(4)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(filterCNode));
 
@@ -2482,7 +2522,8 @@ TEST(PhysRewriter, CompoundIndex4Negative) {
         std::move(scanNode));
 
     ABT filterANode = make<FilterNode>(
-        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1))),
+        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                            PathTraverse::kSingleLevel),
                          make<Variable>("pa")),
         std::move(evalANode));
 
@@ -2492,7 +2533,8 @@ TEST(PhysRewriter, CompoundIndex4Negative) {
         std::move(filterANode));
 
     ABT filterBNode = make<FilterNode>(
-        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(2))),
+        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(2)),
+                                            PathTraverse::kSingleLevel),
                          make<Variable>("pb")),
         std::move(evalBNode));
 
@@ -2543,23 +2585,28 @@ TEST(PhysRewriter, IndexBoundsIntersect) {
 
     ABT filterNode1 = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "b", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)))),
+            make<PathGet>("b",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(scanNode));
 
     ABT filterNode2 = make<FilterNode>(
         make<EvalFilter>(
             make<PathComposeA>(
-                make<PathComposeM>(make<PathGet>("a",
-                                                 make<PathTraverse>(make<PathCompare>(
-                                                     Operations::Gt, Constant::int64(70)))),
-                                   make<PathGet>("a",
-                                                 make<PathTraverse>(make<PathCompare>(
-                                                     Operations::Lt, Constant::int64(90))))),
+                make<PathComposeM>(
+                    make<PathGet>(
+                        "a",
+                        make<PathTraverse>(make<PathCompare>(Operations::Gt, Constant::int64(70)),
+                                           PathTraverse::kSingleLevel)),
+                    make<PathGet>(
+                        "a",
+                        make<PathTraverse>(make<PathCompare>(Operations::Lt, Constant::int64(90)),
+                                           PathTraverse::kSingleLevel))),
                 make<PathGet>(
                     "a",
-                    make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(100))))),
+                    make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(100)),
+                                       PathTraverse::kSingleLevel))),
             make<Variable>("root")),
         std::move(filterNode1));
 
@@ -2677,8 +2724,10 @@ TEST(PhysRewriter, IndexBoundsIntersect1) {
     ABT filterNode = make<FilterNode>(
         make<EvalFilter>(
             make<PathComposeM>(
-                make<PathTraverse>(make<PathCompare>(Operations::Gt, Constant::int64(70))),
-                make<PathTraverse>(make<PathCompare>(Operations::Lt, Constant::int64(90)))),
+                make<PathTraverse>(make<PathCompare>(Operations::Gt, Constant::int64(70)),
+                                   PathTraverse::kSingleLevel),
+                make<PathTraverse>(make<PathCompare>(Operations::Lt, Constant::int64(90)),
+                                   PathTraverse::kSingleLevel)),
             make<Variable>("pa")),
         std::move(evalNode));
 
@@ -2743,10 +2792,12 @@ TEST(PhysRewriter, IndexBoundsIntersect2) {
         std::move(scanNode));
 
     ABT filterNode = make<FilterNode>(
-        make<EvalFilter>(make<PathTraverse>(make<PathComposeM>(
-                             make<PathCompare>(Operations::Gt, Constant::int64(70)),
-                             make<PathCompare>(Operations::Lt, Constant::int64(90)))),
-                         make<Variable>("pa")),
+        make<EvalFilter>(
+            make<PathTraverse>(
+                make<PathComposeM>(make<PathCompare>(Operations::Gt, Constant::int64(70)),
+                                   make<PathCompare>(Operations::Lt, Constant::int64(90))),
+                PathTraverse::kSingleLevel),
+            make<Variable>("pa")),
         std::move(evalNode));
 
     ABT rootNode =
@@ -2807,14 +2858,19 @@ TEST(PhysRewriter, IndexBoundsIntersect3) {
 
     ABT filterNode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>("a",
-                          make<PathTraverse>(make<PathComposeM>(
-                              make<PathGet>("b",
-                                            make<PathTraverse>(make<PathCompare>(
-                                                Operations::Gt, Constant::int64(70)))),
-                              make<PathGet>("b",
-                                            make<PathTraverse>(make<PathCompare>(
-                                                Operations::Lt, Constant::int64(90))))))),
+            make<PathGet>(
+                "a",
+                make<PathTraverse>(
+                    make<PathComposeM>(
+                        make<PathGet>("b",
+                                      make<PathTraverse>(
+                                          make<PathCompare>(Operations::Gt, Constant::int64(70)),
+                                          PathTraverse::kSingleLevel)),
+                        make<PathGet>("b",
+                                      make<PathTraverse>(
+                                          make<PathCompare>(Operations::Lt, Constant::int64(90)),
+                                          PathTraverse::kSingleLevel))),
+                    PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(scanNode));
 
@@ -2908,14 +2964,19 @@ TEST(PhysRewriter, IndexBoundsIntersect4) {
 
     ABT filterNode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>("a",
-                          make<PathTraverse>(make<PathComposeM>(
-                              make<PathGet>("b",
-                                            make<PathTraverse>(make<PathCompare>(
-                                                Operations::Gt, Constant::int64(70)))),
-                              make<PathGet>("c",
-                                            make<PathTraverse>(make<PathCompare>(
-                                                Operations::Lt, Constant::int64(90))))))),
+            make<PathGet>(
+                "a",
+                make<PathTraverse>(
+                    make<PathComposeM>(
+                        make<PathGet>("b",
+                                      make<PathTraverse>(
+                                          make<PathCompare>(Operations::Gt, Constant::int64(70)),
+                                          PathTraverse::kSingleLevel)),
+                        make<PathGet>("c",
+                                      make<PathTraverse>(
+                                          make<PathCompare>(Operations::Lt, Constant::int64(90)),
+                                          PathTraverse::kSingleLevel))),
+                    PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(scanNode));
 
@@ -2955,14 +3016,14 @@ TEST(PhysRewriter, IndexBoundsIntersect4) {
         "|   EvalFilter []\n"
         "|   |   Variable [root]\n"
         "|   PathGet [a]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathComposeM []\n"
         "|   |   PathGet [c]\n"
-        "|   |   PathTraverse []\n"
+        "|   |   PathTraverse [1]\n"
         "|   |   PathCompare [Lt]\n"
         "|   |   Const [90]\n"
         "|   PathGet [b]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathCompare [Gt]\n"
         "|   Const [70]\n"
         "PhysicalScan [{'<root>': root}, c1]\n"
@@ -3184,15 +3245,17 @@ TEST(PhysRewriter, IndexResidualReq2) {
 
     ABT filterANode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "a", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(0)))),
+            make<PathGet>("a",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(0)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(scanNode));
 
     ABT filterBNode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "b", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(0)))),
+            make<PathGet>("b",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(0)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(filterANode));
 
@@ -3266,10 +3329,12 @@ TEST(PhysRewriter, ElemMatchIndex) {
         make<EvalFilter>(
             make<PathGet>(
                 "a",
-                make<PathComposeM>(make<PathArr>(),
-                                   make<PathTraverse>(make<PathComposeM>(
-                                       make<PathCompare>(Operations::Gt, Constant::int64(70)),
-                                       make<PathCompare>(Operations::Lt, Constant::int64(90)))))),
+                make<PathComposeM>(
+                    make<PathArr>(),
+                    make<PathTraverse>(
+                        make<PathComposeM>(make<PathCompare>(Operations::Gt, Constant::int64(70)),
+                                           make<PathCompare>(Operations::Lt, Constant::int64(90))),
+                        PathTraverse::kSingleLevel))),
             make<Variable>("root")),
         std::move(scanNode));
 
@@ -3331,8 +3396,9 @@ TEST(PhysRewriter, ElemMatchIndex1) {
 
     ABT filterNode1 = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "b", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)))),
+            make<PathGet>("b",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(scanNode));
 
@@ -3341,10 +3407,12 @@ TEST(PhysRewriter, ElemMatchIndex1) {
         make<EvalFilter>(
             make<PathGet>(
                 "a",
-                make<PathComposeM>(make<PathArr>(),
-                                   make<PathTraverse>(make<PathComposeM>(
-                                       make<PathCompare>(Operations::Gt, Constant::int64(70)),
-                                       make<PathCompare>(Operations::Lt, Constant::int64(90)))))),
+                make<PathComposeM>(
+                    make<PathArr>(),
+                    make<PathTraverse>(
+                        make<PathComposeM>(make<PathCompare>(Operations::Gt, Constant::int64(70)),
+                                           make<PathCompare>(Operations::Lt, Constant::int64(90))),
+                        PathTraverse::kSingleLevel))),
             make<Variable>("root")),
         std::move(filterNode1));
 
@@ -3414,14 +3482,19 @@ TEST(PhysRewriter, ObjectElemMatch) {
         make<EvalFilter>(
             make<PathGet>(
                 "a",
-                make<PathComposeM>(make<PathArr>(),
-                                   make<PathTraverse>(make<PathComposeM>(
-                                       make<PathGet>("b",
-                                                     make<PathTraverse>(make<PathCompare>(
-                                                         Operations::Eq, Constant::int64(1)))),
-                                       make<PathGet>("c",
-                                                     make<PathTraverse>(make<PathCompare>(
-                                                         Operations::Eq, Constant::int64(2)))))))),
+                make<PathComposeM>(
+                    make<PathArr>(),
+                    make<PathTraverse>(
+                        make<PathComposeM>(
+                            make<PathGet>("b",
+                                          make<PathTraverse>(
+                                              make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                              PathTraverse::kSingleLevel)),
+                            make<PathGet>("c",
+                                          make<PathTraverse>(
+                                              make<PathCompare>(Operations::Eq, Constant::int64(2)),
+                                              PathTraverse::kSingleLevel))),
+                        PathTraverse::kSingleLevel))),
             make<Variable>("root")),
         std::move(scanNode));
 
@@ -3456,14 +3529,14 @@ TEST(PhysRewriter, ObjectElemMatch) {
         "|   EvalFilter []\n"
         "|   |   Variable [root]\n"
         "|   PathGet [a]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathComposeM []\n"
         "|   |   PathGet [c]\n"
-        "|   |   PathTraverse []\n"
+        "|   |   PathTraverse [1]\n"
         "|   |   PathCompare [Eq]\n"
         "|   |   Const [2]\n"
         "|   PathGet [b]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [1]\n"
         "Filter []\n"
@@ -3486,8 +3559,9 @@ TEST(PhysRewriter, ArrayConstantIndex) {
 
     ABT filterNode1 = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "b", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(0)))),
+            make<PathGet>("b",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(0)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(scanNode));
 
@@ -3501,10 +3575,11 @@ TEST(PhysRewriter, ArrayConstantIndex) {
     // This encodes a match against an array constant.
     ABT filterNode2 = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>("a",
-                          make<PathComposeA>(
-                              make<PathTraverse>(make<PathCompare>(Operations::Eq, arrayConst)),
-                              make<PathCompare>(Operations::Eq, arrayConst))),
+            make<PathGet>(
+                "a",
+                make<PathComposeA>(make<PathTraverse>(make<PathCompare>(Operations::Eq, arrayConst),
+                                                      PathTraverse::kSingleLevel),
+                                   make<PathCompare>(Operations::Eq, arrayConst))),
             make<Variable>("root")),
         std::move(filterNode1));
 
@@ -3544,7 +3619,7 @@ TEST(PhysRewriter, ArrayConstantIndex) {
         "|   PathComposeA []\n"
         "|   |   PathCompare [Eq]\n"
         "|   |   Const [[1, 2, 3]]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [[1, 2, 3]]\n"
         "BinaryJoin [joinType: Inner, {rid_0}]\n"
@@ -3589,8 +3664,9 @@ TEST(PhysRewriter, ParallelScan) {
 
     ABT filterNode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "a", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)))),
+            make<PathGet>("a",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(scanNode));
 
@@ -3623,7 +3699,7 @@ TEST(PhysRewriter, ParallelScan) {
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [evalTemp_0]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [1]\n"
         "PhysicalScan [{'<root>': root, 'a': evalTemp_0}, c1, parallel]\n"
@@ -4293,14 +4369,16 @@ TEST(PhysRewriter, PartialIndex1) {
 
     ABT filterANode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "a", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(3)))),
+            make<PathGet>("a",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(3)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(scanNode));
     ABT filterBNode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "b", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(2)))),
+            make<PathGet>("b",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(2)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(filterANode));
 
@@ -4312,8 +4390,9 @@ TEST(PhysRewriter, PartialIndex1) {
     // TODO: (e.g. half open interval)
     auto conversionResult = convertExprToPartialSchemaReq(
         make<EvalFilter>(
-            make<PathGet>(
-                "b", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(2)))),
+            make<PathGet>("b",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(2)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         true /*isFilterContext*/);
     ASSERT_TRUE(conversionResult.has_value());
@@ -4350,7 +4429,7 @@ TEST(PhysRewriter, PartialIndex1) {
         "|   Filter []\n"
         "|   |   EvalFilter []\n"
         "|   |   |   Variable [evalTemp_2]\n"
-        "|   |   PathTraverse []\n"
+        "|   |   PathTraverse [1]\n"
         "|   |   PathCompare [Eq]\n"
         "|   |   Const [2]\n"
         "|   LimitSkip []\n"
@@ -4381,8 +4460,9 @@ TEST(PhysRewriter, PartialIndex2) {
 
     ABT filterANode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "a", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(3)))),
+            make<PathGet>("a",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(3)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(scanNode));
 
@@ -4391,8 +4471,9 @@ TEST(PhysRewriter, PartialIndex2) {
 
     auto conversionResult = convertExprToPartialSchemaReq(
         make<EvalFilter>(
-            make<PathGet>(
-                "a", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(3)))),
+            make<PathGet>("a",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(3)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         true /*isFilterContext*/);
     ASSERT_TRUE(conversionResult.has_value());
@@ -4452,14 +4533,16 @@ TEST(PhysRewriter, PartialIndexReject) {
 
     ABT filterANode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "a", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(3)))),
+            make<PathGet>("a",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(3)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(scanNode));
     ABT filterBNode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "b", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(2)))),
+            make<PathGet>("b",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(2)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(filterANode));
 
@@ -4468,8 +4551,9 @@ TEST(PhysRewriter, PartialIndexReject) {
 
     auto conversionResult = convertExprToPartialSchemaReq(
         make<EvalFilter>(
-            make<PathGet>(
-                "b", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(4)))),
+            make<PathGet>("b",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(4)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         true /*isFilterContext*/);
     ASSERT_TRUE(conversionResult.has_value());
@@ -4504,13 +4588,13 @@ TEST(PhysRewriter, PartialIndexReject) {
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [evalTemp_1]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [2]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [evalTemp_0]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [3]\n"
         "PhysicalScan [{'<root>': root, 'a': evalTemp_0, 'b': evalTemp_1}, c1]\n"
@@ -4532,8 +4616,9 @@ TEST(PhysRewriter, RequireRID) {
 
     ABT filterNode = make<FilterNode>(
         make<EvalFilter>(
-            make<PathGet>(
-                "a", make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(3)))),
+            make<PathGet>("a",
+                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(3)),
+                                             PathTraverse::kSingleLevel)),
             make<Variable>("root")),
         std::move(scanNode));
 
@@ -4565,7 +4650,7 @@ TEST(PhysRewriter, RequireRID) {
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [evalTemp_0]\n"
-        "|   PathTraverse []\n"
+        "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [3]\n"
         "PhysicalScan [{'<rid>': rid_0, '<root>': root, 'a': evalTemp_0}, c1]\n"

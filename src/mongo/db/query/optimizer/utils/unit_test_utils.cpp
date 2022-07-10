@@ -60,7 +60,7 @@ ABT makeIndexPath(FieldPathType fieldPath, bool isMultiKey) {
 
     for (size_t i = fieldPath.size(); i-- > 0;) {
         if (isMultiKey) {
-            result = make<PathTraverse>(std::move(result));
+            result = make<PathTraverse>(std::move(result), PathTraverse::kSingleLevel);
         }
         result = make<PathGet>(std::move(fieldPath.at(i)), std::move(result));
     }
