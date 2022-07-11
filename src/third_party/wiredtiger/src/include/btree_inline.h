@@ -33,7 +33,7 @@ __wt_ref_cas_state_int(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t old_state,
 
     cas_result = __wt_atomic_casv8(&ref->state, old_state, new_state);
 
-#ifdef HAVE_DIAGNOSTIC
+#ifdef HAVE_REF_TRACK
     /*
      * The history update here has potential to race; if the state gets updated again after the CAS
      * above but before the history has been updated.

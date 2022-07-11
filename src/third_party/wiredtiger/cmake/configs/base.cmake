@@ -43,6 +43,12 @@ config_bool(
 )
 
 config_bool(
+    HAVE_REF_TRACK
+    "Enable WiredTiger to track recent state transitions for WT_REF structures (always enabled in diagnostic build)"
+    DEFAULT OFF
+)
+
+config_bool(
     NON_BARRIER_DIAGNOSTIC_YIELDS
     "Don't set a full barrier when yielding threads in diagnostic mode. Requires diagnostic mode to be enabled."
     DEFAULT OFF
@@ -274,6 +280,12 @@ if(HAVE_DIAGNOSTIC AND NOT "${CMAKE_BUILD_TYPE}" MATCHES "^(Debug|RelWithDebInfo
     else()
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
     endif()
+endif()
+
+# Ref tracking is always enabled in diagnostic build.
+if (HAVE_DIAGNOSTIC AND NOT HAVE_REF_TRACK)
+    set(HAVE_REF_TRACK ON CACHE STRING "" FORCE)
+    set(HAVE_REF_TRACK_DISABLED OFF CACHE INTERNAL "" FORCE)
 endif()
 
 if (NON_BARRIER_DIAGNOSTIC_YIELDS AND NOT HAVE_DIAGNOSTIC)

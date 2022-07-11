@@ -1028,14 +1028,13 @@ struct __wt_ref {
         WT_UPDATE **update;   /* Page instantiated, update list for subsequent commit/abort */
     } ft_info;
 
+#ifdef HAVE_REF_TRACK
 /*
- * In DIAGNOSTIC mode we overwrite the WT_REF on free to force failures. Don't clear the history in
- * that case.
+ * In DIAGNOSTIC mode we overwrite the WT_REF on free to force failures, but we want to retain ref
+ * state history. Don't overwrite these fields.
  */
 #define WT_REF_CLEAR_SIZE (offsetof(WT_REF, hist))
-
 #define WT_REF_SAVE_STATE_MAX 3
-#ifdef HAVE_DIAGNOSTIC
     /* Capture history of ref state changes. */
     WT_REF_HIST hist[WT_REF_SAVE_STATE_MAX];
     uint64_t histoff;
@@ -1055,6 +1054,7 @@ struct __wt_ref {
         WT_PUBLISH((ref)->state, s);                              \
     } while (0)
 #else
+#define WT_REF_CLEAR_SIZE (sizeof(WT_REF))
 #define WT_REF_SET_STATE(ref, s) WT_PUBLISH((ref)->state, s)
 #endif
 };
@@ -1063,7 +1063,7 @@ struct __wt_ref {
  * WT_REF_SIZE is the expected structure size -- we verify the build to ensure the compiler hasn't
  * inserted padding which would break the world.
  */
-#ifdef HAVE_DIAGNOSTIC
+#ifdef HAVE_REF_TRACK
 #define WT_REF_SIZE (48 + WT_REF_SAVE_STATE_MAX * sizeof(WT_REF_HIST) + 8)
 #else
 #define WT_REF_SIZE 48

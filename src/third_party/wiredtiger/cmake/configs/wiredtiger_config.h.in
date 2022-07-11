@@ -33,6 +33,9 @@
 /* Define to 1 for diagnostic tests. */
 #cmakedefine HAVE_DIAGNOSTIC 1
 
+/* Define to 1 for ref tracking */
+#cmakedefine HAVE_REF_TRACK 1
+
 /* Define to 1 to remove full memory barriers on diagnostic yields. */
 #cmakedefine NON_BARRIER_DIAGNOSTIC_YIELDS 0
 
