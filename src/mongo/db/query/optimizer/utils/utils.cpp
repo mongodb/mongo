@@ -636,28 +636,25 @@ public:
         if (!inputResult) {
             return {};
         }
-        if (!inputResult->_bound.has_value() || !inputResult->_reqMap.empty()) {
+        if (!inputResult->_bound || !inputResult->_reqMap.empty()) {
             return {};
         }
 
-        const auto& bound = inputResult->_bound;
-        bool lowBoundInclusive = false;
-        boost::optional<ABT> lowBound;
-        bool highBoundInclusive = false;
-        boost::optional<ABT> highBound;
+        const auto& bound = *inputResult->_bound;
+        bool lowBoundInclusive = true;
+        ABT lowBound = Constant::minKey();
+        bool highBoundInclusive = true;
+        ABT highBound = Constant::maxKey();
 
         const Operations op = pathCompare.op();
         switch (op) {
             case Operations::Eq:
-                lowBoundInclusive = true;
                 lowBound = bound;
-                highBoundInclusive = true;
                 highBound = bound;
                 break;
 
             case Operations::Lt:
             case Operations::Lte:
-                lowBoundInclusive = false;
                 highBoundInclusive = op == Operations::Lte;
                 highBound = bound;
                 break;
@@ -666,7 +663,6 @@ public:
             case Operations::Gte:
                 lowBoundInclusive = op == Operations::Gte;
                 lowBound = bound;
-                highBoundInclusive = false;
                 break;
 
             default:
@@ -1165,13 +1161,13 @@ public:
         }
 
         ABT result = make<PathIdentity>();
-        if (!lowBound.isInfinite()) {
+        if (!lowBound.isMinusInf()) {
             maybeComposePath(
                 result,
                 make<PathCompare>(lowBound.isInclusive() ? Operations::Gte : Operations::Gt,
                                   lowBound.getBound()));
         }
-        if (!highBound.isInfinite()) {
+        if (!highBound.isPlusInf()) {
             maybeComposePath(
                 result,
                 make<PathCompare>(highBound.isInclusive() ? Operations::Lte : Operations::Lt,

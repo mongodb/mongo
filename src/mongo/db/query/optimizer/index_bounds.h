@@ -38,31 +38,28 @@ namespace mongo::optimizer {
 
 class BoundRequirement {
 public:
-    static BoundRequirement makeInfinite() {
-        return BoundRequirement(false, boost::none);
-    }
+    static BoundRequirement makeMinusInf();
+    static BoundRequirement makePlusInf();
 
-    BoundRequirement();
-    BoundRequirement(bool inclusive, boost::optional<ABT> bound);
+    BoundRequirement(bool inclusive, ABT bound);
 
     bool operator==(const BoundRequirement& other) const;
 
     bool isInclusive() const;
-    void setInclusive(bool value);
 
-    bool isInfinite() const;
+    bool isMinusInf() const;
+    bool isPlusInf() const;
+
     const ABT& getBound() const;
 
 private:
     bool _inclusive;
-
-    // If we do not have a bound ABT, the bound is considered infinite.
-    boost::optional<ABT> _bound;
+    ABT _bound;
 };
 
 class IntervalRequirement {
 public:
-    IntervalRequirement() = default;
+    IntervalRequirement();
     IntervalRequirement(BoundRequirement lowBound, BoundRequirement highBound);
 
     bool operator==(const IntervalRequirement& other) const;

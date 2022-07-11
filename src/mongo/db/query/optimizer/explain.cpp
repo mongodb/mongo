@@ -712,37 +712,23 @@ public:
             };
 
             printer.print(lowBound.isInclusive() ? "[" : "(");
-            if (lowBound.isInfinite()) {
-                printer.print("-inf");
-            } else {
-                printBoundFn(printer, lowBound.getBound());
-            }
+            printBoundFn(printer, lowBound.getBound());
 
             printer.print(", ");
-            if (highBound.isInfinite()) {
-                printer.print("+inf");
-            } else {
-                printBoundFn(printer, highBound.getBound());
-            }
+            printBoundFn(printer, highBound.getBound());
 
             printer.print(highBound.isInclusive() ? "]" : ")");
         } else if constexpr (version == ExplainVersion::V3) {
             ExplainPrinter lowBoundPrinter;
-            lowBoundPrinter.fieldName("inclusive")
-                .print(lowBound.isInclusive())
-                .fieldName("infinite")
-                .print(lowBound.isInfinite());
-            if (!lowBound.isInfinite()) {
+            lowBoundPrinter.fieldName("inclusive").print(lowBound.isInclusive());
+            {
                 ExplainPrinter boundPrinter = generate(lowBound.getBound());
                 lowBoundPrinter.fieldName("bound").print(boundPrinter);
             }
 
             ExplainPrinter highBoundPrinter;
-            highBoundPrinter.fieldName("inclusive")
-                .print(highBound.isInclusive())
-                .fieldName("infinite")
-                .print(highBound.isInfinite());
-            if (!highBound.isInfinite()) {
+            highBoundPrinter.fieldName("inclusive").print(highBound.isInclusive());
+            {
                 ExplainPrinter boundPrinter = generate(highBound.getBound());
                 highBoundPrinter.fieldName("bound").print(boundPrinter);
             }

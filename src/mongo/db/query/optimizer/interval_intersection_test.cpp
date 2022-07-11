@@ -383,10 +383,10 @@ TEST(IntervalIntersection, VariableIntervals) {
                 IntervalReqExpr::make<IntervalReqExpr::Conjunction>(IntervalReqExpr::NodeVector{
                     IntervalReqExpr::make<IntervalReqExpr::Atom>(IntervalRequirement{
                         BoundRequirement(true /*inclusive*/, make<Variable>("v1")),
-                        BoundRequirement::makeInfinite()}),
+                        BoundRequirement::makePlusInf()}),
                     IntervalReqExpr::make<IntervalReqExpr::Atom>(IntervalRequirement{
                         BoundRequirement(false /*inclusive*/, make<Variable>("v2")),
-                        BoundRequirement::makeInfinite()})})});
+                        BoundRequirement::makePlusInf()})})});
 
         auto result = intersectDNFIntervals(interval);
         ASSERT_TRUE(result);
@@ -401,7 +401,7 @@ TEST(IntervalIntersection, VariableIntervals) {
             " U \n"
             "    {\n"
             "        {(If [] BinaryOp [Gte] Variable [v1] Variable [v2] Variable [v1] Variable "
-            "[v2], +inf)}\n"
+            "[v2], Const [maxKey]]}\n"
             "    }\n"
             "}\n",
             ExplainGenerator::explainIntervalExpr(*result));

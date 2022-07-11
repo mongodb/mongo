@@ -1107,7 +1107,7 @@ TEST(PhysRewriter, FilterIndexing3) {
         "|   RefBlock: \n"
         "|       Variable [pa]\n"
         "IndexScan [{'<indexKey> 0': pa}, scanDefName: c1, indexDefName: index1, interval: {[Const "
-        "[1], Const [1]], (-inf, +inf)}]\n"
+        "[1], Const [1]], [Const [minKey], Const [maxKey]]}]\n"
         "    BindBlock:\n"
         "        [pa]\n"
         "            Source []\n",
@@ -1176,7 +1176,7 @@ TEST(PhysRewriter, FilterIndexing3MultiKey) {
         "|   projections: \n"
         "|       rid_0\n"
         "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const "
-        "[1], Const [1]], (-inf, +inf)}]\n"
+        "[1], Const [1]], [Const [minKey], Const [maxKey]]}]\n"
         "    BindBlock:\n"
         "        [rid_0]\n"
         "            Source []\n",
@@ -1275,8 +1275,9 @@ TEST(PhysRewriter, FilterIndexing4) {
         "|   PathCompare [Lt]\n"
         "|   Const [1]\n"
         "IndexScan [{'<indexKey> 0': pa, '<indexKey> 1': evalTemp_6, '<indexKey> 2': evalTemp_7, "
-        "'<indexKey> 3': evalTemp_8}, scanDefName: c1, indexDefName: index1, interval: {(-inf, "
-        "Const [1]), (-inf, +inf), (-inf, +inf), (-inf, +inf)}]\n"
+        "'<indexKey> 3': evalTemp_8}, scanDefName: c1, indexDefName: index1, interval: {[Const "
+        "[minKey], Const [1]), [Const [minKey], Const [maxKey]], [Const [minKey], Const [maxKey]], "
+        "[Const [minKey], Const [maxKey]]}]\n"
         "    BindBlock:\n"
         "        [evalTemp_6]\n"
         "            Source []\n"
@@ -1363,7 +1364,7 @@ TEST(PhysRewriter, FilterIndexing5) {
         "|   PathCompare [Gt]\n"
         "|   Const [0]\n"
         "IndexScan [{'<indexKey> 0': pa, '<indexKey> 1': pb}, scanDefName: c1, indexDefName: "
-        "index1, interval: {(Const [0], +inf), (-inf, +inf)}]\n"
+        "index1, interval: {(Const [0], Const [maxKey]], [Const [minKey], Const [maxKey]]}]\n"
         "    BindBlock:\n"
         "        [pa]\n"
         "            Source []\n"
@@ -1436,7 +1437,7 @@ TEST(PhysRewriter, FilterIndexing6) {
         "|       Variable [pa]\n"
         "|       Variable [pb]\n"
         "IndexScan [{'<indexKey> 0': pa, '<indexKey> 1': pb}, scanDefName: c1, indexDefName: "
-        "index1, interval: {[Const [0], Const [0]], (Const [0], +inf)}]\n"
+        "index1, interval: {[Const [0], Const [0]], (Const [0], Const [maxKey]]}]\n"
         "    BindBlock:\n"
         "        [pa]\n"
         "            Source []\n"
@@ -1586,7 +1587,8 @@ TEST(PhysRewriter, FilterIndexingVariable) {
     ASSERT_EQ(4, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Observe unioning of two index scans with complex expressions for bounds. This encodes:
-    // (max(param_0, param_1), +inf) U [param_0 > param_1 ? MaxKey : param_1, max(param_0, param_1)]
+    // (max(param_0, param_1), Const [maxKey]] U [param_0 > param_1 ? MaxKey : param_1, max(param_0,
+    // param_1)]
     ASSERT_EXPLAIN_V2(
         "Root []\n"
         "|   |   projections: \n"
@@ -1616,8 +1618,8 @@ TEST(PhysRewriter, FilterIndexingVariable) {
         "|   |           Source []\n"
         "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {(If [] "
         "BinaryOp [Gte] FunctionCall [getQueryParam] Const [0] FunctionCall [getQueryParam] Const "
-        "[1] FunctionCall [getQueryParam] Const [0] FunctionCall [getQueryParam] Const [1], "
-        "+inf)}]\n"
+        "[1] FunctionCall [getQueryParam] Const [0] FunctionCall [getQueryParam] Const [1], Const "
+        "[maxKey]]}]\n"
         "|       BindBlock:\n"
         "|           [rid_0]\n"
         "|               Source []\n"
@@ -1628,6 +1630,81 @@ TEST(PhysRewriter, FilterIndexingVariable) {
         "FunctionCall [getQueryParam] Const [0] FunctionCall [getQueryParam] Const [1]]}]\n"
         "    BindBlock:\n"
         "        [rid_0]\n"
+        "            Source []\n",
+        optimized);
+}
+
+TEST(PhysRewriter, FilterIndexingMaxKey) {
+    using namespace properties;
+
+    ABT scanNode = make<ScanNode>("root", "c1");
+
+    ABT filterNode1 = make<FilterNode>(
+        make<EvalFilter>(
+            make<PathGet>(
+                "a",
+                make<PathTraverse>(
+                    make<PathComposeM>(make<PathCompare>(Operations::Gt, Constant::int64(1)),
+                                       make<PathCompare>(Operations::Lte, Constant::maxKey())),
+                    PathTraverse::kSingleLevel)),
+            make<Variable>("root")),
+        std::move(scanNode));
+
+    ABT filterNode2 = make<FilterNode>(
+        make<EvalFilter>(
+            make<PathGet>(
+                "b",
+                make<PathTraverse>(
+                    make<PathComposeM>(make<PathCompare>(Operations::Gt, Constant::int64(2)),
+                                       make<PathCompare>(Operations::Lt, Constant::maxKey())),
+                    PathTraverse::kSingleLevel)),
+            make<Variable>("root")),
+        std::move(filterNode1));
+
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode2));
+
+    PrefixId prefixId;
+    OptPhaseManager phaseManager(
+        {OptPhaseManager::OptPhase::MemoSubstitutionPhase,
+         OptPhaseManager::OptPhase::MemoExplorationPhase,
+         OptPhaseManager::OptPhase::MemoImplementationPhase},
+        prefixId,
+        {{{"c1", ScanDefinition{{}, {}}}}},
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = rootNode;
+    ASSERT_TRUE(phaseManager.optimize(optimized));
+
+    // Observe redundant predicate a <= MaxKey is removed.
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       root\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_1]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathCompare [Lt]\n"
+        "|   |   Const [maxKey]\n"
+        "|   PathCompare [Gt]\n"
+        "|   Const [2]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_0]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathCompare [Gt]\n"
+        "|   Const [1]\n"
+        "PhysicalScan [{'<root>': root, 'a': evalTemp_0, 'b': evalTemp_1}, c1]\n"
+        "    BindBlock:\n"
+        "        [evalTemp_0]\n"
+        "            Source []\n"
+        "        [evalTemp_1]\n"
+        "            Source []\n"
+        "        [root]\n"
         "            Source []\n",
         optimized);
 }
@@ -1768,9 +1845,8 @@ TEST(PhysRewriter, CoveredScan) {
         "|   |       pa\n"
         "|   RefBlock: \n"
         "|       Variable [pa]\n"
-        "IndexScan [{'<indexKey> 0': pa}, scanDefName: c1, indexDefName: index1, interval: "
-        "{(-inf, "
-        "+inf)}]\n"
+        "IndexScan [{'<indexKey> 0': pa}, scanDefName: c1, indexDefName: index1, interval: {[Const "
+        "[minKey], Const [maxKey]]}]\n"
         "    BindBlock:\n"
         "        [pa]\n"
         "            Source []\n",
@@ -1824,7 +1900,7 @@ TEST(PhysRewriter, EvalIndexing) {
             "|   RefBlock: \n"
             "|       Variable [pa]\n"
             "IndexScan [{'<indexKey> 0': pa}, scanDefName: c1, indexDefName: index1, "
-            "interval: {(Const [1], +inf)}]\n"
+            "interval: {(Const [1], Const [maxKey]]}]\n"
             "    BindBlock:\n"
             "        [pa]\n"
             "            Source []\n",
@@ -1862,7 +1938,7 @@ TEST(PhysRewriter, EvalIndexing) {
             "|   RefBlock: \n"
             "|       Variable [pa]\n"
             "IndexScan [{'<indexKey> 0': pa}, scanDefName: c1, indexDefName: index1, "
-            "interval: {(Const [1], +inf)}]\n"
+            "interval: {(Const [1], Const [maxKey]]}]\n"
             "    BindBlock:\n"
             "        [pa]\n"
             "            Source []\n",
@@ -1999,7 +2075,7 @@ TEST(PhysRewriter, EvalIndexing2) {
         "|           PathConstant []\n"
         "|           Variable [pa1]\n"
         "IndexScan [{'<indexKey> 0': pa1}, scanDefName: c1, indexDefName: index1, interval: "
-        "{(-inf, +inf)}]\n"
+        "{[Const [minKey], Const [maxKey]]}]\n"
         "    BindBlock:\n"
         "        [pa1]\n"
         "            Source []\n",
@@ -2130,9 +2206,8 @@ TEST(PhysRewriter, MultiKeyIndex) {
             "|   |   BindBlock:\n"
             "|   |       [sideId_0]\n"
             "|   |           Const [1]\n"
-            "|   IndexScan [{'<indexKey> 0': pb, '<rid>': rid_0}, scanDefName: c1, "
-            "indexDefName: "
-            "index2, interval: {(Const [2], +inf)}]\n"
+            "|   IndexScan [{'<indexKey> 0': pb, '<rid>': rid_0}, scanDefName: c1, indexDefName: "
+            "index2, interval: {(Const [2], Const [maxKey]]}]\n"
             "|       BindBlock:\n"
             "|           [pb]\n"
             "|               Source []\n"
@@ -2200,7 +2275,7 @@ TEST(PhysRewriter, MultiKeyIndex) {
             "|   |       [rid_2]\n"
             "|   |           Variable [rid_0]\n"
             "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index2, interval: "
-            "{(Const [2], +inf)}, reversed]\n"
+            "{(Const [2], Const [maxKey]]}, reversed]\n"
             "|       BindBlock:\n"
             "|           [rid_0]\n"
             "|               Source []\n"
@@ -2654,7 +2729,8 @@ TEST(PhysRewriter, IndexBoundsIntersect) {
         "|   |       [rid_0]\n"
         "|   |           Source []\n"
         "|   IndexScan [{'<indexKey> 1': disjunction_0, '<rid>': rid_0}, scanDefName: c1, "
-        "indexDefName: index1, interval: {[Const [100], Const [100]], (-inf, +inf)}]\n"
+        "indexDefName: index1, interval: {[Const [100], Const [100]], [Const [minKey], Const "
+        "[maxKey]]}]\n"
         "|       BindBlock:\n"
         "|           [disjunction_0]\n"
         "|               Source []\n"
@@ -2690,7 +2766,8 @@ TEST(PhysRewriter, IndexBoundsIntersect) {
         "|   |       [sideId_0]\n"
         "|   |           Const [1]\n"
         "|   IndexScan [{'<indexKey> 1': conjunction_0, '<rid>': rid_0}, scanDefName: c1, "
-        "indexDefName: index1, interval: {(-inf, Const [90]), (-inf, +inf)}]\n"
+        "indexDefName: index1, interval: {[Const [minKey], Const [90]), [Const [minKey], Const "
+        "[maxKey]]}]\n"
         "|       BindBlock:\n"
         "|           [conjunction_0]\n"
         "|               Source []\n"
@@ -2701,7 +2778,8 @@ TEST(PhysRewriter, IndexBoundsIntersect) {
         "|       [sideId_0]\n"
         "|           Const [0]\n"
         "IndexScan [{'<indexKey> 1': conjunction_0, '<rid>': rid_0}, scanDefName: c1, "
-        "indexDefName: index1, interval: {(Const [70], +inf), (-inf, +inf)}]\n"
+        "indexDefName: index1, interval: {(Const [70], Const [maxKey]], [Const [minKey], Const "
+        "[maxKey]]}]\n"
         "    BindBlock:\n"
         "        [conjunction_0]\n"
         "            Source []\n"
@@ -2938,9 +3016,8 @@ TEST(PhysRewriter, IndexBoundsIntersect3) {
         "|   |   BindBlock:\n"
         "|   |       [sideId_0]\n"
         "|   |           Const [1]\n"
-        "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: "
-        "{(-inf, "
-        "Const [90])}]\n"
+        "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const "
+        "[minKey], Const [90])}]\n"
         "|       BindBlock:\n"
         "|           [rid_0]\n"
         "|               Source []\n"
@@ -2949,7 +3026,7 @@ TEST(PhysRewriter, IndexBoundsIntersect3) {
         "|       [sideId_0]\n"
         "|           Const [0]\n"
         "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {(Const "
-        "[70], +inf)}]\n"
+        "[70], Const [maxKey]]}]\n"
         "    BindBlock:\n"
         "        [rid_0]\n"
         "            Source []\n",
@@ -3140,7 +3217,8 @@ TEST(PhysRewriter, IndexResidualReq) {
         "|   PathCompare [Gt]\n"
         "|   Const [0]\n"
         "IndexScan [{'<indexKey> 0': pa, '<indexKey> 1': evalTemp_1}, scanDefName: c1, "
-        "indexDefName: index1, interval: {(Const [0], +inf), (-inf, +inf)}]\n"
+        "indexDefName: index1, interval: {(Const [0], Const [maxKey]], [Const [minKey], Const "
+        "[maxKey]]}]\n"
         "    BindBlock:\n"
         "        [evalTemp_1]\n"
         "            Source []\n"
@@ -3230,7 +3308,8 @@ TEST(PhysRewriter, IndexResidualReq1) {
         "|   RefBlock: \n"
         "|       Variable [rid_0]\n"
         "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const "
-        "[0], Const [0]], [Const [0], Const [0]], [Const [0], Const [0]], (-inf, +inf)}]\n"
+        "[0], Const [0]], [Const [0], Const [0]], [Const [0], Const [0]], [Const [minKey], Const "
+        "[maxKey]]}]\n"
         "    BindBlock:\n"
         "        [rid_0]\n"
         "            Source []\n",
@@ -3307,9 +3386,9 @@ TEST(PhysRewriter, IndexResidualReq2) {
         "|   |   Variable [evalTemp_4]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [0]\n"
-        "IndexScan [{'<indexKey> 2': evalTemp_4, '<rid>': rid_0}, scanDefName: c1, "
-        "indexDefName: "
-        "index1, interval: {[Const [0], Const [0]], (-inf, +inf), (-inf, +inf)}]\n"
+        "IndexScan [{'<indexKey> 2': evalTemp_4, '<rid>': rid_0}, scanDefName: c1, indexDefName: "
+        "index1, interval: {[Const [0], Const [0]], [Const [minKey], Const [maxKey]], [Const "
+        "[minKey], Const [maxKey]]}]\n"
         "    BindBlock:\n"
         "        [evalTemp_4]\n"
         "            Source []\n"
@@ -3879,7 +3958,7 @@ TEST(PhysRewriter, IndexPartitioning) {
         "|   |       type: RoundRobin\n"
         "|   RefBlock: \n"
         "IndexScan [{'<indexKey> 0': pa, '<rid>': rid_0}, scanDefName: c1, indexDefName: index1, "
-        "interval: {(Const [0], +inf)}]\n"
+        "interval: {(Const [0], Const [maxKey]]}]\n"
         "    BindBlock:\n"
         "        [pa]\n"
         "            Source []\n"
@@ -4869,7 +4948,7 @@ TEST(PhysRewriter, JoinRewrite1) {
         "BinaryJoin [joinType: Inner, {p1, p2}]\n"
         "|   |   Const [true]\n"
         "|   IndexScan [{}, scanDefName: test2, indexDefName: index1, interval: {(If [] BinaryOp "
-        "[Gte] Variable [p1] Variable [p2] Variable [p1] Variable [p2], +inf)}]\n"
+        "[Gte] Variable [p1] Variable [p2] Variable [p1] Variable [p2], Const [maxKey]]}]\n"
         "|       BindBlock:\n"
         "PhysicalScan [{'a1': p1, 'a2': p2}, test1]\n"
         "    BindBlock:\n"

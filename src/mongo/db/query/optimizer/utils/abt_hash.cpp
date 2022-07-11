@@ -72,9 +72,7 @@ static size_t computeDistributionHash(const properties::DistributionRequirement&
 
 static void updateBoundHash(size_t& result, const BoundRequirement& bound) {
     updateHash(result, std::hash<bool>()(bound.isInclusive()));
-    if (!bound.isInfinite()) {
-        updateHash(result, ABTHashGenerator::generate(bound.getBound()));
-    }
+    updateHash(result, ABTHashGenerator::generate(bound.getBound()));
 };
 
 template <class T>

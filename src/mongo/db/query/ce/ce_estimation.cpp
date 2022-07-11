@@ -143,26 +143,20 @@ double estimateIntervalCardinality(const ce::ArrayHistogram& ah,
     }
 
     // Otherwise, we have a range.
-    ce::SBEValue lowSBEValue(sbe::value::TypeTags::MinKey, 0);
     auto lowBound = interval.getLowBound();
-    if (!lowBound.isInfinite()) {
-        lowSBEValue = getBound(lowBound);
-    }
+    auto [lowTag, lowVal] = getBound(lowBound);
 
-    ce::SBEValue highSBEValue(sbe::value::TypeTags::MaxKey, 0);
     auto highBound = interval.getHighBound();
-    if (!highBound.isInfinite()) {
-        highSBEValue = getBound(highBound);
-    }
+    auto [highTag, highVal] = getBound(highBound);
 
     return estimateCardRange(ah,
                              true /*includeScalar*/,
                              lowBound.isInclusive(),
-                             lowSBEValue.getTag(),
-                             lowSBEValue.getValue(),
+                             lowTag,
+                             lowVal,
                              highBound.isInclusive(),
-                             highSBEValue.getTag(),
-                             highSBEValue.getValue());
+                             highTag,
+                             highVal);
 }
 
 }  // namespace mongo::ce

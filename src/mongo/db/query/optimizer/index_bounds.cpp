@@ -34,12 +34,16 @@
 
 namespace mongo::optimizer {
 
-BoundRequirement::BoundRequirement() : _inclusive(false), _bound() {}
-
-BoundRequirement::BoundRequirement(bool inclusive, boost::optional<ABT> bound)
-    : _inclusive(inclusive), _bound(std::move(bound)) {
-    uassert(6624077, "Infinite bound cannot be inclusive", !inclusive || !isInfinite());
+BoundRequirement BoundRequirement::makeMinusInf() {
+    return {true /*inclusive*/, Constant::minKey()};
 }
+
+BoundRequirement BoundRequirement::makePlusInf() {
+    return {true /*inclusive*/, Constant::maxKey()};
+}
+
+BoundRequirement::BoundRequirement(bool inclusive, ABT bound)
+    : _inclusive(inclusive), _bound(std::move(bound)) {}
 
 bool BoundRequirement::operator==(const BoundRequirement& other) const {
     return _inclusive == other._inclusive && _bound == other._bound;
@@ -49,18 +53,20 @@ bool BoundRequirement::isInclusive() const {
     return _inclusive;
 }
 
-void BoundRequirement::setInclusive(bool value) {
-    _inclusive = value;
+bool BoundRequirement::isMinusInf() const {
+    return _inclusive && _bound == Constant::minKey();
 }
 
-bool BoundRequirement::isInfinite() const {
-    return !_bound.has_value();
+bool BoundRequirement::isPlusInf() const {
+    return _inclusive && _bound == Constant::maxKey();
 }
 
 const ABT& BoundRequirement::getBound() const {
-    uassert(6624078, "Cannot retrieve infinite bound", !isInfinite());
-    return _bound.get();
+    return _bound;
 }
+
+IntervalRequirement::IntervalRequirement()
+    : IntervalRequirement(BoundRequirement::makeMinusInf(), BoundRequirement::makePlusInf()) {}
 
 IntervalRequirement::IntervalRequirement(BoundRequirement lowBound, BoundRequirement highBound)
     : _lowBound(std::move(lowBound)), _highBound(std::move(highBound)) {}
@@ -70,7 +76,7 @@ bool IntervalRequirement::operator==(const IntervalRequirement& other) const {
 }
 
 bool IntervalRequirement::isFullyOpen() const {
-    return _lowBound.isInfinite() && _highBound.isInfinite();
+    return _lowBound.isMinusInf() && _highBound.isPlusInf();
 }
 
 bool IntervalRequirement::isEquality() const {
