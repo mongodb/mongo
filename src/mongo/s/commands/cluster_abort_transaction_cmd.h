@@ -116,7 +116,7 @@ public:
     }
 
     bool runWithRequestParser(OperationContext* opCtx,
-                              const std::string& dbName,
+                              const DatabaseName& dbName,
                               const BSONObj& cmdObj,
                               const RequestParser& requestParser,
                               BSONObjBuilder& result) final {

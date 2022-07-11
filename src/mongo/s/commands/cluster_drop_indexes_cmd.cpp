@@ -93,7 +93,7 @@ public:
     }
 
     bool runWithRequestParser(OperationContext* opCtx,
-                              const std::string& dbName,
+                              const DatabaseName& dbName,
                               const BSONObj& cmdObj,
                               const RequestParser& requestParser,
                               BSONObjBuilder& output) final {
@@ -117,12 +117,14 @@ public:
         ShardsvrDropIndexes shardsvrDropIndexCmd(nss);
         shardsvrDropIndexCmd.setDropIndexesRequest(requestParser.request().getDropIndexesRequest());
 
-        const CachedDatabaseInfo dbInfo =
-            uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
+        // TODO SERVER-67797 Change CatalogCache to use DatabaseName object
+        const CachedDatabaseInfo dbInfo = uassertStatusOK(
+            Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName.toStringWithTenantId()));
 
+        // TODO SERVER-67411 change executeCommandAgainstDatabasePrimary to take in DatabaseName
         auto cmdResponse = executeCommandAgainstDatabasePrimary(
             opCtx,
-            dbName,
+            dbName.toStringWithTenantId(),
             dbInfo,
             CommandHelpers::appendMajorityWriteConcern(shardsvrDropIndexCmd.toBSON({}),
                                                        opCtx->getWriteConcern()),

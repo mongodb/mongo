@@ -1074,10 +1074,9 @@ protected:
         auto result = replyBuilder->getBodyBuilder();
 
         // To enforce API versioning
-        auto requestParser = RequestParser(opCtx, cmdObj);
+        auto requestParser = RequestParser(opCtx, dbName, cmdObj);
 
-        auto cmdDone = runWithRequestParser(
-            opCtx, dbName.toStringWithTenantId(), cmdObj, requestParser, result);
+        auto cmdDone = runWithRequestParser(opCtx, dbName, cmdObj, requestParser, result);
 
         // Only validate results in test mode so that we don't expose users to errors if we
         // construct an invalid reply.
@@ -1094,7 +1093,7 @@ protected:
      * Runs the given command. Returns true upon success.
      */
     virtual bool runWithRequestParser(OperationContext* opCtx,
-                                      const std::string& db,
+                                      const DatabaseName& dbName,
                                       const BSONObj& cmdObj,
                                       const RequestParser& requestParser,
                                       BSONObjBuilder& result) = 0;
@@ -1135,15 +1134,18 @@ class BasicCommandWithRequestParser<Derived>::RequestParser {
 public:
     using RequestType = typename Derived::Request;
 
-    RequestParser(OperationContext* opCtx, const BSONObj& cmdObj)
-        : _request{_parseRequest(opCtx, cmdObj)} {}
+    RequestParser(OperationContext* opCtx, const DatabaseName& dbName, const BSONObj& cmdObj)
+        : _request{_parseRequest(opCtx, dbName, cmdObj)} {}
 
     const RequestType& request() const {
         return _request;
     }
 
 private:
-    static RequestType _parseRequest(OperationContext* opCtx, const BSONObj& cmdObj) {
+    static RequestType _parseRequest(OperationContext* opCtx,
+                                     const DatabaseName& dbName,
+                                     const BSONObj& cmdObj) {
+        // TODO SERVER-67155 pass tenantId to the BSONObj parse function
         return RequestType::parse(
             IDLParserErrorContext(RequestType::kCommandName,
                                   APIParameters::get(opCtx).getAPIStrict().value_or(false)),

@@ -84,7 +84,7 @@ public:
     }
 
     bool runWithRequestParser(OperationContext* opCtx,
-                              const std::string& db,
+                              const DatabaseName& dbName,
                               const BSONObj& cmdObj,
                               const RequestParser& requestParser,
                               BSONObjBuilder& result) final {
@@ -110,10 +110,11 @@ public:
 
         ShardsvrCollMod collModCommand(nss);
         collModCommand.setCollModRequest(cmd.getCollModRequest());
+        // TODO SERVER-67411 change executeCommandAgainstDatabasePrimary to take in DatabaseName
         auto cmdResponse =
             uassertStatusOK(executeCommandAgainstDatabasePrimary(
                                 opCtx,
-                                db,
+                                dbName.toStringWithTenantId(),
                                 dbInfo,
                                 CommandHelpers::appendMajorityWriteConcern(
                                     collModCommand.toBSON({}), opCtx->getWriteConcern()),
