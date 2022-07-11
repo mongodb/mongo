@@ -5,8 +5,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest,
-                                                   // isChangeStreamsOptimizationEnabled.
+load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest
 load('jstests/replsets/libs/two_phase_drops.js');  // For 'TwoPhaseDropCollectionTest'.
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
@@ -202,17 +201,15 @@ cst.assertDatabaseDrop({cursor: aggCursor, db: testDB});
 const invalidateEvent = cst.assertNextChangesEqual(
     {cursor: aggCursor, expectedChanges: [{operationType: "invalidate"}]});
 
-// Test that if change stream optimization is enabled, then even after the 'invalidate' event has
-// been filtered out, the cursor should hold the resume token of the 'invalidate' event.
-if (isChangeStreamsOptimizationEnabled(testDB)) {
-    const resumeStream =
-        testDB.watch([{$match: {operationType: "DummyOperationType"}}], {resumeAfter: change._id});
-    assert.soon(() => {
-        assert(!resumeStream.hasNext());
-        return resumeStream.isExhausted();
-    });
-    assert.eq(resumeStream.getResumeToken(), invalidateEvent[0]._id);
-}
+// Even after the 'invalidate' event has been filtered out, the cursor should hold the resume token
+// of the 'invalidate' event.
+const resumeStream =
+    testDB.watch([{$match: {operationType: "DummyOperationType"}}], {resumeAfter: change._id});
+assert.soon(() => {
+    assert(!resumeStream.hasNext());
+    return resumeStream.isExhausted();
+});
+assert.eq(resumeStream.getResumeToken(), invalidateEvent[0]._id);
 
 cst.cleanUp();
 }());

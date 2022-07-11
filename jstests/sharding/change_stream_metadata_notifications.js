@@ -4,7 +4,7 @@
 // ]
 (function() {
 "use strict";
-load("jstests/libs/change_stream_util.js");        // For isChangeStreamsOptimizationEnabled.
+
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
 load('jstests/replsets/libs/two_phase_drops.js');  // For TwoPhaseDropCollectionTest.
 
@@ -18,7 +18,6 @@ const st = new ShardingTest({
 
 const mongosDB = st.s0.getDB(jsTestName());
 const mongosColl = mongosDB[jsTestName()];
-const isChangeStreamOptimized = isChangeStreamsOptimizationEnabled(mongosDB);
 
 assert.commandWorked(mongosDB.dropDatabase());
 
@@ -85,17 +84,15 @@ const collectionDropinvalidateToken = next._id;
 assert(!changeStream.hasNext());
 assert(changeStream.isExhausted());
 
-// If change stream optimization feature flag is enabled, verify that even after filtering out all
-// events, the cursor still returns the invalidate resume token of the dropped collection.
-if (isChangeStreamOptimized) {
-    const resumeStream = mongosColl.watch([{$match: {operationType: "DummyOperationType"}}],
-                                          {resumeAfter: resumeTokenFromFirstUpdate});
-    assert.soon(() => {
-        assert(!resumeStream.hasNext());
-        return resumeStream.isExhausted();
-    });
-    assert.eq(resumeStream.getResumeToken(), collectionDropinvalidateToken);
-}
+// Verify that even after filtering out all events, the cursor still returns the invalidate resume
+// token of the dropped collection.
+const resumeStream = mongosColl.watch([{$match: {operationType: "DummyOperationType"}}],
+                                      {resumeAfter: resumeTokenFromFirstUpdate});
+assert.soon(() => {
+    assert(!resumeStream.hasNext());
+    return resumeStream.isExhausted();
+});
+assert.eq(resumeStream.getResumeToken(), collectionDropinvalidateToken);
 
 // With an explicit collation, test that we can resume from before the collection drop.
 changeStream =
@@ -171,17 +168,15 @@ assert(changeStream.isExhausted());
 // Store the database drop invalidate token for other change streams.
 const dbDropInvalidateToken = next._id;
 
-// If change stream optimization feature flag is enabled, verify that even after filtering out all
-// events, the cursor still returns the invalidate resume token of the dropped database.
-if (isChangeStreamOptimized) {
-    const resumeStream = mongosColl.watch([{$match: {operationType: "DummyOperationType"}}],
-                                          {resumeAfter: resumeTokenAfterDbDrop});
-    assert.soon(() => {
-        assert(!resumeStream.hasNext());
-        return resumeStream.isExhausted();
-    });
-    assert.eq(resumeStream.getResumeToken(), dbDropInvalidateToken);
-}
+// Verify that even after filtering out all events, the cursor still returns the invalidate resume
+// token of the dropped database.
+const resumeStream1 = mongosColl.watch([{$match: {operationType: "DummyOperationType"}}],
+                                       {resumeAfter: resumeTokenAfterDbDrop});
+assert.soon(() => {
+    assert(!resumeStream1.hasNext());
+    return resumeStream1.isExhausted();
+});
+assert.eq(resumeStream1.getResumeToken(), dbDropInvalidateToken);
 
 st.stop();
 })();

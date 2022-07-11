@@ -7,8 +7,7 @@
 (function() {
 'use strict';
 
-load('jstests/libs/change_stream_util.js');  // For isChangeStreamsOptimizationEnabled().
-load('jstests/libs/profiler.js');            // For various profiler helpers.
+load('jstests/libs/profiler.js');  // For various profiler helpers.
 
 const st = new ShardingTest({
     shards: 3,
@@ -25,8 +24,6 @@ const mongosColl = mongos.getDB(dbName).getCollection(collName);
 const shard0 = st.shard0;
 const shard1 = st.shard1;
 const shard2 = st.shard2;
-
-const isChangeStreamOptimized = isChangeStreamsOptimizationEnabled(mongos.getDB(dbName));
 
 // Enable sharding to inform mongos of the database, and make sure all chunks start on shard 0.
 assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
@@ -58,14 +55,13 @@ function checkUpdateEvents(changeStream, csComment, idShardPairs) {
 
         // Test that each update lookup goes to the appropriate shard.
         const filter = {
-            op: isChangeStreamOptimized ? "command" : "query",
+            op: "command",
             ns: ns,
             "command.comment": csComment,
-            errCode: {$ne: ErrorCodes.StaleConfig}
+            errCode: {$ne: ErrorCodes.StaleConfig},
+            "command.aggregate": collName,
+            "command.pipeline.0.$match._id": id
         };
-        filter[isChangeStreamOptimized ? "command.aggregate" : "command.find"] = collName;
-        filter[isChangeStreamOptimized ? "command.pipeline.0.$match._id" : "command.filter._id"] =
-            id;
 
         profilerHasSingleMatchingEntryOrThrow({profileDB: shard.getDB(dbName), filter: filter});
     }

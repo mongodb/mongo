@@ -6,13 +6,6 @@
 "use strict";
 
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
-load("jstests/libs/change_stream_util.js");        // For isChangeStreamsOptimizationEnabled.
-
-if (!isChangeStreamsOptimizationEnabled(db)) {
-    jsTestLog(
-        'Skipping test because featureFlagChangeStreamsOptimization feature flag is not enabled');
-    return;
-}
 
 const testDB = db.getSiblingDB("change_stream_check_resumability");
 const collName = "test";

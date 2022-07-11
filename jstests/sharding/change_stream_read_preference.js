@@ -7,8 +7,7 @@
 (function() {
 "use strict";
 
-load('jstests/libs/change_stream_util.js');  // For isChangeStreamsOptimizationEnabled().
-load('jstests/libs/profiler.js');            // For various profiler helpers.
+load('jstests/libs/profiler.js');  // For various profiler helpers.
 
 const st = new ShardingTest({
     name: "change_stream_read_pref",
@@ -62,8 +61,6 @@ assert.eq(primaryStream.next().fullDocument, {_id: -1, updated: true});
 assert.soon(() => primaryStream.hasNext());
 assert.eq(primaryStream.next().fullDocument, {_id: 1, updated: true});
 
-const isChangeStreamOptimized = isChangeStreamsOptimizationEnabled(mongosDB);
-
 for (let rs of [st.rs0, st.rs1]) {
     const primaryDB = rs.getPrimary().getDB(dbName);
     // Test that the change stream itself goes to the primary. There might be more than one if
@@ -75,11 +72,11 @@ for (let rs of [st.rs0, st.rs1]) {
 
     // Test that the update lookup goes to the primary as well.
     let filter = {
-        op: isChangeStreamOptimized ? "command" : "query",
+        op: "command",
         ns: mongosColl.getFullName(),
-        "command.comment": changeStreamComment
+        "command.comment": changeStreamComment,
+        "command.aggregate": mongosColl.getName()
     };
-    filter[isChangeStreamOptimized ? "command.aggregate" : "command.find"] = mongosColl.getName();
 
     profilerHasSingleMatchingEntryOrThrow({profileDB: primaryDB, filter: filter});
 }
@@ -111,15 +108,15 @@ for (let rs of [st.rs0, st.rs1]) {
 
     // Test that the update lookup goes to the secondary as well.
     let filter = {
-        op: isChangeStreamOptimized ? "command" : "query",
+        op: "command",
         ns: mongosColl.getFullName(),
         "command.comment": changeStreamComment,
         // We need to filter out any profiler entries with a stale config - this is the
         // first read on this secondary with a readConcern specified, so it is the first
         // read on this secondary that will enforce shard version.
-        errCode: {$ne: ErrorCodes.StaleConfig}
+        errCode: {$ne: ErrorCodes.StaleConfig},
+        "command.aggregate": mongosColl.getName()
     };
-    filter[isChangeStreamOptimized ? "command.aggregate" : "command.find"] = mongosColl.getName();
 
     profilerHasSingleMatchingEntryOrThrow({profileDB: secondaryDB, filter: filter});
 }
