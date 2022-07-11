@@ -370,6 +370,7 @@ class Type(common.SourceLocation):
         self.serializer = None  # type: str
         self.deserializer = None  # type: str
         self.description = None  # type: str
+        self.deserialize_with_tenant = False  # type: bool
         self.default = None  # type: str
 
         super(Type, self).__init__(file_name, line, column)

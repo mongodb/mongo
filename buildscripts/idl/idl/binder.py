@@ -982,6 +982,7 @@ def _bind_type(idltype):
     ast_type.bindata_subtype = idltype.bindata_subtype
     ast_type.serializer = _normalize_method_name(idltype.cpp_type, idltype.serializer)
     ast_type.deserializer = _normalize_method_name(idltype.cpp_type, idltype.deserializer)
+    ast_type.deserialize_with_tenant = idltype.deserialize_with_tenant
     return ast_type
 
 

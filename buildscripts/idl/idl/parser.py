@@ -253,6 +253,7 @@ def _parse_type(ctxt, spec, name, node):
             "bindata_subtype": _RuleDesc('scalar'),
             "serializer": _RuleDesc('scalar'),
             "deserializer": _RuleDesc('scalar'),
+            "deserialize_with_tenant": _RuleDesc('bool_scalar'),
             "default": _RuleDesc('scalar'),
         })
 

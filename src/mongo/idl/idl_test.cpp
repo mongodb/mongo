@@ -2321,6 +2321,15 @@ OpMsgRequest makeOMR(BSONObj obj) {
     return request;
 }
 
+OpMsgRequest makeOMRWithTenant(BSONObj obj, TenantId tenant) {
+    OpMsgRequest request;
+    request.body = obj;
+
+    using VTS = auth::ValidatedTenancyScope;
+    request.validatedTenancyScope = VTS(std::move(tenant), VTS::TenantForTestingTag{});
+    return request;
+}
+
 // Positive: demonstrate a command with concatenate with db
 TEST(IDLCommand, TestConcatentateWithDb) {
     IDLParserErrorContext ctxt("root");
@@ -2365,6 +2374,28 @@ TEST(IDLCommand, TestConcatentateWithDb) {
         one_new.setField2("five");
         ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
     }
+}
+
+TEST(IDLCommand, TestConcatentateWithDb_WithTenant) {
+    IDLParserErrorContext ctxt("root");
+
+    const auto kTenantId = TenantId(OID::gen());
+
+    auto testDoc = BSONObjBuilder{}
+                       .append(BasicConcatenateWithDbCommand::kCommandName, "coll1")
+                       .append("field1", 3)
+                       .append("field2", "five")
+                       .append("$db", "db")
+                       .obj();
+
+    auto testStruct =
+        BasicConcatenateWithDbCommand::parse(ctxt, makeOMRWithTenant(testDoc, kTenantId));
+    ASSERT_EQUALS(testStruct.getNamespace(), NamespaceString(kTenantId, "db.coll1"));
+
+    assert_same_types<decltype(testStruct.getNamespace()), const NamespaceString&>();
+
+    // Positive: Test we can roundtrip from the just parsed document
+    ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
 }
 
 TEST(IDLCommand, TestConcatentateWithDbSymbol) {
@@ -2477,6 +2508,27 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS) {
     }
 }
 
+TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS_WithTenant) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSONObjBuilder{}
+                       .append(BasicConcatenateWithDbOrUUIDCommand::kCommandName, "coll1")
+                       .append("field1", 3)
+                       .append("field2", "five")
+                       .append("$db", "db")
+                       .obj();
+
+    const auto kTenantId = TenantId(OID::gen());
+    auto testStruct =
+        BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMRWithTenant(testDoc, kTenantId));
+    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().nss().get(),
+                  NamespaceString(kTenantId, "db.coll1"));
+
+    assert_same_types<decltype(testStruct.getNamespaceOrUUID()), const NamespaceStringOrUUID&>();
+
+    // Positive: Test we can roundtrip from the just parsed document
+    ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
+}
 
 // Positive: demonstrate a command with concatenate with db or uuid - test UUID
 TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID) {
@@ -2523,6 +2575,30 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID) {
         one_new.setField2("five");
         ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(one_new));
     }
+}
+
+TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID_WithTenant) {
+    IDLParserErrorContext ctxt("root");
+
+    UUID uuid = UUID::gen();
+
+    auto testDoc =
+        BSONObjBuilder{}
+            .appendElements(BSON(BasicConcatenateWithDbOrUUIDCommand::kCommandName << uuid))
+            .append("field1", 3)
+            .append("field2", "five")
+            .append("$db", "db")
+            .obj();
+
+    const auto kTenantId = TenantId(OID::gen());
+    auto testStruct =
+        BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMRWithTenant(testDoc, kTenantId));
+    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().dbName().get(), DatabaseName(kTenantId, "db"));
+
+    assert_same_types<decltype(testStruct.getNamespaceOrUUID()), const NamespaceStringOrUUID&>();
+
+    // Positive: Test we can roundtrip from the just parsed document
+    ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
 }
 
 
@@ -3818,6 +3894,53 @@ TEST(IDLTypeCommand, TestCommandWithIDLAnyTypeOwnedField) {
     ASSERT_BSONELT_EQ(parsed.getAnyTypeField().getElement(),
                       BSON("anyTypeField" << BSON_ARRAY("a"
                                                         << "b"))["anyTypeField"]);
+}
+
+TEST(IDLCommand, TestCommandTypeNamespaceCommand_WithTenant) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSON(CommandTypeNamespaceCommand::kCommandName << "db.coll1"
+                                                                  << "field1" << 3 << "$db"
+                                                                  << "admin");
+
+    const auto kTenantId = TenantId(OID::gen());
+    auto testStruct =
+        CommandTypeNamespaceCommand::parse(ctxt, makeOMRWithTenant(testDoc, kTenantId));
+    ASSERT_EQUALS(testStruct.getCommandParameter(), NamespaceString(kTenantId, "db.coll1"));
+
+    assert_same_types<decltype(testStruct.getCommandParameter()), const NamespaceString&>();
+
+    // Positive: Test we can roundtrip from the just parsed document
+    ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
+}
+
+TEST(IDLTypeCommand, TestCommandWithNamespaceMember_WithTenant) {
+    IDLParserErrorContext ctxt("root");
+
+    auto testDoc = BSONObjBuilder{}
+                       .append("CommandWithNamespaceMember", 1)
+                       .append("field1", "db.coll1")
+                       .append("field2",
+                               BSON_ARRAY("a.b"
+                                          << "c.d"))
+                       .append("$db", "admin")
+                       .obj();
+
+    const auto kTenantId = TenantId(OID::gen());
+    auto testStruct =
+        CommandWithNamespaceMember::parse(ctxt, makeOMRWithTenant(testDoc, kTenantId));
+
+    assert_same_types<decltype(testStruct.getField1()), const NamespaceString&>();
+    assert_same_types<decltype(testStruct.getField2()),
+                      const std::vector<mongo::NamespaceString>&>();
+
+    ASSERT_EQUALS(testStruct.getField1(), NamespaceString(kTenantId, "db.coll1"));
+    std::vector<NamespaceString> field2{NamespaceString(kTenantId, "a.b"),
+                                        NamespaceString(kTenantId, "c.d")};
+    ASSERT_TRUE(field2 == testStruct.getField2());
+
+    // Positive: Test we can roundtrip from the just parsed document
+    ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
 }
 
 void verifyContract(const AuthorizationContract& left, const AuthorizationContract& right) {
