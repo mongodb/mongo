@@ -152,7 +152,9 @@ void acquireCollectionLocksInResourceIdOrder(
             temp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID));
         }
 
-        // Acquire all of the locks in order.
+        // Acquire all of the locks in order. And clear the 'catalog' because the locks will access
+        // a fresher one internally.
+        catalog = nullptr;
         for (auto& nss : temp) {
             collLocks->emplace_back(opCtx, nss, modeColl, deadline);
         }
@@ -160,6 +162,10 @@ void acquireCollectionLocksInResourceIdOrder(
         // Check that the namespaces have NOT changed after acquiring locks. It's possible to race
         // with a rename collection when the given NamespaceStringOrUUID is a UUID, and consequently
         // fail to lock the correct namespace.
+        //
+        // The catalog reference must be refreshed to see the latest Collection data. Otherwise we
+        // won't see any concurrent DDL/catalog operations.
+        auto catalog = CollectionCatalog::get(opCtx);
         verifyTemp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID));
         for (const auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
             verifyTemp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID));
