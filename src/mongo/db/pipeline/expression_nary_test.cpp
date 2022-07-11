@@ -181,7 +181,7 @@ protected:
         DepsTracker dependencies;
         expr->addDependencies(&dependencies);
         BSONArrayBuilder dependenciesBson;
-        for (set<string>::const_iterator i = dependencies.fields.begin();
+        for (OrderedPathSet::const_iterator i = dependencies.fields.begin();
              i != dependencies.fields.end();
              ++i) {
             dependenciesBson << *i;
