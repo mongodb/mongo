@@ -218,18 +218,12 @@ std::unique_ptr<Pipeline, PipelineDeleter> processFLEPipelineD(
  */
 template <typename T>
 bool shouldDoFLERewrite(const std::unique_ptr<T>& cmd) {
-    // TODO (SERVER-65077): Remove FCV check once 6.0 is released
-    return (!serverGlobalParams.featureCompatibility.isVersionInitialized() ||
-            gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility)) &&
-        cmd->getEncryptionInformation();
+    return cmd->getEncryptionInformation().has_value();
 }
 
 template <typename T>
 bool shouldDoFLERewrite(const T& cmd) {
-    // TODO (SERVER-65077): Remove FCV check once 6.0 is released
-    return (!serverGlobalParams.featureCompatibility.isVersionInitialized() ||
-            gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility)) &&
-        cmd.getEncryptionInformation();
+    return cmd.getEncryptionInformation().has_value();
 }
 
 /**

@@ -41,12 +41,6 @@ enums:
             Range: "range"
 
 feature_flags:
-    featureFlagFLE2:
-        description: "Enable Queryable Encryption support"
-        cpp_varname: gFeatureFlagFLE2
-        default: true
-        version: 6.0
-
     featureFlagFLE2Range:
       description: "Enable support for range indexes in Queryable Encryption"
       cpp_varname: gFeatureFlagFLE2Range

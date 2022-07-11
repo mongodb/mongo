@@ -351,17 +351,6 @@ public:
             if (request.getPhase() == SetFCVPhaseEnum::kStart) {
                 invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
-                // TODO SERVER-65077: Remove FCV check once 6.0 is released
-                if (actualVersion > requestedVersion &&
-                    !gFeatureFlagFLE2.isEnabledOnVersion(requestedVersion)) {
-                    // No more (recoverable) CompactStructuredEncryptionDataCoordinator will start
-                    // because we have already switched the FCV value to kDowngrading. Wait for the
-                    // ongoing CompactStructuredEncryptionDataCoordinator to finish.
-                    ShardingDDLCoordinatorService::getService(opCtx)
-                        ->waitForCoordinatorsOfGivenTypeToComplete(
-                            opCtx, DDLCoordinatorTypeEnum::kCompactStructuredEncryptionData);
-                }
-
                 // If we are only running phase-1, then we are done
                 return true;
             }
@@ -534,21 +523,6 @@ private:
                     },
                     [&](const CollectionPtr& collection) {
                         return collection->getTimeseriesOptions() != boost::none;
-                    });
-            }
-
-            // Block downgrade for collections with encrypted fields
-            // TODO SERVER-65077: Remove once FCV 6.0 becomes last-lts.
-            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-                Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
-                catalog::forEachCollectionFromDb(
-                    opCtx, dbName, MODE_X, [&](const CollectionPtr& collection) {
-                        uassert(
-                            ErrorCodes::CannotDowngrade,
-                            str::stream() << "Cannot downgrade the cluster as collection "
-                                          << collection->ns() << " has 'encryptedFields'",
-                            !collection->getCollectionOptions().encryptedFieldConfig.has_value());
-                        return true;
                     });
             }
         }

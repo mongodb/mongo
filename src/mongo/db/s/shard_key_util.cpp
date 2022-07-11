@@ -235,11 +235,6 @@ bool validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
 void validateShardKeyIsNotEncrypted(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     const ShardKeyPattern& shardKeyPattern) {
-    // TODO (SERVER-65077): Remove FCV check once 6.0 is released
-    if (!gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility)) {
-        return;
-    }
-
     AutoGetCollection collection(opCtx, nss, MODE_IS, AutoGetCollectionViewMode::kViewsPermitted);
     if (!collection || collection.getView()) {
         return;

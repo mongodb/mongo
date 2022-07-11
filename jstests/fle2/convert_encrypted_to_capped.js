@@ -2,7 +2,6 @@
 
 /**
  * @tags: [
- * requires_fcv_60,
  * assumes_unsharded_collection,
  * requires_non_retryable_commands,
  * assumes_against_mongod_not_mongos

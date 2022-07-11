@@ -359,8 +359,6 @@ TEST(CollectionOptions, NExtentsNoError) {
 
 // Duplicate fields is not allowed
 TEST(FLECollectionOptions, MultipleFields) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagFLE2", true);
-
     ASSERT_STATUS_CODE(6338402, CollectionOptions::parse(fromjson(R"({
     encryptedFields: {
         "fields": [
@@ -382,8 +380,6 @@ TEST(FLECollectionOptions, MultipleFields) {
 
 // Duplicate key ids are bad, it breaks the design
 TEST(FLECollectionOptions, DuplicateKeyIds) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagFLE2", true);
-
     ASSERT_STATUS_CODE(6338401, CollectionOptions::parse(fromjson(R"({
     encryptedFields: {
         "fields": [
@@ -404,7 +400,6 @@ TEST(FLECollectionOptions, DuplicateKeyIds) {
 }
 
 TEST(FLECollectionOptions, NonConflictingPrefixes) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagFLE2", true);
     ASSERT_OK(CollectionOptions::parse(fromjson(R"({
     encryptedFields: {
         "fields": [
@@ -445,8 +440,6 @@ TEST(FLECollectionOptions, NonConflictingPrefixes) {
 }
 
 TEST(FLECollectionOptions, ConflictingPrefixes) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagFLE2", true);
-
     ASSERT_STATUS_CODE(6338403, CollectionOptions::parse(fromjson(R"({
     encryptedFields: {
         "fields": [
@@ -503,10 +496,6 @@ TEST(FLECollectionOptions, ConflictingPrefixes) {
 }
 
 TEST(FLECollectionOptions, DuplicateQueryTypes) {
-
-
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagFLE2", true);
-
     ASSERT_STATUS_CODE(6338404, CollectionOptions::parse(fromjson(R"({
     encryptedFields: {
         "fields": [
@@ -521,8 +510,6 @@ TEST(FLECollectionOptions, DuplicateQueryTypes) {
 }
 
 TEST(FLECollectionOptions, AllowedTypes) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagFLE2", true);
-
     std::vector<std::string> typesAllowedIndexed({
         "string",
         "binData",
@@ -591,8 +578,6 @@ TEST(FLECollectionOptions, AllowedTypes) {
 
 
 TEST(FLECollectionOptions, DisAllowedTypes) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagFLE2", true);
-
     std::vector<std::string> typesDisallowedIndexed({
         "minKey",
         "missing",

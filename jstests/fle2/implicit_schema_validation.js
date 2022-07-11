@@ -2,7 +2,6 @@
 
 /**
  * @tags: [
- * requires_fcv_60,
  * assumes_unsharded_collection,
  * does_not_support_transactions
  * ]

@@ -203,12 +203,6 @@ void validateTTLOptions(OperationContext* opCtx,
 void checkEncryptedFieldIndexRestrictions(OperationContext* opCtx,
                                           const NamespaceString& ns,
                                           const CreateIndexesCommand& cmd) {
-    // TODO (SERVER-65077): Remove FCV check once 6.0 is released
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        !gFeatureFlagFLE2.isEnabled(serverGlobalParams.featureCompatibility)) {
-        return;
-    }
-
     AutoGetCollection collection(opCtx, ns, MODE_IS);
     if (!collection) {
         return;
