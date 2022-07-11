@@ -63,12 +63,10 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_donor_service.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
-#include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/balancer/balancer.h"
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
-#include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
@@ -86,7 +84,6 @@
 #include "mongo/idl/cluster_server_parameter_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/pm2423_feature_flags_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/exit.h"
@@ -339,22 +336,6 @@ public:
 
         if (!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kStart) {
             {
-                boost::optional<MigrationBlockingGuard> drainNewMoveChunks;
-
-                // Drain moveChunks if the actualVersion relies on the new migration protocol but
-                // the requestedVersion uses the old one (downgrading).
-                if (feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
-                        actualVersion) &&
-                    !feature_flags::gFeatureFlagMigrationRecipientCriticalSection
-                         .isEnabledOnVersion(requestedVersion)) {
-                    drainNewMoveChunks.emplace(opCtx, "setFeatureCompatibilityVersionDowngrade");
-
-                    // At this point, because we are holding the MigrationBlockingGuard, no new
-                    // migrations can start and there are no active ongoing ones. Still, there could
-                    // be migrations pending recovery. Drain them.
-                    migrationutil::drainMigrationsPendingRecovery(opCtx);
-                }
-
                 // Start transition to 'requestedVersion' by updating the local FCV document to a
                 // 'kUpgrading' or 'kDowngrading' state, respectively.
                 const auto fcvChangeRegion(
@@ -421,23 +402,6 @@ public:
 
         hangBeforeDrainingMigrations.pauseWhileSet();
         {
-            boost::optional<MigrationBlockingGuard> drainOldMoveChunks;
-
-            // Drain moveChunks if the actualVersion relies on the old migration protocol but the
-            // requestedVersion uses the new one (upgrading), we're persisting the new chunk
-            // version format, or we are adding the numOrphans field to range deletion documents.
-            if (!feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
-                    actualVersion) &&
-                feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabledOnVersion(
-                    requestedVersion)) {
-                drainOldMoveChunks.emplace(opCtx, "setFeatureCompatibilityVersionUpgrade");
-
-                // At this point, because we are holding the MigrationBlockingGuard, no new
-                // migrations can start and there are no active ongoing ones. Still, there could
-                // be migrations pending recovery. Drain them.
-                migrationutil::drainMigrationsPendingRecovery(opCtx);
-            }
-
             // Complete transition by updating the local FCV document to the fully upgraded or
             // downgraded requestedVersion.
             const auto fcvChangeRegion(FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));

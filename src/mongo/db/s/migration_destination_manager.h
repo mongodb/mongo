@@ -155,7 +155,7 @@ public:
      */
     void abortWithoutSessionIdCheck();
 
-    Status startCommit(const MigrationSessionId& sessionId, bool acquireCSOnRecipient);
+    Status startCommit(const MigrationSessionId& sessionId);
 
     /*
      * Refreshes the filtering metadata and releases the migration recipient critical section for
@@ -316,8 +316,6 @@ private:
 
     // Condition variable, which is signalled every time the state of the migration changes.
     stdx::condition_variable _stateChangedCV;
-
-    bool _acquireCSOnRecipient{false};
 
     // Promise that will be fulfilled when the donor has signaled us that we can release the
     // critical section.

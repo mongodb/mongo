@@ -511,7 +511,6 @@ Status MigrationDestinationManager::restoreRecoveredMigrationState(
     _lsid = recoveryDoc.getLsid();
     _txnNumber = recoveryDoc.getTxnNumber();
     _state = kCommitStart;
-    _acquireCSOnRecipient = true;
 
     invariant(!_canReleaseCriticalSectionPromise);
     _canReleaseCriticalSectionPromise = std::make_unique<SharedPromise<void>>();
@@ -637,12 +636,8 @@ void MigrationDestinationManager::abortWithoutSessionIdCheck() {
     _errmsg = "aborted without session id check";
 }
 
-Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessionId,
-                                                bool acquireCSOnRecipient) {
-
+Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessionId) {
     stdx::unique_lock<Latch> lock(_mutex);
-
-    _acquireCSOnRecipient = acquireCSOnRecipient;
 
     const auto convergenceTimeout =
         Shard::kDefaultConfigCommandTimeout + Shard::kDefaultConfigCommandTimeout / 4;
@@ -690,36 +685,20 @@ Status MigrationDestinationManager::startCommit(const MigrationSessionId& sessio
     // Assigning a timeout slightly higher than the one used for network requests to the config
     // server. Enough time to retry at least once in case of network failures (SERVER-51397).
     deadline = Date_t::now() + convergenceTimeout;
-    if (!_acquireCSOnRecipient) {
-        while (_sessionId) {
-            if (stdx::cv_status::timeout ==
-                _isActiveCV.wait_until(lock, deadline.toSystemTimePoint())) {
-                _errmsg = str::stream()
-                    << "startCommit timed out waiting, " << _sessionId->toString();
-                _state = kFail;
-                _stateChangedCV.notify_all();
-                return {ErrorCodes::CommandFailed, _errmsg};
-            }
+
+    while (_state == kCommitStart) {
+        if (stdx::cv_status::timeout ==
+            _stateChangedCV.wait_until(lock, deadline.toSystemTimePoint())) {
+            _errmsg = str::stream() << "startCommit timed out waiting, " << _sessionId->toString();
+            _state = kFail;
+            _stateChangedCV.notify_all();
+            return {ErrorCodes::CommandFailed, _errmsg};
         }
-        if (_state != kDone) {
-            return {ErrorCodes::CommandFailed, "startCommit failed, final data failed to transfer"};
-        }
-    } else {
-        while (_state == kCommitStart) {
-            if (stdx::cv_status::timeout ==
-                _stateChangedCV.wait_until(lock, deadline.toSystemTimePoint())) {
-                _errmsg = str::stream()
-                    << "startCommit timed out waiting, " << _sessionId->toString();
-                _state = kFail;
-                _stateChangedCV.notify_all();
-                return {ErrorCodes::CommandFailed, _errmsg};
-            }
-        }
-        if (_state != kEnteredCritSec) {
-            return {ErrorCodes::CommandFailed,
-                    "startCommit failed, final data failed to transfer or failed to enter critical "
-                    "section"};
-        }
+    }
+    if (_state != kEnteredCritSec) {
+        return {ErrorCodes::CommandFailed,
+                "startCommit failed, final data failed to transfer or failed to enter critical "
+                "section"};
     }
 
     return Status::OK();
@@ -1116,7 +1095,7 @@ void MigrationDestinationManager::_migrateThread(CancellationToken cancellationT
         } catch (...) {
             _setStateFail(str::stream() << "migrate failed: " << redact(exceptionToStatus()));
 
-            if (!cancellationToken.isCanceled() && _acquireCSOnRecipient) {
+            if (!cancellationToken.isCanceled()) {
                 // Run recovery if needed.
                 recovering = true;
                 continue;
@@ -1641,50 +1620,44 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
         timing->done(7);
         migrateThreadHangAtStep7.pauseWhileSet();
 
-        if (_acquireCSOnRecipient) {
-            const auto critSecReason = criticalSectionReason(*_sessionId);
+        const auto critSecReason = criticalSectionReason(*_sessionId);
 
-            runWithoutSession(outerOpCtx, [&] {
-                // Persist the migration recipient recovery document so that in case of failover,
-                // the new primary will resume the MigrationDestinationManager and retake the
-                // critical section.
-                migrationutil::persistMigrationRecipientRecoveryDocument(
-                    opCtx,
-                    {*_migrationId, _nss, *_sessionId, range, _fromShard, _lsid, _txnNumber});
+        runWithoutSession(outerOpCtx, [&] {
+            // Persist the migration recipient recovery document so that in case of failover, the
+            // new primary will resume the MigrationDestinationManager and retake the critical
+            // section.
+            migrationutil::persistMigrationRecipientRecoveryDocument(
+                opCtx, {*_migrationId, _nss, *_sessionId, range, _fromShard, _lsid, _txnNumber});
 
-                LOGV2_DEBUG(5899113,
-                            2,
-                            "Persisted migration recipient recovery document",
-                            "sessionId"_attr = _sessionId);
+            LOGV2_DEBUG(5899113,
+                        2,
+                        "Persisted migration recipient recovery document",
+                        "sessionId"_attr = _sessionId);
 
-                // Enter critical section. Ensure it has been majority commited before
-                // _recvChunkCommit returns success to the donor, so that if the recipient steps
-                // down, the critical section is kept taken while the donor commits the migration.
-                RecoverableCriticalSectionService::get(opCtx)
-                    ->acquireRecoverableCriticalSectionBlockWrites(
-                        opCtx, _nss, critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
+            // Enter critical section. Ensure it has been majority commited before _recvChunkCommit
+            // returns success to the donor, so that if the recipient steps down, the critical
+            // section is kept taken while the donor commits the migration.
+            RecoverableCriticalSectionService::get(opCtx)
+                ->acquireRecoverableCriticalSectionBlockWrites(
+                    opCtx, _nss, critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
-                LOGV2(5899114, "Entered migration recipient critical section", logAttrs(_nss));
-                timeInCriticalSection.emplace();
-            });
+            LOGV2(5899114, "Entered migration recipient critical section", logAttrs(_nss));
+            timeInCriticalSection.emplace();
+        });
 
-            if (getState() == kFail || getState() == kAbort) {
-                _setStateFail("timed out waiting for critical section acquisition");
-            }
+        if (getState() == kFail || getState() == kAbort) {
+            _setStateFail("timed out waiting for critical section acquisition");
+        }
 
-            {
-                // Make sure we don't overwrite a FAIL or ABORT state.
-                stdx::lock_guard<Latch> sl(_mutex);
-                if (_state != kFail && _state != kAbort) {
-                    _state = kEnteredCritSec;
-                    _stateChangedCV.notify_all();
-                }
+        {
+            // Make sure we don't overwrite a FAIL or ABORT state.
+            stdx::lock_guard<Latch> sl(_mutex);
+            if (_state != kFail && _state != kAbort) {
+                _state = kEnteredCritSec;
+                _stateChangedCV.notify_all();
             }
         }
     } else {
-        // We can only ever be in this path if the recipient critical section feature is enabled.
-        invariant(_acquireCSOnRecipient);
-
         outerOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
         auto newClient = outerOpCtx->getServiceContext()->makeClient("MigrationCoordinator");
         {
@@ -1718,30 +1691,28 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
         LOGV2(6064503, "Recovered migration recipient", "sessionId"_attr = *_sessionId);
     }
 
-    if (_acquireCSOnRecipient) {
-        outerOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-        auto newClient = outerOpCtx->getServiceContext()->makeClient("MigrationCoordinator");
-        {
-            stdx::lock_guard<Client> lk(*newClient.get());
-            newClient->setSystemOperationKillableByStepdown(lk);
-        }
-        AlternativeClientRegion acr(newClient);
-        auto executor =
-            Grid::get(outerOpCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
-        auto newOpCtxPtr = CancelableOperationContext(
-            cc().makeOperationContext(), outerOpCtx->getCancellationToken(), executor);
-        auto opCtx = newOpCtxPtr.get();
-
-        if (skipToCritSecTaken) {
-            timeInCriticalSection.emplace();
-        }
-        invariant(timeInCriticalSection);
-
-        // Wait until signaled to exit the critical section and then release it.
-        runWithoutSession(outerOpCtx, [&] {
-            awaitCriticalSectionReleaseSignalAndCompleteMigration(opCtx, *timeInCriticalSection);
-        });
+    outerOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+    auto newClient = outerOpCtx->getServiceContext()->makeClient("MigrationCoordinator");
+    {
+        stdx::lock_guard<Client> lk(*newClient.get());
+        newClient->setSystemOperationKillableByStepdown(lk);
     }
+    AlternativeClientRegion acr(newClient);
+    auto executor =
+        Grid::get(outerOpCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
+    auto newOpCtxPtr = CancelableOperationContext(
+        cc().makeOperationContext(), outerOpCtx->getCancellationToken(), executor);
+    auto opCtx = newOpCtxPtr.get();
+
+    if (skipToCritSecTaken) {
+        timeInCriticalSection.emplace();
+    }
+    invariant(timeInCriticalSection);
+
+    // Wait until signaled to exit the critical section and then release it.
+    runWithoutSession(outerOpCtx, [&] {
+        awaitCriticalSectionReleaseSignalAndCompleteMigration(opCtx, *timeInCriticalSection);
+    });
 
     _setState(kDone);
 

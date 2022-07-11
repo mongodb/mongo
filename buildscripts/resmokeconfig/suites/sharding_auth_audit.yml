@@ -28,7 +28,6 @@ selector:
   - jstests/sharding/migration_ignore_interrupts_2.js                 # SERVER-21713
   - jstests/sharding/movechunk_parallel.js                            # SERVER-21713
   - jstests/sharding/migration_server_status.js                       # SERVER-21713
-  - jstests/sharding/migration_move_chunk_after_receive.js            # SERVER-21713
   - jstests/sharding/migration_critical_section_concurrency.js        # SERVER-21713
   # Runs with auth enabled.
   - jstests/sharding/mongod_returns_no_cluster_time_without_keys.js

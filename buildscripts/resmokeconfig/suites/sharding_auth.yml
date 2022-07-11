@@ -24,7 +24,6 @@ selector:
   # Skip the testcases that do not have auth bypass when running ops in parallel.
   - jstests/sharding/migration_ignore_interrupts_1.js                 # SERVER-21713
   - jstests/sharding/migration_ignore_interrupts_2.js                 # SERVER-21713
-  - jstests/sharding/migration_move_chunk_after_receive.js            # SERVER-21713
   - jstests/sharding/migration_server_status.js                       # SERVER-21713
   - jstests/sharding/migration_sets_fromMigrate_flag.js               # SERVER-21713
   - jstests/sharding/migration_with_source_ops.js                     # SERVER-21713

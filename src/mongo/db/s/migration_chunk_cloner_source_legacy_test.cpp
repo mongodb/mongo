@@ -375,7 +375,7 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, CorrectDocumentsFetched) {
         onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
 
-    ASSERT_OK(cloner.commitClone(operationContext(), true /* acquireCSOnRecipient */));
+    ASSERT_OK(cloner.commitClone(operationContext()));
     futureCommit.default_timed_get();
 }
 
@@ -470,7 +470,7 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, RemoveDuplicateDocuments) {
         onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
 
-    ASSERT_OK(cloner.commitClone(operationContext(), true /* acquireCSOnRecipient */));
+    ASSERT_OK(cloner.commitClone(operationContext()));
     futureCommit.default_timed_get();
 }
 
@@ -533,7 +533,7 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, OneLargeDocumentTransferMods) {
         onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
 
-    ASSERT_OK(cloner.commitClone(operationContext(), true /* acquireCSOnRecipient */));
+    ASSERT_OK(cloner.commitClone(operationContext()));
     futureCommit.default_timed_get();
 }
 
@@ -610,7 +610,7 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, ManySmallDocumentsTransferMods) {
         onCommand([&](const RemoteCommandRequest& request) { return BSON("ok" << true); });
     });
 
-    ASSERT_OK(cloner.commitClone(operationContext(), true /* acquireCSOnRecipient */));
+    ASSERT_OK(cloner.commitClone(operationContext()));
     futureCommit.default_timed_get();
 }
 

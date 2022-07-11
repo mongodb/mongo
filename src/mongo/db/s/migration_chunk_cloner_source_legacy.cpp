@@ -369,8 +369,7 @@ Status MigrationChunkClonerSourceLegacy::awaitUntilCriticalSectionIsAppropriate(
     return _checkRecipientCloningStatus(opCtx, maxTimeToWait);
 }
 
-StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::commitClone(OperationContext* opCtx,
-                                                                  bool acquireCSOnRecipient) {
+StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::commitClone(OperationContext* opCtx) {
     invariant(_state == kCloning);
     invariant(!opCtx->lockState()->isLocked());
     if (_jumboChunkCloneState && _forceJumbo) {
@@ -392,7 +391,9 @@ StatusWith<BSONObj> MigrationChunkClonerSourceLegacy::commitClone(OperationConte
     auto responseStatus = _callRecipient(opCtx, [&] {
         BSONObjBuilder builder;
         builder.append(kRecvChunkCommit, nss().ns());
-        builder.append("acquireCSOnRecipient", acquireCSOnRecipient);
+        // For backward compatibility with v6.0 recipients.
+        // TODO (SERVER-67844): Remove it once 7.0 becomes LTS.
+        builder.append("acquireCSOnRecipient", true);
         _sessionId.append(&builder);
         return builder.obj();
     }());

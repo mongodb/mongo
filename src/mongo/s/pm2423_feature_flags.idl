@@ -35,12 +35,6 @@ imports:
     - "mongo/idl/basic_types.idl"
 
 feature_flags:
-    featureFlagMigrationRecipientCriticalSection:
-        description: Feature flag for enabling the migration recipient critical section.
-        cpp_varname: gFeatureFlagMigrationRecipientCriticalSection
-        default: true
-        version: 5.3
-
     featureFlagNoChangeStreamEventsDueToOrphans:
         description: Feature flag for preventing the generation of change stream events due to
             writes on orphan documents.

@@ -204,22 +204,6 @@ function testSetFCVDoesNotBlockWhileMigratingChunk() {
     jsTestLog("Testing that setFCV does not block while migrating a chunk");
     let st = setup();
 
-    const featureFlagMigrationRecipientCriticalSection =
-        assert.commandWorked(st.configRS.getPrimary().adminCommand(
-            {getParameter: 1, featureFlagMigrationRecipientCriticalSection: 1}));
-    const featureFlagMigrationRecipientCriticalSectionEnabled =
-        featureFlagMigrationRecipientCriticalSection.featureFlagMigrationRecipientCriticalSection
-            .value;
-
-    // SERVER-61072: Reenable this test once 6.0 becomes last LTS.
-    // We have to skip this test because the current implementation of the setFCV might wait for the
-    // completion of moveChunk operations before starting to use a different migration protocol.
-    if (featureFlagMigrationRecipientCriticalSectionEnabled) {
-        jsTest.log('Skipping test because featureFlagMigrationRecipientCriticalSection is enabled');
-        st.stop();
-        return;
-    }
-
     // Set config and shards to last-lts FCV
     assert.commandWorked(
         st.s.getDB("admin").runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));

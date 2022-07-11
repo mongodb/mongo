@@ -70,7 +70,6 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/pm2423_feature_flags_gen.h"
 #include "mongo/s/request_types/ensure_chunk_version_is_greater_than_gen.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/exit.h"
@@ -1020,15 +1019,12 @@ void recoverMigrationCoordinations(OperationContext* opCtx,
 
     unsigned migrationRecoveryCount = 0;
 
-    const auto acquireCSOnRecipient =
-        feature_flags::gFeatureFlagMigrationRecipientCriticalSection.isEnabled(
-            serverGlobalParams.featureCompatibility);
     PersistentTaskStore<MigrationCoordinatorDocument> store(
         NamespaceString::kMigrationCoordinatorsNamespace);
     store.forEach(
         opCtx,
         BSON(MigrationCoordinatorDocument::kNssFieldName << nss.toString()),
-        [&opCtx, &nss, &migrationRecoveryCount, acquireCSOnRecipient, &cancellationToken](
+        [&opCtx, &nss, &migrationRecoveryCount, &cancellationToken](
             const MigrationCoordinatorDocument& doc) {
             LOGV2_DEBUG(4798502,
                         2,
@@ -1046,7 +1042,7 @@ void recoverMigrationCoordinations(OperationContext* opCtx,
 
             if (doc.getDecision()) {
                 // The decision is already known.
-                coordinator.completeMigration(opCtx, acquireCSOnRecipient);
+                coordinator.completeMigration(opCtx);
                 return true;
             }
 
@@ -1128,7 +1124,7 @@ void recoverMigrationCoordinations(OperationContext* opCtx,
                 }
             }
 
-            coordinator.completeMigration(opCtx, acquireCSOnRecipient);
+            coordinator.completeMigration(opCtx);
             setFilteringMetadata();
             return true;
         });
