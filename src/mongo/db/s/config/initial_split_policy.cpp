@@ -56,7 +56,7 @@ using ZoneShardMap = StringMap<std::vector<ShardId>>;
 std::vector<ShardId> getAllShardIdsSorted(OperationContext* opCtx) {
     // Many tests assume that chunks will be placed on shards
     // according to their IDs in ascending lexical order.
-    auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload();
+    auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
     std::sort(shardIds.begin(), shardIds.end());
     return shardIds;
 }

@@ -80,7 +80,7 @@ protected:
     }
 
     void runDummyCommandOnShard(ShardId shardId) {
-        auto shard = shardRegistry()->getShardNoReload(shardId);
+        auto shard = unittest::assertGet(shardRegistry()->getShard(operationContext(), shardId));
         uassertStatusOK(shard->runCommand(operationContext(),
                                           ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                           "unusedDb",

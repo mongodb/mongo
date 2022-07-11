@@ -56,7 +56,7 @@ void SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext* 
     uassert(ErrorCodes::ShardNotFound,
             str::stream() << "Failed to create " << NamespaceString::kLogicalSessionsNamespace
                           << ": cannot create the collection until there are shards",
-            Grid::get(opCtx)->shardRegistry()->getNumShardsNoReload() != 0);
+            Grid::get(opCtx)->shardRegistry()->getNumShards(opCtx) != 0);
 
     ShardsvrCreateCollection shardsvrCollRequest(NamespaceString::kLogicalSessionsNamespace);
     CreateCollectionRequest requestParamsObj;

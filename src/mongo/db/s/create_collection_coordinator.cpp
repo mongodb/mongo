@@ -570,7 +570,7 @@ void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx
         // less danger of an OOM error.
 
         const int maxNumInitialChunksForShards =
-            Grid::get(opCtx)->shardRegistry()->getNumShardsNoReload() * shardutil::kMaxSplitPoints;
+            Grid::get(opCtx)->shardRegistry()->getNumShards(opCtx) * shardutil::kMaxSplitPoints;
         const int maxNumInitialChunksTotal = 1000 * 1000;  // Arbitrary limit to memory consumption
         int numChunks = _request.getNumInitialChunks().value();
         uassert(ErrorCodes::InvalidOptions,

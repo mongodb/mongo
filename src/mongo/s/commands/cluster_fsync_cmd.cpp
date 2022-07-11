@@ -82,14 +82,14 @@ public:
         bool ok = true;
 
         auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
-        const auto shardIds = shardRegistry->getAllShardIdsNoReload();
+        const auto shardIds = shardRegistry->getAllShardIds(opCtx);
 
         for (const ShardId& shardId : shardIds) {
             auto shardStatus = shardRegistry->getShard(opCtx, shardId);
             if (!shardStatus.isOK()) {
                 continue;
             }
-            const auto s = shardStatus.getValue();
+            const auto s = std::move(shardStatus.getValue());
 
             auto response = uassertStatusOK(s->runCommandWithFixedRetryAttempts(
                 opCtx,

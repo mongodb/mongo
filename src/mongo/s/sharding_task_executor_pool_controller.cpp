@@ -59,12 +59,7 @@ void emplaceOrInvariant(Map&& map, Args&&... args) noexcept {
 }
 
 bool isConfigServer(const ShardRegistry* sr, const HostAndPort& peer) {
-    if (!sr)
-        return false;
-    auto shard = sr->getShardForHostNoReload(peer);
-    if (!shard)
-        return false;
-    return shard->isConfig();
+    return sr && sr->isConfigServer(peer);
 }
 
 }  // namespace

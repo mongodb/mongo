@@ -548,23 +548,17 @@ ShardRegistry::Cache::ValueHandle ShardRegistry::_getData(OperationContext* opCt
     return _getDataAsync().get(opCtx);
 }
 
+bool ShardRegistry::isConfigServer(const HostAndPort& host) const {
+    const auto configsvrConnString = getConfigServerConnectionString();
+    const auto& configsvrHosts = configsvrConnString.getServers();
+    return std::find(configsvrHosts.begin(), configsvrHosts.end(), host) != configsvrHosts.end();
+}
+
 // TODO SERVER-50206: Remove usage of these non-causally consistent accessors.
 
 ShardRegistry::Cache::ValueHandle ShardRegistry::_getCachedData() const {
     _initializeCacheIfNecessary();
     return _cache->peekLatestCached(_kSingleton);
-}
-
-std::shared_ptr<Shard> ShardRegistry::getShardNoReload(const ShardId& shardId) const {
-    // First check if this is a config shard lookup.
-    {
-        stdx::lock_guard<Latch> lk(_mutex);
-        if (auto shard = _configShardData.findShard(shardId)) {
-            return shard;
-        }
-    }
-    auto data = _getCachedData();
-    return data->findShard(shardId);
 }
 
 std::shared_ptr<Shard> ShardRegistry::getShardForHostNoReload(const HostAndPort& host) const {
@@ -577,14 +571,6 @@ std::shared_ptr<Shard> ShardRegistry::getShardForHostNoReload(const HostAndPort&
     }
     auto data = _getCachedData();
     return data->findByHostAndPort(host);
-}
-
-std::vector<ShardId> ShardRegistry::getAllShardIdsNoReload() const {
-    return _getCachedData()->getAllShardIds();
-}
-
-int ShardRegistry::getNumShardsNoReload() const {
-    return _getCachedData()->getAllShardIds().size();
 }
 
 std::shared_ptr<Shard> ShardRegistry::_getShardForRSNameNoReload(const std::string& name) const {

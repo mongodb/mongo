@@ -894,7 +894,7 @@ void Balancer::_sleepFor(OperationContext* opCtx, Milliseconds waitTimeout) {
 bool Balancer::_checkOIDs(OperationContext* opCtx) {
     auto shardingContext = Grid::get(opCtx);
 
-    const auto all = shardingContext->shardRegistry()->getAllShardIdsNoReload();
+    const auto all = shardingContext->shardRegistry()->getAllShardIds(opCtx);
 
     // map of OID machine ID => shardId
     map<int, ShardId> oids;
@@ -908,7 +908,7 @@ bool Balancer::_checkOIDs(OperationContext* opCtx) {
         if (!shardStatus.isOK()) {
             continue;
         }
-        const auto s = shardStatus.getValue();
+        const auto s = std::move(shardStatus.getValue());
 
         auto result = uassertStatusOK(
             s->runCommandWithFixedRetryAttempts(opCtx,

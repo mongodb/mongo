@@ -292,6 +292,13 @@ public:
     static void updateReplicaSetOnConfigServer(ServiceContext* serviceContex,
                                                const ConnectionString& connStr) noexcept;
 
+    /*
+     * Returns true if the given host is part of the config server replica set.
+     *
+     * This method relies on the RSM to have pushed the correct CSRS membership information.
+     */
+    bool isConfigServer(const HostAndPort& host) const;
+
     // TODO SERVER-50206: Remove usage of these non-causally consistent accessors.
     //
     // Their most important current users are dispatching requests to hosts, and processing
@@ -301,22 +308,10 @@ public:
     // refreshed via _lookup()).
 
     /**
-     * Returns a shared pointer to the shard object with the given shard id. The shardId parameter
-     * can actually be the shard name or the HostAndPort for any server in the shard. Will not
-     * refresh the shard registry or otherwise perform any network traffic. This means that if the
-     * shard was recently added it may not be found.  USE WITH CAUTION.
-     */
-    std::shared_ptr<Shard> getShardNoReload(const ShardId& shardId) const;
-
-    /**
      * Finds the Shard that the mongod listening at this HostAndPort is a member of. Will not
      * refresh the shard registry or otherwise perform any network traffic.
      */
     std::shared_ptr<Shard> getShardForHostNoReload(const HostAndPort& shardHost) const;
-
-    std::vector<ShardId> getAllShardIdsNoReload() const;
-
-    int getNumShardsNoReload() const;
 
 private:
     /**

@@ -616,7 +616,7 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetAllShards(OperationContex
     // implies the collection is sharded, so we should always have a chunk manager.
     invariant(_cm.isSharded());
 
-    auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload();
+    auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
 
     std::vector<ShardEndpoint> endpoints;
     for (auto&& shardId : shardIds) {

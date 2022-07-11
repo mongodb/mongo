@@ -104,7 +104,7 @@ public:
             std::map<std::string, long long> sizes;
             std::map<std::string, std::unique_ptr<BSONObjBuilder>> dbShardInfo;
 
-            auto shardIds = shardRegistry->getAllShardIdsNoReload();
+            auto shardIds = shardRegistry->getAllShardIds(opCtx);
             shardIds.emplace_back(ShardId::kConfigServerId);
 
             // { filter: matchExpression }.
@@ -112,11 +112,11 @@ public:
                 opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON({})));
 
             for (const ShardId& shardId : shardIds) {
-                const auto shardStatus = shardRegistry->getShard(opCtx, shardId);
+                auto shardStatus = shardRegistry->getShard(opCtx, shardId);
                 if (!shardStatus.isOK()) {
                     continue;
                 }
-                const auto s = shardStatus.getValue();
+                const auto s = std::move(shardStatus.getValue());
 
                 auto response = uassertStatusOK(
                     s->runCommandWithFixedRetryAttempts(opCtx,

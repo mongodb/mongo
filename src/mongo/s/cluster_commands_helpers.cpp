@@ -388,7 +388,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShar
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy) {
     std::vector<AsyncRequestsSender::Request> requests;
-    for (auto shardId : Grid::get(opCtx)->shardRegistry()->getAllShardIdsNoReload())
+    for (auto&& shardId : Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx))
         requests.emplace_back(std::move(shardId), cmdObj);
 
     return gatherResponses(opCtx, dbName, readPref, retryPolicy, requests);
