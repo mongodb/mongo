@@ -310,12 +310,6 @@ public:
         };
 
         /*
-         * Returns false if the protocol is FCV incompatible. Also, resets the 'protocol' field in
-         * the _stateDoc to boost::none for FCV < 5.2.
-         */
-        bool _checkifProtocolRemainsFCVCompatible();
-
-        /*
          * Helper for interrupt().
          * The _receivedForgetMigrationPromise is resolved when skipWaitingForForgetMigration is
          * set (e.g. stepDown/shutDown). And we use skipWaitingForForgetMigration=false for

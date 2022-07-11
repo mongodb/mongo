@@ -154,9 +154,7 @@ AggregateCommandRequest ResolvedView::asExpandedViewAggregation(
         resolvedPipeline[1] =
             BSON(DocumentSourceInternalConvertBucketIndexStats::kStageName << builder.obj());
     } else if (resolvedPipeline.size() >= 1 &&
-               resolvedPipeline[0][DocumentSourceInternalUnpackBucket::kStageNameInternal] &&
-               serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-                   multiversion::FeatureCompatibilityVersion::kVersion_5_2)) {
+               resolvedPipeline[0][DocumentSourceInternalUnpackBucket::kStageNameInternal]) {
         auto unpackStage = resolvedPipeline[0];
 
         BSONObjBuilder builder;

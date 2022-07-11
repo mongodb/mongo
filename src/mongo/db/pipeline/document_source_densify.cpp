@@ -124,19 +124,15 @@ RangeStatement RangeStatement::parse(RangeSpec spec) {
     return range;
 }
 
-REGISTER_DOCUMENT_SOURCE_WITH_MIN_VERSION(densify,
-                                          LiteParsedDocumentSourceDefault::parse,
-                                          document_source_densify::createFromBson,
-                                          AllowedWithApiStrict::kAlways,
-                                          multiversion::FeatureCompatibilityVersion::kVersion_5_1)
+REGISTER_DOCUMENT_SOURCE(densify,
+                         LiteParsedDocumentSourceDefault::parse,
+                         document_source_densify::createFromBson,
+                         AllowedWithApiStrict::kAlways);
 
-REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(_internalDensify,
-                                       LiteParsedDocumentSourceDefault::parse,
-                                       DocumentSourceInternalDensify::createFromBson,
-                                       AllowedWithApiStrict::kInternal,
-                                       AllowedWithClientType::kInternal,
-                                       multiversion::FeatureCompatibilityVersion::kVersion_5_1,
-                                       true);
+REGISTER_INTERNAL_DOCUMENT_SOURCE(_internalDensify,
+                                  LiteParsedDocumentSourceDefault::parse,
+                                  DocumentSourceInternalDensify::createFromBson,
+                                  true);
 
 namespace document_source_densify {
 

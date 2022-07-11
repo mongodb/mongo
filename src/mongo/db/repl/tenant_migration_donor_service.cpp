@@ -772,9 +772,7 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDa
 
         stdx::lock_guard<Latch> lg(_mutex);
 
-        if (_isAtLeastFCV52AtStart) {
-            commonData.setProtocol(_protocol);
-        }
+        commonData.setProtocol(_protocol);
         request.setMigrationRecipientCommonData(commonData);
 
         invariant(_stateDoc.getStartMigrationDonorTimestamp());
@@ -802,14 +800,8 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForget
     commonData.setRecipientCertificateForDonor(_recipientCertificateForDonor);
     // TODO SERVER-63454: Pass tenantId only for 'kMultitenantMigrations' protocol.
     commonData.setTenantId(_tenantId);
-    auto isAtLeastFCV52AtStart = [&]() -> bool {
-        stdx::lock_guard<Latch> lg(_mutex);
-        return _isAtLeastFCV52AtStart;
-    };
 
-    if (isAtLeastFCV52AtStart()) {
-        commonData.setProtocol(_protocol);
-    }
+    commonData.setProtocol(_protocol);
     request.setMigrationRecipientCommonData(commonData);
 
     return _sendCommandToRecipient(executor, recipientTargeterRS, request.toBSON(BSONObj()), token);
@@ -827,33 +819,6 @@ CancellationToken TenantMigrationDonorService::Instance::_initAbortMigrationSour
     }
 
     return _abortMigrationSource->token();
-}
-
-bool TenantMigrationDonorService::Instance::_checkifProtocolRemainsFCVCompatible() {
-    stdx::lock_guard<Latch> lg(_mutex);
-
-    // Ensure that the on-disk protocol and cached value remains the same.
-    invariant(!_stateDoc.getProtocol() || _stateDoc.getProtocol().value() == getProtocol());
-
-    _isAtLeastFCV52AtStart = serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-        multiversion::FeatureCompatibilityVersion::kVersion_5_2);
-    if (_isAtLeastFCV52AtStart) {
-        // When the instance is started using state doc < 5.2 FCV format, _stateDoc._protocol field
-        // won't be set. In that case, the cached value Instance::_protocol will be set to
-        // "kMultitenantMigrations".
-        return true;
-    }
-
-    if (getProtocol() == MigrationProtocolEnum::kShardMerge) {
-        LOGV2(5949503,
-              "Must abort tenant migration as 'Merge' protocol is not supported for FCV "
-              "below 5.2");
-        return false;
-    }
-    // For backward compatibility, ensure that the 'protocol' field is not set in the
-    // document.
-    _stateDoc.setProtocol(boost::none);
-    return true;
 }
 
 SemiFuture<void> TenantMigrationDonorService::Instance::run(
@@ -884,7 +849,7 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
     // SetFeatureCompatibilityVersionCommand::_cancelTenantMigrations(), we might miss aborting this
     // tenant migration and FCV might have updated or downgraded at this point. So, need to ensure
     // that the protocol is still compatible with FCV.
-    if (isFCVUpgradingOrDowngrading() || !_checkifProtocolRemainsFCVCompatible()) {
+    if (isFCVUpgradingOrDowngrading()) {
         onReceiveDonorAbortMigration();
     }
 

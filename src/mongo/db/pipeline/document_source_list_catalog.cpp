@@ -116,20 +116,6 @@ intrusive_ptr<DocumentSource> DocumentSourceListCatalog::createFromBson(
             feature_flags::gDocumentSourceListCatalog.isEnabled(
                 serverGlobalParams.featureCompatibility));
 
-    // We declare this stage with a min version but the base class DocumentSource checks the
-    // minimum version only if pExpCtx->maxFeatureCompatibilityVersion is provided.
-    if (!pExpCtx->maxFeatureCompatibilityVersion) {
-        const auto& globalFcv = serverGlobalParams.featureCompatibility;
-        using FCV = multiversion::FeatureCompatibilityVersion;
-        uassert(ErrorCodes::QueryFeatureNotAllowed,
-                fmt::format("The {} aggregation stage is not allowed in the current feature "
-                            "compatibility version. See {} for more information.",
-                            kStageName,
-                            feature_compatibility_version_documentation::kCompatibilityLink),
-                !globalFcv.isVersionInitialized() ||
-                    globalFcv.isGreaterThanOrEqualTo(FCV::kVersion_5_3));
-    }
-
     return new DocumentSourceListCatalog(pExpCtx);
 }
 

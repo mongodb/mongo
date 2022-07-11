@@ -177,16 +177,6 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::extractWCFromCommand(const 
 }
 
 WriteConcernW deserializeWriteConcernW(BSONElement wEl) {
-    // Preserve pre-5.3 behavior to avoid issues with mixed-version clusters. This will eventually
-    // be removed when we release 7.0.
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        serverGlobalParams.featureCompatibility.isLessThan(
-            multiversion::FeatureCompatibilityVersion::kVersion_5_3)) {
-        uassert(ErrorCodes::FailedToParse,
-                "w has to be a number or string; found: {}"_format(typeName(wEl.type())),
-                wEl.type() != BSONType::Object);
-    }
-
     if (wEl.isNumber()) {
         auto wNum = wEl.safeNumberLong();
         if (wNum < 0 || wNum > static_cast<long long>(repl::ReplSetConfig::kMaxMembers)) {

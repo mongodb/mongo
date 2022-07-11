@@ -278,12 +278,6 @@ public:
          */
         CancellationToken _initAbortMigrationSource(const CancellationToken& token);
 
-        /*
-         * Returns false if the protocol is FCV incompatible. Also, resets the 'protocol' field in
-         * the _stateDoc to boost::none for FCV < 5.2.
-         */
-        bool _checkifProtocolRemainsFCVCompatible();
-
         ServiceContext* const _serviceContext;
         const TenantMigrationDonorService* const _donorService;
 
@@ -342,10 +336,6 @@ public:
         // interrupting the instance, e.g. receiving donorAbortMigration. Initialized in
         // _initAbortMigrationSource().
         boost::optional<CancellationSource> _abortMigrationSource;
-
-        // Value is set at the beginning of run() method. Mainly used to determine if the 'protocol'
-        // field needs to be added to recipient migration commands and state document.
-        bool _isAtLeastFCV52AtStart = false;
     };
 
 private:

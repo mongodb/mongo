@@ -84,12 +84,6 @@ inline Status validateProtocolFCVCompatibility(
     if (!protocol)
         return Status::OK();
 
-    if (!serverGlobalParams.featureCompatibility.isGreaterThanOrEqualTo(
-            multiversion::FeatureCompatibilityVersion::kVersion_5_2)) {
-        return Status(ErrorCodes::InvalidOptions,
-                      str::stream() << "'protocol' field is not supported for FCV below 5.2'");
-    }
-
     if (*protocol == MigrationProtocolEnum::kShardMerge &&
         !repl::feature_flags::gShardMerge.isEnabled(serverGlobalParams.featureCompatibility)) {
         return Status(ErrorCodes::IllegalOperation,

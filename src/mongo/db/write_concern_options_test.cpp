@@ -213,13 +213,5 @@ TEST(WriteConcernOptionsTest, ParseWithTags) {
     ASSERT(wc != wc5);
 }
 
-TEST(WriteConcernOptionsTest, WTagsNotPermittedFCVLessThan53) {
-    serverGlobalParams.mutableFeatureCompatibility.setVersion(
-        multiversion::FeatureCompatibilityVersion::kVersion_5_2);
-    auto status = WriteConcernOptions::parse(BSON("w" << BSON("abc" << 1))).getStatus();
-    ASSERT_EQUALS(ErrorCodes::FailedToParse, status);
-    ASSERT_STRING_CONTAINS(status.reason(), "w has to be a number or string");
-}
-
 }  // namespace
 }  // namespace mongo
