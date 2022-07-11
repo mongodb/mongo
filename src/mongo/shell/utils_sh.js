@@ -266,7 +266,17 @@ sh.waitForBalancer = function(wait, timeout, interval) {
     var currentStatus;
     assert.soon(function() {
         currentStatus = sh._getBalancerStatus();
-        return (currentStatus.numBalancerRounds - initialStatus.numBalancerRounds) != 0;
+        assert.eq(currentStatus.mode, 'full', "Balancer is disabled");
+        if (!friendlyEqual(currentStatus.term, initialStatus.term)) {
+            // A new primary of the csrs has been elected
+            initialStatus = currentStatus;
+            return false;
+        }
+        assert.gte(currentStatus.numBalancerRounds,
+                   initialStatus.numBalancerRounds,
+                   'Number of balancer rounds moved back in time unexpectedly. Current status: ' +
+                       tojson(currentStatus) + ', initial status: ' + tojson(initialStatus));
+        return currentStatus.numBalancerRounds > initialStatus.numBalancerRounds;
     }, 'Latest balancer status: ' + tojson(currentStatus), timeout, interval);
 };
 

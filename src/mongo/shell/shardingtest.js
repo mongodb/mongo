@@ -602,36 +602,9 @@ var ShardingTest = function(params) {
     /**
      * Waits up to the specified timeout (with a default of 60s) for the balancer to execute one
      * round. If no round has been executed, throws an error.
-     *
-     * The mongosConnection parameter is optional and allows callers to specify a connection
-     * different than the first mongos instance in the list.
      */
-    this.awaitBalancerRound = function(timeoutMs, mongosConnection) {
-        timeoutMs = timeoutMs || 60000;
-        mongosConnection = mongosConnection || self.s0;
-
-        // Get the balancer section from the server status of the config server primary
-        function getBalancerStatus() {
-            var balancerStatus =
-                assert.commandWorked(mongosConnection.adminCommand({balancerStatus: 1}));
-            if (balancerStatus.mode !== 'full') {
-                throw Error('Balancer is not enabled');
-            }
-
-            return balancerStatus;
-        }
-
-        var initialStatus = getBalancerStatus();
-        var currentStatus;
-        assert.soon(
-            function() {
-                currentStatus = getBalancerStatus();
-                return (currentStatus.numBalancerRounds - initialStatus.numBalancerRounds) != 0;
-            },
-            function() {
-                return 'Latest balancer status: ' + tojson(currentStatus);
-            },
-            timeoutMs);
+    this.awaitBalancerRound = function(timeoutMs) {
+        return this.waitForBalancer(true, timeoutMs || 60000);
     };
 
     /**
