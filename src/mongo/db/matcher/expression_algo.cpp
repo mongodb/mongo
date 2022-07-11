@@ -835,7 +835,8 @@ bool isIndependentOf(const MatchExpression& expr, const OrderedPathSet& pathSet)
 
     auto depsTracker = DepsTracker{};
     expr.addDependencies(&depsTracker);
-    if (depsTracker.needWholeDocument) {
+    // Match expressions that generate random numbers can't be safely split out and pushed down.
+    if (depsTracker.needRandomGenerator || depsTracker.needWholeDocument) {
         return false;
     }
     return areIndependent(pathSet, depsTracker.fields);
@@ -858,6 +859,10 @@ bool isOnlyDependentOn(const MatchExpression& expr, const OrderedPathSet& pathSe
     // Now add the match expression's paths and see if the dependencies are the same.
     auto exprDepsTracker = DepsTracker{};
     expr.addDependencies(&exprDepsTracker);
+    // Match expressions that generate random numbers can't be safely split out and pushed down.
+    if (exprDepsTracker.needRandomGenerator) {
+        return false;
+    }
     pathsDepsCopy.insert(exprDepsTracker.fields.begin(), exprDepsTracker.fields.end());
 
     return pathsDeps ==

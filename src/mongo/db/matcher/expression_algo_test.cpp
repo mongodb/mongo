@@ -1387,6 +1387,31 @@ TEST(SplitMatchExpression, ShouldMoveIndependentPredicateWhenThereAreMultipleRen
     ASSERT_FALSE(splitExpr.second.get());
 }
 
+TEST(SplitMatchExpression, ShouldNotSplitWhenRand) {
+    const auto randExpr = "{$expr: {$lt: [{$rand: {}}, {$const: 0.25}]}}";
+    const auto assertMatchDoesNotSplit = [&](const std::string& exprString) {
+        BSONObj matchPredicate = fromjson(exprString);
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        auto matcher = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+        ASSERT_OK(matcher.getStatus());
+
+        auto&& [split, residual] =
+            expression::splitMatchExpressionBy(std::move(matcher.getValue()), {}, {});
+        ASSERT_FALSE(split.get());
+        ASSERT_TRUE(residual.get());
+
+        BSONObjBuilder oldBob;
+        residual->serialize(&oldBob, true);
+        ASSERT_BSONOBJ_EQ(oldBob.obj(), fromjson(randExpr));
+    };
+
+    // We should not push down a $match with a $rand expression.
+    assertMatchDoesNotSplit(randExpr);
+
+    // This is equivalent to 'randExpr'.
+    assertMatchDoesNotSplit("{$sampleRate: 0.25}");
+}
+
 TEST(ApplyRenamesToExpression, ShouldApplyBasicRenamesForAMatchWithExpr) {
     BSONObj matchPredicate = fromjson("{$expr: {$eq: ['$a.b', '$c']}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
