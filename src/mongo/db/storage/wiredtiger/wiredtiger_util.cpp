@@ -466,6 +466,10 @@ Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) 
         return {ErrorCodes::FailedToParse, "malformed 'configString' value."};
     }
 
+    if (config.find("type=lsm") != std::string::npos) {
+        return {ErrorCodes::Error(6627201), "Configuration 'type=lsm' is not supported."};
+    }
+
     Status status = wtRCToStatus(
         wiredtiger_config_validate(nullptr, &eventHandler, "WT_SESSION.create", config.rawData()),
         nullptr);

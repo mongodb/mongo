@@ -1974,6 +1974,17 @@ void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx) {
                         _ns,
                         rollbackReason));
     } else if (ret != WT_NOTFOUND) {
+        if (ret == ENOTSUP) {
+            auto creationMetadata = WiredTigerUtil::getMetadataCreate(wtSession, _uri).getValue();
+            if (creationMetadata.find("lsm=") != std::string::npos) {
+                LOGV2_FATAL(
+                    6627200,
+                    "WiredTiger tables using 'type=lsm' (Log-Structured Merge Tree) are not "
+                    "supported.",
+                    "namespace"_attr = _ns,
+                    "metadata"_attr = redact(creationMetadata));
+            }
+        }
         invariantWTOK(ret, wtSession);
         auto recordId = getKey(cursor);
         nextId = recordId.getLong() + 1;
