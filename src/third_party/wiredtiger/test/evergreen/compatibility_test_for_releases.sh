@@ -4,6 +4,7 @@
 ##############################################################################################
 
 set -e
+set -x
 
 #############################################################
 # bflag:
@@ -77,7 +78,8 @@ build_branch()
     cd "$1"
     git checkout --quiet "$1"
 
-    if [ "${build_sys[$1]}" == "cmake" ]; then
+    build_system=$(get_build_system $1)
+    if [ "$build_system" == "cmake" ]; then
         . ./test/evergreen/find_cmake.sh
         config=""
         config+="-DENABLE_SNAPPY=1 "
@@ -295,7 +297,8 @@ run_test_checkpoint()
 
     cd "$branch_name/build/test/checkpoint"
 
-    if [ "${build_sys[$branch_name]}" == "cmake" ]; then
+    build_system=$(get_build_system $branch_name)
+    if [ "$build_system" == "cmake" ]; then
         test_bin="test_checkpoint"
     else
         test_bin="t"
@@ -386,7 +389,8 @@ verify_test_checkpoint()
     top_dir=$PWD
     cd "$1/build/test/checkpoint"
 
-    if [ "${build_sys[$1]}" == "cmake" ]; then
+    build_system=$(get_build_system $1)
+    if [ "$build_system" == "cmake" ]; then
         test_bin="test_checkpoint"
     else
         test_bin="t"
@@ -466,7 +470,8 @@ test_upgrade_to_branch()
 {
     cd $1/build/test/checkpoint
 
-    if [ "${build_sys[$1]}" == "cmake" ]; then
+    build_system=$(get_build_system $1)
+    if [ "$build_system" == "cmake" ]; then
         test_bin="test_checkpoint"
     else
         test_bin="t"
@@ -561,17 +566,43 @@ scopes[upgrade_to_latest]="upgrade/downgrade databases to the latest versions of
 scopes[wt_standalone]="WiredTiger standalone releases"
 scopes[two_versions]="any two given versions"
 
-# The following associative array maps the 'official' build system to use for each branch.
-# CMake build support is reliably mature in newer release branches, whilst earlier revisions
-# primarily use Autoconf (note: some earlier branches may have CMake support, but these aren't
-# considered 'mature' versions.)
-declare -A build_sys
-build_sys['develop']="cmake"
-build_sys['mongodb-6.0']="cmake"
-build_sys['mongodb-5.0']="autoconf"
-build_sys['mongodb-4.4']="autoconf"
-build_sys['mongodb-4.2']="autoconf"
-build_sys['mongodb-4.0']="autoconf"
+#############################################################
+# Retrieve the build system used by a particular release,
+# since WiredTiger switched from autoconf to cmake.
+#       arg1: branch name to check against
+#       output: string as name of build system
+#############################################################
+get_build_system()
+{
+    branch="$1"
+    # Default to cmake.
+    local build_system="cmake"
+
+    # As of MongoDB 6.0, WiredTiger standalone builds switched to CMake
+    if [[ $branch == mongodb-* ]]; then
+        major=`echo $branch | cut -d '-' -f 2 | cut -d '.' -f 1`
+        if [ $major -lt 6 ]; then
+            build_system="autoconf"
+        fi
+    fi
+    # Check for WiredTiger standalone branch names. They are of the form 10.0.0 - figure out
+    # if the first element is numerical, and use that to decide.
+    wt_version="false"
+    major=`echo $branch | cut -d '.' -f 1`
+    case $major in
+        ''|*[!0-9]*) wt_version="false" ;;
+        *) wt_version="true" ;;
+    esac
+
+    if [[ "$wt_version" == "true" ]]; then
+        # The 11.0.0 version of WiredTiger is where cmake became the default
+        if [ $major -lt 11 ]; then
+            build_system="autoconf"
+        fi
+    fi
+    echo $build_system
+
+}
 
 #############################################################
 # usage string
@@ -703,13 +734,14 @@ if [ "$patch_version" = true ]; then
         if [ -n "$pv" ]; then
             (build_branch $pv)
             rtn=$(is_test_checkpoint_recovery_supported $pv)
-            patch_fix_included=$(git log --oneline --grep=WT-8708 -b "$pv" --)
+            patch_fix_included=$(git log --format=%h -1 --grep=WT-8708 -b "$pv" --)
 
             # Only run verify if the picked version supports test checkpoint recovery
             if [ $rtn == "no" ]; then
                 echo -e "\n\"$pv\" does not support test checkpoint with recovery, skipping ...\n"
-            # Apply patch fix from WT-8708 to already released compatible versions to avoid test/checkpoint setting commit timestamp less than stable timestamp
-            elif [ $rtn == "yes" ] && [ ! $patch_fix_included ]; then
+            # Apply patch fix from WT-8708 to already released compatible versions to avoid
+            # test/checkpoint setting commit timestamp less than stable timestamp
+            elif [ $rtn == "yes" ] && [ -z $patch_fix_included ]; then
                 cd $pv;
 
                 git format-patch -1 d4b0ad6cacb874fdc20bcc76311d789dd5a01441;
