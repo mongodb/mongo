@@ -90,7 +90,7 @@ void failsWithLockTimeout(std::function<void()> func, Milliseconds timeoutMillis
 
 TEST_F(CatalogRAIITestFixture, AutoGetDBDeadline) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_X);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
     failsWithLockTimeout(
         [&] { AutoGetDb db(client2.second.get(), nss.db(), MODE_X, Date_t::now() + timeoutMs); },
         timeoutMs);
@@ -106,7 +106,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetDBGlobalLockDeadline) {
 
 TEST_F(CatalogRAIITestFixture, AutoGetDBDeadlineNow) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
     AutoGetDb db(client2.second.get(), nss.db(), MODE_IX);
     failsWithLockTimeout(
         [&] { AutoGetDb db(client2.second.get(), nss.db(), MODE_X, Date_t::now()); },
@@ -115,7 +115,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetDBDeadlineNow) {
 
 TEST_F(CatalogRAIITestFixture, AutoGetDBDeadlineMin) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
     AutoGetDb db(client2.second.get(), nss.db(), MODE_IX);
     failsWithLockTimeout([&] { AutoGetDb db(client2.second.get(), nss.db(), MODE_X, Date_t{}); },
                          Milliseconds(0));
@@ -123,7 +123,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetDBDeadlineMin) {
 
 TEST_F(CatalogRAIITestFixture, AutoGetCollectionCollLockDeadline) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
     Lock::CollectionLock collLock1(client1.second.get(), nss, MODE_X);
     ASSERT(client1.second->lockState()->isCollectionLockedForMode(nss, MODE_X));
     failsWithLockTimeout(
@@ -139,7 +139,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionCollLockDeadline) {
 
 TEST_F(CatalogRAIITestFixture, AutoGetCollectionDBLockDeadline) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_X);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
     failsWithLockTimeout(
         [&] {
             AutoGetCollection coll(client2.second.get(),
@@ -167,7 +167,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionGlobalLockDeadline) {
 
 TEST_F(CatalogRAIITestFixture, AutoGetCollectionDeadlineNow) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
     Lock::CollectionLock collLock1(client1.second.get(), nss, MODE_X);
     ASSERT(client1.second->lockState()->isCollectionLockedForMode(nss, MODE_X));
 
@@ -184,7 +184,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionDeadlineNow) {
 
 TEST_F(CatalogRAIITestFixture, AutoGetCollectionDeadlineMin) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
     Lock::CollectionLock collLock1(client1.second.get(), nss, MODE_X);
     ASSERT(client1.second->lockState()->isCollectionLockedForMode(nss, MODE_X));
 
@@ -216,7 +216,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionNotCompatibleWithRSTLExclusiveLo
 
 TEST_F(CatalogRAIITestFixture, AutoGetCollectionDBLockCompatibleX) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
 
     AutoGetCollection coll(client2.second.get(), nss, MODE_X);
 }
@@ -238,7 +238,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionSecondaryNamespacesSingleDb) {
 
     ASSERT(opCtx1->lockState()->isRSTLLocked());
     ASSERT(opCtx1->lockState()->isReadLocked());  // Global lock check
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(nss.db(), MODE_IS));
+    ASSERT(opCtx1->lockState()->isDbLockedForMode(nss.dbName(), MODE_IS));
     ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss1.db(), MODE_IS));
     ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss2.db(), MODE_IS));
     ASSERT(opCtx1->lockState()->isCollectionLockedForMode(nss, MODE_IS));
@@ -276,7 +276,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionMultiNamespacesMODEIX) {
 
     ASSERT(opCtx1->lockState()->isRSTLLocked());
     ASSERT(opCtx1->lockState()->isWriteLocked());  // Global lock check
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+    ASSERT(opCtx1->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
     ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss1.db(), MODE_IX));
     ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss2.db(), MODE_IX));
     ASSERT(opCtx1->lockState()->isCollectionLockedForMode(nss, MODE_IX));
@@ -303,7 +303,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetDbSecondaryNamespacesSingleDb) {
 
     ASSERT(opCtx1->lockState()->isRSTLLocked());
     ASSERT(opCtx1->lockState()->isReadLocked());  // Global lock check
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(nss.db(), MODE_IS));
+    ASSERT(opCtx1->lockState()->isDbLockedForMode(nss.dbName(), MODE_IS));
     ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss1.db(), MODE_IS));
     ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss2.db(), MODE_IS));
 
@@ -380,7 +380,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionLockFreeGlobalLockDeadline) {
 
 TEST_F(CatalogRAIITestFixture, AutoGetCollectionLockFreeCompatibleWithCollectionExclusiveLock) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
     Lock::CollectionLock collLock1(client1.second.get(), nss, MODE_X);
     ASSERT(client1.second->lockState()->isCollectionLockedForMode(nss, MODE_X));
 
@@ -392,7 +392,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionLockFreeCompatibleWithCollection
 
 TEST_F(CatalogRAIITestFixture, AutoGetCollectionLockFreeCompatibleWithDatabaseExclusiveLock) {
     Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_X);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
 
     AutoGetCollectionLockFree coll(
         client2.second.get(), nss, [](std::shared_ptr<const Collection>&, OperationContext*, UUID) {

@@ -289,7 +289,7 @@ public:
     // These are shortcut methods for the above calls. They however check that the entire
     // hierarchy is properly locked and because of this they are very expensive to call.
     // Do not use them in performance critical code paths.
-    virtual bool isDbLockedForMode(StringData dbName, LockMode mode) const = 0;
+    virtual bool isDbLockedForMode(const DatabaseName& dbName, LockMode mode) const = 0;
     virtual bool isCollectionLockedForMode(const NamespaceString& nss, LockMode mode) const = 0;
 
     /**

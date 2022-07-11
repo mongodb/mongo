@@ -92,7 +92,8 @@ void _finishDropDatabase(OperationContext* opCtx,
                          Database* db,
                          std::size_t numCollections,
                          bool abortIndexBuilds) {
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
+    // TODO SERVER-67549 Use dbName directly.
+    invariant(opCtx->lockState()->isDbLockedForMode(DatabaseName(boost::none, dbName), MODE_X));
 
     // If DatabaseHolder::dropDb() fails, we should reset the drop-pending state on Database.
     ScopeGuard dropPendingGuard([db, opCtx] { db->setDropPending(opCtx, false); });

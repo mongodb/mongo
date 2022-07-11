@@ -681,14 +681,14 @@ void createChangeStreamPreImagesCollection(OperationContext* opCtx) {
             status.isOK() || status.code() == ErrorCodes::NamespaceExists);
 }
 
-// TODO SERVER-62880 pass DatabaseName instead of dbName.
+// TODO SERVER-62395 Pass DatabaseName instead of dbName, and pass to isDbLockedForMode.
 Status createCollectionForApplyOps(OperationContext* opCtx,
                                    const std::string& dbName,
                                    const boost::optional<UUID>& ui,
                                    const BSONObj& cmdObj,
                                    const bool allowRenameOutOfTheWay,
                                    const boost::optional<BSONObj>& idIndex) {
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IX));
+    invariant(opCtx->lockState()->isDbLockedForMode(DatabaseName(boost::none, dbName), MODE_IX));
 
     const NamespaceString newCollName(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
     auto newCmd = cmdObj;

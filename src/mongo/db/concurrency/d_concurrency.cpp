@@ -276,7 +276,7 @@ Lock::CollectionLock::CollectionLock(OperationContext* opCtx,
         _id = {RESOURCE_COLLECTION, nss.ns()};
 
         invariant(nss.coll().size(), str::stream() << "expected non-empty collection name:" << nss);
-        dassert(_opCtx->lockState()->isDbLockedForMode(nss.db(),
+        dassert(_opCtx->lockState()->isDbLockedForMode(nss.dbName(),
                                                        isSharedLockMode(mode) ? MODE_IS : MODE_IX));
 
         _opCtx->lockState()->lock(_opCtx, _id, mode, deadline);
@@ -288,7 +288,7 @@ Lock::CollectionLock::CollectionLock(OperationContext* opCtx,
     auto nss = CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(opCtx, nssOrUUID);
 
     // The UUID cannot move between databases so this one dassert is sufficient.
-    dassert(_opCtx->lockState()->isDbLockedForMode(nss.db(),
+    dassert(_opCtx->lockState()->isDbLockedForMode(nss.dbName(),
                                                    isSharedLockMode(mode) ? MODE_IS : MODE_IX));
 
     // We cannot be sure that the namespace we lock matches the UUID given because we resolve the

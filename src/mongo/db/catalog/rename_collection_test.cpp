@@ -220,7 +220,7 @@ void OpObserverMock::onInserts(OperationContext* opCtx,
     }
 
     onInsertsIsTargetDatabaseExclusivelyLocked =
-        opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_X);
+        opCtx->lockState()->isDbLockedForMode(nss.dbName(), MODE_X);
 
     _logOp(opCtx, nss, "inserts");
     OpObserverNoop::onInserts(opCtx, nss, uuid, begin, end, fromMigrate);

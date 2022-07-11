@@ -1130,7 +1130,7 @@ TEST_F(DConcurrencyTestFixture, MultipleWriteDBLocksOnSameThread) {
     Lock::DBLock r1(opCtx.get(), dbName, MODE_X);
     Lock::DBLock r2(opCtx.get(), dbName, MODE_X);
 
-    ASSERT(opCtx->lockState()->isDbLockedForMode("db1", MODE_X));
+    ASSERT(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
 }
 
 TEST_F(DConcurrencyTestFixture, MultipleConflictingDBLocksOnSameThread) {
@@ -1141,17 +1141,17 @@ TEST_F(DConcurrencyTestFixture, MultipleConflictingDBLocksOnSameThread) {
     Lock::DBLock r1(opCtx.get(), dbName, MODE_X);
     Lock::DBLock r2(opCtx.get(), dbName, MODE_S);
 
-    ASSERT(lockState->isDbLockedForMode("db1", MODE_X));
-    ASSERT(lockState->isDbLockedForMode("db1", MODE_S));
+    ASSERT(lockState->isDbLockedForMode(dbName, MODE_X));
+    ASSERT(lockState->isDbLockedForMode(dbName, MODE_S));
 }
 
 TEST_F(DConcurrencyTestFixture, IsDbLockedForSMode) {
-    const std::string dbName("db");
+    DatabaseName dbName(boost::none, "db");
 
     auto opCtx = makeOperationContext();
     getClient()->swapLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
     auto lockState = opCtx->lockState();
-    Lock::DBLock dbLock(opCtx.get(), DatabaseName(boost::none, "db"), MODE_S);
+    Lock::DBLock dbLock(opCtx.get(), dbName, MODE_S);
 
     ASSERT(lockState->isDbLockedForMode(dbName, MODE_IS));
     ASSERT(!lockState->isDbLockedForMode(dbName, MODE_IX));
@@ -1160,12 +1160,12 @@ TEST_F(DConcurrencyTestFixture, IsDbLockedForSMode) {
 }
 
 TEST_F(DConcurrencyTestFixture, IsDbLockedForXMode) {
-    const std::string dbName("db");
+    DatabaseName dbName(boost::none, "db");
 
     auto opCtx = makeOperationContext();
     getClient()->swapLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
     auto lockState = opCtx->lockState();
-    Lock::DBLock dbLock(opCtx.get(), DatabaseName(boost::none, "db"), MODE_X);
+    Lock::DBLock dbLock(opCtx.get(), dbName, MODE_X);
 
     ASSERT(lockState->isDbLockedForMode(dbName, MODE_IS));
     ASSERT(lockState->isDbLockedForMode(dbName, MODE_IX));
@@ -1239,6 +1239,8 @@ TEST_F(DConcurrencyTestFixture, Stress) {
     AtomicWord<int> ready{0};
     std::vector<stdx::thread> threads;
 
+    DatabaseName fooDb(boost::none, "foo");
+    DatabaseName localDb(boost::none, "local");
 
     for (int threadId = 0; threadId < kMaxStressThreads; threadId++) {
         threads.emplace_back([&, threadId]() {
@@ -1270,11 +1272,7 @@ TEST_F(DConcurrencyTestFixture, Stress) {
                     Lock::GlobalRead r2(clients[threadId].second.get());
                     ASSERT(clients[threadId].second->lockState()->isReadLocked());
                 } else if (i % 7 == 5) {
-                    {
-                        Lock::DBLock r(clients[threadId].second.get(),
-                                       DatabaseName(boost::none, "foo"),
-                                       MODE_S);
-                    }
+                    { Lock::DBLock r(clients[threadId].second.get(), fooDb, MODE_S); }
                     {
                         Lock::DBLock r(clients[threadId].second.get(),
                                        DatabaseName(boost::none, "bar"),
@@ -1285,36 +1283,24 @@ TEST_F(DConcurrencyTestFixture, Stress) {
                         int q = i % 11;
 
                         if (q == 0) {
-                            Lock::DBLock r(clients[threadId].second.get(),
-                                           DatabaseName(boost::none, "foo"),
-                                           MODE_S);
+                            Lock::DBLock r(clients[threadId].second.get(), fooDb, MODE_S);
                             ASSERT(clients[threadId].second->lockState()->isDbLockedForMode(
-                                "foo", MODE_S));
+                                fooDb, MODE_S));
 
-                            Lock::DBLock r2(clients[threadId].second.get(),
-                                            DatabaseName(boost::none, "foo"),
-                                            MODE_S);
+                            Lock::DBLock r2(clients[threadId].second.get(), fooDb, MODE_S);
                             ASSERT(clients[threadId].second->lockState()->isDbLockedForMode(
-                                "foo", MODE_S));
+                                fooDb, MODE_S));
 
-                            Lock::DBLock r3(clients[threadId].second.get(),
-                                            DatabaseName(boost::none, "local"),
-                                            MODE_S);
+                            Lock::DBLock r3(clients[threadId].second.get(), localDb, MODE_S);
                             ASSERT(clients[threadId].second->lockState()->isDbLockedForMode(
-                                "foo", MODE_S));
+                                fooDb, MODE_S));
                             ASSERT(clients[threadId].second->lockState()->isDbLockedForMode(
-                                "local", MODE_S));
+                                localDb, MODE_S));
                         } else if (q == 1) {
                             // test locking local only -- with no preceding lock
-                            {
-                                Lock::DBLock x(clients[threadId].second.get(),
-                                               DatabaseName(boost::none, "local"),
-                                               MODE_S);
-                            }
+                            { Lock::DBLock x(clients[threadId].second.get(), localDb, MODE_S); }
 
-                            Lock::DBLock x(clients[threadId].second.get(),
-                                           DatabaseName(boost::none, "local"),
-                                           MODE_X);
+                            Lock::DBLock x(clients[threadId].second.get(), localDb, MODE_X);
 
                         } else if (q == 2) {
                             {
@@ -1328,9 +1314,7 @@ TEST_F(DConcurrencyTestFixture, Stress) {
                                                MODE_X);
                             }
                         } else if (q == 3) {
-                            Lock::DBLock x(clients[threadId].second.get(),
-                                           DatabaseName(boost::none, "foo"),
-                                           MODE_X);
+                            Lock::DBLock x(clients[threadId].second.get(), fooDb, MODE_X);
                             Lock::DBLock y(clients[threadId].second.get(),
                                            DatabaseName(boost::none, "admin"),
                                            MODE_S);
@@ -1342,38 +1326,20 @@ TEST_F(DConcurrencyTestFixture, Stress) {
                                            DatabaseName(boost::none, "admin"),
                                            MODE_S);
                         } else if (q == 5) {
-                            Lock::DBLock x(clients[threadId].second.get(),
-                                           DatabaseName(boost::none, "foo"),
-                                           MODE_IS);
+                            Lock::DBLock x(clients[threadId].second.get(), fooDb, MODE_IS);
                         } else if (q == 6) {
-                            Lock::DBLock x(clients[threadId].second.get(),
-                                           DatabaseName(boost::none, "foo"),
-                                           MODE_IX);
-                            Lock::DBLock y(clients[threadId].second.get(),
-                                           DatabaseName(boost::none, "local"),
-                                           MODE_IX);
+                            Lock::DBLock x(clients[threadId].second.get(), fooDb, MODE_IX);
+                            Lock::DBLock y(clients[threadId].second.get(), localDb, MODE_IX);
                         } else {
-                            Lock::DBLock w(clients[threadId].second.get(),
-                                           DatabaseName(boost::none, "foo"),
-                                           MODE_X);
+                            Lock::DBLock w(clients[threadId].second.get(), fooDb, MODE_X);
 
-                            Lock::DBLock r2(clients[threadId].second.get(),
-                                            DatabaseName(boost::none, "foo"),
-                                            MODE_S);
-                            Lock::DBLock r3(clients[threadId].second.get(),
-                                            DatabaseName(boost::none, "local"),
-                                            MODE_S);
+                            Lock::DBLock r2(clients[threadId].second.get(), fooDb, MODE_S);
+                            Lock::DBLock r3(clients[threadId].second.get(), localDb, MODE_S);
                         }
                     } else {
-                        Lock::DBLock r(clients[threadId].second.get(),
-                                       DatabaseName(boost::none, "foo"),
-                                       MODE_S);
-                        Lock::DBLock r2(clients[threadId].second.get(),
-                                        DatabaseName(boost::none, "foo"),
-                                        MODE_S);
-                        Lock::DBLock r3(clients[threadId].second.get(),
-                                        DatabaseName(boost::none, "local"),
-                                        MODE_S);
+                        Lock::DBLock r(clients[threadId].second.get(), fooDb, MODE_S);
+                        Lock::DBLock r2(clients[threadId].second.get(), fooDb, MODE_S);
+                        Lock::DBLock r3(clients[threadId].second.get(), localDb, MODE_S);
                     }
                 }
 
@@ -1758,16 +1724,16 @@ TEST_F(DConcurrencyTestFixture, DBLockTimeout) {
 
     const Milliseconds timeoutMillis = Milliseconds(1500);
 
-    Lock::DBLock L1(opctx1, DatabaseName(boost::none, "testdb"), MODE_X, Date_t::max());
-    ASSERT(opctx1->lockState()->isDbLockedForMode("testdb"_sd, MODE_X));
+    DatabaseName testDb(boost::none, "testdb");
+
+    Lock::DBLock L1(opctx1, testDb, MODE_X, Date_t::max());
+    ASSERT(opctx1->lockState()->isDbLockedForMode(testDb, MODE_X));
     ASSERT(L1.isLocked());
 
     Date_t t1 = Date_t::now();
-    ASSERT_THROWS_CODE(
-        Lock::DBLock(
-            opctx2, DatabaseName(boost::none, "testdb"), MODE_X, Date_t::now() + timeoutMillis),
-        AssertionException,
-        ErrorCodes::LockTimeout);
+    ASSERT_THROWS_CODE(Lock::DBLock(opctx2, testDb, MODE_X, Date_t::now() + timeoutMillis),
+                       AssertionException,
+                       ErrorCodes::LockTimeout);
     Date_t t2 = Date_t::now();
     ASSERT_GTE(t2 - t1 + kMaxClockJitterMillis, Milliseconds(timeoutMillis));
 }
@@ -1844,14 +1810,16 @@ TEST_F(DConcurrencyTestFixture, CollectionLockTimeout) {
 
     const Milliseconds timeoutMillis = Milliseconds(1500);
 
-    Lock::DBLock DBL1(opctx1, DatabaseName(boost::none, "testdb"), MODE_IX, Date_t::max());
-    ASSERT(opctx1->lockState()->isDbLockedForMode("testdb"_sd, MODE_IX));
+    DatabaseName testDb(boost::none, "testdb");
+
+    Lock::DBLock DBL1(opctx1, testDb, MODE_IX, Date_t::max());
+    ASSERT(opctx1->lockState()->isDbLockedForMode(testDb, MODE_IX));
     Lock::CollectionLock CL1(opctx1, NamespaceString("testdb.test"), MODE_X, Date_t::max());
     ASSERT(opctx1->lockState()->isCollectionLockedForMode(NamespaceString("testdb.test"), MODE_X));
 
     Date_t t1 = Date_t::now();
-    Lock::DBLock DBL2(opctx2, DatabaseName(boost::none, "testdb"), MODE_IX, Date_t::max());
-    ASSERT(opctx2->lockState()->isDbLockedForMode("testdb"_sd, MODE_IX));
+    Lock::DBLock DBL2(opctx2, testDb, MODE_IX, Date_t::max());
+    ASSERT(opctx2->lockState()->isDbLockedForMode(testDb, MODE_IX));
     ASSERT_THROWS_CODE(
         Lock::CollectionLock(
             opctx2, NamespaceString("testdb.test"), MODE_X, Date_t::now() + timeoutMillis),
@@ -2389,8 +2357,8 @@ TEST_F(DConcurrencyTestFixture, DifferentTenantsTakeDBLockOnConflictingNamespace
     Lock::DBLock r1(opCtx1, dbName1, MODE_X);
     Lock::DBLock r2(opCtx2, dbName2, MODE_X);
 
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(dbName1.toStringWithTenantId(), MODE_X));
-    ASSERT(opCtx2->lockState()->isDbLockedForMode(dbName2.toStringWithTenantId(), MODE_X));
+    ASSERT(opCtx1->lockState()->isDbLockedForMode(dbName1, MODE_X));
+    ASSERT(opCtx2->lockState()->isDbLockedForMode(dbName2, MODE_X));
 }
 
 TEST_F(DConcurrencyTestFixture, ConflictingTenantDBLockThrows) {
@@ -2402,10 +2370,12 @@ TEST_F(DConcurrencyTestFixture, ConflictingTenantDBLockThrows) {
     DatabaseName dbName1(TenantId(OID::gen()), db);
 
     Lock::DBLock r1(opCtx1, dbName1, MODE_X);
+    ASSERT(opCtx1->lockState()->isDbLockedForMode(dbName1, MODE_X));
 
     auto result = runTaskAndKill(opCtx2, [&]() { Lock::DBLock r2(opCtx2, dbName1, MODE_S); });
 
     ASSERT_THROWS_CODE(result.get(), AssertionException, ErrorCodes::Interrupted);
+    ASSERT(opCtx1->lockState()->isDbLockedForMode(dbName1, MODE_X));
 }
 
 }  // namespace

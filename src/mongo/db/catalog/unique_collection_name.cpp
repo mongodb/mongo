@@ -45,7 +45,7 @@ PseudoRandom uniqueCollectionNamespacePseudoRandom(Date_t::now().asInt64());
 StatusWith<NamespaceString> makeUniqueCollectionName(OperationContext* opCtx,
                                                      const DatabaseName& dbName,
                                                      StringData collectionNameModel) {
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName.db(), MODE_IX));
+    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IX));
 
     // There must be at least one percent sign in the collection name model.
     auto numPercentSign = std::count(collectionNameModel.begin(), collectionNameModel.end(), '%');

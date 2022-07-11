@@ -155,7 +155,7 @@ Status renameTargetCollectionToTmp(OperationContext* opCtx,
 
     // The generated unique collection name is only guaranteed to exist if the database is
     // exclusively locked.
-    invariant(opCtx->lockState()->isDbLockedForMode(targetDB->name().db(), LockMode::MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(targetDB->name(), LockMode::MODE_X));
     auto tmpNameResult = makeUniqueCollectionName(opCtx, targetDB->name(), "tmp%%%%%.rename");
     if (!tmpNameResult.isOK()) {
         return tmpNameResult.getStatus().withContext(
@@ -480,7 +480,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
     }
 
     boost::optional<Lock::DBLock> targetDBLock;
-    if (!opCtx->lockState()->isDbLockedForMode(target.db(), MODE_X)) {
+    if (!opCtx->lockState()->isDbLockedForMode(target.dbName(), MODE_X)) {
         targetDBLock.emplace(opCtx, target.dbName(), MODE_X);
     }
 
@@ -545,7 +545,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
 
     // The generated unique collection name is only guaranteed to exist if the database is
     // exclusively locked.
-    invariant(opCtx->lockState()->isDbLockedForMode(targetDB->name().db(), LockMode::MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(targetDB->name(), LockMode::MODE_X));
 
     // Note that this temporary collection name is used by MongoMirror and thus must not be changed
     // without consultation.

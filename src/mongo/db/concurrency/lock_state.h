@@ -181,7 +181,7 @@ public:
 
     virtual LockMode getLockMode(ResourceId resId) const;
     virtual bool isLockHeldForMode(ResourceId resId, LockMode mode) const;
-    virtual bool isDbLockedForMode(StringData dbName, LockMode mode) const;
+    virtual bool isDbLockedForMode(const DatabaseName& dbName, LockMode mode) const;
     virtual bool isCollectionLockedForMode(const NamespaceString& nss, LockMode mode) const;
 
     virtual ResourceId getWaitingResource() const;

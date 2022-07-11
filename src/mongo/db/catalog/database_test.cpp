@@ -414,10 +414,10 @@ TEST_F(
 TEST_F(DatabaseTest, AutoGetDBSucceedsWithDeadlineNow) {
     NamespaceString nss("test", "coll");
     Lock::DBLock lock(_opCtx.get(), nss.dbName(), MODE_X);
-    ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+    ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
     try {
         AutoGetDb db(_opCtx.get(), nss.db(), MODE_X, Date_t::now());
-        ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+        ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
     } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
         FAIL("Should get the db within the timeout");
     }
@@ -426,10 +426,10 @@ TEST_F(DatabaseTest, AutoGetDBSucceedsWithDeadlineNow) {
 TEST_F(DatabaseTest, AutoGetDBSucceedsWithDeadlineMin) {
     NamespaceString nss("test", "coll");
     Lock::DBLock lock(_opCtx.get(), nss.dbName(), MODE_X);
-    ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+    ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
     try {
         AutoGetDb db(_opCtx.get(), nss.db(), MODE_X, Date_t());
-        ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+        ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
     } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
         FAIL("Should get the db within the timeout");
     }
@@ -438,7 +438,7 @@ TEST_F(DatabaseTest, AutoGetDBSucceedsWithDeadlineMin) {
 TEST_F(DatabaseTest, AutoGetCollectionForReadCommandSucceedsWithDeadlineNow) {
     NamespaceString nss("test", "coll");
     Lock::DBLock dbLock(_opCtx.get(), nss.dbName(), MODE_X);
-    ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+    ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
     Lock::CollectionLock collLock(_opCtx.get(), nss, MODE_X);
     ASSERT(_opCtx.get()->lockState()->isCollectionLockedForMode(nss, MODE_X));
     try {
@@ -452,7 +452,7 @@ TEST_F(DatabaseTest, AutoGetCollectionForReadCommandSucceedsWithDeadlineNow) {
 TEST_F(DatabaseTest, AutoGetCollectionForReadCommandSucceedsWithDeadlineMin) {
     NamespaceString nss("test", "coll");
     Lock::DBLock dbLock(_opCtx.get(), nss.dbName(), MODE_X);
-    ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.db(), MODE_X));
+    ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
     Lock::CollectionLock collLock(_opCtx.get(), nss, MODE_X);
     ASSERT(_opCtx.get()->lockState()->isCollectionLockedForMode(nss, MODE_X));
     try {

@@ -277,7 +277,7 @@ DurableCatalog::Entry DurableCatalogImpl::getEntry(RecordId catalogId) const {
 StatusWith<DurableCatalog::Entry> DurableCatalogImpl::_addEntry(OperationContext* opCtx,
                                                                 NamespaceString nss,
                                                                 const CollectionOptions& options) {
-    invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+    invariant(opCtx->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
 
     auto ident = _newUniqueIdent(nss, "collection");
 
@@ -319,7 +319,7 @@ StatusWith<DurableCatalog::Entry> DurableCatalogImpl::_addEntry(OperationContext
 StatusWith<DurableCatalog::Entry> DurableCatalogImpl::_importEntry(OperationContext* opCtx,
                                                                    NamespaceString nss,
                                                                    const BSONObj& metadata) {
-    invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+    invariant(opCtx->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
 
     auto ident = metadata["ident"].String();
     StatusWith<RecordId> res =

@@ -87,7 +87,8 @@ DatabaseShardingState::DatabaseShardingState(const StringData dbName)
 DatabaseShardingState* DatabaseShardingState::get(OperationContext* opCtx,
                                                   const StringData dbName) {
     // db lock must be held to have a reference to the database sharding state
-    dassert(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IS));
+    // TODO SERVER-63706 Use dbName directly
+    dassert(opCtx->lockState()->isDbLockedForMode(DatabaseName(boost::none, dbName), MODE_IS));
 
     auto& databasesMap = DatabaseShardingStateMap::get(opCtx->getServiceContext());
     return databasesMap.getOrCreate(dbName).get();
@@ -102,14 +103,14 @@ std::shared_ptr<DatabaseShardingState> DatabaseShardingState::getSharedForLockFr
 void DatabaseShardingState::enterCriticalSectionCatchUpPhase(OperationContext* opCtx,
                                                              DSSLock&,
                                                              const BSONObj& reason) {
-    invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(DatabaseName(boost::none, _dbName), MODE_X));
     _critSec.enterCriticalSectionCatchUpPhase(reason);
 }
 
 void DatabaseShardingState::enterCriticalSectionCommitPhase(OperationContext* opCtx,
                                                             DSSLock&,
                                                             const BSONObj& reason) {
-    invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(DatabaseName(boost::none, _dbName), MODE_X));
     _critSec.enterCriticalSectionCommitPhase(reason);
 }
 
@@ -125,7 +126,7 @@ MovePrimarySourceManager* DatabaseShardingState::getMovePrimarySourceManager(DSS
 void DatabaseShardingState::setMovePrimarySourceManager(OperationContext* opCtx,
                                                         MovePrimarySourceManager* sourceMgr,
                                                         DSSLock&) {
-    invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(DatabaseName(boost::none, _dbName), MODE_X));
     invariant(sourceMgr);
     invariant(!_sourceMgr);
 
@@ -133,7 +134,7 @@ void DatabaseShardingState::setMovePrimarySourceManager(OperationContext* opCtx,
 }
 
 void DatabaseShardingState::clearMovePrimarySourceManager(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_IX));
+    invariant(opCtx->lockState()->isDbLockedForMode(DatabaseName(boost::none, _dbName), MODE_IX));
     const auto dssLock = DSSLock::lockExclusive(opCtx, this);
     _sourceMgr = nullptr;
 }

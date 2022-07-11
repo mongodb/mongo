@@ -56,7 +56,7 @@ Database* DatabaseHolderImpl::getDb(OperationContext* opCtx, const DatabaseName&
         "invalid db name: " + dbName.db(),
         NamespaceString::validDBName(dbName.db(), NamespaceString::DollarInDbNameBehavior::Allow));
 
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName.toString(), MODE_IS) ||
+    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IS) ||
               (dbName.db().compare("local") == 0 && opCtx->lockState()->isLocked()));
 
     stdx::lock_guard<SimpleMutex> lk(_m);
@@ -112,7 +112,7 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx,
         6198701,
         "invalid db name: " + dbName.db(),
         NamespaceString::validDBName(dbName.db(), NamespaceString::DollarInDbNameBehavior::Allow));
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName.db(), MODE_IX));
+    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IX));
 
     if (justCreated)
         *justCreated = false;  // Until proven otherwise.
@@ -216,7 +216,7 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
 
     LOGV2_DEBUG(20310, 1, "dropDatabase {name}", "name"_attr = name);
 
-    invariant(opCtx->lockState()->isDbLockedForMode(name.db(), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(name, MODE_X));
 
     auto catalog = CollectionCatalog::get(opCtx);
     for (auto collIt = catalog->begin(opCtx, name); collIt != catalog->end(opCtx); ++collIt) {
@@ -274,7 +274,7 @@ void DatabaseHolderImpl::close(OperationContext* opCtx, const DatabaseName& dbNa
         6198700,
         "invalid db name: " + dbName.db(),
         NamespaceString::validDBName(dbName.db(), NamespaceString::DollarInDbNameBehavior::Allow));
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName.db(), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
 
     stdx::lock_guard<SimpleMutex> lk(_m);
 
@@ -330,7 +330,7 @@ void DatabaseHolderImpl::setDbInfo(OperationContext* opCtx,
         6420900,
         "Invalid database name: " + dbName.db(),
         NamespaceString::validDBName(dbName.db(), NamespaceString::DollarInDbNameBehavior::Allow));
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName.db(), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
 
     stdx::lock_guard<SimpleMutex> lk(_m);
 
@@ -353,7 +353,7 @@ void DatabaseHolderImpl::clearDbInfo(OperationContext* opCtx, const DatabaseName
         6420902,
         "Invalid database name: " + dbName.db(),
         NamespaceString::validDBName(dbName.db(), NamespaceString::DollarInDbNameBehavior::Allow));
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName.db(), MODE_IX));
+    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IX));
 
     stdx::lock_guard<SimpleMutex> lk(_m);
 
@@ -394,7 +394,7 @@ boost::optional<ShardId> DatabaseHolderImpl::getDbPrimary(OperationContext* opCt
         6420905,
         "Invalid database name: " + dbName.db(),
         NamespaceString::validDBName(dbName.db(), NamespaceString::DollarInDbNameBehavior::Allow));
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName.db(), MODE_IS));
+    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IS));
 
     stdx::lock_guard<SimpleMutex> lk(_m);
 

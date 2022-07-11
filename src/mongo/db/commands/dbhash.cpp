@@ -344,7 +344,7 @@ private:
                                   << minSnapshot->toString(),
                     !minSnapshot || *mySnapshot >= *minSnapshot);
         } else {
-            invariant(opCtx->lockState()->isDbLockedForMode(db->name().db(), MODE_S));
+            invariant(opCtx->lockState()->isDbLockedForMode(db->name(), MODE_S));
         }
 
         auto desc = collection->getIndexCatalog()->findIdIndex(opCtx);

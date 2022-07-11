@@ -218,8 +218,10 @@ void OplogApplierImplTest::_testApplyOplogEntryOrGroupedInsertsCrudOperation(
 
     auto checkOpCtx = [](OperationContext* opCtx) {
         ASSERT_TRUE(opCtx);
-        ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode("test", MODE_IX));
-        ASSERT_FALSE(opCtx->lockState()->isDbLockedForMode("test", MODE_X));
+        ASSERT_TRUE(
+            opCtx->lockState()->isDbLockedForMode(DatabaseName(boost::none, "test"), MODE_IX));
+        ASSERT_FALSE(
+            opCtx->lockState()->isDbLockedForMode(DatabaseName(boost::none, "test"), MODE_X));
         ASSERT_TRUE(
             opCtx->lockState()->isCollectionLockedForMode(NamespaceString("test.t"), MODE_IX));
         ASSERT_FALSE(opCtx->writesAreReplicated());

@@ -143,7 +143,7 @@ public:
         return true;
     }
 
-    bool isDbLockedForMode(StringData dbName, LockMode mode) const override {
+    bool isDbLockedForMode(const DatabaseName& dbName, LockMode mode) const override {
         return true;
     }
 

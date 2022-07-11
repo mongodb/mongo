@@ -118,7 +118,7 @@ Status validateDBNameForWindows(StringData dbname) {
 }
 
 void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const& nss) {
-    invariant(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IS));
+    invariant(opCtx->lockState()->isDbLockedForMode(nss.dbName(), MODE_IS));
     auto dss = DatabaseShardingState::get(opCtx, nss.db().toString());
     if (!dss) {
         return;
@@ -305,7 +305,7 @@ Status DatabaseImpl::init(OperationContext* const opCtx) {
 }
 
 void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) const {
-    invariant(opCtx->lockState()->isDbLockedForMode(name().db(), MODE_IX));
+    invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_IX));
 
     CollectionCatalog::CollectionInfoFn callback = [&](const CollectionPtr& collection) {
         try {
@@ -339,12 +339,12 @@ void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) const {
 
 void DatabaseImpl::setDropPending(OperationContext* opCtx, bool dropPending) {
     auto mode = dropPending ? MODE_X : MODE_IX;
-    invariant(opCtx->lockState()->isDbLockedForMode(name().db(), mode));
+    invariant(opCtx->lockState()->isDbLockedForMode(name(), mode));
     _dropPending.store(dropPending);
 }
 
 bool DatabaseImpl::isDropPending(OperationContext* opCtx) const {
-    invariant(opCtx->lockState()->isDbLockedForMode(name().db(), MODE_IS));
+    invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_IS));
     return _dropPending.load();
 }
 
@@ -363,7 +363,7 @@ void DatabaseImpl::getStats(OperationContext* opCtx,
     long long indexSize = 0;
     long long indexFreeStorageSize = 0;
 
-    invariant(opCtx->lockState()->isDbLockedForMode(name().db(), MODE_IS));
+    invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_IS));
 
     catalog::forEachCollectionFromDb(
         opCtx, name(), MODE_IS, [&](const CollectionPtr& collection) -> bool {
@@ -435,7 +435,7 @@ void DatabaseImpl::getStats(OperationContext* opCtx,
 }
 
 Status DatabaseImpl::dropView(OperationContext* opCtx, NamespaceString viewName) const {
-    dassert(opCtx->lockState()->isDbLockedForMode(name().db(), MODE_IX));
+    dassert(opCtx->lockState()->isDbLockedForMode(name(), MODE_IX));
     dassert(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
     dassert(opCtx->lockState()->isCollectionLockedForMode(NamespaceString(_viewsName), MODE_X));
 
@@ -783,7 +783,7 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
 Status DatabaseImpl::createView(OperationContext* opCtx,
                                 const NamespaceString& viewName,
                                 const CollectionOptions& options) const {
-    dassert(opCtx->lockState()->isDbLockedForMode(name().db(), MODE_IX));
+    dassert(opCtx->lockState()->isDbLockedForMode(name(), MODE_IX));
     dassert(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
     dassert(opCtx->lockState()->isCollectionLockedForMode(NamespaceString(_viewsName), MODE_X));
 

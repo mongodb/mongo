@@ -110,7 +110,7 @@ void validateViewDefinitionBSON(OperationContext* opCtx,
 // DurableViewCatalog
 
 void DurableViewCatalog::onExternalChange(OperationContext* opCtx, const NamespaceString& name) {
-    dassert(opCtx->lockState()->isDbLockedForMode(name.db(), MODE_IX));
+    dassert(opCtx->lockState()->isDbLockedForMode(name.dbName(), MODE_IX));
     dassert(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString(name.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
@@ -147,7 +147,7 @@ Status DurableViewCatalog::onExternalInsert(OperationContext* opCtx,
 
 void DurableViewCatalog::onSystemViewsCollectionDrop(OperationContext* opCtx,
                                                      const NamespaceString& name) {
-    dassert(opCtx->lockState()->isDbLockedForMode(name.db(), MODE_IX));
+    dassert(opCtx->lockState()->isDbLockedForMode(name.dbName(), MODE_IX));
     dassert(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString(name.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
     dassert(name.coll() == NamespaceString::kSystemDotViewsCollectionName);
@@ -228,7 +228,7 @@ BSONObj DurableViewCatalogImpl::_validateViewDefinition(OperationContext* opCtx,
 void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
                                     const NamespaceString& name,
                                     const BSONObj& view) {
-    dassert(opCtx->lockState()->isDbLockedForMode(_db->name().db(), MODE_IX));
+    dassert(opCtx->lockState()->isDbLockedForMode(_db->name(), MODE_IX));
     dassert(opCtx->lockState()->isCollectionLockedForMode(name, MODE_IX));
 
     NamespaceString systemViewsNs(_db->getSystemViewsName());
@@ -261,7 +261,7 @@ void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
 }
 
 void DurableViewCatalogImpl::remove(OperationContext* opCtx, const NamespaceString& name) {
-    dassert(opCtx->lockState()->isDbLockedForMode(_db->name().db(), MODE_IX));
+    dassert(opCtx->lockState()->isDbLockedForMode(_db->name(), MODE_IX));
     dassert(opCtx->lockState()->isCollectionLockedForMode(name, MODE_IX));
 
     CollectionPtr systemViews = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(

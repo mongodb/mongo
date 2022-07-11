@@ -156,7 +156,7 @@ TEST_F(AutoGetCollectionMultiTest, LockFreeMultiCollectionSingleDB) {
     auto locker = opCtx1->lockState();
     locker->dump();
     invariant(locker->isLockHeldForMode(resourceIdGlobal, MODE_IS));
-    invariant(!locker->isDbLockedForMode(_primaryNss.db(), MODE_IS));
+    invariant(!locker->isDbLockedForMode(_primaryNss.dbName(), MODE_IS));
     // Set 'shouldConflictWithSecondaryBatchApplication' to true so isCollectionLockedForMode()
     // doesn't return true regardless of what locks are held.
     opCtx1->lockState()->setShouldConflictWithSecondaryBatchApplication(true);
@@ -190,8 +190,8 @@ TEST_F(AutoGetCollectionMultiTest, LockedDuplicateNamespaces) {
     auto locker = opCtx1->lockState();
     locker->dump();
     invariant(locker->isLockHeldForMode(resourceIdGlobal, MODE_IS));
-    invariant(locker->isDbLockedForMode(_primaryNss.db(), MODE_IS));
-    invariant(locker->isDbLockedForMode(_secondaryNss1.db(), MODE_IS));
+    invariant(locker->isDbLockedForMode(_primaryNss.dbName(), MODE_IS));
+    invariant(locker->isDbLockedForMode(_secondaryNss1.dbName(), MODE_IS));
     // Set 'shouldConflictWithSecondaryBatchApplication' to true so isCollectionLockedForMode()
     // doesn't return true regardless of what locks are held.
     opCtx1->lockState()->setShouldConflictWithSecondaryBatchApplication(true);
@@ -217,8 +217,8 @@ TEST_F(AutoGetCollectionMultiTest, LockFreeMultiDBs) {
     auto locker = opCtx1->lockState();
     locker->dump();
     invariant(locker->isLockHeldForMode(resourceIdGlobal, MODE_IS));
-    invariant(!locker->isDbLockedForMode(_primaryNss.db(), MODE_IS));
-    invariant(!locker->isDbLockedForMode(_secondaryNssOtherDbNss.db(), MODE_IS));
+    invariant(!locker->isDbLockedForMode(_primaryNss.dbName(), MODE_IS));
+    invariant(!locker->isDbLockedForMode(_secondaryNssOtherDbNss.dbName(), MODE_IS));
     // Set 'shouldConflictWithSecondaryBatchApplication' to true so isCollectionLockedForMode()
     // doesn't return true regardless of what locks are held.
     opCtx1->lockState()->setShouldConflictWithSecondaryBatchApplication(true);
@@ -265,11 +265,11 @@ TEST_F(AutoGetCollectionMultiTest, LockedSecondaryNamespaceNotFound) {
 
     invariant(locker->isLocked());
     invariant(locker->isLockHeldForMode(resourceIdGlobal, MODE_IS));
-    invariant(locker->isDbLockedForMode(_primaryNss.db(), MODE_IS));
+    invariant(locker->isDbLockedForMode(_primaryNss.dbName(), MODE_IS));
     invariant(locker->isCollectionLockedForMode(_primaryNss, MODE_IS));
 
     for (const auto& secondaryNss : _secondaryNssOrUUIDVec) {
-        invariant(locker->isDbLockedForMode(secondaryNss.db(), MODE_IS));
+        invariant(locker->isDbLockedForMode(secondaryNss.nss()->dbName(), MODE_IS));
         invariant(locker->isCollectionLockedForMode(*secondaryNss.nss(), MODE_IS));
     }
 

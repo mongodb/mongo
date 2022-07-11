@@ -838,7 +838,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_Success) {
                                   const OplogDeleteEntryArgs& args) {
         onDeleteCalled = true;
         ASSERT_TRUE(opCtx);
-        ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+        ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
         ASSERT_TRUE(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
         ASSERT_TRUE(opCtx->writesAreReplicated());
         ASSERT_FALSE(args.fromMigrate);
@@ -958,7 +958,7 @@ TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_Success) {
                                             const BSONObj&) {
         applyCmdCalled = true;
         ASSERT_TRUE(opCtx);
-        ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+        ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
         ASSERT_TRUE(opCtx->writesAreReplicated());
         ASSERT_EQUALS(nss, collNss);
     };
@@ -1001,7 +1001,7 @@ TEST_F(TenantOplogApplierTest, ApplyCreateIndexesCommand_Success) {
                                        bool fromMigrate) {
         ASSERT_FALSE(applyCmdCalled);
         applyCmdCalled = true;
-        ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+        ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
         ASSERT_TRUE(opCtx->writesAreReplicated());
         ASSERT_BSONOBJ_EQ(indexDoc,
                           BSON("v" << 2 << "key" << BSON("a" << 1) << "name"

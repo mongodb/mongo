@@ -57,7 +57,15 @@ public:
      * the dbName is a valid db name.
      */
     DatabaseName(boost::optional<TenantId> tenantId, StringData dbString)
-        : _tenantId(std::move(tenantId)), _dbString(dbString.toString()) {}
+        : _tenantId(std::move(tenantId)), _dbString(dbString.toString()) {
+        uassert(ErrorCodes::InvalidNamespace,
+                "'.' is an invalid character in a db name: " + _dbString,
+                dbString.find('.') == std::string::npos);
+
+        uassert(ErrorCodes::InvalidNamespace,
+                "database names cannot have embedded null characters",
+                dbString.find('\0') == std::string::npos);
+    }
 
     /**
      * Prefer to use the constructor above.

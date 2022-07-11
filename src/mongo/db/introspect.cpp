@@ -162,7 +162,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
 
 
 Status createProfileCollection(OperationContext* opCtx, Database* db) {
-    invariant(opCtx->lockState()->isDbLockedForMode(db->name().db(), MODE_IX));
+    invariant(opCtx->lockState()->isDbLockedForMode(db->name(), MODE_IX));
     invariant(!opCtx->shouldParticipateInFlowControl());
 
     const auto dbProfilingNS = NamespaceString(db->name().db(), "system.profile");

@@ -206,7 +206,20 @@ AutoGetCollection::AutoGetCollection(
 
     // Acquire the global/RSTL and all the database locks (may or may not be multiple
     // databases).
-    _autoDb.emplace(opCtx, nsOrUUID.db(), isSharedLockMode(modeColl) ? MODE_IS : MODE_IX, deadline);
+
+    // TODO SERVER-62923 Use DatabaseName obj directly.
+    auto dbName = [nsOrUUID]() {
+        // TODO SERVER-67817 Use NamespaceStringOrUUID::db() instead.
+        if (nsOrUUID.dbName())
+            return nsOrUUID.dbName()->toStringWithTenantId();
+
+        if (nsOrUUID.nss())
+            return nsOrUUID.nss()->dbName().toStringWithTenantId();
+
+        return DatabaseName(boost::none, "").toStringWithTenantId();
+    }();
+
+    _autoDb.emplace(opCtx, dbName, isSharedLockMode(modeColl) ? MODE_IS : MODE_IX, deadline);
 
     // Out of an abundance of caution, force operations to acquire new snapshots after
     // acquiring exclusive collection locks. Operations that hold MODE_X locks make an

@@ -148,7 +148,7 @@ public:
         return true;
     }
 
-    virtual bool isDbLockedForMode(StringData dbName, LockMode mode) const {
+    virtual bool isDbLockedForMode(const DatabaseName& dbName, LockMode mode) const {
         return true;
     }
 

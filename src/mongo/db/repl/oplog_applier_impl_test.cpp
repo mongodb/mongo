@@ -515,7 +515,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsCommand) {
                                             const BSONObj&) {
         applyCmdCalled = true;
         ASSERT_TRUE(opCtx);
-        ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+        ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
         ASSERT_EQUALS(nss, collNss);
         return Status::OK();
     };

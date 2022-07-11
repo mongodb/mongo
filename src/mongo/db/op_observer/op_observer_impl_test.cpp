@@ -2914,7 +2914,7 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateIncludesTenantId) 
     WriteUnitOfWork wuow(opCtx, true /* groupOplogEntries */);
     ASSERT(bwc.writesAreBatched());
 
-    AutoGetCollection locks(opCtx, _nssWithTid, LockMode::MODE_IX);
+    AutoGetCollection locks(opCtx, NamespaceStringOrUUID(_nssWithTid), LockMode::MODE_IX);
 
     // (0) Insert
     {

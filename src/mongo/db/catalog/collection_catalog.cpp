@@ -682,7 +682,7 @@ void CollectionCatalog::dropCollection(OperationContext* opCtx, Collection* coll
 void CollectionCatalog::onOpenDatabase(OperationContext* opCtx,
                                        const DatabaseName& dbName,
                                        ViewsForDatabase&& viewsForDb) {
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName.db(), MODE_IS));
+    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IS));
     uassert(ErrorCodes::AlreadyInitialized,
             str::stream() << "Database " << dbName << " is already initialized",
             _viewsForDatabase.find(dbName) == _viewsForDatabase.end());
@@ -691,7 +691,7 @@ void CollectionCatalog::onOpenDatabase(OperationContext* opCtx,
 }
 
 void CollectionCatalog::onCloseDatabase(OperationContext* opCtx, DatabaseName dbName) {
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName.db(), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
     auto rid = ResourceId(RESOURCE_DATABASE, dbName.toString());
     removeResource(rid, dbName.toString());
     _viewsForDatabase.erase(dbName);
@@ -1057,7 +1057,7 @@ std::vector<UUID> CollectionCatalog::getAllCollectionUUIDsFromDb(const DatabaseN
 
 std::vector<NamespaceString> CollectionCatalog::getAllCollectionNamesFromDb(
     OperationContext* opCtx, const DatabaseName& dbName) const {
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName.db(), MODE_S));
+    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_S));
 
     auto minUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
 

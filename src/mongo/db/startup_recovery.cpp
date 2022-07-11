@@ -292,7 +292,7 @@ bool hasReplSetConfigDoc(OperationContext* opCtx) {
  */
 void assertCappedOplog(OperationContext* opCtx, Database* db) {
     const NamespaceString oplogNss(NamespaceString::kRsOplogNamespace);
-    invariant(opCtx->lockState()->isDbLockedForMode(oplogNss.db(), MODE_IS));
+    invariant(opCtx->lockState()->isDbLockedForMode(oplogNss.dbName(), MODE_IS));
     const CollectionPtr& oplogCollection =
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, oplogNss);
     if (oplogCollection && !oplogCollection->isCapped()) {

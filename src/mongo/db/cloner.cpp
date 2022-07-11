@@ -348,7 +348,7 @@ Status Cloner::_createCollectionsForDb(
     auto databaseHolder = DatabaseHolder::get(opCtx);
     const DatabaseName tenantDbName(boost::none, dbName);
     auto db = databaseHolder->openDb(opCtx, tenantDbName);
-    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(tenantDbName, MODE_X));
 
     auto catalog = CollectionCatalog::get(opCtx);
     auto collCount = 0;
