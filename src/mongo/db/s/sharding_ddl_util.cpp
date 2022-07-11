@@ -40,7 +40,6 @@
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_util.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_block_bypass.h"
 #include "mongo/logv2/log.h"
@@ -200,9 +199,7 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
     // the command
     BSONObjBuilder bob(command);
     rpc::writeAuthDataToImpersonatedUserMetadata(opCtx, &bob);
-    if (gFeatureFlagUserWriteBlocking.isEnabled(serverGlobalParams.featureCompatibility)) {
-        WriteBlockBypass::get(opCtx).writeAsMetadata(&bob);
-    }
+    WriteBlockBypass::get(opCtx).writeAsMetadata(&bob);
     auto authenticatedCommand = bob.obj();
     return sharding_util::sendCommandToShards(
         opCtx, dbName, authenticatedCommand, shardIds, executor);

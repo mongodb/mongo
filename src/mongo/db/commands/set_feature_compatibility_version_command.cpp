@@ -64,7 +64,6 @@
 #include "mongo/db/repl/tenant_migration_donor_service.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/s/balancer/balancer.h"
-#include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/migration_coordinator_document_gen.h"
 #include "mongo/db/s/range_deletion_util.h"
@@ -74,7 +73,6 @@
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/serverless/shard_split_donor_service.h"
 #include "mongo/db/session_catalog.h"
@@ -340,28 +338,6 @@ public:
                 // 'kUpgrading' or 'kDowngrading' state, respectively.
                 const auto fcvChangeRegion(
                     FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
-
-                if (!gFeatureFlagUserWriteBlocking.isEnabledOnVersion(requestedVersion)) {
-                    // TODO SERVER-65010 Remove this scope once 6.0 has branched out
-
-                    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-                        uassert(
-                            ErrorCodes::CannotDowngrade,
-                            "Cannot downgrade while user write blocking is being changed",
-                            ConfigsvrCoordinatorService::getService(opCtx)
-                                ->areAllCoordinatorsOfTypeFinished(
-                                    opCtx, ConfigsvrCoordinatorTypeEnum::kSetUserWriteBlockMode));
-                    }
-
-                    DBDirectClient client(opCtx);
-
-                    const bool isBlockingUserWrites =
-                        client.count(NamespaceString::kUserWritesCriticalSectionsNamespace) != 0;
-
-                    uassert(ErrorCodes::CannotDowngrade,
-                            "Cannot downgrade while user write blocking is enabled.",
-                            !isBlockingUserWrites);
-                }
 
                 FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                     opCtx,

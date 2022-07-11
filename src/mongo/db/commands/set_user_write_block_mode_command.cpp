@@ -32,14 +32,12 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/set_user_write_block_mode_gen.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/global_user_write_block_state.h"
 #include "mongo/db/s/user_writes_recoverable_critical_section_service.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
@@ -82,13 +80,6 @@ public:
             // way we enable/disable user index build blocking is not concurrency-safe.
             stdx::lock_guard lock(_mutex);
             {
-                // TODO SERVER-65010 Remove FCV guard once 6.0 has branched out
-                FixedFCVRegion fixedFcvRegion(opCtx);
-                uassert(ErrorCodes::IllegalOperation,
-                        "featureFlagUserWriteBlocking not enabled",
-                        gFeatureFlagUserWriteBlocking.isEnabled(
-                            serverGlobalParams.featureCompatibility));
-
                 if (request().getGlobal()) {
                     // Enabling write block mode on a replicaset requires several steps
                     // First, we must prevent new index builds from starting
