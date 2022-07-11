@@ -121,7 +121,7 @@ let numTransactionsCollEntriesReaped = 0;
     assert.eq(0, transactionsColl.find(parentLsidFilter).itcount());
     assert.eq(0, transactionsColl.find(childLsidFilter).itcount());
     assert.eq(0, imageColl.find(parentLsidFilter).itcount());
-    assert.eq(0, imageColl.find(parentLsidFilter).itcount());
+    assert.eq(0, imageColl.find(childLsidFilter).itcount());
     numTransactionsCollEntriesReaped += 2;
 }
 
