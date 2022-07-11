@@ -40,6 +40,8 @@
 namespace mongo {
 
 /**
+ * DO NOT USE - only necessary for the legacy range deleter
+ *
  * Deletes a range of orphaned documents for the given namespace and collection UUID. Returns a
  * future which will be resolved when the range has finished being deleted. The resulting future
  * will contain an error in cases where the range could not be deleted successfully.
@@ -61,6 +63,17 @@ SharedSemiFuture<void> removeDocumentsInRange(
     const ChunkRange& range,
     const UUID& migrationId,
     Seconds delayForActiveQueriesOnSecondariesToComplete);
+
+/**
+ * Delete the range in a sequence of batches until there are no more documents to delete or deletion
+ * returns an error.
+ */
+Status deleteRangeInBatches(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            const UUID& collectionUuid,
+                            const BSONObj& keyPattern,
+                            const ChunkRange& range,
+                            const UUID& migrationId);
 
 /**
  * - Retrieves source collection's persistent range deletion tasks from `config.rangeDeletions`
