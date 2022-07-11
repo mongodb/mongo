@@ -97,16 +97,32 @@ const exceptionFilteredBackgroundDbCheck = function(hosts) {
             const healthlog = node.getDB('local').system.healthlog;
             // Regex matching strings that start without "SnapshotTooOld"
             const regexStringWithoutSnapTooOld = /^((?!^SnapshotTooOld).)*$/;
-            let errs =
-                healthlog.find({"severity": "error", "data.error": regexStringWithoutSnapTooOld});
-            if (errs.hasNext()) {
-                const err = "dbCheck found inconsistency on " + node.host;
-                jsTestLog(err + ". Errors: ");
-                for (let count = 0; errs.hasNext() && count < 20; count++) {
-                    jsTestLog(tojson(errs.next()));
+
+            // healthlog is a capped collection, truncation during scan might cause cursor
+            // invalidation. Truncated data is most likely from previous tests in the fixture, so we
+            // should still be able to catch errors by retrying.
+            assert.soon(() => {
+                try {
+                    let errs = healthlog.find(
+                        {"severity": "error", "data.error": regexStringWithoutSnapTooOld});
+                    if (errs.hasNext()) {
+                        const err = "dbCheck found inconsistency on " + node.host;
+                        jsTestLog(err + ". Errors: ");
+                        for (let count = 0; errs.hasNext() && count < 20; count++) {
+                            jsTestLog(tojson(errs.next()));
+                        }
+                        assert(false, err);
+                    }
+                    return true;
+                } catch (e) {
+                    if (e.code !== ErrorCodes.CappedPositionLost) {
+                        throw e;
+                    }
+                    jsTestLog(`Retrying on CappedPositionLost error: ${tojson(e)}`);
+                    return false;
                 }
-                assert(false, err);
-            }
+            }, "healthlog scan could not complete.", 60000);
+
             jsTestLog("Checked health log on " + node.host);
         });
 
