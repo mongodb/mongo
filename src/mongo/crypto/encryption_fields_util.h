@@ -78,7 +78,39 @@ inline bool isFLE2EqualityIndexedSupportedType(BSONType type) {
 
 
 inline bool isFLE2RangeIndexedSupportedType(BSONType type) {
-    return true;
+    switch (type) {
+        case NumberInt:
+        case NumberLong:
+        case NumberDecimal:
+        case NumberDouble:
+        case Date:
+            return true;
+
+        // Valid for FLE Equality but not for Range.
+        case bsonTimestamp:
+        case Bool:
+        case BinData:
+        case Code:
+        case RegEx:
+        case String:
+        case jstOID:
+        case Symbol:
+        case DBRef:
+
+        // Non-deterministic
+        case CodeWScope:
+        case Array:
+        case Object:
+
+        // Singletons
+        case EOO:
+        case jstNULL:
+        case MaxKey:
+        case MinKey:
+        case Undefined:
+            return false;
+    }
+    MONGO_UNREACHABLE;
 }
 
 inline bool isFLE2UnindexedSupportedType(BSONType type) {
