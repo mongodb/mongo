@@ -1057,8 +1057,7 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
         }
     }
 
-    // TODO SERVER-66813 fix issue with batch deletion.
-    if (!ns().isChangeCollection()) {
+    if (!ns().isImplicitlyReplicated()) {
         opCtx->getServiceContext()->getOpObserver()->onInserts(
             opCtx, ns(), uuid(), begin, end, fromMigrate);
     }

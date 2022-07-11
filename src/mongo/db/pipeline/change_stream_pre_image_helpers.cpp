@@ -66,8 +66,6 @@ void writeToChangeStreamPreImagesCollection(OperationContext* opCtx,
             "The change stream pre-images collection is not present",
             changeStreamPreImagesCollection);
 
-    // Inserts into the change stream pre-images collection are not replicated.
-    repl::UnreplicatedWritesBlock unreplicatedWritesBlock{opCtx};
     const auto insertionStatus = changeStreamPreImagesCollection->insertDocument(
         opCtx, InsertStatement{preImage.toBSON()}, &CurOp::get(opCtx)->debug());
     tassert(5868601,
