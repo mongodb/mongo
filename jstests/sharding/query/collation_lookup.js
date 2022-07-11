@@ -552,15 +552,6 @@ function runTests(withDefaultCollationColl, withoutDefaultCollationColl, collati
 
 const st = new ShardingTest({shards: 2});
 
-const getShardedLookupParam = st.s.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
-const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
-    getShardedLookupParam.featureFlagShardedLookup.value;
-
-if (!isShardedLookupEnabled) {
-    st.stop();
-    return;
-}
-
 const testName = "collation_lookup";
 const caseInsensitive = {
     collation: {locale: "en_US", strength: 2}

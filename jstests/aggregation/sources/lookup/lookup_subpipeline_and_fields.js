@@ -4,8 +4,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/fixture_helpers.js");  // For isSharded.
-
 const testDB = db.getSiblingDB(jsTestName());
 assert(testDB.dropDatabase());
 
@@ -24,15 +22,6 @@ assert.commandWorked(locations.insert([
     {_id: "puppyhouse", coordinates: [-25.0, 60.0], extra: {breeds: 1,
                                                             feeling: ["cute", "small"]}}
 ]));
-
-// Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
-// allow $lookup/$graphLookup into a sharded collection is disabled.
-const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
-const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
-    getShardedLookupParam.featureFlagShardedLookup.value;
-if (FixtureHelpers.isSharded(locations) && !isShardedLookupEnabled) {
-    return;
-}
 
 const animals = testDB.animals;
 assert.commandWorked(animals.insert([

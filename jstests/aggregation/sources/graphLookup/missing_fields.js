@@ -2,19 +2,9 @@
 (function() {
 "use strict";
 
-load("jstests/libs/fixture_helpers.js");      // For isSharded.
 load("jstests/aggregation/extras/utils.js");  // arrayEq
 
 var local = db[jsTestName()];
-
-// Do not run the the tests if the foreign collection is implicitly sharded but the flag to
-// allow $lookup/$graphLookup into a sharded collection is disabled.
-const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
-const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
-    getShardedLookupParam.featureFlagShardedLookup.value;
-if (FixtureHelpers.isSharded(local) && !isShardedLookupEnabled) {
-    return;
-}
 
 local.drop();
 

@@ -11,22 +11,11 @@ load("jstests/aggregation/extras/utils.js");  // For anyEq.
 
 "use strict";
 
-load("jstests/libs/fixture_helpers.js");  // For isSharded.
-
 const testDB = db.getSiblingDB(jsTestName());
 const localColl = testDB.local_no_collation;
 const localCaseInsensitiveColl = testDB.local_collation;
 const foreignColl = testDB.foreign_no_collation;
 const foreignCaseInsensitiveColl = testDB.foreign_collation;
-
-// Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
-// allow $lookup/$graphLookup into a sharded collection is disabled.
-const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
-const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
-    getShardedLookupParam.featureFlagShardedLookup.value;
-if (FixtureHelpers.isSharded(foreignColl) && !isShardedLookupEnabled) {
-    return;
-}
 
 const caseInsensitiveCollation = {
     locale: "en_US",

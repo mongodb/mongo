@@ -53,12 +53,7 @@ public:
 
         bool allowShardedForeignCollection(NamespaceString nss,
                                            bool inMultiDocumentTransaction) const override {
-            if (feature_flags::gFeatureFlagShardedLookup.isEnabled(
-                    serverGlobalParams.featureCompatibility) &&
-                !inMultiDocumentTransaction) {
-                return true;
-            }
-            return _foreignNss != nss;
+            return !inMultiDocumentTransaction || _foreignNss != nss;
         }
 
         PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const {
@@ -215,7 +210,7 @@ private:
     bool addToVisitedAndFrontier(Document result, long long depth);
 
     /**
-     * Returns true if 'featureFlagShardedLookup' is enabled and we are not in a transaction.
+     * Returns true if we are not in a transaction.
      */
     bool foreignShardedGraphLookupAllowed() const;
 

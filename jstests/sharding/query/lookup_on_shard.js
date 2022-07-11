@@ -111,33 +111,27 @@ const runTest = function() {
 jsTestLog("Running test with neither collection sharded");
 runTest();
 
-const getShardedLookupParam =
-    sharded.s.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
-const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
-    getShardedLookupParam.featureFlagShardedLookup.value;
+jsTestLog("Running test with foreign collection sharded");
+sharded.shardColl(
+    "foreignColl",
+    {_id: 1},  // shard key
+    {_id: 5},  // split
+    {_id: 5},  // move
+    "test",    // dbName
+    true       // waitForDelete
+);
+runTest();
 
-if (isShardedLookupEnabled) {
-    jsTestLog("Running test with foreign collection sharded");
-    sharded.shardColl(
-        "foreignColl",
-        {_id: 1},  // shard key
-        {_id: 5},  // split
-        {_id: 5},  // move
-        "test",    // dbName
-        true       // waitForDelete
-    );
-    runTest();
+jsTestLog("Running test with main and foreign collection sharded");
+sharded.shardColl(
+    "mainColl",
+    {_id: 1},  // shard key
+    {_id: 5},  // split
+    {_id: 5},  // move
+    "test",    // dbName
+    true       // waitForDelete
+);
+runTest();
 
-    jsTestLog("Running test with main and foreign collection sharded");
-    sharded.shardColl(
-        "mainColl",
-        {_id: 1},  // shard key
-        {_id: 5},  // split
-        {_id: 5},  // move
-        "test",    // dbName
-        true       // waitForDelete
-    );
-    runTest();
-}
 sharded.stop();
 })();

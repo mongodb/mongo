@@ -19,8 +19,6 @@ load("jstests/libs/analyze_plan.js");         // For getAggPlanStages, getWinnin
 
 "use strict";
 
-load("jstests/libs/fixture_helpers.js");  // For isSharded.
-
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
 
@@ -41,15 +39,6 @@ const collAa_indexed = testDB.case_sensitive_indexed;
 
 assert.commandWorked(testDB.createCollection("case_insensitive", {collation: caseInsensitive}));
 const collAA = testDB.case_insensitive;
-
-// Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
-// allow $lookup/$graphLookup into a sharded collection is disabled.
-const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
-const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
-    getShardedLookupParam.featureFlagShardedLookup.value;
-if (FixtureHelpers.isSharded(collAA) && !isShardedLookupEnabled) {
-    return;
-}
 
 const records = [{_id: 0, key: "a"}, {_id: 1, key: "A"}];
 assert.commandWorked(collAa.insert(records));

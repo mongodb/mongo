@@ -4,7 +4,6 @@
 "use strict";
 
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode and arrayEq.
-load("jstests/libs/fixture_helpers.js");      // For isSharded.
 load("jstests/libs/discover_topology.js");    // For findDataBearingNodes.
 
 const st = new ShardingTest({shards: 2, mongos: 1});
@@ -448,28 +447,21 @@ function runTest(coll, from, thirdColl, fourthColl) {
     //
     // Test $lookup when the foreign collection is a view.
     //
-    const getShardedLookupParam =
-        coll.getDB().adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
-    const isShardedLookupEnabled =
-        getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
-        getShardedLookupParam.featureFlagShardedLookup.value;
-    if (!FixtureHelpers.isSharded(from) || isShardedLookupEnabled) {
-        assert.commandWorked(
-            coll.getDB().runCommand({create: "fromView", viewOn: "from", pipeline: []}));
-        pipeline = [
-                {
-                  $lookup: {
-                      localField: "a.b",
-                      foreignField: "_id",
-                      from: "fromView",
-                      as: "c",
-                  }
-                },
-            ];
+    assert.commandWorked(
+        coll.getDB().runCommand({create: "fromView", viewOn: "from", pipeline: []}));
+    pipeline = [
+            {
+                $lookup: {
+                    localField: "a.b",
+                    foreignField: "_id",
+                    from: "fromView",
+                    as: "c",
+                }
+            },
+        ];
 
-        expectedResults = [{"_id": 0, "a": [{"b": 1}, {"b": 2}], "c": [{"_id": 1}, {"_id": 2}]}];
-        testPipeline(pipeline, expectedResults, coll);
-    }
+    expectedResults = [{"_id": 0, "a": [{"b": 1}, {"b": 2}], "c": [{"_id": 1}, {"_id": 2}]}];
+    testPipeline(pipeline, expectedResults, coll);
 
     //
     // Error cases.
@@ -557,27 +549,23 @@ st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
 st.shardColl(mongosDB.lookup, {_id: 1}, {_id: 0}, {_id: 1}, mongosDB.getName());
 runTest(mongosDB.lookUp, mongosDB.from, mongosDB.thirdColl, mongosDB.fourthColl);
 
-const getShardedLookupParam = mongosDB.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
-const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
-    getShardedLookupParam.featureFlagShardedLookup.value;
-if (isShardedLookupEnabled) {
-    //
-    // Test unsharded local collection and sharded foreign collection.
-    //
-    assert(mongosDB.lookup.drop());
+//
+// Test unsharded local collection and sharded foreign collection.
+//
+assert(mongosDB.lookup.drop());
 
-    // Shard the foreign collection on _id.
-    st.shardColl(mongosDB.from, {_id: 1}, {_id: 0}, {_id: 1}, mongosDB.getName());
-    runTest(mongosDB.lookUp, mongosDB.from, mongosDB.thirdColl, mongosDB.fourthColl);
+// Shard the foreign collection on _id.
+st.shardColl(mongosDB.from, {_id: 1}, {_id: 0}, {_id: 1}, mongosDB.getName());
+runTest(mongosDB.lookUp, mongosDB.from, mongosDB.thirdColl, mongosDB.fourthColl);
 
-    //
-    // Test sharded local and foreign collections.
-    //
+//
+// Test sharded local and foreign collections.
+//
 
-    // Shard the local collection on _id.
-    st.shardColl(mongosDB.lookup, {_id: 1}, {_id: 0}, {_id: 1}, mongosDB.getName());
-    runTest(mongosDB.lookUp, mongosDB.from, mongosDB.thirdColl, mongosDB.fourthColl);
-}
+// Shard the local collection on _id.
+st.shardColl(mongosDB.lookup, {_id: 1}, {_id: 0}, {_id: 1}, mongosDB.getName());
+runTest(mongosDB.lookUp, mongosDB.from, mongosDB.thirdColl, mongosDB.fourthColl);
+
 // Test that a $lookup from an unsharded collection followed by a $merge to a sharded collection
 // is allowed.
 const sourceColl = st.getDB(testName).lookUp;

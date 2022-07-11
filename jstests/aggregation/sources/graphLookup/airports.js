@@ -3,8 +3,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/fixture_helpers.js");  // For isSharded.
-
 var local = db.local;
 var foreign = db.foreign;
 
@@ -30,15 +28,6 @@ assert.commandWorked(bulk.execute());
 
 // Insert a dummy document so that something will flow through the pipeline.
 local.insert({});
-
-// Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
-// allow $lookup/$graphLookup into a sharded collection is disabled.
-const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
-const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
-    getShardedLookupParam.featureFlagShardedLookup.value;
-if (FixtureHelpers.isSharded(foreign) && !isShardedLookupEnabled) {
-    return;
-}
 
 // Perform a simple $graphLookup and ensure it retrieves every result.
 var res = local

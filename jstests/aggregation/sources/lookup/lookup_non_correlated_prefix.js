@@ -7,21 +7,10 @@
 (function() {
 "use strict";
 
-load("jstests/libs/fixture_helpers.js");  // For isSharded.
-
 const testColl = db.lookup_non_correlated_prefix;
 testColl.drop();
 const joinColl = db.lookup_non_correlated_prefix_join;
 joinColl.drop();
-
-// Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
-// allow $lookup/$graphLookup into a sharded collection is disabled.
-const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
-const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
-    getShardedLookupParam.featureFlagShardedLookup.value;
-if (FixtureHelpers.isSharded(joinColl) && !isShardedLookupEnabled) {
-    return;
-}
 
 const users = [
     {

@@ -341,9 +341,7 @@ const char* DocumentSourceLookUp::getSourceName() const {
 }
 
 bool DocumentSourceLookUp::foreignShardedLookupAllowed() const {
-    return feature_flags::gFeatureFlagShardedLookup.isEnabled(
-               serverGlobalParams.featureCompatibility) &&
-        !pExpCtx->opCtx->inMultiDocumentTransaction();
+    return !pExpCtx->opCtx->inMultiDocumentTransaction();
 }
 
 void DocumentSourceLookUp::determineSbeCompatibility() {
@@ -444,11 +442,6 @@ DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
             staleInfo->getVersionWanted() != ChunkVersion::UNSHARDED()) {
             uassert(3904800,
                     "Cannot run $lookup with a sharded foreign collection in a transaction",
-                    !feature_flags::gFeatureFlagShardedLookup.isEnabled(
-                        serverGlobalParams.featureCompatibility) ||
-                        !pExpCtx->opCtx->inMultiDocumentTransaction());
-            uassert(51069,
-                    "Cannot run $lookup with sharded foreign collection",
                     foreignShardedLookupAllowed());
         }
         throw;

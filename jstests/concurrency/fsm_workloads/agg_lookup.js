@@ -1,7 +1,5 @@
 'use strict';
 
-load("jstests/libs/fixture_helpers.js");  // For isSharded.
-
 /**
  * agg_lookup.js
  *
@@ -9,14 +7,9 @@ load("jstests/libs/fixture_helpers.js");  // For isSharded.
  */
 var $config = (function() {
     const data = {numDocs: 100};
-    const isShardedAndShardedLookupDisabled = false;
 
     const states = (function() {
         function query(db, collName) {
-            if (this.isShardedAndShardedLookupDisabled) {
-                return;
-            }
-
             // Run the aggregate with 'allowDiskUse' if it was configured during setup.
             const aggOptions = {allowDiskUse: this.allowDiskUse};
 
@@ -68,19 +61,6 @@ var $config = (function() {
     const transitions = {query: {query: 0.5, update: 0.5}, update: {query: 0.5, update: 0.5}};
 
     function setup(db, collName, cluster) {
-        // Do not run the rest of the tests if the foreign collection is implicitly sharded but the
-        // flag to allow $lookup into a sharded collection is disabled.
-        const getParam = db.adminCommand(
-            {getParameter: 1, featureFlagShardedLookup: 1, internalQueryForceClassicEngine: 1});
-        const isShardedLookupEnabled = getParam.hasOwnProperty("featureFlagShardedLookup") &&
-            getParam.featureFlagShardedLookup.value;
-        if (FixtureHelpers.isSharded(db[collName]) && !isShardedLookupEnabled) {
-            jsTestLog(
-                "Skipping test because the sharded lookup feature flag is disabled and we have sharded collections");
-            this.isShardedAndShardedLookupDisabled = true;
-            return;
-        }
-
         // Load example data.
         const bulk = db[collName].initializeUnorderedBulkOp();
         for (let i = 0; i < this.numDocs; ++i) {
@@ -92,6 +72,7 @@ var $config = (function() {
         assertWhenOwnColl.eq(this.numDocs, res.nInserted);
         assertWhenOwnColl.eq(this.numDocs, db[collName].find().itcount());
 
+        const getParam = db.adminCommand({getParameter: 1, internalQueryForceClassicEngine: 1});
         const isLookupPushdownEnabled =
             getParam.hasOwnProperty("internalQueryForceClassicEngine") &&
             !getParam.internalQueryForceClassicEngine.value;

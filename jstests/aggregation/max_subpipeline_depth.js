@@ -3,8 +3,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/fixture_helpers.js");  // For isSharded.
-
 const coll = db.max_subpipeline_depth;
 coll.drop();
 
@@ -35,15 +33,6 @@ assert.commandWorked(db.runCommand(
 assert.commandFailedWithCode(
     db.runCommand({aggregate: coll.getName(), pipeline: [makeUnionNDeep(maxDepth)], cursor: {}}),
     ErrorCodes.MaxSubPipelineDepthExceeded);
-
-// Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
-// allow $lookup/$graphLookup into a sharded collection is disabled.
-const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
-const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
-    getShardedLookupParam.featureFlagShardedLookup.value;
-if (FixtureHelpers.isSharded(coll) && !isShardedLookupEnabled) {
-    return;
-}
 
 assert.commandWorked(db.runCommand(
     {aggregate: coll.getName(), pipeline: [makeLookupNDeep(maxDepth - 1)], cursor: {}}));

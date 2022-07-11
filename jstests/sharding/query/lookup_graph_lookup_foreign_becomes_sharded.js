@@ -1,6 +1,6 @@
 /**
- * Tests that $lookup and $graphLookup correctly throw an exception if the foreign collection is
- * sharded, or if it becomes sharded mid-iteration.
+ * Tests that $lookup and $graphLookup correctly succeed if the foreign collection is sharded, or if
+ * it becomes sharded mid-iteration.
  *
  *@tags: [
  *   requires_persistence
@@ -9,13 +9,7 @@
 (function() {
 "use strict";
 
-load("jstests/aggregation/extras/utils.js");         // For assertErrorCode.
-load("jstests/libs/profiler.js");                    // For profilerHasSingleMatchingEntryOrThrow.
 load("jstests/multiVersion/libs/multi_cluster.js");  // For ShardingTest.waitUntilStable.
-
-// Currently, even if the 'featureFlagShardedLookup' flag is enabled, $graphLookup into a
-// sharded collection is not supported (testing this functionality should assert that the
-// command fails). This will be fixed by SERVER-58073.
 
 const st = new ShardingTest({shards: 1, mongos: 2, rs: {nodes: 1}});
 const shard0 = st.rs0;
@@ -75,7 +69,6 @@ const testCases = [{
             batchSize: batchSize,
         },
     },
-    errCode: 51069
 }, {
     aggCmd: {
         aggregate: sourceCollection.getName(),
@@ -92,7 +85,6 @@ const testCases = [{
             batchSize: batchSize,
         },
     },
-    errCode: 31428
 }];
 
 // Drop and recreate both collections, so that both mongos know the foreign collection is unsharded.
@@ -110,76 +102,42 @@ for (let testCase of testCases) {
 assert.commandWorked(
     freshMongos.adminCommand({shardCollection: foreignCollection.getFullName(), key: {_id: 1}}));
 
-const getShardedLookupParam = st.s.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
-const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
-    getShardedLookupParam.featureFlagShardedLookup.value;
-
-let res = st.getPrimaryShard(jsTestName()).getDB("admin").adminCommand({
-    getParameter: 1,
-    internalQueryForceClassicEngine: 1
-});
-let isSBELookupEnabled = res.ok && res.hasOwnProperty("internalQueryForceClassicEngine") &&
-    !res.internalQueryForceClassicEngine;
-
-// Now run a getMore for each of the test cases. The collection has become sharded mid-iteration, so
-// we should observe the error code associated with the test case.
-// TODO SERVER-60018: When the feature flag is removed, assert that the command works and has
-// expected results.
-if (!isShardedLookupEnabled) {
-    for (let testCase of testCases) {
-        // In the classic lookup, when we compile an internal $match stage for $lookup local
-        // document match against the foreign collection, we try to get a lock on the foreign
-        // collection as the MAIN collection and in the SBE lookup, we try to get a lock on both the
-        // local (MAIN) and foreign (secondary) collection. The thing is we go through different
-        // checks for the main collection and secondary namespaces. For the main collection, we
-        // check the shard version explicitly. For the secondary namespaces, we check sharding
-        // changes based on the snapshot. So, we don't get the error and the SBE lookup succeeds at
-        // getMore request. This is a similar situation as SERVER-64128 though it's not exactly
-        // same. Until SERVER-64128 is resolved, the expected behavior is not exactly clear and we
-        // need to revisit this scenario after SERVER-64128 is resolved. Until then, just checks
-        // whether this scenario succeeds when the SBE lookup feature is enabled.
-        if (isSBELookupEnabled && testCase.aggCmd.pipeline[0].hasOwnProperty("$lookup")) {
-            assert.commandWorked(
-                freshMongos.runCommand(
-                    {getMore: testCase.aggCmdRes.cursor.id, collection: testCase.aggCmd.aggregate}),
-                `Expected getMore to succeed. Original command: ${tojson(testCase.aggCmd)}`);
-            continue;
-        }
-
-        assert.commandFailedWithCode(
-            freshMongos.runCommand(
-                {getMore: testCase.aggCmdRes.cursor.id, collection: testCase.aggCmd.aggregate}),
-            testCase.errCode,
-            `Expected getMore to fail. Original command: ${tojson(testCase.aggCmd)}`);
-    }
+// Now run a getMore for each of the test cases. The foreign collection has become sharded mid-
+// iteration, but we can recover from this and continue execution.
+for (let testCase of testCases) {
+    // In the classic lookup, when we compile an internal $match stage for $lookup local
+    // document match against the foreign collection, we try to get a lock on the foreign
+    // collection as the MAIN collection and in the SBE lookup, we try to get a lock on both the
+    // local (MAIN) and foreign (secondary) collection. The thing is we go through different
+    // checks for the main collection and secondary namespaces. For the main collection, we
+    // check the shard version explicitly. For the secondary namespaces, we check sharding
+    // changes based on the snapshot. So, SBE lookup succeeds at getMore request.
+    //
+    // This is a similar situation as SERVER-64128 though it's not exactly same. Until SERVER-64128
+    // is resolved, the expected behavior is not exactly clear and we need to revisit this scenario
+    // after SERVER-64128 is resolved. Until then, just checks whether this scenario succeeds.
+    assert.commandWorked(
+        freshMongos.runCommand(
+            {getMore: testCase.aggCmdRes.cursor.id, collection: testCase.aggCmd.aggregate}),
+        `Expected getMore to succeed. Original command: ${tojson(testCase.aggCmd)}`);
 }
 
-// Run both test cases again. The fresh mongos knows that the foreign collection is sharded now, so
-// both tests will fail on the mongos with error code 28769 without ever reaching the shard if the
-// 'featureFlagShardedLookup' flag is disabled.
-// TODO SERVER-60018: When the feature flag is removed, assert that the command works and has
-// expected results.
-if (!isShardedLookupEnabled) {
-    for (let testCase of testCases) {
-        assert.commandFailedWithCode(
-            freshMongos.runCommand(testCase.aggCmd),
-            28769,
-            `Expected command to fail on mongos: ${tojson(testCase.aggCmd)}`);
-    }
+// Run both test cases again. The fresh mongos knows that the foreign collection is sharded now,
+// and the query should still work.
+for (let testCase of testCases) {
+    const aggCmdRes =
+        assert.commandWorked(freshMongos.runCommand(testCase.aggCmd),
+                             `Expected command to succeed: ${tojson(testCase.aggCmd)}`);
+    assert.eq(aggCmdRes.cursor.firstBatch.length, batchSize);
 }
 
 // Run the test cases through the stale mongos. It should still believe that the foreign collection
-// is unsharded, and so it will send the aggregate command to the shard, where it will hit an error
-// as soon as it attempts to access the foreign collection.
-// TODO SERVER-60018: When the feature flag is removed, assert that the command works and has
-// expected results.
-if (!isShardedLookupEnabled) {
-    for (let testCase of testCases) {
-        assert.commandFailedWithCode(
-            staleMongos.runCommand(testCase.aggCmd),
-            testCase.errCode,
-            `Expected command to fail on shard: ${tojson(testCase.aggCmd)}`);
-    }
+// is unsharded, but it should recover from this, and the query should still work.
+for (let testCase of testCases) {
+    const aggCmdRes =
+        assert.commandWorked(staleMongos.runCommand(testCase.aggCmd),
+                             `Expected command to succeed: ${tojson(testCase.aggCmd)}`);
+    assert.eq(aggCmdRes.cursor.firstBatch.length, batchSize);
 }
 
 // Reset both collections to unsharded and make sure both mongos know.
@@ -216,32 +174,10 @@ for (let testCase of testCases) {
 const newStaleConfigErrorCount = assert.commandWorked(primaryDB.runCommand({serverStatus: 1}))
                                      .shardingStatistics.countStaleConfigErrors;
 
-// ... and a single StaleConfig exception for the foreign namespace. Note that the 'ns' field of the
-// profiler entry is the source collection in both cases, because the $lookup's parent aggregation
-// produces the profiler entry, and it is always running on the source collection.
-// TODO SERVER-60018: When the feature flag is removed, remove the check and ensure the results are
-// expected.
-if (!isShardedLookupEnabled) {
-    // Both in the classic lookup and the SBE lookup, 'StaleConfig' error happens. In the classic
-    // lookup, profiling can properly report the 'StaleConfig' of the foreign collection.
-    //
-    // On the other hand, in the SBE lookup, profiling fails to report the error because the
-    // profiling level is not set up properly according to the configured profiling level in case of
-    // lock acquisition exception. So, we check statusStatus' StaleConfig error count instead.
-    assert.gt(newStaleConfigErrorCount,
-              prevStaleConfigErrorCount,
-              "StaleConfig errors must have happened");
-    if (!isSBELookupEnabled) {
-        profilerHasSingleMatchingEntryOrThrow({
-            profileDB: primaryDB,
-            filter: {
-                ns: sourceCollection.getFullName(),
-                errCode: ErrorCodes.StaleConfig,
-                errMsg: {$regex: `${foreignCollection.getFullName()} is not currently available`}
-            }
-        });
-    }
-}
-
+// ... and a single StaleConfig exception for the foreign namespace. These StalecConfig errors are
+// not always reported in the profiler, but they are reflected in the serverStatus StaleConfig error
+// count.
+assert.gt(
+    newStaleConfigErrorCount, prevStaleConfigErrorCount, "StaleConfig errors must have happened");
 st.stop();
 }());

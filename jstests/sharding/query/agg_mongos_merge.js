@@ -24,10 +24,6 @@ const mongosColl = mongosDB[jsTestName()];
 const unshardedColl = mongosDB[jsTestName() + "_unsharded"];
 const primaryShardDB = st.shard0.getDB(jsTestName());
 
-const getShardedLookupParam = st.s.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
-const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
-    getShardedLookupParam.featureFlagShardedLookup.value;
-
 assert.commandWorked(mongosDB.dropDatabase());
 
 // Always merge pipelines which cannot merge on mongoS on the primary shard instead, so we know
@@ -284,72 +280,50 @@ function runTestCasesWhoseMergeLocationIsConsistentRegardlessOfAllowDiskUse(allo
         expectedCount: 400
     });
 
-    if (!isShardedLookupEnabled) {
-        // Test that $lookup is merged on the primary shard when the foreign collection is
-        // unsharded.
-        assertMergeOnMongoD({
-            testName: "agg_mongos_merge_lookup_unsharded_disk_use_" + allowDiskUse,
-            pipeline: [
-                {$match: {_id: {$gte: -200, $lte: 200}}},
-                {
-                    $lookup: {
-                        from: unshardedColl.getName(),
-                        localField: "_id",
-                        foreignField: "_id",
-                        as: "lookupField"
-                    }
-                }
-            ],
-            mergeType: "primaryShard",
-            allowDiskUse: allowDiskUse,
-            expectedCount: 400
-        });
-    } else {
-        // Test that equality $lookup continues to be merged on the primary shard when the foreign
-        // collection is unsharded.
-        assertMergeOnMongoD({
-            testName: "agg_mongos_merge_lookup_unsharded_flag_on_disk_use_" + allowDiskUse,
-            pipeline: [
-                {$match: {_id: {$gte: -200, $lte: 200}}},
-                // $lookup is now allowed on the shards pipeline, but we should force it to be part
-                // of the merge pipeline for this test.
-                {$_internalSplitPipeline: {}},
-                {
-                $lookup: {
-                    from: unshardedColl.getName(),
-                    localField: "_id",
-                    foreignField: "_id",
-                    as: "lookupField"
-                }
-                }
-            ],
-            mergeType: "primaryShard",
-            allowDiskUse: allowDiskUse,
-            expectedCount: 400
-        });
+    // Test that equality $lookup continues to be merged on the primary shard when the foreign
+    // collection is unsharded.
+    assertMergeOnMongoD({
+        testName: "agg_mongos_merge_lookup_unsharded_flag_on_disk_use_" + allowDiskUse,
+        pipeline: [
+            {$match: {_id: {$gte: -200, $lte: 200}}},
+            // $lookup is now allowed on the shards pipeline, but we should force it to be part
+            // of the merge pipeline for this test.
+            {$_internalSplitPipeline: {}},
+            {
+            $lookup: {
+                from: unshardedColl.getName(),
+                localField: "_id",
+                foreignField: "_id",
+                as: "lookupField"
+            }
+            }
+        ],
+        mergeType: "primaryShard",
+        allowDiskUse: allowDiskUse,
+        expectedCount: 400
+    });
 
-        // Test that equality $lookup is merged on mongoS when the foreign collection is sharded.
-        assertMergeOnMongoS({
-            testName: "agg_mongos_merge_lookup_sharded_flag_on_disk_use_" + allowDiskUse,
-            pipeline: [
-                {$match: {_id: {$gte: -200, $lte: 200}}},
-                // $lookup is now allowed on the shards pipeline, but we should force it to be part
-                // of the merge pipeline for this test.
-                {$_internalSplitPipeline: {}},
-                {
-                $lookup: {
-                    from: mongosColl.getName(),
-                    localField: "_id",
-                    foreignField: "_id",
-                    as: "lookupField"
-                }
-                }
-            ],
-            mergeType: "mongos",
-            allowDiskUse: allowDiskUse,
-            expectedCount: 400
-        });
-    }
+    // Test that equality $lookup is merged on mongoS when the foreign collection is sharded.
+    assertMergeOnMongoS({
+        testName: "agg_mongos_merge_lookup_sharded_flag_on_disk_use_" + allowDiskUse,
+        pipeline: [
+            {$match: {_id: {$gte: -200, $lte: 200}}},
+            // $lookup is now allowed on the shards pipeline, but we should force it to be part
+            // of the merge pipeline for this test.
+            {$_internalSplitPipeline: {}},
+            {
+            $lookup: {
+                from: mongosColl.getName(),
+                localField: "_id",
+                foreignField: "_id",
+                as: "lookupField"
+            }
+            }
+        ],
+        mergeType: "mongos",
+        allowDiskUse: allowDiskUse,
+        expectedCount: 400
+    });
 }
 
 /**
@@ -423,29 +397,27 @@ function runTestCasesWhoseMergeLocationDependsOnAllowDiskUse(allowDiskUse) {
         expectedCount: 10
     });
 
-    if (isShardedLookupEnabled) {
-        // Test that $lookup with a subpipeline containing a spillable stage is only merged on
-        // mongoS when 'allowDiskUse' is not set.
-        assertMergeOnMongoX({
-            testName: "agg_mongos_merge_lookup_subpipeline_disk_use_" + allowDiskUse,
-            pipeline: [
-                {$match: {_id: {$gt: -25, $lte: 25}}},
-                // $lookup is now allowed on the shards pipeline, but we should force it to be part
-                // of the merge pipeline for this test.
-                {$_internalSplitPipeline: {}},
-                {
-                    $lookup: {
-                        from: mongosColl.getName(),
-                        let: {idVar: "$_id"},
-                        pipeline: [{$group: {_id: {$mod: ["$_id", 150]}}}],
-                        as: "lookupField"
-                    }
+    // Test that $lookup with a subpipeline containing a spillable stage is only merged on
+    // mongoS when 'allowDiskUse' is not set.
+    assertMergeOnMongoX({
+        testName: "agg_mongos_merge_lookup_subpipeline_disk_use_" + allowDiskUse,
+        pipeline: [
+            {$match: {_id: {$gt: -25, $lte: 25}}},
+            // $lookup is now allowed on the shards pipeline, but we should force it to be part
+            // of the merge pipeline for this test.
+            {$_internalSplitPipeline: {}},
+            {
+                $lookup: {
+                    from: mongosColl.getName(),
+                    let: {idVar: "$_id"},
+                    pipeline: [{$group: {_id: {$mod: ["$_id", 150]}}}],
+                    as: "lookupField"
                 }
-            ],
-            allowDiskUse: allowDiskUse,
-            expectedCount: 50
-        });
-    }
+            }
+        ],
+        allowDiskUse: allowDiskUse,
+        expectedCount: 50
+    });
 
     //
     // Test composite stages.

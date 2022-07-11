@@ -211,9 +211,7 @@ void DocumentSourceGraphLookUp::doDispose() {
 }
 
 bool DocumentSourceGraphLookUp::foreignShardedGraphLookupAllowed() const {
-    return feature_flags::gFeatureFlagShardedLookup.isEnabled(
-               serverGlobalParams.featureCompatibility) &&
-        !pExpCtx->opCtx->inMultiDocumentTransaction();
+    return !pExpCtx->opCtx->inMultiDocumentTransaction();
 }
 
 boost::optional<DocumentSource::DistributedPlanLogic>
@@ -498,11 +496,6 @@ void DocumentSourceGraphLookUp::performSearch() {
             staleInfo->getVersionWanted() != ChunkVersion::UNSHARDED()) {
             uassert(3904801,
                     "Cannot run $graphLookup with a sharded foreign collection in a transaction",
-                    !feature_flags::gFeatureFlagShardedLookup.isEnabled(
-                        serverGlobalParams.featureCompatibility) ||
-                        !pExpCtx->opCtx->inMultiDocumentTransaction());
-            uassert(31428,
-                    "Cannot run $graphLookup with sharded foreign collection",
                     foreignShardedGraphLookupAllowed());
         }
         throw;
@@ -521,9 +514,9 @@ DocumentSource::GetModPathsReturn DocumentSourceGraphLookUp::getModifiedPaths() 
 }
 
 StageConstraints DocumentSourceGraphLookUp::constraints(Pipeline::SplitState pipeState) const {
-    // If we are in a mongos, the from collection of the graphLookup is sharded, and the
-    // 'featureFlagShardedLookup' flag is enabled, the host type requirement is mongos or
-    // a shard. Otherwise, it's the primary shard.
+    // If we are in a mongos, graphLookup on sharded foreign collections is allowed, and the foreign
+    // collection is sharded, then the host type requirement is mongos or a shard. Otherwise, it's
+    // the primary shard.
     HostTypeRequirement hostRequirement =
         (pExpCtx->inMongos && pExpCtx->mongoProcessInterface->isSharded(pExpCtx->opCtx, _from) &&
          foreignShardedGraphLookupAllowed())

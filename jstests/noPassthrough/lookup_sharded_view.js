@@ -13,14 +13,6 @@ const sharded = new ShardingTest({
 });
 assert(sharded.adminCommand({enableSharding: "test"}));
 
-const isShardedLookupEnabled =
-    sharded.s.adminCommand({getParameter: 1, featureFlagShardedLookup: 1})
-        .featureFlagShardedLookup.value;
-if (!isShardedLookupEnabled) {
-    sharded.stop();
-    return;
-}
-
 const testDBName = "test";
 const testDB = sharded.getDB(testDBName);
 const primaryShard = sharded.shard0;

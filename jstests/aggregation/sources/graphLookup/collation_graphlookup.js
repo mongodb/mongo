@@ -7,8 +7,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/fixture_helpers.js");  // For isSharded.
-
 var res;
 const caseInsensitiveUS = {
     collation: {locale: "en_US", strength: 2}
@@ -19,15 +17,6 @@ const caseSensitiveUS = {
 
 var coll = db.collation_graphlookup;
 var foreignColl = db.collation_graphlookup_foreign;
-
-// Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
-// allow $lookup/$graphLookup into a sharded collection is disabled.
-const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
-const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
-    getShardedLookupParam.featureFlagShardedLookup.value;
-if (FixtureHelpers.isSharded(foreignColl) && !isShardedLookupEnabled) {
-    return;
-}
 
 // Test that $graphLookup respects the collation set on the aggregation pipeline. Case
 // insensitivity should mean that we find both "jeremy" and "jimmy" as friends.

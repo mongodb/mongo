@@ -6,19 +6,9 @@
 "use strict";
 
 load("jstests/aggregation/extras/utils.js");  // For documentEq.
-load("jstests/libs/fixture_helpers.js");      // For isSharded.
 
 // We will only use one collection, the $graphLookup will look up from the same collection.
 var graphColl = db.facetGraphLookup;
-
-// Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
-// allow $lookup/$graphLookup into a sharded collection is disabled.
-const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
-const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
-    getShardedLookupParam.featureFlagShardedLookup.value;
-if (FixtureHelpers.isSharded(graphColl) && !isShardedLookupEnabled) {
-    return;
-}
 
 // The graph in ASCII form: 0 --- 1 --- 2    3
 graphColl.drop();

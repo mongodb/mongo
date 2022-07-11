@@ -53,17 +53,11 @@ let pipelineLookup = [
             as: "joinedField"
 	}}];
 
-const isShardedLookupEnabled =
-    db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1}).featureFlagShardedLookup.value;
-if (!FixtureHelpers.isMongos(db) || isShardedLookupEnabled) {
-    const lookupRes = geo2.aggregate(pipelineLookup).toArray();
-    assert.eq(lookupRes.length, 2);
-    // Make sure the computed distance uses the location field in the current document in the outer
-    // collection.
-    assert.neq(lookupRes[0].joinedField[0].distance, lookupRes[1].joinedField[0].distance);
-} else {
-    jsTestLog("Skipping test with $lookup in sharded environment if sharded lookup is not enabled");
-}
+const lookupRes = geo2.aggregate(pipelineLookup).toArray();
+assert.eq(lookupRes.length, 2);
+// Make sure the computed distance uses the location field in the current document in the outer
+// collection.
+assert.neq(lookupRes[0].joinedField[0].distance, lookupRes[1].joinedField[0].distance);
 
 // With legacy geometry.
 

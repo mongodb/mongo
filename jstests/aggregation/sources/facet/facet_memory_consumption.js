@@ -7,21 +7,10 @@
 (function() {
 "use strict";
 
-load("jstests/libs/fixture_helpers.js");  // For isSharded.
-
 const collName = "facet_memory_consumption";
 const coll = db[collName];
 const kFacetOutputTooLargeCode = 4031700;
 coll.drop();
-
-// Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
-// allow $lookup/$graphLookup into a sharded collection is disabled.
-const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
-const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
-    getShardedLookupParam.featureFlagShardedLookup.value;
-if (FixtureHelpers.isSharded(coll) && !isShardedLookupEnabled) {
-    return;
-}
 
 // A document that is slightly less than 1MB.
 const doc = {

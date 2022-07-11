@@ -83,14 +83,6 @@ assert.commandWorked(mongos0ForeignColl.insert({_id: 1, b: null}));
 assert.commandWorked(mongos1LocalColl.insert({_id: 2}));
 assert.commandWorked(mongos1ForeignColl.insert({_id: 2}));
 
-const getShardedLookupParam = st.s.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
-const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
-    getShardedLookupParam.featureFlagShardedLookup.value;
-
-if (!isShardedLookupEnabled) {
-    st.stop();
-    return;
-}
 //
 // Test unsharded local and sharded foreign collections, with the primary shard unaware that
 // the foreign collection is sharded.

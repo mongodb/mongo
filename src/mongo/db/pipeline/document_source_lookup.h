@@ -82,9 +82,7 @@ public:
          */
         bool allowShardedForeignCollection(NamespaceString nss,
                                            bool inMultiDocumentTransaction) const override final {
-            const bool foreignShardedAllowed = feature_flags::gFeatureFlagShardedLookup.isEnabled(
-                serverGlobalParams.featureCompatibility);
-            if (foreignShardedAllowed && !inMultiDocumentTransaction) {
+            if (!inMultiDocumentTransaction) {
                 return true;
             }
             auto involvedNss = getInvolvedNamespaces();
@@ -359,7 +357,7 @@ private:
     void appendSpecificExecStats(MutableDocument& doc) const;
 
     /**
-     * Returns true if 'featureFlagShardedLookup' is enabled and we are not in a transaction.
+     * Returns true if we are not in a transaction.
      */
     bool foreignShardedLookupAllowed() const;
 

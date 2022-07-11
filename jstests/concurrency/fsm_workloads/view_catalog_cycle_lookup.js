@@ -1,7 +1,5 @@
 'use strict';
 
-load("jstests/libs/fixture_helpers.js");  // For isSharded.
-
 /**
  * view_catalog_cycle_lookup.js
  *
@@ -16,9 +14,6 @@ var $config = (function() {
     // Use the workload name as a prefix for the view names, since the workload name is assumed
     // to be unique.
     const prefix = 'view_catalog_cycle_lookup_';
-
-    // Track if the test is not allowed to run on sharded collections.
-    var isShardedAndShardedLookupDisabled = false;
 
     // Store the default value of the max sub pipeline view depth so it can be reset at the end of
     // the test.
@@ -88,7 +83,7 @@ var $config = (function() {
          * is expected at view create/modification time.
          */
         function remapViewToView(db, collName) {
-            if (this.isShardedAndShardedLookupDisabled || this.isSBELookupEnabled) {
+            if (this.isSBELookupEnabled) {
                 return;
             }
 
@@ -110,7 +105,7 @@ var $config = (function() {
          * error as it is expected at view create/modification time.
          */
         function remapViewToCollection(db, collName) {
-            if (this.isShardedAndShardedLookupDisabled || this.isSBELookupEnabled) {
+            if (this.isSBELookupEnabled) {
                 return;
             }
 
@@ -126,7 +121,7 @@ var $config = (function() {
         }
 
         function readFromView(db, collName) {
-            if (this.isShardedAndShardedLookupDisabled || this.isSBELookupEnabled) {
+            if (this.isSBELookupEnabled) {
                 return;
             }
 
@@ -159,20 +154,6 @@ var $config = (function() {
 
     function setup(db, collName, cluster) {
         const coll = db[collName];
-
-        // Do not run the rest of the tests if the foreign collection is implicitly sharded but the
-        // flag to allow $lookup/$graphLookup into a sharded collection is disabled.
-        const getShardedLookupParam =
-            db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
-        const isShardedLookupEnabled =
-            getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
-            getShardedLookupParam.featureFlagShardedLookup.value;
-        if (FixtureHelpers.isSharded(coll) && !isShardedLookupEnabled) {
-            jsTestLog(
-                "Skipping test because the sharded lookup feature flag is disabled and we have sharded collections");
-            this.isShardedAndShardedLookupDisabled = true;
-            return;
-        }
 
         assertAlways.commandWorked(coll.insert({a: 1, b: 2}));
         assertAlways.commandWorked(coll.insert({a: 2, b: 3}));

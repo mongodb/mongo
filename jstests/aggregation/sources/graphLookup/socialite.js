@@ -4,8 +4,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/fixture_helpers.js");  // For isSharded.
-
 var follower = db.followers;
 var users = db.users;
 
@@ -28,15 +26,6 @@ var followers = [{_f: "djw", _t: "jsr"}, {_f: "jsr", _t: "bmw"}, {_f: "ftr", _t:
 followers.forEach(function(f) {
     assert.commandWorked(follower.insert(f));
 });
-
-// Do not run the rest of the tests if the foreign collection is implicitly sharded but the flag to
-// allow $lookup/$graphLookup into a sharded collection is disabled.
-const getShardedLookupParam = db.adminCommand({getParameter: 1, featureFlagShardedLookup: 1});
-const isShardedLookupEnabled = getShardedLookupParam.hasOwnProperty("featureFlagShardedLookup") &&
-    getShardedLookupParam.featureFlagShardedLookup.value;
-if (FixtureHelpers.isSharded(follower) && !isShardedLookupEnabled) {
-    return;
-}
 
 // Find the social network of "Darren", that is, people Darren follows, and people who are
 // followed by someone Darren follows, etc.

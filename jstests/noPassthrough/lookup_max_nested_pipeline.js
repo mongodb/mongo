@@ -70,13 +70,7 @@ const sharded = new ShardingTest({mongos: 1, shards: 2});
 assert(sharded.adminCommand({enableSharding: "test"}));
 assert(sharded.adminCommand({shardCollection: "test.lookup", key: {_id: 'hashed'}}));
 
-const isShardedLookupEnabled =
-    sharded.s.adminCommand({getParameter: 1, featureFlagShardedLookup: 1})
-        .featureFlagShardedLookup.value;
-
-if (isShardedLookupEnabled) {
-    runTest(sharded.getDB('test').lookup);
-}
+runTest(sharded.getDB('test').lookup);
 
 sharded.stop();
 }());
