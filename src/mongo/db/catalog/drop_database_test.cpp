@@ -66,7 +66,7 @@ using namespace mongo;
  */
 class OpObserverMock : public OpObserverNoop {
 public:
-    void onDropDatabase(OperationContext* opCtx, const std::string& dbName) override;
+    void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) override;
 
     using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
@@ -82,11 +82,12 @@ public:
     const repl::OpTime dropOpTime = {Timestamp(Seconds(100), 1U), 1LL};
 };
 
-void OpObserverMock::onDropDatabase(OperationContext* opCtx, const std::string& dbName) {
+void OpObserverMock::onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
     ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());
     OpObserverNoop::onDropDatabase(opCtx, dbName);
     // Do not update 'droppedDatabaseNames' if OpObserverNoop::onDropDatabase() throws.
-    droppedDatabaseNames.insert(dbName);
+    // TODO: SERVER-67549 to change droppedDatabaseNames to use DatabaseName
+    droppedDatabaseNames.insert(dbName.toStringWithTenantId());
 }
 
 repl::OpTime OpObserverMock::onDropCollection(OperationContext* opCtx,

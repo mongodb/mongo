@@ -124,7 +124,7 @@ public:
                    const CollectionOptions& oldCollOptions,
                    boost::optional<IndexCollModInfo> indexInfo) final {}
 
-    void onDropDatabase(OperationContext* opCtx, const std::string& dbName) final {}
+    void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) final {}
 
     using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
@@ -174,7 +174,7 @@ public:
                               const boost::optional<UUID>& dropTargetUUID,
                               bool stayTemp) final {}
     void onApplyOps(OperationContext* opCtx,
-                    const std::string& dbName,
+                    const DatabaseName& dbName,
                     const BSONObj& applyOpCmd) final {}
 
     void onEmptyCapped(OperationContext* opCtx,

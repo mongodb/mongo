@@ -267,7 +267,7 @@ public:
                            const BSONObj& collModCmd,
                            const CollectionOptions& oldCollOptions,
                            boost::optional<IndexCollModInfo> indexInfo) = 0;
-    virtual void onDropDatabase(OperationContext* opCtx, const std::string& dbName) = 0;
+    virtual void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) = 0;
 
     /**
      * This function logs an oplog entry when a 'drop' command on a collection is executed.
@@ -378,7 +378,7 @@ public:
                                     bool isDryRun) = 0;
 
     virtual void onApplyOps(OperationContext* opCtx,
-                            const std::string& dbName,
+                            const DatabaseName& dbName,
                             const BSONObj& applyOpCmd) = 0;
     virtual void onEmptyCapped(OperationContext* opCtx,
                                const NamespaceString& collectionName,

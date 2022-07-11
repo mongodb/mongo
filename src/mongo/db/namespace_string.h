@@ -588,7 +588,7 @@ public:
     std::string getSisterNS(StringData local) const;
 
     NamespaceString getCommandNS() const {
-        return {db(), "$cmd"};
+        return {dbName(), "$cmd"};
     }
 
     void serializeCollectionName(BSONObjBuilder* builder, StringData fieldName) const;

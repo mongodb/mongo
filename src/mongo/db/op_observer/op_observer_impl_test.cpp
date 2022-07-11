@@ -600,6 +600,32 @@ TEST_F(OpObserverTest, OnDropCollectionReturnsDropOpTime) {
     ASSERT_EQUALS(repl::ReplClientInfo::forClient(&cc()).getLastOp(), dropOpTime);
 }
 
+TEST_F(OpObserverTest, OnDropCollectionInlcudesTenantId) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    OpObserverImpl opObserver;
+    auto opCtx = cc().makeOperationContext();
+    auto uuid = UUID::gen();
+
+    // Create 'drop' command.
+    TenantId tid{TenantId(OID::gen())};
+    NamespaceString nss(tid, "test.coll");
+    auto dropCmd = BSON("drop" << nss.coll());
+
+    // Write to the oplog.
+    {
+        AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
+        WriteUnitOfWork wunit(opCtx.get());
+        opObserver.onDropCollection(
+            opCtx.get(), nss, uuid, 0U, OpObserver::CollectionDropType::kTwoPhase);
+        wunit.commit();
+    }
+
+    OplogEntry oplogEntry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx.get())));
+    ASSERT_EQUALS(tid, *oplogEntry.getTid());
+    // TODO: SERVER-67155 perform check against getCommandNS after oplogEntry.getNss() contains tid
+    ASSERT_EQUALS(NamespaceString(boost::none, nss.dbName().db(), "$cmd"), oplogEntry.getNss());
+}
+
 TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
     OpObserverImpl opObserver;
     auto opCtx = cc().makeOperationContext();
@@ -633,6 +659,79 @@ TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
 
     // Ensure that the rename optime returned is the same as the last optime in the ReplClientInfo.
     ASSERT_EQUALS(repl::ReplClientInfo::forClient(&cc()).getLastOp(), renameOpTime);
+}
+
+TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOff) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
+    OpObserverImpl opObserver;
+    auto opCtx = cc().makeOperationContext();
+
+    auto uuid = UUID::gen();
+    auto dropTargetUuid = UUID::gen();
+    auto stayTemp = false;
+    auto tid{TenantId(OID::gen())};  // rename should not occur across tenants
+    NamespaceString sourceNss(tid, "test.foo");
+    NamespaceString targetNss(tid, "test.bar");
+
+    // Write to the oplog.
+    {
+        AutoGetDb autoDb(opCtx.get(), sourceNss.db(), MODE_X);
+        WriteUnitOfWork wunit(opCtx.get());
+        opObserver.onRenameCollection(
+            opCtx.get(), sourceNss, targetNss, uuid, dropTargetUuid, 0U, stayTemp);
+        wunit.commit();
+    }
+
+    auto oplogEntryObj = getSingleOplogEntry(opCtx.get());
+    OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
+
+    // Ensure that renameCollection fields were properly added to oplog entry.
+    ASSERT_EQUALS(uuid, unittest::assertGet(UUID::parse(oplogEntryObj["ui"])));
+    ASSERT_FALSE(oplogEntry.getTid());
+    // TODO: SERVER-67155 perform check against getCommandNS after oplogEntry.getNss() contains tid
+    ASSERT_EQUALS(NamespaceString(boost::none, sourceNss.dbName().db(), "$cmd"),
+                  oplogEntry.getNss());
+    auto oExpected = BSON("renameCollection" << sourceNss.toStringWithTenantId() << "to"
+                                             << targetNss.toStringWithTenantId() << "stayTemp"
+                                             << stayTemp << "dropTarget" << dropTargetUuid);
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntry.getObject());
+}
+
+TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOn) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    OpObserverImpl opObserver;
+    auto opCtx = cc().makeOperationContext();
+
+    auto uuid = UUID::gen();
+    auto dropTargetUuid = UUID::gen();
+    auto stayTemp = false;
+    auto tid{TenantId(OID::gen())};  // rename should not occur across tenants
+    NamespaceString sourceNss(tid, "test.foo");
+    NamespaceString targetNss(tid, "test.bar");
+
+    // Write to the oplog.
+    {
+        AutoGetDb autoDb(opCtx.get(), sourceNss.db(), MODE_X);
+        WriteUnitOfWork wunit(opCtx.get());
+        opObserver.onRenameCollection(
+            opCtx.get(), sourceNss, targetNss, uuid, dropTargetUuid, 0U, stayTemp);
+        wunit.commit();
+    }
+
+    auto oplogEntryObj = getSingleOplogEntry(opCtx.get());
+    OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
+
+    // Ensure that renameCollection fields were properly added to oplog entry.
+    ASSERT_EQUALS(uuid, unittest::assertGet(UUID::parse(oplogEntryObj["ui"])));
+    ASSERT_EQUALS(tid, *oplogEntry.getTid());
+    // TODO: SERVER-67155 perform check against getCommandNS after oplogEntry.getNss() contains tid
+    ASSERT_EQUALS(NamespaceString(boost::none, sourceNss.dbName().db(), "$cmd"),
+                  oplogEntry.getNss());
+
+    auto oExpected =
+        BSON("renameCollection" << sourceNss.toString() << "to" << targetNss.toString()
+                                << "stayTemp" << stayTemp << "dropTarget" << dropTargetUuid);
+    ASSERT_BSONOBJ_EQ(oExpected, oplogEntry.getObject());
 }
 
 TEST_F(OpObserverTest, OnRenameCollectionOmitsDropTargetFieldIfDropTargetUuidIsNull) {
@@ -711,6 +810,50 @@ TEST_F(OpObserverTest, ImportCollectionOplogEntry) {
     OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
     ASSERT_TRUE(repl::OpTypeEnum::kCommand == oplogEntry.getOpType());
     ASSERT_TRUE(OplogEntry::CommandType::kImportCollection == oplogEntry.getCommandType());
+
+    ImportCollectionOplogEntry importCollection(
+        nss, importUUID, numRecords, dataSize, catalogEntry, storageMetadata, isDryRun);
+    ASSERT_BSONOBJ_EQ(importCollection.toBSON(), oplogEntry.getObject());
+}
+
+TEST_F(OpObserverTest, ImportCollectionOplogEntryIncludesTenantId) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    OpObserverImpl opObserver;
+    auto opCtx = cc().makeOperationContext();
+
+    auto importUUID = UUID::gen();
+    TenantId tid{TenantId(OID::gen())};
+    NamespaceString nss(tid, "test.coll");
+    long long numRecords = 1;
+    long long dataSize = 2;
+    // A dummy invalid catalog entry. We do not need a valid catalog entry for this test.
+    auto catalogEntry = BSON("ns" << nss.ns() << "ident"
+                                  << "collection-7-1792004489479993697");
+    auto storageMetadata = BSON("storage"
+                                << "metadata");
+    bool isDryRun = false;
+
+    // Write to the oplog.
+    {
+        AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
+        WriteUnitOfWork wunit(opCtx.get());
+        opObserver.onImportCollection(opCtx.get(),
+                                      importUUID,
+                                      nss,
+                                      numRecords,
+                                      dataSize,
+                                      catalogEntry,
+                                      storageMetadata,
+                                      isDryRun);
+        wunit.commit();
+    }
+
+    auto oplogEntryObj = getSingleOplogEntry(opCtx.get());
+    OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
+    ASSERT_TRUE(repl::OpTypeEnum::kCommand == oplogEntry.getOpType());
+    ASSERT_TRUE(OplogEntry::CommandType::kImportCollection == oplogEntry.getCommandType());
+
+    ASSERT_EQUALS(tid, *oplogEntry.getTid());
 
     ImportCollectionOplogEntry importCollection(
         nss, importUUID, numRecords, dataSize, catalogEntry, storageMetadata, isDryRun);

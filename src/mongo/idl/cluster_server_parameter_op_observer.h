@@ -65,7 +65,7 @@ public:
                   const UUID& uuid,
                   StmtId stmtId,
                   const OplogDeleteEntryArgs& args) final;
-    void onDropDatabase(OperationContext* opCtx, const std::string& dbName) final;
+    void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) final;
     using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
@@ -176,7 +176,7 @@ public:
                             bool stayTemp) final {}
 
     void onApplyOps(OperationContext* opCtx,
-                    const std::string& dbName,
+                    const DatabaseName& dbName,
                     const BSONObj& applyOpCmd) final {}
 
     void onEmptyCapped(OperationContext* opCtx,

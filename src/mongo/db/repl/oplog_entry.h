@@ -36,6 +36,7 @@
 #include "mongo/db/repl/apply_ops_gen.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/util/overloaded_visitor.h"
 
 namespace mongo {
@@ -194,6 +195,17 @@ public:
             setFromMigrate(value);
     }
 
+    /**
+     * This function overrides the base class setTid() function for the sole purpose of satisfying
+     * the FCV checks.  Once these are deprecated, we should remove this overridden function
+     * entirely.
+     */
+    void setTid(boost::optional<mongo::TenantId> value) & {
+        // TODO SERVER-62114 Change to check for upgraded FCV rather than feature flag
+        if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))
+            DurableReplOperation::setTid(value);
+    }
+
 private:
     BSONObj _preImageDocumentKey;
 
@@ -275,7 +287,9 @@ public:
     }
 
     void setTid(boost::optional<mongo::TenantId> value) & {
-        getDurableReplOperation().setTid(std::move(value));
+        // TODO SERVER-62114 Change to check for upgraded FCV rather than feature flag
+        if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))
+            getDurableReplOperation().setTid(std::move(value));
     }
 
     void setNss(NamespaceString value) & {

@@ -104,7 +104,8 @@ void _finishDropDatabase(OperationContext* opCtx,
 
     writeConflictRetry(opCtx, "dropDatabase_database", dbName, [&] {
         WriteUnitOfWork wunit(opCtx);
-        opCtx->getServiceContext()->getOpObserver()->onDropDatabase(opCtx, dbName);
+        // TODO: SERVER-67549 pass the dbName directly
+        opCtx->getServiceContext()->getOpObserver()->onDropDatabase(opCtx, DatabaseName(dbName));
         wunit.commit();
     });
 

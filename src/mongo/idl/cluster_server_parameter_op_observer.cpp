@@ -122,8 +122,8 @@ void ClusterServerParameterOpObserver::onDelete(OperationContext* opCtx,
 }
 
 void ClusterServerParameterOpObserver::onDropDatabase(OperationContext* opCtx,
-                                                      const std::string& dbName) {
-    if (dbName == NamespaceString::kConfigDb) {
+                                                      const DatabaseName& dbName) {
+    if (dbName.db() == NamespaceString::kConfigDb) {
         // Entire config DB deleted, reset to default state.
         ClusterServerParameterInitializer::get(opCtx)->clearAllParameters(opCtx);
     }

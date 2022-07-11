@@ -127,7 +127,7 @@ void AuthOpObserver::onCollMod(OperationContext* opCtx,
         ->logOp(opCtx, "c", cmdNss, cmdObj, nullptr);
 }
 
-void AuthOpObserver::onDropDatabase(OperationContext* opCtx, const std::string& dbName) {
+void AuthOpObserver::onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
     const NamespaceString cmdNss{dbName, "$cmd"};
     const auto cmdObj = BSON("dropDatabase" << 1);
 
@@ -206,7 +206,7 @@ void AuthOpObserver::onImportCollection(OperationContext* opCtx,
 }
 
 void AuthOpObserver::onApplyOps(OperationContext* opCtx,
-                                const std::string& dbName,
+                                const DatabaseName& dbName,
                                 const BSONObj& applyOpCmd) {
     const NamespaceString cmdNss{dbName, "$cmd"};
 

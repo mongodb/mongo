@@ -203,7 +203,7 @@ public:
             o->onCollMod(opCtx, nss, uuid, collModCmd, oldCollOptions, indexInfo);
     }
 
-    void onDropDatabase(OperationContext* const opCtx, const std::string& dbName) override {
+    void onDropDatabase(OperationContext* const opCtx, const DatabaseName& dbName) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
             o->onDropDatabase(opCtx, dbName);
@@ -352,7 +352,7 @@ public:
                 opCtx, fromCollection, toCollection, uuid, dropTargetUUID, stayTemp);
     }
     void onApplyOps(OperationContext* const opCtx,
-                    const std::string& dbName,
+                    const DatabaseName& dbName,
                     const BSONObj& applyOpCmd) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)

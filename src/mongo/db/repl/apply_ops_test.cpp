@@ -56,7 +56,7 @@ public:
      * Called by applyOps() when ops are applied atomically.
      */
     void onApplyOps(OperationContext* opCtx,
-                    const std::string& dbName,
+                    const DatabaseName& dbName,
                     const BSONObj& applyOpCmd) override;
 
     // If not empty, holds the command object passed to last invocation of onApplyOps().
@@ -64,7 +64,7 @@ public:
 };
 
 void OpObserverMock::onApplyOps(OperationContext* opCtx,
-                                const std::string& dbName,
+                                const DatabaseName& dbName,
                                 const BSONObj& applyOpCmd) {
     ASSERT_FALSE(applyOpCmd.isEmpty());
     // Get owned copy because 'applyOpCmd' may be a temporary BSONObj created by applyOps().

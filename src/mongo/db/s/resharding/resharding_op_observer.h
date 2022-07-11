@@ -140,7 +140,7 @@ public:
                    const CollectionOptions& oldCollOptions,
                    boost::optional<IndexCollModInfo> indexInfo) override {}
 
-    void onDropDatabase(OperationContext* opCtx, const std::string& dbName) override {}
+    void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) override {}
 
     using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
@@ -194,7 +194,7 @@ public:
                               bool stayTemp) override {}
 
     void onApplyOps(OperationContext* opCtx,
-                    const std::string& dbName,
+                    const DatabaseName& dbName,
                     const BSONObj& applyOpCmd) override {}
 
     void onEmptyCapped(OperationContext* opCtx,

@@ -217,8 +217,8 @@ void UserWriteBlockModeOpObserver::onCollMod(OperationContext* opCtx,
 }
 
 void UserWriteBlockModeOpObserver::onDropDatabase(OperationContext* opCtx,
-                                                  const std::string& dbName) {
-    _checkWriteAllowed(opCtx, NamespaceString(dbName));
+                                                  const DatabaseName& dbName) {
+    _checkWriteAllowed(opCtx, NamespaceString(dbName, ""));
 }
 
 repl::OpTime UserWriteBlockModeOpObserver::onDropCollection(OperationContext* opCtx,

@@ -52,6 +52,7 @@
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
@@ -191,9 +192,7 @@ struct ImageBundle {
 OpTimeBundle replLogUpdate(OperationContext* opCtx,
                            const OplogUpdateEntryArgs& args,
                            MutableOplogEntry* oplogEntry) {
-    // TODO SERVER-62114 Change to check for upgraded FCV rather than feature flag
-    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))
-        oplogEntry->setTid(args.nss.tenantId());
+    oplogEntry->setTid(args.nss.tenantId());
     oplogEntry->setNss(args.nss);
     oplogEntry->setUuid(args.uuid);
 
@@ -269,9 +268,7 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
                            StmtId stmtId,
                            bool fromMigrate,
                            const boost::optional<BSONObj>& deletedDoc) {
-    // TODO SERVER-62114 Change to check for upgraded FCV rather than feature flag
-    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))
-        oplogEntry->setTid(nss.tenantId());
+    oplogEntry->setTid(nss.tenantId());
     oplogEntry->setNss(nss);
     oplogEntry->setUuid(uuid);
     oplogEntry->setDestinedRecipient(destinedRecipientDecoration(opCtx));
@@ -381,6 +378,8 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
 
         MutableOplogEntry oplogEntry;
         oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+
+        oplogEntry.setTid(nss.tenantId());
         oplogEntry.setNss(nss.getCommandNS());
         oplogEntry.setUuid(uuid);
         oplogEntry.setObject(builder.done());
@@ -408,6 +407,8 @@ void OpObserverImpl::onStartIndexBuild(OperationContext* opCtx,
 
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+
+    oplogEntry.setTid(nss.tenantId());
     oplogEntry.setNss(nss.getCommandNS());
     oplogEntry.setUuid(collUUID);
     oplogEntry.setObject(oplogEntryBuilder.done());
@@ -471,6 +472,8 @@ void OpObserverImpl::onCommitIndexBuild(OperationContext* opCtx,
 
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+
+    oplogEntry.setTid(nss.tenantId());
     oplogEntry.setNss(nss.getCommandNS());
     oplogEntry.setUuid(collUUID);
     oplogEntry.setObject(oplogEntryBuilder.done());
@@ -505,6 +508,8 @@ void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
 
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+
+    oplogEntry.setTid(nss.tenantId());
     oplogEntry.setNss(nss.getCommandNS());
     oplogEntry.setUuid(collUUID);
     oplogEntry.setObject(oplogEntryBuilder.done());
@@ -604,9 +609,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
             };
 
         MutableOplogEntry oplogEntryTemplate;
-        // TODO SERVER-62114 Change to check for upgraded FCV rather than feature flag
-        if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))
-            oplogEntryTemplate.setTid(nss.tenantId());
+        oplogEntryTemplate.setTid(nss.tenantId());
         oplogEntryTemplate.setNss(nss);
         oplogEntryTemplate.setUuid(uuid);
         oplogEntryTemplate.setFromMigrateIfTrue(fromMigrate);
@@ -1087,6 +1090,8 @@ void OpObserverImpl::onInternalOpMessage(
     const boost::optional<OplogSlot> slot) {
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+
+    oplogEntry.setTid(nss.tenantId());
     oplogEntry.setNss(nss);
     oplogEntry.setUuid(uuid);
     oplogEntry.setObject(msgObj);
@@ -1122,6 +1127,8 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
     } else {
         MutableOplogEntry oplogEntry;
         oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+
+        oplogEntry.setTid(collectionName.tenantId());
         oplogEntry.setNss(collectionName.getCommandNS());
         oplogEntry.setUuid(options.uuid);
         oplogEntry.setObject(
@@ -1165,6 +1172,8 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
 
         MutableOplogEntry oplogEntry;
         oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+
+        oplogEntry.setTid(nss.tenantId());
         oplogEntry.setNss(nss.getCommandNS());
         oplogEntry.setUuid(uuid);
         oplogEntry.setObject(repl::makeCollModCmdObj(collModCmd, oldCollOptions, indexInfo));
@@ -1187,21 +1196,24 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
     invariant(coll->uuid() == uuid);
 }
 
-void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const std::string& dbName) {
+void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+
+    oplogEntry.setTid(dbName.tenantId());
     oplogEntry.setNss({dbName, "$cmd"});
     oplogEntry.setObject(BSON("dropDatabase" << 1));
     logOperation(opCtx, &oplogEntry);
 
-    uassert(
-        50714, "dropping the admin database is not allowed.", dbName != NamespaceString::kAdminDb);
+    uassert(50714,
+            "dropping the admin database is not allowed.",
+            dbName.db() != NamespaceString::kAdminDb);
 
-    if (dbName == NamespaceString::kSessionTransactionsTableNamespace.db()) {
+    if (dbName.db() == NamespaceString::kSessionTransactionsTableNamespace.db()) {
         MongoDSessionCatalog::invalidateAllSessions(opCtx);
     }
 
-    BucketCatalog::get(opCtx).clear(dbName);
+    BucketCatalog::get(opCtx).clear(dbName.db());
 }
 
 repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
@@ -1223,6 +1235,8 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
         // Do not replicate system.profile modifications.
         MutableOplogEntry oplogEntry;
         oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+
+        oplogEntry.setTid(collectionName.tenantId());
         oplogEntry.setNss(collectionName.getCommandNS());
         oplogEntry.setUuid(uuid);
         oplogEntry.setFromMigrateIfTrue(markFromMigrate);
@@ -1271,6 +1285,8 @@ void OpObserverImpl::onDropIndex(OperationContext* opCtx,
                                  const BSONObj& indexInfo) {
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+
+    oplogEntry.setTid(nss.tenantId());
     oplogEntry.setNss(nss.getCommandNS());
     oplogEntry.setUuid(uuid);
     oplogEntry.setObject(BSON("dropIndexes" << nss.coll() << "index" << indexName));
@@ -1304,8 +1320,16 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
                                                  bool stayTemp,
                                                  bool markFromMigrate) {
     BSONObjBuilder builder;
-    builder.append("renameCollection", fromCollection.ns());
-    builder.append("to", toCollection.ns());
+    // TODO SERVER-62114 Change to check for upgraded FCV rather than feature flag
+    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility) ||
+        !gMultitenancySupport) {
+        builder.append("renameCollection", fromCollection.ns());
+        builder.append("to", toCollection.ns());
+    } else {
+        builder.append("renameCollection", fromCollection.toStringWithTenantId());
+        builder.append("to", toCollection.toStringWithTenantId());
+    }
+
     builder.append("stayTemp", stayTemp);
     if (dropTargetUUID) {
         dropTargetUUID->appendToBuilder(&builder, "dropTarget");
@@ -1313,6 +1337,8 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
 
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+
+    oplogEntry.setTid(fromCollection.tenantId());
     oplogEntry.setNss(fromCollection.getCommandNS());
     oplogEntry.setUuid(uuid);
     oplogEntry.setFromMigrateIfTrue(markFromMigrate);
@@ -1385,16 +1411,20 @@ void OpObserverImpl::onImportCollection(OperationContext* opCtx,
 
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+
+    oplogEntry.setTid(nss.tenantId());
     oplogEntry.setNss(nss.getCommandNS());
     oplogEntry.setObject(importCollection.toBSON());
     logOperation(opCtx, &oplogEntry);
 }
 
 void OpObserverImpl::onApplyOps(OperationContext* opCtx,
-                                const std::string& dbName,
+                                const DatabaseName& dbName,
                                 const BSONObj& applyOpCmd) {
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+
+    oplogEntry.setTid(dbName.tenantId());
     oplogEntry.setNss({dbName, "$cmd"});
     oplogEntry.setObject(applyOpCmd);
     logOperation(opCtx, &oplogEntry);
@@ -1407,6 +1437,8 @@ void OpObserverImpl::onEmptyCapped(OperationContext* opCtx,
         // Do not replicate system.profile modifications
         MutableOplogEntry oplogEntry;
         oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+
+        oplogEntry.setTid(collectionName.tenantId());
         oplogEntry.setNss(collectionName.getCommandNS());
         oplogEntry.setUuid(uuid);
         oplogEntry.setObject(BSON("emptycapped" << collectionName.coll()));
@@ -1718,6 +1750,7 @@ OpTimeBundle logApplyOps(OperationContext* opCtx,
     invariant(bool(txnRetryCounter) == bool(TransactionParticipant::get(opCtx)));
 
     oplogEntry->setOpType(repl::OpTypeEnum::kCommand);
+    oplogEntry->setTid(TenantId::kSystemTenantId);
     oplogEntry->setNss({"admin", "$cmd"});
     // Batched writes (that is, WUOWs with 'groupOplogEntries') are not associated with a txnNumber,
     // so do not emit an lsid either.
@@ -1822,6 +1855,7 @@ int logOplogEntries(
         imageEntry.setStatementIds(statement.getStatementIds());
         imageEntry.setOpType(repl::OpTypeEnum::kNoop);
         imageEntry.setObject(imageDoc);
+        imageEntry.setTid(statement.getTid());
         imageEntry.setNss(statement.getNss());
         imageEntry.setUuid(statement.getUuid());
         imageEntry.setOpTime(slot);
@@ -1974,6 +2008,7 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
     const auto txnRetryCounter = *opCtx->getTxnRetryCounter();
 
     oplogEntry->setOpType(repl::OpTypeEnum::kCommand);
+    oplogEntry->setTid(TenantId::kSystemTenantId);
     oplogEntry->setNss({"admin", "$cmd"});
     oplogEntry->setSessionId(opCtx->getLogicalSessionId());
     oplogEntry->setTxnNumber(opCtx->getTxnNumber());

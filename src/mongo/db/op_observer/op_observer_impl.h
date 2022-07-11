@@ -118,7 +118,7 @@ public:
                    const BSONObj& collModCmd,
                    const CollectionOptions& oldCollOptions,
                    boost::optional<IndexCollModInfo> indexInfo) final;
-    void onDropDatabase(OperationContext* opCtx, const std::string& dbName) final;
+    void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) final;
     repl::OpTime onDropCollection(OperationContext* opCtx,
                                   const NamespaceString& collectionName,
                                   const UUID& uuid,
@@ -180,7 +180,7 @@ public:
                             const BSONObj& storageMetadata,
                             bool isDryRun) final;
     void onApplyOps(OperationContext* opCtx,
-                    const std::string& dbName,
+                    const DatabaseName& dbName,
                     const BSONObj& applyOpCmd) final;
     void onEmptyCapped(OperationContext* opCtx,
                        const NamespaceString& collectionName,

@@ -96,7 +96,7 @@ public:
                    const CollectionOptions& oldCollOptions,
                    boost::optional<IndexCollModInfo> indexInfo) final;
 
-    void onDropDatabase(OperationContext* opCtx, const std::string& dbName) final;
+    void onDropDatabase(OperationContext* opCtx, const DatabaseName& dbName) final;
 
     using OpObserver::onDropCollection;
     repl::OpTime onDropCollection(OperationContext* opCtx,
@@ -193,7 +193,7 @@ public:
     // The transaction commit related hooks don't need to be checked, because all of the operations
     // inside the transaction are checked and they all execute in one WUOW.
     void onApplyOps(OperationContext* opCtx,
-                    const std::string& dbName,
+                    const DatabaseName& dbName,
                     const BSONObj& applyOpCmd) final {}
 
     void onEmptyCapped(OperationContext* opCtx,
