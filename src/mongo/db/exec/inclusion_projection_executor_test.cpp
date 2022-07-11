@@ -1068,8 +1068,8 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ExtractComputedPro
     ASSERT_EQ(deleteFlag, false);
 
     auto expectedProjection =
-        Document(fromjson("{_id: true, computedMeta1: true, computed2: {$add: [\"$c\", {$const: "
-                          "1}]}, computedMeta3: \"$computedMeta3\"}"));
+        Document(fromjson("{_id: true, computedMeta1: true, computed2: {$add: [{$const: "
+                          "1}, \"$c\"]}, computedMeta3: \"$computedMeta3\"}"));
     ASSERT_DOCUMENT_EQ(expectedProjection, inclusion->serializeTransformation(boost::none));
 }
 
