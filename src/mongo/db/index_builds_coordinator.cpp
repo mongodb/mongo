@@ -1757,6 +1757,16 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
         return SharedSemiFuture(indexCatalogStats);
     }
 
+    // Ensure we can support two phase index builds when the two phase IndexBuildProtocol is
+    // specified. 'protocol' is evaluated outside of a global lock in an earlier call so there is a
+    // potential race when downgrading to a FCV version which invalidates the protocol (i.e.,
+    // downgrading from a version >= 4.4 to a version <= 4.2).
+    uassert(ErrorCodes::CannotCreateIndex,
+            "Two phase index build protocol was specified but we only support single phase index "
+            "builds.",
+            protocol != IndexBuildProtocol::kTwoPhase ||
+                IndexBuildsCoordinator::supportsTwoPhaseIndexBuild());
+
     // Bypass the thread pool if we are building indexes on an empty collection.
     if (shouldBuildIndexesOnEmptyCollectionSinglePhased(opCtx, collection, protocol)) {
         ReplIndexBuildState::IndexCatalogStats indexCatalogStats;
