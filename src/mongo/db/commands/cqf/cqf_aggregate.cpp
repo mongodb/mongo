@@ -33,7 +33,10 @@
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/pipeline/abt/document_source_visitor.h"
 #include "mongo/db/pipeline/abt/match_expression_visitor.h"
+#include "mongo/db/query/ce/ce_histogram.h"
 #include "mongo/db/query/ce/ce_sampling.h"
+#include "mongo/db/query/ce/collection_statistics.h"
+#include "mongo/db/query/ce_mode_parameter.h"
 #include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/cascades/cost_derivation.h"
 #include "mongo/db/query/optimizer/explain.h"
@@ -457,8 +460,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
     OPTIMIZER_DEBUG_LOG(
         6264803, 5, "Translated ABT", "explain"_attr = ExplainGenerator::explainV2(abtTree));
 
-    if (collectionExists && numRecords > 0 &&
-        internalQueryEnableSamplingCardinalityEstimator.load()) {
+    if (internalQueryCardinalityEstimatorMode == ce::kSampling && collectionExists &&
+        numRecords > 0) {
         Metadata metadataForSampling = metadata;
         // Do not use indexes for sampling.
         for (auto& entry : metadataForSampling._scanDefs) {
@@ -486,17 +489,33 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
 
         return optimizeAndCreateExecutor(
             phaseManager, std::move(abtTree), opCtx, expCtx, nss, collection);
+
+    } else if (internalQueryCardinalityEstimatorMode == ce::kHistogram &&
+               ce::CollectionStatistics::hasCollectionStatistics(nss)) {
+        const auto& stats = ce::CollectionStatistics::getCollectionStatistics(nss);
+        auto ceDerivation = std::make_unique<CEHistogramTransport>(opCtx, stats);
+        OptPhaseManager phaseManager{OptPhaseManager::getAllRewritesSet(),
+                                     prefixId,
+                                     false /*requireRID*/,
+                                     std::move(metadata),
+                                     std::move(ceDerivation),
+                                     std::make_unique<DefaultCosting>(),
+                                     DebugInfo::kDefaultForProd};
+
+        return optimizeAndCreateExecutor(
+            phaseManager, std::move(abtTree), opCtx, expCtx, nss, collection);
+
+    } else {
+        // Default to using heuristics.
+        OptPhaseManager phaseManager{OptPhaseManager::getAllRewritesSet(),
+                                     prefixId,
+                                     std::move(metadata),
+                                     DebugInfo::kDefaultForProd};
+        phaseManager.getHints() = queryHints;
+
+        return optimizeAndCreateExecutor(
+            phaseManager, std::move(abtTree), opCtx, expCtx, nss, collection);
     }
-
-    // Use heuristics.
-    OptPhaseManager phaseManager{OptPhaseManager::getAllRewritesSet(),
-                                 prefixId,
-                                 std::move(metadata),
-                                 DebugInfo::kDefaultForProd};
-    phaseManager.getHints() = queryHints;
-
-    return optimizeAndCreateExecutor(
-        phaseManager, std::move(abtTree), opCtx, expCtx, nss, collection);
 }
 
 }  // namespace mongo

@@ -29,6 +29,7 @@
 global:
   cpp_namespace: "mongo"
   cpp_includes:
+    - "mongo/db/query/ce_mode_parameter.h"
     - "mongo/db/query/plan_cache_size_parameter.h"
     - "mongo/db/query/sbe_plan_cache_on_parameter_change.h"
     - "mongo/platform/atomic_proxy.h"
@@ -713,14 +714,15 @@ server_parameters:
         expr: 100 * 1024 * 1024
     validator:
         gt: 0
-
-  internalQueryEnableSamplingCardinalityEstimator:
-    description: "Set to use the sampling-based method for estimating cardinality in the Cascades
-    optimizer."
+  
+  internalQueryCardinalityEstimatorMode:
+    description: "Set to select a method for estimating cardinality in the Cascades optimizer."
     set_at: [ startup, runtime ]
-    cpp_varname: "internalQueryEnableSamplingCardinalityEstimator"
-    cpp_vartype: AtomicWord<bool>
-    default: true
+    cpp_varname: "internalQueryCardinalityEstimatorMode"
+    cpp_vartype: std::string
+    default: sampling
+    validator:
+      callback: ce::validateCEMode
 
   internalQueryEnableCascadesOptimizer:
     description: "Set to use the new optimizer path, must be used in conjunction with the feature
