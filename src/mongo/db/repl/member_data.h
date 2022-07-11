@@ -44,6 +44,31 @@ namespace repl {
  **/
 class MemberData {
 public:
+    class HeartbeatChanges {
+    public:
+        HeartbeatChanges(bool opTimeAdvanced, bool configChanged, bool memberStateChanged)
+            : _opTimeAdvanced(opTimeAdvanced),
+              _configChanged(configChanged),
+              _memberStateChanged(memberStateChanged) {}
+
+        bool getOpTimeAdvanced() const {
+            return _opTimeAdvanced;
+        }
+
+        bool getConfigChanged() const {
+            return _configChanged;
+        }
+
+        bool getMemberStateChanged() const {
+            return _memberStateChanged;
+        }
+
+    private:
+        const bool _opTimeAdvanced;
+        const bool _configChanged;
+        const bool _memberStateChanged;
+    };
+
     MemberData();
 
     MemberState getState() const {
@@ -159,11 +184,11 @@ public:
     }
 
     /**
-     * Sets values in this object from the results of a successful heartbeat command.
-     * Returns true if the lastApplied/lastDurable values advanced or we've received a newer
-     * config since the last heartbeat response.
+     * Sets values in this object from the results of a successful heartbeat command.  Returns a
+     * value indicating whether the lastApplied/lastDurable values advanced, we've received a newer
+     * config, and/or the member state changed since the last heartbeat response.
      */
-    bool setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse);
+    HeartbeatChanges setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse);
 
     /**
      * Sets values in this object from the results of a erroring/failed heartbeat command.

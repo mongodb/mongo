@@ -99,6 +99,7 @@ public:
     virtual void signalApplierToChooseNewSyncSource();
     virtual void stopProducer();
     virtual void startProducerIfStopped();
+    void notifyOtherMemberDataChanged() final;
     virtual bool tooStale();
     void clearCommittedSnapshot() final;
     void updateCommittedSnapshot(const OpTime& newCommitPoint) final;

@@ -235,6 +235,11 @@ public:
     virtual void startProducerIfStopped() = 0;
 
     /**
+     * Notify interested parties that member data for other nodes has changed.
+     */
+    virtual void notifyOtherMemberDataChanged() = 0;
+
+    /**
      * True if we have discovered that no sync source's oplog overlaps with ours.
      */
     virtual bool tooStale() = 0;

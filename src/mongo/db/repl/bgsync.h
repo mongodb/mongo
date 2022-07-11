@@ -122,8 +122,10 @@ public:
      */
     bool tooStale() const;
 
-    // starts the sync target notifying thread
-    void notifierThread();
+    /**
+     * Informs us that data relevant to sync source selection has changed.
+     */
+    void notifySyncSourceSelectionDataChanged();
 
     HostAndPort getSyncTarget() const;
 
@@ -214,6 +216,14 @@ private:
 
     long long _getRetrySleepMS();
 
+    // Waits for the given time, or until we are notified that relevant sync source selection data
+    // has changed.  Takes _mutex, so don't call with _mutex held.
+    void _waitForNewSyncSourceSelectionData(long long waitTimeMillis);
+
+    // Internal version of notifySyncSourceSelectionDataChanged(), to be used by callers
+    // which already hold _mutex.
+    void _notifySyncSourceSelectionDataChanged(WithLock);
+
     // This OplogApplier applies oplog entries fetched from the sync source.
     OplogApplier* const _oplogApplier;
 
@@ -275,6 +285,13 @@ private:
     // operations in the local oplog in order to bring this server to a consistent state relative
     // to the sync source.
     std::unique_ptr<RollbackImpl> _rollback;  // (PR)
+
+    // A condition variable used to wake us when sync source selection data changes.
+    stdx::condition_variable _syncSourceSelectionDataCv;  // (S)
+
+    // A latch which tells us if sync source selection data has changed since we called
+    // the syncSourcSelector
+    bool _syncSourceSelectionDataChanged = true;  // (M)
 };
 
 

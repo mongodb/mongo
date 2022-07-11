@@ -335,5 +335,17 @@ JournalListener* ReplicationCoordinatorExternalStateMock::getReplicationJournalL
     MONGO_UNREACHABLE;
 }
 
+void ReplicationCoordinatorExternalStateMock::notifyOtherMemberDataChanged() {
+    _otherMemberDataChanged = true;
+}
+
+void ReplicationCoordinatorExternalStateMock::clearOtherMemberDataChanged() {
+    _otherMemberDataChanged = false;
+}
+
+bool ReplicationCoordinatorExternalStateMock::getOtherMemberDataChanged() const {
+    return _otherMemberDataChanged;
+}
+
 }  // namespace repl
 }  // namespace mongo

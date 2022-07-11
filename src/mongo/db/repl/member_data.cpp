@@ -47,7 +47,8 @@ MemberData::MemberData() : _health(-1), _authIssue(false), _configIndex(-1), _is
     _lastResponse.setAppliedOpTimeAndWallTime(OpTimeAndWallTime());
 }
 
-bool MemberData::setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse) {
+MemberData::HeartbeatChanges MemberData::setUpValues(Date_t now,
+                                                     ReplSetHeartbeatResponse&& hbResponse) {
     _health = 1;
     if (_upSince == Date_t()) {
         _upSince = now;
@@ -69,7 +70,8 @@ bool MemberData::setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse) 
         hbResponse.setAppliedOpTimeAndWallTime(_lastResponse.getAppliedOpTimeAndWallTime());
     }
     // Log if the state changes
-    if (_lastResponse.getState() != hbResponse.getState()) {
+    const bool memberStateChanged = _lastResponse.getState() != hbResponse.getState();
+    if (memberStateChanged) {
         LOGV2(21215,
               "Member {hostAndPort} is now in state {newState}",
               "Member is in new state",
@@ -91,7 +93,7 @@ bool MemberData::setUpValues(Date_t now, ReplSetHeartbeatResponse&& hbResponse) 
 
     _lastResponse = std::move(hbResponse);
 
-    return (opTimeAdvanced || configChanged);
+    return {opTimeAdvanced, configChanged, memberStateChanged};
 }
 
 void MemberData::setDownValues(Date_t now, const std::string& heartbeatMessage) {

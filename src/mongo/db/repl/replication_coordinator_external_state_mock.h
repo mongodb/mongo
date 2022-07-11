@@ -90,6 +90,7 @@ public:
     virtual void signalApplierToChooseNewSyncSource();
     virtual void stopProducer();
     virtual void startProducerIfStopped();
+    void notifyOtherMemberDataChanged() final;
     virtual bool tooStale();
     virtual void clearCommittedSnapshot();
     virtual void updateCommittedSnapshot(const OpTime& newCommitPoint);
@@ -200,6 +201,13 @@ public:
 
     virtual bool isShardPartOfShardedCluster(OperationContext* opCtx) const final;
 
+    /**
+     * Clear the _otherMemberDataChanged flag so we can check it later.
+     */
+    void clearOtherMemberDataChanged();
+
+    bool getOtherMemberDataChanged() const;
+
     JournalListener* getReplicationJournalListener() final;
 
 private:
@@ -221,6 +229,7 @@ private:
     bool _threadsStarted;
     bool _isReadCommittedSupported = true;
     bool _areSnapshotsEnabled = true;
+    bool _otherMemberDataChanged = false;
     OpTime _firstOpTimeOfMyTerm;
     double _electionTimeoutOffsetLimitFraction = 0.15;
     Timestamp _globalTimestamp;

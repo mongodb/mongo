@@ -469,6 +469,11 @@ stdx::unique_lock<Latch> ReplicationCoordinatorImpl::_handleHeartbeatResponseAct
             break;
         }
     }
+    if (action.getChangedSignificantly()) {
+        lock.unlock();
+        _externalState->notifyOtherMemberDataChanged();
+        lock.lock();
+    }
     return lock;
 }
 
@@ -1025,7 +1030,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
         }
         myIndex = StatusWith<int>(-1);
     }
-    const ReplSetConfig oldConfig = _rsConfig;
+    const bool contentChanged = !sameConfigContents(_rsConfig, newConfig);
     // If we do not have an index, we should pass -1 as our index to avoid falsely adding ourself to
     // the data structures inside of the TopologyCoordinator.
     const int myIndexValue = myIndex.getStatus().isOK() ? myIndex.getValue() : -1;
@@ -1034,6 +1039,9 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
         _setCurrentRSConfig(lk, opCtx.get(), newConfig, myIndexValue);
 
     lk.unlock();
+    if (contentChanged) {
+        _externalState->notifyOtherMemberDataChanged();
+    }
     _performPostMemberStateUpdateAction(action);
     if (MONGO_unlikely(waitForPostActionCompleteInHbReconfig.shouldFail())) {
         // Used in tests that wait for the post member state update action to complete.

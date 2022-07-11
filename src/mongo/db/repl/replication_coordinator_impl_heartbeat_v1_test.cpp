@@ -1944,6 +1944,158 @@ TEST_F(ReplCoordHBV1Test, handleHeartbeatResponseForTestEnqueuesValidHandle) {
     heartbeatReponseThread.join();
 }
 
+TEST_F(ReplCoordHBV1Test, NotifiesExternalStateOfChangeOnlyWhenDataChanges) {
+    unittest::MinimumLoggedSeverityGuard replLogSeverityGuard{logv2::LogComponent::kReplication,
+                                                              logv2::LogSeverity::Debug(3)};
+    // Ensure that the metadata is processed if it is contained in a heartbeat response.
+    assertStartSuccess(BSON("_id"
+                            << "mySet"
+                            << "term" << 1 << "version" << 2 << "members"
+                            << BSON_ARRAY(BSON("host"
+                                               << "node1:12345"
+                                               << "_id" << 0)
+                                          << BSON("host"
+                                                  << "node2:12345"
+                                                  << "_id" << 1))
+                            << "protocolVersion" << 1),
+                       HostAndPort("node1", 12345));
+    ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
+    ASSERT_EQUALS(OpTime(), getReplCoord()->getLastCommittedOpTime());
+
+    auto config = getReplCoord()->getConfig();
+
+    auto net = getNet();
+    ReplSetHeartbeatResponse hbResp;
+    OpTimeAndWallTime appliedOpTimeAndWallTime = {OpTime({11, 1}, 1), Date_t::now()};
+    OpTimeAndWallTime durableOpTimeAndWallTime = {OpTime({10, 1}, 1), Date_t::now()};
+    hbResp.setConfigVersion(config.getConfigVersion());
+    hbResp.setConfigTerm(config.getConfigTerm());
+    hbResp.setSetName(config.getReplSetName());
+    hbResp.setState(MemberState::RS_SECONDARY);
+    hbResp.setElectable(false);
+    hbResp.setAppliedOpTimeAndWallTime(appliedOpTimeAndWallTime);
+    hbResp.setDurableOpTimeAndWallTime(durableOpTimeAndWallTime);
+    auto hbRespObj = hbResp.toBSON();
+    // First heartbeat, to set the stored data for the node.
+    {
+        net->enterNetwork();
+        ASSERT_TRUE(net->hasReadyRequests());
+        auto noi = net->getNextReadyRequest();
+        auto& request = noi->getRequest();
+        ASSERT_EQUALS(config.getMemberAt(1).getHostAndPort(), request.target);
+        ASSERT_EQUALS("replSetHeartbeat", request.cmdObj.firstElement().fieldNameStringData());
+
+        net->scheduleResponse(noi, net->now(), makeResponseStatus(hbRespObj));
+        net->runReadyNetworkOperations();
+        net->exitNetwork();
+    }
+
+    // Second heartbeat, same as the first, should not trigger external notification.
+    getExternalState()->clearOtherMemberDataChanged();
+    {
+        net->enterNetwork();
+        net->runUntil(net->now() + config.getHeartbeatInterval());
+        auto noi = net->getNextReadyRequest();
+        auto& request = noi->getRequest();
+        ASSERT_EQUALS("replSetHeartbeat", request.cmdObj.firstElement().fieldNameStringData());
+
+        net->scheduleResponse(noi, net->now(), makeResponseStatus(hbRespObj));
+        net->runReadyNetworkOperations();
+        net->exitNetwork();
+
+        ASSERT_FALSE(getExternalState()->getOtherMemberDataChanged());
+    }
+
+    // Change electability, should signal data changed.
+    hbResp.setElectable(true);
+    hbRespObj = hbResp.toBSON();
+    getExternalState()->clearOtherMemberDataChanged();
+    {
+        net->enterNetwork();
+        net->runUntil(net->now() + config.getHeartbeatInterval());
+        auto noi = net->getNextReadyRequest();
+        auto& request = noi->getRequest();
+        ASSERT_EQUALS("replSetHeartbeat", request.cmdObj.firstElement().fieldNameStringData());
+
+        net->scheduleResponse(noi, net->now(), makeResponseStatus(hbRespObj));
+        net->runReadyNetworkOperations();
+        net->exitNetwork();
+
+        ASSERT_TRUE(getExternalState()->getOtherMemberDataChanged());
+    }
+
+    // Change applied optime, should signal data changed.
+    appliedOpTimeAndWallTime.opTime = OpTime({11, 2}, 1);
+    hbResp.setAppliedOpTimeAndWallTime(appliedOpTimeAndWallTime);
+    hbRespObj = hbResp.toBSON();
+    getExternalState()->clearOtherMemberDataChanged();
+    {
+        net->enterNetwork();
+        net->runUntil(net->now() + config.getHeartbeatInterval());
+        auto noi = net->getNextReadyRequest();
+        auto& request = noi->getRequest();
+        ASSERT_EQUALS("replSetHeartbeat", request.cmdObj.firstElement().fieldNameStringData());
+
+        net->scheduleResponse(noi, net->now(), makeResponseStatus(hbRespObj));
+        net->runReadyNetworkOperations();
+        net->exitNetwork();
+
+        ASSERT_TRUE(getExternalState()->getOtherMemberDataChanged());
+    }
+
+    // Change durable optime, should signal data changed.
+    durableOpTimeAndWallTime.opTime = OpTime({10, 2}, 1);
+    hbResp.setDurableOpTimeAndWallTime(durableOpTimeAndWallTime);
+    hbRespObj = hbResp.toBSON();
+    getExternalState()->clearOtherMemberDataChanged();
+    {
+        net->enterNetwork();
+        net->runUntil(net->now() + config.getHeartbeatInterval());
+        auto noi = net->getNextReadyRequest();
+        auto& request = noi->getRequest();
+        ASSERT_EQUALS("replSetHeartbeat", request.cmdObj.firstElement().fieldNameStringData());
+
+        net->scheduleResponse(noi, net->now(), makeResponseStatus(hbRespObj));
+        net->runReadyNetworkOperations();
+        net->exitNetwork();
+
+        ASSERT_TRUE(getExternalState()->getOtherMemberDataChanged());
+    }
+
+    // Change member state, should signal data changed.
+    hbResp.setState(MemberState::RS_PRIMARY);
+    hbRespObj = hbResp.toBSON();
+    getExternalState()->clearOtherMemberDataChanged();
+    {
+        net->enterNetwork();
+        net->runUntil(net->now() + config.getHeartbeatInterval());
+        auto noi = net->getNextReadyRequest();
+        auto& request = noi->getRequest();
+        ASSERT_EQUALS("replSetHeartbeat", request.cmdObj.firstElement().fieldNameStringData());
+
+        net->scheduleResponse(noi, net->now(), makeResponseStatus(hbRespObj));
+        net->runReadyNetworkOperations();
+        net->exitNetwork();
+
+        ASSERT_TRUE(getExternalState()->getOtherMemberDataChanged());
+    }
+
+    // Change nothing again, should see no change.
+    getExternalState()->clearOtherMemberDataChanged();
+    {
+        net->enterNetwork();
+        net->runUntil(net->now() + config.getHeartbeatInterval());
+        auto noi = net->getNextReadyRequest();
+        auto& request = noi->getRequest();
+        ASSERT_EQUALS("replSetHeartbeat", request.cmdObj.firstElement().fieldNameStringData());
+
+        net->scheduleResponse(noi, net->now(), makeResponseStatus(hbRespObj));
+        net->runReadyNetworkOperations();
+        net->exitNetwork();
+
+        ASSERT_FALSE(getExternalState()->getOtherMemberDataChanged());
+    }
+}
 
 /**
  * Test a concurrent stepdown and reconfig. The stepdown is triggered by a heartbeat response

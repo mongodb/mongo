@@ -5061,10 +5061,21 @@ Status ReplicationCoordinatorImpl::processReplSetUpdatePosition(const UpdatePosi
     }
     _updateStateAfterRemoteOpTimeUpdates(lock, maxRemoteOpTime);
 
-    if (gotValidUpdate && !_getMemberState_inlock().primary()) {
+    if (gotValidUpdate) {
+        // If we become primary after the unlock below, the forwardSecondaryProgress will do nothing
+        // (slightly expensively).  If we become secondary after the unlock below, BackgroundSync
+        // will take care of forwarding our progress by calling signalUpstreamUpdater() once we
+        // select a new sync source.  So it's OK to depend on the stale value of wasPrimary here.
+        bool wasPrimary = _getMemberState_inlock().primary();
         lock.unlock();
-        // Must do this outside _mutex
-        _externalState->forwardSecondaryProgress();
+        // maxRemoteOpTime is null here if we got valid updates but no downstream node had
+        // actually advanced any optime.
+        if (!maxRemoteOpTime.isNull())
+            _externalState->notifyOtherMemberDataChanged();
+        if (!wasPrimary) {
+            // Must do this outside _mutex
+            _externalState->forwardSecondaryProgress();
+        }
     }
     return status;
 }

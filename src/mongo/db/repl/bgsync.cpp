@@ -187,6 +187,8 @@ void BackgroundSync::shutdown(OperationContext* opCtx) {
     stdx::lock_guard<Latch> lock(_mutex);
 
     setState(lock, ProducerState::Stopped);
+    // If we happen to be waiting for sync source data, stop.
+    _notifySyncSourceSelectionDataChanged(lock);
 
     if (_syncSourceResolver) {
         _syncSourceResolver->shutdown();
@@ -327,6 +329,11 @@ void BackgroundSync::_produce() {
             lastOpTimeFetched,
             OpTime(),
             [&syncSourceResp](const SyncSourceResolverResponse& resp) { syncSourceResp = resp; });
+        // It is possible for _syncSourceSelectionDataChanged to become true between when we release
+        // the lock at the end of this block and when the syncSourceResolver retrieves the relevant
+        // heartbeat data, which means if we don't get a sync source we won't sleep even though we
+        // used the relevant data.  But that's OK because we'll only spin once.
+        _syncSourceSelectionDataChanged = false;
     }
     // This may deadlock if called inside the mutex because SyncSourceResolver::startup() calls
     // ReplicationCoordinator::chooseNewSyncSource(). ReplicationCoordinatorImpl's mutex has to
@@ -413,20 +420,18 @@ void BackgroundSync::_produce() {
             source = _syncSourceHost;
         }
         // If our sync source has not changed, it is likely caused by our heartbeat data map being
-        // out of date. In that case we sleep for 1 second to reduce the amount we spin waiting
-        // for our map to update.
+        // out of date. In that case we sleep for up to 1 second to reduce the amount we spin
+        // waiting for our map to update.  If we are notified of heartbeat data change, we will
+        // interrupt the wait early.
         if (oldSource == source) {
             long long sleepMS = _getRetrySleepMS();
             LOGV2(21087,
-                  "Chose same sync source candidate as last time, {syncSource}. Sleeping for "
-                  "{sleepDurationMillis}ms to avoid immediately choosing a new sync source for the "
-                  "same reason as last time.",
                   "Chose same sync source candidate as last time. Sleeping to avoid immediately "
                   "choosing a new sync source for the same reason as last time",
                   "syncSource"_attr = source,
                   "sleepDurationMillis"_attr = sleepMS);
             numTimesChoseSameSyncSource.increment(1);
-            mongo::sleepmillis(sleepMS);
+            _waitForNewSyncSourceSelectionData(sleepMS);
         } else {
             LOGV2(21088,
                   "Changed sync source from {oldSyncSource} to {newSyncSource}",
@@ -449,12 +454,10 @@ void BackgroundSync::_produce() {
         // No sync source found.
         LOGV2_DEBUG(21090,
                     1,
-                    "Could not find a sync source. Sleeping for {sleepDurationMillis}ms before "
-                    "trying again.",
                     "Could not find a sync source. Sleeping before trying again",
                     "sleepDurationMillis"_attr = sleepMS);
         numTimesCouldNotFindSyncSource.increment(1);
-        mongo::sleepmillis(sleepMS);
+        _waitForNewSyncSourceSelectionData(sleepMS);
         return;
     }
 
@@ -863,6 +866,33 @@ void BackgroundSync::_fallBackOnRollbackViaRefetch(
     rollback(opCtx, *localOplog, rollbackSource, requiredRBID, _replCoord, _replicationProcess);
 }
 
+void BackgroundSync::notifySyncSourceSelectionDataChanged() {
+    stdx::lock_guard lock(_mutex);
+    _notifySyncSourceSelectionDataChanged(lock);
+}
+
+void BackgroundSync::_notifySyncSourceSelectionDataChanged(WithLock) {
+    if (!_syncSourceSelectionDataChanged) {
+        _syncSourceSelectionDataChanged = true;
+        _syncSourceSelectionDataCv.notify_one();
+    }
+}
+
+void BackgroundSync::_waitForNewSyncSourceSelectionData(long long waitTimeMillis) {
+    stdx::unique_lock<Latch> lock(_mutex);
+    if (_syncSourceSelectionDataCv.wait_for(
+            lock, stdx::chrono::milliseconds(waitTimeMillis), [this] {
+                return _syncSourceSelectionDataChanged || _inShutdown;
+            })) {
+        LOGV2_DEBUG(6795401,
+                    1,
+                    "Sync source wait interrupted early",
+                    "syncSourceSelectionDataChanged"_attr = _syncSourceSelectionDataChanged,
+                    "inShutdown"_attr = _inShutdown,
+                    "waitTimeMillis"_attr = waitTimeMillis);
+    }
+}
+
 HostAndPort BackgroundSync::getSyncTarget() const {
     stdx::unique_lock<Latch> lock(_mutex);
     return _syncSourceHost;
@@ -875,11 +905,15 @@ void BackgroundSync::clearSyncTarget() {
           "Resetting sync source to empty",
           "previousSyncSource"_attr = _syncSourceHost);
     _syncSourceHost = HostAndPort();
+    _notifySyncSourceSelectionDataChanged(lock);
 }
 
 void BackgroundSync::_stop(WithLock lock, bool resetLastFetchedOptime) {
     setState(lock, ProducerState::Stopped);
     LOGV2(21107, "Stopping replication producer");
+
+    // If we happen to be waiting for sync source data, stop.
+    _notifySyncSourceSelectionDataChanged(lock);
 
     _syncSourceHost = HostAndPort();
     if (resetLastFetchedOptime) {

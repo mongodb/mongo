@@ -112,6 +112,11 @@ public:
      */
     void setBecameElectable(bool becameElectable);
 
+    /*
+     * Sets whether or not the member has changed member state since the last heartbeat response.
+     */
+    void setChangedMemberState(bool changedMemberState);
+
     /**
      * Gets the action type of this action.
      */
@@ -151,12 +156,27 @@ public:
         return _becameElectable;
     }
 
+    /*
+     * Returns true if the heartbeat response results in the member changing member state.
+     */
+    bool getChangedMemberState() const {
+        return _changedMemberState;
+    }
+
+    /*
+     * Returns true if the heartbeat results in any significant change in member data.
+     */
+    bool getChangedSignificantly() const {
+        return _changedMemberState || _advancedOpTimeOrUpdatedConfig || _becameElectable;
+    }
+
 private:
     Action _action;
     int _primaryIndex;
     Date_t _nextHeartbeatStartDate;
     bool _advancedOpTimeOrUpdatedConfig = false;
     bool _becameElectable = false;
+    bool _changedMemberState = false;
 };
 
 }  // namespace repl

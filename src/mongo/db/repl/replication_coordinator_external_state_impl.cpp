@@ -1030,6 +1030,13 @@ void ReplicationCoordinatorExternalStateImpl::startProducerIfStopped() {
     }
 }
 
+void ReplicationCoordinatorExternalStateImpl::notifyOtherMemberDataChanged() {
+    stdx::lock_guard<Latch> lk(_threadMutex);
+    if (_bgSync) {
+        _bgSync->notifySyncSourceSelectionDataChanged();
+    }
+}
+
 bool ReplicationCoordinatorExternalStateImpl::tooStale() {
     stdx::lock_guard<Latch> lk(_threadMutex);
     if (_bgSync) {
