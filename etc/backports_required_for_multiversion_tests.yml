@@ -230,6 +230,8 @@ last-continuous:
       test_file: jstests/core/clustered_collection_create_index_clustered.js
     - ticket: SERVER-67800
       test_file: jstests/core/clustered_collection_creation.js
+    - ticket: SERVER-63255
+      test_file: jstests/core/dbstats.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -595,6 +597,8 @@ last-lts:
       test_file: jstests/core/clustered_collection_create_index_clustered.js
     - ticket: SERVER-67800
       test_file: jstests/core/clustered_collection_creation.js
+    - ticket: SERVER-63255
+      test_file: jstests/core/dbstats.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
