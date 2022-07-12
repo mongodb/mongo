@@ -38,6 +38,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/serverless/shard_split_statistics.h"
 #include "mongo/db/serverless/shard_split_utils.h"
 #include "mongo/executor/cancelable_executor.h"
@@ -424,7 +425,8 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
                 LOGV2(6236700,
                       "Shard split decision reached",
                       "id"_attr = _migrationId,
-                      "state"_attr = _stateDoc.getState());
+                      "state"_attr = ShardSplitDonorState_serializer(_stateDoc.getState()),
+                      "status"_attr = status);
 
                 {
                     stdx::lock_guard<Latch> lg(_mutex);
@@ -616,6 +618,8 @@ ShardSplitDonorService::DonorStateMachine::_enterAbortIndexBuildsOrAbortedState(
             if (isAbortedDocumentPersistent(lg, _stateDoc)) {
                 // Node has step up and created an instance using a document in abort state. No
                 // need to write the document as it already exists.
+                _abortReason = mongo::resharding::getStatusFromAbortReason(_stateDoc);
+
                 return ExecutorFuture(**executor);
             }
 

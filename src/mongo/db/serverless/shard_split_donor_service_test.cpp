@@ -1108,6 +1108,9 @@ TEST_F(ShardSplitAbortedStepUpTest, ShardSplitAbortedStepUp) {
     auto result = optionalDonor->get()->decisionFuture().get();
 
     ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kAborted);
+    ASSERT_TRUE(!!result.abortReason);
+    ASSERT_EQ(result.abortReason->code(), ErrorCodes::InternalError);
+    ASSERT_EQ(result.abortReason->reason(), abortReason);
 }
 
 }  // namespace mongo
