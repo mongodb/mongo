@@ -286,7 +286,7 @@ function assertRangeMatch(savedRange, paramRange) {
     assert.commandFailedWithCode(
         mongo.s.adminCommand({renameCollection: viewNss, to: newViewNss}), [
             ErrorCodes.IllegalOperation,
-            ErrorCodes.NamespaceNotSharded /* TODO SSERVER-67929 Remove this error code */
+            ErrorCodes.NamespaceNotFound /* TODO SERVER-67929 Remove this error code */
         ]);
     dropTimeSeriesColl();
 })();
