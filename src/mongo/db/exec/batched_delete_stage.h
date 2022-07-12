@@ -125,8 +125,8 @@ public:
     }
 
 private:
-    // Returns NEED_YIELD when there is a write conflict. Otherwise, returns NEED_TIME when
-    // some, or all, of the documents staged in the _stagedDeletesBuffer are successfully deleted.
+    // Returns NEED_TIME when some, or all, of the documents staged in the _stagedDeletesBuffer are
+    // successfully deleted. Returns NEED_YIELD otherwise.
     PlanStage::StageState _deleteBatch(WorkingSetID* out);
 
     // Attempts to delete the documents staged for deletion in a WriteUnitOfWork. Updates
@@ -150,13 +150,13 @@ private:
     void _stageNewDelete(WorkingSetID* workingSetMemberID);
 
     // Tries to restore the child's state. Returns NEED_TIME if the restore succeeds, NEED_YIELD
-    // upon write conflict.
+    // otherwise.
     PlanStage::StageState _tryRestoreState(WorkingSetID* out);
 
-    // Prepares to retry draining the _stagedDeletesBuffer after a write conflict. Removes
-    // 'recordsThatNoLongerMatch' then yields.
-    PlanStage::StageState _prepareToRetryDrainAfterWCE(
-        WorkingSetID* out, const std::set<WorkingSetID>& recordsThatNoLongerMatch);
+    // Prepares to retry draining the _stagedDeletesBuffer after a WriteConflictException or a
+    // TemporarilyUnavailableException. Removes 'recordsThatNoLongerMatch' then yields.
+    void _prepareToRetryDrainAfterYield(WorkingSetID* out,
+                                        const std::set<WorkingSetID>& recordsThatNoLongerMatch);
 
     BatchedDeleteStats _specificStats;
 

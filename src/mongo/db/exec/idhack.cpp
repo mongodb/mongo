@@ -39,6 +39,7 @@
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/btree_access_method.h"
+#include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -84,50 +85,56 @@ PlanStage::StageState IDHackStage::doWork(WorkingSetID* out) {
     }
 
     WorkingSetID id = WorkingSet::INVALID_ID;
-    try {
-        // Look up the key by going directly to the index.
-        auto recordId =
-            indexAccessMethod()->asSortedData()->findSingle(opCtx(), collection(), _key);
+    return handlePlanStageYield(
+        opCtx(),
+        expCtx(),
+        "IDHackStage",
+        collection()->ns().ns(),
+        [&] {
+            // Look up the key by going directly to the index.
+            auto recordId =
+                indexAccessMethod()->asSortedData()->findSingle(opCtx(), collection(), _key);
 
-        // Key not found.
-        if (recordId.isNull()) {
-            _done = true;
-            return PlanStage::IS_EOF;
-        }
+            // Key not found.
+            if (recordId.isNull()) {
+                _done = true;
+                return PlanStage::IS_EOF;
+            }
 
-        ++_specificStats.keysExamined;
-        ++_specificStats.docsExamined;
+            ++_specificStats.keysExamined;
+            ++_specificStats.docsExamined;
 
-        // Create a new WSM for the result document.
-        id = _workingSet->allocate();
-        WorkingSetMember* member = _workingSet->get(id);
-        member->recordId = recordId;
-        _workingSet->transitionToRecordIdAndIdx(id);
+            // Create a new WSM for the result document.
+            id = _workingSet->allocate();
+            WorkingSetMember* member = _workingSet->get(id);
+            member->recordId = recordId;
+            _workingSet->transitionToRecordIdAndIdx(id);
 
-        const auto& coll = collection();
-        if (!_recordCursor)
-            _recordCursor = coll->getCursor(opCtx());
+            const auto& coll = collection();
+            if (!_recordCursor)
+                _recordCursor = coll->getCursor(opCtx());
 
-        // Find the document associated with 'id' in the collection's record store.
-        if (!WorkingSetCommon::fetch(
-                opCtx(), _workingSet, id, _recordCursor.get(), coll, coll->ns())) {
-            // We didn't find a document with RecordId 'id'.
-            _workingSet->free(id);
-            _commonStats.isEOF = true;
-            _done = true;
-            return IS_EOF;
-        }
+            // Find the document associated with 'id' in the collection's record store.
+            if (!WorkingSetCommon::fetch(
+                    opCtx(), _workingSet, id, _recordCursor.get(), coll, coll->ns())) {
+                // We didn't find a document with RecordId 'id'.
+                _workingSet->free(id);
+                _commonStats.isEOF = true;
+                _done = true;
+                return IS_EOF;
+            }
 
-        return advance(id, member, out);
-    } catch (const WriteConflictException&) {
-        // Restart at the beginning on retry.
-        _recordCursor.reset();
-        if (id != WorkingSet::INVALID_ID)
-            _workingSet->free(id);
+            return advance(id, member, out);
+        },
+        [&] {
+            // yieldHandler
+            // Restart at the beginning on retry.
+            _recordCursor.reset();
+            if (id != WorkingSet::INVALID_ID)
+                _workingSet->free(id);
 
-        *out = WorkingSet::INVALID_ID;
-        return NEED_YIELD;
-    }
+            *out = WorkingSet::INVALID_ID;
+        });
 }
 
 PlanStage::StageState IDHackStage::advance(WorkingSetID id,

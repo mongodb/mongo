@@ -40,6 +40,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -142,28 +143,40 @@ boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
 PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     // Get the next kv pair from the index, if any.
     boost::optional<IndexKeyEntry> kv;
-    try {
-        switch (_scanState) {
-            case INITIALIZING:
-                kv = initIndexScan();
-                break;
-            case GETTING_NEXT:
-                kv = _indexCursor->next();
-                break;
-            case NEED_SEEK:
-                ++_specificStats.seeks;
-                kv = _indexCursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
-                    _seekPoint,
-                    indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion(),
-                    indexAccessMethod()->getSortedDataInterface()->getOrdering(),
-                    _forward));
-                break;
-            case HIT_END:
-                return PlanStage::IS_EOF;
-        }
-    } catch (const WriteConflictException&) {
-        *out = WorkingSet::INVALID_ID;
-        return PlanStage::NEED_YIELD;
+
+    const auto ret = handlePlanStageYield(
+        opCtx(),
+        expCtx(),
+        "IndexScan",
+        collection()->ns().ns(),
+        [&] {
+            switch (_scanState) {
+                case INITIALIZING:
+                    kv = initIndexScan();
+                    break;
+                case GETTING_NEXT:
+                    kv = _indexCursor->next();
+                    break;
+                case NEED_SEEK:
+                    ++_specificStats.seeks;
+                    kv = _indexCursor->seek(IndexEntryComparison::makeKeyStringFromSeekPointForSeek(
+                        _seekPoint,
+                        indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion(),
+                        indexAccessMethod()->getSortedDataInterface()->getOrdering(),
+                        _forward));
+                    break;
+                case HIT_END:
+                    return PlanStage::IS_EOF;
+            }
+            return PlanStage::ADVANCED;
+        },
+        [&] {
+            // yieldHandler
+            *out = WorkingSet::INVALID_ID;
+        });
+
+    if (ret != PlanStage::ADVANCED) {
+        return ret;
     }
 
     if (kv) {

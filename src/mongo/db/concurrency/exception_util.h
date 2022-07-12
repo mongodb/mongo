@@ -87,7 +87,7 @@ void handleTemporarilyUnavailableExceptionInTransaction(OperationContext* opCtx,
 
 /**
  * Runs the argument function f as many times as needed for f to complete or throw an exception
- * other than WriteConflictException or TemporarilyUnavailableException. For each time f throws an
+ * other than WriteConflictException or TemporarilyUnavailableException. For each time f throws
  * one of these exceptions, logs the error, waits a spell, cleans up, and then tries f again.
  * Imposes no upper limit on the number of times to re-try f after a WriteConflictException, so any
  * required timeout behavior must be enforced within f. When retrying a

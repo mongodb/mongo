@@ -509,20 +509,23 @@ public:
         msparams.pattern = BSON("foo" << 1);
         auto ms = std::make_unique<MergeSortStage>(_expCtx.get(), msparams, ws.get());
 
-        int numIndices = 20;
+        const int numIndices = 20;
+        BSONObj indexSpec[numIndices];
+
         for (int i = 0; i < numIndices; ++i) {
             // 'a', 'b', ...
             string index(1, 'a' + i);
             insert(BSON(index << 1 << "foo" << i));
 
-            BSONObj indexSpec = BSON(index << 1 << "foo" << 1);
-            addIndex(indexSpec);
-            auto params = makeIndexScanParams(
-                &_opCtx, ctx.getCollection(), getIndex(indexSpec, ctx.getCollection()));
-            ms->addChild(std::make_unique<IndexScan>(
-                _expCtx.get(), ctx.getCollection(), params, ws.get(), nullptr));
+            indexSpec[i] = BSON(index << 1 << "foo" << 1);
+            addIndex(indexSpec[i]);
         }
-        auto coll = ctx.getCollection();
+        const auto& coll = ctx.getCollection();
+        for (int i = 0; i < numIndices; ++i) {
+            auto params = makeIndexScanParams(&_opCtx, coll, getIndex(indexSpec[i], coll));
+            ms->addChild(
+                std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
+        }
         unique_ptr<FetchStage> fetchStage =
             make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
 
@@ -569,22 +572,25 @@ public:
 
         // Index 'a'+i has foo equal to 'i'.
 
-        int numIndices = 20;
+        const int numIndices = 20;
+        BSONObj indexSpec[numIndices];
         for (int i = 0; i < numIndices; ++i) {
             // 'a', 'b', ...
             string index(1, 'a' + i);
             insert(BSON(index << 1 << "foo" << i));
 
-            BSONObj indexSpec = BSON(index << 1 << "foo" << 1);
-            addIndex(indexSpec);
-            auto params = makeIndexScanParams(
-                &_opCtx, ctx.getCollection(), getIndex(indexSpec, ctx.getCollection()));
-            ms->addChild(std::make_unique<IndexScan>(
-                _expCtx.get(), ctx.getCollection(), params, &ws, nullptr));
+            indexSpec[i] = BSON(index << 1 << "foo" << 1);
+            addIndex(indexSpec[i]);
+        }
+        const auto& coll = ctx.getCollection();
+        for (int i = 0; i < numIndices; ++i) {
+            auto params =
+                makeIndexScanParams(&_opCtx, coll, getIndex(indexSpec[i], ctx.getCollection()));
+            ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
         }
 
         set<RecordId> recordIds;
-        getRecordIds(&recordIds, ctx.getCollection());
+        getRecordIds(&recordIds, coll);
 
         set<RecordId>::iterator it = recordIds.begin();
 
@@ -613,7 +619,6 @@ public:
         // stage, and therefore should still be returned.
         ms->saveState();
         remove(BSON(std::string(1u, 'a' + count) << 1));
-        auto coll = ctx.getCollection();
         ms->restoreState(&coll);
 
         // Make sure recordIds[11] is returned as expected. We expect the corresponding working set

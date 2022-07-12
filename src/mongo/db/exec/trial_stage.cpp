@@ -73,6 +73,11 @@ Status TrialStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     while (!_specificStats.trialCompleted) {
         WorkingSetID id = WorkingSet::INVALID_ID;
         const bool mustYield = (work(&id) == PlanStage::NEED_YIELD);
+        if (mustYield) {
+            // Run-time plan selection occurs before a WriteUnitOfWork is opened and it's not
+            // subject to TemporarilyUnavailableException's.
+            invariant(!expCtx()->getTemporarilyUnavailableException());
+        }
         if (mustYield || yieldPolicy->shouldYieldOrInterrupt(expCtx()->opCtx)) {
             if (mustYield && !yieldPolicy->canAutoYield()) {
                 throwWriteConflictException();
@@ -131,6 +136,9 @@ PlanStage::StageState TrialStage::_workTrialPlan(WorkingSetID* out) {
             }
             return state;
         case PlanStage::NEED_YIELD:
+            // Run-time plan selection occurs before a WriteUnitOfWork is opened and it's not
+            // subject to TemporarilyUnavailableException's.
+            invariant(!expCtx()->getTemporarilyUnavailableException());
             // Nothing to update here.
             return state;
         case PlanStage::IS_EOF:

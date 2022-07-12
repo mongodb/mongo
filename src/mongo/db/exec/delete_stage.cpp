@@ -33,13 +33,13 @@
 #include "mongo/db/exec/delete_stage.h"
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/service_context.h"
@@ -160,13 +160,27 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
 
     // Ensure the document still exists and matches the predicate.
     bool docStillMatches;
-    try {
-        docStillMatches = write_stage_common::ensureStillMatches(
-            collection(), opCtx(), _ws, id, _params->canonicalQuery);
-    } catch (const WriteConflictException&) {
-        // There was a problem trying to detect if the document still exists, so retry.
-        memberFreer.dismiss();
-        return prepareToRetryWSM(id, out);
+
+    const auto ret =
+        handlePlanStageYield(opCtx(),
+                             expCtx(),
+                             "DeleteStage ensureStillMatches",
+                             collection()->ns().ns(),
+                             [&] {
+                                 docStillMatches = write_stage_common::ensureStillMatches(
+                                     collection(), opCtx(), _ws, id, _params->canonicalQuery);
+                                 return PlanStage::NEED_TIME;
+                             },
+                             [&] {
+                                 // yieldHandler
+                                 // There was a problem trying to detect if the document still
+                                 // exists, so retry.
+                                 memberFreer.dismiss();
+                                 prepareToRetryWSM(id, out);
+                             });
+
+    if (ret != PlanStage::NEED_TIME) {
+        return ret;
     }
 
     if (!docStillMatches) {
@@ -209,7 +223,8 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
                 // failing due to StaleConfig and exhausting the mongos retry attempts.
                 planExecutorShardingCriticalSectionFuture(opCtx()) = ex->getCriticalSectionSignal();
                 memberFreer.dismiss();  // Keep this member around so we can retry deleting it.
-                return prepareToRetryWSM(id, out);
+                prepareToRetryWSM(id, out);
+                return PlanStage::NEED_YIELD;
             }
             throw;
         }
@@ -229,29 +244,50 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
         uassertStatusOK(_params->removeSaver->goingToDelete(bsonObjDoc));
     }
 
-    try {
-        child()->saveState();
-    } catch (const WriteConflictException&) {
-        std::terminate();
-    }
+    handlePlanStageYield(opCtx(),
+                         expCtx(),
+                         "DeleteStage saveState",
+                         collection()->ns().ns(),
+                         [&] {
+                             child()->saveState();
+                             return PlanStage::NEED_TIME /* unused */;
+                         },
+                         [&] {
+                             // yieldHandler
+                             std::terminate();
+                         });
 
     // Do the write, unless this is an explain.
     if (!_params->isExplain) {
         try {
-            WriteUnitOfWork wunit(opCtx());
-            collection()->deleteDocument(opCtx(),
-                                         Snapshotted(memberDoc.snapshotId(), bsonObjDoc),
-                                         _params->stmtId,
-                                         recordId,
-                                         _params->opDebug,
-                                         writeToOrphan || _params->fromMigrate,
-                                         false,
-                                         _params->returnDeleted ? Collection::StoreDeletedDoc::On
-                                                                : Collection::StoreDeletedDoc::Off);
-            wunit.commit();
-        } catch (const WriteConflictException&) {
-            memberFreer.dismiss();  // Keep this member around so we can retry deleting it.
-            return prepareToRetryWSM(id, out);
+            const auto ret = handlePlanStageYield(
+                opCtx(),
+                expCtx(),
+                "DeleteStage deleteDocument",
+                collection()->ns().ns(),
+                [&] {
+                    WriteUnitOfWork wunit(opCtx());
+                    collection()->deleteDocument(opCtx(),
+                                                 Snapshotted(memberDoc.snapshotId(), bsonObjDoc),
+                                                 _params->stmtId,
+                                                 recordId,
+                                                 _params->opDebug,
+                                                 writeToOrphan || _params->fromMigrate,
+                                                 false,
+                                                 _params->returnDeleted
+                                                     ? Collection::StoreDeletedDoc::On
+                                                     : Collection::StoreDeletedDoc::Off);
+                    wunit.commit();
+                    return PlanStage::NEED_TIME;
+                },
+                [&] {
+                    // yieldHandler
+                    memberFreer.dismiss();  // Keep this member around so we can retry deleting it.
+                    prepareToRetryWSM(id, out);
+                });
+            if (ret != PlanStage::NEED_TIME) {
+                return ret;
+            }
         } catch (const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
             if (ex->getVersionReceived() == ChunkVersion::IGNORED() &&
                 ex->getCriticalSectionSignal()) {
@@ -261,7 +297,8 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
                 // failing due to StaleConfig and exhausting the mongos retry attempts.
                 planExecutorShardingCriticalSectionFuture(opCtx()) = ex->getCriticalSectionSignal();
                 memberFreer.dismiss();  // Keep this member around so we can retry deleting it.
-                return prepareToRetryWSM(id, out);
+                prepareToRetryWSM(id, out);
+                return PlanStage::NEED_YIELD;
             }
             throw;
         }
@@ -275,24 +312,36 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
         member->transitionToOwnedObj();
     }
 
-    // As restoreState may restore (recreate) cursors, cursors are tied to the transaction in which
-    // they are created, and a WriteUnitOfWork is a transaction, make sure to restore the state
-    // outside of the WriteUnitOfWork.
-    try {
-        child()->restoreState(&collection());
-    } catch (const WriteConflictException&) {
-        // Note we don't need to retry anything in this case since the delete already was committed.
-        // However, we still need to return the deleted document (if it was requested).
-        if (_params->returnDeleted) {
-            // member->obj should refer to the deleted document.
-            invariant(member->getState() == WorkingSetMember::OWNED_OBJ);
+    // As restoreState may restore (recreate) cursors, cursors are tied to the transaction in
+    // which they are created, and a WriteUnitOfWork is a transaction, make sure to restore the
+    // state outside of the WriteUnitOfWork.
+    const auto restoreStateRet =
+        handlePlanStageYield(opCtx(),
+                             expCtx(),
+                             "DeleteStage restoreState",
+                             collection()->ns().ns(),
+                             [&] {
+                                 child()->restoreState(&collection());
+                                 return PlanStage::NEED_TIME;
+                             },
+                             [&] {
+                                 // yieldHandler
+                                 // Note we don't need to retry anything in this case since the
+                                 // delete already was committed. However, we still need to return
+                                 // the deleted document (if it was requested).
+                                 if (_params->returnDeleted) {
+                                     // member->obj should refer to the deleted document.
+                                     invariant(member->getState() == WorkingSetMember::OWNED_OBJ);
 
-            _idReturning = id;
-            // Keep this member around so that we can return it on the next work() call.
-            memberFreer.dismiss();
-        }
-        *out = WorkingSet::INVALID_ID;
-        return NEED_YIELD;
+                                     _idReturning = id;
+                                     // Keep this member around so that we can return it on
+                                     // the next work() call.
+                                     memberFreer.dismiss();
+                                 }
+                                 *out = WorkingSet::INVALID_ID;
+                             });
+    if (restoreStateRet != PlanStage::NEED_TIME) {
+        return ret;
     }
 
     if (_params->returnDeleted) {
@@ -329,10 +378,9 @@ const SpecificStats* DeleteStage::getSpecificStats() const {
     return &_specificStats;
 }
 
-PlanStage::StageState DeleteStage::prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out) {
+void DeleteStage::prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out) {
     _idRetrying = idToRetry;
     *out = WorkingSet::INVALID_ID;
-    return NEED_YIELD;
 }
 
 }  // namespace mongo

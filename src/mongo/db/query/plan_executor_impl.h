@@ -32,12 +32,50 @@
 #include <boost/optional.hpp>
 #include <queue>
 
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/exec/multi_plan.h"
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_solution.h"
 
 namespace mongo {
+
+/**
+ * Query execution helper. Runs the argument function 'f'. If 'f' throws an exception other than
+ * 'WriteConflictException' or 'TemporarilyUnavailableException', then these exceptions escape
+ * this function. In contrast 'WriteConflictException' or 'TemporarilyUnavailableException' are
+ * caught, the given 'yieldHandler' is run, and the helper returns PlanStage::NEED_YIELD.
+ *
+ * In a multi-document transaction, it rethrows a TemporarilyUnavailableException as a
+ * WriteConflictException.
+ */
+template <typename F, typename H>
+auto handlePlanStageYield(OperationContext* opCtx,
+                          ExpressionContext* expCtx,
+                          StringData opStr,
+                          StringData ns,
+                          F&& f,
+                          H&& yieldHandler) {
+    invariant(opCtx);
+    invariant(opCtx->lockState());
+    invariant(opCtx->recoveryUnit());
+    invariant(!expCtx->getTemporarilyUnavailableException());
+
+    try {
+        return f();
+    } catch (const WriteConflictException&) {
+        yieldHandler();
+        return PlanStage::NEED_YIELD;
+    } catch (const TemporarilyUnavailableException& e) {
+        if (opCtx->inMultiDocumentTransaction()) {
+            handleTemporarilyUnavailableExceptionInTransaction(opCtx, opStr, ns, e);
+        }
+        expCtx->setTemporarilyUnavailableException(true);
+        yieldHandler();
+        return PlanStage::NEED_YIELD;
+    }
+}
 
 class CappedInsertNotifier;
 class CollectionScan;

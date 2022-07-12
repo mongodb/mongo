@@ -136,7 +136,7 @@ public:
         params.bounds.fields.push_back(oil);
 
         MatchExpression* filter = nullptr;
-        return new IndexScan(_expCtx.get(), _coll, params, &_ws, filter);
+        return new IndexScan(_expCtx.get(), _collPtr, params, &_ws, filter);
     }
 
     static const char* ns() {

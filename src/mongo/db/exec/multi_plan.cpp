@@ -333,6 +333,9 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
             doneWorking = true;
         } else if (PlanStage::NEED_YIELD == state) {
             invariant(id == WorkingSet::INVALID_ID);
+            // Run-time plan selection occurs before a WriteUnitOfWork is opened and it's not
+            // subject to TemporarilyUnavailableException's.
+            invariant(!expCtx()->getTemporarilyUnavailableException());
             if (!yieldPolicy->canAutoYield()) {
                 throwWriteConflictException();
             }

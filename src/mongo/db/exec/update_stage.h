@@ -166,9 +166,9 @@ private:
 
     /**
      * Stores 'idToRetry' in '_idRetrying' so the update can be retried during the next call to
-     * doWork(). Always returns NEED_YIELD and sets 'out' to WorkingSet::INVALID_ID.
+     * doWork(). Sets 'out' to WorkingSet::INVALID_ID.
      */
-    StageState prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out);
+    void prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out);
 
     /**
      * Returns true if the owning shard under the current key pattern would change as a result of

@@ -344,8 +344,10 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
         return PlanExecutor::ADVANCED;
     }
 
-    // Incremented on every writeConflict, reset to 0 on any successful call to _root->work.
+    // The below are incremented on every WriteConflict or TemporarilyUnavailable error accordingly,
+    // and reset to 0 on any successful call to _root->work.
     size_t writeConflictsInARow = 0;
+    size_t tempUnavailErrorsInARow = 0;
 
     // Capped insert data; declared outside the loop so we hold a shared pointer to the capped
     // insert notifier the entire time we are in the loop.  Holding a shared pointer to the
@@ -386,8 +388,10 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
         WorkingSetID id = WorkingSet::INVALID_ID;
         PlanStage::StageState code = _root->work(&id);
 
-        if (code != PlanStage::NEED_YIELD)
+        if (code != PlanStage::NEED_YIELD) {
             writeConflictsInARow = 0;
+            tempUnavailErrorsInARow = 0;
+        }
 
         if (PlanStage::ADVANCED == code) {
             WorkingSetMember* member = _workingSet->get(id);
@@ -436,19 +440,41 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
             // This result didn't have the data the caller wanted, try again.
         } else if (PlanStage::NEED_YIELD == code) {
             invariant(id == WorkingSet::INVALID_ID);
-            if (!_yieldPolicy->canAutoYield() ||
-                MONGO_unlikely(skipWriteConflictRetries.shouldFail())) {
-                throwWriteConflictException();
+            invariant(_opCtx->recoveryUnit());
+
+            if (_expCtx->getTemporarilyUnavailableException()) {
+                _expCtx->setTemporarilyUnavailableException(false);
+
+                if (!_yieldPolicy->canAutoYield()) {
+                    throwTemporarilyUnavailableException(
+                        "got TemporarilyUnavailable exception on a plan that cannot auto-yield");
+                }
+
+                CurOp::get(_opCtx)->debug().additiveMetrics.incrementTemporarilyUnavailableErrors(
+                    1);
+                tempUnavailErrorsInARow++;
+                handleTemporarilyUnavailableException(
+                    _opCtx,
+                    tempUnavailErrorsInARow,
+                    "plan executor",
+                    _nss.ns(),
+                    TemporarilyUnavailableException(
+                        Status(ErrorCodes::TemporarilyUnavailable, "temporarily unavailable")));
+            } else {
+                // We're yielding because of a WriteConflictException.
+                if (!_yieldPolicy->canAutoYield() ||
+                    MONGO_unlikely(skipWriteConflictRetries.shouldFail())) {
+                    throwWriteConflictException();
+                }
+
+                CurOp::get(_opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
+                writeConflictsInARow++;
+                logWriteConflictAndBackoff(writeConflictsInARow, "plan execution", _nss.ns());
             }
 
-            CurOp::get(_opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
-            writeConflictsInARow++;
-            logWriteConflictAndBackoff(writeConflictsInARow, "plan execution", _nss.ns());
-
-            // If we're allowed to, we will yield next time through the loop.
-            if (_yieldPolicy->canAutoYield()) {
-                _yieldPolicy->forceYield();
-            }
+            // Yield next time through the loop.
+            invariant(_yieldPolicy->canAutoYield());
+            _yieldPolicy->forceYield();
         } else if (PlanStage::NEED_TIME == code) {
             // Fall through to yield check at end of large conditional.
         } else {

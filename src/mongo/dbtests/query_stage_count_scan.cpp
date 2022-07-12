@@ -137,16 +137,17 @@ public:
         // Add an index on a:1
         addIndex(BSON("a" << 1));
 
+        const CollectionPtr coll = ctx.getCollection();
+
         // Set up the count stage
-        auto params =
-            makeCountScanParams(&_opCtx, ctx.getCollection(), getIndex(ctx.db(), BSON("a" << 1)));
+        auto params = makeCountScanParams(&_opCtx, coll, getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("a" << 1);
         params.startKeyInclusive = true;
         params.endKey = BSON("a" << 10);
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), getCollection(), params, &ws);
+        CountScan count(_expCtx.get(), coll, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(2, numCounted);
@@ -169,16 +170,17 @@ public:
         // Add an index
         addIndex(BSON("a" << 1));
 
+        const CollectionPtr coll = ctx.getCollection();
+
         // Set up the count stage
-        auto params =
-            makeCountScanParams(&_opCtx, ctx.getCollection(), getIndex(ctx.db(), BSON("a" << 1)));
+        auto params = makeCountScanParams(&_opCtx, coll, getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 3);
         params.startKeyInclusive = true;
         params.endKey = BSON("" << 7);
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), getCollection(), params, &ws);
+        CountScan count(_expCtx.get(), coll, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(5, numCounted);
@@ -201,16 +203,17 @@ public:
         // Add an index
         addIndex(BSON("a" << 1));
 
+        const CollectionPtr coll = ctx.getCollection();
+
         // Set up the count stage
-        auto params =
-            makeCountScanParams(&_opCtx, ctx.getCollection(), getIndex(ctx.db(), BSON("a" << 1)));
+        auto params = makeCountScanParams(&_opCtx, coll, getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 3);
         params.startKeyInclusive = false;
         params.endKey = BSON("" << 7);
         params.endKeyInclusive = false;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), getCollection(), params, &ws);
+        CountScan count(_expCtx.get(), coll, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(3, numCounted);
@@ -229,16 +232,17 @@ public:
         insert(BSON("a" << 2));
         addIndex(BSON("a" << 1));
 
+        const CollectionPtr coll = ctx.getCollection();
+
         // Set up count, and run
-        auto params =
-            makeCountScanParams(&_opCtx, ctx.getCollection(), getIndex(ctx.db(), BSON("a" << 1)));
+        auto params = makeCountScanParams(&_opCtx, coll, getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 2);
         params.startKeyInclusive = false;
         params.endKey = BSON("" << 3);
         params.endKeyInclusive = false;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), getCollection(), params, &ws);
+        CountScan count(_expCtx.get(), coll, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(0, numCounted);
@@ -258,16 +262,17 @@ public:
         insert(BSON("a" << 3));
         addIndex(BSON("a" << 1));
 
+        const CollectionPtr coll = ctx.getCollection();
+
         // Set up count, and run
-        auto params =
-            makeCountScanParams(&_opCtx, ctx.getCollection(), getIndex(ctx.db(), BSON("a" << 1)));
+        auto params = makeCountScanParams(&_opCtx, coll, getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 2);
         params.startKeyInclusive = false;
         params.endKey = BSON("" << 3);
         params.endKeyInclusive = false;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), getCollection(), params, &ws);
+        CountScan count(_expCtx.get(), coll, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(0, numCounted);
@@ -288,16 +293,17 @@ public:
         insert(BSON("a" << 4));
         addIndex(BSON("a" << 1));
 
+        const CollectionPtr coll = ctx.getCollection();
+
         // Set up count, and run
-        auto params =
-            makeCountScanParams(&_opCtx, ctx.getCollection(), getIndex(ctx.db(), BSON("a" << 1)));
+        auto params = makeCountScanParams(&_opCtx, coll, getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 2);
         params.startKeyInclusive = false;
         params.endKey = BSON("" << 3);
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), getCollection(), params, &ws);
+        CountScan count(_expCtx.get(), coll, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(0, numCounted);
@@ -319,16 +325,17 @@ public:
         }
         addIndex(BSON("a" << 1));
 
+        const CollectionPtr coll = ctx.getCollection();
+
         // Set up count stage
-        auto params =
-            makeCountScanParams(&_opCtx, ctx.getCollection(), getIndex(ctx.db(), BSON("a" << 1)));
+        auto params = makeCountScanParams(&_opCtx, coll, getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 2);
         params.startKeyInclusive = false;
         params.endKey = BSON("" << 6);
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), getCollection(), params, &ws);
+        CountScan count(_expCtx.get(), coll, params, &ws);
         WorkingSetID wsid;
 
         int numCounted = 0;
@@ -345,7 +352,8 @@ public:
         static_cast<PlanStage*>(&count)->saveState();
 
         // Recover from yield
-        auto coll = getCollection();
+        auto c = getCollection();
+
         static_cast<PlanStage*>(&count)->restoreState(&coll);
 
         // finish counting
@@ -373,16 +381,17 @@ public:
         }
         addIndex(BSON("a" << 1));
 
+        const CollectionPtr coll = ctx.getCollection();
+
         // Set up count stage
-        auto params =
-            makeCountScanParams(&_opCtx, ctx.getCollection(), getIndex(ctx.db(), BSON("a" << 1)));
+        auto params = makeCountScanParams(&_opCtx, coll, getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 2);
         params.startKeyInclusive = false;
         params.endKey = BSON("" << 6);
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), getCollection(), params, &ws);
+        CountScan count(_expCtx.get(), coll, params, &ws);
         WorkingSetID wsid;
 
         int numCounted = 0;
@@ -398,11 +407,12 @@ public:
         // Prepare the cursor to yield
         static_cast<PlanStage*>(&count)->saveState();
 
+        // Recover from yield
+        auto c = getCollection();
+
         // Remove remaining objects
         remove(BSON("a" << GTE << 5));
 
-        // Recover from yield
-        auto coll = getCollection();
         static_cast<PlanStage*>(&count)->restoreState(&coll);
 
         // finish counting
@@ -430,16 +440,17 @@ public:
         }
         addIndex(BSON("a" << 1));
 
+        const CollectionPtr coll = ctx.getCollection();
+
         // Set up count stage
-        auto params =
-            makeCountScanParams(&_opCtx, ctx.getCollection(), getIndex(ctx.db(), BSON("a" << 1)));
+        auto params = makeCountScanParams(&_opCtx, coll, getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 2);
         params.startKeyInclusive = false;
         params.endKey = BSON("" << 6);
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), getCollection(), params, &ws);
+        CountScan count(_expCtx.get(), coll, params, &ws);
         WorkingSetID wsid;
 
         int numCounted = 0;
@@ -462,7 +473,8 @@ public:
         insert(BSON("a" << 6.5));
 
         // Recover from yield
-        auto coll = getCollection();
+        auto c = getCollection();
+
         static_cast<PlanStage*>(&count)->restoreState(&coll);
 
         // finish counting
@@ -494,16 +506,17 @@ public:
         remove(BSON("a" << 1 << "b" << 3));
         remove(BSON("a" << 1 << "b" << 4));
 
+        const CollectionPtr coll = ctx.getCollection();
+
         // Ensure that count does not include unused keys
-        auto params =
-            makeCountScanParams(&_opCtx, ctx.getCollection(), getIndex(ctx.db(), BSON("a" << 1)));
+        auto params = makeCountScanParams(&_opCtx, coll, getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 1);
         params.startKeyInclusive = true;
         params.endKey = BSON("" << 1);
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), getCollection(), params, &ws);
+        CountScan count(_expCtx.get(), coll, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(7, numCounted);
@@ -527,16 +540,17 @@ public:
         // Mark key at end position as 'unused' by deleting
         remove(BSON("a" << 1 << "b" << 9));
 
+        const CollectionPtr coll = ctx.getCollection();
+
         // Run count and check
-        auto params =
-            makeCountScanParams(&_opCtx, ctx.getCollection(), getIndex(ctx.db(), BSON("a" << 1)));
+        auto params = makeCountScanParams(&_opCtx, coll, getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 0);
         params.startKeyInclusive = true;
         params.endKey = BSON("" << 2);
         params.endKeyInclusive = true;  // yes?
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), getCollection(), params, &ws);
+        CountScan count(_expCtx.get(), coll, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(9, numCounted);
@@ -557,16 +571,17 @@ public:
         }
         addIndex(BSON("a" << 1));
 
+        const CollectionPtr coll = ctx.getCollection();
+
         // Set up count stage
-        auto params =
-            makeCountScanParams(&_opCtx, ctx.getCollection(), getIndex(ctx.db(), BSON("a" << 1)));
+        auto params = makeCountScanParams(&_opCtx, coll, getIndex(ctx.db(), BSON("a" << 1)));
         params.startKey = BSON("" << 1);
         params.startKeyInclusive = true;
         params.endKey = BSON("" << 1);
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), getCollection(), params, &ws);
+        CountScan count(_expCtx.get(), coll, params, &ws);
         WorkingSetID wsid;
 
         int numCounted = 0;
@@ -586,7 +601,7 @@ public:
         remove(BSON("a" << 1 << "b" << 5));
 
         // Recover from yield
-        auto coll = getCollection();
+        auto c = getCollection();
         static_cast<PlanStage*>(&count)->restoreState(&coll);
 
         // finish counting

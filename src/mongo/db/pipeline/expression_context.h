@@ -489,6 +489,16 @@ public:
     // expression counting.
     bool enabledCounters = true;
 
+    // Returns true if we've received a TemporarilyUnavailableException.
+    bool getTemporarilyUnavailableException() {
+        return _gotTemporarilyUnavailableException;
+    }
+
+    // Sets or clears the flag indicating whether we've received a TemporarilyUnavailableException.
+    void setTemporarilyUnavailableException(bool v) {
+        _gotTemporarilyUnavailableException = v;
+    }
+
 protected:
     static const int kInterruptCheckPeriod = 128;
 
@@ -515,6 +525,7 @@ protected:
 
 private:
     boost::optional<ExpressionCounters> _expressionCounters = boost::none;
+    bool _gotTemporarilyUnavailableException = false;
 };
 
 }  // namespace mongo

@@ -34,13 +34,13 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/pm2423_feature_flags_gen.h"
@@ -242,11 +242,18 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
         return PlanStage::NEED_TIME;
     }
 
-    try {
-        child()->saveState();
-    } catch (const WriteConflictException&) {
-        std::terminate();
-    }
+    handlePlanStageYield(opCtx(),
+                         expCtx(),
+                         "BatchedDeleteStage saveState",
+                         collection()->ns().ns(),
+                         [&] {
+                             child()->saveState();
+                             return PlanStage::NEED_TIME /* unused */;
+                         },
+                         [&] {
+                             // yieldHandler
+                             std::terminate();
+                         });
 
     std::set<WorkingSetID> recordsToSkip;
     unsigned int docsDeleted = 0;
@@ -254,9 +261,23 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
     long long timeInBatch = 0;
 
     try {
-        timeInBatch = _commitBatch(out, &recordsToSkip, &docsDeleted, &bufferOffset);
-    } catch (const WriteConflictException&) {
-        return _prepareToRetryDrainAfterWCE(out, recordsToSkip);
+        const auto ret = handlePlanStageYield(
+            opCtx(),
+            expCtx(),
+            "BatchedDeleteStage::_deleteBatch",
+            collection()->ns().ns(),
+            [&] {
+                timeInBatch = _commitBatch(out, &recordsToSkip, &docsDeleted, &bufferOffset);
+                return PlanStage::NEED_TIME;
+            },
+            [&] {
+                // yieldHandler
+                _prepareToRetryDrainAfterYield(out, recordsToSkip);
+            });
+
+        if (ret != PlanStage::NEED_TIME) {
+            return ret;
+        }
     } catch (const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
         if (ex->getVersionReceived() == ChunkVersion::IGNORED() && ex->getCriticalSectionSignal()) {
             // If ChunkVersion is IGNORED and we encountered a critical section, then yield, wait
@@ -264,7 +285,8 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
             // left. We do this to prevent large multi-writes from repeatedly failing due to
             // StaleConfig and exhausting the mongos retry attempts.
             planExecutorShardingCriticalSectionFuture(opCtx()) = ex->getCriticalSectionSignal();
-            return _prepareToRetryDrainAfterWCE(out, recordsToSkip);
+            _prepareToRetryDrainAfterYield(out, recordsToSkip);
+            return PlanStage::NEED_YIELD;
         }
         throw;
     }
@@ -454,20 +476,24 @@ void BatchedDeleteStage::_stageNewDelete(WorkingSetID* workingSetMemberID) {
 }
 
 PlanStage::StageState BatchedDeleteStage::_tryRestoreState(WorkingSetID* out) {
-    try {
-        child()->restoreState(&collection());
-    } catch (const WriteConflictException&) {
-        *out = WorkingSet::INVALID_ID;
-        return NEED_YIELD;
-    }
-    return NEED_TIME;
+    return handlePlanStageYield(opCtx(),
+                                expCtx(),
+                                "BatchedDeleteStage::_tryRestoreState",
+                                collection()->ns().ns(),
+                                [&] {
+                                    child()->restoreState(&collection());
+                                    return PlanStage::NEED_TIME;
+                                },
+                                [&] {
+                                    // yieldHandler
+                                    *out = WorkingSet::INVALID_ID;
+                                });
 }
 
-PlanStage::StageState BatchedDeleteStage::_prepareToRetryDrainAfterWCE(
+void BatchedDeleteStage::_prepareToRetryDrainAfterYield(
     WorkingSetID* out, const std::set<WorkingSetID>& recordsToSkip) {
     _stagedDeletesBuffer.erase(recordsToSkip);
     *out = WorkingSet::INVALID_ID;
-    return NEED_YIELD;
 }
 
 bool BatchedDeleteStage::_batchTargetMet() {

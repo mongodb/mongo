@@ -160,9 +160,9 @@ protected:
 private:
     /**
      * Stores 'idToRetry' in '_idRetrying' so the delete can be retried during the next call to
-     * work(). Always returns NEED_YIELD and sets 'out' to WorkingSet::INVALID_ID.
+     * work(). Sets 'out' to WorkingSet::INVALID_ID.
      */
-    StageState prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out);
+    void prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out);
 
     // If not WorkingSet::INVALID_ID, we use this rather than asking our child what to do next.
     WorkingSetID _idRetrying;

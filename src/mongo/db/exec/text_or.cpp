@@ -39,6 +39,7 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/record_id.h"
 #include "mongo/util/assert_util.h"
 
@@ -151,15 +152,21 @@ PlanStage::StageState TextOrStage::doWork(WorkingSetID* out) {
 
 PlanStage::StageState TextOrStage::initStage(WorkingSetID* out) {
     *out = WorkingSet::INVALID_ID;
-    try {
-        _recordCursor = collection()->getCursor(opCtx());
-        _internalState = State::kReadingTerms;
-        return PlanStage::NEED_TIME;
-    } catch (const WriteConflictException&) {
-        invariant(_internalState == State::kInit);
-        _recordCursor.reset();
-        return PlanStage::NEED_YIELD;
-    }
+
+    return handlePlanStageYield(opCtx(),
+                                expCtx(),
+                                "TextOrStage initStage",
+                                collection()->ns().ns(),
+                                [&] {
+                                    _recordCursor = collection()->getCursor(opCtx());
+                                    _internalState = State::kReadingTerms;
+                                    return PlanStage::NEED_TIME;
+                                },
+                                [&] {
+                                    // yieldHandler
+                                    invariant(_internalState == State::kInit);
+                                    _recordCursor.reset();
+                                });
 }
 
 PlanStage::StageState TextOrStage::readFromChildren(WorkingSetID* out) {
@@ -254,19 +261,34 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
 
         // Our parent expects RID_AND_OBJ members, so we fetch the document here if we haven't
         // already.
-        try {
-            if (!WorkingSetCommon::fetch(
-                    opCtx(), _ws, wsid, _recordCursor.get(), collection(), collection()->ns())) {
-                _ws->free(wsid);
-                textRecordData->score = -1;
-                return NEED_TIME;
-            }
-            ++_specificStats.fetches;
-        } catch (const WriteConflictException&) {
-            wsm->makeObjOwnedIfNeeded();
-            _idRetrying = wsid;
-            *out = WorkingSet::INVALID_ID;
-            return NEED_YIELD;
+        const auto ret =
+            handlePlanStageYield(opCtx(),
+                                 expCtx(),
+                                 "TextOrStage addTerm",
+                                 collection()->ns().ns(),
+                                 [&] {
+                                     if (!WorkingSetCommon::fetch(opCtx(),
+                                                                  _ws,
+                                                                  wsid,
+                                                                  _recordCursor.get(),
+                                                                  collection(),
+                                                                  collection()->ns())) {
+                                         _ws->free(wsid);
+                                         textRecordData->score = -1;
+                                         return NEED_TIME;
+                                     }
+                                     ++_specificStats.fetches;
+                                     return PlanStage::ADVANCED;
+                                 },
+                                 [&] {
+                                     // yieldHandler
+                                     wsm->makeObjOwnedIfNeeded();
+                                     _idRetrying = wsid;
+                                     *out = WorkingSet::INVALID_ID;
+                                 });
+
+        if (ret != PlanStage::ADVANCED) {
+            return ret;
         }
 
         textRecordData->wsid = wsid;

@@ -156,22 +156,21 @@ public:
         //
         // Full yield request semantics:
         //
+        // If the storage engine aborts the storage-level transaction with WriteConflictException or
+        // TemporarilyUnavailableException, then an execution stage that interfaces with storage is
+        // responsible for catching this exception. After catching the exception, it suspends its
+        // state in such a way that will allow it to retry the storage-level operation on the next
+        // work() call. Then it populates the out parameter of work(...) with WorkingSet::INVALID_ID
+        // and returns NEED_YIELD to its parent. The stage that requested the yield also holds the
+        // WSID of the loc it wants fetched. On the next call to work(), if needed that stage will
+        // refetch the WSM that the held WSID refers to.
+        //
         // Each stage that receives a NEED_YIELD from a child must propagate the NEED_YIELD up
         // and perform no work.
         //
-        // If a yield is requested due to a WriteConflict, the out parameter of work(...) should
-        // be populated with WorkingSet::INVALID_ID. If it is illegal to yield, a
-        // WriteConflictException will be thrown.
+        // The NEED_YIELD is handled at the level of the PlanExecutor, either by re-throwing the
+        // WCE/TUE or by resetting transaction state.
         //
-        // A yield-requesting stage populates the out parameter of work(...) with a WSID that
-        // refers to a WSM with a Fetcher*. If it is illegal to yield, this is ignored. This
-        // difference in behavior can be removed once SERVER-16051 is resolved.
-        //
-        // The plan executor is responsible for yielding and, if requested, paging in the data
-        // upon receipt of a NEED_YIELD. The plan executor does NOT free the WSID of the
-        // requested fetch. The stage that requested the fetch holds the WSID of the loc it
-        // wants fetched. On the next call to work() that stage can assume a fetch was performed
-        // on the WSM that the held WSID refers to.
         NEED_YIELD,
     };
 

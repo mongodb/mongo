@@ -146,6 +146,9 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             return Status::OK();
         } else if (PlanStage::NEED_YIELD == state) {
             invariant(id == WorkingSet::INVALID_ID);
+            // Run-time plan selection occurs before a WriteUnitOfWork is opened and it's not
+            // subject to TemporarilyUnavailableException's.
+            invariant(!expCtx()->getTemporarilyUnavailableException());
             if (!yieldPolicy->canAutoYield()) {
                 throwWriteConflictException();
             }

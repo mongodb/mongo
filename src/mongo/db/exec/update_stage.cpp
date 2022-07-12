@@ -39,7 +39,6 @@
 #include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -47,6 +46,7 @@
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -441,13 +441,26 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         }
 
         bool docStillMatches;
-        try {
-            docStillMatches = write_stage_common::ensureStillMatches(
-                collection(), opCtx(), _ws, id, _params.canonicalQuery);
-        } catch (const WriteConflictException&) {
-            // There was a problem trying to detect if the document still exists, so retry.
-            memberFreer.dismiss();
-            return prepareToRetryWSM(id, out);
+        const auto ensureStillMatchesRet =
+            handlePlanStageYield(opCtx(),
+                                 expCtx(),
+                                 "UpdateStage ensureStillMatches",
+                                 collection()->ns().ns(),
+                                 [&] {
+                                     docStillMatches = write_stage_common::ensureStillMatches(
+                                         collection(), opCtx(), _ws, id, _params.canonicalQuery);
+                                     return PlanStage::NEED_TIME;
+                                 },
+                                 [&] {
+                                     // yieldHandler
+                                     // There was a problem trying to detect if the document still
+                                     // exists, so retry.
+                                     memberFreer.dismiss();
+                                     prepareToRetryWSM(id, out);
+                                 });
+
+        if (ensureStillMatchesRet != PlanStage::NEED_TIME) {
+            return ensureStillMatchesRet;
         }
 
         if (!docStillMatches) {
@@ -493,7 +506,8 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
                     planExecutorShardingCriticalSectionFuture(opCtx()) =
                         ex->getCriticalSectionSignal();
                     memberFreer.dismiss();  // Keep this member around so we can retry deleting it.
-                    return prepareToRetryWSM(id, out);
+                    prepareToRetryWSM(id, out);
+                    return PlanStage::NEED_YIELD;
                 }
                 throw;
             }
@@ -504,11 +518,18 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         member->makeObjOwnedIfNeeded();
 
         // Save state before making changes.
-        try {
-            child()->saveState();
-        } catch (const WriteConflictException&) {
-            std::terminate();
-        }
+        handlePlanStageYield(opCtx(),
+                             expCtx(),
+                             "UpdateStage saveState",
+                             collection()->ns().ns(),
+                             [&] {
+                                 child()->saveState();
+                                 return PlanStage::NEED_TIME /* unused */;
+                             },
+                             [&] {
+                                 // yieldHandler
+                                 std::terminate();
+                             });
 
         // If we care about the pre-updated version of the doc, save it out here.
         BSONObj oldObj;
@@ -518,13 +539,28 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         }
 
         BSONObj newObj;
+
         try {
-            // Do the update, get us the new version of the doc.
-            newObj = transformAndUpdate(
-                {oldSnapshot, member->doc.value().toBson()}, recordId, writeToOrphan);
-        } catch (const WriteConflictException&) {
-            memberFreer.dismiss();  // Keep this member around so we can retry updating it.
-            return prepareToRetryWSM(id, out);
+            const auto updateRet = handlePlanStageYield(
+                opCtx(),
+                expCtx(),
+                "UpdateStage update",
+                collection()->ns().ns(),
+                [&] {
+                    // Do the update, get us the new version of the doc.
+                    newObj = transformAndUpdate(
+                        {oldSnapshot, member->doc.value().toBson()}, recordId, writeToOrphan);
+                    return PlanStage::NEED_TIME;
+                },
+                [&] {
+                    // yieldHandler
+                    memberFreer.dismiss();  // Keep this member around so we can retry updating it.
+                    prepareToRetryWSM(id, out);
+                });
+
+            if (updateRet != PlanStage::NEED_TIME) {
+                return updateRet;
+            }
         } catch (const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
             if (ex->getVersionReceived() == ChunkVersion::IGNORED() &&
                 ex->getCriticalSectionSignal()) {
@@ -534,7 +570,8 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
                 // failing due to StaleConfig and exhausting the mongos retry attempts.
                 planExecutorShardingCriticalSectionFuture(opCtx()) = ex->getCriticalSectionSignal();
                 memberFreer.dismiss();  // Keep this member around so we can retry updating it.
-                return prepareToRetryWSM(id, out);
+                prepareToRetryWSM(id, out);
+                return PlanStage::NEED_YIELD;
             }
             throw;
         }
@@ -554,26 +591,36 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         // This should be after transformAndUpdate to make sure we actually updated this doc.
         _specificStats.nMatched += _params.numStatsForDoc ? _params.numStatsForDoc(newObj) : 1;
 
-        // Restore state after modification
+        // Restore state after modification. As restoreState may restore (recreate) cursors, make
+        // sure to restore the state outside of the WritUnitOfWork.
+        const auto restoreStateRet = handlePlanStageYield(
+            opCtx(),
+            expCtx(),
+            "UpdateStage restoreState",
+            collection()->ns().ns(),
+            [&] {
+                child()->restoreState(&collection());
+                return PlanStage::NEED_TIME;
+            },
+            [&] {
+                // yieldHandler
+                // Note we don't need to retry updating anything in this case since the update
+                // already was committed. However, we still need to return the updated document (if
+                // it was requested).
+                if (_params.request->shouldReturnAnyDocs()) {
+                    // member->obj should refer to the document we want to return.
+                    invariant(member->getState() == WorkingSetMember::OWNED_OBJ);
 
-        // As restoreState may restore (recreate) cursors, make sure to restore the
-        // state outside of the WritUnitOfWork.
-        try {
-            child()->restoreState(&collection());
-        } catch (const WriteConflictException&) {
-            // Note we don't need to retry updating anything in this case since the update
-            // already was committed. However, we still need to return the updated document
-            // (if it was requested).
-            if (_params.request->shouldReturnAnyDocs()) {
-                // member->obj should refer to the document we want to return.
-                invariant(member->getState() == WorkingSetMember::OWNED_OBJ);
+                    _idReturning = id;
+                    // Keep this member around so that we can return it on the next
+                    // work() call.
+                    memberFreer.dismiss();
+                }
+                *out = WorkingSet::INVALID_ID;
+            });
 
-                _idReturning = id;
-                // Keep this member around so that we can return it on the next work() call.
-                memberFreer.dismiss();
-            }
-            *out = WorkingSet::INVALID_ID;
-            return NEED_YIELD;
+        if (restoreStateRet != PlanStage::NEED_TIME) {
+            return restoreStateRet;
         }
 
         if (_params.request->shouldReturnAnyDocs()) {
@@ -643,10 +690,9 @@ const SpecificStats* UpdateStage::getSpecificStats() const {
     return &_specificStats;
 }
 
-PlanStage::StageState UpdateStage::prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out) {
+void UpdateStage::prepareToRetryWSM(WorkingSetID idToRetry, WorkingSetID* out) {
     _idRetrying = idToRetry;
     *out = WorkingSet::INVALID_ID;
-    return NEED_YIELD;
 }
 
 
