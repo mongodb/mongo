@@ -188,6 +188,23 @@ for (let res of results) {
     assert.eq(res, trueResult, originalDoc);
 }
 
+// Run a query that tests the SERVER-67742 fix
+const kPrefixProjection = {
+    _id: 0,
+    "a": 1,
+    num: 1
+};
+
+// TODO SERVER-62985: Add a hint to this query to ensure it uses the column store index.
+results = coll.find({"a.m": 1}, kPrefixProjection).toArray();
+assert.gt(results.length, 0);
+for (let res of results) {
+    const trueResult =
+        coll.find({num: res.num}, kPrefixProjection).hint({$natural: 1}).toArray()[0];
+    const originalDoc = coll.findOne({num: res.num});
+    assert.eq(res, trueResult, originalDoc);
+}
+
 // Now test grouping semantics.
 
 // Sanity check that we are comparing the plans we expect to be.

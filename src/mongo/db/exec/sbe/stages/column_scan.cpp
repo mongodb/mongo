@@ -349,7 +349,7 @@ PlanState ColumnScanStage::getNext() {
     auto& outObj = *value::bitcastTo<value::Object*>(outVal);
     value::ValueGuard materializedObjGuard(outTag, outVal);
 
-    StringDataSet parentPathsRead;
+    StringDataSet pathsRead;
     bool useRowStore = false;
     for (size_t i = 0; i < _columnCursors.size(); ++i) {
         auto& lastCell = _columnCursors[i].lastCell();
@@ -367,11 +367,12 @@ PlanState ColumnScanStage::getNext() {
             } else {
                 if (!splitCellView || splitCellView->isSparse) {
                     // Must read in the parent information first.
-                    readParentsIntoObj(path, &outObj, &parentPathsRead);
+                    readParentsIntoObj(path, &outObj, &pathsRead);
                 }
                 if (splitCellView) {
                     auto translatedCell = translateCell(path, *splitCellView);
                     addCellToObject(translatedCell, outObj);
+                    pathsRead.insert(path);
                 }
             }
         }

@@ -746,7 +746,14 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     std::string rootStr = "rowStoreRoot";
     optimizer::FieldMapBuilder builder(rootStr, true);
-    for (const std::string& field : csn->allFields) {
+
+    // When building its output document (in 'recordSlot'), the 'ColumnStoreStage' should not try to
+    // separately project both a document and its sub-fields (e.g., both 'a' and 'a.b'). Compute the
+    // subset of 'csn->allFields' that only includes a field if no other field in 'csn->allFields'
+    // is its prefix.
+    auto fieldsToProject =
+        DepsTracker::simplifyDependencies(csn->allFields, DepsTracker::TruncateToRootLevel::no);
+    for (const std::string& field : fieldsToProject) {
         builder.integrateFieldPath(FieldPath(field),
                                    [](const bool isLastElement, optimizer::FieldMapEntry& entry) {
                                        entry._hasLeadingObj = true;
