@@ -545,10 +545,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     });
 
     // Create the pre-images collection if it doesn't exist yet.
-    if (::mongo::feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        createChangeStreamPreImagesCollection(opCtx);
-    }
+    createChangeStreamPreImagesCollection(opCtx);
 
     // TODO: SERVER-66631 move the change collection creation logic from here to the PM-2502 hooks.
     // The change collection will be created when the change stream is enabled.

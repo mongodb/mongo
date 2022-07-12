@@ -471,13 +471,6 @@ private:
                     opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
         }
 
-        // Create the pre-images collection if the feature flag is enabled on the requested version.
-        // TODO SERVER-61770: Remove once FCV 6.0 becomes last-lts.
-        if (feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabledOnVersion(
-                requestedVersion)) {
-            createChangeStreamPreImagesCollection(opCtx);
-        }
-
         // TODO SERVER-67392: Remove once FCV 7.0 becomes last-lts.
         if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(requestedVersion)) {
             uassertStatusOK(sharding_util::createGlobalIndexesIndexes(opCtx));
@@ -490,9 +483,6 @@ private:
                        const SetFeatureCompatibilityVersion& request,
                        boost::optional<Timestamp> changeTimestamp) {
         const auto requestedVersion = request.getCommandParameter();
-        const bool preImagesFeatureFlagDisabledOnDowngradeVersion =
-            !feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabledOnVersion(
-                requestedVersion);
 
         // TODO  SERVER-65332 remove logic bound to this future object When kLastLTS is 6.0
         boost::optional<SharedSemiFuture<void>> chunkResizeAsyncTask;
@@ -528,29 +518,6 @@ private:
                 .isFCVDowngradingOrAlreadyDowngradedFromLatest()) {
             for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
                 Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
-                catalog::forEachCollectionFromDb(
-                    opCtx,
-                    dbName,
-                    MODE_X,
-                    [&](const CollectionPtr& collection) {
-                        // Fail to downgrade if there exists a collection with
-                        // 'changeStreamPreAndPostImages' enabled.
-                        // TODO SERVER-61770: Remove once FCV 6.0 becomes last-lts.
-                        uassert(ErrorCodes::CannotDowngrade,
-                                str::stream() << "Cannot downgrade the cluster as collection "
-                                              << collection->ns()
-                                              << " has 'changeStreamPreAndPostImages' enabled",
-                                preImagesFeatureFlagDisabledOnDowngradeVersion &&
-                                    !collection->isChangeStreamPreAndPostImagesEnabled());
-                        return true;
-                    },
-                    [&](const CollectionPtr& collection) {
-                        // TODO SERVER-61770: Remove 'changeStreamPreAndPostImages' check once
-                        // FCV 6.0 becomes last-lts.
-                        return preImagesFeatureFlagDisabledOnDowngradeVersion &&
-                            collection->isChangeStreamPreAndPostImagesEnabled();
-                    });
-
                 catalog::forEachCollectionFromDb(
                     opCtx,
                     dbName,
@@ -592,23 +559,6 @@ private:
                     [&](const CollectionPtr& collection) {
                         return collection->getTimeseriesOptions() != boost::none;
                     });
-            }
-
-            // Drop the pre-images collection if 'changeStreamPreAndPostImages' feature flag is not
-            // enabled on the downgrade version.
-            // TODO SERVER-61770: Remove once FCV 6.0 becomes last-lts.
-            if (preImagesFeatureFlagDisabledOnDowngradeVersion) {
-                DropReply dropReply;
-                const auto deletionStatus =
-                    dropCollection(opCtx,
-                                   NamespaceString::kChangeStreamPreImagesNamespace,
-                                   &dropReply,
-                                   DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
-                uassert(deletionStatus.code(),
-                        str::stream() << "Failed to drop the change stream pre-images collection"
-                                      << causedBy(deletionStatus.reason()),
-                        deletionStatus.isOK() ||
-                            deletionStatus.code() == ErrorCodes::NamespaceNotFound);
             }
 
             // Block downgrade for collections with encrypted fields
