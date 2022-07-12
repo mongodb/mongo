@@ -43,7 +43,11 @@ SPECIFIC_TASK_OVERRIDES = {
     "enterprise-rhel-80-64-bit-coverage": {
         "replica_sets_jscore_passthrough": timedelta(hours=2, minutes=30),
     },
-    "macos": {"replica_sets_jscore_passthrough": timedelta(hours=2, minutes=30), },
+    "macos": {
+        "replica_sets_jscore_passthrough": timedelta(hours=2, minutes=30),
+        "sharded_collections_jscore_passthrough": timedelta(hours=5)
+    },
+    "macos-arm64": {"sharded_collections_jscore_passthrough": timedelta(hours=5)},
     "enterprise-macos": {"replica_sets_jscore_passthrough": timedelta(hours=2, minutes=30), },
 
     # unittests outliers
