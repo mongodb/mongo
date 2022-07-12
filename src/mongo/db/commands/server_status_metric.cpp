@@ -30,10 +30,13 @@
 #include "mongo/db/commands/server_status_metric.h"
 
 #include <fmt/format.h>
+#include <memory>
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
+#include "mongo/util/synchronized_value.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -53,14 +56,11 @@ std::string ServerStatusMetric::_parseLeafName(const std::string& name) {
 }
 
 MetricTree* globalMetricTree(bool create) {
-    static struct {
-        stdx::mutex* mutex = new stdx::mutex();  // NOLINT
-        MetricTree* metricTree = nullptr;
-    } instance;
-    stdx::lock_guard lock(*instance.mutex);
-    if (create && !instance.metricTree)
-        instance.metricTree = new MetricTree();
-    return instance.metricTree;
+    static StaticImmortal<synchronized_value<std::unique_ptr<MetricTree>>> instance{};
+    auto updateGuard = **instance;
+    if (create && !*updateGuard)
+        *updateGuard = std::make_unique<MetricTree>();
+    return updateGuard->get();
 }
 
 void MetricTree::add(std::unique_ptr<ServerStatusMetric> metric) {
