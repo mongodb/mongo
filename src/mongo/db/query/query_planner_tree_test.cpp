@@ -433,6 +433,19 @@ TEST_F(QueryPlannerTest, RootedOrOfAndDontCollapseDifferentBounds) {
         "bounds: {c: [[3,3,true,true]], d: [[4,4,true,true]]}}}]}}}}");
 }
 
+TEST_F(QueryPlannerTest, DontCrashTryingToPushToSingleChildIndexedOr) {
+    FailPointEnableBlock failPoint("disableMatchExpressionOptimization");
+    addIndex(BSON("indexed" << 1));
+    runQuery(
+        fromjson("{ $and : [\n"
+                 "      { $and : [ { indexed : { $gt : 5 } },\n"
+                 "                 { unindexed : 42 } ] },\n"
+                 "      { $or : [ { indexed: { $lt : 100 } } ] }\n"
+                 "  ] }"));
+
+    assertNumSolutions(3U);
+}
+
 // SERVER-13960: properly handle $or with a mix of exact and inexact predicates.
 TEST_F(QueryPlannerTest, OrInexactWithExact) {
     addIndex(BSON("name" << 1));
@@ -1374,7 +1387,7 @@ TEST_F(QueryPlannerTest, CannotMergeSort) {
 }
 
 
-TEST_F(QueryPlannerTest, ContainedOr) {
+TEST_F(QueryPlannerTest, ContainedOrBase) {
     addIndex(BSON("b" << 1 << "a" << 1));
     addIndex(BSON("c" << 1 << "a" << 1));
 

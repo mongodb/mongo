@@ -286,21 +286,24 @@ void resolveOrPushdowns(MatchExpression* tree) {
         AndMatchExpression* andNode = static_cast<AndMatchExpression*>(tree);
         MatchExpression* indexedOr = getIndexedOr(andNode);
 
-        for (size_t i = 0; i < andNode->numChildren(); ++i) {
-            auto child = andNode->getChild(i);
+        if (indexedOr) {
+            for (size_t i = 0; i < andNode->numChildren(); ++i) {
+                auto child = andNode->getChild(i);
 
-            // For ELEM_MATCH_OBJECT, we push down all tagged descendants. However, we cannot trim
-            // any of these predicates, since the $elemMatch filter must be applied in its entirety.
-            if (child->matchType() == MatchExpression::ELEM_MATCH_OBJECT) {
-                std::vector<MatchExpression*> orPushdownDescendants;
-                getElemMatchOrPushdownDescendants(child, &orPushdownDescendants);
-                for (auto descendant : orPushdownDescendants) {
-                    static_cast<void>(processOrPushdownNode(descendant, indexedOr));
+                // For ELEM_MATCH_OBJECT, we push down all tagged descendants. However, we cannot
+                // trim any of these predicates, since the $elemMatch filter must be applied in its
+                // entirety.
+                if (child->matchType() == MatchExpression::ELEM_MATCH_OBJECT) {
+                    std::vector<MatchExpression*> orPushdownDescendants;
+                    getElemMatchOrPushdownDescendants(child, &orPushdownDescendants);
+                    for (auto descendant : orPushdownDescendants) {
+                        static_cast<void>(processOrPushdownNode(descendant, indexedOr));
+                    }
+                } else if (processOrPushdownNode(child, indexedOr)) {
+                    // The indexed $or can completely satisfy the child predicate, so we trim it.
+                    auto ownedChild = andNode->removeChild(i);
+                    --i;
                 }
-            } else if (processOrPushdownNode(child, indexedOr)) {
-                // The indexed $or can completely satisfy the child predicate, so we trim it.
-                auto ownedChild = andNode->removeChild(i);
-                --i;
             }
         }
     }
