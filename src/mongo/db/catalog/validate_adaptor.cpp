@@ -136,10 +136,35 @@ void schemaValidationFailed(CollectionValidation::ValidateState* state,
         results->valid = false;
     }
 }
+
+// Checks if the embedded timestamp in the bucket id field matches that in the 'control.min' field.
+Status _validateTimeSeriesIdTimestamp(const CollectionPtr& collection, const BSONObj& recordBson) {
+    // Compares both timestamps measured in seconds.
+    int64_t minTimestamp = recordBson.getField(timeseries::kBucketControlFieldName)
+                               .Obj()
+                               .getField(timeseries::kBucketControlMinFieldName)
+                               .Obj()
+                               .getField(collection->getTimeseriesOptions()->getTimeField())
+                               .timestamp()
+                               .asInt64() /
+        1000;
+    int64_t oidEmbeddedTimestamp =
+        recordBson.getField(timeseries::kBucketIdFieldName).OID().getTimestamp();
+    if (minTimestamp != oidEmbeddedTimestamp) {
+        return Status(
+            ErrorCodes::InvalidIdField,
+            fmt::format("Mismatch between the embedded timestamp {} in the time-series "
+                        "bucket '_id' field and the timestamp {} in 'control.min' field.",
+                        Date_t::fromMillisSinceEpoch(oidEmbeddedTimestamp * 1000).toString(),
+                        Date_t::fromMillisSinceEpoch(minTimestamp * 1000).toString()));
+    }
+    return Status::OK();
+}
+
 /**
  * Checks the value of the bucket's version and if it matches the types of the data fields.
  */
-Status _validateTimeSeriesBucketRecord(const RecordId& recordId,
+Status _validateTimeSeriesBucketRecord(const CollectionPtr& collection,
                                        const BSONObj& recordBson,
                                        ValidateResults* results) {
     int controlVersion = recordBson.getField(timeseries::kBucketControlFieldName)
@@ -153,7 +178,7 @@ Status _validateTimeSeriesBucketRecord(const RecordId& recordId,
                         controlVersion));
     }
     auto dataType = controlVersion == 1 ? BSONType::Object : BSONType::BinData;
-    // In addition to checking dataType, make sure that closed buckets have BinData Column subtype
+    // In addition to checking dataType, make sure that closed buckets have BinData Column subtype.
     auto isCorrectType = [&](BSONElement el) {
         if (controlVersion == 1) {
             return el.type() == BSONType::Object;
@@ -171,6 +196,9 @@ Status _validateTimeSeriesBucketRecord(const RecordId& recordId,
                                       mongo::typeName(dataType),
                                       mongo::typeName(e.type())));
         }
+    }
+    if (Status status = _validateTimeSeriesIdTimestamp(collection, recordBson); !status.isOK()) {
+        return status;
     }
     return Status::OK();
 }
@@ -698,7 +726,7 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
                        coll->getTimeseriesOptions()) {
                 // Checks for time-series collection consistency.
                 Status bucketStatus =
-                    _validateTimeSeriesBucketRecord(record->id, record->data.toBson(), results);
+                    _validateTimeSeriesBucketRecord(coll, record->data.toBson(), results);
 
                 // This log id should be kept in sync with the associated warning messages that are
                 // returned to the client.
