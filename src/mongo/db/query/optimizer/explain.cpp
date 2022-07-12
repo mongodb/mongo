@@ -1671,8 +1671,10 @@ public:
             struct Comparator {
                 bool operator()(const properties::DistributionRequirement& d1,
                                 const properties::DistributionRequirement& d2) const {
-                    const auto& distr1 = d1.getDistributionAndProjections();
-                    const auto& distr2 = d2.getDistributionAndProjections();
+                    const properties::DistributionAndProjections& distr1 =
+                        d1.getDistributionAndProjections();
+                    const properties::DistributionAndProjections& distr2 =
+                        d2.getDistributionAndProjections();
 
                     if (distr1._type < distr2._type) {
                         return true;
