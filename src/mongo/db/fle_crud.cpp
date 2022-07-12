@@ -187,6 +187,31 @@ boost::intrusive_ptr<ExpressionContext> makeExpCtx(OperationContext* opCtx,
 
 }  // namespace
 
+/**
+ * Checks that all encrypted payloads correspond to an encrypted field,
+ * and that the encryption keyId used was appropriate for that field.
+ */
+void validateInsertUpdatePayloads(const std::vector<EncryptedField>& fields,
+                                  const std::vector<EDCServerPayloadInfo>& payload) {
+    std::map<StringData, UUID> pathToKeyIdMap;
+    for (const auto& field : fields) {
+        pathToKeyIdMap.insert({field.getPath(), field.getKeyId()});
+    }
+
+    for (const auto& field : payload) {
+        auto fieldPath = field.fieldPathName;
+        auto expect = pathToKeyIdMap.find(fieldPath);
+        uassert(6726300,
+                str::stream() << "Field '" << fieldPath << "' is unexpectedly encrypted",
+                expect != pathToKeyIdMap.end());
+        auto indexKeyId = field.payload.getIndexKeyId();
+        uassert(6726301,
+                str::stream() << "Mismatched keyId for field '" << fieldPath << "' expected "
+                              << expect->second << ", found " << indexKeyId,
+                indexKeyId == expect->second);
+    }
+}
+
 std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
     OperationContext* opCtx,
     const write_ops::InsertCommandRequest& insertRequest,
@@ -217,6 +242,8 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
         return std::pair<FLEBatchResult, write_ops::InsertCommandReply>{
             FLEBatchResult::kNotProcessed, write_ops::InsertCommandReply()};
     }
+
+    validateInsertUpdatePayloads(efc.getFields(), *serverPayload);
 
     auto reply = std::make_shared<write_ops::InsertCommandReply>();
 
@@ -633,6 +660,54 @@ std::shared_ptr<write_ops::FindAndModifyCommandRequest> constructDefaultReply() 
     return std::make_shared<write_ops::FindAndModifyCommandRequest>(NamespaceString());
 }
 
+/**
+ * Extracts update payloads from a {findAndModify: nss, ...} request,
+ * and proxies to `validateInsertUpdatePayload()`.
+ */
+void validateFindAndModifyRequest(const write_ops::FindAndModifyCommandRequest& request) {
+    // Is this a delete?
+    const bool isDelete = request.getRemove().value_or(false);
+
+    // User can only specify either remove = true or update != {}
+    uassert(6371401,
+            "Must specify either update or remove to findAndModify, not both",
+            !(request.getUpdate().has_value() && isDelete));
+
+    uassert(6371402,
+            "findAndModify with encryption only supports new: false",
+            request.getNew().value_or(false) == false);
+
+    uassert(6371408,
+            "findAndModify fields must be empty",
+            request.getFields().value_or(BSONObj()).isEmpty());
+
+    // pipeline - is agg specific, delta is oplog, transform is internal (timeseries)
+    auto updateMod = request.getUpdate().get_value_or({});
+    const auto updateModicationType = updateMod.type();
+
+    uassert(6439901,
+            "FLE only supports modifier and replacement style updates",
+            updateModicationType == write_ops::UpdateModification::Type::kModifier ||
+                updateModicationType == write_ops::UpdateModification::Type::kReplacement);
+
+    auto nss = request.getNamespace();
+    auto ei = request.getEncryptionInformation().get();
+    auto efc = EncryptionInformationHelpers::getAndValidateSchema(nss, ei);
+
+    BSONObj update;
+    if (updateMod.type() == write_ops::UpdateModification::Type::kReplacement) {
+        update = updateMod.getUpdateReplacement();
+    } else {
+        invariant(updateMod.type() == write_ops::UpdateModification::Type::kModifier);
+        update = updateMod.getUpdateModifier().getObjectField("$set"_sd);
+    }
+
+    if (!update.firstElement().eoo()) {
+        auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(update);
+        validateInsertUpdatePayloads(efc.getFields(), serverPayload);
+    }
+}
+
 }  // namespace
 
 template <typename ReplyType>
@@ -642,29 +717,7 @@ StatusWith<std::pair<ReplyType, OpMsgRequest>> processFindAndModifyRequest(
     GetTxnCallback getTxns,
     ProcessFindAndModifyCallback<ReplyType> processCallback) {
 
-    // Is this a delete
-    bool isDelete = findAndModifyRequest.getRemove().value_or(false);
-
-    // User can only specify either remove = true or update != {}
-    uassert(6371401,
-            "Must specify either update or remove to findAndModify, not both",
-            !(findAndModifyRequest.getUpdate().has_value() && isDelete));
-
-    uassert(6371402,
-            "findAndModify with encryption only supports new: false",
-            findAndModifyRequest.getNew().value_or(false) == false);
-
-    uassert(6371408,
-            "findAndModify fields must be empty",
-            findAndModifyRequest.getFields().value_or(BSONObj()).isEmpty());
-
-    // pipeline - is agg specific, delta is oplog, transform is internal (timeseries)
-    auto updateModicationType =
-        findAndModifyRequest.getUpdate().value_or(write_ops::UpdateModification()).type();
-    uassert(6439901,
-            "FLE only supports modifier and replacement style updates",
-            updateModicationType == write_ops::UpdateModification::Type::kModifier ||
-                updateModicationType == write_ops::UpdateModification::Type::kReplacement);
+    validateFindAndModifyRequest(findAndModifyRequest);
 
     std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
 
@@ -837,6 +890,7 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
         auto setObject = updateModifier.getObjectField("$set");
         EDCServerCollection::validateEncryptedFieldInfo(setObject, efc, bypassDocumentValidation);
         serverPayload = EDCServerCollection::getEncryptedFieldInfo(setObject);
+        validateInsertUpdatePayloads(efc.getFields(), serverPayload);
 
         processFieldsForInsert(
             queryImpl, edcNss, serverPayload, efc, &stmtId, bypassDocumentValidation);
@@ -851,6 +905,7 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
         EDCServerCollection::validateEncryptedFieldInfo(
             replacementDocument, efc, bypassDocumentValidation);
         serverPayload = EDCServerCollection::getEncryptedFieldInfo(replacementDocument);
+        validateInsertUpdatePayloads(efc.getFields(), serverPayload);
 
         processFieldsForInsert(
             queryImpl, edcNss, serverPayload, efc, &stmtId, bypassDocumentValidation);

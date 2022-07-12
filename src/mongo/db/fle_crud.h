@@ -488,4 +488,8 @@ processFindAndModifyRequest<write_ops::FindAndModifyCommandRequest>(
 write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
                                             const write_ops::UpdateCommandRequest& updateRequest,
                                             GetTxnCallback getTxns);
+
+void validateInsertUpdatePayloads(const std::vector<EncryptedField>& fields,
+                                  const std::vector<EDCServerPayloadInfo>& payload);
+
 }  // namespace mongo
