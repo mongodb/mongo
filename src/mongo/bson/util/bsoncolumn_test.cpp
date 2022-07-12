@@ -407,6 +407,15 @@ public:
         ASSERT_EQ(memcmp(columnBinary.data, buf, columnBinary.length), 0);
     }
 
+    static void verifyDecompression(const BufBuilder& columnBinary,
+                                    const std::vector<BSONElement>& expected) {
+        BSONBinData bsonBinData;
+        bsonBinData.data = columnBinary.buf();
+        bsonBinData.length = columnBinary.len();
+        bsonBinData.type = Column;
+        verifyDecompression(bsonBinData, expected);
+    }
+
     static void verifyDecompression(BSONBinData columnBinary,
                                     const std::vector<BSONElement>& expected) {
         BSONObjBuilder obj;
@@ -5022,6 +5031,22 @@ TEST_F(BSONColumnTest, NonZeroRLEInFirstBlockAfterSimple8bBlocks) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, elems);
+}
+
+TEST_F(BSONColumnTest, ZeroDeltaAfterInterleaved) {
+    auto obj = createElementObj(BSON("a" << 1));
+    std::vector<BSONElement> elems = {obj, obj};
+
+    BufBuilder expected;
+    appendInterleavedStart(expected, obj.Obj());
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendEOO(expected);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, kDeltaForBinaryEqualValues);
+    appendEOO(expected);
+
+    verifyDecompression(expected, elems);
 }
 
 TEST_F(BSONColumnTest, InvalidControlByte) {
