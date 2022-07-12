@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/s/sharding_data_transform_cumulative_metrics_field_name_provider.h"
 #include "mongo/db/s/sharding_data_transform_metrics_observer_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
@@ -79,6 +80,7 @@ public:
         kNumStates
     };
 
+    using NameProvider = ShardingDataTransformCumulativeMetricsFieldNameProvider;
     using Role = ShardingDataTransformMetrics::Role;
     using InstanceObserver = ShardingDataTransformMetricsObserverInterface;
     using DeregistrationFunction = unique_function<void()>;
@@ -173,6 +175,7 @@ private:
 
     mutable Mutex _mutex;
     const std::string _rootSectionName;
+    std::unique_ptr<NameProvider> _fieldNames;
     std::vector<MetricsSet> _instanceMetricsForAllRoles;
     AtomicWord<bool> _operationWasAttempted;
 
@@ -191,8 +194,8 @@ private:
     AtomicWord<int64_t> _totalBatchRetrievedDuringCloneMillis{0};
     AtomicWord<int64_t> _oplogBatchApplied{0};
     AtomicWord<int64_t> _oplogBatchAppliedMillis{0};
-    AtomicWord<int64_t> _documentsCopied{0};
-    AtomicWord<int64_t> _bytesCopied{0};
+    AtomicWord<int64_t> _documentsProcessed{0};
+    AtomicWord<int64_t> _bytesWritten{0};
 
     AtomicWord<int64_t> _lastOpEndingChunkImbalance{0};
     AtomicWord<int64_t> _readsDuringCriticalSection{0};

@@ -44,37 +44,14 @@ constexpr int64_t kPlaceholderLong = 0;
 namespace {
 constexpr auto kResharding = "resharding";
 constexpr auto kGlobalIndex = "globalIndex";
-constexpr auto kCountStarted = "countStarted";
-constexpr auto kCountSucceeded = "countSucceeded";
-constexpr auto kCountFailed = "countFailed";
-constexpr auto kCountCanceled = "countCanceled";
-constexpr auto kLastOpEndingChunkImbalance = "lastOpEndingChunkImbalance";
 constexpr auto kActive = "active";
-constexpr auto kDocumentsCopied = "documentsCopied";
-constexpr auto kBytesCopied = "bytesCopied";
 constexpr auto kOplogEntriesFetched = "oplogEntriesFetched";
 constexpr auto kOplogEntriesApplied = "oplogEntriesApplied";
 constexpr auto kInsertsApplied = "insertsApplied";
 constexpr auto kUpdatesApplied = "updatesApplied";
 constexpr auto kDeletesApplied = "deletesApplied";
-constexpr auto kCountWritesToStashCollections = "countWritesToStashCollections";
-constexpr auto kCountWritesDuringCriticalSection = "countWritesDuringCriticalSection";
-constexpr auto kCountReadsDuringCriticalSection = "countReadsDuringCriticalSection";
 constexpr auto kOldestActive = "oldestActive";
-constexpr auto kCoordinatorAllShardsLowestRemainingOperationTimeEstimatedMillis =
-    "coordinatorAllShardsLowestRemainingOperationTimeEstimatedMillis";
-constexpr auto kCoordinatorAllShardsHighestRemainingOperationTimeEstimatedMillis =
-    "coordinatorAllShardsHighestRemainingOperationTimeEstimatedMillis";
-constexpr auto kRecipientRemainingOperationTimeEstimatedMillis =
-    "recipientRemainingOperationTimeEstimatedMillis";
 constexpr auto kLatencies = "latencies";
-constexpr auto kCollectionCloningTotalRemoteBatchRetrievalTimeMillis =
-    "collectionCloningTotalRemoteBatchRetrievalTimeMillis";
-constexpr auto kCollectionCloningTotalRemoteBatchesRetrieved =
-    "collectionCloningTotalRemoteBatchesRetrieved";
-constexpr auto kCollectionCloningTotalLocalInsertTimeMillis =
-    "collectionCloningTotalLocalInsertTimeMillis";
-constexpr auto kCollectionCloningTotalLocalInserts = "collectionCloningTotalLocalInserts";
 constexpr auto kOplogFetchingTotalRemoteBatchRetrievalTimeMillis =
     "oplogFetchingTotalRemoteBatchRetrievalTimeMillis";
 constexpr auto kOplogFetchingTotalRemoteBatchesRetrieved =
@@ -154,6 +131,7 @@ ShardingDataTransformCumulativeMetrics* ShardingDataTransformCumulativeMetrics::
 ShardingDataTransformCumulativeMetrics::ShardingDataTransformCumulativeMetrics(
     const std::string& rootSectionName)
     : _rootSectionName{rootSectionName},
+      _fieldNames{std::make_unique<ShardingDataTransformCumulativeMetricsFieldNamePlaceholder>()},
       _instanceMetricsForAllRoles(ShardingDataTransformMetrics::kRoleCount),
       _operationWasAttempted{false},
       _coordinatorStateList{AtomicWord<int64_t>{0},
@@ -226,11 +204,12 @@ void ShardingDataTransformCumulativeMetrics::reportForServerStatus(BSONObjBuilde
     }
 
     BSONObjBuilder root(bob->subobjStart(_rootSectionName));
-    root.append(kCountStarted, _countStarted.load());
-    root.append(kCountSucceeded, _countSucceeded.load());
-    root.append(kCountFailed, _countFailed.load());
-    root.append(kCountCanceled, _countCancelled.load());
-    root.append(kLastOpEndingChunkImbalance, _lastOpEndingChunkImbalance.load());
+    root.append(_fieldNames->getForCountStarted(), _countStarted.load());
+    root.append(_fieldNames->getForCountSucceeded(), _countSucceeded.load());
+    root.append(_fieldNames->getForCountFailed(), _countFailed.load());
+    root.append(_fieldNames->getForCountCanceled(), _countCancelled.load());
+    root.append(_fieldNames->getForLastOpEndingChunkImbalance(),
+                _lastOpEndingChunkImbalance.load());
 
     reportActive(&root);
     reportOldestActive(&root);
@@ -240,36 +219,41 @@ void ShardingDataTransformCumulativeMetrics::reportForServerStatus(BSONObjBuilde
 
 void ShardingDataTransformCumulativeMetrics::reportActive(BSONObjBuilder* bob) const {
     BSONObjBuilder s(bob->subobjStart(kActive));
-    s.append(kDocumentsCopied, _documentsCopied.load());
-    s.append(kBytesCopied, _bytesCopied.load());
+    s.append(_fieldNames->getForDocumentsProcessed(), _documentsProcessed.load());
+    s.append(_fieldNames->getForBytesWritten(), _bytesWritten.load());
     s.append(kOplogEntriesFetched, _oplogEntriesFetched.load());
     s.append(kOplogEntriesApplied, _oplogEntriesApplied.load());
     s.append(kInsertsApplied, _insertsApplied.load());
     s.append(kUpdatesApplied, _updatesApplied.load());
     s.append(kDeletesApplied, _deletesApplied.load());
-    s.append(kCountWritesToStashCollections, _writesToStashedCollections.load());
-    s.append(kCountWritesDuringCriticalSection, _writesDuringCriticalSection.load());
-    s.append(kCountReadsDuringCriticalSection, _readsDuringCriticalSection.load());
+    s.append(_fieldNames->getForCountWritesToStashCollections(),
+             _writesToStashedCollections.load());
+    s.append(_fieldNames->getForCountWritesDuringCriticalSection(),
+             _writesDuringCriticalSection.load());
+    s.append(_fieldNames->getForCountReadsDuringCriticalSection(),
+             _readsDuringCriticalSection.load());
 }
 
 void ShardingDataTransformCumulativeMetrics::reportOldestActive(BSONObjBuilder* bob) const {
     BSONObjBuilder s(bob->subobjStart(kOldestActive));
-    s.append(kCoordinatorAllShardsHighestRemainingOperationTimeEstimatedMillis,
+    s.append(_fieldNames->getForCoordinatorAllShardsHighestRemainingOperationTimeEstimatedMillis(),
              getOldestOperationHighEstimateRemainingTimeMillis(Role::kCoordinator));
-    s.append(kCoordinatorAllShardsLowestRemainingOperationTimeEstimatedMillis,
+    s.append(_fieldNames->getForCoordinatorAllShardsLowestRemainingOperationTimeEstimatedMillis(),
              getOldestOperationLowEstimateRemainingTimeMillis(Role::kCoordinator));
-    s.append(kRecipientRemainingOperationTimeEstimatedMillis,
+    s.append(_fieldNames->getForRecipientRemainingOperationTimeEstimatedMillis(),
              getOldestOperationHighEstimateRemainingTimeMillis(Role::kRecipient));
 }
 
 void ShardingDataTransformCumulativeMetrics::reportLatencies(BSONObjBuilder* bob) const {
     BSONObjBuilder s(bob->subobjStart(kLatencies));
-    s.append(kCollectionCloningTotalRemoteBatchRetrievalTimeMillis,
+    s.append(_fieldNames->getForCollectionCloningTotalRemoteBatchRetrievalTimeMillis(),
              _totalBatchRetrievedDuringCloneMillis.load());
-    s.append(kCollectionCloningTotalRemoteBatchesRetrieved, _totalBatchRetrievedDuringClone.load());
-    s.append(kCollectionCloningTotalLocalInsertTimeMillis,
+    s.append(_fieldNames->getForCollectionCloningTotalRemoteBatchesRetrieved(),
+             _totalBatchRetrievedDuringClone.load());
+    s.append(_fieldNames->getForCollectionCloningTotalLocalInsertTimeMillis(),
              _collectionCloningTotalLocalInsertTimeMillis.load());
-    s.append(kCollectionCloningTotalLocalInserts, _collectionCloningTotalLocalBatchInserts.load());
+    s.append(_fieldNames->getForCollectionCloningTotalLocalInserts(),
+             _collectionCloningTotalLocalBatchInserts.load());
     s.append(kOplogFetchingTotalRemoteBatchRetrievalTimeMillis,
              _oplogFetchingTotalRemoteBatchesRetrievalTimeMillis.load());
     s.append(kOplogFetchingTotalRemoteBatchesRetrieved,
@@ -422,8 +406,8 @@ const char* ShardingDataTransformCumulativeMetrics::fieldNameFor(
 void ShardingDataTransformCumulativeMetrics::onInsertsDuringCloning(
     int64_t count, int64_t bytes, const Milliseconds& elapsedTime) {
     _collectionCloningTotalLocalBatchInserts.fetchAndAdd(1);
-    _documentsCopied.fetchAndAdd(count);
-    _bytesCopied.fetchAndAdd(bytes);
+    _documentsProcessed.fetchAndAdd(count);
+    _bytesWritten.fetchAndAdd(bytes);
     _collectionCloningTotalLocalInsertTimeMillis.fetchAndAdd(
         durationCount<Milliseconds>(elapsedTime));
 }
