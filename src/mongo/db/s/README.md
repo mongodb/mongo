@@ -1166,6 +1166,20 @@ For resharding, the process is similar to how chunk migrations are handled. The 
 * [**Refreshing client and internal sessions logic**](https://github.com/mongodb/mongo/blob/master/src/mongo/db/transaction_participant.cpp#L2923-L2986)
 * [**RetryableWriteTransactionParticipantCatalog**](https://github.com/mongodb/mongo/blob/master/src/mongo/db/transaction_participant.h#L1221-L1299)
 
+### Transaction API
+
+The [transaction API](https://github.com/mongodb/mongo/blob/master/src/mongo/db/transaction_api.h) is used to initiate transactions from within the server. The API starts an internal transaction on its local process, executes transaction statements specified in a callback, and completes the transaction by committing/aborting/retrying on transient errors. By default, a transaction can be retried 120 times to mirror the 2 minute timeout used by the [driver’s convenient transactions API](https://github.com/mongodb/specifications/blob/92d77a6d/source/transactions-convenient-api/transactions-convenient-api.rst).
+
+Additionally, the API can use router commands when running on a mongod. Each command will execute as if on a mongos, targeting remote shards and initiating a two phase commit if necessary. To enable this router behavior the [`cluster_transaction_api`](https://github.com/mongodb/mongo/blob/master/src/mongo/db/cluster_transaction_api.h) defines an additional set of behaviors to rename commands to their [cluster command names](https://github.com/mongodb/mongo/blob/63f99193df82777239f038666270e4bfb2be3567/src/mongo/db/cluster_transaction_api.cpp#L44-L52).
+
+Transactions for non-retryable operations or operations without a session initiated through the API use sessions from the [InternalSessionPool](https://github.com/mongodb/mongo/blob/master/src/mongo/db/internal_session_pool.h) to prevent the creation and maintenance of many single-use sessions.
+
+To use the transaction API, [instantiate a transaction client](https://github.com/mongodb/mongo/blob/63f99193df82777239f038666270e4bfb2be3567/src/mongo/s/commands/cluster_find_and_modify_cmd.cpp#L250-L253) by providing the opCtx, an executor, and resource yielder. Then, run the commands to be grouped in the same transaction session on the transaction object. Some examples of this are listed below. 
+
+* [Cluster Find and Modify Command](https://github.com/mongodb/mongo/blob/63f99193df82777239f038666270e4bfb2be3567/src/mongo/s/commands/cluster_find_and_modify_cmd.cpp#L255-L265)
+* [Queryable Encryption](https://github.com/mongodb/mongo/blob/63f99193df82777239f038666270e4bfb2be3567/src/mongo/db/commands/fle2_compact.cpp#L636-L648)
+* [Cluster Write Command - WouldChangeOwningShard Error](https://github.com/mongodb/mongo/blob/63f99193df82777239f038666270e4bfb2be3567/src/mongo/s/commands/cluster_write_cmd.cpp#L162-L190)
+
 ## The historical routing table
 
 When a mongos or mongod executes a command that requires shard targeting, it must use routing information
