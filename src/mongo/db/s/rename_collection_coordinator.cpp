@@ -335,6 +335,18 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                                             "admin",
                                             cmdObj.addFields(getCurrentSession().toBSON()),
                                             Shard::RetryPolicy::kIdempotent)));
+
+                // (SERVER-67730) Delete potential orphaned chunk entries from CSRS since
+                // ConfigsvrRenameCollectionMetadata is not idempotent in case of a CSRS step-down
+                auto uuid = _doc.getTargetUUID();
+                if (uuid) {
+                    auto query = BSON("uuid" << *uuid);
+                    uassertStatusOK(Grid::get(opCtx)->catalogClient()->removeConfigDocuments(
+                        opCtx,
+                        ChunkType::ConfigNS,
+                        query,
+                        ShardingCatalogClient::kMajorityWriteConcern));
+                }
             }))
         .then(_executePhase(
             Phase::kUnblockCRUD,
