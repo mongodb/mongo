@@ -594,5 +594,14 @@ function assertMigrationState(primary, migrationId, state) {
         print(tojson(migrationDoc));
     }
 
+    // If transitioning to "blocking", prove that we wrote that fact at the blockTimestamp.
+    if (state === "blocking") {
+        const oplogEntry =
+            primary.getDB("local").oplog.rs.find({ts: migrationDoc.blockTimestamp}).next();
+        assert.neq(null, oplogEntry.o, oplogEntry);
+        assert.neq(null, oplogEntry.o.state, oplogEntry);
+        assert.eq(oplogEntry.o.state, state, oplogEntry);
+    }
+
     assert.eq(migrationDoc.state, state);
 }

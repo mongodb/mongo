@@ -916,16 +916,18 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
     const ScopedTaskExecutorPtr& executor,
     const CancellationToken& token,
     ShardSplitDonorStateEnum nextState) {
-    auto [tenantIds, isInsert] = [&]() {
+    auto [tenantIds, isInsert, originalStateDocBson] = [&]() {
         stdx::lock_guard<Latch> lg(_mutex);
-        auto isInsert = _stateDoc.getState() == ShardSplitDonorStateEnum::kUninitialized ||
-            _stateDoc.getState() == ShardSplitDonorStateEnum::kAborted;
-        return std::make_pair(_stateDoc.getTenantIds(), isInsert);
+        auto currentState = _stateDoc.getState();
+        auto isInsert = currentState == ShardSplitDonorStateEnum::kUninitialized ||
+            currentState == ShardSplitDonorStateEnum::kAborted;
+        return std::make_tuple(_stateDoc.getTenantIds(), isInsert, _stateDoc.toBSON());
     }();
 
     return AsyncTry([this,
                      tenantIds = std::move(tenantIds),
                      isInsert = isInsert,
+                     originalStateDocBson = originalStateDocBson,
                      uuid = _migrationId,
                      nextState] {
                auto opCtxHolder = _cancelableOpCtxFactory->makeOperationContext(&cc());
@@ -960,7 +962,7 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
 
                        // Reserve an opTime for the write.
                        auto oplogSlot = LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];
-                       {
+                       auto updatedStateDocBson = [&]() {
                            stdx::lock_guard<Latch> lg(_mutex);
                            _stateDoc.setState(nextState);
                            switch (nextState) {
@@ -985,27 +987,58 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
                                default:
                                    MONGO_UNREACHABLE;
                            }
-                       }
+                           if (isInsert) {
+                               return BSON("$setOnInsert" << _stateDoc.toBSON());
+                           }
 
-                       const auto filter = BSON(ShardSplitDonorDocument::kIdFieldName << uuid);
-                       const auto updatedStateDocBson = [&]() {
-                           stdx::lock_guard<Latch> lg(_mutex);
-                           return BSON("$set" << _stateDoc.toBSON());
+                           return _stateDoc.toBSON();
                        }();
-                       auto updateResult = Helpers::upsert(opCtx,
-                                                           _stateDocumentsNS,
-                                                           filter,
-                                                           updatedStateDocBson,
-                                                           /*fromMigrate=*/false);
 
-                       if (isInsert) {
-                           invariant(!updateResult.existing);
-                           invariant(!updateResult.upsertedId.isEmpty());
-                       } else {
-                           invariant(updateResult.numDocsModified == 1);
-                       }
+                       auto updateOpTime = [&]() {
+                           if (isInsert) {
+                               const auto filter =
+                                   BSON(ShardSplitDonorDocument::kIdFieldName << uuid);
+                               auto updateResult = Helpers::upsert(opCtx,
+                                                                   _stateDocumentsNS,
+                                                                   filter,
+                                                                   updatedStateDocBson,
+                                                                   /*fromMigrate=*/false);
+
+                               // '$setOnInsert' update operator can never modify an existing
+                               // on-disk state doc.
+                               invariant(!updateResult.existing);
+                               invariant(!updateResult.numDocsModified);
+
+                               return repl::ReplClientInfo::forClient(opCtx->getClient())
+                                   .getLastOp();
+                           }
+
+                           const auto originalRecordId =
+                               Helpers::findOne(opCtx,
+                                                collection.getCollection(),
+                                                BSON("_id" << originalStateDocBson["_id"]));
+                           const auto originalSnapshot = Snapshotted<BSONObj>(
+                               opCtx->recoveryUnit()->getSnapshotId(), originalStateDocBson);
+                           invariant(!originalRecordId.isNull());
+
+                           CollectionUpdateArgs args;
+                           args.criteria = BSON("_id" << uuid);
+                           args.oplogSlots = {oplogSlot};
+                           args.update = updatedStateDocBson;
+
+                           collection->updateDocument(opCtx,
+                                                      originalRecordId,
+                                                      originalSnapshot,
+                                                      updatedStateDocBson,
+                                                      false,
+                                                      nullptr /* OpDebug* */,
+                                                      &args);
+
+                           return oplogSlot;
+                       }();
 
                        wuow.commit();
+                       return updateOpTime;
                    });
 
                return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
