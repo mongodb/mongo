@@ -14,12 +14,14 @@ from typing import Optional, Set, Tuple, List, Dict
 import click
 import requests
 import yaml
-from evergreen.api import RetryingEvergreenApi, EvergreenApi
+
 from git import Repo
 import structlog
 from structlog.stdlib import LoggerFactory
 
 from shrub.v2 import Task, TaskDependency, BuildVariant, ShrubProject, ExistingTask
+
+from evergreen.api import RetryingEvergreenApi, EvergreenApi
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -256,8 +258,9 @@ def find_excludes(selector_file: str) -> Tuple[List, List, List]:
 
     try:
         js_test = yml["selector"]["js_test"]
-    except KeyError:
-        raise Exception(f"The selector file {selector_file} is missing the 'selector.js_test' key")
+    except KeyError as exc:
+        raise Exception(
+            f"The selector file {selector_file} is missing the 'selector.js_test' key") from exc
 
     return (default_if_none(js_test.get("exclude_suites"), []),
             default_if_none(js_test.get("exclude_tasks"), []),

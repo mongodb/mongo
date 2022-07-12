@@ -146,7 +146,7 @@ class EnterpriseDistro(packager.Distro):
 
         if re.search("(redhat|fedora|centos)", self.dname):
             return ["rhel80", "rhel70", "rhel62", "rhel57"]
-        return super(EnterpriseDistro, self).build_os(arch)
+        return super().build_os(arch)
         # pylint: enable=too-many-return-statements
 
 
@@ -228,10 +228,10 @@ def unpack_binaries_into(build_os, arch, spec, where):
         for releasefile in "bin", "snmp", "LICENSE-Enterprise.txt", "README", "THIRD-PARTY-NOTICES", "MPL-2":
             os.rename("%s/%s" % (release_dir, releasefile), releasefile)
         os.rmdir(release_dir)
-    except Exception:
+    except Exception as oexc:
         exc = sys.exc_info()[1]
         os.chdir(rootdir)
-        raise exc
+        raise exc from oexc
     os.chdir(rootdir)
 
 
@@ -333,12 +333,12 @@ def move_repos_into_place(src, dst):  # pylint: disable=too-many-branches
         try:
             os.mkdir(dname)
             break
-        except OSError:
+        except OSError as oexc:
             exc = sys.exc_info()[1]
             if exc.errno == errno.EEXIST:
                 pass
             else:
-                raise exc
+                raise exc from oexc
         idx = idx + 1
 
     # Put the stuff in our new directory.
@@ -353,12 +353,12 @@ def move_repos_into_place(src, dst):  # pylint: disable=too-many-branches
         try:
             os.symlink(dname, tmpnam)
             break
-        except OSError:  # as exc: # Python >2.5
+        except OSError as oexc:  # as exc: # Python >2.5
             exc = sys.exc_info()[1]
             if exc.errno == errno.EEXIST:
                 pass
             else:
-                raise exc
+                raise exc from oexc
         idx = idx + 1
 
     # Make a symlink to the old directory; this symlink will be
@@ -371,12 +371,12 @@ def move_repos_into_place(src, dst):  # pylint: disable=too-many-branches
             try:
                 os.symlink(os.readlink(dst), oldnam)
                 break
-            except OSError:  # as exc: # Python >2.5
+            except OSError as oexc:  # as exc: # Python >2.5
                 exc = sys.exc_info()[1]
                 if exc.errno == errno.EEXIST:
                     pass
                 else:
-                    raise exc
+                    raise exc from oexc
 
     os.rename(tmpnam, dst)
     if oldnam:

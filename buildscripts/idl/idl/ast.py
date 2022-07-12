@@ -82,7 +82,7 @@ class Global(common.SourceLocation):
         self.cpp_includes = []  # type: List[str]
         self.configs = None  # type: ConfigGlobal
 
-        super(Global, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class Struct(common.SourceLocation):
@@ -105,7 +105,7 @@ class Struct(common.SourceLocation):
         self.inline_chained_structs = False  # type: bool
         self.generate_comparison_operators = False  # type: bool
         self.fields = []  # type: List[Field]
-        super(Struct, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class Expression(common.SourceLocation):
@@ -118,7 +118,7 @@ class Expression(common.SourceLocation):
         self.validate_constexpr = True  # type: bool
         self.export = False  # type: bool
 
-        super(Expression, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class Validator(common.SourceLocation):
@@ -142,7 +142,7 @@ class Validator(common.SourceLocation):
         self.lte = None  # type: Expression
         self.callback = None  # type: Optional[str]
 
-        super(Validator, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class Field(common.SourceLocation):
@@ -196,7 +196,7 @@ class Field(common.SourceLocation):
         # Validation rules.
         self.validator = None  # type: Optional[Validator]
 
-        super(Field, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class Command(Struct):
@@ -211,7 +211,7 @@ class Command(Struct):
         """Construct a command."""
         self.namespace = None  # type: str
         self.command_field = None  # type: Field
-        super(Command, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class EnumValue(common.SourceLocation):
@@ -227,7 +227,7 @@ class EnumValue(common.SourceLocation):
         self.name = None  # type: str
         self.value = None  # type: str
 
-        super(EnumValue, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class Enum(common.SourceLocation):
@@ -246,7 +246,7 @@ class Enum(common.SourceLocation):
         self.type = None  # type: str
         self.values = []  # type: List[EnumValue]
 
-        super(Enum, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class Condition(common.SourceLocation):
@@ -259,7 +259,7 @@ class Condition(common.SourceLocation):
         self.constexpr = None  # type: str
         self.preprocessor = None  # type: str
 
-        super(Condition, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class ServerParameterClass(common.SourceLocation):
@@ -274,7 +274,7 @@ class ServerParameterClass(common.SourceLocation):
         self.override_ctor = False  # type: bool
         self.override_set = False  # type: bool
 
-        super(ServerParameterClass, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class ServerParameter(common.SourceLocation):
@@ -301,7 +301,7 @@ class ServerParameter(common.SourceLocation):
         self.validator = None  # type: Validator
         self.on_update = None  # type: str
 
-        super(ServerParameter, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class GlobalInitializer(common.SourceLocation):
@@ -315,7 +315,7 @@ class GlobalInitializer(common.SourceLocation):
         self.register = None  # type: str
         self.store = None  # type: str
 
-        super(GlobalInitializer, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class ConfigGlobal(common.SourceLocation):
@@ -328,7 +328,7 @@ class ConfigGlobal(common.SourceLocation):
         # Other config globals are consumed in bind phase.
         self.initializer = None  # type: GlobalInitializer
 
-        super(ConfigGlobal, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class ConfigOption(common.SourceLocation):
@@ -365,4 +365,4 @@ class ConfigOption(common.SourceLocation):
         self.positional_end = None  # type: int
         self.validator = None  # type: Validator
 
-        super(ConfigOption, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)

@@ -15,7 +15,7 @@ import argparse
 import collections
 import logging
 import os
-import shutil
+import sys
 
 LOGGER = logging.getLogger("scons.cache.prune.lru")  # type: ignore
 
@@ -124,14 +124,14 @@ def main():
 
     if args.cache_dir is None or not os.path.isdir(args.cache_dir):
         LOGGER.error("must specify a valid cache path, [%s]", args.cache_dir)
-        exit(1)
+        sys.exit(1)
 
     ok = prune_cache(cache_path=args.cache_dir, cache_size_gb=args.cache_size,
                      clean_ratio=args.prune_ratio)
 
     if not ok:
         LOGGER.error("encountered error cleaning the cache. exiting.")
-        exit(1)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

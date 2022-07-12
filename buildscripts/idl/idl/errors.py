@@ -136,7 +136,7 @@ class ParserError(common.SourceLocation):
         # pylint: disable=too-many-arguments
         self.error_id = error_id
         self.msg = msg
-        super(ParserError, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
     def __str__(self):
         # type: () -> str

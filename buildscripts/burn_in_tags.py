@@ -5,12 +5,11 @@ import logging
 import os
 import sys
 from typing import Any, Dict, List
-
+from git import Repo
+from shrub.v2 import ShrubProject, BuildVariant, ExistingTask
 import click
 
 from evergreen.api import RetryingEvergreenApi, EvergreenApi
-from git import Repo
-from shrub.v2 import ShrubProject, BuildVariant, ExistingTask
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:

@@ -184,7 +184,7 @@ def _get_all_fields(struct):
 
     all_fields += struct.fields
 
-    return sorted([field for field in all_fields], key=lambda f: f.cpp_name)
+    return sorted(all_fields, key=lambda f: f.cpp_name)
 
 
 class _FieldUsageCheckerBase(object, metaclass=ABCMeta):
@@ -226,7 +226,7 @@ class _SlowFieldUsageChecker(_FieldUsageCheckerBase):
 
     def __init__(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
-        super(_SlowFieldUsageChecker, self).__init__(indented_writer)
+        super().__init__(indented_writer)
 
         self._writer.write_line('std::set<StringData> usedFields;')
 
@@ -285,7 +285,7 @@ class _FastFieldUsageChecker(_FieldUsageCheckerBase):
 
     def __init__(self, indented_writer, fields):
         # type: (writer.IndentedTextWriter, List[ast.Field]) -> None
-        super(_FastFieldUsageChecker, self).__init__(indented_writer)
+        super().__init__(indented_writer)
 
         self._writer.write_line('std::bitset<%d> usedFields;' % (len(fields)))
 
@@ -1054,7 +1054,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         # type: (writer.IndentedTextWriter, str) -> None
         """Create a C++ .cpp file code writer."""
         self._target_arch = target_arch
-        super(_CppSourceFileWriter, self).__init__(indented_writer)
+        super().__init__(indented_writer)
 
     def _gen_field_deserializer_expression(self, element_name, field):
         # type: (str, ast.Field) -> str
@@ -1450,7 +1450,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     self._writer.write_line(
                         '%s object(localNS);' % (common.title_case(struct.cpp_name)))
                 else:
-                    assert "Missing case"
+                    assert False, "Missing case"
             else:
                 self._writer.write_line('%s object;' % common.title_case(struct.cpp_name))
 

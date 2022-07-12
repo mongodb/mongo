@@ -190,12 +190,10 @@ class ClangFormat(object):
             for ospath in directories_to_check:
                 for program in programs:
                     self.path = os.path.join(ospath, program)
-                    if os.path.exists(self.path) and self._validate_version():
-                        break
-                    else:
+                    if not os.path.exists(self.path) or not self._validate_version():
                         self.path = None
-                        continue
-                    break
+                    else:
+                        break
                 else:
                     continue
                 break

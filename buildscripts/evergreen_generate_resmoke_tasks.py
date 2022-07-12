@@ -23,10 +23,11 @@ import requests
 import structlog
 import yaml
 
-from evergreen.api import EvergreenApi, RetryingEvergreenApi
 from pydantic.main import BaseModel
 
 from shrub.v2 import Task, TaskDependency, BuildVariant, ExistingTask, ShrubProject
+
+from evergreen.api import EvergreenApi, RetryingEvergreenApi
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -69,7 +70,7 @@ you need to:
 (1) add a "large_distro_name" expansion to this build variant ("{build_variant}").
 
  -- or --
- 
+
 (2) add this build variant ("{build_variant}") to the "build_variant_large_distro_exception"
 list in the "etc/generate_subtasks_config.yml" file.
 ***************************************************************************************

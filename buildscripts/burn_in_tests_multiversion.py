@@ -6,11 +6,13 @@ import sys
 from typing import Dict
 
 import click
-from evergreen.api import EvergreenApi
+
 from git import Repo
 from shrub.v2 import BuildVariant, ExistingTask, ShrubProject
 import structlog
 from structlog.stdlib import LoggerFactory
+
+from evergreen.api import EvergreenApi
 
 import buildscripts.evergreen_gen_multiversion_tests as gen_multiversion
 import buildscripts.evergreen_generate_resmoke_tasks as gen_resmoke

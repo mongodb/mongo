@@ -48,7 +48,7 @@ class QueueElemRepeatTime(QueueElem):
 
     def __init__(self, testcase, config, suite_options):
         """Initialize QueueElemRepeatTime class."""
-        super(QueueElemRepeatTime, self).__init__(testcase, config, suite_options)
+        super().__init__(testcase, config, suite_options)
         self.repeat_num_min = suite_options.num_repeat_tests_min
         self.repeat_num_max = suite_options.num_repeat_tests_max
         self.repeat_secs = suite_options.time_repeat_tests_secs

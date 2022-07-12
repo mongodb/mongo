@@ -9,10 +9,11 @@ from typing import Any, Dict, List, Set
 import click
 import structlog
 from structlog.stdlib import LoggerFactory
-from evergreen.api import EvergreenApi, RetryingEvergreenApi
 from git import Repo
 
 from shrub.v2 import ShrubProject, BuildVariant
+
+from evergreen.api import EvergreenApi, RetryingEvergreenApi
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 from buildscripts.patch_builds.change_data import find_changed_files_in_repos, \

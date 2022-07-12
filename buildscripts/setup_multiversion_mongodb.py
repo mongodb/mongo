@@ -93,7 +93,8 @@ def download_file(url, file_name, download_retries=5):
                 except requests.exceptions.ChunkedEncodingError as err:
                     download_retries -= 1
                     if download_retries == 0:
-                        raise Exception("Incomplete download for URL {}: {}".format(url, err))
+                        raise Exception("Incomplete download for URL {}: {}".format(url,
+                                                                                    err)) from err
                     continue
 
         # Check if file download was completed.
@@ -350,7 +351,7 @@ class MultiVersionDownloader(object):  # pylint: disable=too-many-instance-attri
                     # os.symlink is not supported on Windows, use a direct method instead.
                     def symlink_ms(source, link_name):
                         """Provide symlink for Windows."""
-                        import ctypes
+                        import ctypes  #  pylint: disable=import-outside-toplevel
                         csl = ctypes.windll.kernel32.CreateSymbolicLinkW
                         csl.argtypes = (ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32)
                         csl.restype = ctypes.c_ubyte

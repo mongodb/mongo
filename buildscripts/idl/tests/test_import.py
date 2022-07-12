@@ -53,7 +53,7 @@ class DictionaryImportResolver(idl.parser.ImportResolverBase):
         # type: (Dict[str, str]) -> None
         """Construct a DictionaryImportResolver."""
         self._import_dict = import_dict
-        super(DictionaryImportResolver, self).__init__()
+        super().__init__()
 
     def resolve(self, base_file, imported_file_name):
         # type: (str, str) -> str

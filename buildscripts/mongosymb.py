@@ -228,7 +228,7 @@ def main():
 
     if not trace_doc:
         print("could not find json backtrace object in input", file=sys.stderr)
-        exit(1)
+        sys.exit(1)
 
     output_fn = None
     if options.output_format == 'json':

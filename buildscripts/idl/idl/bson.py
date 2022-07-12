@@ -98,7 +98,7 @@ def cpp_bson_type_name(name):
 def list_valid_types():
     # type: () -> List[str]
     """Return a list of supported bson types."""
-    return [a for a in _BSON_TYPE_INFORMATION]
+    return list(_BSON_TYPE_INFORMATION)
 
 
 def is_valid_bindata_subtype(name):

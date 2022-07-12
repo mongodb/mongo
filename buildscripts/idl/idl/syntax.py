@@ -231,7 +231,7 @@ class Global(common.SourceLocation):
         self.cpp_includes = []  # type: List[str]
         self.configs = None  # type: ConfigGlobal
 
-        super(Global, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class Import(common.SourceLocation):
@@ -248,7 +248,7 @@ class Import(common.SourceLocation):
         # All imports directly or indirectly included
         self.dependencies = []  # type: List[str]
 
-        super(Import, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class Type(common.SourceLocation):
@@ -274,7 +274,7 @@ class Type(common.SourceLocation):
         self.deserializer = None  # type: str
         self.default = None  # type: str
 
-        super(Type, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class Validator(common.SourceLocation):
@@ -298,7 +298,7 @@ class Validator(common.SourceLocation):
         self.lte = None  # type: Expression
         self.callback = None  # type: str
 
-        super(Validator, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class Field(common.SourceLocation):
@@ -331,7 +331,7 @@ class Field(common.SourceLocation):
         self.serialize_op_msg_request_only = False  # type: bool
         self.constructed = False  # type: bool
 
-        super(Field, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class ChainedStruct(common.SourceLocation):
@@ -347,7 +347,7 @@ class ChainedStruct(common.SourceLocation):
         self.name = None  # type: str
         self.cpp_name = None  # type: str
 
-        super(ChainedStruct, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class ChainedType(common.SourceLocation):
@@ -363,7 +363,7 @@ class ChainedType(common.SourceLocation):
         self.name = None  # type: str
         self.cpp_name = None  # type: str
 
-        super(ChainedType, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class Struct(common.SourceLocation):
@@ -398,7 +398,7 @@ class Struct(common.SourceLocation):
         # Internal property: cpp_namespace from globals section
         self.cpp_namespace = None  # type: str
 
-        super(Struct, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class Command(Struct):
@@ -414,7 +414,7 @@ class Command(Struct):
         self.namespace = None  # type: str
         self.type = None  # type: str
 
-        super(Command, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class EnumValue(common.SourceLocation):
@@ -430,7 +430,7 @@ class EnumValue(common.SourceLocation):
         self.name = None  # type: str
         self.value = None  # type: str
 
-        super(EnumValue, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class Enum(common.SourceLocation):
@@ -455,7 +455,7 @@ class Enum(common.SourceLocation):
         # Internal property: cpp_namespace from globals section
         self.cpp_namespace = None  # type: str
 
-        super(Enum, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class Condition(common.SourceLocation):
@@ -468,7 +468,7 @@ class Condition(common.SourceLocation):
         self.constexpr = None  # type: str
         self.preprocessor = None  # type: str
 
-        super(Condition, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class Expression(common.SourceLocation):
@@ -482,7 +482,7 @@ class Expression(common.SourceLocation):
         self.expr = None  # type: str
         self.is_constexpr = True  # type: bool
 
-        super(Expression, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class ServerParameterClass(common.SourceLocation):
@@ -497,7 +497,7 @@ class ServerParameterClass(common.SourceLocation):
         self.override_ctor = False  # type: bool
         self.override_set = False  # type: bool
 
-        super(ServerParameterClass, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class ServerParameter(common.SourceLocation):
@@ -524,7 +524,7 @@ class ServerParameter(common.SourceLocation):
         self.validator = None  # type: Validator
         self.on_update = None  # type: str
 
-        super(ServerParameter, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class GlobalInitializer(common.SourceLocation):
@@ -538,7 +538,7 @@ class GlobalInitializer(common.SourceLocation):
         self.register = None  # type: str
         self.store = None  # type: str
 
-        super(GlobalInitializer, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class ConfigGlobal(common.SourceLocation):
@@ -551,7 +551,7 @@ class ConfigGlobal(common.SourceLocation):
         self.source = []  # type: List[str]
         self.initializer = None  # type: GlobalInitializer
 
-        super(ConfigGlobal, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)
 
 
 class ConfigOption(common.SourceLocation):
@@ -588,4 +588,4 @@ class ConfigOption(common.SourceLocation):
         self.positional = None  # type str
         self.validator = None  # type: Validator
 
-        super(ConfigOption, self).__init__(file_name, line, column)
+        super().__init__(file_name, line, column)

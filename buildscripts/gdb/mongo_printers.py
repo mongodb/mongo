@@ -502,7 +502,7 @@ class MongoSubPrettyPrinter(gdb.printing.SubPrettyPrinter):
 
     def __init__(self, name, prefix, is_template, printer):
         """Initialize MongoSubPrettyPrinter."""
-        super(MongoSubPrettyPrinter, self).__init__(name)
+        super().__init__(name)
         self.prefix = prefix
         self.printer = printer
         self.is_template = is_template
@@ -516,7 +516,7 @@ class MongoPrettyPrinterCollection(gdb.printing.PrettyPrinter):
 
     def __init__(self):
         """Initialize MongoPrettyPrinterCollection."""
-        super(MongoPrettyPrinterCollection, self).__init__("mongo", [])
+        super().__init__("mongo", [])
 
     def add(self, name, prefix, is_template, printer):
         """Add a subprinter."""

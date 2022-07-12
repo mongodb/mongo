@@ -248,7 +248,7 @@ class TestRunner(interface.Subcommand):  # pylint: disable=too-many-instance-att
                                suite.test_kind, suite.get_display_name(), config.RANDOM_SEED)
         random.shuffle(suite.tests)
 
-    def _get_suites(self):
+    def _get_suites(self):  # pylint: disable=inconsistent-return-statements
         """Return the list of suites for this resmoke invocation."""
         try:
             return suitesconfig.get_suites(config.SUITE_FILES, config.TEST_FILES)
@@ -297,9 +297,9 @@ class TestRunner(interface.Subcommand):  # pylint: disable=too-many-instance-att
         proto_file = os.path.join(root_dir, "buildscripts", "resmokelib", "core", "jasper.proto")
         try:
             well_known_protos_include = pkg_resources.resource_filename("grpc_tools", "_proto")
-        except ImportError:
+        except ImportError as exc:
             raise ImportError("You must run: sys.executable + '-m pip install grpcio grpcio-tools "
-                              "googleapis-common-protos' to use --spawnUsing=jasper.")
+                              "googleapis-common-protos' to use --spawnUsing=jasper.") from exc
 
         # We use the build/ directory as the output directory because the generated files aren't
         # meant to because tracked by git or linted.
@@ -331,8 +331,8 @@ class TestRunner(interface.Subcommand):  # pylint: disable=too-many-instance-att
 
         sys.path.append(os.path.dirname(proto_out))
 
-        from jasper import jasper_pb2
-        from jasper import jasper_pb2_grpc
+        from jasper import jasper_pb2  # pylint: disable=import-outside-toplevel
+        from jasper import jasper_pb2_grpc  # pylint: disable=import-outside-toplevel
 
         jasper_process.Process.jasper_pb2 = jasper_pb2
         jasper_process.Process.jasper_pb2_grpc = jasper_pb2_grpc

@@ -12,15 +12,14 @@ import urllib.parse
 from urllib.parse import urlparse
 import urllib.request
 from typing import Any, Dict, List
-
-import click
-
-from evergreen.api import RetryingEvergreenApi, EvergreenApi, Build, Task
 from git.repo import Repo
 import requests
 import structlog
 from structlog.stdlib import LoggerFactory
 import yaml
+import click
+
+from evergreen.api import RetryingEvergreenApi, EvergreenApi, Build, Task
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -338,11 +337,11 @@ def download_file(download_url: str, download_location: str) -> None:
     """
     try:
         urllib.request.urlretrieve(download_url, download_location)
-    except urllib.error.ContentTooShortError:
+    except urllib.error.ContentTooShortError as exc:
         LOGGER.warning(
             "The artifact could not be completely downloaded. Default"
             " compile bypass to false.", filename=download_location)
-        raise ValueError("No artifacts were found for the current task")
+        raise ValueError("No artifacts were found for the current task") from exc
 
 
 def extract_artifacts(filename: str) -> None:

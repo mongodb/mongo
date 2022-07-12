@@ -344,8 +344,8 @@ def _set_logging_config():
                 return
 
         raise ValueError("Unknown logger '%s'" % pathname)
-    except FileNotFoundError:
-        raise IOError("Directory {} does not exist.".format(_config.LOGGER_DIR))
+    except FileNotFoundError as exc:
+        raise IOError("Directory {} does not exist.".format(_config.LOGGER_DIR)) from exc
 
 
 def _expand_user(pathname):

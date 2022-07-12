@@ -123,7 +123,7 @@ class Archival(object):  # pylint: disable=too-many-instance-attributes
     @staticmethod
     def _get_s3_client():
         # Since boto3 is a 3rd party module, we import locally.
-        import boto3
+        import boto3  # pylint: disable=import-outside-toplevel
         return boto3.client("s3")
 
     def archive_files_to_s3(self, display_name, input_files, s3_bucket, s3_path):
