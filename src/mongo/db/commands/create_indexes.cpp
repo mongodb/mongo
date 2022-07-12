@@ -448,7 +448,7 @@ CreateIndexesReply runCreateIndexesOnNewCollection(
 }
 
 bool isCreatingInternalConfigTxnsPartialIndex(const CreateIndexesCommand& cmd) {
-    if (cmd.getIndexes().size() > 1) {
+    if (cmd.getIndexes().size() != 1) {
         return false;
     }
     const auto& index = cmd.getIndexes()[0];

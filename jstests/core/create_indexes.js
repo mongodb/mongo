@@ -178,4 +178,10 @@ var configDB = db.getSiblingDB('config');
 res =
     configDB.runCommand({createIndexes: 'transactions', indexes: [{key: {star: 1}, name: 'star'}]});
 assert.commandFailedWithCode(res, ErrorCodes.IllegalOperation);
+
+// Test that providing an empty list of index spec for config.transactions should also fail with
+// IllegalOperation, rather than BadValue for a normal collection.
+// This is consistent with server behavior prior to 6.0.
+res = configDB.runCommand({createIndexes: 'transactions', indexes: []});
+assert.commandFailedWithCode(res, ErrorCodes.IllegalOperation);
 }());
