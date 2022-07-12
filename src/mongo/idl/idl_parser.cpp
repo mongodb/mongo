@@ -241,7 +241,7 @@ void IDLParserErrorContext::throwAPIStrictErrorIfApplicable(StringData fieldName
             !_apiStrict);
 }
 
-NamespaceString IDLParserErrorContext::parseNSCollectionRequired(const DatabaseName& dbName,
+NamespaceString IDLParserErrorContext::parseNSCollectionRequired(StringData dbName,
                                                                  const BSONElement& element,
                                                                  bool allowGlobalCollectionName) {
     const bool isUUID = (element.canonicalType() == canonicalizeBSONType(mongo::BinData) &&
@@ -272,13 +272,14 @@ NamespaceString IDLParserErrorContext::parseNSCollectionRequired(const DatabaseN
     return nss;
 }
 
-NamespaceStringOrUUID IDLParserErrorContext::parseNsOrUUID(const DatabaseName& dbName,
+NamespaceStringOrUUID IDLParserErrorContext::parseNsOrUUID(StringData dbname,
                                                            const BSONElement& element) {
     if (element.type() == BinData && element.binDataType() == BinDataType::newUUID) {
-        return {dbName, uassertStatusOK(UUID::parse(element))};
+        return {dbname.toString(), uassertStatusOK(UUID::parse(element))};
     } else {
         // Ensure collection identifier is not a Command
-        return {parseNSCollectionRequired(dbName, element, false)};
+        const NamespaceString nss(parseNSCollectionRequired(dbname, element, false));
+        return nss;
     }
 }
 
