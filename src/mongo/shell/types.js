@@ -617,7 +617,7 @@ tojsononeline = function(x) {
     return tojson(x, " ", true);
 };
 
-tojson = function(x, indent, nolint, depth) {
+tojson = function(x, indent, nolint, depth, sortKeys) {
     if (x === null)
         return "null";
 
@@ -655,7 +655,7 @@ tojson = function(x, indent, nolint, depth) {
 };
 tojson.MAX_DEPTH = 100;
 
-tojsonObject = function(x, indent, nolint, depth) {
+tojsonObject = function(x, indent, nolint, depth, sortKeys) {
     if (typeof depth !== 'number') {
         depth = 0;
     }
@@ -698,8 +698,15 @@ tojsonObject = function(x, indent, nolint, depth) {
     var keys = x;
     if (typeof (x._simpleKeys) == "function")
         keys = x._simpleKeys();
-    var fieldStrings = [];
+    let keyNames = [];
     for (var k in keys) {
+        keyNames.push(k);
+    }
+    if (sortKeys)
+        keyNames.sort();
+
+    var fieldStrings = [];
+    for (const k of keyNames) {
         var val = x[k];
 
         // skip internal DB types to avoid issues with interceptors

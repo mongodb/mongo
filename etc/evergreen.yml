@@ -248,6 +248,7 @@ buildvariants:
   - name: .jscore .common
   - name: jsCore_txns_large_txns_format
   - name: json_schema
+  - name: query_golden_classic
   - name: libunwind_tests
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
@@ -885,6 +886,8 @@ buildvariants:
   - name: cqf_disabled_pipeline_opt
   - name: cqf_passthrough
   - name: cqf_parallel
+  - name: query_golden_classic
+  - name: query_golden_cqf
   - name: compile_and_archive_dist_test_then_package_TG
     distros:
     - windows-vsCurrent-xlarge
@@ -1434,6 +1437,8 @@ buildvariants:
   - name: cqf_disabled_pipeline_opt
   - name: cqf_passthrough
   - name: cqf_parallel
+  - name: query_golden_classic
+  - name: query_golden_cqf
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
     - rhel80-large
@@ -2235,6 +2240,8 @@ buildvariants:
   - name: cqf_disabled_pipeline_opt
   - name: cqf_passthrough
   - name: cqf_parallel
+  - name: query_golden_classic
+  - name: query_golden_cqf
   - name: compile_and_archive_dist_test_then_package_TG
   - name: .aggregation
   #  - name: .auth
@@ -2395,6 +2402,8 @@ buildvariants:
   - name: cqf_disabled_pipeline_opt
   - name: cqf_passthrough
   - name: cqf_parallel
+  - name: query_golden_classic
+  - name: query_golden_cqf
   - name: compile_and_archive_dist_test_then_package_TG
   - name: .aggregation
   - name: .auth

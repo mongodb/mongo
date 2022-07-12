@@ -135,6 +135,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/traffic_reader',
         '$BUILD_DIR/mongo/scripting/scripting',
         '$BUILD_DIR/mongo/transport/message_compressor',
+        '$BUILD_DIR/mongo/unittest/golden_test_base',
         '$BUILD_DIR/mongo/util/password',
         'benchrun',
         'shell_options_storage',

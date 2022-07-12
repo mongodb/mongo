@@ -891,6 +891,19 @@ int mongo_main(int argc, char* argv[]) {
                 return kInputFileError;
             }
 
+            // If the test began a GoldenTestContext, end it and compare actual/expected results.
+            // NOTE: putting this in ~MongoProgramScope would call it at the end of each load(),
+            // but we only want to call it once the original test file finishes.
+            try {
+                shell_utils::closeGoldenTestContext();
+            } catch (const shell_utils::GoldenTestContextShellFailure& exn) {
+                std::cout << "failed to load: " << shellGlobalParams.files[i] << std::endl;
+                std::cout << exn.toString() << std::endl;
+                exn.diff();
+                std::cout << "exiting with code " << static_cast<int>(kInputFileError) << std::endl;
+                return kInputFileError;
+            }
+
             // Check if the process left any running child processes.
             std::vector<ProcessId> pids = mongo::shell_utils::getRunningMongoChildProcessIds();
 

@@ -30,38 +30,33 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/unittest/golden_test_base.h"
-#include "mongo/unittest/test_info.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo::unittest {
-
-namespace fs = ::boost::filesystem;
-
-class GoldenTestContext : public GoldenTestContextBase {
+/**
+ * Represents data about a single unit test.
+ */
+class TestInfo {
 public:
-    explicit GoldenTestContext(
-        const GoldenTestConfig* config,
-        const TestInfo* testInfo = UnitTest::getInstance()->currentTestInfo(),
-        bool validateOnClose = true)
-        : GoldenTestContextBase(
-              config,
-              fs::path(sanitizeName(testInfo->suiteName().toString())) /
-                  fs::path(sanitizeName(testInfo->testName().toString()) + ".txt"),
-              validateOnClose,
-              [this](auto const&... args) { return onError(args...); }),
-          _testInfo(testInfo) {}
+    TestInfo(StringData suiteName, StringData testName, StringData file, unsigned int line)
+        : _suiteName(suiteName), _testName(testName), _file(file), _line(line) {}
 
-    // Disable move/copy because onError captures 'this' address.
-    GoldenTestContext(GoldenTestContext&&) = delete;
-
-protected:
-    void onError(const std::string& message,
-                 const std::string& actualStr,
-                 const boost::optional<std::string>& expectedStr);
+    StringData suiteName() const {
+        return _suiteName;
+    }
+    StringData testName() const {
+        return _testName;
+    }
+    StringData file() const {
+        return _file;
+    }
+    unsigned int line() const {
+        return _line;
+    }
 
 private:
-    const TestInfo* _testInfo;
+    StringData _suiteName;
+    StringData _testName;
+    StringData _file;
+    unsigned int _line;
 };
-
 }  // namespace mongo::unittest

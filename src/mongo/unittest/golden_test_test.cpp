@@ -87,14 +87,22 @@ TEST(GoldenSelfTest, GoldenTestContextGetPath) {
 
         {
             TestInfo testInfo(badName, "TestName"_sd, __FILE__, __LINE__);
-            GoldenTestContext ctx(&goldenTestConfig, &testInfo, false);
-            ASSERT_THROWS([&] { ctx.getTestPath(); }(), TestAssertionFailureException);
+            ASSERT_THROWS(
+                [&] {
+                    GoldenTestContext ctx(&goldenTestConfig, &testInfo, false);
+                    ctx.getTestPath();
+                }(),
+                AssertionException);
         }
 
         {
             TestInfo testInfo("SuiteName"_sd, badName, __FILE__, __LINE__);
-            GoldenTestContext ctx(&goldenTestConfig, &testInfo, false);
-            ASSERT_THROWS([&] { ctx.getTestPath(); }(), TestAssertionFailureException);
+            ASSERT_THROWS(
+                [&] {
+                    GoldenTestContext ctx(&goldenTestConfig, &testInfo, false);
+                    ctx.getTestPath();
+                }(),
+                AssertionException);
         }
     }
 }

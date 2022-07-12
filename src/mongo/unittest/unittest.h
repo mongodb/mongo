@@ -52,6 +52,7 @@
 #include "mongo/logv2/log_debug.h"
 #include "mongo/logv2/log_detail.h"
 #include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/test_info.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/optional_util.h"
 #include "mongo/util/str.h"
@@ -514,36 +515,6 @@ struct OldStyleSuiteInitializer {
         }
     }
 };
-
-
-/**
- * Represents data about a single unit test.
- */
-class TestInfo {
-public:
-    TestInfo(StringData suiteName, StringData testName, StringData file, unsigned int line)
-        : _suiteName(suiteName), _testName(testName), _file(file), _line(line) {}
-
-    StringData suiteName() const {
-        return _suiteName;
-    }
-    StringData testName() const {
-        return _testName;
-    }
-    StringData file() const {
-        return _file;
-    }
-    unsigned int line() const {
-        return _line;
-    }
-
-private:
-    StringData _suiteName;
-    StringData _testName;
-    StringData _file;
-    unsigned int _line;
-};
-
 
 /**
  * UnitTest singleton class. Provides access to information about current execution state.

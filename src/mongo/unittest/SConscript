@@ -3,6 +3,19 @@
 Import("env")
 
 env = env.Clone()
+env.InjectThirdParty(libraries=['yaml'])
+env.Library(
+    target="golden_test_base",
+    source=[
+        'golden_test_base.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/third_party/shim_yaml',
+    ],
+)
 
 utEnv = env.Clone()
 utEnv.InjectThirdParty(libraries=['yaml'])
@@ -20,6 +33,7 @@ utEnv.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        'golden_test_base',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_options_core',

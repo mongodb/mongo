@@ -1,6 +1,6 @@
 # Overview
 Golden Data test framework provides ability to run and manage tests that produce an output which is 
-verified by comparing it to the checked-in, known valid output. Any differences result in rest 
+verified by comparing it to the checked-in, known valid output. Any differences result in test 
 failure and either the code or expected output has to be updated.
 
 Golden Data tests excel at bulk diffing of failed test outputs and bulk accepting of new test 
@@ -160,7 +160,7 @@ buildscripts/golden_test.py requires a one-time workstation setup.
 Note: this setup is only required to use buildscripts/golden_test.py itself. It is NOT required to
 just run the Golden Data tests when not using buildscripts/golden_test.py.
 
-1. Create a yaml config file, as described by golden_test_options.idl (link TBD). 
+1. Create a yaml config file, as described by [Appendix - Config file reference](#appendix---config-file-reference).
 2. Set GOLDEN_TEST_CONFIG_PATH environment variable to config file location, so that is available 
 when running tests and when running buildscripts/golden_test.py tool.
 
@@ -198,19 +198,19 @@ alternatively modify /etc/environment or other configuration if needed by Debugg
 
 ### List all available test outputs
 ```bash
-mongo > buildscripts/golden_test.py list
+$> buildscripts/golden_test.py list
 ```
 
 ### Diff test results from most recent test run:
 
 ```bash
-mongo > buildscripts/golden_test.py diff
+$> buildscripts/golden_test.py diff
 ```
 This will run the diffCmd that was specified in the config file
 
 ### Diff test results from most recent test run:
 ```bash
-mongo > buildscripts/golden_test.py accept
+$> buildscripts/golden_test.py accept
 ```
 This will copy all actual test outputs from that test run to the source repo and new expected 
 outputs.
@@ -219,17 +219,17 @@ outputs.
 ### Get paths from most recent test run (to be used by custom tools)
 Get expected and actual output paths for most recent test run:
 ```bash
-mongo > buildscripts/golden_test.py get
+$> buildscripts/golden_test.py get
 ```
 
 Get expected and actual output paths for most most recent test run:
 ```bash
-mongo > buildscripts/golden_test.py get_root
+$> buildscripts/golden_test.py get_root
 ```
 
 Get all available commands and options:
 ```bash
-mongo > buildscripts/golden_test.py --help
+$> buildscripts/golden_test.py --help
 ```
 
 # How to diff test results from a non-workstation test run
@@ -281,9 +281,10 @@ diffCmd:
         Shell command to diff a single golden test run output.
         {{expected}} and {{actual}} variables should be used and will be replaced  with expected and
         actual output folder paths respectively.
-        This property is not used during test execution, it is only used by post processing tools, 
-        like golden_test.py
+        This property is not used to decide whether the test passes or fails; it is only used to
+        display differences once we've decided that a test failed.
     examples: 
          diff -ruN --unidirectional-new-file --color=always "{{expected}}" "{{actual}}"
+         git diff --no-index "{{expected}}" "{{actual}}"
 ```
 

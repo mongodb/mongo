@@ -44,170 +44,30 @@
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/util/ctype.h"
-#include "mongo/util/pcre.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::unittest {
 
 namespace fs = ::boost::filesystem;
-namespace po = ::boost::program_options;
 
 using namespace fmt::literals;
 
-static const pcre::Regex validNameRegex(R"(^[[:alnum:]_\-]*$)");
-
-std::string readFile(const fs::path& path) {
-    ASSERT_FALSE(is_directory(path));
-    ASSERT_TRUE(is_regular_file(path));
-
-    std::ostringstream os;
-    os << fs::ifstream(path).rdbuf();
-    return os.str();
-}
-
-void writeFile(const fs::path& path, const std::string& contents) {
-    create_directories(path.parent_path());
-    fs::ofstream ofs(path);
-    ofs << contents;
-}
-
-GoldenTestEnvironment* GoldenTestEnvironment::getInstance() {
-    static GoldenTestEnvironment instance;
-    return &instance;
-}
-
-GoldenTestEnvironment::GoldenTestEnvironment() : _goldenDataRoot(".") {
-    // Parse environment variables
-    auto opts = GoldenTestOptions::parseEnvironment();
-
-    fs::path outputRoot;
-    if (opts.outputRootPattern) {
-        fs::path pattern(*opts.outputRootPattern);
-        outputRoot = pattern.parent_path() / fs::unique_path(pattern.leaf());
-    } else {
-        outputRoot = fs::temp_directory_path() / fs::unique_path("out-%%%%-%%%%-%%%%-%%%%");
-    }
-
-    _actualOutputRoot = outputRoot / "actual";
-    _expectedOutputRoot = outputRoot / "expected";
-}
-
-std::string GoldenTestContext::toSnakeCase(const std::string& str) {
-    std::string result;
-    bool lastAlpha = false;
-    for (char c : str) {
-        if (ctype::isUpper(c)) {
-            if (lastAlpha) {
-                result += '_';
-            }
-
-            result += ctype::toLower(c);
-        } else {
-            result += c;
-        }
-
-        lastAlpha = ctype::isAlpha(c);
-    }
-
-    return result;
-}
-
-std::string GoldenTestContext::sanitizeName(const std::string& str) {
-    if (!validNameRegex.matchView(str)) {
-        FAIL("Unsupported characters in name '{}'"_format(str));
-    }
-
-    return toSnakeCase(str);
-}
-
-void GoldenTestContext::verifyOutput() {
-    std::string actualStr = _outStream.str();
-
-    fs::path goldenDataPath = getGoldedDataPath();
-    if (!fs::exists(goldenDataPath)) {
-        failResultMismatch(actualStr, boost::none, "Golden data file doesn't exist.");
-    }
-
-    std::string expectedStr = readFile(goldenDataPath);
-    if (actualStr != expectedStr) {
-        failResultMismatch(actualStr, expectedStr, "Actual result doesn't match golden data.");
-    }
-}
-
-void GoldenTestContext::failResultMismatch(const std::string& actualStr,
-                                           const boost::optional<std::string>& expectedStr,
-                                           const std::string& message) {
-    fs::path actualOutputFilePath = getActualOutputPath();
-    fs::path expectedOutputFilePath = getExpectedOutputPath();
-
-    writeFile(actualOutputFilePath, actualStr);
-    if (expectedStr != boost::none) {
-        writeFile(expectedOutputFilePath, *expectedStr);
-    }
-
+void GoldenTestContext::onError(const std::string& message,
+                                const std::string& actualStr,
+                                const boost::optional<std::string>& expectedStr) {
     LOGV2_ERROR(6273501,
                 "Test output verification failed",
                 "message"_attr = message,
                 "testPath"_attr = getTestPath().string(),
                 "actualOutput"_attr = actualStr,
                 "expectedOutput"_attr = expectedStr,
-                "actualOutputPath"_attr = actualOutputFilePath.string(),
-                "expectedOutputPath"_attr = expectedOutputFilePath.string(),
-                "actualOutputRoot"_attr = _env->actualOutputRoot().string(),
-                "expectedOutputRoot"_attr = _env->expectedOutputRoot().string());
+                "actualOutputPath"_attr = getActualOutputPath().string(),
+                "expectedOutputPath"_attr = getExpectedOutputPath().string(),
+                "actualOutputRoot"_attr = getEnv()->actualOutputRoot().string(),
+                "expectedOutputRoot"_attr = getEnv()->expectedOutputRoot().string());
 
-    throwAssertionFailureException(
-        "Test output verification failed: {}, "
-        "actual output file: {}, "
-        "expected output file: {}"
-        ""_format(message, actualOutputFilePath, expectedOutputFilePath));
-}
-
-void GoldenTestContext::throwAssertionFailureException(const std::string& message) {
     throw TestAssertionFailureException(_testInfo->file().toString(), _testInfo->line(), message);
-}
-
-fs::path GoldenTestContext::getActualOutputPath() const {
-    return _env->actualOutputRoot() / _config->relativePath / getTestPath();
-}
-
-fs::path GoldenTestContext::getExpectedOutputPath() const {
-    return _env->expectedOutputRoot() / _config->relativePath / getTestPath();
-}
-
-fs::path GoldenTestContext::getGoldedDataPath() const {
-    return _env->goldenDataRoot() / _config->relativePath / getTestPath();
-}
-
-fs::path GoldenTestContext::getTestPath() const {
-    return fs::path(sanitizeName(_testInfo->suiteName().toString())) /
-        fs::path(sanitizeName(_testInfo->testName().toString()) + ".txt");
-}
-
-GoldenTestOptions GoldenTestOptions::parseEnvironment() {
-    GoldenTestOptions opts;
-    po::options_description desc_env;
-    boost::optional<std::string> configPath;
-    desc_env.add_options()  //
-        ("config_path",
-         po::value<std::string>()->notifier([&configPath](auto v) { configPath = v; }));
-
-    po::variables_map vm_env;
-    po::store(po::parse_environment(desc_env, "GOLDEN_TEST_"), vm_env);
-    po::notify(vm_env);
-
-    if (configPath) {
-        std::string configStr = readFile(*configPath);
-        YAML::Node configNode = YAML::Load(configStr);
-        YAML::Node outputRootPatternNode = configNode["outputRootPattern"];
-
-        if (outputRootPatternNode && outputRootPatternNode.IsScalar()) {
-            opts.outputRootPattern = outputRootPatternNode.as<std::string>();
-        }
-    }
-
-    return opts;
 }
 
 }  // namespace mongo::unittest

@@ -1305,7 +1305,7 @@ BSONObj GetFCVConstants(const BSONObj&, void*) {
 }
 
 MongoProgramScope::~MongoProgramScope() {
-    DESTRUCTOR_GUARD(KillMongoProgramInstances(); ClearRawMongoProgramOutput(BSONObj(), nullptr);)
+    DESTRUCTOR_GUARD(KillMongoProgramInstances(); ClearRawMongoProgramOutput(BSONObj(), nullptr))
 }
 
 void installShellUtilsLauncher(Scope& scope) {

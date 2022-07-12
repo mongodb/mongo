@@ -28,3 +28,55 @@ function usedBonsaiOptimizer(explain) {
         return explain.queryPlanner.winningPlan.hasOwnProperty("optimizerPlan");
     }
 }
+
+/**
+ * Given a query plan or explain output, follow the leftmost child until
+ * we reach a leaf stage, and return it.
+ *
+ * This is useful for finding the access path part of a plan, typically a PhysicalScan or IndexScan.
+ */
+function leftmostLeafStage(node) {
+    for (;;) {
+        if (node.queryPlanner) {
+            node = node.queryPlanner;
+        } else if (node.winningPlan) {
+            node = node.winningPlan;
+        } else if (node.optimizerPlan) {
+            node = node.optimizerPlan;
+        } else if (node.child) {
+            node = node.child;
+        } else if (node.leftChild) {
+            node = node.leftChild;
+        } else {
+            break;
+        }
+    }
+    return node;
+}
+
+/**
+ * Get a very simplified version of a plan, which only includes nodeType and nesting structure.
+ */
+function getPlanSkeleton(node) {
+    const keepKeys = [
+        'nodeType',
+
+        'queryPlanner',
+        'winningPlan',
+        'optimizerPlan',
+        'child',
+        'children',
+        'leftChild',
+        'rightChild',
+    ];
+
+    if (Array.isArray(node)) {
+        return node.map(n => getPlanSkeleton(n));
+    } else if (node === null || typeof node !== 'object') {
+        return node;
+    } else {
+        return Object.fromEntries(Object.keys(node)
+                                      .filter(key => keepKeys.includes(key))
+                                      .map(key => [key, getPlanSkeleton(node[key])]));
+    }
+}

@@ -97,5 +97,21 @@ extern Mutex& mongoProgramOutputMutex;
 // Helper to tell if a file exists cross platform
 // TODO: Remove this when we have a cross platform file utility library
 bool fileExists(const std::string& file);
+
+// If the test began a GoldenTestContext, end it and compare actual/expected results.
+void closeGoldenTestContext();
+
+/**
+ * Thrown when a GoldenTestContextShell test fails.
+ */
+struct GoldenTestContextShellFailure {
+    std::string message;
+    std::string actualOutputFile;
+    std::string expectedOutputFile;
+
+    std::string toString() const;
+    void diff() const;
+};
+
 }  // namespace shell_utils
 }  // namespace mongo

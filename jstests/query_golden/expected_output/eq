@@ -1,0 +1,979 @@
+
+
+[jsTest] ----
+[jsTest] Inserting docs:
+[jsTest] ----
+
+{  "a" : "" }
+{  "a" : "A" }
+{  "a" : "a" }
+{  "a" : "😀" }
+{  "a" : -1 }
+{  "a" : -1.7976931348623157e+308 }
+{  "a" : -1.7976931348623157e+308 }
+{  "a" : -2 }
+{  "a" : -5e-324 }
+{  "a" : -Infinity }
+{  "a" : /(?:)/ }
+{  "a" : /A/ }
+{  "a" : /a/ }
+{  "a" : /a/i }
+{  "a" : 0 }
+{  "a" : 0 }
+{  "a" : 1 }
+{  "a" : 2 }
+{  "a" : 5e-324 }
+{  "a" : BinData(0,"") }
+{  "a" : BinData(0,"asdf") }
+{  "a" : ISODate("0000-01-01T00:00:00Z") }
+{  "a" : ISODate("1969-12-31T23:59:59.999Z") }
+{  "a" : ISODate("1970-01-01T00:00:00Z") }
+{  "a" : ISODate("2022-07-14T18:34:28.937Z") }
+{  "a" : ISODate("9999-12-31T23:59:59.999Z") }
+{  "a" : Infinity }
+{  "a" : NaN }
+{  "a" : NumberDecimal("-0") }
+{  "a" : NumberDecimal("-0.000") }
+{  "a" : NumberDecimal("-1") }
+{  "a" : NumberDecimal("-1.000") }
+{  "a" : NumberDecimal("-1E-6176") }
+{  "a" : NumberDecimal("-9.999999999999999999999999999999999E+6144") }
+{  "a" : NumberDecimal("-Infinity") }
+{  "a" : NumberDecimal("-Infinity") }
+{  "a" : NumberDecimal("0") }
+{  "a" : NumberDecimal("0.000") }
+{  "a" : NumberDecimal("1") }
+{  "a" : NumberDecimal("1E-6176") }
+{  "a" : NumberDecimal("9.999999999999999999999999999999999E+6144") }
+{  "a" : NumberDecimal("NaN") }
+{  "a" : NumberInt(-1) }
+{  "a" : NumberInt(-2) }
+{  "a" : NumberInt(-2147483648) }
+{  "a" : NumberInt(0) }
+{  "a" : NumberInt(1) }
+{  "a" : NumberInt(2) }
+{  "a" : NumberInt(2147483647) }
+{  "a" : NumberLong("-9223372036854775808") }
+{  "a" : NumberLong("9223372036854775807") }
+{  "a" : NumberLong(-1) }
+{  "a" : NumberLong(-2) }
+{  "a" : NumberLong(0) }
+{  "a" : NumberLong(1) }
+{  "a" : NumberLong(2) }
+{  "a" : ObjectId("000000000000000000000000") }
+{  "a" : ObjectId("62d05ec744ca83616c92772c") }
+{  "a" : ObjectId("62d05fa144ca83616c92772e") }
+{  "a" : ObjectId("ffffffffffffffffffffffff") }
+{  "a" : UUID("167c25c0-4f45-488a-960a-3171ec07726b") }
+{  "a" : UUID("326d92af-2d76-452b-a03f-69f05ab98416") }
+{  "a" : [ "" ] }
+{  "a" : [ "A" ] }
+{  "a" : [ "a" ] }
+{  "a" : [ "😀" ] }
+{  "a" : [ -1 ] }
+{  "a" : [ -1.7976931348623157e+308 ] }
+{  "a" : [ -1.7976931348623157e+308 ] }
+{  "a" : [ -2 ] }
+{  "a" : [ -5e-324 ] }
+{  "a" : [ -Infinity ] }
+{  "a" : [ /(?:)/ ] }
+{  "a" : [ /A/ ] }
+{  "a" : [ /a/ ] }
+{  "a" : [ /a/i ] }
+{  "a" : [ 0 ] }
+{  "a" : [ 0 ] }
+{  "a" : [ 1 ] }
+{  "a" : [ 2 ] }
+{  "a" : [ 5e-324 ] }
+{  "a" : [ BinData(0,"") ] }
+{  "a" : [ BinData(0,"asdf") ] }
+{  "a" : [ ISODate("0000-01-01T00:00:00Z") ] }
+{  "a" : [ ISODate("1969-12-31T23:59:59.999Z") ] }
+{  "a" : [ ISODate("1970-01-01T00:00:00Z") ] }
+{  "a" : [ ISODate("2022-07-14T18:34:28.937Z") ] }
+{  "a" : [ ISODate("9999-12-31T23:59:59.999Z") ] }
+{  "a" : [ Infinity ] }
+{  "a" : [ NaN ] }
+{  "a" : [ NumberDecimal("-0") ] }
+{  "a" : [ NumberDecimal("-0.000") ] }
+{  "a" : [ NumberDecimal("-1") ] }
+{  "a" : [ NumberDecimal("-1.000") ] }
+{  "a" : [ NumberDecimal("-1E-6176") ] }
+{  "a" : [ NumberDecimal("-9.999999999999999999999999999999999E+6144") ] }
+{  "a" : [ NumberDecimal("-Infinity") ] }
+{  "a" : [ NumberDecimal("-Infinity") ] }
+{  "a" : [ NumberDecimal("0") ] }
+{  "a" : [ NumberDecimal("0.000") ] }
+{  "a" : [ NumberDecimal("1") ] }
+{  "a" : [ NumberDecimal("1E-6176") ] }
+{  "a" : [ NumberDecimal("9.999999999999999999999999999999999E+6144") ] }
+{  "a" : [ NumberDecimal("NaN") ] }
+{  "a" : [ NumberInt(-1) ] }
+{  "a" : [ NumberInt(-2) ] }
+{  "a" : [ NumberInt(-2147483648) ] }
+{  "a" : [ NumberInt(0) ] }
+{  "a" : [ NumberInt(1) ] }
+{  "a" : [ NumberInt(2) ] }
+{  "a" : [ NumberInt(2147483647) ] }
+{  "a" : [ NumberLong("-9223372036854775808") ] }
+{  "a" : [ NumberLong("9223372036854775807") ] }
+{  "a" : [ NumberLong(-1) ] }
+{  "a" : [ NumberLong(-2) ] }
+{  "a" : [ NumberLong(0) ] }
+{  "a" : [ NumberLong(1) ] }
+{  "a" : [ NumberLong(2) ] }
+{  "a" : [ ObjectId("000000000000000000000000") ] }
+{  "a" : [ ObjectId("62d05ec744ca83616c92772c") ] }
+{  "a" : [ ObjectId("62d05fa144ca83616c92772e") ] }
+{  "a" : [ ObjectId("ffffffffffffffffffffffff") ] }
+{  "a" : [ UUID("167c25c0-4f45-488a-960a-3171ec07726b") ] }
+{  "a" : [ UUID("326d92af-2d76-452b-a03f-69f05ab98416") ] }
+{  "a" : [ [ ] ] }
+{  "a" : [ ] }
+{  "a" : [ false ] }
+{  "a" : [ function inc(x) {
+            return x + 1;
+        } ] }
+{  "a" : [ null ] }
+{  "a" : [ true ] }
+{  "a" : [ undefined ] }
+{  "a" : [ {  } ] }
+{  "a" : [ { "$maxKey" : 1 } ] }
+{  "a" : [ { "$minKey" : 1 } ] }
+{  "a" : false }
+{  "a" : function inc(x) {
+            return x + 1;
+        } }
+{  "a" : null }
+{  "a" : true }
+{  "a" : undefined }
+{  "a" : {   } }
+{  "a" : {  "x" : "" } }
+{  "a" : {  "x" : "A" } }
+{  "a" : {  "x" : "a" } }
+{  "a" : {  "x" : "😀" } }
+{  "a" : {  "x" : -1 } }
+{  "a" : {  "x" : -1.7976931348623157e+308 } }
+{  "a" : {  "x" : -1.7976931348623157e+308 } }
+{  "a" : {  "x" : -2 } }
+{  "a" : {  "x" : -5e-324 } }
+{  "a" : {  "x" : -Infinity } }
+{  "a" : {  "x" : /(?:)/ } }
+{  "a" : {  "x" : /A/ } }
+{  "a" : {  "x" : /a/ } }
+{  "a" : {  "x" : /a/i } }
+{  "a" : {  "x" : 0 } }
+{  "a" : {  "x" : 0 } }
+{  "a" : {  "x" : 1 } }
+{  "a" : {  "x" : 2 } }
+{  "a" : {  "x" : 5e-324 } }
+{  "a" : {  "x" : BinData(0,"") } }
+{  "a" : {  "x" : BinData(0,"asdf") } }
+{  "a" : {  "x" : ISODate("0000-01-01T00:00:00Z") } }
+{  "a" : {  "x" : ISODate("1969-12-31T23:59:59.999Z") } }
+{  "a" : {  "x" : ISODate("1970-01-01T00:00:00Z") } }
+{  "a" : {  "x" : ISODate("2022-07-14T18:34:28.937Z") } }
+{  "a" : {  "x" : ISODate("9999-12-31T23:59:59.999Z") } }
+{  "a" : {  "x" : Infinity } }
+{  "a" : {  "x" : NaN } }
+{  "a" : {  "x" : NumberDecimal("-0") } }
+{  "a" : {  "x" : NumberDecimal("-0.000") } }
+{  "a" : {  "x" : NumberDecimal("-1") } }
+{  "a" : {  "x" : NumberDecimal("-1.000") } }
+{  "a" : {  "x" : NumberDecimal("-1E-6176") } }
+{  "a" : {  "x" : NumberDecimal("-9.999999999999999999999999999999999E+6144") } }
+{  "a" : {  "x" : NumberDecimal("-Infinity") } }
+{  "a" : {  "x" : NumberDecimal("-Infinity") } }
+{  "a" : {  "x" : NumberDecimal("0") } }
+{  "a" : {  "x" : NumberDecimal("0.000") } }
+{  "a" : {  "x" : NumberDecimal("1") } }
+{  "a" : {  "x" : NumberDecimal("1E-6176") } }
+{  "a" : {  "x" : NumberDecimal("9.999999999999999999999999999999999E+6144") } }
+{  "a" : {  "x" : NumberDecimal("NaN") } }
+{  "a" : {  "x" : NumberInt(-1) } }
+{  "a" : {  "x" : NumberInt(-2) } }
+{  "a" : {  "x" : NumberInt(-2147483648) } }
+{  "a" : {  "x" : NumberInt(0) } }
+{  "a" : {  "x" : NumberInt(1) } }
+{  "a" : {  "x" : NumberInt(2) } }
+{  "a" : {  "x" : NumberInt(2147483647) } }
+{  "a" : {  "x" : NumberLong("-9223372036854775808") } }
+{  "a" : {  "x" : NumberLong("9223372036854775807") } }
+{  "a" : {  "x" : NumberLong(-1) } }
+{  "a" : {  "x" : NumberLong(-2) } }
+{  "a" : {  "x" : NumberLong(0) } }
+{  "a" : {  "x" : NumberLong(1) } }
+{  "a" : {  "x" : NumberLong(2) } }
+{  "a" : {  "x" : ObjectId("000000000000000000000000") } }
+{  "a" : {  "x" : ObjectId("62d05ec744ca83616c92772c") } }
+{  "a" : {  "x" : ObjectId("62d05fa144ca83616c92772e") } }
+{  "a" : {  "x" : ObjectId("ffffffffffffffffffffffff") } }
+{  "a" : {  "x" : UUID("167c25c0-4f45-488a-960a-3171ec07726b") } }
+{  "a" : {  "x" : UUID("326d92af-2d76-452b-a03f-69f05ab98416") } }
+{  "a" : {  "x" : [ ] } }
+{  "a" : {  "x" : false } }
+{  "a" : {  "x" : function inc(x) {
+            return x + 1;
+        } } }
+{  "a" : {  "x" : null } }
+{  "a" : {  "x" : true } }
+{  "a" : {  "x" : undefined } }
+{  "a" : {  "x" : {   } } }
+{  "a" : {  "x" : { "$maxKey" : 1 } } }
+{  "a" : {  "x" : { "$minKey" : 1 } } }
+{  "a" : { "$maxKey" : 1 } }
+{  "a" : { "$minKey" : 1 } }
+Collection count: 213
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : { "$minKey" : 1 } } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : [ { "$minKey" : 1 } ] }
+{  "a" : { "$minKey" : 1 } }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : -Infinity } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : -Infinity }
+{  "a" : NumberDecimal("-Infinity") }
+{  "a" : NumberDecimal("-Infinity") }
+{  "a" : [ -Infinity ] }
+{  "a" : [ NumberDecimal("-Infinity") ] }
+{  "a" : [ NumberDecimal("-Infinity") ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : -1.7976931348623157e+308 } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : -1.7976931348623157e+308 }
+{  "a" : -1.7976931348623157e+308 }
+{  "a" : [ -1.7976931348623157e+308 ] }
+{  "a" : [ -1.7976931348623157e+308 ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : -2 } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : -2 }
+{  "a" : -2 }
+{  "a" : NumberLong(-2) }
+{  "a" : [ -2 ] }
+{  "a" : [ -2 ] }
+{  "a" : [ NumberLong(-2) ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : -1 } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : -1 }
+{  "a" : -1 }
+{  "a" : NumberDecimal("-1") }
+{  "a" : NumberDecimal("-1.000") }
+{  "a" : NumberLong(-1) }
+{  "a" : [ -1 ] }
+{  "a" : [ -1 ] }
+{  "a" : [ NumberDecimal("-1") ] }
+{  "a" : [ NumberDecimal("-1.000") ] }
+{  "a" : [ NumberLong(-1) ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : -5e-324 } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : -5e-324 }
+{  "a" : [ -5e-324 ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : 0 } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : 0 }
+{  "a" : 0 }
+{  "a" : 0 }
+{  "a" : NumberDecimal("-0") }
+{  "a" : NumberDecimal("-0.000") }
+{  "a" : NumberDecimal("0") }
+{  "a" : NumberDecimal("0.000") }
+{  "a" : NumberLong(0) }
+{  "a" : [ 0 ] }
+{  "a" : [ 0 ] }
+{  "a" : [ 0 ] }
+{  "a" : [ NumberDecimal("-0") ] }
+{  "a" : [ NumberDecimal("-0.000") ] }
+{  "a" : [ NumberDecimal("0") ] }
+{  "a" : [ NumberDecimal("0.000") ] }
+{  "a" : [ NumberLong(0) ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : 0 } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : 0 }
+{  "a" : 0 }
+{  "a" : 0 }
+{  "a" : NumberDecimal("-0") }
+{  "a" : NumberDecimal("-0.000") }
+{  "a" : NumberDecimal("0") }
+{  "a" : NumberDecimal("0.000") }
+{  "a" : NumberLong(0) }
+{  "a" : [ 0 ] }
+{  "a" : [ 0 ] }
+{  "a" : [ 0 ] }
+{  "a" : [ NumberDecimal("-0") ] }
+{  "a" : [ NumberDecimal("-0.000") ] }
+{  "a" : [ NumberDecimal("0") ] }
+{  "a" : [ NumberDecimal("0.000") ] }
+{  "a" : [ NumberLong(0) ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : 5e-324 } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : 5e-324 }
+{  "a" : [ 5e-324 ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : 1 } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : 1 }
+{  "a" : 1 }
+{  "a" : NumberDecimal("1") }
+{  "a" : NumberLong(1) }
+{  "a" : [ 1 ] }
+{  "a" : [ 1 ] }
+{  "a" : [ NumberDecimal("1") ] }
+{  "a" : [ NumberLong(1) ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : 2 } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : 2 }
+{  "a" : 2 }
+{  "a" : NumberLong(2) }
+{  "a" : [ 2 ] }
+{  "a" : [ 2 ] }
+{  "a" : [ NumberLong(2) ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : -1.7976931348623157e+308 } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : -1.7976931348623157e+308 }
+{  "a" : -1.7976931348623157e+308 }
+{  "a" : [ -1.7976931348623157e+308 ] }
+{  "a" : [ -1.7976931348623157e+308 ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : Infinity } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : Infinity }
+{  "a" : [ Infinity ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : "" } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : "" }
+{  "a" : [ "" ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : "a" } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : "a" }
+{  "a" : [ "a" ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : "A" } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : "A" }
+{  "a" : [ "A" ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : "😀" } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : "😀" }
+{  "a" : [ "😀" ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : {   } } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : [ {  } ] }
+{  "a" : {   } }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : [ ] } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : [ [ ] ] }
+{  "a" : [ ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : BinData(0,"") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : BinData(0,"") }
+{  "a" : [ BinData(0,"") ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : BinData(0,"asdf") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : BinData(0,"asdf") }
+{  "a" : [ BinData(0,"asdf") ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : UUID("326d92af-2d76-452b-a03f-69f05ab98416") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : UUID("326d92af-2d76-452b-a03f-69f05ab98416") }
+{  "a" : [ UUID("326d92af-2d76-452b-a03f-69f05ab98416") ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : UUID("167c25c0-4f45-488a-960a-3171ec07726b") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : UUID("167c25c0-4f45-488a-960a-3171ec07726b") }
+{  "a" : [ UUID("167c25c0-4f45-488a-960a-3171ec07726b") ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : ObjectId("62d05ec744ca83616c92772c") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : ObjectId("62d05ec744ca83616c92772c") }
+{  "a" : [ ObjectId("62d05ec744ca83616c92772c") ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : ObjectId("62d05fa144ca83616c92772e") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : ObjectId("62d05fa144ca83616c92772e") }
+{  "a" : [ ObjectId("62d05fa144ca83616c92772e") ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : ObjectId("000000000000000000000000") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : ObjectId("000000000000000000000000") }
+{  "a" : [ ObjectId("000000000000000000000000") ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : ObjectId("ffffffffffffffffffffffff") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : ObjectId("ffffffffffffffffffffffff") }
+{  "a" : [ ObjectId("ffffffffffffffffffffffff") ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : false } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : [ false ] }
+{  "a" : false }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : true } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : [ true ] }
+{  "a" : true }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : ISODate("2022-07-14T18:34:28.937Z") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : ISODate("2022-07-14T18:34:28.937Z") }
+{  "a" : [ ISODate("2022-07-14T18:34:28.937Z") ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : ISODate("0000-01-01T00:00:00Z") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : ISODate("0000-01-01T00:00:00Z") }
+{  "a" : [ ISODate("0000-01-01T00:00:00Z") ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : ISODate("9999-12-31T23:59:59.999Z") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : ISODate("9999-12-31T23:59:59.999Z") }
+{  "a" : [ ISODate("9999-12-31T23:59:59.999Z") ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : ISODate("1969-12-31T23:59:59.999Z") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : ISODate("1969-12-31T23:59:59.999Z") }
+{  "a" : [ ISODate("1969-12-31T23:59:59.999Z") ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : ISODate("1970-01-01T00:00:00Z") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : ISODate("1970-01-01T00:00:00Z") }
+{  "a" : [ ISODate("1970-01-01T00:00:00Z") ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : /(?:)/ } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : /(?:)/ }
+{  "a" : [ /(?:)/ ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : /a/ } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : /a/ }
+{  "a" : [ /a/ ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : /A/ } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : /A/ }
+{  "a" : [ /A/ ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : /a/i } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : /a/i }
+{  "a" : [ /a/i ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : function inc(x) {
+[jsTest]             return x + 1;
+[jsTest]         } } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : [ { "code" : "function inc(x) {\n            return x + 1;\n        }" } ] }
+{  "a" : {  "code" : "function inc(x) {\n            return x + 1;\n        }" } }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberInt(-2147483648) } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : -2147483648 }
+{  "a" : [ -2147483648 ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberInt(-2) } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : -2 }
+{  "a" : -2 }
+{  "a" : NumberLong(-2) }
+{  "a" : [ -2 ] }
+{  "a" : [ -2 ] }
+{  "a" : [ NumberLong(-2) ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberInt(-1) } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : -1 }
+{  "a" : -1 }
+{  "a" : NumberDecimal("-1") }
+{  "a" : NumberDecimal("-1.000") }
+{  "a" : NumberLong(-1) }
+{  "a" : [ -1 ] }
+{  "a" : [ -1 ] }
+{  "a" : [ NumberDecimal("-1") ] }
+{  "a" : [ NumberDecimal("-1.000") ] }
+{  "a" : [ NumberLong(-1) ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberInt(0) } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : 0 }
+{  "a" : 0 }
+{  "a" : 0 }
+{  "a" : NumberDecimal("-0") }
+{  "a" : NumberDecimal("-0.000") }
+{  "a" : NumberDecimal("0") }
+{  "a" : NumberDecimal("0.000") }
+{  "a" : NumberLong(0) }
+{  "a" : [ 0 ] }
+{  "a" : [ 0 ] }
+{  "a" : [ 0 ] }
+{  "a" : [ NumberDecimal("-0") ] }
+{  "a" : [ NumberDecimal("-0.000") ] }
+{  "a" : [ NumberDecimal("0") ] }
+{  "a" : [ NumberDecimal("0.000") ] }
+{  "a" : [ NumberLong(0) ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberInt(1) } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : 1 }
+{  "a" : 1 }
+{  "a" : NumberDecimal("1") }
+{  "a" : NumberLong(1) }
+{  "a" : [ 1 ] }
+{  "a" : [ 1 ] }
+{  "a" : [ NumberDecimal("1") ] }
+{  "a" : [ NumberLong(1) ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberInt(2) } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : 2 }
+{  "a" : 2 }
+{  "a" : NumberLong(2) }
+{  "a" : [ 2 ] }
+{  "a" : [ 2 ] }
+{  "a" : [ NumberLong(2) ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberInt(2147483647) } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : 2147483647 }
+{  "a" : [ 2147483647 ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberLong("-9223372036854775808") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : NumberLong("-9223372036854775808") }
+{  "a" : [ NumberLong("-9223372036854775808") ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberLong(-2) } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : -2 }
+{  "a" : -2 }
+{  "a" : NumberLong(-2) }
+{  "a" : [ -2 ] }
+{  "a" : [ -2 ] }
+{  "a" : [ NumberLong(-2) ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberLong(-1) } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : -1 }
+{  "a" : -1 }
+{  "a" : NumberDecimal("-1") }
+{  "a" : NumberDecimal("-1.000") }
+{  "a" : NumberLong(-1) }
+{  "a" : [ -1 ] }
+{  "a" : [ -1 ] }
+{  "a" : [ NumberDecimal("-1") ] }
+{  "a" : [ NumberDecimal("-1.000") ] }
+{  "a" : [ NumberLong(-1) ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberLong(0) } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : 0 }
+{  "a" : 0 }
+{  "a" : 0 }
+{  "a" : NumberDecimal("-0") }
+{  "a" : NumberDecimal("-0.000") }
+{  "a" : NumberDecimal("0") }
+{  "a" : NumberDecimal("0.000") }
+{  "a" : NumberLong(0) }
+{  "a" : [ 0 ] }
+{  "a" : [ 0 ] }
+{  "a" : [ 0 ] }
+{  "a" : [ NumberDecimal("-0") ] }
+{  "a" : [ NumberDecimal("-0.000") ] }
+{  "a" : [ NumberDecimal("0") ] }
+{  "a" : [ NumberDecimal("0.000") ] }
+{  "a" : [ NumberLong(0) ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberLong(1) } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : 1 }
+{  "a" : 1 }
+{  "a" : NumberDecimal("1") }
+{  "a" : NumberLong(1) }
+{  "a" : [ 1 ] }
+{  "a" : [ 1 ] }
+{  "a" : [ NumberDecimal("1") ] }
+{  "a" : [ NumberLong(1) ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberLong(2) } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : 2 }
+{  "a" : 2 }
+{  "a" : NumberLong(2) }
+{  "a" : [ 2 ] }
+{  "a" : [ 2 ] }
+{  "a" : [ NumberLong(2) ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberLong("9223372036854775807") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : NumberLong("9223372036854775807") }
+{  "a" : [ NumberLong("9223372036854775807") ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberDecimal("-Infinity") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : -Infinity }
+{  "a" : NumberDecimal("-Infinity") }
+{  "a" : NumberDecimal("-Infinity") }
+{  "a" : [ -Infinity ] }
+{  "a" : [ NumberDecimal("-Infinity") ] }
+{  "a" : [ NumberDecimal("-Infinity") ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberDecimal("-9.999999999999999999999999999999999E+6144") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : NumberDecimal("-9.999999999999999999999999999999999E+6144") }
+{  "a" : [ NumberDecimal("-9.999999999999999999999999999999999E+6144") ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberDecimal("-1.000") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : -1 }
+{  "a" : -1 }
+{  "a" : NumberDecimal("-1") }
+{  "a" : NumberDecimal("-1.000") }
+{  "a" : NumberLong(-1) }
+{  "a" : [ -1 ] }
+{  "a" : [ -1 ] }
+{  "a" : [ NumberDecimal("-1") ] }
+{  "a" : [ NumberDecimal("-1.000") ] }
+{  "a" : [ NumberLong(-1) ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberDecimal("-1") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : -1 }
+{  "a" : -1 }
+{  "a" : NumberDecimal("-1") }
+{  "a" : NumberDecimal("-1.000") }
+{  "a" : NumberLong(-1) }
+{  "a" : [ -1 ] }
+{  "a" : [ -1 ] }
+{  "a" : [ NumberDecimal("-1") ] }
+{  "a" : [ NumberDecimal("-1.000") ] }
+{  "a" : [ NumberLong(-1) ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberDecimal("-1E-6176") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : NumberDecimal("-1E-6176") }
+{  "a" : [ NumberDecimal("-1E-6176") ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberDecimal("-0.000") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : 0 }
+{  "a" : 0 }
+{  "a" : 0 }
+{  "a" : NumberDecimal("-0") }
+{  "a" : NumberDecimal("-0.000") }
+{  "a" : NumberDecimal("0") }
+{  "a" : NumberDecimal("0.000") }
+{  "a" : NumberLong(0) }
+{  "a" : [ 0 ] }
+{  "a" : [ 0 ] }
+{  "a" : [ 0 ] }
+{  "a" : [ NumberDecimal("-0") ] }
+{  "a" : [ NumberDecimal("-0.000") ] }
+{  "a" : [ NumberDecimal("0") ] }
+{  "a" : [ NumberDecimal("0.000") ] }
+{  "a" : [ NumberLong(0) ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberDecimal("-0") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : 0 }
+{  "a" : 0 }
+{  "a" : 0 }
+{  "a" : NumberDecimal("-0") }
+{  "a" : NumberDecimal("-0.000") }
+{  "a" : NumberDecimal("0") }
+{  "a" : NumberDecimal("0.000") }
+{  "a" : NumberLong(0) }
+{  "a" : [ 0 ] }
+{  "a" : [ 0 ] }
+{  "a" : [ 0 ] }
+{  "a" : [ NumberDecimal("-0") ] }
+{  "a" : [ NumberDecimal("-0.000") ] }
+{  "a" : [ NumberDecimal("0") ] }
+{  "a" : [ NumberDecimal("0.000") ] }
+{  "a" : [ NumberLong(0) ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberDecimal("0") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : 0 }
+{  "a" : 0 }
+{  "a" : 0 }
+{  "a" : NumberDecimal("-0") }
+{  "a" : NumberDecimal("-0.000") }
+{  "a" : NumberDecimal("0") }
+{  "a" : NumberDecimal("0.000") }
+{  "a" : NumberLong(0) }
+{  "a" : [ 0 ] }
+{  "a" : [ 0 ] }
+{  "a" : [ 0 ] }
+{  "a" : [ NumberDecimal("-0") ] }
+{  "a" : [ NumberDecimal("-0.000") ] }
+{  "a" : [ NumberDecimal("0") ] }
+{  "a" : [ NumberDecimal("0.000") ] }
+{  "a" : [ NumberLong(0) ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberDecimal("0.000") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : 0 }
+{  "a" : 0 }
+{  "a" : 0 }
+{  "a" : NumberDecimal("-0") }
+{  "a" : NumberDecimal("-0.000") }
+{  "a" : NumberDecimal("0") }
+{  "a" : NumberDecimal("0.000") }
+{  "a" : NumberLong(0) }
+{  "a" : [ 0 ] }
+{  "a" : [ 0 ] }
+{  "a" : [ 0 ] }
+{  "a" : [ NumberDecimal("-0") ] }
+{  "a" : [ NumberDecimal("-0.000") ] }
+{  "a" : [ NumberDecimal("0") ] }
+{  "a" : [ NumberDecimal("0.000") ] }
+{  "a" : [ NumberLong(0) ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberDecimal("1E-6176") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : NumberDecimal("1E-6176") }
+{  "a" : [ NumberDecimal("1E-6176") ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberDecimal("1") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : 1 }
+{  "a" : 1 }
+{  "a" : NumberDecimal("1") }
+{  "a" : NumberLong(1) }
+{  "a" : [ 1 ] }
+{  "a" : [ 1 ] }
+{  "a" : [ NumberDecimal("1") ] }
+{  "a" : [ NumberLong(1) ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberDecimal("9.999999999999999999999999999999999E+6144") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : NumberDecimal("9.999999999999999999999999999999999E+6144") }
+{  "a" : [ NumberDecimal("9.999999999999999999999999999999999E+6144") ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : NumberDecimal("-Infinity") } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : -Infinity }
+{  "a" : NumberDecimal("-Infinity") }
+{  "a" : NumberDecimal("-Infinity") }
+{  "a" : [ -Infinity ] }
+{  "a" : [ NumberDecimal("-Infinity") ] }
+{  "a" : [ NumberDecimal("-Infinity") ] }
+
+
+[jsTest] ----
+[jsTest] Query: {  "find" : "query_golden_eq",  "filter" : {  "a" : {  "$eq" : { "$maxKey" : 1 } } },  "projection" : {  "_id" : 0 } }
+[jsTest] ----
+
+{  "a" : [ { "$maxKey" : 1 } ] }
+{  "a" : { "$maxKey" : 1 } }
