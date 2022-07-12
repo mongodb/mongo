@@ -4156,6 +4156,9 @@ buildvariants:
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
       LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_BUILDDIR/test/utility/
     posix_configure_flags:
+      # By default WiredTiger is compiled with -O1, but for performance tests we want 
+      # to run on an optimised build
+      -DCC_OPTIMIZE_LEVEL="-O3"
       -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v3_gcc.cmake
       -DCMAKE_C_FLAGS="-ggdb"
       -DHAVE_DIAGNOSTIC=1
@@ -4182,6 +4185,7 @@ buildvariants:
     - name: ".long-perf"
     - name: many-dhandle-stress
     - name: ".wt2853-perf"
+    - name: cppsuite-bounded-cursor-perf-stress
   display_tasks:
     - name: Wiredtiger-perf-btree-jobs
       execution_tasks:
@@ -4266,7 +4270,6 @@ buildvariants:
     - name: cppsuite-search-near-01-stress
     - name: cppsuite-search-near-02-stress
     - name: cppsuite-search-near-03-stress
-    - name: cppsuite-bounded-cursor-perf-stress
 
 - name: package
   display_name: "~ Package"
