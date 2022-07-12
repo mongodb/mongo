@@ -49,53 +49,7 @@
 namespace mongo {
 namespace change_stream_legacy {
 
-std::list<boost::intrusive_ptr<DocumentSource>> buildPipeline(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx, DocumentSourceChangeStreamSpec spec) {
-    // The only case where we expect to build a legacy pipeline is if we are a shard which has
-    // received a $changeStream request from an older mongoS.
-    tassert(5565900,
-            "Unexpected {needsMerge:false} request for a legacy change stream pipeline",
-            expCtx->needsMerge);
-
-    std::list<boost::intrusive_ptr<DocumentSource>> stages;
-
-    const auto userRequestedResumePoint =
-        spec.getResumeAfter() || spec.getStartAfter() || spec.getStartAtOperationTime();
-
-    if (!userRequestedResumePoint) {
-        // Make sure we update the 'resumeAfter' in the 'spec' so that we serialize the
-        // correct resume token when sending it to the shards.
-        auto clusterTime = DocumentSourceChangeStream::getStartTimeForNewStream(expCtx);
-        spec.setResumeAfter(
-            ResumeToken::makeHighWaterMarkToken(clusterTime, expCtx->changeStreamTokenVersion));
-    }
-
-    // Unfold the $changeStream into its constituent stages and add them to the pipeline.
-    stages.push_back(DocumentSourceChangeStreamOplogMatch::create(expCtx, spec));
-    stages.push_back(DocumentSourceChangeStreamUnwindTransaction::create(expCtx));
-    stages.push_back(DocumentSourceChangeStreamTransform::create(expCtx, spec));
-
-    tassert(5467606,
-            "'DocumentSourceChangeStreamTransform' stage should populate "
-            "'initialPostBatchResumeToken' field",
-            !expCtx->initialPostBatchResumeToken.isEmpty());
-
-    // The resume stage must come after the check invalidate stage so that the former can determine
-    // whether the event that matches the resume token should be followed by an "invalidate" event.
-    stages.push_back(DocumentSourceChangeStreamCheckInvalidate::create(expCtx, spec));
-
-    // We must always check that the shard is capable of resuming from the specified point.
-    stages.push_back(DocumentSourceChangeStreamCheckResumability::create(expCtx, spec));
-
-    // If 'showExpandedEvents' is NOT set, add a filter that returns only classic change events.
-    if (!spec.getShowExpandedEvents()) {
-        stages.push_back(DocumentSourceMatch::create(
-            change_stream_filter::getMatchFilterForClassicOperationTypes(), expCtx));
-    }
-
-    return stages;
-}
-
+// TODO SERVER-60919 remove 'legacyLookupPreImage' function.
 boost::optional<Document> legacyLookupPreImage(boost::intrusive_ptr<ExpressionContext> pExpCtx,
                                                const Document& preImageId) {
     // We need the oplog's UUID for lookup, so obtain the collection info via MongoProcessInterface.

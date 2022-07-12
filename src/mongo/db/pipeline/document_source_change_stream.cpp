@@ -285,11 +285,6 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
     // Save a copy of the spec on the expression context. Used when building the oplog filter.
     expCtx->changeStreamSpec = spec;
 
-    // If we see this stage on a shard, it means that the raw $changeStream stage was dispatched to
-    // us from an old mongoS. Build a legacy shard pipeline.
-    if (expCtx->needsMerge) {
-        return change_stream_legacy::buildPipeline(expCtx, spec);
-    }
     return _buildPipeline(expCtx, spec);
 }
 
