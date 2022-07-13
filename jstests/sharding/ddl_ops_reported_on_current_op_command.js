@@ -55,88 +55,81 @@ let getCurrentOpOfDDL = (ddlOpThread, desc) => {
     assert.eq(shardKey, currOp[0].command.shardKey);
 }
 
-// TODO SERVER-61756: remove mixed bin versions check when 6.0 becomes LTS, the test requires both
-// refineCollectionShardKey and movePrimary to use the new DDLCoordinator.
-if (jsTestOptions().useRandomBinVersionsWithinReplicaSet || jsTestOptions().shardMixedBinVersions) {
-    jsTest.log(
-        "Skipping checking refineCollectionShardKey, movePrimary and setAllowMigrations due to the fact that they're not using a DDLCoordinator on 5.0");
-} else {
-    {
-        jsTestLog('Check refine collection shard key shows in current op');
+{
+    jsTestLog('Check refine collection shard key shows in current op');
 
-        let newShardKey = {_id: 1, x: 1};
-        st.s.getCollection(nss).createIndex(newShardKey);
-        let ddlOpThread = new Thread((mongosConnString, nss, newShardKey) => {
-            let mongos = new Mongo(mongosConnString);
-            mongos.adminCommand({refineCollectionShardKey: nss, key: newShardKey});
-        }, st.s0.host, nss, newShardKey);
+    let newShardKey = {_id: 1, x: 1};
+    st.s.getCollection(nss).createIndex(newShardKey);
+    let ddlOpThread = new Thread((mongosConnString, nss, newShardKey) => {
+        let mongos = new Mongo(mongosConnString);
+        mongos.adminCommand({refineCollectionShardKey: nss, key: newShardKey});
+    }, st.s0.host, nss, newShardKey);
 
-        let currOp = getCurrentOpOfDDL(ddlOpThread, 'RefineCollectionShardKeyCoordinator');
+    let currOp = getCurrentOpOfDDL(ddlOpThread, 'RefineCollectionShardKeyCoordinator');
 
-        // There must be one operation running with the appropiate ns.
-        assert.eq(1, currOp.length);
-        assert.eq(nss, currOp[0].ns);
-        assert(currOp[0].hasOwnProperty('command'));
-        assert(currOp[0].command.hasOwnProperty('newShardKey'));
-        assert.eq(newShardKey, currOp[0].command.newShardKey);
-    }
+    // There must be one operation running with the appropiate ns.
+    assert.eq(1, currOp.length);
+    assert.eq(nss, currOp[0].ns);
+    assert(currOp[0].hasOwnProperty('command'));
+    assert(currOp[0].command.hasOwnProperty('newShardKey'));
+    assert.eq(newShardKey, currOp[0].command.newShardKey);
+}
 
-    {
-        jsTestLog('Check move primary shows in current op');
+{
+    jsTestLog('Check move primary shows in current op');
 
-        let ddlOpThread = new Thread((mongosConnString, dbName, destShard) => {
-            let mongos = new Mongo(mongosConnString);
-            mongos.adminCommand({movePrimary: dbName, to: destShard});
-        }, st.s0.host, kDbName, st.shard0.shardName);
+    let ddlOpThread = new Thread((mongosConnString, dbName, destShard) => {
+        let mongos = new Mongo(mongosConnString);
+        mongos.adminCommand({movePrimary: dbName, to: destShard});
+    }, st.s0.host, kDbName, st.shard0.shardName);
 
-        let currOp = getCurrentOpOfDDL(ddlOpThread, 'MovePrimaryCoordinator');
+    let currOp = getCurrentOpOfDDL(ddlOpThread, 'MovePrimaryCoordinator');
 
-        // There must be one operation running with the appropiate ns.
-        assert.eq(1, currOp.length);
-        assert.eq(kDbName, currOp[0].ns);
-        assert(currOp[0].command.hasOwnProperty('request'));
-        assert(currOp[0].command.request.hasOwnProperty('toShardId'));
-        assert.eq(st.shard0.shardName, currOp[0].command.request.toShardId);
-    }
+    // There must be one operation running with the appropiate ns.
+    assert.eq(1, currOp.length);
+    assert.eq(kDbName, currOp[0].ns);
+    assert(currOp[0].command.hasOwnProperty('request'));
+    assert(currOp[0].command.request.hasOwnProperty('toShardId'));
+    assert.eq(st.shard0.shardName, currOp[0].command.request.toShardId);
+}
 
-    {
-        jsTestLog('Check set allow migrations shows in current op');
+{
+    jsTestLog('Check set allow migrations shows in current op');
 
-        let ddlOpThread = new Thread((mongosConnString, nss) => {
-            let mongos = new Mongo(mongosConnString);
-            mongos.adminCommand({setAllowMigrations: nss, allowMigrations: true});
-        }, st.s0.host, nss);
+    let ddlOpThread = new Thread((mongosConnString, nss) => {
+        let mongos = new Mongo(mongosConnString);
+        mongos.adminCommand({setAllowMigrations: nss, allowMigrations: true});
+    }, st.s0.host, nss);
 
-        let currOp = getCurrentOpOfDDL(ddlOpThread, 'SetAllowMigrationsCoordinator');
+    let currOp = getCurrentOpOfDDL(ddlOpThread, 'SetAllowMigrationsCoordinator');
 
-        // There must be one operation running with the appropiate ns.
-        assert.eq(1, currOp.length);
-        assert.eq(nss, currOp[0].ns);
-        assert(currOp[0].hasOwnProperty('command'));
-        assert(currOp[0].command.hasOwnProperty('allowMigrations'));
-        assert.eq(true, currOp[0].command.allowMigrations);
-    }
+    // There must be one operation running with the appropiate ns.
+    assert.eq(1, currOp.length);
+    assert.eq(nss, currOp[0].ns);
+    assert(currOp[0].hasOwnProperty('command'));
+    assert(currOp[0].command.hasOwnProperty('allowMigrations'));
+    assert.eq(true, currOp[0].command.allowMigrations);
+}
 
-    {
-        jsTestLog('Check collmod shows in current op');
+{
+    jsTestLog('Check collmod shows in current op');
 
-        let ddlOpThread = new Thread((mongosConnString, db, coll, nss) => {
-            let mongos = new Mongo(mongosConnString);
-            mongos.getCollection(nss).runCommand(
-                {createIndexes: coll, indexes: [{key: {c: 1}, name: "c_1"}]});
-            mongos.getDB(db).runCommand({collMod: coll, validator: {}});
-        }, st.s0.host, kDbName, kCollectionName, nss);
+    let ddlOpThread = new Thread((mongosConnString, db, coll, nss) => {
+        let mongos = new Mongo(mongosConnString);
+        mongos.getCollection(nss).runCommand(
+            {createIndexes: coll, indexes: [{key: {c: 1}, name: "c_1"}]});
+        mongos.getDB(db).runCommand({collMod: coll, validator: {}});
+    }, st.s0.host, kDbName, kCollectionName, nss);
 
-        let currOp = getCurrentOpOfDDL(ddlOpThread, 'CollModCoordinator');
+    let currOp = getCurrentOpOfDDL(ddlOpThread, 'CollModCoordinator');
 
-        // There must be one operation running with the appropiate ns.
-        assert.eq(1, currOp.length);
-        assert.eq(nss, currOp[0].ns);
-        assert(currOp[0].hasOwnProperty('command'));
-        jsTestLog(tojson(currOp[0].command));
-        assert(currOp[0].command.hasOwnProperty('validator'));
-        assert.docEq({}, currOp[0].command.validator);
-    }
+    // There must be one operation running with the appropiate ns.
+    assert.eq(1, currOp.length);
+    assert.eq(nss, currOp[0].ns);
+    assert(currOp[0].hasOwnProperty('command'));
+    jsTestLog(tojson(currOp[0].command));
+    assert(currOp[0].command.hasOwnProperty('validator'));
+    assert.docEq({}, currOp[0].command.validator);
 }
 
 {
