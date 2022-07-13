@@ -461,6 +461,7 @@ struct __wt_connection_stats {
     int64_t cache_hs_order_lose_durable_timestamp;
     int64_t cache_hs_key_truncate_rts_unstable;
     int64_t cache_hs_key_truncate_rts;
+    int64_t cache_hs_btree_truncate;
     int64_t cache_hs_key_truncate;
     int64_t cache_hs_order_remove;
     int64_t cache_hs_key_truncate_onpage_removal;
@@ -970,6 +971,7 @@ struct __wt_dsrc_stats {
     int64_t cache_hs_order_lose_durable_timestamp;
     int64_t cache_hs_key_truncate_rts_unstable;
     int64_t cache_hs_key_truncate_rts;
+    int64_t cache_hs_btree_truncate;
     int64_t cache_hs_key_truncate;
     int64_t cache_hs_order_remove;
     int64_t cache_hs_key_truncate_onpage_removal;

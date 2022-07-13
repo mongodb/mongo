@@ -164,7 +164,9 @@ __wt_schema_range_truncate(WT_SESSION_IMPL *session, WT_CURSOR *start, WT_CURSOR
 
     uri = start->internal_uri;
 
-    if (WT_PREFIX_MATCH(uri, "file:")) {
+    if (WT_STREQ(uri, WT_HS_URI))
+        ret = __wt_curhs_range_truncate(start, stop);
+    else if (WT_PREFIX_MATCH(uri, "file:")) {
         WT_ERR(__cursor_needkey(start));
         if (stop != NULL)
             WT_ERR(__cursor_needkey(stop));

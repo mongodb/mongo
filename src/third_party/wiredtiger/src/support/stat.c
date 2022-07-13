@@ -90,6 +90,7 @@ static const char *const __stats_dsrc_desc[] = {
   "timestamp",
   "cache: history store table truncation by rollback to stable to remove an unstable update",
   "cache: history store table truncation by rollback to stable to remove an update",
+  "cache: history store table truncation to remove all the keys of a btree",
   "cache: history store table truncation to remove an update",
   "cache: history store table truncation to remove range of updates due to an update without a "
   "timestamp on data page",
@@ -397,6 +398,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->cache_hs_order_lose_durable_timestamp = 0;
     stats->cache_hs_key_truncate_rts_unstable = 0;
     stats->cache_hs_key_truncate_rts = 0;
+    stats->cache_hs_btree_truncate = 0;
     stats->cache_hs_key_truncate = 0;
     stats->cache_hs_order_remove = 0;
     stats->cache_hs_key_truncate_onpage_removal = 0;
@@ -686,6 +688,7 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->cache_hs_order_lose_durable_timestamp += from->cache_hs_order_lose_durable_timestamp;
     to->cache_hs_key_truncate_rts_unstable += from->cache_hs_key_truncate_rts_unstable;
     to->cache_hs_key_truncate_rts += from->cache_hs_key_truncate_rts;
+    to->cache_hs_btree_truncate += from->cache_hs_btree_truncate;
     to->cache_hs_key_truncate += from->cache_hs_key_truncate;
     to->cache_hs_order_remove += from->cache_hs_order_remove;
     to->cache_hs_key_truncate_onpage_removal += from->cache_hs_key_truncate_onpage_removal;
@@ -976,6 +979,7 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->cache_hs_key_truncate_rts_unstable +=
       WT_STAT_READ(from, cache_hs_key_truncate_rts_unstable);
     to->cache_hs_key_truncate_rts += WT_STAT_READ(from, cache_hs_key_truncate_rts);
+    to->cache_hs_btree_truncate += WT_STAT_READ(from, cache_hs_btree_truncate);
     to->cache_hs_key_truncate += WT_STAT_READ(from, cache_hs_key_truncate);
     to->cache_hs_order_remove += WT_STAT_READ(from, cache_hs_order_remove);
     to->cache_hs_key_truncate_onpage_removal +=
@@ -1307,6 +1311,7 @@ static const char *const __stats_connection_desc[] = {
   "timestamp",
   "cache: history store table truncation by rollback to stable to remove an unstable update",
   "cache: history store table truncation by rollback to stable to remove an update",
+  "cache: history store table truncation to remove all the keys of a btree",
   "cache: history store table truncation to remove an update",
   "cache: history store table truncation to remove range of updates due to an update without a "
   "timestamp on data page",
@@ -1907,6 +1912,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->cache_hs_order_lose_durable_timestamp = 0;
     stats->cache_hs_key_truncate_rts_unstable = 0;
     stats->cache_hs_key_truncate_rts = 0;
+    stats->cache_hs_btree_truncate = 0;
     stats->cache_hs_key_truncate = 0;
     stats->cache_hs_order_remove = 0;
     stats->cache_hs_key_truncate_onpage_removal = 0;
@@ -2490,6 +2496,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->cache_hs_key_truncate_rts_unstable +=
       WT_STAT_READ(from, cache_hs_key_truncate_rts_unstable);
     to->cache_hs_key_truncate_rts += WT_STAT_READ(from, cache_hs_key_truncate_rts);
+    to->cache_hs_btree_truncate += WT_STAT_READ(from, cache_hs_btree_truncate);
     to->cache_hs_key_truncate += WT_STAT_READ(from, cache_hs_key_truncate);
     to->cache_hs_order_remove += WT_STAT_READ(from, cache_hs_order_remove);
     to->cache_hs_key_truncate_onpage_removal +=
