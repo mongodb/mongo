@@ -1066,6 +1066,15 @@ commands:
         type:
             variant: [bool, one_string]
 
+    CommandTypeNamespaceCommand:
+        description: Command with custom type naemspacestring
+        command_name: CommandTypeNamespaceCommand
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        fields:
+            field1: int
+
     _underscore_command:
         description: Command with custom type string
         command_name: _underscore_command
@@ -1139,6 +1148,17 @@ commands:
         reply_type: OkReply
         fields:
             anyTypeField: IDLAnyTypeOwned
+
+    CommandWithNamespaceMember:
+        description: "A mock command to test field with namespacestring"
+        command_name: CommandWithNamespaceMember
+        namespace: ignored
+        api_version: ""
+        fields:
+            field1:
+                type: namespacestring
+            field2:
+                type: array<namespacestring>
 
     AccessCheckNone:
         description: A Stable API command with access_check and none

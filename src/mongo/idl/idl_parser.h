@@ -340,14 +340,15 @@ public:
      * Equivalent to CommandHelpers::parseNsCollectionRequired.
      * 'allowGlobalCollectionName' allows use of global collection name, e.g. {aggregate: 1}.
      */
-    static NamespaceString parseNSCollectionRequired(StringData dbName,
+    static NamespaceString parseNSCollectionRequired(const DatabaseName& dbname,
                                                      const BSONElement& element,
                                                      bool allowGlobalCollectionName);
 
     /**
      * Equivalent to CommandHelpers::parseNsOrUUID
      */
-    static NamespaceStringOrUUID parseNsOrUUID(StringData dbname, const BSONElement& element);
+    static NamespaceStringOrUUID parseNsOrUUID(const DatabaseName& dbname,
+                                               const BSONElement& element);
 
     /**
      * Take all the well known command generic arguments from commandPassthroughFields, but ignore

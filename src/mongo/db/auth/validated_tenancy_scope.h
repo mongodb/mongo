@@ -35,6 +35,7 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/stdx/variant.h"
+#include "mongo/util/overloaded_visitor.h"
 
 namespace mongo {
 
@@ -78,8 +79,17 @@ public:
                                                          BSONObj securityToken);
 
     bool hasAuthenticatedUser() const;
+
     const UserName& authenticatedUser() const;
-    const TenantId& tenantId() const;
+
+    const TenantId& tenantId() const {
+        return stdx::visit(
+            OverloadedVisitor{
+                [](const UserName& userName) -> decltype(auto) { return *userName.getTenant(); },
+                [](const TenantId& tenant) -> decltype(auto) { return tenant; },
+            },
+            _tenantOrUser);
+    }
 
     BSONObj getOriginalToken() const {
         return _originalToken;
@@ -96,6 +106,13 @@ public:
      */
     struct TokenForTestingTag {};
     explicit ValidatedTenancyScope(BSONObj token, TokenForTestingTag);
+
+    /**
+     * Setup a validated tenant for test, do not use outside of test code.
+     */
+    struct TenantForTestingTag {};
+    explicit ValidatedTenancyScope(TenantId tenant, TenantForTestingTag)
+        : _tenantOrUser(std::move(tenant)) {}
 
     /**
      * Backdoor API for use by FLE Query Analysis to setup a validated tenant without a security

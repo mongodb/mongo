@@ -143,15 +143,6 @@ const UserName& ValidatedTenancyScope::authenticatedUser() const {
     return stdx::get<UserName>(_tenantOrUser);
 }
 
-const TenantId& ValidatedTenancyScope::tenantId() const {
-    if (hasAuthenticatedUser()) {
-        return stdx::get<UserName>(_tenantOrUser).getTenant().get();
-    } else {
-        invariant(stdx::holds_alternative<TenantId>(_tenantOrUser));
-        return stdx::get<TenantId>(_tenantOrUser);
-    }
-}
-
 const boost::optional<ValidatedTenancyScope>& ValidatedTenancyScope::get(OperationContext* opCtx) {
     return validatedTenancyScopeDecoration(opCtx);
 }

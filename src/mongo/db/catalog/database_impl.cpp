@@ -119,7 +119,7 @@ Status validateDBNameForWindows(StringData dbname) {
 
 void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const& nss) {
     invariant(opCtx->lockState()->isDbLockedForMode(nss.dbName(), MODE_IS));
-    auto dss = DatabaseShardingState::get(opCtx, nss.db().toString());
+    auto dss = DatabaseShardingState::get(opCtx, nss.dbName().toStringWithTenantId());
     if (!dss) {
         return;
     }
