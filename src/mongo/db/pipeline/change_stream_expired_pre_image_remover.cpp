@@ -325,100 +325,106 @@ private:
 
 void deleteExpiredChangeStreamPreImages(Client* client, Date_t currentTimeForTimeBasedExpiration) {
     const auto startTime = Date_t::now();
-    auto opCtx = client->makeOperationContext();
+    ServiceContext::UniqueOperationContext opCtx;
+    try {
+        opCtx = client->makeOperationContext();
 
-    // Acquire intent-exclusive lock on the pre-images collection. Early exit if the collection
-    // doesn't exist.
-    AutoGetCollection autoColl(
-        opCtx.get(), NamespaceString::kChangeStreamPreImagesNamespace, MODE_IX);
-    const auto& preImagesColl = autoColl.getCollection();
-    if (!preImagesColl) {
-        return;
-    }
+        // Acquire intent-exclusive lock on the pre-images collection. Early exit if the collection
+        // doesn't exist.
+        AutoGetCollection autoColl(
+            opCtx.get(), NamespaceString::kChangeStreamPreImagesNamespace, MODE_IX);
+        const auto& preImagesColl = autoColl.getCollection();
+        if (!preImagesColl) {
+            return;
+        }
 
-    // Do not run the job on secondaries.
-    if (!repl::ReplicationCoordinator::get(opCtx.get())
-             ->canAcceptWritesForDatabase(opCtx.get(), NamespaceString::kAdminDb)) {
-        return;
-    }
+        // Do not run the job on secondaries.
+        if (!repl::ReplicationCoordinator::get(opCtx.get())
+                 ->canAcceptWritesForDatabase(opCtx.get(), NamespaceString::kAdminDb)) {
+            return;
+        }
 
-    // Get the timestamp of the ealiest oplog entry.
-    const auto currentEarliestOplogEntryTs =
-        repl::StorageInterface::get(client->getServiceContext())
-            ->getEarliestOplogTimestamp(opCtx.get());
+        // Get the timestamp of the earliest oplog entry.
+        const auto currentEarliestOplogEntryTs =
+            repl::StorageInterface::get(client->getServiceContext())
+                ->getEarliestOplogTimestamp(opCtx.get());
 
-    const bool isBatchedRemoval = gBatchedExpiredChangeStreamPreImageRemoval.load();
-    size_t numberOfRemovals = 0;
+        const bool isBatchedRemoval = gBatchedExpiredChangeStreamPreImageRemoval.load();
+        size_t numberOfRemovals = 0;
 
-    ChangeStreamExpiredPreImageIterator expiredPreImages(
-        opCtx.get(),
-        &preImagesColl,
-        currentEarliestOplogEntryTs,
-        ::mongo::preImageRemoverInternal::getPreImageExpirationTime(
-            opCtx.get(), currentTimeForTimeBasedExpiration));
-
-    for (const auto& collectionRange : expiredPreImages) {
-        writeConflictRetry(
+        ChangeStreamExpiredPreImageIterator expiredPreImages(
             opCtx.get(),
-            "ChangeStreamExpiredPreImagesRemover",
-            NamespaceString::kChangeStreamPreImagesNamespace.ns(),
-            [&] {
-                auto params = std::make_unique<DeleteStageParams>();
-                params->isMulti = true;
+            &preImagesColl,
+            currentEarliestOplogEntryTs,
+            ::mongo::preImageRemoverInternal::getPreImageExpirationTime(
+                opCtx.get(), currentTimeForTimeBasedExpiration));
 
-                std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams;
-                if (isBatchedRemoval) {
-                    batchedDeleteParams = std::make_unique<BatchedDeleteStageParams>();
-                }
+        for (const auto& collectionRange : expiredPreImages) {
+            writeConflictRetry(
+                opCtx.get(),
+                "ChangeStreamExpiredPreImagesRemover",
+                NamespaceString::kChangeStreamPreImagesNamespace.ns(),
+                [&] {
+                    auto params = std::make_unique<DeleteStageParams>();
+                    params->isMulti = true;
 
-                auto exec = InternalPlanner::deleteWithCollectionScan(
-                    opCtx.get(),
-                    &preImagesColl,
-                    std::move(params),
-                    PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
-                    InternalPlanner::Direction::FORWARD,
-                    RecordIdBound(collectionRange.first),
-                    RecordIdBound(collectionRange.second),
-                    CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords,
-                    std::move(batchedDeleteParams));
-                numberOfRemovals += exec->executeDelete();
-            });
-    }
+                    std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams;
+                    if (isBatchedRemoval) {
+                        batchedDeleteParams = std::make_unique<BatchedDeleteStageParams>();
+                    }
 
-    if (numberOfRemovals > 0) {
-        LOGV2_DEBUG(5869104,
-                    3,
-                    "Periodic expired pre-images removal job finished executing",
-                    "numberOfRemovals"_attr = numberOfRemovals,
-                    "jobDuration"_attr = (Date_t::now() - startTime).toString());
+                    auto exec = InternalPlanner::deleteWithCollectionScan(
+                        opCtx.get(),
+                        &preImagesColl,
+                        std::move(params),
+                        PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                        InternalPlanner::Direction::FORWARD,
+                        RecordIdBound(collectionRange.first),
+                        RecordIdBound(collectionRange.second),
+                        CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords,
+                        std::move(batchedDeleteParams));
+                    numberOfRemovals += exec->executeDelete();
+                });
+        }
+
+        if (numberOfRemovals > 0) {
+            LOGV2_DEBUG(5869104,
+                        3,
+                        "Periodic expired pre-images removal job finished executing",
+                        "numberOfRemovals"_attr = numberOfRemovals,
+                        "jobDuration"_attr = (Date_t::now() - startTime).toString());
+        }
+    } catch (const DBException& exception) {
+        if (opCtx && opCtx.get()->getKillStatus() != ErrorCodes::OK) {
+            LOGV2_DEBUG(5869105,
+                        3,
+                        "Periodic expired pre-images removal job operation was killed",
+                        "errorCode"_attr = opCtx.get()->getKillStatus());
+        } else {
+            LOGV2_ERROR(5869106,
+                        "Periodic expired pre-images removal job failed",
+                        "reason"_attr = exception.reason());
+        }
     }
 }
 
 void performExpiredChangeStreamPreImagesRemovalPass(Client* client) {
-    try {
-        Date_t currentTimeForTimeBasedExpiration = Date_t::now();
+    Date_t currentTimeForTimeBasedExpiration = Date_t::now();
 
-        changeStreamPreImageRemoverCurrentTime.execute([&](const BSONObj& data) {
-            // Populate the current time for time based expiration of pre-images.
-            if (auto currentTimeElem = data["currentTimeForTimeBasedExpiration"]) {
-                const BSONType bsonType = currentTimeElem.type();
-                tassert(5869300,
-                        str::stream() << "Expected type for 'currentTimeForTimeBasedExpiration' is "
-                                         "'date', but found: "
-                                      << bsonType,
-                        bsonType == BSONType::Date);
+    changeStreamPreImageRemoverCurrentTime.execute([&](const BSONObj& data) {
+        // Populate the current time for time based expiration of pre-images.
+        if (auto currentTimeElem = data["currentTimeForTimeBasedExpiration"]) {
+            const BSONType bsonType = currentTimeElem.type();
+            tassert(5869300,
+                    str::stream() << "Expected type for 'currentTimeForTimeBasedExpiration' is "
+                                     "'date', but found: "
+                                  << bsonType,
+                    bsonType == BSONType::Date);
 
-                currentTimeForTimeBasedExpiration = currentTimeElem.Date();
-            }
-        });
-        deleteExpiredChangeStreamPreImages(client, currentTimeForTimeBasedExpiration);
-    } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
-        LOGV2_WARNING(5869105, "Periodic expired pre-images removal job was interrupted");
-    } catch (const DBException& exception) {
-        LOGV2_ERROR(5869106,
-                    "Periodic expired pre-images removal job failed",
-                    "reason"_attr = exception.reason());
-    }
+            currentTimeForTimeBasedExpiration = currentTimeElem.Date();
+        }
+    });
+    deleteExpiredChangeStreamPreImages(client, currentTimeForTimeBasedExpiration);
 }
 }  // namespace
 
