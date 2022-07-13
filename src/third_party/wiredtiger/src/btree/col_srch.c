@@ -279,6 +279,10 @@ leaf_only:
     return (0);
 
 past_end:
+    /* We don't always set these below, add a catch-all. */
+    cbt->ins_head = NULL;
+    cbt->ins = NULL;
+
     /*
      * A record past the end of the page's standard information. Check the append list; by
      * definition, any record on the append list is closer than the last record on the page, so it's
@@ -286,11 +290,39 @@ past_end:
      * because column-store files are dense, but in this case the caller searched past the end of
      * the table.
      */
-    cbt->ins_head = WT_COL_APPEND(page);
-    if ((cbt->ins = __col_insert_search(cbt->ins_head, cbt->ins_stack, cbt->next_stack, recno)) ==
-      NULL)
+    ins_head = WT_COL_APPEND(page);
+    ins = __col_insert_search(ins_head, cbt->ins_stack, cbt->next_stack, recno);
+    if (ins == NULL) {
+        /*
+         * There is nothing on the append list, so search the insert list. (The append list would
+         * have been closer to the search record).
+         */
+        if (cbt->recno != WT_RECNO_OOB) {
+            if (page->type == WT_PAGE_COL_FIX)
+                ins_head = WT_COL_UPDATE_SINGLE(page);
+            else {
+                ins_head = WT_COL_UPDATE_SLOT(page, cbt->slot);
+
+                /*
+                 * Set this, otherwise the code in cursor_valid will assume there's no on-disk value
+                 * underneath ins_head.
+                 */
+                F_SET(cbt, WT_CBT_VAR_ONPAGE_MATCH);
+            }
+
+            ins = WT_SKIP_LAST(ins_head);
+            if (ins != NULL && cbt->recno == WT_INSERT_RECNO(ins)) {
+                cbt->ins_head = ins_head;
+                cbt->ins = ins;
+            }
+        }
+
         cbt->compare = -1;
-    else {
+    } else {
+        WT_ASSERT(session, page->type == WT_PAGE_COL_FIX || !F_ISSET(cbt, WT_CBT_VAR_ONPAGE_MATCH));
+
+        cbt->ins_head = ins_head;
+        cbt->ins = ins;
         cbt->recno = WT_INSERT_RECNO(cbt->ins);
         if (recno == cbt->recno)
             cbt->compare = 0;

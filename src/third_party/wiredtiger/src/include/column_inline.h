@@ -238,7 +238,7 @@ __col_var_last_recno(WT_REF *ref)
      * records, our callers must handle that explicitly, if they care.
      */
     if (!WT_COL_VAR_REPEAT_SET(page))
-        return (page->entries == 0 ? 0 : ref->ref_recno + (page->entries - 1));
+        return (page->entries == 0 ? WT_RECNO_OOB : ref->ref_recno + (page->entries - 1));
 
     repeat = &page->pg_var_repeats[page->pg_var_nrepeats - 1];
     return ((repeat->recno + repeat->rle) - 1 + (page->entries - (repeat->indx + 1)));
@@ -259,7 +259,7 @@ __col_fix_last_recno(WT_REF *ref)
      * If there's an append list, there may be more records on the page. This function ignores those
      * records, our callers must handle that explicitly, if they care.
      */
-    return (page->entries == 0 ? 0 : ref->ref_recno + (page->entries - 1));
+    return (page->entries == 0 ? WT_RECNO_OOB : ref->ref_recno + (page->entries - 1));
 }
 
 /*
