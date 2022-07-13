@@ -1953,7 +1953,7 @@ buildvariants:
     num_scons_link_jobs_available: 0.99
     large_distro_name: ubuntu1804-large
     test_flags: >-
-      --mongodSetParameters="{maintainValidCursorsAcrossSBEYieldandReadCommands: true, featureFlagSbeFull: true}"
+      --mongodSetParameters="{maintainValidCursorsAcrossSBEReadCommands: true, maintainValidCursorsAcrossSBEYield: true, featureFlagSbeFull: true}"
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:

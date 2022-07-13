@@ -101,12 +101,19 @@ server_parameters:
         cpp_varname: gValidateTimeseriesCompression
         default: true
 
-    maintainValidCursorsAcrossSBEYieldandReadCommands:
-        description: "Enable retaining valid cursor across SBE query yield and getMore"
+    maintainValidCursorsAcrossSBEReadCommands:
+        description: "Enable maintaining valid cursors across SBE read commands (find, agg, getMore)"
+        set_at: startup
+        cpp_varname: gMaintainValidCursorsAcrossReadCommands
+        cpp_vartype: bool
+        default: false
+
+    maintainValidCursorsAcrossSBEYield:
+        description: "Enable retaining valid cursors across SBE query yield"
         set_at: startup
         cpp_varname: gYieldingSupportForSBE
         cpp_vartype: bool
-        default: false
+        default: true
 
 feature_flags:
     featureFlagClusteredIndexes:
