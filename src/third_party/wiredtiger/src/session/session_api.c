@@ -1412,14 +1412,16 @@ __wt_session_range_truncate(
      * than the original key. If we fail to find a key in a search-near, there are no keys in the
      * table. If we fail to move forward or backward in a range, there are no keys in the range. In
      * either of those cases, we're done.
+     *
+     * No need to search the record again if it is already pointing to the btree.
      */
-    if (start != NULL)
+    if (start != NULL && !F_ISSET(start, WT_CURSTD_KEY_INT))
         if ((ret = start->search_near(start, &cmp)) != 0 ||
           (cmp < 0 && (ret = start->next(start)) != 0)) {
             WT_ERR_NOTFOUND_OK(ret, false);
             goto done;
         }
-    if (stop != NULL)
+    if (stop != NULL && !F_ISSET(stop, WT_CURSTD_KEY_INT))
         if ((ret = stop->search_near(stop, &cmp)) != 0 ||
           (cmp > 0 && (ret = stop->prev(stop)) != 0)) {
             WT_ERR_NOTFOUND_OK(ret, false);

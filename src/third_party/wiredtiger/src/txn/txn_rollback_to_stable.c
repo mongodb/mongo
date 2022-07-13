@@ -1407,50 +1407,72 @@ __rollback_to_stable_check(WT_SESSION_IMPL *session)
 static int
 __rollback_to_stable_btree_hs_truncate(WT_SESSION_IMPL *session, uint32_t btree_id)
 {
-    WT_CURSOR *hs_cursor;
+    WT_CURSOR *hs_cursor_start, *hs_cursor_stop;
     WT_DECL_ITEM(hs_key);
     WT_DECL_RET;
-    WT_TIME_WINDOW *hs_tw;
+    WT_SESSION *truncate_session;
     wt_timestamp_t hs_start_ts;
     uint64_t hs_counter;
     uint32_t hs_btree_id;
-    char tw_string[WT_TIME_STRING_SIZE];
 
-    hs_cursor = NULL;
+    hs_cursor_start = hs_cursor_stop = NULL;
+    hs_btree_id = 0;
+    truncate_session = (WT_SESSION *)session;
 
     WT_RET(__wt_scr_alloc(session, 0, &hs_key));
 
-    /* Open a history store table cursor. */
-    WT_ERR(__wt_curhs_open(session, NULL, &hs_cursor));
-    F_SET(hs_cursor, WT_CURSTD_HS_READ_COMMITTED);
+    /* Open a history store start cursor. */
+    WT_ERR(__wt_curhs_open(session, NULL, &hs_cursor_start));
+    F_SET(hs_cursor_start, WT_CURSTD_HS_READ_COMMITTED);
 
-    /* Walk the history store for the given btree. */
-    hs_cursor->set_key(hs_cursor, 1, btree_id);
-    ret = __wt_curhs_search_near_after(session, hs_cursor);
-
-    for (; ret == 0; ret = hs_cursor->next(hs_cursor)) {
-        WT_ERR(hs_cursor->get_key(hs_cursor, &hs_btree_id, hs_key, &hs_start_ts, &hs_counter));
-
-        /* We shouldn't cross the btree search space. */
-        WT_ASSERT(session, btree_id == hs_btree_id);
-
-        /* Retrieve the time window from the history cursor. */
-        __wt_hs_upd_time_window(hs_cursor, &hs_tw);
-
-        __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
-          "rollback to stable history store cleanup of update with time window: %s",
-          __wt_time_window_to_string(hs_tw, tw_string));
-
-        WT_ERR(hs_cursor->remove(hs_cursor));
-        WT_STAT_CONN_DATA_INCR(session, txn_rts_hs_removed);
-        WT_STAT_CONN_DATA_INCR(session, cache_hs_key_truncate_rts);
+    hs_cursor_start->set_key(hs_cursor_start, 1, btree_id);
+    WT_ERR_NOTFOUND_OK(__wt_curhs_search_near_after(session, hs_cursor_start), true);
+    if (ret == WT_NOTFOUND) {
+        ret = 0;
+        goto done;
     }
-    WT_ERR_NOTFOUND_OK(ret, false);
 
+    /* Open a history store stop cursor. */
+    WT_ERR(__wt_curhs_open(session, NULL, &hs_cursor_stop));
+    F_SET(hs_cursor_stop, WT_CURSTD_HS_READ_COMMITTED | WT_CURSTD_HS_READ_ACROSS_BTREE);
+
+    hs_cursor_stop->set_key(hs_cursor_stop, 1, btree_id + 1);
+    WT_ERR_NOTFOUND_OK(__wt_curhs_search_near_after(session, hs_cursor_stop), true);
+
+#ifdef HAVE_DIAGNOSTIC
+    /* If we get not found, we are at the largest btree id in the history store. */
+    if (ret == 0) {
+        hs_cursor_stop->get_key(hs_cursor_stop, &hs_btree_id, hs_key, &hs_start_ts, &hs_counter);
+        WT_ASSERT(session, hs_btree_id > btree_id);
+    }
+#endif
+
+    do {
+        WT_ASSERT(session, ret == WT_NOTFOUND || hs_btree_id > btree_id);
+
+        WT_ERR_NOTFOUND_OK(hs_cursor_stop->prev(hs_cursor_stop), true);
+        /* We can find the start point then we must be able to find the stop point. */
+        if (ret == WT_NOTFOUND)
+            WT_ERR_PANIC(
+              session, ret, "cannot locate the stop point to truncate the history store.");
+        hs_cursor_stop->get_key(hs_cursor_stop, &hs_btree_id, hs_key, &hs_start_ts, &hs_counter);
+    } while (hs_btree_id != btree_id);
+
+    WT_ERR(
+      truncate_session->truncate(truncate_session, NULL, hs_cursor_start, hs_cursor_stop, NULL));
+
+    WT_STAT_CONN_DATA_INCR(session, cache_hs_btree_truncate);
+
+    __wt_verbose(session, WT_VERB_RECOVERY_PROGRESS,
+      "Rollback to stable has truncated records for btree %u from the history store", btree_id);
+
+done:
 err:
     __wt_scr_free(session, &hs_key);
-    if (hs_cursor != NULL)
-        WT_TRET(hs_cursor->close(hs_cursor));
+    if (hs_cursor_start != NULL)
+        WT_TRET(hs_cursor_start->close(hs_cursor_start));
+    if (hs_cursor_stop != NULL)
+        WT_TRET(hs_cursor_stop->close(hs_cursor_stop));
 
     return (ret);
 }
@@ -1530,8 +1552,9 @@ __rollback_to_stable_hs_final_pass(WT_SESSION_IMPL *session, wt_timestamp_t roll
         for (i = 0; conn->partial_backup_remove_ids[i] != 0; ++i)
             WT_ERR(
               __rollback_to_stable_btree_hs_truncate(session, conn->partial_backup_remove_ids[i]));
-    WT_TRET(__wt_session_release_dhandle(session));
 err:
+    if (session->dhandle != NULL)
+        WT_TRET(__wt_session_release_dhandle(session));
     __wt_free(session, config);
     return (ret);
 }
@@ -1834,6 +1857,9 @@ __rollback_to_stable(WT_SESSION_IMPL *session, bool no_ckpt)
     F_SET(session, WT_SESSION_ROLLBACK_TO_STABLE);
 
     WT_ERR(__rollback_to_stable_check(session));
+
+    /* Update the oldest id to get a consistent view of global visibility. */
+    WT_ERR(__wt_txn_update_oldest(session, WT_TXN_OLDEST_STRICT | WT_TXN_OLDEST_WAIT));
 
     /*
      * Copy the stable timestamp, otherwise we'd need to lock it each time it's accessed. Even
