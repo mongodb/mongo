@@ -22,7 +22,6 @@ import requests
 import structlog
 import yaml
 
-from evergreen.api import RetryingEvergreenApi
 from pydantic import BaseModel
 from shrub.config import Configuration
 from shrub.command import CommandDefinition
@@ -30,6 +29,8 @@ from shrub.operations import CmdTimeoutUpdate
 from shrub.task import TaskDependency
 from shrub.variant import DisplayTaskDefinition
 from shrub.variant import TaskSpec
+
+from evergreen.api import EvergreenApi, RetryingEvergreenApi
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -66,7 +67,7 @@ you need to:
 (1) add a "large_distro_name" expansion to this build variant ("{build_variant}").
 
  -- or --
- 
+
 (2) add this build variant ("{build_variant}") to the "build_variant_large_distro_exception"
 list in the "etc/generate_subtasks_config.yml" file.
 ***************************************************************************************

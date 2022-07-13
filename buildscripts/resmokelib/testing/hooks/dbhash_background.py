@@ -64,8 +64,8 @@ class CheckReplDBHashInBackground(jsfile.JSHook):
         self._background_job.resume(hook_test_case, test_report)
 
     def after_test(self, test, test_report):  # noqa: D205,D400
-        """Instruct the background thread to stop running the dbhash check now that 'test' has
-        finished running.
+        """Instruct the background thread to stop running the dbhash check.
+        This can be done now that 'test' has finished running.
         """
         if self._background_job is None:
             return
@@ -139,8 +139,8 @@ class _BackgroundJob(threading.Thread):  # pylint: disable=too-many-instance-att
         self.join()
 
     def pause(self):  # noqa: D205,D400
-        """Signal the background thread that it should stop executing 'self._hook_test_case', and
-        wait until the current execution has finished.
+        """Signal the background thread that it should stop executing 'self._hook_test_case'.
+        Wait until the current execution has finished.
         """
         self._hook_test_case.signal_stop_test()
         with self._lock:
@@ -170,7 +170,7 @@ class _ContinuousDynamicJSTestCase(jsfile.DynamicJSTestCase):
         while not self._should_stop.is_set():
             jsfile.DynamicJSTestCase.run_test(self)
 
-    def signal_stop_test(self):  # noqa: D205,D400
+    def signal_stop_test(self):  # noqa: D205,D400,D415
         """Indicate to the thread executing the run_test() method that the current execution is the
         last one. This method returns without waiting for the current execution to finish.
         """

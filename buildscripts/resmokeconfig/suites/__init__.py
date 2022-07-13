@@ -20,9 +20,9 @@ def _get_named_suites():
             if ext in (".yml", ".yaml"):
                 pathname = os.path.join(root, filename)
                 named_suites[short_name] = os.path.relpath(pathname)
-    except StopIteration:
+    except StopIteration as exc:
         # 'dirname' does not exist, which should be impossible because it contains __file__.
-        raise IOError("Directory '%s' does not exist" % (dirname))
+        raise IOError("Directory '%s' does not exist" % (dirname)) from exc
 
     return named_suites
 

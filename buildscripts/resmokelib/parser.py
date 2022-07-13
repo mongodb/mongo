@@ -500,25 +500,25 @@ def to_local_args(input_args=None):  # pylint: disable=too-many-branches,too-man
             # one such argument has been visited.
             if arg_dest in arg_dests_visited:
                 continue
-            else:
-                arg_dests_visited.add(arg_dest)
+
+            arg_dests_visited.add(arg_dest)
 
             # If the arg doesn't exist in the parsed namespace, skip.
             # This is mainly for "--help".
             if not hasattr(parsed_args, arg_dest):
                 continue
             # Skip any evergreen centric args.
-            elif group.title in [_INTERNAL_OPTIONS_TITLE, _EVERGREEN_ARGUMENT_TITLE]:
+            if group.title in [_INTERNAL_OPTIONS_TITLE, _EVERGREEN_ARGUMENT_TITLE]:
                 continue
             # Keep these args.
-            elif group.title == 'optional arguments':
+            if group.title == 'optional arguments':
                 arg_name = action.option_strings[-1]
 
                 # If an option has the same value as the default, we don't need to specify it.
                 if getattr(parsed_args, arg_dest, None) == action.default:
                     continue
                 # These are arguments that take no value.
-                elif action.nargs == 0:
+                if action.nargs == 0:
                     other_local_args.append(arg_name)
                 elif isinstance(action, argparse._AppendAction):  # pylint: disable=protected-access
                     args = [format_option(arg_name, elem) for elem in arg_value]

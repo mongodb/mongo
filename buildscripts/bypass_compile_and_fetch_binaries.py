@@ -12,14 +12,14 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-import click
-
-from evergreen.api import RetryingEvergreenApi, EvergreenApi, Build, Task
 from git.repo import Repo
 import requests
 import structlog
 from structlog.stdlib import LoggerFactory
 import yaml
+import click
+
+from evergreen.api import RetryingEvergreenApi, EvergreenApi, Build, Task
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -332,11 +332,11 @@ def fetch_artifacts(build: Build, revision: str):
             # This is the artifacts.tgz as referenced in evergreen.yml.
             try:
                 urllib.request.urlretrieve(artifact.url, filename)
-            except urllib.error.ContentTooShortError:
+            except urllib.error.ContentTooShortError as exc:
                 LOGGER.warning(
                     "The artifact could not be completely downloaded. Default"
                     " compile bypass to false.", filename=filename)
-                raise ValueError("No artifacts were found for the current task")
+                raise ValueError("No artifacts were found for the current task") from exc
             # Need to extract certain files from the pre-existing artifacts.tgz.
             extract_files = [
                 executable_name("mongobridge"),
@@ -359,11 +359,11 @@ def fetch_artifacts(build: Build, revision: str):
             # This is the distsrc.[tgz|zip] as referenced in evergreen.yml.
             try:
                 urllib.request.urlretrieve(artifact.url, filename)
-            except urllib.error.ContentTooShortError:
+            except urllib.error.ContentTooShortError as exc:
                 LOGGER.warn(
                     "The artifact could not be completely downloaded. Default"
                     " compile bypass to false.", filename=filename)
-                raise ValueError("No artifacts were found for the current task")
+                raise ValueError("No artifacts were found for the current task") from exc
             extension = os.path.splitext(filename)[1]
             distsrc_filename = "distsrc{}".format(extension)
             LOGGER.info("Renaming", filename=filename, rename=distsrc_filename)

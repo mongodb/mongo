@@ -175,21 +175,21 @@ class ReplFixture(Fixture):
                 remaining = deadline - time.time()
                 insert_fn(remaining)
                 break
-            except pymongo.errors.ConnectionFailure:
+            except pymongo.errors.ConnectionFailure as exc:
                 remaining = deadline - time.time()
                 if remaining <= 0.0:
                     message = "Failed to connect to {} within {} minutes".format(
                         self.get_driver_connection_url(), ReplFixture.AWAIT_REPL_TIMEOUT_MINS)
                     self.logger.error(message)
-                    raise errors.ServerFailure(message)
-            except pymongo.errors.WTimeoutError:
+                    raise errors.ServerFailure(message) from exc
+            except pymongo.errors.WTimeoutError as exc:
                 message = "Replication of write operation timed out."
                 self.logger.error(message)
-                raise errors.ServerFailure(message)
+                raise errors.ServerFailure(message) from exc
             except pymongo.errors.PyMongoError as err:
                 message = "Write operation on {} failed: {}".format(
                     self.get_driver_connection_url(), err)
-                raise errors.ServerFailure(message)
+                raise errors.ServerFailure(message) from err
 
 
 class NoOpFixture(Fixture):
@@ -221,7 +221,9 @@ class FixtureTeardownHandler(object):
         """Initialize a FixtureTeardownHandler.
 
         Args:
+        ----
             logger: A logger to use to log teardown activity.
+
         """
         self._logger = logger
         self._success = True

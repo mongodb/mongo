@@ -8,7 +8,7 @@ import sys
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import buildscripts.cpplint as cpplint  # pylint: disable=wrong-import-position
+import buildscripts.cpplint as cpplint  # pylint: disable=wrong-import-position,syntax-error
 import buildscripts.utils as utils  # pylint: disable=wrong-import-position
 
 
@@ -126,9 +126,8 @@ def main():
             if arg == "nudge":
                 nudge = True
                 continue
-            else:
-                print("unknown arg [%s]" % arg)
-                sys.exit(-1)
+            print("unknown arg [%s]" % arg)
+            sys.exit(-1)
         paths.append(arg)
 
     if not paths:

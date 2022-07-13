@@ -243,18 +243,18 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
         except errors.StopExecution:
             raise
 
-        except errors.ServerFailure:
+        except errors.ServerFailure as exc:
             self.logger.exception("%s marked as a failure by a hook's before_test.",
                                   test.short_description())
             self._fail_test(test, sys.exc_info(), return_code=2)
-            raise errors.StopExecution("A hook's before_test failed")
+            raise errors.StopExecution("A hook's before_test failed") from exc
 
-        except errors.TestFailure:
+        except errors.TestFailure as exc:
             self.logger.exception("%s marked as a failure by a hook's before_test.",
                                   test.short_description())
             self._fail_test(test, sys.exc_info(), return_code=1)
             if self.suite_options.fail_fast:
-                raise errors.StopExecution("A hook's before_test failed")
+                raise errors.StopExecution("A hook's before_test failed") from exc
 
         except:
             # Record the before_test() error in 'self.report'.
@@ -276,18 +276,18 @@ class Job(object):  # pylint: disable=too-many-instance-attributes
         except errors.StopExecution:
             raise
 
-        except errors.ServerFailure:
+        except errors.ServerFailure as exc:
             self.logger.exception("%s marked as a failure by a hook's after_test.",
                                   test.short_description())
             self.report.setFailure(test, return_code=2)
-            raise errors.StopExecution("A hook's after_test failed")
+            raise errors.StopExecution("A hook's after_test failed") from exc
 
-        except errors.TestFailure:
+        except errors.TestFailure as exc:
             self.logger.exception("%s marked as a failure by a hook's after_test.",
                                   test.short_description())
             self.report.setFailure(test, return_code=1)
             if self.suite_options.fail_fast:
-                raise errors.StopExecution("A hook's after_test failed")
+                raise errors.StopExecution("A hook's after_test failed") from exc
 
         except:
             self.report.setError(test)

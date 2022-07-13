@@ -7,10 +7,11 @@ import os
 
 from collections import namedtuple
 
-from evergreen.api import RetryingEvergreenApi
 from git import Repo
 from shrub.config import Configuration
 from shrub.variant import TaskSpec
+
+from evergreen.api import RetryingEvergreenApi
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:

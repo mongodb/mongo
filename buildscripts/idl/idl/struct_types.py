@@ -314,7 +314,7 @@ class _CommandBaseTypeInfo(_StructTypeInfo):
         """Create a _CommandBaseTypeInfo instance."""
         self._command = command
 
-        super(_CommandBaseTypeInfo, self).__init__(command)
+        super().__init__(command)
 
     def get_op_msg_request_serializer_method(self):
         # type: () -> Optional[MethodInfo]
@@ -344,7 +344,7 @@ class _IgnoredCommandTypeInfo(_CommandBaseTypeInfo):
         """Create a _IgnoredCommandTypeInfo instance."""
         self._command = command
 
-        super(_IgnoredCommandTypeInfo, self).__init__(command)
+        super().__init__(command)
 
     def get_serializer_method(self):
         # type: () -> MethodInfo
@@ -387,7 +387,7 @@ class _CommandFromType(_CommandBaseTypeInfo):
         """Create a _CommandFromType instance."""
         assert command.command_field
         self._command = command
-        super(_CommandFromType, self).__init__(command)
+        super().__init__(command)
 
     def get_constructor_method(self):
         # type: () -> MethodInfo
@@ -449,7 +449,7 @@ class _CommandWithNamespaceTypeInfo(_CommandBaseTypeInfo):
         """Create a _CommandWithNamespaceTypeInfo instance."""
         self._command = command
 
-        super(_CommandWithNamespaceTypeInfo, self).__init__(command)
+        super().__init__(command)
 
     def get_constructor_method(self):
         # type: () -> MethodInfo
@@ -511,7 +511,7 @@ class _CommandWithUUIDNamespaceTypeInfo(_CommandBaseTypeInfo):
         """Create a _CommandWithUUIDNamespaceTypeInfo instance."""
         self._command = command
 
-        super(_CommandWithUUIDNamespaceTypeInfo, self).__init__(command)
+        super().__init__(command)
 
     def get_constructor_method(self):
         # type: () -> MethodInfo

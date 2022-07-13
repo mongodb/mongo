@@ -38,8 +38,8 @@ def get_tags(pathname):
                     raise TypeError("Expected a list of string tags, but got '%s'" % (tags))
                 return tags
             except yaml.YAMLError as err:
-                raise ValueError(
-                    "File '%s' contained invalid tags (expected YAML): %s" % (pathname, err))
+                raise ValueError("File '%s' contained invalid tags (expected YAML): %s" %
+                                 (pathname, err)) from err
 
     return []
 

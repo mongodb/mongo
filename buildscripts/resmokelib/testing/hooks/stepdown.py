@@ -30,6 +30,7 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
         """Initialize the ContinuousStepdown.
 
         Args:
+        ----
             hook_logger: the logger instance for this hook.
             fixture: the target fixture (a replica set or sharded cluster).
             config_stepdown: whether to stepdown the CSRS.
@@ -45,6 +46,7 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
         Note that the "terminate" and "kill" arguments are named after the "SIGTERM" and
         "SIGKILL" signals that are used to stop the process. On Windows, there are no signals,
         so we use a different means to achieve the same result as sending SIGTERM or SIGKILL.
+
         """
         interface.Hook.__init__(self, hook_logger, fixture, ContinuousStepdown.DESCRIPTION)
 
@@ -203,7 +205,7 @@ class FlagBasedStepdownLifecycle(object):
         with self.__lock:
             self.__cond.wait(timeout)
 
-    def poll_for_idle_request(self):  # noqa: D205,D400
+    def poll_for_idle_request(self):  # noqa: D205,D400,D415
         """Return true if the stepdown thread should continue running stepdowns, or false if it
         should temporarily stop running stepdowns.
         """
@@ -323,7 +325,7 @@ class FileBasedStepdownLifecycle(object):
         with self.__lock:
             self.__cond.wait(timeout)
 
-    def poll_for_idle_request(self):  # noqa: D205,D400
+    def poll_for_idle_request(self):  # noqa: D205,D400,D415
         """Return true if the stepdown thread should continue running stepdowns, or false if it
         should temporarily stop running stepdowns.
         """

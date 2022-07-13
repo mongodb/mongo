@@ -141,11 +141,13 @@ class _TestList(object):
     A list of tests on which filtering operations can be applied.
 
     Args:
+    ----
         test_file_explorer: a TestFileExplorer instance.
         roots: a list of tests to initialize the _TestList with.
         tests_are_files: indicates if the tests are file paths. If so the _TestList will perform
             glob expansion of paths and check if they are existing files. If not, calling
             'include_files()' or 'exclude_files()' will raise an TypeError.
+
     """
 
     def __init__(self, test_file_explorer, roots, tests_are_files=True):
@@ -170,9 +172,11 @@ class _TestList(object):
         """Filter the test list so that it only includes files matching 'include_files'.
 
         Args:
+        ----
             include_files: a list of paths or glob patterns that match the files to include.
             force: if True include the matching files that were previously excluded, otherwise only
                    include files that match and were not previously excluded from this _TestList.
+
         """
         if not self._tests_are_files:
             raise TypeError("_TestList does not contain files.")
@@ -190,10 +194,14 @@ class _TestList(object):
         """Exclude from the test list the files that match elements from 'exclude_files'.
 
         Args:
+        ----
             exclude_files: a list of paths or glob patterns that match the files to exclude.
+
         Raises:
+        ------
             ValueError: if exclude_files contains a non-globbed path that does not correspond to
                 an existing file.
+
         """
         if not self._tests_are_files:
             raise TypeError("_TestList does not contain files.")
@@ -215,10 +223,12 @@ class _TestList(object):
         """Filter the test list to only include tests that match the tag expression.
 
         Args:
+        ----
             tag_expression: a callable object that takes a list of tags and indicate if the required
                 condition is met by returning a boolean.
             get_tags: a callable object that takes a test and returns the corresponding list of
                 tags.
+
         """
         self._filtered = {test for test in self._filtered if tag_expression(get_tags(test))}
 
@@ -340,6 +350,7 @@ class _SelectorConfig(object):
         """Initialize the _SelectorConfig from the configuration elements.
 
         Args:
+        ----
             root: the path to a file containing the list of root tests. Incompatible with 'roots'.
             roots: a list of root tests. Incompatible with 'root'.
             include_files: a list of paths or glob patterns the tests must be included in.
@@ -350,6 +361,7 @@ class _SelectorConfig(object):
                 selected tests must not match. Incompatible with 'include_tags'.
             include_with_any_tags: a list of tags. All selected tests must have at least one them.
             exclude_with_any_tags: a list of tags. No selected tests can have any of them.
+
         """
         # Incompatible arguments check.
         if root and roots:
@@ -405,7 +417,10 @@ class _Selector(object):
         """Initialize the _Selector.
 
         Args:
+        ----
             test_file_explorer: a TestFileExplorer instance.
+            tests_are_files: flag if tests are files.
+
         """
         self._test_file_explorer = test_file_explorer
         self._tests_are_files = tests_are_files
@@ -712,10 +727,12 @@ def filter_tests(test_kind, selector_config, test_file_explorer=_DEFAULT_TEST_FI
     """Filter the tests according to a specified configuration.
 
     Args:
+    ----
         test_kind: the test kind, from _SELECTOR_REGISTRY.
         selector_config: a dict containing the selector configuration.
         test_file_explorer: the TestFileExplorer to use. Using a TestFileExplorer other than
         the default one should not be needed except for mocking purposes.
+
     """
     if test_kind not in _SELECTOR_REGISTRY:
         raise ValueError("Unknown test kind '{}'".format(test_kind))

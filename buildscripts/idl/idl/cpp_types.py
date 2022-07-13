@@ -247,7 +247,7 @@ class _CppTypeView(CppTypeBase):
         # type: (ast.Field, str, str) -> None
         self._storage_type = storage_type
         self._view_type = view_type
-        super(_CppTypeView, self).__init__(field)
+        super().__init__(field)
 
     def get_type_name(self):
         # type: () -> str
@@ -363,7 +363,7 @@ class _CppTypeDelegating(CppTypeBase):
     def __init__(self, base, field):
         # type: (CppTypeBase, ast.Field) -> None
         self._base = base
-        super(_CppTypeDelegating, self).__init__(field)
+        super().__init__(field)
 
     def get_type_name(self):
         # type: () -> str
@@ -614,7 +614,7 @@ class _CommonBsonCppTypeBase(BsonCppTypeBase):
     def __init__(self, field, deserialize_method_name):
         # type: (ast.Field, str) -> None
         self._deserialize_method_name = deserialize_method_name
-        super(_CommonBsonCppTypeBase, self).__init__(field)
+        super().__init__(field)
 
     def gen_deserializer_expression(self, indented_writer, object_instance):
         # type: (writer.IndentedTextWriter, str) -> str

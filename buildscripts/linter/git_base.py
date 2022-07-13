@@ -230,12 +230,14 @@ class GitException(Exception):
     """Custom Exception for the git module.
 
     Args:
+    ----
         message: the exception message.
         returncode: the return code of the failed git command, if any.
         cmd: the git subcommand that was run, if any.
         process_args: a list containing the git command and arguments (includes 'git' as its first
             element) that were run, if any.
         stderr: the error output of the git command.
+
     """
 
     def __init__(  # pylint: disable=too-many-arguments
@@ -253,11 +255,13 @@ class GitCommandResult(object):
     """The result of running git subcommand.
 
     Args:
+    ----
         cmd: the git subcommand that was executed (e.g. 'clone', 'diff').
         process_args: the full list of process arguments, starting with the 'git' command.
         returncode: the return code.
         stdout: the output of the command.
         stderr: the error output of the command.
+
     """
 
     def __init__(  # pylint: disable=too-many-arguments

@@ -437,7 +437,8 @@ def download_file(url, file_name, download_retries=5):
                 except requests.exceptions.ChunkedEncodingError as err:
                     download_retries -= 1
                     if download_retries == 0:
-                        raise Exception("Incomplete download for URL {}: {}".format(url, err))
+                        raise Exception("Incomplete download for URL {}: {}".format(url,
+                                                                                    err)) from err
                     continue
 
         # Check if file download was completed.
@@ -503,8 +504,7 @@ def install_tarball(tarball, root_dir):
                fi ;
             done ;
             popd ;
-            """.format(  # pylint: disable=bad-continuation
-            tarball=tarball, tmp_dir=tmp_dir, root_dir=root_dir)
+            """.format(tarball=tarball, tmp_dir=tmp_dir, root_dir=root_dir)
         ret, output = execute_cmd(cmds, use_file=True)
         shutil.rmtree(tmp_dir)
     else:

@@ -90,7 +90,7 @@ def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many
     # Use RSK_ prefixed environment variables to indicate resmoke-specific values.
     # The list of configuration is detailed in config.py
     resmoke_env_prefix = 'RSK_'
-    for key in os.environ.keys():
+    for key in os.environ:
         if key.startswith(resmoke_env_prefix):
             # Windows env vars are case-insensitive, we use lowercase to be consistent
             # with existing resmoke options.

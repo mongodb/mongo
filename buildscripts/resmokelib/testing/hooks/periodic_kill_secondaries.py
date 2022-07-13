@@ -198,10 +198,10 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
 
             try:
                 secondary.teardown()
-            except errors.ServerFailure:
+            except errors.ServerFailure as exc:
                 raise errors.ServerFailure(
                     "{} did not exit cleanly after reconciling the end of its oplog".format(
-                        secondary))
+                        secondary)) from exc
 
         self.logger.info("Starting the fixture back up again with its data files intact for final"
                          " validation...")
@@ -244,9 +244,10 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
 
         try:
             self.fixture.teardown()
-        except errors.ServerFailure:
+        except errors.ServerFailure as exc:
             raise errors.ServerFailure(
-                "{} did not exit cleanly after verifying data consistency".format(self.fixture))
+                "{} did not exit cleanly after verifying data consistency".format(
+                    self.fixture)) from exc
 
         self.logger.info("Starting the fixture back up again with no data...")
         self.fixture.setup()
@@ -407,10 +408,10 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
 
             try:
                 secondary.teardown()
-            except errors.ServerFailure:
+            except errors.ServerFailure as exc:
                 raise errors.ServerFailure(
                     "{} did not exit cleanly after being started up as a standalone".format(
-                        secondary))
+                        secondary)) from exc
         except pymongo.errors.OperationFailure as err:
             self.logger.exception(
                 "Failed to read the minValid document, the oplogTruncateAfterPoint document,"

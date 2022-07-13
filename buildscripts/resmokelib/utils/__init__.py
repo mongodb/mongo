@@ -80,7 +80,7 @@ def load_yaml_file(filename):
         with open(filename, "r") as fp:
             return yaml.safe_load(fp)
     except yaml.YAMLError as err:
-        raise ValueError("File '%s' contained invalid YAML: %s" % (filename, err))
+        raise ValueError("File '%s' contained invalid YAML: %s" % (filename, err)) from err
 
 
 def dump_yaml_file(value, filename):
@@ -89,7 +89,7 @@ def dump_yaml_file(value, filename):
         with open(filename, "w") as fp:
             return yaml.safe_dump(value, fp)
     except yaml.YAMLError as err:
-        raise ValueError("Could not write YAML to file '%s': %s" % (filename, err))
+        raise ValueError("Could not write YAML to file '%s': %s" % (filename, err)) from err
 
 
 def dump_yaml(value):
@@ -103,4 +103,4 @@ def load_yaml(value):
     try:
         return yaml.safe_load(value)
     except yaml.YAMLError as err:
-        raise ValueError("Attempted to parse invalid YAML value '%s': %s" % (value, err))
+        raise ValueError("Attempted to parse invalid YAML value '%s': %s" % (value, err)) from err

@@ -262,7 +262,7 @@ class WtCursorPrinter(object):
         cursor_flags = []
 
     def __init__(self, val):
-        """Initializer."""
+        """Initialize the instance."""
         self.val = val
 
     # pylint: disable=R0201
@@ -297,7 +297,7 @@ class WtSessionImplPrinter(object):
         session_flags = []
 
     def __init__(self, val):
-        """Initializer."""
+        """Initialize the instance."""
         self.val = val
 
     # pylint: disable=R0201
@@ -332,7 +332,7 @@ class WtTxnPrinter(object):
         txn_flags = []
 
     def __init__(self, val):
-        """Initializer."""
+        """Initialize the instance."""
         self.val = val
 
     # pylint: disable=R0201
@@ -473,8 +473,10 @@ def find_match_brackets(search, opening='<', closing='>'):
     Return -1 if no last matching bracket is found, i.e. not a template.
 
     Example:
+    -------
         'Foo<T>::iterator<U>''
         returns 5
+
     """
     index = search.find(opening)
     if index == -1:
@@ -502,7 +504,7 @@ class MongoSubPrettyPrinter(gdb.printing.SubPrettyPrinter):
 
     def __init__(self, name, prefix, is_template, printer):
         """Initialize MongoSubPrettyPrinter."""
-        super(MongoSubPrettyPrinter, self).__init__(name)
+        super().__init__(name)
         self.prefix = prefix
         self.printer = printer
         self.is_template = is_template
@@ -516,7 +518,7 @@ class MongoPrettyPrinterCollection(gdb.printing.PrettyPrinter):
 
     def __init__(self):
         """Initialize MongoPrettyPrinterCollection."""
-        super(MongoPrettyPrinterCollection, self).__init__("mongo", [])
+        super().__init__("mongo", [])
 
     def add(self, name, prefix, is_template, printer):
         """Add a subprinter."""

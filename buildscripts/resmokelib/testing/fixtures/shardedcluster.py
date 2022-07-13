@@ -387,12 +387,12 @@ class _MongoSFixture(interface.Fixture):
                 client = self.mongo_client(timeout_millis=500)
                 client.admin.command("ping")
                 break
-            except pymongo.errors.ConnectionFailure:
+            except pymongo.errors.ConnectionFailure as exc:
                 remaining = deadline - time.time()
                 if remaining <= 0.0:
                     raise errors.ServerFailure(
                         "Failed to connect to mongos on port {} after {} seconds".format(
-                            self.port, standalone.MongoDFixture.AWAIT_READY_TIMEOUT_SECS))
+                            self.port, standalone.MongoDFixture.AWAIT_READY_TIMEOUT_SECS)) from exc
 
                 self.logger.info("Waiting to connect to mongos on port %d.", self.port)
                 time.sleep(0.1)  # Wait a little bit before trying again.

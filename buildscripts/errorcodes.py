@@ -223,8 +223,10 @@ def replace_bad_codes(errors, next_code):  # pylint: disable=too-many-locals
     For now, we only modify zero codes.
 
     Args:
+    ----
         errors: list of AssertLocation
         next_code: int, next non-conflicting assertion code
+
     """
     zero_errors = [e for e in errors if int(e.code) == 0]
     skip_errors = [e for e in errors if int(e.code) != 0]
@@ -258,7 +260,7 @@ def replace_bad_codes(errors, next_code):  # pylint: disable=too-many-locals
 
 
 def main():
-    """Main."""
+    """Execute the main function."""
     parser = OptionParser(description=__doc__.strip())
     parser.add_option("--fix", dest="replace", action="store_true", default=False,
                       help="Fix zero codes in source files [default: %default]")

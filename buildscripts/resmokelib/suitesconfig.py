@@ -65,10 +65,12 @@ def get_suites(suite_files, test_files):
     """Retrieve the Suite instances based on suite configuration files and override parameters.
 
     Args:
+    ----
         suite_files: A list of file paths pointing to suite YAML configuration files. For the suites
             defined in 'buildscripts/resmokeconfig/suites/', a shorthand name consisting of the
             filename without the extension can be used.
         test_files: A list of file paths pointing to test files overriding the roots for the suites.
+
     """
     suite_roots = None
     if test_files:
