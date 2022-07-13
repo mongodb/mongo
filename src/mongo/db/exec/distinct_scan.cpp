@@ -82,7 +82,6 @@ PlanStage::StageState DistinctScan::doWork(WorkingSetID* out) {
     boost::optional<IndexKeyEntry> kv;
 
     const auto ret = handlePlanStageYield(
-        opCtx(),
         expCtx(),
         "DistinctScan",
         collection()->ns().ns(),

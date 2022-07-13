@@ -442,8 +442,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
 
         bool docStillMatches;
         const auto ensureStillMatchesRet =
-            handlePlanStageYield(opCtx(),
-                                 expCtx(),
+            handlePlanStageYield(expCtx(),
                                  "UpdateStage ensureStillMatches",
                                  collection()->ns().ns(),
                                  [&] {
@@ -518,8 +517,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         member->makeObjOwnedIfNeeded();
 
         // Save state before making changes.
-        handlePlanStageYield(opCtx(),
-                             expCtx(),
+        handlePlanStageYield(expCtx(),
                              "UpdateStage saveState",
                              collection()->ns().ns(),
                              [&] {
@@ -542,7 +540,6 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
 
         try {
             const auto updateRet = handlePlanStageYield(
-                opCtx(),
                 expCtx(),
                 "UpdateStage update",
                 collection()->ns().ns(),
@@ -594,7 +591,6 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
         // Restore state after modification. As restoreState may restore (recreate) cursors, make
         // sure to restore the state outside of the WritUnitOfWork.
         const auto restoreStateRet = handlePlanStageYield(
-            opCtx(),
             expCtx(),
             "UpdateStage restoreState",
             collection()->ns().ns(),

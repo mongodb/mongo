@@ -242,8 +242,7 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
         return PlanStage::NEED_TIME;
     }
 
-    handlePlanStageYield(opCtx(),
-                         expCtx(),
+    handlePlanStageYield(expCtx(),
                          "BatchedDeleteStage saveState",
                          collection()->ns().ns(),
                          [&] {
@@ -262,7 +261,6 @@ PlanStage::StageState BatchedDeleteStage::_deleteBatch(WorkingSetID* out) {
 
     try {
         const auto ret = handlePlanStageYield(
-            opCtx(),
             expCtx(),
             "BatchedDeleteStage::_deleteBatch",
             collection()->ns().ns(),
@@ -476,8 +474,7 @@ void BatchedDeleteStage::_stageNewDelete(WorkingSetID* workingSetMemberID) {
 }
 
 PlanStage::StageState BatchedDeleteStage::_tryRestoreState(WorkingSetID* out) {
-    return handlePlanStageYield(opCtx(),
-                                expCtx(),
+    return handlePlanStageYield(expCtx(),
                                 "BatchedDeleteStage::_tryRestoreState",
                                 collection()->ns().ns(),
                                 [&] {

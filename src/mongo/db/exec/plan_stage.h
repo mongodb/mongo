@@ -161,9 +161,7 @@ public:
         // responsible for catching this exception. After catching the exception, it suspends its
         // state in such a way that will allow it to retry the storage-level operation on the next
         // work() call. Then it populates the out parameter of work(...) with WorkingSet::INVALID_ID
-        // and returns NEED_YIELD to its parent. The stage that requested the yield also holds the
-        // WSID of the loc it wants fetched. On the next call to work(), if needed that stage will
-        // refetch the WSM that the held WSID refers to.
+        // and returns NEED_YIELD to its parent.
         //
         // Each stage that receives a NEED_YIELD from a child must propagate the NEED_YIELD up
         // and perform no work.

@@ -56,8 +56,7 @@ void MultiIteratorStage::addIterator(unique_ptr<RecordCursor> it) {
 PlanStage::StageState MultiIteratorStage::doWork(WorkingSetID* out) {
     boost::optional<Record> record;
 
-    const auto ret = handlePlanStageYield(opCtx(),
-                                          expCtx(),
+    const auto ret = handlePlanStageYield(expCtx(),
                                           "MultiIteratorStage",
                                           collection()->ns().ns(),
                                           [&] {

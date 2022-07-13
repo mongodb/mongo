@@ -142,7 +142,6 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
     const bool needToMakeCursor = !_cursor;
 
     const auto ret = handlePlanStageYield(
-        opCtx(),
         expCtx(),
         "CollectionScan",
         collection()->ns().ns(),

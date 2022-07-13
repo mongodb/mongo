@@ -101,7 +101,6 @@ PlanStage::StageState FetchStage::doWork(WorkingSetID* out) {
             verify(member->hasRecordId());
 
             const auto ret = handlePlanStageYield(
-                opCtx(),
                 expCtx(),
                 "FetchStage",
                 collection()->ns().ns(),

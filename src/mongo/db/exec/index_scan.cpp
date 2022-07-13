@@ -145,7 +145,6 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
     boost::optional<IndexKeyEntry> kv;
 
     const auto ret = handlePlanStageYield(
-        opCtx(),
         expCtx(),
         "IndexScan",
         collection()->ns().ns(),

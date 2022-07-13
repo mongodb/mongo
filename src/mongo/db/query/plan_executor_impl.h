@@ -51,12 +51,9 @@ namespace mongo {
  * WriteConflictException.
  */
 template <typename F, typename H>
-auto handlePlanStageYield(OperationContext* opCtx,
-                          ExpressionContext* expCtx,
-                          StringData opStr,
-                          StringData ns,
-                          F&& f,
-                          H&& yieldHandler) {
+auto handlePlanStageYield(
+    ExpressionContext* expCtx, StringData opStr, StringData ns, F&& f, H&& yieldHandler) {
+    auto opCtx = expCtx->opCtx;
     invariant(opCtx);
     invariant(opCtx->lockState());
     invariant(opCtx->recoveryUnit());

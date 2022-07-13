@@ -162,8 +162,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     bool docStillMatches;
 
     const auto ret =
-        handlePlanStageYield(opCtx(),
-                             expCtx(),
+        handlePlanStageYield(expCtx(),
                              "DeleteStage ensureStillMatches",
                              collection()->ns().ns(),
                              [&] {
@@ -244,8 +243,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
         uassertStatusOK(_params->removeSaver->goingToDelete(bsonObjDoc));
     }
 
-    handlePlanStageYield(opCtx(),
-                         expCtx(),
+    handlePlanStageYield(expCtx(),
                          "DeleteStage saveState",
                          collection()->ns().ns(),
                          [&] {
@@ -261,7 +259,6 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     if (!_params->isExplain) {
         try {
             const auto ret = handlePlanStageYield(
-                opCtx(),
                 expCtx(),
                 "DeleteStage deleteDocument",
                 collection()->ns().ns(),
@@ -316,8 +313,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     // which they are created, and a WriteUnitOfWork is a transaction, make sure to restore the
     // state outside of the WriteUnitOfWork.
     const auto restoreStateRet =
-        handlePlanStageYield(opCtx(),
-                             expCtx(),
+        handlePlanStageYield(expCtx(),
                              "DeleteStage restoreState",
                              collection()->ns().ns(),
                              [&] {

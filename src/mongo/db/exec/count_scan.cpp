@@ -112,7 +112,6 @@ PlanStage::StageState CountScan::doWork(WorkingSetID* out) {
     const bool needInit = !_cursor;
 
     const auto ret = handlePlanStageYield(
-        opCtx(),
         expCtx(),
         "CountScan",
         collection()->ns().ns(),

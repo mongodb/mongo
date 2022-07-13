@@ -153,8 +153,7 @@ PlanStage::StageState TextOrStage::doWork(WorkingSetID* out) {
 PlanStage::StageState TextOrStage::initStage(WorkingSetID* out) {
     *out = WorkingSet::INVALID_ID;
 
-    return handlePlanStageYield(opCtx(),
-                                expCtx(),
+    return handlePlanStageYield(expCtx(),
                                 "TextOrStage initStage",
                                 collection()->ns().ns(),
                                 [&] {
@@ -262,8 +261,7 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
         // Our parent expects RID_AND_OBJ members, so we fetch the document here if we haven't
         // already.
         const auto ret =
-            handlePlanStageYield(opCtx(),
-                                 expCtx(),
+            handlePlanStageYield(expCtx(),
                                  "TextOrStage addTerm",
                                  collection()->ns().ns(),
                                  [&] {

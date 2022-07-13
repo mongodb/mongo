@@ -86,7 +86,6 @@ PlanStage::StageState IDHackStage::doWork(WorkingSetID* out) {
 
     WorkingSetID id = WorkingSet::INVALID_ID;
     return handlePlanStageYield(
-        opCtx(),
         expCtx(),
         "IDHackStage",
         collection()->ns().ns(),
