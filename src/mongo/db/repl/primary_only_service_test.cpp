@@ -52,6 +52,8 @@
 using namespace mongo;
 using namespace mongo::repl;
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 namespace {
 constexpr StringData kTestServiceName = "TestService"_sd;
 
@@ -61,6 +63,7 @@ MONGO_FAIL_POINT_DEFINE(TestServiceHangDuringStateTwo);
 MONGO_FAIL_POINT_DEFINE(TestServiceHangDuringCompletion);
 MONGO_FAIL_POINT_DEFINE(TestServiceHangBeforeMakingOpCtx);
 MONGO_FAIL_POINT_DEFINE(TestServiceHangAfterMakingOpCtx);
+MONGO_FAIL_POINT_DEFINE(TestServiceFailRebuildService);
 }  // namespace
 
 class TestService final : public PrimaryOnlyService {
@@ -283,6 +286,9 @@ public:
 private:
     ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                          const CancellationToken& token) override {
+        if (TestServiceFailRebuildService.shouldFail()) {
+            uassertStatusOK(Status(ErrorCodes::InternalError, "test error"));
+        }
         auto nss = getStateDocumentsNS();
 
         AllowOpCtxWhenServiceRebuildingBlock allowOpCtxBlock(Client::getCurrent());
@@ -1147,4 +1153,47 @@ TEST_F(PrimaryOnlyServiceTest, StateTransitionFromRebuildingShouldWakeUpConditio
 
     stepUpThread.join();
     lookUpInstanceThread.join();
+}
+
+TEST_F(PrimaryOnlyServiceTest, RebuildServiceFailsShouldSetStateFromRebuilding) {
+    /**
+     * (1) onStepUp changes state to kRebuilding. lookupInstanceThread blocks waiting for state
+     * not rebuilding.
+     * (2) PrimaryOnlyService::_rebuildService fails due to fail point, causing rebuilding to
+     * fail, despite no stepDown/shutDown occuring.
+     * (3) Failure _rebuildService results in state change to kRebuildFailed
+     * (4) lookupInstanceThread notified of the state change, unblocks and sees error that
+     * caused _rebuildService to fail.
+     */
+    stepDown();
+    stdx::thread stepUpThread;
+    stdx::thread lookUpInstanceThread;
+    Status lookupError = Status::OK();
+    FailPointEnableBlock failRebuildServiceFailPoint("TestServiceFailRebuildService");
+    {
+        FailPointEnableBlock stepUpFailpoint("PrimaryOnlyServiceHangBeforeLaunchingStepUpLogic");
+        stepUpThread = stdx::thread([this] {
+            ThreadClient tc("StepUpThread", getServiceContext());
+            stepUp();
+        });
+
+        stepUpFailpoint->waitForTimesEntered(stepUpFailpoint.initialTimesEntered() + 1);
+
+        lookUpInstanceThread = stdx::thread([this, &lookupError] {
+            try {
+                ThreadClient tc("LookUpInstanceThread", getServiceContext());
+                auto opCtx = makeOperationContext();
+                TestService::Instance::lookup(opCtx.get(), _service, BSON("_id" << 0));
+            } catch (DBException& ex) {
+                lookupError = ex.toStatus();
+            }
+        });
+    }
+    failRebuildServiceFailPoint->waitForTimesEntered(
+        failRebuildServiceFailPoint.initialTimesEntered() + 1);
+    stepUpThread.join();
+    lookUpInstanceThread.join();
+    ASSERT(!lookupError.isOK()) << "lookup thread did not receive an error";
+    ASSERT_EQ(lookupError.code(), ErrorCodes::InternalError);
+    ASSERT_EQ(lookupError.reason(), "test error");
 }
