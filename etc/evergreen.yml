@@ -3833,14 +3833,6 @@ tasks:
           --detect-odr-violations
           --separate-debug
           PREFIX=dist-test
-    - command: subprocess.exec
-      params:
-        binary: bash
-        add_expansions_to_env: true
-        args:
-        - "src/evergreen/run_python_script.sh"
-        - "evergreen/macos_notary.py"
-        - "mongodb-binaries.${ext|tgz}"
 
     - command: archive.targz_pack
       params:
