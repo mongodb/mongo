@@ -70,13 +70,7 @@ feature_flags:
         cpp_varname: gFeatureFlagLocf
         default: true
         version: 5.2
-
-    featureFlagFill:
-        description: "Feature flag for allowing $fill and $linearFill window functions"
-        cpp_varname: gFeatureFlagFill
-        default: true
-        version: 5.3
-
+        
     featureFlagCommonQueryFramework:
       description: "Feature flag for allowing use of Cascades-based query optimizer"
       cpp_varname: gFeatureFlagCommonQueryFramework

@@ -58,11 +58,7 @@ using namespace window_function_n_traits;
 REGISTER_STABLE_WINDOW_FUNCTION(derivative, ExpressionDerivative::parse);
 REGISTER_STABLE_WINDOW_FUNCTION(first, ExpressionFirst::parse);
 REGISTER_STABLE_WINDOW_FUNCTION(last, ExpressionLast::parse);
-REGISTER_WINDOW_FUNCTION_CONDITIONALLY(linearFill,
-                                       (ExpressionLinearFill::parse),
-                                       feature_flags::gFeatureFlagFill.getVersion(),
-                                       AllowedWithApiStrict::kNeverInVersion1,
-                                       feature_flags::gFeatureFlagFill.isEnabledAndIgnoreFCV());
+REGISTER_STABLE_WINDOW_FUNCTION(linearFill, ExpressionLinearFill::parse);
 REGISTER_STABLE_WINDOW_FUNCTION(minN, (ExpressionN<WindowFunctionMinN, AccumulatorMinN>::parse));
 REGISTER_STABLE_WINDOW_FUNCTION(maxN, (ExpressionN<WindowFunctionMaxN, AccumulatorMaxN>::parse));
 REGISTER_STABLE_WINDOW_FUNCTION(firstN,

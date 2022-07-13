@@ -14,10 +14,6 @@ load("jstests/libs/fixture_helpers.js");
 load("jstests/libs/feature_flag_util.js");    // For isEnabled.
 load("jstests/aggregation/extras/utils.js");  // For arrayEq.
 
-if (!FeatureFlagUtil.isEnabled(db, "Fill")) {
-    jsTestLog("Skipping as featureFlagFill is not enabled");
-    return;
-}
 const coll = db[jsTestName()];
 coll.drop();
 const documents = [
