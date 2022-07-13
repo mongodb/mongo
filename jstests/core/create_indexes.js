@@ -8,9 +8,9 @@
 'use strict';
 
 const kUnknownIDLFieldError = 40415;
-var isMongos = ("isdbgrid" == db.runCommand("hello").msg);
+const isMongos = ("isdbgrid" == db.runCommand("hello").msg);
 
-var extractResult = function(obj) {
+const extractResult = function(obj) {
     if (!isMongos)
         return obj;
 
@@ -27,9 +27,9 @@ var extractResult = function(obj) {
     //   ok: 1
     // }
 
-    var numFields = 0;
-    var result = null;
-    for (var field in obj.raw) {
+    let numFields = 0;
+    let result = null;
+    for (let field in obj.raw) {
         result = obj.raw[field];
         numFields++;
     }
@@ -39,16 +39,22 @@ var extractResult = function(obj) {
     return result;
 };
 
-var checkImplicitCreate = function(createIndexResult) {
+const checkImplicitCreate = function(createIndexResult) {
     assert.eq(true, createIndexResult.createdCollectionAutomatically);
 };
 
-var dbTest = db.getSiblingDB('create_indexes_db');
+const assertIndexes = function(coll, expectedIndexNames) {
+    const indexSpecs = coll.getIndexes();
+    const indexNames = indexSpecs.map(spec => spec.name);
+    assert.sameMembers(indexNames, expectedIndexNames, tojson(indexSpecs));
+};
+
+const dbTest = db.getSiblingDB('create_indexes_db');
 dbTest.dropDatabase();
 
 // Database does not exist
-var collDbNotExist = dbTest.create_indexes_no_db;
-var res = assert.commandWorked(
+const collDbNotExist = dbTest.create_indexes_no_db;
+let res = assert.commandWorked(
     collDbNotExist.runCommand('createIndexes', {indexes: [{key: {x: 1}, name: 'x_1'}]}));
 res = extractResult(res);
 checkImplicitCreate(res);
@@ -58,9 +64,8 @@ assert.isnull(
     'createIndexes.note should not be present in results when adding a new index: ' + tojson(res));
 
 // Collection does not exist, but database does
-var t = dbTest.create_indexes;
-var res =
-    assert.commandWorked(t.runCommand('createIndexes', {indexes: [{key: {x: 1}, name: 'x_1'}]}));
+const t = dbTest.create_indexes;
+res = assert.commandWorked(t.runCommand('createIndexes', {indexes: [{key: {x: 1}, name: 'x_1'}]}));
 res = extractResult(res);
 checkImplicitCreate(res);
 assert.eq(res.numIndexesAfter, res.numIndexesBefore + 1);
@@ -107,16 +112,18 @@ assert(res.note,
        'createIndexes.note should be present in results when adding a duplicate index: ' +
            tojson(res));
 
+// Test that index creation fails on specs that are missing required fields such as 'key'.
 res = t.runCommand("createIndexes", {indexes: [{}]});
-assert(!res.ok);
+assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
 
+// Test that any malformed specs in the list causes the entire index creation to fail and
+// will not result in new indexes in the catalog.
 res = t.runCommand("createIndexes", {indexes: [{}, {key: {m: 1}, name: "asd"}]});
-assert(!res.ok);
-
-assert.eq(5, t.getIndexes().length);
+assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
+assertIndexes(t, ["_id_", "x_1", "y_1", "a_1", "b_1"]);
 
 res = t.runCommand("createIndexes", {indexes: [{key: {"c": 1}, sparse: true, name: "c_1"}]});
-assert.eq(6, t.getIndexes().length);
+assertIndexes(t, ["_id_", "x_1", "y_1", "a_1", "b_1", "c_1"]);
 assert.eq(1,
           t.getIndexes()
               .filter(function(z) {
@@ -124,15 +131,17 @@ assert.eq(1,
               })
               .length);
 
-res = t.runCommand("createIndexes", {indexes: [{key: {"x": "foo"}, name: "x_1"}]});
-assert(!res.ok);
+// Test that index creation fails if we specify an unsupported index type.
+res = t.runCommand("createIndexes", {indexes: [{key: {"x": "invalid_index_type"}, name: "x_1"}]});
+assert.commandFailedWithCode(res, ErrorCodes.CannotCreateIndex);
 
-assert.eq(6, t.getIndexes().length);
+assertIndexes(t, ["_id_", "x_1", "y_1", "a_1", "b_1", "c_1"]);
 
+// Test that an index name, if provided by the user, cannot be empty.
 res = t.runCommand("createIndexes", {indexes: [{key: {"x": 1}, name: ""}]});
-assert(!res.ok);
+assert.commandFailedWithCode(res, ErrorCodes.CannotCreateIndex);
 
-assert.eq(6, t.getIndexes().length);
+assertIndexes(t, ["_id_", "x_1", "y_1", "a_1", "b_1", "c_1"]);
 
 // Test that v0 indexes cannot be created.
 res = t.runCommand('createIndexes', {indexes: [{key: {d: 1}, name: 'd_1', v: 0}]});
@@ -174,7 +183,7 @@ res = t.runCommand('createIndexes', {
 assert.commandFailedWithCode(res, ErrorCodes.IndexKeySpecsConflict);
 
 // Test that user is not allowed to create indexes in config.transactions.
-var configDB = db.getSiblingDB('config');
+const configDB = db.getSiblingDB('config');
 res =
     configDB.runCommand({createIndexes: 'transactions', indexes: [{key: {star: 1}, name: 'star'}]});
 assert.commandFailedWithCode(res, ErrorCodes.IllegalOperation);
