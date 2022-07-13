@@ -54,9 +54,8 @@ const kTenantDefinedDbName = "0";
 const kTenantId = `${kTenantIdPrefix}-multiWrites`;
 const kDbName = tenantMigrationTest.tenantDB(kTenantId, kTenantDefinedDbName);
 
-const kRecords = 500;
+const kRecords = 2000;
 const kUpdateCycles = 600;
-const kSleepDurationMs = 10000;
 
 function prepareDatabase(dbName) {
     let db = donorPrimary.getDB(dbName);
@@ -96,9 +95,6 @@ function doMultiUpdate(
             });
             break;
         }
-        // SERVER-66206 ubsan build can take too much time to process the bulk inserts. Sleep to
-        // limit ops throughput.
-        sleep(kSleepDurationMs);
     }
 
     jsTestLog(`All updates completed without consistency error, in ${completedCycles} cycles`);
