@@ -270,13 +270,17 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
                                       config.MONGOD_SET_PARAMETERS)
             self._resmoke_logger.info("Fuzzed wiredTigerConnectionString: %s",
                                       config.WT_ENGINE_CONFIG)
+        resmoke_env_options = ''
+        if os.path.exists('resmoke_env_options.txt'):
+            with open('resmoke_env_options.txt') as fin:
+                resmoke_env_options = fin.read().strip()
 
-        self._resmoke_logger.info("resmoke.py invocation for local usage: %s",
-                                  local_resmoke_invocation)
+        self._resmoke_logger.info("resmoke.py invocation for local usage: %s %s",
+                                  resmoke_env_options, local_resmoke_invocation)
 
         if config.EVERGREEN_TASK_ID:
             with open("local-resmoke-invocation.txt", "w") as fh:
-                fh.write(local_resmoke_invocation)
+                fh.write(f"{resmoke_env_options} {local_resmoke_invocation}")
 
     def _log_resmoke_summary(self, suites):
         """Log a summary of the resmoke run."""

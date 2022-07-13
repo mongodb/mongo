@@ -112,6 +112,9 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
     suite_name=${suite}
   fi
 
+  resmoke_env_options="${gcov_environment} ${lang_environment} ${san_options} ${snmp_config_path}"
+  echo $resmoke_env_options > resmoke_env_options.txt
+
   # The "resmoke_wrapper" expansion is used by the 'burn_in_tests' task to wrap the resmoke.py
   # invocation. It doesn't set any environment variables and should therefore come last in
   # this list of expansions.
@@ -119,10 +122,7 @@ if [[ ${disable_unit_tests} = "false" && ! -f ${skip_tests} ]]; then
   PATH="$path_value" \
     AWS_PROFILE=${aws_profile_remote} \
     eval \
-    ${gcov_environment} \
-    ${lang_environment} \
-    ${san_options} \
-    ${snmp_config_path} \
+    $resmoke_env_options \
     ${resmoke_wrapper} \
     $python buildscripts/resmoke.py run \
     ${record_with} \
