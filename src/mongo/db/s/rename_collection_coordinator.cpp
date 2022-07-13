@@ -177,19 +177,27 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                         sharding_ddl_util::checkDbPrimariesOnTheSameShard(opCtx, fromNss, toNss);
                     }
 
-                    // (SERVER-67325) Acquire critical section on the target collection in order
-                    // to disallow concurrent `createCollection`
+                    const auto optTargetCollType = getShardedCollection(opCtx, toNss);
+                    const bool targetIsSharded = (bool)optTargetCollType;
+                    _doc.setTargetIsSharded(targetIsSharded);
+                    _doc.setTargetUUID(getCollectionUUID(
+                        opCtx, toNss, optTargetCollType, /*throwNotFound*/ false));
+
                     auto criticalSection = RecoverableCriticalSectionService::get(opCtx);
-                    criticalSection->acquireRecoverableCriticalSectionBlockWrites(
-                        opCtx,
-                        toNss,
-                        criticalSectionReason,
-                        ShardingCatalogClient::kLocalWriteConcern);
-                    criticalSection->promoteRecoverableCriticalSectionToBlockAlsoReads(
-                        opCtx,
-                        toNss,
-                        criticalSectionReason,
-                        ShardingCatalogClient::kLocalWriteConcern);
+                    if (!targetIsSharded) {
+                        // (SERVER-67325) Acquire critical section on the target collection in order
+                        // to disallow concurrent `createCollection`
+                        criticalSection->acquireRecoverableCriticalSectionBlockWrites(
+                            opCtx,
+                            toNss,
+                            criticalSectionReason,
+                            ShardingCatalogClient::kLocalWriteConcern);
+                        criticalSection->promoteRecoverableCriticalSectionToBlockAlsoReads(
+                            opCtx,
+                            toNss,
+                            criticalSectionReason,
+                            ShardingCatalogClient::kLocalWriteConcern);
+                    }
 
                     // Make sure the target namespace is not a view
                     {
@@ -198,12 +206,6 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                                               << "` because it is a view.",
                                 !CollectionCatalog::get(opCtx)->lookupView(opCtx, toNss));
                     }
-
-                    const auto optTargetCollType = getShardedCollection(opCtx, toNss);
-                    const bool targetIsSharded = (bool)optTargetCollType;
-                    _doc.setTargetIsSharded(targetIsSharded);
-                    _doc.setTargetUUID(getCollectionUUID(
-                        opCtx, toNss, optTargetCollType, /*throwNotFound*/ false));
 
                     const bool targetExists = [&]() {
                         if (targetIsSharded) {
