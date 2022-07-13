@@ -5,7 +5,7 @@
 (function() {
 "use strict";
 
-const memoryLimitMb = 1;
+const memoryLimitMb = 16;
 const memoryLimitBytes = memoryLimitMb * 1024 * 1024;
 
 // Start mongod with reduced memory limit for the $group stage.
@@ -31,7 +31,7 @@ let pipeline =
 assert.throwsWithCode(() => testDb.largeColl.aggregate(pipeline, {allowDiskUse: false}),
                       ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
 
-testDb.largeColl.aggregate(pipeline);
+testDb.largeColl.aggregate(pipeline).itcount();
 assert.eq(listFiles(conn.dbpath + "/_tmp").length, 0);
 
 // Run the pipeline without $_internalInhibitOptimization so that $group runs in the sbe engine.
@@ -40,7 +40,8 @@ pipeline = [{$group: {_id: '$largeStr', minId: {$min: '$_id'}}}];
 // Make sure that the pipeline needs to spill to disk.
 assert.throwsWithCode(() => testDb.largeColl.aggregate(pipeline, {allowDiskUse: false}),
                       ErrorCodes.QueryExceededMemoryLimitNoDiskUseAllowed);
-testDb.largeColl.aggregate(pipeline);
+testDb.largeColl.aggregate(pipeline).itcount();
+assert.eq(listFiles(conn.dbpath + "/_tmp").length, 0);
 
 MongoRunner.stopMongod(conn);
 })();
