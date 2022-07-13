@@ -115,10 +115,8 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
         goto err;
     if (addr.ta.prepare)
         goto err;
-    /* History store data are always visible. No need to check visibility. */
-    if (!WT_IS_HS(session->dhandle) &&
-      !__wt_txn_visible(session, addr.ta.newest_txn,
-        WT_MAX(addr.ta.newest_start_durable_ts, addr.ta.newest_stop_durable_ts)))
+    if (!__wt_txn_visible(session, addr.ta.newest_txn,
+          WT_MAX(addr.ta.newest_start_durable_ts, addr.ta.newest_stop_durable_ts)))
         goto err;
 
     /*
@@ -131,9 +129,7 @@ __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
     WT_ERR(__wt_calloc_one(session, &ref->ft_info.del));
     ref->ft_info.del->previous_ref_state = previous_state;
 
-    /* History store truncation is non-transactional. */
-    if (!WT_IS_HS(session->dhandle))
-        WT_ERR(__wt_txn_modify_page_delete(session, ref));
+    WT_ERR(__wt_txn_modify_page_delete(session, ref));
 
     *skipp = true;
     WT_STAT_CONN_DATA_INCR(session, rec_page_delete_fast);
