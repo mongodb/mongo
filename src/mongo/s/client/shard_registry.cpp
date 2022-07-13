@@ -47,7 +47,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/str.h"
-#include "mongo/util/testing_proctor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -209,7 +208,7 @@ void ShardRegistry::startupPeriodicReloader(OperationContext* opCtx) {
 
     AsyncTry([this] {
         LOGV2_DEBUG(22726, 1, "Reloading shardRegistry");
-        return _reloadAsyncNoRetry();
+        return _reloadAsync();
     })
         .until([](auto&& sw) {
             if (!sw.isOK()) {
@@ -448,22 +447,6 @@ void ShardRegistry::reload(OperationContext* opCtx) {
 }
 
 SharedSemiFuture<ShardRegistry::Cache::ValueHandle> ShardRegistry::_reloadAsync() {
-    if (MONGO_unlikely(TestingProctor::instance().isEnabled())) {
-        // Some unit tests don't support running the reload's AsyncTry on the fixed executor.
-        return _reloadAsyncNoRetry();
-    } else {
-        return AsyncTry([=]() mutable { return _reloadAsyncNoRetry(); })
-            .until([](auto sw) mutable {
-                return sw.getStatus() != ErrorCodes::ReadConcernMajorityNotAvailableYet;
-            })
-            .withBackoffBetweenIterations(kExponentialBackoff)
-            .on(Grid::get(getGlobalServiceContext())->getExecutorPool()->getFixedExecutor(),
-                CancellationToken::uncancelable())
-            .share();
-    }
-}
-
-SharedSemiFuture<ShardRegistry::Cache::ValueHandle> ShardRegistry::_reloadAsyncNoRetry() {
     // Make the next acquire do a lookup.
     auto value = _forceReloadIncrement.addAndFetch(1);
     LOGV2_DEBUG(4620253, 2, "Forcing ShardRegistry reload", "newForceReloadIncrement"_attr = value);

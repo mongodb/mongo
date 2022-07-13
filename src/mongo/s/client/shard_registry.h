@@ -431,7 +431,6 @@ private:
     void _initializeCacheIfNecessary() const;
 
     SharedSemiFuture<Cache::ValueHandle> _reloadAsync();
-    SharedSemiFuture<Cache::ValueHandle> _reloadAsyncNoRetry();
 
     /**
      * Factory to create shards.  Never changed after startup so safe to access outside of _mutex.
