@@ -21,7 +21,10 @@ load('jstests/libs/change_stream_util.js');  // For 'assertChangeStreamEventEq'.
 // Create a single-shard cluster for this test.
 const st = new ShardingTest({
     shards: 1,
-    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}
+    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
+    other: {
+        configOptions: {setParameter: {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000}}
+    }
 });
 
 const testDB = st.s.getDB(jsTestName());

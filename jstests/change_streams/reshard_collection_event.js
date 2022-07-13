@@ -21,7 +21,10 @@ load('jstests/libs/change_stream_util.js');        // For 'ChangeStreamTest' and
 
 var st = new ShardingTest({
     shards: 2,
-    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}}
+    rs: {nodes: 1, setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}},
+    other: {
+        configOptions: {setParameter: {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000}}
+    }
 });
 
 const mongos = st.s0;
