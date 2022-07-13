@@ -125,6 +125,11 @@ public:
             return;
         }
 
+        // Do not increase consumption metrics during wait for write concern, as in serverless this
+        // might cause a tenant to be billed for reading the oplog entry (which might be of
+        // considerable size) of another tenant.
+        ResourceConsumption::PauseMetricsCollectorBlock pauseMetricsCollection(opCtx);
+
         auto lastOpAfterRun = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
 
         auto waitForWriteConcernAndAppendStatus = [&]() {

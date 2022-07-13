@@ -301,7 +301,7 @@ public:
         bool endScopedCollecting();
 
         bool isCollecting() const {
-            return _collecting == ScopedCollectionState::kInScopeCollecting;
+            return !_paused && _collecting == ScopedCollectionState::kInScopeCollecting;
         }
 
         bool isInScope() const {
@@ -391,6 +391,30 @@ public:
          */
         void incrementOneCursorSeek(StringData uri);
 
+        /**
+         * Pause metrics collection, overriding kInScopeCollecting status. The scope status may be
+         * changed during a pause, but will not come into effect until resume() is called.
+         */
+        void pause() {
+            invariant(!_paused);
+            _paused = true;
+        }
+
+        /**
+         * Resume metrics collection. Trying to resume a non-paused object will invariant.
+         */
+        void resume() {
+            invariant(_paused);
+            _paused = false;
+        }
+
+        /**
+         * Returns if the current object is in paused state.
+         */
+        bool isPaused() {
+            return _paused;
+        }
+
     private:
         // Privatize copy constructors to prevent callers from accidentally copying when this is
         // decorated on the OperationContext by reference.
@@ -418,6 +442,7 @@ public:
         bool _hasCollectedMetrics = false;
         std::string _dbName;
         OperationMetrics _metrics;
+        bool _paused = false;
     };
 
     /**
@@ -437,6 +462,37 @@ public:
     private:
         bool _topLevel;
         OperationContext* _opCtx;
+    };
+
+    /**
+     * RAII-style class to temporarily pause the MetricsCollector in the OperationContext. This
+     * applies even if the MetricsCollector is started explicitly in lower levels.
+     *
+     * Exception: CPU metrics are not paused.
+     */
+    class PauseMetricsCollectorBlock {
+        PauseMetricsCollectorBlock(const PauseMetricsCollectorBlock&) = delete;
+        PauseMetricsCollectorBlock& operator=(const PauseMetricsCollectorBlock&) = delete;
+
+    public:
+        explicit PauseMetricsCollectorBlock(OperationContext* opCtx) : _opCtx(opCtx) {
+            auto& metrics = MetricsCollector::get(_opCtx);
+            _wasPaused = metrics.isPaused();
+            if (!_wasPaused) {
+                metrics.pause();
+            }
+        }
+
+        ~PauseMetricsCollectorBlock() {
+            if (!_wasPaused) {
+                auto& metrics = MetricsCollector::get(_opCtx);
+                metrics.resume();
+            }
+        }
+
+    private:
+        OperationContext* _opCtx;
+        bool _wasPaused;
     };
 
     /**

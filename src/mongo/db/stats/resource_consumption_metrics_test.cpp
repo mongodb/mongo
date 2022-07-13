@@ -722,4 +722,44 @@ TEST_F(ResourceConsumptionMetricsTest, CursorSeeks) {
     auto metricsCopy = globalResourceConsumption.getDbMetrics();
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.cursorSeeks, expectedSeeks);
 }
+
+TEST_F(ResourceConsumptionMetricsTest, PauseMetricsCollectorBlock) {
+    auto& globalResourceConsumption = ResourceConsumption::get(getServiceContext());
+    auto& operationMetrics = ResourceConsumption::MetricsCollector::get(_opCtx.get());
+
+    {
+        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1");
+        {
+            // Metrics increase within this scope should not be applied.
+            ResourceConsumption::PauseMetricsCollectorBlock pauseMetricsCollection(_opCtx.get());
+            operationMetrics.incrementOneDocRead("", 2);
+            operationMetrics.incrementOneIdxEntryRead("", 8);
+            operationMetrics.incrementKeysSorted(16);
+            operationMetrics.incrementSorterSpills(32);
+            operationMetrics.incrementDocUnitsReturned("", makeDocUnits(64));
+            operationMetrics.incrementOneCursorSeek("");
+        }
+
+        // Once PauseMetricsCollectorBlock goes out of scope, metrics collection should work as
+        // normal.
+        operationMetrics.incrementOneDocRead("", 4);
+        operationMetrics.incrementOneIdxEntryRead("", 16);
+        operationMetrics.incrementKeysSorted(32);
+        operationMetrics.incrementSorterSpills(64);
+        operationMetrics.incrementDocUnitsReturned("", makeDocUnits(128));
+        operationMetrics.incrementOneCursorSeek("");
+    }
+
+    auto metricsCopy = globalResourceConsumption.getDbMetrics();
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsRead.bytes(), 4);
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsRead.units(), 1);
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.idxEntriesRead.bytes(), 16);
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.idxEntriesRead.units(), 1);
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.keysSorted, 32);
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.sorterSpills, 64);
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsReturned.bytes(), 128);
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsReturned.units(), 1);
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.cursorSeeks, 1);
+}
+
 }  // namespace mongo

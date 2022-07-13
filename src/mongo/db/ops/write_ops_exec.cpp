@@ -373,7 +373,11 @@ void insertDocuments(OperationContext* opCtx,
     hangAndFailAfterDocumentInsertsReserveOpTimes.executeIf(
         [&](const BSONObj& data) {
             hangAndFailAfterDocumentInsertsReserveOpTimes.pauseWhileSet(opCtx);
-            uasserted(51269, "hangAndFailAfterDocumentInsertsReserveOpTimes fail point enabled");
+            const auto skipFail = data["skipFail"];
+            if (!skipFail || !skipFail.boolean()) {
+                uasserted(51269,
+                          "hangAndFailAfterDocumentInsertsReserveOpTimes fail point enabled");
+            }
         },
         [&](const BSONObj& data) {
             // Check if the failpoint specifies no collection or matches the existing one.
