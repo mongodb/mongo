@@ -281,7 +281,8 @@ boost::optional<IntervalReqExpr::Node> intersectDNFIntervals(
 }
 
 bool combineMultiKeyIntervalsDNF(MultiKeyIntervalReqExpr::Node& targetIntervals,
-                                 const IntervalReqExpr::Node& sourceIntervals) {
+                                 const IntervalReqExpr::Node& sourceIntervals,
+                                 const bool reverseSource) {
     MultiKeyIntervalReqExpr::NodeVector newDisjunction;
 
     for (const auto& sourceConjunction :
@@ -301,11 +302,17 @@ bool combineMultiKeyIntervalsDNF(MultiKeyIntervalReqExpr::Node& targetIntervals,
                     if (!targetInterval.empty() && !targetInterval.back().isEquality() &&
                         !sourceInterval.isFullyOpen()) {
                         // We do not have an equality prefix. Reject.
-                        return {};
+                        return false;
                     }
 
                     auto newInterval = targetInterval;
-                    newInterval.push_back(sourceInterval);
+                    if (reverseSource) {
+                        auto newSource = sourceInterval;
+                        newSource.reverse();
+                        newInterval.push_back(std::move(newSource));
+                    } else {
+                        newInterval.push_back(sourceInterval);
+                    }
                     newConjunction.emplace_back(
                         MultiKeyIntervalReqExpr::make<MultiKeyIntervalReqExpr::Atom>(
                             std::move(newInterval)));

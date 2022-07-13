@@ -99,6 +99,10 @@ BoundRequirement& IntervalRequirement::getHighBound() {
     return _highBound;
 }
 
+void IntervalRequirement::reverse() {
+    std::swap(_lowBound, _highBound);
+}
+
 PartialSchemaKey::PartialSchemaKey() : PartialSchemaKey({}, make<PathIdentity>()) {}
 
 PartialSchemaKey::PartialSchemaKey(ProjectionName projectionName)

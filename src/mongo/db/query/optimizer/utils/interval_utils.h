@@ -60,9 +60,12 @@ boost::optional<IntervalReqExpr::Node> intersectDNFIntervals(
  * operator. If we fail to combine, the target multi-key interval is left unchanged.
  * Currently we only support a single "equality prefix": 0+ equalities followed by at most
  * inequality, and trailing open intervals.
+ * reverseSource flag indicates the sourceInterval corresponds to a descending index, so the bounds
+ * are flipped before combining with the target.
  * TODO: support Recursive Index Navigation.
  */
 bool combineMultiKeyIntervalsDNF(MultiKeyIntervalReqExpr::Node& targetIntervals,
-                                 const IntervalReqExpr::Node& sourceIntervals);
+                                 const IntervalReqExpr::Node& sourceIntervals,
+                                 bool reverseSource = false);
 
 }  // namespace mongo::optimizer

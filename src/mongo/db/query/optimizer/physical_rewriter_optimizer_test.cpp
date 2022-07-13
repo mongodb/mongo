@@ -2177,6 +2177,7 @@ TEST(PhysRewriter, MultiKeyIndex) {
 
         // GroupBy+Union cannot propagate collation requirement, and we need a separate
         // CollationNode.
+
         ASSERT_EXPLAIN_V2(
             "Root []\n"
             "|   |   projections: \n"
@@ -2245,7 +2246,7 @@ TEST(PhysRewriter, MultiKeyIndex) {
             "|   |       [sideId_0]\n"
             "|   |           Const [1]\n"
             "|   IndexScan [{'<indexKey> 0': pb, '<rid>': rid_0}, scanDefName: c1, indexDefName: "
-            "index2, interval: {(Const [2], Const [maxKey]]}]\n"
+            "index2, interval: {[Const [maxKey], Const [2])}]\n"
             "|       BindBlock:\n"
             "|           [pb]\n"
             "|               Source []\n"
@@ -2313,7 +2314,7 @@ TEST(PhysRewriter, MultiKeyIndex) {
             "|   |       [rid_2]\n"
             "|   |           Variable [rid_0]\n"
             "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index2, interval: "
-            "{(Const [2], Const [maxKey]]}, reversed]\n"
+            "{[Const [maxKey], Const [2])}, reversed]\n"
             "|       BindBlock:\n"
             "|           [rid_0]\n"
             "|               Source []\n"

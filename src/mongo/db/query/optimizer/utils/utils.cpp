@@ -29,13 +29,12 @@
 
 #include "mongo/db/query/optimizer/utils/utils.h"
 
-#include "boost/none.hpp"
+#include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/utils/interval_utils.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo::optimizer {
 
@@ -1043,7 +1042,7 @@ CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
         for (size_t indexField = 0; indexField < indexCollationSpec.size(); indexField++) {
             const auto& indexCollationEntry = indexCollationSpec.at(indexField);
             PartialSchemaKey indexKey{scanProjectionName, indexCollationEntry._path};
-
+            const bool reverse = indexCollationEntry._op == CollationOp::Descending;
             if (reqMap.count(indexKey) == 1 && isPrefix) {
                 hasExactMatch = true;
 
@@ -1051,11 +1050,11 @@ CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
                 const PartialSchemaRequirement& req = reqMap.find(indexKey)->second;
                 const auto& requiredInterval = req.getIntervals();
 
-                if (combineMultiKeyIntervalsDNF(intervals, requiredInterval)) {
+                if (combineMultiKeyIntervalsDNF(intervals, requiredInterval, reverse)) {
                     intervalPrefixSize++;
                 } else {
-                    if (!combineMultiKeyIntervalsDNF(intervals,
-                                                     IntervalReqExpr::makeSingularDNF())) {
+                    if (!combineMultiKeyIntervalsDNF(
+                            intervals, IntervalReqExpr::makeSingularDNF(), reverse)) {
                         uasserted(6624155, "Cannot combine with an open interval");
                     }
 
@@ -1121,9 +1120,8 @@ CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
                                  .second) {
                             uasserted(6624158, "Duplicate field name");
                         }
-
-                        if (!combineMultiKeyIntervalsDNF(intervals,
-                                                         IntervalReqExpr::makeSingularDNF())) {
+                        if (!combineMultiKeyIntervalsDNF(
+                                intervals, IntervalReqExpr::makeSingularDNF(), reverse)) {
                             uasserted(6624159, "Cannot combine with an open interval");
                         }
 
@@ -1135,8 +1133,8 @@ CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
 
                 if (!foundPathPrefix) {
                     isPrefix = false;
-                    if (!combineMultiKeyIntervalsDNF(intervals,
-                                                     IntervalReqExpr::makeSingularDNF())) {
+                    if (!combineMultiKeyIntervalsDNF(
+                            intervals, IntervalReqExpr::makeSingularDNF(), reverse)) {
                         uasserted(6624160, "Cannot combine with an open interval");
                     }
                 }

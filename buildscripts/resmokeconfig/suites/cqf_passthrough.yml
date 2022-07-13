@@ -26,9 +26,8 @@ selector:
   - jstests/core/kill_cursors.js
   - jstests/core/minmax.js
   - jstests/core/show_record_id.js
-  # TODO SERVER-67510
+  # TODO SERVER-68512
   - jstests/core/collation_with_reverse_index.js
-  - jstests/core/find_covered_projection.js
   # TODO SERVER-67548 Fix equality to null with indexes.
   - jstests/core/cover_null_queries.js
   - jstests/core/null_query_semantics.js
