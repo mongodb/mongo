@@ -54,3 +54,7 @@ feature_flags:
         description: "Enable newly added cluster connection health metrics"
         cpp_varname: gFeatureFlagConnHealthMetrics
         default: false
+    featureFlagGlobalIndexes:
+        description: "Enable support for global indexes"
+        cpp_varname: gFeatureFlagGlobalIndexes
+        default: false
