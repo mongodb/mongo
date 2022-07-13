@@ -1280,8 +1280,9 @@ std::shared_ptr<BucketCatalog::WriteBatch> BucketCatalog::_insertIntoBucket(
         bucket->_memoryUsage += (info->key.ns.size() * 2) + doc.objsize() + sizeof(Bucket) +
             sizeof(std::unique_ptr<Bucket>) + (sizeof(Bucket*) * 2);
 
-        bucket->_schema.update(
+        auto updateStatus = bucket->_schema.update(
             doc, info->options.getMetaField(), info->key.metadata.getComparator());
+        invariant(updateStatus == timeseries::Schema::UpdateStatus::Updated);
     } else {
         _memoryUsage.fetchAndSubtract(bucket->_memoryUsage);
     }
