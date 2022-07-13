@@ -112,6 +112,10 @@ assert(res.note,
        'createIndexes.note should be present in results when adding a duplicate index: ' +
            tojson(res));
 
+// Test that index creation fails with an empty list of specs.
+res = t.runCommand("createIndexes", {indexes: []});
+assert.commandFailedWithCode(res, ErrorCodes.BadValue);
+
 // Test that index creation fails on specs that are missing required fields such as 'key'.
 res = t.runCommand("createIndexes", {indexes: [{}]});
 assert.commandFailedWithCode(res, ErrorCodes.FailedToParse);
