@@ -74,11 +74,11 @@ tsj="$(date --utc --date='1 seconds ago' +'%Y-%m-%d %H:%M:%S')"
 sudo --non-interactive systemctl start mongod \
   && sudo --non-interactive systemctl status mongod || (
   set +o errexit
-  echo "=== SELinux errors:"
+  echo "================== SELinux errors: =================="
   sudo --non-interactive ausearch -m AVC,USER_AVC,SELINUX_ERR,USER_SELINUX_ERR -ts $ts
-  echo "=== journalctl --unit=mongod:"
-  sudo --non-interactive journalctl --no-pager --since="$tsj" --unit=mongod --unit=systemd --catalog
-  echo "=== /var/log/mongodb/mongod.log:"
+  echo "================== journalctl =================="
+  sudo --non-interactive journalctl --no-pager --catalog --since="$tsj" | grep -i mongo
+  echo "================== /var/log/mongodb/mongod.log =================="
   sudo --non-interactive cat /var/log/mongodb/mongod.log
   echo "==== FAIL: mongod service was not started successfully"
   exit 1
