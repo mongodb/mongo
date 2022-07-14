@@ -27,25 +27,26 @@
  *    it in the license file.
  */
 
+#pragma once
+
+#include <map>
+#include <string>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/rsa_public_key.h"
-#include "mongo/crypto/jwt_types_gen.h"
-#include "mongo/util/base64.h"
 
 namespace mongo::crypto {
-namespace {
-std::vector<std::uint8_t> vectorFromCDR(ConstDataRange cdr) {
-    return {cdr.data(), cdr.data() + cdr.length()};
-}
-}  // namespace
 
-RsaPublicKey::RsaPublicKey(StringData keyId, ConstDataRange e, ConstDataRange n)
-    : _keyId(keyId.toString()), _e(vectorFromCDR(e)), _n(vectorFromCDR(n)) {}
+class JWKManager {
+public:
+    JWKManager() = default;
+    explicit JWKManager(BSONObj data);
 
-void RsaPublicKey::appendToBSON(BSONObjBuilder* builder) const {
-    builder->append(JWK::kTypeFieldName, "RSA"_sd);
-    builder->append(JWK::kKeyIdFieldName, _keyId);
-    builder->append(JWK::kEFieldName, base64url::encode(_e.data(), _e.size()));
-    builder->append(JWK::kNFieldName, base64url::encode(_n.data(), _n.size()));
-}
+    const RsaPublicKey& getKey(StringData keyId) const;
+
+private:
+    std::map<std::string, RsaPublicKey> _keys;
+};
 
 }  // namespace mongo::crypto
