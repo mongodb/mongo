@@ -57,6 +57,7 @@ namespace mongo::logv2 {
     X(kControl,                , "control"               , "CONTROL" , kDefault) \
     X(kExecutor,               , "executor"              , "EXECUTOR", kDefault) \
     X(kGeo,                    , "geo"                   , "GEO"     , kDefault) \
+    X(kGlobalIndex,            , "globalIndex"           , "GBL_IDX" , kDefault) \
     X(kIndex,                  , "index"                 , "INDEX"   , kDefault) \
     X(kNetwork,                , "network"               , "NETWORK" , kDefault) \
     X(kProcessHealth,          , "processHealth"         , "HEALTH"  , kDefault) \

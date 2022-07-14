@@ -106,7 +106,8 @@ public:
      * The given stmtIds are included in the sent command. If the API's transaction was spawned on
      * behalf of a retryable write, the statement ids must be unique for each write in the
      * transaction as the underlying servers will save history for each id the same as for a
-     * retryable write. A write can opt out of this by sending a -1 statement id, which is ignored.
+     * retryable write. A write can opt out of this by sending a -1 statement id or an empty vector,
+     * which is ignored.
      *
      * If a sent statement id had already been seen for this transaction, the write with that id
      * won't apply a second time and instead returns its response from its original execution. That
