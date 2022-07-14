@@ -77,7 +77,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/pm2423_feature_flags_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/stdx/chrono.h"

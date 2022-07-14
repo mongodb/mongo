@@ -39,7 +39,6 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/logv2/redaction.h"
-#include "mongo/s/pm2423_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
@@ -49,14 +48,7 @@ namespace mongo {
 namespace write_stage_common {
 
 PreWriteFilter::PreWriteFilter(OperationContext* opCtx, NamespaceString nss)
-    : _opCtx(opCtx),
-      _nss(std::move(nss)),
-      _isEnabled([] {
-          auto& fcv = serverGlobalParams.featureCompatibility;
-          return fcv.isVersionInitialized() &&
-              feature_flags::gFeatureFlagNoChangeStreamEventsDueToOrphans.isEnabled(fcv);
-      }()),
-      _skipFiltering([&] {
+    : _opCtx(opCtx), _nss(std::move(nss)), _skipFiltering([&] {
           // Always allow writes on replica sets.
           if (serverGlobalParams.clusterRole == ClusterRole::None) {
               return true;
@@ -68,10 +60,6 @@ PreWriteFilter::PreWriteFilter(OperationContext* opCtx, NamespaceString nss)
       }()) {}
 
 PreWriteFilter::Action PreWriteFilter::computeAction(const Document& doc) {
-    // Skip the checks if the Filter is not enabled.
-    if (!_isEnabled)
-        return Action::kWrite;
-
     if (_skipFiltering) {
         // Secondaries do not apply any filtering logic as the primary already did.
         return Action::kWrite;

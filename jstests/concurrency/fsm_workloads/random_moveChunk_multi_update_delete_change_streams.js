@@ -8,9 +8,7 @@
  * @tags: [
  *  requires_sharding,
  *  assumes_balancer_off,
- *  uses_change_streams,
- *  requires_fcv_53,
- *  featureFlagNoChangeStreamEventsDueToOrphans
+ *  uses_change_streams
  * ];
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');

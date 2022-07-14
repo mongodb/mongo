@@ -79,7 +79,6 @@ private:
 
     OperationContext* _opCtx;
     NamespaceString _nss;
-    const bool _isEnabled;
     const bool _skipFiltering;
     std::unique_ptr<ShardFilterer> _shardFilterer;
 };

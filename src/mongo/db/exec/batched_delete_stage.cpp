@@ -43,7 +43,6 @@
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/pm2423_feature_flags_gen.h"
 #include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
