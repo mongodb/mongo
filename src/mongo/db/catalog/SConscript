@@ -319,6 +319,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/rebuild_indexes',
+        '$BUILD_DIR/mongo/db/repl/oplog',
         '$BUILD_DIR/mongo/db/service_context',
         'collection',
         'collection_catalog',

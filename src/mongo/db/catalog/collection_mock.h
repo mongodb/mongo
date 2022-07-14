@@ -379,10 +379,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void establishOplogCollectionForLogging(OperationContext* opCtx) const {
-        MONGO_UNREACHABLE;
-    }
-
     void onDeregisterFromCatalog(OperationContext* opCtx) {}
 
     UUID uuid() const {

@@ -2076,10 +2076,6 @@ void CollectionImpl::indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntr
     _indexCatalog->indexBuildSuccess(opCtx, this, index);
 }
 
-void CollectionImpl::establishOplogCollectionForLogging(OperationContext* opCtx) const {
-    repl::establishOplogCollectionForLogging(opCtx, {this, CollectionPtr::NoYieldTag{}});
-}
-
 StatusWith<int> CollectionImpl::checkMetaDataForIndex(const std::string& indexName,
                                                       const BSONObj& spec) const {
     int offset = _metadata->findIndexOffset(indexName);

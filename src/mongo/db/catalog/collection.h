@@ -821,14 +821,6 @@ public:
     virtual void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) = 0;
 
     /**
-     * Use this Collection as the new cached pointer to the local oplog.
-     *
-     * Called by catalog::openCatalog() to re-establish the oplog collection pointer while holding
-     * onto the global lock in exclusive mode.
-     */
-    virtual void establishOplogCollectionForLogging(OperationContext* opCtx) const = 0;
-
-    /**
      * Called when this Collection is deregistered from the catalog
      */
     virtual void onDeregisterFromCatalog(OperationContext* opCtx) = 0;

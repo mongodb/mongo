@@ -43,6 +43,7 @@
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/rebuild_indexes.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -107,7 +108,9 @@ void reopenAllDatabasesAndReloadCollectionCatalog(
                 // The oplog collection must be visible when establishing for repl. Finish our
                 // batched catalog write and continue on a new batch afterwards.
                 catalogWriter.reset();
-                collection->establishOplogCollectionForLogging(opCtx);
+
+                repl::establishOplogCollectionForLogging(
+                    opCtx, {collection.get(), CollectionPtr::NoYieldTag{}});
                 catalogWriter.emplace(opCtx);
             }
         }
