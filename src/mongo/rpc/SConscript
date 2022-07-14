@@ -114,7 +114,6 @@ env.Library(
     source=[
         'metadata.cpp',
         'metadata/egress_metadata_hook_list.cpp',
-        'metadata/sharding_metadata.cpp',
         'metadata/repl_set_metadata.cpp',
         'metadata/oplog_query_metadata.cpp',
         'metadata/tracking_metadata.cpp',

@@ -47,7 +47,6 @@
 #include "mongo/db/service_entry_point_common.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/sharding_metadata.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/s/stale_exception.h"
@@ -207,8 +206,6 @@ public:
     void appendReplyMetadata(OperationContext* opCtx,
                              const OpMsgRequest& request,
                              BSONObjBuilder* metadataBob) const override {
-        const bool isShardingAware = ShardingState::get(opCtx)->enabled();
-        const bool isConfig = serverGlobalParams.clusterRole == ClusterRole::ConfigServer;
         auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
         const bool isReplSet =
             replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
@@ -218,21 +215,6 @@ public:
             repl::OpTime lastOpTimeFromClient =
                 repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
             replCoord->prepareReplMetadata(request.body, lastOpTimeFromClient, metadataBob);
-
-            if (isShardingAware || isConfig) {
-                // The getLastError command is removed in version 5.1 and 'ShardingMetadata' is for
-                // mongos getLastError processing. So, it's not necessary to send 'ShardingMetadata'
-                // when FCV >= 5.1.
-                // TODO: SERVER-58743: Remove following 'if' block.
-                if (auto& fcv = serverGlobalParams.featureCompatibility;
-                    !fcv.isVersionInitialized() ||
-                    fcv.isLessThan(multiversion::FeatureCompatibilityVersion::kVersion_5_1)) {
-                    // For commands from mongos, append some info to help getLastError(w) work.
-                    rpc::ShardingMetadata(lastOpTimeFromClient, replCoord->getElectionId())
-                        .writeToMetadata(metadataBob)
-                        .transitional_ignore();
-                }
-            }
         }
     }
 
