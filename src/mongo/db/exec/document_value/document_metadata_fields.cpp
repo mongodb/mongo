@@ -236,9 +236,11 @@ void DocumentMetadataFields::deserializeForSorter(BufReader& buf, DocumentMetada
             out->setSearchScoreDetails(
                 BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings()));
         } else if (marker == static_cast<char>(MetaType::kTimeseriesBucketMinTime) + 1) {
-            out->setTimeseriesBucketMinTime(Date_t::fromMillisSinceEpoch(buf.read<long long>()));
+            out->setTimeseriesBucketMinTime(
+                Date_t::fromMillisSinceEpoch(buf.read<LittleEndian<long long>>()));
         } else if (marker == static_cast<char>(MetaType::kTimeseriesBucketMaxTime) + 1) {
-            out->setTimeseriesBucketMaxTime(Date_t::fromMillisSinceEpoch(buf.read<long long>()));
+            out->setTimeseriesBucketMaxTime(
+                Date_t::fromMillisSinceEpoch(buf.read<LittleEndian<long long>>()));
         } else {
             uasserted(28744, "Unrecognized marker, unable to deserialize buffer");
         }
