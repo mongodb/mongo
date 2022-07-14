@@ -271,13 +271,13 @@ int main(int argc, char** argv) {
     auto ret = mongo::embedded::addMongocEmbeddedTestOptions(&options);
     if (!ret.isOK()) {
         std::cerr << ret << std::endl;
-        return static_cast<int>(ExitCode::fail);
+        return static_cast<int>(mongo::ExitCode::fail);
     }
 
     ret = parser.run(options, std::vector<std::string>(argv, argv + argc), &environment);
     if (!ret.isOK()) {
         std::cerr << options.helpString();
-        return static_cast<int>(ExitCode::fail);
+        return static_cast<int>(mongo::ExitCode::fail);
     }
     if (environment.count("tempPath")) {
         ::mongo::unittest::TempDir::setTempPath(environment["tempPath"].as<std::string>());
@@ -291,13 +291,13 @@ int main(int argc, char** argv) {
     ret = mongo::runGlobalInitializers(std::vector<std::string>{});
     if (!ret.isOK()) {
         std::cerr << "Global initilization failed";
-        return static_cast<int>(ExitCode::fail);
+        return static_cast<int>(mongo::ExitCode::fail);
     }
 
     ret = mongo::runGlobalDeinitializers();
     if (!ret.isOK()) {
         std::cerr << "Global deinitilization failed";
-        return static_cast<int>(ExitCode::fail);
+        return static_cast<int>(mongo::ExitCode::fail);
     }
 
     mongo::StatusPtr status(mongo_embedded_v1_status_create());
@@ -311,14 +311,14 @@ int main(int argc, char** argv) {
     global_lib_handle = mongo_embedded_v1_lib_init(&params, status.get());
     if (global_lib_handle == nullptr) {
         std::cerr << "Error: " << mongo_embedded_v1_status_get_explanation(status.get());
-        return static_cast<int>(ExitCode::fail);
+        return static_cast<int>(mongo::ExitCode::fail);
     }
 
     auto result = ::mongo::unittest::Suite::run(std::vector<std::string>(), "", "", 1);
 
     if (mongo_embedded_v1_lib_fini(global_lib_handle, status.get()) != MONGO_EMBEDDED_V1_SUCCESS) {
         std::cerr << "Error: " << mongo_embedded_v1_status_get_explanation(status.get());
-        return static_cast<int>(ExitCode::fail);
+        return static_cast<int>(mongo::ExitCode::fail);
     }
 
     mongoc_cleanup();
