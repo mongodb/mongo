@@ -5688,12 +5688,13 @@ tasks:
     vars:
       use_large_distro: "true"
 
-- <<: *task_template
-  name: write_concern_majority_passthrough
+- <<: *gen_task_template
+  name: write_concern_majority_passthrough_gen
   tags: ["read_write_concern", "large", "write"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
 
 - <<: *task_template
   name: cwrwc_passthrough
