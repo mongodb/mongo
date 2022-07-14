@@ -59,6 +59,7 @@ env.Library(
         'config_server_op_observer.cpp',
         'global_index/global_index_entry.idl',
         'global_index/global_index_inserter.cpp',
+        'global_index_cumulative_metrics_field_name_provider.cpp',
         'global_index_metrics.cpp',
         'metadata_manager.cpp',
         'migration_chunk_cloner_source_legacy.cpp',
