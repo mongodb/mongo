@@ -50,6 +50,9 @@ public:
     static ABT emptyObject();
     static ABT emptyArray();
 
+    static ABT timestamp(const Timestamp& t);
+    static ABT date(const Date_t& d);
+
     static ABT nothing();
     static ABT null();
 

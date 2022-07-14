@@ -68,6 +68,14 @@ ABT Constant::fromDouble(double value) {
     return make<Constant>(TypeTags::NumberDouble, bitcastFrom<double>(value));
 }
 
+ABT Constant::timestamp(const Timestamp& t) {
+    return make<Constant>(TypeTags::Timestamp, bitcastFrom<uint64_t>(t.asULL()));
+}
+
+ABT Constant::date(const Date_t& d) {
+    return make<Constant>(TypeTags::Date, bitcastFrom<int64_t>(d.toMillisSinceEpoch()));
+}
+
 ABT Constant::emptyObject() {
     auto [tag, val] = makeNewObject();
     return make<Constant>(tag, val);

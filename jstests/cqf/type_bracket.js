@@ -2,10 +2,6 @@
 "use strict";
 
 load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
-if (!checkCascadesOptimizerEnabled(db)) {
-    jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
-}
 
 const t = db.cqf_type_bracket;
 t.drop();
