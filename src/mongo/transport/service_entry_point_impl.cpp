@@ -306,7 +306,7 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
         // Imbue the new Client with a ServiceExecutorContext.
         {
             auto seCtx = std::make_unique<transport::ServiceExecutorContext>();
-            seCtx->setThreadingModel(transport::ServiceExecutor::getInitialThreadingModel());
+            seCtx->setUseDedicatedThread(transport::gInitialUseDedicatedThread);
             seCtx->setCanUseReserved(isPrivilegedSession);
             stdx::lock_guard lk(*client);
             transport::ServiceExecutorContext::set(&*client, std::move(seCtx));

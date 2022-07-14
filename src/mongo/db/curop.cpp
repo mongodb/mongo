@@ -218,9 +218,7 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
     }
 
     if (const auto seCtx = transport::ServiceExecutorContext::get(client)) {
-        bool isDedicated = (seCtx->getThreadingModel() ==
-                            transport::ServiceExecutorContext::ThreadingModel::kDedicated);
-        infoBuilder->append("threaded"_sd, isDedicated);
+        infoBuilder->append("threaded"_sd, seCtx->useDedicatedThread());
     }
 
     if (clientOpCtx) {

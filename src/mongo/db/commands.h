@@ -259,13 +259,12 @@ struct CommandHelpers {
     static BSONObj runCommandDirectly(OperationContext* opCtx, const OpMsgRequest& request);
 
     /**
-     * Decides the command execution model (i.e., synchronous or asynchronous) based on the provided
-     * threading model.
+     * Runs the command synchronously in presence of a dedicated thread.
+     * Otherwise, runs the command asynchronously.
      */
-    static Future<void> runCommandInvocation(
-        std::shared_ptr<RequestExecutionContext> rec,
-        std::shared_ptr<CommandInvocation> invocation,
-        transport::ServiceExecutor::ThreadingModel threadingModel);
+    static Future<void> runCommandInvocation(std::shared_ptr<RequestExecutionContext> rec,
+                                             std::shared_ptr<CommandInvocation> invocation,
+                                             bool useDedicatedThread);
 
     /**
      * Runs a previously parsed CommandInvocation and propagates the result to the

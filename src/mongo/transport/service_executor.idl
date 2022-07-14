@@ -32,14 +32,13 @@ global:
     - "mongo/transport/service_executor.h"
 
 server_parameters:
-  initialServiceExecutorThreadingModel:
+  initialServiceExecutorUseDedicatedThread:
     description: >-
-        Start new client connections using an executor that follows this model.
+        If true, each client will use a dedicated thread.
     set_at: [ startup ]
-    cpp_vartype: "std::string"
-    cpp_varname: "initialServiceExecutorThreadingModel"
-    on_update: "ServiceExecutor::setInitialThreadingModelFromString"
-    default: "dedicated"
+    cpp_vartype: bool
+    cpp_varname: gInitialServiceExecutorUseDedicatedThread
+    default: true
   synchronousServiceExecutorRecursionLimit:
     description: >-
         Tasks may recurse further if their recursion depth is less than this value.

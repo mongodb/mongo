@@ -54,7 +54,7 @@ namespace {
 class EmbeddedClientObserver final : public ServiceContext::ClientObserver {
     void onCreateClient(Client* client) {
         auto seCtx = std::make_unique<transport::ServiceExecutorContext>();
-        seCtx->setThreadingModel(transport::ServiceExecutor::ThreadingModel::kDedicated);
+        seCtx->setUseDedicatedThread(true);
         transport::ServiceExecutorContext::set(client, std::move(seCtx));
     }
     void onDestroyClient(Client*) {}

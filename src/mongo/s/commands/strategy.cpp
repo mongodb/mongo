@@ -116,17 +116,18 @@ MONGO_FAIL_POINT_DEFINE(allowSkippingAppendRequiredFieldsToResponse);
 
 Future<void> runCommandInvocation(std::shared_ptr<RequestExecutionContext> rec,
                                   std::shared_ptr<CommandInvocation> invocation) {
-    auto threadingModel = [client = rec->getOpCtx()->getClient()] {
+    bool useDedicatedThread = [&] {
+        auto client = rec->getOpCtx()->getClient();
         if (auto context = transport::ServiceExecutorContext::get(client); context) {
-            return context->getThreadingModel();
+            return context->useDedicatedThread();
         }
         tassert(5453902,
                 "Threading model may only be absent for internal and direct clients",
                 !client->hasRemote() || client->isInDirectClient());
-        return transport::ServiceExecutor::ThreadingModel::kDedicated;
+        return true;
     }();
     return CommandHelpers::runCommandInvocation(
-        std::move(rec), std::move(invocation), threadingModel);
+        std::move(rec), std::move(invocation), useDedicatedThread);
 }
 
 /**
@@ -355,7 +356,7 @@ void ExecCommandClient::_onCompletion() {
     if (!_invocation->isSafeForBorrowedThreads()) {
         // If the last command wasn't safe for a borrowed thread, then let's move
         // off of it.
-        seCtx->setThreadingModel(transport::ServiceExecutor::ThreadingModel::kDedicated);
+        seCtx->setUseDedicatedThread(true);
     }
 }
 

@@ -2616,8 +2616,8 @@ buildvariants:
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     test_flags: >-
-      --mongosSetParameters="{initialServiceExecutorThreadingModel: borrowed}"
-      --mongodSetParameters="{initialServiceExecutorThreadingModel: borrowed}"
+      --mongosSetParameters="{initialServiceExecutorUseDedicatedThread: false}"
+      --mongodSetParameters="{initialServiceExecutorUseDedicatedThread: false}"
     large_distro_name: rhel80-build
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG

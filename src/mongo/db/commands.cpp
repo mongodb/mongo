@@ -155,22 +155,17 @@ BSONObj CommandHelpers::runCommandDirectly(OperationContext* opCtx, const OpMsgR
     return replyBuilder.releaseBody();
 }
 
-Future<void> CommandHelpers::runCommandInvocation(
-    std::shared_ptr<RequestExecutionContext> rec,
-    std::shared_ptr<CommandInvocation> invocation,
-    transport::ServiceExecutor::ThreadingModel threadingModel) {
-    switch (threadingModel) {
-        case transport::ServiceExecutor::ThreadingModel::kBorrowed:
-            return runCommandInvocationAsync(std::move(rec), std::move(invocation));
-        case transport::ServiceExecutor::ThreadingModel::kDedicated:
-            return makeReadyFutureWith([opCtx = rec->getOpCtx(),
-                                        request = rec->getRequest(),
-                                        invocation = invocation.get(),
-                                        replyBuilder = rec->getReplyBuilder()] {
-                runCommandInvocation(opCtx, request, invocation, replyBuilder);
-            });
-    }
-    MONGO_UNREACHABLE;
+Future<void> CommandHelpers::runCommandInvocation(std::shared_ptr<RequestExecutionContext> rec,
+                                                  std::shared_ptr<CommandInvocation> invocation,
+                                                  bool useDedicatedThread) {
+    if (useDedicatedThread)
+        return makeReadyFutureWith([opCtx = rec->getOpCtx(),
+                                    request = rec->getRequest(),
+                                    invocation = invocation.get(),
+                                    replyBuilder = rec->getReplyBuilder()] {
+            runCommandInvocation(opCtx, request, invocation, replyBuilder);
+        });
+    return runCommandInvocationAsync(std::move(rec), std::move(invocation));
 }
 
 void CommandHelpers::runCommandInvocation(OperationContext* opCtx,

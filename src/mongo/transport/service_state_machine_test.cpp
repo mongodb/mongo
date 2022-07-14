@@ -65,6 +65,21 @@ namespace mongo {
 namespace transport {
 namespace {
 
+/** Scope guard to set and restore an object value. */
+template <typename T>
+class ScopedValueOverride {
+public:
+    ScopedValueOverride(T& target, T v)
+        : _target{target}, _saved{std::exchange(_target, std::move(v))} {}
+    ~ScopedValueOverride() {
+        _target = std::move(_saved);
+    }
+
+private:
+    T& _target;
+    T _saved;
+};
+
 // TODO(cr) Does this go into its own header?
 /**
  * The ServiceStateMachineTest is a fixture that mocks the external inputs into the
@@ -150,9 +165,6 @@ public:
 
         return std::make_shared<ThreadPool>(std::move(options));
     }
-
-    ServiceStateMachineTest(boost::optional<ServiceExecutor::ThreadingModel> threadingModel = {})
-        : _threadingModel(std::move(threadingModel)) {}
 
     void setUp() override;
     void tearDown() override;
@@ -463,9 +475,6 @@ private:
         ++_onClientDisconnectCalled;
     }
 
-    const boost::optional<ServiceExecutor::ThreadingModel> _threadingModel;
-    boost::optional<ServiceExecutor::ThreadingModel> _originalThreadingModel;
-
     ServiceStateMachineTest::ServiceEntryPoint* _sep;
 
     const std::shared_ptr<ThreadPool> _threadPool = makeThreadPool();
@@ -754,11 +763,6 @@ void ServiceStateMachineTest::terminateViaServiceEntryPoint() {
 void ServiceStateMachineTest::setUp() {
     ServiceContextTest::setUp();
 
-    if (_threadingModel) {
-        _originalThreadingModel = ServiceExecutor::getInitialThreadingModel();
-        ServiceExecutor::setInitialThreadingModel(*_threadingModel);
-    }
-
     auto sep = std::make_unique<ServiceStateMachineTest::ServiceEntryPoint>(this);
     _sep = sep.get();
     getServiceContext()->setServiceEntryPoint(std::move(sep));
@@ -779,23 +783,15 @@ void ServiceStateMachineTest::tearDown() {
 
     _threadPool->shutdown();
     _threadPool->join();
-
-    if (_originalThreadingModel) {
-        ServiceExecutor::setInitialThreadingModel(*_originalThreadingModel);
-    }
 }
 
-class ServiceStateMachineWithDedicatedThreadsTest : public ServiceStateMachineTest {
-public:
-    ServiceStateMachineWithDedicatedThreadsTest()
-        : ServiceStateMachineTest(ServiceExecutor::ThreadingModel::kDedicated) {}
+template <bool useDedicatedThread>
+class DedicatedThreadOverrideTest : public ServiceStateMachineTest {
+    ScopedValueOverride<bool> _svo{gInitialUseDedicatedThread, useDedicatedThread};
 };
 
-class ServiceStateMachineWithBorrowedThreadsTest : public ServiceStateMachineTest {
-public:
-    ServiceStateMachineWithBorrowedThreadsTest()
-        : ServiceStateMachineTest(ServiceExecutor::ThreadingModel::kBorrowed) {}
-};
+using ServiceStateMachineWithBorrowedThreadsTest = DedicatedThreadOverrideTest<false>;
+using ServiceStateMachineWithDedicatedThreadsTest = DedicatedThreadOverrideTest<true>;
 
 TEST_F(ServiceStateMachineTest, StartThenEndSession) {
     initNewSession();

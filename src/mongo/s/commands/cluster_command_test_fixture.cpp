@@ -125,7 +125,7 @@ DbResponse ClusterCommandTestFixture::runCommand(BSONObj cmd) {
         // execution of the command by the client thread.
         stdx::lock_guard lk(*client.get());
         auto seCtx = std::make_unique<transport::ServiceExecutorContext>();
-        seCtx->setThreadingModel(transport::ServiceExecutor::ThreadingModel::kDedicated);
+        seCtx->setUseDedicatedThread(true);
         transport::ServiceExecutorContext::set(client.get(), std::move(seCtx));
     }
 

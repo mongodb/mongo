@@ -45,26 +45,13 @@
 namespace mongo {
 namespace transport {
 
+extern bool gInitialUseDedicatedThread;
+
 /*
  * This is the interface for all ServiceExecutors.
  */
 class ServiceExecutor : public OutOfLineExecutor {
 public:
-    /**
-     * An enum to indicate if a ServiceExecutor should use dedicated or borrowed threading
-     * resources.
-     */
-    enum class ThreadingModel {
-        kBorrowed,
-        kDedicated,
-    };
-
-    friend StringData toString(ThreadingModel threadingModel);
-
-    static Status setInitialThreadingModelFromString(StringData value) noexcept;
-    static void setInitialThreadingModel(ThreadingModel threadingModel) noexcept;
-    static ThreadingModel getInitialThreadingModel() noexcept;
-
     static void shutdownAll(ServiceContext* serviceContext, Date_t deadline);
 
     virtual ~ServiceExecutor() = default;
@@ -142,8 +129,6 @@ public:
  */
 class ServiceExecutorContext {
 public:
-    using ThreadingModel = ServiceExecutor::ThreadingModel;
-
     /**
      * Get a pointer to the ServiceExecutorContext for a given client.
      *
@@ -173,11 +158,11 @@ public:
     ServiceExecutorContext& operator=(ServiceExecutorContext&&) = delete;
 
     /**
-     * Set the ThreadingModel for the associated Client's service execution.
+     * Set the threading model for the associated Client's service execution.
      *
      * This function is only valid to invoke with the Client lock or before the Client is set.
      */
-    void setThreadingModel(ThreadingModel threadingModel) noexcept;
+    void setUseDedicatedThread(bool dedicated) noexcept;
 
     /**
      * Set if reserved resources are available for the associated Client's service execution.
@@ -191,8 +176,8 @@ public:
      *
      * This function is valid to invoke either on the Client thread or with the Client lock.
      */
-    auto getThreadingModel() const noexcept {
-        return _threadingModel;
+    bool useDedicatedThread() const noexcept {
+        return _useDedicatedThread;
     }
 
     /**
@@ -207,7 +192,7 @@ private:
     Client* _client = nullptr;
     ServiceEntryPoint* _sep = nullptr;
 
-    ThreadingModel _threadingModel = ThreadingModel::kDedicated;
+    bool _useDedicatedThread = true;
     bool _canUseReserved = false;
     bool _hasUsedSynchronous = false;
 };
