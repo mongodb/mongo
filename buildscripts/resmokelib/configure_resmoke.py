@@ -218,6 +218,7 @@ be invoked as either:
     _config.ENABLED_FEATURE_FLAGS, all_feature_flags = setup_feature_flags()
     not_enabled_feature_flags = list(set(all_feature_flags) - set(_config.ENABLED_FEATURE_FLAGS))
 
+    _config.AUTO_KILL = config.pop("auto_kill")
     _config.ALWAYS_USE_LOG_FILES = config.pop("always_use_log_files")
     _config.BASE_PORT = int(config.pop("base_port"))
     _config.BACKUP_ON_RESTART_DIR = config.pop("backup_on_restart_dir")

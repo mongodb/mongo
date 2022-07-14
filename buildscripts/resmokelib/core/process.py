@@ -89,7 +89,14 @@ class Process(object):
 
         self.logger = logger
         self.args = args
+
         self.env = utils.default_if_none(env, os.environ.copy())
+        if not self.env.get('RESMOKE_PARENT_PROCESS'):
+            self.env['RESMOKE_PARENT_PROCESS'] = os.environ.get('RESMOKE_PARENT_PROCESS',
+                                                                str(os.getpid()))
+        if not self.env.get('RESMOKE_PARENT_CTIME'):
+            self.env['RESMOKE_PARENT_CTIME'] = os.environ.get('RESMOKE_PARENT_CTIME',
+                                                              str(psutil.Process().create_time()))
         if env_vars is not None:
             self.env.update(env_vars)
 

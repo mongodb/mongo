@@ -124,6 +124,7 @@ class _FixtureConfig(object):  # pylint: disable=too-many-instance-attributes
         self.DEFAULT_MONGOD_EXECUTABLE = config.DEFAULT_MONGOD_EXECUTABLE
         self.MONGOD_SET_PARAMETERS = config.MONGOD_SET_PARAMETERS
         self.FIXTURE_SUBDIR = config.FIXTURE_SUBDIR
+        self.AUTO_KILL = config.AUTO_KILL
         self.ALWAYS_USE_LOG_FILES = config.ALWAYS_USE_LOG_FILES
         self.LAST_LTS_MONGOD_BINARY = LAST_LTS_MONGOD_BINARY
         self.LAST_LTS_MONGOS_BINARY = LAST_LTS_MONGOS_BINARY

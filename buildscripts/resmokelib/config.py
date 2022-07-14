@@ -50,6 +50,7 @@ DEFAULT_GENNY_EXECUTABLE = os.path.normpath("genny/build/src/driver/genny")
 
 # Names below correspond to how they are specified via the command line or in the options YAML file.
 DEFAULTS = {
+    "auto_kill": "on",
     "always_use_log_files": False,
     "archive_limit_mb": 5000,
     "archive_limit_tests": 10,
@@ -264,6 +265,9 @@ class MultiversionOptions(object):
 ##
 # Variables that are set by the user at the command line or with --options.
 ##
+
+# Allow resmoke permission to automatically kill existing rogue mongo processes.
+AUTO_KILL = "on"
 
 # Log to files located in the db path and don't clean dbpaths after tests.
 ALWAYS_USE_LOG_FILES = False

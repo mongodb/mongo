@@ -8,11 +8,13 @@ import os.path
 import random
 import shlex
 import sys
+import textwrap
 import time
 import shutil
 
 import curatorbin
 import pkg_resources
+import psutil
 
 from buildscripts.resmokelib import parser as main_parser
 from buildscripts.resmokelib import config
@@ -50,7 +52,6 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
         self._archive = None
         self._interrupted = False
         self._exit_code = 0
-
         runtime_recorder.setup_start_time(start_time)
 
     def _setup_logging(self):
@@ -206,6 +207,7 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
         """Run the suite and tests specified."""
         self._resmoke_logger.info("verbatim resmoke.py invocation: %s",
                                   " ".join([shlex.quote(arg) for arg in sys.argv]))
+        self._check_for_mongo_processes()
 
         if config.EVERGREEN_TASK_DOC:
             self._resmoke_logger.info("Evergreen task documentation:\n%s",
@@ -281,6 +283,88 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
         if config.EVERGREEN_TASK_ID:
             with open("local-resmoke-invocation.txt", "w") as fh:
                 fh.write(f"{resmoke_env_options} {local_resmoke_invocation}")
+
+    def _check_for_mongo_processes(self):
+        # pylint: disable=too-many-branches,
+        """Check for existing mongo processes as they could interfere with running the tests."""
+
+        if config.AUTO_KILL == 'off' or config.SHELL_CONN_STRING is not None:
+            return
+
+        rogue_procs = []
+        # Iterate over all running process
+        for proc in psutil.process_iter():
+            try:
+                parent_resmoke_pid = proc.environ().get('RESMOKE_PARENT_PROCESS')
+                parent_resmoke_ctime = proc.environ().get('RESMOKE_PARENT_CTIME')
+                if not parent_resmoke_pid:
+                    continue
+                if psutil.pid_exists(int(parent_resmoke_pid)):
+                    # Double check `parent_resmoke_pid` is really a rooting resmoke process. Having
+                    # the RESMOKE_PARENT_PROCESS environment variable proves it is a process which
+                    # was spawned through resmoke. Only a resmoke process has RESMOKE_PARENT_PROCESS
+                    # as the value of its own PID.
+                    parent_resmoke_proc = psutil.Process(int(parent_resmoke_pid))
+                    if parent_resmoke_ctime == str(parent_resmoke_proc.create_time()):
+                        continue
+
+                rogue_procs.append(proc)
+
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                pass
+
+        if rogue_procs:
+            msg = "detected existing mongo processes. Please clean up these processes as they may affect tests:"
+
+            if config.AUTO_KILL == 'on':
+                msg += textwrap.dedent("""\
+
+                    Congratulations, you have selected auto kill mode:
+                    HASTA LA VISTA MONGO""" + r"""
+                                          ______
+                                         <((((((\\\
+                                         /      . }\
+                                         ;--..--._|}
+                      (\                 '--/\--'  )
+                       \\                | '-'  :'|
+                        \\               . -==- .-|
+                         \\               \.__.'   \--._
+                         [\\          __.--|       //  _/'--.
+                         \ \\       .'-._ ('-----'/ __/      \\
+                          \ \\     /   __>|      | '--.       |
+                           \ \\   |   \   |     /    /       /
+                            \ '\ /     \  |     |  _/       /
+                             \  \       \ |     | /        /
+                              \  \      \        /
+                    """)
+                print(f"WARNING: {msg}")
+            else:
+                self._resmoke_logger.error("ERROR: %s", msg)
+
+            for proc in rogue_procs:
+                if config.AUTO_KILL == 'on':
+                    proc_msg = f"    Target acquired: pid: {str(proc.pid).ljust(5)} name: {proc.exe()}"
+                    try:
+                        proc.kill()
+                    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess) as exc:
+                        proc_msg += f" - target escaped: {type(exc).__name__ }"
+                    else:
+                        proc_msg += " - target destroyed\n"
+                    print(proc_msg)
+
+                else:
+                    self._resmoke_logger.error("    pid: %s name: %s",
+                                               str(proc.pid).ljust(5), proc.exe())
+
+            if config.AUTO_KILL == 'on':
+                print("I'll be back...\n")
+            else:
+                raise errors.ResmokeError(
+                    textwrap.dedent("""\
+                Failing because existing mongo processes detected.
+                You can use --autoKillResmokeMongo=on to automatically kill the processes,
+                or --autoKillResmokeMongo=off to ignore them.
+                """))
 
     def _log_resmoke_summary(self, suites):
         """Log a summary of the resmoke run."""
@@ -566,6 +650,14 @@ class RunPlugin(PluginInterface):
                   " specified, e.g. 'core'. If a list of files is passed in as"
                   " positional arguments, they will be run using the suites'"
                   " configurations."))
+
+        parser.add_argument(
+            "--autoKillResmokeMongo", dest="auto_kill", choices=['on', 'error',
+                                                                 'off'], default='on',
+            help=("When resmoke starts up, existing mongo processes created from resmoke "
+                  " could cause issues when running tests. This option causes resmoke to kill"
+                  " the existing processes and continue running the test, or if 'error' option"
+                  " is used, prints the offending processes and fails the test."))
 
         parser.add_argument("--installDir", dest="install_dir", metavar="INSTALL_DIR",
                             help="Directory to search for MongoDB binaries")
