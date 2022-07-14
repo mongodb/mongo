@@ -101,9 +101,15 @@ StatusWith<CommitResult> SyncTransactionWithRetries::runNoThrow(OperationContext
         return yieldStatus;
     }
 
-    auto txnResult = _txn->run(std::move(callback)).getNoThrow(opCtx);
+    auto txnFuture = _txn->run(std::move(callback));
+    auto txnResult = txnFuture.getNoThrow(opCtx);
+
     // Cancel the source to guarantee the transaction will terminate if our opCtx was interrupted.
     _source.cancel();
+
+    // Wait for transaction to complete before returning so variables referenced by its callback are
+    // guaranteed to be in scope even if the API caller's opCtx was interrupted.
+    txnFuture.wait();
 
     // Post transaction processing, which must also happen inline.
     OperationTimeTracker::get(opCtx)->updateOperationTime(_txn->getOperationTime());
