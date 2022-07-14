@@ -86,5 +86,5 @@ assert.soon(
                 shardDoc.host.split(',').length + " in " + shardDoc.host);
     });
 
-st.stop();
+st.stop({parallelSupported: false});
 }());

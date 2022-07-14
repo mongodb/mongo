@@ -85,6 +85,6 @@ assert.soon(function() {
 
 assert.eq(100, newMongosConn.getDB('test').foo.find().itcount());
 
-st.stop();
+st.stop({parallelSupported: false});
 MongoRunner.stopMongos(newMongosInfo);
 }());

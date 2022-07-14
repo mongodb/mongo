@@ -364,10 +364,150 @@ var ShardingTest = function(params) {
         this.configRS.stopSet(undefined, forRestart, opts);
     };
 
-    this.stopAllShards = function(opts, forRestart = undefined) {
-        this._rs.forEach((rs) => {
-            rs.test.stopSet(15, forRestart, opts);
+    /**
+     * Returns boolean for whether the sharding test is compatible to shutdown in parallel.
+     */
+    function isShutdownParallelSupported(opts = {}) {
+        if (!tryLoadParallelTester()) {
+            return false;
+        }
+
+        if (otherParams.useBridge) {
+            // Keep the current behavior of shutting down each replica set shard and the
+            // CSRS individually when otherParams.useBridge === true. There appear to only
+            // be 8 instances of {useBridge: true} with ShardingTest and the implementation
+            // complexity is too high
+            return false;
+        }
+
+        if (otherParams.configOptions && otherParams.configOptions.clusterAuthMode === "x509") {
+            // The mongo shell performing X.509 authentication as a cluster member requires
+            // starting a parallel shell and using the server's (not the client's)
+            // certificate. The ReplSetTest instance constructed in a Thread wouldn't have
+            // copied the path to the server's certificate. We therefore fall back to
+            // initiating the CSRS and replica set shards sequentially when X.509
+            // authentication is being used.
+            return false;
+        }
+
+        if (otherParams.configOptions && otherParams.configOptions.tlsMode === "preferTLS") {
+            return false;
+        }
+
+        if (otherParams.configOptions && otherParams.configOptions.sslMode === "requireSSL") {
+            return false;
+        }
+
+        if (opts.parallelSupported !== undefined && opts.parallelSupported === false) {
+            // The test has chosen to opt out of parallel shutdown
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Returns the replica sets args for sets that are to be terminated in parallel threads.
+     */
+    function replicaSetsToTerminate(shardRS) {
+        const replicaSetsToTerminate = [];
+        [...(shardRS.map(obj => obj.test))].forEach(rst => {
+            // Generating a list of live nodes in the replica set
+            liveNodes = [];
+            rst.nodes.forEach(function(node) {
+                try {
+                    node.getDB('admin')._helloOrLegacyHello();
+                } catch (err) {
+                    // Ignore since the node is not live
+                    return;
+                }
+
+                if (!node.pid) {
+                    // Getting the pid for the node
+                    rst.keyFile = rst.keyFile ? rst.keyFile : this.keyFile;
+                    if (rst.keyFile) {
+                        serverStatus = authutil.asCluster(node, rst.keyFile, () => {
+                            return node.getDB("admin").serverStatus();
+                        });
+                    } else {
+                        serverStatus = node.getDB("admin").serverStatus();
+                    }
+
+                    if (serverStatus["pid"]) {
+                        node.pid = serverStatus["pid"].valueOf();
+                    } else {
+                        // Shutdown requires PID values for every node. The case we are
+                        // unable to obtain a PID value is rare, however, should it
+                        // occur, the code will throw this error.
+                        throw 'Could not obtain node PID value. Shutdown failed.';
+                    }
+                }
+
+                liveNodes.push(node);
+            });
+
+            if (liveNodes.length > 0) {
+                replicaSetsToTerminate.push({
+                    // Arguments for each replica set within parallel threads.
+                    rstArgs: {
+                        name: rst.name,
+                        nodeHosts: liveNodes.map(node => `${node.host}`),
+                        nodeOptions: rst.nodeOptions,
+                        // Mixed-mode SSL tests may specify a keyFile per replica set rather
+                        // than one for the whole cluster.
+                        keyFile: rst.keyFile ? rst.keyFile : this.keyFile,
+                        host: otherParams.useHostname ? hostName : "localhost",
+                        waitForKeys: false,
+                        nodes: liveNodes
+                    },
+                });
+            }
         });
+        return replicaSetsToTerminate;
+    }
+
+    this.stopAllShards = function(opts = {}, forRestart = undefined) {
+        if (isShutdownParallelSupported(opts)) {
+            const threads = [];
+            try {
+                for (let {rstArgs} of replicaSetsToTerminate(this._rs)) {
+                    const thread = new Thread((rstArgs, signal, forRestart, opts) => {
+                        try {
+                            const rst = new ReplSetTest({rstArgs});
+                            rst.stopSet(signal, forRestart, opts);
+                            return {ok: 1};
+                        } catch (e) {
+                            return {
+                                ok: 0,
+                                hosts: rstArgs.nodeHosts,
+                                name: rstArgs.name,
+                                error: e.toString(),
+                                stack: e.stack,
+                            };
+                        }
+                    }, rstArgs, 15, forRestart, opts);
+
+                    thread.start();
+                    threads.push(thread);
+                }
+            } finally {
+                // Wait for each thread to finish. Throw an error if any thread fails.
+                const returnData = threads.map(thread => {
+                    thread.join();
+                    return thread.returnData();
+                });
+
+                returnData.forEach(res => {
+                    assert.commandWorked(res,
+                                         'terminating shard or config server replica sets failed');
+                });
+            }
+        } else {
+            // The replica sets shutting down serially
+            this._rs.forEach((rs) => {
+                rs.test.stopSet(15, forRestart, opts);
+            });
+        }
     };
 
     this.stopAllMongos = function(opts) {
