@@ -3,29 +3,9 @@ test_kind: js_test
 selector:
   roots:
   # shardingtest.js relies on FCV and bin versions to be equal; this can be re-enabled after FCV constants are updated.
-  # TODO (SERVER-64909): Re-enable non-query sharding tests in the
-  # sharding_last_lts_mongos_and_mixed_shards suite.
-  #  - jstests/sharding/**/*.js
-  - jstests/sharding/query/*.js
-  - jstests/sharding/change_streams/*.js
+  - jstests/sharding/**/*.js
   exclude_files:
-  # SERVER-33683: We added a restriction on using an aggregation within a transaction against
-  # mongos. This should be removed and the test can be adjusted and re-added to this passthrough.
-  # - jstests/sharding/aggregations_in_session.js
-  # # Enable when SERVER-43860 is backported by BACKPORT-5471 or 4.4 becomes last-lts
-  # - jstests/sharding/agg_merge_hashed.js
-  # - jstests/sharding/merge_from_stale_mongos.js
-  # - jstests/sharding/refresh_sessions.js
-  # - jstests/sharding/max_time_ms_enforced_on_shard.js
-  # # Enable when SERVER-44733 is backported
-  # - jstests/sharding/change_streams_update_lookup_shard_metadata_missing.js
-  # - jstests/sharding/repl_monitor_refresh.js
-  # - jstests/sharding/retryable_write_error_labels.js
-  # # Enable when SERVER-43310 is backported
-  # - jstests/sharding/cluster_create_indexes_always_routes_through_primary.js
-  # # Enable when SERVER-43614 is backported.
-  # - jstests/sharding/verify_sessions_expiration_sharded.js
-#
+  - jstests/sharding/**/libs/**/*.js
 #  # This tag file can be created using ./buildscripts/resmoke.py generate-multiversion-exclude-tags
 #  # or downloaded from the evergreen task.
 #  tag_file: multiversion_exclude_tags.yml
