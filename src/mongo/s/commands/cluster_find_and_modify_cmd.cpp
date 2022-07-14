@@ -228,7 +228,8 @@ void handleWouldChangeOwningShardErrorTransaction(
     const NamespaceString nss,
     Status responseStatus,
     const write_ops::FindAndModifyCommandRequest& request,
-    BSONObjBuilder* result) {
+    BSONObjBuilder* result,
+    bool fleCrudProcessed) {
 
     BSONObjBuilder extraInfoBuilder;
     responseStatus.extraInfo()->serialize(&extraInfoBuilder);
@@ -253,10 +254,14 @@ void handleWouldChangeOwningShardErrorTransaction(
             TransactionRouterResourceYielder::makeForLocalHandoff());
 
         txn.run(opCtx,
-                [sharedBlock](const txn_api::TransactionClient& txnClient,
-                              ExecutorPtr txnExec) -> SemiFuture<void> {
+                [sharedBlock, fleCrudProcessed](const txn_api::TransactionClient& txnClient,
+                                                ExecutorPtr txnExec) -> SemiFuture<void> {
                     return documentShardKeyUpdateUtil::updateShardKeyForDocument(
-                               txnClient, txnExec, sharedBlock->nss, sharedBlock->changeInfo)
+                               txnClient,
+                               txnExec,
+                               sharedBlock->nss,
+                               sharedBlock->changeInfo,
+                               fleCrudProcessed)
                         .thenRunOn(txnExec)
                         .then([sharedBlock](bool matchedDocOrUpserted) {
                             sharedBlock->matchedDocOrUpserted = matchedDocOrUpserted;
@@ -283,7 +288,8 @@ void handleWouldChangeOwningShardErrorTransactionLegacy(OperationContext* opCtx,
                                                         const NamespaceString nss,
                                                         Status responseStatus,
                                                         const BSONObj& cmdObj,
-                                                        BSONObjBuilder* result) {
+                                                        BSONObjBuilder* result,
+                                                        bool fleCrudProcessed) {
     BSONObjBuilder extraInfoBuilder;
     responseStatus.extraInfo()->serialize(&extraInfoBuilder);
     auto extraInfo = extraInfoBuilder.obj();
@@ -292,7 +298,7 @@ void handleWouldChangeOwningShardErrorTransactionLegacy(OperationContext* opCtx,
 
     try {
         auto matchedDocOrUpserted = documentShardKeyUpdateUtil::updateShardKeyForDocumentLegacy(
-            opCtx, nss, wouldChangeOwningShardExtraInfo);
+            opCtx, nss, wouldChangeOwningShardExtraInfo, fleCrudProcessed);
 
         auto shouldReturnPostImage = cmdObj.getBoolField("new");
         updateReplyOnWouldChangeOwningShardSuccess(
@@ -512,6 +518,17 @@ public:
     }
 
 private:
+    static bool getCrudProcessedFromCmd(const BSONObj& cmdObj) {
+        // We could have wrapped the FindAndModify command in an explain object
+        const BSONObj& realCmdObj =
+            cmdObj.getField("explain").ok() ? cmdObj.getObjectField("explain") : cmdObj;
+        auto req = write_ops::FindAndModifyCommandRequest::parse(
+            IDLParserContext("ClusterFindAndModify"), realCmdObj);
+
+        return req.getEncryptionInformation().has_value() &&
+            req.getEncryptionInformation()->getCrudProcessed().get_value_or(false);
+    }
+
     static void _runCommand(OperationContext* opCtx,
                             const ShardId& shardId,
                             const boost::optional<ChunkVersion>& shardVersion,
@@ -565,6 +582,7 @@ private:
         if (responseStatus.code() == ErrorCodes::WouldChangeOwningShard) {
             if (feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
                     serverGlobalParams.featureCompatibility)) {
+
                 auto parsedRequest = write_ops::FindAndModifyCommandRequest::parse(
                     IDLParserContext("ClusterFindAndModify"), cmdObj);
                 // Strip write concern because this command will be sent as part of a
@@ -576,8 +594,12 @@ private:
                 // recursively sent through the service entry point.
                 parsedRequest.setLegacyRuntimeConstants(boost::none);
                 if (txnRouter) {
-                    handleWouldChangeOwningShardErrorTransaction(
-                        opCtx, nss, responseStatus, parsedRequest, result);
+                    handleWouldChangeOwningShardErrorTransaction(opCtx,
+                                                                 nss,
+                                                                 responseStatus,
+                                                                 parsedRequest,
+                                                                 result,
+                                                                 getCrudProcessedFromCmd(cmdObj));
                 } else {
                     if (isRetryableWrite) {
                         parsedRequest.setStmtId(0);
@@ -592,7 +614,12 @@ private:
                         opCtx, shardId, shardVersion, dbVersion, nss, cmdObj, result);
                 } else {
                     handleWouldChangeOwningShardErrorTransactionLegacy(
-                        opCtx, nss, responseStatus, cmdObj, result);
+                        opCtx,
+                        nss,
+                        responseStatus,
+                        cmdObj,
+                        result,
+                        getCrudProcessedFromCmd(cmdObj));
                 }
             }
 

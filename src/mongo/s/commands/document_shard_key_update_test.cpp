@@ -69,7 +69,7 @@ TEST_F(DocumentShardKeyUpdateTest, constructShardKeyInsertCmdObj) {
     NamespaceString nss("test.foo");
     BSONObj updatePostImage = BSON("x" << 4 << "y" << 3 << "_id" << 20);
 
-    auto insertCmdObj = constructShardKeyInsertCmdObj(nss, updatePostImage);
+    auto insertCmdObj = constructShardKeyInsertCmdObj(nss, updatePostImage, false);
 
     auto insertsObj = insertCmdObj["documents"].Array();
     ASSERT_EQ(insertsObj.size(), 1U);

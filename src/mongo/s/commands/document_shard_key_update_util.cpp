@@ -123,9 +123,18 @@ write_ops::DeleteCommandRequest createShardKeyDeleteOp(const NamespaceString& ns
  * Creates the insert op that will be used to insert the new document with the post-update image.
  */
 write_ops::InsertCommandRequest createShardKeyInsertOp(const NamespaceString& nss,
-                                                       const BSONObj& updatePostImage) {
+                                                       const BSONObj& updatePostImage,
+                                                       bool fleCrudProcessed) {
     write_ops::InsertCommandRequest insertOp(nss);
     insertOp.setDocuments({updatePostImage});
+    if (fleCrudProcessed) {
+        EncryptionInformation encryptionInformation;
+        encryptionInformation.setCrudProcessed(fleCrudProcessed);
+
+        // We need to set an empty BSON object here for the schema.
+        encryptionInformation.setSchema(BSONObj());
+        insertOp.getWriteCommandRequestBase().setEncryptionInformation(encryptionInformation);
+    }
     return insertOp;
 }
 
@@ -135,12 +144,13 @@ namespace documentShardKeyUpdateUtil {
 
 bool updateShardKeyForDocumentLegacy(OperationContext* opCtx,
                                      const NamespaceString& nss,
-                                     const WouldChangeOwningShardInfo& documentKeyChangeInfo) {
+                                     const WouldChangeOwningShardInfo& documentKeyChangeInfo,
+                                     bool fleCrudProcessed) {
     auto updatePreImage = documentKeyChangeInfo.getPreImage().getOwned();
     auto updatePostImage = documentKeyChangeInfo.getPostImage().getOwned();
 
     auto deleteCmdObj = constructShardKeyDeleteCmdObj(nss, updatePreImage);
-    auto insertCmdObj = constructShardKeyInsertCmdObj(nss, updatePostImage);
+    auto insertCmdObj = constructShardKeyInsertCmdObj(nss, updatePostImage, fleCrudProcessed);
 
     return executeOperationsAsPartOfShardKeyUpdate(
         opCtx, deleteCmdObj, insertCmdObj, nss.db(), documentKeyChangeInfo.getShouldUpsert());
@@ -168,15 +178,18 @@ BSONObj constructShardKeyDeleteCmdObj(const NamespaceString& nss, const BSONObj&
     return deleteOp.toBSON({});
 }
 
-BSONObj constructShardKeyInsertCmdObj(const NamespaceString& nss, const BSONObj& updatePostImage) {
-    auto insertOp = createShardKeyInsertOp(nss, updatePostImage);
+BSONObj constructShardKeyInsertCmdObj(const NamespaceString& nss,
+                                      const BSONObj& updatePostImage,
+                                      bool fleCrudProcessed) {
+    auto insertOp = createShardKeyInsertOp(nss, updatePostImage, fleCrudProcessed);
     return insertOp.toBSON({});
 }
 
 SemiFuture<bool> updateShardKeyForDocument(const txn_api::TransactionClient& txnClient,
                                            ExecutorPtr txnExec,
                                            const NamespaceString& nss,
-                                           const WouldChangeOwningShardInfo& changeInfo) {
+                                           const WouldChangeOwningShardInfo& changeInfo,
+                                           bool fleCrudProcessed) {
     auto deleteCmdObj = documentShardKeyUpdateUtil::constructShardKeyDeleteCmdObj(
         nss, changeInfo.getPreImage().getOwned());
     auto deleteOpMsg = OpMsgRequest::fromDBAndBody(nss.db(), std::move(deleteCmdObj));
@@ -186,7 +199,7 @@ SemiFuture<bool> updateShardKeyForDocument(const txn_api::TransactionClient& txn
     // so send it with the uninitialized sentinel statement id to opt out of storing history.
     return txnClient.runCRUDOp(deleteRequest, {kUninitializedStmtId})
         .thenRunOn(txnExec)
-        .then([&txnClient, &nss, &changeInfo](
+        .then([&txnClient, &nss, &changeInfo, fleCrudProcessed](
                   auto deleteResponse) -> SemiFuture<BatchedCommandResponse> {
             uassertStatusOK(deleteResponse.toStatus());
 
@@ -211,7 +224,7 @@ SemiFuture<bool> updateShardKeyForDocument(const txn_api::TransactionClient& txn
             }
 
             auto insertCmdObj = documentShardKeyUpdateUtil::constructShardKeyInsertCmdObj(
-                nss, changeInfo.getPostImage().getOwned());
+                nss, changeInfo.getPostImage().getOwned(), fleCrudProcessed);
             auto insertOpMsg = OpMsgRequest::fromDBAndBody(nss.db(), std::move(insertCmdObj));
             auto insertRequest = BatchedCommandRequest::parseInsert(std::move(insertOpMsg));
 

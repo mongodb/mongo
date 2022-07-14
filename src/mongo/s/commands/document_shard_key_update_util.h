@@ -75,7 +75,8 @@ static constexpr StringData kNonDuplicateKeyErrorContext =
  */
 bool updateShardKeyForDocumentLegacy(OperationContext* opCtx,
                                      const NamespaceString& nss,
-                                     const WouldChangeOwningShardInfo& documentKeyChangeInfo);
+                                     const WouldChangeOwningShardInfo& documentKeyChangeInfo,
+                                     bool fleCrudProcessed = false);
 
 /**
  * Coordinating method and external point of entry for updating a document's shard key. This method
@@ -91,7 +92,8 @@ bool updateShardKeyForDocumentLegacy(OperationContext* opCtx,
 SemiFuture<bool> updateShardKeyForDocument(const txn_api::TransactionClient& txnClient,
                                            ExecutorPtr txnExec,
                                            const NamespaceString& nss,
-                                           const WouldChangeOwningShardInfo& changeInfo);
+                                           const WouldChangeOwningShardInfo& changeInfo,
+                                           bool fleCrudProcessed = false);
 
 /**
  * Starts a transaction on this session. This method is called when WouldChangeOwningShard is thrown
@@ -121,6 +123,8 @@ BSONObj constructShardKeyDeleteCmdObj(const NamespaceString& nss, const BSONObj&
  * This method should not be called outside of this class. It is only temporarily exposed for
  * intermediary test coverage.
  */
-BSONObj constructShardKeyInsertCmdObj(const NamespaceString& nss, const BSONObj& updatePostImage);
+BSONObj constructShardKeyInsertCmdObj(const NamespaceString& nss,
+                                      const BSONObj& updatePostImage,
+                                      bool fleCrudProcessed);
 }  // namespace documentShardKeyUpdateUtil
 }  // namespace mongo
