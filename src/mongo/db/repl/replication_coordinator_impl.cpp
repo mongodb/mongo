@@ -745,8 +745,7 @@ void ReplicationCoordinatorImpl::_startInitialSync(
                     onCompletion);
             };
 
-            if (repl::feature_flags::gFileCopyBasedInitialSync.isEnabledAndIgnoreFCV() &&
-                !fallbackToLogical) {
+            if (!fallbackToLogical) {
                 auto swInitialSyncer = createInitialSyncer(initialSyncMethod);
                 if (swInitialSyncer.getStatus().code() == ErrorCodes::NotImplemented &&
                     initialSyncMethod != "logical") {

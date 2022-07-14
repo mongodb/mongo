@@ -663,13 +663,6 @@ feature_flags:
         default: true
         version: 5.1
 
-    featureFlagFileCopyBasedInitialSync:
-        description: >-
-            When enabled, file copy based initial sync will be supported in Enterprise Server.
-        cpp_varname: feature_flags::gFileCopyBasedInitialSync
-        default: true
-        version: 5.2
-
     featureFlagShardMerge:
         description: When enabled, multitenant migration uses the "shard merge" protocol.
         cpp_varname: feature_flags::gShardMerge
