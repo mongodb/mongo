@@ -1765,6 +1765,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, CannotContinueOnSnapshotErrorAft
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
     txnRouter.setDefaultAtClusterTime(operationContext());
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
 
     ASSERT(txnRouter.canContinueOnSnapshotError());
 
@@ -1834,6 +1835,32 @@ TEST_F(TransactionRouterTestWithDefaultSession, ParticipantsRememberStmtIdCreate
 
     txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     ASSERT_EQ(txnRouter.getParticipant(shard1)->stmtIdCreatedAt, initialStmtId + 1);
+}
+
+TEST_F(TransactionRouterTestWithDefaultSession,
+       LatestStmtIdNotIncrementedIfNoParticipantsTargeted) {
+    TxnNumber txnNum{3};
+    operationContext()->setTxnNumber(txnNum);
+
+    auto txnRouter = TransactionRouter::get(operationContext());
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(operationContext());
+
+    int initialStmtId = 0;
+    repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue);
+
+    ASSERT_EQ(txnRouter.getLatestStmtId(), initialStmtId);
+
+    // Ensure that latestStmtId gets incremented when a participant is targeted.
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
+    repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
+    txnRouter.beginOrContinueTxn(
+        operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue);
+
+    ASSERT_EQ(txnRouter.getLatestStmtId(), 1);
 }
 
 TEST_F(TransactionRouterTestWithDefaultSession,
@@ -1942,6 +1969,7 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     // First statement selects an atClusterTime.
 
     txnRouter.setDefaultAtClusterTime(operationContext());
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
 
     // A later statement retries on a stale version error and a view resolution error and cannot
     // change the atClusterTime.
@@ -1961,22 +1989,21 @@ TEST_F(TransactionRouterTestWithDefaultSession,
     BSONObj expectedReadConcern = BSON("level"
                                        << "snapshot"
                                        << "atClusterTime" << kInMemoryLogicalTime.asTimestamp());
-
     auto newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
-                                                    shard1,
+                                                    shard2,
                                                     BSON("find"
                                                          << "test"));
     ASSERT_BSONOBJ_EQ(expectedReadConcern, newCmd["readConcern"].Obj());
 
     auto future =
         launchAsync([&] { txnRouter.onViewResolutionError(operationContext(), kViewNss); });
-    expectAbortTransactions({hostAndPort1}, getSessionId(), txnNum);
+    expectAbortTransactions({hostAndPort2}, getSessionId(), txnNum);
     future.default_timed_get();
 
     txnRouter.setDefaultAtClusterTime(operationContext());
 
     newCmd = txnRouter.attachTxnFieldsIfNeeded(operationContext(),
-                                               shard1,
+                                               shard2,
                                                BSON("find"
                                                     << "test"));
     ASSERT_BSONOBJ_EQ(expectedReadConcern, newCmd["readConcern"].Obj());
@@ -2003,7 +2030,7 @@ TEST_F(TransactionRouterTestWithDefaultSession, WritesCanOnlyBeRetriedIfFirstOve
     }
 
     // Advance to the next command.
-
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue);
@@ -2463,14 +2490,14 @@ TEST_F(TransactionRouterTestWithDefaultSession, ContinueOnlyOnStaleVersionOnFirs
 
     future.default_timed_get();
 
-    // Start a new transaction statement.
     repl::ReadConcernArgs::get(operationContext()) = repl::ReadConcernArgs();
+
+    // Start a new transaction statement.
+    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
     txnRouter.beginOrContinueTxn(
         operationContext(), txnNum, TransactionRouter::TransactionActions::kContinue);
 
     // Cannot retry on a stale config error with one participant after the first statement.
-    txnRouter.attachTxnFieldsIfNeeded(operationContext(), shard1, kDummyFindCmd);
-
     ASSERT_FALSE(txnRouter.canContinueOnStaleShardOrDbError("update", kStaleConfigStatus));
 }
 

@@ -959,7 +959,14 @@ void TransactionRouter::Router::_continueTxn(OperationContext* opCtx,
             APIParameters::get(opCtx) = o().apiParameters;
             repl::ReadConcernArgs::get(opCtx) = o().readConcernArgs;
 
-            ++p().latestStmtId;
+            // Don't increment latestStmtId if no shards have been targeted, since that implies no
+            // statements would have been executed inside this transaction at this point. This can
+            // occur when an internal transaction is invoked within a client's transaction that
+            // hasn't executed any statements yet.
+            if (!o().participants.empty()) {
+                ++p().latestStmtId;
+            }
+
             _onContinue(opCtx);
             break;
         }
