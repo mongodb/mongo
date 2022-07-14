@@ -17,10 +17,9 @@
 load("jstests/libs/analyze_plan.js");  // For getPlanCacheKeyFromShape.
 load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 
-// For testing convenience this variable is made an integer "1" if featureFlagSbePlanCache is on,
-// because the expected amount of plan cache entries differs between the two different plan caches.
-const isSbePlanCacheEnabled =
-    checkSBEEnabled(db, ["featureFlagSbePlanCache", "featureFlagSbeFull"]) ? 1 : 0;
+// For testing convenience this variable is made an integer "1" if SBE is fully enabled, because the
+// expected amount of plan cache entries differs between the SBE plan cache and the classic one.
+const isSbeEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]) ? 1 : 0;
 
 const collName = "index_filter_commands_invalidate_plan_cache_entries";
 const coll = db[collName];
@@ -61,11 +60,11 @@ assert.eq(0, coll.find({a: 1}).skip(1).itcount());
 
 // SBE plan cache key encodes "skip", so there's one more plan cache entry in SBE plan cache. While
 // in classic plan cache, queries with only difference in "skip" share the same plan cache entry.
-assert.eq(coll.aggregate([{$planCacheStats: {}}]).itcount(), 3 + isSbePlanCacheEnabled);
+assert.eq(coll.aggregate([{$planCacheStats: {}}]).itcount(), 3 + isSbeEnabled);
 
 assert.commandWorked(
     db.runCommand({planCacheSetFilter: collName, query: {a: 1, b: 1}, indexes: [{a: 1}]}));
-assert.eq(coll.aggregate([{$planCacheStats: {}}]).toArray().length, 2 + isSbePlanCacheEnabled);
+assert.eq(coll.aggregate([{$planCacheStats: {}}]).toArray().length, 2 + isSbeEnabled);
 
 // This planCacheSetFilter command will invalidate plan cache entries with filter {a: 1}. There are
 // two entries in the SBE plan cache that got invalidated, or one entry in the classic plan cache

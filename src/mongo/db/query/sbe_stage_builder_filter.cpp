@@ -2065,11 +2065,12 @@ std::pair<boost::optional<sbe::value::SlotId>, EvalStage> generateFilter(
         return {boost::none, std::move(stage)};
     }
 
-    // We only use the classic matcher path (aka "franken matcher") when the plan cache is off,
-    // because embedding the classic matcher into the query execution tree is not compatible with
-    // auto parameterization. All of the constants used in the filter are in the MatchExpression
-    // itself, rather than in slots.
-    if (!feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+    // We only use the classic matcher path (aka "franken matcher") when the SBE is not fully
+    // enabled. Fully enabling SBE turns on the SBE plan cache, and embedding the classic matcher
+    // into the query execution tree is not compatible with the plan cache's use of
+    // auto-parameterization. This is because when embedding the classic matcher all of the
+    // constants used in the filter are in the MatchExpression itself rather than in slots.
+    if (!feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
         tassert(6681403, "trackIndex=true not supported for classic matcher in SBE", !trackIndex);
 
         auto expr = makeFunction("applyClassicMatcher",
@@ -2106,11 +2107,12 @@ EvalStage generateIndexFilter(StageBuilderState& state,
         return stage;
     }
 
-    // We only use the classic matcher path (aka "franken matcher") when the plan cache is off,
-    // because embedding the classic matcher into the query execution tree is not compatible with
-    // auto parameterization. All of the constants used in the filter are in the MatchExpression
-    // itself, rather than in slots.
-    if (!feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+    // We only use the classic matcher path (aka "franken matcher") when SBE is not fully enabled.
+    // Fully enabling SBE turns on the SBE plan cache, and embedding the classic matcher into the
+    // query execution tree is not compatible with the plan cache's use of auto-parameterization.
+    // This is because when embedding the classic mathcer all of the constants used in the filter
+    // are in the MatchExpression itself rather than in slots.
+    if (!feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
         BSONObjBuilder keyPatternBuilder;
         for (auto& field : keyFields) {
             keyPatternBuilder.append(field, 1);

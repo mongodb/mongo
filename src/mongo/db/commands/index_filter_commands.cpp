@@ -232,7 +232,7 @@ Status ClearFilters::runIndexFilterCommand(OperationContext* opCtx,
     sbe::PlanCache* planCacheSBE = nullptr;
     invariant(planCacheClassic);
 
-    if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+    if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
         planCacheSBE = &sbe::getPlanCache(opCtx);
     }
 
@@ -352,7 +352,7 @@ Status SetFilter::runIndexFilterCommand(OperationContext* opCtx,
     sbe::PlanCache* planCacheSBE = nullptr;
     invariant(planCacheClassic);
 
-    if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+    if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
         planCacheSBE = &sbe::getPlanCache(opCtx);
     }
 

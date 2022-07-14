@@ -554,7 +554,7 @@ std::vector<BSONObj> CommonMongodProcessInterface::getMatchingPlanCacheEntryStat
     auto planCacheEntries =
         planCache->getMatchingStats({} /* cacheKeyFilterFunc */, serializer, predicate);
 
-    if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+    if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
         // Retrieve plan cache entries from the SBE plan cache.
         const auto cacheKeyFilter = [uuid = collection->uuid(),
                                      collVersion = collQueryInfo.getPlanCacheInvalidatorVersion()](

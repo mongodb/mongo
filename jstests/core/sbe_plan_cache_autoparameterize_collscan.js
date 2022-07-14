@@ -17,10 +17,10 @@
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/sbe_util.js");
 
-// This test is specifically verifying the behavior of the SBE plan cache. So if either the SBE plan
-// cache or SBE itself are disabled, bail out.
-if (!checkSBEEnabled(db, ["featureFlagSbePlanCache", "featureFlagSbeFull"])) {
-    jsTestLog("Skipping test because either SBE engine or SBE plan cache is disabled");
+// This test is specifically verifying the behavior of the SBE plan cache, which is only enabled
+// when 'featureFlagSbeFull' is on.
+if (!checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+    jsTestLog("Skipping test because SBE is not fully enabled");
     return;
 }
 

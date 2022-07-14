@@ -16,8 +16,8 @@
 'use strict';
 load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
-if (checkSBEEnabled(db, ["featureFlagSbePlanCache", "featureFlagSbeFull"])) {
-    jsTest.log("Skipping test because SBE and SBE plan cache are both enabled.");
+if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+    jsTest.log("Skipping test because SBE is fully enabled.");
     return;
 }
 

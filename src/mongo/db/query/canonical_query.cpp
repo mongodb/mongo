@@ -202,7 +202,7 @@ Status CanonicalQuery::init(OperationContext* opCtx,
 
     // If caching is disabled, do not perform any autoparameterization.
     if (!internalQueryDisablePlanCache.load() &&
-        feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+        feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
         const bool hasNoTextNodes =
             !QueryPlannerCommon::hasNode(_root.get(), MatchExpression::TEXT);
         if (hasNoTextNodes) {
@@ -541,8 +541,8 @@ std::string CanonicalQuery::toStringShort() const {
 }
 
 CanonicalQuery::QueryShapeString CanonicalQuery::encodeKey() const {
-    return (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV() &&
-            !_forceClassicEngine && _sbeCompatible)
+    return (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV() && !_forceClassicEngine &&
+            _sbeCompatible)
         ? canonical_query_encoder::encodeSBE(*this)
         : canonical_query_encoder::encode(*this);
 }

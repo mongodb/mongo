@@ -16,9 +16,8 @@
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
-const isSBEEnabled = checkSBEEnabled(db, ["featureFlagSbePlanCache", "featureFlagSbeFull"]);
-if (!isSBEEnabled) {
-    jsTest.log("Skip running the test because featureFlagSbePlanCache is not enabled");
+if (!checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+    jsTest.log("Skip running the test because SBE is not enabled");
     return;
 }
 

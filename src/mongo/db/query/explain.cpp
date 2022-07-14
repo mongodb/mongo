@@ -97,7 +97,7 @@ void generatePlannerInfo(PlanExecutor* exec,
         const QuerySettings* querySettings =
             QuerySettingsDecoration::get(mainCollection->getSharedDecorations());
         if (exec->getCanonicalQuery()->isSbeCompatible() &&
-            feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV() &&
+            feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV() &&
             !exec->getCanonicalQuery()->getForceClassicEngine()) {
             const auto planCacheKeyInfo =
                 plan_cache_key_factory::make(*exec->getCanonicalQuery(), collections);

@@ -418,7 +418,7 @@ TEST(CanonicalQueryEncoderTest, ComputeKeySBE) {
     // SBE must be enabled in order to generate SBE plan cache keys.
     RAIIServerParameterControllerForTest controllerSBE("internalQueryForceClassicEngine", false);
 
-    RAIIServerParameterControllerForTest controllerSBEPlanCache("featureFlagSbePlanCache", true);
+    RAIIServerParameterControllerForTest controllerSBEPlanCache("featureFlagSbeFull", true);
 
     testComputeSBEKey("{}", "{}", "{}", "YW4ABQAAAAAAAAAAAAAAAG5ubm4FAAAAAGZe");
     testComputeSBEKey("{$or: [{a: 1}, {b: 2}]}",
@@ -536,7 +536,7 @@ TEST(CanonicalQueryEncoderTest, ComputeKeySBEWithPipeline) {
     // SBE must be enabled in order to generate SBE plan cache keys.
     RAIIServerParameterControllerForTest controllerSBE("internalQueryForceClassicEngine", false);
 
-    RAIIServerParameterControllerForTest controllerSBEPlanCache("featureFlagSbePlanCache", true);
+    RAIIServerParameterControllerForTest controllerSBEPlanCache("featureFlagSbeFull", true);
 
     auto getLookupBson = [](StringData localField, StringData foreignField, StringData asField) {
         return BSON("$lookup" << BSON("from" << foreignNss.coll() << "localField" << localField
@@ -596,7 +596,7 @@ TEST(CanonicalQueryEncoderTest, ComputeKeySBEWithPipeline) {
 TEST(CanonicalQueryEncoderTest, ComputeKeySBEWithReadConcern) {
     // SBE must be enabled in order to generate SBE plan cache keys.
     RAIIServerParameterControllerForTest controllerSBE("internalQueryForceClassicEngine", false);
-    RAIIServerParameterControllerForTest controllerSBEPlanCache("featureFlagSbePlanCache", true);
+    RAIIServerParameterControllerForTest controllerSBEPlanCache("featureFlagSbeFull", true);
 
     const auto sbeEncodingWithoutReadConcernAvailable =
         "ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAG5ubm4FAAAAAGZe";

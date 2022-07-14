@@ -10,8 +10,7 @@ load('jstests/libs/analyze_plan.js');              // For getPlanStage().
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 load("jstests/libs/sbe_util.js");                  // For checkSBEEnabled.
 
-const isSbePlanCacheEnabled =
-    checkSBEEnabled(db, ["featureFlagSbePlanCache", "featureFlagSbeFull"]);
+const isSbeEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 
 let coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
 
@@ -32,7 +31,7 @@ function assertPlanHasIxScanStage(entry, indexName, expectedQueryHash) {
     assert.eq(entry.queryHash, expectedQueryHash, entry);
 
     const cachedPlan = getCachedPlan(entry.cachedPlan);
-    if (isSbePlanCacheEnabled) {
+    if (isSbeEnabled) {
         // The $planCacheStats output for the SBE plan cache only contains an debug string
         // representation of the execution plan. Rather than parse this string, we just check that
         // the index name appears somewhere in the plan.
@@ -202,7 +201,7 @@ coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
     // Execution stats from when the plan cache entry was created are not exposed from the SBE plan
     // cache.
     let specialValueCacheEntryKeysExamined;
-    if (!isSbePlanCacheEnabled) {
+    if (!isSbeEnabled) {
         specialValueCacheEntryKeysExamined = entry.creationExecStats[0].totalKeysExamined;
     }
 
@@ -224,7 +223,7 @@ coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
     // The new cache entry's plan should have used fewer works (and examined fewer keys) compared
     // to the old cache entry's, since the query on the special value is slightly less efficient.
     assert.lt(entry.works, specialValueCacheEntryWorks, entry);
-    if (!isSbePlanCacheEnabled) {
+    if (!isSbeEnabled) {
         assert.lt(entry.creationExecStats[0].totalKeysExamined,
                   specialValueCacheEntryKeysExamined,
                   entry);
@@ -240,7 +239,7 @@ coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
     assertPlanHasIxScanStage(entry, "selectiveKey_1_tiebreak_1", queryHash);
 
     assert.eq(entry.works, entryAfterRunningSpecialQuery.works, entryAfterRunningSpecialQuery);
-    if (!isSbePlanCacheEnabled) {
+    if (!isSbeEnabled) {
         assert.eq(entryAfterRunningSpecialQuery.creationExecStats[0].totalKeysExamined,
                   entry.creationExecStats[0].totalKeysExamined,
                   entryAfterRunningSpecialQuery);

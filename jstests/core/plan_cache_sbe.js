@@ -19,18 +19,16 @@
 (function() {
 "use strict";
 
-load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
-load("jstests/libs/sbe_explain_helpers.js");  // For engineSpecificAssertion.
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 const coll = db.plan_cache_sbe;
 coll.drop();
-const isSbePlanCacheEnabled =
-    checkSBEEnabled(db, ["featureFlagSbePlanCache", "featureFlagSbeFull"]);
+const isSbeEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 
 assert.commandWorked(coll.insert({a: 1, b: 1}));
 
 // Check that a new entry is added to the plan cache even for single plans.
-if (isSbePlanCacheEnabled) {
+if (isSbeEnabled) {
     assert.eq(1, coll.find({a: 1}).itcount());
     // Validate sbe plan cache stats entry.
     const allStats = coll.aggregate([{$planCacheStats: {}}]).toArray();
@@ -56,23 +54,11 @@ assert.eq(allStats.length, 1, allStats);
 const stats = allStats[0];
 assert(stats.hasOwnProperty("cachedPlan"), stats);
 
-if (!isSbePlanCacheEnabled) {
-    // TODO SERVER-61314: Please modify this branch when "featureFlagSbePlanCache" is removed.
-    // Currently this branch will be taken if either 1) SBE is disabled, or 2) SBE is enabled but
-    // the "featureFlagSbePlanCache" flag is disabled.
-    engineSpecificAssertion(!stats.cachedPlan.hasOwnProperty("queryPlan"),
-                            stats.cachedPlan.hasOwnProperty("queryPlan"),
-                            db,
-                            stats);
-    engineSpecificAssertion(!stats.cachedPlan.hasOwnProperty("slotBasedPlan"),
-                            stats.cachedPlan.hasOwnProperty("slotBasedPlan"),
-                            db,
-                            stats);
+if (isSbeEnabled) {
+    assert(stats.cachedPlan.hasOwnProperty("slots"), stats);
+    assert(stats.cachedPlan.hasOwnProperty("stages"), stats);
 } else {
-    engineSpecificAssertion(
-        !stats.cachedPlan.hasOwnProperty("slots") && !stats.cachedPlan.hasOwnProperty("stages"),
-        stats.cachedPlan.hasOwnProperty("slots") && stats.cachedPlan.hasOwnProperty("stages"),
-        db,
-        stats);
+    assert(!stats.cachedPlan.hasOwnProperty("queryPlan"), stats);
+    assert(!stats.cachedPlan.hasOwnProperty("slotBasedPlan"), stats);
 }
 })();

@@ -1021,7 +1021,7 @@ protected:
         // go through the normal planning and plan compilation process, resulting in an
         // auto-parameterized SBE plan cache entry. Subsequent idhack queries can simply re-use this
         // cache entry, and the hot path for recovering cached plans is already carefully optimized.
-        if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+        if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
             return nullptr;
         }
 
@@ -1099,7 +1099,7 @@ protected:
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildCachedPlan(
         const sbe::PlanCacheKey& planCacheKey) final {
         if (shouldCacheQuery(*_cq)) {
-            if (!feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+            if (!feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
                 // If the feature flag is off, we first try to build an "id hack" plan because the
                 // id hack plans are not cached in the classic cache. We then fall back to use the
                 // classic plan cache.
@@ -1138,8 +1138,11 @@ protected:
         return buildIdHackPlan();
     }
 
-    // A temporary function to allow recovering SBE plans from the classic plan cache.
-    // TODO SERVER-61314: Remove this function when "featureFlagSbePlanCache" is removed.
+    // A temporary function to allow recovering SBE plans from the classic plan cache. When the
+    // feature flag for "SBE full" is disabled, we are still able to use the classic plan cache for
+    // queries that execute in SBE.
+    //
+    // TODO SERVER-64882: Remove this function when "featureFlagSbeFull" is removed.
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildCachedPlanFromClassicCache() {
         const auto& mainColl = getMainCollection();
         auto planCacheKey = plan_cache_key_factory::make<PlanCacheKey>(*_cq, mainColl);

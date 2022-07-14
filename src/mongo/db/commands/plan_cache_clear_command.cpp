@@ -91,7 +91,7 @@ Status clear(OperationContext* opCtx,
         // Default value of planner options (0) is SBE compatible, so it does not affect result of
         // sbe::isQuerySbeCompatible here.
         const size_t plannerOptions = 0;
-        if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV() &&
+        if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV() &&
             !cq->getForceClassicEngine() &&
             sbe::isQuerySbeCompatible(&collection, cq.get(), plannerOptions)) {
             cq->setSbeCompatible(true);
@@ -112,7 +112,7 @@ Status clear(OperationContext* opCtx,
 
     planCache->clear();
 
-    if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+    if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
         auto version = CollectionQueryInfo::get(collection).getPlanCacheInvalidatorVersion();
         sbe::clearPlanCacheEntriesWith(opCtx->getServiceContext(), collection->uuid(), version);
     }

@@ -200,7 +200,7 @@ void updatePlanCache(
 
         if (winningPlan.solution->cacheData != nullptr) {
             if constexpr (std::is_same_v<PlanStageType, std::unique_ptr<sbe::PlanStage>>) {
-                if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+                if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
                     tassert(6142201,
                             "The winning CandidatePlan should contain the original plan",
                             winningPlan.clonedPlan);
@@ -224,8 +224,9 @@ void updatePlanCache(
                         &callbacks,
                         boost::none /* worksGrowthCoefficient */));
                 } else {
-                    // TODO SERVER-64882: Fall back to use the classic plan cache.
-                    // Remove this branch after "gFeatureFlagSbePlanCache" is removed.
+                    // Fall back to use the classic plan cache.
+                    //
+                    // TODO SERVER-64882: Remove this branch after "gFeatureFlagSbeFull" is removed.
                     cacheClassicPlan();
                 }
             } else {

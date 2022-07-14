@@ -1095,8 +1095,8 @@ void encodeKeyForAutoParameterizedMatchSBE(MatchExpression* matchExpr, BufBuilde
 
 std::string encodeSBE(const CanonicalQuery& cq) {
     tassert(6512900,
-            "using the SBE plan cache key encoding requires the SBE plan cache to be enabled",
-            feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV());
+            "using the SBE plan cache key encoding requires SBE to be fully enabled",
+            feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV());
     tassert(6142104,
             "attempting to encode SBE plan cache key for SBE-incompatible query",
             cq.isSbeCompatible());

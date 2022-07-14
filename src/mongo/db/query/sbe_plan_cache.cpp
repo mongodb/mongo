@@ -105,7 +105,7 @@ class PlanCacheOnParamChangeUpdaterImpl final : public plan_cache_util::OnParamC
 public:
     void updateCacheSize(ServiceContext* serviceCtx,
                          plan_cache_util::PlanCacheSizeParameter parameter) final {
-        if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+        if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
             auto size = getPlanCacheSizeInBytes(parameter);
             auto& globalPlanCache = sbePlanCacheDecoration(serviceCtx);
             globalPlanCache->reset(size);
@@ -113,7 +113,7 @@ public:
     }
 
     void clearCache(ServiceContext* serviceCtx) final {
-        if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+        if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
             auto& globalPlanCache = sbePlanCacheDecoration(serviceCtx);
             globalPlanCache->clear();
         }
@@ -125,7 +125,7 @@ ServiceContext::ConstructorActionRegisterer planCacheRegisterer{
         plan_cache_util::sbePlanCacheOnParamChangeUpdater(serviceCtx) =
             std::make_unique<PlanCacheOnParamChangeUpdaterImpl>();
 
-        if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+        if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
             auto status = plan_cache_util::PlanCacheSizeParameter::parse(planCacheSize.get());
             uassertStatusOK(status);
 
@@ -139,15 +139,15 @@ ServiceContext::ConstructorActionRegisterer planCacheRegisterer{
 
 sbe::PlanCache& getPlanCache(ServiceContext* serviceCtx) {
     uassert(5933402,
-            "Cannot getPlanCache() if gFeatureFlagSbePlanCache is disabled",
-            feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV());
+            "Cannot getPlanCache() if 'featureFlagSbeFull' is disabled",
+            feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV());
     return *sbePlanCacheDecoration(serviceCtx);
 }
 
 sbe::PlanCache& getPlanCache(OperationContext* opCtx) {
     uassert(5933401,
-            "Cannot getPlanCache() if gFeatureFlagSbePlanCache is disabled",
-            feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV());
+            "Cannot getPlanCache() if 'featureFlagSbeFull' is disabled",
+            feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV());
     tassert(5933400, "Cannot get the global SBE plan cache by a nullptr", opCtx);
     return getPlanCache(opCtx->getServiceContext());
 }
@@ -155,7 +155,7 @@ sbe::PlanCache& getPlanCache(OperationContext* opCtx) {
 void clearPlanCacheEntriesWith(ServiceContext* serviceCtx,
                                UUID collectionUuid,
                                size_t collectionVersion) {
-    if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+    if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
         auto removed =
             sbe::getPlanCache(serviceCtx)
                 .removeIf([&collectionUuid, collectionVersion](const PlanCacheKey& key,

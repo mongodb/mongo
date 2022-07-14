@@ -54,11 +54,6 @@ feature_flags:
       default: true
       version: 6.0
 
-    featureFlagSbePlanCache:
-      description: "Feature flag for enabling use of the SBE plan cache"
-      cpp_varname: gFeatureFlagSbePlanCache
-      default: false
-
     featureFlagChangeStreamsFurtherEnrichedEvents:
       description: "Feature flag for enabling the reshardCollection and refineCollectionShardKey events, as well as enhancements to the updateDescription field for update events"
       cpp_varname: gFeatureFlagChangeStreamsFurtherEnrichedEvents
@@ -99,7 +94,8 @@ feature_flags:
       default: false
 
     featureFlagSbeFull:
-      description: "Feature flag to enable using SBE for a larger number of queries"
+      description: "Feature flag for enabling full SBE support. Enables SBE for a much larger class
+      of queries, including NLJ $lookup plans. Also enables the SBE plan cache."
       cpp_varname: gFeatureFlagSbeFull
       default: false
 

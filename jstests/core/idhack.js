@@ -62,9 +62,8 @@ winningPlan = getWinningPlan(explain.queryPlanner);
 engineSpecificAssertion(!isIdhack(db, winningPlan), isIxscan(db, winningPlan), db, winningPlan);
 
 // Covered query returning _id field only can be handled by ID hack.
-const isSBEPlanCacheEnabled =
-    checkSBEEnabled(db, ["featureFlagSbePlanCache", "featureFlagSbeFull"]);
-const parentStage = isSBEPlanCacheEnabled ? "PROJECTION_COVERED" : "FETCH";
+const isSbeEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
+const parentStage = isSbeEnabled ? "PROJECTION_COVERED" : "FETCH";
 explain = t.find(query, {_id: 1}).explain();
 winningPlan = getWinningPlan(explain.queryPlanner);
 engineSpecificAssertion(

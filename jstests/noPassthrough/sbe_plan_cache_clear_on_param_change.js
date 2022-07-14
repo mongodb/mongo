@@ -48,10 +48,10 @@ assert.neq(conn, null, "mongod failed to start up");
 const dbName = jsTestName();
 const db = conn.getDB(dbName);
 
-// This test is specifically verifying the behavior of the SBE plan cache. So if either the SBE plan
-// cache or SBE itself are disabled, bail out.
-if (!checkSBEEnabled(db, ["featureFlagSbePlanCache", "featureFlagSbeFull"])) {
-    jsTestLog("Skipping test because either SBE engine or SBE plan cache are disabled");
+// This test is specifically verifying the behavior of the SBE plan cache which is enabled by
+// 'featureFlagSbeFull'.
+if (!checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+    jsTestLog("Skipping test because SBE is not fully enabled");
     MongoRunner.stopMongod(conn);
     return;
 }

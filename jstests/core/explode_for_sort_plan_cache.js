@@ -56,7 +56,7 @@ const sortSpec = {
 
 // TODO SERVER-67576: remove this branch once explode for sort plans are supported by the SBE plan
 // cache.
-if (checkSBEEnabled(db, ["featureFlagSbePlanCache", "featureFlagSbeFull"])) {
+if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
     // Run the query for the first time and make sure the plan hasn't been cached.
     assert.eq(0, coll.find(querySpec).sort(sortSpec).itcount());
     assertCacheEntryDoesNotExist(querySpec, sortSpec);

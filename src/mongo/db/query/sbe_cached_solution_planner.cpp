@@ -58,8 +58,11 @@ CandidatePlans CachedSolutionPlanner::plan(
     // only track the number of reads from the local side. Thus, we can use the number of reads the
     // plan was cached with during multiplanning even though multiplanning ran trials of
     // pre-extended plans.
-    if (!_cq.pipeline().empty() &&
-        !feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+    //
+    // When "featureFlagSbeFull" is enabled we use the SBE plan cache. The SBE plan cache stores the
+    // entire plan, including the part for any agg pipeline pushed down to SBE. Therefore, this
+    // logic is only necessary when "featureFlagSbeFull" is disabled.
+    if (!_cq.pipeline().empty() && !feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
         _yieldPolicy->clearRegisteredPlans();
         auto secondaryCollectionsInfo =
             fillOutSecondaryCollectionsInformation(_opCtx, _collections, &_cq);
@@ -185,7 +188,7 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
         // be simplified to only deactivate the entry in the SBE plan cache.
         auto cache = CollectionQueryInfo::get(mainColl).getPlanCache();
         cache->deactivate(plan_cache_key_factory::make<mongo::PlanCacheKey>(_cq, mainColl));
-        if (feature_flags::gFeatureFlagSbePlanCache.isEnabledAndIgnoreFCV()) {
+        if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
             auto&& sbePlanCache = sbe::getPlanCache(_opCtx);
             sbePlanCache.deactivate(plan_cache_key_factory::make(_cq, _collections));
         }

@@ -19,9 +19,8 @@
 
 load('jstests/libs/analyze_plan.js');              // For getPlanStage().
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load('jstests/libs/fixture_helpers.js');      // For getPrimaryForNodeHostingDatabase and isMongos.
-load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
-load("jstests/libs/sbe_explain_helpers.js");  // For engineSpecificAssertion.
+load('jstests/libs/fixture_helpers.js');  // For getPrimaryForNodeHostingDatabase and isMongos.
+load("jstests/libs/sbe_util.js");         // For checkSBEEnabled.
 
 const coll = db.wildcard_cached_plans;
 coll.drop();
@@ -29,7 +28,7 @@ coll.drop();
 assert.commandWorked(coll.createIndex({"b.$**": 1}));
 assert.commandWorked(coll.createIndex({"a": 1}));
 
-const sbePlanCacheEnabled = checkSBEEnabled(db, ["featureFlagSbePlanCache", "featureFlagSbeFull"]);
+const isSbeEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 
 // In order for the plan cache to be used, there must be more than one plan available. Insert
 // data into the collection such that the b.$** index will be far more selective than the index
@@ -72,22 +71,11 @@ for (let i = 0; i < 2; i++) {
 let cacheEntry = getCacheEntryForQuery(query);
 assert.neq(cacheEntry, null);
 assert.eq(cacheEntry.isActive, true);
-if (!sbePlanCacheEnabled) {
+if (!isSbeEnabled) {
     // Should be at least two plans: one using the {a: 1} index and the other using the b.$** index.
     assert.gte(cacheEntry.creationExecStats.length, 2, tojson(cacheEntry.plans));
 
-    // In SBE index scan stage does not serialize key pattern in execution stats, so we use IXSCAN
-    // from the query plan instead.
-    const sbeIxScan = function() {
-        const cachedPlan = cacheEntry.cachedPlan;
-        if (!cachedPlan)
-            return null;
-        if (!cachedPlan.queryPlan)
-            return null;
-        return getPlanStage(cachedPlan.queryPlan, "IXSCAN");
-    }();
-
-    const classicIxScan = function() {
+    const ixscan = function() {
         const execStats = cacheEntry.creationExecStats;
         if (!execStats)
             return null;
@@ -99,11 +87,14 @@ if (!sbePlanCacheEnabled) {
         return getPlanStage(elem.executionStages, "IXSCAN");
     }();
     const expectedKeyPattern = {"$_path": 1, "b": 1};
-    const classicKeyPatternMatch =
-        classicIxScan !== null && bsonWoCompare(classicIxScan.keyPattern, expectedKeyPattern) === 0;
-    const sbeKeyPatternmatch =
-        sbeIxScan !== null && bsonWoCompare(sbeIxScan.keyPattern, expectedKeyPattern) === 0;
-    engineSpecificAssertion(classicKeyPatternMatch, sbeKeyPatternmatch, db, tojson(cacheEntry));
+    assert.neq(null, ixscan, cacheEntry);
+    assert(bsonWoCompare(ixscan.keyPattern, expectedKeyPattern) === 0, ixscan);
+} else {
+    assert(cacheEntry.hasOwnProperty("cachedPlan"), cacheEntry);
+    assert(cacheEntry.cachedPlan.hasOwnProperty("stages"), cacheEntry);
+    const sbePlan = cacheEntry.cachedPlan.stages;
+    // The SBE plan string should contain the name of the b.$** index.
+    assert(sbePlan.includes("b.$**_1"), cacheEntry);
 }
 
 // Run the query again. This time it should use the cached plan. We should get the same result
@@ -125,7 +116,7 @@ assert.neq(getPlanCacheKeyFromShape({query: queryWithBNull, collection: coll, db
 // There should only have been one solution for the above query, so it would get cached only by the
 // SBE plan cache.
 cacheEntry = getCacheEntryForQuery({a: 1, b: null});
-if (sbePlanCacheEnabled) {
+if (isSbeEnabled) {
     assert.neq(cacheEntry, null);
     assert.eq(cacheEntry.isActive, true, cacheEntry);
     assert.eq(cacheEntry.isPinned, true, cacheEntry);
