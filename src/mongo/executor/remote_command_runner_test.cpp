@@ -27,7 +27,9 @@
  *    it in the license file.
  */
 
+#include "mongo/executor/remote_command_retry_policy.h"
 #include "mongo/executor/remote_command_runner.h"
+#include "mongo/executor/remote_command_targeter.h"
 
 #include "mongo/bson/oid.h"
 #include "mongo/db/repl/hello_gen.h"
@@ -39,6 +41,7 @@
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include <memory>
 
@@ -194,6 +197,28 @@ TEST_F(RemoteCommandRunnerTestFixture, WriteError) {
     });
 
     ASSERT_THROWS_CODE(resultFuture.get(), DBException, ErrorCodes::DocumentValidationFailure);
+}
+
+/*
+ * Basic Targeter that returns the host that invoked it.
+ */
+TEST_F(RemoteCommandRunnerTestFixture, LocalTargeter) {
+    RemoteCommandLocalHostTargeter t;
+    auto targetFuture = t.resolve(_cancellationToken);
+    auto target = targetFuture.get();
+
+    ASSERT_EQ(target.size(), 1);
+    ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), target[0]);
+}
+
+/*
+ * Basic RetryPolicy that never retries.
+ */
+TEST_F(RemoteCommandRunnerTestFixture, NoRetry) {
+    RemoteCommandNoRetryPolicy p;
+
+    ASSERT_FALSE(p.shouldRetry(Status(ErrorCodes::BadValue, "mock")));
+    ASSERT_EQUALS(p.getNextRetryDelay(), Milliseconds::zero());
 }
 
 }  // namespace
