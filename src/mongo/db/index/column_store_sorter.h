@@ -50,15 +50,14 @@ namespace mongo {
  * preferable to defer the cost of sorting to the end in order to avoid the cost of a binary tree
  * traversal for each inserted cell.
  */
-class ColumnStoreSorter {
+class ColumnStoreSorter : public SorterBase {
 public:
-    ColumnStoreSorter(size_t maxMemoryUsageBytes, StringData dbName, SorterFileStats* stats);
+    ColumnStoreSorter(size_t maxMemoryUsageBytes,
+                      StringData dbName,
+                      SorterFileStats* stats,
+                      SorterTracker* tracker = nullptr);
 
     void add(PathView path, const RecordId& recordId, CellView cellContents);
-
-    size_t numSpills() const {
-        return _numSpills;
-    }
 
     struct Key {
         PathView path;
@@ -114,11 +113,10 @@ private:
     Iterator* inMemoryIterator() const;
 
     const std::string _dbName;
-    SorterFileStats* _stats;  // Unowned
+    SorterFileStats* _fileStats;  // Unowned
 
     const size_t _maxMemoryUsageBytes;
     size_t _memUsed = 0;
-    size_t _numSpills = 0;
 
     /**
      * Mapping from path name to the sorted list of (RecordId, Cell) pairs.

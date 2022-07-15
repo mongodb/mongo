@@ -69,11 +69,11 @@ TEST(ColumnStoreSorter, SortTest) {
     // We test two sorters: one that can perform the sort in memory and one that is constrained so
     // that it must spill to disk.
 
-    SorterFileStats statsForInMemorySorter;
+    SorterFileStats statsForInMemorySorter(nullptr);
     auto inMemorySorter = std::make_unique<ColumnStoreSorter>(
         1000000 /* maxMemoryUsageBytes */, "dbName", &statsForInMemorySorter);
 
-    SorterFileStats statsForExternalSorter;
+    SorterFileStats statsForExternalSorter(nullptr);
     auto externalSorter = std::make_unique<ColumnStoreSorter>(
         500 /* maxMemoryUsageBytes */, "dbName", &statsForExternalSorter);
 
@@ -122,9 +122,9 @@ TEST(ColumnStoreSorter, SortTest) {
     // Ensure that statistics for spills and file accesses are as expected.
     // Note: The number of spills in the external sorter depends on the size of C++ data structures,
     // which can be different between architectures. The test allows a range of reasonable values.
-    ASSERT_EQ(0, inMemorySorter->numSpills());
-    ASSERT_LTE(3, externalSorter->numSpills());
-    ASSERT_GTE(5, externalSorter->numSpills());
+    ASSERT_EQ(0, inMemorySorter->stats().spilledRanges());
+    ASSERT_LTE(3, externalSorter->stats().spilledRanges());
+    ASSERT_GTE(5, externalSorter->stats().spilledRanges());
 
     ASSERT_EQ(0, statsForInMemorySorter.opened.load());
     ASSERT_EQ(0, statsForInMemorySorter.closed.load());

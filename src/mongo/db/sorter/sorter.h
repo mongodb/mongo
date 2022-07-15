@@ -43,6 +43,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/sorter/sorter_gen.h"
+#include "mongo/db/sorter/sorter_stats.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
@@ -96,14 +97,6 @@
 namespace mongo {
 
 /**
- * For collecting file usage metrics.
- */
-struct SorterFileStats {
-    AtomicWord<long long> opened;
-    AtomicWord<long long> closed;
-};
-
-/**
  * Runtime options that control the Sorter's behavior
  */
 struct SortOptions {
@@ -130,6 +123,9 @@ struct SortOptions {
     // If set, allows us to observe Sorter file handle usage.
     SorterFileStats* sorterFileStats;
 
+    // If set, allows us to observe aggregate Sorter behaviors.
+    SorterTracker* sorterTracker;
+
     // If set to true and sorted data fits into memory, sorted data will be moved into iterator
     // instead of copying.
     bool moveSortedDataIntoIterator;
@@ -139,6 +135,7 @@ struct SortOptions {
           maxMemoryUsageBytes(64 * 1024 * 1024),
           extSortAllowed(false),
           sorterFileStats(nullptr),
+          sorterTracker(nullptr),
           moveSortedDataIntoIterator(false) {}
 
     // Fluent API to support expressions like SortOptions().Limit(1000).ExtSortAllowed(true)
@@ -170,6 +167,11 @@ struct SortOptions {
 
     SortOptions& FileStats(SorterFileStats* newSorterFileStats) {
         sorterFileStats = newSorterFileStats;
+        return *this;
+    }
+
+    SortOptions& Tracker(SorterTracker* newSorterTracker) {
+        sorterTracker = newSorterTracker;
         return *this;
     }
 
@@ -241,6 +243,18 @@ protected:
     SortIteratorInterface() {}  // can only be constructed as a base
 };
 
+class SorterBase {
+public:
+    SorterBase(SorterTracker* sorterTracker = nullptr) : _stats(sorterTracker) {}
+
+    const SorterStats& stats() const {
+        return _stats;
+    }
+
+protected:
+    SorterStats _stats;
+};
+
 /**
  * This is the way to input data to the sorting framework.
  *
@@ -257,7 +271,7 @@ protected:
  * nextFileName() for example.
  */
 template <typename Key, typename Value>
-class Sorter {
+class Sorter : public SorterBase {
     Sorter(const Sorter&) = delete;
     Sorter& operator=(const Sorter&) = delete;
 
@@ -279,10 +293,7 @@ public:
      */
     class File {
     public:
-        File(std::string path, SorterFileStats* stats = nullptr)
-            : _path(std::move(path)), _stats(stats) {
-            invariant(!_path.empty());
-        }
+        File(std::string path, SorterFileStats* stats = nullptr);
 
         ~File();
 
@@ -365,10 +376,6 @@ public:
 
     virtual ~Sorter() {}
 
-    size_t numSpills() const {
-        return _numSpills;
-    }
-
     size_t numSorted() const {
         return _numSorted;
     }
@@ -380,8 +387,6 @@ public:
     PersistedState persistDataForShutdown();
 
 protected:
-    Sorter() {}  // can only be constructed as a base
-
     virtual void spill() = 0;
 
     size_t _numSorted = 0;              // Keeps track of the number of keys sorted.
@@ -391,14 +396,16 @@ protected:
 
     std::shared_ptr<File> _file;
 
-    std::size_t _numSpills = 0;  // Keeps track of the number of spills that have happened.
     std::vector<std::shared_ptr<Iterator>> _iters;  // Data that has already been spilled.
 };
 
 
 template <typename Key, typename Value>
-class BoundedSorterInterface {
+class BoundedSorterInterface : public SorterBase {
+
 public:
+    BoundedSorterInterface(const SortOptions& opts) : SorterBase(opts.sorterTracker) {}
+
     virtual ~BoundedSorterInterface() {}
 
     // Feed one item of input to the sorter.
@@ -439,7 +446,6 @@ public:
     virtual Document serializeBound() const = 0;
 
     virtual size_t totalDataSizeBytes() const = 0;
-    virtual size_t numSpills() const = 0;
     virtual size_t limit() const = 0;
 
     // By default, uassert that the input meets our assumptions of being almost-sorted.
@@ -525,10 +531,6 @@ public:
         return _totalDataSizeSorted;
     }
 
-    size_t numSpills() const {
-        return _numSpills;
-    }
-
     size_t limit() const {
         return _opts.limit;
     }
@@ -563,7 +565,6 @@ private:
 
     std::shared_ptr<typename Sorter<Key, Value>::File> _file;
     std::shared_ptr<SpillIterator> _spillIter;
-    std::size_t _numSpills = 0;  // Keeps track of the number of spills that have happened.
 
     boost::optional<Key> _min;
     bool _done = false;

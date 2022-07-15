@@ -76,11 +76,13 @@ ColumnStoreSorter::Value ColumnStoreSorter::Value::deserializeForSorter(
 
 ColumnStoreSorter::ColumnStoreSorter(size_t maxMemoryUsageBytes,
                                      StringData dbName,
-                                     SorterFileStats* stats)
-    : _dbName(dbName.toString()),
-      _stats(stats),
+                                     SorterFileStats* stats,
+                                     SorterTracker* tracker)
+    : SorterBase(tracker),
+      _dbName(dbName.toString()),
+      _fileStats(stats),
       _maxMemoryUsageBytes(maxMemoryUsageBytes),
-      _spillFile(std::make_shared<Sorter<Key, Value>::File>(pathForNewSpillFile(), _stats)) {}
+      _spillFile(std::make_shared<Sorter<Key, Value>::File>(pathForNewSpillFile(), _fileStats)) {}
 
 void ColumnStoreSorter::add(PathView path, const RecordId& recordId, CellView cellContents) {
     auto& cellListAtPath = _dataByPath[path];
@@ -123,9 +125,9 @@ void ColumnStoreSorter::spill() {
     if (_dataByPath.empty()) {
         return;
     }
-    ++_numSpills;
+    this->_stats.incrementSpilledRanges();
 
-    SortedFileWriter<Key, Value> writer(makeSortOptions(_dbName, _stats), _spillFile, {});
+    SortedFileWriter<Key, Value> writer(makeSortOptions(_dbName, _fileStats), _spillFile, {});
 
     // Cells loaded into memory are sorted by record id but not yet sorted by path. We perform that
     // sort now, so that we can output cells sorted by (path, rid) for later consumption by our
@@ -212,7 +214,7 @@ ColumnStoreSorter::Iterator* ColumnStoreSorter::done() {
 
     spill();
     return SortIteratorInterface<Key, Value>::merge(
-        _spilledFileIterators, makeSortOptions(_dbName, _stats), ComparisonForPathAndRid());
+        _spilledFileIterators, makeSortOptions(_dbName, _fileStats), ComparisonForPathAndRid());
 }
 
 /**

@@ -12,9 +12,15 @@
 
 load('jstests/noPassthrough/libs/index_build.js');
 
+const maxMemUsageMegabytes = 50;
+const numDocs = 10;
+const fieldSize = 10 * 1024 * 1024;
+const approxMemoryUsage = numDocs * fieldSize;
+let expectedSpilledRanges = approxMemoryUsage / (maxMemUsageMegabytes * 1024 * 1024);
+
 const replSet = new ReplSetTest({
     nodes: 1,
-    nodeOptions: {setParameter: {maxIndexBuildMemoryUsageMegabytes: 50}},
+    nodeOptions: {setParameter: {maxIndexBuildMemoryUsageMegabytes: maxMemUsageMegabytes}},
 });
 replSet.startSet();
 replSet.initiate();
@@ -23,10 +29,10 @@ let primary = replSet.getPrimary();
 let testDB = primary.getDB('test');
 let coll = testDB.getCollection('t');
 
-for (let i = 0; i < 10; i++) {
+for (let i = 0; i < numDocs; i++) {
     assert.commandWorked(coll.insert({
         _id: i,
-        a: 'a'.repeat(10 * 1024 * 1024),
+        a: 'a'.repeat(fieldSize),
     }));
 }
 
@@ -41,6 +47,13 @@ assert.eq(indexBulkBuilderSection.count, 1, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.resumed, 0, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.filesOpenedForExternalSort, 1, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.filesClosedForExternalSort, 1, tojson(indexBulkBuilderSection));
+assert.eq(
+    indexBulkBuilderSection.spilledRanges, expectedSpilledRanges, tojson(indexBulkBuilderSection));
+assert.between(0,
+               indexBulkBuilderSection.bytesSpilled,
+               approxMemoryUsage,
+               tojson(indexBulkBuilderSection),
+               true);
 
 // Shut down server during an index to verify 'resumable' value on restart.
 IndexBuildTest.pauseIndexBuilds(primary);
@@ -68,9 +81,16 @@ assert.eq(indexBulkBuilderSection.resumed, 1, tojson(indexBulkBuilderSection));
 // and read it back on startup.
 assert.eq(indexBulkBuilderSection.filesOpenedForExternalSort, 1, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.filesClosedForExternalSort, 1, tojson(indexBulkBuilderSection));
+assert.eq(indexBulkBuilderSection.spilledRanges, 1, tojson(indexBulkBuilderSection));
+assert.between(0,
+               indexBulkBuilderSection.bytesSpilled,
+               approxMemoryUsage,
+               tojson(indexBulkBuilderSection),
+               true);
 
 // Confirm that metrics are updated during initial sync.
-const newNode = replSet.add({setParameter: {maxIndexBuildMemoryUsageMegabytes: 50}});
+const newNode =
+    replSet.add({setParameter: {maxIndexBuildMemoryUsageMegabytes: maxMemUsageMegabytes}});
 replSet.reInitiate();
 replSet.waitForState(newNode, ReplSetTest.State.SECONDARY);
 replSet.awaitReplication();
@@ -85,6 +105,17 @@ indexBulkBuilderSection = newNodeTestDB.serverStatus().indexBulkBuilder;
 assert.gte(indexBulkBuilderSection.count, 3, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.filesOpenedForExternalSort, 1, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.filesClosedForExternalSort, 1, tojson(indexBulkBuilderSection));
+// We try building two indexes for the test collection so the memory usage limit for each index
+// build during initial sync is the maxIndexBuildMemoryUsageMegabytes divided by the number of index
+// builds. We end up with half of the in-memory memory so we double the amount of spills expected.
+expectedSpilledRanges *= 2;
+assert.eq(
+    indexBulkBuilderSection.spilledRanges, expectedSpilledRanges, tojson(indexBulkBuilderSection));
+assert.between(0,
+               indexBulkBuilderSection.bytesSpilled,
+               approxMemoryUsage,
+               tojson(indexBulkBuilderSection),
+               true);
 
 // Building multiple indexes in a single createIndex command increases count by the number of
 // indexes requested.
@@ -99,6 +130,14 @@ assert.eq(indexBulkBuilderSection.count, 4, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.resumed, 1, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.filesOpenedForExternalSort, 2, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.filesClosedForExternalSort, 2, tojson(indexBulkBuilderSection));
+expectedSpilledRanges += 2;
+assert.eq(
+    indexBulkBuilderSection.spilledRanges, expectedSpilledRanges, tojson(indexBulkBuilderSection));
+assert.between(0,
+               indexBulkBuilderSection.bytesSpilled,
+               approxMemoryUsage,
+               tojson(indexBulkBuilderSection),
+               true);
 
 replSet.stopSet();
 })();

@@ -597,7 +597,6 @@ protected:
      * following:
      *
      * {1, 2, 3, 4, 5}
-     * {12, 3, 4, 5}
      * {12, 34, 5}
      * {1234, 5}
      */
@@ -647,7 +646,7 @@ protected:
                 auto iteratorPtr = std::shared_ptr<Iterator>(writer.done());
                 mergeIterator->closeSource();
                 mergedIterators.push_back(std::move(iteratorPtr));
-                this->_numSpills++;
+                this->_stats.incrementSpilledRanges();
             }
 
             LOGV2_DEBUG(6033101,
@@ -708,7 +707,7 @@ public:
                                this->_opts.dbName,
                                range.getChecksum());
                        });
-        this->_numSpills = this->_iters.size();
+        this->_stats.setSpilledRanges(this->_iters.size());
     }
 
     void add(const Key& key, const Value& val) {
@@ -800,7 +799,7 @@ private:
 
         _memUsed = 0;
 
-        this->_numSpills++;
+        this->_stats.incrementSpilledRanges();
     }
 
     bool _done = false;
@@ -817,7 +816,7 @@ public:
     typedef SortIteratorInterface<Key, Value> Iterator;
 
     LimitOneSorter(const SortOptions& opts, const Comparator& comp)
-        : _comp(comp), _haveData(false) {
+        : Sorter<Key, Value>(opts), _comp(comp), _haveData(false) {
         verify(opts.limit == 1);
     }
 
@@ -1084,7 +1083,7 @@ private:
 
         _memUsed = 0;
 
-        this->_numSpills++;
+        this->_stats.incrementSpilledRanges();
     }
 
     bool _done = false;
@@ -1106,14 +1105,16 @@ private:
 
 template <typename Key, typename Value>
 Sorter<Key, Value>::Sorter(const SortOptions& opts)
-    : _opts(opts),
+    : SorterBase(opts.sorterTracker),
+      _opts(opts),
       _file(opts.extSortAllowed ? std::make_shared<Sorter<Key, Value>::File>(
                                       opts.tempDir + "/" + nextFileName(), opts.sorterFileStats)
                                 : nullptr) {}
 
 template <typename Key, typename Value>
 Sorter<Key, Value>::Sorter(const SortOptions& opts, const std::string& fileName)
-    : _opts(opts),
+    : SorterBase(opts.sorterTracker),
+      _opts(opts),
       _file(std::make_shared<Sorter<Key, Value>::File>(opts.tempDir + "/" + fileName,
                                                        opts.sorterFileStats)) {
     invariant(opts.extSortAllowed);
@@ -1133,6 +1134,15 @@ typename Sorter<Key, Value>::PersistedState Sorter<Key, Value>::persistDataForSh
     });
 
     return {_file->path().filename().string(), ranges};
+}
+
+template <typename Key, typename Value>
+Sorter<Key, Value>::File::File(std::string path, SorterFileStats* stats)
+    : _path(std::move(path)), _stats(stats) {
+    invariant(!_path.empty());
+    if (_stats && boost::filesystem::exists(_path) && boost::filesystem::is_regular_file(_path)) {
+        _stats->addSpilledDataSize(boost::filesystem::file_size(_path));
+    }
 }
 
 template <typename Key, typename Value>
@@ -1196,6 +1206,9 @@ void Sorter<Key, Value>::File::write(const char* data, std::streamsize size) {
     try {
         _file.write(data, size);
         _offset += size;
+        if (_stats) {
+            this->_stats->addSpilledDataSize(size);
+        };
     } catch (const std::system_error& ex) {
         if (ex.code() == std::errc::no_space_on_device) {
             uasserted(ErrorCodes::OutOfDiskSpace,
@@ -1351,7 +1364,8 @@ BoundedSorter<Key, Value, Comparator, BoundMaker>::BoundedSorter(const SortOptio
                                                                  Comparator comp,
                                                                  BoundMaker makeBound,
                                                                  bool checkInput)
-    : compare(comp),
+    : BoundedSorterInterface<Key, Value>(opts),
+      compare(comp),
       makeBound(makeBound),
       _comparePairs{compare},
       _checkInput(checkInput),
@@ -1509,7 +1523,7 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::_spill() {
                           << " bytes, but did not opt in to external sorting.",
             _opts.extSortAllowed);
 
-    ++_numSpills;
+    this->_stats.incrementSpilledRanges();
 
     // Write out all the values from the heap in sorted order.
     SortedFileWriter<Key, Value> writer(_opts, _file, {});

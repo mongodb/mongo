@@ -225,6 +225,7 @@ public:
         static void countNewBuildInStats();
         static void countResumedBuildInStats();
         static SorterFileStats* bulkBuilderFileStats();
+        static SorterTracker* bulkBuilderTracker();
 
         /**
          * Abandon the current snapshot and release then reacquire locks. Tests that target the

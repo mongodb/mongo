@@ -139,7 +139,7 @@ public:
         }
         _output.reset(_sorter->done());
         _stats.keysSorted += _sorter->numSorted();
-        _stats.spills += _sorter->numSpills();
+        _stats.spills += _sorter->stats().spilledRanges();
         _stats.totalDataSizeBytes += _sorter->totalDataSizeSorted();
         _sorter.reset();
     }

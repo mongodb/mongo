@@ -9,6 +9,7 @@ sorterEnv.CppUnitTest(
     target='db_sorter_test',
     source=[
         'sorter_test.cpp',
+        'sorter_stats_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
@@ -18,8 +19,15 @@ sorterEnv.CppUnitTest(
         '$BUILD_DIR/mongo/s/is_mongos',
         '$BUILD_DIR/third_party/shim_snappy',
         'sorter_idl',
+        'sorter_stats',
     ],
 )
+
+sorterEnv.Library(target='sorter_stats', source=[
+    'sorter_stats.cpp',
+], LIBDEPS_PRIVATE=[
+    '$BUILD_DIR/mongo/db/commands/server_status_core',
+])
 
 env.Library(
     target='sorter_idl',
@@ -28,6 +36,7 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
+        '$BUILD_DIR/mongo/db/sorter/sorter_stats',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )

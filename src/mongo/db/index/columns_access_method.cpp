@@ -108,7 +108,8 @@ private:
 ColumnStoreAccessMethod::BulkBuilder::BulkBuilder(ColumnStoreAccessMethod* index,
                                                   size_t maxMemoryUsageBytes,
                                                   StringData dbName)
-    : _columnsAccess(index), _sorter(maxMemoryUsageBytes, dbName, bulkBuilderFileStats()) {
+    : _columnsAccess(index),
+      _sorter(maxMemoryUsageBytes, dbName, bulkBuilderFileStats(), bulkBuilderTracker()) {
     countNewBuildInStats();
 }
 
@@ -116,7 +117,8 @@ ColumnStoreAccessMethod::BulkBuilder::BulkBuilder(ColumnStoreAccessMethod* index
                                                   size_t maxMemoryUsageBytes,
                                                   const IndexStateInfo& stateInfo,
                                                   StringData dbName)
-    : _columnsAccess(index), _sorter(maxMemoryUsageBytes, dbName, bulkBuilderFileStats()) {
+    : _columnsAccess(index),
+      _sorter(maxMemoryUsageBytes, dbName, bulkBuilderFileStats(), bulkBuilderTracker()) {
     countResumedBuildInStats();
     // TODO SERVER-66925: Add this support.
     tasserted(6548103, "No support for resuming interrupted columnstore index builds.");

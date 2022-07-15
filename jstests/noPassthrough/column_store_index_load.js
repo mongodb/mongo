@@ -79,6 +79,12 @@ const testProjection = {
     "bar.baz": 1,
 };
 
+const maxMemUsageBytes = 20000;
+const numDocs = testDocs.length;
+const approxDocSize = 800;
+const approxMemoryUsage = numDocs * approxDocSize;
+const expectedSpilledRanges = Math.ceil(approxMemoryUsage / maxMemUsageBytes);
+
 // The test query would normally not qualify for a column store index plan, because it projects a
 // large number of fields. We raise the limit on the number of fields to allow column store plans
 // for the purposes of this test.
@@ -125,7 +131,9 @@ assert.docEq({
     count: NumberLong(1),
     resumed: NumberLong(0),
     filesOpenedForExternalSort: NumberLong(0),
-    filesClosedForExternalSort: NumberLong(0)
+    filesClosedForExternalSort: NumberLong(0),
+    spilledRanges: NumberLong(0),
+    bytesSpilled: NumberLong(0),
 },
              statsAfterInMemoryBuild.indexBulkBuilder);
 
@@ -135,19 +143,30 @@ bulkLoadExternalColl.drop();
 assert.commandWorked(db.adminCommand({
     configureFailPoint: "constrainMemoryForBulkBuild",
     mode: "alwaysOn",
-    data: {maxBytes: 20000}
+    data: {maxBytes: maxMemUsageBytes},
 }));
 loadDocs(bulkLoadExternalColl, testDocs);
 assert.commandWorked(bulkLoadExternalColl.createIndex({"$**": "columnstore"}));
 
 const statsAfterExternalLoad = assert.commandWorked(db.runCommand({serverStatus: 1}));
-assert.docEq({
-    count: NumberLong(2),
-    resumed: NumberLong(0),
-    filesOpenedForExternalSort: NumberLong(1),
-    filesClosedForExternalSort: NumberLong(1)
-},
-             statsAfterExternalLoad.indexBulkBuilder);
+let indexBulkBuilderSection = statsAfterExternalLoad.indexBulkBuilder;
+assert.eq(indexBulkBuilderSection.count, 2, tojson(indexBulkBuilderSection));
+assert.eq(indexBulkBuilderSection.resumed, 0, tojson(indexBulkBuilderSection));
+assert.eq(indexBulkBuilderSection.filesOpenedForExternalSort, 1, tojson(indexBulkBuilderSection));
+assert.eq(indexBulkBuilderSection.filesClosedForExternalSort, 1, tojson(indexBulkBuilderSection));
+// Note: The number of spills in the external sorter depends on the size of C++ data structures,
+// which can be different between architectures. The test allows a range of reasonable values.
+assert.between(expectedSpilledRanges - 1,
+               indexBulkBuilderSection.spilledRanges,
+               expectedSpilledRanges + 1,
+               tojson(indexBulkBuilderSection),
+               true);
+// We can only approximate the memory usage and bytes that will be spilled.
+assert.between(0,
+               indexBulkBuilderSection.bytesSpilled,
+               approxMemoryUsage,
+               tojson(indexBulkBuilderSection),
+               true);
 
 // Perfom the online load.
 onlineLoadColl.drop();

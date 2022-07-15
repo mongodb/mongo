@@ -221,7 +221,7 @@ void DocumentSourceBucketAuto::initializeBucketIteration() {
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(pExpCtx->opCtx);
     metricsCollector.incrementKeysSorted(_sorter->numSorted());
-    metricsCollector.incrementSorterSpills(_sorter->numSpills());
+    metricsCollector.incrementSorterSpills(_sorter->stats().spilledRanges());
 
     _sorter.reset();
 

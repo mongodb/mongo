@@ -215,11 +215,11 @@ void SortStage::open(bool reOpen) {
 
     _specificStats.totalDataSizeBytes += _sorter->totalDataSizeSorted();
     _mergeIt.reset(_sorter->done());
-    _specificStats.spills += _sorter->numSpills();
+    _specificStats.spills += _sorter->stats().spilledRanges();
     _specificStats.keysSorted += _sorter->numSorted();
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
     metricsCollector.incrementKeysSorted(_sorter->numSorted());
-    metricsCollector.incrementSorterSpills(_sorter->numSpills());
+    metricsCollector.incrementSorterSpills(_sorter->stats().spilledRanges());
 
     _children[0]->close();
 }
