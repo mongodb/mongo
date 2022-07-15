@@ -161,17 +161,17 @@ __wt_session_lock_dhandle(WT_SESSION_IMPL *session, uint32_t flags, bool *is_dea
          * thread has it locked for real.
          */
         if (F_ISSET(dhandle, WT_DHANDLE_OPEN) && (!want_exclusive || lock_busy)) {
-            __wt_readlock(session, &dhandle->rwlock);
+            WT_WITH_DHANDLE(session, dhandle, __wt_session_dhandle_readlock(session));
             if (F_ISSET(dhandle, WT_DHANDLE_DEAD)) {
                 *is_deadp = true;
-                __wt_readunlock(session, &dhandle->rwlock);
+                WT_WITH_DHANDLE(session, dhandle, __wt_session_dhandle_readunlock(session));
                 return (0);
             }
 
             is_open = F_ISSET(dhandle, WT_DHANDLE_OPEN);
             if (is_open && !want_exclusive)
                 return (0);
-            __wt_readunlock(session, &dhandle->rwlock);
+            WT_WITH_DHANDLE(session, dhandle, __wt_session_dhandle_readunlock(session));
         } else
             is_open = false;
 
@@ -180,10 +180,11 @@ __wt_session_lock_dhandle(WT_SESSION_IMPL *session, uint32_t flags, bool *is_dea
          * subtlety here: if we race with another thread that successfully opens the file, we don't
          * want to block waiting to get exclusive access.
          */
-        if ((ret = __wt_try_writelock(session, &dhandle->rwlock)) == 0) {
+        WT_WITH_DHANDLE(session, dhandle, ret = __wt_session_dhandle_try_writelock(session));
+        if (ret == 0) {
             if (F_ISSET(dhandle, WT_DHANDLE_DEAD)) {
                 *is_deadp = true;
-                __wt_writeunlock(session, &dhandle->rwlock);
+                WT_WITH_DHANDLE(session, dhandle, __wt_session_dhandle_writeunlock(session));
                 return (0);
             }
 
@@ -192,7 +193,7 @@ __wt_session_lock_dhandle(WT_SESSION_IMPL *session, uint32_t flags, bool *is_dea
              */
             if (F_ISSET(dhandle, WT_DHANDLE_OPEN) && !want_exclusive) {
                 lock_busy = false;
-                __wt_writeunlock(session, &dhandle->rwlock);
+                WT_WITH_DHANDLE(session, dhandle, __wt_session_dhandle_writeunlock(session));
                 continue;
             }
 
@@ -273,9 +274,9 @@ __wt_session_release_dhandle(WT_SESSION_IMPL *session)
     if (locked) {
         if (write_locked) {
             F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
-            __wt_writeunlock(session, &dhandle->rwlock);
+            WT_WITH_DHANDLE(session, dhandle, __wt_session_dhandle_writeunlock(session));
         } else
-            __wt_readunlock(session, &dhandle->rwlock);
+            WT_WITH_DHANDLE(session, dhandle, __wt_session_dhandle_readunlock(session));
     }
 
     session->dhandle = NULL;
@@ -756,6 +757,57 @@ __session_get_dhandle(WT_SESSION_IMPL *session, const char *uri, const char *che
 }
 
 /*
+ * __wt_session_dhandle_readlock --
+ *     Acquire read lock for the session's current dhandle.
+ */
+void
+__wt_session_dhandle_readlock(WT_SESSION_IMPL *session)
+{
+    WT_ASSERT(session, session->dhandle != NULL);
+    __wt_readlock(session, &session->dhandle->rwlock);
+}
+
+/*
+ * __wt_session_dhandle_readunlock --
+ *     Release read lock for the session's current dhandle.
+ */
+void
+__wt_session_dhandle_readunlock(WT_SESSION_IMPL *session)
+{
+    WT_ASSERT(session, session->dhandle != NULL);
+    __wt_readunlock(session, &session->dhandle->rwlock);
+}
+
+/*
+ * __wt_session_dhandle_writeunlock --
+ *     Release write lock for the session's current dhandle.
+ */
+void
+__wt_session_dhandle_writeunlock(WT_SESSION_IMPL *session)
+{
+    WT_ASSERT(session, session->dhandle != NULL);
+    WT_ASSERT(session, FLD_ISSET(session->dhandle->lock_flags, WT_DHANDLE_LOCK_WRITE));
+    FLD_CLR(session->dhandle->lock_flags, WT_DHANDLE_LOCK_WRITE);
+    __wt_writeunlock(session, &session->dhandle->rwlock);
+}
+
+/*
+ * __wt_session_dhandle_try_writelock --
+ *     Try to acquire write lock for the session's current dhandle.
+ */
+int
+__wt_session_dhandle_try_writelock(WT_SESSION_IMPL *session)
+{
+    WT_DECL_RET;
+
+    WT_ASSERT(session, session->dhandle != NULL);
+    if ((ret = __wt_try_writelock(session, &session->dhandle->rwlock)) == 0)
+        FLD_SET(session->dhandle->lock_flags, WT_DHANDLE_LOCK_WRITE);
+
+    return (ret);
+}
+
+/*
  * __wt_session_get_dhandle --
  *     Get a data handle for the given name, set session->dhandle. Optionally if we opened a
  *     checkpoint return its checkpoint order number.
@@ -798,7 +850,7 @@ __wt_session_get_dhandle(WT_SESSION_IMPL *session, const char *uri, const char *
             dhandle->excl_session = NULL;
             dhandle->excl_ref = 0;
             F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
-            __wt_writeunlock(session, &dhandle->rwlock);
+            WT_WITH_DHANDLE(session, dhandle, __wt_session_dhandle_writeunlock(session));
 
             WT_WITH_SCHEMA_LOCK(
               session, ret = __wt_session_get_dhandle(session, uri, checkpoint, cfg, flags));
@@ -818,7 +870,7 @@ __wt_session_get_dhandle(WT_SESSION_IMPL *session, const char *uri, const char *
         dhandle->excl_session = NULL;
         dhandle->excl_ref = 0;
         F_CLR(dhandle, WT_DHANDLE_EXCLUSIVE);
-        __wt_writeunlock(session, &dhandle->rwlock);
+        WT_WITH_DHANDLE(session, dhandle, __wt_session_dhandle_writeunlock(session));
         WT_RET(ret);
     }
 

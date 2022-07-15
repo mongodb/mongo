@@ -1409,6 +1409,8 @@ extern int __wt_session_create(WT_SESSION_IMPL *session, const char *uri, const 
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_session_cursor_cache_sweep(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_session_dhandle_try_writelock(WT_SESSION_IMPL *session)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const char *cfg[],
   uint32_t flags, WT_DATA_HANDLE **hs_dhandlep, WT_CKPT_SNAPSHOT *ckpt_snapshot)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
@@ -1863,6 +1865,9 @@ extern void __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK *l);
 extern void __wt_schema_destroy_colgroup(WT_SESSION_IMPL *session, WT_COLGROUP **colgroupp);
 extern void __wt_scr_discard(WT_SESSION_IMPL *session);
 extern void __wt_session_close_cache(WT_SESSION_IMPL *session);
+extern void __wt_session_dhandle_readlock(WT_SESSION_IMPL *session);
+extern void __wt_session_dhandle_readunlock(WT_SESSION_IMPL *session);
+extern void __wt_session_dhandle_writeunlock(WT_SESSION_IMPL *session);
 extern void __wt_session_gen_enter(WT_SESSION_IMPL *session, int which);
 extern void __wt_session_gen_leave(WT_SESSION_IMPL *session, int which);
 extern void __wt_stash_discard(WT_SESSION_IMPL *session);

@@ -58,6 +58,19 @@
 #define WT_DHANDLE_IS_CHECKPOINT(dhandle) ((dhandle)->checkpoint != NULL)
 
 /*
+ * WT_WITH_DHANDLE_WRITE_LOCK_NOWAIT --
+ *	Try to acquire write lock for the session's current dhandle, perform an operation, drop the
+ *  lock.
+ */
+#define WT_WITH_DHANDLE_WRITE_LOCK_NOWAIT(session, ret, op)               \
+    do {                                                                  \
+        if (((ret) = __wt_session_dhandle_try_writelock(session)) == 0) { \
+            op;                                                           \
+            __wt_session_dhandle_writeunlock(session);                    \
+        }                                                                 \
+    } while (0)
+
+/*
  * WT_DATA_HANDLE --
  *	A handle for a generic named data source.
  */
@@ -137,6 +150,11 @@ struct __wt_data_handle {
 #define WT_DHANDLE_TS_MIXED_MODE 0x04u         /* Handle using mixed mode timestamps checking. */
 #define WT_DHANDLE_TS_NEVER 0x08u              /* Handle never using timestamps checking. */
 #define WT_DHANDLE_TS_ORDERED 0x10u            /* Handle using ordered timestamps checking. */
-                                               /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
-    uint32_t ts_flags;
+                                               /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
+    uint16_t ts_flags;
+
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
+#define WT_DHANDLE_LOCK_WRITE 0x1u /* Write lock is acquired. */
+                                   /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
+    uint16_t lock_flags;
 };

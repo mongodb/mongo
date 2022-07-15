@@ -465,7 +465,7 @@ __conn_dhandle_config_parse_ts(WT_SESSION_IMPL *session)
 {
     WT_CONFIG_ITEM cval;
     WT_DATA_HANDLE *dhandle;
-    uint32_t flags;
+    uint16_t flags;
     const char **cfg;
 
     dhandle = session->dhandle;

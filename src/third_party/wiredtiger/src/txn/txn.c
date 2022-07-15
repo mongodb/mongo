@@ -846,7 +846,7 @@ __txn_timestamp_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_UPDATE *
     WT_BTREE *btree;
     WT_TXN *txn;
     wt_timestamp_t op_ts, prev_op_durable_ts;
-    uint32_t flags;
+    uint16_t flags;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
     const char *name;
     bool no_ts_ok, txn_has_ts;

@@ -1352,7 +1352,7 @@ static inline int
 __wt_txn_search_check(WT_SESSION_IMPL *session)
 {
     WT_TXN *txn;
-    uint32_t flags;
+    uint16_t flags;
     const char *name;
 
     txn = session->txn;
