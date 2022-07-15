@@ -381,13 +381,16 @@ void parseNSHelper(const std::string& dbName,
                    const BSONObj& invalidFields,
                    ErrorCodes::Error expectedCode) {
     // Verify that 'validRequest' parses correctly.
-    auto shouldNotThrow = aggregation_request_helper::parseNs(dbName, validRequest);
+    auto shouldNotThrow =
+        aggregation_request_helper::parseNs(DatabaseName(boost::none, dbName), validRequest);
 
     auto invalidRequest = constructInvalidRequest(validRequest, invalidFields);
 
     // Verify that the constructed invalid request fails to parse with 'expectedCode'.
     ASSERT_THROWS_CODE(
-        aggregation_request_helper::parseNs("a", invalidRequest), AssertionException, expectedCode);
+        aggregation_request_helper::parseNs(DatabaseName(boost::none, "a"), invalidRequest),
+        AssertionException,
+        expectedCode);
 }
 
 TEST(AggregationRequestTest, ShouldRejectNonArrayPipeline) {
@@ -661,7 +664,8 @@ TEST(AggregationRequestTest, ParseNSShouldReturnAggregateOneNSIfAggregateFieldIs
     for (auto& one : ones) {
         const BSONObj inputBSON =
             fromjson(str::stream() << "{aggregate: " << one << ", pipeline: [], $db: 'a'}");
-        ASSERT(aggregation_request_helper::parseNs("a", inputBSON).isCollectionlessAggregateNS());
+        ASSERT(aggregation_request_helper::parseNs(DatabaseName(boost::none, "a"), inputBSON)
+                   .isCollectionlessAggregateNS());
     }
 }
 

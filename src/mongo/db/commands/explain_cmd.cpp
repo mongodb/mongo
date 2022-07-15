@@ -68,6 +68,10 @@ public:
         return AllowedOnSecondary::kOptIn;
     }
 
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
     bool maintenanceOk() const override {
         return false;
     }
@@ -97,7 +101,7 @@ public:
                std::unique_ptr<CommandInvocation> innerInvocation)
         : CommandInvocation(explainCommand),
           _outerRequest{&request},
-          _dbName{_outerRequest->getDatabase().toString()},
+          _dbName(_outerRequest->getValidatedTenantId(), _outerRequest->getDatabase()),
           _verbosity{std::move(verbosity)},
           _innerRequest{std::move(innerRequest)},
           _innerInvocation{std::move(innerInvocation)} {}
@@ -105,11 +109,14 @@ public:
     void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
         // Explain is never allowed in multi-document transactions.
         const bool inMultiDocumentTransaction = false;
+        // TODO SERVER-68655 pass _dbName directly to commandCanRunHere
         uassert(50746,
                 "Explain's child command cannot run on this node. "
                 "Are you explaining a write command on a secondary?",
-                commandCanRunHere(
-                    opCtx, _dbName, _innerInvocation->definition(), inMultiDocumentTransaction));
+                commandCanRunHere(opCtx,
+                                  _dbName.toStringWithTenantId(),
+                                  _innerInvocation->definition(),
+                                  inMultiDocumentTransaction));
         _innerInvocation->explain(opCtx, _verbosity, result);
     }
 
@@ -142,7 +149,7 @@ private:
     }
 
     const OpMsgRequest* _outerRequest;
-    const std::string _dbName;
+    const DatabaseName _dbName;
     const NamespaceString _ns;
     ExplainOptions::Verbosity _verbosity;
     std::unique_ptr<OpMsgRequest> _innerRequest;  // Lifespan must enclose that of _innerInvocation.
@@ -157,7 +164,7 @@ std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
     auto cmdObj = ExplainCommandRequest::parse(
         IDLParserContext(ExplainCommandRequest::kCommandName,
                          APIParameters::get(opCtx).getAPIStrict().value_or(false)),
-        request.body);
+        request);
     std::string dbname = cmdObj.getDbName().toString();
     ExplainOptions::Verbosity verbosity = cmdObj.getVerbosity();
     auto explainedObj = cmdObj.getCommandParameter();
@@ -182,6 +189,7 @@ std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
             explainedCommand);
     auto innerRequest =
         std::make_unique<OpMsgRequest>(OpMsgRequest::fromDBAndBody(dbname, explainedObj));
+    innerRequest->validatedTenancyScope = request.validatedTenancyScope;
     auto innerInvocation = explainedCommand->parseForExplain(opCtx, *innerRequest, verbosity);
     return std::make_unique<Invocation>(
         this, request, std::move(verbosity), std::move(innerRequest), std::move(innerInvocation));

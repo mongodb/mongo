@@ -55,7 +55,7 @@ void validate(OperationContext* opCtx,
               boost::optional<ExplainOptions::Verbosity> explainVerbosity);
 
 AggregateCommandRequest parseFromBSON(OperationContext* opCtx,
-                                      const std::string& dbName,
+                                      const DatabaseName& dbName,
                                       const BSONObj& cmdObj,
                                       boost::optional<ExplainOptions::Verbosity> explainVerbosity,
                                       bool apiStrict) {
@@ -80,7 +80,12 @@ StatusWith<AggregateCommandRequest> parseFromBSONForTests(
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
     bool apiStrict) {
     try {
-        return parseFromBSON(/*opCtx=*/nullptr, dbName, cmdObj, explainVerbosity, apiStrict);
+        return parseFromBSON(
+            /*opCtx=*/nullptr,
+            DatabaseName(boost::none, dbName),
+            cmdObj,
+            explainVerbosity,
+            apiStrict);
     } catch (const AssertionException&) {
         return exceptionToStatus();
     }
@@ -102,6 +107,7 @@ AggregateCommandRequest parseFromBSON(OperationContext* opCtx,
         cmdObjChanged = true;
     }
 
+    // TODO SERVER-68721: pass in tenantId from nss to IDLParserContext
     AggregateCommandRequest request(nss);
     request = AggregateCommandRequest::parse(IDLParserContext("aggregate", apiStrict),
                                              cmdObjChanged ? cmdObjBob.obj() : cmdObj);
@@ -118,7 +124,7 @@ AggregateCommandRequest parseFromBSON(OperationContext* opCtx,
     return request;
 }
 
-NamespaceString parseNs(const std::string& dbname, const BSONObj& cmdObj) {
+NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj) {
     auto firstElement = cmdObj.firstElement();
 
     if (firstElement.isNumber()) {
@@ -127,14 +133,14 @@ NamespaceString parseNs(const std::string& dbname, const BSONObj& cmdObj) {
                               << firstElement.fieldNameStringData()
                               << "' field must specify a collection name or 1",
                 firstElement.number() == 1);
-        return NamespaceString::makeCollectionlessAggregateNSS(DatabaseName(boost::none, dbname));
+        return NamespaceString::makeCollectionlessAggregateNSS(dbName);
     } else {
         uassert(ErrorCodes::TypeMismatch,
                 str::stream() << "collection name has invalid type: "
                               << typeName(firstElement.type()),
                 firstElement.type() == BSONType::String);
 
-        const NamespaceString nss(dbname, firstElement.valueStringData());
+        const NamespaceString nss(dbName, firstElement.valueStringData());
 
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid namespace specified '" << nss.ns() << "'",

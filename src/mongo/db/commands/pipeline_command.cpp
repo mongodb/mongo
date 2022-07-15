@@ -75,7 +75,7 @@ public:
         boost::optional<ExplainOptions::Verbosity> explainVerbosity) override {
         const auto aggregationRequest = aggregation_request_helper::parseFromBSON(
             opCtx,
-            opMsgRequest.getDatabase().toString(),
+            DatabaseName(opMsgRequest.getValidatedTenantId(), opMsgRequest.getDatabase()),
             opMsgRequest.body,
             explainVerbosity,
             APIParameters::get(opCtx).getAPIStrict().value_or(false));
@@ -88,6 +88,10 @@ public:
 
         return std::make_unique<Invocation>(
             this, opMsgRequest, std::move(aggregationRequest), std::move(privileges));
+    }
+
+    bool allowedWithSecurityToken() const final {
+        return true;
     }
 
     bool shouldAffectReadConcernCounter() const override {
@@ -106,7 +110,7 @@ public:
                    PrivilegeVector privileges)
             : CommandInvocation(cmd),
               _request(request),
-              _dbName(request.getDatabase().toString()),
+              _dbName(request.getValidatedTenantId(), request.getDatabase()),
               _aggregationRequest(std::move(aggregationRequest)),
               _liteParsedPipeline(_aggregationRequest),
               _privileges(std::move(privileges)) {}
@@ -182,7 +186,7 @@ public:
         }
 
         const OpMsgRequest& _request;
-        const std::string _dbName;
+        const DatabaseName _dbName;
         AggregateCommandRequest _aggregationRequest;
         const LiteParsedPipeline _liteParsedPipeline;
         const PrivilegeVector _privileges;

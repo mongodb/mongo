@@ -314,11 +314,14 @@ public:
         return true;
     }
 
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
     class Invocation final : public CommandInvocation {
     public:
         Invocation(Command* cmd, const OpMsgRequest& request)
             : CommandInvocation(cmd),
-              _cmd(GetMoreCommandRequest::parse(IDLParserContext{"getMore"}, request.body)) {
+              _cmd(GetMoreCommandRequest::parse(IDLParserContext{"getMore"}, request)) {
             NamespaceString nss(_cmd.getDbName(), _cmd.getCollection());
             uassert(ErrorCodes::InvalidNamespace,
                     str::stream() << "Invalid namespace for getMore: " << nss.ns(),
@@ -733,7 +736,7 @@ public:
             // Counted as a getMore, not as a command.
             globalOpCounters.gotGetMore();
             auto curOp = CurOp::get(opCtx);
-            NamespaceString nss(_cmd.getDbName(), _cmd.getCollection());
+            NamespaceString nss = ns();
             int64_t cursorId = _cmd.getCommandParameter();
             curOp->debug().cursorid = cursorId;
 

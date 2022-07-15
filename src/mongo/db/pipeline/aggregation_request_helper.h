@@ -85,7 +85,7 @@ StatusWith<AggregateCommandRequest> parseFromBSONForTests(
  * name and command object.
  */
 AggregateCommandRequest parseFromBSON(OperationContext* opCtx,
-                                      const std::string& dbName,
+                                      const DatabaseName& dbName,
                                       const BSONObj& cmdObj,
                                       boost::optional<ExplainOptions::Verbosity> explainVerbosity,
                                       bool apiStrict);
@@ -101,7 +101,7 @@ StatusWith<AggregateCommandRequest> parseFromBSONForTests(
  * number 1. In the latter case, returns a reserved namespace that does not represent a user
  * collection. See 'NamespaceString::makeCollectionlessAggregateNSS()'.
  */
-NamespaceString parseNs(const std::string& dbname, const BSONObj& cmdObj);
+NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj);
 
 /**
  * Serializes the options to a Document. Note that this serialization includes the original

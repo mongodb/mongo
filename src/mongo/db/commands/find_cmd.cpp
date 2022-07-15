@@ -175,7 +175,7 @@ public:
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& opMsgRequest) override {
         // TODO: Parse into a QueryRequest here.
-        return std::make_unique<Invocation>(this, opMsgRequest, opMsgRequest.getDatabase());
+        return std::make_unique<Invocation>(this, opMsgRequest);
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext* context) const override {
@@ -231,8 +231,10 @@ public:
 
     class Invocation final : public CommandInvocation {
     public:
-        Invocation(const FindCmd* definition, const OpMsgRequest& request, StringData dbName)
-            : CommandInvocation(definition), _request(request), _dbName(dbName) {
+        Invocation(const FindCmd* definition, const OpMsgRequest& request)
+            : CommandInvocation(definition),
+              _request(request),
+              _dbName(_request.getValidatedTenantId(), _request.getDatabase()) {
             invariant(_request.body.isOwned());
         }
 
@@ -277,7 +279,7 @@ public:
             uassertStatusOK(auth::checkAuthForFind(
                 authSession,
                 CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(
-                    opCtx, CommandHelpers::parseNsOrUUID({boost::none, _dbName}, _request.body)),
+                    opCtx, CommandHelpers::parseNsOrUUID(_dbName, _request.body)),
                 hasTerm));
         }
 
@@ -319,7 +321,9 @@ public:
                 auto viewAggregationCommand =
                     uassertStatusOK(query_request_helper::asAggregationCommand(findCommand));
 
-                auto viewAggCmd = OpMsgRequest::fromDBAndBody(_dbName, viewAggregationCommand).body;
+                auto viewAggCmd =
+                    OpMsgRequest::fromDBAndBody(_dbName.db(), viewAggregationCommand).body;
+
                 // Create the agg request equivalent of the find operation, with the explain
                 // verbosity included.
                 auto aggRequest = aggregation_request_helper::parseFromBSON(
@@ -382,7 +386,7 @@ public:
 
             // Parse the command BSON to a FindCommandRequest. Pass in the parsedNss in case cmdObj
             // does not have a UUID.
-            auto parsedNss = NamespaceString{CommandHelpers::parseNsFromCommand(_dbName, cmdObj)};
+            auto parsedNss = ns();
             const bool isExplain = false;
             const bool isOplogNss = (parsedNss == NamespaceString::kRsOplogNamespace);
             auto findCommand =
@@ -462,7 +466,7 @@ public:
             // request into an aggregation command.
             boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
             ctx.emplace(opCtx,
-                        CommandHelpers::parseNsOrUUID({boost::none, _dbName}, _request.body),
+                        CommandHelpers::parseNsOrUUID(_dbName, _request.body),
                         AutoGetCollectionViewMode::kViewsPermitted);
             const auto& nss = ctx->getNss();
 
@@ -523,7 +527,8 @@ public:
                     uassertStatusOK(query_request_helper::asAggregationCommand(findCommand));
 
                 BSONObj aggResult = CommandHelpers::runCommandDirectly(
-                    opCtx, OpMsgRequest::fromDBAndBody(_dbName, std::move(viewAggregationCommand)));
+                    opCtx,
+                    OpMsgRequest::fromDBAndBody(_dbName.db(), std::move(viewAggregationCommand)));
                 auto status = getStatusFromCommandResult(aggResult);
                 if (status.code() == ErrorCodes::InvalidPipelineOperator) {
                     uasserted(ErrorCodes::InvalidPipelineOperator,
@@ -736,7 +741,7 @@ public:
 
     private:
         const OpMsgRequest _request;
-        const StringData _dbName;
+        const DatabaseName _dbName;
     };
 
 } findCmd;

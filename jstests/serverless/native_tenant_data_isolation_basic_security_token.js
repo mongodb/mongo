@@ -41,6 +41,20 @@ const tokenConn = new Mongo(mongod.host);
     assert.commandWorked(
         tokenDB.runCommand({insert: kCollName, documents: [{_id: 0, a: 1, b: 1}]}));
 
+    // Find the document and call getMore on the cursor
+    {
+        // Add additional document in order to have two batches for getMore
+        assert.commandWorked(
+            tokenDB.runCommand({insert: kCollName, documents: [{_id: 100, x: 1}]}));
+
+        const findRes = assert.commandWorked(
+            tokenDB.runCommand({find: kCollName, filter: {a: 1}, batchSize: 1}));
+        assert(arrayEq([{_id: 0, a: 1, b: 1}], findRes.cursor.firstBatch), tojson(findRes));
+
+        assert.commandWorked(
+            tokenDB.runCommand({getMore: findRes.cursor.id, collection: kCollName}));
+    }
+
     // Find and modify the document.
     {
         const fad1 = assert.commandWorked(
@@ -65,6 +79,12 @@ const tokenConn = new Mongo(mongod.host);
             {"name": "view1", "type": "view"}
         ];
         assert(arrayEq(expectedColls, colls.cursor.firstBatch), tojson(colls.cursor.firstBatch));
+    }
+
+    // Test explain command with find
+    {
+        const cmdRes = tokenDB.runCommand({explain: {find: kCollName, filter: {a: 1}}});
+        assert.eq(1, cmdRes.executionStats.nReturned, tojson(cmdRes));
     }
 
     // Test count and distinct command.
@@ -116,6 +136,15 @@ const tokenConn = new Mongo(mongod.host);
         {user: "readWriteUserTenant2", db: '$external', tenant: kOtherTenant}));
 
     const tokenDB2 = tokenConn.getDB(kDbName);
+
+    const findOtherUser =
+        assert.commandWorked(tokenDB2.runCommand({find: kCollName, filter: {a: 1}}));
+    assert.eq(findOtherUser.cursor.firstBatch.length, 0, tojson(findOtherUser));
+
+    const explainOtherUser =
+        assert.commandWorked(tokenDB2.runCommand({explain: {find: kCollName, filter: {a: 1}}}));
+    assert.eq(explainOtherUser.executionStats.nReturned, 0, tojson(explainOtherUser));
+
     const fadOtherUser = assert.commandWorked(
         tokenDB2.runCommand({findAndModify: kCollName, query: {b: 1}, update: {$inc: {b: 10}}}));
     assert.eq(null, fadOtherUser.value);

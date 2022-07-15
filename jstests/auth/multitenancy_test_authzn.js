@@ -30,7 +30,7 @@ function runTests(conn, tenant, multitenancySupport) {
         }
     }
 
-    // TODO (SERVER-67657) Use $tenant with {find:...} operation
+    // TODO (SERVER-67423) Use $tenant with {find:...} operation
     const tenantAdmin = conn.getDB((tenant ? tenant.str + '_' : '') + 'admin');
     const test = conn.getDB('test');
     const cmdSuffix = (tenant === null) ? {} : {"$tenant": tenant};

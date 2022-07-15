@@ -69,11 +69,12 @@ struct ClusterPipelineCommandD {
         // Replace clusterAggregate in the request body because the parser doesn't recognize it.
         auto modifiedRequestBody =
             opMsgRequest.body.replaceFieldNames(BSON(AggregateCommandRequest::kCommandName << 1));
-        return aggregation_request_helper::parseFromBSON(opCtx,
-                                                         opMsgRequest.getDatabase().toString(),
-                                                         modifiedRequestBody,
-                                                         explainVerbosity,
-                                                         apiStrict);
+        return aggregation_request_helper::parseFromBSON(
+            opCtx,
+            DatabaseName(opMsgRequest.getValidatedTenantId(), opMsgRequest.getDatabase()),
+            modifiedRequestBody,
+            explainVerbosity,
+            apiStrict);
     }
 };
 ClusterPipelineCommandBase<ClusterPipelineCommandD> clusterPipelineCmdD;

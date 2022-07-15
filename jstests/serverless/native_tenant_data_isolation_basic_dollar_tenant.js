@@ -49,6 +49,56 @@ const testColl = testDb.getCollection(kCollName);
     assert.eq(0, collsWithDiffTenant.cursor.firstBatch.length);
 }
 
+// Test insert, find, getMore, and explain commands.
+{
+    const kTenantDocs = [{w: 0}, {x: 1}, {y: 2}, {z: 3}];
+    const kOtherTenantDocs = [{i: 1}, {j: 2}, {k: 3}];
+
+    assert.commandWorked(
+        testDb.runCommand({insert: kCollName, documents: kTenantDocs, '$tenant': kTenant}));
+    assert.commandWorked(testDb.runCommand(
+        {insert: kCollName, documents: kOtherTenantDocs, '$tenant': kOtherTenant}));
+
+    // Check that find only returns documents from the correct tenant
+    const findRes = assert.commandWorked(
+        testDb.runCommand({find: kCollName, projection: {_id: 0}, '$tenant': kTenant}));
+    assert.eq(
+        kTenantDocs.length, findRes.cursor.firstBatch.length, tojson(findRes.cursor.firstBatch));
+    assert(arrayEq(kTenantDocs, findRes.cursor.firstBatch), tojson(findRes.cursor.firstBatch));
+
+    const findRes2 = assert.commandWorked(
+        testDb.runCommand({find: kCollName, projection: {_id: 0}, '$tenant': kOtherTenant}));
+    assert.eq(kOtherTenantDocs.length,
+              findRes2.cursor.firstBatch.length,
+              tojson(findRes2.cursor.firstBatch));
+    assert(arrayEq(kOtherTenantDocs, findRes2.cursor.firstBatch),
+           tojson(findRes2.cursor.firstBatch));
+
+    // Test that getMore only works on a tenant's own cursor
+    const cmdRes = assert.commandWorked(testDb.runCommand(
+        {find: kCollName, projection: {_id: 0}, batchSize: 1, '$tenant': kTenant}));
+    assert.eq(cmdRes.cursor.firstBatch.length, 1, tojson(cmdRes.cursor.firstBatch));
+    assert.commandWorked(
+        testDb.runCommand({getMore: cmdRes.cursor.id, collection: kCollName, '$tenant': kTenant}));
+
+    const cmdRes2 = assert.commandWorked(testDb.runCommand(
+        {find: kCollName, projection: {_id: 0}, batchSize: 1, '$tenant': kTenant}));
+    assert.commandFailedWithCode(
+        testDb.runCommand(
+            {getMore: cmdRes2.cursor.id, collection: kCollName, '$tenant': kOtherTenant}),
+        ErrorCodes.Unauthorized);
+
+    const kTenantExplainRes = assert.commandWorked(testDb.runCommand(
+        {explain: {find: kCollName}, verbosity: 'executionStats', '$tenant': kTenant}));
+    assert.eq(
+        kTenantDocs.length, kTenantExplainRes.executionStats.nReturned, tojson(kTenantExplainRes));
+    const kOtherTenantExplainRes = assert.commandWorked(testDb.runCommand(
+        {explain: {find: kCollName}, verbosity: 'executionStats', '$tenant': kOtherTenant}));
+    assert.eq(kOtherTenantDocs.length,
+              kOtherTenantExplainRes.executionStats.nReturned,
+              tojson(kOtherTenantExplainRes));
+}
+
 // Test insert and findAndModify command.
 {
     assert.commandWorked(testDb.runCommand(
