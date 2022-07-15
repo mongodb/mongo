@@ -1566,6 +1566,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/op_observer/op_observer_impl',
+        '$BUILD_DIR/mongo/db/op_observer/oplog_writer_impl',
         'primary_only_service',
         'repl_coordinator_interface',
         'replmocks',
@@ -1710,6 +1711,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/logical_time',
             '$BUILD_DIR/mongo/db/multitenancy',
             '$BUILD_DIR/mongo/db/op_observer/op_observer_impl',
+            '$BUILD_DIR/mongo/db/op_observer/oplog_writer_impl',
             '$BUILD_DIR/mongo/db/pipeline/change_stream_expired_pre_image_remover',
             '$BUILD_DIR/mongo/db/query/command_request_response',
             '$BUILD_DIR/mongo/db/s/sharding_runtime_d',

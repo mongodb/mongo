@@ -359,6 +359,9 @@ bool shouldTimestampIndexBuildSinglePhase(OperationContext* opCtx, const Namespa
 
 }  // namespace
 
+OpObserverImpl::OpObserverImpl(std::unique_ptr<OplogWriter> oplogWriter)
+    : _oplogWriter(std::move(oplogWriter)) {}
+
 void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const UUID& uuid,

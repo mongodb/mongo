@@ -38,6 +38,7 @@
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/op_observer/oplog_writer_mock.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
@@ -100,7 +101,8 @@ void ValidateStateTest::setUp() {
     // Set up OpObserver so that we will append actual oplog entries to the oplog using
     // repl::logOp(). This supports index builds that have to look up the last oplog entry.
     auto opObserverRegistry = dynamic_cast<OpObserverRegistry*>(service->getOpObserver());
-    opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
+    opObserverRegistry->addObserver(
+        std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterMock>()));
 
     // Index builds expect a non-empty oplog and a valid committed snapshot.
     auto opCtx = operationContext();

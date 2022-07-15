@@ -34,6 +34,7 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/op_observer/oplog_writer_mock.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
 #include "mongo/db/s/collection_sharding_state_factory_standalone.h"
@@ -146,7 +147,8 @@ public:
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
         _serviceContext->setOpObserver([&] {
             auto opObserver = std::make_unique<OpObserverRegistry>();
-            opObserver->addObserver(std::make_unique<OpObserverShardingImpl>());
+            opObserver->addObserver(
+                std::make_unique<OpObserverShardingImpl>(std::make_unique<OplogWriterMock>()));
             opObserver->addObserver(std::make_unique<ShardServerOpObserver>());
             return opObserver;
         }());

@@ -46,6 +46,7 @@
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/op_observer_util.h"
+#include "mongo/db/op_observer/oplog_writer_impl.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
@@ -339,7 +340,7 @@ private:
 };
 
 TEST_F(OpObserverTest, StartIndexBuildExpectedOplogEntry) {
-    OpObserverImpl opObserver;
+    OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
     auto uuid = UUID::gen();
     NamespaceString nss(boost::none, "test.coll");
@@ -379,7 +380,7 @@ TEST_F(OpObserverTest, StartIndexBuildExpectedOplogEntry) {
 }
 
 TEST_F(OpObserverTest, CommitIndexBuildExpectedOplogEntry) {
-    OpObserverImpl opObserver;
+    OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
     auto uuid = UUID::gen();
     NamespaceString nss(boost::none, "test.coll");
@@ -419,7 +420,7 @@ TEST_F(OpObserverTest, CommitIndexBuildExpectedOplogEntry) {
 }
 
 TEST_F(OpObserverTest, AbortIndexBuildExpectedOplogEntry) {
-    OpObserverImpl opObserver;
+    OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
     auto uuid = UUID::gen();
     NamespaceString nss(boost::none, "test.coll");
@@ -468,7 +469,7 @@ TEST_F(OpObserverTest, AbortIndexBuildExpectedOplogEntry) {
 }
 
 TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
-    OpObserverImpl opObserver;
+    OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
     auto uuid = UUID::gen();
 
@@ -528,7 +529,7 @@ TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
 }
 
 TEST_F(OpObserverTest, CollModWithOnlyCollectionOptions) {
-    OpObserverImpl opObserver;
+    OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
     auto uuid = UUID::gen();
 
@@ -570,7 +571,7 @@ TEST_F(OpObserverTest, CollModWithOnlyCollectionOptions) {
 }
 
 TEST_F(OpObserverTest, OnDropCollectionReturnsDropOpTime) {
-    OpObserverImpl opObserver;
+    OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
     auto uuid = UUID::gen();
 
@@ -602,7 +603,7 @@ TEST_F(OpObserverTest, OnDropCollectionReturnsDropOpTime) {
 
 TEST_F(OpObserverTest, OnDropCollectionInlcudesTenantId) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
-    OpObserverImpl opObserver;
+    OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
     auto uuid = UUID::gen();
 
@@ -627,7 +628,7 @@ TEST_F(OpObserverTest, OnDropCollectionInlcudesTenantId) {
 }
 
 TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
-    OpObserverImpl opObserver;
+    OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
 
     auto uuid = UUID::gen();
@@ -663,7 +664,7 @@ TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
 
 TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOff) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
-    OpObserverImpl opObserver;
+    OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
 
     auto uuid = UUID::gen();
@@ -699,7 +700,7 @@ TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOff) {
 
 TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOn) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
-    OpObserverImpl opObserver;
+    OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
 
     auto uuid = UUID::gen();
@@ -735,7 +736,7 @@ TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOn) {
 }
 
 TEST_F(OpObserverTest, OnRenameCollectionOmitsDropTargetFieldIfDropTargetUuidIsNull) {
-    OpObserverImpl opObserver;
+    OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
 
     auto uuid = UUID::gen();
@@ -762,7 +763,7 @@ TEST_F(OpObserverTest, OnRenameCollectionOmitsDropTargetFieldIfDropTargetUuidIsN
 }
 
 TEST_F(OpObserverTest, MustBePrimaryToWriteOplogEntries) {
-    OpObserverImpl opObserver;
+    OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
 
     ASSERT_OK(repl::ReplicationCoordinator::get(opCtx.get())
@@ -777,7 +778,7 @@ TEST_F(OpObserverTest, MustBePrimaryToWriteOplogEntries) {
 }
 
 TEST_F(OpObserverTest, ImportCollectionOplogEntry) {
-    OpObserverImpl opObserver;
+    OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
 
     auto importUUID = UUID::gen();
@@ -818,7 +819,7 @@ TEST_F(OpObserverTest, ImportCollectionOplogEntry) {
 
 TEST_F(OpObserverTest, ImportCollectionOplogEntryIncludesTenantId) {
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
-    OpObserverImpl opObserver;
+    OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
 
     auto importUUID = UUID::gen();
@@ -874,7 +875,7 @@ TEST_F(OpObserverTest, SingleStatementInsertTestIncludesTenantId) {
     AutoGetCollection locks(opCtx.get(), nss, LockMode::MODE_IX);
 
     OpObserverRegistry opObserver;
-    opObserver.addObserver(std::make_unique<OpObserverImpl>());
+    opObserver.addObserver(std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
     opObserver.onInserts(opCtx.get(), nss, uuid, insert.begin(), insert.end(), false),
         wuow.commit();
 
@@ -909,7 +910,7 @@ TEST_F(OpObserverTest, SingleStatementUpdateTestIncludesTenantId) {
     AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
 
     OpObserverRegistry opObserver;
-    opObserver.addObserver(std::make_unique<OpObserverImpl>());
+    opObserver.addObserver(std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
     opObserver.onUpdate(opCtx.get(), update);
     wuow.commit();
 
@@ -935,7 +936,7 @@ TEST_F(OpObserverTest, SingleStatementDeleteTestIncludesTenantId) {
     AutoGetCollection locks(opCtx.get(), nss, LockMode::MODE_IX);
 
     OpObserverRegistry opObserver;
-    opObserver.addObserver(std::make_unique<OpObserverImpl>());
+    opObserver.addObserver(std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
     // This test does not call `OpObserver::aboutToDelete`. That method has the side-effect
     // of setting of `documentKey` on the delete for sharding purposes.
     // `OpObserverImpl::onDelete` asserts its existence.
@@ -1020,7 +1021,7 @@ TEST_F(OpObserverSessionCatalogRollbackTest,
     {
         auto opCtx = cc().makeOperationContext();
 
-        OpObserverImpl opObserver;
+        OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
         OpObserver::RollbackObserverInfo rbInfo;
         opObserver.onReplicationRollback(opCtx.get(), rbInfo);
     }
@@ -1036,7 +1037,7 @@ TEST_F(OpObserverSessionCatalogRollbackTest,
 
 TEST_F(OpObserverTest, MultipleAboutToDeleteAndOnDelete) {
     auto uuid = UUID::gen();
-    OpObserverImpl opObserver;
+    OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
     NamespaceString nss = {boost::none, "test", "coll"};
     AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
@@ -1048,7 +1049,7 @@ TEST_F(OpObserverTest, MultipleAboutToDeleteAndOnDelete) {
 }
 
 DEATH_TEST_F(OpObserverTest, AboutToDeleteMustPreceedOnDelete, "invariant") {
-    OpObserverImpl opObserver;
+    OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
     cc().swapLockState(std::make_unique<LockerNoop>());
     NamespaceString nss = {boost::none, "test", "coll"};
@@ -1058,7 +1059,7 @@ DEATH_TEST_F(OpObserverTest, AboutToDeleteMustPreceedOnDelete, "invariant") {
 DEATH_TEST_REGEX_F(OpObserverTest,
                    AboutToDeleteRequiresIdField,
                    "Invariant failure.*!id.isEmpty()") {
-    OpObserverImpl opObserver;
+    OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
     cc().swapLockState(std::make_unique<LockerNoop>());
     NamespaceString nss = {boost::none, "test", "coll"};
@@ -1069,7 +1070,7 @@ DEATH_TEST_REGEX_F(OpObserverTest,
 DEATH_TEST_REGEX_F(OpObserverTest,
                    NodeCrashesIfShardIdentityDocumentRolledBack,
                    "Fatal assertion.*50712") {
-    OpObserverImpl opObserver;
+    OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
 
     OpObserver::RollbackObserverInfo rbInfo;
@@ -1082,7 +1083,7 @@ public:
     void setUp() override {
         OpObserverTest::setUp();
         _opCtx = cc().makeOperationContext();
-        _opObserver.emplace();
+        _opObserver.emplace(std::make_unique<OplogWriterImpl>());
         _times.emplace(opCtx());
     }
 
@@ -2551,7 +2552,7 @@ TEST_F(OnUpdateOutputsTest, TestNonTransactionFundamentalOnUpdateOutputs) {
     // instantiated. Due to strong encapsulation, we use the registry that managers the
     // `ReservedTimes` on our behalf.
     OpObserverRegistry opObserver;
-    opObserver.addObserver(std::make_unique<OpObserverImpl>());
+    opObserver.addObserver(std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
 
     for (std::size_t testIdx = 0; testIdx < _cases.size(); ++testIdx) {
         const auto& testCase = _cases[testIdx];
@@ -2596,7 +2597,7 @@ TEST_F(OnUpdateOutputsTest, TestFundamentalTransactionOnUpdateOutputs) {
     // instantiated. Due to strong encapsulation, we use the registry that managers the
     // `ReservedTimes` on our behalf.
     OpObserverRegistry opObserver;
-    opObserver.addObserver(std::make_unique<OpObserverImpl>());
+    opObserver.addObserver(std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
 
     for (std::size_t testIdx = 0; testIdx < _cases.size(); ++testIdx) {
         const auto& testCase = _cases[testIdx];
@@ -2649,7 +2650,7 @@ TEST_F(OnUpdateOutputsTest,
     // instantiated. Due to strong encapsulation, we use the registry that managers the
     // `ReservedTimes` on our behalf.
     OpObserverRegistry opObserver;
-    opObserver.addObserver(std::make_unique<OpObserverImpl>());
+    opObserver.addObserver(std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
 
     auto opCtxRaii = cc().makeOperationContext();
     OperationContext* opCtx = opCtxRaii.get();
@@ -2684,7 +2685,7 @@ TEST_F(OpObserverTest, TestFundamentalOnInsertsOutputs) {
     // Impl directly. It falls into cases where `ReservedTimes` is expected to be instantiated. Due
     // to strong encapsulation, we use the registry that managers the `ReservedTimes` on our behalf.
     OpObserverRegistry opObserver;
-    opObserver.addObserver(std::make_unique<OpObserverImpl>());
+    opObserver.addObserver(std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
 
     NamespaceString nss(boost::none, "test", "coll");
     UUID uuid = UUID::gen();
@@ -2804,7 +2805,8 @@ public:
         OpObserverTest::setUp();
 
         auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
-        opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
+        opObserverRegistry->addObserver(
+            std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
         getServiceContext()->setOpObserver(std::move(opObserverRegistry));
     }
 
@@ -3258,7 +3260,8 @@ TEST_F(AtomicApplyOpsOutputsTest, InsertInNestedApplyOpsReturnsSuccess) {
     resetOplogAndTransactions(opCtx);
 
     auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
-    opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
+    opObserverRegistry->addObserver(
+        std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
     opCtx->getServiceContext()->setOpObserver(std::move(opObserverRegistry));
 
     auto mode = repl::OplogApplication::Mode::kApplyOpsCmd;
@@ -3309,7 +3312,8 @@ TEST_F(AtomicApplyOpsOutputsTest, AtomicApplyOpsWithNoOpsReturnsSuccess) {
     resetOplogAndTransactions(opCtx);
 
     auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
-    opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
+    opObserverRegistry->addObserver(
+        std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
     opCtx->getServiceContext()->setOpObserver(std::move(opObserverRegistry));
 
     auto mode = repl::OplogApplication::Mode::kApplyOpsCmd;
@@ -3329,7 +3333,8 @@ TEST_F(AtomicApplyOpsOutputsTest, AtomicApplyOpsInsertWithUuidIntoCollectionWith
     resetOplogAndTransactions(opCtx);
 
     auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
-    opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
+    opObserverRegistry->addObserver(
+        std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
     opCtx->getServiceContext()->setOpObserver(std::move(opObserverRegistry));
 
     auto mode = repl::OplogApplication::Mode::kApplyOpsCmd;
@@ -3368,7 +3373,8 @@ TEST_F(AtomicApplyOpsOutputsTest, AtomicApplyOpsInsertWithoutUuidIntoCollectionW
     resetOplogAndTransactions(opCtx);
 
     auto opObserverRegistry = std::make_unique<OpObserverRegistry>();
-    opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
+    opObserverRegistry->addObserver(
+        std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
     opCtx->getServiceContext()->setOpObserver(std::move(opObserverRegistry));
 
     auto mode = repl::OplogApplication::Mode::kApplyOpsCmd;
@@ -3549,7 +3555,7 @@ TEST_F(OnDeleteOutputsTest, TestNonTransactionFundamentalOnDeleteOutputs) {
     // instantiated. Due to strong encapsulation, we use the registry that managers the
     // `ReservedTimes` on our behalf.
     OpObserverRegistry opObserver;
-    opObserver.addObserver(std::make_unique<OpObserverImpl>());
+    opObserver.addObserver(std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
 
     for (std::size_t testIdx = 0; testIdx < _cases.size(); ++testIdx) {
         const auto& testCase = _cases[testIdx];
@@ -3597,7 +3603,7 @@ TEST_F(OnDeleteOutputsTest, TestTransactionFundamentalOnDeleteOutputs) {
     // instantiated. Due to strong encapsulation, we use the registry that managers the
     // `ReservedTimes` on our behalf.
     OpObserverRegistry opObserver;
-    opObserver.addObserver(std::make_unique<OpObserverImpl>());
+    opObserver.addObserver(std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
 
     for (std::size_t testIdx = 0; testIdx < _cases.size(); ++testIdx) {
         const auto& testCase = _cases[testIdx];
@@ -3652,7 +3658,7 @@ TEST_F(OnDeleteOutputsTest,
     // instantiated. Due to strong encapsulation, we use the registry that managers the
     // `ReservedTimes` on our behalf.
     OpObserverRegistry opObserver;
-    opObserver.addObserver(std::make_unique<OpObserverImpl>());
+    opObserver.addObserver(std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
 
     auto opCtxRaii = cc().makeOperationContext();
     OperationContext* opCtx = opCtxRaii.get();
@@ -4689,7 +4695,7 @@ TEST_F(OpObserverTest, OnRollbackInvalidatesDefaultRWConcernCache) {
     // Rollback to a timestamp should invalidate the cache and getting the defaults should now
     // return the latest value.
     {
-        OpObserverImpl opObserver;
+        OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
         OpObserver::RollbackObserverInfo rbInfo;
         opObserver.onReplicationRollback(opCtx.get(), rbInfo);
     }
@@ -4720,7 +4726,7 @@ TEST_F(OpObserverTest, OnInsertChecksIfTenantMigrationIsBlockingWrites) {
 
     {
         AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
-        OpObserverImpl opObserver;
+        OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
         ASSERT_THROWS_CODE(
             opObserver.onInserts(opCtx.get(), nss, uuid, insert.begin(), insert.end(), false),
             DBException,

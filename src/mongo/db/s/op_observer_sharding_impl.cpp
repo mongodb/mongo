@@ -106,6 +106,9 @@ void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const&
 
 }  // namespace
 
+OpObserverShardingImpl::OpObserverShardingImpl(std::unique_ptr<OplogWriter> oplogWriter)
+    : OpObserverImpl(std::move(oplogWriter)) {}
+
 bool OpObserverShardingImpl::isMigrating(OperationContext* opCtx,
                                          NamespaceString const& nss,
                                          BSONObj const& docToDelete) {

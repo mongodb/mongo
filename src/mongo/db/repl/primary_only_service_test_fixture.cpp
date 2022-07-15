@@ -28,8 +28,10 @@
  */
 
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
+
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/op_observer/oplog_writer_impl.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/primary_only_service_op_observer.h"
@@ -66,7 +68,8 @@ void PrimaryOnlyServiceMongoDTest::setUp() {
         _opObserverRegistry = dynamic_cast<OpObserverRegistry*>(serviceContext->getOpObserver());
         invariant(_opObserverRegistry);
 
-        _opObserverRegistry->addObserver(std::make_unique<OpObserverImpl>());
+        _opObserverRegistry->addObserver(
+            std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
         _opObserverRegistry->addObserver(
             std::make_unique<repl::PrimaryOnlyServiceOpObserver>(serviceContext));
         setUpOpObserverRegistry(_opObserverRegistry);
