@@ -969,13 +969,13 @@ protected:
     static long long _marginalMemoryUsageForArchivedBucket(const ArchivedBucket& bucket,
                                                            bool onlyEntryForMatchingMetaHash);
 
+    mutable Mutex _mutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "BucketCatalog::_mutex");
+
     EraManager _eraManager = {&_mutex};
 
     static constexpr std::size_t kNumberOfStripes = 32;
     std::array<Stripe, kNumberOfStripes> _stripes;
-
-    mutable Mutex _mutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "BucketCatalog::_mutex");
 
     // Bucket state for synchronization with direct writes, protected by '_mutex'
     stdx::unordered_map<OID, BucketState, OID::Hasher> _bucketStates;
