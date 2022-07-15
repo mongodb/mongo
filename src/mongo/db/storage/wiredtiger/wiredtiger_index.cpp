@@ -1192,16 +1192,12 @@ protected:
 
             LOGV2_TRACE_CURSOR(5683900, "cmp after advance: {cmp}", "cmp"_attr = cmp);
 
-            // We do not expect any exact matches or matches of prefixes by comparing keys of
-            // different lengths. Callers either seek using keys with discriminators that always
-            // compare unequally, or in the case of restoring a cursor, perform exact searches. In
-            // the case of an exact search, we will have returned earlier.
-            dassert(cmp);
-
             if (enforcingPrepareConflicts) {
                 // If we are enforcing prepare conflicts, calling next() or prev() must always give
                 // us a key that compares, respectively, greater than or less than our search key.
-                dassert(_forward ? cmp > 0 : cmp < 0);
+                // An exact match is also possible in the case of _id indexes, because the recordid
+                // is not a part of the key.
+                dassert(_forward ? cmp >= 0 : cmp <= 0);
             }
         }
 
