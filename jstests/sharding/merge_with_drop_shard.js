@@ -29,7 +29,6 @@ function setAggHang(mode) {
 function removeShard(shard) {
     // We need the balancer to drain all the chunks out of the shard that is being removed.
     assert.commandWorked(st.startBalancer());
-    st.waitForBalancer(true, 60000);
     var res = st.s.adminCommand({removeShard: shard.shardName});
     assert.commandWorked(res);
     assert.eq('started', res.state);
@@ -45,7 +44,6 @@ function removeShard(shard) {
     st.configRS.awaitLastOpCommitted();
     assert.commandWorked(st.s.adminCommand({flushRouterConfig: 1}));
     assert.commandWorked(st.stopBalancer());
-    st.waitForBalancer(false, 60000);
 }
 
 function addShard(shard) {

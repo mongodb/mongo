@@ -75,7 +75,7 @@ let MongosAPIParametersUtil = (function() {
 
     function awaitRemoveShard(shardName) {
         assert.commandWorked(st.startBalancer());
-        st.waitForBalancer(true, 60000);
+        st.awaitBalancerRound();
         assert.soon(() => {
             const res = st.s.adminCommand({removeShard: shardName});
             jsTestLog(`removeShard result: ${tojson(res)}`);

@@ -255,18 +255,28 @@ sh.waitForPingChange = function(activePings, timeout, interval) {
     return remainingPings;
 };
 
-sh.waitForBalancer = function(wait, timeout, interval) {
-    if (typeof (wait) === 'undefined') {
-        wait = false;
-    }
+/**
+ * Waits up to the specified timeout (with a default of 60s) for the balancer to execute one
+ * round. If no round has been executed, throws an error.
+ */
+sh.awaitBalancerRound = function(timeout, interval) {
+    timeout = timeout || 60000;
+
     var initialStatus = sh._getBalancerStatus();
-    if (!initialStatus.inBalancerRound && !wait) {
-        return;
-    }
     var currentStatus;
     assert.soon(function() {
         currentStatus = sh._getBalancerStatus();
-        return (currentStatus.numBalancerRounds - initialStatus.numBalancerRounds) != 0;
+        assert.eq(currentStatus.mode, 'full', "Balancer is disabled");
+        if (!friendlyEqual(currentStatus.term, initialStatus.term)) {
+            // A new primary of the csrs has been elected
+            initialStatus = currentStatus;
+            return false;
+        }
+        assert.gte(currentStatus.numBalancerRounds,
+                   initialStatus.numBalancerRounds,
+                   'Number of balancer rounds moved back in time unexpectedly. Current status: ' +
+                       tojson(currentStatus) + ', initial status: ' + tojson(initialStatus));
+        return currentStatus.numBalancerRounds > initialStatus.numBalancerRounds;
     }, 'Latest balancer status: ' + tojson(currentStatus), timeout, interval);
 };
 

@@ -740,41 +740,6 @@ var ShardingTest = function(params) {
     };
 
     /**
-     * Waits up to the specified timeout (with a default of 60s) for the balancer to execute one
-     * round. If no round has been executed, throws an error.
-     *
-     * The mongosConnection parameter is optional and allows callers to specify a connection
-     * different than the first mongos instance in the list.
-     */
-    this.awaitBalancerRound = function(timeoutMs, mongosConnection) {
-        timeoutMs = timeoutMs || 60000;
-        mongosConnection = mongosConnection || self.s0;
-
-        // Get the balancer section from the server status of the config server primary
-        function getBalancerStatus() {
-            var balancerStatus =
-                assert.commandWorked(mongosConnection.adminCommand({balancerStatus: 1}));
-            if (balancerStatus.mode !== 'full') {
-                throw Error('Balancer is not enabled');
-            }
-
-            return balancerStatus;
-        }
-
-        var initialStatus = getBalancerStatus();
-        var currentStatus;
-        assert.soon(
-            function() {
-                currentStatus = getBalancerStatus();
-                return (currentStatus.numBalancerRounds - initialStatus.numBalancerRounds) != 0;
-            },
-            function() {
-                return 'Latest balancer status: ' + tojson(currentStatus);
-            },
-            timeoutMs);
-    };
-
-    /**
      * Waits up to one minute for the difference in chunks between the most loaded shard and
      * least loaded shard to be 0 or 1, indicating that the collection is well balanced. This should
      * only be called after creating a big enough chunk difference to trigger balancing.
