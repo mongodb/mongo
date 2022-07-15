@@ -37,6 +37,7 @@
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
+#include "mongo/db/query/planner_analysis.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/sbe_multi_planner.h"
 #include "mongo/db/query/stage_builder_util.h"
@@ -50,29 +51,70 @@ namespace mongo::sbe {
 CandidatePlans CachedSolutionPlanner::plan(
     std::vector<std::unique_ptr<QuerySolution>> solutions,
     std::vector<std::pair<std::unique_ptr<PlanStage>, stage_builder::PlanStageData>> roots) {
-
-    // If the cached plan is accepted we'd like to keep the results from the trials even if there
-    // are parts of agg pipelines being lowered into SBE, so we run the trial with the extended
-    // plan. This works because TrialRunTracker, attached to HashAgg stage in $group queries, tracks
-    // as "results" the results of its child stage. For $lookup queries, the TrialRunTracker will
-    // only track the number of reads from the local side. Thus, we can use the number of reads the
-    // plan was cached with during multiplanning even though multiplanning ran trials of
-    // pre-extended plans.
-    //
-    // When "featureFlagSbeFull" is enabled we use the SBE plan cache. The SBE plan cache stores the
-    // entire plan, including the part for any agg pipeline pushed down to SBE. Therefore, this
-    // logic is only necessary when "featureFlagSbeFull" is disabled.
-    if (!_cq.pipeline().empty() && !feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
-        _yieldPolicy->clearRegisteredPlans();
+    if (!_cq.pipeline().empty()) {
+        // When "featureFlagSbeFull" is enabled we use the SBE plan cache. If the plan cache is
+        // enabled we'd like to check if there is any foreign collection in the hash_lookup stage
+        // that is no longer eligible for it. In this case we invalidate the cache and immediately
+        // replan without ever running a trial period.
         auto secondaryCollectionsInfo =
             fillOutSecondaryCollectionsInformation(_opCtx, _collections, &_cq);
-        solutions[0] = QueryPlanner::extendWithAggPipeline(
-            _cq, std::move(solutions[0]), secondaryCollectionsInfo);
-        roots[0] = stage_builder::buildSlotBasedExecutableTree(
-            _opCtx, _collections, _cq, *solutions[0], _yieldPolicy);
+
+        if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
+            for (const auto foreignCollection : roots[0].second.foreignHashJoinCollections) {
+                const auto collectionInfo = secondaryCollectionsInfo.find(foreignCollection);
+                tassert(6693500,
+                        "Foreign collection must be present in the collections info",
+                        collectionInfo != secondaryCollectionsInfo.end());
+                tassert(6693501, "Foreign collection must exist", collectionInfo->second.exists);
+
+                if (!QueryPlannerAnalysis::isEligibleForHashJoin(collectionInfo->second)) {
+                    return replan(/* shouldCache */ true,
+                                  str::stream() << "Foreign collection " << foreignCollection
+                                                << " is not eligible for hash join anymore");
+                }
+            }
+        } else {
+            // The SBE plan cache is not enabled. If the cached plan is accepted we'd like to keep
+            // the results from the trials even if there are parts of agg pipelines being lowered
+            // into SBE, so we run the trial with the extended plan. This works because
+            // TrialRunTracker, attached to HashAgg stage in $group queries, tracks as "results" the
+            // results of its child stage. For $lookup queries, the TrialRunTracker will only track
+            // the number of reads from the local side. Thus, we can use the number of reads the
+            // plan was cached with during multiplanning even though multiplanning ran trials of
+            // pre-extended plans.
+            //
+            // The SBE plan cache stores the entire plan, including the part for any agg pipeline
+            // pushed down to SBE. Therefore, this logic is only necessary when "featureFlagSbeFull"
+            // is disabled.
+            _yieldPolicy->clearRegisteredPlans();
+            solutions[0] = QueryPlanner::extendWithAggPipeline(
+                _cq, std::move(solutions[0]), secondaryCollectionsInfo);
+            roots[0] = stage_builder::buildSlotBasedExecutableTree(
+                _opCtx, _collections, _cq, *solutions[0], _yieldPolicy);
+        }
     }
 
-    const size_t maxReadsBeforeReplan = internalQueryCacheEvictionRatio * _decisionReads;
+    // If the '_decisionReads' is not present then we do not run a trial period, keeping the current
+    // plan.
+    if (!_decisionReads) {
+        const auto status = prepareExecutionPlan(
+            roots[0].first.get(), &roots[0].second, true /* preparingFromCache */);
+        uassertStatusOK(status);
+        bool exitedEarly;
+
+        // Discarding SlotAccessor pointers as they will be reacquired later.
+        std::tie(std::ignore, std::ignore, exitedEarly) = status.getValue();
+        tassert(
+            6693502, "TrialRunTracker is not attached therefore can not exit early", !exitedEarly);
+        return {makeVector(plan_ranker::CandidatePlan{std::move(solutions[0]),
+                                                      std::move(roots[0].first),
+                                                      std::move(roots[0].second),
+                                                      false /* exitedEarly*/,
+                                                      Status::OK()}),
+                0};
+    }
+
+    const size_t maxReadsBeforeReplan = internalQueryCacheEvictionRatio * _decisionReads.get();
 
     // In cached solution planning we collect execution stats with an upper bound on reads allowed
     // per trial run computed based on previous decision reads. If the trial run ends before
@@ -122,14 +164,14 @@ CandidatePlans CachedSolutionPlanner::plan(
         "Evicting cache entry for a query and replanning it since the number of required reads "
         "mismatch the number of cached reads",
         "maxReadsBeforeReplan"_attr = maxReadsBeforeReplan,
-        "decisionReads"_attr = _decisionReads,
+        "decisionReads"_attr = *_decisionReads,
         "query"_attr = redact(_cq.toStringShort()),
         "planSummary"_attr = explainer->getPlanSummary());
     return replan(
         true,
         str::stream()
             << "cached plan was less efficient than expected: expected trial execution to take "
-            << _decisionReads << " reads but it took at least " << numReads << " reads");
+            << *_decisionReads << " reads but it took at least " << numReads << " reads");
 }
 
 plan_ranker::CandidatePlan CachedSolutionPlanner::collectExecutionStatsForCachedPlan(
@@ -209,6 +251,13 @@ CandidatePlans CachedSolutionPlanner::replan(bool shouldCache, std::string reaso
     auto solutions = uassertStatusOK(std::move(statusWithMultiPlanSolns));
 
     if (solutions.size() == 1) {
+        if (!_cq.pipeline().empty()) {
+            auto secondaryCollectionsInfo =
+                fillOutSecondaryCollectionsInformation(_opCtx, _collections, &_cq);
+            solutions[0] = QueryPlanner::extendWithAggPipeline(
+                _cq, std::move(solutions[0]), secondaryCollectionsInfo);
+        }
+
         // Only one possible plan. Build the stages from the solution.
         auto [root, data] = buildExecutableTree(*solutions[0]);
         auto status = prepareExecutionPlan(root.get(), &data);

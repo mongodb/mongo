@@ -176,7 +176,7 @@ plan_cache_debug_info::DebugInfoSBE buildDebugInfo(const QuerySolution* solution
             }
             case STAGE_EQ_LOOKUP: {
                 auto eln = static_cast<const EqLookupNode*>(node);
-                auto& secondaryStats = debugInfo.secondaryStats[eln->foreignCollection];
+                auto& secondaryStats = debugInfo.secondaryStats[eln->foreignCollection.toString()];
                 if (eln->lookupStrategy == EqLookupNode::LookupStrategy::kIndexedLoopJoin) {
                     tassert(6466200, "Index join lookup should have an index entry", eln->idxEntry);
                     secondaryStats.indexesUsed.push_back(eln->idxEntry->identifier.catalogName);

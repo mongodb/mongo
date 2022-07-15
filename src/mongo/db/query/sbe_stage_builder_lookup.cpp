@@ -1053,6 +1053,9 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildLookupResultObject(
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildLookup(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     const auto eqLookupNode = static_cast<const EqLookupNode*>(root);
+    if (eqLookupNode->lookupStrategy == EqLookupNode::LookupStrategy::kHashJoin) {
+        _state.data->foreignHashJoinCollections.emplace(eqLookupNode->foreignCollection);
+    }
 
     // $lookup creates its own output documents.
     _shouldProduceRecordIdSlot = false;

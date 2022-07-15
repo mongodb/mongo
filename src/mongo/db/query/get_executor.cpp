@@ -1247,7 +1247,8 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
     boost::optional<size_t> decisionWorks,
     bool needsSubplanning,
     PlanYieldPolicySBE* yieldPolicy,
-    size_t plannerOptions) {
+    size_t plannerOptions,
+    const stage_builder::PlanStageData& planStageData) {
     // If we have multiple solutions, we always need to do the runtime planning.
     if (numSolutions > 1) {
         invariant(!needsSubplanning && !decisionWorks);
@@ -1279,15 +1280,15 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
 
     invariant(numSolutions == 1);
 
-    // If we have a single solution but it was created from a cached plan, we will need to do the
-    // runtime planning to check if the cached plan still performs efficiently, or requires
-    // re-planning. The 'decisionWorks' is used to determine whether the existing cache entry should
-    // be evicted, and the query re-planned.
-    if (decisionWorks) {
+    // If we have a single solution and the plan is not pinned or plan contains a hash_lookup stage,
+    // we will need we will need to do the runtime planning to check if the cached plan still
+    // performs efficiently, or requires re-planning.
+    const bool hasHashLookup = !planStageData.foreignHashJoinCollections.empty();
+    if (decisionWorks || hasHashLookup) {
         QueryPlannerParams plannerParams;
         plannerParams.options = plannerOptions;
         return std::make_unique<sbe::CachedSolutionPlanner>(
-            opCtx, collections, *canonicalQuery, plannerParams, *decisionWorks, yieldPolicy);
+            opCtx, collections, *canonicalQuery, plannerParams, decisionWorks, yieldPolicy);
     }
 
     // Runtime planning is not required.
@@ -1344,7 +1345,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
                                                   planningResult->decisionWorks(),
                                                   planningResult->needsSubplanning(),
                                                   yieldPolicy.get(),
-                                                  plannerParams.options)) {
+                                                  plannerParams.options,
+                                                  roots[0].second)) {
         // Do the runtime planning and pick the best candidate plan.
         auto candidates = planner->plan(std::move(solutions), std::move(roots));
 

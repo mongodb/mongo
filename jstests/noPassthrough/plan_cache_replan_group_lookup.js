@@ -461,6 +461,97 @@ assertCacheUsage(false /*multiPlanning*/,
                  "b_1" /*cachedIndexName*/,
                  avoidReplanLookupPipeline);
 
+/**
+ * Tests if replanning and cache invalidation are performed for hash-join plans, when foreign
+ * collection size increases.
+ *
+ * 'singleSolution' indicates whether the initial aggregation pipeline run will result in a single
+ * solution.
+ */
+function testReplanningAndCacheInvalidationOnForeignCollSizeIncrease(singleSolution) {
+    if (!sbeFullEnabled) {
+        return;
+    }
+
+    const coll = db.plan_cache_replan_group_lookup_coll_resize;
+    const foreignColl = db.plan_cache_replan_group_lookup_coll_resize_foreign;
+
+    const pipeline = [
+        {$match: {a: 2, b: 2}},
+        {$lookup: {from: foreignColl.getName(), localField: "a", foreignField: "a", as: "out"}}
+    ];
+
+    function runLookup() {
+        assert.eq([{_id: 2, a: 2, b: 2, out: [{_id: 1, a: 2, b: 1}]}],
+                  coll.aggregate(pipeline).toArray());
+    }
+
+    // Asserts that the plan cache has only one entry and checks if it has a hash_lookup stage.
+    function assertPlanCacheEntry(shouldHaveHashLookup) {
+        const entries = coll.getPlanCache().list();
+        assert.eq(entries.length, 1, entries);
+        assert(entries[0].isActive, entries[0]);
+        const hasHashLookup = entries[0].cachedPlan.stages.includes("hash_lookup");
+        assert.eq(shouldHaveHashLookup, hasHashLookup, entries[0]);
+    }
+
+    // Set maximum number of documents in the foreign collection to 5.
+    const initialMaxNoOfDocuments =
+        assert
+            .commandWorked(db.adminCommand(
+                {getParameter: 1, internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin: 1}))
+            .internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin;
+    assert.commandWorked(db.adminCommand(
+        {setParameter: 1, internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin: 5}));
+
+    coll.drop();
+    foreignColl.drop();
+
+    if (!singleSolution) {
+        assert.commandWorked(coll.createIndex({a: 1}));
+        assert.commandWorked(coll.createIndex({b: 1}));
+    }
+
+    assert.commandWorked(coll.insert({_id: 1, a: 1, b: 1}));
+    assert.commandWorked(coll.insert({_id: 2, a: 2, b: 2}));
+    assert.commandWorked(coll.insert({_id: 3, a: 2, b: 3}));
+    assert.commandWorked(coll.insert({_id: 4, a: 3, b: 4}));
+    assert.commandWorked(coll.insert({_id: 5, a: 5, b: 5}));
+    assert.commandWorked(coll.insert({_id: 6, a: 6, b: 6}));
+    assert.commandWorked(coll.insert({_id: 7, a: 6, b: 7}));
+    assert.commandWorked(foreignColl.insert({_id: 1, a: 2, b: 1}));
+    assert.commandWorked(foreignColl.insert({_id: 2, a: 3, b: 2}));
+
+    // Ensure that plan cache entry has a plan with hash-join in it.
+    runLookup();
+    runLookup();
+    assertPlanCacheEntry(true /* shouldHaveHashLookup */);
+    verifyCorrectLookupAlgorithmUsed("HashJoin", pipeline);
+
+    // Increase the size of the foreign collection
+    assert.commandWorked(foreignColl.insert({a: 3, b: 3}));
+    assert.commandWorked(foreignColl.insert({a: 5, b: 4}));
+    assert.commandWorked(foreignColl.insert({a: 6, b: 5}));
+    assert.commandWorked(foreignColl.insert({a: 6, b: 6}));
+    assert.commandWorked(foreignColl.insert({a: 7, b: 7}));
+
+    // Ensure that plan cache entry does not have a plan with hash-join in it.
+    runLookup();
+    runLookup();
+    assertPlanCacheEntry(false /* shouldHaveHashLookup */);
+
+    // Ensure that hash-join is no longer used in the plan.
+    verifyCorrectLookupAlgorithmUsed("NestedLoopJoin", pipeline);
+
+    // Reset the 'internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin' knob.
+    assert.commandWorked(db.adminCommand({
+        setParameter: 1,
+        internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin: initialMaxNoOfDocuments
+    }));
+}
+testReplanningAndCacheInvalidationOnForeignCollSizeIncrease(true /* singleSolution */);
+testReplanningAndCacheInvalidationOnForeignCollSizeIncrease(false /* singleSolution */);
+
 // Disable $lookup pushdown. This should not invalidate the cache entry, but it should prevent
 // $lookup from being pushed down.
 assert.commandWorked(

@@ -48,7 +48,7 @@ public:
                           const MultipleCollectionAccessor& collections,
                           const CanonicalQuery& cq,
                           const QueryPlannerParams& queryParams,
-                          size_t decisionReads,
+                          boost::optional<size_t> decisionReads,
                           PlanYieldPolicySBE* yieldPolicy)
         : BaseRuntimePlanner{opCtx, collections, cq, queryParams, yieldPolicy},
           _decisionReads{decisionReads} {}
@@ -96,7 +96,7 @@ private:
     CandidatePlans replan(bool shouldCache, std::string reason) const;
 
     // The number of physical reads taken to decide on a winning plan when the plan was first
-    // cached.
-    const size_t _decisionReads;
+    // cached. boost::none in case planing will not be based on the trial run logic.
+    const boost::optional<size_t> _decisionReads;
 };
 }  // namespace mongo::sbe

@@ -374,6 +374,10 @@ struct PlanStageData {
     // every index used by the plan.
     std::vector<IndexBoundsEvaluationInfo> indexBoundsEvaluationInfos;
 
+    // Stores all namespaces involved in the build side of a hash join plan. Needed to check if the
+    // plan should be evicted as the size of the foreign namespace changes.
+    stdx::unordered_set<NamespaceString> foreignHashJoinCollections;
+
 private:
     // This copy function copies data from 'other' but will not create a copy of its
     // RuntimeEnvironment and CompileCtx.
@@ -397,6 +401,7 @@ private:
         inputParamToSlotMap = other.inputParamToSlotMap;
         variableIdToSlotMap = other.variableIdToSlotMap;
         indexBoundsEvaluationInfos = other.indexBoundsEvaluationInfos;
+        foreignHashJoinCollections = other.foreignHashJoinCollections;
     }
 };
 

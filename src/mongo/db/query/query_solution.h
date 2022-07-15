@@ -1479,7 +1479,7 @@ struct EqLookupNode : public QuerySolutionNode {
     }
 
     EqLookupNode(std::unique_ptr<QuerySolutionNode> child,
-                 const std::string& foreignCollection,
+                 const NamespaceString& foreignCollection,
                  const FieldPath& joinFieldLocal,
                  const FieldPath& joinFieldForeign,
                  const FieldPath& joinField,
@@ -1528,9 +1528,9 @@ struct EqLookupNode : public QuerySolutionNode {
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
     /**
-     * The foreign (inner) collection namespace name.
+     * The foreign (inner) collection namespace string.
      */
-    std::string foreignCollection;
+    NamespaceString foreignCollection;
 
     /**
      * The local (outer) join field.

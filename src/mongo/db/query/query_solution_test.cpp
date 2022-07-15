@@ -1134,7 +1134,7 @@ TEST(QuerySolutionTest, EqLookupNodeWithIndexScan) {
     scanNode->bounds.endKey = BSON("a" << 1 << "b" << 1);
 
     EqLookupNode node(std::move(scanNode),
-                      "col",
+                      NamespaceString("db.col"),
                       "local",
                       "foreign",
                       "as",
@@ -1169,7 +1169,7 @@ TEST(QuerySolutionTest, EqLookupNodeWithIndexScanFieldOverwrite) {
                                        << "1");
 
     EqLookupNode node(std::move(scanNode),
-                      "col",
+                      NamespaceString("db.col"),
                       "local",
                       "foreign",
                       "b",
@@ -1242,7 +1242,7 @@ TEST(QuerySolutionTest, FieldAvailabilityOutputStreamOperator) {
 TEST(QuerySolutionTest, GetSecondaryNamespaceVectorOverSingleEqLookupNode) {
     auto scanNode = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
     const NamespaceString mainNss("db.main");
-    const auto foreignColl = "db.col";
+    const NamespaceString foreignColl("db.col");
     auto root = std::make_unique<EqLookupNode>(std::move(scanNode),
                                                foreignColl,
                                                "local",
@@ -1257,7 +1257,7 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorOverSingleEqLookupNode) {
     qs.setRoot(std::move(root));
 
     // The output vector should only contain 'foreignColl'.
-    std::vector<NamespaceStringOrUUID> expectedNssVector{NamespaceString(foreignColl)};
+    std::vector<NamespaceStringOrUUID> expectedNssVector{foreignColl};
     assertNamespaceVectorsAreEqual(qs.getAllSecondaryNamespaces(mainNss), expectedNssVector);
 }
 
@@ -1265,7 +1265,7 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesMainNss) {
     auto scanNode = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
     const NamespaceString mainNss("db.main");
     auto root = std::make_unique<EqLookupNode>(std::move(scanNode),
-                                               mainNss.toString(),
+                                               mainNss,
                                                "local",
                                                "remote",
                                                "b",
@@ -1286,8 +1286,8 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesMainNss) {
 TEST(QuerySolutionTest, GetSecondaryNamespaceVectorOverNestedEqLookupNodes) {
     auto scanNode = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
     const NamespaceString mainNss("db.main");
-    const auto foreignCollOne = "db.col";
-    const auto foreignCollTwo = "db.foo";
+    const NamespaceString foreignCollOne("db.col");
+    const NamespaceString foreignCollTwo("db.foo");
     auto childEqLookupNode =
         std::make_unique<EqLookupNode>(std::move(scanNode),
                                        foreignCollOne,
@@ -1314,15 +1314,14 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorOverNestedEqLookupNodes) {
     // The foreign collections are unique, so our output vector should contain both of them. Note
     // that because 'getAllSecondaryNamespaces' uses a set internally, these namespaces are
     // expected to be in sorted order in the output vector.
-    std::vector<NamespaceStringOrUUID> expectedNssVector{NamespaceString(foreignCollOne),
-                                                         NamespaceString(foreignCollTwo)};
+    std::vector<NamespaceStringOrUUID> expectedNssVector{foreignCollOne, foreignCollTwo};
     assertNamespaceVectorsAreEqual(qs.getAllSecondaryNamespaces(mainNss), expectedNssVector);
 }
 
 TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesNestedEqLookupNodes) {
     auto scanNode = std::make_unique<IndexScanNode>(buildSimpleIndexEntry(BSON("a" << 1)));
     const NamespaceString mainNss("db.main");
-    const auto foreignColl = "db.col";
+    const NamespaceString foreignColl("db.col");
     auto childEqLookupNode =
         std::make_unique<EqLookupNode>(std::move(scanNode),
                                        foreignColl,
@@ -1348,7 +1347,7 @@ TEST(QuerySolutionTest, GetSecondaryNamespaceVectorDeduplicatesNestedEqLookupNod
 
     // Both nodes reference the same foreign collection. Therefore, our output vector should contain
     // a single copy of that namespace.
-    std::vector<NamespaceStringOrUUID> expectedNssVector{NamespaceString(foreignColl)};
+    std::vector<NamespaceStringOrUUID> expectedNssVector{foreignColl};
     assertNamespaceVectorsAreEqual(qs.getAllSecondaryNamespaces(mainNss), expectedNssVector);
 }
 }  // namespace

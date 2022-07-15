@@ -644,18 +644,6 @@ void removeInclusionProjectionBelowGroupRecursive(QuerySolutionNode* solnRoot) {
     }
 }
 
-// Checks if the foreign collection is eligible for the hash join algorithm. We conservatively
-// choose the hash join algorithm for cases when the hash table is unlikely to spill data.
-bool isEligibleForHashJoin(const SecondaryCollectionInfo& foreignCollInfo) {
-    return !internalQueryDisableLookupExecutionUsingHashJoin.load() && foreignCollInfo.exists &&
-        foreignCollInfo.noOfRecords <=
-        internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin.load() &&
-        foreignCollInfo.approximateDataSizeBytes <=
-        internalQueryCollectionMaxDataSizeBytesToChooseHashJoin.load() &&
-        foreignCollInfo.storageSizeBytes <=
-        internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin.load();
-}
-
 // Determines whether 'index' is eligible for executing the right side of a pushed down $lookup over
 // 'foreignField'.
 bool isIndexEligibleForRightSideOfLookupPushdown(const IndexEntry& index,
@@ -666,6 +654,16 @@ bool isIndexEligibleForRightSideOfLookupPushdown(const IndexEntry& index,
         !index.sparse && CollatorInterface::collatorsMatch(collator, index.collator);
 }
 }  // namespace
+
+bool QueryPlannerAnalysis::isEligibleForHashJoin(const SecondaryCollectionInfo& foreignCollInfo) {
+    return !internalQueryDisableLookupExecutionUsingHashJoin.load() && foreignCollInfo.exists &&
+        foreignCollInfo.noOfRecords <=
+        internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin.load() &&
+        foreignCollInfo.approximateDataSizeBytes <=
+        internalQueryCollectionMaxDataSizeBytesToChooseHashJoin.load() &&
+        foreignCollInfo.storageSizeBytes <=
+        internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin.load();
+}
 
 // static
 std::unique_ptr<QuerySolution> QueryPlannerAnalysis::removeInclusionProjectionBelowGroup(

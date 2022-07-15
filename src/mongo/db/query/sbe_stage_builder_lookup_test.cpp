@@ -119,9 +119,8 @@ public:
         localScanNode->name = _nss.toString();
 
         // Construct logical query solution.
-        auto foreignCollName = _foreignNss.toString();
         auto lookupNode = std::make_unique<EqLookupNode>(std::move(localScanNode),
-                                                         foreignCollName,
+                                                         _foreignNss,
                                                          localKey,
                                                          foreignKey,
                                                          asKey,

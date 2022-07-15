@@ -172,7 +172,7 @@ void statsToBSON(const QuerySolutionNode* node,
         case STAGE_EQ_LOOKUP: {
             auto eln = static_cast<const EqLookupNode*>(node);
 
-            bob->append("foreignCollection", eln->foreignCollection);
+            bob->append("foreignCollection", eln->foreignCollection.toString());
             bob->append("localField", eln->joinFieldLocal.fullPath());
             bob->append("foreignField", eln->joinFieldForeign.fullPath());
             bob->append("asField", eln->joinField.fullPath());
