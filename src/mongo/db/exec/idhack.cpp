@@ -106,7 +106,7 @@ PlanStage::StageState IDHackStage::doWork(WorkingSetID* out) {
             // Create a new WSM for the result document.
             id = _workingSet->allocate();
             WorkingSetMember* member = _workingSet->get(id);
-            member->recordId = recordId;
+            member->recordId = std::move(recordId);
             _workingSet->transitionToRecordIdAndIdx(id);
 
             const auto& coll = collection();

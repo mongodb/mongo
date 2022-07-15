@@ -79,7 +79,7 @@ public:
         const CollectionPtr* collection,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         Direction direction = FORWARD,
-        boost::optional<RecordId> resumeAfterRecordId = boost::none,
+        const boost::optional<RecordId>& resumeAfterRecordId = boost::none,
         boost::optional<RecordIdBound> minRecord = boost::none,
         boost::optional<RecordIdBound> maxRecord = boost::none,
         CollectionScanParams::ScanBoundInclusion boundInclusion =
@@ -192,9 +192,9 @@ private:
         WorkingSet* ws,
         const CollectionPtr* collection,
         Direction direction,
-        boost::optional<RecordId> resumeAfterRecordId = boost::none,
-        boost::optional<RecordId> minRecord = boost::none,
-        boost::optional<RecordId> maxRecord = boost::none);
+        const boost::optional<RecordId>& resumeAfterRecordId = boost::none,
+        const boost::optional<RecordId>& minRecord = boost::none,
+        const boost::optional<RecordId>& maxRecord = boost::none);
 
     static std::unique_ptr<PlanStage> _collectionScan(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,

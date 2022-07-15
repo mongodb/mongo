@@ -89,7 +89,8 @@ struct RecordIdAndWall {
     RecordId id;
     Date_t wall;
 
-    RecordIdAndWall(RecordId lastRecord, Date_t wallTime) : id(lastRecord), wall(wallTime) {}
+    RecordIdAndWall(RecordId lastRecord, Date_t wallTime)
+        : id(std::move(lastRecord)), wall(wallTime) {}
 };
 
 WiredTigerRecordStore::CursorKey makeCursorKey(const RecordId& rid, KeyFormat format) {
@@ -314,7 +315,7 @@ void WiredTigerRecordStore::OplogStones::popOldestStone() {
 }
 
 void WiredTigerRecordStore::OplogStones::createNewStoneIfNeeded(OperationContext* opCtx,
-                                                                RecordId lastRecord,
+                                                                const RecordId& lastRecord,
                                                                 Date_t wallTime) {
     auto logFailedLockAcquisition = [&](const std::string& lock) {
         LOGV2_DEBUG(5384101,
@@ -350,8 +351,8 @@ void WiredTigerRecordStore::OplogStones::createNewStoneIfNeeded(OperationContext
         return;
     }
 
-    OplogStones::Stone stone(_currentRecords.swap(0), _currentBytes.swap(0), lastRecord, wallTime);
-    _stones.push_back(stone);
+    auto& stone =
+        _stones.emplace_back(_currentRecords.swap(0), _currentBytes.swap(0), lastRecord, wallTime);
 
     LOGV2_DEBUG(22381,
                 2,
@@ -383,7 +384,7 @@ void WiredTigerRecordStore::OplogStones::clearStonesOnCommit(OperationContext* o
 }
 
 void WiredTigerRecordStore::OplogStones::updateStonesAfterCappedTruncateAfter(
-    int64_t recordsRemoved, int64_t bytesRemoved, RecordId firstRemovedId) {
+    int64_t recordsRemoved, int64_t bytesRemoved, const RecordId& firstRemovedId) {
     stdx::lock_guard<Latch> lk(_mutex);
 
     int64_t numStonesToRemove = 0;
@@ -1290,7 +1291,7 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx, Timestamp mayT
 
             // Stash the truncate point for next time to cleanly skip over tombstones, etc.
             _oplogStones->firstRecord = stone->lastRecord;
-            _oplogFirstRecord = stone->lastRecord;
+            _oplogFirstRecord = std::move(stone->lastRecord);
         } catch (const WriteConflictException&) {
             LOGV2_DEBUG(
                 22400, 1, "Caught WriteConflictException while truncating oplog entries, retrying");
@@ -1347,7 +1348,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
                     record_id_helpers::extractKeyOptime(record.data.data(), record.data.size());
                 if (!status.isOK())
                     return status.getStatus();
-                record.id = status.getValue();
+                record.id = std::move(status.getValue());
             } else {
                 // Some RecordStores, like TemporaryRecordStores, may want to set their own
                 // RecordIds.
@@ -2066,7 +2067,7 @@ void WiredTigerRecordStore::setDataSize(long long dataSize) {
 }
 
 void WiredTigerRecordStore::doCappedTruncateAfter(OperationContext* opCtx,
-                                                  RecordId end,
+                                                  const RecordId& end,
                                                   bool inclusive) {
     std::unique_ptr<SeekableRecordCursor> cursor = getCursor(opCtx, true);
 
@@ -2082,7 +2083,7 @@ void WiredTigerRecordStore::doCappedTruncateAfter(OperationContext* opCtx,
         std::unique_ptr<SeekableRecordCursor> reverseCursor = getCursor(opCtx, false);
         invariant(reverseCursor->seekExact(end));
         auto prev = reverseCursor->next();
-        lastKeptId = prev ? prev->id : RecordId();
+        lastKeptId = prev ? std::move(prev->id) : RecordId();
         firstRemovedId = end;
     } else {
         // If not deleting the record located at 'end', then advance the cursor to the first record
@@ -2394,7 +2395,8 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekNear(const RecordId
 
     _lastReturnedId = curId;
     _eof = false;
-    return {{curId, {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
+    return {
+        {std::move(curId), {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
 }
 
 void WiredTigerRecordStoreCursorBase::save() {

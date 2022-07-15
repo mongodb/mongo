@@ -72,8 +72,8 @@ StatusWith<RecordId> extractKeyOptime(const char* data, int len);
  * RecordId because it loses information about the original RecordId format. If you require passing
  * a RecordId as a token or storing for a resumable scan, for example, use RecordId::serializeToken.
  */
-void appendToBSONAs(RecordId rid, BSONObjBuilder* builder, StringData fieldName);
-BSONObj toBSONAs(RecordId rid, StringData fieldName);
+void appendToBSONAs(const RecordId& rid, BSONObjBuilder* builder, StringData fieldName);
+BSONObj toBSONAs(const RecordId& rid, StringData fieldName);
 
 /**
  * Enumerates all reserved ids that have been allocated for a specific purpose. These IDs may not be
@@ -89,7 +89,7 @@ RecordId reservedIdFor(ReservationId res, KeyFormat keyFormat);
 /**
  * Returns true if this RecordId falls within the reserved range for a given RecordId type.
  */
-bool isReserved(RecordId id);
+bool isReserved(const RecordId& id);
 
 }  // namespace record_id_helpers
 }  // namespace mongo

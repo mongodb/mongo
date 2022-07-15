@@ -489,7 +489,7 @@ void ExpressionKeysPrivate::get2DKeys(SharedBufferFragmentBuilder& pooledBufferB
                                       KeyStringSet* keys,
                                       KeyString::Version keyStringVersion,
                                       Ordering ordering,
-                                      boost::optional<RecordId> id) {
+                                      const boost::optional<RecordId>& id) {
     BSONElementMultiSet bSet;
 
     // Get all the nested location fields, but don't return individual elements from
@@ -581,7 +581,7 @@ void ExpressionKeysPrivate::getFTSKeys(SharedBufferFragmentBuilder& pooledBuffer
                                        KeyStringSet* keys,
                                        KeyString::Version keyStringVersion,
                                        Ordering ordering,
-                                       boost::optional<RecordId> id) {
+                                       const boost::optional<RecordId>& id) {
     fts::FTSIndexFormat::getKeys(
         pooledBufferBuilder, ftsSpec, obj, keys, keyStringVersion, ordering, id);
 }
@@ -598,7 +598,7 @@ void ExpressionKeysPrivate::getHashKeys(SharedBufferFragmentBuilder& pooledBuffe
                                         KeyString::Version keyStringVersion,
                                         Ordering ordering,
                                         bool ignoreArraysAlongPath,
-                                        boost::optional<RecordId> id) {
+                                        const boost::optional<RecordId>& id) {
     static const BSONObj nullObj = BSON("" << BSONNULL);
     auto hasFieldValue = false;
     KeyString::PooledBuilder keyString(pooledBufferBuilder, keyStringVersion, ordering);
@@ -672,7 +672,7 @@ void ExpressionKeysPrivate::getS2Keys(SharedBufferFragmentBuilder& pooledBufferB
                                       KeyString::Version keyStringVersion,
                                       SortedDataIndexAccessMethod::GetKeysContext context,
                                       Ordering ordering,
-                                      boost::optional<RecordId> id) {
+                                      const boost::optional<RecordId>& id) {
     std::vector<KeyString::HeapBuilder> keysToAdd;
 
     // Does one of our documents have a geo field?

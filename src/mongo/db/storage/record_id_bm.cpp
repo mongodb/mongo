@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include <random>
+
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/record_id.h"
@@ -127,6 +129,32 @@ void BM_RecordIdFormatString(benchmark::State& state) {
         benchmark::ClobberMemory();
     }
 }
+
+template <typename V>
+void BM_RecordIdSort(benchmark::State& state) {
+    std::mt19937_64 gen(1234);
+    std::uniform_int_distribution<uint64_t> dist;
+    int64_t last = 0;
+    struct KV {
+        uint64_t key;
+        V val;
+    };
+    auto comp = [](const KV& left, const KV& right) { return left.key < right.key; };
+    std::vector<KV> data;
+
+    for (auto j = 0; j < state.range(0); ++j)
+        data.emplace_back(KV{dist(gen), V(++last)});
+    for (auto _ : state) {
+        auto copy = data;
+        std::sort(copy.begin(), copy.end(), comp);
+        benchmark::ClobberMemory();
+    }
+    state.SetItemsProcessed(data.size() * state.iterations());
+    state.SetBytesProcessed(data.size() * state.iterations() * sizeof(KV));
+}
+
+BENCHMARK_TEMPLATE(BM_RecordIdSort, uint64_t)->RangeMultiplier(10)->Range(100, 100'000);
+BENCHMARK_TEMPLATE(BM_RecordIdSort, RecordId)->RangeMultiplier(10)->Range(100, 100'000);
 
 BENCHMARK(BM_RecordIdCopyLong);
 BENCHMARK(BM_RecordIdCopyOID);

@@ -114,7 +114,7 @@ void WildcardKeyGenerator::generateKeys(SharedBufferFragmentBuilder& pooledBuffe
                                         BSONObj inputDoc,
                                         KeyStringSet* keys,
                                         KeyStringSet* multikeyPaths,
-                                        boost::optional<RecordId> id) const {
+                                        const boost::optional<RecordId>& id) const {
     FieldRef rootPath;
     auto keysSequence = keys->extract_sequence();
     // multikeyPaths is allowed to be nullptr
@@ -139,7 +139,7 @@ void WildcardKeyGenerator::_traverseWildcard(SharedBufferFragmentBuilder& pooled
                                              FieldRef* path,
                                              KeyStringSet::sequence_type* keys,
                                              KeyStringSet::sequence_type* multikeyPaths,
-                                             boost::optional<RecordId> id) const {
+                                             const boost::optional<RecordId>& id) const {
     for (const auto& elem : obj) {
         // If the element's fieldName contains a ".", fast-path skip it because it's not queryable.
         if (elem.fieldNameStringData().find('.', 0) != std::string::npos)
@@ -185,7 +185,7 @@ bool WildcardKeyGenerator::_addKeyForNestedArray(SharedBufferFragmentBuilder& po
                                                  const FieldRef& fullPath,
                                                  bool enclosingObjIsArray,
                                                  KeyStringSet::sequence_type* keys,
-                                                 boost::optional<RecordId> id) const {
+                                                 const boost::optional<RecordId>& id) const {
     // If this element is an array whose parent is also an array, index it as a value.
     if (enclosingObjIsArray && elem.type() == BSONType::Array) {
         _addKey(pooledBufferBuilder, elem, fullPath, keys, id);
@@ -198,7 +198,7 @@ bool WildcardKeyGenerator::_addKeyForEmptyLeaf(SharedBufferFragmentBuilder& pool
                                                BSONElement elem,
                                                const FieldRef& fullPath,
                                                KeyStringSet::sequence_type* keys,
-                                               boost::optional<RecordId> id) const {
+                                               const boost::optional<RecordId>& id) const {
     invariant(elem.isABSONObj());
     if (elem.embeddedObject().isEmpty()) {
         // In keeping with the behaviour of regular indexes, an empty object is indexed as-is while
@@ -217,7 +217,7 @@ void WildcardKeyGenerator::_addKey(SharedBufferFragmentBuilder& pooledBufferBuil
                                    BSONElement elem,
                                    const FieldRef& fullPath,
                                    KeyStringSet::sequence_type* keys,
-                                   boost::optional<RecordId> id) const {
+                                   const boost::optional<RecordId>& id) const {
     // Wildcard keys are of the form { "": "path.to.field", "": <collation-aware value> }.
     KeyString::PooledBuilder keyString(pooledBufferBuilder, _keyStringVersion, _ordering);
     keyString.appendString(fullPath.dottedField());

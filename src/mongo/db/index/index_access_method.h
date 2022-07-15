@@ -387,8 +387,8 @@ public:
      * If any key generation errors are encountered and suppressed due to the provided GetKeysMode,
      * 'onSuppressedErrorFn' is called.
      */
-    using OnSuppressedErrorFn =
-        std::function<void(Status status, const BSONObj& obj, boost::optional<RecordId> loc)>;
+    using OnSuppressedErrorFn = std::function<void(
+        Status status, const BSONObj& obj, const boost::optional<RecordId>& loc)>;
     void getKeys(OperationContext* opCtx,
                  const CollectionPtr& collection,
                  SharedBufferFragmentBuilder& pooledBufferBuilder,
@@ -398,7 +398,7 @@ public:
                  KeyStringSet* keys,
                  KeyStringSet* multikeyMetadataKeys,
                  MultikeyPaths* multikeyPaths,
-                 boost::optional<RecordId> id,
+                 const boost::optional<RecordId>& id,
                  OnSuppressedErrorFn&& onSuppressedError = nullptr) const;
 
     /**
@@ -585,7 +585,7 @@ protected:
                            KeyStringSet* keys,
                            KeyStringSet* multikeyMetadataKeys,
                            MultikeyPaths* multikeyPaths,
-                           boost::optional<RecordId> id) const = 0;
+                           const boost::optional<RecordId>& id) const = 0;
 
     const IndexCatalogEntry* const _indexCatalogEntry;  // owned by IndexCatalog
     const IndexDescriptor* const _descriptor;

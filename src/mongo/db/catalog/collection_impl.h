@@ -123,7 +123,7 @@ public:
 
     bool requiresIdIndex() const final;
 
-    Snapshotted<BSONObj> docFor(OperationContext* opCtx, RecordId loc) const final {
+    Snapshotted<BSONObj> docFor(OperationContext* opCtx, const RecordId& loc) const final {
         return Snapshotted<BSONObj>(opCtx->recoveryUnit()->getSnapshotId(),
                                     _shared->_recordStore->dataFor(opCtx, loc).releaseToBson());
     }
@@ -132,7 +132,9 @@ public:
      * @param out - contents set to the right docs if exists, or nothing.
      * @return true iff loc exists
      */
-    bool findDoc(OperationContext* opCtx, RecordId loc, Snapshotted<BSONObj>* out) const final;
+    bool findDoc(OperationContext* opCtx,
+                 const RecordId& loc,
+                 Snapshotted<BSONObj>* out) const final;
 
     std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
                                                     bool forward = true) const final;
@@ -144,7 +146,7 @@ public:
     void deleteDocument(
         OperationContext* opCtx,
         StmtId stmtId,
-        RecordId loc,
+        const RecordId& loc,
         OpDebug* opDebug,
         bool fromMigrate = false,
         bool noWarn = false,
@@ -172,7 +174,7 @@ public:
         OperationContext* opCtx,
         Snapshotted<BSONObj> doc,
         StmtId stmtId,
-        RecordId loc,
+        const RecordId& loc,
         OpDebug* opDebug,
         bool fromMigrate = false,
         bool noWarn = false,
@@ -232,7 +234,7 @@ public:
      * @return the post update location of the doc (may or may not be the same as oldLocation)
      */
     RecordId updateDocument(OperationContext* opCtx,
-                            RecordId oldLocation,
+                            const RecordId& oldLocation,
                             const Snapshotted<BSONObj>& oldDoc,
                             const BSONObj& newDoc,
                             bool indexesAffected,
@@ -249,7 +251,7 @@ public:
      * @return the contents of the updated record.
      */
     StatusWith<RecordData> updateDocumentWithDamages(OperationContext* opCtx,
-                                                     RecordId loc,
+                                                     const RecordId& loc,
                                                      const Snapshotted<RecordData>& oldRec,
                                                      const char* damageSource,
                                                      const mutablebson::DamageVector& damages,
@@ -276,7 +278,9 @@ public:
      * The caller should hold a collection X lock and ensure there are no index builds in progress
      * on the collection.
      */
-    void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) const final;
+    void cappedTruncateAfter(OperationContext* opCtx,
+                             const RecordId& end,
+                             bool inclusive) const final;
 
     /**
      * Returns a non-ok Status if validator is not legal for this collection.
@@ -424,7 +428,7 @@ public:
         const CollectionPtr& yieldableCollection,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         ScanDirection scanDirection,
-        boost::optional<RecordId> resumeAfterRecordId) const final;
+        const boost::optional<RecordId>& resumeAfterRecordId) const final;
 
     void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) final;
 

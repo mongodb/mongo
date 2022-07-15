@@ -196,7 +196,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                     //
                     // Note that we want to return the record *after* this one since we have already
                     // returned this one prior to the resume.
-                    auto recordIdToSeek = *_params.resumeAfterRecordId;
+                    auto& recordIdToSeek = *_params.resumeAfterRecordId;
                     if (!_cursor->seekExact(recordIdToSeek)) {
                         uasserted(ErrorCodes::KeyNotFound,
                                   str::stream()
@@ -328,7 +328,7 @@ bool pastEndOfRange(const CollectionScanParams& params, const WorkingSetMember& 
             return false;
         }
 
-        auto endRecord = params.maxRecord->recordId();
+        const auto& endRecord = params.maxRecord->recordId();
         return member.recordId > endRecord ||
             (member.recordId == endRecord && !shouldIncludeEndRecord(params));
     } else {
@@ -336,7 +336,7 @@ bool pastEndOfRange(const CollectionScanParams& params, const WorkingSetMember& 
         if (!params.minRecord) {
             return false;
         }
-        auto endRecord = params.minRecord->recordId();
+        const auto& endRecord = params.minRecord->recordId();
 
         return member.recordId < endRecord ||
             (member.recordId == endRecord && !shouldIncludeEndRecord(params));
@@ -350,7 +350,7 @@ bool beforeStartOfRange(const CollectionScanParams& params, const WorkingSetMemb
             return false;
         }
 
-        auto startRecord = params.minRecord->recordId();
+        const auto& startRecord = params.minRecord->recordId();
         return member.recordId < startRecord ||
             (member.recordId == startRecord && !shouldIncludeStartRecord(params));
     } else {
@@ -358,7 +358,7 @@ bool beforeStartOfRange(const CollectionScanParams& params, const WorkingSetMemb
         if (!params.maxRecord) {
             return false;
         }
-        auto startRecord = params.maxRecord->recordId();
+        const auto& startRecord = params.maxRecord->recordId();
         return member.recordId > startRecord ||
             (member.recordId == startRecord && !shouldIncludeStartRecord(params));
     }

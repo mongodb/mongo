@@ -2534,7 +2534,7 @@ void IndexBuildsCoordinator::_buildIndex(OperationContext* opCtx,
 void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
     OperationContext* opCtx,
     std::shared_ptr<ReplIndexBuildState> replState,
-    boost::optional<RecordId> resumeAfterRecordId) {
+    const boost::optional<RecordId>& resumeAfterRecordId) {
     // Collection scan and insert into index.
     {
         indexBuildsSSS.scanCollection.addAndFetch(1);

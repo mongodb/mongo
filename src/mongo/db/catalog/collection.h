@@ -344,14 +344,14 @@ public:
 
     virtual bool requiresIdIndex() const = 0;
 
-    virtual Snapshotted<BSONObj> docFor(OperationContext* opCtx, RecordId loc) const = 0;
+    virtual Snapshotted<BSONObj> docFor(OperationContext* opCtx, const RecordId& loc) const = 0;
 
     /**
      * @param out - contents set to the right docs if exists, or nothing.
      * @return true iff loc exists
      */
     virtual bool findDoc(OperationContext* opCtx,
-                         RecordId loc,
+                         const RecordId& loc,
                          Snapshotted<BSONObj>* out) const = 0;
 
     virtual std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
@@ -363,7 +363,7 @@ public:
      */
     virtual void deleteDocument(OperationContext* opCtx,
                                 StmtId stmtId,
-                                RecordId loc,
+                                const RecordId& loc,
                                 OpDebug* opDebug,
                                 bool fromMigrate = false,
                                 bool noWarn = false,
@@ -388,7 +388,7 @@ public:
     virtual void deleteDocument(OperationContext* opCtx,
                                 Snapshotted<BSONObj> doc,
                                 StmtId stmtId,
-                                RecordId loc,
+                                const RecordId& loc,
                                 OpDebug* opDebug,
                                 bool fromMigrate = false,
                                 bool noWarn = false,
@@ -449,7 +449,7 @@ public:
      * @return the post update location of the doc (may or may not be the same as oldLocation)
      */
     virtual RecordId updateDocument(OperationContext* opCtx,
-                                    RecordId oldLocation,
+                                    const RecordId& oldLocation,
                                     const Snapshotted<BSONObj>& oldDoc,
                                     const BSONObj& newDoc,
                                     bool indexesAffected,
@@ -467,7 +467,7 @@ public:
      */
     virtual StatusWith<RecordData> updateDocumentWithDamages(
         OperationContext* opCtx,
-        RecordId loc,
+        const RecordId& loc,
         const Snapshotted<RecordData>& oldRec,
         const char* damageSource,
         const mutablebson::DamageVector& damages,
@@ -495,7 +495,7 @@ public:
      * on the collection.
      */
     virtual void cappedTruncateAfter(OperationContext* opCtx,
-                                     RecordId end,
+                                     const RecordId& end,
                                      bool inclusive) const = 0;
 
     /**
@@ -816,7 +816,7 @@ public:
         const CollectionPtr& yieldableCollection,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         ScanDirection scanDirection,
-        boost::optional<RecordId> resumeAfterRecordId = boost::none) const = 0;
+        const boost::optional<RecordId>& resumeAfterRecordId = boost::none) const = 0;
 
     virtual void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) = 0;
 

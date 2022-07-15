@@ -49,12 +49,12 @@ public:
     RecordIdBound() = default;
 
     explicit RecordIdBound(RecordId&& recordId, boost::optional<BSONObj> bson = boost::none)
-        : _recordId(recordId), _bson(bson) {}
+        : _recordId(std::move(recordId)), _bson(bson) {}
 
     explicit RecordIdBound(const RecordId& recordId, boost::optional<BSONObj> bson = boost::none)
         : _recordId(recordId), _bson(bson) {}
 
-    RecordId recordId() const {
+    const RecordId& recordId() const {
         return _recordId;
     }
 

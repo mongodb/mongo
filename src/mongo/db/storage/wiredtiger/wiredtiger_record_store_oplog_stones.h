@@ -52,7 +52,10 @@ public:
         Date_t wallTime;      // Walltime of when this chunk of the oplog was created.
 
         Stone(int64_t records, int64_t bytes, RecordId lastRecord, Date_t wallTime)
-            : records(records), bytes(bytes), lastRecord(lastRecord), wallTime(wallTime) {}
+            : records(records),
+              bytes(bytes),
+              lastRecord(std::move(lastRecord)),
+              wallTime(wallTime) {}
     };
 
     OplogStones(OperationContext* opCtx, WiredTigerRecordStore* rs);
@@ -77,7 +80,9 @@ public:
 
     void popOldestStone();
 
-    void createNewStoneIfNeeded(OperationContext* opCtx, RecordId lastRecord, Date_t wallTime);
+    void createNewStoneIfNeeded(OperationContext* opCtx,
+                                const RecordId& lastRecord,
+                                Date_t wallTime);
 
     void updateCurrentStoneAfterInsertOnCommit(OperationContext* opCtx,
                                                int64_t bytesInserted,
@@ -89,7 +94,7 @@ public:
     // Updates the metadata about the oplog stones after a rollback occurs.
     void updateStonesAfterCappedTruncateAfter(int64_t recordsRemoved,
                                               int64_t bytesRemoved,
-                                              RecordId firstRemovedId);
+                                              const RecordId& firstRemovedId);
 
     // Resize oplog size
     void adjust(int64_t maxSize);

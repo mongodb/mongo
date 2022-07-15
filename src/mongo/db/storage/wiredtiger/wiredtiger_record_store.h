@@ -200,7 +200,7 @@ public:
                                       BSONObjBuilder* result,
                                       double scale) const;
 
-    void doCappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) final;
+    void doCappedTruncateAfter(OperationContext* opCtx, const RecordId& end, bool inclusive) final;
 
     virtual void updateStatsAfterRepair(OperationContext* opCtx,
                                         long long numRecords,

@@ -54,7 +54,7 @@ class ColumnStoreSorter {
 public:
     ColumnStoreSorter(size_t maxMemoryUsageBytes, StringData dbName, SorterFileStats* stats);
 
-    void add(PathView path, RecordId recordId, CellView cellContents);
+    void add(PathView path, const RecordId& recordId, CellView cellContents);
 
     size_t numSpills() const {
         return _numSpills;

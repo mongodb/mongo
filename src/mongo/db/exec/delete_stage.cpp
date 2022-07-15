@@ -153,7 +153,10 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
     ScopeGuard memberFreer([&] { _ws->free(id); });
 
     invariant(member->hasRecordId());
-    RecordId recordId = member->recordId;
+    // It's safe to have a reference instead of a copy here due to the member pointer only being
+    // invalidated if the memberFreer ScopeGuard activates. This will only be the case if the
+    // document is deleted successfully and thus the existing RecordId becomes invalid.
+    const auto& recordId = member->recordId;
     // Deletes can't have projections. This means that covering analysis will always add
     // a fetch. We should always get fetched data, and never just key data.
     invariant(member->hasObj());

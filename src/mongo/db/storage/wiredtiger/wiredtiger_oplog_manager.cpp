@@ -145,7 +145,7 @@ void WiredTigerOplogManager::waitForAllEarlierOplogWritesToBeVisible(
         opCtx->recoveryUnit()->abandonSnapshot();
         return;
     }
-    const auto waitingFor = lastOplogRecord->id;
+    const auto& waitingFor = lastOplogRecord->id;
 
     // Close transaction before we wait.
     opCtx->recoveryUnit()->abandonSnapshot();

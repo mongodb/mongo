@@ -418,7 +418,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
 
             if (nullptr != dlOut) {
                 tassert(6297500, "Working set member has no record ID", member->hasRecordId());
-                *dlOut = member->recordId;
+                *dlOut = std::move(member->recordId);
             }
 
             if (hasRequestedData) {

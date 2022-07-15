@@ -60,13 +60,12 @@ StatusWith<RecordId> keyForOptime(const Timestamp& opTime, const KeyFormat keyFo
             if (opTime.getInc() > uint32_t(std::numeric_limits<int32_t>::max()))
                 return {ErrorCodes::BadValue, "ts inc too high"};
 
-            const auto out = RecordId(opTime.getSecs(), opTime.getInc());
+            auto out = RecordId(opTime.getSecs(), opTime.getInc());
             if (out <= RecordId::minLong())
                 return {ErrorCodes::BadValue, "ts too low"};
             if (out >= RecordId::maxLong())
                 return {ErrorCodes::BadValue, "ts too high"};
-
-            return out;
+            return {std::move(out)};
         }
         case KeyFormat::String: {
             KeyString::Builder keyBuilder(KeyString::Version::kLatestVersion);
@@ -145,7 +144,7 @@ RecordId keyForDate(Date_t date) {
     return RecordId(keyBuilder.getBuffer(), keyBuilder.getSize());
 }
 
-void appendToBSONAs(RecordId rid, BSONObjBuilder* builder, StringData fieldName) {
+void appendToBSONAs(const RecordId& rid, BSONObjBuilder* builder, StringData fieldName) {
     rid.withFormat([&](RecordId::Null) { builder->appendNull(fieldName); },
                    [&](int64_t val) { builder->append(fieldName, val); },
                    [&](const char* str, int len) {
@@ -153,7 +152,7 @@ void appendToBSONAs(RecordId rid, BSONObjBuilder* builder, StringData fieldName)
                    });
 }
 
-BSONObj toBSONAs(RecordId rid, StringData fieldName) {
+BSONObj toBSONAs(const RecordId& rid, StringData fieldName) {
     BSONObjBuilder builder;
     appendToBSONAs(rid, &builder, fieldName);
     return builder.obj();
@@ -178,7 +177,7 @@ RecordId reservedIdFor(ReservationId res, KeyFormat keyFormat) {
     }
 }
 
-bool isReserved(RecordId id) {
+bool isReserved(const RecordId& id) {
     if (id.isNull()) {
         return false;
     }

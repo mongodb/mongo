@@ -91,7 +91,7 @@ IndexEntryInfo::IndexEntryInfo(const IndexInfo& indexInfo,
     : indexName(indexInfo.indexName),
       keyPattern(indexInfo.keyPattern),
       ord(indexInfo.ord),
-      recordId(entryRecordId),
+      recordId(std::move(entryRecordId)),
       idKey(entryIdKey.getOwned()),
       keyString(entryKeyString) {}
 
@@ -305,7 +305,7 @@ void IndexConsistency::addDocumentMultikeyPaths(IndexInfo* indexInfo,
 void IndexConsistency::addDocKey(OperationContext* opCtx,
                                  const KeyString::Value& ks,
                                  IndexInfo* indexInfo,
-                                 RecordId recordId) {
+                                 const RecordId& recordId) {
     auto rawHash = ks.hash(indexInfo->indexNameHash);
     auto hashLower = rawHash % kNumHashBuckets;
     auto hashUpper = (rawHash / kNumHashBuckets) % kNumHashBuckets;
@@ -360,7 +360,7 @@ void IndexConsistency::addDocKey(OperationContext* opCtx,
 void IndexConsistency::addIndexKey(OperationContext* opCtx,
                                    const KeyString::Value& ks,
                                    IndexInfo* indexInfo,
-                                   RecordId recordId,
+                                   const RecordId& recordId,
                                    ValidateResults* results) {
     auto rawHash = ks.hash(indexInfo->indexNameHash);
     auto hashLower = rawHash % kNumHashBuckets;
@@ -512,7 +512,7 @@ bool IndexConsistency::limitMemoryUsageForSecondPhase(ValidateResults* result) {
 
 BSONObj IndexConsistency::_generateInfo(const std::string& indexName,
                                         const BSONObj& keyPattern,
-                                        RecordId recordId,
+                                        const RecordId& recordId,
                                         const BSONObj& indexKey,
                                         const BSONObj& idKey) {
 

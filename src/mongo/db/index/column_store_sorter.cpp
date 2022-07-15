@@ -82,7 +82,7 @@ ColumnStoreSorter::ColumnStoreSorter(size_t maxMemoryUsageBytes,
       _maxMemoryUsageBytes(maxMemoryUsageBytes),
       _spillFile(std::make_shared<Sorter<Key, Value>::File>(pathForNewSpillFile(), _stats)) {}
 
-void ColumnStoreSorter::add(PathView path, RecordId recordId, CellView cellContents) {
+void ColumnStoreSorter::add(PathView path, const RecordId& recordId, CellView cellContents) {
     auto& cellListAtPath = _dataByPath[path];
     if (cellListAtPath.empty()) {
         // Track memory usage of this new path.
@@ -181,7 +181,7 @@ void ColumnStoreSorter::spill() {
             writer.writeChunk();
             currentChunkSize = 0;
         }
-        for (auto ridAndCell : cellVector) {
+        for (auto& ridAndCell : cellVector) {
             const auto& cell = ridAndCell.second;
             currentChunkSize += path.size() + ridAndCell.first.memUsage() + cell.size();
             writer.addAlreadySorted(Key{path, ridAndCell.first},

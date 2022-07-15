@@ -504,7 +504,7 @@ public:
     explicit BuilderBase(Version version)
         : BuilderBase(version, ALL_ASCENDING, Discriminator::kInclusive) {}
 
-    BuilderBase(Version version, const BSONObj& obj, Ordering ord, RecordId recordId)
+    BuilderBase(Version version, const BSONObj& obj, Ordering ord, const RecordId& recordId)
         : BuilderBase(version, ord) {
         resetToKey(obj, ord, recordId);
     }
@@ -527,7 +527,7 @@ public:
         resetFromBuffer(other.getBuffer(), other.getSize());
     }
 
-    BuilderBase(Version version, RecordId rid) : BuilderBase(version) {
+    BuilderBase(Version version, const RecordId& rid) : BuilderBase(version) {
         appendRecordId(rid);
     }
 
@@ -552,7 +552,7 @@ public:
         return {version, _buffer().len(), SharedBufferFragment(newBuf.release(), newBufLen)};
     }
 
-    void appendRecordId(RecordId loc);
+    void appendRecordId(const RecordId& loc);
     void appendTypeBits(const TypeBits& bits);
 
     /*
@@ -603,7 +603,7 @@ public:
         _transition(BuildState::kEmpty);
     }
 
-    void resetToKey(const BSONObj& obj, Ordering ord, RecordId recordId);
+    void resetToKey(const BSONObj& obj, Ordering ord, const RecordId& recordId);
     void resetToKey(const BSONObj& obj,
                     Ordering ord,
                     Discriminator discriminator = Discriminator::kInclusive);

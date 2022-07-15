@@ -398,7 +398,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
 Status MultiIndexBlock::insertAllDocumentsInCollection(
     OperationContext* opCtx,
     const CollectionPtr& collection,
-    boost::optional<RecordId> resumeAfterRecordId) {
+    const boost::optional<RecordId>& resumeAfterRecordId) {
     invariant(!_buildIsCleanedUp);
     invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->inAWriteUnitOfWork());
 
@@ -600,7 +600,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
 
 void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
                                         const CollectionPtr& collection,
-                                        boost::optional<RecordId> resumeAfterRecordId,
+                                        const boost::optional<RecordId>& resumeAfterRecordId,
                                         ProgressMeterHolder* progress) {
     PlanYieldPolicy::YieldPolicy yieldPolicy;
     if (isBackgroundBuilding()) {

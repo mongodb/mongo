@@ -51,7 +51,7 @@ public:
                         KeyStringSet* keys,
                         KeyString::Version keyStringVersion,
                         Ordering ordering,
-                        boost::optional<RecordId> id = boost::none);
+                        const boost::optional<RecordId>& id = boost::none);
 
     /**
      * Helper method to get return entry from the FTSIndex as a BSONObj

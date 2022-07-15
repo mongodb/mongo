@@ -177,7 +177,7 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
         while (record) {
             opCtx->checkForInterrupt();
 
-            RecordId currentRecordId = record->id;
+            auto& currentRecordId = record->id;
             BSONObj unownedDoc = record->data.toBson();
 
             // Don't apply this record if the total batch size in bytes would be too large.
@@ -207,7 +207,7 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
 
             // Save the record ids of the documents inserted into the index for deletion later.
             // We can't delete records while holding a positioned cursor.
-            recordsAddedToIndex.push_back(currentRecordId);
+            recordsAddedToIndex.emplace_back(std::move(currentRecordId));
 
             // Don't continue if the batch is full. Allow the transaction to commit.
             if (batchSize == kBatchMaxSize) {

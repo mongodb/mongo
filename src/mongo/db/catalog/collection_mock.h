@@ -50,7 +50,7 @@ public:
                    std::unique_ptr<IndexCatalog> indexCatalog)
         : _uuid(uuid), _nss(nss), _indexCatalog(std::move(indexCatalog)) {}
     CollectionMock(const NamespaceString& nss, RecordId catalogId)
-        : _nss(nss), _catalogId(catalogId) {}
+        : _nss(nss), _catalogId(std::move(catalogId)) {}
     ~CollectionMock() = default;
 
     std::shared_ptr<Collection> clone() const {
@@ -71,7 +71,7 @@ public:
     }
 
     void setCatalogId(RecordId catalogId) {
-        _catalogId = catalogId;
+        _catalogId = std::move(catalogId);
     }
 
     const NamespaceString& ns() const {
@@ -110,11 +110,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    Snapshotted<BSONObj> docFor(OperationContext* opCtx, RecordId loc) const {
+    Snapshotted<BSONObj> docFor(OperationContext* opCtx, const RecordId& loc) const {
         MONGO_UNREACHABLE;
     }
 
-    bool findDoc(OperationContext* opCtx, RecordId loc, Snapshotted<BSONObj>* out) const {
+    bool findDoc(OperationContext* opCtx, const RecordId& loc, Snapshotted<BSONObj>* out) const {
         MONGO_UNREACHABLE;
     }
 
@@ -124,7 +124,7 @@ public:
 
     void deleteDocument(OperationContext* opCtx,
                         StmtId stmtId,
-                        RecordId loc,
+                        const RecordId& loc,
                         OpDebug* opDebug,
                         bool fromMigrate,
                         bool noWarn,
@@ -137,7 +137,7 @@ public:
         OperationContext* opCtx,
         Snapshotted<BSONObj> doc,
         StmtId stmtId,
-        RecordId loc,
+        const RecordId& loc,
         OpDebug* opDebug,
         bool fromMigrate = false,
         bool noWarn = false,
@@ -174,7 +174,7 @@ public:
     }
 
     RecordId updateDocument(OperationContext* opCtx,
-                            RecordId oldLocation,
+                            const RecordId& oldLocation,
                             const Snapshotted<BSONObj>& oldDoc,
                             const BSONObj& newDoc,
                             bool indexesAffected,
@@ -188,7 +188,7 @@ public:
     }
 
     StatusWith<RecordData> updateDocumentWithDamages(OperationContext* opCtx,
-                                                     RecordId loc,
+                                                     const RecordId& loc,
                                                      const Snapshotted<RecordData>& oldRec,
                                                      const char* damageSource,
                                                      const mutablebson::DamageVector& damages,
@@ -200,7 +200,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) const {
+    void cappedTruncateAfter(OperationContext* opCtx, const RecordId& end, bool inclusive) const {
         MONGO_UNREACHABLE;
     }
 
@@ -375,7 +375,7 @@ public:
         const CollectionPtr& yieldableCollection,
         PlanYieldPolicy::YieldPolicy yieldPolicy,
         ScanDirection scanDirection,
-        boost::optional<RecordId> resumeAfterRecordId) const {
+        const boost::optional<RecordId>& resumeAfterRecordId) const {
         MONGO_UNREACHABLE;
     }
 

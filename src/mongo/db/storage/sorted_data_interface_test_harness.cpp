@@ -68,7 +68,7 @@ void mongo::removeFromIndex(OperationContext* opCtx,
 
 mongo::KeyString::Value mongo::makeKeyString(SortedDataInterface* sorted,
                                              BSONObj bsonKey,
-                                             boost::optional<RecordId> rid) {
+                                             const boost::optional<RecordId>& rid) {
     KeyString::Builder builder(sorted->getKeyStringVersion(), bsonKey, sorted->getOrdering());
     if (rid) {
         builder.appendRecordId(*rid);

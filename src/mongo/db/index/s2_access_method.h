@@ -76,7 +76,7 @@ private:
                    KeyStringSet* keys,
                    KeyStringSet* multikeyMetadataKeys,
                    MultikeyPaths* multikeyPaths,
-                   boost::optional<RecordId> id) const final;
+                   const boost::optional<RecordId>& id) const final;
 
     S2IndexingParams _params;
 

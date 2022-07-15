@@ -437,7 +437,7 @@ RecordId SortedDataIndexAccessMethod::findSingle(OperationContext* opCtx,
 
     if (auto loc = _newInterface->findLoc(opCtx, actualKey)) {
         dassert(!loc->isNull());
-        return *loc;
+        return std::move(*loc);
     }
 
     return RecordId();
@@ -771,7 +771,7 @@ Status SortedDataIndexAccessMethod::BulkBuilderImpl::insert(
                       &_multikeyMetadataKeys,
                       multikeyPaths.get(),
                       loc,
-                      [&](Status status, const BSONObj&, boost::optional<RecordId>) {
+                      [&](Status status, const BSONObj&, const boost::optional<RecordId>&) {
                           // If a key generation error was suppressed, record the document as
                           // "skipped" so the index builder can retry at a point when data is
                           // consistent.
@@ -1018,7 +1018,7 @@ void SortedDataIndexAccessMethod::getKeys(OperationContext* opCtx,
                                           KeyStringSet* keys,
                                           KeyStringSet* multikeyMetadataKeys,
                                           MultikeyPaths* multikeyPaths,
-                                          boost::optional<RecordId> id,
+                                          const boost::optional<RecordId>& id,
                                           OnSuppressedErrorFn&& onSuppressedError) const {
     invariant(!id || _newInterface->rsKeyFormat() != KeyFormat::String || id->isStr(),
               fmt::format("RecordId is not in the same string format as its RecordStore; id: {}",

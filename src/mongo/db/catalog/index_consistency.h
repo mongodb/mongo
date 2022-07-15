@@ -108,7 +108,7 @@ public:
     void addDocKey(OperationContext* opCtx,
                    const KeyString::Value& ks,
                    IndexInfo* indexInfo,
-                   RecordId recordId);
+                   const RecordId& recordId);
 
     /**
      * During the first phase of validation, given the index entry's KeyString, decrement the
@@ -119,7 +119,7 @@ public:
     void addIndexKey(OperationContext* opCtx,
                      const KeyString::Value& ks,
                      IndexInfo* indexInfo,
-                     RecordId recordId,
+                     const RecordId& recordId,
                      ValidateResults* results);
 
     /**
@@ -232,7 +232,7 @@ private:
      */
     BSONObj _generateInfo(const std::string& indexName,
                           const BSONObj& keyPattern,
-                          RecordId recordId,
+                          const RecordId& recordId,
                           const BSONObj& indexKey,
                           const BSONObj& idKey);
 

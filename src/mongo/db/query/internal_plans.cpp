@@ -120,7 +120,7 @@ CollectionScanParams createCollectionScanParams(
     WorkingSet* ws,
     const CollectionPtr* coll,
     InternalPlanner::Direction direction,
-    boost::optional<RecordId> resumeAfterRecordId,
+    const boost::optional<RecordId>& resumeAfterRecordId,
     boost::optional<RecordIdBound> minRecord,
     boost::optional<RecordIdBound> maxRecord,
     CollectionScanParams::ScanBoundInclusion boundInclusion) {
@@ -148,7 +148,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collection
     const CollectionPtr* coll,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     const Direction direction,
-    boost::optional<RecordId> resumeAfterRecordId,
+    const boost::optional<RecordId>& resumeAfterRecordId,
     boost::optional<RecordIdBound> minRecord,
     boost::optional<RecordIdBound> maxRecord,
     CollectionScanParams::ScanBoundInclusion boundInclusion) {

@@ -153,7 +153,7 @@ public:
     Status insertAllDocumentsInCollection(
         OperationContext* opCtx,
         const CollectionPtr& collection,
-        boost::optional<RecordId> resumeAfterRecordId = boost::none);
+        const boost::optional<RecordId>& resumeAfterRecordId = boost::none);
 
     /**
      * Call this after init() for each document in the collection.
@@ -344,7 +344,7 @@ private:
      */
     void _doCollectionScan(OperationContext* opCtx,
                            const CollectionPtr& collection,
-                           boost::optional<RecordId> resumeAfterRecordId,
+                           const boost::optional<RecordId>& resumeAfterRecordId,
                            ProgressMeterHolder* progress);
 
     // Is set during init() and ensures subsequent function calls act on the same Collection.

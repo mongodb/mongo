@@ -145,7 +145,7 @@ bool indexTypeSupportsPathLevelMultikeyTracking(StringData accessMethod) {
 class DurableCatalogImpl::AddIdentChange : public RecoveryUnit::Change {
 public:
     AddIdentChange(DurableCatalogImpl* catalog, RecordId catalogId)
-        : _catalog(catalog), _catalogId(catalogId) {}
+        : _catalog(catalog), _catalogId(std::move(catalogId)) {}
 
     virtual void commit(boost::optional<Timestamp>) {}
     virtual void rollback() {
@@ -267,7 +267,7 @@ std::vector<DurableCatalog::Entry> DurableCatalogImpl::getAllCatalogEntries(
     return ret;
 }
 
-DurableCatalog::Entry DurableCatalogImpl::getEntry(RecordId catalogId) const {
+DurableCatalog::Entry DurableCatalogImpl::getEntry(const RecordId& catalogId) const {
     stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
     auto it = _catalogIdToEntryMap.find(catalogId);
     invariant(it != _catalogIdToEntryMap.end());
@@ -337,7 +337,7 @@ StatusWith<DurableCatalog::Entry> DurableCatalogImpl::_importEntry(OperationCont
 }
 
 std::string DurableCatalogImpl::getIndexIdent(OperationContext* opCtx,
-                                              RecordId catalogId,
+                                              const RecordId& catalogId,
                                               StringData idxName) const {
     BSONObj obj = _findEntry(opCtx, catalogId);
     BSONObj idxIdent = obj["idxIdent"].Obj();
@@ -345,7 +345,7 @@ std::string DurableCatalogImpl::getIndexIdent(OperationContext* opCtx,
 }
 
 std::vector<std::string> DurableCatalogImpl::getIndexIdents(OperationContext* opCtx,
-                                                            RecordId catalogId) const {
+                                                            const RecordId& catalogId) const {
     std::vector<std::string> idents;
 
     BSONObj obj = _findEntry(opCtx, catalogId);
@@ -365,7 +365,7 @@ std::vector<std::string> DurableCatalogImpl::getIndexIdents(OperationContext* op
     return idents;
 }
 
-BSONObj DurableCatalogImpl::_findEntry(OperationContext* opCtx, RecordId catalogId) const {
+BSONObj DurableCatalogImpl::_findEntry(OperationContext* opCtx, const RecordId& catalogId) const {
     LOGV2_DEBUG(22208, 3, "looking up metadata for: {catalogId}", "catalogId"_attr = catalogId);
     RecordData data;
     if (!_rs->findRecord(opCtx, catalogId, &data)) {
@@ -379,7 +379,7 @@ BSONObj DurableCatalogImpl::_findEntry(OperationContext* opCtx, RecordId catalog
 }
 
 std::shared_ptr<BSONCollectionCatalogEntry::MetaData> DurableCatalogImpl::getMetaData(
-    OperationContext* opCtx, RecordId catalogId) const {
+    OperationContext* opCtx, const RecordId& catalogId) const {
     BSONObj obj = _findEntry(opCtx, catalogId);
     LOGV2_DEBUG(22209, 3, " fetched CCE metadata: {obj}", "obj"_attr = obj);
     std::shared_ptr<BSONCollectionCatalogEntry::MetaData> md;
@@ -393,7 +393,7 @@ std::shared_ptr<BSONCollectionCatalogEntry::MetaData> DurableCatalogImpl::getMet
 }
 
 void DurableCatalogImpl::putMetaData(OperationContext* opCtx,
-                                     RecordId catalogId,
+                                     const RecordId& catalogId,
                                      BSONCollectionCatalogEntry::MetaData& md) {
     NamespaceString nss(md.ns);
     BSONObj obj = _findEntry(opCtx, catalogId);
@@ -441,7 +441,7 @@ void DurableCatalogImpl::putMetaData(OperationContext* opCtx,
 }
 
 Status DurableCatalogImpl::_replaceEntry(OperationContext* opCtx,
-                                         RecordId catalogId,
+                                         const RecordId& catalogId,
                                          const NamespaceString& toNss,
                                          BSONCollectionCatalogEntry::MetaData& md) {
     BSONObj old = _findEntry(opCtx, catalogId).getOwned();
@@ -474,7 +474,7 @@ Status DurableCatalogImpl::_replaceEntry(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status DurableCatalogImpl::_removeEntry(OperationContext* opCtx, RecordId catalogId) {
+Status DurableCatalogImpl::_removeEntry(OperationContext* opCtx, const RecordId& catalogId) {
     stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
     const auto it = _catalogIdToEntryMap.find(catalogId);
     if (it == _catalogIdToEntryMap.end()) {
@@ -634,7 +634,7 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalogImpl
 }
 
 Status DurableCatalogImpl::createIndex(OperationContext* opCtx,
-                                       RecordId catalogId,
+                                       const RecordId& catalogId,
                                        const NamespaceString& nss,
                                        const CollectionOptions& collOptions,
                                        const IndexDescriptor* spec) {
@@ -755,13 +755,13 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
 }
 
 Status DurableCatalogImpl::renameCollection(OperationContext* opCtx,
-                                            RecordId catalogId,
+                                            const RecordId& catalogId,
                                             const NamespaceString& toNss,
                                             BSONCollectionCatalogEntry::MetaData& md) {
     return _replaceEntry(opCtx, catalogId, toNss, md);
 }
 
-Status DurableCatalogImpl::dropCollection(OperationContext* opCtx, RecordId catalogId) {
+Status DurableCatalogImpl::dropCollection(OperationContext* opCtx, const RecordId& catalogId) {
     Entry entry;
     {
         stdx::lock_guard<Latch> lk(_catalogIdToEntryMapLock);
@@ -795,7 +795,7 @@ Status DurableCatalogImpl::dropAndRecreateIndexIdentForResume(OperationContext* 
 }
 
 bool DurableCatalogImpl::isIndexMultikey(OperationContext* opCtx,
-                                         RecordId catalogId,
+                                         const RecordId& catalogId,
                                          StringData indexName,
                                          MultikeyPaths* multikeyPaths) const {
     auto md = getMetaData(opCtx, catalogId);
@@ -812,7 +812,8 @@ bool DurableCatalogImpl::isIndexMultikey(OperationContext* opCtx,
     return md->indexes[offset].multikey;
 }
 
-int DurableCatalogImpl::getTotalIndexCount(OperationContext* opCtx, RecordId catalogId) const {
+int DurableCatalogImpl::getTotalIndexCount(OperationContext* opCtx,
+                                           const RecordId& catalogId) const {
     auto md = getMetaData(opCtx, catalogId);
     if (!md)
         return 0;
@@ -821,7 +822,7 @@ int DurableCatalogImpl::getTotalIndexCount(OperationContext* opCtx, RecordId cat
 }
 
 bool DurableCatalogImpl::isIndexPresent(OperationContext* opCtx,
-                                        RecordId catalogId,
+                                        const RecordId& catalogId,
                                         StringData indexName) const {
     auto md = getMetaData(opCtx, catalogId);
     if (!md)
@@ -832,7 +833,7 @@ bool DurableCatalogImpl::isIndexPresent(OperationContext* opCtx,
 }
 
 bool DurableCatalogImpl::isIndexReady(OperationContext* opCtx,
-                                      RecordId catalogId,
+                                      const RecordId& catalogId,
                                       StringData indexName) const {
     auto md = getMetaData(opCtx, catalogId);
     if (!md)

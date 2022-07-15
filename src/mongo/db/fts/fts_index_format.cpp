@@ -115,7 +115,7 @@ void FTSIndexFormat::getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
                              KeyStringSet* keys,
                              KeyString::Version keyStringVersion,
                              Ordering ordering,
-                             boost::optional<RecordId> id) {
+                             const boost::optional<RecordId>& id) {
     int extraSize = 0;
     vector<BSONElement> extrasBefore;
     vector<BSONElement> extrasAfter;

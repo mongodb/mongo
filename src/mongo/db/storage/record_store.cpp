@@ -76,7 +76,9 @@ Status RecordStore::truncate(OperationContext* opCtx) {
     return doTruncate(opCtx);
 }
 
-void RecordStore::cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) {
+void RecordStore::cappedTruncateAfter(OperationContext* opCtx,
+                                      const RecordId& end,
+                                      bool inclusive) {
     validateWriteAllowed(opCtx);
     doCappedTruncateAfter(opCtx, end, inclusive);
 }

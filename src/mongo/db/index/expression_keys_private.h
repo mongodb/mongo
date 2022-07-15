@@ -76,7 +76,7 @@ public:
                           KeyStringSet* keys,
                           KeyString::Version keyStringVersion,
                           Ordering ordering,
-                          boost::optional<RecordId> id = boost::none);
+                          const boost::optional<RecordId>& id = boost::none);
 
     //
     // FTS
@@ -88,7 +88,7 @@ public:
                            KeyStringSet* keys,
                            KeyString::Version keyStringVersion,
                            Ordering ordering,
-                           boost::optional<RecordId> id = boost::none);
+                           const boost::optional<RecordId>& id = boost::none);
 
     //
     // Hash
@@ -108,7 +108,7 @@ public:
                             KeyString::Version keyStringVersion,
                             Ordering ordering,
                             bool ignoreArraysAlongPath,
-                            boost::optional<RecordId> id = boost::none);
+                            const boost::optional<RecordId>& id = boost::none);
 
     /**
      * Hashing function used by both getHashKeys and the cursors we create.
@@ -133,7 +133,7 @@ public:
                           KeyString::Version keyStringVersion,
                           SortedDataIndexAccessMethod::GetKeysContext context,
                           Ordering ordering,
-                          boost::optional<RecordId> id = boost::none);
+                          const boost::optional<RecordId>& id = boost::none);
 };
 
 }  // namespace mongo

@@ -278,8 +278,8 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
     // use cursor->next() to get subsequent Records. However, if the Record Store is empty,
     // there is no first record. In this case, we set the first Record Id to an invalid RecordId
     // (RecordId()), which will halt iteration at the initialization step.
-    const boost::optional<Record> record = _traverseRecordStoreCursor->next(opCtx);
-    _firstRecordId = record ? record->id : RecordId();
+    auto record = _traverseRecordStoreCursor->next(opCtx);
+    _firstRecordId = record ? std::move(record->id) : RecordId();
 }
 
 void ValidateState::_relockDatabaseAndCollection(OperationContext* opCtx) {

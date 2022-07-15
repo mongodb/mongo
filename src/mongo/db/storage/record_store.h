@@ -372,13 +372,16 @@ public:
      * A thin wrapper around insertRecords() to simplify handling of single document inserts.
      * If RecordId is null, the storage engine will generate one and return it.
      */
-    StatusWith<RecordId> insertRecord(
-        OperationContext* opCtx, RecordId rid, const char* data, int len, Timestamp timestamp) {
+    StatusWith<RecordId> insertRecord(OperationContext* opCtx,
+                                      const RecordId& rid,
+                                      const char* data,
+                                      int len,
+                                      Timestamp timestamp) {
         std::vector<Record> inOutRecords{Record{rid, RecordData(data, len)}};
         Status status = insertRecords(opCtx, &inOutRecords, std::vector<Timestamp>{timestamp});
         if (!status.isOK())
             return status;
-        return inOutRecords.front().id;
+        return std::move(inOutRecords.front().id);
     }
 
     /**
@@ -458,7 +461,7 @@ public:
      * function.  An assertion will be thrown if that is attempted.
      * @param inclusive - Truncate 'end' as well iff true
      */
-    void cappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive);
+    void cappedTruncateAfter(OperationContext* opCtx, const RecordId& end, bool inclusive);
 
     /**
      * does this RecordStore support the compact operation?
@@ -626,7 +629,9 @@ protected:
         const char* damageSource,
         const mutablebson::DamageVector& damages) = 0;
     virtual Status doTruncate(OperationContext* opCtx) = 0;
-    virtual void doCappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) = 0;
+    virtual void doCappedTruncateAfter(OperationContext* opCtx,
+                                       const RecordId& end,
+                                       bool inclusive) = 0;
     virtual Status doCompact(OperationContext* opCtx) {
         MONGO_UNREACHABLE;
     }

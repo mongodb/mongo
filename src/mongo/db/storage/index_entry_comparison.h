@@ -92,7 +92,7 @@ inline bool operator!=(const IndexKeyEntry& lhs, const IndexKeyEntry& rhs) {
  * Represents KeyString struct containing a KeyString::Value and its RecordId
  */
 struct KeyStringEntry {
-    KeyStringEntry(KeyString::Value ks, RecordId loc) : keyString(ks), loc(loc) {
+    KeyStringEntry(KeyString::Value ks, RecordId id) : keyString(ks), loc(std::move(id)) {
         if (!kDebugBuild) {
             return;
         }

@@ -173,7 +173,7 @@ void BtreeKeyGenerator::_getKeysArrEltFixed(const std::vector<const char*>& fiel
                                             const std::vector<PositionalPathInfo>& positionalInfo,
                                             MultikeyPaths* multikeyPaths,
                                             const CollatorInterface* collator,
-                                            boost::optional<RecordId> id) const {
+                                            const boost::optional<RecordId>& id) const {
     // fieldNamesTemp and fixedTemp are passed in by the caller to be used as temporary data
     // structures as we need them to be mutable in the recursion. When they are stored outside we
     // can reuse their memory.
@@ -210,7 +210,7 @@ void BtreeKeyGenerator::getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder
                                 KeyStringSet* keys,
                                 MultikeyPaths* multikeyPaths,
                                 const CollatorInterface* collator,
-                                boost::optional<RecordId> id) const {
+                                const boost::optional<RecordId>& id) const {
     if (_isIdIndex) {
         // we special case for speed
         BSONElement e = obj["_id"];
@@ -311,7 +311,7 @@ size_t BtreeKeyGenerator::PositionalPathInfo::getApproximateSize() const {
 void BtreeKeyGenerator::_getKeysWithoutArray(SharedBufferFragmentBuilder& pooledBufferBuilder,
                                              const BSONObj& obj,
                                              const CollatorInterface* collator,
-                                             boost::optional<RecordId> id,
+                                             const boost::optional<RecordId>& id,
                                              KeyStringSet* keys) const {
 
     KeyString::PooledBuilder keyString{pooledBufferBuilder, _keyStringVersion, _ordering};
@@ -351,7 +351,7 @@ void BtreeKeyGenerator::_getKeysWithArray(std::vector<const char*>* fieldNames,
                                           const std::vector<PositionalPathInfo>& positionalInfo,
                                           MultikeyPaths* multikeyPaths,
                                           const CollatorInterface* collator,
-                                          boost::optional<RecordId> id) const {
+                                          const boost::optional<RecordId>& id) const {
     BSONElement arrElt;
 
     // A set containing the position of any indexed fields in the key pattern that traverse through

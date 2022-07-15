@@ -34,6 +34,7 @@
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/debug_util.h"
 
 namespace mongo {
 namespace {
@@ -295,24 +296,24 @@ TEST(RecordId, RecordIdBigStr) {
 
     // This string should be just enough to qualify for the small string optimization.
     RecordId smallId(buf, RecordId::kSmallStrMaxSize);
-    ASSERT_FALSE(smallId.sharedBuffer().isShared());
+    ASSERT_TRUE(smallId.isInlineAllocated_forTest());
     ASSERT_EQ(smallId.getStr().size(), RecordId::kSmallStrMaxSize);
     ASSERT_EQ(sizeof(RecordId), smallId.memUsage());
 
     // At a certain size RecordId strings should expand beyond the size of the struct and start
-    // using a shared buffer.
+    // using a heap buffer.
     RecordId bigId(buf, RecordId::kSmallStrMaxSize + 1);
-    ASSERT_FALSE(bigId.sharedBuffer().isShared());
+    ASSERT_FALSE(bigId.isInlineAllocated_forTest());
     ASSERT_EQ(bigId.getStr().size(), RecordId::kSmallStrMaxSize + 1);
     ASSERT_EQ(sizeof(RecordId) + bigId.getStr().size(), bigId.memUsage());
     ASSERT_GT(bigId, smallId);
     ASSERT_LT(smallId, bigId);
 
-    // Once copied, this RecordId should be sharing its contents.
+    // Once copied, this RecordId should not be sharing its contents.
     RecordId bigCopy = bigId;
-    ASSERT_TRUE(bigId.sharedBuffer().isShared());
-    ASSERT_TRUE(bigCopy.sharedBuffer().isShared());
-    ASSERT_EQ(bigId.getStr().rawData(), bigCopy.getStr().rawData());
+    ASSERT_FALSE(bigId.isInlineAllocated_forTest());
+    ASSERT_FALSE(bigCopy.isInlineAllocated_forTest());
+    ASSERT_NE(bigId.getStr().rawData(), bigCopy.getStr().rawData());
     ASSERT_EQ(bigId.getStr().size(), bigCopy.getStr().size());
     ASSERT_EQ(sizeof(RecordId) + bigId.getStr().size(), bigCopy.memUsage());
 
@@ -328,9 +329,15 @@ TEST(RecordId, RecordIdBigStr) {
 
 // RecordIds of different formats may not be compared.
 DEATH_TEST(RecordId, UnsafeComparison, "Invariant failure") {
-    RecordId rid1(1);
-    RecordId rid2 = record_id_helpers::keyForOID(OID::createFromString("000000000000000000000001"));
-    ASSERT_NOT_EQUALS(rid1, rid2);
+    if (kDebugBuild) {
+        RecordId rid1(1);
+        RecordId rid2 =
+            record_id_helpers::keyForOID(OID::createFromString("000000000000000000000001"));
+        ASSERT_NOT_EQUALS(rid1, rid2);
+    } else {
+        // This test should not be run in release builds as the assertion won't be in there.
+        invariant(false, "Deliberately crash here so the test doesn't fail on release builds");
+    }
 }
 
 }  // namespace

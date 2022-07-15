@@ -368,7 +368,7 @@ Status EphemeralForTestRecordStore::doInsertRecords(OperationContext* opCtx,
                 extractAndCheckLocForOplog(lock, record->data.data(), record->data.size());
             if (!status.isOK())
                 return status.getStatus();
-            loc = status.getValue();
+            loc = std::move(status.getValue());
         } else {
             loc = allocateLoc(lock);
         }
@@ -377,7 +377,7 @@ Status EphemeralForTestRecordStore::doInsertRecords(OperationContext* opCtx,
         _data->records[loc] = rec;
         record->id = loc;
 
-        opCtx->recoveryUnit()->onRollback([this, loc]() {
+        opCtx->recoveryUnit()->onRollback([this, loc = std::move(loc)]() {
             stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
 
             Records::iterator it = _data->records.find(loc);
@@ -489,13 +489,13 @@ Status EphemeralForTestRecordStore::doTruncate(OperationContext* opCtx) {
 }
 
 void EphemeralForTestRecordStore::doCappedTruncateAfter(OperationContext* opCtx,
-                                                        RecordId end,
+                                                        const RecordId& end,
                                                         bool inclusive) {
     stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
     Records::iterator it =
         inclusive ? _data->records.lower_bound(end) : _data->records.upper_bound(end);
     while (it != _data->records.end()) {
-        RecordId id = it->first;
+        auto& id = it->first;
         EphemeralForTestRecord record = it->second;
 
         if (_cappedCallback) {

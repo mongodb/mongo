@@ -246,7 +246,7 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
             *out = Document{std::move(doc)};
         }
         if (dlOut && recordId) {
-            *dlOut = *recordId;
+            *dlOut = std::move(*recordId);
         }
         _stash.pop_front();
         return PlanExecutor::ExecState::ADVANCED;

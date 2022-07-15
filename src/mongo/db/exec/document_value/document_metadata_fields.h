@@ -302,7 +302,7 @@ public:
         }
 
         _holder->metaFields.set(MetaType::kRecordId);
-        _holder->recordId = rid;
+        _holder->recordId = std::move(rid);
     }
 
     bool hasSearchScoreDetails() const {

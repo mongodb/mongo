@@ -437,7 +437,7 @@ CollectionImpl::CollectionImpl(OperationContext* opCtx,
                                const CollectionOptions& options,
                                std::unique_ptr<RecordStore> recordStore)
     : _ns(nss),
-      _catalogId(catalogId),
+      _catalogId(std::move(catalogId)),
       _uuid(options.uuid.get()),
       _shared(std::make_shared<SharedState>(this, std::move(recordStore), options)),
       _indexCatalog(std::make_unique<IndexCatalogImpl>()) {}
@@ -447,7 +447,7 @@ CollectionImpl::CollectionImpl(OperationContext* opCtx,
                                RecordId catalogId,
                                std::shared_ptr<BSONCollectionCatalogEntry::MetaData> metadata,
                                std::unique_ptr<RecordStore> recordStore)
-    : CollectionImpl(opCtx, nss, catalogId, metadata->options, std::move(recordStore)) {
+    : CollectionImpl(opCtx, nss, std::move(catalogId), metadata->options, std::move(recordStore)) {
     _metadata = std::move(metadata);
 }
 
@@ -467,7 +467,8 @@ std::shared_ptr<Collection> CollectionImpl::FactoryImpl::make(
     RecordId catalogId,
     const CollectionOptions& options,
     std::unique_ptr<RecordStore> rs) const {
-    return std::make_shared<CollectionImpl>(opCtx, nss, catalogId, options, std::move(rs));
+    return std::make_shared<CollectionImpl>(
+        opCtx, nss, std::move(catalogId), options, std::move(rs));
 }
 
 std::shared_ptr<Collection> CollectionImpl::FactoryImpl::make(
@@ -477,7 +478,7 @@ std::shared_ptr<Collection> CollectionImpl::FactoryImpl::make(
     std::shared_ptr<BSONCollectionCatalogEntry::MetaData> metadata,
     std::unique_ptr<RecordStore> rs) const {
     return std::make_shared<CollectionImpl>(
-        opCtx, nss, catalogId, std::move(metadata), std::move(rs));
+        opCtx, nss, std::move(catalogId), std::move(metadata), std::move(rs));
 }
 
 std::shared_ptr<Collection> CollectionImpl::clone() const {
@@ -601,7 +602,7 @@ std::unique_ptr<SeekableRecordCursor> CollectionImpl::getCursor(OperationContext
 
 
 bool CollectionImpl::findDoc(OperationContext* opCtx,
-                             RecordId loc,
+                             const RecordId& loc,
                              Snapshotted<BSONObj>* out) const {
     RecordData rd;
     if (!_shared->_recordStore->findRecord(opCtx, loc, &rd))
@@ -1013,12 +1014,13 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
 
         if (MONGO_unlikely(corruptDocumentOnInsert.shouldFail())) {
             // Insert a truncated record that is half the expected size of the source document.
-            records.emplace_back(Record{recordId, RecordData(doc.objdata(), doc.objsize() / 2)});
+            records.emplace_back(
+                Record{std::move(recordId), RecordData(doc.objdata(), doc.objsize() / 2)});
             timestamps.emplace_back(it->oplogSlot.getTimestamp());
             continue;
         }
 
-        records.emplace_back(Record{recordId, RecordData(doc.objdata(), doc.objsize())});
+        records.emplace_back(Record{std::move(recordId), RecordData(doc.objdata(), doc.objsize())});
         timestamps.emplace_back(it->oplogSlot.getTimestamp());
     }
 
@@ -1036,8 +1038,9 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
             invariant(loc < RecordId::maxLong());
         }
 
-        BsonRecord bsonRecord = {loc, Timestamp(it->oplogSlot.getTimestamp()), &(it->doc)};
-        bsonRecords.push_back(bsonRecord);
+        BsonRecord bsonRecord = {
+            std::move(loc), Timestamp(it->oplogSlot.getTimestamp()), &(it->doc)};
+        bsonRecords.emplace_back(std::move(bsonRecord));
     }
 
     int64_t keysInserted = 0;
@@ -1207,7 +1210,7 @@ void CollectionImpl::_cappedDeleteAsNeeded(OperationContext* opCtx,
                                      &unusedKeysDeleted);
 
         // We're about to delete the record our cursor is positioned on, so advance the cursor.
-        RecordId toDelete = record->id;
+        RecordId toDelete = std::move(record->id);
         record = cursor->next();
 
         _shared->_recordStore->deleteRecord(opCtx, toDelete);
@@ -1218,15 +1221,16 @@ void CollectionImpl::_cappedDeleteAsNeeded(OperationContext* opCtx,
         if (!record) {
             _shared->_cappedFirstRecord = RecordId();
         } else {
-            _shared->_cappedFirstRecord = record->id;
+            _shared->_cappedFirstRecord = std::move(record->id);
         }
     } else {
         // Update the next record to be deleted. The next record must exist as we're using the same
         // snapshot the insert was performed on and we can't delete newly inserted records.
         invariant(record);
-        opCtx->recoveryUnit()->onCommit([this, recordId = record->id](boost::optional<Timestamp>) {
-            _shared->_cappedFirstRecord = recordId;
-        });
+        opCtx->recoveryUnit()->onCommit(
+            [this, recordId = std::move(record->id)](boost::optional<Timestamp>) {
+                _shared->_cappedFirstRecord = std::move(recordId);
+            });
     }
 
     wuow.commit();
@@ -1270,7 +1274,7 @@ Status CollectionImpl::SharedState::aboutToDeleteCapped(OperationContext* opCtx,
 
 void CollectionImpl::deleteDocument(OperationContext* opCtx,
                                     StmtId stmtId,
-                                    RecordId loc,
+                                    const RecordId& loc,
                                     OpDebug* opDebug,
                                     bool fromMigrate,
                                     bool noWarn,
@@ -1284,7 +1288,7 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
 void CollectionImpl::deleteDocument(OperationContext* opCtx,
                                     Snapshotted<BSONObj> doc,
                                     StmtId stmtId,
-                                    RecordId loc,
+                                    const RecordId& loc,
                                     OpDebug* opDebug,
                                     bool fromMigrate,
                                     bool noWarn,
@@ -1369,7 +1373,7 @@ bool compareSafeContentElem(const BSONObj& oldDoc, const BSONObj& newDoc) {
 }
 
 RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
-                                        RecordId oldLocation,
+                                        const RecordId& oldLocation,
                                         const Snapshotted<BSONObj>& oldDoc,
                                         const BSONObj& newDoc,
                                         bool indexesAffected,
@@ -1513,7 +1517,7 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
 
     getGlobalServiceContext()->getOpObserver()->onUpdate(opCtx, onUpdateArgs);
 
-    return {oldLocation};
+    return oldLocation;
 }
 
 bool CollectionImpl::updateWithDamagesSupported() const {
@@ -1525,7 +1529,7 @@ bool CollectionImpl::updateWithDamagesSupported() const {
 
 StatusWith<RecordData> CollectionImpl::updateDocumentWithDamages(
     OperationContext* opCtx,
-    RecordId loc,
+    const RecordId& loc,
     const Snapshotted<RecordData>& oldRec,
     const char* damageSource,
     const mutablebson::DamageVector& damages,
@@ -1833,7 +1837,7 @@ Status CollectionImpl::truncate(OperationContext* opCtx) {
 }
 
 void CollectionImpl::cappedTruncateAfter(OperationContext* opCtx,
-                                         RecordId end,
+                                         const RecordId& end,
                                          bool inclusive) const {
     dassert(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_X));
     invariant(isCapped());
@@ -2037,7 +2041,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CollectionImpl::makePlanExe
     const CollectionPtr& yieldableCollection,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     ScanDirection scanDirection,
-    boost::optional<RecordId> resumeAfterRecordId) const {
+    const boost::optional<RecordId>& resumeAfterRecordId) const {
     auto isForward = scanDirection == ScanDirection::kForward;
     auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
     return InternalPlanner::collectionScan(

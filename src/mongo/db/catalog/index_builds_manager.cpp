@@ -124,10 +124,11 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status IndexBuildsManager::startBuildingIndex(OperationContext* opCtx,
-                                              const CollectionPtr& collection,
-                                              const UUID& buildUUID,
-                                              boost::optional<RecordId> resumeAfterRecordId) {
+Status IndexBuildsManager::startBuildingIndex(
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    const UUID& buildUUID,
+    const boost::optional<RecordId>& resumeAfterRecordId) {
     auto builder = invariant(_getBuilder(buildUUID));
 
     return builder->insertAllDocumentsInCollection(opCtx, collection, resumeAfterRecordId);
@@ -171,7 +172,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
             }
             WriteUnitOfWork wunit(opCtx);
             for (int i = 0; record && i < internalInsertMaxBatchSize.load(); i++) {
-                RecordId id = record->id;
+                auto& id = record->id;
                 RecordData& data = record->data;
                 // We retain decimal data when repairing database even if decimal is disabled.
                 auto validStatus = validateBSON(data.data(), data.size());

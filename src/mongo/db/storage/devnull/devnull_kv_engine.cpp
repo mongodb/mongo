@@ -146,7 +146,9 @@ public:
         return Status::OK();
     }
 
-    void doCappedTruncateAfter(OperationContext* opCtx, RecordId end, bool inclusive) override {}
+    void doCappedTruncateAfter(OperationContext* opCtx,
+                               const RecordId& end,
+                               bool inclusive) override {}
 
     virtual void appendNumericCustomStats(OperationContext* opCtx,
                                           BSONObjBuilder* result,

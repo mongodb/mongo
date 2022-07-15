@@ -84,7 +84,7 @@ public:
                  KeyStringSet* keys,
                  MultikeyPaths* multikeyPaths,
                  const CollatorInterface* collator = nullptr,
-                 boost::optional<RecordId> id = boost::none) const;
+                 const boost::optional<RecordId>& id = boost::none) const;
 
     size_t getApproximateSize() const;
 
@@ -157,7 +157,7 @@ private:
                            const std::vector<PositionalPathInfo>& positionalInfo,
                            MultikeyPaths* multikeyPaths,
                            const CollatorInterface* collator,
-                           boost::optional<RecordId> id) const;
+                           const boost::optional<RecordId>& id) const;
 
     /**
      * An optimized version of the key generation algorithm to be used when it is known that 'obj'
@@ -166,7 +166,7 @@ private:
     void _getKeysWithoutArray(SharedBufferFragmentBuilder& pooledBufferBuilder,
                               const BSONObj& obj,
                               const CollatorInterface* collator,
-                              boost::optional<RecordId> id,
+                              const boost::optional<RecordId>& id,
                               KeyStringSet* keys) const;
 
     /**
@@ -228,7 +228,7 @@ private:
                              const std::vector<PositionalPathInfo>& positionalInfo,
                              MultikeyPaths* multikeyPaths,
                              const CollatorInterface* collator,
-                             boost::optional<RecordId> id) const;
+                             const boost::optional<RecordId>& id) const;
 
     KeyString::Value _buildNullKeyString() const;
 

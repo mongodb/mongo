@@ -60,7 +60,7 @@ public:
     struct Entry {
         Entry() {}
         Entry(RecordId catalogId, std::string ident, NamespaceString nss)
-            : catalogId(catalogId), ident(std::move(ident)), nss(std::move(nss)) {}
+            : catalogId(std::move(catalogId)), ident(std::move(ident)), nss(std::move(nss)) {}
         RecordId catalogId;
         std::string ident;
         NamespaceString nss;
@@ -87,18 +87,19 @@ public:
 
     virtual std::vector<Entry> getAllCatalogEntries(OperationContext* opCtx) const = 0;
 
-    virtual Entry getEntry(RecordId catalogId) const = 0;
+    virtual Entry getEntry(const RecordId& catalogId) const = 0;
 
     virtual std::string getIndexIdent(OperationContext* opCtx,
-                                      RecordId id,
+                                      const RecordId& id,
                                       StringData idxName) const = 0;
 
-    virtual std::vector<std::string> getIndexIdents(OperationContext* opCtx, RecordId id) const = 0;
+    virtual std::vector<std::string> getIndexIdents(OperationContext* opCtx,
+                                                    const RecordId& id) const = 0;
 
-    virtual BSONObj getCatalogEntry(OperationContext* opCtx, RecordId catalogId) const = 0;
+    virtual BSONObj getCatalogEntry(OperationContext* opCtx, const RecordId& catalogId) const = 0;
 
     virtual std::shared_ptr<BSONCollectionCatalogEntry::MetaData> getMetaData(
-        OperationContext* opCtx, RecordId id) const = 0;
+        OperationContext* opCtx, const RecordId& id) const = 0;
 
     /**
      * Updates the catalog entry for the collection 'nss' with the fields specified in 'md'. If
@@ -106,7 +107,7 @@ public:
      * adds it to the catalog entry.
      */
     virtual void putMetaData(OperationContext* opCtx,
-                             RecordId id,
+                             const RecordId& id,
                              BSONCollectionCatalogEntry::MetaData& md) = 0;
 
     virtual std::vector<std::string> getAllIdents(OperationContext* opCtx) const = 0;
@@ -152,7 +153,7 @@ public:
         bool allocateDefaultSpace) = 0;
 
     virtual Status createIndex(OperationContext* opCtx,
-                               RecordId catalogId,
+                               const RecordId& catalogId,
                                const NamespaceString& nss,
                                const CollectionOptions& collOptions,
                                const IndexDescriptor* spec) = 0;
@@ -174,7 +175,7 @@ public:
      */
     struct ImportResult {
         ImportResult(RecordId catalogId, std::unique_ptr<RecordStore> rs, UUID uuid)
-            : catalogId(catalogId), rs(std::move(rs)), uuid(uuid) {}
+            : catalogId(std::move(catalogId)), rs(std::move(rs)), uuid(uuid) {}
         RecordId catalogId;
         std::unique_ptr<RecordStore> rs;
         UUID uuid;
@@ -187,7 +188,7 @@ public:
                                                       const ImportOptions& importOptions) = 0;
 
     virtual Status renameCollection(OperationContext* opCtx,
-                                    RecordId catalogId,
+                                    const RecordId& catalogId,
                                     const NamespaceString& toNss,
                                     BSONCollectionCatalogEntry::MetaData& md) = 0;
 
@@ -197,7 +198,7 @@ public:
      * Expects (invariants) that all of the index catalog entries have been removed already via
      * removeIndex.
      */
-    virtual Status dropCollection(OperationContext* opCtx, RecordId catalogId) = 0;
+    virtual Status dropCollection(OperationContext* opCtx, const RecordId& catalogId) = 0;
 
     /**
      * Drops the provided ident and recreates it as empty for use in resuming an index build.
@@ -208,14 +209,14 @@ public:
                                                       const IndexDescriptor* spec,
                                                       StringData ident) = 0;
 
-    virtual int getTotalIndexCount(OperationContext* opCtx, RecordId catalogId) const = 0;
+    virtual int getTotalIndexCount(OperationContext* opCtx, const RecordId& catalogId) const = 0;
 
     virtual bool isIndexPresent(OperationContext* opCtx,
-                                RecordId catalogId,
+                                const RecordId& catalogId,
                                 StringData indexName) const = 0;
 
     virtual bool isIndexReady(OperationContext* opCtx,
-                              RecordId catalogId,
+                              const RecordId& catalogId,
                               StringData indexName) const = 0;
 
     /**
@@ -230,7 +231,7 @@ public:
      * number of elements in the index key pattern of empty sets.
      */
     virtual bool isIndexMultikey(OperationContext* opCtx,
-                                 RecordId catalogId,
+                                 const RecordId& catalogId,
                                  StringData indexName,
                                  MultikeyPaths* multikeyPaths) const = 0;
 

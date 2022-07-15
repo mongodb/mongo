@@ -339,7 +339,7 @@ string readInvertedCStringWithNuls(BufReader* reader) {
 }  // namespace
 
 template <class BufferT>
-void BuilderBase<BufferT>::resetToKey(const BSONObj& obj, Ordering ord, RecordId recordId) {
+void BuilderBase<BufferT>::resetToKey(const BSONObj& obj, Ordering ord, const RecordId& recordId) {
     resetToEmpty(ord);
     _appendAllElementsForIndexing(obj, Discriminator::kInclusive);
     appendRecordId(recordId);
@@ -551,7 +551,7 @@ void BuilderBase<BufferT>::_appendAllElementsForIndexing(const BSONObj& obj,
 }
 
 template <class BufferT>
-void BuilderBase<BufferT>::appendRecordId(RecordId loc) {
+void BuilderBase<BufferT>::appendRecordId(const RecordId& loc) {
     _doneAppending();
     _transition(BuildState::kAppendedRecordID);
     loc.withFormat([](RecordId::Null n) { invariant(false); },

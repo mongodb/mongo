@@ -33,8 +33,10 @@
 #include <boost/optional.hpp>
 #include <climits>
 #include <cstdint>
+#include <cstring>
 #include <fmt/format.h>
 #include <ostream>
+#include <type_traits>
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
@@ -44,14 +46,27 @@
 
 namespace mongo {
 
+namespace details {
+class RecordIdChecks;
+}
+
 /**
  * The key that uniquely identifies a Record in a Collection or RecordStore.
  */
-class RecordId {
+#pragma pack(push, 1)
+class alignas(int64_t) RecordId {
+    // The alignas is necessary in order to comply with memory alignment. Internally we're using
+    // 8-byte aligned data members (int64_t / char *) but as we're packing the structure the
+    // compiler will set the alignment to 1 due to the pragma so we must correct its alignment
+    // information for users of the class.
+
+    // Class used for static assertions that can only happen when RecordId is completely defined.
+    friend class details::RecordIdChecks;
+
 public:
     // This set of constants define the boundaries of the 'normal' id ranges for the int64_t format.
-    static constexpr int64_t kMinRepr = LLONG_MIN;
-    static constexpr int64_t kMaxRepr = LLONG_MAX;
+    static constexpr int64_t kMinRepr = std::numeric_limits<int64_t>::min();
+    static constexpr int64_t kMaxRepr = std::numeric_limits<int64_t>::max();
 
     // A RecordId binary string cannot be larger than this arbitrary size. RecordIds get written to
     // the key and the value in WiredTiger, so we should avoid large strings.
@@ -73,15 +88,58 @@ public:
         return RecordId(kMaxRepr);
     }
 
-    RecordId() = default;
+    RecordId() : _format(Format::kNull){};
+
+    ~RecordId() {
+        if (_format == Format::kBigStr) {
+            free(_data.heapStr.stringPtr);
+        }
+    }
+
+    RecordId(RecordId&& other) {
+        std::memcpy(this, &other, sizeof(RecordId));
+        other._format = Format::kNull;
+    };
+
+    RecordId(const RecordId& other) {
+        std::memcpy(this, &other, sizeof(RecordId));
+        if (other._format == Format::kBigStr) {
+            auto ptr = (char*)mongoMalloc(other._data.heapStr.size);
+            std::memcpy(ptr, other._data.heapStr.stringPtr, other._data.heapStr.size);
+            _data.heapStr.stringPtr = ptr;
+        }
+    };
+
+    RecordId& operator=(const RecordId& other) {
+        if (_format == Format::kBigStr) {
+            free(_data.heapStr.stringPtr);
+        }
+        std::memcpy(this, &other, sizeof(RecordId));
+        if (other._format == Format::kBigStr) {
+            auto ptr = (char*)mongoMalloc(other._data.heapStr.size);
+            std::memcpy(ptr, other._data.heapStr.stringPtr, other._data.heapStr.size);
+            _data.heapStr.stringPtr = ptr;
+        }
+        return *this;
+    };
+
+
+    RecordId& operator=(RecordId&& other) {
+        if (_format == Format::kBigStr) {
+            free(_data.heapStr.stringPtr);
+        }
+        std::memcpy(this, &other, sizeof(RecordId));
+        other._format = Format::kNull;
+        return *this;
+    }
 
     /**
      * Construct a RecordId that holds an int64_t. The raw value for RecordStore storage may be
      * retrieved using getLong().
      */
     explicit RecordId(int64_t s) {
-        memcpy(_buffer, &s, sizeof(s));
         _format = Format::kLong;
+        _data.longId.id = s;
     }
 
     /**
@@ -90,21 +148,20 @@ public:
      */
     explicit RecordId(const char* str, int32_t size) {
         invariant(size > 0, "key size must be greater than 0");
+        uassert(
+            5894900,
+            fmt::format("Size of RecordId ({}) is above limit of {} bytes", size, kBigStrMaxSize),
+            size <= kBigStrMaxSize);
         if (size <= kSmallStrMaxSize) {
             _format = Format::kSmallStr;
-            // Must fit into the buffer minus 1 byte for size.
-            _buffer[0] = static_cast<uint8_t>(size);
-            memcpy(_buffer + 1, str, size);
-        } else if (size <= kBigStrMaxSize) {
-            _format = Format::kBigStr;
-            auto sharedBuf = SharedBuffer::allocate(size);
-            memcpy(sharedBuf.get(), str, size);
-            _sharedBuffer = std::move(sharedBuf);
+            _data.inlineStr.size = static_cast<uint8_t>(size);
+            std::memcpy(_data.inlineStr.dataArr.data(), str, size);
         } else {
-            uasserted(5894900,
-                      fmt::format("Size of RecordId ({}) is above limit of {} bytes",
-                                  size,
-                                  kBigStrMaxSize));
+            _format = Format::kBigStr;
+            _data.heapStr.size = size;
+            auto ptr = (char*)mongoMalloc(size);
+            _data.heapStr.stringPtr = ptr;
+            std::memcpy(ptr, str, size);
         }
     }
 
@@ -159,8 +216,8 @@ public:
         if (_format == Format::kNull) {
             return 0;
         }
-        invariant(isLong(),
-                  fmt::format("expected RecordID long format, got: {}", _formatToString(_format)));
+        dassert(isLong(),
+                fmt::format("expected RecordID long format, got: {}", _formatToString(_format)));
         return _getLongNoCheck();
     }
 
@@ -169,20 +226,13 @@ public:
      * constructed with a binary string value, and invariants otherwise.
      */
     StringData getStr() const {
-        invariant(
-            isStr(),
-            fmt::format("expected RecordID string format, got: {}", _formatToString(_format)));
+        dassert(isStr(),
+                fmt::format("expected RecordID string format, got: {}", _formatToString(_format)));
         if (_format == Format::kSmallStr) {
             return _getSmallStrNoCheck();
-        } else if (_format == Format::kBigStr) {
+        } else {
             return _getBigStrNoCheck();
         }
-        MONGO_UNREACHABLE;
-    }
-
-    // If this RecordId is holding a large string, returns the ConstSharedBuffer holding it.
-    const ConstSharedBuffer& sharedBuffer() const {
-        return _sharedBuffer;
     }
 
     /**
@@ -194,6 +244,15 @@ public:
             return getLong() == 0;
         }
         return _format == Format::kNull;
+    }
+
+    /**
+     * Returns whether the data for the RecordId is completely stored inline (within the class
+     * memory allocation). The only cases where this won't be true is when the RecordId contains a
+     * large key string that cannot be allocated inline completely.
+     */
+    bool isInlineAllocated_forTest() {
+        return _format != Format::kBigStr;
     }
 
     /**
@@ -216,13 +275,14 @@ public:
         switch (_format) {
             case Format::kNull:
                 return rhs._format == Format::kNull ? 0 : -1;
-            case Format::kLong:
+            case Format::kLong: {
                 if (rhs._format == Format::kNull) {
                     return 1;
                 }
-                return _getLongNoCheck() == rhs.getLong()
-                    ? 0
-                    : (_getLongNoCheck() > rhs.getLong()) ? 1 : -1;
+                auto ourId = _getLongNoCheck();
+                auto rhsId = rhs.getLong();
+                return ourId == rhsId ? 0 : (ourId > rhsId) ? 1 : -1;
+            }
             case Format::kSmallStr:
                 if (rhs._format == Format::kNull) {
                     return 1;
@@ -255,11 +315,12 @@ public:
     }
 
     /**
-     * Returns the total amount of memory used by this RecordId, including itself and any shared
+     * Returns the total amount of memory used by this RecordId, including itself and any heap
      * buffers.
      */
     size_t memUsage() const {
-        return sizeof(RecordId) + _sharedBuffer.capacity();
+        size_t largeStrSize = (_format == Format::kBigStr) ? _data.heapStr.size : 0;
+        return sizeof(RecordId) + largeStrSize;
     }
 
     /**
@@ -321,7 +382,7 @@ public:
      * Decode a token created by serializeToken().
      */
     static RecordId deserializeToken(BufReader& buf) {
-        auto format = buf.read<Format>();
+        auto format = static_cast<Format>(buf.read<char>());
         if (format == Format::kNull) {
             return RecordId();
         } else if (format == Format::kLong) {
@@ -341,34 +402,33 @@ public:
      * This maximum size for 'small' strings was chosen as a good tradeoff between keeping the
      * RecordId struct lightweight to copy by value (32 bytes), but also making the struct large
      * enough to hold a wider variety of strings. Larger strings must be stored in the
-     * ConstSharedBuffer, which requires an extra memory allocation and is reference counted, which
-     * makes it more expensive to copy.
+     * heap, which requires an extra memory allocation and makes it more expensive to copy.
      */
-    enum { kSmallStrMaxSize = 22 };
+    static constexpr auto kSmallStrMaxSize = 30;
 
 private:
     /**
      * Format specifies the in-memory representation of this RecordId. This does not represent any
      * durable storage format.
      */
-    enum Format : int8_t {
+    enum Format : uint8_t {
         /* Uninitialized and contains no value */
         kNull,
         /**
-         * Stores an integer. The first 8 bytes of '_buffer' encode the value in machine-endian
-         * order. The RecordId may only be accessed using getLong().
+         * Stores an integer. Data is stored in '_data.longId.id'. The RecordId may only be accessed
+         * using getLong().
          */
         kLong,
         /**
-         * Stores a variable-length binary string smaller than kSmallStrMaxSize. The first byte of
-         * '_buffer' encodes the length and the remaining bytes store the string. This RecordId may
-         * only be accessed using getStr().
+         * Stores a variable-length binary string smaller than kSmallStrMaxSize. Data is stored in
+         * the InlineStr struct at '_data.inlineStr'. This RecordId may only be accessed using
+         * getStr().
          */
         kSmallStr,
         /**
          * Stores a variable-length binary string larger than kSmallStrMaxSize. The value is stored
-         * in a reference-counted buffer, '_sharedBuffer'. This RecordId may only be accessed using
-         * getStr().
+         * in a heap buffer '_data.heapStr.stringPtr' with its size stored in '_data.heapStr.size'.
+         * This RecordId may only be accessed using getStr().
          */
         kBigStr
     };
@@ -388,36 +448,63 @@ private:
     }
 
     int64_t _getLongNoCheck() const {
-        int64_t val;
-        memcpy(&val, _buffer, sizeof(val));
-        return val;
+        return _data.longId.id;
     }
 
     StringData _getSmallStrNoCheck() const {
-        char size = _buffer[0];
-        invariant(size > 0);
-        invariant(size <= kSmallStrMaxSize);
-        return StringData(_buffer + 1, size);
+        return StringData(_data.inlineStr.dataArr.data(), _data.inlineStr.size);
     }
 
     StringData _getBigStrNoCheck() const {
-        // We use a ConstSharedBuffer that is only allocated once and assume the string size is
-        // just the originally allocated capacity.
-        size_t size = _sharedBuffer.capacity();
-        invariant(size > kSmallStrMaxSize);
-        invariant(size <= kBigStrMaxSize);
-        return StringData(_sharedBuffer.get(), size);
+        return StringData(_data.heapStr.stringPtr, _data.heapStr.size);
     }
 
-    Format _format = Format::kNull;
-    // An extra byte of space is required to store the size for the
-    // kSmallStr Format. Zero the buffer so we don't need to write
-    // explicit lifecycle methods that avoid copying from
-    // uninitialized portions of the buffer.
-    char _buffer[kSmallStrMaxSize + 1] = {};
-    // Used only for the kBigStr Format.
-    ConstSharedBuffer _sharedBuffer;
+    static constexpr auto kTargetSizeInBytes = 32;
+    // In the usual case we would store the data as Format followed by a struct union of the
+    // InlineString (size + array), HeapStr (size + ptr), and LongId (int64_t). This however leaves
+    // 7 bytes unused for pading if Format is 1 byte and 4 if it is 4 bytes (x86) due to data
+    // alignment requirements of the union. To avoid this we manually perform memory padding in the
+    // structs of the union coupled with packing the class so that all items align properly.
+    Format _format;  // offset = 0, size = 1
+    static_assert(sizeof(Format) == 1);
+    // All of this will work if and only if char size is 1 (std::byte) for the InlineString.
+    static_assert(sizeof(std::byte) == sizeof(char));
+    // Offsets/padding will be computed in respect to the whole class by taking into account the
+    // Format data member.
+    struct HeapStr {
+        std::byte _padding[std::alignment_of_v<uint32_t> - sizeof(Format)];  // offset = 1, size = 3
+        uint32_t size;  // offset = 1 + 3, size = 4
+        static constexpr auto ptrPaddingBytes =
+            std::alignment_of_v<char*> - sizeof(Format) - sizeof(_padding) - sizeof(size);
+        static_assert(ptrPaddingBytes == 0,
+                      "No padding should be necessary between the size and pointer of HeapStr");
+        char* stringPtr;  // offset = 1 + 3 + 4, size = 8
+    };
+    struct InlineStr {
+        uint8_t size;  // offset = 1, size = 1
+        std::array<char, kTargetSizeInBytes - sizeof(Format) - sizeof(size)>
+            dataArr;  // offset = 1 + 1, size = 30
+    };
+    struct LongId {
+        std::byte _padding[std::alignment_of_v<int64_t> - sizeof(Format)];  // offset = 1, size = 7
+        int64_t id;  // offset = 1 + 7, size = 8
+    };
+    union Content {
+        HeapStr heapStr;
+        InlineStr inlineStr;
+        LongId longId;
+    };
+    Content _data;  // offset = 1, size = 31
 };
+#pragma pack(pop)
+
+namespace details {
+// Various assertions of RecordId that can only happen when the type is completely defined.
+class RecordIdChecks {
+    static_assert(sizeof(RecordId) == RecordId::kTargetSizeInBytes);
+    static_assert(std::alignment_of_v<RecordId> == std::alignment_of_v<int64_t>);
+};
+}  // namespace details
 
 inline bool operator==(const RecordId& lhs, const RecordId& rhs) {
     return lhs.compare(rhs) == 0;

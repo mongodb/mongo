@@ -67,7 +67,7 @@ private:
                    KeyStringSet* keys,
                    KeyStringSet* multikeyMetadataKeys,
                    MultikeyPaths* multikeyPaths,
-                   boost::optional<RecordId> id) const final;
+                   const boost::optional<RecordId>& id) const final;
 
     BSONObj _keyPattern;
 

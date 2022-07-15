@@ -125,7 +125,7 @@ void S2BucketAccessMethod::doGetKeys(OperationContext* opCtx,
                                      KeyStringSet* keys,
                                      KeyStringSet* multikeyMetadataKeys,
                                      MultikeyPaths* multikeyPaths,
-                                     boost::optional<RecordId> id) const {
+                                     const boost::optional<RecordId>& id) const {
     ExpressionKeysPrivate::getS2Keys(pooledBufferBuilder,
                                      obj,
                                      _descriptor->keyPattern(),

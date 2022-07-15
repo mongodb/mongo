@@ -41,7 +41,7 @@ namespace index_repair {
 StatusWith<int> moveRecordToLostAndFound(OperationContext* opCtx,
                                          const NamespaceString& nss,
                                          const NamespaceString& lostAndFoundNss,
-                                         RecordId dupRecord) {
+                                         const RecordId& dupRecord) {
     AutoGetCollection autoColl(opCtx, lostAndFoundNss, MODE_IX);
     auto catalog = CollectionCatalog::get(opCtx);
     auto originalCollection = catalog->lookupCollectionByNamespace(opCtx, nss);
