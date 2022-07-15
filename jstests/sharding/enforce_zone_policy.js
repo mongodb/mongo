@@ -39,7 +39,7 @@ function assertBalanceCompleteAndStable(checkFunc, stepName) {
 
     assert.soon(checkFunc, 'Balance at step ' + stepName + ' did not happen', 3 * 60 * 1000, 2000);
 
-    st.waitForBalancer(true, 60000);
+    st.awaitBalancerRound();
     st.printShardingStatus(true);
     assert(checkFunc());
 

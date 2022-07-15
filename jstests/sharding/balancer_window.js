@@ -78,7 +78,7 @@ assert.commandWorked(
                              true));
 st.startBalancer();
 
-st.waitForBalancer(true, 60000);
+st.awaitBalancerRound();
 
 var shard0ChunksAfter =
     findChunksUtil.findChunksByNs(configDB, ns, {shard: st.shard0.shardName}).count();
@@ -93,7 +93,7 @@ assert.commandWorked(configDB.settings.update(
     },
     true));
 
-st.waitForBalancer(true, 60000);
+st.awaitBalancerRound();
 
 shard0ChunksAfter =
     findChunksUtil.findChunksByNs(configDB, ns, {shard: st.shard0.shardName}).count();
