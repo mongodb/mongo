@@ -56,6 +56,8 @@ protected:
 
     using EraCountMap = stdx::unordered_map<uint64_t, uint64_t>;
 
+    using ShouldClearFn = std::function<bool(const NamespaceString&)>;
+
     struct BucketHandle {
         const OID id;
         const StripeNumber stripe;
@@ -351,7 +353,7 @@ public:
     /**
      * Clears any bucket whose namespace satisfies the predicate.
      */
-    void clear(const std::function<bool(const NamespaceString&)>& shouldClear);
+    void clear(ShouldClearFn&& shouldClear);
 
     /**
      * Clears the buckets for the given namespace.
@@ -529,12 +531,26 @@ protected:
     public:
         EraManager(Mutex* m);
         uint64_t getEra();
-        void incrementEra();
+        uint64_t incrementEra();
         uint64_t getEraAndIncrementCount();
         void decrementCountForEra(uint64_t value);
         uint64_t getCountForEra(uint64_t value);
 
+        // Records a clear operation in the clearRegistry. The key is the new era after the clear
+        // operation has occurred, and the value is a function which takes a namespace and returns
+        // whether this namespace should be cleared.
+        void insertToRegistry(uint64_t era,
+                              std::function<bool(const NamespaceString&)>&& shouldClear);
+
+        // Returns whether the Bucket has been marked as cleared by checking against the
+        // clearRegistry. Advances Bucket's era up to current global era if the bucket has not been
+        // cleared.
+        bool hasBeenCleared(Bucket* bucket);
+
     private:
+        void _decrementEraCountHelper(uint64_t era);
+        void _incrementEraCountHelper(uint64_t era);
+
         // Pointer to 'BucketCatalog::_mutex'.
         Mutex* _mutex;
 
@@ -544,6 +560,10 @@ protected:
 
         // Mapping of era to counts of how many buckets are associated with that era.
         EraCountMap _countMap;
+
+        // Registry storing clear operations. Maps from era to a lambda function which takes in
+        // information about a Bucket and returns whether the Bucket has been cleared.
+        std::map<uint64_t, ShouldClearFn> _clearRegistry;
     };
 
     /**
@@ -560,7 +580,9 @@ protected:
 
         ~Bucket();
 
-        uint64_t era() const;
+        uint64_t getEra() const;
+
+        void setEra(uint64_t era);
 
         /**
          * Returns the ID for the underlying bucket.
