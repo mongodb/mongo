@@ -9,7 +9,6 @@
  *   # test suite that turns journaling off.
  *   requires_replication,
  *   requires_fcv_60,
- *   featureFlagChangeStreamPreAndPostImages,
  * ]
  */
 

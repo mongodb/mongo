@@ -3,7 +3,6 @@
 // periodic job.
 // @tags: [
 //  requires_fcv_60,
-//  featureFlagChangeStreamPreAndPostImages,
 //  assumes_against_mongod_not_mongos,
 //  change_stream_does_not_expect_txns,
 //  requires_replication,

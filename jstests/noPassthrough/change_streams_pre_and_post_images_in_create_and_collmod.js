@@ -4,7 +4,6 @@
  * 'config' databases as well as on view collections.
  * @tags: [
  * requires_fcv_60,
- * featureFlagChangeStreamPreAndPostImages,
  * requires_replication,
  * ]
  */

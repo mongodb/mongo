@@ -85,15 +85,6 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamAddPostImage::doGetNext(
         return input;
     }
 
-    // TODO SERVER-58584: remove the feature flag.
-    if (_fullDocumentMode != FullDocumentModeEnum::kUpdateLookup) {
-        tassert(5869000,
-                str::stream() << "Feature flag must be enabled for fullDocument: "
-                              << FullDocumentMode_serializer(_fullDocumentMode),
-                feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabled(
-                    serverGlobalParams.featureCompatibility));
-    }
-
     // Create a mutable output document from the input document.
     MutableDocument output(input.releaseDocument());
     const auto postImageDoc = (_fullDocumentMode == FullDocumentModeEnum::kUpdateLookup

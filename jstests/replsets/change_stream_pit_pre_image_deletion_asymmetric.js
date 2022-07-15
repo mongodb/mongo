@@ -5,7 +5,6 @@
  *
  * @tags: [
  * requires_fcv_60,
- * featureFlagChangeStreamPreAndPostImages,
  * ]
  */
 (function() {

@@ -439,9 +439,7 @@ void CollectionOptions::appendBSON(BSONObjBuilder* builder,
         builder->appendBool(CreateCommand::kRecordPreImagesFieldName, true);
     }
 
-    // TODO SERVER-58584: remove the feature flag.
-    if (feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabledAndIgnoreFCV() &&
-        changeStreamPreAndPostImagesOptions.getEnabled() &&
+    if (changeStreamPreAndPostImagesOptions.getEnabled() &&
         shouldAppend(CreateCommand::kChangeStreamPreAndPostImagesFieldName)) {
         builder->append(CreateCommand::kChangeStreamPreAndPostImagesFieldName,
                         changeStreamPreAndPostImagesOptions.toBSON());

@@ -317,19 +317,11 @@ public:
             const auto isChangeStreamPreAndPostImagesEnabled =
                 (cmd.getChangeStreamPreAndPostImages() &&
                  cmd.getChangeStreamPreAndPostImages()->getEnabled());
-
-            if (feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
-                const auto isRecordPreImagesEnabled = cmd.getRecordPreImages().get_value_or(false);
-                uassert(ErrorCodes::InvalidOptions,
-                        "'recordPreImages' and 'changeStreamPreAndPostImages.enabled' can not be "
-                        "set to true simultaneously",
-                        !(isChangeStreamPreAndPostImagesEnabled && isRecordPreImagesEnabled));
-            } else {
-                uassert(ErrorCodes::InvalidOptions,
-                        "BSON field 'changeStreamPreAndPostImages' is an unknown field.",
-                        !cmd.getChangeStreamPreAndPostImages().has_value());
-            }
+            const auto isRecordPreImagesEnabled = cmd.getRecordPreImages().get_value_or(false);
+            uassert(ErrorCodes::InvalidOptions,
+                    "'recordPreImages' and 'changeStreamPreAndPostImages.enabled' can not be "
+                    "set to true simultaneously",
+                    !(isChangeStreamPreAndPostImagesEnabled && isRecordPreImagesEnabled));
 
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
                 unsafeCreateCollection(opCtx);

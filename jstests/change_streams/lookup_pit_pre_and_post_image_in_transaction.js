@@ -3,15 +3,13 @@
  * performed in a transaction and non-atomic "applyOps" command.
  * @tags: [
  * requires_fcv_60,
- * featureFlagChangeStreamPreAndPostImages,
  * uses_transactions,
  * ]
  */
 (function() {
 "use strict";
 
-load("jstests/libs/change_stream_util.js");        // For isChangeStreamPreAndPostImagesEnabled and
-                                                   // ChangeStreamTest.
+load("jstests/libs/change_stream_util.js");        // For ChangeStreamTest.
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
 load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.isMongos.
 load("jstests/libs/transactions_util.js");         // For TransactionsUtil.runInTransaction.

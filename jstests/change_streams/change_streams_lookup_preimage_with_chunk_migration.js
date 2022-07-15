@@ -4,7 +4,6 @@
  *
  *  @tags: [
  *    requires_fcv_60,
- *    featureFlagChangeStreamPreAndPostImages,
  *    requires_sharding,
  *    uses_change_streams,
  *    change_stream_does_not_expect_txns,

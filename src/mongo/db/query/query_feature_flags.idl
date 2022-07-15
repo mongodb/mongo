@@ -48,11 +48,10 @@ feature_flags:
       default: true
       version: 5.1
 
-    featureFlagChangeStreamPreAndPostImages:
-      description: "Feature flag for allowing usage of point-in-time pre- and post-images of documents in change streams"
-      cpp_varname: gFeatureFlagChangeStreamPreAndPostImages
-      default: true
-      version: 6.0
+    featureFlagSbePlanCache:
+      description: "Feature flag for enabling use of the SBE plan cache"
+      cpp_varname: gFeatureFlagSbePlanCache
+      default: false
 
     featureFlagChangeStreamsFurtherEnrichedEvents:
       description: "Feature flag for enabling the reshardCollection and refineCollectionShardKey events, as well as enhancements to the updateDescription field for update events"
@@ -65,7 +64,7 @@ feature_flags:
         cpp_varname: gFeatureFlagLocf
         default: true
         version: 5.2
-        
+
     featureFlagCommonQueryFramework:
       description: "Feature flag for allowing use of Cascades-based query optimizer"
       cpp_varname: gFeatureFlagCommonQueryFramework

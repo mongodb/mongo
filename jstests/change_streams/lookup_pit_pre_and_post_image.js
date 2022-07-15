@@ -1,29 +1,12 @@
 // Tests that the point-in-time pre- and post-images are loaded correctly in $changeStream running
 // with different arguments for collections with 'changeStreamPreAndPostImages' being enabled.
-// @tags: [
-//   requires_fcv_52,
-// ]
 (function() {
 "use strict";
 
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
-load("jstests/libs/change_stream_util.js");        // For isChangeStreamPreAndPostImagesEnabled.
 
 const testDB = db.getSiblingDB(jsTestName());
 const collName = "test";
-
-if (!isChangeStreamPreAndPostImagesEnabled(testDB)) {
-    const coll = assertDropAndRecreateCollection(testDB, collName);
-
-    // If feature flag is off, creating changeStream with new fullDocument arguments should throw.
-    assert.throwsWithCode(() => coll.watch([], {fullDocument: 'whenAvailable'}),
-                          ErrorCodes.BadValue);
-    assert.throwsWithCode(() => coll.watch([], {fullDocument: 'required'}), ErrorCodes.BadValue);
-
-    jsTestLog(
-        "Skipping test because pre-image recording capability in 'system.preimages' is not enabled.");
-    return;
-}
 
 const originalDoc = {
     _id: 1,

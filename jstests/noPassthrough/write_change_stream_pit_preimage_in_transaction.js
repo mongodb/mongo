@@ -3,7 +3,6 @@
  * transactions and for non-atomic "applyOps" command.
  * @tags: [
  *  requires_fcv_60,
- *  featureFlagChangeStreamPreAndPostImages,
  *  requires_replication,
  *  no_selinux,
  *  requires_majority_read_concern,
@@ -14,12 +13,8 @@
 
 load("jstests/core/txns/libs/prepare_helpers.js");  // For PrepareHelpers.prepareTransaction.
 load("jstests/libs/collection_drop_recreate.js");   // For assertDropAndRecreateCollection.
-load(
-    "jstests/libs/change_stream_util.js");  // For
-                                            // assertChangeStreamPreAndPostImagesCollectionOptionIsEnabled,
-                                            // assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent,
-                                            // preImagesForOps.
-load("jstests/libs/transactions_util.js");  // For TransactionsUtil.runInTransaction.
+load("jstests/libs/change_stream_util.js");         // For preImagesForOps.
+load("jstests/libs/transactions_util.js");          // For TransactionsUtil.runInTransaction.
 
 const rst = new ReplSetTest({
     nodes: [

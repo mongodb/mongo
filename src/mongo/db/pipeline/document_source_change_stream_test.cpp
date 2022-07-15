@@ -417,10 +417,6 @@ bool getCSRewriteFeatureFlagValue() {
     return feature_flags::gFeatureFlagChangeStreamsRewrite.isEnabledAndIgnoreFCV();
 }
 
-bool isChangeStreamPreAndPostImagesEnabled() {
-    return feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabledAndIgnoreFCV();
-}
-
 TEST_F(ChangeStreamStageTest, ShouldRejectNonObjectArg) {
     auto expCtx = getExpCtx();
 
@@ -475,41 +471,6 @@ TEST_F(ChangeStreamStageTest, ShouldRejectUnrecognizedFullDocumentOption) {
                                        expCtx),
         AssertionException,
         ErrorCodes::BadValue);
-}
-
-TEST_F(ChangeStreamStageTest, ShouldRejectUnsupportedFullDocumentOption) {
-    auto expCtx = getExpCtx();
-
-    // New modes that are supposed to be working only when pre-/post-images feature flag is on.
-    FullDocumentModeEnum modes[] = {FullDocumentModeEnum::kWhenAvailable,
-                                    FullDocumentModeEnum::kRequired};
-
-    for (const auto& mode : modes) {
-        auto spec =
-            BSON("$changeStream: " << DocumentSourceChangeStreamAddPostImageSpec(mode).toBSON());
-
-        // TODO SERVER-58584: remove the feature flag.
-        {
-            RAIIServerParameterControllerForTest controller(
-                "featureFlagChangeStreamPreAndPostImages", false);
-            ASSERT_FALSE(isChangeStreamPreAndPostImagesEnabled());
-
-            // 'DSChangeStream' is not allowed to be instantiated with new document modes when
-            // pre-/post-images feature flag is disabled.
-            ASSERT_THROWS_CODE(DSChangeStream::createFromBson(spec.firstElement(), expCtx),
-                               AssertionException,
-                               ErrorCodes::BadValue);
-        }
-        {
-            RAIIServerParameterControllerForTest controller(
-                "featureFlagChangeStreamPreAndPostImages", true);
-            ASSERT(isChangeStreamPreAndPostImagesEnabled());
-
-            // 'DSChangeStream' is allowed to be instantiated with new document modes when
-            // pre-/post-images feature flag is enabled.
-            DSChangeStream::createFromBson(spec.firstElement(), expCtx);
-        }
-    }
 }
 
 TEST_F(ChangeStreamStageTest, ShouldRejectBothStartAtOperationTimeAndResumeAfterOptions) {

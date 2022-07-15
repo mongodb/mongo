@@ -6,7 +6,6 @@
  *
  * @tags: [
  * requires_fcv_60,
- * featureFlagChangeStreamPreAndPostImages,
  * # The test waits for the Checkpointer, but this process runs only for on-disk storage engines.
  * requires_persistence,
  * ]

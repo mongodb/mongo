@@ -404,24 +404,6 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
                           << (spec.getAllowToRunOnSystemNS() ? " through mongos" : ""),
             !expCtx->ns.isSystem() || (spec.getAllowToRunOnSystemNS() && !expCtx->inMongos));
 
-    // TODO SERVER-58584: remove the feature flag.
-    if (!feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        const bool shouldAddPreImage =
-            (spec.getFullDocumentBeforeChange() != FullDocumentBeforeChangeModeEnum::kOff);
-        uassert(51771,
-                "the 'fullDocumentBeforeChange' option is not supported in a sharded cluster",
-                !(shouldAddPreImage && (expCtx->inMongos || expCtx->needsMerge)));
-
-        uassert(ErrorCodes::BadValue,
-                str::stream() << "Specified value '"
-                              << FullDocumentMode_serializer(spec.getFullDocument())
-                              << "' is not a valid option for the 'fullDocument' parameter of the "
-                                 "$changeStream stage",
-                spec.getFullDocument() == FullDocumentModeEnum::kDefault ||
-                    spec.getFullDocument() == FullDocumentModeEnum::kUpdateLookup);
-    }
-
     uassert(31123,
             "Change streams from mongos may not show migration events",
             !(expCtx->inMongos && spec.getShowMigrationEvents()));

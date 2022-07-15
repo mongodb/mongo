@@ -4,7 +4,6 @@
  *
  * @tags: [
  * requires_fcv_60,
- * featureFlagChangeStreamPreAndPostImages,
  * uses_transactions,
  * ]
  */

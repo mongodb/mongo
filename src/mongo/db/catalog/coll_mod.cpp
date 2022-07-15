@@ -832,30 +832,17 @@ Status _collModInternal(OperationContext* opCtx,
 
         const CollectionOptions& oldCollOptions = coll->getCollectionOptions();
 
-        // TODO SERVER-58584: remove the feature flag.
-        if (feature_flags::gFeatureFlagChangeStreamPreAndPostImages.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
-            // If 'changeStreamPreAndPostImagesOptions' are enabled, 'recordPreImages' must be set
-            // to false. If 'recordPreImages' is set to true, 'changeStreamPreAndPostImagesOptions'
-            // must be disabled.
-            if (cmrNew.changeStreamPreAndPostImagesOptions &&
-                cmrNew.changeStreamPreAndPostImagesOptions->getEnabled()) {
-                cmrNew.recordPreImages = false;
-            }
-
-            if (cmrNew.recordPreImages) {
-                cmrNew.changeStreamPreAndPostImagesOptions =
-                    ChangeStreamPreAndPostImagesOptions(false);
-            }
-        } else {
-            // If the FCV has changed while executing the command to the version, where the feature
-            // flag is disabled, specifying changeStreamPreAndPostImagesOptions is not allowed.
-            if (cmrNew.changeStreamPreAndPostImagesOptions) {
-                return Status(ErrorCodes::InvalidOptions,
-                              "The 'changeStreamPreAndPostImages' is an unknown field.");
-            }
+        // If 'changeStreamPreAndPostImagesOptions' are enabled, 'recordPreImages' must be set
+        // to false. If 'recordPreImages' is set to true, 'changeStreamPreAndPostImagesOptions'
+        // must be disabled.
+        if (cmrNew.changeStreamPreAndPostImagesOptions &&
+            cmrNew.changeStreamPreAndPostImagesOptions->getEnabled()) {
+            cmrNew.recordPreImages = false;
         }
 
+        if (cmrNew.recordPreImages) {
+            cmrNew.changeStreamPreAndPostImagesOptions = ChangeStreamPreAndPostImagesOptions(false);
+        }
         if (cmrNew.cappedSize || cmrNew.cappedMax) {
             // If the current capped collection size exceeds the newly set limits, future document
             // inserts will prompt document deletion.

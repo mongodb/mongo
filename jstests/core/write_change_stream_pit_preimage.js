@@ -2,7 +2,6 @@
 // collections with 'changeStreamPreAndPostImages' being enabled.
 // @tags: [
 //  requires_fcv_60,
-//  featureFlagChangeStreamPreAndPostImages,
 //  assumes_against_mongod_not_mongos,
 //  requires_capped,
 //  requires_replication,
