@@ -1,55 +1,52 @@
 # Configuration for cursor_bound_01 default test.
-# During the test duration:
-#   - M threads will keep inserting new random keys.
-#   - N threads will execute search_near calls with random bounds set. Each search_near
-# call with bounds set is verified against the default search_near.
-#   - O threads will continuously remove random keys.
-#   - P threads will continuously update random keys.
-#   - Q threads will utilize the custom operation and will execute next() and prev() calls with
-# random bounds.
-duration_seconds=120,
-cache_size_mb=1000,
+duration_seconds=60,
+cache_size_mb=100,
 reverse_collator=false,
 timestamp_manager=
 (
-    # This will let us randomly pick a read timestamp in a bigger range to trigger visibility
-    # checks.
-    oldest_lag=50,
+    stable_lag=2,
+    oldest_lag=2,
 ),
 workload_manager=
 (
     populate_config=
     (
         collection_count=10,
-        key_count_per_collection=0,
-        thread_count=0,
+        key_count_per_collection=100,
+        thread_count=10,
     ),
     insert_config=
     (
         key_size=100,
         op_rate=10ms,
         thread_count=10,
-        value_size=20
+        value_size=2000,
+        ops_per_transaction=(max=5,min=0)
     ),
     read_config=
     (
         op_rate=3ms,
-        thread_count=0
+        thread_count=10,
+        ops_per_transaction=(max=5,min=0)
     ),
     remove_config=
     (
-        op_rate=500ms,
-        thread_count=5
+        op_rate=5ms,
+        thread_count=5,
+        ops_per_transaction=(max=5,min=0)
     ),
     update_config=
     (
         op_rate=15ms,
         thread_count=10,
-        value_size=20
+        value_size=2000,
+        ops_per_transaction=(max=5,min=0)
     ),
     custom_config=
     (
-        thread_count=10
+        thread_count=10,
+        op_rate=10ms,
+        ops_per_transaction=(max=5,min=0)
     )
 ),
 operation_tracker=

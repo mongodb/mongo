@@ -1,0 +1,63 @@
+# Stressful configuration for the cursor_bound_01 test.
+duration_seconds=3600,
+cache_size_mb=1500,
+reverse_collator=true,
+timestamp_manager=
+(
+    # This will let us randomly choose a read timestamp in a bigger range to trigger visibility
+    # checks.
+    stable_lag=25,
+    oldest_lag=25,
+),
+workload_manager=
+(
+    populate_config=
+    (
+        collection_count=100,
+        key_count_per_collection=10000,
+        value_size=100000,
+        thread_count=50,
+    ),
+    #100MB/s insert rate
+    insert_config=
+    (
+        key_size=100,
+        op_rate=100ms,
+        thread_count=10,
+        value_size=1000000,
+        ops_per_transaction=(max=20,min=0)
+    ),
+    read_config=
+    (
+        op_rate=3ms,
+        thread_count=30
+    ),
+    #100MB/s remove rate
+    remove_config=
+    (
+        op_rate=10ms,
+        thread_count=10,
+        ops_per_transaction=(max=20,min=0)
+    ),
+    #100MB/s update rate
+    update_config=
+    (
+        op_rate=100ms,
+        thread_count=10,
+        value_size=1000000,
+        ops_per_transaction=(max=20,min=0)
+    ),
+    custom_config=
+    (
+        thread_count=10,
+        op_rate=100ms
+    ),
+    checkpoint_config=
+    (
+        op_rate=240s,
+    )
+),
+operation_tracker=
+(
+    enabled=false,
+)

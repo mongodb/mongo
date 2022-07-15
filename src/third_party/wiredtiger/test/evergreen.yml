@@ -1187,6 +1187,30 @@ tasks:
           test_config_filename: configs/bounded_cursor_perf_default.txt
           test_name: bounded_cursor_perf
 
+  - name: cppsuite-cursor-bound-01-default
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "cppsuite test"
+        vars:
+          test_config: debug_mode=(cursor_copy=true)
+          test_config_filename: configs/cursor_bound_01_default.txt
+          test_name: cursor_bound_01
+
+  - name: cppsuite-cursor-bound-01-reverse-default
+    tags: ["pull_request"]
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "cppsuite test"
+        vars:
+          test_config: debug_mode=(cursor_copy=true)
+          test_config_filename: configs/cursor_bound_01_reverse_default.txt
+          test_name: cursor_bound_01
+
   - name: cppsuite-operations-test-stress
     depends_on:
       - name: compile
@@ -1216,6 +1240,26 @@ tasks:
         vars:
           test_config_filename: configs/burst_inserts_stress.txt
           test_name: burst_inserts
+
+  - name: cppsuite-cursor-bound-01-stress
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "cppsuite test"
+        vars:
+          test_config_filename: configs/cursor_bound_01_stress.txt
+          test_name: cursor_bound_01
+
+  - name: cppsuite-cursor-bound-01-reverse-stress
+    depends_on:
+      - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "cppsuite test"
+        vars:
+          test_config_filename: configs/cursor_bound_01_reverse_stress.txt
+          test_name: cursor_bound_01
 
   - name: cppsuite-search-near-01-stress
     depends_on:
@@ -4266,6 +4310,8 @@ buildvariants:
     - name: compile
     - name: cppsuite-operations-test-stress
     - name: cppsuite-burst-inserts-stress
+    - name: cppsuite-cursor-bound-01-stress
+    - name: cppsuite-cursor-bound-01-reverse-stress
     - name: cppsuite-hs-cleanup-stress
     - name: cppsuite-search-near-01-stress
     - name: cppsuite-search-near-02-stress
