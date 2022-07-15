@@ -354,6 +354,11 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
                 .unsafeToInlineFuture();
         }
 
+        LOGV2(6086506,
+              "Starting shard split.",
+              "id"_attr = _migrationId,
+              "timeout"_attr = repl::shardSplitTimeoutMS.load());
+
         auto isConfigValidWithStatus = [&]() {
             stdx::lock_guard<Latch> lg(_mutex);
             auto replCoord = repl::ReplicationCoordinator::get(cc().getServiceContext());
@@ -363,20 +368,15 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
         }();
 
         if (!isConfigValidWithStatus.isOK()) {
+            stdx::lock_guard<Latch> lg(_mutex);
+
             LOGV2_ERROR(6395900,
                         "Failed to validate recipient nodes for shard split.",
                         "id"_attr = _migrationId,
                         "status"_attr = isConfigValidWithStatus);
-            return ExecutorFuture(
-                       **executor,
-                       DurableState{ShardSplitDonorStateEnum::kAborted, isConfigValidWithStatus})
-                .unsafeToInlineFuture();
-        }
 
-        LOGV2(6086506,
-              "Starting shard split.",
-              "id"_attr = _migrationId,
-              "timeout"_attr = repl::shardSplitTimeoutMS.load());
+            _abortReason = isConfigValidWithStatus;
+        }
 
         _initiateTimeout(executor, abortToken);
         return ExecutorFuture(**executor)
@@ -614,7 +614,7 @@ ShardSplitDonorService::DonorStateMachine::_enterAbortIndexBuildsOrAbortedState(
     ShardSplitDonorStateEnum nextState;
     {
         stdx::lock_guard<Latch> lg(_mutex);
-        if (_stateDoc.getState() == ShardSplitDonorStateEnum::kAborted) {
+        if (_stateDoc.getState() == ShardSplitDonorStateEnum::kAborted || _abortReason) {
             if (isAbortedDocumentPersistent(lg, _stateDoc)) {
                 // Node has step up and created an instance using a document in abort state. No
                 // need to write the document as it already exists.
@@ -623,8 +623,10 @@ ShardSplitDonorService::DonorStateMachine::_enterAbortIndexBuildsOrAbortedState(
                 return ExecutorFuture(**executor);
             }
 
-            _abortReason =
-                Status(ErrorCodes::TenantMigrationAborted, "Aborted due to 'abortShardSplit'.");
+            if (!_abortReason) {
+                _abortReason =
+                    Status(ErrorCodes::TenantMigrationAborted, "Aborted due to 'abortShardSplit'.");
+            }
             BSONObjBuilder bob;
             _abortReason->serializeErrorToBSON(&bob);
             _stateDoc.setAbortReason(bob.obj());

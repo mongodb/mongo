@@ -841,9 +841,14 @@ TEST_F(ShardSplitDonorServiceTest, AbortDueToRecipientNodesValidation) {
     auto result = serviceInstance->decisionFuture().get();
 
     ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kAborted);
+    ASSERT(result.abortReason);
+    ASSERT_EQ(result.abortReason->code(), ErrorCodes::BadValue);
+    ASSERT_TRUE(serviceInstance->isGarbageCollectable());
 
-    ASSERT_OK(serviceInstance->completionFuture().getNoThrow());
-    ASSERT_FALSE(serviceInstance->isGarbageCollectable());
+    auto statusWithDoc = getStateDocument(opCtx.get(), stateDocument.getId());
+    ASSERT_OK(statusWithDoc.getStatus());
+
+    ASSERT_EQ(statusWithDoc.getValue().getState(), ShardSplitDonorStateEnum::kAborted);
 }
 
 TEST(RecipientAcceptSplitListenerTest, FutureReady) {
