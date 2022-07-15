@@ -99,6 +99,8 @@ public:
         builder.append("resumed", resumed.loadRelaxed());
         builder.append("filesOpenedForExternalSort", sorterFileStats.opened.loadRelaxed());
         builder.append("filesClosedForExternalSort", sorterFileStats.closed.loadRelaxed());
+        builder.append("spilledRanges", sorterTracker.spilledRanges.loadRelaxed());
+        builder.append("bytesSpilled", sorterTracker.bytesSpilled.loadRelaxed());
         return builder.obj();
     }
 
@@ -109,11 +111,15 @@ public:
     // This value should not exceed 'count'.
     AtomicWord<long long> resumed;
 
+    // Sorter statistics that are aggregate of all sorters.
+    SorterTracker sorterTracker;
+
     // Number of times the external sorter opened/closed a file handle to spill data to disk.
     // This pair of counters in aggregate indicate the number of open file handles used by
     // the external sorter and may be useful in diagnosing situations where the process is
     // close to exhausting this finite resource.
-    SorterFileStats sorterFileStats;
+    SorterFileStats sorterFileStats = {&sorterTracker};
+
 } indexBulkBuilderSSS;
 
 /**
@@ -133,6 +139,7 @@ SortOptions makeSortOptions(size_t maxMemoryUsageBytes, StringData dbName) {
         .ExtSortAllowed()
         .MaxMemoryUsageBytes(maxMemoryUsageBytes)
         .FileStats(&indexBulkBuilderSSS.sorterFileStats)
+        .Tracker(&indexBulkBuilderSSS.sorterTracker)
         .DBName(dbName.toString());
 }
 
@@ -607,6 +614,23 @@ Status SortedDataIndexAccessMethod::compact(OperationContext* opCtx) {
 
 Ident* SortedDataIndexAccessMethod::getIdentPtr() const {
     return this->_newInterface.get();
+}
+
+void IndexAccessMethod::BulkBuilder::countNewBuildInStats() {
+    indexBulkBuilderSSS.count.addAndFetch(1);
+}
+
+void IndexAccessMethod::BulkBuilder::countResumedBuildInStats() {
+    indexBulkBuilderSSS.count.addAndFetch(1);
+    indexBulkBuilderSSS.resumed.addAndFetch(1);
+}
+
+SorterFileStats* IndexAccessMethod::BulkBuilder::bulkBuilderFileStats() {
+    return &indexBulkBuilderSSS.sorterFileStats;
+}
+
+SorterTracker* IndexAccessMethod::BulkBuilder::bulkBuilderTracker() {
+    return &indexBulkBuilderSSS.sorterTracker;
 }
 
 class SortedDataIndexAccessMethod::BulkBuilderImpl final : public IndexAccessMethod::BulkBuilder {

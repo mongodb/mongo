@@ -59,8 +59,9 @@ sbeEnv.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/sorter/sorter_idl',
-         ]
-    )
+        '$BUILD_DIR/mongo/db/sorter/sorter_stats',
+    ],
+)
 
 sbeEnv.Library(
     target='query_sbe_stages',
@@ -106,6 +107,7 @@ sbeEnv.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/sorter/sorter_idl',
+        '$BUILD_DIR/mongo/db/sorter/sorter_stats',
         'query_sbe',
         'query_sbe_storage',
          ]
