@@ -77,9 +77,6 @@ DocumentSourceGeoNearCursor::DocumentSourceGeoNearCursor(
       _distanceField(std::move(distanceField)),
       _locationField(std::move(locationField)),
       _distanceMultiplier(distanceMultiplier) {
-    tassert(6466203,
-            "$geoNear cursor shouldn't have secondary collections",
-            collections.getSecondaryCollections().empty());
     invariant(_distanceMultiplier >= 0);
 }
 

@@ -38,8 +38,8 @@ const geonearWithinLookupPipeline = [
         },
     ];
 
-assert.commandWorked(coll.insert({_id: 5, x: 5}));
-assert.commandWorked(from.insert({_id: 1, geo: [0, 0]}));
+assert.commandWorked(coll.insert({_id: 5, x: 5, geo: [1, 1]}));
+assert.commandWorked(from.insert({_id: 1, x: 5, geo: [0, 0]}));
 
 // Fail without index.
 assertErrorCode(from, geonearPipeline, ErrorCodes.IndexNotFound);
@@ -50,4 +50,12 @@ assert.commandWorked(from.createIndex({geo: "2dsphere"}));
 // Run successfully when you have the geospatial index.
 assert.eq(from.aggregate(geonearPipeline).itcount(), 1);
 assert.eq(coll.aggregate(geonearWithinLookupPipeline).itcount(), 1);
+
+// Test that we can run a pipeline with a $geoNear stage followed by a $lookup.
+const geonearThenLookupPipeline = [
+    {$geoNear: {near: [0, 1], distanceField: "distance", spherical: true}},
+    {$lookup: {from: from.getName(), localField: "x", foreignField: "x", as: "new"}},
+];
+assert.commandWorked(coll.createIndex({geo: "2dsphere"}));
+assert.eq(coll.aggregate(geonearThenLookupPipeline).itcount(), 1);
 }());
