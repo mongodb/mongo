@@ -41,12 +41,15 @@ class ProfiledFunction:
             'outputs': [str(t) for t in target],
             'inputs': [str(s) for s in source],
             'action': fullname(self.original_func),
-            'start_time': time.time_ns(),
             'builder': target[0].get_builder().get_name(target[0].get_env()),
         }
-
         profile = memory_profiler.LineProfiler(include_children=False)
+
+        task_metrics['start_time'] = time.time_ns()
+        thread_start_time = time.thread_time_ns()
         return_value = profile(self.original_func)(target=target, source=source, env=env)
+        task_metrics['cpu_time'] = time.thread_time_ns() - thread_start_time
+        task_metrics['end_time'] = time.time_ns()
 
         memory_increases_per_line = []
         for (file_where_code_is, lines_of_code) in profile.code_map.items():
@@ -58,8 +61,6 @@ class ProfiledFunction:
                     memory_increase = memory_usage[0]
                     memory_increases_per_line.append(memory_increase)
 
-        task_metrics['cpu_time'] = time.thread_time_ns()
-        task_metrics['end_time'] = time.time_ns()
         task_metrics['mem_usage'] = int(sum(memory_increases_per_line) * 1024 * 1024)
 
         self.per_action_instance.build_tasks_metrics.append(task_metrics)
