@@ -60,7 +60,7 @@ CandidatePlans CachedSolutionPlanner::plan(
             fillOutSecondaryCollectionsInformation(_opCtx, _collections, &_cq);
 
         if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
-            for (const auto foreignCollection : roots[0].second.foreignHashJoinCollections) {
+            for (const auto& foreignCollection : roots[0].second.foreignHashJoinCollections) {
                 const auto collectionInfo = secondaryCollectionsInfo.find(foreignCollection);
                 tassert(6693500,
                         "Foreign collection must be present in the collections info",
