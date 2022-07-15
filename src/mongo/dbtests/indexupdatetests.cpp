@@ -273,7 +273,7 @@ public:
         }
 
         regenOpCtx();
-        AutoGetDb dbRaii(_opCtx, _nss.db(), LockMode::MODE_IX);
+        AutoGetDb dbRaii(_opCtx, _nss.dbName(), LockMode::MODE_IX);
         boost::optional<Lock::CollectionLock> collLk;
         collLk.emplace(_opCtx, _nss, LockMode::MODE_IX);
         // The new index is not listed in the index catalog because the index build failed.

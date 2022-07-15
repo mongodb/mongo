@@ -57,7 +57,7 @@ TextMatchExpression::TextMatchExpression(OperationContext* opCtx,
     fts::TextIndexVersion version;
     {
         // Find text index.
-        AutoGetDb autoDb(opCtx, nss.db(), MODE_IS);
+        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IS);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
         Database* db = autoDb.getDb();
 

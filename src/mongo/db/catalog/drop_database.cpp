@@ -157,7 +157,8 @@ Status _dropDatabase(OperationContext* opCtx, const std::string& dbName, bool ab
 
     {
         boost::optional<AutoGetDb> autoDB;
-        autoDB.emplace(opCtx, dbName, MODE_X);
+        // TODO SERVER-67549 Use dbName directly.
+        autoDB.emplace(opCtx, DatabaseName(boost::none, dbName), MODE_X);
 
         Database* db = autoDB->getDb();
         Status status = _checkNssAndReplState(opCtx, db, dbName);
@@ -191,7 +192,8 @@ Status _dropDatabase(OperationContext* opCtx, const std::string& dbName, bool ab
                 // yielded.
                 ScopeGuard dropPendingGuardWhileUnlocked([dbName, opCtx, &dropPendingGuard] {
                     UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-                    AutoGetDb autoDB(opCtx, dbName, MODE_IX);
+                    // TODO SERVER-67549 Use dbName directly.
+                    AutoGetDb autoDB(opCtx, DatabaseName(boost::none, dbName), MODE_IX);
                     if (auto db = autoDB.getDb()) {
                         db->setDropPending(opCtx, false);
                     }
@@ -212,7 +214,8 @@ Status _dropDatabase(OperationContext* opCtx, const std::string& dbName, bool ab
                     dropDatabaseHangAfterWaitingForIndexBuilds.pauseWhileSet();
                 }
 
-                autoDB.emplace(opCtx, dbName, MODE_X);
+                // TODO SERVER-67549 Use dbName directly.
+                autoDB.emplace(opCtx, DatabaseName(boost::none, dbName), MODE_X);
                 db = autoDB->getDb();
 
                 dropPendingGuardWhileUnlocked.dismiss();
@@ -307,7 +310,8 @@ Status _dropDatabase(OperationContext* opCtx, const std::string& dbName, bool ab
     // locks (which can throw) needed to finish the drop database.
     ScopeGuard dropPendingGuardWhileUnlocked([dbName, opCtx] {
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-        AutoGetDb autoDB(opCtx, dbName, MODE_IX);
+        // TODO SERVER-67549 Use dbName directly.
+        AutoGetDb autoDB(opCtx, DatabaseName(boost::none, dbName), MODE_IX);
         if (auto db = autoDB.getDb()) {
             db->setDropPending(opCtx, false);
         }
@@ -388,7 +392,8 @@ Status _dropDatabase(OperationContext* opCtx, const std::string& dbName, bool ab
         dropDatabaseHangAfterAllCollectionsDrop.pauseWhileSet();
     }
 
-    AutoGetDb autoDB(opCtx, dbName, MODE_X);
+    // TODO SERVER-67549 Use dbName directly.
+    AutoGetDb autoDB(opCtx, DatabaseName(boost::none, dbName), MODE_X);
     auto db = autoDB.getDb();
     if (!db) {
         return Status(ErrorCodes::NamespaceNotFound,

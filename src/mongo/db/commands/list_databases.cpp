@@ -154,7 +154,7 @@ public:
                         continue;
                     }
 
-                    AutoGetDbForReadMaybeLockFree lockFreeReadBlock(opCtx, dbName.db());
+                    AutoGetDbForReadMaybeLockFree lockFreeReadBlock(opCtx, dbName);
                     // The database could have been dropped since we called 'listDatabases()' above.
                     if (!DatabaseHolder::get(opCtx)->dbExists(opCtx, dbName)) {
                         continue;

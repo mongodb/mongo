@@ -1503,7 +1503,7 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                   "Dropping collection",
                   "namespace"_attr = *nss,
                   "uuid"_attr = uuid);
-            AutoGetDb dbLock(opCtx, nss->db(), MODE_X);
+            AutoGetDb dbLock(opCtx, nss->dbName(), MODE_X);
 
             Database* db = dbLock.getDb();
             if (db) {

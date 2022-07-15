@@ -130,7 +130,7 @@ public:
                 : collectionCatalog->getAllDbNames();
 
             for (const auto& dbName : dbNames) {
-                AutoGetDb autoDb(opCtx, dbName.db(), LockMode::MODE_IS);
+                AutoGetDb autoDb(opCtx, dbName, LockMode::MODE_IS);
                 if (!autoDb.getDb()) {
                     continue;
                 }

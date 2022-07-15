@@ -74,7 +74,7 @@ class PersistentTaskStoreTest : public CatalogTestFixture {
         CatalogTestFixture::setUp();
         auto opCtx = operationContext();
 
-        AutoGetDb autoDb(opCtx, kNss.db(), MODE_IX);
+        AutoGetDb autoDb(opCtx, kNss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, kNss, MODE_IX);
     }
 };

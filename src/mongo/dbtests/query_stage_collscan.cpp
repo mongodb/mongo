@@ -160,7 +160,7 @@ public:
         ScopedCollectionDeleter(OperationContext* opCtx, NamespaceString nss)
             : _opCtx(opCtx), _nss(nss) {}
         ~ScopedCollectionDeleter() {
-            AutoGetDb autoDb(_opCtx, _nss.db(), MODE_IX);
+            AutoGetDb autoDb(_opCtx, _nss.dbName(), MODE_IX);
             if (!autoDb.getDb())
                 return;
 

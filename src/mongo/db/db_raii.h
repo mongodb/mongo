@@ -503,7 +503,7 @@ private:
 class AutoGetDbForReadLockFree {
 public:
     AutoGetDbForReadLockFree(OperationContext* opCtx,
-                             StringData dbName,
+                             const DatabaseName& dbName,
                              Date_t deadline = Date_t::max());
 
 private:
@@ -524,7 +524,7 @@ private:
 class AutoGetDbForReadMaybeLockFree {
 public:
     AutoGetDbForReadMaybeLockFree(OperationContext* opCtx,
-                                  StringData dbName,
+                                  const DatabaseName& dbName,
                                   Date_t deadline = Date_t::max());
 
 private:

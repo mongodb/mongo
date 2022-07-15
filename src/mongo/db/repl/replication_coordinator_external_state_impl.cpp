@@ -1058,7 +1058,7 @@ void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationC
                     "Removing temporary collections from {db}",
                     "Removing temporary collections",
                     "db"_attr = dbName);
-        AutoGetDb autoDb(opCtx, dbName.db(), MODE_IX);
+        AutoGetDb autoDb(opCtx, dbName, MODE_IX);
         invariant(autoDb.getDb(),
                   str::stream() << "Unable to get reference to database " << dbName.db());
         autoDb.getDb()->clearTmpCollections(opCtx);

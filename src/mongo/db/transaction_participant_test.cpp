@@ -291,7 +291,7 @@ protected:
         {
             // Set up a collection so that TransactionParticipant::prepareTransaction() can safely
             // access it.
-            AutoGetDb autoDb(opCtx(), kNss.db(), MODE_X);
+            AutoGetDb autoDb(opCtx(), kNss.dbName(), MODE_X);
             auto db = autoDb.ensureDbExists(opCtx());
             ASSERT_TRUE(db);
 
@@ -398,7 +398,7 @@ void insertTxnRecord(OperationContext* opCtx, unsigned i, DurableTxnStateEnum st
     record.setLastWriteOpTime(repl::OpTime(ts, 0));
     record.setLastWriteDate(Date_t::now());
 
-    AutoGetDb autoDb(opCtx, nss.db(), MODE_X);
+    AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
     auto db = autoDb.ensureDbExists(opCtx);
     ASSERT(db);
     WriteUnitOfWork wuow(opCtx);
@@ -673,7 +673,7 @@ TEST_F(TxnParticipantTest, PrepareFailsOnTemporaryCollection) {
 
     // Create a temporary collection so that we can write to it.
     {
-        AutoGetDb autoDb(opCtx(), kNss.db(), MODE_X);
+        AutoGetDb autoDb(opCtx(), kNss.dbName(), MODE_X);
         auto db = autoDb.ensureDbExists(opCtx());
         ASSERT_TRUE(db);
 
@@ -4473,7 +4473,7 @@ TEST_F(TxnParticipantTest, OldestActiveTransactionTimestamp) {
 
     auto deleteTxnRecord = [&](unsigned i) {
         Timestamp ts(1, i);
-        AutoGetDb autoDb(opCtx(), nss.db(), MODE_X);
+        AutoGetDb autoDb(opCtx(), nss.dbName(), MODE_X);
         auto db = autoDb.ensureDbExists(opCtx());
         ASSERT(db);
         WriteUnitOfWork wuow(opCtx());
@@ -4530,7 +4530,7 @@ TEST_F(TxnParticipantTest, OldestActiveTransactionTimestamp) {
 TEST_F(TxnParticipantTest, OldestActiveTransactionTimestampTimeout) {
     // Block getOldestActiveTimestamp() by locking the config database.
     auto nss = NamespaceString::kSessionTransactionsTableNamespace;
-    AutoGetDb autoDb(opCtx(), nss.db(), MODE_X);
+    AutoGetDb autoDb(opCtx(), nss.dbName(), MODE_X);
     auto db = autoDb.ensureDbExists(opCtx());
     ASSERT(db);
     auto statusWith = TransactionParticipant::getOldestActiveTimestamp(Timestamp());

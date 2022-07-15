@@ -86,7 +86,7 @@ Timestamp generateMinFetchTimestamp(OperationContext* opCtx, const NamespaceStri
     // Do a no-op write and use the OpTime as the minFetchTimestamp
     writeConflictRetry(
         opCtx, "resharding donor minFetchTimestamp", NamespaceString::kRsOplogNamespace.ns(), [&] {
-            AutoGetDb db(opCtx, sourceNss.db(), MODE_IX);
+            AutoGetDb db(opCtx, sourceNss.dbName(), MODE_IX);
             Lock::CollectionLock collLock(opCtx, sourceNss, MODE_S);
 
             AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);

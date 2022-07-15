@@ -115,7 +115,7 @@ Status createIndexFromSpec(OperationContext* opCtx,
     // on this namespace would have a dangling Collection pointer after this function has run.
     invariant(!opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 
-    AutoGetDb autoDb(opCtx, nsToDatabaseSubstring(ns), MODE_X);
+    AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
     {
         WriteUnitOfWork wunit(opCtx);
         auto coll =

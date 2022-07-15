@@ -449,7 +449,7 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
     ASSERT_OK(swCollInfo.getStatus());
     ASSERT(collectionExists(opCtx.get(), collNs));
 
-    AutoGetDb db(opCtx.get(), collNs.db(), LockMode::MODE_X);
+    AutoGetDb db(opCtx.get(), collNs.dbName(), LockMode::MODE_X);
     // Only drop the catalog entry; storage engine still knows about this ident.
     // This simulates an unclean shutdown happening between dropping the catalog entry and
     // the actual drop in storage engine.
@@ -485,7 +485,7 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphans) {
     ASSERT_OK(swCollInfo.getStatus());
     ASSERT(collectionExists(opCtx.get(), collNs));
 
-    AutoGetDb db(opCtx.get(), collNs.db(), LockMode::MODE_X);
+    AutoGetDb db(opCtx.get(), collNs.dbName(), LockMode::MODE_X);
     // Only drop the catalog entry; storage engine still knows about this ident.
     // This simulates an unclean shutdown happening between dropping the catalog entry and
     // the actual drop in storage engine.

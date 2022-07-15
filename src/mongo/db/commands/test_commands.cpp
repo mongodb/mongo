@@ -262,7 +262,7 @@ public:
         const Timestamp requestedPinTs = cmdObj.firstElement().timestamp();
         const bool round = cmdObj["round"].booleanSafe();
 
-        AutoGetDb autoDb(opCtx, kDurableHistoryTestNss.db(), MODE_IX);
+        AutoGetDb autoDb(opCtx, kDurableHistoryTestNss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, kDurableHistoryTestNss, MODE_IX);
         if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
                 opCtx,

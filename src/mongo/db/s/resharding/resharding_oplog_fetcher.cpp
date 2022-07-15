@@ -253,7 +253,7 @@ void ReshardingOplogFetcher::_ensureCollection(Client* client,
         }
 
         WriteUnitOfWork wuow(opCtx);
-        AutoGetDb autoDb(opCtx, nss.db(), LockMode::MODE_IX);
+        AutoGetDb autoDb(opCtx, nss.dbName(), LockMode::MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
         auto db = autoDb.ensureDbExists(opCtx);
 

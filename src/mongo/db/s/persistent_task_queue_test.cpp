@@ -83,7 +83,7 @@ void killOps(ServiceContext* serviceCtx) {
 class PersistentTaskQueueTest : public ShardServerTestFixture {
     void setUp() override {
         ShardServerTestFixture::setUp();
-        AutoGetDb autoDb(operationContext(), kNss.db(), MODE_IX);
+        AutoGetDb autoDb(operationContext(), kNss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(operationContext(), kNss, MODE_IX);
         CollectionShardingRuntime::get(operationContext(), kNss)
             ->setFilteringMetadata(operationContext(), CollectionMetadata());

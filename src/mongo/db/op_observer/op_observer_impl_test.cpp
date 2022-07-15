@@ -356,7 +356,7 @@ TEST_F(OpObserverTest, StartIndexBuildExpectedOplogEntry) {
 
     // Write to the oplog.
     {
-        AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
+        AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         opObserver.onStartIndexBuild(
             opCtx.get(), nss, uuid, indexBuildUUID, specs, false /*fromMigrate*/);
@@ -396,7 +396,7 @@ TEST_F(OpObserverTest, CommitIndexBuildExpectedOplogEntry) {
 
     // Write to the oplog.
     {
-        AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
+        AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         opObserver.onCommitIndexBuild(
             opCtx.get(), nss, uuid, indexBuildUUID, specs, false /*fromMigrate*/);
@@ -437,7 +437,7 @@ TEST_F(OpObserverTest, AbortIndexBuildExpectedOplogEntry) {
     // Write to the oplog.
     Status cause(ErrorCodes::OperationFailed, "index build failed");
     {
-        AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
+        AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         auto fromMigrate = false;
         opObserver.onAbortIndexBuild(
@@ -582,7 +582,7 @@ TEST_F(OpObserverTest, OnDropCollectionReturnsDropOpTime) {
     // Write to the oplog.
     repl::OpTime dropOpTime;
     {
-        AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
+        AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         opObserver.onDropCollection(
             opCtx.get(), nss, uuid, 0U, OpObserver::CollectionDropType::kTwoPhase);
@@ -640,7 +640,7 @@ TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
     // Write to the oplog.
     repl::OpTime renameOpTime;
     {
-        AutoGetDb autoDb(opCtx.get(), sourceNss.db(), MODE_X);
+        AutoGetDb autoDb(opCtx.get(), sourceNss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         opObserver.onRenameCollection(
             opCtx.get(), sourceNss, targetNss, uuid, dropTargetUuid, 0U, stayTemp);
@@ -746,7 +746,7 @@ TEST_F(OpObserverTest, OnRenameCollectionOmitsDropTargetFieldIfDropTargetUuidIsN
 
     // Write to the oplog.
     {
-        AutoGetDb autoDb(opCtx.get(), sourceNss.db(), MODE_X);
+        AutoGetDb autoDb(opCtx.get(), sourceNss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         opObserver.onRenameCollection(opCtx.get(), sourceNss, targetNss, uuid, {}, 0U, stayTemp);
         wunit.commit();
@@ -794,7 +794,7 @@ TEST_F(OpObserverTest, ImportCollectionOplogEntry) {
 
     // Write to the oplog.
     {
-        AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
+        AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         opObserver.onImportCollection(opCtx.get(),
                                       importUUID,
@@ -907,7 +907,7 @@ TEST_F(OpObserverTest, SingleStatementUpdateTestIncludesTenantId) {
     OplogUpdateEntryArgs update(&updateArgs, nss, uuid);
 
     WriteUnitOfWork wuow(opCtx.get());
-    AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
+    AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
 
     OpObserverRegistry opObserver;
     opObserver.addObserver(std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
@@ -1040,7 +1040,7 @@ TEST_F(OpObserverTest, MultipleAboutToDeleteAndOnDelete) {
     OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
     NamespaceString nss = {boost::none, "test", "coll"};
-    AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
+    AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
     WriteUnitOfWork wunit(opCtx.get());
     opObserver.aboutToDelete(opCtx.get(), nss, uuid, BSON("_id" << 1));
     opObserver.onDelete(opCtx.get(), nss, uuid, kUninitializedStmtId, {});
@@ -2051,7 +2051,7 @@ protected:
         OplogUpdateEntryArgs update(&updateArgs, nss, uuid);
         update.retryableFindAndModifyLocation = RetryableFindAndModifyLocation::kSideCollection;
 
-        AutoGetDb autoDb(opCtx(), nss.db(), MODE_X);
+        AutoGetDb autoDb(opCtx(), nss.dbName(), MODE_X);
         opObserver().onUpdate(opCtx(), update);
         commit();
 
@@ -2082,7 +2082,7 @@ protected:
         OplogUpdateEntryArgs update(&updateArgs, nss, uuid);
         update.retryableFindAndModifyLocation = RetryableFindAndModifyLocation::kSideCollection;
 
-        AutoGetDb autoDb(opCtx(), nss.db(), MODE_X);
+        AutoGetDb autoDb(opCtx(), nss.dbName(), MODE_X);
         opObserver().onUpdate(opCtx(), update);
         commit();
 
@@ -2102,7 +2102,7 @@ protected:
         NamespaceString nss = {boost::none, "test", "coll"};
         const auto uuid = UUID::gen();
 
-        AutoGetDb autoDb(opCtx(), nss.db(), MODE_X);
+        AutoGetDb autoDb(opCtx(), nss.dbName(), MODE_X);
         const auto deletedDoc = BSON("_id" << 0 << "data"
                                            << "x");
         opObserver().aboutToDelete(opCtx(), nss, uuid, deletedDoc);

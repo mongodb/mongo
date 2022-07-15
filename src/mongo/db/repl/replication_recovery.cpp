@@ -806,7 +806,7 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
 
     // Fetch the oplog collection.
     const NamespaceString oplogNss(NamespaceString::kRsOplogNamespace);
-    AutoGetDb autoDb(opCtx, oplogNss.db(), MODE_IX);
+    AutoGetDb autoDb(opCtx, oplogNss.dbName(), MODE_IX);
     Lock::CollectionLock oplogCollectionLoc(opCtx, oplogNss, MODE_X);
     auto oplogCollection =
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, oplogNss);

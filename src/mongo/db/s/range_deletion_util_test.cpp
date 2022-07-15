@@ -117,7 +117,7 @@ public:
                         DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
                         makeStandaloneRoutingTableHistory(std::move(rt)),
                         boost::none);
-        AutoGetDb autoDb(_opCtx, kNss.db(), MODE_IX);
+        AutoGetDb autoDb(_opCtx, kNss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(_opCtx, kNss, MODE_IX);
         CollectionMetadata collMetadata(std::move(cm), ShardId("dummyShardId"));
         CollectionShardingRuntime::get(_opCtx, kNss)->setFilteringMetadata(_opCtx, collMetadata);

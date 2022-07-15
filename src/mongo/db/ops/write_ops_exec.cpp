@@ -235,7 +235,7 @@ void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& ns) {
 
 void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
     writeConflictRetry(opCtx, "implicit collection creation", ns.ns(), [&opCtx, &ns] {
-        AutoGetDb autoDb(opCtx, ns.db(), MODE_IX);
+        AutoGetDb autoDb(opCtx, ns.dbName(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, ns, MODE_IX);
 
         assertCanWrite_inlock(opCtx, ns);

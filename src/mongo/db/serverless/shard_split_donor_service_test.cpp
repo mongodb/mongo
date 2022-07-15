@@ -351,7 +351,8 @@ public:
         // The database needs to be open before using shard split donor service.
         {
             auto opCtx = cc().makeOperationContext();
-            AutoGetDb autoDb(opCtx.get(), NamespaceString::kShardSplitDonorsNamespace.db(), MODE_X);
+            AutoGetDb autoDb(
+                opCtx.get(), NamespaceString::kShardSplitDonorsNamespace.dbName(), MODE_X);
             auto db = autoDb.ensureDbExists(opCtx.get());
             ASSERT_TRUE(db);
         }

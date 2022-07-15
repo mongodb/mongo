@@ -461,7 +461,7 @@ void ShardingInitializationMongoD::updateShardIdentityConfigString(
         write_ops::UpdateModification::parseFromClassicUpdate(updateObj));
 
     try {
-        AutoGetDb autoDb(opCtx, NamespaceString::kServerConfigurationNamespace.db(), MODE_X);
+        AutoGetDb autoDb(opCtx, NamespaceString::kServerConfigurationNamespace.dbName(), MODE_X);
 
         auto result = update(opCtx, autoDb.ensureDbExists(opCtx), updateReq);
         if (result.numMatched == 0) {

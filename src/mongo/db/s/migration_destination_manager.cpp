@@ -992,7 +992,7 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
 
         // Take the exclusive database lock if the collection does not exist or indexes are missing
         // (needs auto-heal).
-        AutoGetDb autoDb(opCtx, nss.db(), MODE_X);
+        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
         auto db = autoDb.ensureDbExists(opCtx);
 
         auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);

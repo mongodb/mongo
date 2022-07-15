@@ -171,7 +171,7 @@ void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
         const auto nss = collectionMetadata.ns;
         writeConflictRetry(opCtx, "importCollection", nss.ns(), [&] {
             LOGV2_DEBUG(6114303, 1, "Importing donor collection", "ns"_attr = nss);
-            AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
+            AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
             auto db = autoDb.ensureDbExists(opCtx);
             invariant(db);
             Lock::CollectionLock collLock(opCtx, nss, MODE_X);

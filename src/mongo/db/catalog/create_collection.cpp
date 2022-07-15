@@ -157,7 +157,7 @@ Status _createView(OperationContext* opCtx,
             !nss.isSystemDotViews());
 
     return writeConflictRetry(opCtx, "create", nss.ns(), [&] {
-        AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
+        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
         // Operations all lock system.views in the end to prevent deadlock.
         Lock::CollectionLock systemViewsLock(
@@ -311,7 +311,7 @@ Status _createTimeseries(OperationContext* opCtx,
 
     Status ret =
         writeConflictRetry(opCtx, "createBucketCollection", bucketsNs.ns(), [&]() -> Status {
-            AutoGetDb autoDb(opCtx, bucketsNs.db(), MODE_IX);
+            AutoGetDb autoDb(opCtx, bucketsNs.dbName(), MODE_IX);
             Lock::CollectionLock bucketsCollLock(opCtx, bucketsNs, MODE_X);
             auto db = autoDb.ensureDbExists(opCtx);
 
@@ -468,7 +468,7 @@ Status _createCollection(OperationContext* opCtx,
                          const CollectionOptions& collectionOptions,
                          const boost::optional<BSONObj>& idIndex) {
     return writeConflictRetry(opCtx, "create", nss.ns(), [&] {
-        AutoGetDb autoDb(opCtx, nss.dbName().toStringWithTenantId(), MODE_IX);
+        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
         auto db = autoDb.ensureDbExists(opCtx);
 

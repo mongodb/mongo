@@ -753,7 +753,7 @@ void doLocalRenameIfOptionsAndIndexesHaveNotChanged(OperationContext* opCtx,
                                                     const RenameCollectionOptions& options,
                                                     std::list<BSONObj> originalIndexes,
                                                     BSONObj originalCollectionOptions) {
-    AutoGetDb dbLock(opCtx, targetNs.db(), MODE_X);
+    AutoGetDb dbLock(opCtx, targetNs.dbName(), MODE_X);
     auto collection = dbLock.getDb()
         ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, targetNs)
         : nullptr;

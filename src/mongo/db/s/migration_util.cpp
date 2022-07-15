@@ -1067,7 +1067,7 @@ void recoverMigrationCoordinations(OperationContext* opCtx,
             }
 
             auto setFilteringMetadata = [&opCtx, &currentMetadata, &doc, &cancellationToken]() {
-                AutoGetDb autoDb(opCtx, doc.getNss().db(), MODE_IX);
+                AutoGetDb autoDb(opCtx, doc.getNss().dbName(), MODE_IX);
                 Lock::CollectionLock collLock(opCtx, doc.getNss(), MODE_IX);
                 auto* const csr = CollectionShardingRuntime::get(opCtx, doc.getNss());
 

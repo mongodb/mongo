@@ -355,7 +355,7 @@ Status _dropCollection(OperationContext* opCtx,
 
     try {
         return writeConflictRetry(opCtx, "drop", collectionName.ns(), [&] {
-            AutoGetDb autoDb(opCtx, collectionName.db(), MODE_IX);
+            AutoGetDb autoDb(opCtx, collectionName.dbName(), MODE_IX);
             auto db = autoDb.getDb();
             if (!db) {
                 return expectedUUID
@@ -505,7 +505,7 @@ Status dropCollection(OperationContext* opCtx,
 Status dropCollectionIfUUIDNotMatching(OperationContext* opCtx,
                                        const NamespaceString& ns,
                                        const UUID& expectedUUID) {
-    AutoGetDb autoDb(opCtx, ns.db(), MODE_IX);
+    AutoGetDb autoDb(opCtx, ns.dbName(), MODE_IX);
     if (autoDb.getDb()) {
         {
             Lock::CollectionLock collLock(opCtx, ns, MODE_IS);
@@ -540,7 +540,7 @@ Status dropCollectionForApplyOps(OperationContext* opCtx,
         hangDropCollectionBeforeLockAcquisition.pauseWhileSet();
     }
     return writeConflictRetry(opCtx, "drop", collectionName.ns(), [&] {
-        AutoGetDb autoDb(opCtx, collectionName.db(), MODE_IX);
+        AutoGetDb autoDb(opCtx, collectionName.dbName(), MODE_IX);
         Database* db = autoDb.getDb();
         if (!db) {
             return Status(ErrorCodes::NamespaceNotFound, "ns not found");

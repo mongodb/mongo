@@ -221,7 +221,9 @@ public:
             // later commitTransaction or abortTransaction oplog entry.
             shouldNotConflictBlock.emplace(opCtx->lockState());
         }
-        AutoGetDb autoDb(opCtx, ns, lockMode);
+
+        // TODO SERVER-67459 Pass dbName obj directly
+        AutoGetDb autoDb(opCtx, DatabaseName(boost::none, ns), lockMode);
         Database* db = autoDb.getDb();
 
         result.append("host", prettyHostName());

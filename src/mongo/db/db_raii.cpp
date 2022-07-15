@@ -976,7 +976,7 @@ AutoReadLockFree::AutoReadLockFree(OperationContext* opCtx, Date_t deadline)
 }
 
 AutoGetDbForReadLockFree::AutoGetDbForReadLockFree(OperationContext* opCtx,
-                                                   StringData dbName,
+                                                   const DatabaseName& dbName,
                                                    Date_t deadline)
     : _catalogStash(opCtx),
       _lockFreeReadsBlock(opCtx),
@@ -996,7 +996,8 @@ AutoGetDbForReadLockFree::AutoGetDbForReadLockFree(OperationContext* opCtx,
             // Note: this must always be checked, regardless of whether the collection exists, so
             // that the dbVersion of this node or the caller gets updated quickly in case either is
             // stale.
-            catalog_helper::assertMatchingDbVersion(opCtx, dbName);
+            // TODO SERVER-63706 Pass dbName directly.
+            catalog_helper::assertMatchingDbVersion(opCtx, dbName.toStringWithTenantId());
             return std::make_pair(&fakeColl, /* isView */ false);
         },
         /* ResetFunc */
@@ -1006,7 +1007,7 @@ AutoGetDbForReadLockFree::AutoGetDbForReadLockFree(OperationContext* opCtx,
 }
 
 AutoGetDbForReadMaybeLockFree::AutoGetDbForReadMaybeLockFree(OperationContext* opCtx,
-                                                             StringData dbName,
+                                                             const DatabaseName& dbName,
                                                              Date_t deadline) {
     if (supportsLockFreeRead(opCtx)) {
         _autoGetLockFree.emplace(opCtx, dbName, deadline);

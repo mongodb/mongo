@@ -58,7 +58,7 @@ public:
 
     StatusWith<DurableCatalog::Entry> createCollection(OperationContext* opCtx,
                                                        NamespaceString ns) {
-        AutoGetDb db(opCtx, ns.db(), LockMode::MODE_X);
+        AutoGetDb db(opCtx, ns.dbName(), LockMode::MODE_X);
         CollectionOptions options;
         options.uuid = UUID::gen();
         RecordId catalogId;

@@ -164,8 +164,7 @@ Status DatabaseImpl::validateDBName(StringData dbname) {
 }
 
 DatabaseImpl::DatabaseImpl(const DatabaseName& dbName)
-    : _name(dbName),
-      _viewsName(_name.toString() + "." + DurableViewCatalog::viewsCollectionName().toString()) {}
+    : _name(dbName), _viewsName(_name, DurableViewCatalog::viewsCollectionName().toString()) {}
 
 Status DatabaseImpl::init(OperationContext* const opCtx) {
     Status status = validateDBName(_name.db());

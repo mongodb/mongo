@@ -131,7 +131,7 @@ TEST_F(AuthOpObserverTest, MultipleAboutToDeleteAndOnDelete) {
     AuthOpObserver opObserver;
     auto opCtx = cc().makeOperationContext();
     NamespaceString nss = {"test", "coll"};
-    AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_X);
+    AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
     WriteUnitOfWork wunit(opCtx.get());
     opObserver.aboutToDelete(opCtx.get(), nss, uuid, BSON("_id" << 1));
     opObserver.onDelete(opCtx.get(), nss, uuid, {}, {});

@@ -384,7 +384,7 @@ void _createCollection(OperationContext* opCtx,
                        const NamespaceString& nss,
                        const CollectionOptions options = {}) {
     writeConflictRetry(opCtx, "_createCollection", nss.ns(), [=] {
-        AutoGetDb autoDb(opCtx, nss.db(), MODE_X);
+        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
         auto db = autoDb.ensureDbExists(opCtx);
         ASSERT_TRUE(db) << "Cannot create collection " << nss << " because database " << nss.db()
                         << " does not exist.";
@@ -519,7 +519,7 @@ CollectionPtr _getCollection_inlock(OperationContext* opCtx, const NamespaceStri
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionReturnsNamespaceNotFoundIfDatabaseDoesNotExist) {
-    ASSERT_FALSE(AutoGetDb(_opCtx.get(), _sourceNss.db(), MODE_X).getDb());
+    ASSERT_FALSE(AutoGetDb(_opCtx.get(), _sourceNss.dbName(), MODE_X).getDb());
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
                   renameCollection(_opCtx.get(), _sourceNss, _targetNss, {}));
 }

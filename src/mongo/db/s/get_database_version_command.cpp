@@ -80,7 +80,7 @@ public:
                     str::stream() << definition()->getName() << " can only be run on shard servers",
                     serverGlobalParams.clusterRole == ClusterRole::ShardServer);
             BSONObj versionObj;
-            AutoGetDb autoDb(opCtx, _targetDb(), MODE_IS);
+            AutoGetDb autoDb(opCtx, DatabaseName(boost::none, _targetDb()), MODE_IS);
 
             if (const auto dbVersion =
                     DatabaseHolder::get(opCtx)->getDbVersion(opCtx, _targetDb())) {

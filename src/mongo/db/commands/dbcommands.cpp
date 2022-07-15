@@ -661,7 +661,8 @@ public:
             CurOp::get(opCtx)->setNS_inlock(dbname);
         }
 
-        AutoGetDb autoDb(opCtx, ns, MODE_IS);
+        // TODO SERVER-67519 Pass ns.dbName() directly once parseNs returns NamespaceString obj
+        AutoGetDb autoDb(opCtx, DatabaseName(boost::none, ns), MODE_IS);
 
         result.append("db", ns);
 

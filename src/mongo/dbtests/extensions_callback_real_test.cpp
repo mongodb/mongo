@@ -53,7 +53,7 @@ public:
     }
 
     void setUp() final {
-        AutoGetDb autoDb(&_opCtx, _nss.db(), MODE_X);
+        AutoGetDb autoDb(&_opCtx, _nss.dbName(), MODE_X);
         auto database = autoDb.ensureDbExists(&_opCtx);
         {
             WriteUnitOfWork wunit(&_opCtx);
@@ -63,7 +63,7 @@ public:
     }
 
     void tearDown() final {
-        AutoGetDb autoDb(&_opCtx, _nss.db(), MODE_X);
+        AutoGetDb autoDb(&_opCtx, _nss.dbName(), MODE_X);
         Database* database = autoDb.getDb();
         if (!database) {
             return;

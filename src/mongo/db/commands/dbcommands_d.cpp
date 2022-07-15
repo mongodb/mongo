@@ -168,7 +168,7 @@ protected:
         // Accessing system.profile collection should not conflict with oplog application.
         ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
             opCtx->lockState());
-        AutoGetDb ctx(opCtx, dbName.db(), dbMode);
+        AutoGetDb ctx(opCtx, dbName, dbMode);
         Database* db = ctx.getDb();
 
         // Fetches the database profiling level + filter or the server default if the db does not

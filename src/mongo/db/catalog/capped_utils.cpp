@@ -58,7 +58,7 @@
 namespace mongo {
 
 Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionName) {
-    AutoGetDb autoDb(opCtx, collectionName.db(), MODE_X);
+    AutoGetDb autoDb(opCtx, collectionName.dbName(), MODE_X);
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, collectionName);

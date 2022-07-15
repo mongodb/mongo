@@ -71,7 +71,7 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
 
     LOGV2(6319900, "Compacting the encrypted compaction collection", "namespace"_attr = edcNss);
 
-    AutoGetDb autoDb(opCtx, edcNss.db(), MODE_IX);
+    AutoGetDb autoDb(opCtx, edcNss.dbName(), MODE_IX);
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Database '" << edcNss.db() << "' does not exist",
             autoDb.getDb());

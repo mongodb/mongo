@@ -333,7 +333,7 @@ public:
             {
                 // Acquire only the global lock and set up a consistent in-memory catalog and
                 // storage snapshot.
-                AutoGetDbForReadMaybeLockFree lockFreeReadBlock(opCtx, db);
+                AutoGetDbForReadMaybeLockFree lockFreeReadBlock(opCtx, dbName);
                 auto catalog = CollectionCatalog::get(opCtx);
 
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(&hangBeforeListCollections,

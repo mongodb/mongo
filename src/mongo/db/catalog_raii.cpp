@@ -175,16 +175,17 @@ void acquireCollectionLocksInResourceIdOrder(
 
 }  // namespace
 
-// TODO SERVER-62923 Use DatabaseName obj to construct '_dbLock' and to pass to
-// DatabaseHolder::getDb().
-AutoGetDb::AutoGetDb(OperationContext* opCtx, StringData dbName, LockMode mode, Date_t deadline)
-    : _dbName(dbName), _dbLock(opCtx, DatabaseName(boost::none, dbName), mode, deadline), _db([&] {
-          const DatabaseName tenantDbName(boost::none, dbName);
+AutoGetDb::AutoGetDb(OperationContext* opCtx,
+                     const DatabaseName& dbName,
+                     LockMode mode,
+                     Date_t deadline)
+    : _dbName(dbName), _dbLock(opCtx, dbName, mode, deadline), _db([&] {
           auto databaseHolder = DatabaseHolder::get(opCtx);
-          return databaseHolder->getDb(opCtx, tenantDbName);
+          return databaseHolder->getDb(opCtx, dbName);
       }()) {
     // The 'primary' database must be version checked for sharding.
-    catalog_helper::assertMatchingDbVersion(opCtx, _dbName);
+    // TODO SERVER-63706 Pass dbName directly
+    catalog_helper::assertMatchingDbVersion(opCtx, _dbName.toStringWithTenantId());
 }
 
 Database* AutoGetDb::ensureDbExists(OperationContext* opCtx) {
@@ -193,10 +194,9 @@ Database* AutoGetDb::ensureDbExists(OperationContext* opCtx) {
     }
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    const DatabaseName dbName(boost::none, _dbName);
-    _db = databaseHolder->openDb(opCtx, dbName, nullptr);
+    _db = databaseHolder->openDb(opCtx, _dbName, nullptr);
 
-    catalog_helper::assertMatchingDbVersion(opCtx, _dbName);
+    catalog_helper::assertMatchingDbVersion(opCtx, _dbName.toStringWithTenantId());
 
     return _db;
 }
@@ -213,19 +213,11 @@ AutoGetCollection::AutoGetCollection(
     // Acquire the global/RSTL and all the database locks (may or may not be multiple
     // databases).
 
-    // TODO SERVER-62923 Use DatabaseName obj directly.
-    auto dbName = [nsOrUUID]() {
-        // TODO SERVER-67817 Use NamespaceStringOrUUID::db() instead.
-        if (nsOrUUID.dbName())
-            return nsOrUUID.dbName()->toStringWithTenantId();
-
-        if (nsOrUUID.nss())
-            return nsOrUUID.nss()->dbName().toStringWithTenantId();
-
-        return DatabaseName(boost::none, "").toStringWithTenantId();
-    }();
-
-    _autoDb.emplace(opCtx, dbName, isSharedLockMode(modeColl) ? MODE_IS : MODE_IX, deadline);
+    // TODO SERVER-67817 Use NamespaceStringOrUUID::db() instead.
+    _autoDb.emplace(opCtx,
+                    nsOrUUID.nss() ? nsOrUUID.nss()->dbName() : *nsOrUUID.dbName(),
+                    isSharedLockMode(modeColl) ? MODE_IS : MODE_IX,
+                    deadline);
 
     // Out of an abundance of caution, force operations to acquire new snapshots after
     // acquiring exclusive collection locks. Operations that hold MODE_X locks make an
@@ -263,14 +255,14 @@ AutoGetCollection::AutoGetCollection(
         auto secondaryResolvedNss =
             catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID);
         auto secondaryColl = catalog->lookupCollectionByNamespace(opCtx, secondaryResolvedNss);
-        // TODO SERVER-64608 Use tenantID on NamespaceString to construct DatabaseName
-        const DatabaseName secondaryDbName(boost::none, secondaryNssOrUUID.db());
+        auto secondaryDbName = secondaryNssOrUUID.dbName() ? secondaryNssOrUUID.dbName()
+                                                           : secondaryNssOrUUID.nss()->dbName();
         verifyDbAndCollection(opCtx,
                               MODE_IS,
                               secondaryNssOrUUID,
                               secondaryResolvedNss,
                               secondaryColl,
-                              databaseHolder->getDb(opCtx, secondaryDbName));
+                              databaseHolder->getDb(opCtx, *secondaryDbName));
     }
 
     if (_coll) {

@@ -383,6 +383,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         // primary, blocking behind the critical section.
 
         // Extract which database was updated
+        // TODO SERVER-67789 Change to extract DatabaseName obj, and use when locking db below.
         std::string db;
         fassert(40478,
                 bsonExtractStringField(
@@ -395,7 +396,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
             // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can
             // block.
             AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
-            AutoGetDb autoDb(opCtx, db, MODE_X);
+            AutoGetDb autoDb(opCtx, DatabaseName(boost::none, db), MODE_X);
             DatabaseHolder::get(opCtx)->clearDbInfo(opCtx, DatabaseName(boost::none, db));
         }
     }
@@ -484,6 +485,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
         }
 
         // Extract which database entry is being deleted from the _id field.
+        // TODO SERVER-67789 Change to extract DatabaseName obj, and use when locking db below.
         std::string deletedDatabase;
         fassert(50772,
                 bsonExtractStringField(
@@ -491,7 +493,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
 
         // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can block.
         AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
-        AutoGetDb autoDb(opCtx, deletedDatabase, MODE_X);
+        AutoGetDb autoDb(opCtx, DatabaseName(boost::none, deletedDatabase), MODE_X);
         DatabaseHolder::get(opCtx)->clearDbInfo(opCtx, DatabaseName(boost::none, deletedDatabase));
     }
 

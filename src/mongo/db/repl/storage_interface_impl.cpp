@@ -242,7 +242,7 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
         UnreplicatedWritesBlock uwb(opCtx.get());
 
         // Get locks and create the collection.
-        AutoGetDb autoDb(opCtx.get(), nss.db(), MODE_IX);
+        AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_IX);
         AutoGetCollection coll(opCtx.get(), nss, fixLockModeForSystemDotViewsChanges(nss, MODE_X));
         if (coll) {
             return Status(ErrorCodes::NamespaceExists,
@@ -452,7 +452,7 @@ Status StorageInterfaceImpl::createCollection(OperationContext* opCtx,
                                               const bool createIdIndex,
                                               const BSONObj& idIndexSpec) {
     return writeConflictRetry(opCtx, "StorageInterfaceImpl::createCollection", nss.ns(), [&] {
-        AutoGetDb databaseWriteGuard(opCtx, nss.db(), MODE_IX);
+        AutoGetDb databaseWriteGuard(opCtx, nss.dbName(), MODE_IX);
         auto db = databaseWriteGuard.ensureDbExists(opCtx);
         invariant(db);
 
@@ -513,7 +513,7 @@ Status StorageInterfaceImpl::createIndexesOnEmptyCollection(
 
 Status StorageInterfaceImpl::dropCollection(OperationContext* opCtx, const NamespaceString& nss) {
     return writeConflictRetry(opCtx, "StorageInterfaceImpl::dropCollection", nss.ns(), [&] {
-        AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
+        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_X);
         if (!autoDb.getDb()) {
             // Database does not exist - nothing to do.
@@ -560,7 +560,7 @@ Status StorageInterfaceImpl::renameCollection(OperationContext* opCtx,
     }
 
     return writeConflictRetry(opCtx, "StorageInterfaceImpl::renameCollection", fromNS.ns(), [&] {
-        AutoGetDb autoDB(opCtx, fromNS.db(), MODE_X);
+        AutoGetDb autoDB(opCtx, fromNS.dbName(), MODE_X);
         if (!autoDB.getDb()) {
             return Status(ErrorCodes::NamespaceNotFound,
                           str::stream()
@@ -1428,7 +1428,7 @@ boost::optional<Timestamp> StorageInterfaceImpl::getRecoveryTimestamp(
 }
 
 Status StorageInterfaceImpl::isAdminDbValid(OperationContext* opCtx) {
-    AutoGetDb autoDB(opCtx, "admin", MODE_X);
+    AutoGetDb autoDB(opCtx, DatabaseName(boost::none, "admin"), MODE_X);
     auto adminDb = autoDB.getDb();
     if (!adminDb) {
         return Status::OK();

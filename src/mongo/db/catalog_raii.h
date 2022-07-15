@@ -57,7 +57,7 @@ class AutoGetDb {
 
 public:
     AutoGetDb(OperationContext* opCtx,
-              StringData dbName,
+              const DatabaseName& dbName,
               LockMode mode,
               Date_t deadline = Date_t::max());
 
@@ -76,7 +76,7 @@ public:
     Database* ensureDbExists(OperationContext* opCtx);
 
 private:
-    std::string _dbName;
+    DatabaseName _dbName;
 
     // Special note! The primary DBLock must destruct last (be declared first) so that the global
     // and RSTL locks are not released until all the secondary DBLocks (without global and RSTL)

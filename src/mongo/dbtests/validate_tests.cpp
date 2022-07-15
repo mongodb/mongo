@@ -108,7 +108,7 @@ public:
         : ValidateBase(full, background, /*clustered=*/false) {}
 
     ~ValidateBase() {
-        AutoGetDb autoDb(&_opCtx, _nss.db(), MODE_X);
+        AutoGetDb autoDb(&_opCtx, _nss.dbName(), MODE_X);
         auto db = autoDb.getDb();
         ASSERT_TRUE(db);
 
@@ -192,7 +192,7 @@ protected:
     void lockDb(LockMode mode) {
         _autoDb.reset();
         invariant(_opCtx.lockState()->isDbLockedForMode(_nss.dbName(), MODE_NONE));
-        _autoDb.reset(new AutoGetDb(&_opCtx, _nss.db().toString(), mode));
+        _autoDb.reset(new AutoGetDb(&_opCtx, _nss.dbName(), mode));
         invariant(_opCtx.lockState()->isDbLockedForMode(_nss.dbName(), mode));
         _db = _autoDb.get()->getDb();
     }

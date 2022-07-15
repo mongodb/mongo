@@ -100,7 +100,7 @@ Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
     {
         // We use AutoGetDb::ensureDbExists() the first time just in case movePrimary was called
         // before any data was inserted into the database.
-        AutoGetDb autoDb(opCtx, getNss().toString(), MODE_X);
+        AutoGetDb autoDb(opCtx, getNss().dbName(), MODE_X);
         invariant(autoDb.ensureDbExists(opCtx), getNss().toString());
 
         auto dss = DatabaseShardingState::get(opCtx, getNss().toString());
@@ -164,7 +164,7 @@ Status MovePrimarySourceManager::enterCriticalSection(OperationContext* opCtx) {
         // The critical section must be entered with the database X lock in order to ensure there
         // are no writes which could have entered and passed the database version check just before
         // we entered the critical section, but will potentially complete after we left it.
-        AutoGetDb autoDb(opCtx, getNss().toString(), MODE_X);
+        AutoGetDb autoDb(opCtx, getNss().dbName(), MODE_X);
 
         if (!autoDb.getDb()) {
             uasserted(ErrorCodes::ConflictingOperationInProgress,
@@ -213,7 +213,7 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
     ScopeGuard scopedGuard([&] { cleanupOnError(opCtx); });
 
     {
-        AutoGetDb autoDb(opCtx, getNss().toString(), MODE_X);
+        AutoGetDb autoDb(opCtx, getNss().dbName(), MODE_X);
 
         if (!autoDb.getDb()) {
             uasserted(ErrorCodes::ConflictingOperationInProgress,
@@ -273,7 +273,7 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
         // this node can accept writes for this collection as a proxy for it being primary.
         if (!validateStatus.isOK()) {
             UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-            AutoGetDb autoDb(opCtx, getNss().toString(), MODE_IX);
+            AutoGetDb autoDb(opCtx, getNss().dbName(), MODE_IX);
 
             if (!autoDb.getDb()) {
                 uasserted(ErrorCodes::ConflictingOperationInProgress,
@@ -443,7 +443,7 @@ void MovePrimarySourceManager::_cleanup(OperationContext* opCtx) {
     {
         // Unregister from the database's sharding state if we're still registered.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-        AutoGetDb autoDb(opCtx, getNss().toString(), MODE_IX);
+        AutoGetDb autoDb(opCtx, getNss().dbName(), MODE_IX);
 
         auto dss = DatabaseShardingState::get(opCtx, getNss().db());
         dss->clearMovePrimarySourceManager(opCtx);

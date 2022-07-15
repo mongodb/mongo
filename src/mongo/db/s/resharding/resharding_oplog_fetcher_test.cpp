@@ -215,7 +215,7 @@ public:
     void create(NamespaceString nss) {
         writeConflictRetry(_opCtx, "create", nss.ns(), [&] {
             AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(_opCtx->lockState());
-            AutoGetDb autoDb(_opCtx, nss.db(), LockMode::MODE_X);
+            AutoGetDb autoDb(_opCtx, nss.dbName(), LockMode::MODE_X);
             WriteUnitOfWork wunit(_opCtx);
             if (_opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
                 ASSERT_OK(_opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1)));

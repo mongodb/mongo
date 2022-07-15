@@ -117,7 +117,7 @@ void DatabaseTest::tearDown() {
 
 TEST_F(DatabaseTest, SetDropPendingThrowsExceptionIfDatabaseIsAlreadyInADropPendingState) {
     writeConflictRetry(_opCtx.get(), "testSetDropPending", _nss.ns(), [this] {
-        AutoGetDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
+        AutoGetDb autoDb(_opCtx.get(), _nss.dbName(), MODE_X);
         auto db = autoDb.ensureDbExists(_opCtx.get());
         ASSERT_TRUE(db);
 
@@ -140,7 +140,7 @@ TEST_F(DatabaseTest, SetDropPendingThrowsExceptionIfDatabaseIsAlreadyInADropPend
 TEST_F(DatabaseTest, CreateCollectionThrowsExceptionWhenDatabaseIsInADropPendingState) {
     writeConflictRetry(
         _opCtx.get(), "testÇreateCollectionWhenDatabaseIsInADropPendingState", _nss.ns(), [this] {
-            AutoGetDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
+            AutoGetDb autoDb(_opCtx.get(), _nss.dbName(), MODE_X);
             auto db = autoDb.ensureDbExists(_opCtx.get());
             ASSERT_TRUE(db);
 
@@ -166,7 +166,7 @@ void _testDropCollection(OperationContext* opCtx,
     if (createCollectionBeforeDrop) {
         writeConflictRetry(opCtx, "testDropCollection", nss.ns(), [=] {
             WriteUnitOfWork wuow(opCtx);
-            AutoGetDb autoDb(opCtx, nss.db(), MODE_X);
+            AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
             auto db = autoDb.ensureDbExists(opCtx);
             ASSERT_TRUE(db);
             ASSERT_TRUE(db->createCollection(opCtx, nss, collOpts));
@@ -175,7 +175,7 @@ void _testDropCollection(OperationContext* opCtx,
     }
 
     writeConflictRetry(opCtx, "testDropCollection", nss.ns(), [=] {
-        AutoGetDb autoDb(opCtx, nss.db(), MODE_X);
+        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
         auto db = autoDb.ensureDbExists(opCtx);
         ASSERT_TRUE(db);
 
@@ -216,7 +216,7 @@ TEST_F(DatabaseTest, DropCollectionRejectsProvidedDropOpTimeIfWritesAreReplicate
 
     auto opCtx = _opCtx.get();
     auto nss = _nss;
-    AutoGetDb autoDb(opCtx, nss.db(), MODE_X);
+    AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
     auto db = autoDb.ensureDbExists(opCtx);
     writeConflictRetry(opCtx, "testDropOpTimeWithReplicated", nss.ns(), [&] {
         ASSERT_TRUE(db);
@@ -234,7 +234,7 @@ TEST_F(DatabaseTest, DropCollectionRejectsProvidedDropOpTimeIfWritesAreReplicate
 void _testDropCollectionThrowsExceptionIfThereAreIndexesInProgress(OperationContext* opCtx,
                                                                    const NamespaceString& nss) {
     writeConflictRetry(opCtx, "testDropCollectionWithIndexesInProgress", nss.ns(), [opCtx, nss] {
-        AutoGetDb autoDb(opCtx, nss.db(), MODE_X);
+        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
         auto db = autoDb.ensureDbExists(opCtx);
         ASSERT_TRUE(db);
 
@@ -292,7 +292,7 @@ TEST_F(DatabaseTest, RenameCollectionPreservesUuidOfSourceCollectionAndUpdatesUu
     auto toNss = NamespaceString(fromNss.getSisterNS("bar"));
     ASSERT_NOT_EQUALS(fromNss, toNss);
 
-    AutoGetDb autoDb(opCtx, fromNss.db(), MODE_X);
+    AutoGetDb autoDb(opCtx, fromNss.dbName(), MODE_X);
     auto db = autoDb.ensureDbExists(opCtx);
     ASSERT_TRUE(db);
 
@@ -334,7 +334,7 @@ TEST_F(DatabaseTest, RenameCollectionPreservesUuidOfSourceCollectionAndUpdatesUu
 TEST_F(DatabaseTest,
        MakeUniqueCollectionNamespaceReturnsFailedToParseIfModelDoesNotContainPercentSign) {
     writeConflictRetry(_opCtx.get(), "testMakeUniqueCollectionNamespace", _nss.ns(), [this] {
-        AutoGetDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
+        AutoGetDb autoDb(_opCtx.get(), _nss.dbName(), MODE_X);
         auto db = autoDb.ensureDbExists(_opCtx.get());
         ASSERT_TRUE(db);
         ASSERT_EQUALS(ErrorCodes::FailedToParse,
@@ -345,7 +345,7 @@ TEST_F(DatabaseTest,
 
 TEST_F(DatabaseTest, MakeUniqueCollectionNamespaceReplacesPercentSignsWithRandomCharacters) {
     writeConflictRetry(_opCtx.get(), "testMakeUniqueCollectionNamespace", _nss.ns(), [this] {
-        AutoGetDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
+        AutoGetDb autoDb(_opCtx.get(), _nss.dbName(), MODE_X);
         auto db = autoDb.ensureDbExists(_opCtx.get());
         ASSERT_TRUE(db);
 
@@ -388,7 +388,7 @@ TEST_F(
     DatabaseTest,
     MakeUniqueCollectionNamespaceReturnsNamespaceExistsIfGeneratedNamesMatchExistingCollections) {
     writeConflictRetry(_opCtx.get(), "testMakeUniqueCollectionNamespace", _nss.ns(), [this] {
-        AutoGetDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
+        AutoGetDb autoDb(_opCtx.get(), _nss.dbName(), MODE_X);
         auto db = autoDb.ensureDbExists(_opCtx.get());
         ASSERT_TRUE(db);
 
@@ -418,7 +418,7 @@ TEST_F(DatabaseTest, AutoGetDBSucceedsWithDeadlineNow) {
     Lock::DBLock lock(_opCtx.get(), nss.dbName(), MODE_X);
     ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
     try {
-        AutoGetDb db(_opCtx.get(), nss.db(), MODE_X, Date_t::now());
+        AutoGetDb db(_opCtx.get(), nss.dbName(), MODE_X, Date_t::now());
         ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
     } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
         FAIL("Should get the db within the timeout");
@@ -430,7 +430,7 @@ TEST_F(DatabaseTest, AutoGetDBSucceedsWithDeadlineMin) {
     Lock::DBLock lock(_opCtx.get(), nss.dbName(), MODE_X);
     ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
     try {
-        AutoGetDb db(_opCtx.get(), nss.db(), MODE_X, Date_t());
+        AutoGetDb db(_opCtx.get(), nss.dbName(), MODE_X, Date_t());
         ASSERT(_opCtx.get()->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
     } catch (const ExceptionFor<ErrorCodes::LockTimeout>&) {
         FAIL("Should get the db within the timeout");
@@ -470,7 +470,7 @@ TEST_F(DatabaseTest, CreateCollectionProhibitsReplicatedCollectionsWithoutIdInde
                        "testÇreateCollectionProhibitsReplicatedCollectionsWithoutIdIndex",
                        _nss.ns(),
                        [this] {
-                           AutoGetDb autoDb(_opCtx.get(), _nss.db(), MODE_X);
+                           AutoGetDb autoDb(_opCtx.get(), _nss.dbName(), MODE_X);
                            auto db = autoDb.ensureDbExists(_opCtx.get());
                            ASSERT_TRUE(db);
 

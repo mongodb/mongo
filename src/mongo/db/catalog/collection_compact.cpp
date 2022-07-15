@@ -72,7 +72,7 @@ CollectionPtr getCollectionForCompact(OperationContext* opCtx,
 
 StatusWith<int64_t> compactCollection(OperationContext* opCtx,
                                       const NamespaceString& collectionNss) {
-    AutoGetDb autoDb(opCtx, collectionNss.db(), MODE_IX);
+    AutoGetDb autoDb(opCtx, collectionNss.dbName(), MODE_IX);
     Database* database = autoDb.getDb();
     uassert(ErrorCodes::NamespaceNotFound, "database does not exist", database);
 

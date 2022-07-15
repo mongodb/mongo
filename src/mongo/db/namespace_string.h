@@ -701,6 +701,7 @@ private:
  */
 class NamespaceStringOrUUID {
 public:
+    NamespaceStringOrUUID() = delete;
     NamespaceStringOrUUID(NamespaceString nss) : _nss(std::move(nss)) {}
     NamespaceStringOrUUID(DatabaseName dbname, UUID uuid)
         : _uuid(std::move(uuid)), _dbname(std::move(dbname)) {}

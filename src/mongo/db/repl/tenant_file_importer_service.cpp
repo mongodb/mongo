@@ -101,7 +101,7 @@ void importCopiedFiles(OperationContext* opCtx,
 
     auto catalog = CollectionCatalog::get(opCtx);
     for (auto&& m : metadatas) {
-        AutoGetDb dbLock(opCtx, m.ns.db(), MODE_IX);
+        AutoGetDb dbLock(opCtx, m.ns.dbName(), MODE_IX);
         Lock::CollectionLock systemViewsLock(
             opCtx,
             NamespaceString(m.ns.dbName(), NamespaceString::kSystemDotViewsCollectionName),

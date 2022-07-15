@@ -2681,7 +2681,10 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         hangIndexBuildBeforeCommit.pauseWhileSet();
     }
 
-    AutoGetDb autoDb(opCtx, replState->dbName, MODE_IX);
+    // TODO SERVER-67437 Once ReplIndexBuildState holds DatabaseName, use dbName directly for
+    // lock
+    DatabaseName dbName(boost::none, replState->dbName);
+    AutoGetDb autoDb(opCtx, dbName, MODE_IX);
 
     // Unlock RSTL to avoid deadlocks with prepare conflicts and state transitions caused by waiting
     // for a a strong collection lock. See SERVER-42621.

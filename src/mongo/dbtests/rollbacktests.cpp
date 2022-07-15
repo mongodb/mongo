@@ -488,7 +488,7 @@ public:
         dropDatabase(&opCtx, nss);
         createCollection(&opCtx, nss);
 
-        AutoGetDb autoDb(&opCtx, nss.db(), MODE_X);
+        AutoGetDb autoDb(&opCtx, nss.dbName(), MODE_X);
 
         CollectionWriter coll(&opCtx, nss);
 
@@ -530,7 +530,7 @@ public:
         dropDatabase(&opCtx, nss);
         createCollection(&opCtx, nss);
 
-        AutoGetDb autoDb(&opCtx, nss.db(), MODE_X);
+        AutoGetDb autoDb(&opCtx, nss.dbName(), MODE_X);
 
         CollectionWriter coll(&opCtx, nss);
 
@@ -584,7 +584,7 @@ public:
         dropDatabase(&opCtx, nss);
         createCollection(&opCtx, nss);
 
-        AutoGetDb autoDb(&opCtx, nss.db(), MODE_X);
+        AutoGetDb autoDb(&opCtx, nss.dbName(), MODE_X);
         CollectionWriter coll(&opCtx, nss);
 
         string idxName = "a";

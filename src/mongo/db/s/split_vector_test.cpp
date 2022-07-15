@@ -48,7 +48,7 @@ const NamespaceString kNss = NamespaceString("foo", "bar");
 const std::string kPattern = "_id";
 
 void setUnshardedFilteringMetadata(OperationContext* opCtx, const NamespaceString& nss) {
-    AutoGetDb autoDb(opCtx, nss.db(), MODE_IX);
+    AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
     CollectionShardingRuntime::get(opCtx, nss)->setFilteringMetadata(opCtx, CollectionMetadata());
 }
