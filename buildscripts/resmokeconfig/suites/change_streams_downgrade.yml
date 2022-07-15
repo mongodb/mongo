@@ -4,8 +4,6 @@ test_kind: multi_stmt_txn_passthrough
 selector:
   roots:
   - jstests/core/**/*.js
-  - jstests/fle2/**/*.js
-  - src/mongo/db/modules/*/jstests/fle2/*.js
   exclude_files:
   # These tests run in the jscore_txn passthrough suites.
   - jstests/core/txns/**/*.js
