@@ -107,6 +107,7 @@
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/oplog_writer_impl.h"
+#include "mongo/db/op_observer/oplog_writer_transaction_proxy.h"
 #include "mongo/db/op_observer/user_write_block_mode_op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/periodic_runner_job_abort_expired_transactions.h"
@@ -1109,8 +1110,8 @@ void setUpObservers(ServiceContext* serviceContext) {
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
         DurableHistoryRegistry::get(serviceContext)
             ->registerPin(std::make_unique<ReshardingHistoryHook>());
-        opObserverRegistry->addObserver(
-            std::make_unique<OpObserverShardingImpl>(std::make_unique<OplogWriterImpl>()));
+        opObserverRegistry->addObserver(std::make_unique<OpObserverShardingImpl>(
+            std::make_unique<OplogWriterTransactionProxy>(std::make_unique<OplogWriterImpl>())));
         opObserverRegistry->addObserver(std::make_unique<ShardServerOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<ReshardingOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<repl::TenantMigrationDonorOpObserver>());

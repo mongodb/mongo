@@ -42,6 +42,16 @@ env.Library(
 )
 
 env.Library(
+    target='oplog_writer_transaction_proxy',
+    source=[
+        'oplog_writer_transaction_proxy.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
     target="op_observer_impl",
     source=[
         "op_observer_impl.cpp",

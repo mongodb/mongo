@@ -2440,6 +2440,7 @@ env.Library(
         'op_observer/fcv_op_observer',
         'op_observer/op_observer',
         'op_observer/oplog_writer_impl',
+        'op_observer/oplog_writer_transaction_proxy',
         'op_observer/user_write_block_mode_op_observer',
         'periodic_runner_job_abort_expired_transactions',
         'pipeline/process_interface/mongod_process_interface_factory',
