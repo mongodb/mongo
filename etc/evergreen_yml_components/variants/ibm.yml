@@ -28,7 +28,7 @@ buildvariants:
     multiversion_architecture: ppc64le
     multiversion_edition: enterprise
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel81-power8-large
   - name: .aggregation .common
@@ -84,7 +84,7 @@ buildvariants:
     multiversion_architecture: s390x
     multiversion_edition: enterprise
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel72-zseries-build
   - name: .aggregation .common
@@ -140,7 +140,7 @@ buildvariants:
     multiversion_architecture: s390x
     multiversion_edition: enterprise
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel83-zseries-large
   - name: .aggregation .common

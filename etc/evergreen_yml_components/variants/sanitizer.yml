@@ -23,7 +23,7 @@ buildvariants:
     test_flags: --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
     separate_debug: off
   tasks:
-    - name: compile_test_and_package_serial_TG
+    - name: compile_test_and_package_serial_no_unittests_TG
     - name: .aggfuzzer .common !.feature_flag_guarded
     - name: free_monitoring
     - name: .jstestfuzz !.initsync
@@ -55,7 +55,7 @@ buildvariants:
     separate_debug: off
     large_distro_name: rhel80-build
   tasks:
-  - name: compile_test_benchmark_and_package_serial_TG
+  - name: compile_test_benchmark_and_package_serial_no_unittests_TG
   - name: .aggregation !.feature_flag_guarded
   - name: .auth
   - name: audit
@@ -127,7 +127,7 @@ buildvariants:
     separate_debug: off
     large_distro_name: rhel80-build
   tasks:
-  - name: compile_test_benchmark_and_package_serial_TG
+  - name: compile_test_benchmark_and_package_serial_no_unittests_TG
   - name: .aggregation !.feature_flag_guarded
   - name: .auth
   - name: audit

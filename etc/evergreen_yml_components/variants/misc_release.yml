@@ -24,7 +24,7 @@ buildvariants:
     virtualenv: /opt/mongodbtoolchain/v3/bin/virtualenv
     large_distro_name: amazon1-2018-build
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - amazon1-2018-build
   - name: .aggfuzzer .common
@@ -79,7 +79,7 @@ buildvariants:
     scons_cache_scope: shared
     virtualenv: /opt/mongodbtoolchain/v3/bin/virtualenv
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - amazon1-2018-build
   - name: .aggfuzzer .common
@@ -132,7 +132,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: amazon2-large
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - amazon2-build
   - name: .aggfuzzer .common
@@ -191,7 +191,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - amazon2-build
   - name: .aggfuzzer .common
@@ -244,7 +244,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: amazon2-arm64-large
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - amazon2-arm64-large
   - name: aggregation !.feature_flag_guarded
@@ -303,7 +303,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - amazon2-arm64-large
   - name: test_api_version_compatibility
@@ -421,7 +421,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: debian10-build
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - debian10-build
   - name: .aggfuzzer .common
@@ -479,7 +479,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: debian10-build
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - debian10-build
   - name: .aggfuzzer .common
@@ -531,7 +531,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: debian11-large
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - debian11-large
   - name: .aggfuzzer .common
@@ -589,7 +589,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: debian11-large
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - debian11-large
   - name: .aggfuzzer .common
@@ -639,7 +639,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: rhel70
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel70
   - name: aggregation !.feature_flag_guarded
@@ -729,7 +729,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: rhel80-build
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel80-build
   - name: aggregation !.feature_flag_guarded
@@ -789,7 +789,7 @@ buildvariants:
     max_sub_suites: 3
     large_distro_name: rhel80-medium
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel80-large
   - name: .aggfuzzer
@@ -895,7 +895,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: rhel82-arm64-large
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel82-arm64-large
   - name: aggregation !.feature_flag_guarded
@@ -947,7 +947,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel82-arm64-large
   - name: .aggfuzzer !.multiversion
@@ -1006,7 +1006,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: suse12-sp5-large
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - suse12-sp5-large
   - name: .aggfuzzer .common
@@ -1060,7 +1060,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - suse12-sp5-large
   - name: .aggfuzzer .common
@@ -1108,7 +1108,7 @@ buildvariants:
     repo_edition: enterprise
     scons_cache_scope: shared
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - suse15-build
   - name: .aggfuzzer .common !.multiversion
@@ -1154,7 +1154,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: suse15-build
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - suse15-build
   - name: .aggfuzzer .common !.multiversion
@@ -1204,7 +1204,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: ubuntu1804-build
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - ubuntu1804-build
   - name: .aggfuzzer .common
@@ -1269,7 +1269,7 @@ buildvariants:
     # TODO SERVER-64479 remove external_auth_jobs_max once resolved
     external_auth_jobs_max: 1
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - ubuntu1804-build
   - name: compile_build_tools_next_TG
@@ -1340,7 +1340,7 @@ buildvariants:
     multiversion_edition: enterprise
     scons_cache_scope: shared
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
   - name: aggregation !.feature_flag_guarded
   - name: aggregation_wildcard_fuzzer_gen
   - name: .auth !.audit !.multiversion !.jscore
@@ -1395,7 +1395,7 @@ buildvariants:
     multiversion_edition: targeted
     scons_cache_scope: shared
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
   - name: free_monitoring
   - name: jsCore
   - name: replica_sets_jscore_passthrough
@@ -1428,7 +1428,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: ubuntu2004-large
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - ubuntu2004-large
   - name: .aggfuzzer .common !.multiversion
@@ -1487,7 +1487,7 @@ buildvariants:
     # TODO SERVER-64479 remove external_auth_jobs_max once resolved
     external_auth_jobs_max: 1
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - ubuntu2004-large
   - name: .crypt
@@ -1544,7 +1544,7 @@ buildvariants:
     multiversion_edition: enterprise
     scons_cache_scope: shared
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
   - name: aggregation !.feature_flag_guarded
   - name: aggregation_wildcard_fuzzer_gen
   - name: .auth !.audit !.multiversion !.jscore
@@ -1596,7 +1596,7 @@ buildvariants:
     multiversion_edition: targeted
     scons_cache_scope: shared
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
   - name: free_monitoring
   - name: jsCore
   - name: replica_sets_jscore_passthrough
@@ -1633,7 +1633,7 @@ buildvariants:
     large_distro_name: windows-vsCurrent-large
     test_flags: &windows_common_test_excludes --excludeWithAnyTags=incompatible_with_windows_tls
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - windows-vsCurrent-large
   - name: .aggfuzzer

@@ -17,7 +17,7 @@ buildvariants:
     scons_cache_scope: shared
     large_distro_name: rhel80-large
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel80-xlarge
   - name: .aggfuzzer .common
@@ -85,7 +85,7 @@ buildvariants:
     multiversion_edition: enterprise
     large_distro_name: windows-vsCurrent-large
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - windows-vsCurrent-large
   - name: .aggfuzzer .common

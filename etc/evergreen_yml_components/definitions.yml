@@ -7563,6 +7563,19 @@ task_groups:
   - compile_all
   - package
 
+# The *no_unittests_TG taskgroups remove compile/run unittests to work around
+# limitations in the size of debug info. See SERVER-68024.
+- <<: *compile_task_group_template
+  name: compile_test_and_package_serial_no_unittests_TG
+  tasks:
+  - compile_dist_test
+  - archive_dist_test
+  - archive_dist_test_debug
+  - compile_dbtest
+  - run_dbtest
+  - archive_dbtest
+  - package
+
 - <<: *compile_task_group_template
   name: compile_test_benchmark_and_package_serial_TG
   tasks:
@@ -7575,7 +7588,18 @@ task_groups:
   - run_dbtest
   - archive_dbtest
   - compile_upload_benchmarks
-  - compile_all
+  - package
+
+- <<: *compile_task_group_template
+  name: compile_test_benchmark_and_package_serial_no_unittests_TG
+  tasks:
+  - compile_dist_test
+  - archive_dist_test
+  - archive_dist_test_debug
+  - compile_dbtest
+  - run_dbtest
+  - archive_dbtest
+  - compile_upload_benchmarks
   - package
 
 - <<: *compile_task_group_template
