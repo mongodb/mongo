@@ -1243,7 +1243,7 @@ void resumeMigrationRecipientsOnStepUp(OperationContext* opCtx) {
                     nss,
                     doc.getRange(),
                     doc.getDonorShardIdForLoggingPurposesOnly(),
-                    true /* waitForOngoingMigrations */)));
+                    true /* waitForCompletionOfConflictingOps */)));
 
             const auto mdm = MigrationDestinationManager::get(opCtx);
             uassertStatusOK(

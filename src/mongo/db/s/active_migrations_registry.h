@@ -91,20 +91,22 @@ public:
                                                       const ShardsvrMoveRange& args);
 
     /**
-     * If there are no migrations or split/merges running on this shard, registers an active receive
-     * operation with the specified session id and returns a ScopedReceiveChunk. The
-     * ScopedReceiveChunk will unregister the migration when the ScopedReceiveChunk goes out of
-     * scope.
+     * Registers an active receive chunk operation with the specified session id and returns a
+     * ScopedReceiveChunk. The returned ScopedReceiveChunk object will unregister the migration when
+     * it goes out of scope.
      *
-     * Otherwise returns a ConflictingOperationInProgress error if waitForOngoingMigrations is false
-     * or waits for the ongoing migration/split/merge to finish and then registers the migration if
-     * waitForOngoingMigrations is true.
+     * In case registerReceiveChunk() is called while other operations (a second migration or a
+     * registry lock()) are already holding resources of the ActiveMigrationsRegistry, the function
+     * will either
+     * - wait for such operations to complete and then perform the registration
+     * - return a ConflictingOperationInProgress error
+     * based on the value of the waitForCompletionOfConflictingOps parameter
      */
     StatusWith<ScopedReceiveChunk> registerReceiveChunk(OperationContext* opCtx,
                                                         const NamespaceString& nss,
                                                         const ChunkRange& chunkRange,
                                                         const ShardId& fromShardId,
-                                                        bool waitForOngoingMigrations);
+                                                        bool waitForCompletionOfConflictingOps);
 
     /**
      * If there are no migrations running on this shard, registers an active split or merge

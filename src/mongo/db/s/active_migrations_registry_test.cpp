@@ -33,7 +33,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/s/active_migrations_registry.h"
-#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/s/commands/cluster_commands_gen.h"
 #include "mongo/stdx/future.h"
 #include "mongo/unittest/unittest.h"
@@ -43,19 +43,17 @@ namespace {
 
 using unittest::assertGet;
 
-class MoveChunkRegistration : public ServiceContextMongoDTest {
+class MoveChunkRegistration : public ShardServerTestFixture {
 public:
     void setUp() override {
-        _opCtx = getClient()->makeOperationContext();
-    }
-
-    OperationContext* operationContext() {
-        return _opCtx.get();
+        ShardServerTestFixture::setUp();
+        _opCtx = operationContext();
+        _opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
     }
 
 protected:
     ActiveMigrationsRegistry _registry;
-    ServiceContext::UniqueOperationContext _opCtx;
+    OperationContext* _opCtx;
 };
 
 ShardsvrMoveRange createMoveRangeRequest(const NamespaceString& nss,
@@ -73,7 +71,7 @@ ShardsvrMoveRange createMoveRangeRequest(const NamespaceString& nss,
 
 TEST_F(MoveChunkRegistration, ScopedDonateChunkMoveConstructorAndAssignment) {
     auto originalScopedDonateChunk = assertGet(_registry.registerDonateChunk(
-        operationContext(), createMoveRangeRequest(NamespaceString("TestDB", "TestColl"))));
+        _opCtx, createMoveRangeRequest(NamespaceString("TestDB", "TestColl"))));
     ASSERT(originalScopedDonateChunk.mustExecute());
 
     ScopedDonateChunk movedScopedDonateChunk(std::move(originalScopedDonateChunk));
@@ -144,7 +142,11 @@ TEST_F(MoveChunkRegistration, TestBlockingDonateChunk) {
     // Registry thread.
     auto result = stdx::async(stdx::launch::async, [&] {
         // 2. Lock the registry so that starting to donate will block.
-        _registry.lock(operationContext(), "dummy");
+        ThreadClient tc("ActiveMigrationsRegistryTest", getGlobalServiceContext());
+        auto opCtxHolder = tc->makeOperationContext();
+        opCtxHolder->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
+        _registry.lock(opCtxHolder.get(), "dummy");
 
         // 3. Signal the donate thread that the donate is ready to be started.
         readyToLock.set_value();
@@ -202,7 +204,11 @@ TEST_F(MoveChunkRegistration, TestBlockingReceiveChunk) {
     // Registry thread.
     auto result = stdx::async(stdx::launch::async, [&] {
         // 2. Lock the registry so that starting to receive will block.
-        _registry.lock(operationContext(), "dummy");
+        ThreadClient tc("ActiveMigrationsRegistryTest", getGlobalServiceContext());
+        auto opCtxHolder = tc->makeOperationContext();
+        opCtxHolder->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
+        _registry.lock(opCtxHolder.get(), "dummy");
 
         // 3. Signal the receive thread that the receive is ready to be started.
         readyToLock.set_value();
@@ -284,9 +290,10 @@ TEST_F(MoveChunkRegistration, TestBlockingWhileDonateInProgress) {
     // Registry locking thread.
     auto lockReleased = stdx::async(stdx::launch::async, [&] {
         ThreadClient tc("ActiveMigrationsRegistryTest", getGlobalServiceContext());
-        auto opCtx = tc->makeOperationContext();
+        auto opCtxHolder = tc->makeOperationContext();
+        opCtxHolder->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-        auto baton = opCtx->getBaton();
+        auto baton = opCtxHolder->getBaton();
         baton->schedule([&inLock](Status) {
             // 7. This is called when the registry lock is blocking. We let the test method know
             // that we're blocked on the registry lock so that it tell the migration thread to let
@@ -299,7 +306,7 @@ TEST_F(MoveChunkRegistration, TestBlockingWhileDonateInProgress) {
 
         // 6. Now that we're woken up by the migration thread, let's attempt to lock the registry.
         // This will block and call the lambda set on the baton above.
-        _registry.lock(opCtx.get(), "dummy");
+        _registry.lock(opCtxHolder.get(), "dummy");
 
         // 10. Unlock the registry and return.
         _registry.unlock("dummy");
@@ -347,9 +354,10 @@ TEST_F(MoveChunkRegistration, TestBlockingWhileReceiveInProgress) {
     // Registry locking thread.
     auto lockReleased = stdx::async(stdx::launch::async, [&] {
         ThreadClient tc("ActiveMigrationsRegistryTest", getGlobalServiceContext());
-        auto opCtx = tc->makeOperationContext();
+        auto opCtxHolder = tc->makeOperationContext();
+        opCtxHolder->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-        auto baton = opCtx->getBaton();
+        auto baton = opCtxHolder->getBaton();
         baton->schedule([&inLock](Status) {
             // 7. This is called when the registry lock is blocking. We let the test method know
             // that we're blocked on the registry lock so that it tell the migration thread to let
@@ -362,7 +370,7 @@ TEST_F(MoveChunkRegistration, TestBlockingWhileReceiveInProgress) {
 
         // 6. Now that we're woken up by the migration thread, let's attempt to lock the registry.
         // This will block and call the lambda set on the baton above.
-        _registry.lock(opCtx.get(), "dummy");
+        _registry.lock(opCtxHolder.get(), "dummy");
 
         // 10. Unlock the registry and return.
         _registry.unlock("dummy");

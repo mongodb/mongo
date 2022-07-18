@@ -120,7 +120,11 @@ public:
         // Ensure this shard is not currently receiving or donating any chunks.
         auto scopedReceiveChunk(
             uassertStatusOK(ActiveMigrationsRegistry::get(opCtx).registerReceiveChunk(
-                opCtx, nss, chunkRange, cloneRequest.getFromShardId(), false)));
+                opCtx,
+                nss,
+                chunkRange,
+                cloneRequest.getFromShardId(),
+                false /* waitForCompletionOfConflictingOps*/)));
 
         // We force a refresh immediately after registering this migration to guarantee that this
         // shard will not receive a chunk after refreshing.

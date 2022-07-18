@@ -65,6 +65,8 @@ ActiveMigrationsRegistry& ActiveMigrationsRegistry::get(OperationContext* opCtx)
 }
 
 void ActiveMigrationsRegistry::lock(OperationContext* opCtx, StringData reason) {
+    // The method requires the requesting operation to be interruptible
+    invariant(opCtx->shouldAlwaysInterruptAtStepDownOrUp());
     stdx::unique_lock<Latch> lock(_mutex);
 
     // This wait is to hold back additional lock requests while there is already one in progress
@@ -81,6 +83,17 @@ void ActiveMigrationsRegistry::lock(OperationContext* opCtx, StringData reason) 
     opCtx->waitForConditionOrInterrupt(_chunkOperationsStateChangedCV, lock, [this] {
         return !(_activeMoveChunkState || _activeReceiveChunkState);
     });
+
+    // lock() may be called while the node is still completing its draining mode; if so, reject the
+    // request with a retriable error and allow the draining mode to invoke registerReceiveChunk()
+    // as part of its recovery sequence.
+    {
+        AutoGetDb autoDB(opCtx, NamespaceString::kAdminDb, MODE_IS);
+        uassert(ErrorCodes::NotWritablePrimary,
+                "Cannot lock the registry while the node is in draining mode",
+                repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
+                    opCtx, NamespaceString::kAdminDb));
+    }
 
     unblockMigrationsOnError.dismiss();
 }
@@ -99,8 +112,7 @@ StatusWith<ScopedDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
     stdx::unique_lock<Latch> ul(_mutex);
 
     opCtx->waitForConditionOrInterrupt(_chunkOperationsStateChangedCV, ul, [&] {
-        return !_migrationsBlocked &&
-            !_activeSplitMergeChunkStates.count(args.getCommandParameter());
+        return !_activeSplitMergeChunkStates.count(args.getCommandParameter());
     });
 
     if (_activeReceiveChunkState) {
@@ -129,6 +141,12 @@ StatusWith<ScopedDonateChunk> ActiveMigrationsRegistry::registerDonateChunk(
         return _activeMoveChunkState->constructErrorStatus();
     }
 
+    if (_migrationsBlocked) {
+        return {ErrorCodes::ConflictingOperationInProgress,
+                "Unable to start new balancer operation because the ActiveMigrationsRegistry of "
+                "this shard is temporarily locked"};
+    }
+
     _activeMoveChunkState.emplace(args);
 
     return {ScopedDonateChunk(this, true, _activeMoveChunkState->notification)};
@@ -139,17 +157,14 @@ StatusWith<ScopedReceiveChunk> ActiveMigrationsRegistry::registerReceiveChunk(
     const NamespaceString& nss,
     const ChunkRange& chunkRange,
     const ShardId& fromShardId,
-    bool waitForOngoingMigrations) {
+    bool waitForCompletionOfConflictingOps) {
     stdx::unique_lock<Latch> ul(_mutex);
 
-    if (waitForOngoingMigrations) {
+    if (waitForCompletionOfConflictingOps) {
         opCtx->waitForConditionOrInterrupt(_chunkOperationsStateChangedCV, ul, [this] {
             return !_migrationsBlocked && !_activeMoveChunkState && !_activeReceiveChunkState;
         });
     } else {
-        opCtx->waitForConditionOrInterrupt(
-            _chunkOperationsStateChangedCV, ul, [this] { return !_migrationsBlocked; });
-
         if (_activeReceiveChunkState) {
             return _activeReceiveChunkState->constructErrorStatus();
         }
@@ -161,10 +176,16 @@ StatusWith<ScopedReceiveChunk> ActiveMigrationsRegistry::registerReceiveChunk(
                   "runningMigration"_attr = _activeMoveChunkState->args.toBSON({}));
             return _activeMoveChunkState->constructErrorStatus();
         }
+
+        if (_migrationsBlocked) {
+            return {
+                ErrorCodes::ConflictingOperationInProgress,
+                "Unable to start new balancer operation because the ActiveMigrationsRegistry of "
+                "this shard is temporarily locked"};
+        }
     }
 
     _activeReceiveChunkState.emplace(nss, chunkRange, fromShardId);
-
     return {ScopedReceiveChunk(this)};
 }
 
