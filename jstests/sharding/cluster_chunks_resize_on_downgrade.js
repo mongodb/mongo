@@ -2,8 +2,7 @@
  * Tests that chunks are re-split upon downgrade from v6.0.
  *
  * @tags: [
- *  requires_fcv_60,
- *  __TEMPORARILY_DISABLED__,
+ *  requires_fcv_61,
  * ]
  */
 
@@ -38,7 +37,7 @@ assert.commandWorked(bulk.execute());
 
 const numChunksBeforeDowngrade = findChunksUtil.countChunksForNs(st.config, nss);
 
-assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastContinuousFCV}));
+assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
 
 const numChunksAfterDowngrade = findChunksUtil.countChunksForNs(st.config, nss);
 jsTest.log("Number of chunks: before downgrade = " + numChunksBeforeDowngrade +
