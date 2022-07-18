@@ -1305,8 +1305,15 @@ SemiFuture<void> ReshardingCoordinatorService::ReshardingCoordinator::run(
         })
         .onCompletion([this, executor](Status status) {
             auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-            reshardingPauseCoordinatorBeforeCompletion.pauseWhileSetAndNotCanceled(
-                opCtx.get(), _ctHolder->getStepdownToken());
+            reshardingPauseCoordinatorBeforeCompletion.executeIf(
+                [&](const BSONObj&) {
+                    reshardingPauseCoordinatorBeforeCompletion.pauseWhileSetAndNotCanceled(
+                        opCtx.get(), _ctHolder->getStepdownToken());
+                },
+                [&](const BSONObj& data) {
+                    auto ns = data.getStringField("sourceNamespace");
+                    return ns.empty() ? true : ns.toString() == _coordinatorDoc.getSourceNss().ns();
+                });
 
             {
                 auto lg = stdx::lock_guard(_fulfillmentMutex);
