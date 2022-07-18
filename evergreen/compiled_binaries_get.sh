@@ -6,8 +6,9 @@ cd src
 set -o errexit
 set -o verbose
 
+# activate_venv will make sure we are using python 3
+activate_venv
 setup_db_contrib_tool_venv
-activate_db_contrib_tool_venv
 
 rm -rf /data/install /data/multiversion
 
