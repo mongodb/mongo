@@ -32,7 +32,7 @@ Here we will divide it into the following phases and topics:
        or projections
      * **Plan Selection:** Compete the candidate plans against each other
        and select the winner.
-     * **Plan Caching:** Attempt to skip the expensive steps above by
+     * [**Plan Caching:**](#plan-caching) Attempt to skip the expensive steps above by
        caching the previous winning solution.
  * **Query Execution:** Iterate the winning plan and return results to the
    client.
@@ -282,4 +282,128 @@ give a summary of how each is parsed, but not get into the same level of detail.
   query portion is delegated to the query parser and if this is an update (rather than a delete) it
   uses the same parser as the update command.
 
-TODO from here on.
+## Plan caching
+
+Plan caching is a technique in which the plans produced by the query optimizer are stored and
+subsequently reused when the client re-issues the same or similar queries. This is purely a
+performance optimization with the goal of avoiding potentially costly re-optimization.
+
+The query engine currently has two separate plan cache implementations: one for the classic
+execution engine and another for the slot-based execution engine (SBE). Although they share some
+code and behaviors, the two plan caches have some important differences and are described separately
+below.
+
+### Classic plan cache
+
+The classic plan cache (of type
+[`mongo::PlanCache`](https://github.com/mongodb/mongo/blob/f28a9f718268ca84644aa77e98ca7ee9651bd5b6/src/mongo/db/query/classic_plan_cache.h#L243-L248)
+in the implementation) is an in-memory data structure with a separate instance for each collection.
+The plan cache does not persist. It exists only on mongod, not on mongos.
+
+The cache is logically a map from "query shape" to cached plan. The query shape is non
+human-readable string that encodes the match, projection, sort, and collation of a find command (or
+the pushed-down pieces of an aggregate command) with the constants removed. For more details on the
+cache key encoding, see the
+[`canonical_query_encoder`](https://github.com/mongodb/mongo/blob/91cef76e80b79fe4a2867413af5910027c3b69d5/src/mongo/db/query/canonical_query_encoder.h).
+The plan cache keys map to cache entries which, loosely speaking, consist of index tags (see
+[PlanCacheIndexTree](https://github.com/mongodb/mongo/blob/bc7d24c035466c435ade89b62f958a6fa4e22333/src/mongo/db/query/classic_plan_cache.h#L113)
+for details). When the system receives a new query, before doing any query optimization, the query's
+plan cache key is calculated and used to look for a matching cache entry. If there is a cache hit,
+the index tags from the cache are applied to the query's `MatchExpression`. Based on these tags,
+the `QueryPlanner` is used to re-construct the corresponding `QuerySolution` and `PlanStage` trees,
+skipping plan enumeration and multi-planning.
+
+The primary goal of the classic plan cache is to avoid multi-planning: although the `QuerySolution`
+and `PlanStage` tree need to be reconstructed from scratch when recovering plans from the classic
+cache, there is still a major performance benefit achieved by avoiding the cost of repeated runtime
+plan selection.
+
+### SBE plan cache
+
+The SBE plan cache is also an in-memory map from key to cache entry (see
+[`sbe::PlanCache`](https://github.com/mongodb/mongo/blob/a04e1c1812a28ebfb9a2684859097ade649a1184/src/mongo/db/query/sbe_plan_cache.h#L224-L229)).
+Like the classic plan cache it is not persistent and exists only on mongod. The keys are encoded
+slightly differently for the SBE plan cache than for classic (see
+[`canonical_query_encoder::encodeSBE()`](https://github.com/mongodb/mongo/blob/91cef76e80b79fe4a2867413af5910027c3b69d5/src/mongo/db/query/canonical_query_encoder.h#L58))
+but they are conceptually similar.
+
+The first important difference between the caches is that there is a single SBE plan cache instance
+for the entire mongod process rather than a per-collection instance. The `sbe::PlanCache` decorates
+the `ServiceContext`. Since SBE is designed to execute queries that span multiple collections, this
+avoids having the cache entries be owned by any one collection. Also, the process-global design
+makes memory management easier: the SBE plan cache is given a maximum memory footprint based on the
+`planCacheSize` setParameter and will never exceed this memory budget. (This is in contrast to the
+classic cache, which attempts to limit its memory footprint but can be memory-greedy in some edge
+cases.)
+
+The second -- and possibly the most significant -- difference between the two plan cache
+implementations is that the SBE cache stores `sbe::PlanStage` execution trees directly. When a query
+recovers a plan from the cache, it first makes a clone of the cached tree. Each query needs its own
+execution tree, so the one in the cache acts as a master copy. Any expressions in the tree are
+compiled to SBE bytecode in order to prepare the tree for execution. Next, the plan goes through a
+"bind-in" phase which allows the SBE plan cache to work together with auto-parameterization. Queries
+using SBE are auto-parameterized, meaning that eligible constants in the incoming match expression
+are automatically assigned input parameter ids. Currently, only the match portion of the query is
+auto-parameterized. (MongoDB does not currently support prepared statements with explicit parameter
+markers; auto-parameterization is the only way a query can have parameter markers.) When the
+`QuerySolution` is compiled to an `sbe::PlanStage` tree, any constants are replaced with references
+to slots in the SBE `RuntimeEnvironment`. Thus, the resulting plan is parameterized -- it can be
+rebound to new constants by assigning new values to `RuntimeEnvironment` slots. To support this, a
+[map from input parameter id to runtime environment
+slot](https://github.com/mongodb/mongo/blob/a04e1c1812a28ebfb9a2684859097ade649a1184/src/mongo/db/query/sbe_stage_builder.h#L356-L368)
+is constructed and kept alongside the cached plan. During the bind-in phase, we lookup the slot
+associated with each input parameter id and then assign these slots to the corresponding values from
+the input query.
+
+While the classic plan cache was designed specifically to avoid repeated multi-planning, the SBE
+plan cache skips all phases of query optimization and compilation. The compilation of
+`QuerySolution` to `sbe::PlanStage` tree can be expensive, so there is a noticeable performance
+benefit associated with avoiding this recompilation. This underlies another important distinction
+between the classic and SBE caches. When a query using the classic engine has just one query
+solution, no entry is inserted into the classic cache. The reasoning is that the classic cache is
+focused on avoiding multi-planning, and single-solution queries don't go through the multi-planning
+process. However, for queries using SBE, it is valuable to avoid not just multi-planning but also
+compilation to `sbe::PlanStage`. For this reason, single-solution queries result in SBE plan cache
+entries.
+
+### Cache eviction and invalidation
+
+Both the classic and SBE plan caches avoid growing too large by implementing a least-recently used
+(LRU) eviction policy.
+
+DDL events such as index builds, index drops, and collection drops result in invalidating all cache
+entries associated with the collection. In the case of the classic plan cache, there is a
+per-collection plan cache instance, so the entire object can be flushed of its contents.
+Invalidation in the case of the SBE plan cache, on the other hand, requires the traversal of the
+cache to identify all cache entries associated with a particular collection.
+
+### Cached plan replanning
+
+For both the classic and SBE plan caches, each cache entry has an associated "works" value. The
+naming derives from the classic engine's `PlanStage::work()` method, but for SBE this is actually
+the number of individual reads done from storage-level cursors. The works value is derived from the
+original multi-planning trial period, e.g. it is the number of storage reads an SBE plan required
+during the multi-planning trial period to produce the initial batch of results or, correspondingly,
+the number of works required by a classic plan during the multi-planning trial period.
+
+When a plan is recovered from the cache, we run a similar trial period to gather the first batch of
+results before returning them to the client. If the number of works required exceeds the number
+recorded in the plan cache by some factor (10x by default), the plan cache entry is deactivated, the
+buffered result batch is discarded, and the query is planned from scratch. Otherwise, the initial
+batch is unspooled to the client and the cached plan is used to execute the remainder of the query.
+SBE and the classic engine have separate implementations of this "cached plan replanning" process,
+but they conceptually work identically.
+
+Plans in the SBE plan cache can be pinned, meaning that they have no associated works value and are
+not subject to replanning. Plans with just a single query solution as well as plans produced by
+subplanning rooted $or queries are pinned. Although pinned plans cannot be evicted through
+replanning, they can get invalidated by other means such as DDL events or LRU replacement.
+
+### Inactive cache entries
+
+When cache entries are first created, they are considered inactive. This means that the cache
+entries exist but are unused. Inactive cache entries can be promoted to active when a query of the
+same shape runs and exhibits similar or better trial period performance, as measured by the number of
+"works". Although the full mechanism is not described here, the goal of this behavior is to avoid
+situations where a plan cache entry is created with an unreasonably high works value. When this
+happens, the plan can get stuck in the cache since replanning will never kick in.
