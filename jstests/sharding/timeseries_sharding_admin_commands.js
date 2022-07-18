@@ -150,13 +150,17 @@ function assertRangeMatch(savedRange, paramRange) {
     check({[metaField]: 1}, {[metaField]: 10}, true);
 })();
 
-// Check shardingState commands will return collection info in bucket namespace.
+// Check shardingState commands returns the expected collection info about buckets & view nss.
 (function checkShardingStateCommand() {
     createTimeSeriesColl(
         {index: {[metaField]: 1, [timeField]: 1}, shardKey: {[metaField]: 1, [timeField]: 1}});
     const shardingStateRes = mongo.getPrimaryShard(dbName).adminCommand({shardingState: 1});
-    const shardingStateColls = Object.keys(shardingStateRes.versions);
-    assert(shardingStateColls.includes(bucketNss) && !shardingStateColls.includes(viewNss));
+    const shardingStateColls = shardingStateRes.versions;
+    const bucketNssIsSharded = (bucketNss in shardingStateColls &&
+                                timestampCmp(shardingStateColls[bucketNss], Timestamp(0, 0)) !== 0);
+    const viewNssIsSharded = (viewNss in shardingStateColls &&
+                              timestampCmp(shardingStateColls[viewNss], Timestamp(0, 0)) !== 0);
+    assert(bucketNssIsSharded && !viewNssIsSharded);
     dropTimeSeriesColl();
 })();
 

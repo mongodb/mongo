@@ -53,6 +53,7 @@
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/timeseries/timeseries_options.h"
@@ -172,6 +173,8 @@ Status _createView(OperationContext* opCtx,
             return Status(ErrorCodes::NotWritablePrimary,
                           str::stream() << "Not primary while creating collection " << nss);
         }
+
+        CollectionShardingState::get(opCtx, nss)->checkShardVersionOrThrow(opCtx);
 
         if (collectionOptions.changeStreamPreAndPostImagesOptions.getEnabled()) {
             return Status(ErrorCodes::InvalidOptions,
@@ -332,6 +335,8 @@ Status _createTimeseries(OperationContext* opCtx,
                               str::stream() << "Not primary while creating collection " << ns);
             }
 
+            CollectionShardingState::get(opCtx, bucketsNs)->checkShardVersionOrThrow(opCtx);
+
             WriteUnitOfWork wuow(opCtx);
             AutoStatsTracker bucketsStatsTracker(
                 opCtx,
@@ -413,6 +418,7 @@ Status _createTimeseries(OperationContext* opCtx,
                     str::stream() << "Not primary while creating collection " << ns};
         }
 
+        CollectionShardingState::get(opCtx, ns)->checkShardVersionOrThrow(opCtx);
 
         _createSystemDotViewsIfNecessary(opCtx, db);
 
@@ -526,6 +532,8 @@ Status _createCollection(OperationContext* opCtx,
             return Status(ErrorCodes::NotWritablePrimary,
                           str::stream() << "Not primary while creating collection " << nss);
         }
+
+        CollectionShardingState::get(opCtx, nss)->checkShardVersionOrThrow(opCtx);
 
         WriteUnitOfWork wunit(opCtx);
 
