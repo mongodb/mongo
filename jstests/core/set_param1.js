@@ -17,6 +17,7 @@
 function scrub(obj) {
     delete obj["operationTime"];
     delete obj["$clusterTime"];
+    delete obj["lastCommittedOpTime"];
     // There are Failpoint manipulations in concurrent tasks in the jstest
     // environment. So scrub the volatile "failpoint." parameters.
     for (let key in obj)
