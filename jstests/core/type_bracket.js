@@ -121,9 +121,8 @@ const tests = [
     // {filter: {a: {$gte: MaxKey()}}, expected: docs[docs.length - 1]},
 
     // CODEWSCOPE
-    // TODO Uncomment when SERVER-67782 is merged
-    // {filter: {a: {$gte: new Code('function() {x++;}', {})}}, expected: [docs[24]]},
-    // {filter: {a: {$lt: new Code('x', {})}}, expected: [docs[25]]},
+    {filter: {a: {$gte: new Code('function() {x++;}', {})}}, expected: [docs[24]]},
+    {filter: {a: {$lt: new Code('x', {})}}, expected: [docs[25]]},
 
     // CODE
     {filter: {a: {$gte: new Code("")}}, expected: [docs[28]]},
