@@ -176,6 +176,10 @@ structs:
                 type: safeBool
                 optional: true
                 unstable: true
+            outOfCache:
+                type: safeBool
+                optional: true
+                unstable: true
             clustered:
                 type: safeBool
                 optional: true

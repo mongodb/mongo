@@ -1903,6 +1903,10 @@ StatusWith<BSONObj> IndexCatalogImpl::_fixIndexSpec(OperationContext* opCtx,
         b.appendBool("prepareUnique",
                      true);  // normalize to bool true in case was int 1 or something...
 
+    if (o["outOfCache"].trueValue())
+        b.appendBool("outOfCache",
+                      true);  // normalize to bool true in case was int 1 or something...
+
     BSONObj key = fixIndexKey(o["key"].Obj());
     b.append("key", key);
 
@@ -1932,7 +1936,7 @@ StatusWith<BSONObj> IndexCatalogImpl::_fixIndexSpec(OperationContext* opCtx,
                 // dropDups is silently ignored and removed from the spec as of SERVER-14710.
                 // ns is removed from the spec as of 4.4.
             } else if (s == "v" || s == "unique" || s == "key" || s == "name" || s == "hidden" ||
-                       s == "prepareUnique") {
+                       s == "outOfCache" || s == "prepareUnique") {
                 // covered above
             } else {
                 b.append(e);

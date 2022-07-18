@@ -63,6 +63,7 @@ std::map<StringData, BSONElement> populateOptionsMapForEqualityCheck(const BSONO
         IndexDescriptor::k2dsphereVersionFieldName,    // same as index version
         IndexDescriptor::kBackgroundFieldName,         // this is a creation time option only
         IndexDescriptor::kDropDuplicatesFieldName,     // this is now ignored
+        IndexDescriptor::kOutOfCacheFieldName,         // not considered for equivalence
         IndexDescriptor::kHiddenFieldName,             // not considered for equivalence
         IndexDescriptor::kCollationFieldName,          // checked specially
         IndexDescriptor::kPartialFilterExprFieldName,  // checked specially
@@ -101,6 +102,7 @@ constexpr StringData IndexDescriptor::kIndexVersionFieldName;
 constexpr StringData IndexDescriptor::kKeyPatternFieldName;
 constexpr StringData IndexDescriptor::kLanguageOverrideFieldName;
 constexpr StringData IndexDescriptor::kNamespaceFieldName;
+constexpr StringData IndexDescriptor::kOutOfCacheFieldName;
 constexpr StringData IndexDescriptor::kPartialFilterExprFieldName;
 constexpr StringData IndexDescriptor::kPathProjectionFieldName;
 constexpr StringData IndexDescriptor::kSparseFieldName;
@@ -123,6 +125,7 @@ IndexDescriptor::IndexDescriptor(const std::string& accessMethodName, BSONObj in
       _sparse(infoObj[IndexDescriptor::kSparseFieldName].trueValue()),
       _unique(_isIdIndex || infoObj[kUniqueFieldName].trueValue()),
       _hidden(infoObj[kHiddenFieldName].trueValue()),
+      _outOfCache(infoObj[kOutOfCacheFieldName].trueValue()),
       _partial(!infoObj[kPartialFilterExprFieldName].eoo()) {
     BSONElement e = _infoObj[IndexDescriptor::kIndexVersionFieldName];
     fassert(50942, e.isNumber());

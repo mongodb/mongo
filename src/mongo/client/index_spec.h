@@ -109,6 +109,11 @@ public:
     /** Set the name for this index. If not set, a name will be automatically generated. */
     IndexSpec& name(const StringData& name);
 
+    /** Sets whether this index is expected to be larger than cache. By default, indexes are
+     *  in cache.
+     */
+    IndexSpec& outOfCache(bool value = true);
+
     /** Sets whether duplicates detected while indexing should be dropped. By default,
      *  duplicates are not dropped.
      */

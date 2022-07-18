@@ -268,6 +268,7 @@ BSONObj repairIndexSpec(const NamespaceString& ns,
              IndexDescriptor::kUniqueFieldName == fieldName ||
              IndexDescriptor::kSparseFieldName == fieldName ||
              IndexDescriptor::kDropDuplicatesFieldName == fieldName ||
+             IndexDescriptor::kOutOfCacheFieldName == fieldName ||
              IndexDescriptor::kPrepareUniqueFieldName == fieldName ||
              IndexDescriptor::kClusteredFieldName == fieldName) &&
             !indexSpecElem.isNumber() && !indexSpecElem.isBoolean() && indexSpecElem.trueValue()) {
@@ -502,6 +503,7 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
                     IndexDescriptor::kUniqueFieldName == indexSpecElemFieldName ||
                     IndexDescriptor::kSparseFieldName == indexSpecElemFieldName ||
                     IndexDescriptor::kDropDuplicatesFieldName == indexSpecElemFieldName ||
+                    IndexDescriptor::kOutOfCacheFieldName == indexSpecElemFieldName ||
                     IndexDescriptor::kPrepareUniqueFieldName == indexSpecElemFieldName ||
                     IndexDescriptor::kClusteredFieldName == indexSpecElemFieldName)) {
             if (!indexSpecElem.isNumber() && !indexSpecElem.isBoolean()) {

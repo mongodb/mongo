@@ -150,6 +150,10 @@ structs:
                 type: safeBool
                 optional: true
                 unstable: false
+            outOfCache:
+                type: safeBool
+                optional: true
+                unstable: false
             originalSpec:
                 type: object_owned
                 optional: true
