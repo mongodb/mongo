@@ -414,14 +414,6 @@ private:
      */
     Cache::ValueHandle _getCachedData() const;
 
-    /**
-     * Lookup shard by replica set name. Returns nullptr if the name can't be found.
-     * Note: this doesn't refresh the table if the name isn't found, so it's possible that a
-     * newly added shard/Replica Set may not be found.
-     * TODO SERVER-50206: Remove usage of this non-causally consistent accessor.
-     */
-    std::shared_ptr<Shard> _getShardForRSNameNoReload(const std::string& name) const;
-
     using LatestConnStrings = stdx::unordered_map<ShardId, ConnectionString, ShardId::Hasher>;
 
     std::pair<std::vector<LatestConnStrings::value_type>, Increment> _getLatestConnStrings() const;

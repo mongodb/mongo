@@ -461,36 +461,47 @@ void ShardRegistry::updateReplicaSetOnConfigServer(ServiceContext* serviceContex
 
     auto opCtx = tc->makeOperationContext();
     auto const grid = Grid::get(opCtx.get());
+    auto sr = grid->shardRegistry();
 
-    std::shared_ptr<Shard> s =
-        grid->shardRegistry()->_getShardForRSNameNoReload(connStr.getSetName());
-    if (!s) {
-        LOGV2_DEBUG(22730,
-                    1,
-                    "Error updating replica set on config server. Couldn't find shard for "
-                    "replica set {replicaSetConnectionStr}",
-                    "Error updating replica set on config servers. Couldn't find shard",
-                    "replicaSetConnectionStr"_attr = connStr);
+    // First check if this is a config shard lookup.
+    {
+        stdx::lock_guard<Latch> lk(sr->_mutex);
+        if (auto shard = sr->_configShardData.findByRSName(connStr.getSetName())) {
+            // No need to tell the config servers their own connection string.
+            return;
+        }
+    }
+
+    auto swRegistryData = sr->_getDataAsync().getNoThrow(opCtx.get());
+    if (!swRegistryData.isOK()) {
+        LOGV2_DEBUG(
+            6791401,
+            1,
+            "Error updating replica set on config servers. Failed to fetch shard registry data",
+            "replicaSetConnectionStr"_attr = connStr,
+            "error"_attr = swRegistryData.getStatus());
         return;
     }
 
-    if (s->isConfig()) {
-        // No need to tell the config servers their own connection string.
+    auto shard = swRegistryData.getValue()->findByRSName(connStr.getSetName());
+    if (!shard) {
+        LOGV2_DEBUG(6791402,
+                    1,
+                    "Error updating replica set on config servers. Couldn't find shard",
+                    "replicaSetConnectionStr"_attr = connStr);
         return;
     }
 
     auto swWasUpdated = grid->catalogClient()->updateConfigDocument(
         opCtx.get(),
         NamespaceString::kConfigsvrShardsNamespace,
-        BSON(ShardType::name(s->getId().toString())),
+        BSON(ShardType::name(shard->getId().toString())),
         BSON("$set" << BSON(ShardType::host(connStr.toString()))),
         false,
         ShardingCatalogClient::kMajorityWriteConcern);
     auto status = swWasUpdated.getStatus();
     if (!status.isOK()) {
         LOGV2_ERROR(22736,
-                    "Error updating replica set {replicaSetConnectionStr} on config server caused "
-                    "by {error}",
                     "Error updating replica set on config server",
                     "replicaSetConnectionStr"_attr = connStr,
                     "error"_attr = redact(status));
@@ -554,18 +565,6 @@ std::shared_ptr<Shard> ShardRegistry::getShardForHostNoReload(const HostAndPort&
     }
     auto data = _getCachedData();
     return data->findByHostAndPort(host);
-}
-
-std::shared_ptr<Shard> ShardRegistry::_getShardForRSNameNoReload(const std::string& name) const {
-    // First check if this is a config shard lookup.
-    {
-        stdx::lock_guard<Latch> lk(_mutex);
-        if (auto shard = _configShardData.findByRSName(name)) {
-            return shard;
-        }
-    }
-    auto data = _getCachedData();
-    return data->findByRSName(name);
 }
 
 ////////////// ShardRegistryData //////////////////

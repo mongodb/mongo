@@ -98,7 +98,7 @@ bool Shard::shouldErrorBePropagated(ErrorCodes::Error code) {
 Shard::Shard(const ShardId& id) : _id(id) {}
 
 bool Shard::isConfig() const {
-    return _id == "config";
+    return _id == ShardId::kConfigServerId;
 }
 
 StatusWith<Shard::CommandResponse> Shard::runCommand(OperationContext* opCtx,
