@@ -46,13 +46,13 @@ namespace {
 // Compares 'lhs' for 'rhs', using the tag-based ordering expected by the access planner. Returns a
 // negative number if 'lhs' is smaller than 'rhs', 0 if they are equal, and 1 if 'lhs' is larger.
 int tagComparison(const MatchExpression* lhs, const MatchExpression* rhs) {
-    IndexTag* lhsTag = static_cast<IndexTag*>(lhs->getTag());
-    size_t lhsValue = (nullptr == lhsTag) ? IndexTag::kNoIndex : lhsTag->index;
-    size_t lhsPos = (nullptr == lhsTag) ? IndexTag::kNoIndex : lhsTag->pos;
+    IndexTag* lhsTag = dynamic_cast<IndexTag*>(lhs->getTag());
+    size_t lhsValue = lhsTag ? lhsTag->index : IndexTag::kNoIndex;
+    size_t lhsPos = lhsTag ? lhsTag->pos : IndexTag::kNoIndex;
 
-    IndexTag* rhsTag = static_cast<IndexTag*>(rhs->getTag());
-    size_t rhsValue = (nullptr == rhsTag) ? IndexTag::kNoIndex : rhsTag->index;
-    size_t rhsPos = (nullptr == rhsTag) ? IndexTag::kNoIndex : rhsTag->pos;
+    IndexTag* rhsTag = dynamic_cast<IndexTag*>(rhs->getTag());
+    size_t rhsValue = rhsTag ? rhsTag->index : IndexTag::kNoIndex;
+    size_t rhsPos = rhsTag ? rhsTag->pos : IndexTag::kNoIndex;
 
     // First, order on indices.
     if (lhsValue != rhsValue) {
