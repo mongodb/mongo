@@ -11,6 +11,8 @@
  *   # Fail points in this test do not exist on mongos.
  *   assumes_against_mongod_not_mongos,
  *   uses_parallel_shell,
+ *   # This test is multiversion incompatible with binaries < 6.0.
+ *   requires_fcv_60
  * ]
  */
 (function() {
