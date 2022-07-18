@@ -1,6 +1,10 @@
+/**
+ * Tests that setFeatureCompatibilityVersion command aborts an ongoing reshardCollection command
+ */
 (function() {
 "use strict";
 
+load("jstests/libs/parallel_shell_helpers.js");
 load("jstests/sharding/libs/resharding_test_fixture.js");
 load('jstests/libs/discover_topology.js');
 load('jstests/libs/fail_point_util.js');
@@ -21,6 +25,8 @@ function runTest(forcePooledConnectionsDropped) {
         ],
     });
 
+    const sourceNamespace = inputCollection.getFullName();
+
     let mongos = inputCollection.getMongo();
 
     for (let x = 0; x < 1000; x++) {
@@ -37,7 +43,17 @@ function runTest(forcePooledConnectionsDropped) {
         pauseBeforeCloseCxns = configureFailPoint(config, "pauseBeforeCloseCxns");
     }
 
+    function checkCoordinatorDoc() {
+        assert.soon(() => {
+            const coordinatorDoc =
+                mongos.getCollection("config.reshardingOperations").findOne({ns: sourceNamespace});
+
+            return coordinatorDoc === null || coordinatorDoc.state === "aborting";
+        });
+    }
+
     const recipientShardNames = reshardingTest.recipientShardNames;
+    let awaitShell;
     reshardingTest.withReshardingInBackground(
         {
             newShardKeyPattern: {newKey: 1},
@@ -63,7 +79,7 @@ function runTest(forcePooledConnectionsDropped) {
                 assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
             }`;
 
-            let awaitShell = startParallelShell(codeToRunInParallelShell, mongos.port);
+            awaitShell = startParallelShell(codeToRunInParallelShell, mongos.port);
 
             if (forcePooledConnectionsDropped) {
                 pauseBeforeCloseCxns.wait();
@@ -88,8 +104,7 @@ function runTest(forcePooledConnectionsDropped) {
                 jsTestLog("Turn off pause before pauseBeforeMarkKeepOpen failpoint");
                 pauseBeforeMarkKeepOpen.off();
             }
-
-            awaitShell();
+            checkCoordinatorDoc();
         },
         {
             expectedErrorCode: [
@@ -97,6 +112,8 @@ function runTest(forcePooledConnectionsDropped) {
                 ErrorCodes.Interrupted,
             ]
         });
+
+    awaitShell();
 
     reshardingTest.withReshardingInBackground(
         {
@@ -107,7 +124,14 @@ function runTest(forcePooledConnectionsDropped) {
             ],
         },
         () => {
-            assert.commandWorked(mongos.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+            assert.soon(() => {
+                return mongos.getDB('config').reshardingOperations.findOne() != null;
+            }, "timed out waiting for coordinator doc to be written", 30 * 1000);
+            awaitShell = startParallelShell(funWithArgs(function(latestFCV) {
+                                                assert.commandWorked(db.adminCommand(
+                                                    {setFeatureCompatibilityVersion: latestFCV}));
+                                            }, latestFCV), mongos.port);
+            checkCoordinatorDoc();
         },
         {
             expectedErrorCode: [
@@ -117,6 +141,7 @@ function runTest(forcePooledConnectionsDropped) {
             ]
         });
 
+    awaitShell();
     reshardingTest.teardown();
 }
 
