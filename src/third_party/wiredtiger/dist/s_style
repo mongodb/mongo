@@ -208,7 +208,9 @@ else
 	   ! expr "$f" : 'examples/.*' > /dev/null &&
 	   ! expr "$f" : 'test/.*' > /dev/null &&
 	   ! expr "$f" : 'ext/.*' > /dev/null; then
-		egrep -w ret $f | egrep 'int.*[, ]ret[,;]' > $t
+	   # This regex can return false positives on functions that take ret as
+	   # an argument. Filter out matches that contain brackets.
+		egrep -w ret $f | egrep 'int.*[, ]ret[,;]' | egrep -v '[()]' > $t
 		test -s $t && {
 			echo "$f: explicit declaration of \"ret\""
 			cat $t
