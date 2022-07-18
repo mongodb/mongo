@@ -105,7 +105,6 @@ MONGO_FAIL_POINT_DEFINE(hangWhileUpgrading);
 MONGO_FAIL_POINT_DEFINE(failDowngrading);
 MONGO_FAIL_POINT_DEFINE(hangWhileDowngrading);
 MONGO_FAIL_POINT_DEFINE(hangBeforeUpdatingFcvDoc);
-MONGO_FAIL_POINT_DEFINE(hangBeforeDrainingMigrations);
 
 /**
  * Ensures that only one instance of setFeatureCompatibilityVersion can run at a given time.
@@ -365,7 +364,6 @@ public:
             _runDowngrade(opCtx, request, changeTimestamp);
         }
 
-        hangBeforeDrainingMigrations.pauseWhileSet();
         {
             // Complete transition by updating the local FCV document to the fully upgraded or
             // downgraded requestedVersion.
