@@ -278,9 +278,10 @@ def _encaps(val):
     if val is None:
         return '""'
 
-    for i in ["\\", '"', "'"]:
-        if i in val:
-            val = val.replace(i, '\\' + i)
+    for srch, repl in {"\\": "\\\\", '"': '\\"', "'": "\\'", "\n": "\\n"}.items():
+        if srch in val:
+            val = val.replace(srch, repl)
+
     return '"' + val + '"'
 
 
@@ -368,11 +369,10 @@ class _CppFileWriterBase(object):
     def gen_description_comment(self, description):
         # type: (str) -> None
         """Generate a multiline comment with the description from the IDL."""
-        self._writer.write_line(
-            textwrap.dedent("""\
-        /**
-         * %s
-         */""" % (description)))
+        self._writer.write_line("/**")
+        for desc in description.split("\n"):
+            self._writer.write_line(" * " + desc)
+        self._writer.write_line(" */")
 
     def _with_template(self, template_params):
         # type: (Mapping[str,str]) -> writer.TemplateContext
@@ -629,6 +629,11 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                                      field_name=field.name))
 
         if isinstance(struct, ast.Command):
+            self._writer.write_line(
+                common.template_args(
+                    'static constexpr auto kCommandDescription = ${description}_sd;',
+                    description=_encaps(struct.description)))
+
             self._writer.write_line(
                 common.template_args('static constexpr auto kCommandName = "${command_name}"_sd;',
                                      command_name=struct.command_name))
