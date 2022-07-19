@@ -542,7 +542,7 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
     if (auto& timeseries = cmr.getTimeseries()) {
         parsed.numModifications++;
         if (!isTimeseries) {
-            return getOnlySupportedOnTimeseriesError(CollMod::kIsTimeseriesNamespaceFieldName);
+            return getOnlySupportedOnTimeseriesError(CollMod::kTimeseriesFieldName);
         }
 
         BSONObjBuilder subObjBuilder(oplogEntryBuilder.subobjStart(CollMod::kTimeseriesFieldName));
