@@ -29,24 +29,43 @@
 
 #pragma once
 
+#include <limits>
 #include <vector>
+
+#include "mongo/db/query/optimizer/defs.h"
 
 namespace mongo::ce {
 
+using namespace mongo::optimizer;
+
+// Default cardinality when actual collection cardinality is unknown.
+// Mostly used by unit tests.
+constexpr CEType kDefaultCard = 1000.00;
+
+// Minimum estimated cardinality. In the absense of any statistics we can never
+// assume there are less than this many matching documents.
+constexpr CEType kMinCard = 0.01;
+
 /**
- * Specifies the maximum number of iterations to use when estimating via exponential backoff.
+ * Specifies the maximum number of elements (selectivities) to use when estimating via
+ * exponential backoff.
  */
-const size_t kMaxBackoffIterations = 3;
+const size_t kMaxBackoffElements = 4;
+
+
+bool validSelectivity(SelectivityType sel);
+
+bool validCardinality(CEType card);
 
 /**
  * Estimates the selectivity of a conjunction given the selectivities of its subexpressions using
  * exponential backoff.
  */
-double conjExponentialBackoff(std::vector<double> conjSelectivities);
+SelectivityType conjExponentialBackoff(std::vector<SelectivityType> conjSelectivities);
 
 /**
  * Estimates the selectivity of a disjunction given the selectivities of its subexpressions using
  * exponential backoff.
  */
-double disjExponentialBackoff(std::vector<double> disjSelectivities);
+SelectivityType disjExponentialBackoff(std::vector<SelectivityType> disjSelectivities);
 }  // namespace mongo::ce

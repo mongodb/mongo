@@ -27,9 +27,12 @@
  *    it in the license file.
  */
 
+#include <cstddef>
+
 #include "mongo/db/query/ce/ce_test_utils.h"
 
 #include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
+#include "mongo/db/query/optimizer/cascades/cost_derivation.h"
 #include "mongo/db/query/optimizer/cascades/logical_props_derivation.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
@@ -41,27 +44,31 @@ namespace mongo::ce {
 using namespace optimizer;
 using namespace cascades;
 
-CETester::CETester(std::string collName, double numRecords)
-    : _collName(std::move(collName)), _numRecords(std::move(numRecords)) {}
+CETester::CETester(std::string collName, double collCard)
+    : _collName(std::move(collName)), _collCard(collCard) {}
 
-double CETester::getCE(const std::string& query) {
-    // Mock opCtx for test.
-    QueryTestServiceContext serviceContext;
-    auto opCtx = serviceContext.makeOperationContext();
-
+double CETester::getCE(const std::string& query, size_t optimizationLevel) const {
     // Mock memo.
-    ScanDefinition sd({}, {}, {DistributionType::Centralized}, true, _numRecords);
+    ScanDefinition sd({}, {}, {DistributionType::Centralized}, true, _collCard);
     Metadata metadata({{_collName, sd}});
-    Memo memo(DebugInfo::kDefaultForTests,
-              metadata,
-              std::make_unique<DefaultLogicalPropsDerivation>(),
-              std::make_unique<HeuristicCE>());
 
-    // Construct placeholder PhaseManager.
+    std::vector<OptPhaseManager::OptPhase> optPhaseChoices{
+        OptPhaseManager::OptPhase::MemoSubstitutionPhase,
+        OptPhaseManager::OptPhase::MemoExplorationPhase};
+    optimizationLevel = std::min(optimizationLevel, optPhaseChoices.size());
+    OptPhaseManager::PhaseSet optPhases;
+    for (size_t i = 0; i < optimizationLevel; ++i) {
+        optPhases.insert(optPhaseChoices[i]);
+    }
+
+    // Construct placeholder PhaseManager. Notice that it also creates a Memo internally.
     PrefixId prefixId;
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase},
+    OptPhaseManager phaseManager(optPhases,
                                  prefixId,
-                                 {{{_collName, {{}, {}}}}},
+                                 true /*requireRID*/,
+                                 metadata,
+                                 std::make_unique<HeuristicCE>(),
+                                 std::make_unique<DefaultCosting>(),
                                  DebugInfo::kDefaultForTests);
 
     // Construct ABT from pipeline and optimize.
@@ -69,8 +76,15 @@ double CETester::getCE(const std::string& query) {
     ASSERT_TRUE(phaseManager.optimize(abt));
 
     // Get cardinality estimate.
-    auto cht = getCETransport(opCtx.get());
-    return cht->deriveCE(memo, {}, abt.ref());
+    auto cht = getCETransport();
+    auto ce = cht->deriveCE(phaseManager.getMemo(), {}, abt.ref());
+
+#ifdef CE_TEST_LOG_MODE
+    std::cout << "Query: " << query << ", card: " << _collCard << ", Estimated: " << ce
+              << std::endl;
+#endif
+
+    return ce;
 }
 
 }  // namespace mongo::ce

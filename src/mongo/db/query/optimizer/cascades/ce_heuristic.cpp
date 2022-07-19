@@ -28,18 +28,26 @@
  */
 
 #include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
-#include "mongo/db/query/optimizer/utils/memo_utils.h"
+
+#include "mongo/db/query/optimizer/cascades/memo.h"
+#include "mongo/db/query/optimizer/utils/ce_math.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::optimizer::cascades {
 
 using namespace properties;
+using namespace mongo::ce;
+
+// Invalid estimate - an arbitrary negative value used for initialization.
+constexpr SelectivityType kInvalidSel = -1.0;
+constexpr SelectivityType kDefaultFilterSel = 0.1;
 
 class CEHeuristicTransport {
 public:
     CEType transport(const ScanNode& node, CEType /*bindResult*/) {
         // Default cardinality estimate.
         const CEType metadataCE = _memo.getMetadata()._scanDefs.at(node.getScanDefName()).getCE();
-        return (metadataCE < 0.0) ? 1000.00 : metadataCE;
+        return (metadataCE < 0.0) ? kDefaultCard : metadataCE;
     }
 
     CEType transport(const ValueScanNode& node, CEType /*bindResult*/) {
@@ -53,6 +61,9 @@ public:
     }
 
     CEType transport(const FilterNode& node, CEType childResult, CEType /*exprResult*/) {
+        if (childResult == 0.0) {
+            return 0.0;
+        }
         if (node.getFilter() == Constant::boolean(true)) {
             // Trivially true filter.
             return childResult;
@@ -61,7 +72,7 @@ public:
             return 0.0;
         } else {
             // Estimate filter selectivity at 0.1.
-            return 0.1 * childResult;
+            return std::max(kDefaultFilterSel * childResult, kMinCard);
         }
     }
 
@@ -70,16 +81,120 @@ public:
         return childResult;
     }
 
+    /**
+     * Default selectivity of equalities. To avoid super small selectivities for small
+     * cardinalities, that would result in 0 cardinality for many small inputs, the
+     * estimate is scaled as inputCard grows. The bigger inputCard, the smaller the
+     * selectivity.
+     */
+    SelectivityType equalitySel(const CEType inputCard) {
+        uassert(6716604, "Zero cardinality must be handled by the caller.", inputCard > 0.0);
+        return std::sqrt(inputCard) / inputCard;
+    }
+
+    /**
+     * Default selectivity of intervals with bounds on both ends. These intervals are
+     * considered less selective than equalities.
+     * Examples: (a > 'abc' AND a < 'hta'), (0 < b <= 13)
+     */
+    SelectivityType closedRangeSel(const CEType inputCard) {
+        CEType sel = kInvalidSel;
+        if (inputCard < 20.0) {
+            sel = 0.50;
+        } else if (inputCard < 100.0) {
+            sel = 0.33;
+        } else {
+            sel = 0.20;
+        }
+        return sel;
+    }
+
+    /**
+     * Default selectivity of intervals open on one end. These intervals are
+     * considered less selective than those with both ends specified by the user query.
+     * Examples: (a > 'xyz'), (b <= 13)
+     */
+    SelectivityType openRangeSel(const CEType inputCard) {
+        SelectivityType sel = kInvalidSel;
+        if (inputCard < 20.0) {
+            sel = 0.70;
+        } else if (inputCard < 100.0) {
+            sel = 0.45;
+        } else {
+            sel = 0.33;
+        }
+        return sel;
+    }
+
+    mongo::sbe::value::TypeTags boundType(const BoundRequirement& bound) {
+        const auto constBoundPtr = bound.getBound().cast<Constant>();
+        if (constBoundPtr == nullptr) {
+            return mongo::sbe::value::TypeTags::Nothing;
+        }
+        const auto [tag, val] = constBoundPtr->get();
+        return tag;
+    }
+
+    SelectivityType intervalSel(const IntervalRequirement& interval, const CEType inputCard) {
+        SelectivityType sel = kInvalidSel;
+        if (interval.isFullyOpen()) {
+            sel = 1.0;
+        } else if (interval.isEquality()) {
+            sel = equalitySel(inputCard);
+        } else if (interval.getHighBound().isPlusInf() || interval.getLowBound().isMinusInf() ||
+                   boundType(interval.getLowBound()) != boundType(interval.getHighBound())) {
+            // The interval has an actual bound only on one of it ends if:
+            // - one of the bounds is infinite, or
+            // - both bounds are of a different type - this is the case when due to type bracketing
+            //   one of the bounds is the lowest/highest value of the previous/next type.
+            // TODO: Notice that sometimes type bracketing uses a min/max value from the same type,
+            // so sometimes we may not detect an open-ended interval.
+            sel = openRangeSel(inputCard);
+        } else {
+            sel = closedRangeSel(inputCard);
+        }
+        uassert(6716603, "Invalid selectivity.", validSelectivity(sel));
+        return sel;
+    }
+
     CEType transport(const SargableNode& node,
-                     CEType /*childResult*/,
+                     CEType childResult,
                      CEType /*bindsResult*/,
                      CEType /*refsResult*/) {
-        ABT lowered = node.getChild();
-        for (const auto& [key, req] : node.getReqMap()) {
-            // TODO: consider issuing one filter node per interval.
-            lowerPartialSchemaRequirement(key, req, lowered);
+        // Early out and return 0 since we don't expect to get more results.
+        if (childResult == 0.0) {
+            return 0.0;
         }
-        return algebra::transport<false>(lowered, *this);
+
+        SelectivityType topLevelSel = 1.0;
+        std::vector<SelectivityType> topLevelSelectivities;
+        for (const auto& [key, req] : node.getReqMap()) {
+            SelectivityType disjSel = 1.0;
+            std::vector<SelectivityType> disjSelectivities;
+            // Intervals are in DNF.
+            const auto intervalDNF = req.getIntervals();
+            const auto disjuncts = intervalDNF.cast<IntervalReqExpr::Disjunction>()->nodes();
+            for (const auto& disjunct : disjuncts) {
+                const auto& conjuncts = disjunct.cast<IntervalReqExpr::Conjunction>()->nodes();
+                SelectivityType conjSel = 1.0;
+                std::vector<SelectivityType> conjSelectivities;
+                for (const auto& conjunct : conjuncts) {
+                    const auto& interval = conjunct.cast<IntervalReqExpr::Atom>()->getExpr();
+                    const SelectivityType sel = intervalSel(interval, childResult);
+                    conjSelectivities.push_back(sel);
+                }
+                conjSel = ce::conjExponentialBackoff(std::move(conjSelectivities));
+                disjSelectivities.push_back(conjSel);
+            }
+            disjSel = ce::disjExponentialBackoff(std::move(disjSelectivities));
+            topLevelSelectivities.push_back(disjSel);
+        }
+
+        // The elements of the PartialSchemaRequirements map represent an implicit conjunction.
+        topLevelSel = ce::conjExponentialBackoff(std::move(topLevelSelectivities));
+        CEType card = std::max(topLevelSel * childResult, kMinCard);
+        uassert(6716602, "Invalid cardinality.", mongo::ce::validCardinality(card));
+        return card;
     }
 
     CEType transport(const RIDIntersectNode& node,
@@ -96,7 +211,7 @@ public:
                      CEType /*exprResult*/) {
         const auto& filter = node.getFilter();
 
-        double selectivity = 0.1;
+        SelectivityType selectivity = kDefaultFilterSel;
         if (filter == Constant::boolean(false)) {
             selectivity = 0.0;
         } else if (filter == Constant::boolean(true)) {
@@ -194,7 +309,8 @@ private:
 CEType HeuristicCE::deriveCE(const Memo& memo,
                              const LogicalProps& /*logicalProps*/,
                              const ABT::reference_type logicalNodeRef) const {
-    return CEHeuristicTransport::derive(memo, logicalNodeRef);
+    CEType card = CEHeuristicTransport::derive(memo, logicalNodeRef);
+    return card;
 }
 
 }  // namespace mongo::optimizer::cascades

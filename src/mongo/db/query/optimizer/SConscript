@@ -39,6 +39,7 @@ env.Library(
         "rewrites/path_lower.cpp",
         "syntax/expr.cpp",
         "utils/abt_hash.cpp",
+        'utils/ce_math.cpp',
         "utils/interval_utils.cpp",
         "utils/memo_utils.cpp",
         "utils/utils.cpp",

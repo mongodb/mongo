@@ -493,7 +493,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
     } else if (internalQueryCardinalityEstimatorMode == ce::kHistogram &&
                ce::CollectionStatistics::hasCollectionStatistics(nss)) {
         const auto& stats = ce::CollectionStatistics::getCollectionStatistics(nss);
-        auto ceDerivation = std::make_unique<CEHistogramTransport>(opCtx, stats);
+        auto ceDerivation = std::make_unique<CEHistogramTransport>(stats);
         OptPhaseManager phaseManager{OptPhaseManager::getAllRewritesSet(),
                                      prefixId,
                                      false /*requireRID*/,

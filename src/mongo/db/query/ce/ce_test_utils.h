@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <cstddef>
+#include <sys/types.h>
+
 #include "mongo/db/query/optimizer/cascades/interfaces.h"
 
 namespace mongo {
@@ -44,14 +47,35 @@ class CEInterface;
 
 namespace ce {
 
+// Enable this flag to log all estimates, and let all tests pass.
+//#define CE_TEST_LOG_MODE 1
+
 const double kMaxCEError = 0.01;
 
 /**
- * A helpful macro for asserting that the CE of a $match predicate is approximately what we were
+ * Helpful macros for asserting that the CE of a $match predicate is approximately what we were
  * expecting.
  */
+
+#ifndef CE_TEST_LOG_MODE
 #define ASSERT_MATCH_CE(ce, predicate, expectedCE) \
     ASSERT_APPROX_EQUAL(expectedCE, ce.getCE(predicate), kMaxCEError)
+#else
+#define ASSERT_MATCH_CE(ce, predicate, expectedCE) \
+    ce.getCE(predicate);                           \
+    ASSERT_APPROX_EQUAL(1.0, 1.0, kMaxCEError)
+#endif
+
+#ifndef CE_TEST_LOG_MODE
+#define ASSERT_MATCH_CE_CARD(ce, predicate, expectedCE, collCard) \
+    ce.setCollCard(collCard);                                     \
+    ASSERT_APPROX_EQUAL(expectedCE, ce.getCE(predicate), kMaxCEError)
+#else
+#define ASSERT_MATCH_CE_CARD(ce, predicate, expectedCE, collCard) \
+    ce.setCollCard(collCard);                                     \
+    ce.getCE(predicate);                                          \
+    ASSERT_APPROX_EQUAL(1.0, 1.0, kMaxCEError)
+#endif
 
 /**
  * A test utility class for helping verify the cardinality of CE transports on a given $match
@@ -64,19 +88,22 @@ public:
     /**
      * Returns the estimated cardinality of a given 'matchPredicate'.
      */
-    double getCE(const std::string& matchPredicate);
+    double getCE(const std::string& matchPredicate, size_t optimizationLevel = 1) const;
+
+    void setCollCard(double card) {
+        _collCard = card;
+    }
 
 protected:
     /**
      * Subclasses need to override this method to initialize the transports they are testing.
      */
-    virtual std::unique_ptr<optimizer::cascades::CEInterface> getCETransport(
-        OperationContext* opCtx) = 0;
+    virtual std::unique_ptr<optimizer::cascades::CEInterface> getCETransport() const = 0;
 
     std::string _collName;
 
     // The number of records in the collection we are testing.
-    double _numRecords;
+    double _collCard;
 };
 
 }  // namespace ce

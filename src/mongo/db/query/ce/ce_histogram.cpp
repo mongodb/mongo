@@ -31,11 +31,11 @@
 
 #include "mongo/db/query/ce/ce_estimation.h"
 #include "mongo/db/query/ce/ce_histogram.h"
-#include "mongo/db/query/ce/ce_math.h"
 #include "mongo/db/query/ce/collection_statistics.h"
 
 #include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/utils/abt_hash.h"
+#include "mongo/db/query/optimizer/utils/ce_math.h"
 #include "mongo/db/query/optimizer/utils/memo_utils.h"
 
 namespace mongo::optimizer::cascades {
@@ -44,8 +44,8 @@ using namespace properties;
 
 class CEHistogramTransportImpl {
 public:
-    CEHistogramTransportImpl(OperationContext* opCtx, const ce::CollectionStatistics& stats)
-        : _opCtx(opCtx), _heuristicCE(), _stats(stats) {}
+    CEHistogramTransportImpl(const ce::CollectionStatistics& stats)
+        : _heuristicCE(), _stats(stats) {}
 
     ~CEHistogramTransportImpl() {}
 
@@ -101,16 +101,16 @@ public:
                     conjSelectivities.push_back(cardinality / _stats.getCardinality());
                 }
 
-                auto backoff = ce::conjExponentialBackoff(conjSelectivities);
+                auto backoff = ce::conjExponentialBackoff(std::move(conjSelectivities));
                 disjSelectivities.push_back(backoff);
             }
 
-            auto backoff = ce::disjExponentialBackoff(disjSelectivities);
+            auto backoff = ce::disjExponentialBackoff(std::move(disjSelectivities));
             topLevelSelectivities.push_back(backoff);
         }
 
         // The elements of the PartialSchemaRequirements map represent an implicit conjunction.
-        auto backoff = ce::conjExponentialBackoff(topLevelSelectivities);
+        auto backoff = ce::conjExponentialBackoff(std::move(topLevelSelectivities));
         return backoff * childResult;
     }
 
@@ -140,14 +140,12 @@ public:
     }
 
 private:
-    OperationContext* _opCtx;
     HeuristicCE _heuristicCE;
     const ce::CollectionStatistics& _stats;
 };
 
-CEHistogramTransport::CEHistogramTransport(OperationContext* opCtx,
-                                           const ce::CollectionStatistics& stats)
-    : _impl(std::make_unique<CEHistogramTransportImpl>(opCtx, stats)) {}
+CEHistogramTransport::CEHistogramTransport(const ce::CollectionStatistics& stats)
+    : _impl(std::make_unique<CEHistogramTransportImpl>(stats)) {}
 
 CEHistogramTransport::~CEHistogramTransport() {}
 

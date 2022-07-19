@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include <iostream>
+
 #include "mongo/db/query/ce/ce_estimation.h"
 #include "mongo/db/query/ce/ce_histogram.h"
 #include "mongo/db/query/ce/ce_test_utils.h"
@@ -45,8 +47,8 @@ public:
         : CETester(collName, numRecords), _stats{stats} {}
 
 protected:
-    std::unique_ptr<CEInterface> getCETransport(OperationContext* opCtx) override {
-        return std::make_unique<CEHistogramTransport>(opCtx, _stats);
+    std::unique_ptr<CEInterface> getCETransport() const override {
+        return std::make_unique<CEHistogramTransport>(_stats);
     }
 
 private:
@@ -118,7 +120,7 @@ TEST(CEHistogramTest, AssertSmallMaxDiffHistogramEstimatesAtomicPredicates) {
     ASSERT_MATCH_CE(t, "{a: {$eq: \"foo\"}}", 0.0);
 
     // Test case when field doesn't match fieldpath of histogram. This falls back to heuristics.
-    ASSERT_MATCH_CE(t, "{b: {$eq: 1}}", 0.8);
+    ASSERT_MATCH_CE(t, "{b: {$eq: 1}}", 2.82843);
 
     // Test $gt.
     ASSERT_MATCH_CE(t, "{a: {$gt: 3}}", 0.0);
@@ -201,8 +203,8 @@ TEST(CEHistogramTest, AssertSmallHistogramEstimatesComplexPredicates) {
 
     // Test conjunctions over multiple fields for which we may not have histograms. This falls back
     // to heuristic estimation.
-    ASSERT_MATCH_CE(t, "{a: {$eq: 2}, c: {$eq: 1}}", 0.09);
-    ASSERT_MATCH_CE(t, "{c: {$eq: 2}, d: {$eq: 22}}", 0.09);
+    ASSERT_MATCH_CE(t, "{a: {$eq: 2}, c: {$eq: 1}}", 1.73205);
+    ASSERT_MATCH_CE(t, "{c: {$eq: 2}, d: {$eq: 22}}", 1.73205);
 }
 
 TEST(CEHistogramTest, SanityTestEmptyHistogram) {

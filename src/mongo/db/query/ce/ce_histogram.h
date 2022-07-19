@@ -38,7 +38,7 @@ class CEHistogramTransportImpl;
 
 class CEHistogramTransport : public CEInterface {
 public:
-    CEHistogramTransport(OperationContext* opCtx, const ce::CollectionStatistics& stats);
+    CEHistogramTransport(const ce::CollectionStatistics& stats);
     ~CEHistogramTransport();
 
     CEType deriveCE(const Memo& memo,

@@ -27,19 +27,31 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <cmath>
-#include <functional>
+#include <algorithm>   // std::sort
+#include <cmath>       // std::pow
+#include <functional>  // std::greater
 
-#include "mongo/db/query/ce/ce_math.h"
+#include "mongo/db/query/optimizer/utils/ce_math.h"
 
 namespace mongo::ce {
-double conjExponentialBackoff(std::vector<double> conjSelectivities) {
-    std::sort(conjSelectivities.begin(), conjSelectivities.end());
-    double sel = conjSelectivities[0];
-    double f = 1.0;
+
+bool validSelectivity(SelectivityType sel) {
+    return (sel >= 0.0 && sel <= 1.0);
+}
+
+bool validCardinality(CEType card) {
+    return (card >= kMinCard && card <= std::numeric_limits<CEType>::max());
+}
+
+SelectivityType conjExponentialBackoff(std::vector<SelectivityType> conjSelectivities) {
+    size_t actualMaxBackoffElements = std::min(conjSelectivities.size(), kMaxBackoffElements);
+    std::partial_sort(conjSelectivities.begin(),
+                      conjSelectivities.begin() + actualMaxBackoffElements,
+                      conjSelectivities.end());
+    SelectivityType sel = conjSelectivities[0];
+    SelectivityType f = 1.0;
     size_t i = 1;
-    while (i < conjSelectivities.size() && i <= kMaxBackoffIterations) {
+    while (i < actualMaxBackoffElements) {
         f /= 2.0;
         sel *= std::pow(conjSelectivities[i], f);
         i++;
@@ -47,12 +59,16 @@ double conjExponentialBackoff(std::vector<double> conjSelectivities) {
     return sel;
 }
 
-double disjExponentialBackoff(std::vector<double> disjSelectivities) {
-    std::sort(disjSelectivities.begin(), disjSelectivities.end(), std::greater<double>());
-    double sel = 1.0 - disjSelectivities[0];
-    double f = 1.0;
+SelectivityType disjExponentialBackoff(std::vector<SelectivityType> disjSelectivities) {
+    size_t actualMaxBackoffElements = std::min(disjSelectivities.size(), kMaxBackoffElements);
+    std::partial_sort(disjSelectivities.begin(),
+                      disjSelectivities.begin() + actualMaxBackoffElements,
+                      disjSelectivities.end(),
+                      std::greater<SelectivityType>());
+    SelectivityType sel = 1.0 - disjSelectivities[0];
+    SelectivityType f = 1.0;
     size_t i = 1;
-    while (i < disjSelectivities.size() && i <= kMaxBackoffIterations) {
+    while (i < actualMaxBackoffElements) {
         f /= 2.0;
         sel *= std::pow(1 - disjSelectivities[i], f);
         i++;

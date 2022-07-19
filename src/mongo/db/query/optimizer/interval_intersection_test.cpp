@@ -114,8 +114,8 @@ TEST(IntervalIntersection, SingleFieldIntersection) {
          "    BindBlock:\n"
          "        [rid_0]\n"
          "            Source []\n"},
-        {"{$or: [{$and: [{a0: {$gt:9}}, {a0: {$lt: 12}}]}, {$and: [{a0: {$gt:40}}, {a0: {$lt: "
-         "44}}]}]}",
+        {"{$or: [{$and: [{a0: {$gt:9, $lt:999}}, {a0: {$gt: 0, $lt: 12}}]},"
+         "       {$and: [{a0: {$gt:40, $lt:997}}, {a0: {$gt:0, $lt: 44}}]}]}",
          "Root []\n"
          "|   |   projections: \n"
          "|   |       scan_0\n"
