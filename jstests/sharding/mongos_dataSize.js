@@ -1,5 +1,6 @@
 /*
  * Tests the dataSize command on mongos.
+ * @tags: [requires_fcv_61]
  */
 (function() {
 'use strict';
@@ -52,7 +53,7 @@ function assertDataSizeCmdFailedWithBadValue(conn, keyPattern) {
  */
 function testDataSizeCmd(conn, keyPattern, invalidRanges, numObjects) {
     assert.commandFailedWithCode(conn.adminCommand({dataSize: kCollName}),
-                                 ErrorCodes.InvalidNamespace);
+                                 [ErrorCodes.NamespaceNotFound, ErrorCodes.InvalidNamespace]);
 
     for (const {min, max, errorCode} of invalidRanges) {
         const cmdObj = {dataSize: kNs, keyPattern: keyPattern, min: min, max: max};
@@ -83,9 +84,8 @@ jsTest.log("Verify that keyPattern and key range validation works");
 const invalidRanges1 = [
     {min: {y: MinKey}, max: {y: MaxKey}, errorCode: ErrorCodes.BadValue},
     {min: {x: MinKey, y: MinKey}, max: {x: MaxKey, y: MaxKey}, errorCode: ErrorCodes.BadValue},
-    // The command does not throw any particular error when only one of min or max is specified.
-    {min: {}, max: {x: MaxKey}, errorCode: ErrorCodes.UnknownError},
-    {min: {x: MinKey}, max: {}, errorCode: ErrorCodes.UnknownError},
+    {min: {}, max: {x: MaxKey}, errorCode: ErrorCodes.BadValue},
+    {min: {x: MinKey}, max: {}, errorCode: ErrorCodes.BadValue},
 ];
 testDataSizeCmd(st.s0, shardKey1, invalidRanges1, kNumDocs);
 testDataSizeCmd(st.s1, shardKey1, invalidRanges1, kNumDocs);

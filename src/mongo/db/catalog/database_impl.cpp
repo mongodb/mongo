@@ -348,7 +348,7 @@ bool DatabaseImpl::isDropPending(OperationContext* opCtx) const {
 }
 
 void DatabaseImpl::getStats(OperationContext* opCtx,
-                            BSONObjBuilder* output,
+                            DBStats* output,
                             bool includeFreeStorage,
                             double scale) const {
 
@@ -392,26 +392,22 @@ void DatabaseImpl::getStats(OperationContext* opCtx,
 
     // Make sure that the same fields are returned for non-existing dbs
     // in `DBStats::errmsgRun`
-    output->appendNumber("collections", nCollections);
-    output->appendNumber("views", nViews);
-    output->appendNumber("objects", objects);
-    output->append("avgObjSize", objects == 0 ? 0 : double(size) / double(objects));
-    output->appendNumber("dataSize", size / scale);
-    output->appendNumber("storageSize", storageSize / scale);
+    output->setCollections(nCollections);
+    output->setViews(nViews);
+    output->setObjects(objects);
+    output->setAvgObjSize(objects ? (double(size) / double(objects)) : 0);
+    output->setDataSize(size / scale);
+    output->setStorageSize(storageSize / scale);
+
+    output->setIndexes(indexes);
+    output->setIndexSize(indexSize / scale);
+    output->setTotalSize((storageSize + indexSize) / scale);
     if (includeFreeStorage) {
-        output->appendNumber("freeStorageSize", freeStorageSize / scale);
-        output->appendNumber("indexes", indexes);
-        output->appendNumber("indexSize", indexSize / scale);
-        output->appendNumber("indexFreeStorageSize", indexFreeStorageSize / scale);
-        output->appendNumber("totalSize", (storageSize + indexSize) / scale);
-        output->appendNumber("totalFreeStorageSize",
-                             (freeStorageSize + indexFreeStorageSize) / scale);
-    } else {
-        output->appendNumber("indexes", indexes);
-        output->appendNumber("indexSize", indexSize / scale);
-        output->appendNumber("totalSize", (storageSize + indexSize) / scale);
+        output->setFreeStorageSize(freeStorageSize / scale);
+        output->setIndexFreeStorageSize(indexFreeStorageSize / scale);
+        output->setTotalFreeStorageSize((freeStorageSize + indexFreeStorageSize) / scale);
     }
-    output->appendNumber("scaleFactor", scale);
+    output->setScaleFactor(scale);
 
     if (!opCtx->getServiceContext()->getStorageEngine()->isEphemeral()) {
         boost::filesystem::path dbpath(
@@ -419,11 +415,11 @@ void DatabaseImpl::getStats(OperationContext* opCtx,
         boost::system::error_code ec;
         boost::filesystem::space_info spaceInfo = boost::filesystem::space(dbpath, ec);
         if (!ec) {
-            output->appendNumber("fsUsedSize", (spaceInfo.capacity - spaceInfo.available) / scale);
-            output->appendNumber("fsTotalSize", spaceInfo.capacity / scale);
+            output->setFsUsedSize((spaceInfo.capacity - spaceInfo.available) / scale);
+            output->setFsTotalSize(spaceInfo.capacity / scale);
         } else {
-            output->appendNumber("fsUsedSize", -1);
-            output->appendNumber("fsTotalSize", -1);
+            output->setFsUsedSize(-1);
+            output->setFsTotalSize(-1);
             LOGV2(20312,
                   "Failed to query filesystem disk stats (code: {ec_value}): {ec_message}",
                   "Failed to query filesystem disk stats",

@@ -52,7 +52,7 @@ public:
     bool isDropPending(OperationContext* opCtx) const final;
 
     void getStats(OperationContext* opCtx,
-                  BSONObjBuilder* output,
+                  DBStats* output,
                   bool includeFreeStorage,
                   double scale = 1) const final;
 

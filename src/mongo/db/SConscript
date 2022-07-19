@@ -719,6 +719,20 @@ env.Library(
 )
 
 env.Library(
+    target='dbcommands_idl',
+    source=[
+        'dbcommands.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/pipeline/document_sources_idl',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+env.Library(
     target="commands",
     source=[
         'coll_mod_reply_validation.cpp',

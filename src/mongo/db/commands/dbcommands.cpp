@@ -59,6 +59,7 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/dbcommands_gen.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/drop_database_gen.h"
@@ -170,39 +171,41 @@ public:
     };
 } cmdDropDatabase;
 
-static const char* repairRemovedMessage =
-    "This command has been removed. If you would like to compact your data, use the 'compact' "
-    "command. If you would like to rebuild indexes, use the 'reIndex' command. If you need to "
-    "recover data, please see the documentation for repairing your database offline: "
-    "http://dochub.mongodb.org/core/repair";
-
-class CmdRepairDatabase : public ErrmsgCommandDeprecated {
+class CmdRepairDatabase final : public TypedCommand<CmdRepairDatabase> {
 public:
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+    using Request = RepairDatabaseCommand;
+
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
+
+        bool supportsWriteConcern() const final {
+            return false;
+        }
+
+        NamespaceString ns() const final {
+            return NamespaceString(request().getDbName());
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const final {}
+
+        void typedRun(OperationContext*) {
+            uasserted(ErrorCodes::CommandNotFound, Request::kCommandDescription);
+        }
+    };
+
+    std::string help() const final {
+        return Request::kCommandDescription.toString();
+    }
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kAlways;
     }
-    virtual bool maintenanceMode() const {
+
+    bool maintenanceMode() const final {
         return false;
     }
 
-    std::string help() const override {
-        return repairRemovedMessage;
-    }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-
-    CmdRepairDatabase() : ErrmsgCommandDeprecated("repairDatabase") {}
-
-    bool errmsgRun(OperationContext* opCtx,
-                   const std::string& dbname,
-                   const BSONObj& cmdObj,
-                   std::string& errmsg,
-                   BSONObjBuilder& result) {
-
-        uasserted(ErrorCodes::CommandNotFound, repairRemovedMessage);
-        return false;
-    }
 } cmdRepairDatabase;
 
 /* drop collection */
@@ -264,251 +267,253 @@ public:
     };
 } cmdDrop;
 
-class CmdDatasize : public ErrmsgCommandDeprecated {
+class CmdDataSize final : public TypedCommand<CmdDataSize> {
 public:
-    CmdDatasize() : ErrmsgCommandDeprecated("dataSize", "datasize") {}
+    using Request = DataSizeCommand;
+    using Reply = typename Request::Reply;
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+    CmdDataSize() : TypedCommand(Request::kCommandName, Request::kCommandAlias) {}
+
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
+
+        bool supportsWriteConcern() const final {
+            return false;
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const final {
+            auto as = AuthorizationSession::get(opCtx->getClient());
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    as->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns()),
+                                                         ActionType::find));
+        }
+
+        NamespaceString ns() const final {
+            const auto& tenant = request().getDbName().tenantId();
+            const auto& nss = request().getCommandParameter();
+            return NamespaceString(tenant, nss.db(), nss.coll());
+        }
+
+        Reply typedRun(OperationContext* opCtx) {
+            const auto& cmd = request();
+
+            const bool hasMin = cmd.getMin() != boost::none;
+            const bool hasMax = cmd.getMax() != boost::none;
+
+            const StringData negation = hasMin ? ""_sd : "not "_sd;
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "Max must " << negation << "be set if min is " << negation
+                                  << "set.",
+                    hasMin == hasMax);
+
+            Timer timer;
+            NamespaceString nss = ns();
+            auto min = cmd.getMin().get_value_or({});
+            auto max = cmd.getMax().get_value_or({});
+            auto keyPattern = cmd.getKeyPattern().get_value_or({});
+            const bool estimate = cmd.getEstimate();
+
+            AutoGetCollectionForReadCommand collection(opCtx, nss);
+
+            const auto collDesc =
+                CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx);
+
+            if (collDesc.isSharded()) {
+                const ShardKeyPattern shardKeyPattern(collDesc.getKeyPattern());
+                uassert(ErrorCodes::BadValue,
+                        "keyPattern must be empty or must be an object that equals the shard key",
+                        keyPattern.isEmpty() ||
+                            (SimpleBSONObjComparator::kInstance.evaluate(shardKeyPattern.toBSON() ==
+                                                                         keyPattern)));
+
+                uassert(ErrorCodes::BadValue,
+                        str::stream() << "min value " << min << " does not have shard key",
+                        min.isEmpty() || shardKeyPattern.isShardKey(min));
+                min = shardKeyPattern.normalizeShardKey(min);
+
+                uassert(ErrorCodes::BadValue,
+                        str::stream() << "max value " << max << " does not have shard key",
+                        max.isEmpty() || shardKeyPattern.isShardKey(max));
+                max = shardKeyPattern.normalizeShardKey(max);
+            }
+
+            long long numRecords = 0;
+            if (collection) {
+                numRecords = collection->numRecords(opCtx);
+            }
+
+            Reply reply;
+            reply.setNumObjects(numRecords);
+
+            if (numRecords == 0) {
+                reply.setSize(0);
+                reply.setMillis(timer.millis());
+                return reply;
+            }
+            reply.setEstimate(estimate);
+
+            // hasMin/hasMax check above matches presense of params,
+            // This test matches presence of significant param values.
+            uassert(ErrorCodes::BadValue,
+                    "Only one of min or max specified",
+                    min.isEmpty() == max.isEmpty());
+
+            std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
+            if (min.isEmpty() && max.isEmpty()) {
+                if (estimate) {
+                    reply.setSize(static_cast<long long>(collection->dataSize(opCtx)));
+                    reply.setMillis(timer.millis());
+                    return reply;
+                }
+                exec =
+                    InternalPlanner::collectionScan(opCtx,
+                                                    &collection.getCollection(),
+                                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
+            } else {
+                if (keyPattern.isEmpty()) {
+                    // if keyPattern not provided, try to infer it from the fields in 'min'
+                    keyPattern = Helpers::inferKeyPattern(min);
+                }
+
+                auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
+                                                             *collection,
+                                                             collection->getIndexCatalog(),
+                                                             keyPattern,
+                                                             /*requireSingleKey=*/true);
+
+                uassert(ErrorCodes::OperationFailed,
+                        "Couldn't find valid index containing key pattern",
+                        shardKeyIdx);
+
+                // If both min and max non-empty, append MinKey's to make them fit chosen index
+                KeyPattern kp(shardKeyIdx->keyPattern());
+                min = Helpers::toKeyFormat(kp.extendRangeBound(min, false));
+                max = Helpers::toKeyFormat(kp.extendRangeBound(max, false));
+
+                exec = InternalPlanner::shardKeyIndexScan(
+                    opCtx,
+                    &collection.getCollection(),
+                    *shardKeyIdx,
+                    min,
+                    max,
+                    BoundInclusion::kIncludeStartKeyOnly,
+                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
+            }
+
+            CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                &hangBeforeDatasizeCount, opCtx, "hangBeforeDatasizeCount", []() {});
+
+
+            const auto maxSize = cmd.getMaxSize();
+            const auto maxObjects = cmd.getMaxObjects();
+
+            std::remove_const_t<decltype(maxSize)> size = 0;
+            std::remove_const_t<decltype(size)> avgObjSize =
+                collection->dataSize(opCtx) / numRecords;
+            std::remove_const_t<decltype(maxObjects)> numObjects = 0;
+
+            try {
+                RecordId loc;
+                while (PlanExecutor::ADVANCED ==
+                       exec->getNext(static_cast<BSONObj*>(nullptr), &loc)) {
+                    if (estimate) {
+                        size += avgObjSize;
+                    } else {
+                        size += collection->getRecordStore()->dataFor(opCtx, loc).size();
+                    }
+
+                    ++numObjects;
+
+                    if ((maxSize && (size > maxSize)) ||
+                        (maxObjects && (numObjects > maxObjects))) {
+                        reply.setMaxReached(true);
+                        break;
+                    }
+                }
+            } catch (DBException& ex) {
+                LOGV2_WARNING(23801,
+                              "Internal error while reading",
+                              "namespace"_attr = nss,
+                              "error"_attr = ex.toStatus());
+                ex.addContext("Executor error while reading during dataSize command");
+                throw;
+            }
+
+            reply.setSize(size);
+            reply.setNumObjects(numObjects);
+            reply.setMillis(timer.millis());
+            return reply;
+        }
+    };
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kAlways;
     }
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
+    std::string help() const final {
+        return Request::kCommandDescription.toString();
     }
 
-    std::string help() const override {
-        return "determine data size for a set of data in a certain range"
-               "\nexample: { dataSize:\"blog.posts\", keyPattern:{x:1}, min:{x:10}, max:{x:55} }"
-               "\nmin and max parameters are optional. They must either both be included or both "
-               "omitted"
-               "\nkeyPattern is an optional parameter indicating an index pattern that would be "
-               "useful"
-               "for iterating over the min/max bounds. If keyPattern is omitted, it is inferred "
-               "from "
-               "the structure of min. "
-               "\nnote: This command may take a while to run";
-    }
-
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const override {
-        ActionSet actions;
-        actions.addAction(ActionType::find);
-        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
-    }
-
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsFullyQualified(cmdObj);
-    }
-
-    bool errmsgRun(OperationContext* opCtx,
-                   const std::string& dbname,
-                   const BSONObj& jsobj,
-                   std::string& errmsg,
-                   BSONObjBuilder& result) override {
-        auto hasMin = jsobj.hasField("min");
-        auto hasMax = jsobj.hasField("max");
-
-        uassert(ErrorCodes::BadValue,
-                hasMin ? "max must be set if min is set" : "min must be set if max is set",
-                hasMin == hasMax);
-
-        if (hasMin) {
-            uassert(ErrorCodes::BadValue,
-                    "min key must be an object",
-                    jsobj["min"].type() == BSONType::Object);
-
-            uassert(ErrorCodes::BadValue,
-                    "max key must be an object",
-                    jsobj["max"].type() == BSONType::Object);
-        }
-
-        Timer timer;
-        std::string ns = jsobj.firstElement().String();
-        BSONObj min = jsobj.getObjectField("min");
-        BSONObj max = jsobj.getObjectField("max");
-        BSONObj keyPattern = jsobj.getObjectField("keyPattern");
-        bool estimate = jsobj["estimate"].trueValue();
-
-        const NamespaceString nss(ns);
-        AutoGetCollectionForReadCommand collection(opCtx, nss);
-
-        const auto collDesc =
-            CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx);
-
-        if (collDesc.isSharded()) {
-            const ShardKeyPattern shardKeyPattern(collDesc.getKeyPattern());
-            uassert(ErrorCodes::BadValue,
-                    "keyPattern must be empty or must be an object that equals the shard key",
-                    keyPattern.isEmpty() ||
-                        (SimpleBSONObjComparator::kInstance.evaluate(shardKeyPattern.toBSON() ==
-                                                                     keyPattern)));
-
-            uassert(ErrorCodes::BadValue,
-                    str::stream() << "min value " << min << " does not have shard key",
-                    min.isEmpty() || shardKeyPattern.isShardKey(min));
-            min = shardKeyPattern.normalizeShardKey(min);
-
-            uassert(ErrorCodes::BadValue,
-                    str::stream() << "max value " << max << " does not have shard key",
-                    max.isEmpty() || shardKeyPattern.isShardKey(max));
-            max = shardKeyPattern.normalizeShardKey(max);
-        }
-
-        long long numRecords = 0;
-        if (collection) {
-            numRecords = collection->numRecords(opCtx);
-        }
-
-        if (numRecords == 0) {
-            result.appendNumber("size", 0);
-            result.appendNumber("numObjects", 0);
-            result.append("millis", timer.millis());
-            return true;
-        }
-
-        result.appendBool("estimate", estimate);
-
-        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
-        if (min.isEmpty() && max.isEmpty()) {
-            if (estimate) {
-                result.appendNumber("size", static_cast<long long>(collection->dataSize(opCtx)));
-                result.appendNumber("numObjects", numRecords);
-                result.append("millis", timer.millis());
-                return 1;
-            }
-            exec = InternalPlanner::collectionScan(
-                opCtx, &collection.getCollection(), PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
-        } else if (min.isEmpty() || max.isEmpty()) {
-            errmsg = "only one of min or max specified";
-            return false;
-        } else {
-            if (keyPattern.isEmpty()) {
-                // if keyPattern not provided, try to infer it from the fields in 'min'
-                keyPattern = Helpers::inferKeyPattern(min);
-            }
-
-            auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
-                                                         *collection,
-                                                         collection->getIndexCatalog(),
-                                                         keyPattern,
-                                                         /*requireSingleKey=*/true);
-
-            if (!shardKeyIdx) {
-                errmsg = "couldn't find valid index containing key pattern";
-                return false;
-            }
-            // If both min and max non-empty, append MinKey's to make them fit chosen index
-            KeyPattern kp(shardKeyIdx->keyPattern());
-            min = Helpers::toKeyFormat(kp.extendRangeBound(min, false));
-            max = Helpers::toKeyFormat(kp.extendRangeBound(max, false));
-
-            exec = InternalPlanner::shardKeyIndexScan(opCtx,
-                                                      &collection.getCollection(),
-                                                      *shardKeyIdx,
-                                                      min,
-                                                      max,
-                                                      BoundInclusion::kIncludeStartKeyOnly,
-                                                      PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
-        }
-
-        CurOpFailpointHelpers::waitWhileFailPointEnabled(
-            &hangBeforeDatasizeCount, opCtx, "hangBeforeDatasizeCount", []() {});
-
-        long long avgObjSize = collection->dataSize(opCtx) / numRecords;
-
-        long long maxSize = jsobj["maxSize"].numberLong();
-        long long maxObjects = jsobj["maxObjects"].numberLong();
-
-        long long size = 0;
-        long long numObjects = 0;
-
-        try {
-            RecordId loc;
-            while (PlanExecutor::ADVANCED == exec->getNext(static_cast<BSONObj*>(nullptr), &loc)) {
-                if (estimate)
-                    size += avgObjSize;
-                else
-                    size += collection->getRecordStore()->dataFor(opCtx, loc).size();
-
-                numObjects++;
-
-                if ((maxSize && size > maxSize) || (maxObjects && numObjects > maxObjects)) {
-                    result.appendBool("maxReached", true);
-                    break;
-                }
-            }
-        } catch (DBException& exception) {
-            LOGV2_WARNING(23801,
-                          "Internal error while reading {namespace}",
-                          "Internal error while reading",
-                          "namespace"_attr = ns);
-            exception.addContext("Executor error while reading during dataSize command");
-            throw;
-        }
-
-        StringBuilder os;
-        os << "Finding size for ns: " << ns;
-        if (!min.isEmpty()) {
-            os << " between " << min << " and " << max;
-        }
-
-        result.appendNumber("size", size);
-        result.appendNumber("numObjects", numObjects);
-        result.append("millis", timer.millis());
-        return true;
-    }
 } cmdDatasize;
 
-class CollectionStats : public ErrmsgCommandDeprecated {
+class CmdCollStats final : public BasicCommandWithRequestParser<CmdCollStats> {
 public:
-    CollectionStats() : ErrmsgCommandDeprecated("collStats", "collstats") {}
+    using Request = CollStatsCommand;
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
-    }
-    bool maintenanceOk() const override {
-        return false;
-    }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-    std::string help() const override {
-        return "{ collStats:\"blog.posts\" , scale : 1 } scale divides sizes e.g. for KB use 1024\n"
-               "    avgObjSize - in bytes";
-    }
-
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
-        ActionSet actions;
-        actions.addAction(ActionType::collStats);
-        out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
-    }
-
-    bool errmsgRun(OperationContext* opCtx,
-                   const std::string& dbname,
-                   const BSONObj& jsobj,
-                   std::string& errmsg,
-                   BSONObjBuilder& result) override {
-        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, jsobj));
-
-        if (nss.coll().empty()) {
-            errmsg = "No collection name specified";
-            return false;
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const std::string& dbname,
+                                 const BSONObj& cmdObj) const final {
+        const auto nss = CommandHelpers::parseNsCollectionRequired(dbname, cmdObj);
+        auto as = AuthorizationSession::get(opCtx->getClient());
+        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(nss),
+                                                  ActionType::collStats)) {
+            return {ErrorCodes::Unauthorized, "unauthorized"};
         }
+        return Status::OK();
+    }
+
+    bool supportsWriteConcern(const BSONObj&) const final {
+        return false;
+    }
+
+    bool runWithRequestParser(OperationContext* opCtx,
+                              const DatabaseName&,
+                              const BSONObj& cmdObj,
+                              const RequestParser& requestParser,
+                              BSONObjBuilder& result) final {
+        const auto& cmd = requestParser.request();
+        const auto& nss = cmd.getNamespace();
+
+        uassert(ErrorCodes::OperationFailed, "No collection name specified", !nss.coll().empty());
 
         result.append("ns", nss.ns());
-        auto spec = StorageStatsSpec::parse(IDLParserContext("collStats"), jsobj);
+        auto spec = StorageStatsSpec::parse(IDLParserContext("collStats"), cmdObj);
         Status status = appendCollectionStorageStats(opCtx, nss, spec, &result);
-        if (!status.isOK() && status.code() != ErrorCodes::NamespaceNotFound) {
-            errmsg = status.reason();
-            return false;
+        if (!status.isOK() && (status.code() != ErrorCodes::NamespaceNotFound)) {
+            uassertStatusOK(status);  // throws
         }
 
         return true;
     }
-} cmdCollectionStats;
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
+        return AllowedOnSecondary::kAlways;
+    }
+
+    bool maintenanceOk() const final {
+        return false;
+    }
+
+    std::string help() const final {
+        return Request::kCommandDescription.toString();
+    }
+
+    // Assume that appendCollectionStorageStats() gives us a valid response.
+    void validateResult(const BSONObj& resultObj) final {}
+
+} cmdCollStats;
 
 class CollectionModCommand : public BasicCommandWithRequestParser<CollectionModCommand> {
 public:
@@ -604,114 +609,114 @@ public:
     }
 } collectionModCommand;
 
-class DBStats : public ErrmsgCommandDeprecated {
+class CmdDbStats final : public TypedCommand<CmdDbStats> {
 public:
-    DBStats() : ErrmsgCommandDeprecated("dbStats", "dbstats") {}
+    using Request = DBStatsCommand;
+    using Reply = typename Request::Reply;
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
-    }
-    bool maintenanceOk() const override {
-        return false;
-    }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
-    }
-    std::string help() const override {
-        return "Get stats on a database. Not instantaneous. Slower for databases with large "
-               ".ns files.\n"
-               "Example: { dbStats:1, scale:1 }";
-    }
+    CmdDbStats() : TypedCommand(Request::kCommandName, Request::kCommandAlias) {}
 
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {
-        ActionSet actions;
-        actions.addAction(ActionType::dbStats);
-        out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
-    }
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
 
-    bool errmsgRun(OperationContext* opCtx,
-                   const std::string& dbname,
-                   const BSONObj& jsobj,
-                   std::string& errmsg,
-                   BSONObjBuilder& result) override {
-        int scale = 1;
-        if (jsobj["scale"].isNumber()) {
-            scale = jsobj["scale"].numberInt();
-            if (scale <= 0) {
-                errmsg = "scale has to be > 0";
-                return false;
-            }
-        } else if (jsobj["scale"].trueValue()) {
-            errmsg = "scale has to be a number > 0";
+        bool supportsWriteConcern() const final {
             return false;
         }
-        bool includeFreeStorage = jsobj["freeStorage"].trueValue();
 
-        const std::string ns = parseNs(dbname, jsobj);
-        uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid db name: " << ns,
-                NamespaceString::validDBName(ns, NamespaceString::DollarInDbNameBehavior::Allow));
-
-        // TODO (Kal): OldClientContext legacy, needs to be removed
-        {
-            CurOp::get(opCtx)->ensureStarted();
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->setNS_inlock(dbname);
+        void doCheckAuthorization(OperationContext* opCtx) const final {
+            auto as = AuthorizationSession::get(opCtx->getClient());
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    as->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forDatabaseName(request().getDbName().db()),
+                        ActionType::dbStats));
         }
 
-        // TODO SERVER-67519 Pass ns.dbName() directly once parseNs returns NamespaceString obj
-        AutoGetDb autoDb(opCtx, DatabaseName(boost::none, ns), MODE_IS);
+        NamespaceString ns() const final {
+            return NamespaceString(request().getDbName());
+        }
 
-        result.append("db", ns);
+        Reply typedRun(OperationContext* opCtx) {
+            const auto& cmd = request();
+            const auto& dbname = cmd.getDbName();
 
-        Database* db = autoDb.getDb();
-        if (!db) {
-            // This preserves old behavior where we used to create an empty database even when the
-            // database was accessed for a read. Changing this behavior would impact users that have
-            // learned to depend on it, so we continue to support it. Ensure that these fields match
-            // exactly the fields in `DatabaseImpl::getStats`.
+            uassert(
+                ErrorCodes::BadValue, "Scale factor must be greater than zero", cmd.getScale() > 0);
 
-            result.appendNumber("collections", 0);
-            result.appendNumber("views", 0);
-            result.appendNumber("objects", 0);
-            result.append("avgObjSize", 0);
-            result.appendNumber("dataSize", 0);
-            result.appendNumber("storageSize", 0);
-            if (includeFreeStorage) {
-                result.appendNumber("freeStorageSize", 0);
-                result.appendNumber("indexes", 0);
-                result.appendNumber("indexSize", 0);
-                result.appendNumber("indexFreeStorageSize", 0);
-                result.appendNumber("totalSize", 0);
-                result.appendNumber("totalFreeStorageSize", 0);
-            } else {
-                result.appendNumber("indexes", 0);
-                result.appendNumber("indexSize", 0);
-                result.appendNumber("totalSize", 0);
-            }
-            result.appendNumber("scaleFactor", scale);
-            if (!getGlobalServiceContext()->getStorageEngine()->isEphemeral()) {
-                result.appendNumber("fsUsedSize", 0);
-                result.appendNumber("fsTotalSize", 0);
-            }
-        } else {
+            uassert(ErrorCodes::InvalidNamespace,
+                    str::stream() << "Invalid db name: " << dbname,
+                    NamespaceString::validDBName(dbname.db(),
+                                                 NamespaceString::DollarInDbNameBehavior::Allow));
+
+            // TODO (Kal): OldClientContext legacy, needs to be removed
             {
+                CurOp::get(opCtx)->ensureStarted();
                 stdx::lock_guard<Client> lk(*opCtx->getClient());
-                // TODO SERVER-67459: For getDatabaseProfileLevel, takes the passed in "const
-                // DatabaseName& dbname" directly.
-                // TODO: OldClientContext legacy, needs to be removed
-                CurOp::get(opCtx)->enter_inlock(
-                    dbname.c_str(),
-                    CollectionCatalog::get(opCtx)->getDatabaseProfileLevel({boost::none, dbname}));
+                CurOp::get(opCtx)->setNS_inlock(dbname.db());
             }
 
-            db->getStats(opCtx, &result, includeFreeStorage, scale);
-        }
+            AutoGetDb autoDb(opCtx, dbname, MODE_IS);
+            Database* db = autoDb.getDb();
 
-        return true;
+            Reply reply;
+            reply.setDB(dbname.db());
+
+            if (!db) {
+                // This preserves old behavior where we used to create an empty database even when
+                // the database was accessed for a read. Changing this behavior would impact users
+                // that have learned to depend on it, so we continue to support it. Ensure that
+                // these fields match exactly the fields in `DatabaseImpl::getStats`.
+                reply.setCollections(0);
+                reply.setViews(0);
+                reply.setObjects(0);
+                reply.setAvgObjSize(0);
+                reply.setDataSize(0);
+                reply.setStorageSize(0);
+                reply.setIndexes(0);
+                reply.setIndexSize(0);
+                reply.setTotalSize(0);
+                reply.setScaleFactor(cmd.getScale());
+
+                if (cmd.getFreeStorage()) {
+                    reply.setFreeStorageSize(0);
+                    reply.setIndexFreeStorageSize(0);
+                    reply.setTotalFreeStorageSize(0);
+                }
+
+                if (!getGlobalServiceContext()->getStorageEngine()->isEphemeral()) {
+                    reply.setFsUsedSize(0);
+                    reply.setFsTotalSize(0);
+                }
+
+            } else {
+                {
+                    stdx::lock_guard<Client> lk(*opCtx->getClient());
+                    // TODO: OldClientContext legacy, needs to be removed
+                    CurOp::get(opCtx)->enter_inlock(
+                        dbname.db().c_str(),
+                        CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(dbname));
+                }
+
+                db->getStats(opCtx, &reply, cmd.getFreeStorage(), cmd.getScale());
+            }
+
+            return reply;
+        }
+    };
+
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
+        return AllowedOnSecondary::kAlways;
     }
+
+    bool maintenanceOk() const final {
+        return false;
+    }
+
+    std::string help() const final {
+        return Request::kCommandDescription.toString();
+    }
+
 } cmdDBStats;
 
 // Provides the means to asynchronously run `buildinfo` commands.

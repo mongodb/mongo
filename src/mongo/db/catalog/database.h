@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/dbcommands_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/util/string_map.h"
@@ -94,7 +95,7 @@ public:
     virtual bool isDropPending(OperationContext* opCtx) const = 0;
 
     virtual void getStats(OperationContext* opCtx,
-                          BSONObjBuilder* output,
+                          DBStats* output,
                           bool includeFreeStorage,
                           double scale = 1) const = 0;
 

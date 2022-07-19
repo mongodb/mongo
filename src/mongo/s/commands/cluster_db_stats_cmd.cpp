@@ -31,7 +31,9 @@
 
 #include <vector>
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/dbcommands_gen.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
@@ -42,6 +44,8 @@ namespace {
 void aggregateResults(int scale,
                       const std::vector<AsyncRequestsSender::Response>& responses,
                       BSONObjBuilder& output) {
+    long long collections = 0;
+    long long views = 0;
     long long objects = 0;
     long long unscaledDataSize = 0;
     long long dataSize = 0;
@@ -49,22 +53,29 @@ void aggregateResults(int scale,
     long long totalSize = 0;
     long long indexes = 0;
     long long indexSize = 0;
-    long long fileSize = 0;
+    long long fsUsedSize = 0;
+    long long fsTotalSize = 0;
 
     for (const auto& response : responses) {
         invariant(response.swResponse.getStatus().isOK());
         const BSONObj& b = response.swResponse.getValue().data;
+        auto resp = DBStats::parse({"dbstats"}, b);
 
-        objects += b["objects"].numberLong();
-        unscaledDataSize += b["avgObjSize"].numberLong() * b["objects"].numberLong();
-        dataSize += b["dataSize"].numberLong();
-        storageSize += b["storageSize"].numberLong();
-        totalSize += b["totalSize"].numberLong();
-        indexes += b["indexes"].numberLong();
-        indexSize += b["indexSize"].numberLong();
-        fileSize += b["fileSize"].numberLong();
+        collections += resp.getCollections();
+        views += resp.getViews();
+        objects += resp.getObjects();
+        unscaledDataSize += resp.getAvgObjSize() * resp.getObjects();
+        dataSize += resp.getDataSize();
+        storageSize += resp.getStorageSize();
+        totalSize += resp.getTotalSize();
+        indexes += resp.getIndexes();
+        indexSize += resp.getIndexSize();
+        fsUsedSize += resp.getFsUsedSize().get_value_or(0);
+        fsTotalSize += resp.getFsTotalSize().get_value_or(0);
     }
 
+    output.appendNumber("collections", collections);
+    output.appendNumber("views", views);
     output.appendNumber("objects", objects);
 
     // avgObjSize on mongod is not scaled based on the argument to db.stats(), so we use
@@ -76,69 +87,70 @@ void aggregateResults(int scale,
     output.appendNumber("indexes", indexes);
     output.appendNumber("indexSize", indexSize);
     output.appendNumber("scaleFactor", scale);
-    output.appendNumber("fileSize", fileSize);
+    output.appendNumber("fsUsedSize", fsUsedSize);
+    output.appendNumber("fsTotalSize", fsTotalSize);
 }
 
-class DBStatsCmd : public ErrmsgCommandDeprecated {
+class CmdDBStats final : public BasicCommandWithRequestParser<CmdDBStats> {
 public:
-    DBStatsCmd() : ErrmsgCommandDeprecated("dbStats", "dbstats") {}
+    using Request = DBStatsCommand;
+    using Reply = typename Request::Reply;
 
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
+    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kAlways;
     }
 
-    bool maintenanceOk() const override {
+    bool maintenanceOk() const final {
         return false;
     }
 
-    bool adminOnly() const override {
+    bool adminOnly() const final {
         return false;
     }
 
-    bool supportsWriteConcern(const BSONObj& cmd) const override {
+    bool supportsWriteConcern(const BSONObj&) const final {
         return false;
     }
 
-    void addRequiredPrivileges(const std::string& dbname,
-                               const BSONObj& cmdObj,
-                               std::vector<Privilege>* out) const override {
-        ActionSet actions;
-        actions.addAction(ActionType::dbStats);
-        out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
-    }
-
-    bool errmsgRun(OperationContext* opCtx,
-                   const std::string& dbName,
-                   const BSONObj& cmdObj,
-                   std::string& errmsg,
-                   BSONObjBuilder& output) override {
-        int scale = 1;
-        if (cmdObj["scale"].isNumber()) {
-            scale = cmdObj["scale"].safeNumberInt();
-            if (scale <= 0) {
-                errmsg = "scale has to be > 0";
-                return false;
-            }
-        } else if (cmdObj["scale"].trueValue()) {
-            errmsg = "scale has to be a number > 0";
-            return false;
+    Status checkAuthForOperation(OperationContext* opCtx,
+                                 const std::string& dbname,
+                                 const BSONObj& cmdObj) const final {
+        auto as = AuthorizationSession::get(opCtx->getClient());
+        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
+                                                  ActionType::dbStats)) {
+            return {ErrorCodes::Unauthorized, "unauthorized"};
         }
+        return Status::OK();
+    }
+
+    bool runWithRequestParser(OperationContext* opCtx,
+                              const DatabaseName& dbName,
+                              const BSONObj& cmdObj,
+                              const RequestParser& requestParser,
+                              BSONObjBuilder& output) final {
+        const auto& cmd = requestParser.request();
+        uassert(ErrorCodes::BadValue, "Scale must be greater than zero", cmd.getScale() > 0);
 
         auto shardResponses = scatterGatherUnversionedTargetAllShards(
             opCtx,
-            dbName,
+            dbName.db(),
             applyReadWriteConcern(
                 opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             ReadPreferenceSetting::get(opCtx),
             Shard::RetryPolicy::kIdempotent);
+        std::string errmsg;
         if (!appendRawResponses(opCtx, &errmsg, &output, shardResponses).responseOK) {
-            return false;
+            uasserted(ErrorCodes::OperationFailed, errmsg);
         }
 
-        aggregateResults(scale, shardResponses, output);
+        output.append("db", dbName.db());
+        aggregateResults(cmd.getScale(), shardResponses, output);
         return true;
     }
 
+    void validateResult(const BSONObj& resultObj) final {
+        DBStats::parse({"dbstats.reply"}, resultObj);
+    }
 } clusterDBStatsCmd;
 
 }  // namespace
