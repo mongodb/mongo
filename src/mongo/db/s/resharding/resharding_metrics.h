@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/metrics_state_holder.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_metrics_field_name_provider.h"
 #include "mongo/db/s/resharding/resharding_metrics_helpers.h"
@@ -83,6 +84,13 @@ public:
                       Role role,
                       ClockSource* clockSource,
                       ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
+
+    ReshardingMetrics(const CommonReshardingMetadata& metadata,
+                      Role role,
+                      ClockSource* clockSource,
+                      ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
+                      State state);
+
     ReshardingMetrics(UUID instanceId,
                       BSONObj shardKey,
                       NamespaceString nss,
@@ -90,6 +98,16 @@ public:
                       Date_t startTime,
                       ClockSource* clockSource,
                       ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
+
+    ReshardingMetrics(UUID instanceId,
+                      BSONObj shardKey,
+                      NamespaceString nss,
+                      Role role,
+                      Date_t startTime,
+                      ClockSource* clockSource,
+                      ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
+                      State state);
+
     ~ReshardingMetrics();
 
     static std::unique_ptr<ReshardingMetrics> makeInstance(UUID instanceId,
@@ -108,8 +126,8 @@ public:
             std::make_unique<ReshardingMetrics>(document.getCommonReshardingMetadata(),
                                                 resharding_metrics::getRoleForStateDocument<T>(),
                                                 clockSource,
-                                                cumulativeMetrics);
-        result->setState(resharding_metrics::getState(document));
+                                                cumulativeMetrics,
+                                                resharding_metrics::getState(document));
         result->restoreRoleSpecificFields(document);
         return result;
     }
@@ -121,27 +139,18 @@ public:
             serviceContext->getFastClockSource(),
             ShardingDataTransformCumulativeMetrics::getForResharding(serviceContext));
     }
-
     template <typename T>
     void onStateTransition(T before, boost::none_t after) {
-        getReshardingCumulativeMetrics()->onStateTransition<typename T::MetricsType>(
-            before.toMetrics(), after);
+        _stateHolder.onStateTransition(before, after);
     }
-
     template <typename T>
     void onStateTransition(boost::none_t before, T after) {
-        setState(after.getState());
-        getReshardingCumulativeMetrics()->onStateTransition<typename T::MetricsType>(
-            before, after.toMetrics());
+        _stateHolder.onStateTransition(before, after);
     }
-
     template <typename T>
     void onStateTransition(T before, T after) {
-        setState(after.getState());
-        getReshardingCumulativeMetrics()->onStateTransition<typename T::MetricsType>(
-            before.toMetrics(), after.toMetrics());
+        _stateHolder.onStateTransition(before, after);
     }
-
     void accumulateFrom(const ReshardingOplogApplierProgress& progressDoc);
     BSONObj reportForCurrentOp() const noexcept override;
 
@@ -173,12 +182,6 @@ private:
     void restoreRecipientSpecificFields(const ReshardingRecipientDocument& document);
     void restoreCoordinatorSpecificFields(const ReshardingCoordinatorDocument& document);
     ReshardingCumulativeMetrics* getReshardingCumulativeMetrics();
-
-    template <typename T>
-    void setState(T state) {
-        static_assert(std::is_assignable_v<State, T>);
-        _state.store(state);
-    }
 
     template <typename T>
     void restoreRoleSpecificFields(const T& document) {
@@ -223,7 +226,6 @@ private:
         }
     }
 
-    AtomicWord<State> _state;
     AtomicWord<int64_t> _deletesApplied;
     AtomicWord<int64_t> _insertsApplied;
     AtomicWord<int64_t> _updatesApplied;
@@ -232,9 +234,9 @@ private:
     AtomicWord<Date_t> _applyingStartTime;
     AtomicWord<Date_t> _applyingEndTime;
 
-    ReshardingMetricsFieldNameProvider* _reshardingFieldNames;
-
+    MetricsStateHolder<State, ReshardingCumulativeMetrics> _stateHolder;
     ShardingDataTransformInstanceMetrics::UniqueScopedObserver _scopedObserver;
+    ReshardingMetricsFieldNameProvider* _reshardingFieldNames;
 };
 
 }  // namespace mongo

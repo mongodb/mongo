@@ -32,6 +32,20 @@
 
 namespace mongo {
 namespace {
+
+inline GlobalIndexMetrics::State getDefaultState(GlobalIndexMetrics::Role role) {
+    using Role = GlobalIndexMetrics::Role;
+    switch (role) {
+        case Role::kCoordinator:
+            return GlobalIndexMetrics::GlobalIndexCoordinatorStateEnumPlaceholder::kUnused;
+        case Role::kRecipient:
+            return GlobalIndexMetrics::GlobalIndexRecipientStateEnumPlaceholder::kUnused;
+        case Role::kDonor:
+            return GlobalIndexMetrics::GlobalIndexDonorStateEnumPlaceholder::kUnused;
+    }
+    MONGO_UNREACHABLE;
+}
+
 // Returns the originalCommand with the createIndexes, key and unique fields added.
 BSONObj createOriginalCommand(const NamespaceString& nss, BSONObj keyPattern, bool unique) {
 
@@ -46,6 +60,137 @@ BSONObj createOriginalCommand(const NamespaceString& nss, BSONObj keyPattern, bo
         .toBson();
 }
 }  // namespace
+
+GlobalIndexMetrics::DonorState::DonorState(GlobalIndexDonorStateEnumPlaceholder enumVal)
+    : _enumVal(enumVal) {}
+
+GlobalIndexCumulativeMetrics::DonorStateEnum GlobalIndexMetrics::DonorState::toMetrics() const {
+    using MetricsEnum = GlobalIndexCumulativeMetrics::DonorStateEnum;
+
+    switch (_enumVal) {
+        case GlobalIndexDonorStateEnumPlaceholder::kUnused:
+            return MetricsEnum::kUnused;
+
+        case GlobalIndexDonorStateEnumPlaceholder::kPreparingToDonate:
+            return MetricsEnum::kPreparingToDonate;
+
+        case GlobalIndexDonorStateEnumPlaceholder::kDonatingInitialData:
+            return MetricsEnum::kDonatingInitialData;
+
+        case GlobalIndexDonorStateEnumPlaceholder::kDonatingOplogEntries:
+            return MetricsEnum::kDonatingOplogEntries;
+
+        case GlobalIndexDonorStateEnumPlaceholder::kPreparingToBlockWrites:
+            return MetricsEnum::kPreparingToBlockWrites;
+
+        case GlobalIndexDonorStateEnumPlaceholder::kError:
+            return MetricsEnum::kError;
+
+        case GlobalIndexDonorStateEnumPlaceholder::kBlockingWrites:
+            return MetricsEnum::kBlockingWrites;
+
+        case GlobalIndexDonorStateEnumPlaceholder::kDone:
+            return MetricsEnum::kDone;
+        default:
+            invariant(false, str::stream() << "Unexpected Global Index coordinator state: ");
+            MONGO_UNREACHABLE;
+    }
+}
+
+GlobalIndexMetrics::GlobalIndexDonorStateEnumPlaceholder GlobalIndexMetrics::DonorState::getState()
+    const {
+    return _enumVal;
+}
+
+GlobalIndexMetrics::RecipientState::RecipientState(GlobalIndexRecipientStateEnumPlaceholder enumVal)
+    : _enumVal(enumVal) {}
+
+GlobalIndexCumulativeMetrics::RecipientStateEnum GlobalIndexMetrics::RecipientState::toMetrics()
+    const {
+    using MetricsEnum = GlobalIndexCumulativeMetrics::RecipientStateEnum;
+
+    switch (_enumVal) {
+        case GlobalIndexRecipientStateEnumPlaceholder::kUnused:
+            return MetricsEnum::kUnused;
+
+        case GlobalIndexRecipientStateEnumPlaceholder::kAwaitingFetchTimestamp:
+            return MetricsEnum::kAwaitingFetchTimestamp;
+
+        case GlobalIndexRecipientStateEnumPlaceholder::kCreatingCollection:
+            return MetricsEnum::kCreatingCollection;
+
+        case GlobalIndexRecipientStateEnumPlaceholder::kCloning:
+            return MetricsEnum::kCloning;
+
+        case GlobalIndexRecipientStateEnumPlaceholder::kApplying:
+            return MetricsEnum::kApplying;
+
+        case GlobalIndexRecipientStateEnumPlaceholder::kError:
+            return MetricsEnum::kError;
+
+        case GlobalIndexRecipientStateEnumPlaceholder::kStrictConsistency:
+            return MetricsEnum::kStrictConsistency;
+
+        case GlobalIndexRecipientStateEnumPlaceholder::kDone:
+            return MetricsEnum::kDone;
+
+        default:
+            invariant(false, str::stream() << "Unexpected Global Index coordinator state: ");
+            MONGO_UNREACHABLE;
+    }
+}
+
+GlobalIndexMetrics::GlobalIndexRecipientStateEnumPlaceholder
+GlobalIndexMetrics::RecipientState::getState() const {
+    return _enumVal;
+}
+
+GlobalIndexMetrics::CoordinatorState::CoordinatorState(
+    GlobalIndexCoordinatorStateEnumPlaceholder enumVal)
+    : _enumVal(enumVal) {}
+
+GlobalIndexCumulativeMetrics::CoordinatorStateEnum GlobalIndexMetrics::CoordinatorState::toMetrics()
+    const {
+    using MetricsEnum = GlobalIndexCumulativeMetrics::CoordinatorStateEnum;
+
+    switch (_enumVal) {
+        case GlobalIndexCoordinatorStateEnumPlaceholder::kUnused:
+            return MetricsEnum::kUnused;
+
+        case GlobalIndexCoordinatorStateEnumPlaceholder::kInitializing:
+            return MetricsEnum::kInitializing;
+
+        case GlobalIndexCoordinatorStateEnumPlaceholder::kPreparingToDonate:
+            return MetricsEnum::kPreparingToDonate;
+
+        case GlobalIndexCoordinatorStateEnumPlaceholder::kCloning:
+            return MetricsEnum::kCloning;
+
+        case GlobalIndexCoordinatorStateEnumPlaceholder::kApplying:
+            return MetricsEnum::kApplying;
+
+        case GlobalIndexCoordinatorStateEnumPlaceholder::kBlockingWrites:
+            return MetricsEnum::kBlockingWrites;
+
+        case GlobalIndexCoordinatorStateEnumPlaceholder::kAborting:
+            return MetricsEnum::kAborting;
+
+        case GlobalIndexCoordinatorStateEnumPlaceholder::kCommitting:
+            return MetricsEnum::kCommitting;
+
+        case GlobalIndexCoordinatorStateEnumPlaceholder::kDone:
+            return MetricsEnum::kDone;
+        default:
+            invariant(false, str::stream() << "Unexpected Global Index coordinator state: ");
+            MONGO_UNREACHABLE;
+    }
+}
+
+GlobalIndexMetrics::GlobalIndexCoordinatorStateEnumPlaceholder
+GlobalIndexMetrics::CoordinatorState::getState() const {
+    return _enumVal;
+}
+
 
 GlobalIndexMetrics::GlobalIndexMetrics(UUID instanceId,
                                        BSONObj originatingCommand,
@@ -62,7 +207,10 @@ GlobalIndexMetrics::GlobalIndexMetrics(UUID instanceId,
                                            clockSource,
                                            cumulativeMetrics,
                                            std::make_unique<GlobalIndexMetricsFieldNameProvider>()},
-      _scopedObserver(registerInstanceMetrics()) {}
+      _stateHolder{getGlobalIndexCumulativeMetrics(), getDefaultState(role)},
+      _scopedObserver(registerInstanceMetrics()),
+      _globalIndexFieldNames{static_cast<GlobalIndexMetricsFieldNameProvider*>(_fieldNames.get())} {
+}
 
 GlobalIndexMetrics::~GlobalIndexMetrics() {
     // Deregister the observer first to ensure that the observer will no longer be able to reach
@@ -75,6 +223,11 @@ std::string GlobalIndexMetrics::createOperationDescription() const noexcept {
                        ShardingDataTransformMetrics::getRoleName(_role),
                        _instanceId.toString());
 }
+
+GlobalIndexCumulativeMetrics* GlobalIndexMetrics::getGlobalIndexCumulativeMetrics() {
+    return dynamic_cast<GlobalIndexCumulativeMetrics*>(getCumulativeMetrics());
+}
+
 
 Milliseconds GlobalIndexMetrics::getRecipientHighEstimateRemainingTimeMillis() const {
     return Milliseconds{0};

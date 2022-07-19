@@ -69,7 +69,6 @@ Date_t readStartTime(const CommonReshardingMetadata& metadata, ClockSource* fall
 }
 
 }  // namespace
-
 ReshardingMetrics::ReshardingMetrics(UUID instanceId,
                                      BSONObj shardKey,
                                      NamespaceString nss,
@@ -77,6 +76,23 @@ ReshardingMetrics::ReshardingMetrics(UUID instanceId,
                                      Date_t startTime,
                                      ClockSource* clockSource,
                                      ShardingDataTransformCumulativeMetrics* cumulativeMetrics)
+    : ReshardingMetrics{std::move(instanceId),
+                        shardKey,
+                        std::move(nss),
+                        std::move(role),
+                        std::move(startTime),
+                        clockSource,
+                        cumulativeMetrics,
+                        getDefaultState(role)} {}
+
+ReshardingMetrics::ReshardingMetrics(UUID instanceId,
+                                     BSONObj shardKey,
+                                     NamespaceString nss,
+                                     Role role,
+                                     Date_t startTime,
+                                     ClockSource* clockSource,
+                                     ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
+                                     State state)
     : ShardingDataTransformInstanceMetrics{std::move(instanceId),
                                            createOriginalCommand(nss, std::move(shardKey)),
                                            nss,
@@ -85,7 +101,6 @@ ReshardingMetrics::ReshardingMetrics(UUID instanceId,
                                            clockSource,
                                            cumulativeMetrics,
                                            std::make_unique<ReshardingMetricsFieldNameProvider>()},
-      _state{getDefaultState(role)},
       _deletesApplied{0},
       _insertsApplied{0},
       _updatesApplied{0},
@@ -93,8 +108,23 @@ ReshardingMetrics::ReshardingMetrics(UUID instanceId,
       _oplogEntriesFetched{0},
       _applyingStartTime{kNoDate},
       _applyingEndTime{kNoDate},
-      _reshardingFieldNames{static_cast<ReshardingMetricsFieldNameProvider*>(_fieldNames.get())},
-      _scopedObserver(registerInstanceMetrics()) {}
+      _stateHolder{getReshardingCumulativeMetrics(), state},
+      _scopedObserver(registerInstanceMetrics()),
+      _reshardingFieldNames{static_cast<ReshardingMetricsFieldNameProvider*>(_fieldNames.get())} {}
+
+ReshardingMetrics::ReshardingMetrics(const CommonReshardingMetadata& metadata,
+                                     Role role,
+                                     ClockSource* clockSource,
+                                     ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
+                                     State state)
+    : ReshardingMetrics{metadata.getReshardingUUID(),
+                        metadata.getReshardingKey().toBSON(),
+                        metadata.getSourceNss(),
+                        role,
+                        readStartTime(metadata, clockSource),
+                        clockSource,
+                        cumulativeMetrics,
+                        state} {}
 
 ReshardingMetrics::ReshardingMetrics(const CommonReshardingMetadata& metadata,
                                      Role role,
@@ -106,7 +136,8 @@ ReshardingMetrics::ReshardingMetrics(const CommonReshardingMetadata& metadata,
                         role,
                         readStartTime(metadata, clockSource),
                         clockSource,
-                        cumulativeMetrics} {}
+                        cumulativeMetrics,
+                        getDefaultState(role)} {}
 
 ReshardingMetrics::~ReshardingMetrics() {
     // Deregister the observer first to ensure that the observer will no longer be able to reach
@@ -152,7 +183,8 @@ std::unique_ptr<ReshardingMetrics> ReshardingMetrics::makeInstance(UUID instance
                                                role,
                                                startTime,
                                                serviceContext->getFastClockSource(),
-                                               cumulativeMetrics);
+                                               cumulativeMetrics,
+                                               getDefaultState(role));
 }
 
 StringData ReshardingMetrics::getStateString() const noexcept {
@@ -161,7 +193,7 @@ StringData ReshardingMetrics::getStateString() const noexcept {
             [](CoordinatorStateEnum state) { return CoordinatorState_serializer(state); },
             [](RecipientStateEnum state) { return RecipientState_serializer(state); },
             [](DonorStateEnum state) { return DonorState_serializer(state); }},
-        _state.load());
+        _stateHolder.getState());
 }
 
 BSONObj ReshardingMetrics::reportForCurrentOp() const noexcept {
