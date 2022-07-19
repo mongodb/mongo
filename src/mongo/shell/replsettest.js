@@ -3338,22 +3338,17 @@ var ReplSetTest = function(opts) {
      * Constructor, which instantiates the ReplSetTest object from existing nodes.
      */
     function _constructFromExistingNodes(
-        {name, serverless, nodeHosts, nodeOptions, keyFile, host, waitForKeys, nodes = undefined}) {
+        {name, serverless, nodeHosts, nodeOptions, keyFile, host, waitForKeys}) {
         print('Recreating replica set from existing nodes ' + tojson(nodeHosts));
 
         self.name = name;
         self.serverless = serverless;
         self.ports = nodeHosts.map(node => node.split(':')[1]);
-        if (nodes) {
-            self.nodes = nodes;
-        } else {
-            self.nodes = nodeHosts.map((node) => {
-                const conn = Mongo(node);
-                conn.name = conn.host;
-                conn.port = node.split(':')[1];
-                return conn;
-            });
-        }
+        self.nodes = nodeHosts.map((node) => {
+            const conn = Mongo(node);
+            conn.name = conn.host;
+            return conn;
+        });
         self.host = host;
         self.waitForKeys = waitForKeys;
         self.keyFile = keyFile;

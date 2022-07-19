@@ -70,7 +70,7 @@ function testShutDownAfterFailPoint(failPointName) {
     assert.eq(0, MongoRunner.stopMongod(st.rs0.getPrimary(), null, {}, true /* waitpid */));
     awaitResult();
 
-    st.stop({parallelSupported: false});
+    st.stop();
 }
 
 testShutDownAfterFailPoint("hangInEnsureChunkVersionIsGreaterThanInterruptible");
