@@ -161,8 +161,21 @@ fi
 # Send a Slack notification as the very last thing the setup_spawnhost_coredump script does.
 # This way a Server engineer can temporarily forget about the Evergreen host they spawned until the
 # paths and environment variables are configured as intended for when they first connect.
-slack_user=$(cat ~/.evergreen.yml | awk '{if ($1 == "user:") print $2}')
-ssh_user=$(whoami)
+if [[ "${machine}" = "Cygwin" ]]; then
+    # The setup_spawnhost_coredump script runs as the mci-exec user on Windows hosts. However,
+    # Server engineers log in as the Administrator user.
+    ssh_user="Administrator"
+    # The Evergreen binary only expects a Windows path. The rest of Cygwin is flexible about it
+    # being a Cygwin path or a Windows path so we do the conversion here.
+    evg_credentials_pathname=$(cygpath -w ~Administrator/.evergreen.yml)
+    evg_binary_pathname=~Administrator/cli_bin/evergreen
+else
+    ssh_user=$(whoami)
+    evg_credentials_pathname=~/.evergreen.yml
+    evg_binary_pathname=evergreen
+fi
+
+slack_user=$(awk '{if ($1 == "user:") print $2}' "$evg_credentials_pathname")
 # Refer to the https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-data-retrieval.html
 # documentation for more information on the AWS instance metadata endpoints.
 aws_metadata_svc="http://169.254.169.254"
@@ -183,5 +196,5 @@ fi
 # But in case something unexpected happens we don't want the setup_spawnhost_coredump script itself
 # to error.
 if [[ -n "${slack_user}" ]]; then
-    evergreen notify slack -t "@$slack_user" -m "$slack_message"
+    "$evg_binary_pathname" --config "$evg_credentials_pathname" notify slack -t "@$slack_user" -m "$slack_message"
 fi
