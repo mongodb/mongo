@@ -38,6 +38,9 @@ try:
             '-DHAVE_UNISTD_H',
             '-D_GNU_SOURCE',
         ])
+
+    if not env.TargetOSIs('windows'):
+        env.AddToCCFLAGSIfSupported('-Wno-unused-but-set-variable')
 except ValueError:
     pass
 

@@ -72,7 +72,7 @@ public:
         }
         long long limit = 10000 * cpuFactor;
         // volatile used to ensure that loop is not optimized away
-        volatile uint64_t lresult = 0;  // NOLINT
+        volatile uint64_t lresult [[maybe_unused]] = 0;  // NOLINT
         uint64_t x = 100;
         for (long long i = 0; i < limit; i++) {
             x *= 13;

@@ -2000,10 +2000,6 @@ void readBson(BufReader* reader, bool inverted, Version version) {
 }
 
 void filterKeyFromKeyString(uint8_t ctype, BufReader* reader, bool inverted, Version version) {
-    // This is only used by the kNumeric.*ByteInt types, but needs to be declared up here
-    // since it is used across a fallthrough.
-    bool isNegative = false;
-
     switch (ctype) {
         case CType::kMinKey:
         case CType::kMaxKey:
@@ -2106,7 +2102,6 @@ void filterKeyFromKeyString(uint8_t ctype, BufReader* reader, bool inverted, Ver
 
         case CType::kNumericNegativeLargeMagnitude:
             inverted = !inverted;
-            isNegative = true;
             [[fallthrough]];  // format is the same as positive, but inverted
         case CType::kNumericPositiveLargeMagnitude: {
             uint64_t encoded = readType<uint64_t>(reader, inverted);
@@ -2132,7 +2127,6 @@ void filterKeyFromKeyString(uint8_t ctype, BufReader* reader, bool inverted, Ver
 
         case CType::kNumericNegativeSmallMagnitude:
             inverted = !inverted;
-            isNegative = true;
             [[fallthrough]];  // format is the same as positive, but inverted
 
         case CType::kNumericPositiveSmallMagnitude: {
@@ -2194,7 +2188,6 @@ void filterKeyFromKeyString(uint8_t ctype, BufReader* reader, bool inverted, Ver
         case CType::kNumericNegative2ByteInt:
         case CType::kNumericNegative1ByteInt:
             inverted = !inverted;
-            isNegative = true;
             [[fallthrough]];  // format is the same as positive, but inverted
 
         case CType::kNumericPositive1ByteInt:

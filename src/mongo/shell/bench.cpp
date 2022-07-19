@@ -998,7 +998,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
             // to test underlying system variability.
             long long limit = 10000 * this->cpuFactor;
             // volatile used to ensure that loop is not optimized away
-            volatile uint64_t result = 0;  // NOLINT
+            volatile uint64_t result [[maybe_unused]] = 0;  // NOLINT
             uint64_t x = 100;
             for (long long i = 0; i < limit; i++) {
                 x *= 13;

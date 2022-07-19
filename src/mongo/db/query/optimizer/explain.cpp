@@ -175,7 +175,6 @@ public:
         std::ostringstream os;
         std::vector<std::string> linePrefix;
 
-        bool firstAddLine = true;
         for (const auto& cmd : _cmd) {
             switch (cmd._type) {
                 case CommandType::Indent:
@@ -194,8 +193,6 @@ public:
                         }
                     }
                     os << cmd._str << "\n";
-
-                    firstAddLine = false;
                     break;
                 }
 

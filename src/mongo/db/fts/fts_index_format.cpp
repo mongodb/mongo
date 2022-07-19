@@ -116,7 +116,6 @@ void FTSIndexFormat::getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
                              KeyString::Version keyStringVersion,
                              Ordering ordering,
                              const boost::optional<RecordId>& id) {
-    int extraSize = 0;
     vector<BSONElement> extrasBefore;
     vector<BSONElement> extrasAfter;
 
@@ -124,14 +123,12 @@ void FTSIndexFormat::getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
     for (unsigned i = 0; i < spec.numExtraBefore(); i++) {
         auto indexedElement = extractNonFTSKeyElement(obj, spec.extraBefore(i));
         extrasBefore.push_back(indexedElement);
-        extraSize += indexedElement.size();
     }
 
     // Compute the non FTS key elements for the suffix.
     for (unsigned i = 0; i < spec.numExtraAfter(); i++) {
         auto indexedElement = extractNonFTSKeyElement(obj, spec.extraAfter(i));
         extrasAfter.push_back(indexedElement);
-        extraSize += indexedElement.size();
     }
 
     TermFrequencyMap term_freqs;

@@ -12,6 +12,9 @@ if env.TargetOSIs('windows'):
 
     env.Append(LIBS=["ShLwApi"])
 
+if not env.TargetOSIs('windows'):
+    env.AddToCCFLAGSIfSupported('-Wno-unused-but-set-variable')
+
 env.Append(
     CPPDEFINES=["HAVE_STD_REGEX"],
     CXXFLAGS=[] if env.TargetOSIs('windows') else [
