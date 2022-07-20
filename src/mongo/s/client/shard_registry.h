@@ -271,12 +271,6 @@ public:
      */
     std::unique_ptr<Shard> createConnection(const ConnectionString& connStr) const;
 
-    /**
-     * The ShardRegistry is "up" once a successful lookup from the config servers has been
-     * completed.
-     */
-    bool isUp();
-
     void toBSON(BSONObjBuilder* result) const;
 
     /**

@@ -158,9 +158,6 @@ Status waitForSigningKeys(OperationContext* opCtx) {
     auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
 
     while (true) {
-        // This should be true when shard registry is up
-        invariant(shardRegistry->isUp());
-
         auto configCS = shardRegistry->getConfigServerConnectionString();
         auto rsm = ReplicaSetMonitor::get(configCS.getSetName());
         // mongod will set minWireVersion == maxWireVersion for hello requests from
@@ -443,7 +440,7 @@ Status initializeSharding(OperationContext* opCtx) {
         return status;
     }
 
-    status = waitForShardRegistryReload(opCtx);
+    status = loadGlobalSettingsFromConfigServer(opCtx);
     if (!status.isOK()) {
         return status;
     }

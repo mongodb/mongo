@@ -625,11 +625,10 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     auto shardingInitialized = ShardingInitializationMongoD::get(startupOpCtx.get())
                                    ->initializeShardingAwarenessIfNeeded(startupOpCtx.get());
     if (shardingInitialized) {
-        auto status = waitForShardRegistryReload(startupOpCtx.get());
+        auto status = loadGlobalSettingsFromConfigServer(startupOpCtx.get());
         if (!status.isOK()) {
             LOGV2(20545,
-                  "Error loading shard registry at startup {error}",
-                  "Error loading shard registry at startup",
+                  "Error loading global settings from config server at startup",
                   "error"_attr = redact(status));
         }
     }

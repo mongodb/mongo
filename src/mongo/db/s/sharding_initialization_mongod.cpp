@@ -495,11 +495,10 @@ void ShardingInitializationMongoD::onInitialDataAvailable(OperationContext* opCt
     // This function may take the global lock.
     auto shardingInitialized = initializeShardingAwarenessIfNeeded(opCtx);
     if (shardingInitialized) {
-        auto status = waitForShardRegistryReload(opCtx);
+        auto status = loadGlobalSettingsFromConfigServer(opCtx);
         if (!status.isOK()) {
             LOGV2(6460100,
-                  "Error loading shard registry at startup {error}",
-                  "Error loading shard registry at startup",
+                  "Error loading global settings from config server at startup",
                   "error"_attr = redact(status));
         }
     }

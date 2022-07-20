@@ -72,10 +72,10 @@ Status initializeGlobalShardingState(OperationContext* opCtx,
                                      boost::optional<size_t> taskExecutorPoolSize);
 
 /**
- * Loads cluster ID and waits for the reload of the Shard Registry.
+ * Loads global settings from config server such as cluster ID and default write concern.
  */
 
-Status waitForShardRegistryReload(OperationContext* opCtx);
+Status loadGlobalSettingsFromConfigServer(OperationContext* opCtx);
 
 /**
  * Pre-caches mongod routing info for the calling process.

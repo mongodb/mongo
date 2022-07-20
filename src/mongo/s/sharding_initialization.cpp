@@ -220,7 +220,7 @@ void loadCWWCFromConfigServerForReplication(OperationContext* opCtx) {
     repl::ReplicationCoordinator::get(opCtx)->recordIfCWWCIsSetOnConfigServerOnStartup(opCtx);
 }
 
-Status waitForShardRegistryReload(OperationContext* opCtx) {
+Status loadGlobalSettingsFromConfigServer(OperationContext* opCtx) {
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         return Status::OK();
     }
@@ -236,24 +236,19 @@ Status waitForShardRegistryReload(OperationContext* opCtx) {
                 opCtx, repl::ReadConcernLevel::kMajorityReadConcern));
             // Assert will be raised on failure to talk to config server.
             loadCWWCFromConfigServerForReplication(opCtx);
-            if (Grid::get(opCtx)->shardRegistry()->isUp()) {
-                return Status::OK();
-            }
-            sleepFor(kRetryInterval);
-            continue;
+            return Status::OK();
         } catch (const DBException& ex) {
             Status status = ex.toStatus();
-            LOGV2_WARNING(
-                23834,
-                "Error {error} initializing sharding state, sleeping for 2 seconds and retrying",
-                "Error initializing sharding state, sleeping for 2 seconds and retrying",
-                "error"_attr = status);
+            LOGV2_WARNING(23834,
+                          "Error loading global settings from config server. Sleeping for 2 "
+                          "seconds and retrying",
+                          "error"_attr = status);
             sleepFor(kRetryInterval);
             continue;
         }
     }
 
-    return {ErrorCodes::ShutdownInProgress, "aborting shard loading attempt"};
+    return {ErrorCodes::ShutdownInProgress, "aborted loading global settings from config server"};
 }
 
 void preCacheMongosRoutingInfo(OperationContext* opCtx) {

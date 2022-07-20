@@ -413,20 +413,6 @@ std::unique_ptr<Shard> ShardRegistry::createConnection(const ConnectionString& c
     return _shardFactory->createUniqueShard(ShardId("<unnamed>"), connStr);
 }
 
-bool ShardRegistry::isUp() {
-    if (_isUp.load())
-        return true;
-
-    // Before the first lookup is completed, the latest cached value is either empty or it is
-    // associated to the default constructed time
-    const auto latestCached = _cache->peekLatestCached(_kSingleton);
-    if (latestCached && latestCached.getTime() != Time()) {
-        _isUp.store(true);
-        return true;
-    }
-    return false;
-}
-
 void ShardRegistry::toBSON(BSONObjBuilder* result) const {
     BSONObjBuilder map;
     BSONObjBuilder hosts;
