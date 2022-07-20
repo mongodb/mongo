@@ -62,31 +62,6 @@ public:
     virtual ~TicketHolder(){};
 
     /**
-     * Classifies the priority that an operation acquires a ticket when the system is under high
-     * load (operations are throttled waiting for a ticket). Only applicable when there are no
-     * available tickets.
-     *
-     * 'kLow': It's of low importance that the operation acquires a ticket. These low-priority
-     * operations are reserved for background tasks that have no other operations dependent on them.
-     * These operations may be throttled under load and make significantly less progress as compared
-     * to operations of a higher priority.
-     *
-     * 'kNormal': It's important that the operation be throttled under load. If this operation is
-     * throttled, it will not affect system availability or observability. Most operations, both
-     * user and internal, should use this priority unless they qualify as 'kLow' or 'kHigh'
-     * priority.
-     *
-     * 'kHigh': It's crucial that the operation makes forward progress - bypassing ticket
-     * acquisition. Reserved for operations critical to availability (e.g. replication workers) or
-     * observability (e.g. FTDC), and any operation that is releasing resources (e.g. committing or
-     * aborting prepared transactions). Should be used sparingly.
-     *
-     * TODO SERVER-67951: Update comment to address that kHigh priority operations are always
-     * granted a ticket immediately upon request.
-     */
-    enum class AcquisitionPriority { kLow, kNormal, kHigh };
-
-    /**
      * Wait mode for ticket acquisition: interruptible or uninterruptible.
      */
     enum WaitMode { kInterruptible, kUninterruptible };
