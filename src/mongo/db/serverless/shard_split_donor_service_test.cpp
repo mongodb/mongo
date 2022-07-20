@@ -186,8 +186,7 @@ sdam::TopologyDescriptionPtr makeRecipientTopologyDescription(const MockReplicaS
 
 }  // namespace
 
-std::ostringstream& operator<<(std::ostringstream& builder,
-                               const mongo::ShardSplitDonorStateEnum state) {
+std::ostream& operator<<(std::ostream& builder, mongo::ShardSplitDonorStateEnum state) {
     switch (state) {
         case mongo::ShardSplitDonorStateEnum::kUninitialized:
             builder << "kUninitialized";
