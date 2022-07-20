@@ -94,11 +94,14 @@ load('jstests/multiVersion/libs/multi_cluster.js');  // For upgradeCluster()
     let hashShardedColl = shardCollectionByHashing(db.partial_sum);
 
     for (let i = 0; i < 10; ++i) {
+        // We set predetermined values for _id so that our data can be distributed across shards
+        // deterministically.
+        const idStart = i * 4;
         const docs = [
-            {k: i, n: 1e+34},
-            {k: i, n: NumberDecimal("0.1")},
-            {k: i, n: NumberDecimal("0.01")},
-            {k: i, n: -1e+34}
+            {_id: idStart, k: i, n: 1e+34},
+            {_id: idStart + 1, k: i, n: NumberDecimal("0.1")},
+            {_id: idStart + 2, k: i, n: NumberDecimal("0.01")},
+            {_id: idStart + 3, k: i, n: -1e+34}
         ];
         assert.commandWorked(hashShardedColl.insert(docs));
     }
