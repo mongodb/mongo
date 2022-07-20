@@ -51,6 +51,7 @@
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/rpc/object_check.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

@@ -71,7 +71,6 @@
 #include "mongo/idl/basic_types.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/random.h"
-#include "mongo/rpc/object_check.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
