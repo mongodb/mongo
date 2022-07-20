@@ -60,11 +60,11 @@ public:
 
 private:
     ReshardingMetrics* _metrics;
-    int64_t _insertsApplied{0};
-    int64_t _updatesApplied{0};
-    int64_t _deletesApplied{0};
-    int64_t _oplogEntriesApplied{0};
-    int64_t _writesToStashCollections{0};
+    AtomicWord<int64_t> _insertsApplied{0};
+    AtomicWord<int64_t> _updatesApplied{0};
+    AtomicWord<int64_t> _deletesApplied{0};
+    AtomicWord<int64_t> _oplogEntriesApplied{0};
+    AtomicWord<int64_t> _writesToStashCollections{0};
 };
 
 }  // namespace mongo
