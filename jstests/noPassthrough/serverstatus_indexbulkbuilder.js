@@ -124,7 +124,7 @@ assert.between(0,
 // The expected values in the server status should add to the numbers at the end of the resumable
 // index build test case.
 assert.commandWorked(coll.createIndexes([{c: 1}, {d: 1}, {e: 1, a: 1}]));
-IndexBuildTest.assertIndexes(newNodeColl, 6, ['_id_', 'a_1', 'b_1', 'c_1', 'd_1', 'e_1_a_1']);
+IndexBuildTest.assertIndexes(coll, 6, ['_id_', 'a_1', 'b_1', 'c_1', 'd_1', 'e_1_a_1']);
 indexBulkBuilderSection = testDB.serverStatus().indexBulkBuilder;
 assert.eq(indexBulkBuilderSection.count, 4, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.resumed, 1, tojson(indexBulkBuilderSection));
