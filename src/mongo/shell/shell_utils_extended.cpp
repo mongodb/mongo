@@ -41,6 +41,7 @@
 #include <fstream>
 
 #include "mongo/bson/bson_validate.h"
+#include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/shell/shell_utils_launcher.h"
@@ -448,6 +449,26 @@ BSONObj getFileMode(const BSONObj& a, void* data) {
     return BSON("" << fileStatus.permissions());
 }
 
+BSONObj decompressBSONColumn(const BSONObj& a, void* data) {
+    uassert(ErrorCodes::InvalidOptions,
+            "decompressBSONColumn() takes one argument, the BSONColumn BinData element",
+            a.nFields() == 1 && a.firstElementType() == BinData &&
+                a.firstElement().binDataType() == BinDataType::Column);
+
+    BSONColumn column(a.firstElement());
+
+    BSONObjBuilder wrapper;
+    BSONObjBuilder res(wrapper.subobjStart(""));
+
+    size_t index = 0;
+    for (const BSONElement& e : column) {
+        res.appendAs(e, std::to_string(index++));
+    }
+    res.done();
+
+    return wrapper.obj();
+}
+
 // The name of the file to dump is provided as a string in the first
 // field of the 'a' object. Other arguments in the BSONObj are
 // ignored. The void* argument is unused.
@@ -553,6 +574,7 @@ void installShellUtilsExtended(Scope& scope) {
     scope.injectNative("passwordPrompt", passwordPrompt);
     scope.injectNative("umask", changeUmask);
     scope.injectNative("getFileMode", getFileMode);
+    scope.injectNative("decompressBSONColumn", decompressBSONColumn);
     scope.injectNative("_copyFileRange", copyFileRange);
     scope.injectNative("_readDumpFile", readDumpFile);
     scope.injectNative("_getEnv", shellGetEnv);

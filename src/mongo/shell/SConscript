@@ -140,6 +140,7 @@ env.Library(
         'shell_options_storage',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/bson/util/bson_column',
         '$BUILD_DIR/mongo/db/auth/security_token',
     ],
 )
