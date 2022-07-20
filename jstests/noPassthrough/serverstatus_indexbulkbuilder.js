@@ -65,7 +65,7 @@ assert.eq(indexBulkBuilderSection.filesClosedForExternalSort, 1, tojson(indexBul
 // The expected values in the server status should add to the numbers at the end of the resumable
 // index build test case.
 assert.commandWorked(coll.createIndexes([{c: 1}, {d: 1}, {e: 1, a: 1}]));
-IndexBuildTest.assertIndexes(newNodeColl, 5, ['_id_', 'a_1', 'c_1', 'd_1', 'e_1_a_1']);
+IndexBuildTest.assertIndexes(coll, 5, ['_id_', 'a_1', 'c_1', 'd_1', 'e_1_a_1']);
 indexBulkBuilderSection = testDB.serverStatus().indexBulkBuilder;
 assert.eq(indexBulkBuilderSection.count, 4, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.filesOpenedForExternalSort, 2, tojson(indexBulkBuilderSection));
