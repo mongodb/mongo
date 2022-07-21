@@ -461,9 +461,6 @@ private:
 
     AtomicWord<bool> _isInitialized{false};
 
-    // The ShardRegistry is "up" once there has been a successful refresh.
-    AtomicWord<bool> _isUp{false};
-
     // Set to true in shutdown call to prevent calling it twice.
     AtomicWord<bool> _isShutdown{false};
 

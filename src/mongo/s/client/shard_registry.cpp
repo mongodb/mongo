@@ -119,34 +119,38 @@ ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCt
                                                           const Cache::ValueHandle& cachedData,
                                                           const Time& timeInStore) {
     invariant(key == _kSingleton);
-    invariant(cachedData, "ShardRegistry::_lookup called but the cache is empty");
+
+    auto lastForcedReloadIncrement = _forceReloadIncrement.load();
 
     LOGV2_DEBUG(4620250,
                 2,
                 "Starting ShardRegistry::_lookup",
-                "cachedData"_attr = cachedData->toBSON(),
-                "cachedData.getTime()"_attr = cachedData.getTime(),
-                "timeInStore"_attr = timeInStore);
+                "cachedData"_attr = cachedData ? cachedData->toBSON() : BSONObj{},
+                "cachedData.getTime()"_attr = cachedData ? cachedData.getTime() : Time{},
+                "timeInStore"_attr = timeInStore,
+                "lastForcedReloadIncrement"_attr = lastForcedReloadIncrement);
 
     // Check if we need to refresh from the configsvrs.  If so, then do that and get the results,
     // otherwise (this is a lookup only to incorporate updated connection strings from the RSM),
     // then get the equivalent values from the previously cached data.
-    auto [returnData, returnTopologyTime, returnForceReloadIncrement, removedShards] =
-        [&]() -> std::tuple<ShardRegistryData, Timestamp, Increment, ShardRegistryData::ShardMap> {
-        if (timeInStore.topologyTime > cachedData.getTime().topologyTime ||
-            timeInStore.forceReloadIncrement > cachedData.getTime().forceReloadIncrement) {
+    auto [returnData, returnTopologyTime, removedShards] =
+        [&]() -> std::tuple<ShardRegistryData, Timestamp, ShardRegistryData::ShardMap> {
+        if (!cachedData) {
+            auto [reloadedData, maxTopologyTime] =
+                ShardRegistryData::createFromCatalogClient(opCtx, _shardFactory.get());
+
+            return {std::move(reloadedData), std::move(maxTopologyTime), {}};
+        } else if (timeInStore.topologyTime > cachedData.getTime().topologyTime ||
+                   lastForcedReloadIncrement > cachedData.getTime().forceReloadIncrement) {
             auto [reloadedData, maxTopologyTime] =
                 ShardRegistryData::createFromCatalogClient(opCtx, _shardFactory.get());
 
             auto [mergedData, removedShards] =
                 ShardRegistryData::mergeExisting(*cachedData, reloadedData);
 
-            return {mergedData, maxTopologyTime, timeInStore.forceReloadIncrement, removedShards};
+            return {std::move(mergedData), std::move(maxTopologyTime), std::move(removedShards)};
         } else {
-            return {*cachedData,
-                    cachedData.getTime().topologyTime,
-                    cachedData.getTime().forceReloadIncrement,
-                    {}};
+            return {*cachedData, cachedData.getTime().topologyTime, {}};
         }
     }();
 
@@ -181,7 +185,7 @@ ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCt
         }
     }
 
-    Time returnTime{returnTopologyTime, rsmIncrementForConnStrings, returnForceReloadIncrement};
+    Time returnTime{returnTopologyTime, rsmIncrementForConnStrings, lastForcedReloadIncrement};
     LOGV2_DEBUG(4620251,
                 2,
                 "Finished ShardRegistry::_lookup",
@@ -417,8 +421,9 @@ void ShardRegistry::toBSON(BSONObjBuilder* result) const {
     BSONObjBuilder map;
     BSONObjBuilder hosts;
     BSONObjBuilder connStrings;
-    auto data = _getCachedData();
-    data->toBSON(&map, &hosts, &connStrings);
+    if (auto data = _getCachedData()) {
+        data->toBSON(&map, &hosts, &connStrings);
+    }
     {
         stdx::lock_guard<Latch> lk(_mutex);
         _configShardData.toBSON(&map, &hosts, &connStrings);
@@ -494,26 +499,7 @@ void ShardRegistry::updateReplicaSetOnConfigServer(ServiceContext* serviceContex
     }
 }
 
-// Inserts the initial empty ShardRegistryData into the cache, if the cache is empty.
-void ShardRegistry::_initializeCacheIfNecessary() const {
-    if (!_cache->peekLatestCached(_kSingleton)) {
-        stdx::lock_guard<Latch> lk(_mutex);
-        if (!_cache->peekLatestCached(_kSingleton)) {
-            LOGV2_DEBUG(
-                6471801, 1, "Initializing Shard Registry's cache to an empty set of shards");
-            _cache->insertOrAssign(_kSingleton, {}, Date_t::now(), Time());
-        }
-    }
-}
-
 SharedSemiFuture<ShardRegistry::Cache::ValueHandle> ShardRegistry::_getDataAsync() {
-    _initializeCacheIfNecessary();
-
-    // If the forceReloadIncrement is 0, then we've never done a lookup, so we should be sure to do
-    // one now.
-    Increment uninitializedIncrement{0};
-    _forceReloadIncrement.compareAndSwap(&uninitializedIncrement, 1);
-
     // Update the time the cache should be aiming for.
     auto now = VectorClock::get(_service)->getTime();
     // The topologyTime should be advanced to the gossiped topologyTime.
@@ -537,7 +523,6 @@ bool ShardRegistry::isConfigServer(const HostAndPort& host) const {
 // TODO SERVER-50206: Remove usage of these non-causally consistent accessors.
 
 ShardRegistry::Cache::ValueHandle ShardRegistry::_getCachedData() const {
-    _initializeCacheIfNecessary();
     return _cache->peekLatestCached(_kSingleton);
 }
 
@@ -550,6 +535,10 @@ std::shared_ptr<Shard> ShardRegistry::getShardForHostNoReload(const HostAndPort&
         }
     }
     auto data = _getCachedData();
+    if (!data) {
+        return nullptr;
+    }
+
     return data->findByHostAndPort(host);
 }
 
