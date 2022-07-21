@@ -105,6 +105,9 @@ std::vector<std::string> DependencyGraph::topSort(std::vector<std::string>* cycl
     // Swap the pointers in the `elements` vector that point to `a` and `b`.
     // Update their 'membership' data members to reflect the change.
     auto swapPositions = [](Element& a, Element& b) {
+        if (&a == &b) {
+            return;
+        }
         using std::swap;
         swap(*a.membership, *b.membership);
         swap(a.membership, b.membership);
