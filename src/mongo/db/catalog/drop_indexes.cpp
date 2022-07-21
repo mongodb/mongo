@@ -560,15 +560,6 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
         invariant((*collection)->getIndexCatalog()->numIndexesInProgress(opCtx) == 0);
     }
 
-    // TODO(SERVER-61481): Remove this block once kLastLTS is 6.0. As of 5.2, dropping an index
-    // while having a separate index build on the same collection is permitted.
-    if (serverGlobalParams.featureCompatibility.isLessThan(
-            multiversion::FeatureCompatibilityVersion::kVersion_5_2)) {
-        // The index catalog requires that no active index builders are running when dropping ready
-        // indexes.
-        IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(collectionUUID);
-    }
-
     writeConflictRetry(
         opCtx, "dropIndexes", dbAndUUID.toString(), [opCtx, &collection, &indexNames, &reply] {
             WriteUnitOfWork wunit(opCtx);
@@ -605,14 +596,6 @@ Status dropIndexesForApplyOps(OperationContext* opCtx,
                   "CMD: dropIndexes",
                   "namespace"_attr = nss,
                   "indexes"_attr = cmdObj[kIndexFieldName].toString(false));
-        }
-
-        // TODO(SERVER-61481): Remove this block once kLastLTS is 6.0. As of 5.2, dropping an index
-        // while having a separate index build on the same collection is permitted.
-        if (serverGlobalParams.featureCompatibility.isLessThan(
-                multiversion::FeatureCompatibilityVersion::kVersion_5_2)) {
-            IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
-                collection->uuid());
         }
 
         auto swIndexNames = getIndexNames(opCtx, collection.getCollection(), parsed.getIndex());
