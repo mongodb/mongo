@@ -289,23 +289,6 @@ void writeToImageCollection(OperationContext* opCtx,
     DisableDocumentValidation documentValidationDisabler(
         opCtx, DocumentValidationSettings::kDisableInternalValidation);
 
-    BSONObj existingImageEntryBson;
-    Helpers::findOne(opCtx,
-                     autoColl.getCollection(),
-                     BSON("_id" << imageEntry.get_id().toBSON() << "ts" << imageEntry.getTs()),
-                     existingImageEntryBson);
-    if (!existingImageEntryBson.isEmpty()) {
-        auto existingImageEntry = repl::ImageEntry::parse(
-            IDLParserErrorContext("writeToImageCollection"), existingImageEntryBson);
-        uassert(
-            6652600,
-            str::stream()
-                << "Found an existing findAndModify image entry with unexpected content. Found: "
-                << existingImageEntry.toBSON() << ". Expected: " << imageEntry.toBSON(),
-            existingImageEntry.toBSON().woCompare(imageEntry.toBSON()) == 0);
-        return;
-    }
-
     UpdateRequest request;
     request.setNamespaceString(NamespaceString::kConfigImagesNamespace);
     request.setQuery(
