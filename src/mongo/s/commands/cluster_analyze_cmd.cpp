@@ -27,16 +27,20 @@
  *    it in the license file.
  */
 
-#include <string>
-
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/analyze_command_gen.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/grid.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
 
-class CmdAnalyze final : public TypedCommand<CmdAnalyze> {
+class ClusterAnalyzeCmd final : public TypedCommand<ClusterAnalyzeCmd> {
 public:
     using Request = AnalyzeCommandRequest;
 
@@ -65,13 +69,37 @@ public:
         }
 
         void typedRun(OperationContext* opCtx) {
-            uassert(6660400,
+            uassert(6765500,
                     "Analyze command requires common query framework feature flag to be enabled",
                     serverGlobalParams.featureCompatibility.isVersionInitialized() &&
                         feature_flags::gFeatureFlagCommonQueryFramework.isEnabled(
                             serverGlobalParams.featureCompatibility));
 
-            uasserted(ErrorCodes::NotImplemented, "Analyze command not yet implemented");
+            const NamespaceString& nss = ns();
+
+            auto routingInfo = uassertStatusOK(
+                Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+            auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
+                opCtx,
+                nss.db(),
+                nss,
+                routingInfo,
+                applyReadWriteConcern(
+                    opCtx,
+                    this,
+                    CommandHelpers::filterCommandRequestForPassthrough(unparsedRequest().body)),
+                ReadPreferenceSetting::get(opCtx),
+                Shard::RetryPolicy::kIdempotent,
+                BSONObj() /* query */,
+                BSONObj() /* collation */);
+
+            for (const auto& shardResult : shardResponses) {
+                const auto& shardResponse = uassertStatusOK(std::move(shardResult.swResponse));
+
+                uassertStatusOK(shardResponse.status);
+
+                uassertStatusOK(getStatusFromCommandResult(shardResponse.data));
+            }
         }
 
     private:
@@ -79,8 +107,7 @@ public:
             // TODO SERVER-67656
         }
     };
-
-} cmdAnalyze;
+} clusterAnalyzeCmd;
 
 }  // namespace
 }  // namespace mongo

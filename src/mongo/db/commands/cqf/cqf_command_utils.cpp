@@ -634,7 +634,8 @@ bool isEligibleCommon(const RequestType& request,
 
 boost::optional<bool> shouldForceBonsai() {
     // Without the feature flag set, nothing else matters.
-    if (!feature_flags::gFeatureFlagCommonQueryFramework.isEnabled(
+    if (!serverGlobalParams.featureCompatibility.isVersionInitialized() ||
+        !feature_flags::gFeatureFlagCommonQueryFramework.isEnabled(
             serverGlobalParams.featureCompatibility)) {
         return false;
     }

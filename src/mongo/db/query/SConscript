@@ -202,6 +202,7 @@ env.Library(
 env.Library(
     target='command_request_response',
     source=[
+        "analyze_command.idl",
         "count_command_as_aggregation_command.cpp",
         "count_request.cpp",
         'cursor_request.cpp',

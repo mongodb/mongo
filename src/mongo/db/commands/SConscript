@@ -325,7 +325,6 @@ env.Library(
     target="standalone",
     source=[
         "analyze_cmd.cpp",
-        "analyze_command.idl",
         "count_cmd.cpp",
         "cqf/cqf_aggregate.cpp",
         "cqf/cqf_command_utils.cpp",
