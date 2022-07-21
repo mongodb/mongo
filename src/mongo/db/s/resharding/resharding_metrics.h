@@ -138,12 +138,6 @@ public:
                                                                            after.toMetrics());
     }
 
-    template <typename T>
-    void setState(T state) {
-        static_assert(std::is_assignable_v<State, T>);
-        _state.store(state);
-    }
-
     void accumulateFrom(const ReshardingOplogApplierProgress& progressDoc);
     BSONObj reportForCurrentOp() const noexcept override;
 
@@ -171,6 +165,12 @@ private:
     std::string createOperationDescription() const noexcept override;
     void restoreRecipientSpecificFields(const ReshardingRecipientDocument& document);
     void restoreCoordinatorSpecificFields(const ReshardingCoordinatorDocument& document);
+
+    template <typename T>
+    void setState(T state) {
+        static_assert(std::is_assignable_v<State, T>);
+        _state.store(state);
+    }
 
     template <typename T>
     void restoreRoleSpecificFields(const T& document) {
