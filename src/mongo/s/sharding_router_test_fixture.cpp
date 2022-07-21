@@ -157,7 +157,7 @@ ShardingTestFixture::ShardingTestFixture()
     auto shardFactory =
         std::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
-    auto shardRegistry(std::make_unique<ShardRegistry>(std::move(shardFactory), configCS));
+    auto shardRegistry(std::make_unique<ShardRegistry>(service, std::move(shardFactory), configCS));
     executorPool->startup();
 
     CatalogCacheLoader::set(service, std::make_unique<ConfigServerCatalogCacheLoader>());

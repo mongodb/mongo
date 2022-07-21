@@ -185,17 +185,21 @@ public:
      *                          hook is expected not to throw. If it does throw, the process will be
      *                          terminated.
      */
-    ShardRegistry(std::unique_ptr<ShardFactory> shardFactory,
+    ShardRegistry(ServiceContext* service,
+                  std::unique_ptr<ShardFactory> shardFactory,
                   const ConnectionString& configServerCS,
                   std::vector<ShardRemovalHook> shardRemovalHooks = {});
 
     ~ShardRegistry();
 
     /**
-     * Initializes ShardRegistry with config shard. Must be called outside c-tor to avoid calls on
-     * this while its still not fully constructed.
+     * Initializes ShardRegistry with config shard.
+     *
+     * The creation of the config shard object will intialize the associated RSM monitor that in
+     * turn will call ShardRegistry::updateReplSetHosts(). Hence the config shard object MUST be
+     * created after the ShardRegistry is fully constructed.
      */
-    void init(ServiceContext* service);
+    void init();
 
     /**
      * Startup the periodic reloader of the ShardRegistry.
@@ -418,6 +422,8 @@ private:
 
     SharedSemiFuture<Cache::ValueHandle> _reloadAsync();
 
+    ServiceContext* _service{nullptr};
+
     /**
      * Factory to create shards.  Never changed after startup so safe to access outside of _mutex.
      */
@@ -463,8 +469,6 @@ private:
 
     // Set to true in shutdown call to prevent calling it twice.
     AtomicWord<bool> _isShutdown{false};
-
-    ServiceContext* _service{nullptr};
 };
 
 }  // namespace mongo

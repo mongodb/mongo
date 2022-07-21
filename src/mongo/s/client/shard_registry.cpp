@@ -63,10 +63,12 @@ const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 
-ShardRegistry::ShardRegistry(std::unique_ptr<ShardFactory> shardFactory,
+ShardRegistry::ShardRegistry(ServiceContext* service,
+                             std::unique_ptr<ShardFactory> shardFactory,
                              const ConnectionString& configServerCS,
                              std::vector<ShardRemovalHook> shardRemovalHooks)
-    : _shardFactory(std::move(shardFactory)),
+    : _service(service),
+      _shardFactory(std::move(shardFactory)),
       _initConfigServerCS(configServerCS),
       _shardRemovalHooks(std::move(shardRemovalHooks)),
       _threadPool([] {
@@ -75,7 +77,17 @@ ShardRegistry::ShardRegistry(std::unique_ptr<ShardFactory> shardFactory,
           options.minThreads = 0;
           options.maxThreads = 1;
           return options;
-      }()) {
+      }()),
+      _cache(std::make_unique<Cache>(
+          _cacheMutex,
+          _service,
+          _threadPool,
+          [this](OperationContext* opCtx,
+                 const Singleton& key,
+                 const Cache::ValueHandle& cachedData,
+                 const Time& timeInStore) { return _lookup(opCtx, key, cachedData, timeInStore); },
+          1 /* cacheSize */)) {
+
     invariant(_initConfigServerCS.isValid());
     _threadPool.startup();
 }
@@ -84,26 +96,19 @@ ShardRegistry::~ShardRegistry() {
     shutdown();
 }
 
-void ShardRegistry::init(ServiceContext* service) {
+void ShardRegistry::init() {
     invariant(!_isInitialized.load());
-
-    invariant(!_service);
-    _service = service;
-
-    auto lookupFn = [this](OperationContext* opCtx,
-                           const Singleton& key,
-                           const Cache::ValueHandle& cachedData,
-                           const Time& timeInStore) {
-        return _lookup(opCtx, key, cachedData, timeInStore);
-    };
-
-    _cache =
-        std::make_unique<Cache>(_cacheMutex, _service, _threadPool, lookupFn, 1 /* cacheSize */);
 
     LOGV2_DEBUG(5123000,
                 1,
                 "Initializing ShardRegistry",
                 "configServers"_attr = _initConfigServerCS.toString());
+
+    /* The creation of the config shard object will intialize the associated RSM monitor that in
+     * turn will call ShardRegistry::updateReplSetHosts(). Hence the config shard object MUST be
+     * created after the ShardRegistry is fully constructed. This is why `_configShardData`
+     * is initialized here rather than in the ShardRegistry constructor.
+     */
     {
         stdx::lock_guard<Latch> lk(_mutex);
         _configShardData = ShardRegistryData::createWithConfigShardOnly(
@@ -195,7 +200,6 @@ ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCt
 }
 
 void ShardRegistry::startupPeriodicReloader(OperationContext* opCtx) {
-    invariant(_isInitialized.load());
     // startupPeriodicReloader() must be called only once
     invariant(!_executor);
 

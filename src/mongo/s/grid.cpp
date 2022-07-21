@@ -77,7 +77,7 @@ void Grid::init(std::unique_ptr<ShardingCatalogClient> catalogClient,
     _executorPool = std::move(executorPool);
     _network = network;
 
-    _shardRegistry->init(grid.owner(this));
+    _shardRegistry->init();
 }
 
 bool Grid::isShardingInitialized() const {

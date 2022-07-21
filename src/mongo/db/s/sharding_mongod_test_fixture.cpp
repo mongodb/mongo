@@ -163,7 +163,8 @@ std::unique_ptr<ShardRegistry> ShardingMongodTestFixture::makeShardRegistry(
     auto shardFactory =
         std::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
-    return std::make_unique<ShardRegistry>(std::move(shardFactory), configConnStr);
+    return std::make_unique<ShardRegistry>(
+        getServiceContext(), std::move(shardFactory), configConnStr);
 }
 
 std::unique_ptr<DistLockManager> ShardingMongodTestFixture::makeDistLockManager() {

@@ -568,7 +568,7 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
         }};
 
     auto shardRegistry = std::make_unique<ShardRegistry>(
-        std::move(shardFactory), configCS, std::move(shardRemovalHooks));
+        service, std::move(shardFactory), configCS, std::move(shardRemovalHooks));
 
     uassertStatusOK(
         initializeGlobalShardingState(opCtx,

@@ -420,8 +420,10 @@ Status initializeSharding(OperationContext* opCtx) {
         return {ErrorCodes::BadValue, "Unrecognized connection string."};
     }
 
-    auto shardRegistry = std::make_unique<ShardRegistry>(
-        std::move(shardFactory), mongosGlobalParams.configdbs, std::move(shardRemovalHooks));
+    auto shardRegistry = std::make_unique<ShardRegistry>(opCtx->getServiceContext(),
+                                                         std::move(shardFactory),
+                                                         mongosGlobalParams.configdbs,
+                                                         std::move(shardRemovalHooks));
 
     Status status = initializeGlobalShardingState(
         opCtx,
