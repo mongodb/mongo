@@ -158,11 +158,23 @@ ExecutorFuture<void> ShardingDDLCoordinator::_acquireLockAsync(
                }();
 
                auto distLock = distLockManager->lockDirectLocally(opCtx, resource, lockTimeOut);
-               _scopedLocks.emplace(std::move(distLock));
 
                uassertStatusOK(distLockManager->lockDirect(opCtx, resource, coorName, lockTimeOut));
+               _scopedLocks.emplace(std::move(distLock));
            })
-        .until([this](Status status) { return (!_recoveredFromDisk) || status.isOK(); })
+        .until([this, resource = resource.toString()](Status status) {
+            if (!status.isOK()) {
+                LOGV2_WARNING(6819300,
+                              "DDL lock acquisition attempt failed",
+                              "coordinatorId"_attr = _coordId,
+                              "resource"_attr = resource,
+                              "error"_attr = redact(status));
+            }
+            // Sharding DDL operations are not rollbackable so in case we recovered a coordinator
+            // from disk we need to ensure eventual completion of the DDL operation, so we must
+            // retry until we manage to acquire the lock.
+            return (!_recoveredFromDisk) || status.isOK();
+        })
         .withBackoffBetweenIterations(kExponentialBackoff)
         .on(**executor, token);
 }
