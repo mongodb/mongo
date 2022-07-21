@@ -3015,29 +3015,6 @@ buildvariants:
   tasks:
   - name: selected_tests_gen
 
-- <<: *enterprise-rhel-80-64-bit-dynamic-required-template
-  name: commit-queue
-  display_name: "~ Commit Queue"
-  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
-  stepback: false
-  tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
-    distros:
-    - rhel80-xlarge-commitqueue
-  - name: compile_test_and_package_parallel_unittest_stream_TG
-    distros:
-    - rhel80-xlarge-commitqueue
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
-    distros:
-    - rhel80-xlarge-commitqueue
-  - name: jsCore
-    distros:
-    - rhel80-xlarge-commitqueue
-  - name: .lint
-  - name: test_api_version_compatibility
-  - name: validate_commit_message
-  - name: check_feature_flag_tags
-
 - name: windows-dynamic-visibility-test
   display_name: "~ Shared Library Windows (visibility test)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
