@@ -2,6 +2,10 @@
  * Tests that when the current sync source no longer meets the strict criteria for being a sync
  * source, and there is another node which does meet those criteria, we will change sync source
  * (eventually).
+ *
+ * @tags: [
+ *   __TEMPORARILY_DISABLED__,
+ * ]
  */
 
 (function() {
