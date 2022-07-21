@@ -130,16 +130,29 @@ const withReshardingInBackground = (duringReshardingFn,
 };
 
 // Tests that the prohibited commands work if the resharding operation is aborted.
+let awaitAbort;
 withReshardingInBackground(() => {
     waitUntilReshardingInitializedOnDonor();
+    assert.neq(null,
+               mongos.getCollection("config.reshardingOperations").findOne({ns: sourceNamespace}));
+    awaitAbort = startParallelShell(funWithArgs(function(sourceNamespace) {
+                                        db.adminCommand({abortReshardCollection: sourceNamespace});
+                                    }, sourceNamespace), mongos.port);
+    // Wait for the coordinator to remove coordinator document from config.reshardingOperations
+    // as a result of the recipients and donors transitioning to done due to abort.
+    assert.soon(() => {
+        const coordinatorDoc =
+            mongos.getCollection("config.reshardingOperations").findOne({ns: sourceNamespace});
 
-    assert.commandWorked(mongos.adminCommand({abortReshardCollection: sourceNamespace}));
+        return coordinatorDoc === null || coordinatorDoc.state === "aborting";
+    });
 }, {
     expectedErrorCode: ErrorCodes.ReshardCollectionAborted,
 });
+awaitAbort();
 
 // Tests that the prohibited commands succeed if the resharding operation succeeds. During the
-// operation it makes sures that the prohibited commands are rejected during the resharding
+// operation it makes sure that the prohibited commands are rejected during the resharding
 // operation.
 withReshardingInBackground(() => {
     waitUntilReshardingInitializedOnDonor();
