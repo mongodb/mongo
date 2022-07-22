@@ -120,6 +120,10 @@ std::string ReshardingMetrics::createOperationDescription() const noexcept {
                        _instanceId.toString());
 }
 
+ReshardingCumulativeMetrics* ReshardingMetrics::getReshardingCumulativeMetrics() {
+    return dynamic_cast<ReshardingCumulativeMetrics*>(getCumulativeMetrics());
+}
+
 Milliseconds ReshardingMetrics::getRecipientHighEstimateRemainingTimeMillis() const {
     auto estimate = resharding::estimateRemainingRecipientTime(_applyingStartTime.load() != kNoDate,
                                                                getBytesWrittenCount(),
@@ -222,9 +226,8 @@ void ReshardingMetrics::restoreCoordinatorSpecificFields(
 
 ReshardingMetrics::DonorState::DonorState(DonorStateEnum enumVal) : _enumVal(enumVal) {}
 
-ShardingDataTransformCumulativeMetrics::DonorStateEnum ReshardingMetrics::DonorState::toMetrics()
-    const {
-    using MetricsEnum = ShardingDataTransformCumulativeMetrics::DonorStateEnum;
+ReshardingCumulativeMetrics::DonorStateEnum ReshardingMetrics::DonorState::toMetrics() const {
+    using MetricsEnum = ReshardingCumulativeMetrics::DonorStateEnum;
 
     switch (_enumVal) {
         case DonorStateEnum::kUnused:
@@ -264,9 +267,9 @@ DonorStateEnum ReshardingMetrics::DonorState::getState() const {
 
 ReshardingMetrics::RecipientState::RecipientState(RecipientStateEnum enumVal) : _enumVal(enumVal) {}
 
-ShardingDataTransformCumulativeMetrics::RecipientStateEnum
-ReshardingMetrics::RecipientState::toMetrics() const {
-    using MetricsEnum = ShardingDataTransformCumulativeMetrics::RecipientStateEnum;
+ReshardingCumulativeMetrics::RecipientStateEnum ReshardingMetrics::RecipientState::toMetrics()
+    const {
+    using MetricsEnum = ReshardingCumulativeMetrics::RecipientStateEnum;
 
     switch (_enumVal) {
         case RecipientStateEnum::kUnused:
@@ -308,35 +311,37 @@ RecipientStateEnum ReshardingMetrics::RecipientState::getState() const {
 ReshardingMetrics::CoordinatorState::CoordinatorState(CoordinatorStateEnum enumVal)
     : _enumVal(enumVal) {}
 
-ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum
-ReshardingMetrics::CoordinatorState::toMetrics() const {
+ReshardingCumulativeMetrics::CoordinatorStateEnum ReshardingMetrics::CoordinatorState::toMetrics()
+    const {
+    using MetricsEnum = ReshardingCumulativeMetrics::CoordinatorStateEnum;
+
     switch (_enumVal) {
         case CoordinatorStateEnum::kUnused:
-            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kUnused;
+            return MetricsEnum::kUnused;
 
         case CoordinatorStateEnum::kInitializing:
-            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kInitializing;
+            return MetricsEnum::kInitializing;
 
         case CoordinatorStateEnum::kPreparingToDonate:
-            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kPreparingToDonate;
+            return MetricsEnum::kPreparingToDonate;
 
         case CoordinatorStateEnum::kCloning:
-            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kCloning;
+            return MetricsEnum::kCloning;
 
         case CoordinatorStateEnum::kApplying:
-            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kApplying;
+            return MetricsEnum::kApplying;
 
         case CoordinatorStateEnum::kBlockingWrites:
-            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kBlockingWrites;
+            return MetricsEnum::kBlockingWrites;
 
         case CoordinatorStateEnum::kAborting:
-            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kAborting;
+            return MetricsEnum::kAborting;
 
         case CoordinatorStateEnum::kCommitting:
-            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kCommitting;
+            return MetricsEnum::kCommitting;
 
         case CoordinatorStateEnum::kDone:
-            return ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum::kDone;
+            return MetricsEnum::kDone;
         default:
             invariant(false,
                       str::stream() << "Unexpected resharding coordinator state: "
@@ -351,22 +356,22 @@ CoordinatorStateEnum ReshardingMetrics::CoordinatorState::getState() const {
 
 void ReshardingMetrics::onDeleteApplied() {
     _deletesApplied.addAndFetch(1);
-    getCumulativeMetrics()->onDeleteApplied();
+    getReshardingCumulativeMetrics()->onDeleteApplied();
 }
 
 void ReshardingMetrics::onInsertApplied() {
     _insertsApplied.addAndFetch(1);
-    getCumulativeMetrics()->onInsertApplied();
+    getReshardingCumulativeMetrics()->onInsertApplied();
 }
 
 void ReshardingMetrics::onUpdateApplied() {
     _updatesApplied.addAndFetch(1);
-    getCumulativeMetrics()->onUpdateApplied();
+    getReshardingCumulativeMetrics()->onUpdateApplied();
 }
 
 void ReshardingMetrics::onOplogEntriesFetched(int64_t numEntries, Milliseconds elapsed) {
     _oplogEntriesFetched.addAndFetch(numEntries);
-    getCumulativeMetrics()->onOplogEntriesFetched(numEntries, elapsed);
+    getReshardingCumulativeMetrics()->onOplogEntriesFetched(numEntries, elapsed);
 }
 
 void ReshardingMetrics::restoreOplogEntriesFetched(int64_t numEntries) {
@@ -375,11 +380,23 @@ void ReshardingMetrics::restoreOplogEntriesFetched(int64_t numEntries) {
 
 void ReshardingMetrics::onOplogEntriesApplied(int64_t numEntries) {
     _oplogEntriesApplied.addAndFetch(numEntries);
-    getCumulativeMetrics()->onOplogEntriesApplied(numEntries);
+    getReshardingCumulativeMetrics()->onOplogEntriesApplied(numEntries);
 }
 
 void ReshardingMetrics::restoreOplogEntriesApplied(int64_t numEntries) {
     _oplogEntriesApplied.store(numEntries);
+}
+
+void ReshardingMetrics::onLocalInsertDuringOplogFetching(Milliseconds elapsed) {
+    getReshardingCumulativeMetrics()->onLocalInsertDuringOplogFetching(elapsed);
+}
+
+void ReshardingMetrics::onBatchRetrievedDuringOplogApplying(Milliseconds elapsed) {
+    getReshardingCumulativeMetrics()->onBatchRetrievedDuringOplogApplying(elapsed);
+}
+
+void ReshardingMetrics::onOplogLocalBatchApplied(Milliseconds elapsed) {
+    getReshardingCumulativeMetrics()->onOplogLocalBatchApplied(elapsed);
 }
 
 void ReshardingMetrics::onApplyingBegin() {

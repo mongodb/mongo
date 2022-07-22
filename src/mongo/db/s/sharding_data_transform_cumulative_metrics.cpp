@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
+#include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 
 #include <cstdint>
 
@@ -37,74 +38,18 @@
 namespace mongo {
 
 namespace {
-constexpr int32_t kPlaceholderInt = 0;
-constexpr int64_t kPlaceholderLong = 0;
-}  // namespace
-
-namespace {
-constexpr auto kResharding = "resharding";
 constexpr auto kGlobalIndex = "globalIndex";
 constexpr auto kActive = "active";
-constexpr auto kOplogEntriesFetched = "oplogEntriesFetched";
-constexpr auto kOplogEntriesApplied = "oplogEntriesApplied";
-constexpr auto kInsertsApplied = "insertsApplied";
-constexpr auto kUpdatesApplied = "updatesApplied";
-constexpr auto kDeletesApplied = "deletesApplied";
 constexpr auto kOldestActive = "oldestActive";
 constexpr auto kLatencies = "latencies";
-constexpr auto kOplogFetchingTotalRemoteBatchRetrievalTimeMillis =
-    "oplogFetchingTotalRemoteBatchRetrievalTimeMillis";
-constexpr auto kOplogFetchingTotalRemoteBatchesRetrieved =
-    "oplogFetchingTotalRemoteBatchesRetrieved";
-constexpr auto kOplogFetchingTotalLocalInsertTimeMillis = "oplogFetchingTotalLocalInsertTimeMillis";
-constexpr auto kOplogFetchingTotalLocalInserts = "oplogFetchingTotalLocalInserts";
-constexpr auto kOplogApplyingTotalLocalBatchRetrievalTimeMillis =
-    "oplogApplyingTotalLocalBatchRetrievalTimeMillis";
-constexpr auto kOplogApplyingTotalLocalBatchesRetrieved = "oplogApplyingTotalLocalBatchesRetrieved";
-constexpr auto kOplogApplyingTotalLocalBatchApplyTimeMillis =
-    "oplogApplyingTotalLocalBatchApplyTimeMillis";
-constexpr auto kOplogApplyingTotalLocalBatchesApplied = "oplogApplyingTotalLocalBatchesApplied";
 constexpr auto kCurrentInSteps = "currentInSteps";
-constexpr auto kCountInstancesInCoordinatorState1Initializing =
-    "countInstancesInCoordinatorState1Initializing";
-constexpr auto kCountInstancesInCoordinatorState2PreparingToDonate =
-    "countInstancesInCoordinatorState2PreparingToDonate";
-constexpr auto kCountInstancesInCoordinatorState3Cloning =
-    "countInstancesInCoordinatorState3Cloning";
-constexpr auto kCountInstancesInCoordinatorState4Applying =
-    "countInstancesInCoordinatorState4Applying";
-constexpr auto kCountInstancesInCoordinatorState5BlockingWrites =
-    "countInstancesInCoordinatorState5BlockingWrites";
-constexpr auto kCountInstancesInCoordinatorState6Aborting =
-    "countInstancesInCoordinatorState6Aborting";
-constexpr auto kCountInstancesInCoordinatorState7Committing =
-    "countInstancesInCoordinatorState7Committing";
-constexpr auto kCountInstancesInRecipientState1AwaitingFetchTimestamp =
-    "countInstancesInRecipientState1AwaitingFetchTimestamp";
-constexpr auto kCountInstancesInRecipientState2CreatingCollection =
-    "countInstancesInRecipientState2CreatingCollection";
-constexpr auto kCountInstancesInRecipientState3Cloning = "countInstancesInRecipientState3Cloning";
-constexpr auto kCountInstancesInRecipientState4Applying = "countInstancesInRecipientState4Applying";
-constexpr auto kCountInstancesInRecipientState5Error = "countInstancesInRecipientState5Error";
-constexpr auto kCountInstancesInRecipientState6StrictConsistency =
-    "countInstancesInRecipientState6StrictConsistency";
-constexpr auto kCountInstancesInRecipientState7Done = "countInstancesInRecipientState7Done";
-constexpr auto kCountInstancesInDonorState1PreparingToDonate =
-    "countInstancesInDonorState1PreparingToDonate";
-constexpr auto kCountInstancesInDonorState2DonatingInitialData =
-    "countInstancesInDonorState2DonatingInitialData";
-constexpr auto kCountInstancesInDonorState3DonatingOplogEntries =
-    "countInstancesInDonorState3DonatingOplogEntries";
-constexpr auto kCountInstancesInDonorState4PreparingToBlockWrites =
-    "countInstancesInDonorState4PreparingToBlockWrites";
-constexpr auto kCountInstancesInDonorState5Error = "countInstancesInDonorState5Error";
-constexpr auto kCountInstancesInDonorState6BlockingWrites =
-    "countInstancesInDonorState6BlockingWrites";
-constexpr auto kCountInstancesInDonorState7Done = "countInstancesInDonorState7Done";
 
 struct Metrics {
-    Metrics() : _resharding(kResharding), _globalIndexes(kGlobalIndex) {}
-    ShardingDataTransformCumulativeMetrics _resharding;
+    Metrics()
+        : _globalIndexes(
+              kGlobalIndex,
+              std::make_unique<ShardingDataTransformCumulativeMetricsFieldNamePlaceholder>()) {}
+    ReshardingCumulativeMetrics _resharding;
     ShardingDataTransformCumulativeMetrics _globalIndexes;
 };
 using MetricsPtr = std::unique_ptr<Metrics>;
@@ -129,33 +74,11 @@ ShardingDataTransformCumulativeMetrics* ShardingDataTransformCumulativeMetrics::
 }
 
 ShardingDataTransformCumulativeMetrics::ShardingDataTransformCumulativeMetrics(
-    const std::string& rootSectionName)
+    const std::string& rootSectionName, std::unique_ptr<NameProvider> fieldNameProvider)
     : _rootSectionName{rootSectionName},
-      _fieldNames{std::make_unique<ShardingDataTransformCumulativeMetricsFieldNamePlaceholder>()},
+      _fieldNames{std::move(fieldNameProvider)},
       _instanceMetricsForAllRoles(ShardingDataTransformMetrics::kRoleCount),
-      _operationWasAttempted{false},
-      _coordinatorStateList{AtomicWord<int64_t>{0},
-                            AtomicWord<int64_t>{0},
-                            AtomicWord<int64_t>{0},
-                            AtomicWord<int64_t>{0},
-                            AtomicWord<int64_t>{0},
-                            AtomicWord<int64_t>{0},
-                            AtomicWord<int64_t>{0},
-                            AtomicWord<int64_t>{0}},
-      _donorStateList{AtomicWord<int64_t>{0},
-                      AtomicWord<int64_t>{0},
-                      AtomicWord<int64_t>{0},
-                      AtomicWord<int64_t>{0},
-                      AtomicWord<int64_t>{0},
-                      AtomicWord<int64_t>{0},
-                      AtomicWord<int64_t>{0}},
-      _recipientStateList{AtomicWord<int64_t>{0},
-                          AtomicWord<int64_t>{0},
-                          AtomicWord<int64_t>{0},
-                          AtomicWord<int64_t>{0},
-                          AtomicWord<int64_t>{0},
-                          AtomicWord<int64_t>{0},
-                          AtomicWord<int64_t>{0}} {}
+      _operationWasAttempted{false} {}
 
 ShardingDataTransformCumulativeMetrics::UniqueScopedObserver
 ShardingDataTransformCumulativeMetrics::registerInstanceMetrics(const InstanceObserver* metrics) {
@@ -208,94 +131,59 @@ void ShardingDataTransformCumulativeMetrics::reportForServerStatus(BSONObjBuilde
     root.append(_fieldNames->getForCountCanceled(), _countCancelled.load());
     root.append(_fieldNames->getForLastOpEndingChunkImbalance(),
                 _lastOpEndingChunkImbalance.load());
-
-    reportActive(&root);
-    reportOldestActive(&root);
-    reportLatencies(&root);
-    reportCurrentInSteps(&root);
+    {
+        BSONObjBuilder active(bob->subobjStart(kActive));
+        reportActive(&active);
+    }
+    {
+        BSONObjBuilder oldest(bob->subobjStart(kOldestActive));
+        reportOldestActive(&oldest);
+    }
+    {
+        BSONObjBuilder latencies(bob->subobjStart(kLatencies));
+        reportLatencies(&latencies);
+    }
+    {
+        BSONObjBuilder steps(bob->subobjStart(kCurrentInSteps));
+        reportCurrentInSteps(&steps);
+    }
 }
 
 void ShardingDataTransformCumulativeMetrics::reportActive(BSONObjBuilder* bob) const {
-    BSONObjBuilder s(bob->subobjStart(kActive));
-    s.append(_fieldNames->getForDocumentsProcessed(), _documentsProcessed.load());
-    s.append(_fieldNames->getForBytesWritten(), _bytesWritten.load());
-    s.append(kOplogEntriesFetched, _oplogEntriesFetched.load());
-    s.append(kOplogEntriesApplied, _oplogEntriesApplied.load());
-    s.append(kInsertsApplied, _insertsApplied.load());
-    s.append(kUpdatesApplied, _updatesApplied.load());
-    s.append(kDeletesApplied, _deletesApplied.load());
-    s.append(_fieldNames->getForCountWritesToStashCollections(),
-             _writesToStashedCollections.load());
-    s.append(_fieldNames->getForCountWritesDuringCriticalSection(),
-             _writesDuringCriticalSection.load());
-    s.append(_fieldNames->getForCountReadsDuringCriticalSection(),
-             _readsDuringCriticalSection.load());
+    bob->append(_fieldNames->getForDocumentsProcessed(), _documentsProcessed.load());
+    bob->append(_fieldNames->getForBytesWritten(), _bytesWritten.load());
+    bob->append(_fieldNames->getForCountWritesToStashCollections(),
+                _writesToStashedCollections.load());
+    bob->append(_fieldNames->getForCountWritesDuringCriticalSection(),
+                _writesDuringCriticalSection.load());
+    bob->append(_fieldNames->getForCountReadsDuringCriticalSection(),
+                _readsDuringCriticalSection.load());
 }
 
 void ShardingDataTransformCumulativeMetrics::reportOldestActive(BSONObjBuilder* bob) const {
-    BSONObjBuilder s(bob->subobjStart(kOldestActive));
-    s.append(_fieldNames->getForCoordinatorAllShardsHighestRemainingOperationTimeEstimatedMillis(),
-             getOldestOperationHighEstimateRemainingTimeMillis(Role::kCoordinator));
-    s.append(_fieldNames->getForCoordinatorAllShardsLowestRemainingOperationTimeEstimatedMillis(),
-             getOldestOperationLowEstimateRemainingTimeMillis(Role::kCoordinator));
-    s.append(_fieldNames->getForRecipientRemainingOperationTimeEstimatedMillis(),
-             getOldestOperationHighEstimateRemainingTimeMillis(Role::kRecipient));
+    bob->append(
+        _fieldNames->getForCoordinatorAllShardsHighestRemainingOperationTimeEstimatedMillis(),
+        getOldestOperationHighEstimateRemainingTimeMillis(Role::kCoordinator));
+    bob->append(
+        _fieldNames->getForCoordinatorAllShardsLowestRemainingOperationTimeEstimatedMillis(),
+        getOldestOperationLowEstimateRemainingTimeMillis(Role::kCoordinator));
+    bob->append(_fieldNames->getForRecipientRemainingOperationTimeEstimatedMillis(),
+                getOldestOperationHighEstimateRemainingTimeMillis(Role::kRecipient));
 }
 
 void ShardingDataTransformCumulativeMetrics::reportLatencies(BSONObjBuilder* bob) const {
-    BSONObjBuilder s(bob->subobjStart(kLatencies));
-    s.append(_fieldNames->getForCollectionCloningTotalRemoteBatchRetrievalTimeMillis(),
-             _totalBatchRetrievedDuringCloneMillis.load());
-    s.append(_fieldNames->getForCollectionCloningTotalRemoteBatchesRetrieved(),
-             _totalBatchRetrievedDuringClone.load());
-    s.append(_fieldNames->getForCollectionCloningTotalLocalInsertTimeMillis(),
-             _collectionCloningTotalLocalInsertTimeMillis.load());
-    s.append(_fieldNames->getForCollectionCloningTotalLocalInserts(),
-             _collectionCloningTotalLocalBatchInserts.load());
-    s.append(kOplogFetchingTotalRemoteBatchRetrievalTimeMillis,
-             _oplogFetchingTotalRemoteBatchesRetrievalTimeMillis.load());
-    s.append(kOplogFetchingTotalRemoteBatchesRetrieved,
-             _oplogFetchingTotalRemoteBatchesRetrieved.load());
-    s.append(kOplogFetchingTotalLocalInsertTimeMillis,
-             _oplogFetchingTotalLocalInsertTimeMillis.load());
-    s.append(kOplogFetchingTotalLocalInserts, _oplogFetchingTotalLocalInserts.load());
-    s.append(kOplogApplyingTotalLocalBatchRetrievalTimeMillis,
-             _oplogApplyingTotalBatchesRetrievalTimeMillis.load());
-    s.append(kOplogApplyingTotalLocalBatchesRetrieved, _oplogApplyingTotalBatchesRetrieved.load());
-    s.append(kOplogApplyingTotalLocalBatchApplyTimeMillis, _oplogBatchAppliedMillis.load());
-    s.append(kOplogApplyingTotalLocalBatchesApplied, _oplogBatchApplied.load());
+    bob->append(_fieldNames->getForCollectionCloningTotalRemoteBatchRetrievalTimeMillis(),
+                _totalBatchRetrievedDuringCloneMillis.load());
+    bob->append(_fieldNames->getForCollectionCloningTotalRemoteBatchesRetrieved(),
+                _totalBatchRetrievedDuringClone.load());
+    bob->append(_fieldNames->getForCollectionCloningTotalLocalInsertTimeMillis(),
+                _collectionCloningTotalLocalInsertTimeMillis.load());
+    bob->append(_fieldNames->getForCollectionCloningTotalLocalInserts(),
+                _collectionCloningTotalLocalBatchInserts.load());
 }
 
 void ShardingDataTransformCumulativeMetrics::reportCurrentInSteps(BSONObjBuilder* bob) const {
-    BSONObjBuilder s(bob->subobjStart(kCurrentInSteps));
-
-    auto reportState = [this, &s](auto state) {
-        s.append(fieldNameFor(state), getStateCounter(state)->load());
-    };
-
-    reportState(CoordinatorStateEnum::kInitializing);
-    reportState(CoordinatorStateEnum::kPreparingToDonate);
-    reportState(CoordinatorStateEnum::kCloning);
-    reportState(CoordinatorStateEnum::kApplying);
-    reportState(CoordinatorStateEnum::kBlockingWrites);
-    reportState(CoordinatorStateEnum::kAborting);
-    reportState(CoordinatorStateEnum::kCommitting);
-
-    reportState(RecipientStateEnum::kAwaitingFetchTimestamp);
-    reportState(RecipientStateEnum::kCreatingCollection);
-    reportState(RecipientStateEnum::kCloning);
-    reportState(RecipientStateEnum::kApplying);
-    reportState(RecipientStateEnum::kError);
-    reportState(RecipientStateEnum::kStrictConsistency);
-    reportState(RecipientStateEnum::kDone);
-
-    reportState(DonorStateEnum::kPreparingToDonate);
-    reportState(DonorStateEnum::kDonatingInitialData);
-    reportState(DonorStateEnum::kDonatingOplogEntries);
-    reportState(DonorStateEnum::kPreparingToBlockWrites);
-    reportState(DonorStateEnum::kError);
-    reportState(DonorStateEnum::kBlockingWrites);
-    reportState(DonorStateEnum::kDone);
+    // Do nothing.
 }
 
 const ShardingDataTransformCumulativeMetrics::InstanceObserver*
@@ -354,60 +242,6 @@ void ShardingDataTransformCumulativeMetrics::setLastOpEndingChunkImbalance(int64
     _lastOpEndingChunkImbalance.store(imbalanceCount);
 }
 
-ShardingDataTransformCumulativeMetrics::CoordinatorStateArray*
-ShardingDataTransformCumulativeMetrics::getStateArrayFor(CoordinatorStateEnum state) {
-    return &_coordinatorStateList;
-}
-
-const ShardingDataTransformCumulativeMetrics::CoordinatorStateArray*
-ShardingDataTransformCumulativeMetrics::getStateArrayFor(CoordinatorStateEnum state) const {
-    return &_coordinatorStateList;
-}
-
-ShardingDataTransformCumulativeMetrics::DonorStateArray*
-ShardingDataTransformCumulativeMetrics::getStateArrayFor(DonorStateEnum state) {
-    return &_donorStateList;
-}
-
-const ShardingDataTransformCumulativeMetrics::DonorStateArray*
-ShardingDataTransformCumulativeMetrics::getStateArrayFor(DonorStateEnum state) const {
-    return &_donorStateList;
-}
-
-const char* ShardingDataTransformCumulativeMetrics::fieldNameFor(
-    ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum state) {
-    switch (state) {
-        case CoordinatorStateEnum::kInitializing:
-            return kCountInstancesInCoordinatorState1Initializing;
-
-        case CoordinatorStateEnum::kPreparingToDonate:
-            return kCountInstancesInCoordinatorState2PreparingToDonate;
-
-        case CoordinatorStateEnum::kCloning:
-            return kCountInstancesInCoordinatorState3Cloning;
-
-        case CoordinatorStateEnum::kApplying:
-            return kCountInstancesInCoordinatorState4Applying;
-
-        case CoordinatorStateEnum::kBlockingWrites:
-            return kCountInstancesInCoordinatorState5BlockingWrites;
-
-        case CoordinatorStateEnum::kAborting:
-            return kCountInstancesInCoordinatorState6Aborting;
-
-        case CoordinatorStateEnum::kCommitting:
-            return kCountInstancesInCoordinatorState7Committing;
-
-        default:
-            uasserted(6438601,
-                      str::stream()
-                          << "no field name for coordinator state " << static_cast<int32_t>(state));
-            break;
-    }
-
-    MONGO_UNREACHABLE;
-}
-
 void ShardingDataTransformCumulativeMetrics::onInsertsDuringCloning(
     int64_t count, int64_t bytes, const Milliseconds& elapsedTime) {
     _collectionCloningTotalLocalBatchInserts.fetchAndAdd(1);
@@ -415,53 +249,6 @@ void ShardingDataTransformCumulativeMetrics::onInsertsDuringCloning(
     _bytesWritten.fetchAndAdd(bytes);
     _collectionCloningTotalLocalInsertTimeMillis.fetchAndAdd(
         durationCount<Milliseconds>(elapsedTime));
-}
-
-void ShardingDataTransformCumulativeMetrics::onLocalInsertDuringOplogFetching(
-    const Milliseconds& elapsedTime) {
-    _oplogFetchingTotalLocalInserts.fetchAndAdd(1);
-    _oplogFetchingTotalLocalInsertTimeMillis.fetchAndAdd(durationCount<Milliseconds>(elapsedTime));
-}
-
-void ShardingDataTransformCumulativeMetrics::onBatchRetrievedDuringOplogApplying(
-    const Milliseconds& elapsedTime) {
-    _oplogApplyingTotalBatchesRetrieved.fetchAndAdd(1);
-    _oplogApplyingTotalBatchesRetrievalTimeMillis.fetchAndAdd(
-        durationCount<Milliseconds>(elapsedTime));
-}
-
-const char* ShardingDataTransformCumulativeMetrics::fieldNameFor(
-    ShardingDataTransformCumulativeMetrics::DonorStateEnum state) {
-    switch (state) {
-        case DonorStateEnum::kPreparingToDonate:
-            return kCountInstancesInDonorState1PreparingToDonate;
-
-        case DonorStateEnum::kDonatingInitialData:
-            return kCountInstancesInDonorState2DonatingInitialData;
-
-        case DonorStateEnum::kDonatingOplogEntries:
-            return kCountInstancesInDonorState3DonatingOplogEntries;
-
-        case DonorStateEnum::kPreparingToBlockWrites:
-            return kCountInstancesInDonorState4PreparingToBlockWrites;
-
-        case DonorStateEnum::kError:
-            return kCountInstancesInDonorState5Error;
-
-        case DonorStateEnum::kBlockingWrites:
-            return kCountInstancesInDonorState6BlockingWrites;
-
-        case DonorStateEnum::kDone:
-            return kCountInstancesInDonorState7Done;
-
-        default:
-            uasserted(6438700,
-                      str::stream()
-                          << "no field name for donor state " << static_cast<int32_t>(state));
-            break;
-    }
-
-    MONGO_UNREACHABLE;
 }
 
 void ShardingDataTransformCumulativeMetrics::onReadDuringCriticalSection() {
@@ -472,77 +259,8 @@ void ShardingDataTransformCumulativeMetrics::onWriteDuringCriticalSection() {
     _writesDuringCriticalSection.fetchAndAdd(1);
 }
 
-const char* ShardingDataTransformCumulativeMetrics::fieldNameFor(RecipientStateEnum state) {
-    switch (state) {
-        case RecipientStateEnum::kAwaitingFetchTimestamp:
-            return kCountInstancesInRecipientState1AwaitingFetchTimestamp;
-
-        case RecipientStateEnum::kCreatingCollection:
-            return kCountInstancesInRecipientState2CreatingCollection;
-
-        case RecipientStateEnum::kCloning:
-            return kCountInstancesInRecipientState3Cloning;
-
-        case RecipientStateEnum::kApplying:
-            return kCountInstancesInRecipientState4Applying;
-
-        case RecipientStateEnum::kError:
-            return kCountInstancesInRecipientState5Error;
-
-        case RecipientStateEnum::kStrictConsistency:
-            return kCountInstancesInRecipientState6StrictConsistency;
-
-        case RecipientStateEnum::kDone:
-            return kCountInstancesInRecipientState7Done;
-
-        default:
-            uasserted(6438900,
-                      str::stream()
-                          << "no field name for recipient state " << static_cast<int32_t>(state));
-            break;
-    }
-
-    MONGO_UNREACHABLE;
-}
-
 void ShardingDataTransformCumulativeMetrics::onWriteToStashedCollections() {
     _writesToStashedCollections.fetchAndAdd(1);
-}
-
-ShardingDataTransformCumulativeMetrics::RecipientStateArray*
-ShardingDataTransformCumulativeMetrics::getStateArrayFor(
-    ShardingDataTransformCumulativeMetrics::RecipientStateEnum state) {
-    return &_recipientStateList;
-}
-
-const ShardingDataTransformCumulativeMetrics::RecipientStateArray*
-ShardingDataTransformCumulativeMetrics::getStateArrayFor(
-    ShardingDataTransformCumulativeMetrics::RecipientStateEnum state) const {
-    return &_recipientStateList;
-}
-
-void ShardingDataTransformCumulativeMetrics::onInsertApplied() {
-    _insertsApplied.fetchAndAdd(1);
-}
-
-void ShardingDataTransformCumulativeMetrics::onUpdateApplied() {
-    _updatesApplied.fetchAndAdd(1);
-}
-
-void ShardingDataTransformCumulativeMetrics::onDeleteApplied() {
-    _deletesApplied.fetchAndAdd(1);
-}
-
-void ShardingDataTransformCumulativeMetrics::onOplogEntriesFetched(int64_t numEntries,
-                                                                   Milliseconds elapsed) {
-    _oplogEntriesFetched.fetchAndAdd(numEntries);
-    _oplogFetchingTotalRemoteBatchesRetrieved.fetchAndAdd(1);
-    _oplogFetchingTotalRemoteBatchesRetrievalTimeMillis.fetchAndAdd(
-        durationCount<Milliseconds>(elapsed));
-}
-
-void ShardingDataTransformCumulativeMetrics::onOplogEntriesApplied(int64_t numEntries) {
-    _oplogEntriesApplied.fetchAndAdd(numEntries);
 }
 
 void ShardingDataTransformCumulativeMetrics::onCloningTotalRemoteBatchRetrieval(
@@ -551,9 +269,9 @@ void ShardingDataTransformCumulativeMetrics::onCloningTotalRemoteBatchRetrieval(
     _totalBatchRetrievedDuringCloneMillis.fetchAndAdd(durationCount<Milliseconds>(elapsed));
 }
 
-void ShardingDataTransformCumulativeMetrics::onOplogLocalBatchApplied(Milliseconds elapsed) {
-    _oplogBatchApplied.fetchAndAdd(1);
-    _oplogBatchAppliedMillis.fetchAndAdd(durationCount<Milliseconds>(elapsed));
+const ShardingDataTransformCumulativeMetricsFieldNameProvider*
+ShardingDataTransformCumulativeMetrics::getFieldNames() const {
+    return _fieldNames.get();
 }
 
 ShardingDataTransformCumulativeMetrics::ScopedObserver::ScopedObserver(

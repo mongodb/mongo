@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_metrics_field_name_provider.h"
 #include "mongo/db/s/resharding/resharding_metrics_helpers.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
@@ -44,7 +45,7 @@ public:
     using State = stdx::variant<CoordinatorStateEnum, RecipientStateEnum, DonorStateEnum>;
     class DonorState {
     public:
-        using MetricsType = ShardingDataTransformCumulativeMetrics::DonorStateEnum;
+        using MetricsType = ReshardingCumulativeMetrics::DonorStateEnum;
 
         explicit DonorState(DonorStateEnum enumVal);
         MetricsType toMetrics() const;
@@ -56,7 +57,7 @@ public:
 
     class RecipientState {
     public:
-        using MetricsType = ShardingDataTransformCumulativeMetrics::RecipientStateEnum;
+        using MetricsType = ReshardingCumulativeMetrics::RecipientStateEnum;
 
         explicit RecipientState(RecipientStateEnum enumVal);
         MetricsType toMetrics() const;
@@ -68,7 +69,7 @@ public:
 
     class CoordinatorState {
     public:
-        using MetricsType = ShardingDataTransformCumulativeMetrics::CoordinatorStateEnum;
+        using MetricsType = ReshardingCumulativeMetrics::CoordinatorStateEnum;
 
         explicit CoordinatorState(CoordinatorStateEnum enumVal);
         MetricsType toMetrics() const;
@@ -123,22 +124,22 @@ public:
 
     template <typename T>
     void onStateTransition(T before, boost::none_t after) {
-        getCumulativeMetrics()->onStateTransition<typename T::MetricsType>(before.toMetrics(),
-                                                                           after);
+        getReshardingCumulativeMetrics()->onStateTransition<typename T::MetricsType>(
+            before.toMetrics(), after);
     }
 
     template <typename T>
     void onStateTransition(boost::none_t before, T after) {
         setState(after.getState());
-        getCumulativeMetrics()->onStateTransition<typename T::MetricsType>(before,
-                                                                           after.toMetrics());
+        getReshardingCumulativeMetrics()->onStateTransition<typename T::MetricsType>(
+            before, after.toMetrics());
     }
 
     template <typename T>
     void onStateTransition(T before, T after) {
         setState(after.getState());
-        getCumulativeMetrics()->onStateTransition<typename T::MetricsType>(before.toMetrics(),
-                                                                           after.toMetrics());
+        getReshardingCumulativeMetrics()->onStateTransition<typename T::MetricsType>(
+            before.toMetrics(), after.toMetrics());
     }
 
     void accumulateFrom(const ReshardingOplogApplierProgress& progressDoc);
@@ -153,6 +154,9 @@ public:
     void restoreOplogEntriesApplied(int64_t numEntries);
     void onApplyingBegin();
     void onApplyingEnd();
+    void onLocalInsertDuringOplogFetching(Milliseconds elapsed);
+    void onBatchRetrievedDuringOplogApplying(Milliseconds elapsed);
+    void onOplogLocalBatchApplied(Milliseconds elapsed);
 
     Seconds getApplyingElapsedTimeSecs() const;
     Date_t getApplyingBegin() const;
@@ -168,6 +172,7 @@ private:
     std::string createOperationDescription() const noexcept override;
     void restoreRecipientSpecificFields(const ReshardingRecipientDocument& document);
     void restoreCoordinatorSpecificFields(const ReshardingCoordinatorDocument& document);
+    ReshardingCumulativeMetrics* getReshardingCumulativeMetrics();
 
     template <typename T>
     void setState(T state) {

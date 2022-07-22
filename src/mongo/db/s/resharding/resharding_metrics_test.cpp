@@ -49,6 +49,11 @@ const auto kShardKey = BSON("newKey" << 1);
 class ReshardingMetricsTest : public ShardingDataTransformMetricsTestFixture {
 
 public:
+    virtual std::unique_ptr<ShardingDataTransformCumulativeMetrics> initializeCumulativeMetrics()
+        override {
+        return std::make_unique<ReshardingCumulativeMetrics>();
+    }
+
     std::unique_ptr<ReshardingMetrics> createInstanceMetrics(ClockSource* clockSource,
                                                              UUID instanceId = UUID::gen(),
                                                              Role role = Role::kDonor) {
@@ -58,7 +63,7 @@ public:
                                                    role,
                                                    clockSource->now(),
                                                    clockSource,
-                                                   &_cumulativeMetrics);
+                                                   _cumulativeMetrics.get());
     }
 
     const UUID& getSourceCollectionId() {
@@ -69,7 +74,7 @@ public:
     template <typename T>
     BSONObj getReportFromStateDocument(T document) {
         auto metrics =
-            ReshardingMetrics::initializeFrom(document, getClockSource(), &_cumulativeMetrics);
+            ReshardingMetrics::initializeFrom(document, getClockSource(), _cumulativeMetrics.get());
         return metrics->reportForCurrentOp();
     }
 
@@ -169,7 +174,7 @@ public:
         doc.setMetrics(metricsDoc);
 
         auto metrics =
-            ReshardingMetrics::initializeFrom(doc, getClockSource(), &_cumulativeMetrics);
+            ReshardingMetrics::initializeFrom(doc, getClockSource(), _cumulativeMetrics.get());
 
         clock->advance(kInterval);
         auto report = metrics->reportForCurrentOp();

@@ -247,15 +247,6 @@ void ShardingDataTransformInstanceMetrics::setCoordinatorLowEstimateRemainingTim
     _coordinatorLowEstimateRemainingTimeMillis.store(milliseconds);
 }
 
-void ShardingDataTransformInstanceMetrics::onLocalInsertDuringOplogFetching(Milliseconds elapsed) {
-    _cumulativeMetrics->onLocalInsertDuringOplogFetching(elapsed);
-}
-
-void ShardingDataTransformInstanceMetrics::onBatchRetrievedDuringOplogApplying(
-    Milliseconds elapsed) {
-    _cumulativeMetrics->onBatchRetrievedDuringOplogApplying(elapsed);
-}
-
 void ShardingDataTransformInstanceMetrics::onWriteDuringCriticalSection() {
     _writesDuringCriticalSection.addAndFetch(1);
     _cumulativeMetrics->onWriteDuringCriticalSection();
@@ -299,10 +290,6 @@ void ShardingDataTransformInstanceMetrics::accumulateWritesToStashCollections(
 void ShardingDataTransformInstanceMetrics::onCloningTotalRemoteBatchRetrieval(
     Milliseconds elapsed) {
     _cumulativeMetrics->onCloningTotalRemoteBatchRetrieval(elapsed);
-}
-
-void ShardingDataTransformInstanceMetrics::onOplogLocalBatchApplied(Milliseconds elapsed) {
-    _cumulativeMetrics->onOplogLocalBatchApplied(elapsed);
 }
 
 ShardingDataTransformCumulativeMetrics*

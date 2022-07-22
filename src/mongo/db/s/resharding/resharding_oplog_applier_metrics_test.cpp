@@ -42,6 +42,11 @@ namespace {
 
 class ReshardingOplogApplierMetricsTest : public ShardingDataTransformMetricsTestFixture {
 public:
+    virtual std::unique_ptr<ShardingDataTransformCumulativeMetrics> initializeCumulativeMetrics()
+        override {
+        return std::make_unique<ReshardingCumulativeMetrics>();
+    }
+
     std::unique_ptr<ReshardingMetrics> createInstanceMetrics() {
         return std::make_unique<ReshardingMetrics>(UUID::gen(),
                                                    kTestCommand,
@@ -49,7 +54,7 @@ public:
                                                    ReshardingMetrics::Role::kRecipient,
                                                    getClockSource()->now(),
                                                    getClockSource(),
-                                                   &_cumulativeMetrics);
+                                                   _cumulativeMetrics.get());
     }
 };
 

@@ -103,8 +103,13 @@ public:
             LOGV2(6437400, "", "TestName"_attr = testName, "Role"_attr = role);
             auto uuid = UUID::gen();
             const auto& clock = getClockSource();
-            auto metrics = std::make_unique<T>(
-                uuid, kTestCommand, kTestNamespace, role, clock->now(), clock, &_cumulativeMetrics);
+            auto metrics = std::make_unique<T>(uuid,
+                                               kTestCommand,
+                                               kTestNamespace,
+                                               role,
+                                               clock->now(),
+                                               clock,
+                                               _cumulativeMetrics.get());
 
             // Reports 0 before timed section entered.
             clock->advance(kIncrement);
@@ -129,6 +134,26 @@ public:
     }
 
 protected:
+    void setUp() override {
+        _cumulativeMetrics = initializeCumulativeMetrics();
+    }
+
+    static BSONObj getLatencySection(StringData rootName,
+                                     const ShardingDataTransformCumulativeMetrics* metrics) {
+        BSONObjBuilder bob;
+        metrics->reportForServerStatus(&bob);
+        auto report = bob.done();
+        return report.getObjectField(rootName).getObjectField("latencies").getOwned();
+    }
+
+    static BSONObj getActiveSection(StringData rootName,
+                                    const ShardingDataTransformCumulativeMetrics* metrics) {
+        BSONObjBuilder bob;
+        metrics->reportForServerStatus(&bob);
+        auto report = bob.done();
+        return report.getObjectField(rootName).getObjectField("active").getOwned();
+    }
+
     constexpr static auto kTestMetricsName = "testMetrics";
     constexpr static auto kYoungestTime =
         Date_t::fromMillisSinceEpoch(std::numeric_limits<int64_t>::max());
@@ -140,7 +165,11 @@ protected:
     const BSONObj kTestCommand = BSON("command"
                                       << "test");
 
-    ShardingDataTransformMetricsTestFixture() : _cumulativeMetrics{kTestMetricsName} {}
+    virtual std::unique_ptr<ShardingDataTransformCumulativeMetrics> initializeCumulativeMetrics() {
+        return std::make_unique<ShardingDataTransformCumulativeMetrics>(
+            kTestMetricsName,
+            std::make_unique<ShardingDataTransformCumulativeMetricsFieldNamePlaceholder>());
+    }
 
     const ObserverMock* getYoungestObserver() {
         static StaticImmortal<ObserverMock> youngest{kYoungestTime, kYoungestTimeLeft};
@@ -162,7 +191,7 @@ protected:
     SpecialIndexBehaviorMap registerAtIndex(int index, const ObserverMock* mock) {
         return SpecialIndexBehaviorMap{{index, [this, mock] {
                                             _observers.emplace_back(
-                                                _cumulativeMetrics.registerInstanceMetrics(mock));
+                                                _cumulativeMetrics->registerInstanceMetrics(mock));
                                         }}};
     }
 
@@ -186,7 +215,7 @@ protected:
                 std::make_unique<ScopedObserverType>(Date_t::fromMillisSinceEpoch(startTime),
                                                      timeLeft,
                                                      getClockSource(),
-                                                     &_cumulativeMetrics));
+                                                     _cumulativeMetrics.get()));
         };
         auto performRemoval = [&] {
             auto i = rng.nextInt32(inserted.size());
@@ -219,7 +248,7 @@ protected:
                                 kRemovalOdds,
                                 rng.nextInt64(),
                                 registerAtIndex(rng.nextInt32(kIterations), getOldestObserver()));
-        ASSERT_EQ(_cumulativeMetrics.getOldestOperationHighEstimateRemainingTimeMillis(
+        ASSERT_EQ(_cumulativeMetrics->getOldestOperationHighEstimateRemainingTimeMillis(
                       ObserverMock::kDefaultRole),
                   kOldestTimeLeft);
     }
@@ -256,20 +285,20 @@ protected:
         for (auto& pf : threadPFs) {
             pf.future.wait();
         }
-        ASSERT_EQ(_cumulativeMetrics.getOldestOperationHighEstimateRemainingTimeMillis(
+        ASSERT_EQ(_cumulativeMetrics->getOldestOperationHighEstimateRemainingTimeMillis(
                       ObserverMock::kDefaultRole),
                   kOldestTimeLeft);
         size_t expectedCount = 1;  // Special insert for kOldest is not counted in vector size.
         for (auto& v : threadStorage) {
             expectedCount += v.size();
         }
-        ASSERT_EQ(_cumulativeMetrics.getObservedMetricsCount(), expectedCount);
+        ASSERT_EQ(_cumulativeMetrics->getObservedMetricsCount(), expectedCount);
         for (auto& t : threads) {
             t.join();
         }
     }
 
-    ShardingDataTransformCumulativeMetrics _cumulativeMetrics;
+    std::unique_ptr<ShardingDataTransformCumulativeMetrics> _cumulativeMetrics;
     std::vector<ShardingDataTransformCumulativeMetrics::UniqueScopedObserver> _observers;
 };
 

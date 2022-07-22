@@ -108,7 +108,7 @@ private:
 
     boost::optional<Callback> _runOnMockingNextResponse;
 
-    ShardingDataTransformCumulativeMetrics _cumulativeMetrics{"dummyForTest"};
+    ReshardingCumulativeMetrics _cumulativeMetrics;
     std::shared_ptr<ReshardingMetrics> _metrics;
 };
 

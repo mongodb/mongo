@@ -146,7 +146,7 @@ public:
             role,
             getClockSource()->now(),
             getClockSource(),
-            &_cumulativeMetrics);
+            _cumulativeMetrics.get());
     }
 
     std::unique_ptr<ShardingDataTransformInstanceMetricsForTest> createInstanceMetrics(
@@ -160,7 +160,7 @@ public:
             ShardingDataTransformInstanceMetrics::Role::kDonor,
             getClockSource()->now(),
             getClockSource(),
-            &_cumulativeMetrics,
+            _cumulativeMetrics.get(),
             std::move(fieldNameProvider),
             std::move(mock));
     }
@@ -169,9 +169,9 @@ public:
 TEST_F(ShardingDataTransformInstanceMetricsTest, RegisterAndDeregisterMetrics) {
     for (auto i = 0; i < 100; i++) {
         auto metrics = createInstanceMetrics();
-        ASSERT_EQ(_cumulativeMetrics.getObservedMetricsCount(), 1);
+        ASSERT_EQ(_cumulativeMetrics->getObservedMetricsCount(), 1);
     }
-    ASSERT_EQ(_cumulativeMetrics.getObservedMetricsCount(), 0);
+    ASSERT_EQ(_cumulativeMetrics->getObservedMetricsCount(), 0);
 }
 
 TEST_F(ShardingDataTransformInstanceMetricsTest, RegisterAndDeregisterMetricsAtOnce) {
@@ -179,10 +179,10 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, RegisterAndDeregisterMetricsAtO
         std::vector<std::unique_ptr<ShardingDataTransformInstanceMetricsForTest>> registered;
         for (auto i = 0; i < 100; i++) {
             registered.emplace_back(createInstanceMetrics());
-            ASSERT_EQ(_cumulativeMetrics.getObservedMetricsCount(), registered.size());
+            ASSERT_EQ(_cumulativeMetrics->getObservedMetricsCount(), registered.size());
         }
     }
-    ASSERT_EQ(_cumulativeMetrics.getObservedMetricsCount(), 0);
+    ASSERT_EQ(_cumulativeMetrics->getObservedMetricsCount(), 0);
 }
 
 TEST_F(ShardingDataTransformInstanceMetricsTest, RandomOperations) {
@@ -306,7 +306,7 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, CurrentOpReportsRunningTime) {
                                                                       Role::kCoordinator,
                                                                       start,
                                                                       getClockSource(),
-                                                                      &_cumulativeMetrics);
+                                                                      _cumulativeMetrics.get());
     auto report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("totalOperationTimeElapsedSecs"), kTimeElapsed);
 }

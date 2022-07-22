@@ -54,7 +54,7 @@ public:
                                                     role,
                                                     clockSource->now(),
                                                     clockSource,
-                                                    &_cumulativeMetrics);
+                                                    _cumulativeMetrics.get());
     }
 };
 

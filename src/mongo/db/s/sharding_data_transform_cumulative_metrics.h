@@ -43,43 +43,6 @@ namespace mongo {
 
 class ShardingDataTransformCumulativeMetrics {
 public:
-    enum class CoordinatorStateEnum : int32_t {
-        kUnused = -1,
-        kInitializing,
-        kPreparingToDonate,
-        kCloning,
-        kApplying,
-        kBlockingWrites,
-        kAborting,
-        kCommitting,
-        kDone,
-        kNumStates
-    };
-
-    enum class DonorStateEnum : int32_t {
-        kUnused = -1,
-        kPreparingToDonate,
-        kDonatingInitialData,
-        kDonatingOplogEntries,
-        kPreparingToBlockWrites,
-        kError,
-        kBlockingWrites,
-        kDone,
-        kNumStates
-    };
-
-    enum class RecipientStateEnum : int32_t {
-        kUnused = -1,
-        kAwaitingFetchTimestamp,
-        kCreatingCollection,
-        kCloning,
-        kApplying,
-        kError,
-        kStrictConsistency,
-        kDone,
-        kNumStates
-    };
-
     using NameProvider = ShardingDataTransformCumulativeMetricsFieldNameProvider;
     using Role = ShardingDataTransformMetrics::Role;
     using InstanceObserver = ShardingDataTransformMetricsObserverInterface;
@@ -122,7 +85,10 @@ public:
     static ShardingDataTransformCumulativeMetrics* getForResharding(ServiceContext* context);
     static ShardingDataTransformCumulativeMetrics* getForGlobalIndexes(ServiceContext* context);
 
-    ShardingDataTransformCumulativeMetrics(const std::string& rootSectionName);
+
+    ShardingDataTransformCumulativeMetrics(const std::string& rootSectionName,
+                                           std::unique_ptr<NameProvider> fieldNameProvider);
+    virtual ~ShardingDataTransformCumulativeMetrics() = default;
     [[nodiscard]] UniqueScopedObserver registerInstanceMetrics(const InstanceObserver* metrics);
     int64_t getOldestOperationHighEstimateRemainingTimeMillis(Role role) const;
     int64_t getOldestOperationLowEstimateRemainingTimeMillis(Role role) const;
@@ -137,61 +103,25 @@ public:
 
     void setLastOpEndingChunkImbalance(int64_t imbalanceCount);
 
-    /**
-     * The before can be boost::none to represent the initial state transition and
-     * after can be boost::none to represent cases where it is no longer active.
-     */
-    template <typename T>
-    void onStateTransition(boost::optional<T> before, boost::optional<T> after);
-
     void onReadDuringCriticalSection();
     void onWriteDuringCriticalSection();
     void onWriteToStashedCollections();
 
-    void onInsertApplied();
-    void onUpdateApplied();
-    void onDeleteApplied();
-    void onOplogEntriesFetched(int64_t numEntries, Milliseconds elapsed);
-    void onOplogEntriesApplied(int64_t numEntries);
     void onCloningTotalRemoteBatchRetrieval(Milliseconds elapsed);
-    void onOplogLocalBatchApplied(Milliseconds elapsed);
-
-    static const char* fieldNameFor(CoordinatorStateEnum state);
-    static const char* fieldNameFor(DonorStateEnum state);
-    static const char* fieldNameFor(RecipientStateEnum state);
-
     void onInsertsDuringCloning(int64_t count, int64_t bytes, const Milliseconds& elapsedTime);
-    void onLocalInsertDuringOplogFetching(const Milliseconds& elapsedTime);
-    void onBatchRetrievedDuringOplogApplying(const Milliseconds& elapsedTime);
+
+protected:
+    const ShardingDataTransformCumulativeMetricsFieldNameProvider* getFieldNames() const;
+
+    virtual void reportActive(BSONObjBuilder* bob) const;
+    virtual void reportOldestActive(BSONObjBuilder* bob) const;
+    virtual void reportLatencies(BSONObjBuilder* bob) const;
+    virtual void reportCurrentInSteps(BSONObjBuilder* bob) const;
 
 private:
-    using CoordinatorStateArray =
-        std::array<AtomicWord<int64_t>, static_cast<size_t>(CoordinatorStateEnum::kNumStates)>;
-    using DonorStateArray =
-        std::array<AtomicWord<int64_t>, static_cast<size_t>(DonorStateEnum::kNumStates)>;
-    using RecipientStateArray =
-        std::array<AtomicWord<int64_t>, static_cast<size_t>(RecipientStateEnum::kNumStates)>;
-
-    void reportActive(BSONObjBuilder* bob) const;
-    void reportOldestActive(BSONObjBuilder* bob) const;
-    void reportLatencies(BSONObjBuilder* bob) const;
-    void reportCurrentInSteps(BSONObjBuilder* bob) const;
-
     MetricsSet& getMetricsSetForRole(Role role);
     const MetricsSet& getMetricsSetForRole(Role role) const;
     const InstanceObserver* getOldestOperation(WithLock, Role role) const;
-
-    template <typename T>
-    const AtomicWord<int64_t>* getStateCounter(T state) const;
-    template <typename T>
-    AtomicWord<int64_t>* getMutableStateCounter(T state);
-
-    CoordinatorStateArray* getStateArrayFor(CoordinatorStateEnum state);
-    const CoordinatorStateArray* getStateArrayFor(CoordinatorStateEnum state) const;
-    DonorStateArray* getStateArrayFor(DonorStateEnum state);
-    const DonorStateArray* getStateArrayFor(DonorStateEnum state) const;
-    RecipientStateArray* getStateArrayFor(RecipientStateEnum state);
-    const RecipientStateArray* getStateArrayFor(RecipientStateEnum state) const;
 
     MetricsSet::iterator insertMetrics(const InstanceObserver* metrics, MetricsSet& set);
     void deregisterMetrics(const Role& role, const MetricsSet::iterator& metrics);
@@ -207,16 +137,8 @@ private:
     AtomicWord<int64_t> _countFailed{0};
     AtomicWord<int64_t> _countCancelled{0};
 
-    AtomicWord<int64_t> _insertsApplied{0};
-    AtomicWord<int64_t> _updatesApplied{0};
-    AtomicWord<int64_t> _deletesApplied{0};
-    AtomicWord<int64_t> _oplogEntriesApplied{0};
-    AtomicWord<int64_t> _oplogEntriesFetched{0};
-
     AtomicWord<int64_t> _totalBatchRetrievedDuringClone{0};
     AtomicWord<int64_t> _totalBatchRetrievedDuringCloneMillis{0};
-    AtomicWord<int64_t> _oplogBatchApplied{0};
-    AtomicWord<int64_t> _oplogBatchAppliedMillis{0};
     AtomicWord<int64_t> _documentsProcessed{0};
     AtomicWord<int64_t> _bytesWritten{0};
 
@@ -224,55 +146,9 @@ private:
     AtomicWord<int64_t> _readsDuringCriticalSection{0};
     AtomicWord<int64_t> _writesDuringCriticalSection{0};
 
-    CoordinatorStateArray _coordinatorStateList;
-    DonorStateArray _donorStateList;
-    RecipientStateArray _recipientStateList;
-
     AtomicWord<int64_t> _collectionCloningTotalLocalBatchInserts{0};
     AtomicWord<int64_t> _collectionCloningTotalLocalInsertTimeMillis{0};
-    AtomicWord<int64_t> _oplogFetchingTotalRemoteBatchesRetrieved{0};
-    AtomicWord<int64_t> _oplogFetchingTotalRemoteBatchesRetrievalTimeMillis{0};
-    AtomicWord<int64_t> _oplogFetchingTotalLocalInserts{0};
-    AtomicWord<int64_t> _oplogFetchingTotalLocalInsertTimeMillis{0};
-    AtomicWord<int64_t> _oplogApplyingTotalBatchesRetrieved{0};
-    AtomicWord<int64_t> _oplogApplyingTotalBatchesRetrievalTimeMillis{0};
     AtomicWord<int64_t> _writesToStashedCollections{0};
 };
-
-template <typename T>
-void ShardingDataTransformCumulativeMetrics::onStateTransition(boost::optional<T> before,
-                                                               boost::optional<T> after) {
-    if (before) {
-        if (auto counter = getMutableStateCounter(*before)) {
-            counter->fetchAndSubtract(1);
-        }
-    }
-
-    if (after) {
-        if (auto counter = getMutableStateCounter(*after)) {
-            counter->fetchAndAdd(1);
-        }
-    }
-}
-
-template <typename T>
-const AtomicWord<int64_t>* ShardingDataTransformCumulativeMetrics::getStateCounter(T state) const {
-    if (state == T::kUnused) {
-        return nullptr;
-    }
-
-    invariant(static_cast<size_t>(state) < static_cast<size_t>(T::kNumStates));
-    return &((*getStateArrayFor(state))[static_cast<size_t>(state)]);
-}
-
-template <typename T>
-AtomicWord<int64_t>* ShardingDataTransformCumulativeMetrics::getMutableStateCounter(T state) {
-    if (state == T::kUnused) {
-        return nullptr;
-    }
-
-    invariant(static_cast<size_t>(state) < static_cast<size_t>(T::kNumStates));
-    return &((*getStateArrayFor(state))[static_cast<size_t>(state)]);
-}
 
 }  // namespace mongo
