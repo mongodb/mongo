@@ -723,6 +723,24 @@ Pipeline::SourceContainer::iterator Pipeline::optimizeEndOfPipeline(
     return std::next(itr);
 }
 
+Pipeline::SourceContainer::iterator Pipeline::optimizeAtEndOfPipeline(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    if (itr == container->end()) {
+        return itr;
+    }
+    itr = std::next(itr);
+    try {
+        while (itr != container->end()) {
+            invariant((*itr).get());
+            itr = (*itr).get()->optimizeAt(itr, container);
+        }
+    } catch (DBException& ex) {
+        ex.addContext("Failed to optimize pipeline");
+        throw;
+    }
+    return itr;
+}
+
 std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipelineFromViewDefinition(
     const boost::intrusive_ptr<ExpressionContext>& subPipelineExpCtx,
     ExpressionContext::ResolvedNamespace resolvedNs,
