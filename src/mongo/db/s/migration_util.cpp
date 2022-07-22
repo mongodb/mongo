@@ -521,14 +521,27 @@ void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext) {
             FindCommandRequest findCommand(NamespaceString::kRangeDeletionNamespace);
             findCommand.setFilter(BSON(RangeDeletionTask::kProcessingFieldName << true));
             auto cursor = client.find(std::move(findCommand));
-            if (cursor->more()) {
-                return migrationutil::submitRangeDeletionTask(
+
+            auto retFuture = ExecutorFuture<void>(getMigrationUtilExecutor(serviceContext));
+
+            int rangeDeletionsMarkedAsProcessing = 0;
+            while (cursor->more()) {
+                retFuture = migrationutil::submitRangeDeletionTask(
                     opCtx.get(),
                     RangeDeletionTask::parse(IDLParserErrorContext("rangeDeletionRecovery"),
                                              cursor->next()));
-            } else {
-                return ExecutorFuture<void>(getMigrationUtilExecutor(serviceContext));
+                rangeDeletionsMarkedAsProcessing++;
             }
+
+            if (rangeDeletionsMarkedAsProcessing > 1) {
+                LOGV2_WARNING(
+                    6695800,
+                    "Rescheduling several range deletions marked as processing. Orphans count "
+                    "may be off while they are not drained",
+                    "numRangeDeletionsMarkedAsProcessing"_attr = rangeDeletionsMarkedAsProcessing);
+            }
+
+            return retFuture;
         })
         .then([serviceContext] {
             ThreadClient tc("ResubmitRangeDeletions", serviceContext);
