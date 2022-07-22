@@ -1154,7 +1154,7 @@ TEST(PhysRewriter, FilterIndexing3MultiKey) {
 
     ABT optimized = std::move(rootNode);
     ASSERT_TRUE(phaseManager.optimize(optimized));
-    ASSERT_EQ(7, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(5, 8, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // We need a Seek to obtain value for "a".
     ASSERT_EXPLAIN_V2(
