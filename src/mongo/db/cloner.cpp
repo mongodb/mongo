@@ -258,9 +258,8 @@ void Cloner::_copy(OperationContext* opCtx,
     FindCommandRequest findCmd{nss};
     findCmd.setNoCursorTimeout(true);
     findCmd.setReadConcern(repl::ReadConcernArgs::kLocal);
-    auto cursor = conn->find(std::move(findCmd),
-                             ReadPreferenceSetting{ReadPreference::SecondaryPreferred},
-                             ExhaustMode::kOn);
+    auto cursor = conn->find(
+        std::move(findCmd), ReadPreferenceSetting{ReadPreference::PrimaryOnly}, ExhaustMode::kOn);
 
     // Process the results of the cursor in batches.
     while (cursor->more()) {
