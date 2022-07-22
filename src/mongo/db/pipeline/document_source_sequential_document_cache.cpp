@@ -96,7 +96,7 @@ Pipeline::SourceContainer::iterator DocumentSourceSequentialDocumentCache::doOpt
     _hasOptimizedPos = true;
 
     // If the cache is the only stage in the pipeline, return immediately.
-    if (itr == container->begin()) {
+    if (itr == container->begin() && std::next(itr) == container->end()) {
         return container->end();
     }
 
