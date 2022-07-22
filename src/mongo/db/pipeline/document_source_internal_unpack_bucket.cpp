@@ -29,6 +29,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
+#include "mongo/db/pipeline/document_source_sequential_document_cache.h"
 #include <algorithm>
 #include <iterator>
 
@@ -925,6 +926,14 @@ DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContain
     return {};
 }
 
+bool findSequentialDocumentCache(Pipeline::SourceContainer::iterator start,
+                                 Pipeline::SourceContainer::iterator end) {
+    while (start != end && !dynamic_cast<DocumentSourceSequentialDocumentCache*>(start->get())) {
+        start = std::next(start);
+    }
+    return start != end;
+}
+
 Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimizeAt(
     Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
     invariant(*itr == this);
@@ -965,7 +974,19 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
     // Optimize the pipeline after this stage to merge $match stages and push them forward.
     if (!_optimizedEndOfPipeline) {
         _optimizedEndOfPipeline = true;
-        optimizeEndOfPipeline(itr, container);
+
+        auto cacheFound = findSequentialDocumentCache(itr, container->end());
+        if (cacheFound) {
+            // optimizeAt() is responsible for reordering stages, and optimize() is responsible for
+            // simplifying individual stages. $sequentialCache's optimizeAt() places the stage where
+            // it can cache as big a prefix of the pipeline as possible. To do so correctly, it
+            // needs to look at dependencies: a stage that depends on a let-variable cannot be
+            // cached. But optimize() can inline variables. Therefore, we want to avoid calling
+            // optimize() before $sequentialCache has a chance to run optimizeAt().
+            return Pipeline::optimizeAtEndOfPipeline(itr, container);
+        } else {
+            Pipeline::optimizeEndOfPipeline(itr, container);
+        }
 
         if (std::next(itr) == container->end()) {
             return container->end();

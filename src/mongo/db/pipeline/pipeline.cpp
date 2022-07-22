@@ -658,4 +658,35 @@ std::unique_ptr<Pipeline, PipelineDeleter> Pipeline::makePipeline(
 
     return pipeline;
 }
+
+Pipeline::SourceContainer::iterator Pipeline::optimizeEndOfPipeline(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    // We must create a new SourceContainer representing the subsection of the pipeline we wish to
+    // optimize, since otherwise calls to optimizeAt() will overrun these limits.
+    auto endOfPipeline = Pipeline::SourceContainer(std::next(itr), container->end());
+    Pipeline::optimizeContainer(&endOfPipeline);
+    container->erase(std::next(itr), container->end());
+    container->splice(std::next(itr), endOfPipeline);
+
+    return std::next(itr);
+}
+
+Pipeline::SourceContainer::iterator Pipeline::optimizeAtEndOfPipeline(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    if (itr == container->end()) {
+        return itr;
+    }
+    itr = std::next(itr);
+    try {
+        while (itr != container->end()) {
+            invariant((*itr).get());
+            itr = (*itr).get()->optimizeAt(itr, container);
+        }
+    } catch (DBException& ex) {
+        ex.addContext("Failed to optimize pipeline");
+        throw;
+    }
+    return itr;
+}
+
 }  // namespace mongo
