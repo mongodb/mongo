@@ -112,7 +112,7 @@ var $config = (function() {
             for (let i = 0; i < doc.order.length; i++) {
                 // Pull out only those docIds and txnNums that were updated by this thread.
                 if (doc.order[i].tid === data.tid) {
-                    const txnNum = doc.metadata[i].txnNum;
+                    const txnNum = doc.metadata[i].txnNum.valueOf();
                     updatedDocsServerHistory[txnNum] = updatedDocsServerHistory[txnNum] || [];
                     updatedDocsServerHistory[txnNum].push({
                         _id: doc._id,
@@ -255,7 +255,7 @@ var $config = (function() {
                     prepareProbability: this.prepareProbability
                 });
 
-                this.updatedDocsClientHistory[txnNumber] = committedTxnInfo;
+                this.updatedDocsClientHistory[txnNumber.valueOf()] = committedTxnInfo;
                 ++this.iteration;
             },
 
