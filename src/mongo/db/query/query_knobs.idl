@@ -475,6 +475,7 @@ server_parameters:
       expr: 100 * 1024 * 1024
     validator:
         gt: 0
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryMaxRangeBytes:
     description: "Limits the vector of values pushed into a single array while generating $range
@@ -497,6 +498,7 @@ server_parameters:
       expr: 100 * 1024 * 1024
     validator:
         gt: 0
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryJavaScriptHeapSizeLimitMB:
     description: "Limits the JavaScript heap size used in aggregation. Will defer to the global

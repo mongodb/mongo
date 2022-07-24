@@ -118,12 +118,18 @@ coll.getPlanCache().clearPlansByQuery(
     {query: {a: 'foo', b: 5}, sort: {}, projection: {}, collation: {locale: 'fr_CA'}});
 assert.eq(1, coll.aggregate([{$planCacheStats: {}}]).itcount(), dumpPlanCacheState());
 
-// Dropping a query shape with different string locations should have no effect.
+// Dropping a query shape with different string locations should clear the cache.
 coll.getPlanCache().clearPlansByQuery(
     {query: {a: 'foo', b: 'bar'}, sort: {}, projection: {}, collation: {locale: 'en_US'}});
+assert.eq(0, coll.aggregate([{$planCacheStats: {}}]).itcount(), dumpPlanCacheState());
+
+// Run a query so that an entry is inserted into the cache.
+assert.commandWorked(
+    coll.runCommand("find", {filter: {a: 'foo', b: 5}, collation: {locale: 'en_US'}}),
+    'find command failed');
 assert.eq(1, coll.aggregate([{$planCacheStats: {}}]).itcount(), dumpPlanCacheState());
 
-// Dropping query shape.
+// Dropping query shape using the same filter.
 coll.getPlanCache().clearPlansByQuery(
     {query: {a: 'foo', b: 5}, sort: {}, projection: {}, collation: {locale: 'en_US'}});
 assert.eq(0, coll.aggregate([{$planCacheStats: {}}]).itcount(), dumpPlanCacheState());

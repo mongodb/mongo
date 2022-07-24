@@ -100,7 +100,7 @@ public:
         const PlanCacheEntryBase<CachedPlanType, DebugInfoType>* oldEntry,
         size_t newWorks) const = 0;
     virtual DebugInfoType buildDebugInfo() const = 0;
-    virtual uint32_t getIndexFilterKeyHash() const = 0;
+    virtual uint32_t getPlanCacheCommandKeyHash() const = 0;
 };
 
 /**
@@ -181,9 +181,9 @@ public:
         return _buildDebugInfoCallBack();
     }
 
-    uint32_t getIndexFilterKeyHash() const final {
+    uint32_t getPlanCacheCommandKeyHash() const final {
         return canonical_query_encoder::computeHash(
-            canonical_query_encoder::encodeForIndexFilters(_cq));
+            canonical_query_encoder::encodeForPlanCacheCommand(_cq));
     }
 
 private:

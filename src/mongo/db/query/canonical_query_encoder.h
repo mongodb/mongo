@@ -59,10 +59,11 @@ CanonicalQuery::QueryShapeString encodeSBE(const CanonicalQuery& cq);
 
 /**
  * Encode the given CanonicalQuery into a string representation which represents the shape of the
- * query for matching the query against index filters. This is done by encoding the match,
- * projection, sort and user-specified collation.
+ * query for matching the query used with plan cache commands (planCacheClear, planCacheClearFilter,
+ * planCacheListFilters, and planCacheSetFilter). This is done by encoding the match, projection,
+ * sort and user-specified collation.
  */
-CanonicalQuery::IndexFilterKey encodeForIndexFilters(const CanonicalQuery& cq);
+CanonicalQuery::PlanCacheCommandKey encodeForPlanCacheCommand(const CanonicalQuery& cq);
 
 /**
  * Returns a hash of the given key (produced from either a QueryShapeString or a PlanCacheKey).

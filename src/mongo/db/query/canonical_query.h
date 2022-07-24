@@ -53,9 +53,10 @@ public:
     // with parameter markers.
     typedef std::string QueryShapeString;
     // A second encoding of query shape similar to 'QueryShapeString' above, except designed to work
-    // with index filters rather than the plan cache key. A caller can encode a query into an
-    // 'IndexFilterKey' in order to look for matching index filters that should apply to the query.
-    typedef std::string IndexFilterKey;
+    // with index filters and the 'planCacheClear' command. A caller can encode a query into an
+    // 'PlanCacheCommandKey' in order to look for for matching index filters that should apply to
+    // the query, or plan cache entries to which the 'planCacheClear' command should be applied.
+    typedef std::string PlanCacheCommandKey;
 
     /**
      * If parsing succeeds, returns a std::unique_ptr<CanonicalQuery> representing the parsed
@@ -180,11 +181,10 @@ public:
     QueryShapeString encodeKey() const;
 
     /**
-     * Encode a shape string for the query suitable for matching the query against the set of
-     * pre-defined index filters. Similar to 'encodeKey()' above, but intended for use with index
-     * filters rather than the plan cache.
+     * Similar to 'encodeKey()' above, but intended for use with plan cache commands rather than
+     * the plan cache itself.
      */
-    IndexFilterKey encodeKeyForIndexFilters() const;
+    PlanCacheCommandKey encodeKeyForPlanCacheCommand() const;
 
     /**
      * Sets this CanonicalQuery's collator, and sets the collator on this CanonicalQuery's match

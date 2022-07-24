@@ -240,10 +240,15 @@ PlanCache& getPlanCache(OperationContext* opCtx);
 
 /**
  * Removes cached plan entries with the given collection UUID and collection version number.
+ *
+ * When 'matchSecondaryCollections' is 'true' this function will also clear plan cache entries
+ * whose list of secondary collection contains at least one collection with the 'collectionUuid'.
+ * Otherwise, only the main collection will be matched against the given 'collectionUuid'.
  */
 void clearPlanCacheEntriesWith(ServiceContext* serviceCtx,
                                UUID collectionUuid,
-                               size_t collectionVersion);
+                               size_t collectionVersion,
+                               bool matchSecondaryCollections);
 
 }  // namespace sbe
 }  // namespace mongo

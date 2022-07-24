@@ -118,7 +118,7 @@ public:
      * boost::none if it isn't.
      */
     boost::optional<AllowedIndicesFilter> getAllowedIndicesFilter(
-        const CanonicalQuery::IndexFilterKey& key) const;
+        const CanonicalQuery::PlanCacheCommandKey& key) const;
 
     /**
      * Returns copies of all overrides for the collection.
@@ -136,7 +136,7 @@ public:
     /**
      * Removes single entry from query settings. No effect if query shape is not found.
      */
-    void removeAllowedIndices(const CanonicalQuery::IndexFilterKey& key);
+    void removeAllowedIndices(const CanonicalQuery::PlanCacheCommandKey& key);
 
     /**
      * Clears all allowed indices from query settings.
@@ -146,7 +146,7 @@ public:
 private:
     // Allowed index entries owned here.
     using AllowedIndexEntryMap =
-        stdx::unordered_map<CanonicalQuery::IndexFilterKey, AllowedIndexEntry>;
+        stdx::unordered_map<CanonicalQuery::PlanCacheCommandKey, AllowedIndexEntry>;
     AllowedIndexEntryMap _allowedIndexEntryMap;
 
     /**

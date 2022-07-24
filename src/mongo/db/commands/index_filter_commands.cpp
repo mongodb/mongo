@@ -76,32 +76,6 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SetupIndexFilterCommands, ())
     new ClearFilters();
     new SetFilter();
 }
-
-/**
- * Remove the plan cache entries whose 'indexFilterKey' matches any key in 'indexFilterKeys'. Please
- * note that we do not handle 'indexFilterKey' hash collisions, namely it's fine to clear a plan
- * cache entry that we technically could have kept around.
- */
-void removePlanCacheEntriesByIndexFilterKeys(const stdx::unordered_set<uint32_t>& indexFilterKeys,
-                                             PlanCache* planCache) {
-    planCache->removeIf([&indexFilterKeys](const PlanCacheKey& key, const PlanCacheEntry& entry) {
-        return indexFilterKeys.contains(entry.indexFilterKey);
-    });
-}
-
-/**
- * Similar to removePlanCacheEntriesByIndexFilterKeys() above. This function clears cache entries in
- * a SBE plan cache. There is an extra check on the collection UUID because all collections share
- * one single 'sbe::PlanCache' instance.
- */
-void removePlanCacheEntriesByIndexFilterKeys(const stdx::unordered_set<uint32_t>& indexFilterKeys,
-                                             const UUID& collectionUuid,
-                                             sbe::PlanCache* planCache) {
-    planCache->removeIf([&](const sbe::PlanCacheKey& key, const sbe::PlanCacheEntry& entry) {
-        return indexFilterKeys.contains(entry.indexFilterKey) &&
-            key.getMainCollectionState().uuid == collectionUuid;
-    });
-}
 }  // namespace
 
 namespace mongo {
@@ -257,14 +231,15 @@ Status ClearFilters::clear(OperationContext* opCtx,
 
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-        querySettings->removeAllowedIndices(cq->encodeKeyForIndexFilters());
+        querySettings->removeAllowedIndices(cq->encodeKeyForPlanCacheCommand());
 
-        stdx::unordered_set<uint32_t> indexFilterKeys({canonical_query_encoder::computeHash(
-            canonical_query_encoder::encodeForIndexFilters(*cq))});
-        removePlanCacheEntriesByIndexFilterKeys(indexFilterKeys, planCacheClassic);
+        stdx::unordered_set<uint32_t> planCacheCommandKeys({canonical_query_encoder::computeHash(
+            canonical_query_encoder::encodeForPlanCacheCommand(*cq))});
+        plan_cache_commands::removePlanCacheEntriesByPlanCacheCommandKeys(planCacheCommandKeys,
+                                                                          planCacheClassic);
         if (planCacheSBE) {
-            removePlanCacheEntriesByIndexFilterKeys(
-                indexFilterKeys, collection->uuid(), planCacheSBE);
+            plan_cache_commands::removePlanCacheEntriesByPlanCacheCommandKeys(
+                planCacheCommandKeys, collection->uuid(), planCacheSBE);
         }
         LOGV2(20479, "Removed index filter on query", "query"_attr = redact(cq->toStringShort()));
 
@@ -295,11 +270,12 @@ Status ClearFilters::clear(OperationContext* opCtx,
     // indexed solutions next time the query is run. Resolve plan cache key from (query, sort,
     // projection, and user-defined collation) in query settings entry. Concurrency note: There's no
     // harm in removing plan cache entries one at a time. Only way that
-    // removePlanCacheEntriesByIndexFilterKeys() can fail is when the query shape has been removed
-    // from the cache by some other means (re-index, collection info reset, ...). This is OK since
-    // that's the intended effect of calling the removePlanCacheEntriesByIndexFilterKeys() function
-    // with the key from the index filter entry.
-    stdx::unordered_set<uint32_t> indexFilterKeys;
+    // removePlanCacheEntriesByPlanCacheCommandKeys() can fail is when the query shape has been
+    // removed from the cache by some other means (re-index, collection info reset, ...). This is OK
+    // since that's the intended effect of calling the
+    // removePlanCacheEntriesByPlanCacheCommandKeys() function with the key from the index filter
+    // entry.
+    stdx::unordered_set<uint32_t> planCacheCommandKeys;
     for (auto entry : entries) {
         // Create canonical query.
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
@@ -318,12 +294,14 @@ Status ClearFilters::clear(OperationContext* opCtx,
         invariant(statusWithCQ.isOK());
         std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-        indexFilterKeys.insert(canonical_query_encoder::computeHash(
-            canonical_query_encoder::encodeForIndexFilters(*cq)));
+        planCacheCommandKeys.insert(canonical_query_encoder::computeHash(
+            canonical_query_encoder::encodeForPlanCacheCommand(*cq)));
     }
-    removePlanCacheEntriesByIndexFilterKeys(indexFilterKeys, planCacheClassic);
+    plan_cache_commands::removePlanCacheEntriesByPlanCacheCommandKeys(planCacheCommandKeys,
+                                                                      planCacheClassic);
     if (planCacheSBE) {
-        removePlanCacheEntriesByIndexFilterKeys(indexFilterKeys, collection->uuid(), planCacheSBE);
+        plan_cache_commands::removePlanCacheEntriesByPlanCacheCommandKeys(
+            planCacheCommandKeys, collection->uuid(), planCacheSBE);
     }
 
     LOGV2(20480,
@@ -403,12 +381,14 @@ Status SetFilter::set(OperationContext* opCtx,
     // Add allowed indices to query settings, overriding any previous entries.
     querySettings->setAllowedIndices(*cq, indexes, indexNames);
 
-    // Remove entries that match 'indexFilterKeys' from both plan caches.
-    stdx::unordered_set<uint32_t> indexFilterKeys({canonical_query_encoder::computeHash(
-        canonical_query_encoder::encodeForIndexFilters(*cq))});
-    removePlanCacheEntriesByIndexFilterKeys(indexFilterKeys, planCacheClassic);
+    // Remove entries that match 'planCacheCommandKeys' from both plan caches.
+    stdx::unordered_set<uint32_t> planCacheCommandKeys({canonical_query_encoder::computeHash(
+        canonical_query_encoder::encodeForPlanCacheCommand(*cq))});
+    plan_cache_commands::removePlanCacheEntriesByPlanCacheCommandKeys(planCacheCommandKeys,
+                                                                      planCacheClassic);
     if (planCacheSBE) {
-        removePlanCacheEntriesByIndexFilterKeys(indexFilterKeys, collection->uuid(), planCacheSBE);
+        plan_cache_commands::removePlanCacheEntriesByPlanCacheCommandKeys(
+            planCacheCommandKeys, collection->uuid(), planCacheSBE);
     }
 
     LOGV2(20481,

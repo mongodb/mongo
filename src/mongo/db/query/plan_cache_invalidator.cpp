@@ -66,7 +66,8 @@ void PlanCacheInvalidator::clearPlanCache() const {
     // Some unit tests cannot properly initialize CollectionQueryInfo but rely on it partially
     // initialized to make PlanCacheKeys.
     if (_serviceContext && _uuid) {
-        sbe::clearPlanCacheEntriesWith(_serviceContext, *_uuid, _version);
+        sbe::clearPlanCacheEntriesWith(
+            _serviceContext, *_uuid, _version, true /*matchSecondaryCollections*/);
     }
 }
 

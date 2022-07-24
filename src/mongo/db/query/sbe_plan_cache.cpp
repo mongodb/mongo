@@ -154,20 +154,23 @@ sbe::PlanCache& getPlanCache(OperationContext* opCtx) {
 
 void clearPlanCacheEntriesWith(ServiceContext* serviceCtx,
                                UUID collectionUuid,
-                               size_t collectionVersion) {
+                               size_t collectionVersion,
+                               bool matchSecondaryCollections) {
     if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
         auto removed =
             sbe::getPlanCache(serviceCtx)
-                .removeIf([&collectionUuid, collectionVersion](const PlanCacheKey& key,
-                                                               const sbe::PlanCacheEntry& entry) {
+                .removeIf([&collectionUuid, collectionVersion, matchSecondaryCollections](
+                              const PlanCacheKey& key, const sbe::PlanCacheEntry& entry) {
                     if (key.getMainCollectionState().version == collectionVersion &&
                         key.getMainCollectionState().uuid == collectionUuid) {
                         return true;
                     }
-                    for (auto& collectionState : key.getSecondaryCollectionStates()) {
-                        if (collectionState.version == collectionVersion &&
-                            collectionState.uuid == collectionUuid) {
-                            return true;
+                    if (matchSecondaryCollections) {
+                        for (auto& collectionState : key.getSecondaryCollectionStates()) {
+                            if (collectionState.version == collectionVersion &&
+                                collectionState.uuid == collectionUuid) {
+                                return true;
+                            }
                         }
                     }
                     return false;

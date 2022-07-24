@@ -5,8 +5,9 @@
 "use strict";
 
 // For getLatestProfilerEntry().
-load("jstests/libs/profiler.js");
 load("jstests/libs/logv2_helpers.js");
+load("jstests/libs/profiler.js");
+load("jstests/libs/sbe_util.js");
 
 // Prevent the mongo shell from gossiping its cluster time, since this will increase the amount
 // of data logged for each op. For some of the testcases below, including the cluster time would
@@ -107,7 +108,7 @@ const testList = [
         test: function(db, comment) {
             assert.eq(200, db.test.find().comment(comment).itcount());
         },
-        hasPlanCacheKey: false
+        hasPlanCacheKey: checkSBEEnabled(testDB, ["featureFlagSbeFull"])
     },
     {
         comment: "Test1 find query",

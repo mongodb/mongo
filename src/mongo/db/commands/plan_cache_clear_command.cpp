@@ -85,18 +85,15 @@ Status clear(OperationContext* opCtx,
 
         // Based on a query shape only, we cannot be sure whether a query with the given query shape
         // can be executed with the SBE engine or not. Therefore, we try to clean the plan caches in
-        // the both cases.
-        planCache->remove(plan_cache_key_factory::make<PlanCacheKey>(*cq, collection));
+        // both cases.
+        stdx::unordered_set<uint32_t> planCacheCommandKeys = {canonical_query_encoder::computeHash(
+            canonical_query_encoder::encodeForPlanCacheCommand(*cq))};
+        plan_cache_commands::removePlanCacheEntriesByPlanCacheCommandKeys(planCacheCommandKeys,
+                                                                          planCache);
 
-        // Default value of planner options (0) is SBE compatible, so it does not affect result of
-        // sbe::isQuerySbeCompatible here.
-        const size_t plannerOptions = 0;
-        if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV() &&
-            !cq->getForceClassicEngine() &&
-            sbe::isQuerySbeCompatible(&collection, cq.get(), plannerOptions)) {
-            cq->setSbeCompatible(true);
-            sbe::getPlanCache(opCtx).remove(
-                plan_cache_key_factory::make<sbe::PlanCacheKey>(*cq, collection));
+        if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
+            plan_cache_commands::removePlanCacheEntriesByPlanCacheCommandKeys(
+                planCacheCommandKeys, collection->uuid(), &sbe::getPlanCache(opCtx));
         }
 
         return Status::OK();
@@ -114,7 +111,10 @@ Status clear(OperationContext* opCtx,
 
     if (feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
         auto version = CollectionQueryInfo::get(collection).getPlanCacheInvalidatorVersion();
-        sbe::clearPlanCacheEntriesWith(opCtx->getServiceContext(), collection->uuid(), version);
+        sbe::clearPlanCacheEntriesWith(opCtx->getServiceContext(),
+                                       collection->uuid(),
+                                       version,
+                                       false /*matchSecondaryCollections*/);
     }
 
     LOGV2_DEBUG(

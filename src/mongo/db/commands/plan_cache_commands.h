@@ -32,6 +32,8 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/classic_plan_cache.h"
+#include "mongo/db/query/sbe_plan_cache.h"
 
 namespace mongo::plan_cache_commands {
 
@@ -43,4 +45,22 @@ StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(OperationContext* opCtx
                                                          StringData ns,
                                                          const BSONObj& cmdObj);
 
+/**
+ * Remove the plan cache entries whose 'planCacheCommandKey' matches any key in
+ * 'planCacheCommandKeys'. Please note that we do not handle 'planCacheCommandKey' hash collisions,
+ * namely it's fine to clear a plan cache entry that we technically could have kept around.
+ */
+void removePlanCacheEntriesByPlanCacheCommandKeys(
+    const stdx::unordered_set<uint32_t>& planCacheCommandKeys, PlanCache* planCache);
+
+/**
+ * Similar to removePlanCacheEntriesByPlanCacheCommandKeys() above. This function clears cache
+ * entries in a SBE plan cache. There is an extra check on the collection UUID because all
+ * collections share one single 'sbe::PlanCache' instance. This will only clear plan cache entries
+ * where the given UUID is the main collection (not when it is a secondary collection).
+ */
+void removePlanCacheEntriesByPlanCacheCommandKeys(
+    const stdx::unordered_set<uint32_t>& planCacheCommandKeys,
+    const UUID& collectionUuid,
+    sbe::PlanCache* planCache);
 }  // namespace mongo::plan_cache_commands

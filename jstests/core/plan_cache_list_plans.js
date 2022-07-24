@@ -41,6 +41,16 @@ function getPlansForCacheEntry(query, sort, projection) {
     return res[0];
 }
 
+function getPlansForCacheEntryFromPipeline(pipeline) {
+    const keyHash = getPlanCacheKeyFromPipeline(pipeline, coll, db);
+
+    const res =
+        coll.aggregate([{$planCacheStats: {}}, {$match: {planCacheKey: keyHash}}]).toArray();
+    // We expect exactly one matching cache entry.
+    assert.eq(1, res.length, dumpPlanCacheState());
+    return res[0];
+}
+
 function assertNoCacheEntry(query, sort, projection) {
     const keyHash = getPlanCacheKeyFromShape(
         {query: query, projection: projection, sort: sort, collection: coll, db: db});
@@ -144,5 +154,37 @@ if (!isSbeEnabled) {
             assert.lte(scores[i], scores[i - 1], entry);
         }
     }
+} else {
+    //
+    // Test that $planCacheStats against a particular collection does not list cached $lookup plans
+    // if the collection is the foreign collection (not the main collection).
+    //
+    const foreignColl = db.plan_cache_list_plans_foreign;
+    foreignColl.drop();
+    assert.commandWorked(foreignColl.insert({a: 1, b: 1}));
+    assert.commandWorked(foreignColl.createIndex({b: 1}));
+
+    const pipeline = [
+        {$lookup: {from: foreignColl.getName(), localField: "a", foreignField: "b", as: "matched"}}
+    ];
+    const results = coll.aggregate(pipeline).toArray();
+    assert.eq(4, results.length, results);
+
+    // Make sure we have one plan cache entry for main collection and the plan is indexed NLJ.
+    entry = getPlansForCacheEntryFromPipeline(pipeline);
+    assert.eq(entry.isActive, true);
+
+    const explain = coll.explain().aggregate(pipeline);
+    assert.commandWorked(explain);
+
+    const lookupStage = getPlanStage(explain, "EQ_LOOKUP");
+    assert.neq(null, lookupStage, explain);
+    assert.eq(lookupStage.strategy, "IndexedLoopJoin", explain);
+    assert.eq(lookupStage.indexName, "b_1");
+
+    // The '$planCacheStats' pipeline executed against the foreign collection shouldn't include
+    // cached $lookup plans.
+    const res = foreignColl.aggregate([{$planCacheStats: {}}]).toArray();
+    assert.eq(0, res.length, dumpPlanCacheState());
 }
 })();

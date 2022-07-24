@@ -107,4 +107,22 @@ StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(OperationContext* opCtx
     return std::move(statusWithCQ.getValue());
 }
 
+void removePlanCacheEntriesByPlanCacheCommandKeys(
+    const stdx::unordered_set<uint32_t>& planCacheCommandKeys, PlanCache* planCache) {
+    planCache->removeIf(
+        [&planCacheCommandKeys](const PlanCacheKey& key, const PlanCacheEntry& entry) {
+            return planCacheCommandKeys.contains(entry.planCacheCommandKey);
+        });
+}
+
+void removePlanCacheEntriesByPlanCacheCommandKeys(
+    const stdx::unordered_set<uint32_t>& planCacheCommandKeys,
+    const UUID& collectionUuid,
+    sbe::PlanCache* planCache) {
+    planCache->removeIf([&](const sbe::PlanCacheKey& key, const sbe::PlanCacheEntry& entry) {
+        return planCacheCommandKeys.contains(entry.planCacheCommandKey) &&
+            key.getMainCollectionState().uuid == collectionUuid;
+    });
+}
+
 }  // namespace mongo::plan_cache_commands

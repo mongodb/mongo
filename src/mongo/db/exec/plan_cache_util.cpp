@@ -89,7 +89,7 @@ void updatePlanCache(OperationContext* opCtx,
         sbe::getPlanCache(opCtx).setPinned(
             std::move(key),
             canonical_query_encoder::computeHash(
-                canonical_query_encoder::encodeForIndexFilters(query)),
+                canonical_query_encoder::encodeForPlanCacheCommand(query)),
             std::move(plan),
             opCtx->getServiceContext()->getPreciseClockSource()->now(),
             buildDebugInfo(&solution));

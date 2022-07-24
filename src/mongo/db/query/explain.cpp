@@ -110,7 +110,7 @@ void generatePlannerInfo(PlanExecutor* exec,
             queryHash = planCacheKeyInfo.queryHash();
         }
         if (auto allowedIndicesFilter = querySettings->getAllowedIndicesFilter(
-                exec->getCanonicalQuery()->encodeKeyForIndexFilters())) {
+                exec->getCanonicalQuery()->encodeKeyForPlanCacheCommand())) {
             // Found an index filter set on the query shape.
             indexFilterSet = true;
         }

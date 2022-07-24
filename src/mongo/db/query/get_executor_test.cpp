@@ -109,7 +109,7 @@ void testAllowedIndices(std::vector<IndexEntry> indexes,
 
     // getAllowedIndices should return false when query shape is not yet in query settings.
     unique_ptr<CanonicalQuery> cq(canonicalize("{a: 1}", "{}", "{}"));
-    const auto key = cq->encodeKeyForIndexFilters();
+    const auto key = cq->encodeKeyForPlanCacheCommand();
     ASSERT_FALSE(querySettings.getAllowedIndicesFilter(key));
 
     querySettings.setAllowedIndices(*cq, keyPatterns, indexNames);

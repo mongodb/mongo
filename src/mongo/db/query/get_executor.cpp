@@ -266,7 +266,7 @@ void applyIndexFilters(const CollectionPtr& collection,
     if (!isIdHackEligibleQuery(collection, canonicalQuery)) {
         const QuerySettings* querySettings =
             QuerySettingsDecoration::get(collection->getSharedDecorations());
-        const auto key = canonicalQuery.encodeKeyForIndexFilters();
+        const auto key = canonicalQuery.encodeKeyForPlanCacheCommand();
 
         // Filter index catalog if index filters are specified for query.
         // Also, signal to planner that application hint should be ignored.

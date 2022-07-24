@@ -547,7 +547,7 @@ CanonicalQuery::QueryShapeString CanonicalQuery::encodeKey() const {
         : canonical_query_encoder::encode(*this);
 }
 
-CanonicalQuery::QueryShapeString CanonicalQuery::encodeKeyForIndexFilters() const {
-    return canonical_query_encoder::encodeForIndexFilters(*this);
+CanonicalQuery::QueryShapeString CanonicalQuery::encodeKeyForPlanCacheCommand() const {
+    return canonical_query_encoder::encodeForPlanCacheCommand(*this);
 }
 }  // namespace mongo
