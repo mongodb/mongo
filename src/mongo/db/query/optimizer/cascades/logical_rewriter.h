@@ -58,7 +58,7 @@ public:
      */
     using RewriteSet = opt::unordered_map<LogicalRewriteType, double>;
 
-    LogicalRewriter(Memo& memo, PrefixId& prefixId, RewriteSet rewriteSet);
+    LogicalRewriter(Memo& memo, PrefixId& prefixId, RewriteSet rewriteSet, bool useHeuristicCE);
 
     LogicalRewriter() = delete;
     LogicalRewriter(const LogicalRewriter& other) = delete;
@@ -126,6 +126,9 @@ private:
 
     // Track number of times a SargableNode at a given position in the memo has been split.
     opt::unordered_map<MemoLogicalNodeId, size_t, NodeIdHash> _sargableSplitCountMap;
+
+    // Indicates whether we should only use the heuristic CE during rewrites.
+    const bool _useHeuristicCE;
 };
 
 

@@ -76,8 +76,15 @@ LogicalRewriter::RewriteSet LogicalRewriter::_substitutionSet = {
     {LogicalRewriteType::EvaluationSubstitute, 2},
     {LogicalRewriteType::SargableMerge, 2}};
 
-LogicalRewriter::LogicalRewriter(Memo& memo, PrefixId& prefixId, RewriteSet rewriteSet)
-    : _activeRewriteSet(std::move(rewriteSet)), _groupsPending(), _memo(memo), _prefixId(prefixId) {
+LogicalRewriter::LogicalRewriter(Memo& memo,
+                                 PrefixId& prefixId,
+                                 const RewriteSet rewriteSet,
+                                 const bool useHeuristicCE)
+    : _activeRewriteSet(std::move(rewriteSet)),
+      _groupsPending(),
+      _memo(memo),
+      _prefixId(prefixId),
+      _useHeuristicCE(useHeuristicCE) {
     initializeRewrites();
 
     if (_activeRewriteSet.count(LogicalRewriteType::SargableSplit) > 0) {
@@ -108,8 +115,11 @@ std::pair<GroupIdType, NodeIdSet> LogicalRewriter::addNode(const ABT& node,
         targetGroupMap = {{node.ref(), targetGroupId}};
     }
 
-    const GroupIdType resultGroupId = _memo.integrate(
-        node, std::move(targetGroupMap), insertNodeIds, addExistingNodeWithNewChild);
+    const GroupIdType resultGroupId = _memo.integrate(node,
+                                                      std::move(targetGroupMap),
+                                                      insertNodeIds,
+                                                      addExistingNodeWithNewChild,
+                                                      _useHeuristicCE);
 
     uassert(6624046,
             "Result group is not the same as target group",

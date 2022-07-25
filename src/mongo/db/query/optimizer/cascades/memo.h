@@ -34,6 +34,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/cascades/interfaces.h"
 #include "mongo/db/query/optimizer/cascades/rewrite_queues.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
@@ -194,18 +195,20 @@ public:
 
     ABT::reference_type getNode(MemoLogicalNodeId nodeMemoId) const;
 
-    void estimateCE(GroupIdType groupId);
+    void estimateCE(GroupIdType groupId, bool useHeuristicCE);
 
     MemoLogicalNodeId addNode(GroupIdVector groupVector,
                               ProjectionNameSet projections,
                               GroupIdType targetGroupId,
                               NodeIdSet& insertedNodeIds,
-                              ABT n);
+                              ABT n,
+                              bool useHeuristicCE = false);
 
     GroupIdType integrate(const ABT& node,
                           NodeTargetGroupMap targetGroupMap,
                           NodeIdSet& insertedNodeIds,
-                          bool addExistingNodeWithNewChild = false);
+                          bool addExistingNodeWithNewChild = false,
+                          bool useHeuristicCE = false);
 
     void clearLogicalNodes(GroupIdType groupId);
 
@@ -239,6 +242,8 @@ private:
     const Metadata& _metadata;
     std::unique_ptr<LogicalPropsInterface> _logicalPropsDerivation;
     std::unique_ptr<CEInterface> _ceDerivation;
+    // Used during the substitution phase, where we don't need to call _ceDerivation.
+    HeuristicCE _heuristicCE;
 
     const DebugInfo _debugInfo;
 

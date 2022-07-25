@@ -192,11 +192,13 @@ public:
     explicit MemoIntegrator(Memo& memo,
                             Memo::NodeTargetGroupMap targetGroupMap,
                             NodeIdSet& insertedNodeIds,
-                            const bool addExistingNodeWithNewChild)
+                            const bool addExistingNodeWithNewChild,
+                            const bool useHeuristicCE)
         : _memo(memo),
           _insertedNodeIds(insertedNodeIds),
           _targetGroupMap(std::move(targetGroupMap)),
-          _addExistingNodeWithNewChild(addExistingNodeWithNewChild) {}
+          _addExistingNodeWithNewChild(addExistingNodeWithNewChild),
+          _useHeuristicCE(useHeuristicCE) {}
 
     /**
      * Nodes
@@ -418,7 +420,8 @@ private:
                                           env.getProjections(node),
                                           targetGroupId,
                                           _insertedNodeIds,
-                                          std::move(forMemo));
+                                          std::move(forMemo),
+                                          _useHeuristicCE);
         return result._groupId;
     }
 
@@ -561,6 +564,9 @@ private:
     // would not assume that if F(x) = F(y) then x = y. This is currently used in conjunction with
     // $elemMatch rewrite (PathTraverse over PathCompose).
     bool _addExistingNodeWithNewChild;
+
+    // Indicates whether we should only use the heuristic CE while evaluating.
+    const bool _useHeuristicCE;
 };
 
 size_t Memo::GroupIdVectorHash::operator()(const Memo::GroupIdVector& v) const {
@@ -635,7 +641,9 @@ std::pair<MemoLogicalNodeId, bool> Memo::findNode(const GroupIdVector& groups, c
     return {{0, 0}, false};
 }
 
-void Memo::estimateCE(const GroupIdType groupId) {
+void Memo::estimateCE(const GroupIdType groupId, const bool useHeuristicCE) {
+    CEInterface* ceEstimator = useHeuristicCE ? &_heuristicCE : _ceDerivation.get();
+
     // If inserted into a new group, derive logical properties, and cardinality estimation
     // for the new group.
     Group& group = getGroup(groupId);
@@ -646,7 +654,7 @@ void Memo::estimateCE(const GroupIdType groupId) {
         _logicalPropsDerivation->deriveProps(_metadata, nodeRef, nullptr, this, groupId);
     props.merge(logicalProps);
 
-    const CEType estimate = _ceDerivation->deriveCE(*this, props, nodeRef);
+    const CEType estimate = ceEstimator->deriveCE(*this, props, nodeRef);
     auto ceProp = properties::CardinalityEstimate(estimate);
 
     if (auto sargablePtr = nodeRef.cast<SargableNode>(); sargablePtr != nullptr) {
@@ -656,7 +664,7 @@ void Memo::estimateCE(const GroupIdType groupId) {
                                                  CandidateIndexMap{},
                                                  sargablePtr->getTarget(),
                                                  sargablePtr->getChild());
-            const CEType singularEst = _ceDerivation->deriveCE(*this, props, singularReq.ref());
+            const CEType singularEst = ceEstimator->deriveCE(*this, props, singularReq.ref());
             partialSchemaKeyCEMap.emplace(key, singularEst);
         }
     }
@@ -672,7 +680,8 @@ MemoLogicalNodeId Memo::addNode(GroupIdVector groupVector,
                                 ProjectionNameSet projections,
                                 const GroupIdType targetGroupId,
                                 NodeIdSet& insertedNodeIds,
-                                ABT n) {
+                                ABT n,
+                                const bool useHeuristicCE) {
     for (const GroupIdType groupId : groupVector) {
         // Invalid tree: node is its own child.
         uassert(6624127, "Target group appears inside group vector", groupId != targetGroupId);
@@ -703,7 +712,7 @@ MemoLogicalNodeId Memo::addNode(GroupIdVector groupVector,
         _nodeIdToInputGroupsMap[newId] = groupVector;
 
         if (noTargetGroup) {
-            estimateCE(groupId);
+            estimateCE(groupId, useHeuristicCE);
         } else if (_debugInfo.isDebugMode()) {
             const Group& group = getGroup(groupId);
             // If inserted into an existing group, verify we deliver all expected projections.
@@ -723,10 +732,14 @@ MemoLogicalNodeId Memo::addNode(GroupIdVector groupVector,
 GroupIdType Memo::integrate(const ABT& node,
                             NodeTargetGroupMap targetGroupMap,
                             NodeIdSet& insertedNodeIds,
-                            const bool addExistingNodeWithNewChild) {
+                            const bool addExistingNodeWithNewChild,
+                            const bool useHeuristicCE) {
     _stats._numIntegrations++;
-    MemoIntegrator integrator(
-        *this, std::move(targetGroupMap), insertedNodeIds, addExistingNodeWithNewChild);
+    MemoIntegrator integrator(*this,
+                              std::move(targetGroupMap),
+                              insertedNodeIds,
+                              addExistingNodeWithNewChild,
+                              useHeuristicCE);
     return integrator.integrate(node);
 }
 
