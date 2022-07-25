@@ -81,5 +81,26 @@ TEST_F(DocumentSourceRedactTest, ShouldPropagatePauses) {
     ASSERT_TRUE(redact->getNext().isEOF());
     ASSERT_TRUE(redact->getNext().isEOF());
 }
+
+TEST_F(DocumentSourceRedactTest, ReportsVariableDependencies) {
+    auto varId = getExpCtx()->variablesParseState.defineVariable("var");
+    auto redactSpec = fromjson(R"({
+        "$redact" : {
+            "$cond" : {
+                "if" : "$$var",
+                "then" : "$$PRUNE",
+                "else" : "$$DESCEND"
+            }
+        }
+    })");
+    auto redact = DocumentSourceRedact::createFromBson(redactSpec.firstElement(), getExpCtx());
+
+    DepsTracker deps;
+    ASSERT_EQ(redact->getDependencies(&deps), DepsTracker::State::SEE_NEXT);
+    ASSERT_EQ(deps.needWholeDocument, true);
+    ASSERT_TRUE(deps.fields.empty());
+    ASSERT_EQ(deps.vars.count(varId), 1);
+}
+
 }  // namespace
 }  // namespace mongo
