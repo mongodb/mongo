@@ -283,7 +283,8 @@ public:
         void _startup();
 
         KVEngine* _engine;
-        bool _running;
+        bool _running = false;
+        bool _shuttingDown = false;
 
         // Periodic runner that the timestamp monitor schedules its job on.
         PeriodicRunner* _periodicRunner;
