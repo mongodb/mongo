@@ -308,7 +308,11 @@ var BackupRestoreTest = function(options) {
         if (!_isWindows()) {
             // The mongo shell calls TerminateProcess() on Windows rather than more gracefully
             // interrupting resmoke.py test execution.
-            assert.eq(130, exitCode, 'expected resmoke.py to exit due to being interrupted');
+
+            // resmoke.py may exit cleanly on SIGINT returning 130, or uncleanly in which case
+            // stopMongoProgramByPid returns -SIGINT.
+            assert(exitCode == 130 || exitCode == -kSIGINT,
+                   'expected resmoke.py to exit due to being interrupted');
         }
 
         // Make sure the databases are not in a drop-pending state. This can happen if we
