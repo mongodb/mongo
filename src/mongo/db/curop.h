@@ -270,6 +270,21 @@ public:
     // involved in the execution tree for this query, false if they were not.
     boost::optional<bool> documentSourceUsed;
 
+    // Tracks whether an aggregation query has a lookup stage regardless of the engine used.
+    bool pipelineUsesLookup{false};
+
+    // Tracks the amount of indexed loop joins in a pushed down lookup stage.
+    int indexedLoopJoin{0};
+
+    // Tracks the amount of nested loop joins in a pushed down lookup stage.
+    int nestedLoopJoin{0};
+
+    // Tracks the amount of hash lookups in a pushed down lookup stage.
+    int hashLookup{0};
+
+    // Tracks the amount of spills by hash lookup in a pushed down lookup stage.
+    int hashLookupSpillToDisk{0};
+
     // Details of any error (whether from an exception or a command returning failure).
     Status errInfo = Status::OK();
 

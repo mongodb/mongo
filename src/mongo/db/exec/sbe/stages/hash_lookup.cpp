@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/curop.h"
 #include "mongo/db/exec/sbe/stages/hash_lookup.h"
 #include "mongo/db/exec/sbe/stages/stage_visitors.h"
 
@@ -312,6 +313,8 @@ void HashLookupStage::spillBufferedValueToDisk(OperationContext* opCtx,
                                                RecordStore* rs,
                                                size_t bufferIdx,
                                                const value::MaterializedRow& val) {
+    CurOp::get(_opCtx)->debug().hashLookupSpillToDisk += 1;
+
     auto rid = getValueRecordId(bufferIdx);
 
     BufBuilder buf;
@@ -496,6 +499,8 @@ void HashLookupStage::spillIndicesToRecordStore(RecordStore* rs,
                                                 value::TypeTags tagKey,
                                                 value::Value valKey,
                                                 const std::vector<size_t>& value) {
+    CurOp::get(_opCtx)->debug().hashLookupSpillToDisk += 1;
+
     auto [owned, tagKeyColl, valKeyColl] = normalizeStringIfCollator(tagKey, valKey);
     _probeKey.reset(0, owned, tagKeyColl, valKeyColl);
 

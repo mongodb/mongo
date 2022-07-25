@@ -376,6 +376,32 @@ public:
 };
 extern QueryEngineCounters queryEngineCounters;
 
+class LookupPushdownCounters {
+public:
+    LookupPushdownCounters() = default;
+
+    void incrementLookupCounters(OpDebug& debug) {
+        if (debug.pipelineUsesLookup) {
+            totalLookup.increment();
+        }
+        nestedLoopJoin.increment(debug.nestedLoopJoin);
+        indexedLoopJoin.increment(debug.indexedLoopJoin);
+        hashLookup.increment(debug.hashLookup);
+        hashLookupSpillToDisk.increment(debug.hashLookupSpillToDisk);
+    }
+
+    // Counter tracking pipelines that have a lookup stage regardless of the engine used.
+    CounterMetric totalLookup{"query.lookup.pipelineTotalCount"};
+    // Counters for lookup join strategies.
+    CounterMetric nestedLoopJoin{"query.lookup.slotBasedExecutionCounters.nestedLoopJoin"};
+    CounterMetric indexedLoopJoin{"query.lookup.slotBasedExecutionCounters.indexedLoopJoin"};
+    CounterMetric hashLookup{"query.lookup.slotBasedExecutionCounters.hashLookup"};
+    // Counter tracking hashLookup spills in lookup stages that get pushed down.
+    CounterMetric hashLookupSpillToDisk{
+        "query.lookup.slotBasedExecutionCounters.hashLookupSpillToDisk"};
+};
+extern LookupPushdownCounters lookupPushdownCounters;
+
 /**
  * Generic class for counters of expressions inside various MQL statements.
  */
