@@ -29,12 +29,28 @@
 
 #pragma once
 
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
+
+/**
+ * Acquires the config db lock in IX mode and the collection lock for config.rangeDeletions in X
+ * mode.
+ */
+class ScopedRangeDeleterLock {
+public:
+    ScopedRangeDeleterLock(OperationContext* opCtx);
+    ScopedRangeDeleterLock(OperationContext* opCtx, const UUID& collectionUuid);
+
+private:
+    Lock::DBLock _configLock;
+    Lock::CollectionLock _rangeDeletionLock;
+    boost::optional<Lock::ResourceLock> _collectionUuidLock;
+};
 
 /**
  * The BalancerStatsRegistry is used to cache metadata on shards, such as the orphan documents
@@ -77,6 +93,13 @@ public:
     void onRangeDeletionTaskDeletion(const UUID& collectionUUID, long long numOrphanDocs);
 
     long long getCollNumOrphanDocs(const UUID& collectionUUID) const;
+
+    /**
+     * Retrieves the numOrphanDocs from the balancer stats registry if initialized or runs an
+     * aggregation on disk if not.
+     */
+    long long getCollNumOrphanDocsFromDiskIfNeeded(OperationContext* opCtx,
+                                                   const UUID& collectionUUID) const;
 
 private:
     void onInitialDataAvailable(OperationContext* opCtx,

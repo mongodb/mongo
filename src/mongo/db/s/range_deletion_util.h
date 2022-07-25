@@ -40,21 +40,6 @@
 namespace mongo {
 
 /**
- * Acquires the config db lock in IX mode and the collection lock for config.rangeDeletions in X
- * mode.
- */
-class ScopedRangeDeleterLock {
-public:
-    ScopedRangeDeleterLock(OperationContext* opCtx);
-    ScopedRangeDeleterLock(OperationContext* opCtx, const UUID& collectionUuid);
-
-private:
-    Lock::DBLock _configLock;
-    Lock::CollectionLock _rangeDeletionLock;
-    boost::optional<Lock::ResourceLock> _collectionUuidLock;
-};
-
-/**
  * Deletes a range of orphaned documents for the given namespace and collection UUID. Returns a
  * future which will be resolved when the range has finished being deleted. The resulting future
  * will contain an error in cases where the range could not be deleted successfully.

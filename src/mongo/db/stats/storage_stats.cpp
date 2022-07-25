@@ -36,10 +36,9 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"  // TODO (SERVER-64162) remove
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"  // TODO (SERVER-64162) remove
+#include "mongo/db/s/balancer_stats_registry.h"
 #include "mongo/db/timeseries/bucket_catalog.h"
 #include "mongo/db/timeseries/timeseries_stats.h"
 #include "mongo/logv2/log.h"
@@ -48,36 +47,6 @@
 #include "mongo/db/stats/storage_stats.h"
 
 namespace mongo {
-
-namespace {
-long long countOrphanDocsForCollection(OperationContext* opCtx, const UUID& uuid) {
-    // TODO (SERVER-64162): move this function to range_deletion_util.cpp and replace
-    // "collectionUuid" and "numOrphanDocs" with RangeDeletionTask field names.
-    DBDirectClient client(opCtx);
-    std::vector<BSONObj> pipeline;
-    pipeline.push_back(BSON("$match" << BSON("collectionUuid" << uuid)));
-    pipeline.push_back(BSON("$group" << BSON("_id"
-                                             << "numOrphans"
-                                             << "count"
-                                             << BSON("$sum"
-                                                     << "$numOrphanDocs"))));
-    AggregateCommandRequest aggRequest(NamespaceString::kRangeDeletionNamespace, pipeline);
-    auto swCursor = DBClientCursor::fromAggregationRequest(
-        &client, aggRequest, false /* secondaryOk */, true /* useExhaust */);
-    if (!swCursor.isOK()) {
-        return 0;
-    }
-    auto cursor = std::move(swCursor.getValue());
-    if (!cursor->more()) {
-        return 0;
-    }
-    auto res = cursor->nextSafe();
-    invariant(!cursor->more());
-    auto numOrphans = res.getField("count");
-    invariant(numOrphans);
-    return numOrphans.exactNumberLong();
-}
-}  // namespace
 
 Status appendCollectionStorageStats(OperationContext* opCtx,
                                     const NamespaceString& nss,
@@ -145,8 +114,10 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
 
     if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         feature_flags::gOrphanTracking.isEnabled(serverGlobalParams.featureCompatibility)) {
-        result->appendNumber(kOrphanCountField,
-                             countOrphanDocsForCollection(opCtx, collection->uuid()));
+        result->appendNumber(
+            kOrphanCountField,
+            BalancerStatsRegistry::get(opCtx)->getCollNumOrphanDocsFromDiskIfNeeded(
+                opCtx, collection->uuid()));
     }
 
     const RecordStore* recordStore = collection->getRecordStore();
