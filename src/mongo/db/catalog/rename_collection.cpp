@@ -274,6 +274,12 @@ Status renameCollectionAndDropTarget(OperationContext* opCtx,
         // Target collection exists - drop it.
         invariant(options.dropTarget);
 
+        // Check for index builds on the target collection before dropping any indexes or the
+        // collection.
+        BackgroundOperation::assertNoBgOpInProgForNs(targetColl->ns().ns());
+        IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
+            targetColl->uuid().get());
+
         // If this rename collection is replicated, check for long index names in the target
         // collection that may exceed the MMAPv1 namespace limit when the target collection
         // is renamed with a drop-pending namespace.
@@ -304,10 +310,6 @@ Status renameCollectionAndDropTarget(OperationContext* opCtx,
 
         // No logOp necessary because the entire renameCollection command is one logOp.
         repl::UnreplicatedWritesBlock uwb(opCtx);
-
-        BackgroundOperation::assertNoBgOpInProgForNs(targetColl->ns().ns());
-        IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
-            targetColl->uuid().get());
 
         auto status = db->dropCollection(opCtx, targetColl->ns(), renameOpTime);
         if (!status.isOK())
