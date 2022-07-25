@@ -12,6 +12,7 @@
 load("jstests/libs/api_version_helpers.js");  // For 'APIVersionHelpers'.
 
 const collName = "api_version_new_51_language_features";
+const viewName = collName + "_view";
 const coll = db[collName];
 coll.drop();
 assert.commandWorked(coll.insert({a: 1, date: new ISODate()}));
@@ -26,7 +27,7 @@ for (let pipeline of stablePipelines) {
     APIVersionHelpers.assertAggregateSucceedsWithAPIStrict(pipeline, collName);
 
     // Assert error thrown when creating a view on a pipeline with stages not in API Version 1.
-    APIVersionHelpers.assertViewSucceedsWithAPIStrict(pipeline, collName);
+    APIVersionHelpers.assertViewSucceedsWithAPIStrict(pipeline, viewName, collName);
 
     // Assert error is not thrown when running without apiStrict=true.
     assert.commandWorked(db.runCommand({
