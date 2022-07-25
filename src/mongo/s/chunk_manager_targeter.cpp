@@ -308,8 +308,8 @@ BSONObj ChunkManagerTargeter::extractBucketsShardKeyFromTimeseriesDoc(
             str::stream() << "'" << timeField
                           << "' must be present and contain a valid BSON UTC datetime value",
             !timeElement.eoo() && timeElement.type() == BSONType::Date);
-    auto roundedTimeValue = timeseries::roundTimestampToGranularity(
-        timeElement.date(), timeseriesOptions.getGranularity());
+    auto roundedTimeValue =
+        timeseries::roundTimestampToGranularity(timeElement.date(), timeseriesOptions);
     {
         BSONObjBuilder controlBuilder{builder.subobjStart(timeseries::kBucketControlFieldName)};
         {

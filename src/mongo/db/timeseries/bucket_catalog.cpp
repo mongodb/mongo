@@ -169,7 +169,7 @@ std::pair<OID, Date_t> generateBucketId(const Date_t& time, const TimeseriesOpti
     // time. The second, and more important reason, is so that we reliably group measurements
     // together into predictable chunks for sharding. This way we know from a measurement timestamp
     // what the bucket timestamp will be, so we can route measurements to the right shard chunk.
-    auto roundedTime = timeseries::roundTimestampToGranularity(time, options.getGranularity());
+    auto roundedTime = timeseries::roundTimestampToGranularity(time, options);
     int64_t const roundedSeconds = durationCount<Seconds>(roundedTime.toDurationSinceEpoch());
     bucketId.setTimestamp(roundedSeconds);
 

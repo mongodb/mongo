@@ -57,8 +57,13 @@ BSONObj generateViewPipeline(const TimeseriesOptions& options, bool asArray);
 bool optionsAreEqual(const TimeseriesOptions& option1, const TimeseriesOptions& option2);
 
 /**
+ * Returns the number of seconds used to round down the bucket ID and control.min timestamp.
+ */
+int getBucketRoundingSecondsFromGranularity(BucketGranularityEnum granularity);
+
+/**
  * Rounds down timestamp to the specified granularity.
  */
-Date_t roundTimestampToGranularity(const Date_t& time, BucketGranularityEnum granularity);
+Date_t roundTimestampToGranularity(const Date_t& time, const TimeseriesOptions& options);
 }  // namespace timeseries
 }  // namespace mongo

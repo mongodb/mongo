@@ -229,9 +229,6 @@ Status _validateTimeseriesMinMax(const BSONObj& recordBson, const CollectionPtr&
                 dataFields.size()));
     };
 
-    // Used when checking min timestamp, which is rounded down by granularity.
-    auto granularity = coll->getTimeseriesOptions()->getGranularity();
-
     // Validates that the 'control.min' and 'control.max' field values agree with 'data' field
     // values.
     for (auto fieldName : dataFields) {
@@ -250,10 +247,12 @@ Status _validateTimeseriesMinMax(const BSONObj& recordBson, const CollectionPtr&
         // Checks whether the min and max values between 'control' and 'data' match, taking
         // timestamp granularity into account.
         auto checkMinAndMaxMatch = [&]() {
-            if (fieldName == coll->getTimeseriesOptions()->getTimeField()) {
+            // Needed for granularity, which determines how the min timestamp is rounded down .
+            const auto options = coll->getTimeseriesOptions().get();
+            if (fieldName == options.getTimeField()) {
                 return controlFieldMin.Date() ==
                     timeseries::roundTimestampToGranularity(min.getField(fieldName).Date(),
-                                                            granularity) &&
+                                                            options) &&
                     controlFieldMax.Date() == max.getField(fieldName).Date();
             } else {
                 return controlFieldMin.wrap().woCompare(min) == 0 &&

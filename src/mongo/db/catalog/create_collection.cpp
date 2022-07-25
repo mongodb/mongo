@@ -257,9 +257,24 @@ Status _createTimeseries(OperationContext* opCtx,
 
     CollectionOptions options = optionsArg;
 
-    // Users may not pass a 'bucketMaxSpanSeconds' other than the default. Instead they should rely
-    // on the default behavior from the 'granularity'.
+    // TODO (SERVER-67598) Modify this comment as it will be out of date.
+    // Users may not pass a 'bucketMaxSpanSeconds' or 'bucketRoundingSeconds' other than the
+    // default. Instead they should rely on the default behavior from the 'granularity'.
     auto granularity = options.timeseries->getGranularity();
+    if (feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
+            serverGlobalParams.featureCompatibility) &&
+        options.timeseries->getBucketRoundingSeconds()) {
+        uassert(
+            6759501,
+            "Timeseries 'bucketMaxSpanSeconds' needs to be set alongside 'bucketRoundingSeconds'",
+            options.timeseries->getBucketMaxSpanSeconds());
+
+        auto roundingSeconds = timeseries::getBucketRoundingSecondsFromGranularity(granularity);
+        // TODO (SERVER-67598): add checks for bucketRoundingSeconds (that it divides evenly and is
+        // less than bucketMaxSpanSeconds)
+        options.timeseries->setBucketRoundingSeconds(roundingSeconds);
+    }
+
     auto maxSpanSeconds = timeseries::getMaxSpanSecondsFromGranularity(granularity);
     uassert(5510500,
             fmt::format("Timeseries 'bucketMaxSpanSeconds' is not configurable to a value other "

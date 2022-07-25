@@ -108,6 +108,14 @@ structs:
                 type: BucketGranularity
                 default: Seconds
                 unstable: false
+            bucketRoundingSeconds:
+                description: "Used to determine the minimum time boundary when opening a new bucket 
+                              by rounding the first timestamp down to the next multiple of this 
+                              value. Specified in seconds."
+                type: safeInt
+                optional: true
+                validator: { gte: 1 }
+                unstable: false
             bucketMaxSpanSeconds:
                 description: "The maximum range of time values for a bucket, in seconds"
                 type: safeInt

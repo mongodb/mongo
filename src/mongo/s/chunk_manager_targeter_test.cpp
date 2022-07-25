@@ -376,7 +376,7 @@ TEST(ChunkManagerTargeterTest, ExtractBucketsShardKeyFromTimeseriesDocument) {
     auto dateStatus = dateFromISOString("2021-01-01T00:00:15.555Z");
     ASSERT_OK(dateStatus);
     auto date = dateStatus.getValue();
-    auto roundedDate = timeseries::roundTimestampToGranularity(date, options.getGranularity());
+    auto roundedDate = timeseries::roundTimestampToGranularity(date, options);
 
     auto checkShardKey = [&](const BSONObj& tsShardKeyPattern,
                              const BSONObj& metaValue = BSONObj()) {

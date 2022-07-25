@@ -33,6 +33,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 
 namespace mongo {
@@ -143,10 +144,6 @@ bool optionsAreEqual(const TimeseriesOptions& option1, const TimeseriesOptions& 
         option1BucketSpan == option2BucketSpan;
 }
 
-namespace {
-/**
- * Returns the number of seconds used to round down the bucket ID and control.min timestamp.
- */
 int getBucketRoundingSecondsFromGranularity(BucketGranularityEnum granularity) {
     switch (granularity) {
         case BucketGranularityEnum::Seconds:
@@ -161,10 +158,13 @@ int getBucketRoundingSecondsFromGranularity(BucketGranularityEnum granularity) {
     }
     MONGO_UNREACHABLE;
 }
-}  // namespace
 
-Date_t roundTimestampToGranularity(const Date_t& time, BucketGranularityEnum granularity) {
-    int roundingSeconds = getBucketRoundingSecondsFromGranularity(granularity);
+Date_t roundTimestampToGranularity(const Date_t& time, const TimeseriesOptions& options) {
+    auto roundingSeconds = feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
+                               serverGlobalParams.featureCompatibility) &&
+            options.getBucketRoundingSeconds()
+        ? options.getBucketRoundingSeconds().value()
+        : getBucketRoundingSecondsFromGranularity(options.getGranularity());
     long long timeSeconds = durationCount<Seconds>(time.toDurationSinceEpoch());
     long long roundedTimeSeconds = (timeSeconds - (timeSeconds % roundingSeconds));
     return Date_t::fromDurationSinceEpoch(Seconds{roundedTimeSeconds});

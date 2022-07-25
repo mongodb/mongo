@@ -36,19 +36,31 @@
 
 namespace mongo {
 
+auto createTimeseriesOptionsWithGranularity(BucketGranularityEnum granularity) {
+    auto options = TimeseriesOptions{};
+    options.setGranularity(granularity);
+    return options;
+}
+
 TEST(TimeseriesOptionsTest, RoundTimestampToGranularity) {
-    std::vector<std::tuple<BucketGranularityEnum, std::string, std::string>> testCases{
-        {BucketGranularityEnum::Seconds, "2021-01-01T00:00:15.555Z", "2021-01-01T00:00:00.000Z"},
-        {BucketGranularityEnum::Seconds, "2021-01-01T00:00:30.555Z", "2021-01-01T00:00:00.000Z"},
-        {BucketGranularityEnum::Seconds, "2021-01-01T00:00:45.555Z", "2021-01-01T00:00:00.000Z"},
+    TimeseriesOptions optionsSeconds =
+        createTimeseriesOptionsWithGranularity(BucketGranularityEnum::Seconds);
+    TimeseriesOptions optionsMinutes =
+        createTimeseriesOptionsWithGranularity(BucketGranularityEnum::Minutes);
+    TimeseriesOptions optionsHours =
+        createTimeseriesOptionsWithGranularity(BucketGranularityEnum::Hours);
+    std::vector<std::tuple<TimeseriesOptions, std::string, std::string>> testCases{
+        {optionsSeconds, "2021-01-01T00:00:15.555Z", "2021-01-01T00:00:00.000Z"},
+        {optionsSeconds, "2021-01-01T00:00:30.555Z", "2021-01-01T00:00:00.000Z"},
+        {optionsSeconds, "2021-01-01T00:00:45.555Z", "2021-01-01T00:00:00.000Z"},
 
-        {BucketGranularityEnum::Minutes, "2021-01-01T00:15:00.000Z", "2021-01-01T00:00:00.000Z"},
-        {BucketGranularityEnum::Minutes, "2021-01-01T00:30:00.000Z", "2021-01-01T00:00:00.000Z"},
-        {BucketGranularityEnum::Minutes, "2021-01-01T00:45:00.000Z", "2021-01-01T00:00:00.000Z"},
+        {optionsMinutes, "2021-01-01T00:15:00.000Z", "2021-01-01T00:00:00.000Z"},
+        {optionsMinutes, "2021-01-01T00:30:00.000Z", "2021-01-01T00:00:00.000Z"},
+        {optionsMinutes, "2021-01-01T00:45:00.000Z", "2021-01-01T00:00:00.000Z"},
 
-        {BucketGranularityEnum::Hours, "2021-01-01T06:00:00.000Z", "2021-01-01T00:00:00.000Z"},
-        {BucketGranularityEnum::Hours, "2021-01-01T12:00:00.000Z", "2021-01-01T00:00:00.000Z"},
-        {BucketGranularityEnum::Hours, "2021-01-01T18:00:00.000Z", "2021-01-01T00:00:00.000Z"},
+        {optionsHours, "2021-01-01T06:00:00.000Z", "2021-01-01T00:00:00.000Z"},
+        {optionsHours, "2021-01-01T12:00:00.000Z", "2021-01-01T00:00:00.000Z"},
+        {optionsHours, "2021-01-01T18:00:00.000Z", "2021-01-01T00:00:00.000Z"},
     };
 
     for (const auto& [granularity, input, expectedOutput] : testCases) {
