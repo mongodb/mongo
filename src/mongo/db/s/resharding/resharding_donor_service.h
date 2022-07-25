@@ -33,6 +33,7 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/service_context.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 
 namespace mongo {
@@ -42,7 +43,7 @@ public:
     static constexpr StringData kServiceName = "ReshardingDonorService"_sd;
 
     explicit ReshardingDonorService(ServiceContext* serviceContext)
-        : PrimaryOnlyService(serviceContext) {}
+        : PrimaryOnlyService(serviceContext), _serviceContext(serviceContext) {}
     ~ReshardingDonorService() = default;
 
     class DonorStateMachine;
@@ -66,6 +67,9 @@ public:
         const std::vector<const Instance*>& existingInstances) override {}
 
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override;
+
+private:
+    ServiceContext* _serviceContext;
 };
 
 /**
@@ -77,7 +81,8 @@ class ReshardingDonorService::DonorStateMachine final
 public:
     explicit DonorStateMachine(const ReshardingDonorService* donorService,
                                const ReshardingDonorDocument& donorDoc,
-                               std::unique_ptr<DonorStateMachineExternalState> externalState);
+                               std::unique_ptr<DonorStateMachineExternalState> externalState,
+                               ServiceContext* serviceContext);
 
     ~DonorStateMachine() = default;
 
@@ -219,6 +224,8 @@ private:
 
     // The primary-only service instance corresponding to the donor instance. Not owned.
     const ReshardingDonorService* const _donorService;
+
+    ServiceContext* const _serviceContext;
 
     std::unique_ptr<ReshardingMetrics> _metrics;
 

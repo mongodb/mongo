@@ -47,6 +47,7 @@
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
 #include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
 #include "mongo/db/s/resharding/resharding_service_test_helpers.h"
+#include "mongo/db/service_context.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
@@ -196,7 +197,7 @@ public:
 class ReshardingRecipientServiceForTest : public ReshardingRecipientService {
 public:
     explicit ReshardingRecipientServiceForTest(ServiceContext* serviceContext)
-        : ReshardingRecipientService(serviceContext) {}
+        : ReshardingRecipientService(serviceContext), _serviceContext(serviceContext) {}
 
     std::shared_ptr<repl::PrimaryOnlyService::Instance> constructInstance(
         BSONObj initialState) override {
@@ -204,8 +205,12 @@ public:
             this,
             ReshardingRecipientDocument::parse({"ReshardingRecipientServiceForTest"}, initialState),
             std::make_unique<ExternalStateForTest>(),
-            [](auto...) { return std::make_unique<DataReplicationForTest>(); });
+            [](auto...) { return std::make_unique<DataReplicationForTest>(); },
+            _serviceContext);
     }
+
+private:
+    ServiceContext* _serviceContext;
 };
 
 /**

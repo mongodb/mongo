@@ -36,6 +36,7 @@
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/service_context.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
@@ -46,7 +47,7 @@ public:
     static constexpr StringData kServiceName = "ReshardingRecipientService"_sd;
 
     explicit ReshardingRecipientService(ServiceContext* serviceContext)
-        : PrimaryOnlyService(serviceContext) {}
+        : PrimaryOnlyService(serviceContext), _serviceContext(serviceContext) {}
     ~ReshardingRecipientService() = default;
 
     class RecipientStateMachine;
@@ -76,6 +77,9 @@ public:
         OperationContext* opCtx) {
         return getAllInstances(opCtx);
     }
+
+private:
+    ServiceContext* _serviceContext;
 };
 
 /**
@@ -108,7 +112,8 @@ public:
         const ReshardingRecipientService* recipientService,
         const ReshardingRecipientDocument& recipientDoc,
         std::unique_ptr<RecipientStateMachineExternalState> externalState,
-        ReshardingDataReplicationFactory dataReplicationFactory);
+        ReshardingDataReplicationFactory dataReplicationFactory,
+        ServiceContext* serviceContext);
 
     ~RecipientStateMachine() = default;
 
@@ -290,6 +295,8 @@ private:
 
     // The primary-only service instance corresponding to the recipient instance. Not owned.
     const ReshardingRecipientService* const _recipientService;
+
+    ServiceContext* _serviceContext;
 
     std::unique_ptr<ReshardingMetrics> _metrics;
     ReshardingApplierMetricsMap _applierMetricsMap;

@@ -731,7 +731,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_createAndConnectCli
                        auto majoritySnapshotOpTime = _getDonorMajorityOpTime(client);
                        if (majoritySnapshotOpTime.getTimestamp() < startMigrationDonorTimestamp) {
                            stdx::lock_guard lk(_mutex);
-                           const auto now = getGlobalServiceContext()->getFastClockSource()->now();
+                           const auto now = _serviceContext->getFastClockSource()->now();
                            _excludeDonorHost(
                                lk,
                                serverAddress,
@@ -747,7 +747,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_createAndConnectCli
                        }
                        if (startApplyingOpTime && majoritySnapshotOpTime < *startApplyingOpTime) {
                            stdx::lock_guard lk(_mutex);
-                           const auto now = getGlobalServiceContext()->getFastClockSource()->now();
+                           const auto now = _serviceContext->getFastClockSource()->now();
                            _excludeDonorHost(
                                lk,
                                serverAddress,
@@ -843,7 +843,7 @@ void TenantMigrationRecipientService::Instance::_excludeDonorHost(WithLock,
 
 std::vector<HostAndPort> TenantMigrationRecipientService::Instance::_getExcludedDonorHosts(
     WithLock lk) {
-    const auto now = getGlobalServiceContext()->getFastClockSource()->now();
+    const auto now = _serviceContext->getFastClockSource()->now();
 
     // Clean up any hosts that have had their exclusion duration expired.
     auto itr = std::remove_if(
@@ -890,7 +890,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_initializeStateDoc(
         invariant(!_stateDoc.getExpireAt());
     }
     // Persist the state doc before starting the data sync.
-    _stateDoc.setStartAt(getGlobalServiceContext()->getFastClockSource()->now());
+    _stateDoc.setStartAt(_serviceContext->getFastClockSource()->now());
 
     return ExecutorFuture(**_scopedExecutor)
         .then([this, self = shared_from_this(), stateDoc = _stateDoc] {
@@ -1700,7 +1700,7 @@ void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
                     "tenantId"_attr = getTenantId(),
                     "donorMajorityOpTime"_attr = donorMajorityOpTime,
                     "startFetchOpTime"_attr = startFetchOpTime);
-        const auto now = getGlobalServiceContext()->getFastClockSource()->now();
+        const auto now = _serviceContext->getFastClockSource()->now();
 
         stdx::lock_guard lk(_mutex);
         _excludeDonorHost(lk,
@@ -1835,7 +1835,7 @@ void TenantMigrationRecipientService::Instance::_oplogFetcherCallback(Status opl
                         "error"_attr = oplogFetcherStatus);
 
             stdx::lock_guard lk(_mutex);
-            const auto now = getGlobalServiceContext()->getFastClockSource()->now();
+            const auto now = _serviceContext->getFastClockSource()->now();
             _excludeDonorHost(lk,
                               _client->getServerHostAndPort(),
                               now + Milliseconds(tenantMigrationExcludeDonorHostTimeoutMS));
@@ -2153,7 +2153,7 @@ void TenantMigrationRecipientService::Instance::onMemberImportedFiles(
     _membersWhoHaveImportedFiles.insert(host);
     // Not reconfig-safe, we must not do a reconfig concurrent with a migration.
     if (static_cast<int>(_membersWhoHaveImportedFiles.size()) ==
-        repl::ReplicationCoordinator::get(getGlobalServiceContext())
+        repl::ReplicationCoordinator::get(_serviceContext)
             ->getConfig()
             .getNumDataBearingMembers()) {
         LOGV2_INFO(6112809,
@@ -2182,7 +2182,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_markStateDocAsGarba
     }
 
     _stateDoc.setState(TenantMigrationRecipientStateEnum::kDone);
-    _stateDoc.setExpireAt(getGlobalServiceContext()->getFastClockSource()->now() +
+    _stateDoc.setExpireAt(_serviceContext->getFastClockSource()->now() +
                           Milliseconds{repl::tenantMigrationGarbageCollectionDelayMS.load()});
 
     return ExecutorFuture(**_scopedExecutor)
@@ -2555,7 +2555,7 @@ void TenantMigrationRecipientService::Instance::_setup() {
         }();
 
         _sharedData = std::make_unique<TenantMigrationSharedData>(
-            getGlobalServiceContext()->getFastClockSource(), getMigrationUUID(), resumePhase);
+            _serviceContext->getFastClockSource(), getMigrationUUID(), resumePhase);
 
         _createOplogBuffer(lk, opCtx);
     }

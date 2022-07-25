@@ -982,7 +982,8 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingCoordinatorService
         this,
         ReshardingCoordinatorDocument::parse(IDLParserErrorContext("ReshardingCoordinatorStateDoc"),
                                              std::move(initialState)),
-        std::make_shared<ReshardingCoordinatorExternalStateImpl>());
+        std::make_shared<ReshardingCoordinatorExternalStateImpl>(),
+        _serviceContext);
 }
 
 ExecutorFuture<void> ReshardingCoordinatorService::_rebuildService(
@@ -1028,11 +1029,13 @@ void ReshardingCoordinatorService::abortAllReshardCollection(OperationContext* o
 ReshardingCoordinatorService::ReshardingCoordinator::ReshardingCoordinator(
     const ReshardingCoordinatorService* coordinatorService,
     const ReshardingCoordinatorDocument& coordinatorDoc,
-    std::shared_ptr<ReshardingCoordinatorExternalState> externalState)
+    std::shared_ptr<ReshardingCoordinatorExternalState> externalState,
+    ServiceContext* serviceContext)
     : PrimaryOnlyService::TypedInstance<ReshardingCoordinator>(),
       _id(coordinatorDoc.getReshardingUUID().toBSON()),
       _coordinatorService(coordinatorService),
-      _metrics{ReshardingMetrics::initializeFrom(coordinatorDoc, getGlobalServiceContext())},
+      _serviceContext(serviceContext),
+      _metrics{ReshardingMetrics::initializeFrom(coordinatorDoc, _serviceContext)},
       _metadata(coordinatorDoc.getCommonReshardingMetadata()),
       _coordinatorDoc(coordinatorDoc),
       _markKilledExecutor(std::make_shared<ThreadPool>([] {

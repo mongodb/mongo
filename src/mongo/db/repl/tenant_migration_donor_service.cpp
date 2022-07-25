@@ -1194,7 +1194,7 @@ TenantMigrationDonorService::Instance::_waitUntilStartMigrationDonorTimestampIsC
            })
         .until([this, self = shared_from_this(), startMigrationDonorTimestamp](Status status) {
             uassertStatusOK(status);
-            auto storageEngine = getGlobalServiceContext()->getStorageEngine();
+            auto storageEngine = _serviceContext->getStorageEngine();
             if (storageEngine->getLastStableRecoveryTimestamp() < startMigrationDonorTimestamp) {
                 return false;
             }

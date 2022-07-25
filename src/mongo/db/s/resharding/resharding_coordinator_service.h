@@ -34,6 +34,7 @@
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_observer.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
+#include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
@@ -195,7 +196,7 @@ public:
     static constexpr StringData kServiceName = "ReshardingCoordinatorService"_sd;
 
     explicit ReshardingCoordinatorService(ServiceContext* serviceContext)
-        : PrimaryOnlyService(serviceContext) {}
+        : PrimaryOnlyService(serviceContext), _serviceContext(serviceContext) {}
     ~ReshardingCoordinatorService() = default;
 
     class ReshardingCoordinator;
@@ -234,6 +235,8 @@ public:
 private:
     ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                          const CancellationToken& token) override;
+
+    ServiceContext* _serviceContext;
 };
 
 class ReshardingCoordinatorService::ReshardingCoordinator final
@@ -242,7 +245,8 @@ public:
     explicit ReshardingCoordinator(
         const ReshardingCoordinatorService* coordinatorService,
         const ReshardingCoordinatorDocument& coordinatorDoc,
-        std::shared_ptr<ReshardingCoordinatorExternalState> externalState);
+        std::shared_ptr<ReshardingCoordinatorExternalState> externalState,
+        ServiceContext* serviceContext);
     ~ReshardingCoordinator() = default;
 
     SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -514,6 +518,8 @@ private:
 
     // The primary-only service instance corresponding to the coordinator instance. Not owned.
     const ReshardingCoordinatorService* const _coordinatorService;
+
+    ServiceContext* _serviceContext;
 
     std::shared_ptr<ReshardingMetrics> _metrics;
 

@@ -51,6 +51,7 @@
 #include "mongo/db/s/resharding/resharding_donor_service.h"
 #include "mongo/db/s/resharding/resharding_service_test_helpers.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/unittest/death_test.h"
@@ -104,14 +105,18 @@ public:
 class ReshardingDonorServiceForTest : public ReshardingDonorService {
 public:
     explicit ReshardingDonorServiceForTest(ServiceContext* serviceContext)
-        : ReshardingDonorService(serviceContext) {}
+        : ReshardingDonorService(serviceContext), _serviceContext(serviceContext) {}
 
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override {
         return std::make_shared<DonorStateMachine>(
             this,
             ReshardingDonorDocument::parse({"ReshardingDonorServiceForTest"}, initialState),
-            std::make_unique<ExternalStateForTest>());
+            std::make_unique<ExternalStateForTest>(),
+            _serviceContext);
     }
+
+private:
+    ServiceContext* _serviceContext;
 };
 
 class ReshardingDonorServiceTest : public repl::PrimaryOnlyServiceMongoDTest {

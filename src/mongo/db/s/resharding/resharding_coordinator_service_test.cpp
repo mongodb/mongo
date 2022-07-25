@@ -44,6 +44,7 @@
 #include "mongo/db/s/resharding/resharding_service_test_helpers.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
@@ -110,15 +111,19 @@ class ExternalStateForTest : public ReshardingCoordinatorExternalState {
 class ReshardingCoordinatorServiceForTest : public ReshardingCoordinatorService {
 public:
     explicit ReshardingCoordinatorServiceForTest(ServiceContext* serviceContext)
-        : ReshardingCoordinatorService(serviceContext) {}
+        : ReshardingCoordinatorService(serviceContext), _serviceContext(serviceContext) {}
 
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override {
         return std::make_shared<ReshardingCoordinator>(
             this,
             ReshardingCoordinatorDocument::parse(
                 IDLParserErrorContext("ReshardingCoordinatorStateDoc"), std::move(initialState)),
-            std::make_shared<ExternalStateForTest>());
+            std::make_shared<ExternalStateForTest>(),
+            _serviceContext);
     }
+
+private:
+    ServiceContext* _serviceContext;
 };
 
 class ReshardingCoordinatorServiceTest : public ConfigServerTestFixture {

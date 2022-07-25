@@ -204,16 +204,19 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingDonorService::cons
     return std::make_shared<DonorStateMachine>(
         this,
         ReshardingDonorDocument::parse({"DonorStateMachine"}, initialState),
-        std::make_unique<ExternalStateImpl>());
+        std::make_unique<ExternalStateImpl>(),
+        _serviceContext);
 }
 
 ReshardingDonorService::DonorStateMachine::DonorStateMachine(
     const ReshardingDonorService* donorService,
     const ReshardingDonorDocument& donorDoc,
-    std::unique_ptr<DonorStateMachineExternalState> externalState)
+    std::unique_ptr<DonorStateMachineExternalState> externalState,
+    ServiceContext* serviceContext)
     : repl::PrimaryOnlyService::TypedInstance<DonorStateMachine>(),
       _donorService(donorService),
-      _metrics{ReshardingMetrics::initializeFrom(donorDoc, getGlobalServiceContext())},
+      _serviceContext(serviceContext),
+      _metrics{ReshardingMetrics::initializeFrom(donorDoc, _serviceContext)},
       _metadata{donorDoc.getCommonReshardingMetadata()},
       _recipientShardIds{donorDoc.getRecipientShards()},
       _donorCtx{donorDoc.getMutableState()},
@@ -231,7 +234,7 @@ ReshardingDonorService::DonorStateMachine::DonorStateMachine(
                           << "resharding_donor"
                           << "collection" << _metadata.getSourceNss().toString())),
       _isAlsoRecipient([&] {
-          auto myShardId = _externalState->myShardId(getGlobalServiceContext());
+          auto myShardId = _externalState->myShardId(_serviceContext);
           return std::find(_recipientShardIds.begin(), _recipientShardIds.end(), myShardId) !=
               _recipientShardIds.end();
       }()) {
