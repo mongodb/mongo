@@ -97,6 +97,11 @@ void CollModCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const
     cmdInfoBuilder->appendElements(_request.toBSON());
 };
 
+// TODO SERVER-68008 Remove once 7.0 becomes last LTS
+bool CollModCoordinator::_isPre61Compatible() const {
+    return operationType() == DDLCoordinatorTypeEnum::kCollModPre61Compatible;
+}
+
 void CollModCoordinator::_performNoopRetryableWriteOnParticipants(
     OperationContext* opCtx, const std::shared_ptr<executor::TaskExecutor>& executor) {
     auto shardsAndConfigsvr = [&] {
@@ -174,6 +179,26 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                             *_request.getTimeseries()->getGranularity()));
             }
         })
+        .then([this, executor = executor, anchor = shared_from_this()] {
+            if (_isPre61Compatible()) {
+                return;
+            }
+            _executePhase(
+                Phase::kFreezeMigrations, [this, executor = executor, anchor = shared_from_this()] {
+                    auto opCtxHolder = cc().makeOperationContext();
+                    auto* opCtx = opCtxHolder.get();
+                    getForwardableOpMetadata().setOn(opCtx);
+
+                    _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
+
+                    if (_collInfo->isSharded) {
+                        _doc.setCollUUID(
+                            sharding_ddl_util::getCollectionUUID(opCtx, _collInfo->nsForTargeting));
+                        sharding_ddl_util::stopMigrations(
+                            opCtx, _collInfo->nsForTargeting, _doc.getCollUUID());
+                    }
+                });
+        })
         .then(_executePhase(
             Phase::kBlockShards,
             [this, executor = executor, anchor = shared_from_this()] {
@@ -185,10 +210,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
 
                 _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
 
-                if (_collInfo->isSharded) {
-                    // TODO SERVER-67686 use the translated namespace `_collInfo->nsForTargeting`
-                    // here so that in case of timeseries collection we block migrations on the
-                    // bucket namespace and not the timeseries view namespace `originalNss()`
+                if (_isPre61Compatible() && _collInfo->isSharded) {
                     _doc.setCollUUID(sharding_ddl_util::getCollectionUUID(
                         opCtx, originalNss(), true /* allowViews */));
                     sharding_ddl_util::stopMigrations(opCtx, originalNss(), _doc.getCollUUID());
@@ -290,7 +312,10 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                         CommandHelpers::appendSimpleCommandStatus(builder, ok, errmsg);
                     }
                     _result = builder.obj();
-                    sharding_ddl_util::resumeMigrations(opCtx, originalNss(), _doc.getCollUUID());
+                    sharding_ddl_util::resumeMigrations(
+                        opCtx,
+                        _isPre61Compatible() ? originalNss() : _collInfo->nsForTargeting,
+                        _doc.getCollUUID());
                 } else {
                     CollMod cmd(originalNss());
                     cmd.setCollModRequest(_request);
@@ -325,10 +350,10 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                     auto* opCtx = opCtxHolder.get();
                     getForwardableOpMetadata().setOn(opCtx);
 
-                    // TODO SERVER-67686 use the translated namespace `_collInfo->nsForTargeting`
-                    // here so that in case of timeseries collection we unblock migrations on the
-                    // bucket namespace and not the timeseries view namespace `originalNss()`
-                    sharding_ddl_util::resumeMigrations(opCtx, originalNss(), _doc.getCollUUID());
+                    sharding_ddl_util::resumeMigrations(
+                        opCtx,
+                        _isPre61Compatible() ? originalNss() : _collInfo->nsForTargeting,
+                        _doc.getCollUUID());
                 }
             }
             return status;

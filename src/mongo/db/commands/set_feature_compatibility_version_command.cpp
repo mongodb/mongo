@@ -350,6 +350,15 @@ public:
             if (request.getPhase() == SetFCVPhaseEnum::kStart) {
                 invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
+                // TODO SERVER-68008: Remove collMod draining mechanism after 7.0 becomes last LTS.
+                if (actualVersion > requestedVersion &&
+                    !feature_flags::gCollModCoordinatorV3.isEnabledOnVersion(requestedVersion)) {
+                    // Drain all running collMod v3 coordinator because they produce backward
+                    // incompatible on disk metadata
+                    ShardingDDLCoordinatorService::getService(opCtx)
+                        ->waitForCoordinatorsOfGivenTypeToComplete(
+                            opCtx, DDLCoordinatorTypeEnum::kCollMod);
+                }
                 // If we are only running phase-1, then we are done
                 return true;
             }

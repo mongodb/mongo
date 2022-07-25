@@ -55,3 +55,8 @@ feature_flags:
     description: "Feature flag protecting instantiation and usages of the range deleter service"
     cpp_varname: feature_flags::gRangeDeleterService
     default: false
+  featureFlagCollModCoordinatorV3:
+    description: "Feature for enabling new coll mod coordinator v3"
+    cpp_varname: feature_flags::gCollModCoordinatorV3
+    default: true
+    version: 6.1

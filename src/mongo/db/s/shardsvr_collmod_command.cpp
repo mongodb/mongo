@@ -33,12 +33,14 @@
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/coll_mod_reply_validation.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/s/collmod_coordinator.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -102,13 +104,23 @@ public:
         CurOp::get(opCtx)->raiseDbProfileLevel(
             CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(cmd.getNamespace().dbName()));
 
-        auto coordinatorDoc = CollModCoordinatorDocument();
-        coordinatorDoc.setCollModRequest(cmd.getCollModRequest());
-        coordinatorDoc.setShardingDDLCoordinatorMetadata(
-            {{cmd.getNamespace(), DDLCoordinatorTypeEnum::kCollMod}});
-        auto service = ShardingDDLCoordinatorService::getService(opCtx);
-        auto collModCoordinator = checked_pointer_cast<CollModCoordinator>(
-            service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+        auto collModCoordinator = [&] {
+            FixedFCVRegion fcvRegion(opCtx);
+            auto coordinatorType = DDLCoordinatorTypeEnum::kCollMod;
+            if (!feature_flags::gCollModCoordinatorV3.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                // TODO SERVER-68008 Remove once 7.0 becomes last LTS
+                coordinatorType = DDLCoordinatorTypeEnum::kCollModPre61Compatible;
+            }
+            auto coordinatorDoc = CollModCoordinatorDocument();
+            coordinatorDoc.setCollModRequest(cmd.getCollModRequest());
+            coordinatorDoc.setShardingDDLCoordinatorMetadata(
+                {{cmd.getNamespace(), coordinatorType}});
+            auto service = ShardingDDLCoordinatorService::getService(opCtx);
+            return checked_pointer_cast<CollModCoordinator>(
+                service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+        }();
+
         result.appendElements(collModCoordinator->getResult(opCtx));
         return true;
     }

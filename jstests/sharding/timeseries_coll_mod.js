@@ -74,6 +74,7 @@ function runBasicTest() {
     assert.eq(getGranularity(), 'minutes');
     assert.commandWorked(db.runCommand({collMod: collName, timeseries: {granularity: 'hours'}}));
     assert.eq(getGranularity(), 'hours');
+    assert.eq(0, st.config.collections.countDocuments({allowMigrations: {$exists: true}}));
     st.stop();
 }
 
@@ -155,6 +156,7 @@ function runReadAfterWriteTest() {
     // Assert that we can use 'hours' granularity and find both documents through mongos1.
     assert.eq(mongos1.getDB(dbName).getCollection(collName).countDocuments({[timeField]: time}), 2);
 
+    assert.eq(0, st.config.collections.countDocuments({allowMigrations: {$exists: true}}));
     st.stop();
 }
 

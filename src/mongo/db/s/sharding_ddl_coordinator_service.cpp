@@ -88,6 +88,8 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
                                                                    std::move(initialState));
             break;
         case DDLCoordinatorTypeEnum::kCollMod:
+        case DDLCoordinatorTypeEnum::kCollModPre61Compatible:  // TODO SERVER-68008 Remove once 7.0
+                                                               // becomes last LTS
             return std::make_shared<CollModCoordinator>(service, std::move(initialState));
             break;
         case DDLCoordinatorTypeEnum::kReshardCollection:

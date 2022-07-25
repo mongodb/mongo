@@ -46,6 +46,7 @@ enums:
         type: string
         values:
             kUnset: "unset"
+            kFreezeMigrations: "FreezeMigrations"
             kBlockShards: "BlockShards"
             kUpdateConfig: "UpdateConfig"
             kUpdateShards: "UpdateShards"
