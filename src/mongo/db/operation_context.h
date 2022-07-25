@@ -607,6 +607,20 @@ public:
         return !getServiceContext()->userWritesAllowed();
     }
 
+    /**
+     * Sets whether this operation was started by a compressed command.
+     */
+    void setOpCompressed(bool opCompressed) {
+        _opCompressed = opCompressed;
+    }
+
+    /**
+     * Returns whether this operation was started by a compressed command.
+     */
+    bool isOpCompressed() const {
+        return _opCompressed;
+    }
+
 private:
     StatusWith<stdx::cv_status> waitForConditionOrInterruptNoAssertUntil(
         stdx::condition_variable& cv, BasicLockableAdapter m, Date_t deadline) noexcept override;
@@ -790,6 +804,9 @@ private:
 
     // Whether this operation is an exhaust command.
     bool _exhaust = false;
+
+    // Whether this operation was started by a compressed command.
+    bool _opCompressed = false;
 };
 
 // Gets a TimeZoneDatabase pointer from the ServiceContext.

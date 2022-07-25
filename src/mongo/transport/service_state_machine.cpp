@@ -325,6 +325,9 @@ Future<void> ServiceStateMachine::Impl::processMessage() {
     if (_inExhaust) {
         _opCtx->markKillOnClientDisconnect();
     }
+    if (_inMessage.operation() == dbCompressed) {
+        _opCtx->setOpCompressed(true);
+    }
 
     // The handleRequest is implemented in a subclass for mongod/mongos and actually all the
     // database work for this request.
