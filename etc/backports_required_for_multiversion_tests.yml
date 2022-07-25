@@ -232,6 +232,8 @@ last-continuous:
       test_file: jstests/core/clustered_collection_creation.js
     - ticket: SERVER-63255
       test_file: jstests/core/dbstats.js
+    - ticket: SERVER-67532
+      test_file: jstests/replsets/optime.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -599,6 +601,8 @@ last-lts:
       test_file: jstests/core/clustered_collection_creation.js
     - ticket: SERVER-63255
       test_file: jstests/core/dbstats.js
+    - ticket: SERVER-67532
+      test_file: jstests/replsets/optime.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
