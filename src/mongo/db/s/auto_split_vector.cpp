@@ -52,7 +52,16 @@
 namespace mongo {
 namespace {
 
-constexpr int estimatedAdditionalBytesPerItemInBSONArray{2};
+/*
+ * BSON arrays are serialized as BSON objects with the index of each element as a string key: for
+ * example, the array ["a","b","c"] is going to be serialized as {"0":"a","1":"b","2":"c"}. The
+ * minimum size for a BSON object is `BSONObj::kMinBSONLength`.
+ *
+ * Given that the `vector<BSONObj>` returned by `autoSplitVector` can't be greater than 16MB when
+ * serialized, pessimistically assume that each key occupies the highest possible number of bytes.
+ */
+const int estimatedAdditionalBytesPerItemInBSONArray{
+    (int)std::to_string(BSONObjMaxUserSize / BSONObj::kMinBSONLength).length()};
 
 constexpr int kMaxSplitPointsToReposition{3};
 
