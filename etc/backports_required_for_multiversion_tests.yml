@@ -226,6 +226,10 @@ last-continuous:
       test_file: jstests/sharding/timeseries_multiple_mongos.js
     - ticket: SERVER-66379
       test_file: jstests/core/or_to_in.js
+    - ticket: SERVER-67800
+      test_file: jstests/core/clustered_collection_create_index_clustered.js
+    - ticket: SERVER-67800
+      test_file: jstests/core/clustered_collection_creation.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -587,6 +591,10 @@ last-lts:
       test_file: jstests/sharding/timeseries_multiple_mongos.js
     - ticket: SERVER-66379
       test_file: jstests/core/or_to_in.js
+    - ticket: SERVER-67800
+      test_file: jstests/core/clustered_collection_create_index_clustered.js
+    - ticket: SERVER-67800
+      test_file: jstests/core/clustered_collection_creation.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
