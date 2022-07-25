@@ -137,7 +137,8 @@ Status createIndexFromSpec(OperationContext* opCtx,
                               collection,
                               spec,
                               [opCtx, clock](const std::vector<BSONObj>& specs) -> Status {
-                                  if (opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
+                                  if (opCtx->writesAreReplicated() &&
+                                      opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
                                       return opCtx->recoveryUnit()->setTimestamp(
                                           clock->tickClusterTime(1).asTimestamp());
                                   }
@@ -167,8 +168,10 @@ Status createIndexFromSpec(OperationContext* opCtx,
                              collection.getWritableCollection(opCtx),
                              MultiIndexBlock::kNoopOnCreateEachFn,
                              MultiIndexBlock::kNoopOnCommitFn));
-    LogicalTime indexTs = clock->tickClusterTime(1);
-    ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(indexTs.asTimestamp()));
+    if (opCtx->writesAreReplicated()) {
+        LogicalTime indexTs = clock->tickClusterTime(1);
+        ASSERT_OK(opCtx->recoveryUnit()->setTimestamp(indexTs.asTimestamp()));
+    }
     wunit.commit();
     abortOnExit.dismiss();
     return Status::OK();
@@ -356,7 +359,8 @@ public:
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
             auto db = autoColl.ensureDbExists(_opCtx);
             WriteUnitOfWork wunit(_opCtx);
-            if (_opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
+            if (_opCtx->writesAreReplicated() &&
+                _opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
                 ASSERT_OK(_opCtx->recoveryUnit()->setTimestamp(Timestamp(1, 1)));
             }
             invariant(db->createCollection(_opCtx, nss));
@@ -1666,6 +1670,7 @@ TEST_F(StorageTimestampTest, PrimarySetIndexMultikeyOnInsert) {
 
 TEST_F(StorageTimestampTest, PrimarySetIndexMultikeyOnInsertUnreplicated) {
     // Use an unreplicated collection.
+    repl::UnreplicatedWritesBlock noRep(_opCtx);
     NamespaceString nss("unittests.system.profile");
     create(nss);
 

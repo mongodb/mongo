@@ -127,13 +127,13 @@ using mongo::WiredTigerBeginTxnBlock;
 template <PrepareConflictBehavior behavior, RoundUpPreparedTimestamps round>
 void BM_WiredTigerBeginTxnBlockWithArgs(benchmark::State& state) {
     WiredTigerTestHelper helper;
-    const bool allowUntimestampedWrite = false;
     for (auto _ : state) {
-        WiredTigerBeginTxnBlock beginTxn(helper.wtSession(),
-                                         behavior,
-                                         round,
-                                         RoundUpReadTimestamp::kNoRoundError,
-                                         allowUntimestampedWrite);
+        WiredTigerBeginTxnBlock beginTxn(
+            helper.wtSession(),
+            behavior,
+            round,
+            RoundUpReadTimestamp::kNoRoundError,
+            WiredTigerBeginTxnBlock::UntimestampedWriteAssertion::kEnforce);
     }
 }
 

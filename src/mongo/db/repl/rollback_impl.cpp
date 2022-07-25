@@ -524,6 +524,7 @@ void RollbackImpl::_restoreTxnsTableEntryFromRetryableWrites(OperationContext* o
         }
         const auto nss = NamespaceString::kSessionTransactionsTableNamespace;
         writeConflictRetry(opCtx, "updateSessionTransactionsTableInRollback", nss.ns(), [&] {
+            opCtx->recoveryUnit()->allowUntimestampedWrite();
             AutoGetCollection collection(opCtx, nss, MODE_IX);
             auto filter = BSON(SessionTxnRecord::kSessionIdFieldName << sessionId.toBSON());
             UnreplicatedWritesBlock uwb(opCtx);

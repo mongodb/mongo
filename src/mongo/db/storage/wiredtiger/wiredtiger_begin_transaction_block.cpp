@@ -49,7 +49,7 @@ WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(
     PrepareConflictBehavior prepareConflictBehavior,
     RoundUpPreparedTimestamps roundUpPreparedTimestamps,
     RoundUpReadTimestamp roundUpReadTimestamp,
-    bool allowUntimestampedWrite)
+    UntimestampedWriteAssertion allowUntimestampedWrite)
     : _session(session) {
     invariant(!_rollback);
 
@@ -70,7 +70,7 @@ WiredTigerBeginTxnBlock::WiredTigerBeginTxnBlock(
         }
         builder << "),";
     }
-    if (allowUntimestampedWrite) {
+    if (allowUntimestampedWrite == UntimestampedWriteAssertion::kSuppress) {
         builder << "no_timestamp=true,";
     }
 

@@ -162,6 +162,15 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
     // Returns true if the cursor has reached the end of the table, false if there are more records,
     // and an error Status otherwise.
     auto applySingleBatch = [&]() -> StatusWith<bool> {
+        // This write is performed without a durable/commit timestamp. This transaction trips the
+        // ordered assertion for the side-table documents which are inserted with a timestamp and,
+        // in here, being deleted without a timestamp. Because the data being read is majority
+        // committed, there's no risk of needing to roll back the writes done by this "drain".
+        //
+        // Note that index builds will only "resume" once. A second resume results in the index
+        // build starting from scratch. A "resumed" index build does not use a majority read
+        // concern. And thus will observe data that can be rolled back via replication.
+        opCtx->recoveryUnit()->allowUntimestampedWrite();
         WriteUnitOfWork wuow(opCtx);
 
         int32_t batchSize = 0;

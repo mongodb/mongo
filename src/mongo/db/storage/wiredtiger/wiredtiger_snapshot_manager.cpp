@@ -84,7 +84,7 @@ Timestamp WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(
     WT_SESSION* session,
     PrepareConflictBehavior prepareConflictBehavior,
     RoundUpPreparedTimestamps roundUpPreparedTimestamps,
-    bool allowUntimestampedWrite) const {
+    WiredTigerBeginTxnBlock::UntimestampedWriteAssertion untimestampedWriteAssertion) const {
 
     auto committedSnapshot = [this]() {
         stdx::lock_guard<Latch> lock(_committedSnapshotMutex);
@@ -104,7 +104,7 @@ Timestamp WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(
                                     prepareConflictBehavior,
                                     roundUpPreparedTimestamps,
                                     RoundUpReadTimestamp::kRound,
-                                    allowUntimestampedWrite);
+                                    untimestampedWriteAssertion);
     auto status = txnOpen.setReadSnapshot(committedSnapshot);
     fassert(30635, status);
 

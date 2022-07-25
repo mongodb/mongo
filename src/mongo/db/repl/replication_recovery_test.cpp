@@ -195,10 +195,17 @@ private:
 
         repl::createOplog(_opCtx.get());
 
-        ASSERT_OK(_storageInterface->createCollection(
-            getOperationContext(), testNs, generateOptionsWithUuid()));
+        {
+            // This fixture sets up some replication, but notably omits installing an
+            // OpObserverImpl. This state causes collection creation to timestamp catalog writes,
+            // but secondary index creation does not. We use an UnreplicatedWritesBlock to avoid
+            // timestamping any of the catalog setup.
+            repl::UnreplicatedWritesBlock noRep(_opCtx.get());
+            ASSERT_OK(_storageInterface->createCollection(
+                getOperationContext(), testNs, generateOptionsWithUuid()));
 
-        MongoDSessionCatalog::onStepUp(_opCtx.get());
+            MongoDSessionCatalog::onStepUp(_opCtx.get());
+        }
 
         auto observerRegistry = checked_cast<OpObserverRegistry*>(service->getOpObserver());
         observerRegistry->addObserver(std::make_unique<ReplicationRecoveryTestObObserver>());

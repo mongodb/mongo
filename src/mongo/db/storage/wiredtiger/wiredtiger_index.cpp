@@ -162,12 +162,7 @@ StatusWith<std::string> WiredTigerIndex::generateCreateString(
         ss << "prefix_compression=true,";
     }
 
-    if (  // TODO (SERVER-60753): Remove special handling for index build during recovery.
-        collectionNamespace.ns() == "config.system.indexBuilds") {
-        ss << "write_timestamp_usage=mixed_mode,";
-    } else {
-        ss << "write_timestamp_usage=ordered,";
-    }
+    // Report errors on writes without ordered timestamps.
     ss << "assert=(write_timestamp=on),";
     ss << "verbose=[write_timestamp],";
 

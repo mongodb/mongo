@@ -503,6 +503,10 @@ void createIndex(OperationContext* opCtx,
     Lock::DBLock dbLk(opCtx, nss.dbName(), MODE_IX);
     Lock::CollectionLock collLk(opCtx, nss, MODE_X);
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
+    // This fixture sets up some replication, but notably omits installing an OpObserverImpl. This
+    // state causes collection creation to timestamp catalog writes, but secondary index creation
+    // does not. We use an UnreplicatedWritesBlock to avoid timestamping any of the catalog setup.
+    repl::UnreplicatedWritesBlock noRep(opCtx);
     indexBuildsCoord->createIndex(
         opCtx, collUUID, spec, IndexBuildsManager::IndexConstraints::kEnforce, false);
 }

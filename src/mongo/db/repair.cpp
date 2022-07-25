@@ -71,6 +71,13 @@ using namespace fmt::literals;
 Status rebuildIndexesForNamespace(OperationContext* opCtx,
                                   const NamespaceString& nss,
                                   StorageEngine* engine) {
+    if (opCtx->recoveryUnit()->isActive()) {
+        // This function is shared by multiple callers. Some of which have opened a transaction to
+        // perform reads. This function may make mixed-mode writes. Mixed-mode assertions can only
+        // be suppressed when beginning a fresh transaction.
+        opCtx->recoveryUnit()->abandonSnapshot();
+    }
+
     opCtx->checkForInterrupt();
     auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
     auto swIndexNameObjs = getIndexNameObjs(collection);

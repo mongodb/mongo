@@ -369,6 +369,7 @@ public:
     void setUp() override {
         OplogApplierTest::setUp();
         auto* service = getServiceContext();
+        _origThreadName = *getThreadNameRef().get();
         Client::initThread("OplogApplierDelayTest", service, nullptr);
 
         _mockClock = std::make_shared<ClockSourceMock>();
@@ -387,6 +388,7 @@ public:
         _opCtxHolder = nullptr;
         Client::releaseCurrent();
         OplogApplierTest::tearDown();
+        setThreadName(_origThreadName);
     }
 
     OperationContext* opCtx() override {
@@ -412,6 +414,9 @@ protected:
     std::shared_ptr<ClockSourceMock> _mockClock;
     ServiceContext::UniqueOperationContext _opCtxHolder;
     AtomicWord<bool> _failWaits{false};
+
+private:
+    std::string _origThreadName;
 };
 
 TEST_F(OplogApplierDelayTest, GetNextApplierBatchReturnsEmptyBatchImmediately) {

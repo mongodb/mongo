@@ -68,7 +68,7 @@ public:
         WT_SESSION* session,
         PrepareConflictBehavior prepareConflictBehavior,
         RoundUpPreparedTimestamps roundUpPreparedTimestamps,
-        bool allowUntimestampedWrite) const;
+        WiredTigerBeginTxnBlock::UntimestampedWriteAssertion untimestampedWriteAssertion) const;
 
     /**
      * Returns lowest SnapshotName that could possibly be used by a future call to

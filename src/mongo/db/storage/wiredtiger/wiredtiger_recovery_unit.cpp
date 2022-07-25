@@ -520,7 +520,7 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     _isOplogReader = false;
     _oplogVisibleTs = boost::none;
     _orderedCommit = true;  // Default value is true; we assume all writes are ordered.
-    _allowUntimestampedWrite = false;
+    _untimestampedWriteAssertion = WiredTigerBeginTxnBlock::UntimestampedWriteAssertion::kEnforce;
 }
 
 Status WiredTigerRecoveryUnit::majorityCommittedSnapshotAvailable() const {
@@ -611,7 +611,7 @@ void WiredTigerRecoveryUnit::_txnOpen() {
                                     _prepareConflictBehavior,
                                     _roundUpPreparedTimestamps,
                                     RoundUpReadTimestamp::kNoRoundError,
-                                    _allowUntimestampedWrite)
+                                    _untimestampedWriteAssertion)
                 .done();
             break;
         }
@@ -620,7 +620,7 @@ void WiredTigerRecoveryUnit::_txnOpen() {
                 session,
                 _prepareConflictBehavior,
                 _roundUpPreparedTimestamps,
-                _allowUntimestampedWrite);
+                _untimestampedWriteAssertion);
             break;
         }
         case ReadSource::kLastApplied: {
@@ -643,7 +643,7 @@ void WiredTigerRecoveryUnit::_txnOpen() {
                                             _prepareConflictBehavior,
                                             _roundUpPreparedTimestamps,
                                             RoundUpReadTimestamp::kNoRoundError,
-                                            _allowUntimestampedWrite);
+                                            _untimestampedWriteAssertion);
             auto status = txnOpen.setReadSnapshot(_readAtTimestamp);
 
             if (!status.isOK() && status.code() == ErrorCodes::BadValue) {
@@ -672,7 +672,7 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtAllDurableTimestamp(WT_SESS
                                     _prepareConflictBehavior,
                                     _roundUpPreparedTimestamps,
                                     RoundUpReadTimestamp::kRound,
-                                    _allowUntimestampedWrite);
+                                    _untimestampedWriteAssertion);
     Timestamp txnTimestamp = _sessionCache->getKVEngine()->getAllDurableTimestamp();
     auto status = txnOpen.setReadSnapshot(txnTimestamp);
     fassert(50948, status);
@@ -700,7 +700,7 @@ void WiredTigerRecoveryUnit::_beginTransactionAtLastAppliedTimestamp(WT_SESSION*
                                         _prepareConflictBehavior,
                                         _roundUpPreparedTimestamps,
                                         RoundUpReadTimestamp::kNoRoundError,
-                                        _allowUntimestampedWrite);
+                                        _untimestampedWriteAssertion);
         LOGV2_DEBUG(4847500, 2, "no read timestamp available for kLastApplied");
         txnOpen.done();
         return;
@@ -710,7 +710,7 @@ void WiredTigerRecoveryUnit::_beginTransactionAtLastAppliedTimestamp(WT_SESSION*
                                     _prepareConflictBehavior,
                                     _roundUpPreparedTimestamps,
                                     RoundUpReadTimestamp::kRound,
-                                    _allowUntimestampedWrite);
+                                    _untimestampedWriteAssertion);
     auto status = txnOpen.setReadSnapshot(_readAtTimestamp);
     fassert(4847501, status);
 
@@ -766,7 +766,7 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtNoOverlapTimestamp(WT_SESSI
                                         _prepareConflictBehavior,
                                         _roundUpPreparedTimestamps,
                                         RoundUpReadTimestamp::kNoRoundError,
-                                        _allowUntimestampedWrite);
+                                        _untimestampedWriteAssertion);
         LOGV2_DEBUG(4452900, 1, "no read timestamp available for kNoOverlap");
         txnOpen.done();
         return readTimestamp;
@@ -776,7 +776,7 @@ Timestamp WiredTigerRecoveryUnit::_beginTransactionAtNoOverlapTimestamp(WT_SESSI
                                     _prepareConflictBehavior,
                                     _roundUpPreparedTimestamps,
                                     RoundUpReadTimestamp::kRound,
-                                    _allowUntimestampedWrite);
+                                    _untimestampedWriteAssertion);
     auto status = txnOpen.setReadSnapshot(readTimestamp);
     fassert(51066, status);
 

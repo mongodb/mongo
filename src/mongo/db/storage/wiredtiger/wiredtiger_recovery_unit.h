@@ -150,7 +150,8 @@ public:
 
     void allowUntimestampedWrite() override {
         invariant(!_isActive());
-        _allowUntimestampedWrite = true;
+        _untimestampedWriteAssertion =
+            WiredTigerBeginTxnBlock::UntimestampedWriteAssertion::kSuppress;
     }
 
     void setTimestampReadSource(ReadSource source,
@@ -316,7 +317,8 @@ private:
     boost::optional<Timestamp> _lastTimestampSet;
     Timestamp _readAtTimestamp;
     Timestamp _catalogConflictTimestamp;
-    bool _allowUntimestampedWrite = false;
+    WiredTigerBeginTxnBlock::UntimestampedWriteAssertion _untimestampedWriteAssertion =
+        WiredTigerBeginTxnBlock::UntimestampedWriteAssertion::kEnforce;
     std::unique_ptr<Timer> _timer;
     bool _isOplogReader = false;
     boost::optional<int64_t> _oplogVisibleTs = boost::none;

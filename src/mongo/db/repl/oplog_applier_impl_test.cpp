@@ -2683,6 +2683,11 @@ public:
     void setUp() override {
         OplogApplierImplTest::setUp();
 
+        // This fixture sets up some replication, but notably omits installing an
+        // OpObserverImpl. This state causes collection creation to timestamp catalog writes, but
+        // secondary index creation does not. We use an UnreplicatedWritesBlock to avoid
+        // timestamping any of the catalog setup.
+        repl::UnreplicatedWritesBlock noRep(_opCtx.get());
         MongoDSessionCatalog::onStepUp(_opCtx.get());
 
         DBDirectClient client(_opCtx.get());

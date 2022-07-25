@@ -70,6 +70,11 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
         replSettings.setOplogSizeBytes(10 * 1024 * 1024);
         replSettings.setReplSetString("rs0");
         setGlobalReplSettings(replSettings);
+    } else {
+        repl::ReplSettings replSettings;
+        // The empty string "disables" replication.
+        replSettings.setReplSetString("");
+        setGlobalReplSettings(replSettings);
     }
 
     _stashedStorageParams.engine =

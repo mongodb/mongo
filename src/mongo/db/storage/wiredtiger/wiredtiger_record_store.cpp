@@ -796,20 +796,7 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
     ss << "split_pct=90,";
     ss << "leaf_value_max=64MB,";
 
-    if (nss.isOplog()) {
-        // For the above clauses we do not assert any particular `write_timestamp_usage`. In
-        // particular for the oplog, WT removes all timestamp information. There's nothing in
-        // MDB's control to assert against.
-    } else if (
-        // Side table drains are not timestamped.
-        ident.startsWith("internal-") ||
-        // TODO (SERVER-60753): Remove special handling for index build during recovery. This
-        // includes the following _mdb_catalog ident.
-        nss == NamespaceString::kIndexBuildEntryNamespace || ident.startsWith("_mdb_catalog")) {
-        ss << "write_timestamp_usage=mixed_mode,";
-    } else {
-        ss << "write_timestamp_usage=ordered,";
-    }
+    // Report errors on writes without ordered timestamps.
     ss << "assert=(write_timestamp=on),";
     ss << "verbose=[write_timestamp],";
 
