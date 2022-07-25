@@ -94,7 +94,7 @@ Configure WiredTiger to sleep and wait for a debugger to attach on failure.
 <b>DO NOT</b> configure this option in production environments.
 
 @par \c -DHAVE_DIAGNOSTIC=1
-Configure WiredTiger to perform various run-time diagnostic tests.
+Configure WiredTiger to perform various run-time diagnostic tests (enabled by default for non Release build types).
 <b>DO NOT</b> configure this option in production environments.
 
 @par \c -DNON_BARRIER_DIAGNOSTIC_YIELDS=1
@@ -104,23 +104,23 @@ Requires that HAVE_DIAGNOSTIC is also enabled.
 
 @par \c -DENABLE_LZ4=1
 Configure WiredTiger for <a href="https://github.com/Cyan4973/lz4">LZ4</a>
-compression; see @ref compression for more information.
+compression (enabled by default if the LZ4 library is present); see @ref compression for more information.
 
 @par \c -DENABLE_PYTHON=1
 Build the WiredTiger <a href="http://www.python.org">Python</a> API;
-requires <a href="http://swig.org">SWIG</a>.
+requires <a href="http://swig.org">SWIG</a> (enabled by default if python is available).
 
 @par \c -DENABLE_SNAPPY=1
 Configure WiredTiger for <a href="http://code.google.com/p/snappy/">snappy</a>
-compression; see @ref compression for more information.
+compression (enabled by default if the SNAPPY library is present); see @ref compression for more information.
 
 @par \c -DENABLE_ZLIB=1
 Configure WiredTiger for <a href="http://www.zlib.net/">zlib</a>
-compression; see @ref compression for more information.
+compression (enabled by default if the ZLIB library is present); see @ref compression for more information.
 
 @par \c -DENABLE_ZSTD=1
 Configure WiredTiger for <a href="https://github.com/facebook/zstd">Zstd</a>
-compression; see @ref compression for more information.
+compression (enabled by default if the ZSTD library is present); see @ref compression for more information.
 
 @par \c -DWT_STANDALONE_BUILD=0
 Configure WiredTiger to disable standalone build. Standalone build is enabled
