@@ -17,12 +17,21 @@ assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()})
 st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
 
 function testWriteConcernError(rs) {
+    // Split the target collection at {_id: 10} so that there'll be doc $merge-ed to both shards.
+    if (FixtureHelpers.isSharded(target)) {
+        mongosDB.adminCommand({split: target.getFullName(), middle: {_id: 10}});
+    }
+
     // Make sure that there are only 2 nodes up so w:3 writes will always time out.
     const stoppedSecondary = rs.getSecondary();
     rs.stop(stoppedSecondary);
 
     // Test that $merge correctly returns a WC error.
     withEachMergeMode(({whenMatchedMode, whenNotMatchedMode}) => {
+        // When either mode is "fail", a different error rather than WC error is thrown.
+        if (whenMatchedMode === "fail" || whenNotMatchedMode === "fail") {
+            return;
+        }
         const res = mongosDB.runCommand({
             aggregate: "source",
             pipeline: [{
@@ -36,13 +45,24 @@ function testWriteConcernError(rs) {
             cursor: {},
         });
 
+        jsTestLog("Testing Mode: " + tojson(whenMatchedMode) + tojson(whenNotMatchedMode));
+        jsTestLog("Target collection after $merge: " + tojson(target.find().toArray()));
+
+        let oplogEntries = shard0.getPrimary()
+                               .getDB("local")
+                               .oplog.rs.find({"ns": {$regex: "merge_write_concern.*"}})
+                               .toArray();
+        jsTestLog("Shard0 oplog entries: " + tojson(oplogEntries));
+        oplogEntries = shard1.getPrimary()
+                           .getDB("local")
+                           .oplog.rs.find({"ns": {$regex: "merge_write_concern.*"}})
+                           .toArray();
+        jsTestLog("Shard1 oplog entries: " + tojson(oplogEntries));
+
         // $merge writeConcern errors are handled differently from normal writeConcern
         // errors. Rather than returing ok:1 and a WriteConcernError, the entire operation
         // fails.
-        assert.commandFailedWithCode(res,
-                                     whenNotMatchedMode == "fail"
-                                         ? [13113, ErrorCodes.WriteConcernFailed]
-                                         : ErrorCodes.WriteConcernFailed);
+        assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
         assert.commandWorked(target.remove({}));
     });
 
