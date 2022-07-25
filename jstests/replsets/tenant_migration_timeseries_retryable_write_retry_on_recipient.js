@@ -4,9 +4,12 @@
  *
  * This test is based on "tenant_migration_retryable_write_retry_on_recipient.js".
  *
+ * TODO (SERVER-68159) we should no longer need to use the incompatible_with_shard_merge. Remove it.
+ *
  * @tags: [
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
+ *   incompatible_with_shard_merge,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
