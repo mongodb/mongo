@@ -40,7 +40,7 @@ if(NOT HAVE_BUILTIN_EXTENSION_ZLIB)
     set(default_enable_zlib ${HAVE_LIBZ})
 endif()
 if(NOT HAVE_BUILTIN_EXTENSION_ZSTD)
-    set(default_enable_zstd ${HAVE_LIBTCMALLOC})
+    set(default_enable_zstd ${HAVE_LIBZSTD})
 endif()
 
 if("${CMAKE_BUILD_TYPE}" STREQUAL "Release")

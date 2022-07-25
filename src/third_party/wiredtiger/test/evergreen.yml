@@ -124,6 +124,12 @@ functions:
           ${SPINLOCK_TYPE|} \
           ${CC_OPTIMIZE_LEVEL|}"
 
+        # This is a workaround until WT-8981 is resolved and we can remove this. The Ubuntu PPC platform does not have ZSTD.
+        # Strip it out.
+        if [ "${build_variant|}" = "ubuntu1804-ppc" ] && [[ "$DEFINED_EVERGREEN_CONFIG_FLAGS" =~ (\-DHAVE_BUILTIN_EXTENSION_ZSTD=1) ]]; then
+          DEFINED_EVERGREEN_CONFIG_FLAGS=${DEFINED_EVERGREEN_CONFIG_FLAGS/\-DHAVE_BUILTIN_EXTENSION_ZSTD=1/}
+        fi
+
         if [ "$OS" = "Windows_NT" ]; then
           # Use the Windows powershell script to configure the CMake build.
           # We execute it in a powershell environment as its easier to detect and source the Visual Studio
@@ -4131,7 +4137,7 @@ buildvariants:
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
       LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_BUILDDIR/test/utility/
-    CC_OPTIMIZE_LEVEL: -O3
+    CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O3
     HAVE_DIAGNOSTIC: -DHAVE_DIAGNOSTIC=0
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v3_gcc.cmake
     CMAKE_INSTALL_PREFIX: -DCMAKE_INSTALL_PREFIX=$(pwd)/cmake_build/LOCAL_INSTALL
