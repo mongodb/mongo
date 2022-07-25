@@ -2,6 +2,11 @@ include(ExternalProject)
 include(GNUInstallDirs)
 include(${CMAKE_SOURCE_DIR}/cmake/helpers.cmake)
 
+# Skip the AWS SDK build step if the extension is not enabled.
+if(NOT ENABLE_S3)
+    return()
+endif()
+
 config_choice(
     IMPORT_S3_SDK
     "Specify how to import the S3 SDK"
@@ -10,10 +15,6 @@ config_choice(
         "package;IMPORT_S3_SDK_PACKAGE;ENABLE_S3"
         "external;IMPORT_S3_SDK_EXTERNAL;ENABLE_S3"
 )
- # Skip the AWS SDK build step if the extension is not enabled.
- if(NOT ENABLE_S3)
-     return()
- endif()
  
 if(IMPORT_S3_SDK_NONE)
     message(FATAL_ERROR "Cannot enable S3 extension without specifying an IMPORT_S3_SDK method (package, external).")

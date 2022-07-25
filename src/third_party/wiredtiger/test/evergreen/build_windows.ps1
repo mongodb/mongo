@@ -41,7 +41,7 @@ cd cmake_build
 # Configure build with CMake.
 if ($configure -eq $true) {
     # Note that ${args} are all the command line options that are not automatically parsed by the param function.
-    C:\cmake\bin\cmake --no-warn-unused-cli -DSWIG_DIR='C:\swigwin-3.0.2' -DSWIG_EXECUTABLE='C:\swigwin-3.0.2\swig.exe' -DCMAKE_BUILD_TYPE='None' -DENABLE_PYTHON=1 -DENABLE_STRICT=1 -DCMAKE_TOOLCHAIN_FILE='..\cmake\toolchains\cl.cmake' ${args} -G "Ninja" ..\.
+    C:\cmake\bin\cmake --no-warn-unused-cli -DSWIG_DIR='C:\swigwin-3.0.2' -DSWIG_EXECUTABLE='C:\swigwin-3.0.2\swig.exe' -DCMAKE_TOOLCHAIN_FILE='..\cmake\toolchains\cl.cmake' ${args} -G "Ninja" ..\.
     Die-On-Failure($LastExitCode)
 }
 

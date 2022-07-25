@@ -89,7 +89,8 @@ operation_tracker::do_work()
 {
     WT_DECL_RET;
     wt_timestamp_t ts, oldest_ts;
-    uint64_t collection_id, sweep_collection_id;
+    uint64_t collection_id;
+    uint64_t sweep_collection_id = 0;
     int op_type;
     const char *key, *value;
     char *sweep_key;

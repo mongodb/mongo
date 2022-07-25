@@ -5,7 +5,7 @@ include(CheckCXXCompilerFlag)
 include(${CMAKE_SOURCE_DIR}/cmake/helpers.cmake)
 
 # Establish an internal cache variable to track our custom build modes.
-set(BUILD_MODES None Debug Release RelWithDebInfo CACHE INTERNAL "")
+set(BUILD_MODES Debug Release RelWithDebInfo CACHE INTERNAL "")
 
 if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
     set(MSVC_C_COMPILER 1)
@@ -130,8 +130,6 @@ else()
     endif()
 endif()
 
-# Sanitizer builds should have debug info available and optimization off
-set(san_debug_flags "-O1 -g ${no_omit_frame_flag}")
 
 # UBSAN build variant flags.
 set(ubsan_link_flags "-fsanitize=undefined")
@@ -150,22 +148,22 @@ set(tsan_compiler_cxx_flag "-fsanitize=thread")
 
 # Define our custom build variants.
 define_build_mode(ASan
-    C_COMPILER_FLAGS ${asan_compiler_c_flag} ${san_debug_flags}
-    CXX_COMPILER_FLAGS ${asan_compiler_cxx_flag} ${san_debug_flags}
+    C_COMPILER_FLAGS ${asan_compiler_c_flag} ${no_omit_frame_flag}
+    CXX_COMPILER_FLAGS ${asan_compiler_cxx_flag} ${no_omit_frame_flag}
     LINK_FLAGS ${asan_link_flags}
     LIBS ${asan_lib_flags}
 )
 
 define_build_mode(UBSan
-    C_COMPILER_FLAGS ${ubsan_compiler_c_flag} ${san_debug_flags}
-    CXX_COMPILER_FLAGS ${ubsan_compiler_cxx_flag} ${san_debug_flags}
+    C_COMPILER_FLAGS ${ubsan_compiler_c_flag} ${no_omit_frame_flag}
+    CXX_COMPILER_FLAGS ${ubsan_compiler_cxx_flag} ${no_omit_frame_flag}
     LINK_FLAGS ${ubsan_link_flags}
     # Disable UBSan on MSVC compilers (unsupported).
     DEPENDS "NOT MSVC"
 )
 
 define_build_mode(MSan
-    C_COMPILER_FLAGS ${msan_compiler_c_flag} ${san_debug_flags}
+    C_COMPILER_FLAGS ${msan_compiler_c_flag} ${no_omit_frame_flag}
     CXX_COMPILER_FLAGS ${msan_compiler_cxx_flag}
     LINK_FLAGS ${msan_link_flags}
     # Disable MSan on MSVC and GNU compilers (unsupported).
@@ -173,7 +171,7 @@ define_build_mode(MSan
 )
 
 define_build_mode(TSan
-    C_COMPILER_FLAGS ${tsan_compiler_c_flag} ${san_debug_flags}
+    C_COMPILER_FLAGS ${tsan_compiler_c_flag} ${no_omit_frame_flag}
     CXX_COMPILER_FLAGS ${tsan_compiler_cxx_flag}
     LINK_FLAGS ${tsan_link_flags}
     # Disable TSan on MSVC compilers (unsupported).
@@ -188,11 +186,14 @@ define_build_mode(Coverage
     DEPENDS "NOT MSVC"
 )
 
-define_build_mode(None)
+define_build_mode(Debug)
 
+# Set the WiredTiger default build type to Debug.
+# Primary users of the build are our developers, who want as much help diagnosing
+# issues as possible. Builds targeted for release to customers should switch to a "Release" setting.
 if(NOT CMAKE_BUILD_TYPE)
     string(REPLACE ";" " " build_modes_doc "${BUILD_MODES}")
-    set(CMAKE_BUILD_TYPE "None" CACHE STRING "Choose the type of build, options are: ${build_modes_doc}." FORCE)
+    set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Choose the type of build, options are: ${build_modes_doc}." FORCE)
 endif()
 
 if(CMAKE_BUILD_TYPE)
@@ -202,3 +203,22 @@ if(CMAKE_BUILD_TYPE)
 endif()
 
 set(CMAKE_CONFIGURATION_TYPES ${BUILD_MODES})
+
+# We want to use the optimization level from CC_OPTIMIZE_LEVEL and our DEBUG settings as well.
+# Remove the default values from Release and RelWithDebInfo.
+if("${WT_OS}" STREQUAL "windows")
+    string(REPLACE "/O3" "" CMAKE_C_FLAGS_RELEASE ${CMAKE_C_FLAGS_RELEASE})
+    string(REPLACE "/O3" "" CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE})
+    string(REPLACE "/Z7" "" CMAKE_C_FLAGS_RELWITHDEBINFO ${CMAKE_C_FLAGS_RELWITHDEBINFO})
+    string(REPLACE "/Z7" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO ${CMAKE_CXX_FLAGS_RELWITHDEBINFO})
+    string(REPLACE "/O2" "" CMAKE_C_FLAGS_RELWITHDEBINFO ${CMAKE_C_FLAGS_RELWITHDEBINFO})
+    string(REPLACE "/O2" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO ${CMAKE_CXX_FLAGS_RELWITHDEBINFO})
+else()
+    string(REPLACE "-O3" "" CMAKE_C_FLAGS_RELEASE ${CMAKE_C_FLAGS_RELEASE})
+    string(REPLACE "-O3" "" CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE})
+    string(REPLACE "-O2" "" CMAKE_C_FLAGS_RELWITHDEBINFO ${CMAKE_C_FLAGS_RELWITHDEBINFO})
+    string(REPLACE "-O2" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO ${CMAKE_CXX_FLAGS_RELWITHDEBINFO})
+    string(REPLACE "-g" "" CMAKE_C_FLAGS_RELWITHDEBINFO ${CMAKE_C_FLAGS_RELWITHDEBINFO})
+    string(REPLACE "-g" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO ${CMAKE_CXX_FLAGS_RELWITHDEBINFO})
+endif()
+

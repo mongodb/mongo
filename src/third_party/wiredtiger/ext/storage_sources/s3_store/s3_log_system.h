@@ -82,7 +82,7 @@ class S3LogSystem : public Aws::Utils::Logging::LogSystemInterface {
 
     // Inherited from AWS LogSystemInterface and is not used.
     void
-    Flush()
+    Flush() override final
     {
     }
 

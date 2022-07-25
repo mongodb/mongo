@@ -6,6 +6,7 @@
  * See the file LICENSE for redistribution information.
  */
 #include <cstdio>
+#include <stdexcept>
 
 #include "wiredtiger.h"
 #include "wt_internal.h"
