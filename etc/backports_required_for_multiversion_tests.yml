@@ -266,6 +266,8 @@ last-continuous:
       test_file: jstests/core/check_shard_index.js
     - ticket: SERVER-50792
       test_file: jstests/sharding/refine_collection_shard_key_basic.js
+    - ticket: SERVER-67532
+      test_file: jstests/replsets/optime.js
     - ticket: SERVER-66072
       test_file: jstests/aggregation/match_no_swap_rand.js
     - ticket: SERVER-67723
@@ -669,6 +671,8 @@ last-lts:
       test_file: jstests/core/check_shard_index.js
     - ticket: SERVER-50792
       test_file: jstests/sharding/refine_collection_shard_key_basic.js
+    - ticket: SERVER-67532
+      test_file: jstests/replsets/optime.js
     - ticket: SERVER-66072
       test_file: jstests/aggregation/match_no_swap_rand.js
     - ticket: SERVER-67723
