@@ -83,6 +83,10 @@ intrusive_ptr<DocumentSource> DocumentSourceMatch::optimize() {
 
     _expression = MatchExpression::optimize(std::move(_expression));
 
+    if (_expression->isTriviallyTrue()) {
+        return nullptr;
+    }
+
     return this;
 }
 

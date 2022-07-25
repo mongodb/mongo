@@ -126,6 +126,11 @@ std::unique_ptr<MatchExpression> ExprMatchExpression::shallowClone() const {
     return clone;
 }
 
+bool ExprMatchExpression::isTriviallyTrue() const {
+    auto exprConst = dynamic_cast<ExpressionConstant*>(_expression.get());
+    return exprConst && exprConst->getValue().coerceToBool();
+}
+
 MatchExpression::ExpressionOptimizerFunc ExprMatchExpression::getOptimizer() const {
     return [](std::unique_ptr<MatchExpression> expression) {
         auto& exprMatchExpr = static_cast<ExprMatchExpression&>(*expression);
@@ -148,6 +153,12 @@ MatchExpression::ExpressionOptimizerFunc ExprMatchExpression::getOptimizer() con
             andMatch->add(std::move(expression));
             // Re-optimize the new AND in order to make sure that any AND children are absorbed.
             expression = MatchExpression::optimize(std::move(andMatch));
+        }
+
+        // Replace trivially true expression with an empty AND since the planner doesn't always
+        // check for 'isTriviallyTrue()'.
+        if (expression->isTriviallyTrue()) {
+            expression = std::make_unique<AndMatchExpression>();
         }
 
         return expression;
