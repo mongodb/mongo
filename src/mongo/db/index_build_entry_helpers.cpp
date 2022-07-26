@@ -311,7 +311,7 @@ StatusWith<IndexBuildEntry> getIndexBuildEntry(OperationContext* opCtx, UUID ind
     }
 
     try {
-        IDLParserErrorContext ctx("IndexBuildsEntry Parser");
+        IDLParserContext ctx("IndexBuildsEntry Parser");
         IndexBuildEntry indexBuildEntry = IndexBuildEntry::parse(ctx, obj);
         return indexBuildEntry;
     } catch (DBException& ex) {

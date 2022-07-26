@@ -293,7 +293,7 @@ protected:
         AutoGetCollection sideCollection(
             opCtx, NamespaceString::kConfigImagesNamespace, LockMode::MODE_IS);
         return repl::ImageEntry::parse(
-            IDLParserErrorContext("image entry"),
+            IDLParserContext("image entry"),
             Helpers::findOneForTesting(
                 opCtx, sideCollection.getCollection(), BSON("_id" << sessionId.toBSON())));
     }
@@ -303,7 +303,7 @@ protected:
             opCtx, NamespaceString::kSessionTransactionsTableNamespace, LockMode::MODE_IS);
 
         return SessionTxnRecord::parse(
-            IDLParserErrorContext("txn record"),
+            IDLParserContext("txn record"),
             Helpers::findOneForTesting(
                 opCtx, configTransactions.getCollection(), BSON("_id" << sessionId.toBSON())));
     }
@@ -323,7 +323,7 @@ protected:
                                                 preImagesCollection.getCollection(),
                                                 BSON("_id" << preImageId.toBSON()))
                          .getOwned();
-        return ChangeStreamPreImage::parse(IDLParserErrorContext("pre-image"), *container);
+        return ChangeStreamPreImage::parse(IDLParserContext("pre-image"), *container);
     }
 
     ReadWriteConcernDefaultsLookupMock _lookupMock;
@@ -1197,7 +1197,7 @@ protected:
 
         auto txnRecordObj = cursor->next();
         auto txnRecord =
-            SessionTxnRecord::parse(IDLParserErrorContext("SessionEntryWritten"), txnRecordObj);
+            SessionTxnRecord::parse(IDLParserContext("SessionEntryWritten"), txnRecordObj);
         ASSERT(!cursor->more());
         ASSERT_EQ(session()->getSessionId(), txnRecord.getSessionId());
         ASSERT_EQ(txnNum, txnRecord.getTxnNum());
@@ -1233,7 +1233,7 @@ protected:
 
         auto txnRecordObj = cursor->next();
         auto txnRecord =
-            SessionTxnRecord::parse(IDLParserErrorContext("SessionEntryWritten"), txnRecordObj);
+            SessionTxnRecord::parse(IDLParserContext("SessionEntryWritten"), txnRecordObj);
         ASSERT(!cursor->more());
         ASSERT_EQ(session()->getSessionId(), txnRecord.getSessionId());
         if (!startOpTime) {

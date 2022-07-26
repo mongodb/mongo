@@ -1200,7 +1200,7 @@ void ReshardingRecipientService::RecipientStateMachine::_restoreMetrics(
 
             if (!result.isEmpty()) {
                 progressDoc = ReshardingOplogApplierProgress::parse(
-                    IDLParserErrorContext("resharding-recipient-service-progress-doc"), result);
+                    IDLParserContext("resharding-recipient-service-progress-doc"), result);
                 oplogEntriesApplied += progressDoc->getNumEntriesApplied();
             }
         }

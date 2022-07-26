@@ -169,7 +169,7 @@ void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
     if (args.nss == NamespaceString::kTenantMigrationRecipientsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         auto recipientStateDoc = TenantMigrationRecipientDocument::parse(
-            IDLParserErrorContext("recipientStateDoc"), args.updateArgs->updatedDoc);
+            IDLParserContext("recipientStateDoc"), args.updateArgs->updatedDoc);
         opCtx->recoveryUnit()->onCommit([opCtx, recipientStateDoc](boost::optional<Timestamp>) {
             auto mtab = tenant_migration_access_blocker::getTenantMigrationRecipientAccessBlocker(
                 opCtx->getServiceContext(), recipientStateDoc.getTenantId());
@@ -252,8 +252,8 @@ void TenantMigrationRecipientOpObserver::aboutToDelete(OperationContext* opCtx,
                                                        BSONObj const& doc) {
     if (nss == NamespaceString::kTenantMigrationRecipientsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
-        auto recipientStateDoc = TenantMigrationRecipientDocument::parse(
-            IDLParserErrorContext("recipientStateDoc"), doc);
+        auto recipientStateDoc =
+            TenantMigrationRecipientDocument::parse(IDLParserContext("recipientStateDoc"), doc);
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "cannot delete a recipient's state document " << doc
                               << " since it has not been marked as garbage collectable",

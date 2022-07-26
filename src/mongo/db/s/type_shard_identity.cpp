@@ -49,7 +49,7 @@ StatusWith<ShardIdentityType> ShardIdentityType::fromShardIdentityDocument(const
 
     try {
         ShardIdentityType shardIdentity =
-            ShardIdentity::parse(IDLParserErrorContext("ShardIdentity"), shardIdentityBSON);
+            ShardIdentity::parse(IDLParserContext("ShardIdentity"), shardIdentityBSON);
 
         const auto& configsvrConnStr = shardIdentity.getConfigsvrConnectionString();
         if (configsvrConnStr.type() != ConnectionString::ConnectionType::kReplicaSet) {

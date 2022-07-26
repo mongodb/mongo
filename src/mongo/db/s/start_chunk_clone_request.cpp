@@ -154,7 +154,7 @@ StatusWith<StartChunkCloneRequest> StartChunkCloneRequest::createFromCommand(Nam
 
     request._migrationId = UUID::parse(obj);
     request._lsid =
-        LogicalSessionId::parse(IDLParserErrorContext("StartChunkCloneRequest"), obj[kLsid].Obj());
+        LogicalSessionId::parse(IDLParserContext("StartChunkCloneRequest"), obj[kLsid].Obj());
     request._txnNumber = obj.getField(kTxnNumber).Long();
 
     return request;

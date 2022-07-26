@@ -160,7 +160,7 @@ protected:
         TransactionCoordinatorDocument doc;
         do {
             doc = TransactionCoordinatorDocument::parse(
-                IDLParserErrorContext("dummy"),
+                IDLParserContext("dummy"),
                 dbClient.findOne(NamespaceString::kTransactionCoordinatorsNamespace, BSONObj{}));
         } while (!doc.getDecision());
     }

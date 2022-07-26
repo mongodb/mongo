@@ -206,7 +206,7 @@ Status ReadConcernArgs::parse(const BSONObj& readConcernObj) {
         } else if (fieldName == ReadWriteConcernProvenance::kSourceFieldName) {
             try {
                 _provenance = ReadWriteConcernProvenance::parse(
-                    IDLParserErrorContext("ReadConcernArgs::parse"), readConcernObj);
+                    IDLParserContext("ReadConcernArgs::parse"), readConcernObj);
             } catch (const DBException&) {
                 return exceptionToStatus();
             }

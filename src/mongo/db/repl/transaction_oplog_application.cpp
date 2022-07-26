@@ -184,7 +184,7 @@ repl::OplogEntry getPreviousOplogEntry(OperationContext* opCtx, const repl::Oplo
 Status applyCommitTransaction(OperationContext* opCtx,
                               const OplogEntry& entry,
                               repl::OplogApplication::Mode mode) {
-    IDLParserErrorContext ctx("commitTransaction");
+    IDLParserContext ctx("commitTransaction");
     auto commitOplogEntryOpTime = entry.getOpTime();
     auto commitCommand = CommitTransactionOplogObject::parse(ctx, entry.getObject());
     invariant(commitCommand.getCommitTimestamp());
@@ -595,7 +595,7 @@ void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplica
     while (cursor->more()) {
         const auto txnRecordObj = cursor->next();
         const auto txnRecord = SessionTxnRecord::parse(
-            IDLParserErrorContext("recovering prepared transaction"), txnRecordObj);
+            IDLParserContext("recovering prepared transaction"), txnRecordObj);
 
         invariant(txnRecord.getState() == DurableTxnStateEnum::kPrepared);
 

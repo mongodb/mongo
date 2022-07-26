@@ -157,7 +157,7 @@ StatusWith<TenantMigrationRecipientDocument> getStateDoc(OperationContext* opCtx
     }
 
     try {
-        return TenantMigrationRecipientDocument::parse(IDLParserErrorContext("recipientStateDoc"),
+        return TenantMigrationRecipientDocument::parse(IDLParserContext("recipientStateDoc"),
                                                        result);
     } catch (DBException& ex) {
         return ex.toStatus(

@@ -130,7 +130,7 @@ public:
         }
 
         auto obj = field.Obj();
-        return LocalKMSService::create(LocalKMS::parse(IDLParserErrorContext("root"), obj));
+        return LocalKMSService::create(LocalKMS::parse(IDLParserContext("root"), obj));
     }
 };
 

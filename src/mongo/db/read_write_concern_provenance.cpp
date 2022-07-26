@@ -42,7 +42,7 @@ void ReadWriteConcernProvenance::setSource(boost::optional<Source> source) & {
     ReadWriteConcernProvenanceBase::setSource(std::move(source));
 }
 
-ReadWriteConcernProvenance ReadWriteConcernProvenance::parse(const IDLParserErrorContext& ctxt,
+ReadWriteConcernProvenance ReadWriteConcernProvenance::parse(const IDLParserContext& ctxt,
                                                              const BSONObj& bsonObject) {
     return ReadWriteConcernProvenance(ReadWriteConcernProvenanceBase::parse(ctxt, bsonObject));
 }

@@ -50,8 +50,7 @@ const auto tenantIdsToDeleteDecoration =
     OperationContext::declareDecoration<boost::optional<std::vector<std::string>>>();
 
 ShardSplitDonorDocument parseAndValidateDonorDocument(const BSONObj& doc) {
-    auto donorStateDoc =
-        ShardSplitDonorDocument::parse(IDLParserErrorContext("donorStateDoc"), doc);
+    auto donorStateDoc = ShardSplitDonorDocument::parse(IDLParserContext("donorStateDoc"), doc);
     const std::string errmsg = "Invalid donor state doc, {}: {}";
 
     if (donorStateDoc.getExpireAt()) {

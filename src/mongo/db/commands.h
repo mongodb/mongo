@@ -1044,7 +1044,7 @@ constexpr StringData command_alias_v = CommandAlias<T>::kAlias;
  *
  *      - a static member factory function 'parse', callable as:
  *
- *         const IDLParserErrorContext& idlCtx = ...;
+ *         const IDLParserContext& idlCtx = ...;
  *         const OpMsgRequest& opMsgRequest = ...;
  *         Request r = Request::parse(idlCtx, opMsgRequest);
  *
@@ -1106,7 +1106,7 @@ protected:
      * Calls to this function should be done only in test mode so that we don't expose users to
      * errors if we construct an invalid error reply.
      */
-    static bool checkIsErrorStatus(const BSONObj& resultObj, const IDLParserErrorContext& ctx) {
+    static bool checkIsErrorStatus(const BSONObj& resultObj, const IDLParserContext& ctx) {
         auto wcStatus = getWriteConcernStatusFromCommandResult(resultObj);
         if (!wcStatus.isOK()) {
             if (wcStatus.code() == ErrorCodes::TypeMismatch) {
@@ -1119,7 +1119,7 @@ protected:
             auto status = getStatusFromCommandResult(resultObj);
             if (!status.isOK()) {
                 // Will throw if the result doesn't match the ErrorReply.
-                ErrorReply::parse(IDLParserErrorContext("ErrorType", &ctx), resultObj);
+                ErrorReply::parse(IDLParserContext("ErrorType", &ctx), resultObj);
                 return true;
             }
         }
@@ -1146,8 +1146,8 @@ private:
                                      const BSONObj& cmdObj) {
         // TODO SERVER-67155 pass tenantId to the BSONObj parse function
         return RequestType::parse(
-            IDLParserErrorContext(RequestType::kCommandName,
-                                  APIParameters::get(opCtx).getAPIStrict().value_or(false)),
+            IDLParserContext(RequestType::kCommandName,
+                             APIParameters::get(opCtx).getAPIStrict().value_or(false)),
             cmdObj);
     }
 
@@ -1184,7 +1184,7 @@ class ErrmsgCommandDeprecated : public BasicCommand {
  *
  *      - a static member factory function 'parse', callable as:
  *
- *         const IDLParserErrorContext& idlCtx = ...;
+ *         const IDLParserContext& idlCtx = ...;
  *         const OpMsgRequest& opMsgRequest = ...;
  *         Request r = Request::parse(idlCtx, opMsgRequest);
  *
@@ -1257,8 +1257,7 @@ private:
                                     << command->getName() << "' instead");
         }
 
-        return RequestType::parse(IDLParserErrorContext(command->getName(), apiStrict),
-                                  opMsgRequest);
+        return RequestType::parse(IDLParserContext(command->getName(), apiStrict), opMsgRequest);
     }
 
     RequestType _request;

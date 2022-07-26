@@ -96,8 +96,7 @@ public:
                 "Sharding a Queryable Encryption state collection is not allowed",
                 !nss.isFLE2StateCollection());
 
-        auto shardCollRequest =
-            ShardCollection::parse(IDLParserErrorContext("ShardCollection"), cmdObj);
+        auto shardCollRequest = ShardCollection::parse(IDLParserContext("ShardCollection"), cmdObj);
 
         ShardsvrCreateCollection shardsvrCollRequest(nss);
         CreateCollectionRequest requestParamsObj;

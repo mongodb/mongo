@@ -170,7 +170,7 @@ protected:
                              .getValue();
         if (expectedPhase.has_value()) {
             auto storedDefragmentationPhase = DefragmentationPhase_parse(
-                IDLParserErrorContext("BalancerDefragmentationPolicyTest"),
+                IDLParserContext("BalancerDefragmentationPolicyTest"),
                 configDoc.getStringField(CollectionType::kDefragmentationPhaseFieldName));
             ASSERT_TRUE(storedDefragmentationPhase == *expectedPhase);
         } else {

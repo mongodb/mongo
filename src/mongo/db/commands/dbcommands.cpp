@@ -499,7 +499,7 @@ public:
         }
 
         result.append("ns", nss.ns());
-        auto spec = StorageStatsSpec::parse(IDLParserErrorContext("collStats"), jsobj);
+        auto spec = StorageStatsSpec::parse(IDLParserContext("collStats"), jsobj);
         Status status = appendCollectionStorageStats(opCtx, nss, spec, &result);
         if (!status.isOK() && status.code() != ErrorCodes::NamespaceNotFound) {
             errmsg = status.reason();
@@ -595,7 +595,7 @@ public:
     }
 
     void validateResult(const BSONObj& resultObj) final {
-        auto reply = Reply::parse(IDLParserErrorContext("CollModReply"), resultObj);
+        auto reply = Reply::parse(IDLParserContext("CollModReply"), resultObj);
         coll_mod_reply_validation::validateReply(reply);
     }
 

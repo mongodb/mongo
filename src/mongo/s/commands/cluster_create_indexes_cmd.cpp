@@ -140,7 +140,7 @@ public:
      * 'code' & 'codeName' are permitted in either scenario, but non-zero 'code' indicates "not ok".
      */
     void validateResult(const BSONObj& result) final {
-        auto ctx = IDLParserErrorContext("createIndexesReply");
+        auto ctx = IDLParserContext("createIndexesReply");
         if (checkIsErrorStatus(result, ctx)) {
             return;
         }
@@ -159,7 +159,7 @@ public:
             return;
         }
 
-        auto rawCtx = IDLParserErrorContext(kRawFieldName, &ctx);
+        auto rawCtx = IDLParserContext(kRawFieldName, &ctx);
         for (const auto& element : rawData.Obj()) {
             if (!rawCtx.checkAndAssertType(element, Object)) {
                 return;

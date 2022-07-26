@@ -69,7 +69,7 @@ MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeStoringExternalClusterTimeKeyD
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
 ExternalKeysCollectionDocument makeExternalClusterTimeKeyDoc(UUID migrationId, BSONObj keyDoc) {
-    auto originalKeyDoc = KeysCollectionDocument::parse(IDLParserErrorContext("keyDoc"), keyDoc);
+    auto originalKeyDoc = KeysCollectionDocument::parse(IDLParserContext("keyDoc"), keyDoc);
 
     ExternalKeysCollectionDocument externalKeyDoc(
         OID::gen(), originalKeyDoc.getKeyId(), migrationId);

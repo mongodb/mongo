@@ -65,8 +65,8 @@ intrusive_ptr<DocumentSource> DocumentSourceCollStats::createFromBson(
     uassert(40166,
             str::stream() << "$collStats must take a nested object but found: " << specElem,
             specElem.type() == BSONType::Object);
-    auto spec = DocumentSourceCollStatsSpec::parse(IDLParserErrorContext(kStageName),
-                                                   specElem.embeddedObject());
+    auto spec =
+        DocumentSourceCollStatsSpec::parse(IDLParserContext(kStageName), specElem.embeddedObject());
 
     return make_intrusive<DocumentSourceCollStats>(pExpCtx, std::move(spec));
 }

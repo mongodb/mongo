@@ -434,8 +434,8 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
     if (!opCtx->writesAreReplicated()) {
         opTime = entry.getOpTime();
     }
-    auto type = OplogEntries_parse(IDLParserErrorContext("type"), cmd.getStringField("type"));
-    IDLParserErrorContext ctx("o");
+    auto type = OplogEntries_parse(IDLParserContext("type"), cmd.getStringField("type"));
+    IDLParserContext ctx("o");
 
     switch (type) {
         case OplogEntriesEnum::Batch: {

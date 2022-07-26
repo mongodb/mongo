@@ -664,7 +664,7 @@ std::vector<TransactionCoordinatorDocument> readAllCoordinatorDocs(OperationCont
     while (coordinatorDocsCursor->more()) {
         // TODO (SERVER-38307): Try/catch around parsing the document and skip the document if it
         // fails to parse.
-        auto nextDecision = TransactionCoordinatorDocument::parse(IDLParserErrorContext(""),
+        auto nextDecision = TransactionCoordinatorDocument::parse(IDLParserContext(""),
                                                                   coordinatorDocsCursor->next());
         allCoordinatorDocs.push_back(nextDecision);
     }

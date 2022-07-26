@@ -114,8 +114,7 @@ public:
             ConstDataRange cdr(blobData.get(), blobSize);
             BSONObj respObj = cdr.read<Validated<BSONObj>>();
 
-            auto resp =
-                FreeMonRegistrationResponse::parse(IDLParserErrorContext("response"), respObj);
+            auto resp = FreeMonRegistrationResponse::parse(IDLParserContext("response"), respObj);
 
             return resp;
         });
@@ -137,7 +136,7 @@ public:
 
             BSONObj respObj = cdr.read<Validated<BSONObj>>();
 
-            auto resp = FreeMonMetricsResponse::parse(IDLParserErrorContext("response"), respObj);
+            auto resp = FreeMonMetricsResponse::parse(IDLParserContext("response"), respObj);
 
             return resp;
         });

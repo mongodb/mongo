@@ -1202,7 +1202,7 @@ T parseFromCDR(ConstDataRange cdr) {
     ConstDataRangeCursor cdc(cdr);
     auto obj = cdc.readAndAdvance<Validated<BSONObj>>();
 
-    IDLParserErrorContext ctx("root");
+    IDLParserContext ctx("root");
     return T::parse(ctx, obj);
 }
 

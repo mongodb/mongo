@@ -179,7 +179,7 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldBeAbleToParseSerializedARMParams) {
     // Make sure the serialized version can be parsed into an identical AsyncResultsMergerParams.
     auto newSpec = serializationArray[0].getDocument().toBson();
     ASSERT(newSpec["$mergeCursors"].type() == BSONType::Object);
-    auto newParams = AsyncResultsMergerParams::parse(IDLParserErrorContext("$mergeCursors test"),
+    auto newParams = AsyncResultsMergerParams::parse(IDLParserContext("$mergeCursors test"),
                                                      newSpec["$mergeCursors"].Obj());
     ASSERT_TRUE(params.getSort());
     ASSERT_BSONOBJ_EQ(*params.getSort(), *newParams.getSort());

@@ -276,7 +276,7 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::createFromBson(
             "$changeStream stage expects a document as argument",
             elem.type() == BSONType::Object);
 
-    auto spec = DocumentSourceChangeStreamSpec::parse(IDLParserErrorContext("$changeStream"),
+    auto spec = DocumentSourceChangeStreamSpec::parse(IDLParserContext("$changeStream"),
                                                       elem.embeddedObject());
 
     // Make sure that it is legal to run this $changeStream before proceeding.

@@ -179,8 +179,7 @@ BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
     // testing because an error while parsing indicates an internal error, not something that should
     // surface to a user.
     if (getTestCommandsEnabled()) {
-        ListCollections::parse(IDLParserErrorContext("ListCollectionsForOwnCollections"),
-                               rewrittenCmd);
+        ListCollections::parse(IDLParserContext("ListCollectionsForOwnCollections"), rewrittenCmd);
     }
 
     return rewrittenCmd;
@@ -258,7 +257,7 @@ public:
 
     void validateResult(const BSONObj& result) final {
         StringDataSet ignorableFields({ErrorReply::kOkFieldName});
-        ListCollectionsReply::parse(IDLParserErrorContext("ListCollectionsReply"),
+        ListCollectionsReply::parse(IDLParserContext("ListCollectionsReply"),
                                     result.removeFields(ignorableFields));
     }
 

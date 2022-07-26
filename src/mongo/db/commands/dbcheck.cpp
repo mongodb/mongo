@@ -253,11 +253,11 @@ std::unique_ptr<DbCheckRun> getRun(OperationContext* opCtx,
     // If the dbCheck argument is a string, this is the per-collection form.
     if (toParse["dbCheck"].type() == BSONType::String) {
         return singleCollectionRun(
-            opCtx, dbName, DbCheckSingleInvocation::parse(IDLParserErrorContext(""), toParse));
+            opCtx, dbName, DbCheckSingleInvocation::parse(IDLParserContext(""), toParse));
     } else {
         // Otherwise, it's the database-wide form.
         return fullDatabaseRun(
-            opCtx, dbName, DbCheckAllInvocation::parse(IDLParserErrorContext(""), toParse));
+            opCtx, dbName, DbCheckAllInvocation::parse(IDLParserContext(""), toParse));
     }
 }
 

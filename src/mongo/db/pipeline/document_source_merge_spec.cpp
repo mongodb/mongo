@@ -125,7 +125,7 @@ MergeWhenMatchedPolicy mergeWhenMatchedParseFromBSON(const BSONElement& elem) {
 
     invariant(elem.type() == BSONType::String);
 
-    IDLParserErrorContext ctx{DocumentSourceMergeSpec::kWhenMatchedFieldName};
+    IDLParserContext ctx{DocumentSourceMergeSpec::kWhenMatchedFieldName};
     auto value = elem.valueStringData();
     auto mode = MergeWhenMatchedMode_parse(ctx, value);
 

@@ -116,8 +116,8 @@ public:
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(BSONObj initialState) override {
         return std::make_shared<ReshardingCoordinator>(
             this,
-            ReshardingCoordinatorDocument::parse(
-                IDLParserErrorContext("ReshardingCoordinatorStateDoc"), std::move(initialState)),
+            ReshardingCoordinatorDocument::parse(IDLParserContext("ReshardingCoordinatorStateDoc"),
+                                                 std::move(initialState)),
             std::make_shared<ExternalStateForTest>(),
             _serviceContext);
     }
@@ -231,7 +231,7 @@ public:
         DBDirectClient client(opCtx);
 
         auto doc = client.findOne(NamespaceString::kConfigReshardingOperationsNamespace, BSONObj{});
-        IDLParserErrorContext errCtx("reshardingCoordFromTest");
+        IDLParserContext errCtx("reshardingCoordFromTest");
         return ReshardingCoordinatorDocument::parse(errCtx, doc);
     }
 

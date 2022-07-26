@@ -110,8 +110,7 @@ StatusWith<ShardSplitDonorDocument> getStateDocument(OperationContext* opCtx,
     }
 
     try {
-        return ShardSplitDonorDocument::parse(IDLParserErrorContext("shardSplitStateDocument"),
-                                              result);
+        return ShardSplitDonorDocument::parse(IDLParserContext("shardSplitStateDocument"), result);
     } catch (DBException& ex) {
         return ex.toStatus(str::stream()
                            << "Invalid BSON found for matching document with shard split id: "

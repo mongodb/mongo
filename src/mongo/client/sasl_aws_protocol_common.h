@@ -79,7 +79,7 @@ T convertFromByteString(StringData rawString) {
 
     auto clientFirstBson = cdr.read<Validated<BSONObj>>();
 
-    return T::parse(IDLParserErrorContext("sasl"), clientFirstBson);
+    return T::parse(IDLParserContext("sasl"), clientFirstBson);
 }
 
 /**

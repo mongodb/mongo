@@ -91,7 +91,7 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        IDLParserErrorContext ctx("ClusterMulticast");
+        IDLParserContext ctx("ClusterMulticast");
         auto args = ClusterMulticast::parse(ctx, cmdObj);
 
         // Grab an arbitrary executor.

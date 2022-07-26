@@ -130,7 +130,7 @@ std::unique_ptr<DocumentSourceUnionWith::LiteParsed> DocumentSourceUnionWith::Li
         unionNss = NamespaceString(nss.dbName(), spec.valueStringData());
     } else {
         auto unionWithSpec =
-            UnionWithSpec::parse(IDLParserErrorContext(kStageName), spec.embeddedObject());
+            UnionWithSpec::parse(IDLParserContext(kStageName), spec.embeddedObject());
         if (unionWithSpec.getColl()) {
             unionNss = NamespaceString(nss.dbName(), *unionWithSpec.getColl());
         } else {
@@ -188,7 +188,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
         unionNss = NamespaceString(expCtx->ns.dbName(), elem.valueStringData());
     } else {
         auto unionWithSpec =
-            UnionWithSpec::parse(IDLParserErrorContext(kStageName), elem.embeddedObject());
+            UnionWithSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
         if (unionWithSpec.getColl()) {
             unionNss = NamespaceString(expCtx->ns.dbName(), *unionWithSpec.getColl());
         } else {

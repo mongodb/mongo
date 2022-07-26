@@ -63,8 +63,8 @@ DocumentSourceChangeStreamTransform::createFromBson(
     uassert(5467601,
             "the '$_internalChangeStreamTransform' object spec must be an object",
             rawSpec.type() == BSONType::Object);
-    auto spec = DocumentSourceChangeStreamSpec::parse(IDLParserErrorContext("$changeStream"),
-                                                      rawSpec.Obj());
+    auto spec =
+        DocumentSourceChangeStreamSpec::parse(IDLParserContext("$changeStream"), rawSpec.Obj());
     return new DocumentSourceChangeStreamTransform(expCtx, std::move(spec));
 }
 

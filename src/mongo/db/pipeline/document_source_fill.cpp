@@ -59,7 +59,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
                           << typeName(elem.type()),
             elem.type() == BSONType::Object);
 
-    auto spec = FillSpec::parse(IDLParserErrorContext(kStageName), elem.embeddedObject());
+    auto spec = FillSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
     std::list<boost::intrusive_ptr<DocumentSource>> outputPipeline;
     BSONObjBuilder setWindowFieldsSpec;
 
@@ -81,7 +81,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
                 "Each fill output specification must be an object with exactly one field",
                 fieldSpec.type() == BSONType::Object);
         auto parsedSpec =
-            FillOutputSpec::parse(IDLParserErrorContext(kStageName), fieldSpec.embeddedObject());
+            FillOutputSpec::parse(IDLParserContext(kStageName), fieldSpec.embeddedObject());
         if (auto&& method = parsedSpec.getMethod()) {
             uassert(6050201,
                     "Each fill output specification must have exactly one of 'method' or 'value' "

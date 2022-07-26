@@ -154,7 +154,7 @@ std::unique_ptr<FindCommandRequest> makeFromFindCommand(const BSONObj& cmdObj,
                                                         bool apiStrict) {
 
     auto findCommand = std::make_unique<FindCommandRequest>(
-        FindCommandRequest::parse(IDLParserErrorContext("FindCommandRequest", apiStrict), cmdObj));
+        FindCommandRequest::parse(IDLParserContext("FindCommandRequest", apiStrict), cmdObj));
 
     // If there is an explicit namespace specified overwite it.
     if (nss) {
@@ -224,7 +224,7 @@ TailableModeEnum getTailableMode(const FindCommandRequest& findCommand) {
 
 void validateCursorResponse(const BSONObj& outputAsBson) {
     if (getTestCommandsEnabled()) {
-        CursorInitialReply::parse(IDLParserErrorContext("CursorInitialReply"), outputAsBson);
+        CursorInitialReply::parse(IDLParserContext("CursorInitialReply"), outputAsBson);
     }
 }
 

@@ -1585,7 +1585,7 @@ Status translateEncryptionKeywords(StringMap<BSONElement>& keywordMap,
                                   << "' cannot be an empty object "};
         }
 
-        const IDLParserErrorContext ctxt("encryptMetadata");
+        const IDLParserContext ctxt("encryptMetadata");
         try {
             // Discard the result as we are only concerned with validation.
             EncryptionMetadata::parse(ctxt, encryptMetadataElt.embeddedObject());
@@ -1604,7 +1604,7 @@ Status translateEncryptionKeywords(StringMap<BSONElement>& keywordMap,
 
         try {
             // This checks the types of all the fields. Will throw on any parsing error.
-            const IDLParserErrorContext encryptCtxt("encrypt");
+            const IDLParserContext encryptCtxt("encrypt");
             auto encryptInfo = EncryptionInfo::parse(encryptCtxt, encryptElt.embeddedObject());
             auto infoType = encryptInfo.getBsonType();
 

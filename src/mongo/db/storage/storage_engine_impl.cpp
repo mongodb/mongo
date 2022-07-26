@@ -499,7 +499,7 @@ bool StorageEngineImpl::_handleInternalIdent(OperationContext* opCtx,
                           "failToParseResumeIndexInfo fail point is enabled");
             }
 
-            resumeInfo = ResumeIndexInfo::parse(IDLParserErrorContext("ResumeIndexInfo"), doc);
+            resumeInfo = ResumeIndexInfo::parse(IDLParserContext("ResumeIndexInfo"), doc);
         } catch (const DBException& e) {
             LOGV2(4916300, "Failed to parse resumable index info", "error"_attr = e.toStatus());
 

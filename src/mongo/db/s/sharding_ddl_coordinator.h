@@ -189,7 +189,7 @@ protected:
         : ShardingDDLCoordinator(service, initialStateDoc),
           _coordinatorName(name),
           _initialState(initialStateDoc.getOwned()),
-          _doc(StateDoc::parse(IDLParserErrorContext("CoordinatorDocument"), _initialState)) {}
+          _doc(StateDoc::parse(IDLParserContext("CoordinatorDocument"), _initialState)) {}
 
     ShardingDDLCoordinatorMetadata const& metadata() const override {
         return _doc.getShardingDDLCoordinatorMetadata();

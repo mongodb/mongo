@@ -135,7 +135,7 @@ ReplSetConfig::ReplSetConfig(const BSONObj& cfg,
     // The settings field is optional, but we always serialize it.  Because we can't default it in
     // the IDL, we default it here.
     setSettings(ReplSetConfigSettings());
-    ReplSetConfigBase::parseProtected(IDLParserErrorContext("ReplSetConfig"), cfg);
+    ReplSetConfigBase::parseProtected(IDLParserContext("ReplSetConfig"), cfg);
     uassertStatusOK(_initialize(forInitiate, forceTerm, defaultReplicaSetId));
 
     if (cfg.hasField(kRecipientConfigFieldName)) {

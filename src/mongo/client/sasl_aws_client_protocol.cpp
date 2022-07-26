@@ -99,7 +99,7 @@ template <typename T>
 AWSCredentials parseCredentials(StringData data) {
     BSONObj obj = fromjson(data.toString());
 
-    auto creds = T::parse(IDLParserErrorContext("security-credentials"), obj);
+    auto creds = T::parse(IDLParserContext("security-credentials"), obj);
 
     return AWSCredentials(creds.getAccessKeyId().toString(),
                           creds.getSecretAccessKey().toString(),

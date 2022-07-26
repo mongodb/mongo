@@ -268,8 +268,8 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                 return;
             }
 
-            auto deletionTask = RangeDeletionTask::parse(
-                IDLParserErrorContext("ShardServerOpObserver"), insertedDoc);
+            auto deletionTask =
+                RangeDeletionTask::parse(IDLParserContext("ShardServerOpObserver"), insertedDoc);
 
             if (!deletionTask.getPending()) {
                 opCtx->recoveryUnit()->registerChange(
@@ -284,7 +284,7 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
         if (nss == NamespaceString::kCollectionCriticalSectionsNamespace &&
             !recoverable_critical_section_util::inRecoveryMode(opCtx)) {
             const auto collCSDoc = CollectionCriticalSectionDocument::parse(
-                IDLParserErrorContext("ShardServerOpObserver"), insertedDoc);
+                IDLParserContext("ShardServerOpObserver"), insertedDoc);
             opCtx->recoveryUnit()->onCommit([opCtx,
                                              insertedNss = collCSDoc.getNss(),
                                              reason = collCSDoc.getReason().getOwned()](
@@ -411,8 +411,8 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
             update_oplog_entry::isFieldRemovedByUpdate(args.updateArgs->update, "pending");
 
         if (pendingFieldRemovedStatus == update_oplog_entry::FieldRemovedStatus::kFieldRemoved) {
-            auto deletionTask = RangeDeletionTask::parse(
-                IDLParserErrorContext("ShardServerOpObserver"), args.updateArgs->updatedDoc);
+            auto deletionTask = RangeDeletionTask::parse(IDLParserContext("ShardServerOpObserver"),
+                                                         args.updateArgs->updatedDoc);
 
             if (deletionTask.getDonorShardId() != ShardingState::get(opCtx)->shardId()) {
                 // Range deletion tasks for moved away chunks are scheduled through the
@@ -426,7 +426,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
     if (args.nss == NamespaceString::kCollectionCriticalSectionsNamespace &&
         !recoverable_critical_section_util::inRecoveryMode(opCtx)) {
         const auto collCSDoc = CollectionCriticalSectionDocument::parse(
-            IDLParserErrorContext("ShardServerOpObserver"), args.updateArgs->updatedDoc);
+            IDLParserContext("ShardServerOpObserver"), args.updateArgs->updatedDoc);
 
         opCtx->recoveryUnit()->onCommit(
             [opCtx, updatedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](
@@ -522,7 +522,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
         !recoverable_critical_section_util::inRecoveryMode(opCtx)) {
         const auto& deletedDoc = documentId;
         const auto collCSDoc = CollectionCriticalSectionDocument::parse(
-            IDLParserErrorContext("ShardServerOpObserver"), deletedDoc);
+            IDLParserContext("ShardServerOpObserver"), deletedDoc);
 
         opCtx->recoveryUnit()->onCommit(
             [opCtx, deletedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](

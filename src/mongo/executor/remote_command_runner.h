@@ -80,7 +80,7 @@ SemiFuture<typename CommandType::Reply> doRequest(CommandType cmd,
     return std::move(resFuture)
         .then([&, exec = std::move(exec)](BSONObj r) {
             // TODO SERVER-67661: Make IDL reply types have string representation for logging
-            auto res = CommandType::Reply::parse(IDLParserErrorContext("RemoteCommandRunner"), r);
+            auto res = CommandType::Reply::parse(IDLParserContext("RemoteCommandRunner"), r);
             return res;
         })
         .semi();

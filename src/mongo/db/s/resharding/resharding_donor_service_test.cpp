@@ -289,7 +289,7 @@ TEST_F(ReshardingDonorServiceTest, WritesNoOpOplogEntryOnReshardingBegin) {
 
     ReshardBeginChangeEventO2Field expectedChangeEvent{sourceNss, doc.getReshardingUUID()};
     auto receivedChangeEvent = ReshardBeginChangeEventO2Field::parse(
-        IDLParserErrorContext("ReshardBeginChangeEventO2Field"), *op.getObject2());
+        IDLParserContext("ReshardBeginChangeEventO2Field"), *op.getObject2());
 
     ASSERT_EQ(OpType_serializer(op.getOpType()), OpType_serializer(repl::OpTypeEnum::kNoop))
         << op.getEntry();

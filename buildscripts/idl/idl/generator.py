@@ -572,7 +572,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             # Declare method implemented in C++ file.
             self._writer.write_template('void ${method_name}(${param_type} value);')
             self._writer.write_template(
-                'void ${method_name}(IDLParserErrorContext& ctxt, ${param_type} value);')
+                'void ${method_name}(IDLParserContext& ctxt, ${param_type} value);')
 
         self._writer.write_empty_line()
 
@@ -1174,7 +1174,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         if ast_type.is_struct:
             self._writer.write_line(
-                'IDLParserErrorContext tempContext(%s, &ctxt);' % (_get_field_constant_name(field)))
+                'IDLParserContext tempContext(%s, &ctxt);' % (_get_field_constant_name(field)))
             self._writer.write_line('const auto localObject = %s.Obj();' % (element_name))
             return '%s::parse(tempContext, localObject)' % (ast_type.cpp_type, )
         elif ast_type.deserializer and 'BSONElement::' in ast_type.deserializer:
@@ -1196,9 +1196,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 method_name = writer.get_method_name_from_qualified_method_name(
                     ast_type.deserializer)
 
-                # For fields which are enums, pass a IDLParserErrorContext
+                # For fields which are enums, pass a IDLParserContext
                 if ast_type.is_enum:
-                    self._writer.write_line('IDLParserErrorContext tempContext(%s, &ctxt);' %
+                    self._writer.write_line('IDLParserContext tempContext(%s, &ctxt);' %
                                             (_get_field_constant_name(field)))
                     return common.template_args("${method_name}(tempContext, ${expression})",
                                                 method_name=method_name, expression=expression)
@@ -1233,7 +1233,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         self._writer.write_line('std::uint32_t expectedFieldNumber{0};')
         self._writer.write_line(
-            'const IDLParserErrorContext arrayCtxt(%s, &ctxt);' % (_get_field_constant_name(field)))
+            'const IDLParserContext arrayCtxt(%s, &ctxt);' % (_get_field_constant_name(field)))
         self._writer.write_line('std::vector<%s> values;' % (cpp_type))
         self._writer.write_empty_line()
 
@@ -1470,8 +1470,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
             # Either we are deserializing BSON Objects or IDL structs
             if field.type.is_struct:
-                self._writer.write_line('IDLParserErrorContext tempContext(%s, &ctxt);' %
-                                        (_get_field_constant_name(field)))
+                self._writer.write_line(
+                    'IDLParserContext tempContext(%s, &ctxt);' % (_get_field_constant_name(field)))
                 array_value = '%s::parse(tempContext, sequenceObject)' % (field.type.cpp_type, )
             else:
                 assert field.type.bson_serialization_type == ['object']
@@ -1772,7 +1772,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 # Fields without validators are implemented in the header.
                 continue
 
-            for optional_params in [('IDLParserErrorContext& ctxt, ', 'ctxt, '), ('', '')]:
+            for optional_params in [('IDLParserContext& ctxt, ', 'ctxt, '), ('', '')]:
                 self._gen_field_validator(struct, field, optional_params)
 
     def gen_bson_deserializer_methods(self, struct):
@@ -2097,7 +2097,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         if isinstance(struct, ast.Command):
             known_name = "_knownOP_MSGFields" if is_op_msg_request else "_knownBSONFields"
             self._writer.write_line(
-                "IDLParserErrorContext::appendGenericCommandArguments(commandPassthroughFields, %s, builder);"
+                "IDLParserContext::appendGenericCommandArguments(commandPassthroughFields, %s, builder);"
                 % (known_name))
             self._writer.write_empty_line()
 

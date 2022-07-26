@@ -43,7 +43,7 @@ namespace {
 
 static const NamespaceString testns("TestDB.TestColl");
 
-const IDLParserErrorContext ctxt("count");
+const IDLParserContext ctxt("count");
 
 TEST(CountCommandTest, ParserDealsWithMissingFieldsCorrectly) {
     auto commandObj = BSON("count"

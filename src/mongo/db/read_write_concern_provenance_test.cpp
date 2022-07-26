@@ -108,34 +108,34 @@ DEATH_TEST(ReadWriteConcernProvenanceTest,
 TEST(ReadWriteConcernProvenanceTest, ParseAbsentElement) {
     BSONObj obj = BSON("something"
                        << "else");
-    auto provenance = ReadWriteConcernProvenance::parse(
-        IDLParserErrorContext("ReadWriteConcernProvenanceTest"), obj);
+    auto provenance =
+        ReadWriteConcernProvenance::parse(IDLParserContext("ReadWriteConcernProvenanceTest"), obj);
     ASSERT_FALSE(provenance.hasSource());
 }
 
 TEST(ReadWriteConcernProvenanceTest, ParseNonString) {
     BSONObj obj = BSON("provenance" << 42);
-    ASSERT_THROWS_CODE(ReadWriteConcernProvenance::parse(
-                           IDLParserErrorContext("ReadWriteConcernProvenanceTest"), obj),
-                       DBException,
-                       ErrorCodes::TypeMismatch);
+    ASSERT_THROWS_CODE(
+        ReadWriteConcernProvenance::parse(IDLParserContext("ReadWriteConcernProvenanceTest"), obj),
+        DBException,
+        ErrorCodes::TypeMismatch);
 }
 
 TEST(ReadWriteConcernProvenanceTest, ParseValidSource) {
     BSONObj obj = BSON("provenance"
                        << "clientSupplied");
-    auto provenance = ReadWriteConcernProvenance::parse(
-        IDLParserErrorContext("ReadWriteConcernProvenanceTest"), obj);
+    auto provenance =
+        ReadWriteConcernProvenance::parse(IDLParserContext("ReadWriteConcernProvenanceTest"), obj);
     ASSERT_TRUE(ReadWriteConcernProvenance::Source::clientSupplied == provenance.getSource());
 }
 
 TEST(ReadWriteConcernProvenanceTest, ParseInvalidSource) {
     BSONObj obj = BSON("provenance"
                        << "foobar");
-    ASSERT_THROWS_CODE(ReadWriteConcernProvenance::parse(
-                           IDLParserErrorContext("ReadWriteConcernProvenanceTest"), obj),
-                       DBException,
-                       ErrorCodes::BadValue);
+    ASSERT_THROWS_CODE(
+        ReadWriteConcernProvenance::parse(IDLParserContext("ReadWriteConcernProvenanceTest"), obj),
+        DBException,
+        ErrorCodes::BadValue);
 }
 
 TEST(ReadWriteConcernProvenanceTest, SerializeUnset) {

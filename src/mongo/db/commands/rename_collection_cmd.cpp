@@ -95,7 +95,7 @@ public:
                            string& errmsg,
                            BSONObjBuilder& result) {
         auto renameRequest =
-            RenameCollectionCommand::parse(IDLParserErrorContext("renameCollection"), cmdObj);
+            RenameCollectionCommand::parse(IDLParserContext("renameCollection"), cmdObj);
 
         const auto& fromNss = renameRequest.getCommandParameter();
         const auto& toNss = renameRequest.getTo();

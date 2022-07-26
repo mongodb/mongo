@@ -60,7 +60,7 @@ std::shared_ptr<ReshardingCoordinatorObserver> getReshardingCoordinatorObserver(
 }
 
 boost::optional<Timestamp> parseNewMinFetchTimestampValue(const BSONObj& obj) {
-    auto doc = ReshardingDonorDocument::parse(IDLParserErrorContext("Resharding"), obj);
+    auto doc = ReshardingDonorDocument::parse(IDLParserContext("Resharding"), obj);
     if (doc.getMutableState().getState() == DonorStateEnum::kDonatingInitialData) {
         return doc.getMutableState().getMinFetchTimestamp().get();
     } else {
@@ -218,7 +218,7 @@ void ReshardingOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEn
 
     if (args.nss == NamespaceString::kConfigReshardingOperationsNamespace) {
         auto newCoordinatorDoc = ReshardingCoordinatorDocument::parse(
-            IDLParserErrorContext("reshardingCoordinatorDoc"), args.updateArgs->updatedDoc);
+            IDLParserContext("reshardingCoordinatorDoc"), args.updateArgs->updatedDoc);
         opCtx->recoveryUnit()->onCommit([opCtx, newCoordinatorDoc = std::move(newCoordinatorDoc)](
                                             boost::optional<Timestamp> unusedCommitTime) mutable {
             try {

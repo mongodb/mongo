@@ -112,7 +112,7 @@ ReshardCollectionCoordinator::ReshardCollectionCoordinator(ShardingDDLCoordinato
 
 void ReshardCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
     const auto otherDoc = ReshardCollectionCoordinatorDocument::parse(
-        IDLParserErrorContext("ReshardCollectionCoordinatorDocument"), doc);
+        IDLParserContext("ReshardCollectionCoordinatorDocument"), doc);
 
     uassert(ErrorCodes::ConflictingOperationInProgress,
             "Another reshard collection with different arguments is already running for the same "

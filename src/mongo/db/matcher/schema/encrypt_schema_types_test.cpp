@@ -97,7 +97,7 @@ TEST(EncryptSchemaTest, ParseFullEncryptObjectFromBSON) {
                                    << "AEAD_AES_256_CBC_HMAC_SHA_512-Deterministic"
                                    << "keyId"
                                    << "/pointer");
-    IDLParserErrorContext ctxt("encrypt");
+    IDLParserContext ctxt("encrypt");
     auto encryptInfo = EncryptionInfo::parse(ctxt, encryptInfoBSON);
     MatcherTypeSet resultMatcherSet;
     resultMatcherSet.bsonTypes.insert(BSONType::NumberInt);
@@ -110,7 +110,7 @@ TEST(EncryptSchemaTest, ParseFullEncryptObjectFromBSON) {
 
 TEST(EncryptSchemaTest, WrongTypeFailsParse) {
     BSONObj encryptInfoBSON = BSON("keyId" << 2);
-    IDLParserErrorContext ctxt("encrypt");
+    IDLParserContext ctxt("encrypt");
     ASSERT_THROWS_CODE(EncryptionInfo::parse(ctxt, encryptInfoBSON), DBException, 51085);
     encryptInfoBSON = BSON("algorithm"
                            << "garbage");

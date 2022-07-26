@@ -121,7 +121,7 @@ TEST_F(FreeMonStorageTest, TestStorage) {
 
 
     FreeMonStorageState initialState =
-        FreeMonStorageState::parse(IDLParserErrorContext("foo"),
+        FreeMonStorageState::parse(IDLParserContext("foo"),
                                    BSON("version" << 1LL << "state"
                                                   << "enabled"
                                                   << "registrationId"
@@ -172,7 +172,7 @@ TEST_F(FreeMonStorageTest, TestSecondary) {
 
 
     FreeMonStorageState initialState =
-        FreeMonStorageState::parse(IDLParserErrorContext("foo"),
+        FreeMonStorageState::parse(IDLParserContext("foo"),
                                    BSON("version" << 1LL << "state"
                                                   << "enabled"
                                                   << "registrationId"
@@ -198,7 +198,7 @@ TEST_F(FreeMonStorageTest, TestSecondary) {
     ASSERT_OK(_getReplCoord()->setFollowerMode(repl::MemberState::RS_SECONDARY));
 
     FreeMonStorageState updatedState =
-        FreeMonStorageState::parse(IDLParserErrorContext("foo"),
+        FreeMonStorageState::parse(IDLParserContext("foo"),
                                    BSON("version" << 2LL << "state"
                                                   << "enabled"
                                                   << "registrationId"

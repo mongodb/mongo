@@ -87,8 +87,7 @@ intrusive_ptr<DocumentSource> DocumentSourceReplaceRoot::createFromBson(
                               << " stage, got " << typeName(elem.type()),
                 elem.type() == Object);
 
-        auto spec =
-            ReplaceRootSpec::parse(IDLParserErrorContext(kStageName), elem.embeddedObject());
+        auto spec = ReplaceRootSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
 
         // The IDL doesn't give us back the type we need to feed into the expression parser, and
         // the expression parser needs the extra state in 'vps' and 'expCtx', so for now we have

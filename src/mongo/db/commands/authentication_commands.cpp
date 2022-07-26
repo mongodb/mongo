@@ -444,8 +444,8 @@ void doSpeculativeAuthenticate(OperationContext* opCtx,
         cmd.append(AuthenticateCommand::kDbNameFieldName, kExternalDB);
     }
 
-    auto authCmdObj = AuthenticateCommand::parse(
-        IDLParserErrorContext("speculative X509 Authenticate"), cmd.obj());
+    auto authCmdObj =
+        AuthenticateCommand::parse(IDLParserContext("speculative X509 Authenticate"), cmd.obj());
 
     AuthenticationSession::doStep(
         opCtx, AuthenticationSession::StepType::kSpeculativeAuthenticate, [&](auto session) {

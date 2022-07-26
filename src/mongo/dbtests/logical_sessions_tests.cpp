@@ -69,7 +69,7 @@ StatusWith<LogicalSessionRecord> fetchRecord(OperationContext* opCtx,
     }
 
     try {
-        IDLParserErrorContext ctx("LogicalSessionRecord");
+        IDLParserContext ctx("LogicalSessionRecord");
         return LogicalSessionRecord::parse(ctx, cursor->next());
     } catch (...) {
         return exceptionToStatus();

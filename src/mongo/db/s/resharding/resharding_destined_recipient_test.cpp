@@ -355,7 +355,7 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnInsertsInTran
     auto info = repl::ApplyOpsCommandInfo::parse(entry.getOperationToApply());
 
     auto ops = info.getOperations();
-    auto replOp = repl::ReplOperation::parse(IDLParserErrorContext("insertOp"), ops[0]);
+    auto replOp = repl::ReplOperation::parse(IDLParserContext("insertOp"), ops[0]);
     ASSERT_EQ(replOp.getNss(), kNss);
 
     auto recipShard = replOp.getDestinedRecipient();
@@ -442,7 +442,7 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnUpdatesInTran
     auto info = repl::ApplyOpsCommandInfo::parse(entry.getOperationToApply());
 
     auto ops = info.getOperations();
-    auto replOp = repl::ReplOperation::parse(IDLParserErrorContext("insertOp"), ops[0]);
+    auto replOp = repl::ReplOperation::parse(IDLParserContext("insertOp"), ops[0]);
     ASSERT_EQ(replOp.getNss(), kNss);
 
     auto recipShard = replOp.getDestinedRecipient();
@@ -487,7 +487,7 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnDeletesInTran
     auto info = repl::ApplyOpsCommandInfo::parse(entry.getOperationToApply());
 
     auto ops = info.getOperations();
-    auto replOp = repl::ReplOperation::parse(IDLParserErrorContext("deleteOp"), ops[0]);
+    auto replOp = repl::ReplOperation::parse(IDLParserContext("deleteOp"), ops[0]);
     ASSERT_EQ(replOp.getNss(), kNss);
 
     auto recipShard = replOp.getDestinedRecipient();

@@ -152,7 +152,7 @@ getDataSizeInfoForCollections(OperationContext* opCtx,
 
             const ShardsvrGetStatsForBalancingReply reply =
                 ShardsvrGetStatsForBalancingReply::parse(
-                    IDLParserErrorContext("ShardsvrGetStatsForBalancingReply"),
+                    IDLParserContext("ShardsvrGetStatsForBalancingReply"),
                     std::move(responseValue.data));
             const auto collStatsFromShard = reply.getStats();
 

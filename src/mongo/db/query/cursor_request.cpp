@@ -54,7 +54,7 @@ Status CursorRequest::parseCommandCursorOptions(const BSONObj& cmdObj,
 
     BSONObj cursor = cursorElem.embeddedObject();
     auto options =
-        SimpleCursorOptions::parse(IDLParserErrorContext("parseCommandCursorOptions"), cursor);
+        SimpleCursorOptions::parse(IDLParserContext("parseCommandCursorOptions"), cursor);
     if (options.getBatchSize()) {
         *batchSize = *options.getBatchSize();
     }

@@ -38,7 +38,7 @@ namespace mongo {
 
 namespace {
 
-const IDLParserErrorContext ctxt("killCursors");
+const IDLParserContext ctxt("killCursors");
 
 TEST(KillCursorsRequestTest, parseSuccess) {
     auto bsonObj = BSON("killCursors"

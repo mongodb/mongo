@@ -114,7 +114,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceChangeStreamOplogMatch::creat
             "the match filter must be an expression in an object",
             elem.type() == BSONType::Object);
     auto parsedSpec = DocumentSourceChangeStreamOplogMatchSpec::parse(
-        IDLParserErrorContext("DocumentSourceChangeStreamOplogMatchSpec"), elem.Obj());
+        IDLParserContext("DocumentSourceChangeStreamOplogMatchSpec"), elem.Obj());
 
     // Note: raw new used here to access private constructor.
     return new DocumentSourceChangeStreamOplogMatch(parsedSpec.getFilter(), pExpCtx);

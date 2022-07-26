@@ -585,8 +585,8 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
             uassert(4938001,
                     "the 'api' option for Mongo() must be an object",
                     options["api"].isABSONObj());
-            apiParameters = ClientAPIVersionParameters::parse(IDLParserErrorContext("api"_sd),
-                                                              options["api"].Obj());
+            apiParameters =
+                ClientAPIVersionParameters::parse(IDLParserContext("api"_sd), options["api"].Obj());
             if (apiParameters.getDeprecationErrors().value_or(false) ||
                 apiParameters.getStrict().value_or(false)) {
                 uassert(4938002,

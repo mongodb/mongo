@@ -681,8 +681,8 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         }
     } else if (nss == NamespaceString::kExternalKeysCollectionNamespace) {
         for (auto it = first; it != last; it++) {
-            auto externalKey = ExternalKeysCollectionDocument::parse(
-                IDLParserErrorContext("externalKey"), it->doc);
+            auto externalKey =
+                ExternalKeysCollectionDocument::parse(IDLParserContext("externalKey"), it->doc);
             opCtx->recoveryUnit()->onCommit(
                 [this, opCtx, externalKey = std::move(externalKey)](
                     boost::optional<Timestamp> unusedCommitTime) mutable {

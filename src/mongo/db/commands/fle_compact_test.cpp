@@ -411,7 +411,7 @@ void FleCompactTest::doSingleDelete(int id, BSONObj encryptedFieldsObj) {
     auto doc = EncryptionInformationHelpers::encryptionInformationSerializeForDelete(
         _namespaces.edcNss, efc, &_keyVault);
 
-    auto ei = EncryptionInformation::parse(IDLParserErrorContext("test"), doc);
+    auto ei = EncryptionInformation::parse(IDLParserContext("test"), doc);
 
     write_ops::DeleteOpEntry entry;
     entry.setQ(BSON("_id" << id));

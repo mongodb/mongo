@@ -94,7 +94,7 @@ bool ApplyOpsCommandInfo::isAtomic() const {
 
 ApplyOpsCommandInfo::ApplyOpsCommandInfo(const BSONObj& applyOpCmd)
     : _areOpsCrudOnly(_parseAreOpsCrudOnly(applyOpCmd)) {
-    parseProtected(IDLParserErrorContext("applyOps"), applyOpCmd);
+    parseProtected(IDLParserContext("applyOps"), applyOpCmd);
 
     if (getPreCondition()) {
         uassert(ErrorCodes::InvalidOptions,
@@ -135,7 +135,7 @@ void ApplyOps::extractOperationsTo(const OplogEntry& applyOpsOplogEntry,
     uint64_t applyOpsIdx{0};
     for (const auto& operationDoc : operationDocs) {
         // Make sure that the inner ops are not malformed or over-specified.
-        ReplOperation::parse(IDLParserErrorContext("extractOperations"), operationDoc);
+        ReplOperation::parse(IDLParserContext("extractOperations"), operationDoc);
 
         BSONObjBuilder builder(operationDoc);
 

@@ -306,7 +306,7 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
 
     auto ownedRequest = deleteRequest.serialize({});
     auto ownedDeleteRequest =
-        write_ops::DeleteCommandRequest::parse(IDLParserErrorContext("delete"), ownedRequest);
+        write_ops::DeleteCommandRequest::parse(IDLParserContext("delete"), ownedRequest);
     auto ownedDeleteOpEntry = ownedDeleteRequest.getDeletes()[0];
 
     auto expCtx = makeExpCtx(opCtx, ownedDeleteRequest, ownedDeleteOpEntry);
@@ -394,7 +394,7 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
 
     auto ownedRequest = updateRequest.serialize({});
     auto ownedUpdateRequest =
-        write_ops::UpdateCommandRequest::parse(IDLParserErrorContext("update"), ownedRequest);
+        write_ops::UpdateCommandRequest::parse(IDLParserContext("update"), ownedRequest);
     auto ownedUpdateOpEntry = ownedUpdateRequest.getUpdates()[0];
 
     auto expCtx = makeExpCtx(opCtx, ownedUpdateRequest, ownedUpdateOpEntry);
@@ -674,7 +674,7 @@ StatusWith<std::pair<ReplyType, OpMsgRequest>> processFindAndModifyRequest(
 
     auto ownedRequest = findAndModifyRequest.serialize({});
     auto ownedFindAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
-        IDLParserErrorContext("findAndModify"), ownedRequest);
+        IDLParserContext("findAndModify"), ownedRequest);
 
     auto expCtx = makeExpCtx(opCtx, ownedFindAndModifyRequest, ownedFindAndModifyRequest);
     auto findAndModifyBlock = std::make_tuple(ownedFindAndModifyRequest, expCtx);
@@ -1208,8 +1208,8 @@ FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
                                        BSONObjBuilder& result) {
     // There is no findAndModify parsing in mongos so we need to first parse to decide if it is for
     // FLE2
-    auto request = write_ops::FindAndModifyCommandRequest::parse(
-        IDLParserErrorContext("findAndModify"), cmdObj);
+    auto request =
+        write_ops::FindAndModifyCommandRequest::parse(IDLParserContext("findAndModify"), cmdObj);
 
     if (!request.getEncryptionInformation().has_value()) {
         return FLEBatchResult::kNotProcessed;
@@ -1359,7 +1359,7 @@ std::pair<write_ops::DeleteCommandReply, BSONObj> FLEQueryInterfaceImpl::deleteW
         deleteReply.getWriteCommandReplyBase().setWriteErrors(singleStatusToWriteErrors(status));
     } else {
         auto reply =
-            write_ops::FindAndModifyCommandReply::parse(IDLParserErrorContext("reply"), response);
+            write_ops::FindAndModifyCommandReply::parse(IDLParserContext("reply"), response);
 
         if (reply.getLastErrorObject().getNumDocs() > 0) {
             deleteReply.getWriteCommandReplyBase().setN(1);
@@ -1403,8 +1403,7 @@ std::pair<write_ops::UpdateCommandReply, BSONObj> FLEQueryInterfaceImpl::updateW
     auto status = getStatusFromWriteCommandReply(response);
     uassertStatusOK(status);
 
-    auto reply =
-        write_ops::FindAndModifyCommandReply::parse(IDLParserErrorContext("reply"), response);
+    auto reply = write_ops::FindAndModifyCommandReply::parse(IDLParserContext("reply"), response);
 
     write_ops::UpdateCommandReply updateReply;
 
@@ -1474,7 +1473,7 @@ write_ops::FindAndModifyCommandReply FLEQueryInterfaceImpl::findAndModify(
     auto status = getStatusFromWriteCommandReply(response);
     uassertStatusOK(status);
 
-    return write_ops::FindAndModifyCommandReply::parse(IDLParserErrorContext("reply"), response);
+    return write_ops::FindAndModifyCommandReply::parse(IDLParserContext("reply"), response);
 }
 
 std::vector<BSONObj> FLEQueryInterfaceImpl::findDocuments(const NamespaceString& nss,

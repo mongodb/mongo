@@ -504,7 +504,7 @@ public:
         OneOffRead oor(_opCtx, ts);
 
         auto doc =
-            repl::MinValidDocument::parse(IDLParserErrorContext("MinValidDocument"), findOne(coll));
+            repl::MinValidDocument::parse(IDLParserContext("MinValidDocument"), findOne(coll));
         ASSERT_EQ(expectedDoc.getMinValidTimestamp(), doc.getMinValidTimestamp())
             << "minValid timestamps weren't equal at " << ts.toString()
             << ". Expected: " << expectedDoc.toBSON() << ". Found: " << doc.toBSON();

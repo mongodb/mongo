@@ -93,7 +93,7 @@ public:
                      const std::string& dbname,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        auto request = MovePrimary::parse(IDLParserErrorContext("MovePrimary"), cmdObj);
+        auto request = MovePrimary::parse(IDLParserContext("MovePrimary"), cmdObj);
 
         const string db = parseNs("", cmdObj);
         const StringData toShard(request.getTo());

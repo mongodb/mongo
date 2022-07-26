@@ -93,8 +93,7 @@ list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::createFro
                           << typeName(elem.type()),
             elem.type() == BSONType::Object);
 
-    auto spec =
-        SetWindowFieldsSpec::parse(IDLParserErrorContext(kStageName), elem.embeddedObject());
+    auto spec = SetWindowFieldsSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
     auto partitionBy = [&]() -> boost::optional<boost::intrusive_ptr<Expression>> {
         if (auto partitionBy = spec.getPartitionBy())
             return Expression::parseOperand(
@@ -330,8 +329,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::crea
                           << typeName(elem.type()),
             elem.type() == BSONType::Object);
 
-    auto spec =
-        SetWindowFieldsSpec::parse(IDLParserErrorContext(kStageName), elem.embeddedObject());
+    auto spec = SetWindowFieldsSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
     auto partitionBy = [&]() -> boost::optional<boost::intrusive_ptr<Expression>> {
         if (auto partitionBy = spec.getPartitionBy())
             return Expression::parseOperand(

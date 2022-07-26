@@ -220,7 +220,7 @@ boost::optional<ReshardingOplogApplierProgress> ReshardingOplogApplier::checkSto
         return boost::none;
     }
 
-    IDLParserErrorContext ctx("ReshardingOplogApplierProgress");
+    IDLParserContext ctx("ReshardingOplogApplierProgress");
     return ReshardingOplogApplierProgress::parse(ctx, doc);
 }
 

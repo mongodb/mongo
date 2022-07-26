@@ -803,7 +803,7 @@ public:
     Status commit() {
         auto fp = umcTransaction.scoped();
         if (fp.isActive()) {
-            IDLParserErrorContext ctx("umcTransaction");
+            IDLParserContext ctx("umcTransaction");
             auto delay = UMCTransactionFailPoint::parse(ctx, fp.getData()).getCommitDelayMS();
             LOGV2(4993100,
                   "Sleeping prior to committing UMC transaction",

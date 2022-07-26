@@ -93,7 +93,7 @@ public:
         uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
         const auto movePrimaryRequest =
-            ShardMovePrimary::parse(IDLParserErrorContext("_shardsvrMovePrimary"), cmdObj);
+            ShardMovePrimary::parse(IDLParserContext("_shardsvrMovePrimary"), cmdObj);
         const auto dbname = parseNs("", cmdObj);
 
         const NamespaceString dbNss(dbname);

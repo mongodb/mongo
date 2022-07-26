@@ -103,7 +103,7 @@ AggregateCommandRequest parseFromBSON(OperationContext* opCtx,
     }
 
     AggregateCommandRequest request(nss);
-    request = AggregateCommandRequest::parse(IDLParserErrorContext("aggregate", apiStrict),
+    request = AggregateCommandRequest::parse(IDLParserContext("aggregate", apiStrict),
                                              cmdObjChanged ? cmdObjBob.obj() : cmdObj);
 
     if (explainVerbosity) {
@@ -285,9 +285,8 @@ mongo::SimpleCursorOptions parseAggregateCursorFromBSON(const BSONElement& curso
             "cursor field must be missing or an object",
             cursorElem.type() == mongo::Object);
 
-    SimpleCursorOptions cursor =
-        SimpleCursorOptions::parse(IDLParserErrorContext(AggregateCommandRequest::kCursorFieldName),
-                                   cursorElem.embeddedObject());
+    SimpleCursorOptions cursor = SimpleCursorOptions::parse(
+        IDLParserContext(AggregateCommandRequest::kCursorFieldName), cursorElem.embeddedObject());
     if (!cursor.getBatchSize())
         cursor.setBatchSize(aggregation_request_helper::kDefaultBatchSize);
 

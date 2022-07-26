@@ -59,8 +59,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalApplyOplogUpdate::cre
                           << " stage must be an object, but found type: " << typeName(elem.type()),
             elem.type() == BSONType::Object);
 
-    auto spec = InternalApplyOplogUpdateSpec::parse(IDLParserErrorContext(kStageName),
-                                                    elem.embeddedObject());
+    auto spec =
+        InternalApplyOplogUpdateSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
 
     return new DocumentSourceInternalApplyOplogUpdate(pExpCtx, spec.getOplogUpdate());
 }

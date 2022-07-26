@@ -40,7 +40,7 @@ namespace {
 using unittest::assertGet;
 
 ChunkRange chunkRange(BSON("a" << 1), BSON("a" << 10));
-IDLParserErrorContext ctx("_configsvrCommitChunksMerge");
+IDLParserContext ctx("_configsvrCommitChunksMerge");
 
 TEST(ConfigSvrMergeChunks, BasicValidConfigCommand) {
     auto collUUID = UUID::gen();

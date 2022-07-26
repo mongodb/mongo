@@ -223,7 +223,7 @@ void handleAuthLocalGetUserFailPoint(const std::vector<RoleName>& directRoles) {
         return;
     }
 
-    IDLParserErrorContext ctx("authLocalGetUser");
+    IDLParserContext ctx("authLocalGetUser");
     auto delay = AuthLocalGetUserFailPoint::parse(ctx, sfp.getData()).getResolveRolesDelayMS();
 
     if (delay <= 0) {

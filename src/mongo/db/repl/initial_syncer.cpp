@@ -990,8 +990,7 @@ void InitialSyncer::_getBeginFetchingOpTimeCallback(
     OpTime beginFetchingOpTime = defaultBeginFetchingOpTime;
     if (docs.size() != 0) {
         auto entry = SessionTxnRecord::parse(
-            IDLParserErrorContext("oldest active transaction optime for initial sync"),
-            docs.front());
+            IDLParserContext("oldest active transaction optime for initial sync"), docs.front());
         auto optime = entry.getStartOpTime();
         if (optime) {
             beginFetchingOpTime = optime.get();

@@ -357,8 +357,8 @@ TenantMigrationRecipientService::Instance::Instance(
     : PrimaryOnlyService::TypedInstance<Instance>(),
       _serviceContext(serviceContext),
       _recipientService(recipientService),
-      _stateDoc(TenantMigrationRecipientDocument::parse(IDLParserErrorContext("recipientStateDoc"),
-                                                        stateDoc)),
+      _stateDoc(
+          TenantMigrationRecipientDocument::parse(IDLParserContext("recipientStateDoc"), stateDoc)),
       _tenantId(_stateDoc.getTenantId().toString()),
       _protocol(_stateDoc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations)),
       _migrationUuid(_stateDoc.getId()),
@@ -460,8 +460,8 @@ boost::optional<BSONObj> TenantMigrationRecipientService::Instance::reportForCur
 
 void TenantMigrationRecipientService::Instance::checkIfOptionsConflict(
     const BSONObj& options) const {
-    auto stateDoc = TenantMigrationRecipientDocument::parse(
-        IDLParserErrorContext("recipientStateDoc"), options);
+    auto stateDoc =
+        TenantMigrationRecipientDocument::parse(IDLParserContext("recipientStateDoc"), options);
 
     invariant(stateDoc.getId() == _migrationUuid);
 
@@ -1287,8 +1287,7 @@ TenantMigrationRecipientService::Instance::_makeCommittedTransactionsAggregation
 
 void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntry(
     const BSONObj& entry) {
-    auto sessionTxnRecord =
-        SessionTxnRecord::parse(IDLParserErrorContext("SessionTxnRecord"), entry);
+    auto sessionTxnRecord = SessionTxnRecord::parse(IDLParserContext("SessionTxnRecord"), entry);
     auto sessionId = sessionTxnRecord.getSessionId();
     auto txnNumber = sessionTxnRecord.getTxnNum();
     auto optTxnRetryCounter = sessionTxnRecord.getTxnRetryCounter();

@@ -78,7 +78,7 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
         // Command has no members, invoke the parser to confirm that.
-        IDLParserErrorContext ctx("getFreeMonitoringStatus");
+        IDLParserContext ctx("getFreeMonitoringStatus");
         GetFreeMonitoringStatus::parse(ctx, cmdObj);
 
         result.append("state", "disabled");

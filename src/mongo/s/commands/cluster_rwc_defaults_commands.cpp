@@ -71,8 +71,8 @@ public:
         uassertStatusOK(cmdResponse.writeConcernStatus);
 
         // Quickly pick up the new defaults by setting them in the cache.
-        auto newDefaults = RWConcernDefault::parse(
-            IDLParserErrorContext("ClusterSetDefaultRWConcern"), cmdResponse.response);
+        auto newDefaults = RWConcernDefault::parse(IDLParserContext("ClusterSetDefaultRWConcern"),
+                                                   cmdResponse.response);
         if (auto optWC = newDefaults.getDefaultWriteConcern()) {
             if (optWC->hasCustomWriteMode()) {
                 LOGV2_WARNING(
@@ -155,7 +155,7 @@ public:
             uassertStatusOK(cmdResponse.commandStatus);
 
             return GetDefaultRWConcernResponse::parse(
-                IDLParserErrorContext("ClusterGetDefaultRWConcernResponse"), cmdResponse.response);
+                IDLParserContext("ClusterGetDefaultRWConcernResponse"), cmdResponse.response);
         }
 
     private:

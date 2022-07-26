@@ -5173,7 +5173,7 @@ ReadPreference ReplicationCoordinatorImpl::_getSyncSourceReadPreference(WithLock
         if (!initialSyncSourceReadPreference.empty()) {
             try {
                 readPreference =
-                    ReadPreference_parse(IDLParserErrorContext("initialSyncSourceReadPreference"),
+                    ReadPreference_parse(IDLParserContext("initialSyncSourceReadPreference"),
                                          initialSyncSourceReadPreference);
                 parsedSyncSourceFromInitialSync = true;
             } catch (const DBException& e) {

@@ -177,8 +177,7 @@ void ShardSplitDonorService::checkIfConflictsWithOtherInstances(
     OperationContext* opCtx,
     BSONObj initialState,
     const std::vector<const repl::PrimaryOnlyService::Instance*>& existingInstances) {
-    auto stateDoc =
-        ShardSplitDonorDocument::parse(IDLParserErrorContext("donorStateDoc"), initialState);
+    auto stateDoc = ShardSplitDonorDocument::parse(IDLParserContext("donorStateDoc"), initialState);
 
     for (auto& instance : existingInstances) {
         auto existingTypedInstance =
@@ -200,7 +199,7 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> ShardSplitDonorService::cons
     return std::make_shared<DonorStateMachine>(
         _serviceContext,
         this,
-        ShardSplitDonorDocument::parse(IDLParserErrorContext("donorStateDoc"), initialState));
+        ShardSplitDonorDocument::parse(IDLParserContext("donorStateDoc"), initialState));
 }
 
 void ShardSplitDonorService::abortAllSplits(OperationContext* opCtx) {
@@ -289,8 +288,7 @@ void ShardSplitDonorService::DonorStateMachine::tryForget() {
 
 void ShardSplitDonorService::DonorStateMachine::checkIfOptionsConflict(
     const BSONObj& stateDocBson) const {
-    auto stateDoc =
-        ShardSplitDonorDocument::parse(IDLParserErrorContext("donorStateDoc"), stateDocBson);
+    auto stateDoc = ShardSplitDonorDocument::parse(IDLParserContext("donorStateDoc"), stateDocBson);
 
     stdx::lock_guard<Latch> lg(_mutex);
     invariant(stateDoc.getId() == _stateDoc.getId());

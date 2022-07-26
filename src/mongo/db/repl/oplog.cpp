@@ -952,7 +952,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
           const auto& cmd = entry.getObject();
           auto opMsg = OpMsgRequest::fromDBAndBody(entry.getNss().db(), cmd);
-          auto collModCmd = CollMod::parse(IDLParserErrorContext("collModOplogEntry"), opMsg);
+          auto collModCmd = CollMod::parse(IDLParserContext("collModOplogEntry"), opMsg);
           const auto nssOrUUID([&collModCmd, &entry, mode]() -> NamespaceStringOrUUID {
               // Oplog entries from secondary oplog application will allways have the Uuid set and
               // it is only invocations of applyOps directly that may omit it
@@ -1040,7 +1040,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
     {"importCollection",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
           auto importEntry = mongo::ImportCollectionOplogEntry::parse(
-              IDLParserErrorContext("importCollectionOplogEntry"), entry.getObject());
+              IDLParserContext("importCollectionOplogEntry"), entry.getObject());
           applyImportCollection(opCtx,
                                 importEntry.getImportUUID(),
                                 importEntry.getImportCollection(),

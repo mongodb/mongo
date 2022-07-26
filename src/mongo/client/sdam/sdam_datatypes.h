@@ -85,7 +85,7 @@ public:
         : _server(std::move(server)), _success(true), _response(response), _rtt(rtt) {
         const auto topologyVersionField = response.getField("topologyVersion");
         if (topologyVersionField) {
-            _topologyVersion = TopologyVersion::parse(IDLParserErrorContext("TopologyVersion"),
+            _topologyVersion = TopologyVersion::parse(IDLParserContext("TopologyVersion"),
                                                       topologyVersionField.Obj());
         }
     }
@@ -95,7 +95,7 @@ public:
         : _server(std::move(server)), _success(false), _errorMsg(errorMsg) {
         const auto topologyVersionField = response.getField("topologyVersion");
         if (topologyVersionField) {
-            _topologyVersion = TopologyVersion::parse(IDLParserErrorContext("TopologyVersion"),
+            _topologyVersion = TopologyVersion::parse(IDLParserContext("TopologyVersion"),
                                                       topologyVersionField.Obj());
         }
     }

@@ -582,7 +582,7 @@ TEST(FreeMonRetryTest, TestMetrics) {
 // Positive: Ensure the response is validated correctly
 TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
     ASSERT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
-        IDLParserErrorContext("foo"),
+        IDLParserContext("foo"),
         BSON("version" << 1LL << "haltMetricsUploading" << false << "id"
                        << "mock123"
                        << "informationalURL"
@@ -593,7 +593,7 @@ TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
 
     // max reporting interval
     ASSERT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
-        IDLParserErrorContext("foo"),
+        IDLParserContext("foo"),
         BSON("version" << 1LL << "haltMetricsUploading" << false << "id"
                        << "mock123"
                        << "informationalURL"
@@ -604,7 +604,7 @@ TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
 
     // Positive: version 2
     ASSERT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
-        IDLParserErrorContext("foo"),
+        IDLParserContext("foo"),
         BSON("version" << 2LL << "haltMetricsUploading" << false << "id"
                        << "mock123"
                        << "informationalURL"
@@ -615,7 +615,7 @@ TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
 
     // Positive: empty registration id string
     ASSERT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
-        IDLParserErrorContext("foo"),
+        IDLParserContext("foo"),
         BSON("version" << 1LL << "haltMetricsUploading" << false << "id"
                        << ""
                        << "informationalURL"
@@ -626,7 +626,7 @@ TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
 
     // Negative: bad protocol version
     ASSERT_NOT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
-        IDLParserErrorContext("foo"),
+        IDLParserContext("foo"),
         BSON("version" << 42LL << "haltMetricsUploading" << false << "id"
                        << "mock123"
                        << "informationalURL"
@@ -637,7 +637,7 @@ TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
 
     // Negative: halt uploading
     ASSERT_NOT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
-        IDLParserErrorContext("foo"),
+        IDLParserContext("foo"),
         BSON("version" << 1LL << "haltMetricsUploading" << true << "id"
                        << "mock123"
                        << "informationalURL"
@@ -648,7 +648,7 @@ TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
 
     // Negative: large registartation id
     ASSERT_NOT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
-        IDLParserErrorContext("foo"),
+        IDLParserContext("foo"),
         BSON("version" << 1LL << "haltMetricsUploading" << false << "id" << std::string(5000, 'a')
                        << "informationalURL"
                        << "http://www.example.com/123"
@@ -658,7 +658,7 @@ TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
 
     // Negative: large URL
     ASSERT_NOT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
-        IDLParserErrorContext("foo"),
+        IDLParserContext("foo"),
         BSON("version" << 1LL << "haltMetricsUploading" << false << "id"
                        << "mock123"
                        << "informationalURL" << std::string(5000, 'b') << "message"
@@ -667,7 +667,7 @@ TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
 
     // Negative: large message
     ASSERT_NOT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
-        IDLParserErrorContext("foo"),
+        IDLParserContext("foo"),
         BSON("version" << 1LL << "haltMetricsUploading" << false << "id"
                        << "mock123"
                        << "informationalURL"
@@ -676,7 +676,7 @@ TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
 
     // Negative: too small a reporting interval
     ASSERT_NOT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
-        IDLParserErrorContext("foo"),
+        IDLParserContext("foo"),
         BSON("version" << 1LL << "haltMetricsUploading" << false << "id"
                        << "mock123"
                        << "informationalURL"
@@ -687,7 +687,7 @@ TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
 
     // Negative: too large a reporting interval
     ASSERT_NOT_OK(FreeMonProcessor::validateRegistrationResponse(FreeMonRegistrationResponse::parse(
-        IDLParserErrorContext("foo"),
+        IDLParserContext("foo"),
         BSON("version" << 1LL << "haltMetricsUploading" << false << "id"
                        << "mock123"
                        << "informationalURL"
@@ -701,7 +701,7 @@ TEST(FreeMonProcessorTest, TestRegistrationResponseValidation) {
 // Positive: Ensure the response is validated correctly
 TEST(FreeMonProcessorTest, TestMetricsResponseValidation) {
     ASSERT_OK(FreeMonProcessor::validateMetricsResponse(
-        FreeMonMetricsResponse::parse(IDLParserErrorContext("foo"),
+        FreeMonMetricsResponse::parse(IDLParserContext("foo"),
 
                                       BSON("version" << 1LL << "haltMetricsUploading" << false
                                                      << "permanentlyDelete" << false << "id"
@@ -714,7 +714,7 @@ TEST(FreeMonProcessorTest, TestMetricsResponseValidation) {
 
     // Positive: Support version 2
     ASSERT_OK(FreeMonProcessor::validateMetricsResponse(
-        FreeMonMetricsResponse::parse(IDLParserErrorContext("foo"),
+        FreeMonMetricsResponse::parse(IDLParserContext("foo"),
 
                                       BSON("version" << 2LL << "haltMetricsUploading" << false
                                                      << "permanentlyDelete" << false << "id"
@@ -727,7 +727,7 @@ TEST(FreeMonProcessorTest, TestMetricsResponseValidation) {
 
     // Positive: Add resendRegistration
     ASSERT_OK(FreeMonProcessor::validateMetricsResponse(FreeMonMetricsResponse::parse(
-        IDLParserErrorContext("foo"),
+        IDLParserContext("foo"),
 
         BSON("version" << 2LL << "haltMetricsUploading" << false << "permanentlyDelete" << false
                        << "id"
@@ -741,7 +741,7 @@ TEST(FreeMonProcessorTest, TestMetricsResponseValidation) {
 
     // Positive: max reporting interval
     ASSERT_OK(FreeMonProcessor::validateMetricsResponse(FreeMonMetricsResponse::parse(
-        IDLParserErrorContext("foo"),
+        IDLParserContext("foo"),
 
         BSON("version" << 1LL << "haltMetricsUploading" << false << "permanentlyDelete" << false
                        << "id"
@@ -754,7 +754,7 @@ TEST(FreeMonProcessorTest, TestMetricsResponseValidation) {
 
     // Negative: bad protocol version
     ASSERT_NOT_OK(FreeMonProcessor::validateMetricsResponse(
-        FreeMonMetricsResponse::parse(IDLParserErrorContext("foo"),
+        FreeMonMetricsResponse::parse(IDLParserContext("foo"),
                                       BSON("version" << 42LL << "haltMetricsUploading" << false
                                                      << "permanentlyDelete" << false << "id"
                                                      << "mock123"
@@ -766,7 +766,7 @@ TEST(FreeMonProcessorTest, TestMetricsResponseValidation) {
 
     // Negative: halt uploading
     ASSERT_NOT_OK(FreeMonProcessor::validateMetricsResponse(
-        FreeMonMetricsResponse::parse(IDLParserErrorContext("foo"),
+        FreeMonMetricsResponse::parse(IDLParserContext("foo"),
                                       BSON("version" << 1LL << "haltMetricsUploading" << true
                                                      << "permanentlyDelete" << false << "id"
                                                      << "mock123"
@@ -778,7 +778,7 @@ TEST(FreeMonProcessorTest, TestMetricsResponseValidation) {
 
     // Negative: large registartation id
     ASSERT_NOT_OK(FreeMonProcessor::validateMetricsResponse(FreeMonMetricsResponse::parse(
-        IDLParserErrorContext("foo"),
+        IDLParserContext("foo"),
         BSON("version" << 1LL << "haltMetricsUploading" << false << "permanentlyDelete" << false
                        << "id" << std::string(5000, 'a') << "informationalURL"
                        << "http://www.example.com/123"
@@ -788,7 +788,7 @@ TEST(FreeMonProcessorTest, TestMetricsResponseValidation) {
 
     // Negative: large URL
     ASSERT_NOT_OK(FreeMonProcessor::validateMetricsResponse(FreeMonMetricsResponse::parse(
-        IDLParserErrorContext("foo"),
+        IDLParserContext("foo"),
         BSON("version" << 1LL << "haltMetricsUploading" << false
 
                        << "permanentlyDelete" << false << "id"
@@ -799,7 +799,7 @@ TEST(FreeMonProcessorTest, TestMetricsResponseValidation) {
 
     // Negative: large message
     ASSERT_NOT_OK(FreeMonProcessor::validateMetricsResponse(FreeMonMetricsResponse::parse(
-        IDLParserErrorContext("foo"),
+        IDLParserContext("foo"),
         BSON("version" << 1LL << "haltMetricsUploading" << false << "permanentlyDelete" << false
                        << "id"
                        << "mock123"
@@ -809,7 +809,7 @@ TEST(FreeMonProcessorTest, TestMetricsResponseValidation) {
 
     // Negative: too small a reporting interval
     ASSERT_NOT_OK(FreeMonProcessor::validateMetricsResponse(
-        FreeMonMetricsResponse::parse(IDLParserErrorContext("foo"),
+        FreeMonMetricsResponse::parse(IDLParserContext("foo"),
                                       BSON("version" << 1LL << "haltMetricsUploading" << false
                                                      << "permanentlyDelete" << false << "id"
                                                      << "mock123"
@@ -821,7 +821,7 @@ TEST(FreeMonProcessorTest, TestMetricsResponseValidation) {
 
     // Negative: too large a reporting interval
     ASSERT_NOT_OK(FreeMonProcessor::validateMetricsResponse(FreeMonMetricsResponse::parse(
-        IDLParserErrorContext("foo"),
+        IDLParserContext("foo"),
         BSON("version" << 1LL << "haltMetricsUploading" << false << "permanentlyDelete" << false
                        << "id"
                        << "mock123"

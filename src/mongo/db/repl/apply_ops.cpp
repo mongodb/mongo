@@ -131,7 +131,7 @@ Status _applyOps(OperationContext* opCtx,
 
             // Reject malformed or over-specified operations in an atomic applyOps.
             try {
-                ReplOperation::parse(IDLParserErrorContext("applyOps"), opObj);
+                ReplOperation::parse(IDLParserContext("applyOps"), opObj);
             } catch (...) {
                 uasserted(ErrorCodes::AtomicityFailure,
                           str::stream() << "cannot apply a malformed or over-specified operation "

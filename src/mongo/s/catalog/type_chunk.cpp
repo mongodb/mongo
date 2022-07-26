@@ -193,7 +193,7 @@ StatusWith<std::vector<ChunkHistory>> ChunkHistory::fromBSON(const BSONArray& so
 
     for (const auto& arrayElement : source) {
         if (arrayElement.type() == Object) {
-            IDLParserErrorContext tempContext("chunk history array");
+            IDLParserContext tempContext("chunk history array");
             values.emplace_back(ChunkHistoryBase::parse(tempContext, arrayElement.Obj()));
         } else {
             return {ErrorCodes::BadValue,

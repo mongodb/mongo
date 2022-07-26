@@ -129,7 +129,7 @@ public:
     }
 
     void validateResult(const BSONObj& result) final {
-        auto ctx = IDLParserErrorContext("AnalyzeCommandReply");
+        auto ctx = IDLParserContext("AnalyzeCommandReply");
         if (checkIsErrorStatus(result, ctx)) {
             return;
         }

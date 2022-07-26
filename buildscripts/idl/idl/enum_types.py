@@ -211,7 +211,7 @@ class _EnumTypeInt(EnumTypeInfoBase, metaclass=ABCMeta):
     def get_deserializer_declaration(self):
         # type: () -> str
         return common.template_args(
-            "${enum_name} ${function_name}(const IDLParserErrorContext& ctxt, std::int32_t value)",
+            "${enum_name} ${function_name}(const IDLParserContext& ctxt, std::int32_t value)",
             enum_name=self.get_cpp_type_name(), function_name=self._get_enum_deserializer_name())
 
     def gen_deserializer_definition(self, indented_writer):
@@ -292,7 +292,7 @@ class _EnumTypeString(EnumTypeInfoBase, metaclass=ABCMeta):
     def get_deserializer_declaration(self):
         # type: () -> str
         return common.template_args(
-            "${enum_name} ${function_name}(const IDLParserErrorContext& ctxt, StringData value)",
+            "${enum_name} ${function_name}(const IDLParserContext& ctxt, StringData value)",
             enum_name=self.get_cpp_type_name(), function_name=self._get_enum_deserializer_name())
 
     def gen_deserializer_definition(self, indented_writer):

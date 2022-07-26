@@ -967,7 +967,7 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
             _newCounts.erase(oplogEntry.getUuid().get());
         } else if (oplogEntry.getCommandType() == OplogEntry::CommandType::kImportCollection) {
             auto importEntry = mongo::ImportCollectionOplogEntry::parse(
-                IDLParserErrorContext("importCollectionOplogEntry"), oplogEntry.getObject());
+                IDLParserContext("importCollectionOplogEntry"), oplogEntry.getObject());
             // Nothing to roll back if this is a dryRun.
             if (!importEntry.getDryRun()) {
                 const auto& catalogEntry = importEntry.getCatalogEntry();

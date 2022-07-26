@@ -55,7 +55,7 @@ void readImpersonatedUserMetadata(const BSONElement& elem, OperationContext* opC
     // Always reset the current impersonation data to boost::none.
     MaybeImpersonatedUserMetadata newData;
     if (elem.type() == Object) {
-        IDLParserErrorContext errCtx(kImpersonationMetadataSectionName);
+        IDLParserContext errCtx(kImpersonationMetadataSectionName);
         auto data = ImpersonatedUserMetadata::parse(errCtx, elem.embeddedObject());
 
         uassert(ErrorCodes::BadValue,

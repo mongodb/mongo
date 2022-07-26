@@ -520,7 +520,7 @@ public:
 
                     try {
                         firstBatch.push_back(ListCollectionsReplyItem::parse(
-                            IDLParserErrorContext("ListCollectionsReplyItem"), nextDoc));
+                            IDLParserContext("ListCollectionsReplyItem"), nextDoc));
                     } catch (const DBException& exc) {
                         LOGV2_ERROR(
                             5254300,

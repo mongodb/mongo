@@ -630,7 +630,7 @@ BenchRunOp opFromBson(const BSONObj& op) {
 
             ReadPreference mode;
             try {
-                mode = ReadPreference_parse(IDLParserErrorContext("mode"), arg.str());
+                mode = ReadPreference_parse(IDLParserContext("mode"), arg.str());
             } catch (DBException& e) {
                 e.addContext("benchRun(): Could not parse readPrefMode argument");
                 throw;
@@ -900,8 +900,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
                 str::stream() << "Unable to create session due to error " << result,
                 conn->runCommand("admin", BSON("startSession" << 1), result));
 
-        lsid.emplace(
-            LogicalSessionIdToClient::parse(IDLParserErrorContext("lsid"), result["id"].Obj()));
+        lsid.emplace(LogicalSessionIdToClient::parse(IDLParserContext("lsid"), result["id"].Obj()));
     }
 
     BenchRunOp::State opState(&_rng, &bsonTemplateEvaluator, &_statsBlackHole);

@@ -156,7 +156,7 @@ public:
 
         CountCommandRequest request(NamespaceStringOrUUID(NamespaceString{}));
         try {
-            request = CountCommandRequest::parse(IDLParserErrorContext("count"), opMsgRequest);
+            request = CountCommandRequest::parse(IDLParserContext("count"), opMsgRequest);
         } catch (...) {
             return exceptionToStatus();
         }
@@ -238,7 +238,7 @@ public:
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &hangBeforeCollectionCount, opCtx, "hangBeforeCollectionCount", []() {}, nss);
 
-        auto request = CountCommandRequest::parse(IDLParserErrorContext("count"), cmdObj);
+        auto request = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
         if (shouldDoFLERewrite(request)) {
             processFLECountD(opCtx, nss, &request);
         }

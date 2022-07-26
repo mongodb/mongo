@@ -56,7 +56,7 @@ void OpTime::append(BSONObjBuilder* builder, const std::string& subObjName) cons
 
 StatusWith<OpTime> OpTime::parseFromOplogEntry(const BSONObj& obj) {
     try {
-        OpTimeBase base = OpTimeBase::parse(IDLParserErrorContext("OpTimeBase"), obj);
+        OpTimeBase base = OpTimeBase::parse(IDLParserContext("OpTimeBase"), obj);
         long long term = base.getTerm().value_or(kUninitializedTerm);
         return OpTime(base.getTimestamp(), term);
     } catch (...) {

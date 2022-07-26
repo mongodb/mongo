@@ -111,7 +111,7 @@ public:
                      const std::string& db,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) override {
-        IDLParserErrorContext ctx("KillSessionsCmd");
+        IDLParserContext ctx("KillSessionsCmd");
         auto ksc = KillSessionsCmdFromClient::parse(ctx, cmdObj);
 
         KillAllSessionsByPatternSet patterns;

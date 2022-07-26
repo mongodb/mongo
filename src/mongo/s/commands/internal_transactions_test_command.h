@@ -91,7 +91,7 @@ public:
                             // from the command to append $db, which FindCommandRequest expects.
                             auto findOpMsgRequest = OpMsgRequest::fromDBAndBody(dbName, command);
                             auto findCommand = FindCommandRequest::parse(
-                                IDLParserErrorContext("FindCommandRequest", false /* apiStrict */),
+                                IDLParserContext("FindCommandRequest", false /* apiStrict */),
                                 findOpMsgRequest.body);
 
                             auto docs = txnClient.exhaustiveFind(findCommand).get();

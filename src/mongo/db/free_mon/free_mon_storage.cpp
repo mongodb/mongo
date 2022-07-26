@@ -74,7 +74,7 @@ boost::optional<FreeMonStorageState> FreeMonStorage::read(OperationContext* opCt
         uassertStatusOK(swObj.getStatus());
     }
 
-    return FreeMonStorageState::parse(IDLParserErrorContext("FreeMonStorage"), swObj.getValue());
+    return FreeMonStorageState::parse(IDLParserContext("FreeMonStorage"), swObj.getValue());
 }
 
 void FreeMonStorage::replace(OperationContext* opCtx, const FreeMonStorageState& doc) {

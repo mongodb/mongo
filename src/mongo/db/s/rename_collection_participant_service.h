@@ -86,7 +86,7 @@ public:
 
     explicit RenameParticipantInstance(const BSONObj& participantDoc)
         : _doc(RenameCollectionParticipantDocument::parse(
-              IDLParserErrorContext("RenameCollectionParticipantDocument"), participantDoc)) {}
+              IDLParserContext("RenameCollectionParticipantDocument"), participantDoc)) {}
 
     ~RenameParticipantInstance();
 

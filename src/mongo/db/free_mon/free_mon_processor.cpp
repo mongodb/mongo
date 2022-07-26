@@ -966,7 +966,7 @@ void FreeMonProcessor::doNotifyOnUpsert(
     Client* client, const FreeMonMessageWithPayload<FreeMonMessageType::NotifyOnUpsert>* msg) {
     try {
         const BSONObj& doc = msg->getPayload();
-        auto newState = FreeMonStorageState::parse(IDLParserErrorContext("free_mon_storage"), doc);
+        auto newState = FreeMonStorageState::parse(IDLParserContext("free_mon_storage"), doc);
 
         // Likely, the update changed something
         if (newState != _state) {

@@ -456,8 +456,8 @@ void abortInProgressTransactions(OperationContext* opCtx) {
         LOGV2_DEBUG(21977, 3, "Aborting in-progress transactions on stepup.");
     }
     while (cursor->more()) {
-        auto txnRecord = SessionTxnRecord::parse(
-            IDLParserErrorContext("abort-in-progress-transactions"), cursor->next());
+        auto txnRecord = SessionTxnRecord::parse(IDLParserContext("abort-in-progress-transactions"),
+                                                 cursor->next());
         opCtx->setLogicalSessionId(txnRecord.getSessionId());
         opCtx->setTxnNumber(txnRecord.getTxnNum());
         opCtx->setInMultiDocumentTransaction();
@@ -606,7 +606,7 @@ void MongoDSessionCatalog::observeDirectWriteToConfigTransactions(OperationConte
     const auto catalog = SessionCatalog::get(opCtx);
 
     const auto lsid =
-        LogicalSessionId::parse(IDLParserErrorContext("lsid"), singleSessionDoc["_id"].Obj());
+        LogicalSessionId::parse(IDLParserContext("lsid"), singleSessionDoc["_id"].Obj());
     catalog->scanSession(lsid, [&](const ObservableSession& session) {
         const auto participant = TransactionParticipant::get(session);
         uassert(ErrorCodes::PreparedTransactionInProgress,

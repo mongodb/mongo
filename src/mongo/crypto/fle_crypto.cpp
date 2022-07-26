@@ -1796,7 +1796,7 @@ BSONObj ECOCCollection::generateDocument(StringData fieldName, ConstDataRange pa
 }
 
 ECOCCompactionDocument ECOCCollection::parseAndDecrypt(const BSONObj& doc, ECOCToken token) {
-    IDLParserErrorContext ctx("root");
+    IDLParserContext ctx("root");
     auto ecocDoc = EcocDocument::parse(ctx, doc);
 
     auto swTokens = EncryptedStateCollectionTokens::decryptAndParse(token, ecocDoc.getValue());
@@ -2354,7 +2354,7 @@ EncryptedFieldConfig EncryptionInformationHelpers::getAndValidateSchema(
             "Expected an object for schema in EncryptionInformation",
             !element.eoo() && element.type() == Object);
 
-    auto efc = EncryptedFieldConfig::parse(IDLParserErrorContext("schema"), element.Obj());
+    auto efc = EncryptedFieldConfig::parse(IDLParserContext("schema"), element.Obj());
 
     uassert(6371206, "Expected a value for eccCollection", efc.getEccCollection().has_value());
     uassert(6371207, "Expected a value for escCollection", efc.getEscCollection().has_value());
@@ -2369,7 +2369,7 @@ std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedConstDataRange(Cons
 
     uint8_t subTypeByte = cdrc.readAndAdvance<uint8_t>();
 
-    auto subType = EncryptedBinDataType_parse(IDLParserErrorContext("subtype"), subTypeByte);
+    auto subType = EncryptedBinDataType_parse(IDLParserContext("subtype"), subTypeByte);
     return {subType, cdrc};
 }
 
@@ -2402,8 +2402,7 @@ StringMap<FLEDeleteToken> EncryptionInformationHelpers::getDeleteTokens(
     for (const auto& deleteTokenBSON : element.Obj()) {
         uassert(6371310, "DeleteToken is not an object", deleteTokenBSON.type() == Object);
 
-        auto payload =
-            FLE2DeletePayload::parse(IDLParserErrorContext("delete"), deleteTokenBSON.Obj());
+        auto payload = FLE2DeletePayload::parse(IDLParserContext("delete"), deleteTokenBSON.Obj());
 
         auto deleteToken =
             FLEDeleteToken{FLETokenFromCDR<FLETokenType::ECOCToken>(payload.getEcocToken()),

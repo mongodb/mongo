@@ -197,7 +197,7 @@ TEST(TransportLayerASIO, exhaustIsMasterShouldReceiveMultipleReplies) {
         ASSERT_OK(reply.status);
         ASSERT(reply.moreToCome);
         prevTime = reply.data.getField("localTime").Date();
-        topologyVersion = TopologyVersion::parse(IDLParserErrorContext("TopologyVersion"),
+        topologyVersion = TopologyVersion::parse(IDLParserContext("TopologyVersion"),
                                                  reply.data.getField("topologyVersion").Obj());
     }
 
@@ -211,7 +211,7 @@ TEST(TransportLayerASIO, exhaustIsMasterShouldReceiveMultipleReplies) {
         ASSERT_GT(replyTime, prevTime);
 
         auto replyTopologyVersion = TopologyVersion::parse(
-            IDLParserErrorContext("TopologyVersion"), reply.data.getField("topologyVersion").Obj());
+            IDLParserContext("TopologyVersion"), reply.data.getField("topologyVersion").Obj());
         ASSERT_EQ(replyTopologyVersion.getProcessId(), topologyVersion.getProcessId());
         ASSERT_EQ(replyTopologyVersion.getCounter(), topologyVersion.getCounter());
     }

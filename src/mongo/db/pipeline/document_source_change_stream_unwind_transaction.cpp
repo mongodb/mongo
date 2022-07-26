@@ -100,7 +100,7 @@ DocumentSourceChangeStreamUnwindTransaction::createFromBson(
             str::stream() << "the '" << kStageName << "' stage spec must be an object",
             elem.type() == BSONType::Object);
     auto parsedSpec = DocumentSourceChangeStreamUnwindTransactionSpec::parse(
-        IDLParserErrorContext("DocumentSourceChangeStreamUnwindTransactionSpec"), elem.Obj());
+        IDLParserContext("DocumentSourceChangeStreamUnwindTransactionSpec"), elem.Obj());
     return new DocumentSourceChangeStreamUnwindTransaction(parsedSpec.getFilter(), expCtx);
 }
 
@@ -209,8 +209,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamUnwindTransaction::doGet
 
 bool DocumentSourceChangeStreamUnwindTransaction::_isTransactionOplogEntry(const Document& doc) {
     auto op = doc[repl::OplogEntry::kOpTypeFieldName];
-    auto opType =
-        repl::OpType_parse(IDLParserErrorContext("ChangeStreamEntry.op"), op.getStringData());
+    auto opType = repl::OpType_parse(IDLParserContext("ChangeStreamEntry.op"), op.getStringData());
     auto commandVal = doc["o"];
 
     if (opType != repl::OpTypeEnum::kCommand ||

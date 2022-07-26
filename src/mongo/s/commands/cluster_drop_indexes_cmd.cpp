@@ -71,7 +71,7 @@ public:
     }
 
     void validateResult(const BSONObj& resultObj) final {
-        auto ctx = IDLParserErrorContext("DropIndexesReply");
+        auto ctx = IDLParserContext("DropIndexesReply");
         if (!checkIsErrorStatus(resultObj, ctx)) {
             Reply::parse(ctx, resultObj.removeField(kRawFieldName));
             if (resultObj.hasField(kRawFieldName)) {

@@ -323,7 +323,7 @@ const NamespaceString& CreateCollectionCoordinator::nss() const {
 void CreateCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
     // If we have two shard collections on the same namespace, then the arguments must be the same.
     const auto otherDoc = CreateCollectionCoordinatorDocument::parse(
-        IDLParserErrorContext("CreateCollectionCoordinatorDocument"), doc);
+        IDLParserContext("CreateCollectionCoordinatorDocument"), doc);
 
     uassert(ErrorCodes::ConflictingOperationInProgress,
             "Another create collection with different arguments is already running for the same "
@@ -601,7 +601,7 @@ void CreateCollectionCoordinator::_createCollectionAndIndexes(OperationContext* 
     boost::optional<Collation> collation;
     if (!collationBSON.isEmpty()) {
         collation.emplace(
-            Collation::parse(IDLParserErrorContext("CreateCollectionCoordinator"), collationBSON));
+            Collation::parse(IDLParserContext("CreateCollectionCoordinator"), collationBSON));
     }
 
     // We need to implicitly create a timeseries view and underlying bucket collection.

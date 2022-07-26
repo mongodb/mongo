@@ -139,7 +139,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
 
     Timer cmdTimer;
 
-    auto parsedMr = MapReduceCommandRequest::parse(IDLParserErrorContext("mapReduce"), cmd);
+    auto parsedMr = MapReduceCommandRequest::parse(IDLParserContext("mapReduce"), cmd);
     auto expCtx = makeExpressionContext(opCtx, parsedMr, verbosity);
     auto runnablePipeline = [&]() {
         auto pipeline = map_reduce_common::translateFromMR(parsedMr, expCtx);

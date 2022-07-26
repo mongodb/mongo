@@ -97,7 +97,7 @@ RenameCollectionCoordinator::RenameCollectionCoordinator(ShardingDDLCoordinatorS
 
 void RenameCollectionCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
     const auto otherDoc = RenameCollectionCoordinatorDocument::parse(
-        IDLParserErrorContext("RenameCollectionCoordinatorDocument"), doc);
+        IDLParserContext("RenameCollectionCoordinatorDocument"), doc);
 
     const auto& selfReq = _request.toBSON();
     const auto& otherReq = otherDoc.getRenameCollectionRequest().toBSON();

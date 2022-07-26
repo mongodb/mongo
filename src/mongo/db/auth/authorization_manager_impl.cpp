@@ -319,7 +319,7 @@ auto authorizationManagerCreateRegistration =
 MONGO_FAIL_POINT_DEFINE(waitForUserCacheInvalidation);
 void handleWaitForUserCacheInvalidation(OperationContext* opCtx, const UserHandle& user) {
     auto fp = waitForUserCacheInvalidation.scopedIf([&](const auto& bsonData) {
-        IDLParserErrorContext ctx("waitForUserCacheInvalidation");
+        IDLParserContext ctx("waitForUserCacheInvalidation");
         auto data = WaitForUserCacheInvalidationFailPoint::parse(ctx, bsonData);
 
         const auto& blockedUserName = data.getUserName();

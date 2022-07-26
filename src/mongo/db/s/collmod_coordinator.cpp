@@ -82,7 +82,7 @@ CollModCoordinator::CollModCoordinator(ShardingDDLCoordinatorService* service,
 
 void CollModCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
     const auto otherDoc =
-        CollModCoordinatorDocument::parse(IDLParserErrorContext("CollModCoordinatorDocument"), doc);
+        CollModCoordinatorDocument::parse(IDLParserContext("CollModCoordinatorDocument"), doc);
 
     const auto& selfReq = _request.toBSON();
     const auto& otherReq = otherDoc.getCollModRequest().toBSON();

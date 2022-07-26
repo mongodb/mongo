@@ -50,8 +50,8 @@ const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 }  // namespace
 
 ConfigsvrCoordinatorMetadata extractConfigsvrCoordinatorMetadata(const BSONObj& stateDoc) {
-    return ConfigsvrCoordinatorMetadata::parse(
-        IDLParserErrorContext("ConfigsvrCoordinatorMetadata"), stateDoc);
+    return ConfigsvrCoordinatorMetadata::parse(IDLParserContext("ConfigsvrCoordinatorMetadata"),
+                                               stateDoc);
 }
 
 ConfigsvrCoordinator::ConfigsvrCoordinator(const BSONObj& stateDoc)

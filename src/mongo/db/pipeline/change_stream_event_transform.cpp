@@ -59,8 +59,7 @@ Document copyDocExceptFields(const Document& source, const std::set<StringData>&
 repl::OpTypeEnum getOplogOpType(const Document& oplog) {
     auto opTypeField = oplog[repl::OplogEntry::kOpTypeFieldName];
     checkValueType(opTypeField, repl::OplogEntry::kOpTypeFieldName, BSONType::String);
-    return repl::OpType_parse(IDLParserErrorContext("ChangeStreamEntry.op"),
-                              opTypeField.getString());
+    return repl::OpType_parse(IDLParserContext("ChangeStreamEntry.op"), opTypeField.getString());
 }
 
 Value makeChangeStreamNsField(const NamespaceString& nss) {

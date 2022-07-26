@@ -118,12 +118,12 @@ TEST(OplogEntryTest, OpTimeBaseNonStrictParsing) {
     // OpTimeBase should be successfully created from an OplogEntry, even though it has
     // extraneous fields.
     UNIT_TEST_INTERNALS_IGNORE_UNUSED_RESULT_WARNINGS(
-        OpTimeBase::parse(IDLParserErrorContext("OpTimeBase"), oplogEntryExtraField));
+        OpTimeBase::parse(IDLParserContext("OpTimeBase"), oplogEntryExtraField));
 
     // OplogEntryBase should still use strict parsing and throw an error when it has extraneous
     // fields.
     ASSERT_THROWS_CODE(
-        OplogEntryBase::parse(IDLParserErrorContext("OplogEntryBase"), oplogEntryExtraField),
+        OplogEntryBase::parse(IDLParserContext("OplogEntryBase"), oplogEntryExtraField),
         AssertionException,
         40415);
 
@@ -135,7 +135,7 @@ TEST(OplogEntryTest, OpTimeBaseNonStrictParsing) {
     // When an OplogEntryBase is created with a missing required field in a chained struct, it
     // should throw an exception.
     ASSERT_THROWS_CODE(
-        OplogEntryBase::parse(IDLParserErrorContext("OplogEntryBase"), oplogEntryMissingTimestamp),
+        OplogEntryBase::parse(IDLParserContext("OplogEntryBase"), oplogEntryMissingTimestamp),
         AssertionException,
         40414);
 }

@@ -127,7 +127,7 @@ boost::optional<std::string> parseTenantIdFromDB(StringData dbName) {
 
 TenantMigrationDonorDocument parseDonorStateDocument(const BSONObj& doc) {
     auto donorStateDoc =
-        TenantMigrationDonorDocument::parse(IDLParserErrorContext("donorStateDoc"), doc);
+        TenantMigrationDonorDocument::parse(IDLParserContext("donorStateDoc"), doc);
 
     if (donorStateDoc.getExpireAt()) {
         uassert(ErrorCodes::BadValue,

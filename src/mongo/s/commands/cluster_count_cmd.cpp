@@ -100,7 +100,7 @@ public:
 
         std::vector<AsyncRequestsSender::Response> shardResponses;
         try {
-            auto countRequest = CountCommandRequest::parse(IDLParserErrorContext("count"), cmdObj);
+            auto countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
             if (shouldDoFLERewrite(countRequest)) {
                 processFLECountS(opCtx, nss, &countRequest);
             }
@@ -134,7 +134,7 @@ public:
                 collation);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
             // Rewrite the count command as an aggregation.
-            auto countRequest = CountCommandRequest::parse(IDLParserErrorContext("count"), cmdObj);
+            auto countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
             auto aggCmdOnView =
                 uassertStatusOK(countCommandAsAggregationCommand(countRequest, nss));
             auto aggCmdOnViewObj = OpMsgRequest::fromDBAndBody(nss.db(), aggCmdOnView).body;
@@ -200,7 +200,7 @@ public:
 
         CountCommandRequest countRequest(NamespaceStringOrUUID(NamespaceString{}));
         try {
-            countRequest = CountCommandRequest::parse(IDLParserErrorContext("count"), request);
+            countRequest = CountCommandRequest::parse(IDLParserContext("count"), request);
         } catch (...) {
             return exceptionToStatus();
         }
@@ -240,7 +240,7 @@ public:
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
             CountCommandRequest countRequest(NamespaceStringOrUUID(NamespaceString{}));
             try {
-                countRequest = CountCommandRequest::parse(IDLParserErrorContext("count"), cmdObj);
+                countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
             } catch (...) {
                 return exceptionToStatus();
             }

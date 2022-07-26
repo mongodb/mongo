@@ -100,8 +100,7 @@ StatusWith<multiversion::FeatureCompatibilityVersion> FeatureCompatibilityVersio
     const BSONObj& featureCompatibilityVersionDoc) {
     try {
         auto fcvDoc = FeatureCompatibilityVersionDocument::parse(
-            IDLParserErrorContext("FeatureCompatibilityVersionParser"),
-            featureCompatibilityVersionDoc);
+            IDLParserContext("FeatureCompatibilityVersionParser"), featureCompatibilityVersionDoc);
         auto version = fcvDoc.getVersion();
         auto targetVersion = fcvDoc.getTargetVersion();
         auto previousVersion = fcvDoc.getPreviousVersion();

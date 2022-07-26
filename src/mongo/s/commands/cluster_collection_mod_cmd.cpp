@@ -127,7 +127,7 @@ public:
     }
 
     void validateResult(const BSONObj& resultObj) final {
-        auto ctx = IDLParserErrorContext("CollModReply");
+        auto ctx = IDLParserContext("CollModReply");
         if (checkIsErrorStatus(resultObj, ctx)) {
             return;
         }
@@ -148,7 +148,7 @@ public:
             return;
         }
 
-        auto rawCtx = IDLParserErrorContext(kRawFieldName, &ctx);
+        auto rawCtx = IDLParserContext(kRawFieldName, &ctx);
         for (const auto& element : rawData.Obj()) {
             if (!rawCtx.checkAndAssertType(element, Object)) {
                 return;

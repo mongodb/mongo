@@ -119,7 +119,7 @@ boost::optional<BSONObj> getLet(const BSONObj& cmdObj) {
 
 boost::optional<LegacyRuntimeConstants> getLegacyRuntimeConstants(const BSONObj& cmdObj) {
     if (auto rcElem = cmdObj.getField("runtimeConstants"_sd); rcElem.type() == BSONType::Object) {
-        IDLParserErrorContext ctx("internalLegacyRuntimeConstants");
+        IDLParserContext ctx("internalLegacyRuntimeConstants");
         return LegacyRuntimeConstants::parse(ctx, rcElem.embeddedObject());
     }
     return boost::none;
@@ -375,7 +375,7 @@ public:
         const BSONObj& cmdObj = [&]() {
             // Check whether the query portion needs to be rewritten for FLE.
             auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
-                IDLParserErrorContext("ClusterFindAndModify"), request.body);
+                IDLParserContext("ClusterFindAndModify"), request.body);
             if (shouldDoFLERewrite(findAndModifyRequest)) {
                 auto newRequest = processFLEFindAndModifyExplainMongos(opCtx, findAndModifyRequest);
                 return newRequest.first.toBSON(request.body);
@@ -565,7 +565,7 @@ private:
             if (feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
                     serverGlobalParams.featureCompatibility)) {
                 auto parsedRequest = write_ops::FindAndModifyCommandRequest::parse(
-                    IDLParserErrorContext("ClusterFindAndModify"), cmdObj);
+                    IDLParserContext("ClusterFindAndModify"), cmdObj);
                 // Strip write concern because this command will be sent as part of a
                 // transaction and the write concern has already been loaded onto the opCtx and
                 // will be picked up by the transaction API.

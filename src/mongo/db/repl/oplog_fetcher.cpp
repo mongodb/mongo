@@ -903,9 +903,9 @@ Status OplogFetcher::_onSuccessfulBatch(const Documents& documents) {
     oplogBatchStats.recordMillis(_lastBatchElapsedMS, documents.empty());
 
     if (_cursor->getPostBatchResumeToken()) {
-        auto pbrt = ResumeTokenOplogTimestamp::parse(
-            IDLParserErrorContext("OplogFetcher PostBatchResumeToken"),
-            *_cursor->getPostBatchResumeToken());
+        auto pbrt =
+            ResumeTokenOplogTimestamp::parse(IDLParserContext("OplogFetcher PostBatchResumeToken"),
+                                             *_cursor->getPostBatchResumeToken());
         info.resumeToken = pbrt.getTs();
     }
 

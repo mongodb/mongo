@@ -81,8 +81,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceSetVariableFromSubPipeline::c
             << typeName(elem.type()),
         elem.type() == BSONType::Object);
 
-    auto spec = SetVariableFromSubPipelineSpec::parse(IDLParserErrorContext(kStageName),
-                                                      elem.embeddedObject());
+    auto spec =
+        SetVariableFromSubPipelineSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
     const auto searchMetaStr = "$$" + Variables::getBuiltinVariableName(Variables::kSearchMetaId);
     uassert(
         625291,

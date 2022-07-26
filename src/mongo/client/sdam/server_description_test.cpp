@@ -510,9 +510,8 @@ TEST_F(ServerDescriptionTestFixture, ShouldStoreTopologyVersion) {
     auto response = HelloOutcome(HostAndPort("foo:1234"),
                                  kTopologyVersion,
                                  duration_cast<HelloRTT>(mongo::Milliseconds(40)));
-    auto topologyVersion =
-        TopologyVersion::parse(IDLParserErrorContext("TopologyVersion"),
-                               kTopologyVersion.getObjectField("topologyVersion"));
+    auto topologyVersion = TopologyVersion::parse(
+        IDLParserContext("TopologyVersion"), kTopologyVersion.getObjectField("topologyVersion"));
 
     auto description =
         ServerDescription(clockSource, response, boost::none /*lastRtt*/, topologyVersion);

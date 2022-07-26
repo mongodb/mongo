@@ -80,7 +80,7 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
         // Command has no members, invoke the parser to confirm that.
-        IDLParserErrorContext ctx("getFreeMonitoringStatus");
+        IDLParserContext ctx("getFreeMonitoringStatus");
         GetFreeMonitoringStatus::parse(ctx, cmdObj);
 
         if (globalFreeMonParams.freeMonitoringState == EnableCloudStateEnum::kOff) {
@@ -135,7 +135,7 @@ public:
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
-        IDLParserErrorContext ctx("setFreeMonitoring");
+        IDLParserContext ctx("setFreeMonitoring");
         auto cmd = SetFreeMonitoring::parse(ctx, cmdObj);
 
         auto* controller = FreeMonController::get(opCtx->getServiceContext());

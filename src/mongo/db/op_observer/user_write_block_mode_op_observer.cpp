@@ -63,7 +63,7 @@ void UserWriteBlockModeOpObserver::onInserts(OperationContext* opCtx,
             const auto& insertedDoc = it->doc;
 
             const auto collCSDoc = UserWriteBlockingCriticalSectionDocument::parse(
-                IDLParserErrorContext("UserWriteBlockOpObserver"), insertedDoc);
+                IDLParserContext("UserWriteBlockOpObserver"), insertedDoc);
             opCtx->recoveryUnit()->onCommit(
                 [opCtx,
                  blockShardedDDL = collCSDoc.getBlockNewUserShardedDDL(),
@@ -96,7 +96,7 @@ void UserWriteBlockModeOpObserver::onUpdate(OperationContext* opCtx,
     if (args.nss == NamespaceString::kUserWritesCriticalSectionsNamespace &&
         !user_writes_recoverable_critical_section_util::inRecoveryMode(opCtx)) {
         const auto collCSDoc = UserWriteBlockingCriticalSectionDocument::parse(
-            IDLParserErrorContext("UserWriteBlockOpObserver"), args.updateArgs->updatedDoc);
+            IDLParserContext("UserWriteBlockOpObserver"), args.updateArgs->updatedDoc);
 
         opCtx->recoveryUnit()->onCommit(
             [opCtx,
@@ -150,7 +150,7 @@ void UserWriteBlockModeOpObserver::onDelete(OperationContext* opCtx,
 
         const auto& deletedDoc = documentId;
         const auto collCSDoc = UserWriteBlockingCriticalSectionDocument::parse(
-            IDLParserErrorContext("UserWriteBlockOpObserver"), deletedDoc);
+            IDLParserContext("UserWriteBlockOpObserver"), deletedDoc);
 
         opCtx->recoveryUnit()->onCommit(
             [opCtx, deletedNss = collCSDoc.getNss()](boost::optional<Timestamp>) {

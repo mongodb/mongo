@@ -211,7 +211,7 @@ struct BasicOrderOps<boost::optional<T>> {
 }  // namespace idl
 
 /**
- * IDLParserErrorContext manages the current parser context for parsing BSON documents.
+ * IDLParserContext manages the current parser context for parsing BSON documents.
  *
  * The class stores the path to the current document to enable it provide more useful error
  * messages. The path is a dot delimited list of field names which is useful for nested struct
@@ -220,12 +220,12 @@ struct BasicOrderOps<boost::optional<T>> {
  * This class is responsible for throwing all error messages the IDL generated parsers throw,
  * and provide utility methods like checking a BSON type or set of BSON types.
  */
-class IDLParserErrorContext {
-    IDLParserErrorContext(const IDLParserErrorContext&) = delete;
-    IDLParserErrorContext& operator=(const IDLParserErrorContext&) = delete;
+class IDLParserContext {
+    IDLParserContext(const IDLParserContext&) = delete;
+    IDLParserContext& operator=(const IDLParserContext&) = delete;
 
     template <typename T>
-    friend void throwComparisonError(IDLParserErrorContext& ctxt,
+    friend void throwComparisonError(IDLParserContext& ctxt,
                                      StringData fieldName,
                                      StringData op,
                                      T actualValue,
@@ -238,10 +238,10 @@ public:
     static constexpr auto kOpMsgDollarDB = "$db"_sd;
     static constexpr auto kOpMsgDollarDBDefault = "admin"_sd;
 
-    IDLParserErrorContext(StringData fieldName, bool apiStrict = false)
+    IDLParserContext(StringData fieldName, bool apiStrict = false)
         : _currentField(fieldName), _apiStrict(apiStrict), _predecessor(nullptr) {}
 
-    IDLParserErrorContext(StringData fieldName, const IDLParserErrorContext* predecessor)
+    IDLParserContext(StringData fieldName, const IDLParserContext* predecessor)
         : _currentField(fieldName), _predecessor(predecessor) {}
 
     /**
@@ -390,18 +390,15 @@ private:
     // Pointer to a parent parser context.
     // This provides a singly linked list of parent pointers, and use to produce a full path to a
     // field with an error.
-    const IDLParserErrorContext* _predecessor;
+    const IDLParserContext* _predecessor;
 };
 
 /**
  * Throw an error when BSON validation fails during parse.
  */
 template <typename T>
-void throwComparisonError(IDLParserErrorContext& ctxt,
-                          StringData fieldName,
-                          StringData op,
-                          T actualValue,
-                          T expectedValue) {
+void throwComparisonError(
+    IDLParserContext& ctxt, StringData fieldName, StringData op, T actualValue, T expectedValue) {
     std::string path = ctxt.getElementPath(fieldName);
     throwComparisonError(path, op, actualValue, expectedValue);
 }

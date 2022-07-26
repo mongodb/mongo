@@ -47,7 +47,7 @@ constexpr StringData kAction = "action"_sd;
 
 StatusWith<ActionType> parseActionFromString(StringData action) {
     try {
-        return {ActionType_parse(IDLParserErrorContext(kAction), action)};
+        return {ActionType_parse(IDLParserContext(kAction), action)};
     } catch (DBException&) {
         // ignore
     }

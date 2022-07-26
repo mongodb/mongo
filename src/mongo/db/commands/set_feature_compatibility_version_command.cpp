@@ -267,7 +267,7 @@ public:
         Lock::ExclusiveLock setFCVCommandLock(opCtx->lockState(), commandMutex);
 
         auto request = SetFeatureCompatibilityVersion::parse(
-            IDLParserErrorContext("setFeatureCompatibilityVersion"), cmdObj);
+            IDLParserContext("setFeatureCompatibilityVersion"), cmdObj);
         const auto requestedVersion = request.getCommandParameter();
         const auto actualVersion = serverGlobalParams.featureCompatibility.getVersion();
         if (request.getDowngradeOnDiskChanges()) {
@@ -302,7 +302,7 @@ public:
                 auto fcvObj =
                     FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(opCtx);
                 auto fcvDoc = FeatureCompatibilityVersionDocument::parse(
-                    IDLParserErrorContext("featureCompatibilityVersionDocument"), fcvObj.get());
+                    IDLParserContext("featureCompatibilityVersionDocument"), fcvObj.get());
                 changeTimestamp = fcvDoc.getChangeTimestamp();
                 uassert(5722800,
                         "The 'changeTimestamp' field is missing in the FCV document persisted by "

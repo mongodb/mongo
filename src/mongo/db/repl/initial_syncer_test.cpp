@@ -1662,7 +1662,7 @@ TEST_F(InitialSyncerTest,
     initialSyncer->join();
 
     // OpTimeAndWallTime now uses the IDL parser, so the status code returned is from
-    // IDLParserErrorContext
+    // IDLParserContext
     ASSERT_EQUALS(_lastApplied.getStatus().code(), 40414);
 }
 

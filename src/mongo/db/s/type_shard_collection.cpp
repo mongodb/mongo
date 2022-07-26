@@ -47,7 +47,7 @@ ShardCollectionType::ShardCollectionType(NamespaceString nss,
                               unique) {}
 
 ShardCollectionType::ShardCollectionType(const BSONObj& obj) {
-    ShardCollectionTypeBase::parseProtected(IDLParserErrorContext("ShardCollectionType"), obj);
+    ShardCollectionTypeBase::parseProtected(IDLParserContext("ShardCollectionType"), obj);
 
     uassert(ErrorCodes::ShardKeyNotFound,
             str::stream() << "Empty shard key. Failed to parse: " << obj.toString(),

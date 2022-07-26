@@ -226,7 +226,7 @@ PersistentTaskQueue<T>::_loadNextRecord(DBDirectClient& client) {
     if (!bson.isEmpty()) {
         result = typename PersistentTaskQueue<T>::Record{
             bson.getField("_id").Long(),
-            T::parse(IDLParserErrorContext("PersistentTaskQueue:" + _storageNss.toString()),
+            T::parse(IDLParserContext("PersistentTaskQueue:" + _storageNss.toString()),
                      bson.getObjectField("task"))};
     }
 

@@ -49,7 +49,7 @@ Status ProfileCmdBase::checkAuthForCommand(Client* client,
                                            const BSONObj& cmdObj) const {
     AuthorizationSession* authzSession = AuthorizationSession::get(client);
 
-    auto request = ProfileCmdRequest::parse(IDLParserErrorContext("profile"), cmdObj);
+    auto request = ProfileCmdRequest::parse(IDLParserContext("profile"), cmdObj);
     const auto profilingLevel = request.getCommandParameter();
 
     if (profilingLevel < 0 && !request.getSlowms() && !request.getSampleRate()) {
@@ -71,7 +71,7 @@ bool ProfileCmdBase::run(OperationContext* opCtx,
                          const std::string& dbName,
                          const BSONObj& cmdObj,
                          BSONObjBuilder& result) {
-    auto request = ProfileCmdRequest::parse(IDLParserErrorContext("profile"), cmdObj);
+    auto request = ProfileCmdRequest::parse(IDLParserContext("profile"), cmdObj);
     const auto profilingLevel = request.getCommandParameter();
 
     // Validate arguments before making changes.

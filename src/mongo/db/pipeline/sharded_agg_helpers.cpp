@@ -1286,7 +1286,7 @@ partitionCursors(std::vector<OwnedRemoteCursor> ownedCursors) {
         if (!maybeCursorType) {
             untypedCursors.push_back(std::move(ownedCursor));
         } else {
-            auto cursorType = CursorType_parse(IDLParserErrorContext("ShardedAggHelperCursorType"),
+            auto cursorType = CursorType_parse(IDLParserContext("ShardedAggHelperCursorType"),
                                                maybeCursorType.get());
             if (cursorType == CursorTypeEnum::DocumentResult) {
                 resultsCursors.push_back(std::move(ownedCursor));

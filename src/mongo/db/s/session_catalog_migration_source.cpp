@@ -78,7 +78,7 @@ boost::optional<repl::OplogEntry> forgeNoopEntryFromImageCollection(
         return boost::none;
     }
 
-    auto image = repl::ImageEntry::parse(IDLParserErrorContext("image entry"), imageObj);
+    auto image = repl::ImageEntry::parse(IDLParserContext("image entry"), imageObj);
     if (image.getTxnNumber() != retryableFindAndModifyOplogEntry.getTxnNumber()) {
         // In our snapshot, fetch the current transaction number for a session. If that transaction
         // number doesn't match what's found on the image lookup, it implies that the image is not
@@ -243,8 +243,8 @@ SessionCatalogMigrationSource::SessionCatalogMigrationSource(OperationContext* o
 
     boost::optional<LastTxnSession> lastTxnSession;
     while (cursor->more()) {
-        const auto txnRecord = SessionTxnRecord::parse(
-            IDLParserErrorContext("Session migration cloning"), cursor->next());
+        const auto txnRecord =
+            SessionTxnRecord::parse(IDLParserContext("Session migration cloning"), cursor->next());
 
         const auto sessionId = txnRecord.getSessionId();
         const auto parentSessionId = castToParentSessionId(sessionId);

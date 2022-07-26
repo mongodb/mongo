@@ -264,7 +264,7 @@ public:
                 }
 
                 auto preImage =
-                    ChangeStreamPreImage::parse(IDLParserErrorContext("pre-image"), preImageObj);
+                    ChangeStreamPreImage::parse(IDLParserContext("pre-image"), preImageObj);
                 return {{std::move(preImage.getId().getNsUUID()),
                          std::move(preImage.getId().getTs()),
                          std::move(preImage.getOperationTime())}};

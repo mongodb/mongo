@@ -165,8 +165,7 @@ void ReadWriteConcernDefaults::observeDirectWriteToConfigSettings(OperationConte
     // no new defaults document and the RWConcern will be default constructed, which matches the
     // behavior when lookup discovers a non-existent defaults document.
     auto newDefaultsDoc = newDoc
-        ? RWConcernDefault::parse(IDLParserErrorContext("RWDefaultsWriteObserver"),
-                                  newDoc->getOwned())
+        ? RWConcernDefault::parse(IDLParserContext("RWDefaultsWriteObserver"), newDoc->getOwned())
         : RWConcernDefault();
 
     opCtx->recoveryUnit()->onCommit([this, opCtx, newDefaultsDoc = std::move(newDefaultsDoc)](

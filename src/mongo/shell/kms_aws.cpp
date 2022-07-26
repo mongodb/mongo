@@ -182,7 +182,7 @@ std::vector<uint8_t> AWSKMSService::encrypt(ConstDataRange cdr, StringData kmsKe
     if (!field.eoo()) {
         AwsKMSError awsResponse;
         try {
-            awsResponse = AwsKMSError::parse(IDLParserErrorContext("awsEncryptError"), obj);
+            awsResponse = AwsKMSError::parse(IDLParserContext("awsEncryptError"), obj);
         } catch (DBException& dbe) {
             uasserted(51274,
                       str::stream() << "AWS KMS failed to parse error message: " << dbe.toString()
@@ -194,7 +194,7 @@ std::vector<uint8_t> AWSKMSService::encrypt(ConstDataRange cdr, StringData kmsKe
                                 << awsResponse.getMessage());
     }
 
-    auto awsResponse = AwsEncryptResponse::parse(IDLParserErrorContext("awsEncryptResponse"), obj);
+    auto awsResponse = AwsEncryptResponse::parse(IDLParserContext("awsEncryptResponse"), obj);
 
     auto blobStr = base64::decode(awsResponse.getCiphertextBlob().toString());
 
@@ -218,7 +218,7 @@ BSONObj AWSKMSService::encryptDataKeyByString(ConstDataRange cdr, StringData key
 }
 
 SecureVector<uint8_t> AWSKMSService::decrypt(ConstDataRange cdr, BSONObj masterKey) {
-    auto awsMasterKey = AwsMasterKey::parse(IDLParserErrorContext("awsMasterKey"), masterKey);
+    auto awsMasterKey = AwsMasterKey::parse(IDLParserContext("awsMasterKey"), masterKey);
 
     auto request = UniqueKmsRequest(kms_decrypt_request_new(
         reinterpret_cast<const uint8_t*>(cdr.data()), cdr.length(), nullptr));
@@ -243,7 +243,7 @@ SecureVector<uint8_t> AWSKMSService::decrypt(ConstDataRange cdr, BSONObj masterK
     if (!field.eoo()) {
         AwsKMSError awsResponse;
         try {
-            awsResponse = AwsKMSError::parse(IDLParserErrorContext("awsDecryptError"), obj);
+            awsResponse = AwsKMSError::parse(IDLParserContext("awsDecryptError"), obj);
         } catch (DBException& dbe) {
             uasserted(51275,
                       str::stream() << "AWS KMS failed to parse error message: " << dbe.toString()
@@ -255,7 +255,7 @@ SecureVector<uint8_t> AWSKMSService::decrypt(ConstDataRange cdr, BSONObj masterK
                                 << awsResponse.getMessage());
     }
 
-    auto awsResponse = AwsDecryptResponse::parse(IDLParserErrorContext("awsDecryptResponse"), obj);
+    auto awsResponse = AwsDecryptResponse::parse(IDLParserContext("awsDecryptResponse"), obj);
 
     auto blobStr = base64::decode(awsResponse.getPlaintext().toString());
 
@@ -307,7 +307,7 @@ public:
             return nullptr;
         }
         auto obj = field.Obj();
-        return AWSKMSService::create(AwsKMS::parse(IDLParserErrorContext("root"), obj));
+        return AWSKMSService::create(AwsKMS::parse(IDLParserContext("root"), obj));
     }
 };
 

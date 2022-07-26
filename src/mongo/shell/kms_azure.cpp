@@ -194,7 +194,7 @@ std::unique_ptr<uint8_t, decltype(std::free)*> AzureKMSService::makeRequest(
         AzureKMSError azureResponse;
         try {
             azureResponse =
-                AzureKMSError::parse(IDLParserErrorContext("azureError"), obj["error"].Obj());
+                AzureKMSError::parse(IDLParserContext("azureError"), obj["error"].Obj());
         } catch (DBException& dbe) {
             uasserted(5265102,
                       "Azure KMS failed to parse error message: {}, Response : {}"_format(
@@ -206,7 +206,7 @@ std::unique_ptr<uint8_t, decltype(std::free)*> AzureKMSService::makeRequest(
                                                                azureResponse.getMessage()));
     }
 
-    auto azureResponse = AzureResponseT::parse(IDLParserErrorContext("azureResponse"), obj);
+    auto azureResponse = AzureResponseT::parse(IDLParserContext("azureResponse"), obj);
 
     auto b64Url = azureResponse.getValue().toString();
     std::unique_ptr<uint8_t, decltype(std::free)*> raw_str(
@@ -218,7 +218,7 @@ std::unique_ptr<uint8_t, decltype(std::free)*> AzureKMSService::makeRequest(
 
 
 SecureVector<uint8_t> AzureKMSService::decrypt(ConstDataRange cdr, BSONObj masterKey) {
-    auto azureMasterKey = AzureMasterKey::parse(IDLParserErrorContext("azureMasterKey"), masterKey);
+    auto azureMasterKey = AzureMasterKey::parse(IDLParserContext("azureMasterKey"), masterKey);
     StringData bearerToken = _oauthService->getBearerToken();
 
     HostAndPort keyVaultEndpoint = parseEndpoint(azureMasterKey.getKeyVaultEndpoint());
@@ -241,8 +241,7 @@ SecureVector<uint8_t> AzureKMSService::decrypt(ConstDataRange cdr, BSONObj maste
 
 BSONObj AzureKMSService::encryptDataKeyByBSONObj(ConstDataRange cdr, BSONObj keyId) {
     StringData bearerToken = _oauthService->getBearerToken();
-    AzureMasterKey masterKey =
-        AzureMasterKey::parse(IDLParserErrorContext("azureMasterKey"), keyId);
+    AzureMasterKey masterKey = AzureMasterKey::parse(IDLParserContext("azureMasterKey"), keyId);
 
     HostAndPort keyVaultEndpoint = parseEndpoint(masterKey.getKeyVaultEndpoint());
 
@@ -287,7 +286,7 @@ public:
                 field.type() == BSONType::Object);
 
         auto obj = field.Obj();
-        return AzureKMSService::create(AzureKMS::parse(IDLParserErrorContext("root"), obj));
+        return AzureKMSService::create(AzureKMS::parse(IDLParserContext("root"), obj));
     }
 };
 

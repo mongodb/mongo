@@ -385,7 +385,7 @@ EncryptedFieldConfig getTestEncryptedFieldConfig() {
     ]
 })";
 
-    return EncryptedFieldConfig::parse(IDLParserErrorContext("root"), fromjson(schema));
+    return EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(schema));
 }
 
 void FleCrudTest::assertDocumentCounts(uint64_t edc, uint64_t esc, uint64_t ecc, uint64_t ecoc) {
@@ -547,7 +547,7 @@ void FleCrudTest::doSingleUpdateWithUpdateDoc(int id,
     auto efc = getTestEncryptedFieldConfig();
     auto doc = EncryptionInformationHelpers::encryptionInformationSerializeForDelete(
         _edcNs, efc, &_keyVault);
-    auto ei = EncryptionInformation::parse(IDLParserErrorContext("test"), doc);
+    auto ei = EncryptionInformation::parse(IDLParserContext("test"), doc);
 
     write_ops::UpdateOpEntry entry;
     entry.setQ(BSON("_id" << id));
@@ -574,7 +574,7 @@ void FleCrudTest::doSingleDelete(int id) {
     auto doc = EncryptionInformationHelpers::encryptionInformationSerializeForDelete(
         _edcNs, efc, &_keyVault);
 
-    auto ei = EncryptionInformation::parse(IDLParserErrorContext("test"), doc);
+    auto ei = EncryptionInformation::parse(IDLParserContext("test"), doc);
 
     write_ops::DeleteOpEntry entry;
     entry.setQ(BSON("_id" << id));
@@ -598,7 +598,7 @@ void FleCrudTest::doFindAndModify(write_ops::FindAndModifyCommandRequest& reques
     auto efc = getTestEncryptedFieldConfig();
     auto doc = EncryptionInformationHelpers::encryptionInformationSerializeForDelete(
         _edcNs, efc, &_keyVault);
-    auto ei = EncryptionInformation::parse(IDLParserErrorContext("test"), doc);
+    auto ei = EncryptionInformation::parse(IDLParserContext("test"), doc);
 
     request.setEncryptionInformation(ei);
 
@@ -1186,7 +1186,7 @@ TEST_F(FleTagsTest, InsertAndUpdate) {
 }
 
 TEST_F(FleTagsTest, ContentionFactor) {
-    auto efc = EncryptedFieldConfig::parse(IDLParserErrorContext("root"), fromjson(R"({
+    auto efc = EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(R"({
         "escCollection": "esc",
         "eccCollection": "ecc",
         "ecocCollection": "ecoc",

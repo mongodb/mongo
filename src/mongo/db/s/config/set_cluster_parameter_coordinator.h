@@ -42,7 +42,7 @@ public:
 
     explicit SetClusterParameterCoordinator(const BSONObj& stateDoc)
         : ConfigsvrCoordinator(stateDoc),
-          _doc(StateDoc::parse(IDLParserErrorContext("SetClusterParameterCoordinatorDocument"),
+          _doc(StateDoc::parse(IDLParserContext("SetClusterParameterCoordinatorDocument"),
                                stateDoc)) {}
 
     bool hasSameOptions(const BSONObj& participantDoc) const override;

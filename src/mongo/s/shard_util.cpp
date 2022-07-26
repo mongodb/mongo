@@ -156,7 +156,7 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* opCtx,
     }
 
     const auto response = AutoSplitVectorResponse::parse(
-        IDLParserErrorContext("AutoSplitVectorResponse"), std::move(cmdStatus.getValue().response));
+        IDLParserContext("AutoSplitVectorResponse"), std::move(cmdStatus.getValue().response));
     return response.getSplitKeys();
 }
 

@@ -83,7 +83,7 @@ boost::optional<repl::OplogEntry> forgeNoopImageOplogEntry(
         return boost::none;
     }
 
-    auto image = repl::ImageEntry::parse(IDLParserErrorContext("image entry"), imageDoc->toBson());
+    auto image = repl::ImageEntry::parse(IDLParserContext("image entry"), imageDoc->toBson());
 
     if (image.getTxnNumber() != oplogEntry.getTxnNumber()) {
         // In our snapshot, fetch the current transaction number for a session. If that

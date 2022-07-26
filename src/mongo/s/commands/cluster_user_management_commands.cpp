@@ -77,7 +77,7 @@ void uassertEmptyReply(BSONObj obj) {
 
 template <typename Request, typename Reply>
 Reply parseUMCReply(BSONObj obj) try {
-    return Reply::parse(IDLParserErrorContext(Request::kCommandName), obj);
+    return Reply::parse(IDLParserContext(Request::kCommandName), obj);
 } catch (const AssertionException& ex) {
     uasserted(ex.code(),
               "Received invalid response from {} command: {}, error: {}"_format(

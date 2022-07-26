@@ -138,7 +138,7 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listCollectionsStage() {
         ListCollectionResult result;
         try {
             result = ListCollectionResult::parse(
-                IDLParserErrorContext("TenantDatabaseCloner::listCollectionsStage"), info);
+                IDLParserContext("TenantDatabaseCloner::listCollectionsStage"), info);
         } catch (const DBException& e) {
             uasserted(
                 ErrorCodes::FailedToParse,
@@ -203,7 +203,7 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listExistingCollectionsStag
         ListCollectionResult result;
         try {
             result = ListCollectionResult::parse(
-                IDLParserErrorContext("TenantDatabaseCloner::listExistingCollectionsStage"), info);
+                IDLParserContext("TenantDatabaseCloner::listExistingCollectionsStage"), info);
         } catch (const DBException& e) {
             uasserted(
                 ErrorCodes::FailedToParse,

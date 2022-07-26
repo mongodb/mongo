@@ -326,7 +326,7 @@ public:
 
                 try {
                     firstBatch.push_back(ListIndexesReplyItem::parse(
-                        IDLParserErrorContext("ListIndexesReplyItem"), nextDoc));
+                        IDLParserContext("ListIndexesReplyItem"), nextDoc));
                 } catch (const DBException& exc) {
                     LOGV2_ERROR(5254500,
                                 "Could not parse catalog entry while replying to listIndexes",

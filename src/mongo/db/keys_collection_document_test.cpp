@@ -54,7 +54,7 @@ TEST(KeysCollectionDocument, Roundtrip) {
     keysCollectionDoc.setKeysCollectionDocumentBase({purpose, key, expiresAt});
 
     auto serializedObj = keysCollectionDoc.toBSON();
-    auto parsedKey = KeysCollectionDocument::parse(IDLParserErrorContext("keyDoc"), serializedObj);
+    auto parsedKey = KeysCollectionDocument::parse(IDLParserContext("keyDoc"), serializedObj);
 
     ASSERT_EQ(keyId, parsedKey.getKeyId());
     ASSERT_EQ(purpose, parsedKey.getPurpose());
@@ -77,10 +77,9 @@ TEST(KeysCollectionDocument, MissingKeyIdShouldFailToParse) {
     expiresAt.asTimestamp().append(builder.bb(), "expiresAt");
 
     auto serializedObj = builder.done();
-    ASSERT_THROWS_CODE(
-        KeysCollectionDocument::parse(IDLParserErrorContext("keyDoc"), serializedObj),
-        AssertionException,
-        40414);
+    ASSERT_THROWS_CODE(KeysCollectionDocument::parse(IDLParserContext("keyDoc"), serializedObj),
+                       AssertionException,
+                       40414);
 }
 
 TEST(KeysCollectionDocument, MissingPurposeShouldFailToParse) {
@@ -98,10 +97,9 @@ TEST(KeysCollectionDocument, MissingPurposeShouldFailToParse) {
     expiresAt.asTimestamp().append(builder.bb(), "expiresAt");
 
     auto serializedObj = builder.done();
-    ASSERT_THROWS_CODE(
-        KeysCollectionDocument::parse(IDLParserErrorContext("keyDoc"), serializedObj),
-        AssertionException,
-        40414);
+    ASSERT_THROWS_CODE(KeysCollectionDocument::parse(IDLParserContext("keyDoc"), serializedObj),
+                       AssertionException,
+                       40414);
 }
 
 TEST(KeysCollectionDocument, MissingKeyShouldFailToParse) {
@@ -117,10 +115,9 @@ TEST(KeysCollectionDocument, MissingKeyShouldFailToParse) {
     expiresAt.asTimestamp().append(builder.bb(), "expiresAt");
 
     auto serializedObj = builder.done();
-    ASSERT_THROWS_CODE(
-        KeysCollectionDocument::parse(IDLParserErrorContext("keyDoc"), serializedObj),
-        AssertionException,
-        40414);
+    ASSERT_THROWS_CODE(KeysCollectionDocument::parse(IDLParserContext("keyDoc"), serializedObj),
+                       AssertionException,
+                       40414);
 }
 
 TEST(KeysCollectionDocument, MissingExpiresAtShouldFailToParse) {
@@ -138,10 +135,9 @@ TEST(KeysCollectionDocument, MissingExpiresAtShouldFailToParse) {
     builder.append("key", BSONBinData(key.data(), key.size(), BinDataGeneral));
 
     auto serializedObj = builder.done();
-    ASSERT_THROWS_CODE(
-        KeysCollectionDocument::parse(IDLParserErrorContext("keyDoc"), serializedObj),
-        AssertionException,
-        40414);
+    ASSERT_THROWS_CODE(KeysCollectionDocument::parse(IDLParserContext("keyDoc"), serializedObj),
+                       AssertionException,
+                       40414);
 }
 
 }  // namespace

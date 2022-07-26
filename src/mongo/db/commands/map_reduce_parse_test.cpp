@@ -48,7 +48,7 @@ constexpr auto reduceJavascript = "reduce!"_sd;
 constexpr auto finalizeJavascript = "finalize!"_sd;
 
 TEST(MapReduceParseTest, failedParse) {
-    auto ctx = IDLParserErrorContext("mapReduce");
+    auto ctx = IDLParserContext("mapReduce");
     // Missing fields.
     ASSERT_THROWS(MapReduceCommandRequest::parse(ctx,
                                                  BSON(""
@@ -91,7 +91,7 @@ TEST(MapReduceParseTest, failedParse) {
 }
 
 TEST(MapReduceParseTest, failsToParseCodeWithScope) {
-    auto ctx = IDLParserErrorContext("mapReduce");
+    auto ctx = IDLParserContext("mapReduce");
 
     ASSERT_THROWS(MapReduceCommandRequest::parse(ctx,
                                                  BSON("mapReduce"
@@ -112,7 +112,7 @@ TEST(MapReduceParseTest, failsToParseCodeWithScope) {
 }
 
 TEST(MapReduceParseTest, parseOutputTypes) {
-    auto ctx = IDLParserErrorContext("mapReduce");
+    auto ctx = IDLParserContext("mapReduce");
 
     MapReduceCommandRequest::parse(ctx,
                                    BSON("mapReduce"
@@ -164,7 +164,7 @@ TEST(MapReduceParseTest, parseOutputTypes) {
 }
 
 TEST(MapReduceParseTest, parseAllOptionalFields) {
-    auto ctx = IDLParserErrorContext("mapReduce");
+    auto ctx = IDLParserContext("mapReduce");
 
     MapReduceCommandRequest::parse(ctx,
                                    BSON("mapReduce"
@@ -186,7 +186,7 @@ TEST(MapReduceParseTest, parseAllOptionalFields) {
 }
 
 TEST(MapReduceParseTest, deprecatedOptions) {
-    auto ctx = IDLParserErrorContext("mapReduce");
+    auto ctx = IDLParserContext("mapReduce");
     // jsMode can be true or false
     MapReduceCommandRequest::parse(ctx,
                                    BSON("mapReduce"

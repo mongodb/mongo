@@ -144,7 +144,7 @@ public:
     /**
      * Creates a provenance with source according to the given object's 'provenance' field.
      */
-    static ReadWriteConcernProvenance parse(const IDLParserErrorContext& ctxt,
+    static ReadWriteConcernProvenance parse(const IDLParserContext& ctxt,
                                             const BSONObj& bsonObject);
 
     /**

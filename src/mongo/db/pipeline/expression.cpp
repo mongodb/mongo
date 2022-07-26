@@ -3847,7 +3847,7 @@ intrusive_ptr<Expression> ExpressionInternalFLEEqual::parse(ExpressionContext* c
                                                             BSONElement expr,
                                                             const VariablesParseState& vps) {
 
-    IDLParserErrorContext ctx(kInternalFleEq);
+    IDLParserContext ctx(kInternalFleEq);
     auto fleEq = InternalFleEqStruct::parse(ctx, expr.Obj());
 
     auto fieldExpr = Expression::parseOperand(expCtx, fleEq.getField().getElement(), vps);

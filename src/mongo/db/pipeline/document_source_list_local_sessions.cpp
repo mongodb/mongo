@@ -141,7 +141,7 @@ mongo::ListSessionsSpec mongo::listSessionsParseSpec(StringData stageName,
                           << typeName(spec.type()),
             spec.type() == BSONType::Object);
 
-    IDLParserErrorContext ctx(stageName);
+    IDLParserContext ctx(stageName);
     auto ret = ListSessionsSpec::parse(ctx, spec.Obj());
 
     uassert(ErrorCodes::UnsupportedFormat,

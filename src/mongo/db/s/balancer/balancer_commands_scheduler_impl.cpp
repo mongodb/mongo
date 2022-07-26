@@ -328,7 +328,7 @@ SemiFuture<AutoSplitVectorResponse> BalancerCommandsSchedulerImpl::requestAutoSp
             if (!responseStatus.isOK()) {
                 return responseStatus;
             }
-            return AutoSplitVectorResponse::parse(IDLParserErrorContext("AutoSplitVectorResponse"),
+            return AutoSplitVectorResponse::parse(IDLParserContext("AutoSplitVectorResponse"),
                                                   std::move(remoteResponse.data));
         })
         .semi();

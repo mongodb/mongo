@@ -257,7 +257,7 @@ bool validateOplogId(const Timestamp& clusterTime,
                      const mongo::Document& sourceDoc,
                      const repl::OplogEntry& oplogEntry) {
     auto oplogIdExpected = ReshardingDonorOplogId{clusterTime, sourceDoc["ts"].getTimestamp()};
-    auto oplogId = ReshardingDonorOplogId::parse(IDLParserErrorContext("ReshardingAggTest"),
+    auto oplogId = ReshardingDonorOplogId::parse(IDLParserContext("ReshardingAggTest"),
                                                  oplogEntry.get_id()->getDocument().toBson());
     return oplogIdExpected == oplogId;
 }
@@ -351,7 +351,7 @@ protected:
 
 
     ReshardingDonorOplogId getOplogId(const repl::MutableOplogEntry& oplog) {
-        return ReshardingDonorOplogId::parse(IDLParserErrorContext("ReshardingAggTest::getOplogId"),
+        return ReshardingDonorOplogId::parse(IDLParserContext("ReshardingAggTest::getOplogId"),
                                              oplog.get_id()->getDocument().toBson());
     }
 

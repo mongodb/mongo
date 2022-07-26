@@ -125,7 +125,7 @@ public:
             uassertStatusOK(cmdResponse.commandStatus);
 
             auto renameCollResp = RenameCollectionResponse::parse(
-                IDLParserErrorContext("renameCollection"), cmdResponse.response);
+                IDLParserContext("renameCollection"), cmdResponse.response);
 
             catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
                 toNss, renameCollResp.getCollectionVersion(), dbInfo->getPrimary());

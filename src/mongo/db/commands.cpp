@@ -347,8 +347,7 @@ bool CommandHelpers::appendCommandStatusNoThrow(BSONObjBuilder& result, const St
     // construct an invalid error reply.
     if (!status.isOK() && getTestCommandsEnabled()) {
         try {
-            ErrorReply::parse(IDLParserErrorContext("appendCommandStatusNoThrow"),
-                              result.asTempObj());
+            ErrorReply::parse(IDLParserContext("appendCommandStatusNoThrow"), result.asTempObj());
         } catch (const DBException&) {
             invariant(false,
                       "invalid error-response to a command constructed in "

@@ -100,7 +100,7 @@ public:
         CommandHelpers::uassertCommandRunWithMajority(getName(), opCtx->getWriteConcern());
 
         const auto cloneCatalogDataRequest =
-            CloneCatalogData::parse(IDLParserErrorContext("_shardsvrCloneCatalogData"), cmdObj);
+            CloneCatalogData::parse(IDLParserContext("_shardsvrCloneCatalogData"), cmdObj);
         const auto dbname = cloneCatalogDataRequest.getCommandParameter().toString();
 
         uassert(

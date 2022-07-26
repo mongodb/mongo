@@ -525,7 +525,7 @@ void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext) {
             while (cursor->more()) {
                 retFuture = migrationutil::submitRangeDeletionTask(
                     opCtx.get(),
-                    RangeDeletionTask::parse(IDLParserErrorContext("rangeDeletionRecovery"),
+                    RangeDeletionTask::parse(IDLParserContext("rangeDeletionRecovery"),
                                              cursor->next()));
                 rangeDeletionsMarkedAsProcessing++;
             }

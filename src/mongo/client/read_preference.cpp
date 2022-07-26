@@ -67,7 +67,7 @@ TagSet defaultTagSetForMode(ReadPreference mode) {
 
 Status validateReadPreferenceMode(const std::string& prefStr) {
     try {
-        ReadPreference_parse(IDLParserErrorContext(kModeFieldName), prefStr);
+        ReadPreference_parse(IDLParserContext(kModeFieldName), prefStr);
     } catch (DBException& e) {
         return e.toStatus();
     }
@@ -123,7 +123,7 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSO
 
     ReadPreference mode;
     try {
-        mode = ReadPreference_parse(IDLParserErrorContext(kModeFieldName), modeStr);
+        mode = ReadPreference_parse(IDLParserContext(kModeFieldName), modeStr);
     } catch (DBException& e) {
         return e.toStatus().withContext(
             str::stream() << "Could not parse $readPreference mode '" << modeStr
@@ -144,8 +144,8 @@ StatusWith<ReadPreferenceSetting> ReadPreferenceSetting::fromInnerBSON(const BSO
                                         << " field must be of type object if provided; found "
                                         << hedgingModeEl);
         }
-        hedgingMode = HedgingMode::parse(IDLParserErrorContext(kHedgeFieldName),
-                                         hedgingModeEl.embeddedObject());
+        hedgingMode =
+            HedgingMode::parse(IDLParserContext(kHedgeFieldName), hedgingModeEl.embeddedObject());
         if (hedgingMode->getEnabled() && mode == ReadPreference::PrimaryOnly) {
             return {
                 ErrorCodes::InvalidOptions,

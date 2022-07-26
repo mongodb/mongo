@@ -377,7 +377,7 @@ std::vector<DatabaseType> ShardingCatalogClientImpl::getAllDBs(OperationContext*
     std::vector<DatabaseType> databases;
     databases.reserve(dbs.size());
     for (const BSONObj& doc : dbs) {
-        databases.emplace_back(DatabaseType::parse(IDLParserErrorContext("DatabaseType"), doc));
+        databases.emplace_back(DatabaseType::parse(IDLParserContext("DatabaseType"), doc));
     }
 
     return databases;
@@ -409,8 +409,8 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::_fetchData
     invariant(docsWithOpTime.value.size() == 1);
 
     try {
-        auto db = DatabaseType::parse(IDLParserErrorContext("DatabaseType"),
-                                      docsWithOpTime.value.front());
+        auto db =
+            DatabaseType::parse(IDLParserContext("DatabaseType"), docsWithOpTime.value.front());
         return repl::OpTimeWith<DatabaseType>(db, docsWithOpTime.opTime);
     } catch (const DBException& e) {
         return e.toStatus("Failed to parse DatabaseType");
@@ -1106,7 +1106,7 @@ StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientImpl::getNe
     keys.reserve(keyDocs.size());
     for (auto&& keyDoc : keyDocs) {
         try {
-            keys.push_back(KeysCollectionDocument::parse(IDLParserErrorContext("keyDoc"), keyDoc));
+            keys.push_back(KeysCollectionDocument::parse(IDLParserContext("keyDoc"), keyDoc));
         } catch (...) {
             return exceptionToStatus();
         }

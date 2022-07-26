@@ -55,7 +55,7 @@ public:
         ClusterCommitTransactionCmdBase<Impl>>::RequestParser;
 
     void validateResult(const BSONObj& resultObj) final {
-        auto ctx = IDLParserErrorContext("CommitReply");
+        auto ctx = IDLParserContext("CommitReply");
         if (!BaseType::checkIsErrorStatus(resultObj, ctx)) {
             // Will throw if the result doesn't match the commitReply.
             Reply::parse(ctx, resultObj);

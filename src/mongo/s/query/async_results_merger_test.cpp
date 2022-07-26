@@ -50,7 +50,7 @@ namespace mongo {
 namespace {
 
 LogicalSessionId parseSessionIdFromCmd(BSONObj cmdObj) {
-    return LogicalSessionId::parse(IDLParserErrorContext("lsid"), cmdObj["lsid"].Obj());
+    return LogicalSessionId::parse(IDLParserContext("lsid"), cmdObj["lsid"].Obj());
 }
 
 BSONObj makePostBatchResumeToken(Timestamp clusterTime) {

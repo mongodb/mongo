@@ -179,7 +179,7 @@ protected:
     }
 
     LogicalSessionId getTxnRecordLsid(BSONObj txnRecord) {
-        return SessionTxnRecord::parse(IDLParserErrorContext("ReshardingTxnClonerTest"), txnRecord)
+        return SessionTxnRecord::parse(IDLParserContext("ReshardingTxnClonerTest"), txnRecord)
             .getSessionId();
     }
 
@@ -272,7 +272,7 @@ protected:
                            BSON(SessionTxnRecord::kSessionIdFieldName << sessionId.toBSON()));
         ASSERT(!bsonTxn.isEmpty());
         auto txn = SessionTxnRecord::parse(
-            IDLParserErrorContext("resharding config transactions cloning test"), bsonTxn);
+            IDLParserContext("resharding config transactions cloning test"), bsonTxn);
         ASSERT_EQ(txn.getTxnNum(), txnNum);
         ASSERT_EQ(txn.getLastWriteOpTime(), oplogEntry.getOpTime());
     }
@@ -303,8 +303,8 @@ protected:
             return boost::none;
         }
 
-        return ReshardingTxnClonerProgress::parse(
-            IDLParserErrorContext("ReshardingTxnClonerProgress"), progressDoc);
+        return ReshardingTxnClonerProgress::parse(IDLParserContext("ReshardingTxnClonerProgress"),
+                                                  progressDoc);
     }
 
     boost::optional<LogicalSessionId> getProgressLsid(const ReshardingSourceId& sourceId) {

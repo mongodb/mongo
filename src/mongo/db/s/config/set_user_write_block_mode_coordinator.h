@@ -42,7 +42,7 @@ public:
 
     explicit SetUserWriteBlockModeCoordinator(const BSONObj& stateDoc)
         : ConfigsvrCoordinator(stateDoc),
-          _doc(StateDoc::parse(IDLParserErrorContext("SetUserWriteBlockModeCoordinatorDocument"),
+          _doc(StateDoc::parse(IDLParserContext("SetUserWriteBlockModeCoordinatorDocument"),
                                stateDoc)) {}
 
     bool hasSameOptions(const BSONObj& participantDoc) const override;

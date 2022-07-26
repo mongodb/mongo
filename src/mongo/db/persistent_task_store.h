@@ -158,8 +158,8 @@ public:
 
         while (cursor->more()) {
             auto bson = cursor->next();
-            auto t = T::parse(
-                IDLParserErrorContext("PersistentTaskStore:" + _storageNss.toString()), bson);
+            auto t =
+                T::parse(IDLParserContext("PersistentTaskStore:" + _storageNss.toString()), bson);
 
             if (bool shouldContinue = handler(t); !shouldContinue)
                 return;

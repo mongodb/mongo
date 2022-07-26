@@ -121,7 +121,7 @@ StatusWith<int> StorageInterfaceImpl::getRollbackID(OperationContext* opCtx) {
             return rbidDoc.getStatus();
         }
 
-        auto rbid = RollbackID::parse(IDLParserErrorContext("RollbackID"), rbidDoc.getValue());
+        auto rbid = RollbackID::parse(IDLParserContext("RollbackID"), rbidDoc.getValue());
         invariant(rbid.get_id() == kRollbackIdDocumentId);
         return rbid.getRollbackId();
     } catch (const DBException&) {

@@ -139,7 +139,7 @@ protected:
     }
 
     auto parseSpec(const BSONObj& spec) {
-        IDLParserErrorContext ctx("internalExchange");
+        IDLParserContext ctx("internalExchange");
         return ExchangeSpec::parse(ctx, spec);
     }
 

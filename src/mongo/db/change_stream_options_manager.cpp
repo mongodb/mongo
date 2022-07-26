@@ -87,7 +87,7 @@ Status ChangeStreamOptionsParameter::set(const BSONElement& newValueElement) {
         ChangeStreamOptionsManager& changeStreamOptionsManager =
             ChangeStreamOptionsManager::get(getGlobalServiceContext());
         ChangeStreamOptions newOptions = ChangeStreamOptions::parse(
-            IDLParserErrorContext("changeStreamOptions"), newValueElement.Obj());
+            IDLParserContext("changeStreamOptions"), newValueElement.Obj());
 
         return changeStreamOptionsManager
             .setOptions(Client::getCurrent()->getOperationContext(), newOptions)
@@ -106,7 +106,7 @@ Status ChangeStreamOptionsParameter::validate(const BSONElement& newValueElement
         // default- initialized to 'off'. This is useful for parameter initialization at startup but
         // causes the IDL parser to not enforce the presence of `expireAfterSeconds` in BSON
         // representations. We assert that and the existence of PreAndPostImages here.
-        IDLParserErrorContext ctxt = IDLParserErrorContext("changeStreamOptions"_sd);
+        IDLParserContext ctxt = IDLParserContext("changeStreamOptions"_sd);
         if (auto preAndPostImagesObj = changeStreamOptionsObj["preAndPostImages"_sd];
             !preAndPostImagesObj.eoo()) {
             if (preAndPostImagesObj["expireAfterSeconds"_sd].eoo()) {

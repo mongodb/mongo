@@ -49,7 +49,7 @@ struct TestTask {
     TestTask(BSONObj bson)
         : key(bson.getField("key").String()), val(bson.getField("value").Int()) {}
 
-    static TestTask parse(IDLParserErrorContext, BSONObj bson) {
+    static TestTask parse(IDLParserContext, BSONObj bson) {
         return TestTask{bson};
     }
 

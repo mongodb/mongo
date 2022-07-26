@@ -122,7 +122,7 @@ public:
             auto performViewChange = request().getPerformViewChange();
             uassertStatusOK(timeseries::processCollModCommandWithTimeSeriesTranslation(
                 opCtx, ns(), cmd, performViewChange, &builder));
-            return CollModReply::parse(IDLParserErrorContext("CollModReply"), builder.obj());
+            return CollModReply::parse(IDLParserContext("CollModReply"), builder.obj());
         }
 
     private:

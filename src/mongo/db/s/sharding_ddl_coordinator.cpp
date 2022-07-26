@@ -74,8 +74,8 @@ bool isRetriableErrorForDDLCoordinator(const Status& status) {
 }  // namespace
 
 ShardingDDLCoordinatorMetadata extractShardingDDLCoordinatorMetadata(const BSONObj& coorDoc) {
-    return ShardingDDLCoordinatorMetadata::parse(
-        IDLParserErrorContext("ShardingDDLCoordinatorMetadata"), coorDoc);
+    return ShardingDDLCoordinatorMetadata::parse(IDLParserContext("ShardingDDLCoordinatorMetadata"),
+                                                 coorDoc);
 }
 
 ShardingDDLCoordinator::ShardingDDLCoordinator(ShardingDDLCoordinatorService* service,

@@ -155,7 +155,7 @@ RenameParticipantInstance::~RenameParticipantInstance() {
 
 bool RenameParticipantInstance::hasSameOptions(const BSONObj& participantDoc) {
     const auto otherDoc = RenameCollectionParticipantDocument::parse(
-        IDLParserErrorContext("RenameCollectionParticipantDocument"), participantDoc);
+        IDLParserContext("RenameCollectionParticipantDocument"), participantDoc);
 
     const auto& selfReq = _doc.getRenameCollectionRequest().toBSON();
     const auto& otherReq = otherDoc.getRenameCollectionRequest().toBSON();

@@ -148,7 +148,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                              const BSONObj& cmd,
                              BSONObjBuilder& result,
                              boost::optional<ExplainOptions::Verbosity> verbosity) {
-    auto parsedMr = MapReduceCommandRequest::parse(IDLParserErrorContext("mapReduce"), cmd);
+    auto parsedMr = MapReduceCommandRequest::parse(IDLParserContext("mapReduce"), cmd);
     stdx::unordered_set<NamespaceString> involvedNamespaces{parsedMr.getNamespace()};
     auto hasOutDB = parsedMr.getOutOptions().getDatabaseName();
     auto resolvedOutNss = NamespaceString{hasOutDB ? *hasOutDB : parsedMr.getNamespace().db(),

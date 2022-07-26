@@ -192,8 +192,7 @@ DocumentSource::GetNextResult DocumentSourceReshardingIterateTransaction::doGetN
 
 bool DocumentSourceReshardingIterateTransaction::_isTransactionOplogEntry(const Document& doc) {
     auto op = doc[repl::OplogEntry::kOpTypeFieldName];
-    auto opType =
-        repl::OpType_parse(IDLParserErrorContext("ReshardingEntry.op"), op.getStringData());
+    auto opType = repl::OpType_parse(IDLParserContext("ReshardingEntry.op"), op.getStringData());
     auto commandVal = doc["o"];
 
     if (opType != repl::OpTypeEnum::kCommand || doc["txnNumber"].missing() ||

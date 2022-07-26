@@ -647,7 +647,7 @@ TEST_F(ReshardingRecipientServiceTest, WritesNoopOplogEntryOnReshardDoneCatchUp)
 
     ReshardDoneCatchUpChangeEventO2Field expectedChangeEvent{sourceNss, doc.getReshardingUUID()};
     auto receivedChangeEvent = ReshardDoneCatchUpChangeEventO2Field::parse(
-        IDLParserErrorContext("ReshardDoneCatchUpChangeEventO2Field"), *op.getObject2());
+        IDLParserContext("ReshardDoneCatchUpChangeEventO2Field"), *op.getObject2());
 
     ASSERT_EQ(OpType_serializer(op.getOpType()), OpType_serializer(repl::OpTypeEnum::kNoop))
         << op.getEntry();

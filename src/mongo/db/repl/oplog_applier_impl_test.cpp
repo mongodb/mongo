@@ -489,7 +489,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToRecordChangeStreamPreImages) {
 
             // Verify that the pre-image document is correct.
             const auto preImageDocument = ChangeStreamPreImage::parse(
-                IDLParserErrorContext{"test"}, preImageLoadResult.getValue());
+                IDLParserContext{"test"}, preImageLoadResult.getValue());
             ASSERT_BSONOBJ_EQ(preImageDocument.getPreImage(), document);
             ASSERT_EQUALS(preImageDocument.getOperationTime(), op.getWallClockTime()) << testDesc;
 
@@ -3167,7 +3167,7 @@ TEST_F(OplogApplierImplTxnTableTest, MultiApplyUpdatesTheTransactionTable) {
     ASSERT_TRUE(!resultSingleDoc.isEmpty());
 
     auto resultSingle =
-        SessionTxnRecord::parse(IDLParserErrorContext("resultSingleDoc test"), resultSingleDoc);
+        SessionTxnRecord::parse(IDLParserContext("resultSingleDoc test"), resultSingleDoc);
 
     ASSERT_EQ(resultSingle.getTxnNum(), 5LL);
     ASSERT_EQ(resultSingle.getLastWriteOpTime(), repl::OpTime(Timestamp(Seconds(1), 0), 1));
@@ -3179,7 +3179,7 @@ TEST_F(OplogApplierImplTxnTableTest, MultiApplyUpdatesTheTransactionTable) {
     ASSERT_TRUE(!resultDiffTxnDoc.isEmpty());
 
     auto resultDiffTxn =
-        SessionTxnRecord::parse(IDLParserErrorContext("resultDiffTxnDoc test"), resultDiffTxnDoc);
+        SessionTxnRecord::parse(IDLParserContext("resultDiffTxnDoc test"), resultDiffTxnDoc);
 
     ASSERT_EQ(resultDiffTxn.getTxnNum(), 20LL);
     ASSERT_EQ(resultDiffTxn.getLastWriteOpTime(), repl::OpTime(Timestamp(Seconds(3), 0), 1));
@@ -3191,7 +3191,7 @@ TEST_F(OplogApplierImplTxnTableTest, MultiApplyUpdatesTheTransactionTable) {
     ASSERT_TRUE(!resultSameTxnDoc.isEmpty());
 
     auto resultSameTxn =
-        SessionTxnRecord::parse(IDLParserErrorContext("resultSameTxnDoc test"), resultSameTxnDoc);
+        SessionTxnRecord::parse(IDLParserContext("resultSameTxnDoc test"), resultSameTxnDoc);
 
     ASSERT_EQ(resultSameTxn.getTxnNum(), 30LL);
     ASSERT_EQ(resultSameTxn.getLastWriteOpTime(), repl::OpTime(Timestamp(Seconds(6), 0), 1));

@@ -166,7 +166,7 @@ private:
 
 std::vector<uint8_t> GCPKMSService::encrypt(ConstDataRange cdr, const BSONObj& kmsKeyId) {
     StringData bearerToken = _oauthService->getBearerToken();
-    GcpMasterKey masterKey = GcpMasterKey::parse(IDLParserErrorContext("gcpMasterKey"), kmsKeyId);
+    GcpMasterKey masterKey = GcpMasterKey::parse(IDLParserContext("gcpMasterKey"), kmsKeyId);
 
     auto request = UniqueKmsRequest(kms_gcp_request_encrypt_new(
         _server.host().c_str(),
@@ -195,7 +195,7 @@ std::vector<uint8_t> GCPKMSService::encrypt(ConstDataRange cdr, const BSONObj& k
         GcpKMSError gcpResponse;
         try {
             gcpResponse =
-                GcpKMSError::parse(IDLParserErrorContext("gcpEncryptError"), obj["error"].Obj());
+                GcpKMSError::parse(IDLParserContext("gcpEncryptError"), obj["error"].Obj());
         } catch (DBException& dbe) {
             uasserted(5265005,
                       str::stream() << "GCP KMS failed to parse error message: " << dbe.toString()
@@ -207,7 +207,7 @@ std::vector<uint8_t> GCPKMSService::encrypt(ConstDataRange cdr, const BSONObj& k
                                 << gcpResponse.getStatus() << " : " << gcpResponse.getMessage());
     }
 
-    auto gcpResponce = GcpEncryptResponse::parse(IDLParserErrorContext("gcpEncryptResponse"), obj);
+    auto gcpResponce = GcpEncryptResponse::parse(IDLParserContext("gcpEncryptResponse"), obj);
 
     auto blobStr = base64::decode(gcpResponce.getCiphertext());
 
@@ -215,7 +215,7 @@ std::vector<uint8_t> GCPKMSService::encrypt(ConstDataRange cdr, const BSONObj& k
 }
 
 SecureVector<uint8_t> GCPKMSService::decrypt(ConstDataRange cdr, BSONObj masterKey) {
-    auto gcpMasterKey = GcpMasterKey::parse(IDLParserErrorContext("gcpMasterKey"), masterKey);
+    auto gcpMasterKey = GcpMasterKey::parse(IDLParserContext("gcpMasterKey"), masterKey);
     StringData bearerToken = _oauthService->getBearerToken();
 
     auto request =
@@ -242,7 +242,7 @@ SecureVector<uint8_t> GCPKMSService::decrypt(ConstDataRange cdr, BSONObj masterK
         GcpKMSError gcpResponse;
         try {
             gcpResponse =
-                GcpKMSError::parse(IDLParserErrorContext("gcpDecryptError"), obj["error"].Obj());
+                GcpKMSError::parse(IDLParserContext("gcpDecryptError"), obj["error"].Obj());
         } catch (DBException& dbe) {
             uasserted(5265007,
                       str::stream() << "GCP KMS failed to parse error message: " << dbe.toString()
@@ -254,7 +254,7 @@ SecureVector<uint8_t> GCPKMSService::decrypt(ConstDataRange cdr, BSONObj masterK
                                 << gcpResponse.getStatus() << " : " << gcpResponse.getMessage());
     }
 
-    auto gcpResponce = GcpDecryptResponse::parse(IDLParserErrorContext("gcpDecryptResponse"), obj);
+    auto gcpResponce = GcpDecryptResponse::parse(IDLParserContext("gcpDecryptResponse"), obj);
 
     auto blobStr = base64::decode(gcpResponce.getPlaintext());
 
@@ -264,7 +264,7 @@ SecureVector<uint8_t> GCPKMSService::decrypt(ConstDataRange cdr, BSONObj masterK
 BSONObj GCPKMSService::encryptDataKeyByBSONObj(ConstDataRange cdr, BSONObj keyId) {
     auto dataKey = encrypt(cdr, keyId);
 
-    GcpMasterKey masterKey = GcpMasterKey::parse(IDLParserErrorContext("gcpMasterKey"), keyId);
+    GcpMasterKey masterKey = GcpMasterKey::parse(IDLParserContext("gcpMasterKey"), keyId);
 
     GcpMasterKeyAndMaterial keyAndMaterial;
     keyAndMaterial.setKeyMaterial(std::move(dataKey));
@@ -324,7 +324,7 @@ public:
                 "Misconfigured GCP KMS Config: {}"_format(field.toString()),
                 field.type() == BSONType::Object);
         auto obj = field.Obj();
-        return GCPKMSService::create(GcpKMS::parse(IDLParserErrorContext("root"), obj));
+        return GCPKMSService::create(GcpKMS::parse(IDLParserContext("root"), obj));
     }
 };
 

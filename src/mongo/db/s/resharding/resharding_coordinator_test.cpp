@@ -248,7 +248,7 @@ protected:
                                   BSON("ns" << expectedCoordinatorDoc.getSourceNss().ns()));
 
         auto coordinatorDoc = ReshardingCoordinatorDocument::parse(
-            IDLParserErrorContext("ReshardingCoordinatorTest"), doc);
+            IDLParserContext("ReshardingCoordinatorTest"), doc);
 
         ASSERT_EQUALS(coordinatorDoc.getReshardingUUID(),
                       expectedCoordinatorDoc.getReshardingUUID());

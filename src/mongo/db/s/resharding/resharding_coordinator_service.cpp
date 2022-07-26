@@ -980,7 +980,7 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingCoordinatorService
     BSONObj initialState) {
     return std::make_shared<ReshardingCoordinator>(
         this,
-        ReshardingCoordinatorDocument::parse(IDLParserErrorContext("ReshardingCoordinatorStateDoc"),
+        ReshardingCoordinatorDocument::parse(IDLParserContext("ReshardingCoordinatorStateDoc"),
                                              std::move(initialState)),
         std::make_shared<ReshardingCoordinatorExternalStateImpl>(),
         _serviceContext);

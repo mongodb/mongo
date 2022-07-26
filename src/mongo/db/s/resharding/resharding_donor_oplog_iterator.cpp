@@ -66,7 +66,7 @@ namespace {
  */
 ReshardingDonorOplogId getId(const repl::OplogEntry& oplog) {
     return ReshardingDonorOplogId::parse(
-        IDLParserErrorContext("ReshardingDonorOplogIterator::getOplogId"),
+        IDLParserContext("ReshardingDonorOplogIterator::getOplogId"),
         oplog.get_id()->getDocument().toBson());
 }
 

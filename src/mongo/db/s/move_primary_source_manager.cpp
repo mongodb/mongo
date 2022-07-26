@@ -345,7 +345,7 @@ Status MovePrimarySourceManager::_commitOnConfig(OperationContext* opCtx) {
             !databasesVector.empty());
 
     const auto dbType =
-        DatabaseType::parse(IDLParserErrorContext("DatabaseType"), databasesVector.front());
+        DatabaseType::parse(IDLParserContext("DatabaseType"), databasesVector.front());
 
     if (dbType.getPrimary() == _toShard) {
         return Status::OK();

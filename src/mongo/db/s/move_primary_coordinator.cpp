@@ -54,7 +54,7 @@ void MovePrimaryCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) c
 void MovePrimaryCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
     // If we have two shard collections on the same namespace, then the arguments must be the same.
     const auto otherDoc = MovePrimaryCoordinatorDocument::parse(
-        IDLParserErrorContext("MovePrimaryCoordinatorDocument"), doc);
+        IDLParserContext("MovePrimaryCoordinatorDocument"), doc);
 
     uassert(
         ErrorCodes::ConflictingOperationInProgress,

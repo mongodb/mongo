@@ -167,8 +167,8 @@ std::unique_ptr<CommandInvocation> ClusterExplainCmd::parse(OperationContext* op
 
     // To enforce API versioning
     auto cmdObj = ExplainCommandRequest::parse(
-        IDLParserErrorContext(ExplainCommandRequest::kCommandName,
-                              APIParameters::get(opCtx).getAPIStrict().value_or(false)),
+        IDLParserContext(ExplainCommandRequest::kCommandName,
+                         APIParameters::get(opCtx).getAPIStrict().value_or(false)),
         request.body);
     std::string dbName = cmdObj.getDbName().toString();
     ExplainOptions::Verbosity verbosity = cmdObj.getVerbosity();

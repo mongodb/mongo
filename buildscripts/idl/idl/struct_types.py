@@ -257,14 +257,14 @@ class _StructTypeInfo(StructTypeInfoBase):
         # type: () -> MethodInfo
         class_name = common.title_case(self._struct.cpp_name)
         return MethodInfo(class_name, 'parse',
-                          ['const IDLParserErrorContext& ctxt', 'const BSONObj& bsonObject'],
-                          class_name, static=True)
+                          ['const IDLParserContext& ctxt', 'const BSONObj& bsonObject'], class_name,
+                          static=True)
 
     def get_deserializer_method(self):
         # type: () -> MethodInfo
         return MethodInfo(
             common.title_case(self._struct.cpp_name), 'parseProtected',
-            ['const IDLParserErrorContext& ctxt', 'const BSONObj& bsonObject'], 'void')
+            ['const IDLParserContext& ctxt', 'const BSONObj& bsonObject'], 'void')
 
     def get_serializer_method(self):
         # type: () -> MethodInfo
@@ -326,14 +326,14 @@ class _CommandBaseTypeInfo(_StructTypeInfo):
         # type: () -> Optional[MethodInfo]
         class_name = common.title_case(self._struct.cpp_name)
         return MethodInfo(class_name, 'parse',
-                          ['const IDLParserErrorContext& ctxt', 'const OpMsgRequest& request'],
+                          ['const IDLParserContext& ctxt', 'const OpMsgRequest& request'],
                           class_name, static=True)
 
     def get_op_msg_request_deserializer_method(self):
         # type: () -> Optional[MethodInfo]
         return MethodInfo(
             common.title_case(self._struct.cpp_name), 'parseProtected',
-            ['const IDLParserErrorContext& ctxt', 'const OpMsgRequest& request'], 'void')
+            ['const IDLParserContext& ctxt', 'const OpMsgRequest& request'], 'void')
 
 
 class _IgnoredCommandTypeInfo(_CommandBaseTypeInfo):
@@ -423,7 +423,7 @@ class _CommandFromType(_CommandBaseTypeInfo):
         # type: () -> MethodInfo
         return MethodInfo(
             common.title_case(self._struct.cpp_name), 'parseProtected',
-            ['const IDLParserErrorContext& ctxt', 'const BSONObj& bsonObject'], 'void')
+            ['const IDLParserContext& ctxt', 'const BSONObj& bsonObject'], 'void')
 
     def gen_getter_method(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
@@ -489,7 +489,7 @@ class _CommandWithNamespaceTypeInfo(_CommandBaseTypeInfo):
         # type: () -> MethodInfo
         return MethodInfo(
             common.title_case(self._struct.cpp_name), 'parseProtected',
-            ['const IDLParserErrorContext& ctxt', 'const BSONObj& bsonObject'], 'void')
+            ['const IDLParserContext& ctxt', 'const BSONObj& bsonObject'], 'void')
 
     def gen_getter_method(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None
@@ -568,7 +568,7 @@ class _CommandWithUUIDNamespaceTypeInfo(_CommandBaseTypeInfo):
         # type: () -> MethodInfo
         return MethodInfo(
             common.title_case(self._struct.cpp_name), 'parseProtected',
-            ['const IDLParserErrorContext& ctxt', 'const BSONObj& bsonObject'], 'void')
+            ['const IDLParserContext& ctxt', 'const BSONObj& bsonObject'], 'void')
 
     def gen_getter_method(self, indented_writer):
         # type: (writer.IndentedTextWriter) -> None

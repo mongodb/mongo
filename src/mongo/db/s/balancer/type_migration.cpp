@@ -136,8 +136,8 @@ StatusWith<MigrationType> MigrationType::fromBSON(const BSONObj& source) {
         if (!status.isOK())
             return status;
 
-        migrationType._forceJumbo = ForceJumbo_parse(IDLParserErrorContext("ForceJumbo"),
-                                                     static_cast<int32_t>(forceJumboVal));
+        migrationType._forceJumbo =
+            ForceJumbo_parse(IDLParserContext("ForceJumbo"), static_cast<int32_t>(forceJumboVal));
     }
 
     {

@@ -109,7 +109,7 @@ CachedDatabaseInfo createDatabase(OperationContext* opCtx,
                                        << "Database " << dbName << " could not be created");
 
         auto createDbResponse = ConfigsvrCreateDatabaseResponse::parse(
-            IDLParserErrorContext("configsvrCreateDatabaseResponse"), response.response);
+            IDLParserContext("configsvrCreateDatabaseResponse"), response.response);
         catalogCache->onStaleDatabaseVersion(dbName, createDbResponse.getDatabaseVersion());
 
         dbStatus = catalogCache->getDatabase(opCtx, dbName);
@@ -133,8 +133,8 @@ void createCollection(OperationContext* opCtx, const ShardsvrCreateCollection& r
     const auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
     uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
 
-    auto createCollResp = CreateCollectionResponse::parse(IDLParserErrorContext("createCollection"),
-                                                          remoteResponse.data);
+    auto createCollResp =
+        CreateCollectionResponse::parse(IDLParserContext("createCollection"), remoteResponse.data);
 
     auto catalogCache = Grid::get(opCtx)->catalogCache();
     catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(

@@ -49,7 +49,7 @@ public:
             uassert(5447000,
                     str::stream() << "$collStats must take a nested object but found: " << specElem,
                     specElem.type() == BSONType::Object);
-            auto spec = DocumentSourceCollStatsSpec::parse(IDLParserErrorContext(kStageName),
+            auto spec = DocumentSourceCollStatsSpec::parse(IDLParserContext(kStageName),
                                                            specElem.embeddedObject());
             return std::make_unique<LiteParsed>(specElem.fieldName(), nss, std::move(spec));
         }

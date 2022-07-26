@@ -242,7 +242,7 @@ public:
 } gMirroredReadsSection;
 
 auto parseMirroredReadsParameters(const BSONObj& obj) {
-    IDLParserErrorContext ctx("mirrorReads");
+    IDLParserContext ctx("mirrorReads");
     return MirroredReadsParameters::parse(ctx, obj);
 }
 

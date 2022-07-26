@@ -283,8 +283,8 @@ protected:
             const auto addShardOpMsgRequest =
                 OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
 
-            auto addShardCmd = AddShard::parse(IDLParserErrorContext(AddShard::kCommandName),
-                                               addShardOpMsgRequest);
+            auto addShardCmd =
+                AddShard::parse(IDLParserContext(AddShard::kCommandName), addShardOpMsgRequest);
 
             const auto& updateOpField =
                 add_shard_util::createShardIdentityUpsertForAddShard(addShardCmd);

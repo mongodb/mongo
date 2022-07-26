@@ -144,8 +144,7 @@ BSONObj extractPreOrPostImage(OperationContext* opCtx, const repl::OplogEntry& o
                     << sessionId.toBSON() << " cannot be found");
         }
 
-        auto entry =
-            repl::ImageEntry::parse(IDLParserErrorContext("ImageEntryForRequest"), imageDoc);
+        auto entry = repl::ImageEntry::parse(IDLParserContext("ImageEntryForRequest"), imageDoc);
         if (entry.getInvalidated()) {
             // This case is expected when a node could not correctly compute a retry image due
             // to data inconsistency while in initial sync.

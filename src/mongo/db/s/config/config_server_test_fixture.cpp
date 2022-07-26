@@ -445,7 +445,7 @@ std::vector<KeysCollectionDocument> ConfigServerTestFixture::getKeys(OperationCo
     std::vector<KeysCollectionDocument> keys;
     const auto& docs = findStatus.getValue().docs;
     for (const auto& doc : docs) {
-        auto key = KeysCollectionDocument::parse(IDLParserErrorContext("keyDoc"), doc);
+        auto key = KeysCollectionDocument::parse(IDLParserContext("keyDoc"), doc);
         keys.push_back(std::move(key));
     }
 

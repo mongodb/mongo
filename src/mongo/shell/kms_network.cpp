@@ -177,8 +177,7 @@ void KMSOAuthService::makeBearerTokenRequest() {
     if (!field.eoo()) {
         OAuthErrorResponse oAuthErrorResponse;
         try {
-            oAuthErrorResponse =
-                OAuthErrorResponse::parse(IDLParserErrorContext("oauthError"), obj);
+            oAuthErrorResponse = OAuthErrorResponse::parse(IDLParserContext("oauthError"), obj);
         } catch (DBException& dbe) {
             uasserted(ErrorCodes::FailedToParse,
                       str::stream() << "Failed to parse error message: " << dbe.toString()
@@ -195,7 +194,7 @@ void KMSOAuthService::makeBearerTokenRequest() {
                                 << description);
     }
 
-    auto kmsResponse = OAuthResponse::parse(IDLParserErrorContext("OAuthResponse"), obj);
+    auto kmsResponse = OAuthResponse::parse(IDLParserContext("OAuthResponse"), obj);
 
     _cachedToken = kmsResponse.getAccess_token().toString();
 

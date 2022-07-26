@@ -189,7 +189,7 @@ StatusWith<ShardDatabaseType> readShardDatabasesEntry(OperationContext* opCtx, S
         }
 
         BSONObj document = cursor->nextSafe();
-        return ShardDatabaseType::parse(IDLParserErrorContext("ShardDatabaseType"), document);
+        return ShardDatabaseType::parse(IDLParserContext("ShardDatabaseType"), document);
     } catch (const DBException& ex) {
         return ex.toStatus(str::stream()
                            << "Failed to read the '" << dbName.toString() << "' entry locally from "

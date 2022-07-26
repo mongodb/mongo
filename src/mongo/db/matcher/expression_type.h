@@ -339,8 +339,7 @@ public:
         if (static_cast<size_t>(binDataLen) < sizeof(FleBlobHeader))
             return false;
 
-        auto fleBlobSubType =
-            EncryptedBinDataType_parse(IDLParserErrorContext("subtype"), binData[0]);
+        auto fleBlobSubType = EncryptedBinDataType_parse(IDLParserContext("subtype"), binData[0]);
         switch (fleBlobSubType) {
             case EncryptedBinDataType::kDeterministic:
             case EncryptedBinDataType::kRandom: {

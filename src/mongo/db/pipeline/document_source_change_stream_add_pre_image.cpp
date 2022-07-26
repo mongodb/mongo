@@ -69,7 +69,7 @@ DocumentSourceChangeStreamAddPreImage::createFromBson(
             str::stream() << "the '" << kStageName << "' stage spec must be an object",
             elem.type() == BSONType::Object);
     auto parsedSpec = DocumentSourceChangeStreamAddPreImageSpec::parse(
-        IDLParserErrorContext("DocumentSourceChangeStreamAddPreImageSpec"), elem.Obj());
+        IDLParserContext("DocumentSourceChangeStreamAddPreImageSpec"), elem.Obj());
     return make_intrusive<DocumentSourceChangeStreamAddPreImage>(
         expCtx, parsedSpec.getFullDocumentBeforeChange());
 }

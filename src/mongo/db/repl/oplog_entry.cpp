@@ -281,7 +281,7 @@ ReplOperation MutableOplogEntry::makeDeleteOperation(const NamespaceString& nss,
 StatusWith<MutableOplogEntry> MutableOplogEntry::parse(const BSONObj& object) {
     try {
         MutableOplogEntry oplogEntry;
-        oplogEntry.parseProtected(IDLParserErrorContext("OplogEntryBase"), object);
+        oplogEntry.parseProtected(IDLParserContext("OplogEntryBase"), object);
         return oplogEntry;
     } catch (...) {
         return exceptionToStatus();
@@ -322,7 +322,7 @@ StatusWith<DurableOplogEntry> DurableOplogEntry::parse(const BSONObj& object) {
 DurableOplogEntry::DurableOplogEntry(BSONObj rawInput) : _raw(std::move(rawInput)) {
     _raw = _raw.getOwned();
 
-    parseProtected(IDLParserErrorContext("OplogEntryBase"), _raw);
+    parseProtected(IDLParserContext("OplogEntryBase"), _raw);
 
     // Parse command type from 'o' and 'o2' fields.
     if (isCommand()) {

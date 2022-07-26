@@ -83,7 +83,7 @@ public:
         kOplog,
     };
 
-    static ReplOperation parse(const IDLParserErrorContext& ctxt, const BSONObj& bsonObject) {
+    static ReplOperation parse(const IDLParserContext& ctxt, const BSONObj& bsonObject) {
         ReplOperation o;
         o.parseProtected(ctxt, bsonObject);
         return o;

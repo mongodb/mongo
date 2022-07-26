@@ -136,7 +136,7 @@ public:
     uint8_t* getCiphertextMutable() && = delete;
 
     FleAlgorithmInt getFLEAlgorithmType() {
-        return FleAlgorithmInt_parse(IDLParserErrorContext("root"), _data[0]);
+        return FleAlgorithmInt_parse(IDLParserContext("root"), _data[0]);
     }
 
     size_t getDataLength() const {
@@ -204,7 +204,7 @@ public:
 
 private:
     FleAlgorithmInt getFLEAlgorithmType() const {
-        return FleAlgorithmInt_parse(IDLParserErrorContext("root"), *_data.data<uint8_t>());
+        return FleAlgorithmInt_parse(IDLParserContext("root"), *_data.data<uint8_t>());
     }
 
     size_t getDataLength() const {

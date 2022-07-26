@@ -58,8 +58,8 @@ const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
 }
 
 bool SetClusterParameterCoordinator::hasSameOptions(const BSONObj& otherDocBSON) const {
-    const auto otherDoc = StateDoc::parse(
-        IDLParserErrorContext("SetClusterParameterCoordinatorDocument"), otherDocBSON);
+    const auto otherDoc =
+        StateDoc::parse(IDLParserContext("SetClusterParameterCoordinatorDocument"), otherDocBSON);
     return SimpleBSONObjComparator::kInstance.evaluate(_doc.getParameter() ==
                                                        otherDoc.getParameter());
 }
