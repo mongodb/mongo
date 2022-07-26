@@ -56,6 +56,7 @@ public:
     virtual Status validateRecord(OperationContext* opCtx,
                                   const RecordId& recordId,
                                   const RecordData& record,
+                                  long long* nNonCompliantDocuments,
                                   size_t* dataSize,
                                   ValidateResults* results);
 

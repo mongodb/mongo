@@ -82,6 +82,9 @@ static constexpr const char* kSchemaValidationFailedReason =
 static constexpr const char* kTimeseriesValidationInconsistencyReason =
     "Detected one or more documents in this collection incompatible with time-series "
     "specifications. For more info, see logs with log id 6698300.";
+static constexpr const char* kBSONValidationNonConformantReason =
+    "Detected one or more documents in this collection not conformant to BSON specifications. For "
+    "more info, see logs with log id 6825900";
 
 /**
  * Validate that for each record in a clustered RecordStore the record key (RecordId) matches the
@@ -319,19 +322,42 @@ void _timeseriesValidationFailed(CollectionValidation::ValidateState* state,
 
     results->warnings.push_back(kTimeseriesValidationInconsistencyReason);
 }
+
+void _BSONSpecValidationFailed(CollectionValidation::ValidateState* state,
+                               ValidateResults* results) {
+    if (state->isBSONDataNonConformant()) {
+        // Only report the warning message once.
+        return;
+    }
+    state->setBSONDataNonConformant();
+
+    results->warnings.push_back(kBSONValidationNonConformantReason);
+}
 }  // namespace
 
 Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                                        const RecordId& recordId,
                                        const RecordData& record,
+                                       long long* nNonCompliantDocuments,
                                        size_t* dataSize,
                                        ValidateResults* results) {
-    auto validateBSONMode = _validateState->isCheckingBSONConsistencies()
-        ? BSONValidateMode::kFull
-        : BSONValidateMode::kExtended;
+    auto validateBSONMode = BSONValidateMode::kDefault;
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        feature_flags::gExtendValidateCommand.isEnabled(serverGlobalParams.featureCompatibility)) {
+        validateBSONMode = _validateState->getBSONValidateMode();
+    }
     const Status status = validateBSON(record.data(), record.size(), validateBSONMode);
-    if (!status.isOK())
-        return status;
+    if (!status.isOK()) {
+        if (status.code() != ErrorCodes::NonConformantBSON) {
+            return status;
+        }
+        LOGV2_WARNING(6825900,
+                      "Document is not conformant to BSON specifications",
+                      "recordId"_attr = recordId,
+                      "reason"_attr = status);
+        (*nNonCompliantDocuments)++;
+        _BSONSpecValidationFailed(_validateState, results);
+    }
 
     BSONObj recordBson = record.toBson();
     *dataSize = recordBson.objsize();
@@ -466,7 +492,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
             }
         }
     }
-    return status;
+    return Status::OK();
 }
 
 namespace {
@@ -762,7 +788,8 @@ void ValidateAdaptor::traverseRecordStore(OperationContext* opCtx,
         interruptIntervalNumBytes += dataSize;
         dataSizeTotal += dataSize;
         size_t validatedSize = 0;
-        Status status = validateRecord(opCtx, record->id, record->data, &validatedSize, results);
+        Status status = validateRecord(
+            opCtx, record->id, record->data, &nNonCompliantDocuments, &validatedSize, results);
 
         // RecordStores are required to return records in RecordId order.
         if (prevRecordId.isValid()) {

@@ -90,12 +90,14 @@ public:
         return isFullValidation() || _mode == ValidateMode::kForegroundFullIndexOnly;
     }
 
-    bool isCheckingBSONConsistencies() const {
+    BSONValidateMode getBSONValidateMode() const {
         return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            feature_flags::gExtendValidateCommand.isEnabled(
-                serverGlobalParams.featureCompatibility) &&
-            (_mode == ValidateMode::kForegroundCheckBSON ||
-             _mode == ValidateMode::kBackgroundCheckBSON || isFullValidation());
+                feature_flags::gExtendValidateCommand.isEnabled(
+                    serverGlobalParams.featureCompatibility) &&
+                (_mode == ValidateMode::kForegroundCheckBSON ||
+                 _mode == ValidateMode::kBackgroundCheckBSON || isFullValidation())
+            ? BSONValidateMode::kFull
+            : BSONValidateMode::kExtended;
     }
 
     bool isCollectionSchemaViolated() const {
@@ -106,11 +108,19 @@ public:
         _collectionSchemaViolated = true;
     }
 
-    bool isTimeseriesDataInconsistent() {
+    bool isTimeseriesDataInconsistent() const {
         return _timeseriesDataInconsistency;
     }
     void setTimeseriesDataInconsistent() {
         _timeseriesDataInconsistency = true;
+    }
+
+    bool isBSONDataNonConformant() const {
+        return _BSONDataNonConformant;
+    }
+
+    void setBSONDataNonConformant() {
+        _BSONDataNonConformant = true;
     }
 
     bool fixErrors() const {
@@ -229,6 +239,7 @@ private:
     RepairMode _repairMode;
     bool _collectionSchemaViolated = false;
     bool _timeseriesDataInconsistency = false;
+    bool _BSONDataNonConformant = false;
 
     boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock> _noPBWM;
     boost::optional<Lock::GlobalLock> _globalLock;
