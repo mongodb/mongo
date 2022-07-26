@@ -13,7 +13,8 @@
 
 // Verify that the oplog cap maintainer thread is running under normal circumstances.
 jsTestLog("Testing single node replica set mode");
-const rst = new ReplSetTest({nodes: 1, nodeOptions: {setParameter: {logLevel: 1}}});
+const rst = new ReplSetTest(
+    {nodes: 1, nodeOptions: {setParameter: {logComponentVerbosity: tojson({storage: 1})}}});
 rst.startSet();
 rst.initiate();
 
@@ -39,7 +40,7 @@ let conn = MongoRunner.runMongod({
     dbpath: primary.dbpath,
     noCleanData: true,
     queryableBackupMode: "",  // readOnly
-    setParameter: {logLevel: 1},
+    setParameter: {logComponentVerbosity: tojson({storage: 1})},
 });
 assert(conn);
 MongoRunner.stopMongod(conn);
@@ -50,7 +51,7 @@ clearRawMongoProgramOutput();
 conn = MongoRunner.runMongod({
     dbpath: primary.dbpath,
     noCleanData: true,
-    setParameter: {recoverFromOplogAsStandalone: true, logLevel: 1},
+    setParameter: {recoverFromOplogAsStandalone: true, logComponentVerbosity: tojson({storage: 1})},
 });
 assert(conn);
 MongoRunner.stopMongod(conn);
@@ -62,7 +63,7 @@ conn = MongoRunner.runMongod({
     dbpath: primary.dbpath,
     noCleanData: true,
     repair: "",
-    setParameter: {logLevel: 1},
+    setParameter: {logComponentVerbosity: tojson({storage: 1})},
 });
 assert(!conn);
 verifyOplogCapMaintainerThreadNotStarted(rawMongoProgramOutput());
