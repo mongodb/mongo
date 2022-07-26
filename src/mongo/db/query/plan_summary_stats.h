@@ -30,23 +30,11 @@
 #pragma once
 
 #include <optional>
-#include <set>
 #include <string>
 
 #include "mongo/util/container_size_helper.h"
 
 namespace mongo {
-
-// The precision of 'executionTime'. Note that 'kMicros' precision requires a precise timer which
-// is also slower than the default timer.
-enum class QueryExecTimerPrecision { kNoTiming = 0, kMicros, kMillis };
-
-struct QueryExecTime {
-    // Precision/unit of 'executionTimeEstimate'.
-    QueryExecTimerPrecision precision = QueryExecTimerPrecision::kNoTiming;
-    // Time elapsed while executing this plan.
-    Microseconds executionTimeEstimate{0};
-};
 
 /**
  * A container for the summary statistics that the profiler, slow query log, and
@@ -83,7 +71,7 @@ struct PlanSummaryStats {
     long long collectionScansNonTailable = 0;
 
     // Time elapsed while executing this plan.
-    QueryExecTime executionTime;
+    long long executionTimeMillisEstimate = 0;
 
     // Did this plan use an in-memory sort stage?
     bool hasSortStage = false;

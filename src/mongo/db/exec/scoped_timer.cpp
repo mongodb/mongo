@@ -30,11 +30,16 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/exec/scoped_timer.h"
+#include "mongo/util/clock_source.h"
 
 namespace mongo {
-ScopedTimer::ScopedTimer(Microseconds* counter, TickSource* ts) : _counter(counter), _timer(ts) {}
+
+ScopedTimer::ScopedTimer(ClockSource* cs, long long* counter)
+    : _clock(cs), _counter(counter), _start(cs->now()) {}
 
 ScopedTimer::~ScopedTimer() {
-    *_counter += _timer.elapsed();
+    long long elapsed = durationCount<Milliseconds>(_clock->now() - _start);
+    *_counter += elapsed;
 }
+
 }  // namespace mongo

@@ -53,12 +53,13 @@ struct CommonStats {
     // PlanStages corresponds to an MQL operation specified by the user.
     const PlanNodeId nodeId;
 
-    // Time elapsed while working inside this stage.
+    // Time elapsed while working inside this stage. When this field is set to boost::none,
+    // timing info will not be collected during query execution.
     //
     // The field must be populated when running explain or when running with the profiler on. It
     // must also be populated when multi planning, in order to gather stats stored in the plan
-    // cache.  This struct includes the execution time and its precision/unit.
-    QueryExecTime executionTime;
+    // cache.
+    boost::optional<long long> executionTimeMillis;
 
     size_t advances{0};
     size_t opens{0};

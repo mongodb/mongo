@@ -35,11 +35,9 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/exec/scoped_timer_factory.h"
 #include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_yield_policy.h"
-#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -358,14 +356,8 @@ public:
      * execution has started.
      */
     void markShouldCollectTimingInfo() {
-        invariant(durationCount<Microseconds>(_commonStats.executionTime.executionTimeEstimate) ==
-                  0);
-
-        if (internalMeasureQueryExecutionTimeInMicroseconds.load()) {
-            _commonStats.executionTime.precision = QueryExecTimerPrecision::kMicros;
-        } else {
-            _commonStats.executionTime.precision = QueryExecTimerPrecision::kMillis;
-        }
+        invariant(!_commonStats.executionTimeMillis || *_commonStats.executionTimeMillis == 0);
+        _commonStats.executionTimeMillis.emplace(0);
 
         auto stage = static_cast<T*>(this);
         for (auto&& child : stage->_children) {
@@ -414,10 +406,9 @@ protected:
      * May return boost::none if it is not necessary to collect timing info.
      */
     boost::optional<ScopedTimer> getOptTimer(OperationContext* opCtx) {
-        if (opCtx) {
-            return scoped_timer_factory::make(opCtx->getServiceContext(),
-                                              _commonStats.executionTime.precision,
-                                              &_commonStats.executionTime.executionTimeEstimate);
+        if (_commonStats.executionTimeMillis && opCtx) {
+            return {{opCtx->getServiceContext()->getFastClockSource(),
+                     _commonStats.executionTimeMillis.get_ptr()}};
         }
 
         return boost::none;

@@ -193,7 +193,6 @@ baseEnv.Library(
         'util/assert_util.cpp',
         'util/base64.cpp',
         'util/boost_assert_impl.cpp',
-        'util/clock_tick_source.cpp',
         'util/concurrency/idle_thread_block.cpp',
         'util/concurrency/thread_name.cpp',
         'util/duration.cpp',

@@ -34,10 +34,8 @@
 
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/exec/scoped_timer_factory.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/restore_context.h"
 
 namespace mongo {
@@ -118,7 +116,7 @@ public:
         if (expCtx->explain || expCtx->mayDbProfile) {
             // Populating the field for execution time indicates that this stage should time each
             // call to work().
-            _commonStats.executionTime.emplace(0);
+            _commonStats.executionTimeMillis.emplace(0);
         }
     }
 
@@ -348,9 +346,8 @@ public:
      * execution has started.
      */
     void markShouldCollectTimingInfo() {
-        invariant(!_commonStats.executionTime ||
-                  durationCount<Microseconds>(*_commonStats.executionTime) == 0);
-        _commonStats.executionTime.emplace(0);
+        invariant(!_commonStats.executionTimeMillis || *_commonStats.executionTimeMillis == 0);
+        _commonStats.executionTimeMillis.emplace(0);
     }
 
 protected:
@@ -403,10 +400,8 @@ protected:
      * stage. May return boost::none if it is not necessary to collect timing info.
      */
     boost::optional<ScopedTimer> getOptTimer() {
-        if (_opCtx && _commonStats.executionTime) {
-            return scoped_timer_factory::make(_opCtx->getServiceContext(),
-                                              QueryExecTimerPrecision::kMillis,
-                                              _commonStats.executionTime.get_ptr());
+        if (_commonStats.executionTimeMillis) {
+            return {{getClock(), _commonStats.executionTimeMillis.get_ptr()}};
         }
 
         return boost::none;

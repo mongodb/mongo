@@ -50,7 +50,9 @@ PlanSummaryStats collectExecutionStatsSummary(const PlanStageStats& root) {
     PlanSummaryStats summary;
     summary.nReturned = root.common.advances;
 
-    summary.executionTime = root.common.executionTime;
+    if (root.common.executionTimeMillis) {
+        summary.executionTimeMillisEstimate = *root.common.executionTimeMillis;
+    }
 
     auto visitor = PlanSummaryStatsVisitor(summary);
     auto walker = PlanStageStatsWalker<true, CommonStats>(nullptr, nullptr, &visitor);

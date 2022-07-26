@@ -874,14 +874,6 @@ server_parameters:
     validator:
         gt: 0
         lt: 16777216
-        
-  internalMeasureQueryExecutionTimeInMicroseconds:
-    description: "If true, the explain results include an additional 'executionTimeMicros' field to
-    represent the execution time of each plan stage in microseconds"
-    set_at: [ startup ]
-    cpp_varname: "internalMeasureQueryExecutionTimeInMicroseconds"
-    cpp_vartype: AtomicWord<bool>
-    default: false
 
   internalQueryFLEAlwaysUseHighCardinalityMode:
     description: "Boolean flag to force FLE to always use low selectivity mode"

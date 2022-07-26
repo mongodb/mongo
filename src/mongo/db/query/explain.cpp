@@ -188,18 +188,7 @@ void generateSinglePlanExecutionInfo(const PlanExplainer::PlanStatsDetails& deta
     if (totalTimeMillis) {
         out->appendNumber("executionTimeMillis", *totalTimeMillis);
     } else {
-        if (summary->executionTime.precision == QueryExecTimerPrecision::kMicros) {
-            out->appendNumber(
-                "executionTimeMillisEstimate",
-                durationCount<Milliseconds>(summary->executionTime.executionTimeEstimate));
-            out->appendNumber(
-                "executionTimeMicros",
-                durationCount<Microseconds>(summary->executionTime.executionTimeEstimate));
-        } else if (summary->executionTime.precision == QueryExecTimerPrecision::kMillis) {
-            out->appendNumber(
-                "executionTimeMillisEstimate",
-                durationCount<Milliseconds>(summary->executionTime.executionTimeEstimate));
-        }
+        out->appendNumber("executionTimeMillisEstimate", summary->executionTimeMillisEstimate);
     }
 
     out->appendNumber("totalKeysExamined", static_cast<long long>(summary->totalKeysExamined));

@@ -64,7 +64,7 @@ DocumentSource::DocumentSource(const StringData stageName,
                                const intrusive_ptr<ExpressionContext>& pCtx)
     : pSource(nullptr), pExpCtx(pCtx), _commonStats(stageName.rawData()) {
     if (pExpCtx->shouldCollectDocumentSourceExecStats()) {
-        _commonStats.executionTime.emplace(0);
+        _commonStats.executionTimeMillis.emplace(0);
     }
 }
 

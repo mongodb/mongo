@@ -77,8 +77,9 @@ CachedPlanStage::CachedPlanStage(ExpressionContext* expCtx,
 }
 
 Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
-    // Adds the amount of time taken by pickBestPlan() to executionTime. There's lots of execution
-    // work that happens here, so this is needed for the time accounting to make sense.
+    // Adds the amount of time taken by pickBestPlan() to executionTimeMillis. There's lots of
+    // execution work that happens here, so this is needed for the time accounting to
+    // make sense.
     auto optTimer = getOptTimer();
 
     // During plan selection, the list of indices we are using to plan must remain stable, so the

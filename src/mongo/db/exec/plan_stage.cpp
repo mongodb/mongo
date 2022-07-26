@@ -78,4 +78,9 @@ void PlanStage::reattachToOperationContext(OperationContext* opCtx) {
 
     doReattachToOperationContext();
 }
+
+ClockSource* PlanStage::getClock() const {
+    return _opCtx->getServiceContext()->getFastClockSource();
+}
+
 }  // namespace mongo
