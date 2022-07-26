@@ -991,18 +991,13 @@ TEST(PipelineOptimizationTest, RemoveEmptyMatch) {
 }
 
 TEST(PipelineOptimizationTest, RemoveMultipleEmptyMatches) {
-    assertPipelineOptimizesTo("[{$match: {}}, {$match: {}}]", "[]");
-}
+    string inputPipe = "[{$match: {}}, {$match: {}}]";
 
-TEST(PipelineOptimizationTest, RemoveEmptyMatchesAndKeepNonEmptyMatches) {
-    string inputPipe = "[{$match: {}}, {$match: {}}, {$match: {a: 1}}]";
-    string outputPipe = "[{$match: {a: {$eq: 1}}}]";
-    string serializedPipe = "[{$match: {$and: [{}, {}, {a: 1}]}}]";
+    string outputPipe = "[{$match: {}}]";
+
+    string serializedPipe = "[{$match: {$and: [{}, {}]}}]";
+
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
-}
-
-TEST(PipelineOptimizationTest, RemoveEmptyMatchesAndKeepOtherStages) {
-    assertPipelineOptimizesTo("[{$match: {}}, {$skip: 1}, {$match: {}}]", "[{$skip: 1}]");
 }
 
 TEST(PipelineOptimizationTest, DoNotRemoveNonEmptyMatch) {
@@ -1013,23 +1008,6 @@ TEST(PipelineOptimizationTest, DoNotRemoveNonEmptyMatch) {
     string serializedPipe = "[{$match: {_id: 1}}]";
 
     assertPipelineOptimizesAndSerializesTo(inputPipe, outputPipe, serializedPipe);
-}
-
-TEST(PipelineOptimizationTest, RemoveMatchWithTrueConstExpr) {
-    assertPipelineOptimizesTo("[{$match: {$expr: true}}]", "[]");
-}
-
-TEST(PipelineOptimizationTest, RemoveMultipleMatchesWithTrueConstExpr) {
-    assertPipelineOptimizesTo("[{$match: {$expr: true}}, {$match: {$expr: true}}]", "[]");
-}
-
-TEST(PipelineOptimizationTest, RemoveMatchWithTruthyConstExpr) {
-    assertPipelineOptimizesTo("[{$match: {$expr: {$concat: ['a', 'b']}}}]", "[]");
-}
-
-TEST(PipelineOptimizationTest, KeepMatchWithNonConstExpr) {
-    assertPipelineOptimizesTo("[{$match: {$expr: {$concat: ['$a', '$b']}}}]",
-                              "[{$match: {$expr: {$concat: ['$a', '$b']}}}]");
 }
 
 TEST(PipelineOptimizationTest, MoveMatchBeforeSort) {

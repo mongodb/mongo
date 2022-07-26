@@ -78,10 +78,6 @@ public:
         return _matchExpression->matchesBSON(doc);
     }
 
-    MatchExpression* getMatchExpression() {
-        return _matchExpression.get();
-    }
-
     ExprMatchExpression* getExprMatchExpression() {
         return checked_cast<ExprMatchExpression*>(_matchExpression.get());
     }
@@ -610,13 +606,9 @@ TEST_F(ExprMatchTest, ReturnsFalseInsteadOfErrorWithFailpointSet) {
 }
 
 TEST(ExprMatchTest, IdenticalPostOptimizedExpressionsAreEquivalent) {
-    BSONObj expression =
-        BSON("$expr" << BSON("$ifNull" << BSON_ARRAY("$NO_SUCH_FIELD"
-                                                     << BSON("$multiply" << BSON_ARRAY(2 << 2)))));
-    BSONObj expressionEquiv =
-        BSON("$expr" << BSON("$ifNull" << BSON_ARRAY("$NO_SUCH_FIELD" << BSON("$const" << 4))));
-    BSONObj expressionNotEquiv =
-        BSON("$expr" << BSON("$ifNull" << BSON_ARRAY("$NO_SUCH_FIELD" << BSON("$const" << 10))));
+    BSONObj expression = BSON("$expr" << BSON("$multiply" << BSON_ARRAY(2 << 2)));
+    BSONObj expressionEquiv = BSON("$expr" << BSON("$const" << 4));
+    BSONObj expressionNotEquiv = BSON("$expr" << BSON("$const" << 10));
 
     // Create and optimize an ExprMatchExpression.
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -642,12 +634,11 @@ TEST(ExprMatchTest, ExpressionOptimizeRewritesVariableDereferenceAsConstant) {
     const boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto varId = expCtx->variablesParseState.defineVariable("var");
     expCtx->variables.setConstantValue(varId, Value(4));
-    BSONObj expression = BSON("$expr" << BSON("$ifNull" << BSON_ARRAY("$NO_SUCH_FIELD"
-                                                                      << "$$var")));
-    BSONObj expressionEquiv =
-        BSON("$expr" << BSON("$ifNull" << BSON_ARRAY("$NO_SUCH_FIELD" << BSON("$const" << 4))));
-    BSONObj expressionNotEquiv =
-        BSON("$expr" << BSON("$ifNull" << BSON_ARRAY("$NO_SUCH_FIELD" << BSON("$const" << 10))));
+
+    BSONObj expression = BSON("$expr"
+                              << "$$var");
+    BSONObj expressionEquiv = BSON("$expr" << BSON("$const" << 4));
+    BSONObj expressionNotEquiv = BSON("$expr" << BSON("$const" << 10));
 
     // Create and optimize an ExprMatchExpression.
     std::unique_ptr<MatchExpression> matchExpr =
@@ -737,54 +728,8 @@ TEST(ExprMatchTest, OptimizingExprAbsorbsAndOfAnd) {
     ASSERT_BSONOBJ_EQ(serialized, expectedSerialization);
 }
 
-TEST(ExprMatchTest, OptimizingExprRemovesTrueConstantExpression) {
-    auto exprBson = fromjson("{$expr: true}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-
-    auto matchExpr =
-        std::make_unique<ExprMatchExpression>(exprBson.firstElement(), std::move(expCtx));
-    auto optimized = MatchExpression::optimize(std::move(matchExpr));
-
-    auto serialization = optimized->serialize();
-    auto expectedSerialization = fromjson("{}");
-    ASSERT_BSONOBJ_EQ(serialization, expectedSerialization);
-}
-
-TEST(ExprMatchTest, OptimizingExprRemovesTruthyConstantExpression) {
-    auto exprBson = fromjson("{$expr: {$concat: ['a', 'b', 'c']}}");
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-
-    auto matchExpr =
-        std::make_unique<ExprMatchExpression>(exprBson.firstElement(), std::move(expCtx));
-    auto optimized = MatchExpression::optimize(std::move(matchExpr));
-
-    auto serialization = optimized->serialize();
-    auto expectedSerialization = fromjson("{}");
-    ASSERT_BSONOBJ_EQ(serialization, expectedSerialization);
-}
-
-TEST_F(ExprMatchTest, ExprWithTrueConstantExpressionIsTriviallyTrue) {
-    createMatcher(fromjson("{$expr: true}"));
-    ASSERT_TRUE(getMatchExpression()->isTriviallyTrue());
-}
-
-TEST_F(ExprMatchTest, ExprWithTruthyConstantExpressionIsTriviallyTrue) {
-    createMatcher(fromjson("{$expr: {$concat: ['a', 'b', 'c']}}"));
-    ASSERT_TRUE(getMatchExpression()->isTriviallyTrue());
-}
-
-TEST_F(ExprMatchTest, ExprWithNonConstantExpressionIsNotTriviallyTrue) {
-    createMatcher(fromjson("{$expr: {$concat: ['$a', '$b', '$c']}}"));
-    ASSERT_FALSE(getMatchExpression()->isTriviallyTrue());
-}
-
-TEST_F(ExprMatchTest, ExprWithFalsyConstantExpressionIsNotTriviallyTrue) {
-    createMatcher(fromjson("{$expr: {$sum: [1, -1]}}"));
-    ASSERT_FALSE(getMatchExpression()->isTriviallyTrue());
-}
-
 TEST_F(ExprMatchTest, ExpressionEvaluationReturnsResultsCorrectly) {
-    createMatcher(fromjson("{$expr: {$ifNull: ['$NO_SUCH_FIELD', -2]}}"));
+    createMatcher(fromjson("{$expr: -2}"));
     BSONMatchableDocument document{BSONObj{}};
     auto expressionResult = getExprMatchExpression()->evaluateExpression(&document);
     ASSERT_TRUE(expressionResult.integral());

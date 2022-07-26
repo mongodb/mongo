@@ -77,8 +77,6 @@ public:
 
     void serialize(BSONObjBuilder* out, bool includePath) const final;
 
-    bool isTriviallyTrue() const final;
-
     bool equivalent(const MatchExpression* other) const final;
 
     MatchCategory getCategory() const final {
