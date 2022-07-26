@@ -36,7 +36,7 @@ server_parameters:
         set_at: [ startup, runtime ]
         cpp_varname: 'gEnableTemporarilyUnavailableExceptions'
         cpp_vartype: AtomicWord<bool>
-        default: false
+        default: true
 
     temporarilyUnavailableMaxRetries:
         description: 'The number of times to retry a TemporarilyUnavailable error internally'

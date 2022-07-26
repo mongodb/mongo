@@ -418,7 +418,7 @@ See [writeConflictRetry](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/
 
 ## TemporarilyUnavailableException
 
-When the server parameter `enableTemporarilyUnavailableExceptions` is enabled (off by default), a
+When the server parameter `enableTemporarilyUnavailableExceptions` is enabled (on by default), a
 TemporarilyUnavailableException may be thrown inside the server to indicate that an operation cannot
 complete without blocking and must be retried. The storage engine may throw a
 TemporarilyUnavailableException (converted to a TemporarilyUnavailable error for users) when an
