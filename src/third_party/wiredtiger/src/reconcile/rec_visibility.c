@@ -657,50 +657,45 @@ __rec_fill_tw_from_upd_select(
          * currently we either append the onpage value and return that, or return the tombstone
          * itself; there is no case that returns no update but sets the time window.)
          *
-         * FIXME-WT-6557: no need to check this after WT-6557 is done as the tombstone will be freed
-         * when it is written to the disk image in the previous eviction.
+         * If the tombstone is restored from the disk or the history store, the onpage value and the
+         * history store value should have been restored together. Therefore, we should not end up
+         * here.
          */
-        if (!F_ISSET(tombstone, WT_UPDATE_RESTORED_FROM_DS | WT_UPDATE_RESTORED_FROM_HS)) {
-            WT_RET(__rec_append_orig_value(session, page, tombstone, vpack));
+        WT_ASSERT_ALWAYS(session,
+          !F_ISSET(tombstone, WT_UPDATE_RESTORED_FROM_DS | WT_UPDATE_RESTORED_FROM_HS),
+          "A tombstone written to the disk image or history store should be accompanied by "
+          "the full value.");
+        WT_RET(__rec_append_orig_value(session, page, tombstone, vpack));
 
+        /*
+         * We may have updated the global transaction concurrently and the tombstone is now globally
+         * visible. In this case, the on page value is not appended. Verify that.
+         */
+        if (last_upd->next != NULL) {
+            WT_ASSERT_ALWAYS(session,
+              last_upd->next->txnid == vpack->tw.start_txn &&
+                last_upd->next->start_ts == vpack->tw.start_ts &&
+                last_upd->next->type == WT_UPDATE_STANDARD && last_upd->next->next == NULL,
+              "Tombstone is globally visible, but the tombstoned update is on the update "
+              "chain");
+            upd_select->upd = last_upd->next;
+            WT_TIME_WINDOW_SET_START(select_tw, last_upd->next);
+        } else {
             /*
-             * We may have updated the global transaction concurrently and the tombstone is now
-             * globally visible. In this case, the on page value is not appended. Verify that.
-             */
-            if (last_upd->next != NULL) {
-                WT_ASSERT_ALWAYS(session,
-                  last_upd->next->txnid == vpack->tw.start_txn &&
-                    last_upd->next->start_ts == vpack->tw.start_ts &&
-                    last_upd->next->type == WT_UPDATE_STANDARD && last_upd->next->next == NULL,
-                  "Tombstone is globally visible, but the tombstoned update is on the update "
-                  "chain");
-                upd_select->upd = last_upd->next;
-                WT_TIME_WINDOW_SET_START(select_tw, last_upd->next);
-            } else {
-                /*
-                 * It's possible that onpage value is not appended if the tombstone becomes globally
-                 * visible because the oldest transaction id or the oldest timestamp is moved
-                 * concurrently.
-                 *
-                 * If the tombstone is aborted concurrently, we should still have appended the
-                 * onpage value.
-                 */
-                WT_ASSERT_ALWAYS(session,
-                  tombstone->txnid != WT_TXN_ABORTED &&
-                    __wt_txn_upd_visible_all(session, tombstone) && upd_select->upd == NULL,
-                  "Tombstone has been aborted, but the previously tombstoned update is not on "
-                  "the update chain");
-                upd_select->upd = tombstone;
-            }
-        } else
-            /*
-             * If the tombstone is restored from the disk or history store, it must have already
-             * been written to the disk image in the previous eviction.
+             * It's possible that onpage value is not appended if the tombstone becomes globally
+             * visible because the oldest transaction id or the oldest timestamp is moved
+             * concurrently.
+             *
+             * If the tombstone is aborted concurrently, we should still have appended the onpage
+             * value.
              */
             WT_ASSERT_ALWAYS(session,
-              upd_select->upd == NULL && vpack->tw.durable_stop_ts == tombstone->durable_ts &&
-                vpack->tw.stop_txn == tombstone->txnid,
-              "Tombstone is restored from disk or history store, but is not in the disk image");
+              tombstone->txnid != WT_TXN_ABORTED && __wt_txn_upd_visible_all(session, tombstone) &&
+                upd_select->upd == NULL,
+              "Tombstone has been aborted, but the previously tombstoned update is not on "
+              "the update chain");
+            upd_select->upd = tombstone;
+        }
     }
 
     return (0);
