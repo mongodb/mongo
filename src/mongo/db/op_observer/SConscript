@@ -56,6 +56,9 @@ env.Library(
     source=[
         "op_observer_impl.cpp",
     ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/change_stream_pre_images_collection_manager',
+    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/batched_write_context',
@@ -68,7 +71,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/internal_transactions_feature_flag',
         '$BUILD_DIR/mongo/db/multitenancy',
-        '$BUILD_DIR/mongo/db/pipeline/change_stream_pre_image_helpers',
         '$BUILD_DIR/mongo/db/pipeline/change_stream_preimage',
         '$BUILD_DIR/mongo/db/read_write_concern_defaults',
         '$BUILD_DIR/mongo/db/repl/image_collection_entry',

@@ -59,6 +59,7 @@
 #include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
+#include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/commands.h"
@@ -78,7 +79,6 @@
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/ops/update.h"
-#include "mongo/db/pipeline/change_stream_pre_image_helpers.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/bgsync.h"
@@ -1095,7 +1095,10 @@ void writeChangeStreamPreImage(OperationContext* opCtx,
                                       static_cast<int64_t>(oplogEntry.getApplyOpsIndex())};
     ChangeStreamPreImage preImageDocument{
         std::move(preImageId), oplogEntry.getWallClockTimeForPreImage(), preImage};
-    writeToChangeStreamPreImagesCollection(opCtx, preImageDocument);
+
+    // TODO SERVER-66643 Pass tenant id to the pre-images collection if running in the serverless.
+    ChangeStreamPreImagesCollectionManager::insertPreImage(
+        opCtx, /* tenantId */ boost::none, preImageDocument);
 }
 }  // namespace
 

@@ -65,12 +65,6 @@ Status createCollection(OperationContext* opCtx,
                         const boost::optional<BSONObj>& idIndex);
 
 /**
- * Creates the change stream pre-images collection. The collection is clustered by the primary key,
- * _id.
- */
-void createChangeStreamPreImagesCollection(OperationContext* opCtx);
-
-/**
  * As above, but only used by replication to apply operations. This allows recreating collections
  * with specific UUIDs (if ui is given). If ui is given and and a collection exists with the same
  * name, the existing collection will be renamed to a temporary name if allowRenameOutOfTheWay is

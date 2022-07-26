@@ -561,6 +561,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/index_key_validate',
         '$BUILD_DIR/mongo/db/change_stream_change_collection_manager',
         '$BUILD_DIR/mongo/db/change_stream_options_manager',
+        '$BUILD_DIR/mongo/db/change_stream_pre_images_collection_manager',
         '$BUILD_DIR/mongo/db/cluster_transaction_api',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/curop_failpoint_helpers',

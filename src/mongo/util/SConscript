@@ -750,6 +750,7 @@ icuEnv.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture',
         'alarm',

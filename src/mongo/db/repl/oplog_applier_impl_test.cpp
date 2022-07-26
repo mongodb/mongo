@@ -41,6 +41,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -402,7 +403,8 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentCollec
 
 TEST_F(OplogApplierImplTest, applyOplogEntryToRecordChangeStreamPreImages) {
     // Setup the pre-images collection.
-    createChangeStreamPreImagesCollection(_opCtx.get());
+    ChangeStreamPreImagesCollectionManager::createPreImagesCollection(_opCtx.get(),
+                                                                      boost::none /* tenantId */);
 
     // Create the collection.
     const NamespaceString nss("test.t");

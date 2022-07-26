@@ -68,7 +68,6 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(failTimeseriesViewCreation);
-MONGO_FAIL_POINT_DEFINE(failPreimagesCollectionCreation);
 MONGO_FAIL_POINT_DEFINE(clusterAllCollectionsByDefault);
 
 using IndexVersion = IndexDescriptor::IndexVersion;
@@ -674,24 +673,6 @@ Status createCollection(OperationContext* opCtx,
         options = clusterByDefaultIfNecessary(ns, std::move(options), idIndex);
     }
     return createCollection(opCtx, ns, options, idIndex);
-}
-
-void createChangeStreamPreImagesCollection(OperationContext* opCtx) {
-    uassert(5868501,
-            "Failpoint failPreimagesCollectionCreation enabled. Throwing exception",
-            !MONGO_unlikely(failPreimagesCollectionCreation.shouldFail()));
-
-    const auto nss = NamespaceString::kChangeStreamPreImagesNamespace;
-    CollectionOptions preImagesCollectionOptions;
-
-    // Make the collection clustered by _id.
-    preImagesCollectionOptions.clusteredIndex.emplace(
-        clustered_util::makeCanonicalClusteredInfoForLegacyFormat());
-    const auto status = _createCollection(opCtx, nss, preImagesCollectionOptions, BSONObj());
-    uassert(status.code(),
-            str::stream() << "Failed to create the pre-images collection: " << nss.coll()
-                          << causedBy(status.reason()),
-            status.isOK() || status.code() == ErrorCodes::NamespaceExists);
 }
 
 // TODO SERVER-62395 Pass DatabaseName instead of dbName, and pass to isDbLockedForMode.

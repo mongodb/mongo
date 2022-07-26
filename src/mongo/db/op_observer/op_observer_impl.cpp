@@ -43,6 +43,7 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/import_collection_oplog_entry_gen.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -56,7 +57,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/change_stream_pre_image_helpers.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
@@ -854,7 +854,11 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
 
             ChangeStreamPreImageId id(args.uuid, opTime.writeOpTime.getTimestamp(), 0);
             ChangeStreamPreImage preImage(id, opTime.wallClockTime, preImageDoc.get());
-            writeToChangeStreamPreImagesCollection(opCtx, preImage);
+
+            // TODO SERVER-66643 Pass tenant id to the pre-images collection if running in the
+            // serverless.
+            ChangeStreamPreImagesCollectionManager::insertPreImage(
+                opCtx, /* tenantId */ boost::none, preImage);
         }
 
         SessionTxnRecord sessionTxnRecord;
@@ -1058,7 +1062,11 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 
             ChangeStreamPreImageId id(uuid, opTime.writeOpTime.getTimestamp(), 0);
             ChangeStreamPreImage preImage(id, opTime.wallClockTime, *args.deletedDoc);
-            writeToChangeStreamPreImagesCollection(opCtx, preImage);
+
+            // TODO SERVER-66643 Pass tenant id to the pre-images collection if running in the
+            // serverless.
+            ChangeStreamPreImagesCollectionManager::insertPreImage(
+                opCtx, /* tenantId */ boost::none, preImage);
         }
 
         SessionTxnRecord sessionTxnRecord;
@@ -1483,8 +1491,12 @@ void writeChangeStreamPreImagesForApplyOpsEntries(
             !operation.getNss().isTemporaryReshardingCollection()) {
             invariant(operation.getUuid());
             invariant(!operation.getPreImage().isEmpty());
-            writeToChangeStreamPreImagesCollection(
+
+            // TODO SERVER-66643 Pass tenant id to the pre-images collection if running in the
+            // serverless.
+            ChangeStreamPreImagesCollectionManager::insertPreImage(
                 opCtx,
+                /* tenantId */ boost::none,
                 ChangeStreamPreImage{
                     ChangeStreamPreImageId{*operation.getUuid(), applyOpsTimestamp, applyOpsIndex},
                     operationTime,

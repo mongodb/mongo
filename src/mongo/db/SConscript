@@ -532,6 +532,30 @@ env.Library(
 )
 
 env.Library(
+    target='change_stream_pre_images_collection_manager',
+    source=[
+        'change_stream_pre_images_collection_manager.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/pipeline/change_stream_preimage',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
+        '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
+        '$BUILD_DIR/mongo/db/catalog/collection',
+        '$BUILD_DIR/mongo/db/catalog_raii',
+        '$BUILD_DIR/mongo/db/change_stream_options_manager',
+        '$BUILD_DIR/mongo/db/concurrency/exception_util',
+        '$BUILD_DIR/mongo/db/curop',
+        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/query_exec',
+        '$BUILD_DIR/mongo/db/record_id_helpers',
+        '$BUILD_DIR/mongo/db/repl/storage_interface',
+    ],
+)
+
+env.Library(
     target='write_block_bypass',
     source=[
         'write_block_bypass.cpp',

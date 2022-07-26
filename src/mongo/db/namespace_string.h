@@ -318,6 +318,12 @@ public:
     static NamespaceString makeChangeCollectionNSS(const boost::optional<TenantId>& tenantId);
 
     /**
+     * Constructs the pre-images collection namespace for a tenant if the 'tenantId' is specified,
+     * otherwise creates a default pre-images collection namespace.
+     */
+    static NamespaceString makePreImageCollectionNSS(const boost::optional<TenantId>& tenantId);
+
+    /**
      * Constructs a NamespaceString representing a listCollections namespace. The format for this
      * namespace is "<dbName>.$cmd.listCollections".
      */

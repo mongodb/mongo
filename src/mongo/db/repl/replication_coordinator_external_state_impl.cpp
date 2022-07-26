@@ -44,6 +44,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
+#include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/rwc_defaults_commands_gen.h"
@@ -545,7 +546,8 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     });
 
     // Create the pre-images collection if it doesn't exist yet.
-    createChangeStreamPreImagesCollection(opCtx);
+    ChangeStreamPreImagesCollectionManager::createPreImagesCollection(opCtx,
+                                                                      boost::none /* tenantId */);
 
     // TODO: SERVER-66631 move the change collection creation logic from here to the PM-2502 hooks.
     // The change collection will be created when the change stream is enabled.

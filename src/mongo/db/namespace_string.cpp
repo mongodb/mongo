@@ -318,6 +318,12 @@ NamespaceString NamespaceString::makeChangeCollectionNSS(
     return NamespaceString{NamespaceString::kConfigDb, NamespaceString::kChangeCollectionName};
 }
 
+NamespaceString NamespaceString::makePreImageCollectionNSS(
+    const boost::optional<TenantId>& tenantId) {
+    return tenantId ? NamespaceString(tenantId, kConfigDb, "system.preimages")
+                    : kChangeStreamPreImagesNamespace;
+}
+
 std::string NamespaceString::getSisterNS(StringData local) const {
     verify(local.size() && local[0] != '.');
     return db().toString() + "." + local.toString();
