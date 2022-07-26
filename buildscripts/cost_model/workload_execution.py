@@ -27,30 +27,58 @@
 #
 """Workload Execution. Run the queries to collect data for calibration."""
 
+from __future__ import annotations
+from dataclasses import asdict, dataclass
 import json
 from typing import Sequence
+from data_generator import CollectionInfo
 from database_instance import DatabaseInstance, Pipeline
 from config import WorkloadExecutionConfig, WriteMode
 
 __all__ = ['execute']
 
 
+@dataclass
+class Query:
+    """Query pipleline and related model input parameters."""
+
+    pipeline: Pipeline
+    keys_length_in_bytes: int
+
+
+@dataclass
+class QueryParameters:
+    """Model input parameters specific for a workload query executed on some collection and used for calibration."""
+
+    keys_length_in_bytes: int
+    average_document_size_in_bytes: float
+
+    def to_json(self) -> str:
+        """Serialize the parameters to JSON."""
+        return json.dumps(asdict(self))
+
+    @staticmethod
+    def from_json(json_str: str) -> QueryParameters:
+        """Deserialize from JSON."""
+        return QueryParameters(**json.loads(json_str))
+
+
 def execute(database: DatabaseInstance, config: WorkloadExecutionConfig,
-            collection_names: Sequence[str], pipelines: Sequence[Pipeline]):
+            collection_infos: Sequence[CollectionInfo], queries: Sequence[Query]):
     """Run the given queries and write the collected explain into collection."""
     if not config.enabled:
         return
 
     collector = WorkloadExecution(database, config)
     # run with indexes enabled
-    for collection_name in collection_names:
-        database.unhide_all_indexes(collection_name)
-    collector.collect(collection_names, pipelines)
+    for coll_info in collection_infos:
+        database.unhide_all_indexes(coll_info.name)
+    collector.collect(collection_infos, queries)
 
     # run with indexes disabled
-    for collection_name in collection_names:
-        database.hide_all_indexes(collection_name)
-    collector.collect(collection_names, pipelines)
+    for coll_info in collection_infos:
+        database.hide_all_indexes(coll_info.name)
+    collector.collect(collection_infos, queries)
 
 
 class WorkloadExecution:
@@ -66,25 +94,28 @@ class WorkloadExecution:
         if self.config.write_mode == WriteMode.REPLACE:
             self.database.drop_collection(self.config.output_collection_name)
 
-    def collect(self, collection_names: Sequence[str], pipelines: Sequence[Pipeline]):
+    def collect(self, collection_infos: Sequence[CollectionInfo], queries: Sequence[Query]):
         """Run the given piplelines on the given collection to generate and collect execution statistics."""
         measurements = []
 
-        for collection_name in collection_names:
-            for pipeline in pipelines:
-                self._run_query(collection_name, pipeline, measurements)
+        for coll_info in collection_infos:
+            for query in queries:
+                self._run_query(coll_info, query, measurements)
 
         self.database.insert_many(self.config.output_collection_name, measurements)
 
-    def _run_query(self, collection_name: str, pipeline: Pipeline, result: Sequence):
+    def _run_query(self, coll_info: CollectionInfo, query: Query, result: Sequence):
         # warm up
         for _ in range(self.config.warmup_runs):
-            self.database.explain(collection_name, pipeline)
+            self.database.explain(coll_info.name, query.pipeline)
 
+        avg_doc_size = self.database.get_average_document_size(coll_info.name)
+        parameters = QueryParameters(keys_length_in_bytes=query.keys_length_in_bytes,
+                                     average_document_size_in_bytes=avg_doc_size)
         for _ in range(self.config.runs):
-            explain = self.database.explain(collection_name, pipeline)
+            explain = self.database.explain(coll_info.name, query.pipeline)
             if explain['ok'] == 1:
                 result.append({
-                    'collection': collection_name, 'pipeline': json.dumps(pipeline),
-                    'explain': json.dumps(explain)
+                    'collection': coll_info.name, 'pipeline': json.dumps(query.pipeline),
+                    'explain': json.dumps(explain), 'query_parameters': parameters.to_json()
                 })

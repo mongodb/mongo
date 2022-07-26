@@ -33,6 +33,7 @@ from typing import Sequence
 from sklearn import linear_model
 from sklearn.metrics import mean_squared_error, r2_score, explained_variance_score
 from sklearn.model_selection import train_test_split
+from workload_execution import QueryParameters
 
 
 @dataclass
@@ -45,8 +46,16 @@ class ExecutionStats:
 
 
 @dataclass
+class ModelParameters:
+    """Cost Model Input Parameters."""
+
+    execution_stats: ExecutionStats
+    query_params: QueryParameters
+
+
+@dataclass
 class LinearModel:
-    """Linear Model parameters."""
+    """Calibrated Linear Model and its metrics."""
 
     # pylint: disable=invalid-name
     intercept: float
@@ -56,15 +65,18 @@ class LinearModel:
     evs: float  # Explained Variance Score
 
 
-def estimate(stats: Sequence[ExecutionStats], test_size: float, trace: bool = False):
+def estimate(params: Sequence[ModelParameters], test_size: float, trace: bool = False):
     """Estimate cost model parameters from the given statistics of SBE stage."""
     # pylint: disable=invalid-name
     # clean data
-    stats = list(filter(lambda s: s.n_processed > 0, stats))
+    params = list(filter(lambda s: s.execution_stats.n_processed > 0, params))
 
     # prepare data
-    X = [[s.n_processed] for s in stats]
-    y = [s.execution_time for s in stats]
+    X = [[
+        s.execution_stats.n_processed, s.query_params.average_document_size_in_bytes,
+        s.query_params.keys_length_in_bytes
+    ] for s in params]
+    y = [s.execution_stats.execution_time for s in params]
 
     # split data
     X_training, X_test, y_training, y_test = train_test_split(X, y, test_size=test_size)

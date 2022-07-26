@@ -31,6 +31,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 import os
+from typing import Mapping
 
 
 @dataclass
@@ -116,14 +117,15 @@ class DataGeneratorConfig:
     string_length: int
     collection_cardinalities: list[int]
     collection_fields_counts: list[int]
-    data_types: list[str]
+    data_types: list[DataType]
+    batch_size: int
 
     @staticmethod
     def create(json_config: dict[str, any]) -> DataGeneratorConfig:
         """Create new configuration object from JSON."""
 
         default = DataGeneratorConfig(enabled=False, string_length=8, collection_cardinalities=[],
-                                      collection_fields_counts=[], data_types=[])
+                                      collection_fields_counts=[], data_types=[], batch_size=10000)
         if json_config is None:
             return default
 
@@ -133,11 +135,31 @@ class DataGeneratorConfig:
                                                    default.collection_cardinalities)
         collection_fields_count = json_config.get('collectionFieldsCounts',
                                                   default.collection_fields_counts)
-        data_types = json_config.get('dataTypes', default.data_types)
+        data_types_str = json_config.get('dataTypes', default.data_types)
+        data_types = [DataType.parse(dt, 'dataTypes') for dt in data_types_str]
+        batch_size = json_config.get('batchSize', default.batch_size)
         return DataGeneratorConfig(enabled=enabled, string_length=string_length,
                                    collection_cardinalities=collection_cardinalities,
                                    collection_fields_counts=collection_fields_count,
-                                   data_types=data_types)
+                                   data_types=data_types, batch_size=batch_size)
+
+
+class DataType(Enum):
+    """Data types."""
+
+    INTEGER = 0
+    STRING = 1
+    ARRAY = 2
+
+    def __str__(self):
+        return self.name.lower()[:3]
+
+    @staticmethod
+    def parse(type_str: str, field_name: str) -> DataType:
+        """Parse DataType."""
+        str_to_type = {'int': DataType.INTEGER, 'str': DataType.STRING, 'arr': DataType.ARRAY}
+
+        return parse_multi_value(str_to_type, type_str, field_name)
 
 
 @dataclass
@@ -219,3 +241,13 @@ class WorkloadExecutionConfig:
 def process_path(path):
     """Expand user's home folder and convert to absolute path."""
     return os.path.abspath(os.path.expanduser(path))
+
+
+def parse_multi_value(from_str_dict: Mapping[str, any], value_str: str, field_name: str) -> any:
+    """Parse a string which may contain one of the predefined in from_str_dict values."""
+    value = from_str_dict.get(value_str)
+    if value is None:
+        raise ValueError(
+            f"{field_name} got {value_str} but must be equal to one of: {', '.join(from_str_dict.keys())}"
+        )
+    return value

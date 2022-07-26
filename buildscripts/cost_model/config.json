@@ -22,7 +22,8 @@
             "int",
             "str",
             "arr"
-        ]
+        ],
+        "batchSize": 10000
     },
     "abtCalibrator": {
         "enabled": true,

@@ -28,20 +28,23 @@
 """Implements to populate MongoDB collections with generated data used to calibrate Cost Model."""
 
 from __future__ import annotations
+from dataclasses import dataclass
 import time
 import random
+from typing import Sequence
 import pymongo
 from pymongo import InsertOne, IndexModel
 from pymongo.collection import Collection
-from config import DataGeneratorConfig
+from common import timer_decorator
+from config import DataGeneratorConfig, DataType
 from database_instance import DatabaseInstance
 
 __all__ = ['DataGenerator']
 
 
-def coll_name(doc_count: int, data_type: str, field_count: int) -> str:
+def coll_name(doc_count: int, data_type: DataType, field_count: int) -> str:
     """Generate collection name for the given parameters."""
-    return f'c_{doc_count}_{data_type}_{field_count}'
+    return f'c_{doc_count}_{str(data_type)}_{field_count}'
 
 
 def field_name(pos: int) -> str:
@@ -52,6 +55,23 @@ def field_name(pos: int) -> str:
 def generate_fields(field_count: int) -> list[str]:
     """Generate list of field names."""
     return [field_name(i) for i in range(field_count)]
+
+
+@dataclass
+class FieldInfo:
+    """Field-related information."""
+
+    name: str
+    type: DataType
+
+
+@dataclass
+class CollectionInfo:
+    """Collection-related information."""
+
+    name: str
+    fields: Sequence[FieldInfo]
+    documents_count: int
 
 
 class DataGenerator:
@@ -67,9 +87,16 @@ class DataGenerator:
 
         self.database = database
         self.config = config
-        self.coll_fields = [
+        coll_fields = [
             generate_fields(field_count) for field_count in config.collection_fields_counts
         ]
+
+        self.collection_infos = list(self._generate_collection_infos(coll_fields))
+
+        self.generators = {
+            DataType.INTEGER: gen_random_digit, DataType.STRING: self.gen_random_string,
+            DataType.ARRAY: gen_random_array
+        }
 
     def populate_collections(self) -> None:
         """Create and populate collections for each combination of size and data type in the corresponding 'docCounts' and 'dataTypes' input arrays.
@@ -82,77 +109,82 @@ class DataGenerator:
 
         self.database.enable_cascades(False)
         t0 = time.time()
-        for fields in self.coll_fields:
-            for doc_count in self.config.collection_cardinalities:
-                for data_type in self.config.data_types:
-                    coll = self.database.database.get_collection(
-                        coll_name(doc_count, data_type, len(fields)))
-                    coll.drop()
-                    self._populate_collection(coll, doc_count, fields, data_type)
-                    create_single_field_indexes(coll, fields)
-                    if len(fields) > 1:
-                        create_compound_index(coll, fields)
+        for coll_info in self.collection_infos:
+            coll = self.database.database.get_collection(coll_info.name)
+            coll.drop()
+            self._populate_collection(coll, coll_info)
+            create_single_field_indexes(coll, coll_info.fields)
+            create_compound_index(coll, coll_info.fields)
+
         t1 = time.time()
         print(f'\npopulate Collections took {t1-t0} s.')
 
-    def list_collection_names(self):
-        """Generate collections names for the configured fileds, number of documents and types in the collection."""
-
-        for fields in self.coll_fields:
+    def _generate_collection_infos(self, coll_fields: list[list[str]]):
+        for field_names in coll_fields:
             for doc_count in self.config.collection_cardinalities:
                 for data_type in self.config.data_types:
-                    yield coll_name(doc_count, data_type, len(fields))
+                    fields = [FieldInfo(name=fn, type=data_type) for fn in field_names]
+                    name = coll_name(doc_count, data_type, len(fields))
+                    yield CollectionInfo(name=name, fields=fields, documents_count=doc_count)
 
-    def _populate_collection(self, coll: Collection, doc_count: int, fields: list[str],
-                             data_type: str) -> None:
-        print(f'\nGenerating ${coll.name} ...')
-        start_time = time.time()
-        requests = [InsertOne(self._gen_random_doc(fields, data_type)) for _ in range(doc_count)]
-        generate_time = time.time()
+    @timer_decorator
+    def _populate_collection(self, coll: Collection, coll_info: CollectionInfo) -> None:
+        print(f'\nGenerating ${coll_info.name} ...')
+        batch_size = self.config.batch_size
+        for _ in range(coll_info.documents_count // batch_size):
+            self._populate_batch(coll, batch_size, coll_info.fields)
+        if coll_info.documents_count % batch_size > 0:
+            self._populate_batch(coll, coll_info.documents_count % batch_size, coll_info.fields)
+
+    def _populate_batch(self, coll: Collection, documents_count: int,
+                        fields: Sequence[FieldInfo]) -> None:
+        requests = [
+            InsertOne(doc) for doc in self._generate_collection_data(documents_count, fields)
+        ]
         coll.bulk_write(requests, ordered=False)
-        finish_time = time.time()
-        print(
-            f'Total time: {finish_time - start_time} s., generate time: {generate_time - start_time} s., insert time: {finish_time - generate_time} s.'
-        )
+
+    def _generate_collection_data(self, documents_count: int, fields: Sequence[FieldInfo]):
+        documents = [{} for _ in range(documents_count)]
+        for field in fields:
+            for field_index, field_data in enumerate(
+                    self._generate_random_data(field.type, documents_count)):
+                documents[field_index][field.name] = field_data
+        return documents
 
     def gen_random_string(self) -> str:
         """Generate random string."""
         return f'{gen_random_digit()}{gen_random_digit()}{"x"*(self.config.string_length-2)}'
 
-    def _gen_random_doc(self, doc_fields: list[str], data_type: str) -> dict[str, any]:
-        generators = {
-            'int': gen_random_digit, 'str': self.gen_random_string, 'arr': gen_random_array
-        }
-
-        generator = generators.get(data_type)
+    def _generate_random_data(self, data_type: DataType, count: int):
+        generator = self.generators.get(data_type)
         if generator is None:
             raise ValueError(f'Unknown dataType {data_type}')
+        return [generator() for _ in range(count)]
 
-        return {field: generator() for field in doc_fields}
 
-
-def create_single_field_indexes(coll: Collection, fields: list[str]) -> None:
+def create_single_field_indexes(coll: Collection, fields: Sequence[FieldInfo]) -> None:
     """Create single-fields indexes on the given collection."""
 
     t0 = time.time()
 
-    indexes = [IndexModel([(field, pymongo.ASCENDING)]) for field in fields]
+    indexes = [IndexModel([(field.name, pymongo.ASCENDING)]) for field in fields]
     coll.create_indexes(indexes)
 
     t1 = time.time()
     print(f'createSingleFieldIndexes took {t1 - t0} s.')
 
 
-def create_compound_index(coll: Collection, fields: list[str]) -> None:
+def create_compound_index(coll: Collection, fields: Sequence[FieldInfo]) -> None:
     """Create a coumpound index on the given collection."""
 
-    if not (coll.name.startswith('c_') or coll.name.startswith('c2_')) or 'arr_' in coll.name:
+    field_names = [fi.name for fi in fields if fi.type != DataType.ARRAY]
+    if len(field_names) < 2:
         print(f'Collection: {coll.name} not suitable for compound index')
         return
 
     t0 = time.time()
 
-    index_spec = [(field, pymongo.ASCENDING) for field in fields]
+    index_spec = [(field, pymongo.ASCENDING) for field in field_names]
     coll.create_index(index_spec)
 
     t1 = time.time()

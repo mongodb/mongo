@@ -28,6 +28,7 @@
 """A wrapper with useful methods over MongoDB database."""
 
 from __future__ import annotations
+import re
 from typing import Sequence, Mapping, NewType, Any
 import subprocess
 from pymongo import MongoClient, InsertOne
@@ -123,3 +124,13 @@ class DatabaseInstance:
     def get_all_documents(self, collection_name: str):
         """Get all documents from the collection with the given name."""
         return self.database[collection_name].find({})
+
+    def get_stats(self, collection_name: str):
+        """Get collection statistics."""
+        return self.database.command('collstats', collection_name)
+
+    def get_average_document_size(self, collection_name: str) -> float:
+        """Get average document size for the given collection."""
+        stats = self.get_stats(collection_name)
+        avg_size = stats.get('avgObjSize')
+        return avg_size if avg_size is not None else 0
