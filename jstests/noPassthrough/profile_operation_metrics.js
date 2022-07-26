@@ -1365,13 +1365,24 @@ const operations = [
         profileFilter: {op: 'insert', 'command.insert': 'ts', 'command.ordered': true},
         profileAssert: (db, profileDoc) => {
             if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db)) {
-                assert.eq(profileDoc.docBytesRead, 216);
+                // Debug builds may perform extra reads of the _mdb_catalog when updating index
+                // entries.
+                if (isDebugBuild(db)) {
+                    assert.gte(profileDoc.docBytesRead, 216);
+                    assert.gte(profileDoc.docUnitsRead, 2);
+                    assert.gte(profileDoc.cursorSeeks, 2);
+                } else {
+                    assert.eq(profileDoc.docBytesRead, 216);
+                    assert.eq(profileDoc.docUnitsRead, 2);
+                    assert.eq(profileDoc.cursorSeeks, 2);
+                }
                 assert.eq(profileDoc.docBytesWritten, 242);
             } else {
                 assert.eq(profileDoc.docBytesRead, 207);
                 assert.eq(profileDoc.docBytesWritten, 233);
+                assert.eq(profileDoc.docUnitsRead, 2);
+                assert.eq(profileDoc.cursorSeeks, 2);
             }
-            assert.eq(profileDoc.docUnitsRead, 2);
             assert.eq(profileDoc.idxEntryBytesRead, 0);
             assert.eq(profileDoc.idxEntryUnitsRead, 0);
             assert.eq(profileDoc.docUnitsWritten, 2);
@@ -1384,7 +1395,6 @@ const operations = [
                 assert.eq(profileDoc.idxEntryUnitsWritten, 0);
                 assert.eq(profileDoc.totalUnitsWritten, 2);
             }
-            assert.eq(profileDoc.cursorSeeks, 2);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
         }
@@ -1398,13 +1408,24 @@ const operations = [
         profileFilter: {op: 'insert', 'command.insert': 'ts', 'command.ordered': false},
         profileAssert: (db, profileDoc) => {
             if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db)) {
-                assert.eq(profileDoc.docBytesRead, 216);
+                // Debug builds may perform extra reads of the _mdb_catalog when updating index
+                // entries.
+                if (isDebugBuild(db)) {
+                    assert.gte(profileDoc.docBytesRead, 216);
+                    assert.gte(profileDoc.docUnitsRead, 2);
+                    assert.gte(profileDoc.cursorSeeks, 2);
+                } else {
+                    assert.eq(profileDoc.docBytesRead, 216);
+                    assert.eq(profileDoc.docUnitsRead, 2);
+                    assert.eq(profileDoc.cursorSeeks, 2);
+                }
                 assert.eq(profileDoc.docBytesWritten, 242);
             } else {
                 assert.eq(profileDoc.docBytesRead, 207);
                 assert.eq(profileDoc.docBytesWritten, 233);
+                assert.eq(profileDoc.docUnitsRead, 2);
+                assert.eq(profileDoc.cursorSeeks, 2);
             }
-            assert.eq(profileDoc.docUnitsRead, 2);
             assert.eq(profileDoc.idxEntryBytesRead, 0);
             assert.eq(profileDoc.idxEntryUnitsRead, 0);
             assert.eq(profileDoc.docUnitsWritten, 2);
@@ -1415,7 +1436,6 @@ const operations = [
                 assert.eq(profileDoc.idxEntryBytesWritten, 0);
                 assert.eq(profileDoc.idxEntryUnitsWritten, 0);
             }
-            assert.eq(profileDoc.cursorSeeks, 2);
             assert.eq(profileDoc.keysSorted, 0);
             assert.eq(profileDoc.sorterSpills, 0);
         }
