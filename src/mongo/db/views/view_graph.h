@@ -107,7 +107,7 @@ private:
     struct Node {
         Node() = default;
         Node(const Node& other)
-            : ns(other.ns), children(other.children), parents(other.parents), size(other.size) {
+            : nss(other.nss), children(other.children), parents(other.parents), size(other.size) {
             if (other.collator) {
                 collator = CollatorInterface::cloneCollator(other.collator.get());
             }
@@ -121,7 +121,7 @@ private:
         }
 
         // The fully-qualified namespace that this node represents.
-        std::string ns;
+        NamespaceString nss;
 
         // Represents the namespaces depended on by this view. A view may refer to the same child
         // more than once, but we store the children as a set because each namespace need not be
@@ -180,7 +180,7 @@ private:
 
     // Maps namespaces to an internal node id. A mapping exists for every namespace referenced,
     // i.e. existing views, collections, and non-existing namespaces.
-    StringMap<uint64_t> _namespaceIds;
+    stdx::unordered_map<NamespaceString, uint64_t> _namespaceIds;
 
     // Maps node ids to nodes. There is a 1-1 correspondence with _namespaceIds, hence the lifetime
     // of a node is the same as the lifetime as its corresponding node id.

@@ -45,7 +45,7 @@
 namespace mongo {
 namespace {
 constexpr auto kEmptyPipelineSize = 0;
-constexpr auto kTestDb = "test"_sd;
+const auto kTestDb = DatabaseName(boost::none, "test");
 constexpr auto kFooName = "foo"_sd;
 constexpr auto kBarName = "bar"_sd;
 constexpr auto kQuxName = "qux"_sd;
@@ -70,7 +70,7 @@ public:
         return &_viewGraph;
     }
 
-    ViewDefinition makeViewDefinition(StringData db,
+    ViewDefinition makeViewDefinition(const DatabaseName& dbName,
                                       StringData view,
                                       StringData viewOn,
                                       BSONArray pipeline,
@@ -83,7 +83,7 @@ public:
             collator = std::move(factoryCollator.getValue());
         }
 
-        return {DatabaseName(boost::none, db), view, viewOn, pipeline, std::move(collator)};
+        return {dbName, view, viewOn, pipeline, std::move(collator)};
     }
 
 private:
@@ -243,6 +243,31 @@ TEST_F(ViewGraphFixture, DroppingViewPreservesNodeInGraphIfDependedOnByOtherView
     ASSERT_OK(viewGraph()->insertAndValidate(
         viewWithDifferentCollation, {kBarNamespace}, kEmptyPipelineSize));
     ASSERT_EQ(viewGraph()->size(), 5UL);
+}
+
+TEST_F(ViewGraphFixture, DifferentTenantsCanCreateViewWithConflictingNamespaces) {
+    DatabaseName db1(TenantId(OID::gen()), "test");
+    DatabaseName db2(TenantId(OID::gen()), "test");
+
+    NamespaceString viewOn1(db1, kBarName);
+    NamespaceString viewOn2(db2, kBarName);
+
+    // Create a view "foo" on tenant1's collection "test.bar".
+    const auto fooView1 =
+        makeViewDefinition(db1, kFooName, kBarName, kEmptyPipeline, kBinaryCollation);
+    ASSERT_OK(viewGraph()->insertAndValidate(fooView1, {viewOn1}, kEmptyPipelineSize));
+    ASSERT_EQ(viewGraph()->size(), 2UL);
+
+    // Create a view "foo" on tenant2's collection "test.bar".
+    const auto fooView2 =
+        makeViewDefinition(db2, kFooName, kBarName, kEmptyPipeline, kBinaryCollation);
+    ASSERT_OK(viewGraph()->insertAndValidate(fooView2, {viewOn2}, kEmptyPipelineSize));
+    ASSERT_EQ(viewGraph()->size(), 4UL);
+
+    // Remove tenant1's view "foo".
+    NamespaceString viewToRemove(db1, kFooName);
+    viewGraph()->remove(viewToRemove);
+    ASSERT_EQ(viewGraph()->size(), 2UL);
 }
 }  // namespace
 }  // namespace mongo
