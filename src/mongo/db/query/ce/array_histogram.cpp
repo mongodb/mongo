@@ -32,13 +32,13 @@
 namespace mongo::ce {
 using namespace sbe;
 
-ArrayHistogram::ArrayHistogram() : ArrayHistogram(Histogram(), {}) {}
+ArrayHistogram::ArrayHistogram() : ArrayHistogram(ScalarHistogram(), {}) {}
 
-ArrayHistogram::ArrayHistogram(Histogram scalar,
+ArrayHistogram::ArrayHistogram(ScalarHistogram scalar,
                                std::map<value::TypeTags, size_t> typeCounts,
-                               Histogram arrayUnique,
-                               Histogram arrayMin,
-                               Histogram arrayMax,
+                               ScalarHistogram arrayUnique,
+                               ScalarHistogram arrayMin,
+                               ScalarHistogram arrayMax,
                                std::map<value::TypeTags, size_t> arrayTypeCounts)
     : _scalar(std::move(scalar)),
       _typeCounts(std::move(typeCounts)),
@@ -49,7 +49,7 @@ ArrayHistogram::ArrayHistogram(Histogram scalar,
     invariant(isArray());
 }
 
-ArrayHistogram::ArrayHistogram(Histogram scalar, std::map<value::TypeTags, size_t> typeCounts)
+ArrayHistogram::ArrayHistogram(ScalarHistogram scalar, std::map<value::TypeTags, size_t> typeCounts)
     : _scalar(std::move(scalar)),
       _typeCounts(std::move(typeCounts)),
       _arrayUnique(boost::none),
@@ -92,21 +92,21 @@ std::string ArrayHistogram::toString() const {
     return os.str();
 }
 
-const Histogram& ArrayHistogram::getScalar() const {
+const ScalarHistogram& ArrayHistogram::getScalar() const {
     return _scalar;
 }
 
-const Histogram& ArrayHistogram::getArrayUnique() const {
+const ScalarHistogram& ArrayHistogram::getArrayUnique() const {
     invariant(isArray());
     return *_arrayUnique;
 }
 
-const Histogram& ArrayHistogram::getArrayMin() const {
+const ScalarHistogram& ArrayHistogram::getArrayMin() const {
     invariant(isArray());
     return *_arrayMin;
 }
 
-const Histogram& ArrayHistogram::getArrayMax() const {
+const ScalarHistogram& ArrayHistogram::getArrayMax() const {
     invariant(isArray());
     return *_arrayMax;
 }

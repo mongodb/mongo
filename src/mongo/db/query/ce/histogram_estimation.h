@@ -35,7 +35,36 @@
 
 namespace mongo::ce {
 
-double estimateCardEq(const ArrayHistogram& ah, value::TypeTags tag, value::Value val);
+enum class EstimationType { kEqual, kLess, kLessOrEqual, kGreater, kGreaterOrEqual };
+
+const stdx::unordered_map<EstimationType, std::string> estimationTypeName = {
+    {EstimationType::kEqual, "eq"},
+    {EstimationType::kLess, "lt"},
+    {EstimationType::kLessOrEqual, "lte"},
+    {EstimationType::kGreater, "gt"},
+    {EstimationType::kGreaterOrEqual, "gte"}};
+
+struct EstimationResult {
+    double card;
+    double ndv;
+
+    EstimationResult operator-(const EstimationResult& other) const {
+        return {card - other.card, ndv - other.ndv};
+    }
+};
+
+/**
+ * Returns cumulative total statistics for a histogram.
+ */
+EstimationResult getTotals(const ScalarHistogram& h);
+
+/**
+ * Estimates the cardinality of a predicate of the given type against the histogram.
+ */
+EstimationResult estimate(const ScalarHistogram& h,
+                          sbe::value::TypeTags tag,
+                          sbe::value::Value val,
+                          EstimationType type);
 
 /**
  * Given an array histogram, an interval, and the input cardinality, estimates the cardinality of

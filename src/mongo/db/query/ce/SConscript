@@ -10,10 +10,9 @@ env.Library(
         'array_histogram.cpp',
         'ce_histogram.cpp',
         'ce_sampling.cpp',
-        'ce_estimation.cpp',
         'collection_statistics.cpp',
-        'histogram.cpp',
-        'utils.cpp',
+        'histogram_estimation.cpp',
+        'scalar_histogram.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_abt',

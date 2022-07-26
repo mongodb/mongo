@@ -29,7 +29,10 @@
 
 #pragma once
 
-#include "mongo/db/query/ce/histogram.h"
+#include <map>
+
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/ce/scalar_histogram.h"
 
 namespace mongo::ce {
 
@@ -39,45 +42,52 @@ public:
     ArrayHistogram();
 
     // Constructor for scalar field histograms.
-    ArrayHistogram(Histogram scalar, std::map<value::TypeTags, size_t> typeCounts);
+    ArrayHistogram(ScalarHistogram scalar, std::map<sbe::value::TypeTags, size_t> typeCounts);
 
     // Constructor for array field histograms. We have to initialize all array fields in this case.
-    ArrayHistogram(Histogram scalar,
-                   std::map<value::TypeTags, size_t> typeCounts,
-                   Histogram arrayUnique,
-                   Histogram arrayMin,
-                   Histogram arrayMax,
-                   std::map<value::TypeTags, size_t> arrayTypeCounts);
+    ArrayHistogram(ScalarHistogram scalar,
+                   std::map<sbe::value::TypeTags, size_t> typeCounts,
+                   ScalarHistogram arrayUnique,
+                   ScalarHistogram arrayMin,
+                   ScalarHistogram arrayMax,
+                   std::map<sbe::value::TypeTags, size_t> arrayTypeCounts);
 
+    // ArrayHistogram is neither copy-constructible nor copy-assignable.
     ArrayHistogram(const ArrayHistogram&) = delete;
+    ArrayHistogram& operator=(const ArrayHistogram&) = delete;
+
+    // However, it is move-constructible and move-assignable.
+    ArrayHistogram(ArrayHistogram&&) = default;
+    ArrayHistogram& operator=(ArrayHistogram&&) = default;
+    ~ArrayHistogram() = default;
 
     // Returns whether or not this histogram includes array data points.
     bool isArray() const;
 
     std::string toString() const;
-    const Histogram& getScalar() const;
-    const Histogram& getArrayUnique() const;
-    const Histogram& getArrayMin() const;
-    const Histogram& getArrayMax() const;
-    const std::map<value::TypeTags, size_t>& getTypeCounts() const;
-    const std::map<value::TypeTags, size_t>& getArrayTypeCounts() const;
+    const ScalarHistogram& getScalar() const;
+    const ScalarHistogram& getArrayUnique() const;
+    const ScalarHistogram& getArrayMin() const;
+    const ScalarHistogram& getArrayMax() const;
+    const std::map<sbe::value::TypeTags, size_t>& getTypeCounts() const;
+    const std::map<sbe::value::TypeTags, size_t>& getArrayTypeCounts() const;
 
 private:
-    /* Histogram fields for all paths. */
+    /* ScalarHistogram fields for all paths. */
 
     // Contains values which appeared originally as scalars on the path.
-    Histogram _scalar;
-    std::map<value::TypeTags, size_t> _typeCounts;
+    ScalarHistogram _scalar;
+    std::map<sbe::value::TypeTags, size_t> _typeCounts;
 
-    /* Histogram fields for array paths (only initialized if arrays are present). */
+    /* ScalarHistogram fields for array paths (only initialized if arrays are present). */
 
     // Contains unique scalar values originating from arrays.
-    boost::optional<Histogram> _arrayUnique;
+    boost::optional<ScalarHistogram> _arrayUnique;
     // Contains minimum values originating from arrays **per class**.
-    boost::optional<Histogram> _arrayMin;
+    boost::optional<ScalarHistogram> _arrayMin;
     // Contains maximum values originating from arrays **per class**.
-    boost::optional<Histogram> _arrayMax;
-    boost::optional<std::map<value::TypeTags, size_t>> _arrayTypeCounts;
+    boost::optional<ScalarHistogram> _arrayMax;
+    boost::optional<std::map<sbe::value::TypeTags, size_t>> _arrayTypeCounts;
 };
 
 

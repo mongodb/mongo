@@ -27,11 +27,9 @@
  *    it in the license file.
  */
 
-#include <iostream>
-
-#include "mongo/db/query/ce/ce_estimation.h"
 #include "mongo/db/query/ce/ce_histogram.h"
 #include "mongo/db/query/ce/ce_test_utils.h"
+#include "mongo/db/query/ce/histogram_estimation.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/unittest/unittest.h"
 
@@ -63,9 +61,9 @@ struct TestBucket {
 };
 
 std::unique_ptr<ArrayHistogram> getHistogramFromData(std::vector<TestBucket> testBuckets) {
-    value::Array bounds;
+    sbe::value::Array bounds;
     std::vector<Bucket> buckets;
-    std::map<value::TypeTags, size_t> typeCounts;
+    std::map<sbe::value::TypeTags, size_t> typeCounts;
 
     int cumulativeFreq = 0;
     int cumulativeNDV = 0;
@@ -92,7 +90,7 @@ std::unique_ptr<ArrayHistogram> getHistogramFromData(std::vector<TestBucket> tes
                              cumulativeNDV);
     }
 
-    return std::make_unique<ArrayHistogram>(Histogram(std::move(bounds), std::move(buckets)),
+    return std::make_unique<ArrayHistogram>(ScalarHistogram(std::move(bounds), std::move(buckets)),
                                             std::move(typeCounts));
 }
 

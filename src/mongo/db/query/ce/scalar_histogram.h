@@ -29,19 +29,18 @@
 
 #pragma once
 
+#include <string>
 #include <utility>
 #include <vector>
 
-#include "mongo/db/query/ce/utils.h"
+#include "mongo/db/exec/sbe/values/value.h"
 
 namespace mongo::ce {
 
-using namespace sbe;
-
 /**
- * Statistics related to a single histogram bucket. The boundary value is kept in a separate array,
- * so that each bucket has a corresponding boundary value. The reason for this to manage the memory
- * of values.
+ * Statistics related to a single ScalarHistogram bucket. The boundary value is kept in a separate
+ * array, so that each bucket has a corresponding boundary value. The reason for this to manage the
+ * memory of values.
  */
 struct Bucket {
     Bucket(double equalFreq,
@@ -65,45 +64,23 @@ struct Bucket {
     // Number of distinct values in this bucket, excludes the bound.
     double _ndv;
 
+    // Sum of distinct values in preceding buckets including this bucket.
     double _cumulativeNDV;
-
-    // TODO: add other statistical values like average size, etc
-};
-
-enum class EstimationType { kEqual, kLess, kLessOrEqual, kGreater, kGreaterOrEqual };
-
-const stdx::unordered_map<EstimationType, std::string> estimationTypeName = {
-    {EstimationType::kEqual, "eq"},
-    {EstimationType::kLess, "lt"},
-    {EstimationType::kLessOrEqual, "lte"},
-    {EstimationType::kGreater, "gt"},
-    {EstimationType::kGreaterOrEqual, "gte"}};
-
-struct EstimationResult {
-    double _card;
-    double _ndv;
-
-    EstimationResult operator-(const EstimationResult& other) const {
-        return {_card - other._card, _ndv - other._ndv};
-    }
 };
 
 /**
- * A Histogram over a set of values. The histogram consists of two parallel vectors - one with the
- * individual value statistics, and another one with the actual boundary values.
+ * A ScalarHistogram over a set of values. The ScalarHistogram consists of two parallel vectors -
+ * one with the individual value statistics, and another one with the actual boundary values.
  */
-class Histogram {
+class ScalarHistogram {
 public:
-    Histogram();
-    Histogram(value::Array bounds, std::vector<Bucket> buckets);
+    ScalarHistogram();
+    ScalarHistogram(sbe::value::Array bounds, std::vector<Bucket> buckets);
 
     std::string toString() const;
     std::string plot() const;
 
-    EstimationResult getTotals() const;
-    EstimationResult estimate(value::TypeTags tag, value::Value val, EstimationType type) const;
-
-    const value::Array& getBounds() const;
+    const sbe::value::Array& getBounds() const;
     const std::vector<Bucket>& getBuckets() const;
 
     bool empty() const {
@@ -112,14 +89,9 @@ public:
 
 private:
     // Bucket bounds representing the **highest** value in each bucket.
-    value::Array _bounds;
+    sbe::value::Array _bounds;
 
     std::vector<Bucket> _buckets;
-
-    // TODO: add counts for types of values not in histogram: arrays, objects, null, missing, etc.
-
-    // TODO: _fieldPath - how to represent?
-    // TODO: other metadata?
 };
 
 }  // namespace mongo::ce

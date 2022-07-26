@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/ce/histogram.h"
+#include "mongo/db/query/ce/scalar_histogram.h"
 
 namespace mongo::ce {
 
@@ -55,14 +55,14 @@ std::string Bucket::toString() const {
     return os.str();
 }
 
-Histogram::Histogram() : Histogram({}, {}) {}
+ScalarHistogram::ScalarHistogram() : ScalarHistogram({}, {}) {}
 
-Histogram::Histogram(value::Array bounds, std::vector<Bucket> buckets)
+ScalarHistogram::ScalarHistogram(value::Array bounds, std::vector<Bucket> buckets)
     : _bounds(std::move(bounds)), _buckets(std::move(buckets)) {
     uassert(6695707, "Invalid sizes", bounds.size() == buckets.size());
 }
 
-std::string Histogram::toString() const {
+std::string ScalarHistogram::toString() const {
     std::ostringstream os;
     os << "[";
     for (size_t i = 0; i < _buckets.size(); i++) {
@@ -74,7 +74,7 @@ std::string Histogram::toString() const {
     return os.str();
 }
 
-std::string Histogram::plot() const {
+std::string ScalarHistogram::plot() const {
     std::ostringstream os;
     double maxFreq = 0;
     const double maxBucketSize = 100;
@@ -114,106 +114,11 @@ std::string Histogram::plot() const {
     return os.str();
 }
 
-EstimationResult Histogram::getTotals() const {
-    if (_buckets.empty()) {
-        return {0.0, 0.0};
-    }
-
-    const Bucket& last = _buckets.back();
-    return {last._cumulativeFreq, last._cumulativeNDV};
-}
-
-EstimationResult Histogram::estimate(value::TypeTags tag,
-                                     value::Value val,
-                                     EstimationType type) const {
-    switch (type) {
-        case EstimationType::kGreater:
-            return getTotals() - estimate(tag, val, EstimationType::kLessOrEqual);
-
-        case EstimationType::kGreaterOrEqual:
-            return getTotals() - estimate(tag, val, EstimationType::kLess);
-
-        default:
-            // Continue.
-            break;
-    }
-
-    size_t bucketIndex = 0;
-    {
-        size_t len = _buckets.size();
-        while (len > 0) {
-            const size_t half = len >> 1;
-            const auto [boundTag, boundVal] = _bounds.getAt(bucketIndex + half);
-
-            if (compareValues3w(boundTag, boundVal, tag, val) < 0) {
-                bucketIndex += half + 1;
-                len -= half + 1;
-            } else {
-                len = half;
-            }
-        }
-    }
-    if (bucketIndex == _buckets.size()) {
-        // Value beyond the largest endpoint.
-        switch (type) {
-            case EstimationType::kEqual:
-                return {0.0, 0.0};
-
-            case EstimationType::kLess:
-            case EstimationType::kLessOrEqual:
-                return getTotals();
-
-            default:
-                MONGO_UNREACHABLE;
-        }
-    }
-
-    const Bucket& bucket = _buckets.at(bucketIndex);
-    const auto [boundTag, boundVal] = _bounds.getAt(bucketIndex);
-    const bool isEndpoint = compareValues3w(boundTag, boundVal, tag, val) == 0;
-
-    switch (type) {
-        case EstimationType::kEqual: {
-            if (isEndpoint) {
-                return {bucket._equalFreq, 1.0};
-            }
-            return {(bucket._ndv == 0.0) ? 0.0 : bucket._rangeFreq / bucket._ndv, 1.0};
-        }
-
-        case EstimationType::kLess: {
-            double resultCard = bucket._cumulativeFreq - bucket._equalFreq;
-            double resultNDV = bucket._cumulativeNDV - 1.0;
-
-            if (!isEndpoint) {
-                // TODO: consider value interpolation instead of assigning 50% of the weight.
-                resultCard -= bucket._rangeFreq / 2.0;
-                resultNDV -= bucket._ndv / 2.0;
-            }
-            return {resultCard, resultNDV};
-        }
-
-        case EstimationType::kLessOrEqual: {
-            double resultCard = bucket._cumulativeFreq;
-            double resultNDV = bucket._cumulativeNDV;
-
-            if (!isEndpoint) {
-                // TODO: consider value interpolation instead of assigning 50% of the weight.
-                resultCard -= bucket._equalFreq + bucket._rangeFreq / 2.0;
-                resultNDV -= 1.0 + bucket._ndv / 2.0;
-            }
-            return {resultCard, resultNDV};
-        }
-
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
-const value::Array& Histogram::getBounds() const {
+const value::Array& ScalarHistogram::getBounds() const {
     return _bounds;
 }
 
-const std::vector<Bucket>& Histogram::getBuckets() const {
+const std::vector<Bucket>& ScalarHistogram::getBuckets() const {
     return _buckets;
 }
 

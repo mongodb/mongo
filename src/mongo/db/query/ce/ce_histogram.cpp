@@ -29,9 +29,9 @@
 
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 
-#include "mongo/db/query/ce/ce_estimation.h"
 #include "mongo/db/query/ce/ce_histogram.h"
 #include "mongo/db/query/ce/collection_statistics.h"
+#include "mongo/db/query/ce/histogram_estimation.h"
 
 #include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/utils/abt_hash.h"
