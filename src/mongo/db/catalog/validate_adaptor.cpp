@@ -326,7 +326,10 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                                        const RecordData& record,
                                        size_t* dataSize,
                                        ValidateResults* results) {
-    const Status status = validateBSON(record.data(), record.size());
+    auto validateBSONMode = _validateState->isCheckingBSONConsistencies()
+        ? BSONValidateMode::kFull
+        : BSONValidateMode::kExtended;
+    const Status status = validateBSON(record.data(), record.size(), validateBSONMode);
     if (!status.isOK())
         return status;
 

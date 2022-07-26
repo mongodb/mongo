@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/bson_validate.h"
+
 #include <cstring>
 #include <vector>
 
 #include "mongo/base/data_view.h"
 #include "mongo/bson/bson_depth.h"
-#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/logv2/log.h"
 
@@ -82,10 +83,42 @@ MONGO_STATIC_ASSERT(sizeof(kTypeInfoTable) == 32);
 
 constexpr ErrorCodes::Error InvalidBSON = ErrorCodes::InvalidBSON;
 
-template <bool precise>
+class DefaultValidator {
+public:
+    void checkNonConformantElem(const char* ptr, uint8_t type) {}
+
+    void checkUTF8Char() {}
+
+    void checkDuplicateFieldName() {}
+};
+
+class ExtendedValidator {
+public:
+    void checkNonConformantElem(const char* ptr, uint8_t type) {
+        // TODO: Add checks for different BSON types.
+    }
+
+    void checkUTF8Char() {}
+
+    void checkDuplicateFieldName() {}
+};
+
+class FullValidator : public ExtendedValidator {
+public:
+    void checkNonConformantElem(const char* ptr, uint8_t type) {
+        // TODO: Add checks for different BSON types.
+    }
+
+    void checkUTF8Char() {}
+
+    void checkDuplicateFieldName() {}
+};
+
+template <bool precise, typename BSONValidator>
 class ValidateBuffer {
 public:
-    ValidateBuffer(const char* data, uint64_t maxLength) : _data(data), _maxLength(maxLength) {
+    ValidateBuffer(const char* data, uint64_t maxLength, BSONValidator validator)
+        : _data(data), _maxLength(maxLength), _validator(validator) {
         if constexpr (precise)
             _frames.resize(BSONDepth::getMaxAllowableDepth() + 1);
     }
@@ -264,6 +297,10 @@ private:
                 cursor.ptr += len + 1;
                 cursor.ptr = _validateElem(cursor, type);
 
+                // Check if the data is compliant to other BSON specifications if the element is
+                // structurally correct.
+                _validator.checkNonConformantElem(_currElem + len + 1, type);
+
                 if constexpr (precise) {
                     // See if the _id field was just validated. If so, set the global scope element.
                     if (_currFrame == _frames.begin() && StringData(_currElem + 1) == "_id"_sd)
@@ -304,16 +341,34 @@ private:
     const char* _currElem = nullptr;  // Element to validate: only the name is known to be good.
     typename Frames::iterator _currFrame;  // Frame currently being validated.
     Frames _frames;  // Has end pointers to check and the containing element for precise mode.
+    BSONValidator _validator;
 };
-}  // namespace
 
-Status validateBSON(const char* originalBuffer, uint64_t maxLength) noexcept {
+template <typename BSONValidator>
+Status _doValidate(const char* originalBuffer, uint64_t maxLength, BSONValidator validator) {
     // First try validating using the fast but less precise version. That version will return
     // a not-OK status for objects with CodeWScope or nesting exceeding 32 levels. These cases and
     // actual failures will rerun the precise version that gives a detailed error context.
-    if (MONGO_likely(ValidateBuffer<false>(originalBuffer, maxLength).validate().isOK()))
+    if (MONGO_likely((ValidateBuffer<false, BSONValidator>(originalBuffer, maxLength, validator)
+                          .validate()
+                          .isOK())))
         return Status::OK();
 
-    return ValidateBuffer<true>(originalBuffer, maxLength).validate();
+    return ValidateBuffer<true, BSONValidator>(originalBuffer, maxLength, validator).validate();
+}
+}  // namespace
+
+Status validateBSON(const char* originalBuffer,
+                    uint64_t maxLength,
+                    BSONValidateMode mode) noexcept {
+    if (MONGO_likely(mode == BSONValidateMode::kDefault))
+        return _doValidate(originalBuffer, maxLength, DefaultValidator());
+    else if (mode == BSONValidateMode::kExtended)
+        return _doValidate(originalBuffer, maxLength, ExtendedValidator());
+    else if (mode == BSONValidateMode::kFull)
+        return ValidateBuffer<true, FullValidator>(originalBuffer, maxLength, FullValidator())
+            .validate();
+    else
+        MONGO_UNREACHABLE;
 }
 }  // namespace mongo

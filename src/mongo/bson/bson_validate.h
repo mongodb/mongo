@@ -36,18 +36,37 @@
 
 namespace mongo {
 
+enum class BSONValidateMode {
+    // Only fast structural BSON consistency checks.
+    kDefault,
+    // Structural BSON consistency and extra fast checks on BSON specifications.
+    kExtended,
+    // Structural BSON consistency and extra comprehensive checks on BSON specifications.
+    kFull,
+};
+
 /**
  * Checks that the buf holds a BSON object as defined in http://bsonspec.org/spec.html.
  * Note that maxLength is the buffer size, NOT the BSON size.
  * Validation errors result in returning an InvalidBSON or Overflow status.
- * The checks are structural only, and include:
+ * For the default validation mode, the checks are structural only, and include:
  *    - String, Object, Array, BinData, DBRef, Code, Symbol and CodeWScope lengths are correct.
  *    - Field names, String, Object, Array, DBRef, Code, Symbol, and CodeWScope end with NUL.
  *    - Bool values are false (0) or true (1).
  *    - Correct nesting, not exceeding maximum allowable nesting depth.
- * They do not include validity of UTF-8 strings, contents of array indices, regular expression
- * validity, code validity, correct length and formatting of binary subtypes, etc.
+ * For the extended validation mode, the checks include everything above and:
+ *    - Deprecated types are not used.
+ *    - Contents of array indices are consecutively numbered from zero.
+ *    - Correct UUID and MD5 lengths.
+ *    - Structurally correct encrypted BSON values.
+ *    - Valid regular expression options.
+ * For the full validation mode, the checks include everything above and:
+ *    - Field names are not duplicated in the same level.
+ *    - Validity of UTF-8 strings.
+ *    - Valid compressed BSON columns.
  * Length is only limited by the buffer's maxLength and the inherent 2GB - 1 format limitation.
  */
-Status validateBSON(const char* buf, uint64_t maxLength) noexcept;
+Status validateBSON(const char* buf,
+                    uint64_t maxLength,
+                    BSONValidateMode mode = BSONValidateMode::kDefault) noexcept;
 }  // namespace mongo
