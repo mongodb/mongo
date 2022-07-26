@@ -25,6 +25,16 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "MSan")
     set(default_have_unittest OFF)
 endif()
 
+# Enable python if we have the minimum version.
+set(python_libs)
+set(python_version)
+set(python_executable)
+source_python3_package(python_libs python_version python_executable)
+
+if("${python_version}" VERSION_GREATER_EQUAL "3")
+  set(default_enable_python ON)
+endif()
+
 # MSan / UBSan fails on Python tests due to linking issue.
 if("${CMAKE_BUILD_TYPE}" MATCHES "^(MSan|UBSan)$")
     set(default_enable_python OFF)
@@ -52,16 +62,6 @@ if(WT_WIN)
     # additionally generate a dll file using a *DEF file.
     set(default_enable_static ON)
     set(default_enable_shared OFF)
-endif()
-
-# Enable python if we have the minimum version.
-set(python_libs)
-set(python_version)
-set(python_executable)
-source_python3_package(python_libs python_version python_executable)
-
-if("${python_version}" VERSION_GREATER_EQUAL "3")
-  set(default_enable_python ON)
 endif()
 
 # WiredTiger-related configuration options.
