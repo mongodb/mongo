@@ -488,12 +488,12 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     // Should we make a tailable cursor?
     bool tailable;
 
-    // Should we keep track of the timestamp of the latest oplog entry we've seen? This information
-    // is needed to merge cursors from the oplog in order of operation time when reading the oplog
-    // across a sharded cluster.
+    // Should we keep track of the timestamp of the latest oplog or change collection entry we've
+    // seen? This information is needed to merge cursors from the oplog in order of operation time
+    // when reading the oplog across a sharded cluster.
     bool shouldTrackLatestOplogTimestamp = false;
 
-    // Assert that the specified timestamp has not fallen off the oplog.
+    // Assert that the specified timestamp has not fallen off the oplog or change collection.
     boost::optional<Timestamp> assertTsHasNotFallenOff = boost::none;
 
     int direction{1};

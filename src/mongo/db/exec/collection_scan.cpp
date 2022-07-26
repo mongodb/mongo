@@ -248,6 +248,12 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
         } else {
             _commonStats.isEOF = true;
         }
+
+        // For change collections, advance '_latestOplogEntryTimestamp' to the current snapshot
+        // timestamp, i.e. the latest available timestamp in the global oplog.
+        if (_params.shouldTrackLatestOplogTimestamp && collection()->ns().isChangeCollection()) {
+            setLatestOplogEntryTimestampToReadTimestamp();
+        }
         return PlanStage::IS_EOF;
     }
 
@@ -266,6 +272,23 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
     _workingSet->transitionToRecordIdAndObj(id);
 
     return returnIfMatches(member, id, out);
+}
+
+void CollectionScan::setLatestOplogEntryTimestampToReadTimestamp() {
+    const auto readTimestamp = opCtx()->recoveryUnit()->getPointInTimeReadTimestamp(opCtx());
+
+    // If we don't have a read timestamp, we take no action here.
+    if (!readTimestamp) {
+        return;
+    }
+
+    // Otherwise, verify that it is equal to or greater than the last recorded timestamp, and
+    // advance it accordingly.
+    tassert(
+        6663000,
+        "The read timestamp must always be greater than or equal to the last recorded timestamp",
+        *readTimestamp >= _latestOplogEntryTimestamp);
+    _latestOplogEntryTimestamp = *readTimestamp;
 }
 
 void CollectionScan::setLatestOplogEntryTimestamp(const Record& record) {

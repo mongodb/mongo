@@ -108,6 +108,12 @@ private:
     StageState returnIfMatches(WorkingSetMember* member, WorkingSetID memberID, WorkingSetID* out);
 
     /**
+     * Sets '_latestOplogEntryTimestamp' to the current read timestamp, if available. This is
+     * equivalent to the latest visible timestamp in the oplog.
+     */
+    void setLatestOplogEntryTimestampToReadTimestamp();
+
+    /**
      * Extracts the timestamp from the 'ts' field of 'record', and sets '_latestOplogEntryTimestamp'
      * to that time if it isn't already greater. Throws an exception if the 'ts' field cannot be
      * extracted.
@@ -131,8 +137,9 @@ private:
 
     RecordId _lastSeenId;  // Null if nothing has been returned from _cursor yet.
 
-    // If _params.shouldTrackLatestOplogTimestamp is set and the collection is the oplog, the latest
-    // timestamp seen in the collection.  Otherwise, this is a null timestamp.
+    // If _params.shouldTrackLatestOplogTimestamp is set and the collection is the oplog or a change
+    // collection, this is the latest timestamp seen by the collection scan. For change collections,
+    // on EOF we advance this timestamp to the latest timestamp in the global oplog.
     Timestamp _latestOplogEntryTimestamp;
 
     // Stats

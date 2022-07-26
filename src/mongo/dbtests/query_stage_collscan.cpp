@@ -1238,8 +1238,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInclusionBoundYie
     }
 }
 
-
-// CollectionScanParams::ScanInclusionBound exclusions should take presidence over inclusive
+// CollectionScanParams::ScanInclusionBound exclusions should take precedence over inclusive
 // filtering.
 TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInclusionBoundsOverrideFilter) {
     const std::vector<CollectionScanParams::Direction> collScanDirections{
@@ -1333,4 +1332,44 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInclusionBoundsHa
     }
 }
 
+// Tests behavior of getLatestOplogTimestamp() method when the scanned collection is the change
+// collection.
+TEST_F(QueryStageCollectionScanTest, QueryTestCollscanChangeCollectionGetLatestOplogTimestamp) {
+    // Setup the change collection.
+    auto collectionName = NamespaceString::makeChangeCollectionNSS(boost::none);
+    auto scopedCollectionDeleter =
+        createClusteredCollection(collectionName, false /* prePopulate */);
+    insertDocument(collectionName, BSON("_id" << Timestamp(15, 5) << "ts" << Timestamp(15, 5)));
+
+    // Set the read timestamp.
+    _opCtx.recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
+                                                  Timestamp(16, 1));
+
+    // Build the collection scan stage.
+    AutoGetCollectionForRead autoColl(&_opCtx, collectionName);
+    const CollectionPtr& coll = autoColl.getCollection();
+    CollectionScanParams params;
+    params.tailable = true;
+    params.direction = CollectionScanParams::FORWARD;
+    params.shouldTrackLatestOplogTimestamp = true;
+    WorkingSet ws;
+    auto scanStage = std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, nullptr);
+    WorkingSetID id = WorkingSet::INVALID_ID;
+    auto advance = [&]() {
+        PlanStage::StageState state;
+        while ((state = scanStage->work(&id)) == PlanStage::NEED_TIME) {
+        };
+        return state;
+    };
+
+    // Verify that the latest oplog timestamp is equal to the 'ts' field of the retrieved document.
+    auto state = advance();
+    ASSERT_EQUALS(PlanStage::ADVANCED, state) << " state: " << PlanStage::stateStr(state);
+    ASSERT_EQUALS(Timestamp(15, 5), scanStage->getLatestOplogTimestamp());
+
+    // Verify that the latest oplog timestamp is equal to the read timestamp on EOF.
+    state = advance();
+    ASSERT_EQUALS(PlanStage::IS_EOF, state) << " state: " << PlanStage::stateStr(state);
+    ASSERT_EQUALS(Timestamp(16, 1), scanStage->getLatestOplogTimestamp());
+}
 }  // namespace query_stage_collection_scan
