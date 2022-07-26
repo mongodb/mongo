@@ -69,7 +69,7 @@ private:
             : ChunkRange(task.getRange().getMin(), task.getRange().getMax()),
               _completion(completion) {}
 
-        SharedSemiFuture<void> getCompletionFuture() {
+        SharedSemiFuture<void> getCompletionFuture() const {
             return _completion;
         }
 
@@ -86,13 +86,14 @@ private:
      * sharded collection).
      */
     struct RANGES_COMPARATOR {
-        bool operator()(const ChunkRange& a, const ChunkRange& b) const {
-            return a.getMin().woCompare(b.getMin()) < 0;
+        bool operator()(const std::shared_ptr<ChunkRange>& a,
+                        const std::shared_ptr<ChunkRange>& b) const {
+            return a->getMin().woCompare(b->getMin()) < 0;
         }
     };
 
     // Keeping track of per-collection registered range deletion tasks
-    stdx::unordered_map<UUID, std::set<ChunkRange, RANGES_COMPARATOR>, UUID::Hash>
+    stdx::unordered_map<UUID, std::set<std::shared_ptr<ChunkRange>, RANGES_COMPARATOR>, UUID::Hash>
         _rangeDeletionTasks;
 
     // Mono-threaded executor processing range deletion tasks

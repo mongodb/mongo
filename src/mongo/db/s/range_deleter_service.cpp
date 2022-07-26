@@ -28,6 +28,9 @@
  */
 
 #include "mongo/db/s/range_deleter_service.h"
+#include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingRangeDeleter
 
 namespace mongo {
 SharedSemiFuture<void> RangeDeleterService::registerTask(
@@ -40,7 +43,7 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
     initialFutures.push_back(blockUntilRegistered.getFuture().semi().thenRunOn(_executor));
     initialFutures.push_back(std::move(waitForActiveQueriesToComplete).thenRunOn(_executor));
 
-    auto completionFuture =
+    auto chainCompletionFuture =
         // Step 1: wait for the task to be registered on the service and for the draining of
         // ongoing queries that are retaining the orphaned range
         whenAllSucceed(std::move(initialFutures))
@@ -74,29 +77,34 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
             .semi()
             .share();
 
-    bool inserted = [&]() {
+    auto [taskCompletionFuture, inserted] = [&]() -> std::pair<SharedSemiFuture<void>, bool> {
         stdx::lock_guard<Latch> lg(_mutex);
-        auto [_, inserted] = _rangeDeletionTasks[rdt.getCollectionUuid()].insert(
-            RangeDeletion(rdt, completionFuture));
-        return inserted;
+        auto [registeredTask, inserted] = _rangeDeletionTasks[rdt.getCollectionUuid()].insert(
+            std::make_shared<RangeDeletion>(RangeDeletion(rdt, chainCompletionFuture)));
+        auto retFuture = static_cast<RangeDeletion*>(registeredTask->get())->getCompletionFuture();
+        return {retFuture, inserted};
     }();
 
-    if (!inserted) {
+    if (inserted) {
+        // The range deletion task has been registered, so the chain execution can be unblocked
+        blockUntilRegistered.setFrom(Status::OK());
+    } else {
         // Tried to register a duplicate range deletion task: invalidate the chain
         auto errStatus =
             Status(ErrorCodes::Error(67635), "Not scheduling duplicated range deletion");
+        LOGV2_WARNING(6804200,
+                      "Tried to register duplicate range deletion task. This results in a no-op.",
+                      "collectionUUID"_attr = rdt.getCollectionUuid(),
+                      "range"_attr = rdt.getRange());
         blockUntilRegistered.setFrom(errStatus);
-        return blockUntilRegistered.getFuture();
     }
 
-    // The range deletion task has been registered, so the chain execution can be unblocked
-    blockUntilRegistered.setFrom(Status::OK());
-    return completionFuture;
+    return taskCompletionFuture;
 }
 
 void RangeDeleterService::deregisterTask(const UUID& collUUID, const ChunkRange& range) {
     stdx::lock_guard<Latch> lg(_mutex);
-    _rangeDeletionTasks[collUUID].erase(range);
+    _rangeDeletionTasks[collUUID].erase(std::make_shared<ChunkRange>(range));
 }
 
 int RangeDeleterService::getNumRangeDeletionTasksForCollection(const UUID& collectionUUID) {

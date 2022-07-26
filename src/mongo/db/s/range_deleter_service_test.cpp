@@ -109,22 +109,28 @@ TEST_F(RangeDeleterServiceTest, RegisterAndProcessSingleTask) {
     ASSERT_EQ(0, rds.getNumRangeDeletionTasksForCollection(uuidCollA));
 }
 
-TEST_F(RangeDeleterServiceTest, CantRegisterDuplicateTaskForSameRange) {
+TEST_F(RangeDeleterServiceTest, RegisterDuplicateTaskForSameRangeReturnsOriginalFuture) {
     RangeDeleterService rds;
     auto* taskWithOngoingQueries = &rangeDeletionTask0ForCollA;
 
     auto originalTaskCompletionFuture = rds.registerTask(
         taskWithOngoingQueries->getTask(), taskWithOngoingQueries->getOngoingQueriesFuture());
 
-    // Trying registering a duplicate task must return a future with error
+    // Trying registering a duplicate task must return a future without throwing errors
     auto duplicateTaskCompletionFuture =
         rds.registerTask(taskWithOngoingQueries->getTask(), SemiFuture<void>::makeReady());
-    ASSERT(duplicateTaskCompletionFuture.isReady());
-    ASSERT_THROWS_CODE(duplicateTaskCompletionFuture.get(opCtx), DBException, 67635);
 
-    // Trying registering a duplicate task did not affect the state of the original task
+    // Check that the state of the original task is not affected
     ASSERT(!originalTaskCompletionFuture.isReady());
+
+    // Check that no new task has been registered
     ASSERT_EQ(1, rds.getNumRangeDeletionTasksForCollection(uuidCollA));
+
+    // Check that - upon range deletion completion - both original and "duplicate" futures are ready
+    taskWithOngoingQueries->drainOngoingQueries();
+    originalTaskCompletionFuture.get(opCtx);
+    ASSERT(duplicateTaskCompletionFuture.isReady());
+    ASSERT_EQ(0, rds.getNumRangeDeletionTasksForCollection(uuidCollA));
 }
 
 TEST_F(RangeDeleterServiceTest, RegisterAndProcessMoreTasksForSameCollection) {
