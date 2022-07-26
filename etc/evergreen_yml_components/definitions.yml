@@ -7329,6 +7329,13 @@ tasks:
   - func: "run tests"
 
 - <<: *task_template
+  name: cqf_disabled_pipeline_opt
+  tags: []
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *task_template
   name: cqf_passthrough
   tags: []
   commands:

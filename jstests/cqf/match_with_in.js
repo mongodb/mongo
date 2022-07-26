@@ -30,23 +30,13 @@ const docs = [
 assert.commandWorked(coll.insert(docs));
 
 const runTest = (filter, expected) => {
-    try {
-        // Disabled in order to exercise $in translation directly.
-        assert.commandWorked(db.adminCommand(
-            {'configureFailPoint': 'disablePipelineOptimization', 'mode': 'alwaysOn'}));
+    const result = coll.aggregate({$match: filter}).toArray();
+    assertArrayEq({actual: result, expected: expected, extraErrorMsg: tojson({filter: filter})});
 
-        const result = coll.aggregate({$match: filter}).toArray();
-        assertArrayEq(
-            {actual: result, expected: expected, extraErrorMsg: tojson({filter: filter})});
-
-        // Sanity check that the query uses the bonsai optimizer.
-        const explain = assert.commandWorked(db.runCommand(
-            {explain: {aggregate: coll.getName(), pipeline: [{$match: filter}], cursor: {}}}));
-        assert(usedBonsaiOptimizer(explain), tojson(explain));
-    } finally {
-        assert.commandWorked(
-            db.adminCommand({'configureFailPoint': 'disablePipelineOptimization', 'mode': 'off'}));
-    }
+    // Sanity check that the query uses the bonsai optimizer.
+    const explain = assert.commandWorked(db.runCommand(
+        {explain: {aggregate: coll.getName(), pipeline: [{$match: filter}], cursor: {}}}));
+    assert(usedBonsaiOptimizer(explain), tojson(explain));
 };
 
 const tests = [

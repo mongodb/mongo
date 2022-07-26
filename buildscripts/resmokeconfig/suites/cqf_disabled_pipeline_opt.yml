@@ -1,0 +1,38 @@
+# This test exercises the cqf suite with pipeline optimizations disabled. Pipeline optimizations
+# may hide bugs or incorrect assumptions made in ABT translation or in the new optimizer, since they
+# happen before the CQF path.
+
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/cqf/**/*.js
+
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      crashOnInvalidBSONError: ""
+      objcheck: ""
+      eval: load("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+  hooks:
+  - class: ValidateCollections
+    shell_options:
+      global_vars:
+        TestData:
+          skipValidationOnNamespaceNotFound: false
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        featureFlagCommonQueryFramework: true
+        internalQueryEnableCascadesOptimizer: true
+        # This flag disables the fallback path that may hide bugs in CQF.
+        internalQueryForceCommonQueryFramework: true
+        failpoint.disablePipelineOptimization:
+          mode: alwaysOn
