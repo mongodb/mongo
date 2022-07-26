@@ -121,24 +121,26 @@ databases for unsharded collections.
 
 The shard versioning protocol tracks the placement of chunks for sharded collections.
 
-Each chunk has a version called the "chunk version." A chunk version is represented as C<M, m, E> and consists of three elements:
+Each chunk has a version called the "chunk version." A chunk version is represented as C<E, T, M, m> and consists of four elements:
 
-1. The *M* major version - an integer incremented when a chunk moves shards.
-1. The *m* minor version - an integer incremented when a chunk is split.
-1. The *E* epoch  - an object ID shared among all chunks for a collection that distinguishes a unique instance of the collection. The epoch remains unchanged for the lifetime of the chunk, unless the collection is dropped or the collection's shard key has been refined using the refineCollectionShardKey command.
+1. The *E* epoch  - an object ID shared among all chunks for a collection that distinguishes a unique instance of the collection.
+1. The *T* timestamp - a new unique identifier for a collection introduced in version 5.0. The difference between epoch and timestamp is that timestamps are comparable, allowing for distinguishing between two instances of a collection in which the epoch/timestamp do not match.
+1. The *M* major version - an integer used to specify a change on the data placement (i.e. chunk migration).
+1. The *m* minor version - An integer used to specify that a chunk has been resized (i.e. split or merged).
 
 To completely define the shard versioning protocol, we introduce two extra terms - the "shard
 version" and "collection version."
 
-1. Shard version - For a sharded collection, this is the highest chunk version seen on a particular shard. The version of the *i* shard is represented as SV<sub>i</sub><M<sub>SV<sub>i</sub></sub>, m<sub>SV<sub>i</sub></sub>, E<sub>SV<sub>i</sub></sub>>.
-1. Collection version - For a sharded collection, this is the highest chunk version seen across all shards. The collection version is represented as CV<M<sub>cv</sub>, m<sub>cv</sub>, E<sub>cv</sub>>.
+1. Shard version - For a sharded collection, this is the highest chunk version seen on a particular shard. The version of the *i* shard is represented as SV<sub>i</sub><E<sub>SV<sub>i</sub></sub>, T<sub>SV<sub>i</sub></sub>, M<sub>SV<sub>i</sub></sub>, m<sub>SV<sub>i</sub></sub>>.
+1. Collection version - For a sharded collection, this is the highest chunk version seen across all shards. The collection version is represented as CV<E<sub>cv</sub>, T<sub>cv</sub>, M<sub>cv</sub>, m<sub>cv</sub>>.
 
 ### Database versioning
 
 The database versioning protocol tracks the placement of databases for unsharded collections. The
-"database version" indicates on which shard a database currently exists. A database version is represented as DBV<uuid, Mod> and consists of two elements:
+"database version" indicates on which shard a database currently exists. A database version is represented as DBV<uuid, T, Mod> and consists of two elements:
 
 1. The UUID - a unique identifier to distinguish different instances of the database. The UUID remains unchanged for the lifetime of the database, unless the database is dropped and recreated.
+1. The *T* timestamp - a new unique identifier introduced in version 5.0. Unlike the UUID, the timestamp allows for ordering database versions in which the UUID/Timestamp do not match.
 1. The last modified field - an integer incremented when the database changes its primary shard.
 
 ### Versioning updates
@@ -156,36 +158,36 @@ scenarios:
 
 ### Types of operations that will cause the versioning information to become stale
 
-Before going through the table that explains which operations modify the versioning information and how, it is important to give a bit more information about the move chunk operation. When we move a chunk C from the *i* shard to the *j* shard, where *i* and *j* are different, we end up updating the shard version of both shards. For the recipient shard (i.e. *j* shard), the version of the migrated chunk defines its shard version. For the donor shard (i.e. *i* shard) what we do is look for another chunk of that collection on that shard and update its version. That chunk is called the control chunk and its version defines the *i* shard version. If there are no other chunks, the shard version is updated to SV<sub>i</sub><0, 0, E<sub>cv</sub>>.
+Before going through the table that explains which operations modify the versioning information and how, it is important to give a bit more information about the move chunk operation. When we move a chunk C from the *i* shard to the *j* shard, where *i* and *j* are different, we end up updating the shard version of both shards. For the recipient shard (i.e. *j* shard), the version of the migrated chunk defines its shard version. For the donor shard (i.e. *i* shard) what we do is look for another chunk of that collection on that shard and update its version. That chunk is called the control chunk and its version defines the *i* shard version. If there are no other chunks, the shard version is updated to SV<sub>i</sub><E<sub>cv</sub>, T<sub>cv</sub>, 0, 0>.
 
 Operation Type                                      | Version Modification Behavior                                                                                |
 --------------                                      | -----------------------------                                                                                |
-Moving a chunk C <br> C<M, m, E>                    | C<M<sub>cv</sub> + 1, 0, E<sub>cv</sub>> <br> ControlChunk<M<sub>cv</sub> + 1, 1, E<sub>cv</sub>> if any      |
-Splitting a chunk C into n pieces <br> C<M, m, E>   | C<sub>new 1</sub><M<sub>cv</sub>, m<sub>cv</sub> + 1, E<sub>cv</sub>> <br> ... <br> C<sub>new n</sub><M<sub>cv</sub>, m<sub>cv</sub> + n, E<sub>cv</sub>>                                                         |
-Merging chunks C<sub>1</sub>, ..., C<sub>n</sub> <br> C<sub>1</sub><M<sub>1</sub>, m<sub>1</sub>, E<sub>1</sub>> <br> ... <br> C<sub>n</sub><M<sub>n</sub>, m<sub>n</sub>, E<sub>n</sub>> <br> | C<sub>new</sub><M<sub>cv</sub>, m<sub>cv</sub> + 1, E<sub>cv</sub>>    |
-Dropping a collection                               | SV<sub>i</sub><0, 0, objectid()> forall i in 1 <= i  <= #Shards                                              |
-Refining a collection's shard key                   | C<sub>i</sub><M<sub>i</sub>, m<sub>i</sub>, E<sub>new</sub>>  forall i in 1 <= i  <= #Chunks                 |
-Changing the primary shard for a DB <br> DBV<uuid, Mod> | DBV<uuid, Mod + 1>                                                                                       |
+Moving a chunk C <br> C<E, T, M, m>                    | C<E<sub>cv</sub>, T<sub>cv</sub>, M<sub>cv</sub> + 1, 0> <br> ControlChunk<E<sub>cv</sub>, T<sub>cv</sub>, M<sub>cv</sub> + 1, 1> if any      |
+Splitting a chunk C into n pieces <br> C<E, T, M, m>   | C<sub>new 1</sub><E<sub>cv</sub>, T<sub>cv</sub>, M<sub>cv</sub>, m<sub>cv</sub> + 1> <br> ... <br> C<sub>new n</sub><E<sub>cv</sub>, T<sub>cv</sub>, M<sub>cv</sub>, m<sub>cv</sub> + n>                                                         |
+Merging chunks C<sub>1</sub>, ..., C<sub>n</sub> <br> C<sub>1</sub><E<sub>1</sub>, T<sub>1</sub>, M<sub>1</sub>, m<sub>1</sub>> <br> ... <br> C<sub>n</sub><E<sub>n</sub>, T<sub>n</sub>, M<sub>n</sub>, m<sub>n</sub>> <br> | C<sub>new</sub><E<sub>cv</sub>, T<sub>cv</sub>, M<sub>cv</sub>, m<sub>cv</sub> + 1>    |
+Dropping a collection                               | The dropped collection doesn't have a SV - all chunks are deleted                                              |
+Refining a collection's shard key                   | C<sub>i</sub><E<sub>new</sub>, T<sub>now</sub>, M<sub>i</sub>, m<sub>i</sub>>  forall i in 1 <= i  <= #Chunks                 |
+Changing the primary shard for a DB <br> DBV<uuid, T, Mod> | DBV<uuid, T, Mod + 1>                                                                                       |
 Dropping a database                                 | The dropped DB doesn't have a DBV                                                                            |
 
 ### Special versioning conventions
 
 Chunk versioning conventions
 
-Convention Type                           | Major Version | Minor Version | Epoch        |
----------------                           | ------------- | ------------- | -----        |
-First chunk for sharded collection        | 1             | 0             | ObjectId()   |
-Collection is unsharded                   | 0             | 0             | ObjectId()   |
-Collection was dropped                    | 0             | 0             | ObjectId()   |
-Ignore the chunk version for this request | 0             | 0             | Max DateTime |
+Convention Type                           | Epoch        | Timestamp        | Major Version | Minor Version |
+---------------                           | -----        |--------------    | ------------- | ------------- |
+First chunk for sharded collection        | ObjectId()   | current time     | 1             | 0             |
+Collection is unsharded                   | ObjectId()   | Timestamp()      | 0             | 0             |
+Collection was dropped                    | ObjectId()   | Timestamp()      | 0             | 0             |
+Ignore the chunk version for this request | Max DateTime | Timestamp::max() | 0             | 0             |
 
 Database version conventions
 
-Convention Type | UUID   | Last Modified |
---------------- | ----   | ------------- |
-New database    | UUID() | 1             |
-Config database | UUID() | 0             |
-Admin database  | UUID() | 0             |
+Convention Type | UUID   | Timestamp | Last Modified |
+--------------- | ----   | --------- | ------------- |
+New database    | UUID() | current time | 1          |
+Config database | UUID() | current time | 0          |
+Admin database  | UUID() | current time | 0          |
 
 #### Code references
 
