@@ -32,6 +32,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/s/create_collection_coordinator_document_gen.h"
+#include "mongo/db/s/create_collection_coordinator_params.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
@@ -48,10 +49,10 @@ public:
 
     CreateCollectionCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState)
         : RecoverableShardingDDLCoordinator(service, "CreateCollectionCoordinator", initialState),
-          _request(_doc.getCreateCollectionRequest()),
+          _request(_doc.getCreateCollectionRequest(), originalNss()),
           _critSecReason(BSON("command"
                               << "createCollection"
-                              << "ns" << nss().toString())) {}
+                              << "ns" << originalNss().toString())) {}
 
     ~CreateCollectionCoordinator() = default;
 
@@ -71,7 +72,7 @@ public:
     }
 
 protected:
-    const mongo::CreateCollectionRequest _request;
+    const NamespaceString& nss() const override;
 
 private:
     StringData serializePhase(const Phase& phase) const override {
@@ -90,6 +91,12 @@ private:
      * Checks that the collection has UUID matching the collectionUUID parameter, if provided.
      */
     void _checkCollectionUUIDMismatch(OperationContext* opCtx) const;
+
+    void _acquireCriticalSections(OperationContext* opCtx) const;
+
+    void _promoteCriticalSectionsToBlockReads(OperationContext* opCtx) const;
+
+    void _releaseCriticalSections(OperationContext* opCtx) const;
 
     /**
      * Ensures the collection is created locally and has the appropiate shard index.
@@ -130,11 +137,9 @@ private:
      */
     void _logEndCreateCollection(OperationContext* opCtx);
 
-    const BSONObj _critSecReason;
+    CreateCollectionCoordinatorParams _request;
 
-    // The shard key of the collection, static for the duration of the coordinator and reflects the
-    // original command
-    boost::optional<ShardKeyPattern> _shardKeyPattern;
+    const BSONObj _critSecReason;
 
     // Set on successful completion of the coordinator
     boost::optional<CreateCollectionResponse> _result;
@@ -142,7 +147,6 @@ private:
     // The fields below are only populated if the coordinator enters in the branch where the
     // collection is not already sharded (i.e., they will not be present on early return)
 
-    boost::optional<BSONObj> _collationBSON;
     boost::optional<UUID> _collectionUUID;
 
     std::unique_ptr<InitialSplitPolicy> _splitPolicy;

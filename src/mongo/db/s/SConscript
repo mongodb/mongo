@@ -390,6 +390,7 @@ env.Library(
         'config/set_user_write_block_mode_coordinator_document.idl',
         'config/set_user_write_block_mode_coordinator.cpp',
         'create_collection_coordinator_document.idl',
+        'create_collection_coordinator_params.cpp',
         'create_collection_coordinator.cpp',
         'drop_collection_coordinator_document.idl',
         'drop_collection_coordinator.cpp',

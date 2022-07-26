@@ -29,14 +29,11 @@
 
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/s/create_collection_coordinator.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
-#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -83,71 +80,14 @@ public:
                     "Create Collection path has not been implemented",
                     request().getShardKey());
 
-            auto nss = ns();
-            auto bucketsNs = nss.makeTimeseriesBucketsNamespace();
-            auto bucketsColl =
-                CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, bucketsNs);
-            CreateCollectionRequest createCmdRequest = request().getCreateCollectionRequest();
-
-            // If the 'system.buckets' exists or 'timeseries' parameters are passed in, we know that
-            // we are trying shard a timeseries collection.
-            if (bucketsColl || createCmdRequest.getTimeseries()) {
-                uassert(5731502,
-                        "Sharding a timeseries collection feature is not enabled",
-                        feature_flags::gFeatureFlagShardedTimeSeries.isEnabled(
-                            serverGlobalParams.featureCompatibility));
-
-                if (bucketsColl) {
-                    uassert(6159000,
-                            str::stream() << "the collection '" << bucketsNs
-                                          << "' does not have 'timeseries' options",
-                            bucketsColl->getTimeseriesOptions());
-
-                    if (createCmdRequest.getTimeseries()) {
-                        uassert(5731500,
-                                str::stream()
-                                    << "the 'timeseries' spec provided must match that of exists '"
-                                    << nss << "' collection",
-                                timeseries::optionsAreEqual(*createCmdRequest.getTimeseries(),
-                                                            *bucketsColl->getTimeseriesOptions()));
-                    } else {
-                        createCmdRequest.setTimeseries(bucketsColl->getTimeseriesOptions());
-                    }
-                }
-
-                auto timeField = createCmdRequest.getTimeseries()->getTimeField();
-                auto metaField = createCmdRequest.getTimeseries()->getMetaField();
-                BSONObjIterator iter{*createCmdRequest.getShardKey()};
-                while (auto elem = iter.next()) {
-                    if (elem.fieldNameStringData() == timeField) {
-                        uassert(5914000,
-                                str::stream()
-                                    << "the time field '" << timeField
-                                    << "' can be only at the end of the shard key pattern",
-                                !iter.more());
-                    } else {
-                        uassert(5914001,
-                                str::stream() << "only the time field or meta field can be "
-                                                 "part of shard key pattern",
-                                metaField &&
-                                    (elem.fieldNameStringData() == *metaField ||
-                                     elem.fieldNameStringData().startsWith(*metaField + ".")));
-                    }
-                }
-                nss = bucketsNs;
-                createCmdRequest.setShardKey(
-                    uassertStatusOK(timeseries::createBucketsShardKeySpecFromTimeseriesShardKeySpec(
-                        *createCmdRequest.getTimeseries(), *createCmdRequest.getShardKey())));
-            }
-
             const auto createCollectionCoordinator = [&] {
                 FixedFCVRegion fixedFcvRegion(opCtx);
 
                 auto coordinatorDoc = [&] {
                     auto doc = CreateCollectionCoordinatorDocument();
                     doc.setShardingDDLCoordinatorMetadata(
-                        {{std::move(nss), DDLCoordinatorTypeEnum::kCreateCollection}});
-                    doc.setCreateCollectionRequest(std::move(createCmdRequest));
+                        {{ns(), DDLCoordinatorTypeEnum::kCreateCollection}});
+                    doc.setCreateCollectionRequest(request().getCreateCollectionRequest());
                     return doc.toBSON();
                 }();
 
