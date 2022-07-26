@@ -157,15 +157,13 @@ ShardingDataTransformCumulativeMetrics::ShardingDataTransformCumulativeMetrics(
                           AtomicWord<int64_t>{0},
                           AtomicWord<int64_t>{0}} {}
 
-ShardingDataTransformCumulativeMetrics::DeregistrationFunction
+ShardingDataTransformCumulativeMetrics::UniqueScopedObserver
 ShardingDataTransformCumulativeMetrics::registerInstanceMetrics(const InstanceObserver* metrics) {
     _operationWasAttempted.store(true);
     auto role = metrics->getRole();
     auto it = insertMetrics(metrics, getMetricsSetForRole(role));
-    return [=] {
-        stdx::unique_lock guard(_mutex);
-        getMetricsSetForRole(role).erase(it);
-    };
+    return std::make_unique<ShardingDataTransformCumulativeMetrics::ScopedObserver>(
+        this, role, std::move(it));
 }
 
 int64_t ShardingDataTransformCumulativeMetrics::getOldestOperationHighEstimateRemainingTimeMillis(
@@ -327,6 +325,13 @@ ShardingDataTransformCumulativeMetrics::insertMetrics(const InstanceObserver* me
     auto it = set.insert(set.end(), metrics);
     invariant(before + 1 == set.size());
     return it;
+}
+
+void ShardingDataTransformCumulativeMetrics::deregisterMetrics(
+    const Role& role,
+    const ShardingDataTransformCumulativeMetrics::MetricsSet::iterator& metricsIterator) {
+    stdx::unique_lock guard(_mutex);
+    getMetricsSetForRole(role).erase(metricsIterator);
 }
 
 void ShardingDataTransformCumulativeMetrics::onStarted() {
@@ -549,6 +554,16 @@ void ShardingDataTransformCumulativeMetrics::onCloningTotalRemoteBatchRetrieval(
 void ShardingDataTransformCumulativeMetrics::onOplogLocalBatchApplied(Milliseconds elapsed) {
     _oplogBatchApplied.fetchAndAdd(1);
     _oplogBatchAppliedMillis.fetchAndAdd(durationCount<Milliseconds>(elapsed));
+}
+
+ShardingDataTransformCumulativeMetrics::ScopedObserver::ScopedObserver(
+    ShardingDataTransformCumulativeMetrics* metrics,
+    Role role,
+    MetricsSet::iterator observerIterator)
+    : _metrics(metrics), _role(role), _observerIterator(std::move(observerIterator)) {}
+
+ShardingDataTransformCumulativeMetrics::ScopedObserver::~ScopedObserver() {
+    _metrics->deregisterMetrics(_role, _observerIterator);
 }
 
 }  // namespace mongo

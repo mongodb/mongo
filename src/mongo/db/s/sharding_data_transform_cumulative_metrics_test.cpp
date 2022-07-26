@@ -53,17 +53,12 @@ public:
                        int64_t timeRemaining,
                        ClockSource* clockSource,
                        ShardingDataTransformCumulativeMetrics* parent)
-        : _mock{startTime, timeRemaining}, _deregister{parent->registerInstanceMetrics(&_mock)} {}
-
-    ~ScopedObserverMock() {
-        if (_deregister) {
-            _deregister();
-        }
-    }
+        : _mock{startTime, timeRemaining},
+          _scopedOpObserver{parent->registerInstanceMetrics(&_mock)} {}
 
 private:
     ObserverMock _mock;
-    ShardingDataTransformCumulativeMetrics::DeregistrationFunction _deregister;
+    ShardingDataTransformCumulativeMetrics::UniqueScopedObserver _scopedOpObserver;
 };
 
 class ShardingDataTransformCumulativeMetricsTest : public ShardingDataTransformMetricsTestFixture {
@@ -86,7 +81,7 @@ public:
 TEST_F(ShardingDataTransformCumulativeMetricsTest, AddAndRemoveMetrics) {
     auto deregister = _cumulativeMetrics.registerInstanceMetrics(getOldestObserver());
     ASSERT_EQ(_cumulativeMetrics.getObservedMetricsCount(), 1);
-    deregister();
+    deregister.reset();
     ASSERT_EQ(_cumulativeMetrics.getObservedMetricsCount(), 0);
 }
 
@@ -126,7 +121,7 @@ TEST_F(ShardingDataTransformCumulativeMetricsTest, UpdatesOldestWhenOldestIsRemo
     ASSERT_EQ(_cumulativeMetrics.getOldestOperationHighEstimateRemainingTimeMillis(
                   ObserverMock::kDefaultRole),
               kOldestTimeLeft);
-    deregisterOldest();
+    deregisterOldest.reset();
     ASSERT_EQ(_cumulativeMetrics.getOldestOperationHighEstimateRemainingTimeMillis(
                   ObserverMock::kDefaultRole),
               kYoungestTimeLeft);
@@ -168,11 +163,11 @@ TEST_F(ShardingDataTransformCumulativeMetricsTest, ReportsOldestByRole) {
     ASSERT_EQ(metrics.getObservedMetricsCount(Role::kRecipient), 2);
     ASSERT_EQ(metrics.getOldestOperationHighEstimateRemainingTimeMillis(Role::kDonor), 100);
     ASSERT_EQ(metrics.getOldestOperationHighEstimateRemainingTimeMillis(Role::kRecipient), 300);
-    removeOldD();
+    removeOldD.reset();
     ASSERT_EQ(metrics.getObservedMetricsCount(), 3);
     ASSERT_EQ(metrics.getObservedMetricsCount(Role::kDonor), 1);
     ASSERT_EQ(metrics.getOldestOperationHighEstimateRemainingTimeMillis(Role::kDonor), 200);
-    removeOldR();
+    removeOldR.reset();
     ASSERT_EQ(metrics.getObservedMetricsCount(), 2);
     ASSERT_EQ(metrics.getObservedMetricsCount(Role::kRecipient), 1);
     ASSERT_EQ(metrics.getOldestOperationHighEstimateRemainingTimeMillis(Role::kRecipient), 400);
@@ -182,8 +177,8 @@ TEST_F(ShardingDataTransformCumulativeMetricsTest, ReportContainsTimeEstimates) 
     using Role = ShardingDataTransformMetrics::Role;
     ObserverMock recipient{Date_t::fromMillisSinceEpoch(100), 100, 100, Role::kRecipient};
     ObserverMock coordinator{Date_t::fromMillisSinceEpoch(200), 400, 300, Role::kCoordinator};
-    auto ignore = _cumulativeMetrics.registerInstanceMetrics(&recipient);
-    ignore = _cumulativeMetrics.registerInstanceMetrics(&coordinator);
+    auto recipientObserver = _cumulativeMetrics.registerInstanceMetrics(&recipient);
+    auto coordinatorObserver = _cumulativeMetrics.registerInstanceMetrics(&coordinator);
 
     BSONObjBuilder bob;
     _cumulativeMetrics.reportForServerStatus(&bob);

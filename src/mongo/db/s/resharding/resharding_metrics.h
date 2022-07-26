@@ -77,6 +77,7 @@ public:
     private:
         CoordinatorStateEnum _enumVal;
     };
+
     ReshardingMetrics(const CommonReshardingMetadata& metadata,
                       Role role,
                       ClockSource* clockSource,
@@ -88,6 +89,8 @@ public:
                       Date_t startTime,
                       ClockSource* clockSource,
                       ShardingDataTransformCumulativeMetrics* cumulativeMetrics);
+    ~ReshardingMetrics();
+
     static std::unique_ptr<ReshardingMetrics> makeInstance(UUID instanceId,
                                                            BSONObj shardKey,
                                                            NamespaceString nss,
@@ -225,6 +228,8 @@ private:
     AtomicWord<Date_t> _applyingEndTime;
 
     ReshardingMetricsFieldNameProvider* _reshardingFieldNames;
+
+    ShardingDataTransformInstanceMetrics::UniqueScopedObserver _scopedObserver;
 };
 
 }  // namespace mongo

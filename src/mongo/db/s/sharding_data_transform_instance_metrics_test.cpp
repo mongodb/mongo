@@ -74,15 +74,16 @@ public:
         Date_t startTime,
         ClockSource* clockSource,
         ShardingDataTransformCumulativeMetrics* cumulativeMetrics)
-        : ShardingDataTransformInstanceMetrics{
-              std::move(instanceId),
-              std::move(shardKey),
-              std::move(nss),
-              role,
-              startTime,
-              clockSource,
-              cumulativeMetrics,
-              std::make_unique<ShardingDataTransformInstanceMetricsFieldNameProviderForTest>()} {}
+        : ShardingDataTransformInstanceMetrics{std::move(instanceId),
+                                               std::move(shardKey),
+                                               std::move(nss),
+                                               role,
+                                               startTime,
+                                               clockSource,
+                                               cumulativeMetrics,
+                                               std::make_unique<
+                                                   ShardingDataTransformInstanceMetricsFieldNameProviderForTest>()},
+          _scopedObserver(registerInstanceMetrics()) {}
     ShardingDataTransformInstanceMetricsForTest(
         UUID instanceId,
         BSONObj shardKey,
@@ -101,11 +102,15 @@ public:
                                                clockSource,
                                                cumulativeMetrics,
                                                std::move(fieldNameProvider),
-                                               std::move(observer)} {}
+                                               std::move(observer)},
+          _scopedObserver(registerInstanceMetrics()) {}
 
     Milliseconds getRecipientHighEstimateRemainingTimeMillis() const {
         return Milliseconds{0};
     }
+
+private:
+    ShardingDataTransformInstanceMetrics::UniqueScopedObserver _scopedObserver;
 };
 
 class InstanceMetricsWithObserverMock {
@@ -188,10 +193,7 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, RandomOperationsMultithreaded) 
     doRandomOperationsMultithreadedTest<InstanceMetricsWithObserverMock>();
 }
 
-
 TEST_F(ShardingDataTransformInstanceMetricsTest, ReportForCurrentOpShouldHaveGenericDescription) {
-
-
     std::vector<Role> roles{Role::kCoordinator, Role::kDonor, Role::kRecipient};
 
     std::for_each(roles.begin(), roles.end(), [&](auto role) {

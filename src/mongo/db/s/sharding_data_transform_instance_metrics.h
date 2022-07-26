@@ -63,7 +63,7 @@ public:
                                          ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
                                          FieldNameProviderPtr fieldNames,
                                          ObserverPtr observer);
-    virtual ~ShardingDataTransformInstanceMetrics();
+    virtual ~ShardingDataTransformInstanceMetrics() = default;
 
     virtual BSONObj reportForCurrentOp() const noexcept;
 
@@ -115,6 +115,7 @@ public:
 
 protected:
     static constexpr auto kNoDate = Date_t::min();
+    using UniqueScopedObserver = ShardingDataTransformCumulativeMetrics::UniqueScopedObserver;
 
     template <typename T>
     T getElapsed(const AtomicWord<Date_t>& startTime,
@@ -138,6 +139,7 @@ protected:
 
     ShardingDataTransformCumulativeMetrics* getCumulativeMetrics();
     ClockSource* getClockSource() const;
+    UniqueScopedObserver registerInstanceMetrics();
 
     const UUID _instanceId;
     const BSONObj _originalCommand;
@@ -151,7 +153,6 @@ private:
     ClockSource* _clockSource;
     ObserverPtr _observer;
     ShardingDataTransformCumulativeMetrics* _cumulativeMetrics;
-    ShardingDataTransformCumulativeMetrics::DeregistrationFunction _deregister;
 
     AtomicWord<Date_t> _copyingStartTime;
     AtomicWord<Date_t> _copyingEndTime;

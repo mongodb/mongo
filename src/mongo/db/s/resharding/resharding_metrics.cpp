@@ -93,7 +93,8 @@ ReshardingMetrics::ReshardingMetrics(UUID instanceId,
       _oplogEntriesFetched{0},
       _applyingStartTime{kNoDate},
       _applyingEndTime{kNoDate},
-      _reshardingFieldNames{static_cast<ReshardingMetricsFieldNameProvider*>(_fieldNames.get())} {}
+      _reshardingFieldNames{static_cast<ReshardingMetricsFieldNameProvider*>(_fieldNames.get())},
+      _scopedObserver(registerInstanceMetrics()) {}
 
 ReshardingMetrics::ReshardingMetrics(const CommonReshardingMetadata& metadata,
                                      Role role,
@@ -106,6 +107,12 @@ ReshardingMetrics::ReshardingMetrics(const CommonReshardingMetadata& metadata,
                         readStartTime(metadata, clockSource),
                         clockSource,
                         cumulativeMetrics} {}
+
+ReshardingMetrics::~ReshardingMetrics() {
+    // Deregister the observer first to ensure that the observer will no longer be able to reach
+    // this object while destructor is running.
+    _scopedObserver.reset();
+}
 
 std::string ReshardingMetrics::createOperationDescription() const noexcept {
     return fmt::format("ReshardingMetrics{}Service {}",

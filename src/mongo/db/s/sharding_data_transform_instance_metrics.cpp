@@ -72,7 +72,6 @@ ShardingDataTransformInstanceMetrics::ShardingDataTransformInstanceMetrics(
       _clockSource{clockSource},
       _observer{std::move(observer)},
       _cumulativeMetrics{cumulativeMetrics},
-      _deregister{_cumulativeMetrics->registerInstanceMetrics(_observer.get())},
       _copyingStartTime{kNoDate},
       _copyingEndTime{kNoDate},
       _approxDocumentsToProcess{0},
@@ -84,12 +83,6 @@ ShardingDataTransformInstanceMetrics::ShardingDataTransformInstanceMetrics(
       _criticalSectionStartTime{kNoDate},
       _criticalSectionEndTime{kNoDate},
       _writesDuringCriticalSection{0} {}
-
-ShardingDataTransformInstanceMetrics::~ShardingDataTransformInstanceMetrics() {
-    if (_deregister) {
-        _deregister();
-    }
-}
 
 Milliseconds ShardingDataTransformInstanceMetrics::getHighEstimateRemainingTimeMillis() const {
     switch (_role) {
@@ -339,6 +332,11 @@ void ShardingDataTransformInstanceMetrics::onCanceled() {
 
 void ShardingDataTransformInstanceMetrics::setLastOpEndingChunkImbalance(int64_t imbalanceCount) {
     _cumulativeMetrics->setLastOpEndingChunkImbalance(imbalanceCount);
+}
+
+ShardingDataTransformInstanceMetrics::UniqueScopedObserver
+ShardingDataTransformInstanceMetrics::registerInstanceMetrics() {
+    return _cumulativeMetrics->registerInstanceMetrics(_observer.get());
 }
 
 }  // namespace mongo

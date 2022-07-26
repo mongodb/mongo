@@ -160,8 +160,10 @@ protected:
     using SpecialIndexBehaviorMap = stdx::unordered_map<int, std::function<void()>>;
     const SpecialIndexBehaviorMap kNoSpecialBehavior{};
     SpecialIndexBehaviorMap registerAtIndex(int index, const ObserverMock* mock) {
-        return SpecialIndexBehaviorMap{
-            {index, [=] { auto ignore = _cumulativeMetrics.registerInstanceMetrics(mock); }}};
+        return SpecialIndexBehaviorMap{{index, [this, mock] {
+                                            _observers.emplace_back(
+                                                _cumulativeMetrics.registerInstanceMetrics(mock));
+                                        }}};
     }
 
     template <typename ScopedObserverType>
@@ -268,6 +270,7 @@ protected:
     }
 
     ShardingDataTransformCumulativeMetrics _cumulativeMetrics;
+    std::vector<ShardingDataTransformCumulativeMetrics::UniqueScopedObserver> _observers;
 };
 
 }  // namespace mongo
