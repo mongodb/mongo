@@ -45,6 +45,7 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/clock_tick_source.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/hierarchical_acquisition.h"
@@ -545,6 +546,13 @@ public:
     }
 
     /**
+     * Returns the tick/clock source that wraps '_fastClockSource' in this context.
+     */
+    TickSource* getFastTickSource() {
+        return &_clockTickSource;
+    }
+
+    /**
      * Get a ClockSource implementation that may be less precise than the _preciseClockSource but
      * may be cheaper to call.
      */
@@ -564,6 +572,12 @@ public:
      * destroyed. So make sure that no one is using the old source when calling this.
      */
     void setTickSource(std::unique_ptr<TickSource> newSource);
+
+    /**
+     * Replaces the current tick/clock source with a new one. In other words, the old source will be
+     * destroyed. So make sure that no one is using the old source when calling this.
+     */
+    void setFastTickSource(std::unique_ptr<TickSource> newSource);
 
     /**
      * Call this method with a ClockSource implementation that may be less precise than
@@ -752,6 +766,12 @@ private:
      * may be cheaper to call.
      */
     SyncUnique<ClockSource> _fastClockSource;
+
+    /**
+     * A type of TickSource that wraps '_fastClockSource'. Note that '_clockTickSource' does not own
+     * '_fastClockSource'.
+     */
+    ClockTickSource _clockTickSource;
 
     /**
      * A ClockSource implementation that is very precise but may be expensive to call.

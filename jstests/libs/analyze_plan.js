@@ -38,12 +38,12 @@ function getCachedPlan(cachedPlan) {
 /**
  * Given the root stage of explain's JSON representation of a query plan ('root'), returns all
  * subdocuments whose stage is 'stage'. Returns an empty array if the plan does not have the
- * requested stage.
+ * requested stage. if 'stage' is 'null' returns all the stages in 'root'.
  */
 function getPlanStages(root, stage) {
     var results = [];
 
-    if (root.stage === stage) {
+    if (root.stage === stage || stage === undefined) {
         results.push(root);
     }
 
@@ -93,6 +93,14 @@ function getPlanStages(root, stage) {
     }
 
     return results;
+}
+
+/**
+ * Given the root stage of explain's JSON representation of a query plan ('root'), returns a list of
+ * all the stages in 'root'.
+ */
+function getAllPlanStages(root) {
+    return getPlanStages(root);
 }
 
 /**

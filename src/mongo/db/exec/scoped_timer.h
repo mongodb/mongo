@@ -29,16 +29,17 @@
 
 #pragma once
 
-
+#include "mongo/stdx/variant.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/clock_tick_source.h"
+#include "mongo/util/system_tick_source.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
-
-class ClockSource;
-
 /**
- * This class increments a counter by a rough estimate of the time elapsed since its
- * construction when it goes out of scope.
+ * The timer increments a counter by the time elapsed since its construction when it goes out of
+ * scope.
  */
 class ScopedTimer {
     ScopedTimer(const ScopedTimer&) = delete;
@@ -46,17 +47,14 @@ class ScopedTimer {
 
 public:
     ScopedTimer(ScopedTimer&& other) = default;
-    ScopedTimer(ClockSource* cs, long long* counter);
+
+    ScopedTimer(Microseconds* counter, TickSource* clock);
 
     ~ScopedTimer();
 
 private:
-    ClockSource* const _clock;
     // Reference to the counter that we are incrementing with the elapsed time.
-    long long* _counter;
-
-    // Time at which the timer was constructed.
-    const Date_t _start;
+    Microseconds* const _counter;
+    Timer _timer;
 };
-
 }  // namespace mongo

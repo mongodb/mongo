@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,34 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/exec/scoped_timer_factory.h"
 
-#include "mongo/db/exec/sbe/stages/plan_stats.h"
+namespace mongo {
+namespace scoped_timer_factory {
 
-#include <queue>
+boost::optional<ScopedTimer> make(ServiceContext* context,
+                                  QueryExecTimerPrecision precision,
+                                  Microseconds* counter) {
+    invariant(context);
+    if (precision == QueryExecTimerPrecision::kMillis) {
+        return {{counter, context->getFastTickSource()}};
+    }
+    if (precision == QueryExecTimerPrecision::kMicros) {
+        return {{counter, context->getTickSource()}};
+    }
 
-#include "mongo/db/exec/plan_stats_walker.h"
-#include "mongo/db/exec/sbe/stages/plan_stats.h"
-#include "mongo/db/query/plan_summary_stats_visitor.h"
-#include "mongo/db/query/tree_walker.h"
-
-namespace mongo::sbe {
-size_t calculateNumberOfReads(const PlanStageStats* root) {
-    auto visitor = PlanStatsNumReadsVisitor{};
-    auto walker = PlanStageStatsWalker<true, CommonStats>(nullptr, nullptr, &visitor);
-    tree_walker::walk<true, PlanStageStats>(root, &walker);
-    return visitor.numReads;
+    return boost::none;
 }
 
-PlanSummaryStats collectExecutionStatsSummary(const PlanStageStats& root) {
-    PlanSummaryStats summary;
-    summary.nReturned = root.common.advances;
-
-    summary.executionTime = root.common.executionTime;
-
-    auto visitor = PlanSummaryStatsVisitor(summary);
-    auto walker = PlanStageStatsWalker<true, CommonStats>(nullptr, nullptr, &visitor);
-    tree_walker::walk<true, PlanStageStats>(&root, &walker);
-    return summary;
-}
-}  // namespace mongo::sbe
+}  // namespace scoped_timer_factory
+}  // namespace mongo

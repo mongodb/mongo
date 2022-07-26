@@ -218,8 +218,9 @@ void statsToBSON(const PlanStageStats& stats,
     if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
         bob->appendNumber("nReturned", static_cast<long long>(stats.common.advanced));
         // Include executionTimeMillis if it was recorded.
-        if (stats.common.executionTimeMillis) {
-            bob->appendNumber("executionTimeMillisEstimate", *stats.common.executionTimeMillis);
+        if (stats.common.executionTime) {
+            bob->appendNumber("executionTimeMillisEstimate",
+                              durationCount<Milliseconds>(*stats.common.executionTime));
         }
 
         bob->appendNumber("works", static_cast<long long>(stats.common.works));
@@ -532,8 +533,9 @@ PlanSummaryStats collectExecutionStatsSummary(const PlanStageStats* stats,
     PlanSummaryStats summary;
     summary.nReturned = stats->common.advanced;
 
-    if (stats->common.executionTimeMillis) {
-        summary.executionTimeMillisEstimate = *stats->common.executionTimeMillis;
+    if (stats->common.executionTime) {
+        summary.executionTime.executionTimeEstimate = *stats->common.executionTime;
+        summary.executionTime.precision = QueryExecTimerPrecision::kMillis;
     }
 
     // Flatten the stats tree into a list.
