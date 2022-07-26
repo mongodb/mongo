@@ -422,6 +422,11 @@ void addClusterMonitorPrivileges(PrivilegeVector* privileges) {
         Privilege(ResourcePattern::forDatabaseName("config"), clusterMonitorRoleDatabaseActions));
     Privilege::addPrivilegeToPrivilegeVector(
         privileges,
+        Privilege(ResourcePattern::forExactNamespace(NamespaceString("config", "system.sessions")),
+                  clusterMonitorRoleDatabaseActions));
+
+    Privilege::addPrivilegeToPrivilegeVector(
+        privileges,
         Privilege(ResourcePattern::forDatabaseName("local"), clusterMonitorRoleDatabaseActions));
     addReadOnlyDbPrivileges(privileges, "config");
     addReadOnlyDbPrivileges(privileges, "local");
