@@ -142,8 +142,11 @@ buildvariants:
   - name: mqlrun
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
-  - name: .replica_sets .common
-  - name: .replica_sets .multi_oplog
+  - name: .replica_sets .common !.ignore_non_generated_replica_sets_jscore_passthrough
+  - name: .replica_sets .multi_oplog !.ignore_non_generated_replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough
+    distros:
+    - windows-vsCurrent-large
   - name: replica_sets_ese_gen
   - name: sasl
   - name: server_discovery_and_monitoring_json_test_TG
