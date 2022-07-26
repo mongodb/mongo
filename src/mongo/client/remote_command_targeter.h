@@ -77,6 +77,25 @@ public:
     virtual SemiFuture<std::vector<HostAndPort>> findHosts(
         const ReadPreferenceSetting& readPref, const CancellationToken& cancelToken) = 0;
 
+
+    /**
+     * Checks the given status and updates the host bookkeeping accordingly.
+     */
+    void updateHostWithStatus(const HostAndPort& host, const Status& status) {
+        if (status.isOK())
+            return;
+
+        if (ErrorCodes::isNotPrimaryError(status.code())) {
+            markHostNotPrimary(host, status);
+        } else if (ErrorCodes::isNetworkError(status.code())) {
+            markHostUnreachable(host, status);
+        } else if (status == ErrorCodes::NetworkInterfaceExceededTimeLimit) {
+            markHostUnreachable(host, status);
+        } else if (ErrorCodes::isShutdownError(status.code())) {
+            markHostShuttingDown(host, status);
+        }
+    };
+
     /**
      * Reports to the targeter that a 'status' indicating a not primary error was received when
      * communicating with 'host', and so it should update its bookkeeping to avoid giving out the

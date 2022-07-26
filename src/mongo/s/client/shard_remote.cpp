@@ -131,18 +131,7 @@ bool ShardRemote::isRetriableError(ErrorCodes::Error code, RetryPolicy options) 
 // Any error code changes should possibly also be made to Shard::shouldErrorBePropagated!
 void ShardRemote::updateReplSetMonitor(const HostAndPort& remoteHost,
                                        const Status& remoteCommandStatus) {
-    if (remoteCommandStatus.isOK())
-        return;
-
-    if (ErrorCodes::isNotPrimaryError(remoteCommandStatus.code())) {
-        _targeter->markHostNotPrimary(remoteHost, remoteCommandStatus);
-    } else if (ErrorCodes::isNetworkError(remoteCommandStatus.code())) {
-        _targeter->markHostUnreachable(remoteHost, remoteCommandStatus);
-    } else if (remoteCommandStatus == ErrorCodes::NetworkInterfaceExceededTimeLimit) {
-        _targeter->markHostUnreachable(remoteHost, remoteCommandStatus);
-    } else if (ErrorCodes::isShutdownError(remoteCommandStatus.code())) {
-        _targeter->markHostShuttingDown(remoteHost, remoteCommandStatus);
-    }
+    _targeter->updateHostWithStatus(remoteHost, remoteCommandStatus);
 }
 
 std::string ShardRemote::toString() const {
