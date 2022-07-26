@@ -610,7 +610,7 @@ buildvariants:
       distros:
       - rhel80-xlarge
     - name: test_api_version_compatibility
-    - name: .aggfuzzer !.multiversion
+    - name: .aggfuzzer !.multiversion !.feature_flag_guarded
     - name: .aggregation !.multiversion !.feature_flag_guarded
     - name: audit
     - name: .auth !.multiversion

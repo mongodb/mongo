@@ -31,7 +31,7 @@ buildvariants:
   - name: compile_build_tools_next_TG
     distros:
     - rhel70
-  - name: .aggfuzzer
+  - name: .aggfuzzer !.feature_flag_guarded
   - name: audit
   - name: auth_audit_gen
   - name: auth_gen
