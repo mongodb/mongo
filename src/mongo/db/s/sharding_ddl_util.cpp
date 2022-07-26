@@ -507,5 +507,11 @@ void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
     }
 }
 
+BSONObj getCriticalSectionReasonForRename(const NamespaceString& from, const NamespaceString& to) {
+    return BSON("command"
+                << "rename"
+                << "from" << from.toString() << "to" << to.toString());
+}
+
 }  // namespace sharding_ddl_util
 }  // namespace mongo
