@@ -83,7 +83,7 @@ public:
             collator = std::move(factoryCollator.getValue());
         }
 
-        return {db, view, viewOn, pipeline, std::move(collator)};
+        return {DatabaseName(boost::none, db), view, viewOn, pipeline, std::move(collator)};
     }
 
 private:

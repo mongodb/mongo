@@ -52,7 +52,7 @@ const BSONObj samplePipeline = BSON_ARRAY(BSON("limit" << 9));
 
 TEST(ViewDefinitionTest, ViewDefinitionCreationCorrectlyBuildsNamespaceStrings) {
     ViewDefinition viewDef(
-        viewNss.db(), viewNss.coll(), backingNss.coll(), samplePipeline, nullptr);
+        viewNss.dbName(), viewNss.coll(), backingNss.coll(), samplePipeline, nullptr);
     ASSERT_EQ(viewDef.name(), viewNss);
     ASSERT_EQ(viewDef.viewOn(), backingNss);
 }
@@ -61,7 +61,7 @@ TEST(ViewDefinitionTest, CopyConstructorProperlyClonesAllFields) {
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
     ViewDefinition originalView(
-        viewNss.db(), viewNss.coll(), backingNss.coll(), samplePipeline, std::move(collator));
+        viewNss.dbName(), viewNss.coll(), backingNss.coll(), samplePipeline, std::move(collator));
     ViewDefinition copiedView(originalView);
 
     ASSERT_EQ(originalView.name(), copiedView.name());
@@ -79,7 +79,7 @@ TEST(ViewDefinitionTest, CopyAssignmentOperatorProperlyClonesAllFields) {
     auto collator =
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
     ViewDefinition originalView(
-        viewNss.db(), viewNss.coll(), backingNss.coll(), samplePipeline, std::move(collator));
+        viewNss.dbName(), viewNss.coll(), backingNss.coll(), samplePipeline, std::move(collator));
     ViewDefinition copiedView = originalView;
 
     ASSERT_EQ(originalView.name(), copiedView.name());
@@ -96,14 +96,14 @@ DEATH_TEST_REGEX(ViewDefinitionTest,
                  SetViewOnFailsIfNewViewOnNotInSameDatabaseAsView,
                  R"#(Invariant failure.*_viewNss.db\(\) == viewOnNss.db\(\))#") {
     ViewDefinition viewDef(
-        viewNss.db(), viewNss.coll(), backingNss.coll(), samplePipeline, nullptr);
+        viewNss.dbName(), viewNss.coll(), backingNss.coll(), samplePipeline, nullptr);
     NamespaceString badViewOn("someOtherDb.someOtherCollection");
     viewDef.setViewOn(badViewOn);
 }
 
 TEST(ViewDefinitionTest, SetViewOnSucceedsIfNewViewOnIsInSameDatabaseAsView) {
     ViewDefinition viewDef(
-        viewNss.db(), viewNss.coll(), backingNss.coll(), samplePipeline, nullptr);
+        viewNss.dbName(), viewNss.coll(), backingNss.coll(), samplePipeline, nullptr);
     ASSERT_EQ(viewDef.viewOn(), backingNss);
 
     NamespaceString newViewOn("testdb.othercollection");
@@ -130,12 +130,31 @@ TEST(ViewDefinitionTest, SetPipelineSucceedsOnValidArrayBSONElement) {
 
 TEST(ViewDefinitionTest, ViewDefinitionCreationCorrectlySetsTimeseries) {
     ViewDefinition viewDef(
-        viewNss.db(), viewNss.coll(), bucketsColl.coll(), samplePipeline, nullptr);
+        viewNss.dbName(), viewNss.coll(), bucketsColl.coll(), samplePipeline, nullptr);
     ASSERT_FALSE(viewDef.timeseries());
 
-    ViewDefinition timeseriesDef(
-        timeseriesColl.db(), timeseriesColl.coll(), bucketsColl.coll(), samplePipeline, nullptr);
+    ViewDefinition timeseriesDef(timeseriesColl.dbName(),
+                                 timeseriesColl.coll(),
+                                 bucketsColl.coll(),
+                                 samplePipeline,
+                                 nullptr);
     ASSERT_TRUE(timeseriesDef.timeseries());
+}
+
+TEST(ViewDefinitionTest, ViewDefinitionCreationCorrectlyBuildsNamespaceStringsWithTenantIds) {
+    TenantId tenantId(OID::gen());
+    NamespaceString viewNss(tenantId, "testdb.testview");
+    NamespaceString backingNss(tenantId, "testdb.testcoll");
+
+    ViewDefinition viewDef(
+        viewNss.dbName(), viewNss.coll(), backingNss.coll(), samplePipeline, nullptr);
+    ASSERT(viewDef.name().tenantId());
+    ASSERT_EQ(*viewDef.name().tenantId(), tenantId);
+    ASSERT_EQ(viewDef.name(), viewNss);
+
+    ASSERT(viewDef.viewOn().tenantId());
+    ASSERT_EQ(*viewDef.viewOn().tenantId(), tenantId);
+    ASSERT_EQ(viewDef.viewOn(), backingNss);
 }
 }  // namespace
 }  // namespace mongo

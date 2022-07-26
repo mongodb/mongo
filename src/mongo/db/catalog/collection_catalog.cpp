@@ -1429,7 +1429,7 @@ Status CollectionCatalog::_createOrUpdateView(
     BSONObj viewDef = viewDefBuilder.obj();
     BSONObj ownedPipeline = pipeline.getOwned();
     ViewDefinition view(
-        viewName.db(), viewName.coll(), viewOn.coll(), ownedPipeline, std::move(collator));
+        viewName.dbName(), viewName.coll(), viewOn.coll(), ownedPipeline, std::move(collator));
 
     // If the view is already in the durable view catalog, we don't need to validate the graph. If
     // we need to update the durable view catalog, we need to check that the resulting dependency

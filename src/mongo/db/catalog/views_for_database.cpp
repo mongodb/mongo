@@ -110,7 +110,7 @@ Status ViewsForDatabase::_insert(OperationContext* opCtx, const BSONObj& view) {
         }
     }
 
-    auto viewDef = std::make_shared<ViewDefinition>(viewName.db(),
+    auto viewDef = std::make_shared<ViewDefinition>(viewName.dbName(),
                                                     viewName.coll(),
                                                     view["viewOn"].str(),
                                                     pipeline,
