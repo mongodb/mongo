@@ -801,7 +801,11 @@ StatusWith<std::string> WiredTigerRecordStore::generateCreateString(
             ident.startsWith("internal-") ||
             // TODO (SERVER-60753): Remove special handling for index build during recovery. This
             // includes the following _mdb_catalog ident.
-            nss == NamespaceString::kIndexBuildEntryNamespace || ident.startsWith("_mdb_catalog")) {
+            nss == NamespaceString::kIndexBuildEntryNamespace ||
+            // SERVER-68330: Reconstructing config.transactions after a rollback does a mixed-mode
+            // write.
+            nss == NamespaceString::kSessionTransactionsTableNamespace ||
+            ident.startsWith("_mdb_catalog")) {
             ss << "write_timestamp_usage=mixed_mode,";
         } else {
             ss << "write_timestamp_usage=ordered,";
