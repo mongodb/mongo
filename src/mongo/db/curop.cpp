@@ -808,6 +808,14 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("prepareConflictDuration", prepareConflictDurationMillis);
     }
 
+    if (catalogCacheDatabaseLookupMillis > Milliseconds::zero()) {
+        pAttrs->add("catalogCacheDatabaseLookupDuration", catalogCacheDatabaseLookupMillis);
+    }
+
+    if (catalogCacheCollectionLookupMillis > Milliseconds::zero()) {
+        pAttrs->add("catalogCacheCollectionLookupDuration", catalogCacheCollectionLookupMillis);
+    }
+
     if (databaseVersionRefreshMillis > Milliseconds::zero()) {
         pAttrs->add("databaseVersionRefreshDuration", databaseVersionRefreshMillis);
     }

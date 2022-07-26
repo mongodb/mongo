@@ -299,6 +299,14 @@ public:
     // Stores the duration of time spent blocked on prepare conflicts.
     Milliseconds prepareConflictDurationMillis{0};
 
+    // Total time spent looking up database entry in the local catalog cache, including eventual
+    // refreshes.
+    Milliseconds catalogCacheDatabaseLookupMillis{0};
+
+    // Total time spent looking up collection entry in the local catalog cache, including eventual
+    // refreshes.
+    Milliseconds catalogCacheCollectionLookupMillis{0};
+
     // Stores the duration of time spent waiting for the shard to refresh the database and wait for
     // the database critical section.
     Milliseconds databaseVersionRefreshMillis{0};
