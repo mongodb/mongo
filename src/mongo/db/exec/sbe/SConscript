@@ -18,7 +18,6 @@ env.Library(
         'values/bson.cpp',
         'values/value.cpp',
         'values/value_printer.cpp',
-        'vm/arith.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -48,6 +47,7 @@ sbeEnv.Library(
         'values/sbe_pattern_value_cmp.cpp',
         'values/slot.cpp',
         'values/slot_printer.cpp',
+        'vm/arith.cpp',
         'vm/datetime.cpp',
         'vm/vm.cpp',
     ],
