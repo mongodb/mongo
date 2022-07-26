@@ -187,11 +187,6 @@ commands:
         type: object_owned
         optional: true
         unstable: false
-      options:
-        description: "Deprecated."
-        type: object_owned
-        optional: true
-        unstable: true
       term:
         description: "Deprecated."
         type: safeInt64
