@@ -296,8 +296,10 @@ restart_read:
  *     Return the previous variable-length entry on the append list.
  */
 static inline int
-__cursor_var_append_prev(WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp)
+__cursor_var_append_prev(
+  WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp, bool *key_out_of_boundsp)
 {
+    WT_DECL_RET;
     WT_SESSION_IMPL *session;
 
     session = CUR2S(cbt);
@@ -324,6 +326,15 @@ new_page:
             return (0);
 
 restart_read:
+        /*
+         * If a lower bound has been set ensure that the key is within the range, otherwise early
+         * exit.
+         */
+        if ((ret = __wt_btcur_bounds_early_exit(session, cbt, false, key_out_of_boundsp)) ==
+          WT_NOTFOUND)
+            WT_STAT_CONN_DATA_INCR(session, cursor_bounds_prev_early_exit);
+        WT_RET(ret);
+
         WT_RET(__wt_txn_read_upd_list(session, cbt, cbt->ins->upd));
         if (cbt->upd_value->type == WT_UPDATE_INVALID) {
             ++*skippedp;
@@ -347,11 +358,13 @@ restart_read:
  *     Move to the previous, variable-length column-store item.
  */
 static inline int
-__cursor_var_prev(WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp)
+__cursor_var_prev(
+  WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp, bool *key_out_of_boundsp)
 {
     WT_CELL *cell;
     WT_CELL_UNPACK_KV unpack;
     WT_COL *cip;
+    WT_DECL_RET;
     WT_INSERT *ins;
     WT_PAGE *page;
     WT_SESSION_IMPL *session;
@@ -391,6 +404,19 @@ new_page:
             return (WT_NOTFOUND);
 
 restart_read:
+        /*
+         * If an lower bound has been set ensure that the key is within the range, otherwise early
+         * exit. In the case where there is a large set of RLE deleted records it is possible that
+         * calculated recno will be off the end of the page. We don't need to add an additional
+         * check for this case as the prev iteration, either on a page or append list will check the
+         * recno and early exit. It does present a potential optimization but to keep the bounded
+         * cursor logic simple we will forego it for now.
+         */
+        if ((ret = __wt_btcur_bounds_early_exit(session, cbt, false, key_out_of_boundsp)) ==
+          WT_NOTFOUND)
+            WT_STAT_CONN_DATA_INCR(session, cursor_bounds_prev_early_exit);
+        WT_RET(ret);
+
         /* Find the matching WT_COL slot. */
         if ((cip = __col_var_search(cbt->ref, cbt->recno, &rle_start)) == NULL)
             return (WT_NOTFOUND);
@@ -718,7 +744,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
      * bounds, continue the prev traversal logic.
      */
     if (F_ISSET(cursor, WT_CURSTD_BOUND_UPPER) && !WT_CURSOR_IS_POSITIONED(cbt)) {
-        WT_ERR(__wt_btcur_bounds_row_position(session, cbt, false, &need_walk));
+        WT_ERR(__wt_btcur_bounds_position(session, cbt, false, &need_walk));
         if (!need_walk) {
             __wt_value_return(cbt, cbt->upd_value);
             goto done;
@@ -758,7 +784,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
                 ret = __cursor_fix_append_prev(cbt, newpage, restart);
                 break;
             case WT_PAGE_COL_VAR:
-                ret = __cursor_var_append_prev(cbt, newpage, restart, &skipped);
+                ret = __cursor_var_append_prev(cbt, newpage, restart, &skipped, &key_out_of_bounds);
                 total_skipped += skipped;
                 break;
             default:
@@ -777,7 +803,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
                 ret = __cursor_fix_prev(cbt, newpage, restart);
                 break;
             case WT_PAGE_COL_VAR:
-                ret = __cursor_var_prev(cbt, newpage, restart, &skipped);
+                ret = __cursor_var_prev(cbt, newpage, restart, &skipped, &key_out_of_bounds);
                 total_skipped += skipped;
                 break;
             case WT_PAGE_ROW_LEAF:
@@ -789,16 +815,17 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
             }
             if (ret != WT_NOTFOUND)
                 break;
-            /*
-             * If we are doing a search near with prefix key configured or the cursor has bounds
-             * set, we need to check if we have exited the prev function due to a prefix key
-             * mismatch or the key is out of bounds. If so, we break instead of walking onto the
-             * next page. We're not directly returning here to allow the cursor to be reset first
-             * before we return WT_NOTFOUND.
-             */
-            if (key_out_of_bounds)
-                break;
         }
+
+        /*
+         * If we are doing an operation with bounds set, we need to check if we have exited the prev
+         * function due to the key being out of bounds. If so, we break instead of walking onto the
+         * prev page. We're not directly returning here to allow the cursor to be reset first before
+         * we return WT_NOTFOUND.
+         */
+        if (key_out_of_bounds)
+            break;
+
         /*
          * If we saw a lot of deleted records on this page, or we went all the way through a page
          * and only saw deleted records, try to evict the page when we release it. Otherwise

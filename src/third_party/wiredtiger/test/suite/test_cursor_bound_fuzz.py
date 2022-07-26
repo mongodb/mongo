@@ -91,18 +91,21 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
 
     types = [
         ('file', dict(uri='file:')),
-        ('table', dict(uri='table:'))
+        #('table', dict(uri='table:'))
     ]
 
     data_format = [
         ('row', dict(key_format='i')),
-        # FIXME Enable once column store is completed.
-        #('column', dict(key_format='r'))
+        ('column', dict(key_format='r'))
     ]
     scenarios = make_scenarios(types, data_format)
 
+    def key_range_iter(self):
+        for i in range(self.min_key, self.max_key):
+            yield i
+
     def dump_key_range(self):
-        for i in range(0, self.key_count):
+        for i in self.key_range_iter():
             self.pr(self.key_range[i].to_string())
 
     def generate_value(self):
@@ -127,7 +130,7 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
 
     def apply_ops(self, cursor):
         op_count = self.key_count
-        for i in range(0, op_count):
+        for i in self.key_range_iter():
             op = random.choice(list(operations))
             if (op is operations.UPSERT):
                 self.apply_update(cursor, i)
@@ -141,7 +144,7 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
         checked_keys = []
         if (next):
             self.verbose(2, "Running scenario: NEXT")
-            key_range_it = -1
+            key_range_it = self.min_key - 1
             while (cursor.next() != wiredtiger.WT_NOTFOUND):
                 current_key = cursor.get_key()
                 current_value = cursor.get_value()
@@ -154,18 +157,20 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
                 # Check that the key range between key_range_it and current_key isn't visible
                 if (current_key != key_range_it + 1):
                     for i in range(key_range_it + 1, current_key):
+                        self.verbose(3, "Checking key is deleted or oob: " + str(i))
                         checked_keys.append(i)
                         self.assertTrue(self.key_range[i].is_deleted_or_oob(bound_set))
                 key_range_it = current_key
             # If key_range_it is < key_count then the rest of the range was deleted
             # Remember to increment it by one to get it to the first not in bounds key.
             key_range_it = key_range_it + 1
-            for i in range(key_range_it, self.key_count):
+            for i in range(key_range_it, self.max_key):
                 checked_keys.append(i)
+                self.verbose(3, "Checking key is deleted or oob: " + str(i))
                 self.assertTrue(self.key_range[i].is_deleted_or_oob(bound_set))
         else:
             self.verbose(2, "Running scenario: PREV")
-            key_range_it = self.key_count
+            key_range_it = self.max_key
             while (cursor.prev() != wiredtiger.WT_NOTFOUND):
                 current_key = cursor.get_key()
                 current_value = cursor.get_value()
@@ -176,12 +181,14 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
                 if (current_key != key_range_it - 1):
                     # Check that the key range between key_range_it and current_key isn't visible
                     for i in range(current_key + 1, key_range_it):
+                        self.verbose(3, "Checking key is deleted or oob: " + str(i))
                         checked_keys.append(i)
                         self.assertTrue(self.key_range[i].is_deleted_or_oob(bound_set))
                 key_range_it = current_key
             # If key_range_it is > key_count then the rest of the range was deleted
-            for i in range(0, key_range_it):
+            for i in range(self.min_key, key_range_it):
                 checked_keys.append(i)
+                self.verbose(3, "Checking key is deleted or oob: " + str(i))
                 self.assertTrue(self.key_range[i].is_deleted_or_oob(bound_set))
         self.assertTrue(len(checked_keys) == self.key_count)
 
@@ -212,7 +219,7 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
     def run_search_near(self, bound_set, cursor):
         # Choose N random keys and perform a search near.
         for i in range(0, self.search_count):
-            search_key = random.randrange(self.key_count)
+            search_key = random.randrange(self.min_key, self.max_key)
             cursor.set_key(search_key)
             self.verbose(2, "Searching for key: " + str(search_key))
             ret = cursor.search_near()
@@ -280,7 +287,12 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
                         raise Exception('Illegal state found in search_near')
 
     def run_bound_scenarios(self, bound_set, cursor):
-        scenario = random.choice(list(bound_scenarios))
+        if (self.data_format == 'column'):
+            scenario = random.choice([bound_scenarios.NEXT, bound_scenarios.PREV])
+        else:
+            scenario = random.choice(list(bound_scenarios))
+
+        scenario = bound_scenarios.PREV
         if (scenario is bound_scenarios.NEXT):
             self.run_next_prev(bound_set, True, cursor)
         elif (scenario is bound_scenarios.PREV):
@@ -294,8 +306,8 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
 
     def apply_bounds(self, cursor):
         cursor.reset()
-        lower = bound(random.randrange(0, self.key_count), bool(random.getrandbits(1)), bool(random.getrandbits(1)))
-        upper = bound(random.randrange(lower.key, self.key_count), bool(random.getrandbits(1)), bool(random.getrandbits(1)))
+        lower = bound(random.randrange(self.min_key, self.max_key), bool(random.getrandbits(1)), bool(random.getrandbits(1)))
+        upper = bound(random.randrange(lower.key, self.max_key), bool(random.getrandbits(1)), bool(random.getrandbits(1)))
         # Prevent invalid bounds being generated.
         if (lower.key == upper.key and lower.enabled and upper.enabled):
             lower.inclusive = upper.inclusive = True
@@ -312,11 +324,11 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
         uri = self.uri + self.file_name
         create_params = 'value_format=S,key_format={}'.format(self.key_format)
         # Reset the key range for every scenario.
-        self.key_range = []
+        self.key_range = {}
         # Setup a reproducible random seed.
         # If this test fails inspect the file WT_TEST/results.txt and replace the time.time()
         # with a given seed. e.g.:
-        #seed = 1657150934.9222412
+        #seed = 1657676799.777366
         # Additionally this test is configured for verbose logging which can make debugging a bit
         # easier.
         seed = time.time()
@@ -327,16 +339,18 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor(uri)
 
         # Initialize the value array.
+        self.verbose(2, "Generating value array")
         for i in range(0, self.value_array_size):
             self.value_array.append(self.generate_value())
 
         # Initialize the key range.
-        for i in range(0, self.key_count):
+        for i in self.key_range_iter():
             key_value = self.get_value()
-            self.key_range.append(key(i, key_value, key_states.UPSERTED))
+            self.key_range[i] = key(i, key_value, key_states.UPSERTED)
             cursor[i] = key_value
-        self.session.checkpoint()
 
+        #self.dump_key_range()
+        self.session.checkpoint()
         # Begin main loop
         for  i in range(0, self.iteration_count):
             self.verbose(2, "Iteration: " + str(i))
@@ -353,14 +367,16 @@ class test_cursor_bound_fuzz(wttest.WiredTigerTestCase):
     # A lot of time was spent generating values, to achieve some amount of randomness we pre
     # generate N values and keep them in memory.
     value_array = []
-    iteration_count = 1000 if wttest.islongtest() else 50
-    value_size = 10000
+    iteration_count = 200 if wttest.islongtest() else 50
+    value_size = 1000000 if wttest.islongtest() else 100
     value_array_size = 20
-    key_count = 1000
+    key_count = 10000 if wttest.islongtest() else 1000
+    min_key = 1
+    max_key = min_key + key_count
     # For each iteration we do search_count searches that way we test more cases without having to
     # generate as many key ranges.
     search_count = 20
-    key_range = []
+    key_range = {}
 
 if __name__ == '__main__':
     wttest.run()

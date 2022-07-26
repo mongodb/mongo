@@ -1181,8 +1181,8 @@ __wt_cursor_bound(WT_CURSOR *cursor, const char *config)
 
     CURSOR_API_CALL_CONF(cursor, session, bound, config, cfg, NULL);
 
-    if (WT_STREQ(cursor->key_format, "r"))
-        WT_ERR_MSG(session, EINVAL, "setting bounds is not compatible with column store yet.");
+    if (CUR2BT(cursor)->type == BTREE_COL_FIX)
+        WT_ERR_MSG(session, EINVAL, "setting bounds is not compatible with fixed column store.");
 
     if (F_ISSET(cursor, WT_CURSTD_PREFIX_SEARCH))
         WT_ERR_MSG(session, EINVAL, "setting bounds is not compatible with prefix search.");
