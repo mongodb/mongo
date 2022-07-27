@@ -173,5 +173,7 @@ void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
                                                   std::shared_ptr<executor::TaskExecutor> executor,
                                                   const OperationSessionInfo& osi);
 
+BSONObj getCriticalSectionReasonForRename(const NamespaceString& from, const NamespaceString& to);
+
 }  // namespace sharding_ddl_util
 }  // namespace mongo
