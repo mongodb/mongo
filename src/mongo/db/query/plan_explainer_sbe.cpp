@@ -238,9 +238,18 @@ void statsToBSONHelper(const sbe::PlanStageStats* stats,
 
     // Some top-level exec stats get pulled out of the root stage.
     bob->appendNumber("nReturned", static_cast<long long>(stats->common.advances));
-    // Include executionTimeMillis if it was recorded.
-    if (stats->common.executionTimeMillis) {
-        bob->appendNumber("executionTimeMillisEstimate", *stats->common.executionTimeMillis);
+    // Include the execution time if it was recorded.
+    if (stats->common.executionTime.precision == QueryExecTimerPrecision::kMillis) {
+        bob->appendNumber(
+            "executionTimeMillisEstimate",
+            durationCount<Milliseconds>(stats->common.executionTime.executionTimeEstimate));
+    } else if (stats->common.executionTime.precision == QueryExecTimerPrecision::kMicros) {
+        bob->appendNumber(
+            "executionTimeMillisEstimate",
+            durationCount<Milliseconds>(stats->common.executionTime.executionTimeEstimate));
+        bob->appendNumber(
+            "executionTimeMicros",
+            durationCount<Microseconds>(stats->common.executionTime.executionTimeEstimate));
     }
     bob->appendNumber("opens", static_cast<long long>(stats->common.opens));
     bob->appendNumber("closes", static_cast<long long>(stats->common.closes));

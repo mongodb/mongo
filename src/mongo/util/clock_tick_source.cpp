@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,34 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/util/clock_tick_source.h"
 
-#include "mongo/db/exec/sbe/stages/plan_stats.h"
+namespace mongo {
 
-#include <queue>
+namespace {
 
-#include "mongo/db/exec/plan_stats_walker.h"
-#include "mongo/db/exec/sbe/stages/plan_stats.h"
-#include "mongo/db/query/plan_summary_stats_visitor.h"
-#include "mongo/db/query/tree_walker.h"
+const int64_t kMillisPerSecond = 1000;
+const TickSource::Tick ticksPerSecond = kMillisPerSecond;
 
-namespace mongo::sbe {
-size_t calculateNumberOfReads(const PlanStageStats* root) {
-    auto visitor = PlanStatsNumReadsVisitor{};
-    auto walker = PlanStageStatsWalker<true, CommonStats>(nullptr, nullptr, &visitor);
-    tree_walker::walk<true, PlanStageStats>(root, &walker);
-    return visitor.numReads;
+}  // namespace
+
+TickSource::Tick ClockTickSource::getTicks() {
+    return _cs->now().toMillisSinceEpoch();
 }
 
-PlanSummaryStats collectExecutionStatsSummary(const PlanStageStats& root) {
-    PlanSummaryStats summary;
-    summary.nReturned = root.common.advances;
-
-    summary.executionTime = root.common.executionTime;
-
-    auto visitor = PlanSummaryStatsVisitor(summary);
-    auto walker = PlanStageStatsWalker<true, CommonStats>(nullptr, nullptr, &visitor);
-    tree_walker::walk<true, PlanStageStats>(&root, &walker);
-    return summary;
+TickSource::Tick ClockTickSource::getTicksPerSecond() {
+    return ticksPerSecond;
 }
-}  // namespace mongo::sbe
+
+}  // namespace mongo

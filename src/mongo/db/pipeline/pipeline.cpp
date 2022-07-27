@@ -64,9 +64,10 @@ Value appendCommonExecStats(Value docSource, const CommonStats& stats) {
     invariant(docSource.getType() == BSONType::Object);
     MutableDocument doc(docSource.getDocument());
     auto nReturned = static_cast<long long>(stats.advanced);
-    invariant(stats.executionTimeMillis);
-    auto executionTimeMillisEstimate = static_cast<long long>(*stats.executionTimeMillis);
     doc.addField("nReturned", Value(nReturned));
+
+    invariant(stats.executionTime);
+    auto executionTimeMillisEstimate = durationCount<Milliseconds>(*stats.executionTime);
     doc.addField("executionTimeMillisEstimate", Value(executionTimeMillisEstimate));
     return Value(doc.freeze());
 }

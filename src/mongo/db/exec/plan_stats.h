@@ -104,15 +104,7 @@ struct CommonStats {
     // The field must be populated when running explain or when running with the profiler on. It
     // must also be populated when multi planning, in order to gather stats stored in the plan
     // cache.
-    boost::optional<long long> executionTimeMillis;
-
-    // TODO: have some way of tracking WSM sizes (or really any series of #s).  We can measure
-    // the size of our inputs and the size of our outputs.  We can do a lot with the WS here.
-
-    // TODO: once we've picked a plan, collect different (or additional) stats for display to
-    // the user, eg. time_t totalTimeSpent;
-
-    // TODO: keep track of the total yield time / fetch time done for a plan.
+    boost::optional<Microseconds> executionTime;
 
     bool failed;
     bool isEOF;

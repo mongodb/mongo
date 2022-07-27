@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,34 +27,34 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/exec/sbe/stages/plan_stats.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/tick_source.h"
 
-#include <queue>
+namespace mongo {
 
-#include "mongo/db/exec/plan_stats_walker.h"
-#include "mongo/db/exec/sbe/stages/plan_stats.h"
-#include "mongo/db/query/plan_summary_stats_visitor.h"
-#include "mongo/db/query/tree_walker.h"
+/**
+ * Tick source based on a 'ClockSource'. Note that this precision of this 'TickSource' depends on
+ * the precision of the 'ClockSource' which currently only supports milliseconds.
+ */
+class ClockTickSource final : public TickSource {
+public:
+    explicit ClockTickSource(ClockSource* cs) : _cs(cs) {}
 
-namespace mongo::sbe {
-size_t calculateNumberOfReads(const PlanStageStats* root) {
-    auto visitor = PlanStatsNumReadsVisitor{};
-    auto walker = PlanStageStatsWalker<true, CommonStats>(nullptr, nullptr, &visitor);
-    tree_walker::walk<true, PlanStageStats>(root, &walker);
-    return visitor.numReads;
-}
+    TickSource::Tick getTicks() override;
 
-PlanSummaryStats collectExecutionStatsSummary(const PlanStageStats& root) {
-    PlanSummaryStats summary;
-    summary.nReturned = root.common.advances;
+    TickSource::Tick getTicksPerSecond() override;
 
-    summary.executionTime = root.common.executionTime;
+    ClockSource* getClockSource() {
+        return _cs;
+    }
 
-    auto visitor = PlanSummaryStatsVisitor(summary);
-    auto walker = PlanStageStatsWalker<true, CommonStats>(nullptr, nullptr, &visitor);
-    tree_walker::walk<true, PlanStageStats>(&root, &walker);
-    return summary;
-}
-}  // namespace mongo::sbe
+    void setClockSource(ClockSource* cs) {
+        _cs = cs;
+    }
+
+private:
+    ClockSource* _cs = nullptr;
+};
+}  // namespace mongo

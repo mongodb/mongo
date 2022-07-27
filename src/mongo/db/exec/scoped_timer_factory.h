@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,34 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
-#include "mongo/db/exec/sbe/stages/plan_stats.h"
+#include "mongo/db/exec/scoped_timer.h"
+#include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/service_context.h"
 
-#include <queue>
+namespace mongo {
+namespace scoped_timer_factory {
 
-#include "mongo/db/exec/plan_stats_walker.h"
-#include "mongo/db/exec/sbe/stages/plan_stats.h"
-#include "mongo/db/query/plan_summary_stats_visitor.h"
-#include "mongo/db/query/tree_walker.h"
-
-namespace mongo::sbe {
-size_t calculateNumberOfReads(const PlanStageStats* root) {
-    auto visitor = PlanStatsNumReadsVisitor{};
-    auto walker = PlanStageStatsWalker<true, CommonStats>(nullptr, nullptr, &visitor);
-    tree_walker::walk<true, PlanStageStats>(root, &walker);
-    return visitor.numReads;
-}
-
-PlanSummaryStats collectExecutionStatsSummary(const PlanStageStats& root) {
-    PlanSummaryStats summary;
-    summary.nReturned = root.common.advances;
-
-    summary.executionTime = root.common.executionTime;
-
-    auto visitor = PlanSummaryStatsVisitor(summary);
-    auto walker = PlanStageStatsWalker<true, CommonStats>(nullptr, nullptr, &visitor);
-    tree_walker::walk<true, PlanStageStats>(&root, &walker);
-    return summary;
-}
-}  // namespace mongo::sbe
+/**
+ * A factory helper to make a 'ScopedTimer'. The type of the underlying timer is based on the value
+ * of 'precision'.
+ */
+boost::optional<ScopedTimer> make(ServiceContext* context,
+                                  QueryExecTimerPrecision precision,
+                                  Microseconds* counter);
+}  // namespace scoped_timer_factory
+}  // namespace mongo
