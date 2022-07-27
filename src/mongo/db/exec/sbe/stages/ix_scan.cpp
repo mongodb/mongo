@@ -462,19 +462,19 @@ std::vector<DebugPrinter::Block> IndexScanStage::debugPrint() const {
     }
 
     if (_recordSlot) {
-        DebugPrinter::addIdentifier(ret, _recordSlot.get());
+        DebugPrinter::addIdentifier(ret, _recordSlot.value());
     } else {
         DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
     }
 
     if (_recordIdSlot) {
-        DebugPrinter::addIdentifier(ret, _recordIdSlot.get());
+        DebugPrinter::addIdentifier(ret, _recordIdSlot.value());
     } else {
         DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
     }
 
     if (_snapshotIdSlot) {
-        DebugPrinter::addIdentifier(ret, _snapshotIdSlot.get());
+        DebugPrinter::addIdentifier(ret, _snapshotIdSlot.value());
     } else {
         DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
     }

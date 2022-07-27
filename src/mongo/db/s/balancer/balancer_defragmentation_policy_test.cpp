@@ -254,7 +254,7 @@ TEST_F(BalancerDefragmentationPolicyTest,
     setDefaultClusterStats();
     _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    ASSERT_TRUE(nextAction.is_initialized());
+    ASSERT_TRUE(nextAction.has_value());
     DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
 
     auto resp = StatusWith(DataSizeResponse(2000, 4));
@@ -354,7 +354,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneUserCancellationBeginsPhas
     // Defragmentation should transition to phase 3
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kSplitChunks);
-    ASSERT_TRUE(nextAction.is_initialized());
+    ASSERT_TRUE(nextAction.has_value());
     auto splitVectorAction = stdx::get<AutoSplitVectorInfo>(*nextAction);
 }
 
@@ -373,7 +373,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestNonRetriableErrorRebuildsCurrentPh
     ASSERT_TRUE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
     verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kMergeAndMeasureChunks);
     // 2. The action returned by the stream should be now an actionable DataSizeCommand...
-    ASSERT_TRUE(nextAction.is_initialized());
+    ASSERT_TRUE(nextAction.has_value());
     DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
     // 3. with the expected content
     ASSERT_EQ(coll.getNss(), dataSizeAction.nss);
@@ -409,8 +409,8 @@ TEST_F(BalancerDefragmentationPolicyTest,
     // Phase 1 should restart.
     nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     nextAction2 = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    ASSERT_TRUE(nextAction.is_initialized());
-    ASSERT_TRUE(nextAction2.is_initialized());
+    ASSERT_TRUE(nextAction.has_value());
+    ASSERT_TRUE(nextAction2.has_value());
     DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
     DataSizeInfo dataSizeAction2 = stdx::get<DataSizeInfo>(*nextAction2);
 }
@@ -470,7 +470,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneAcknowledgeSuccessfulMerge
     ASSERT_TRUE(nextAction == boost::none);
     _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
     nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    ASSERT_TRUE(nextAction.is_initialized());
+    ASSERT_TRUE(nextAction.has_value());
     MergeInfo mergeInfoAction = stdx::get<MergeInfo>(*nextAction);
     ASSERT_BSONOBJ_EQ(mergeInfoAction.chunkRange.getMin(), kKeyAtMin);
     ASSERT_BSONOBJ_EQ(mergeInfoAction.chunkRange.getMax(), kKeyAtMax);
@@ -478,7 +478,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneAcknowledgeSuccessfulMerge
     ASSERT_TRUE(nextAction == boost::none);
     _defragmentationPolicy.applyActionResult(operationContext(), mergeInfoAction, Status::OK());
     nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    ASSERT_TRUE(nextAction.is_initialized());
+    ASSERT_TRUE(nextAction.has_value());
     DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
     ASSERT_EQ(mergeInfoAction.nss, dataSizeAction.nss);
     ASSERT_BSONOBJ_EQ(mergeInfoAction.chunkRange.getMin(), dataSizeAction.chunkRange.getMin());
@@ -514,9 +514,9 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneAllConsecutive) {
     _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
     // Test
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    ASSERT_TRUE(nextAction.is_initialized());
+    ASSERT_TRUE(nextAction.has_value());
     auto nextAction2 = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    ASSERT_TRUE(nextAction2.is_initialized());
+    ASSERT_TRUE(nextAction2.has_value());
     // Verify the content of the received merge actions
     // (Note: there is no guarantee on the order provided by the stream)
     MergeInfo mergeAction = stdx::get<MergeInfo>(*nextAction);
@@ -533,7 +533,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneAllConsecutive) {
         ASSERT_BSONOBJ_EQ(mergeAction.chunkRange.getMax(), kKeyAtMax);
     }
     auto nextAction3 = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    ASSERT_FALSE(nextAction3.is_initialized());
+    ASSERT_FALSE(nextAction3.has_value());
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, PhaseOneNotConsecutive) {
@@ -554,11 +554,11 @@ TEST_F(BalancerDefragmentationPolicyTest, PhaseOneNotConsecutive) {
     _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
     // Three actions (in an unspecified order) should be immediately available.
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    ASSERT_TRUE(nextAction.is_initialized());
+    ASSERT_TRUE(nextAction.has_value());
     auto nextAction2 = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    ASSERT_TRUE(nextAction2.is_initialized());
+    ASSERT_TRUE(nextAction2.has_value());
     auto nextAction3 = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    ASSERT_TRUE(nextAction3.is_initialized());
+    ASSERT_TRUE(nextAction3.has_value());
     // Verify their content of the received merge actions
     uint8_t timesLowerRangeMergeFound = 0;
     uint8_t timesUpperRangeMergeFound = 0;
@@ -595,7 +595,7 @@ TEST_F(BalancerDefragmentationPolicyTest, PhaseOneNotConsecutive) {
     ASSERT_EQ(1, timesMiddleRangeDataSizeFound);
 
     auto nextAction4 = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    ASSERT_FALSE(nextAction4.is_initialized());
+    ASSERT_FALSE(nextAction4.has_value());
 }
 
 // Phase 2 tests.
@@ -615,7 +615,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseTwoMissingDataSizeRestartsPha
         _defragmentationPolicy.selectChunksToMove(operationContext(), &usedShards);
     ASSERT_EQ(0, pendingMigrations.size());
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    ASSERT_TRUE(nextAction.is_initialized());
+    ASSERT_TRUE(nextAction.has_value());
     auto dataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
 }
 
@@ -660,7 +660,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseTwoChunkCanBeMovedAndMergedWi
 
     _defragmentationPolicy.applyActionResult(operationContext(), moveAction, Status::OK());
     nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    ASSERT_TRUE(nextAction.is_initialized());
+    ASSERT_TRUE(nextAction.has_value());
     usedShards.clear();
     pendingMigrations = _defragmentationPolicy.selectChunksToMove(operationContext(), &usedShards);
     ASSERT_TRUE(pendingMigrations.empty());
@@ -777,7 +777,7 @@ TEST_F(BalancerDefragmentationPolicyTest, SingleLargeChunkCausesAutoSplitAndSpli
 
     // The new action returned by the stream should be an actionable AutoSplitVector command...
     nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
-    ASSERT_TRUE(nextAction.is_initialized());
+    ASSERT_TRUE(nextAction.has_value());
     AutoSplitVectorInfo splitVectorAction = stdx::get<AutoSplitVectorInfo>(*nextAction);
     // with the expected content
     ASSERT_EQ(coll.getNss(), splitVectorAction.nss);
@@ -797,7 +797,7 @@ TEST_F(BalancerDefragmentationPolicyTest, CollectionMaxChunkSizeIsUsedForPhase3)
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
 
     // The action returned by the stream should be now an actionable AutoSplitVector command...
-    ASSERT_TRUE(nextAction.is_initialized());
+    ASSERT_TRUE(nextAction.has_value());
     AutoSplitVectorInfo splitVectorAction = stdx::get<AutoSplitVectorInfo>(*nextAction);
     // with the expected content
     ASSERT_EQ(coll.getNss(), splitVectorAction.nss);

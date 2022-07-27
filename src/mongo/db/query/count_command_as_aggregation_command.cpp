@@ -65,13 +65,13 @@ StatusWith<BSONObj> countCommandAsAggregationCommand(const CountCommandRequest& 
 
     if (auto skip = cmd.getSkip()) {
         BSONObjBuilder skipBuilder(pipelineBuilder.subobjStart());
-        skipBuilder.append("$skip", skip.get());
+        skipBuilder.append("$skip", skip.value());
         skipBuilder.doneFast();
     }
 
     if (auto limit = cmd.getLimit()) {
         BSONObjBuilder limitBuilder(pipelineBuilder.subobjStart());
-        limitBuilder.append("$limit", limit.get());
+        limitBuilder.append("$limit", limit.value());
         limitBuilder.doneFast();
     }
 
@@ -82,27 +82,27 @@ StatusWith<BSONObj> countCommandAsAggregationCommand(const CountCommandRequest& 
 
     // Complete the command by appending the other options to the aggregate command.
     if (auto collation = cmd.getCollation()) {
-        aggregationBuilder.append(kCollationField, collation.get());
+        aggregationBuilder.append(kCollationField, collation.value());
     }
 
     aggregationBuilder.append(kHintField, cmd.getHint());
 
     if (auto maxTime = cmd.getMaxTimeMS()) {
-        if (maxTime.get() > 0) {
-            aggregationBuilder.append(kMaxTimeMSField, maxTime.get());
+        if (maxTime.value() > 0) {
+            aggregationBuilder.append(kMaxTimeMSField, maxTime.value());
         }
     }
 
     if (auto readConcern = cmd.getReadConcern()) {
         if (!readConcern->isEmpty()) {
-            aggregationBuilder.append(kReadConcernField, readConcern.get());
+            aggregationBuilder.append(kReadConcernField, readConcern.value());
         }
     }
 
     if (auto unwrapped = cmd.getQueryOptions()) {
         if (!unwrapped->isEmpty()) {
             aggregationBuilder.append(query_request_helper::kUnwrappedReadPrefField,
-                                      unwrapped.get());
+                                      unwrapped.value());
         }
     }
 

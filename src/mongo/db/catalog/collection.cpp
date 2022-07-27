@@ -107,7 +107,7 @@ void CollectionPtr::restore() const {
 
 const BSONObj& CollectionPtr::getShardKeyPattern() const {
     dassert(_shardKeyPattern);
-    return _shardKeyPattern.get();
+    return _shardKeyPattern.value();
 }
 
 // ----

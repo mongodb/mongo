@@ -139,7 +139,7 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
 
                 if (collIsSharded) {
                     invariant(_doc.getCollInfo());
-                    const auto& coll = _doc.getCollInfo().get();
+                    const auto& coll = _doc.getCollInfo().value();
                     sharding_ddl_util::removeCollAndChunksMetadataFromConfig(
                         opCtx, coll, ShardingCatalogClient::kMajorityWriteConcern);
                 }

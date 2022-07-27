@@ -65,7 +65,7 @@ BSONObj OplogEntryOrGroupedInserts::toBSON() const {
             long long term = OpTime::kUninitializedTerm;
             auto parsedTerm = op->getTerm();
             if (parsedTerm)
-                term = parsedTerm.get();
+                term = parsedTerm.value();
             tArrayBuilder.append(term);
         }
     }

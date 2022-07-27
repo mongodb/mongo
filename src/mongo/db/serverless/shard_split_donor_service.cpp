@@ -91,7 +91,7 @@ void insertTenantAccessBlocker(WithLock lk,
     auto recipientConnectionString = donorStateDoc.getRecipientConnectionString();
     invariant(recipientConnectionString);
 
-    for (const auto& tenantId : optionalTenants.get()) {
+    for (const auto& tenantId : optionalTenants.value()) {
         auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
             opCtx->getServiceContext(),
             donorStateDoc.getId(),
@@ -984,7 +984,7 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
 
                                    invariant(_abortReason);
                                    BSONObjBuilder bob;
-                                   _abortReason.get().serializeErrorToBSON(&bob);
+                                   _abortReason.value().serializeErrorToBSON(&bob);
                                    _stateDoc.setAbortReason(bob.obj());
                                    break;
                                }
@@ -1138,7 +1138,7 @@ ShardSplitDonorService::DonorStateMachine::_handleErrorOrEnterAbortedState(
         LOGV2(6086508,
               "Entering 'aborted' state.",
               "id"_attr = _migrationId,
-              "abortReason"_attr = _abortReason.get());
+              "abortReason"_attr = _abortReason.value());
     }
 
     return ExecutorFuture<void>(**executor)

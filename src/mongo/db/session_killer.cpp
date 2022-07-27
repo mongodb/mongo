@@ -89,9 +89,9 @@ SessionKiller::Matcher::Matcher(KillAllSessionsByPatternSet&& patterns)
     for (const auto& item : _patterns) {
         auto& pattern = item.pattern;
         if (pattern.getUid()) {
-            _uids.emplace(pattern.getUid().get(), &pattern);
+            _uids.emplace(pattern.getUid().value(), &pattern);
         } else if (pattern.getLsid()) {
-            _lsids.emplace(pattern.getLsid().get(), &pattern);
+            _lsids.emplace(pattern.getLsid().value(), &pattern);
         } else {
             // If we're killing everything, it's the only pattern we care about.
             decltype(_patterns) onlyKillAll{{item}};

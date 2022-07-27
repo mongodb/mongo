@@ -313,7 +313,7 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
         // to 10 seconds to observe an asynchronous update that iterates once per second.
         for (auto iterations = 0; iterations < 100; ++iterations) {
             if (_engine->getPinnedOplog() >= newPinned) {
-                ASSERT_TRUE(_engine->getOplogNeededForCrashRecovery().get() >= newPinned);
+                ASSERT_TRUE(_engine->getOplogNeededForCrashRecovery().value() >= newPinned);
                 return;
             }
 
@@ -350,7 +350,7 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
     _engine->setStableTimestamp(Timestamp(40, 1), false);
     // Await a new checkpoint. Oplog needed for rollback does not advance.
     sleepmillis(1100);
-    ASSERT_EQ(_engine->getOplogNeededForCrashRecovery().get(), Timestamp(30, 1));
+    ASSERT_EQ(_engine->getOplogNeededForCrashRecovery().value(), Timestamp(30, 1));
     _engine->setStableTimestamp(Timestamp(30, 1), false);
     callbackShouldFail.store(false);
     assertPinnedMovesSoon(Timestamp(40, 1));

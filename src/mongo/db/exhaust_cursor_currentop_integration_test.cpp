@@ -179,7 +179,7 @@ auto startExhaustQuery(
             if (findCmd.getTailable() && findCmd.getAwaitData()) {
                 queryCursor->setAwaitDataTimeoutMS(awaitDataTimeoutMS);
                 if (lastKnownCommittedOpTime) {
-                    auto term = lastKnownCommittedOpTime.get().getTerm();
+                    auto term = lastKnownCommittedOpTime.value().getTerm();
                     queryCursor->setCurrentTermAndLastCommittedOpTime(term,
                                                                       lastKnownCommittedOpTime);
                 }

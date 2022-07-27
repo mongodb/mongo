@@ -184,7 +184,7 @@ bool WorkingSetMember::getFieldDotted(const string& field, BSONElement* out) con
 
     // Our state should be such that we have index data/are covered.
     if (auto outOpt = IndexKeyDatum::getFieldDotted(keyData, field)) {
-        *out = outOpt.get();
+        *out = outOpt.value();
         return true;
     } else {
         return false;

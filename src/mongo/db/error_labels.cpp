@@ -55,7 +55,8 @@ bool ErrorLabelBuilder::isTransientTransactionError() const {
     // we have already tried to abort it. An error code for which isTransientTransactionError()
     // is true indicates a transaction failure with no persistent side effects.
     return _code && _sessionOptions.getTxnNumber() && _sessionOptions.getAutocommit() &&
-        mongo::isTransientTransactionError(_code.get(), _wcCode != boost::none, _isCommitOrAbort());
+        mongo::isTransientTransactionError(
+               _code.value(), _wcCode != boost::none, _isCommitOrAbort());
 }
 
 bool ErrorLabelBuilder::isRetryableWriteError() const {
@@ -77,8 +78,8 @@ bool ErrorLabelBuilder::isRetryableWriteError() const {
     // transactions commit/abort.
     if (isRetryableWrite() || isTransactionCommitOrAbort()) {
         bool isShutDownCode = _code &&
-            (ErrorCodes::isShutdownError(_code.get()) ||
-             _code.get() == ErrorCodes::CallbackCanceled);
+            (ErrorCodes::isShutdownError(_code.value()) ||
+             _code.value() == ErrorCodes::CallbackCanceled);
         if (isShutDownCode &&
             (globalInShutdownDeprecated() ||
              MONGO_unlikely(errorLabelBuilderMockShutdown.shouldFail()))) {
@@ -88,14 +89,14 @@ bool ErrorLabelBuilder::isRetryableWriteError() const {
         // mongos should not attach RetryableWriteError label to retryable errors thrown by the
         // config server or targeted shards.
         return !_isMongos &&
-            ((_code && ErrorCodes::isRetriableError(_code.get())) ||
-             (_wcCode && ErrorCodes::isRetriableError(_wcCode.get())));
+            ((_code && ErrorCodes::isRetriableError(_code.value())) ||
+             (_wcCode && ErrorCodes::isRetriableError(_wcCode.value())));
     }
     return false;
 }
 
 bool ErrorLabelBuilder::isNonResumableChangeStreamError() const {
-    return _code && ErrorCodes::isNonResumableChangeStreamError(_code.get());
+    return _code && ErrorCodes::isNonResumableChangeStreamError(_code.value());
 }
 
 bool ErrorLabelBuilder::isResumableChangeStreamError() const {
@@ -198,10 +199,10 @@ BSONObj getErrorLabels(OperationContext* opCtx,
         // This command was failed by a failCommand failpoint. Thus, we return the errorLabels
         // specified in the failpoint to supress any other error labels that would otherwise be
         // returned by the ErrorLabelBuilder.
-        if (errorLabelsOverride(opCtx).get().isEmpty()) {
+        if (errorLabelsOverride(opCtx).value().isEmpty()) {
             return BSONObj();
         } else {
-            return BSON(kErrorLabelsFieldName << errorLabelsOverride(opCtx).get());
+            return BSON(kErrorLabelsFieldName << errorLabelsOverride(opCtx).value());
         }
     }
 

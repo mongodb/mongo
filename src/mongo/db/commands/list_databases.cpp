@@ -102,8 +102,8 @@ public:
                 if (authDB) {
                     uassert(ErrorCodes::Unauthorized,
                             "Insufficient permissions to list all databases",
-                            authDB.get() || mayListAllDatabases);
-                    return authDB.get();
+                            authDB.value() || mayListAllDatabases);
+                    return authDB.value();
                 }
 
                 // By default, list all databases if we can, otherwise
@@ -119,7 +119,7 @@ public:
                 auto expCtx = make_intrusive<ExpressionContext>(
                     opCtx, std::unique_ptr<CollatorInterface>(nullptr), ns());
                 auto matcher = uassertStatusOK(
-                    MatchExpressionParser::parse(filterObj.get(), std::move(expCtx)));
+                    MatchExpressionParser::parse(filterObj.value(), std::move(expCtx)));
                 filter = std::move(matcher);
             }
 

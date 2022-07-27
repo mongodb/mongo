@@ -49,12 +49,12 @@ mongo::StatusWith<mongo::RestrictionSet<>> mongo::parseAddressRestrictionSet(
 
     const boost::optional<std::vector<StringData>>& client = ar.getClientSource();
     if (client) {
-        vec.push_back(std::make_unique<ClientSourceRestriction>(client.get()));
+        vec.push_back(std::make_unique<ClientSourceRestriction>(client.value()));
     }
 
     const boost::optional<std::vector<StringData>>& server = ar.getServerAddress();
     if (server) {
-        vec.push_back(std::make_unique<ServerAddressRestriction>(server.get()));
+        vec.push_back(std::make_unique<ServerAddressRestriction>(server.value()));
     }
 
     if (vec.empty()) {
@@ -109,11 +109,11 @@ mongo::StatusWith<mongo::BSONArray> mongo::getRawAuthenticationRestrictions(
         auto const ar = Address_restriction::parse(ctx, elem.Obj());
         if (auto const&& client = ar.getClientSource()) {
             // Validate
-            ClientSourceRestriction(client.get());
+            ClientSourceRestriction(client.value());
         }
         if (auto const&& server = ar.getServerAddress()) {
             // Validate
-            ServerAddressRestriction(server.get());
+            ServerAddressRestriction(server.value());
         }
         if (!ar.getClientSource() && !ar.getServerAddress()) {
             return Status(ErrorCodes::CollectionIsEmpty,

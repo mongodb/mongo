@@ -129,7 +129,7 @@ BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
     // Compute the set of collection names which would be permissible to return.
     std::set<std::string> collectionNames;
     if (auto authUser = authzSession->getAuthenticatedUser()) {
-        for (const auto& [resource, privilege] : authUser.get()->getPrivileges()) {
+        for (const auto& [resource, privilege] : authUser.value()->getPrivileges()) {
             if (resource.isCollectionPattern() ||
                 (resource.isExactNamespacePattern() &&
                  resource.databaseToMatch() == dbName.toStringWithTenantId())) {

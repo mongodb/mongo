@@ -87,7 +87,7 @@ const ShardId& ChunkInfo::getShardIdAt(const boost::optional<Timestamp>& ts) con
 
     uasserted(ErrorCodes::StaleChunkHistory,
               str::stream() << "Cannot find shardId the chunk belonged to at cluster time "
-                            << ts.get().toString());
+                            << ts.value().toString());
 }
 
 void ChunkInfo::throwIfMovedSince(const Timestamp& ts) const {

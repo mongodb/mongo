@@ -171,7 +171,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpCtx(OperationContext* opCtx,
     std::unique_ptr<CollatorInterface> collator;
     if (op.getCollation()) {
         auto statusWithCollator = CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                      ->makeFromBSON(op.getCollation().get());
+                                      ->makeFromBSON(op.getCollation().value());
 
         uassertStatusOK(statusWithCollator.getStatus());
         collator = std::move(statusWithCollator.getValue());
@@ -193,7 +193,7 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
     GetTxnCallback getTxns) {
 
     auto edcNss = insertRequest.getNamespace();
-    auto ei = insertRequest.getEncryptionInformation().get();
+    auto ei = insertRequest.getEncryptionInformation().value();
 
     bool bypassDocumentValidation =
         insertRequest.getWriteCommandRequestBase().getBypassDocumentValidation();
@@ -458,7 +458,7 @@ void processFieldsForInsert(FLEQueryInterface* queryImpl,
                             int32_t* pStmtId,
                             bool bypassDocumentValidation) {
 
-    NamespaceString nssEsc(edcNss.db(), efc.getEscCollection().get());
+    NamespaceString nssEsc(edcNss.db(), efc.getEscCollection().value());
 
     auto docCount = queryImpl->countDocuments(nssEsc);
 
@@ -516,7 +516,7 @@ void processFieldsForInsert(FLEQueryInterface* queryImpl,
         checkWriteErrors(escInsertReply);
 
 
-        NamespaceString nssEcoc(edcNss.db(), efc.getEcocCollection().get());
+        NamespaceString nssEcoc(edcNss.db(), efc.getEcocCollection().value());
 
         // TODO - should we make this a batch of ECOC updates?
         auto ecocInsertReply = uassertStatusOK(queryImpl->insertDocument(
@@ -537,7 +537,7 @@ void processRemovedFields(FLEQueryInterface* queryImpl,
                           const std::vector<EDCIndexedFields>& deletedFields,
                           int32_t* pStmtId) {
 
-    NamespaceString nssEcc(edcNss.db(), efc.getEccCollection().get());
+    NamespaceString nssEcc(edcNss.db(), efc.getEccCollection().value());
 
 
     auto docCount = queryImpl->countDocuments(nssEcc);
@@ -609,7 +609,7 @@ void processRemovedFields(FLEQueryInterface* queryImpl,
             true));
         checkWriteErrors(eccInsertReply);
 
-        NamespaceString nssEcoc(edcNss.db(), efc.getEcocCollection().get());
+        NamespaceString nssEcoc(edcNss.db(), efc.getEcocCollection().value());
 
         // TODO - make this a batch of ECOC updates?
         EncryptedStateCollectionTokens tokens(plainTextField.esc, plainTextField.ecc);
@@ -751,7 +751,7 @@ write_ops::DeleteCommandReply processDelete(FLEQueryInterface* queryImpl,
                                             const write_ops::DeleteCommandRequest& deleteRequest) {
 
     auto edcNss = deleteRequest.getNamespace();
-    auto ei = deleteRequest.getEncryptionInformation().get();
+    auto ei = deleteRequest.getEncryptionInformation().value();
 
     auto efc = EncryptionInformationHelpers::getAndValidateSchema(edcNss, ei);
     auto tokenMap = EncryptionInformationHelpers::getDeleteTokens(edcNss, ei);
@@ -804,7 +804,7 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
                                             const write_ops::UpdateCommandRequest& updateRequest) {
 
     auto edcNss = updateRequest.getNamespace();
-    auto ei = updateRequest.getEncryptionInformation().get();
+    auto ei = updateRequest.getEncryptionInformation().value();
 
     auto efc = EncryptionInformationHelpers::getAndValidateSchema(edcNss, ei);
     auto tokenMap = EncryptionInformationHelpers::getDeleteTokens(edcNss, ei);
@@ -1002,7 +1002,7 @@ std::unique_ptr<BatchedCommandRequest> processFLEBatchExplain(
         newDeleteOp.setQ(fle::rewriteQuery(opCtx,
                                            getExpCtx(newDeleteOp),
                                            request.getNS(),
-                                           deleteRequest.getEncryptionInformation().get(),
+                                           deleteRequest.getEncryptionInformation().value(),
                                            newDeleteOp.getQ(),
                                            &getTransactionWithRetriesForMongoS,
                                            fle::HighCardinalityModeAllowed::kAllow));
@@ -1019,7 +1019,7 @@ std::unique_ptr<BatchedCommandRequest> processFLEBatchExplain(
         newUpdateOp.setQ(fle::rewriteQuery(opCtx,
                                            getExpCtx(newUpdateOp),
                                            request.getNS(),
-                                           updateRequest.getEncryptionInformation().get(),
+                                           updateRequest.getEncryptionInformation().value(),
                                            newUpdateOp.getQ(),
                                            &getTransactionWithRetriesForMongoS,
                                            highCardinalityModeAllowed));
@@ -1037,7 +1037,7 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
     const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) {
 
     auto edcNss = findAndModifyRequest.getNamespace();
-    auto ei = findAndModifyRequest.getEncryptionInformation().get();
+    auto ei = findAndModifyRequest.getEncryptionInformation().value();
 
     auto efc = EncryptionInformationHelpers::getAndValidateSchema(edcNss, ei);
     auto tokenMap = EncryptionInformationHelpers::getDeleteTokens(edcNss, ei);
@@ -1182,7 +1182,7 @@ write_ops::FindAndModifyCommandRequest processFindAndModifyExplain(
     const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) {
 
     auto edcNss = findAndModifyRequest.getNamespace();
-    auto ei = findAndModifyRequest.getEncryptionInformation().get();
+    auto ei = findAndModifyRequest.getEncryptionInformation().value();
 
     auto efc = EncryptionInformationHelpers::getAndValidateSchema(edcNss, ei);
 

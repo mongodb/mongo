@@ -512,7 +512,7 @@ std::vector<std::unique_ptr<Pipeline, PipelineDeleter>> createExchangePipelinesI
 
     if (request.getExchange() && !expCtx->explain) {
         boost::intrusive_ptr<Exchange> exchange =
-            new Exchange(request.getExchange().get(), std::move(pipeline));
+            new Exchange(request.getExchange().value(), std::move(pipeline));
 
         for (size_t idx = 0; idx < exchange->getConsumers(); ++idx) {
             // For every new pipeline we have create a new ExpressionContext as the context
@@ -956,7 +956,7 @@ Status runAggregate(OperationContext* opCtx,
         if (shouldDoFLERewrite(request)) {
             // After this rewriting, the encryption info does not need to be kept around.
             pipeline = processFLEPipelineD(
-                opCtx, nss, request.getEncryptionInformation().get(), std::move(pipeline));
+                opCtx, nss, request.getEncryptionInformation().value(), std::move(pipeline));
             request.setEncryptionInformation(boost::none);
         }
 

@@ -384,7 +384,7 @@ void BatchedCommandResponse::unsetErrDetails() {
 }
 
 bool BatchedCommandResponse::isErrDetailsSet() const {
-    return _writeErrors.is_initialized();
+    return _writeErrors.has_value();
 }
 
 size_t BatchedCommandResponse::sizeErrDetails() const {

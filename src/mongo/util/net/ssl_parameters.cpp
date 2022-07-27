@@ -128,7 +128,7 @@ void TLSCATrustsSetParameter::append(OperationContext*,
 
     BSONArrayBuilder trusts;
 
-    for (const auto& cait : sslGlobalParams.tlsCATrusts.get()) {
+    for (const auto& cait : sslGlobalParams.tlsCATrusts.value()) {
         BSONArrayBuilder roles;
 
         for (const auto& rolename : cait.second) {

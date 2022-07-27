@@ -50,7 +50,7 @@ public:
 
     BSONObj rewriteMatchExpressionForTest(const BSONObj& obj) {
         auto res = rewriteMatchExpression(obj);
-        return res ? res.get() : obj;
+        return res ? res.value() : obj;
     }
 };
 

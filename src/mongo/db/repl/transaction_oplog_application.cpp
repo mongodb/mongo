@@ -173,7 +173,7 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
 repl::OplogEntry getPreviousOplogEntry(OperationContext* opCtx, const repl::OplogEntry& entry) {
     const auto prevOpTime = entry.getPrevWriteOpTimeInTransaction();
     invariant(prevOpTime);
-    TransactionHistoryIterator iter(prevOpTime.get());
+    TransactionHistoryIterator iter(prevOpTime.value());
     invariant(iter.hasNext());
     const auto prevOplogEntry = iter.next(opCtx);
 
@@ -299,7 +299,7 @@ std::pair<std::vector<OplogEntry>, bool> _readTransactionOperationsFromOplogChai
     const auto lastEntryWrittenToOplogOpTime = oldestEntryInBatch.getPrevWriteOpTimeInTransaction();
     invariant(lastEntryWrittenToOplogOpTime < lastEntryInTxn.getOpTime());
 
-    TransactionHistoryIterator iter(lastEntryWrittenToOplogOpTime.get());
+    TransactionHistoryIterator iter(lastEntryWrittenToOplogOpTime.value());
 
     // If we started with a prepared commit, we want to forget about that operation and move onto
     // the prepare.

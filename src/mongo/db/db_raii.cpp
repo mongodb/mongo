@@ -853,7 +853,7 @@ AutoGetCollectionForReadCommandLockFree::AutoGetCollectionForReadCommandLockFree
 
     while (_autoCollForReadCommandBase->getCollection() &&
            _autoCollForReadCommandBase->getCollection().isSharded() && receivedShardVersion &&
-           receivedShardVersion.get() == ChunkVersion::UNSHARDED()) {
+           receivedShardVersion.value() == ChunkVersion::UNSHARDED()) {
         reachedAutoGetLockFreeShardConsistencyRetry.executeIf(
             [&](auto&) { reachedAutoGetLockFreeShardConsistencyRetry.pauseWhileSet(opCtx); },
             [&](const BSONObj& data) {

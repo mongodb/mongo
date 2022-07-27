@@ -122,23 +122,23 @@ StatusWith<ChangeLogType> ChangeLogType::fromBSON(const BSONObj& source) {
 }
 
 Status ChangeLogType::validate() const {
-    if (!_changeId.is_initialized() || _changeId->empty())
+    if (!_changeId.has_value() || _changeId->empty())
         return {ErrorCodes::NoSuchKey, str::stream() << "missing " << changeId.name() << " field"};
 
-    if (!_server.is_initialized() || _server->empty())
+    if (!_server.has_value() || _server->empty())
         return {ErrorCodes::NoSuchKey, str::stream() << "missing " << server.name() << " field"};
 
-    if (!_clientAddr.is_initialized() || _clientAddr->empty())
+    if (!_clientAddr.has_value() || _clientAddr->empty())
         return {ErrorCodes::NoSuchKey,
                 str::stream() << "missing " << clientAddr.name() << " field"};
 
-    if (!_time.is_initialized())
+    if (!_time.has_value())
         return {ErrorCodes::NoSuchKey, str::stream() << "missing " << time.name() << " field"};
 
-    if (!_what.is_initialized() || _what->empty())
+    if (!_what.has_value() || _what->empty())
         return {ErrorCodes::NoSuchKey, str::stream() << "missing " << what.name() << " field"};
 
-    if (!_details.is_initialized() || _details->isEmpty())
+    if (!_details.has_value() || _details->isEmpty())
         return {ErrorCodes::NoSuchKey, str::stream() << "missing " << details.name() << " field"};
 
     return Status::OK();

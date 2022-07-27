@@ -130,7 +130,7 @@ TEST(TracingSupportTest, BasicUsage) {
                                                       << startTime + 4 * kSpanDuration))
                             << "stopped" << startTime + 4 * kSpanDuration))
                 << "stopped" << startTime + 4 * kSpanDuration));
-    ASSERT_BSONOBJ_EQ(expected, trace.get());
+    ASSERT_BSONOBJ_EQ(expected, trace.value());
 }
 
 }  // namespace mongo

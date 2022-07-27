@@ -105,7 +105,7 @@ public:
 
             HostAndPort target;
             if (auto optTarget = cmd.getTarget()) {
-                target = validateTarget(opCtx, optTarget.get());
+                target = validateTarget(opCtx, optTarget.value());
             } else {
                 target = selectTarget(opCtx);
             }

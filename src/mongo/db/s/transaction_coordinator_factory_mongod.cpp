@@ -41,7 +41,7 @@ namespace {
 void createTransactionCoordinatorImpl(OperationContext* opCtx,
                                       TxnNumber clientTxnNumber,
                                       boost::optional<TxnRetryCounter> clientTxnRetryCounter) {
-    auto clientLsid = opCtx->getLogicalSessionId().get();
+    auto clientLsid = opCtx->getLogicalSessionId().value();
     auto clockSource = opCtx->getServiceContext()->getFastClockSource();
 
     // If this shard has been selected as the coordinator, set up the coordinator state

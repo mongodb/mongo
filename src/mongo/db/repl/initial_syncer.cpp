@@ -993,7 +993,7 @@ void InitialSyncer::_getBeginFetchingOpTimeCallback(
             IDLParserContext("oldest active transaction optime for initial sync"), docs.front());
         auto optime = entry.getStartOpTime();
         if (optime) {
-            beginFetchingOpTime = optime.get();
+            beginFetchingOpTime = optime.value();
         }
     }
 

@@ -585,7 +585,7 @@ CollectionOptions clusterByDefaultIfNecessary(const NamespaceString& nss,
                                               CollectionOptions collectionOptions,
                                               const boost::optional<BSONObj>& idIndex) {
     if (MONGO_unlikely(clusterAllCollectionsByDefault.shouldFail()) &&
-        !collectionOptions.isView() && !collectionOptions.clusteredIndex.is_initialized() &&
+        !collectionOptions.isView() && !collectionOptions.clusteredIndex.has_value() &&
         (!idIndex || idIndex->isEmpty()) && !collectionOptions.capped &&
         !clustered_util::requiresLegacyFormat(nss) &&
         feature_flags::gClusteredIndexes.isEnabled(serverGlobalParams.featureCompatibility)) {
@@ -698,7 +698,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
     // create a database, which could result in createCollection failing if the database
     // does not yet exist.
     if (ui) {
-        auto uuid = ui.get();
+        auto uuid = ui.value();
         uassert(ErrorCodes::InvalidUUID,
                 "Invalid UUID in applyOps create command: " + uuid.toString(),
                 uuid.isRFC4122v4());

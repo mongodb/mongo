@@ -60,7 +60,7 @@ RangeStatement RangeStatement::parse(RangeSpec spec) {
                     "The step parameter in a range statement must be a whole number when "
                     "densifying a date range",
                     step.integral64Bit());
-            return optional<TimeUnit>(parseTimeUnit(unit.get()));
+            return optional<TimeUnit>(parseTimeUnit(unit.value()));
         } else {
             return optional<TimeUnit>(boost::none);
         }
@@ -292,7 +292,7 @@ Document DocumentSourceInternalDensify::DocGenerator::getNextDocument() {
         _state = GeneratorState::kDone;
         // If _finalDoc is boost::none we can't be in this state.
         tassert(5832800, "DocGenerator expected _finalDoc, found boost::none", _finalDoc);
-        return _finalDoc.get();
+        return _finalDoc.value();
     }
     // Assume all types have been checked at this point and we are in a valid state.
     DensifyValue valueToAdd = _min;

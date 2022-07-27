@@ -131,7 +131,7 @@ void AWSKMSService::initRequest(kms_request_t* request, StringData host, StringD
     if (!_config.sessionToken.value_or("").empty()) {
         // TODO: move this into kms-message
         uassertKmsRequest(kms_request_add_header_field(
-            request, "X-Amz-Security-Token", _config.sessionToken.get().c_str()));
+            request, "X-Amz-Security-Token", _config.sessionToken.value().c_str()));
     }
 }
 
@@ -264,7 +264,7 @@ SecureVector<uint8_t> AWSKMSService::decrypt(ConstDataRange cdr, BSONObj masterK
 
 boost::optional<std::string> toString(boost::optional<StringData> str) {
     if (str) {
-        return {str.get().toString()};
+        return {str.value().toString()};
     }
     return boost::none;
 }
@@ -279,7 +279,7 @@ std::unique_ptr<KMSService> AWSKMSService::create(const AwsKMS& config) {
     // the CA file.
     if (!config.getUrl().value_or("").empty()) {
         params.sslCAFile = sslGlobalParams.sslCAFile;
-        awsKMS->_server = parseUrl(config.getUrl().get());
+        awsKMS->_server = parseUrl(config.getUrl().value());
     }
 
     awsKMS->_sslManager = SSLManagerInterface::create(params, false);

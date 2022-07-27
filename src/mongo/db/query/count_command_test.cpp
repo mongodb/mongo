@@ -84,13 +84,13 @@ TEST(CountCommandTest, ParserParsesCommandWithAllFieldsCorrectly) {
     const auto countCmd = CountCommandRequest::parse(ctxt, commandObj);
 
     ASSERT_BSONOBJ_EQ(countCmd.getQuery(), fromjson("{ a : { '$gte' : 11 } }"));
-    ASSERT_EQ(countCmd.getLimit().get(), 100);
-    ASSERT_EQ(countCmd.getSkip().get(), 1000);
-    ASSERT_EQ(countCmd.getMaxTimeMS().get(), 10000u);
+    ASSERT_EQ(countCmd.getLimit().value(), 100);
+    ASSERT_EQ(countCmd.getSkip().value(), 1000);
+    ASSERT_EQ(countCmd.getMaxTimeMS().value(), 10000u);
     ASSERT_BSONOBJ_EQ(countCmd.getHint(), fromjson("{ b : 5 }"));
-    ASSERT_BSONOBJ_EQ(countCmd.getCollation().get(), fromjson("{ locale : 'en_US' }"));
-    ASSERT_BSONOBJ_EQ(countCmd.getReadConcern().get(), fromjson("{ level: 'linearizable' }"));
-    ASSERT_BSONOBJ_EQ(countCmd.getQueryOptions().get(),
+    ASSERT_BSONOBJ_EQ(countCmd.getCollation().value(), fromjson("{ locale : 'en_US' }"));
+    ASSERT_BSONOBJ_EQ(countCmd.getReadConcern().value(), fromjson("{ level: 'linearizable' }"));
+    ASSERT_BSONOBJ_EQ(countCmd.getQueryOptions().value(),
                       fromjson("{ $readPreference: 'secondary' }"));
 }
 
@@ -102,7 +102,7 @@ TEST(CountCommandTest, ParsingNegativeLimitGivesPositiveLimit) {
                            << "limit" << -100);
     const auto countCmd = CountCommandRequest::parse(ctxt, commandObj);
 
-    ASSERT_EQ(countCmd.getLimit().get(), 100);
+    ASSERT_EQ(countCmd.getLimit().value(), 100);
 }
 
 TEST(CountCommandTest, LimitCannotBeMinLong) {

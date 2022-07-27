@@ -358,7 +358,7 @@ public:
             uassertStatusOK(auth::checkAuthForGetMore(AuthorizationSession::get(opCtx->getClient()),
                                                       ns(),
                                                       _cmd.getCommandParameter(),
-                                                      _cmd.getTerm().is_initialized()));
+                                                      _cmd.getTerm().has_value()));
         }
 
         /**
@@ -639,7 +639,7 @@ public:
                     lastKnownCommittedOpTime = cursorPin->getLastKnownCommittedOpTime();
                 }
                 if (lastKnownCommittedOpTime) {
-                    clientsLastKnownCommittedOpTime(opCtx) = lastKnownCommittedOpTime.get();
+                    clientsLastKnownCommittedOpTime(opCtx) = lastKnownCommittedOpTime.value();
                 }
 
                 awaitDataState(opCtx).shouldWaitForInserts = true;

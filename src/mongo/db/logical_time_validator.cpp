@@ -186,7 +186,7 @@ Status LogicalTimeValidator::validate(OperationContext* opCtx, const SignedLogic
     auto firstError = Status::OK();
     for (const auto& key : keys) {
         auto proofStatus =
-            _timeProofService.checkProof(newTime.getTime(), newProof.get(), key.getKey());
+            _timeProofService.checkProof(newTime.getTime(), newProof.value(), key.getKey());
         if (proofStatus.isOK()) {
             return Status::OK();
         } else if (firstError.isOK()) {

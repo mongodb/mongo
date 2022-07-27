@@ -575,7 +575,7 @@ public:
             auto parsedFilter = assertGet(MatchExpressionParser::parse(filter, expCtx));
             auto expr = assertGet(ExpressionWithPlaceholder::make(std::move(parsedFilter)));
             ASSERT(expr->getPlaceholder());
-            arrayFilters[expr->getPlaceholder().get()] = std::move(expr);
+            arrayFilters[expr->getPlaceholder().value()] = std::move(expr);
         }
 
         _driver->setFromOplogApplication(fromOplog);

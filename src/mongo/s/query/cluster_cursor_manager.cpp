@@ -240,7 +240,7 @@ StatusWith<ClusterCursorManager::PinnedCursor> ClusterCursorManager::checkOutCur
     // we pass down to the logical session cache and vivify the record (updating last use).
     if (cursorGuard->getLsid()) {
         auto vivifyCursorStatus =
-            LogicalSessionCache::get(opCtx)->vivify(opCtx, cursorGuard->getLsid().get());
+            LogicalSessionCache::get(opCtx)->vivify(opCtx, cursorGuard->getLsid().value());
         if (!vivifyCursorStatus.isOK()) {
             return vivifyCursorStatus;
         }

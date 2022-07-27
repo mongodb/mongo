@@ -62,7 +62,7 @@ BSONObj createOriginalCommand(const NamespaceString& nss, BSONObj shardKey) {
 
 Date_t readStartTime(const CommonReshardingMetadata& metadata, ClockSource* fallbackSource) {
     if (const auto& startTime = metadata.getStartTime()) {
-        return startTime.get();
+        return startTime.value();
     } else {
         return fallbackSource->now();
     }

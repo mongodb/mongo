@@ -263,7 +263,7 @@ BatchedCommandRequest BatchedCommandRequest::buildDeleteOp(const NamespaceString
             entry.setMulti(multiDelete);
 
             if (hint) {
-                entry.setHint(hint.get());
+                entry.setHint(hint.value());
             }
             return entry;
         }()});
@@ -295,7 +295,7 @@ BatchedCommandRequest BatchedCommandRequest::buildUpdateOp(const NamespaceString
             entry.setUpsert(upsert);
             entry.setMulti(multi);
             if (hint) {
-                entry.setHint(hint.get());
+                entry.setHint(hint.value());
             }
             return entry;
         }()});

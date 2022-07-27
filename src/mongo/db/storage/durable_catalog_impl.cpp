@@ -751,7 +751,7 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
     auto rs = _engine->getEngine()->getRecordStore(opCtx, nss, entry.ident, md.options);
     invariant(rs);
 
-    return DurableCatalog::ImportResult(entry.catalogId, std::move(rs), md.options.uuid.get());
+    return DurableCatalog::ImportResult(entry.catalogId, std::move(rs), md.options.uuid.value());
 }
 
 Status DurableCatalogImpl::renameCollection(OperationContext* opCtx,

@@ -251,7 +251,7 @@ Status _validateTimeseriesMinMax(const BSONObj& recordBson, const CollectionPtr&
         // timestamp granularity into account.
         auto checkMinAndMaxMatch = [&]() {
             // Needed for granularity, which determines how the min timestamp is rounded down .
-            const auto options = coll->getTimeseriesOptions().get();
+            const auto options = coll->getTimeseriesOptions().value();
             if (fieldName == options.getTimeField()) {
                 return controlFieldMin.Date() ==
                     timeseries::roundTimestampToGranularity(min.getField(fieldName).Date(),

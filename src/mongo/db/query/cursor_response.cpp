@@ -114,7 +114,7 @@ void appendCursorResponseObject(long long cursorId,
     cursorObj.append(kNsField, cursorNamespace);
     cursorObj.append(kBatchFieldInitial, firstBatch);
     if (cursorType) {
-        cursorObj.append(kTypeField, cursorType.get());
+        cursorObj.append(kTypeField, cursorType.value());
     }
     cursorObj.done();
 }

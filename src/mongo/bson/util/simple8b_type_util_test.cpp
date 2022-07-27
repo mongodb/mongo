@@ -144,11 +144,11 @@ TEST(Simple8bTypeUtil, DecimalPositiveValue) {
     double val = 1.0;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
-    ASSERT_EQUALS(scalar.get(), scaleIndexForMultiplier(1));
-    boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.get());
+    ASSERT_EQUALS(scalar.value(), scaleIndexForMultiplier(1));
+    boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.value());
     ASSERT_TRUE(encodeResult);
-    ASSERT_EQUALS(encodeResult.get(), 1);
-    double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.get(), scalar.get());
+    ASSERT_EQUALS(encodeResult.value(), 1);
+    double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.value(), scalar.value());
     ASSERT_EQUALS(val, decodeResult);
 }
 
@@ -156,11 +156,11 @@ TEST(Simple8bTypeUtil, EightDigitDecimalValue) {
     double val = 1.12345678;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
-    ASSERT_EQUALS(scalar.get(), scaleIndexForMultiplier(100000000));
-    boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.get());
+    ASSERT_EQUALS(scalar.value(), scaleIndexForMultiplier(100000000));
+    boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.value());
     ASSERT_TRUE(encodeResult);
-    ASSERT_EQUALS(encodeResult.get(), 112345678);
-    double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.get(), scalar.get());
+    ASSERT_EQUALS(encodeResult.value(), 112345678);
+    double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.value(), scalar.value());
     ASSERT_EQUALS(val, decodeResult);
 }
 
@@ -168,11 +168,11 @@ TEST(Simple8bTypeUtil, TwoDigitDecimalValue) {
     double val = 1.12;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
-    ASSERT_EQUALS(scalar.get(), scaleIndexForMultiplier(100));
-    boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.get());
+    ASSERT_EQUALS(scalar.value(), scaleIndexForMultiplier(100));
+    boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.value());
     ASSERT_TRUE(encodeResult);
-    ASSERT_EQUALS(encodeResult.get(), 112);
-    double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.get(), scalar.get());
+    ASSERT_EQUALS(encodeResult.value(), 112);
+    double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.value(), scalar.value());
     ASSERT_EQUALS(val, decodeResult);
 }
 
@@ -186,11 +186,11 @@ TEST(Simple8bTypeUtil, SparseDecimalValue) {
     double val = 1.00000001;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
-    ASSERT_EQUALS(scalar.get(), scaleIndexForMultiplier(100000000));
-    boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.get());
+    ASSERT_EQUALS(scalar.value(), scaleIndexForMultiplier(100000000));
+    boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.value());
     ASSERT_TRUE(encodeResult);
-    ASSERT_EQUALS(encodeResult.get(), 100000001);
-    double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.get(), scalar.get());
+    ASSERT_EQUALS(encodeResult.value(), 100000001);
+    double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.value(), scalar.value());
     ASSERT_EQUALS(val, decodeResult);
 }
 
@@ -198,11 +198,11 @@ TEST(Simple8bTypeUtil, RoundingDecimalValue) {
     double val = 1.455454;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
-    ASSERT_EQUALS(scalar.get(), scaleIndexForMultiplier(100000000));
-    boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.get());
+    ASSERT_EQUALS(scalar.value(), scaleIndexForMultiplier(100000000));
+    boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.value());
     ASSERT_TRUE(encodeResult);
-    ASSERT_EQUALS(encodeResult.get(), 145545400);
-    double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.get(), scalar.get());
+    ASSERT_EQUALS(encodeResult.value(), 145545400);
+    double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.value(), scalar.value());
     ASSERT_EQUALS(val, decodeResult);
 }
 
@@ -210,11 +210,11 @@ TEST(Simple8bTypeUtil, AllNines) {
     double val = 1.99999999;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
-    ASSERT_EQUALS(scalar.get(), scaleIndexForMultiplier(100000000));
-    boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.get());
+    ASSERT_EQUALS(scalar.value(), scaleIndexForMultiplier(100000000));
+    boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.value());
     ASSERT_TRUE(encodeResult);
-    ASSERT_EQUALS(encodeResult.get(), 199999999);
-    double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.get(), scalar.get());
+    ASSERT_EQUALS(encodeResult.value(), 199999999);
+    double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.value(), scalar.value());
     ASSERT_EQUALS(val, decodeResult);
 }
 
@@ -222,11 +222,11 @@ TEST(Simple8bTypeUtil, 3DigitValue) {
     double val = 123.123;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
-    ASSERT_EQUALS(scalar.get(), scaleIndexForMultiplier(10000));
-    boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.get());
+    ASSERT_EQUALS(scalar.value(), scaleIndexForMultiplier(10000));
+    boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.value());
     ASSERT_TRUE(encodeResult);
-    ASSERT_EQUALS(encodeResult.get(), (1231230));
-    double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.get(), scalar.get());
+    ASSERT_EQUALS(encodeResult.value(), (1231230));
+    double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.value(), scalar.value());
     ASSERT_EQUALS(val, decodeResult);
 }
 
@@ -301,12 +301,12 @@ TEST(Simple8bTypeUtil, TestMaxInt) {
     double val = std::pow(2, 53);
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
-    ASSERT_EQUALS(scalar.get(), scaleIndexForMultiplier(1));
-    boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.get());
+    ASSERT_EQUALS(scalar.value(), scaleIndexForMultiplier(1));
+    boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.value());
     ASSERT_TRUE(encodeResult);
     // Handle negative case
-    ASSERT_EQUALS(encodeResult.get(), int64_t(val));
-    double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.get(), scalar.get());
+    ASSERT_EQUALS(encodeResult.value(), int64_t(val));
+    double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.value(), scalar.value());
     ASSERT_EQUALS(val, decodeResult);
 }
 
@@ -314,12 +314,12 @@ TEST(Simple8bTypeUtil, NegativeValue) {
     double val = -123.123;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
-    ASSERT_EQUALS(scalar.get(), scaleIndexForMultiplier(10000));
-    boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.get());
+    ASSERT_EQUALS(scalar.value(), scaleIndexForMultiplier(10000));
+    boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.value());
     ASSERT_TRUE(encodeResult);
     // Handle negative case
-    ASSERT_EQUALS(encodeResult.get(), -1231230);
-    double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.get(), scalar.get());
+    ASSERT_EQUALS(encodeResult.value(), -1231230);
+    double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.value(), scalar.value());
     ASSERT_EQUALS(val, decodeResult);
 }
 
@@ -327,12 +327,12 @@ TEST(Simple8bTypeUtil, NegativeSixDecimalValue) {
     double val = -123.123456;
     boost::optional<uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
-    ASSERT_EQUALS(scalar.get(), scaleIndexForMultiplier(100000000));
-    boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.get());
+    ASSERT_EQUALS(scalar.value(), scaleIndexForMultiplier(100000000));
+    boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.value());
     ASSERT_TRUE(encodeResult);
     // Handle negative case by subtracting 1
-    ASSERT_EQUALS(encodeResult.get(), -12312345600);
-    double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.get(), scalar.get());
+    ASSERT_EQUALS(encodeResult.value(), -12312345600);
+    double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.value(), scalar.value());
     ASSERT_EQUALS(val, decodeResult);
 }
 
@@ -341,12 +341,12 @@ TEST(Simple8bTypeUtil, TestMinInt) {
     double val = -std::pow(2, 53);
     boost::optional<std::uint8_t> scalar = Simple8bTypeUtil::calculateDecimalShiftMultiplier(val);
     ASSERT_TRUE(scalar);
-    ASSERT_EQUALS(scalar.get(), scaleIndexForMultiplier(1));
-    boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.get());
+    ASSERT_EQUALS(scalar.value(), scaleIndexForMultiplier(1));
+    boost::optional<int64_t> encodeResult = Simple8bTypeUtil::encodeDouble(val, scalar.value());
     ASSERT_TRUE(encodeResult);
     // Handle negative case
-    ASSERT_EQUALS(encodeResult.get(), int64_t(val));
-    double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.get(), scalar.get());
+    ASSERT_EQUALS(encodeResult.value(), int64_t(val));
+    double decodeResult = Simple8bTypeUtil::decodeDouble(encodeResult.value(), scalar.value());
     ASSERT_EQUALS(val, decodeResult);
 }
 

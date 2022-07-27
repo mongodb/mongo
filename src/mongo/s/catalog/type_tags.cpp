@@ -93,19 +93,19 @@ StatusWith<TagsType> TagsType::fromBSON(const BSONObj& source) {
 }
 
 Status TagsType::validate() const {
-    if (!_ns.is_initialized() || !_ns->isValid()) {
+    if (!_ns.has_value() || !_ns->isValid()) {
         return Status(ErrorCodes::NoSuchKey, str::stream() << "missing " << ns.name() << " field");
     }
 
-    if (!_tag.is_initialized() || _tag->empty()) {
+    if (!_tag.has_value() || _tag->empty()) {
         return Status(ErrorCodes::NoSuchKey, str::stream() << "missing " << tag.name() << " field");
     }
 
-    if (!_minKey.is_initialized() || _minKey->isEmpty()) {
+    if (!_minKey.has_value() || _minKey->isEmpty()) {
         return Status(ErrorCodes::NoSuchKey, str::stream() << "missing " << min.name() << " field");
     }
 
-    if (!_maxKey.is_initialized() || _maxKey->isEmpty()) {
+    if (!_maxKey.has_value() || _maxKey->isEmpty()) {
         return Status(ErrorCodes::NoSuchKey, str::stream() << "missing " << max.name() << " field");
     }
 
@@ -114,8 +114,8 @@ Status TagsType::validate() const {
         return Status(ErrorCodes::BadValue, "min and max have a different number of keys");
     }
 
-    BSONObjIterator minIt(_minKey.get());
-    BSONObjIterator maxIt(_maxKey.get());
+    BSONObjIterator minIt(_minKey.value());
+    BSONObjIterator maxIt(_maxKey.value());
     while (minIt.more() && maxIt.more()) {
         BSONElement minElem = minIt.next();
         BSONElement maxElem = maxIt.next();
@@ -125,7 +125,7 @@ Status TagsType::validate() const {
     }
 
     // 'max' should be greater than 'min'.
-    if (_minKey->woCompare(_maxKey.get()) >= 0) {
+    if (_minKey->woCompare(_maxKey.value()) >= 0) {
         return Status(ErrorCodes::BadValue, "max key must be greater than min key");
     }
 

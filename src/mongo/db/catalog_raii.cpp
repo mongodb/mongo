@@ -97,7 +97,7 @@ void verifyDbAndCollection(OperationContext* opCtx,
                                  "changes; please retry the operation. Snapshot timestamp is "
                               << mySnapshot.toString() << ". Collection minimum is "
                               << minSnapshot->toString(),
-                mySnapshot.isNull() || mySnapshot >= minSnapshot.get());
+                mySnapshot.isNull() || mySnapshot >= minSnapshot.value());
         }
     }
 }

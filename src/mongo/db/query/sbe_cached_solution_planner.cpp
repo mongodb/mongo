@@ -114,7 +114,7 @@ CandidatePlans CachedSolutionPlanner::plan(
                 0};
     }
 
-    const size_t maxReadsBeforeReplan = internalQueryCacheEvictionRatio * _decisionReads.get();
+    const size_t maxReadsBeforeReplan = internalQueryCacheEvictionRatio * _decisionReads.value();
 
     // In cached solution planning we collect execution stats with an upper bound on reads allowed
     // per trial run computed based on previous decision reads. If the trial run ends before

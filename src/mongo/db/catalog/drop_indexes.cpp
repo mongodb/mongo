@@ -160,20 +160,20 @@ bool containsClusteredIndex(const CollectionPtr& collection, const IndexArgument
                               // creation, it should always be filled in by default on the
                               // collection object.
                               auto clusteredIndexName = clusteredIndexSpec.getName();
-                              invariant(clusteredIndexName.is_initialized());
+                              invariant(clusteredIndexName.has_value());
 
-                              return clusteredIndexName.get() == indexName;
+                              return clusteredIndexName.value() == indexName;
                           },
                           [&](const std::vector<std::string>& indexNames) -> bool {
                               // While the clusteredIndex's name is optional during user
                               // creation, it should always be filled in by default on the
                               // collection object.
                               auto clusteredIndexName = clusteredIndexSpec.getName();
-                              invariant(clusteredIndexName.is_initialized());
+                              invariant(clusteredIndexName.has_value());
 
                               return std::find(indexNames.begin(),
                                                indexNames.end(),
-                                               clusteredIndexName.get()) != indexNames.end();
+                                               clusteredIndexName.value()) != indexNames.end();
                           },
                           [&](const BSONObj& indexKey) -> bool {
                               return clusteredIndexSpec.getKey().woCompare(indexKey) == 0;

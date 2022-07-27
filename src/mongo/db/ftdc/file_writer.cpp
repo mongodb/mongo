@@ -156,8 +156,8 @@ Status FTDCFileWriter::writeSample(const BSONObj& sample, Date_t date) {
         return ret.getStatus();
     }
 
-    if (ret.getValue().is_initialized()) {
-        return flush(std::get<0>(ret.getValue().get()), std::get<2>(ret.getValue().get()));
+    if (ret.getValue().has_value()) {
+        return flush(std::get<0>(ret.getValue().value()), std::get<2>(ret.getValue().value()));
     }
 
     if (_compressor.getSampleCount() != 0 &&
@@ -177,7 +177,7 @@ Status FTDCFileWriter::writeSample(const BSONObj& sample, Date_t date) {
 }
 
 Status FTDCFileWriter::flush(const boost::optional<ConstDataRange>& range, Date_t date) {
-    if (!range.is_initialized()) {
+    if (!range.has_value()) {
         if (_compressor.hasDataToFlush()) {
             auto swBuf = _compressor.getCompressedSamples();
 
@@ -194,7 +194,7 @@ Status FTDCFileWriter::flush(const boost::optional<ConstDataRange>& range, Date_
             }
         }
     } else {
-        BSONObj o = FTDCBSONUtil::createBSONMetricChunkDocument(range.get(), date);
+        BSONObj o = FTDCBSONUtil::createBSONMetricChunkDocument(range.value(), date);
         Status s = writeArchiveFileBuffer({o.objdata(), static_cast<size_t>(o.objsize())});
 
         if (!s.isOK()) {

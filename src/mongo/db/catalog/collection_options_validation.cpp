@@ -82,7 +82,7 @@ EncryptedFieldConfig processAndValidateEncryptedFields(EncryptedFieldConfig conf
         fieldPaths.push_back(std::move(newPath));
 
         if (field.getQueries().has_value()) {
-            auto queriesVariant = field.getQueries().get();
+            auto queriesVariant = field.getQueries().value();
 
             auto queries = stdx::get_if<std::vector<mongo::QueryTypeConfig>>(&queriesVariant);
             if (queries) {

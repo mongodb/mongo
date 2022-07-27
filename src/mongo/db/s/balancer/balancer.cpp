@@ -119,7 +119,7 @@ public:
     BSONObj toBSON() const {
         BSONObjBuilder builder;
         builder.append("executionTimeMillis", _executionTimer.millis());
-        builder.append("errorOccurred", _errMsg.is_initialized());
+        builder.append("errorOccurred", _errMsg.has_value());
 
         if (_errMsg) {
             builder.append("errmsg", *_errMsg);
@@ -551,7 +551,7 @@ void Balancer::_consumeActionStreamLoop() {
 
         _newInfoOnStreamingActions.store(false);
         auto nextAction = selectedStream->getNextStreamingAction(opCtx.get());
-        if ((streamDrained = !nextAction.is_initialized())) {
+        if ((streamDrained = !nextAction.has_value())) {
             continue;
         }
 

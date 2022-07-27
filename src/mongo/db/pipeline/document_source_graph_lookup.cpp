@@ -505,7 +505,7 @@ void DocumentSourceGraphLookUp::performSearch() {
 DocumentSource::GetModPathsReturn DocumentSourceGraphLookUp::getModifiedPaths() const {
     OrderedPathSet modifiedPaths{_as.fullPath()};
     if (_unwind) {
-        auto pathsModifiedByUnwind = _unwind.get()->getModifiedPaths();
+        auto pathsModifiedByUnwind = _unwind.value()->getModifiedPaths();
         invariant(pathsModifiedByUnwind.type == GetModPathsReturn::Type::kFiniteSet);
         modifiedPaths.insert(pathsModifiedByUnwind.paths.begin(),
                              pathsModifiedByUnwind.paths.end());
@@ -688,7 +688,7 @@ DocumentSourceGraphLookUp::DocumentSourceGraphLookUp(
       _variables(original._variables),
       _variablesParseState(original._variablesParseState.copyWith(_variables.useIdGenerator())) {
     if (original._unwind) {
-        _unwind = static_cast<DocumentSourceUnwind*>(original._unwind.get()->clone().get());
+        _unwind = static_cast<DocumentSourceUnwind*>(original._unwind.value()->clone().get());
     }
 }
 

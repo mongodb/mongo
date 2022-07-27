@@ -511,7 +511,7 @@ TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
                   << "warn"
                   << "index"
                   << BSON("name" << indexInfo.indexName << "expireAfterSeconds"
-                                 << durationCount<Seconds>(indexInfo.expireAfterSeconds.get())));
+                                 << durationCount<Seconds>(indexInfo.expireAfterSeconds.value())));
     ASSERT_BSONOBJ_EQ(oExpected, o);
 
     // Ensure that the old collection metadata was saved.
@@ -523,7 +523,7 @@ TEST_F(OpObserverTest, CollModWithCollectionOptionsAndTTLInfo) {
                                    << ValidationAction_serializer(*oldCollOpts.validationAction))
                            << "indexOptions_old"
                            << BSON("expireAfterSeconds" << durationCount<Seconds>(
-                                       indexInfo.oldExpireAfterSeconds.get())));
+                                       indexInfo.oldExpireAfterSeconds.value())));
 
     ASSERT_BSONOBJ_EQ(o2Expected, o2);
 }
@@ -1752,28 +1752,28 @@ TEST_F(OpObserverTransactionTest, TransactionalInsertTestIncludesTenantId) {
     auto oExpected =
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "i"
-                                           << "tid" << nss1.tenantId().get() << "ns"
+                                           << "tid" << nss1.tenantId().value() << "ns"
                                            << nss1.toString() << "ui" << uuid1 << "o"
                                            << BSON("_id" << 0 << "data"
                                                          << "x")
                                            << "o2" << BSON("_id" << 0))
                                       << BSON("op"
                                               << "i"
-                                              << "tid" << nss1.tenantId().get() << "ns"
+                                              << "tid" << nss1.tenantId().value() << "ns"
                                               << nss1.toString() << "ui" << uuid1 << "o"
                                               << BSON("_id" << 1 << "data"
                                                             << "y")
                                               << "o2" << BSON("_id" << 1))
                                       << BSON("op"
                                               << "i"
-                                              << "tid" << nss2.tenantId().get() << "ns"
+                                              << "tid" << nss2.tenantId().value() << "ns"
                                               << nss2.toString() << "ui" << uuid2 << "o"
                                               << BSON("_id" << 2 << "data"
                                                             << "z")
                                               << "o2" << BSON("_id" << 2))
                                       << BSON("op"
                                               << "i"
-                                              << "tid" << nss2.tenantId().get() << "ns"
+                                              << "tid" << nss2.tenantId().value() << "ns"
                                               << nss2.toString() << "ui" << uuid2 << "o"
                                               << BSON("_id" << 3 << "data"
                                                             << "w")
@@ -1877,14 +1877,14 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTestIncludesTenantId) {
     auto oExpected =
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "u"
-                                           << "tid" << nss1.tenantId().get() << "ns"
+                                           << "tid" << nss1.tenantId().value() << "ns"
                                            << nss1.toString() << "ui" << uuid1 << "o"
                                            << BSON("$set" << BSON("data"
                                                                   << "x"))
                                            << "o2" << BSON("_id" << 0))
                                       << BSON("op"
                                               << "u"
-                                              << "tid" << nss2.tenantId().get() << "ns"
+                                              << "tid" << nss2.tenantId().value() << "ns"
                                               << nss2.toString() << "ui" << uuid2 << "o"
                                               << BSON("$set" << BSON("data"
                                                                      << "y"))
@@ -1969,11 +1969,11 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTestIncludesTenantId) {
     auto oExpected = BSON("applyOps" << BSON_ARRAY(
                               BSON("op"
                                    << "d"
-                                   << "tid" << nss1.tenantId().get() << "ns" << nss1.toString()
+                                   << "tid" << nss1.tenantId().value() << "ns" << nss1.toString()
                                    << "ui" << uuid1 << "o" << BSON("_id" << 0))
                               << BSON("op"
                                       << "d"
-                                      << "tid" << nss2.tenantId().get() << "ns" << nss2.toString()
+                                      << "tid" << nss2.tenantId().value() << "ns" << nss2.toString()
                                       << "ui" << uuid2 << "o" << BSON("_id" << 1))));
     ASSERT_BSONOBJ_EQ(oExpected, o);
     ASSERT_FALSE(oplogEntry.hasField("prepare"));
@@ -2391,7 +2391,7 @@ protected:
             const Timestamp preImageOpTime = updateOplogEntry.getPreImageOpTime()->getTimestamp();
             ASSERT_FALSE(preImageOpTime.isNull());
             OplogEntry preImage = *findByTimestamp(oplogs, preImageOpTime);
-            ASSERT_BSONOBJ_EQ(update.updateArgs->preImageDoc.get(), preImage.getObject());
+            ASSERT_BSONOBJ_EQ(update.updateArgs->preImageDoc.value(), preImage.getObject());
             if (updateOplogEntry.getSessionId()) {
                 ASSERT_EQ(*updateOplogEntry.getSessionId(), *preImage.getSessionId());
             }
@@ -2468,7 +2468,7 @@ protected:
             repl::ImageEntry imageEntry =
                 getImageEntryFromSideCollection(opCtx, *updateOplogEntry.getSessionId());
             const BSONObj& expectedImage = testCase.imageType == StoreDocOption::PreImage
-                ? update.updateArgs->preImageDoc.get()
+                ? update.updateArgs->preImageDoc.value()
                 : update.updateArgs->updatedDoc;
             ASSERT_BSONOBJ_EQ(expectedImage, imageEntry.getImage());
             ASSERT(imageEntry.getImageKind() == updateOplogEntry.getNeedsRetryImage());
@@ -2506,7 +2506,7 @@ protected:
             ChangeStreamPreImageId preImageId(
                 _uuid, updateOplogEntry.getOpTime().getTimestamp(), 0);
             ChangeStreamPreImage preImage = getChangeStreamPreImage(opCtx, preImageId, &container);
-            const BSONObj& expectedImage = update.updateArgs->preImageDoc.get();
+            const BSONObj& expectedImage = update.updateArgs->preImageDoc.value();
             ASSERT_BSONOBJ_EQ(expectedImage, preImage.getPreImage());
             ASSERT_EQ(updateOplogEntry.getWallClockTime(), preImage.getOperationTime());
         }
@@ -2747,8 +2747,8 @@ TEST_F(OpObserverTest, TestFundamentalOnInsertsOutputs) {
             }
 
             // Only for retryable writes:
-            ASSERT_EQ(opCtx->getLogicalSessionId().get(), entry.getSessionId().get());
-            ASSERT_EQ(opCtx->getTxnNumber().get(), entry.getTxnNumber().get());
+            ASSERT_EQ(opCtx->getLogicalSessionId().value(), entry.getSessionId().value());
+            ASSERT_EQ(opCtx->getTxnNumber().value(), entry.getTxnNumber().value());
             ASSERT_EQ(1, entry.getStatementIds().size());
             ASSERT_EQ(StmtId(opIdx), entry.getStatementIds()[0]);
             // When we insert multiple documents in retryable writes, each insert will "link" back
@@ -2760,7 +2760,7 @@ TEST_F(OpObserverTest, TestFundamentalOnInsertsOutputs) {
                     oplogs[opIdx - 1][repl::OplogEntryBase::kTimestampFieldName].timestamp();
             }
             ASSERT_EQ(expectedPrevWriteOpTime,
-                      entry.getPrevWriteOpTimeInTransaction().get().getTimestamp());
+                      entry.getPrevWriteOpTimeInTransaction().value().getTimestamp());
         }
 
         if (testCase.isRetryableWrite) {
@@ -3275,7 +3275,7 @@ TEST_F(AtomicApplyOpsOutputsTest, InsertInNestedApplyOpsReturnsSuccess) {
                             << "ns" << _nss.ns() << "o"
                             << BSON("_id"
                                     << "a")
-                            << "ui" << options.uuid.get());
+                            << "ui" << options.uuid.value());
     auto innerApplyOpsObj = BSON("op"
                                  << "c"
                                  << "ns" << _nss.getCommandNS().ns() << "o"

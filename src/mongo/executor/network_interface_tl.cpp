@@ -183,7 +183,7 @@ NetworkInterfaceTL::NetworkInterfaceTL(std::string instanceName,
 #ifdef MONGO_CONFIG_SSL
     if (_connPoolOpts.transientSSLParams) {
         auto statusOrContext =
-            _tl->createTransientSSLContext(_connPoolOpts.transientSSLParams.get());
+            _tl->createTransientSSLContext(_connPoolOpts.transientSSLParams.value());
         uassertStatusOK(statusOrContext.getStatus());
         transientSSLContext = std::move(statusOrContext.getValue());
     }
@@ -832,7 +832,7 @@ void NetworkInterfaceTL::RequestManager::trySend(
                 "requestId"_attr = cmdState->requestOnAny.id,
                 "target"_attr = cmdState->requestOnAny.target[idx]);
 
-    auto request = &requestState->request.get();
+    auto request = &requestState->request.value();
 
     if (requestState->isHedge) {
         invariant(request->options.isHedgeEnabled);
@@ -1164,11 +1164,11 @@ void NetworkInterfaceTL::cancelCommand(const TaskExecutor::CallbackHandle& cbHan
 Status NetworkInterfaceTL::_killOperation(std::shared_ptr<RequestState> requestStateToKill) try {
     auto [target, sslMode] = [&] {
         invariant(requestStateToKill->request);
-        auto request = requestStateToKill->request.get();
+        auto request = requestStateToKill->request.value();
         return std::make_pair(request.target, request.sslMode);
     }();
     auto cmdStateToKill = requestStateToKill->cmdState;
-    auto operationKey = cmdStateToKill->operationKey.get();
+    auto operationKey = cmdStateToKill->operationKey.value();
 
     // Make a request state for _killOperations.
     executor::RemoteCommandRequest killOpRequest(

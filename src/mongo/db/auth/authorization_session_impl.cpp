@@ -184,7 +184,7 @@ void AuthorizationSessionImpl::startRequest(OperationContext* opCtx) {
                         3,
                         "security token based user still authenticated at start of request, "
                         "clearing from authentication state",
-                        "user"_attr = user.get()->getName().toBSON(true /* encode tenant */));
+                        "user"_attr = user.value()->getName().toBSON(true /* encode tenant */));
             _updateInternalAuthorizationState();
         }
         _authenticationMode = AuthenticationMode::kNone;
@@ -205,7 +205,7 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
     // because only the Client thread can mutate _authenticatedUser.
     if (_authenticatedUser) {
         // Already logged in.
-        auto previousUser = _authenticatedUser.get()->getName();
+        auto previousUser = _authenticatedUser.value()->getName();
         if (previousUser == userName) {
             // Allow reauthenticating as the same user, but warn.
             LOGV2_WARNING(5626700,
@@ -274,7 +274,7 @@ Status AuthorizationSessionImpl::addAndAuthorizeUser(OperationContext* opCtx,
 User* AuthorizationSessionImpl::lookupUser(const UserName& name) {
     _contract.addAccessCheck(AccessCheckEnum::kLookupUser);
 
-    if (!_authenticatedUser || (_authenticatedUser.get()->getName() != name)) {
+    if (!_authenticatedUser || (_authenticatedUser.value()->getName() != name)) {
         return nullptr;
     }
     return _authenticatedUser->get();
@@ -297,7 +297,7 @@ void AuthorizationSessionImpl::logoutSecurityTokenUser(Client* client) {
         LOGV2_DEBUG(6161506,
                     5,
                     "security token based user explicitly logged out",
-                    "user"_attr = user.get()->getName().toBSON(true /* encode tenant */));
+                    "user"_attr = user.value()->getName().toBSON(true /* encode tenant */));
     }
 
     // Explicitly skip auditing the logout event,
@@ -318,7 +318,7 @@ void AuthorizationSessionImpl::logoutAllDatabases(Client* client, StringData rea
         return;
     }
 
-    auto names = BSON_ARRAY(user.get()->getName().toBSON());
+    auto names = BSON_ARRAY(user.value()->getName().toBSON());
     audit::logLogout(client, reason, names, BSONArray());
 
     clearImpersonatedUserData();
@@ -335,11 +335,11 @@ void AuthorizationSessionImpl::logoutDatabase(Client* client,
             "May not log out while using a security token based authentication",
             _authenticationMode != AuthenticationMode::kSecurityToken);
 
-    if (!_authenticatedUser || (_authenticatedUser.get()->getName().getDB() != dbname)) {
+    if (!_authenticatedUser || (_authenticatedUser.value()->getName().getDB() != dbname)) {
         return;
     }
 
-    auto names = BSON_ARRAY(_authenticatedUser.get()->getName().toBSON());
+    auto names = BSON_ARRAY(_authenticatedUser.value()->getName().toBSON());
     audit::logLogout(client, reason, names, BSONArray());
     _authenticatedUser = boost::none;
 
@@ -351,7 +351,7 @@ boost::optional<UserName> AuthorizationSessionImpl::getAuthenticatedUserName() {
     _contract.addAccessCheck(AccessCheckEnum::kGetAuthenticatedUserName);
 
     if (_authenticatedUser) {
-        return _authenticatedUser.get()->getName();
+        return _authenticatedUser.value()->getName();
     } else {
         return boost::none;
     }
@@ -366,7 +366,7 @@ RoleNameIterator AuthorizationSessionImpl::getAuthenticatedRoleNames() {
 void AuthorizationSessionImpl::grantInternalAuthorization(Client* client) {
     stdx::lock_guard<Client> lk(*client);
     if (MONGO_unlikely(_authenticatedUser != boost::none)) {
-        auto previousUser = _authenticatedUser.get()->getName();
+        auto previousUser = _authenticatedUser.value()->getName();
         uassert(ErrorCodes::Unauthorized,
                 str::stream() << "Unable to grant internal authorization, previously authorized as "
                               << previousUser.getUnambiguousName(),
@@ -470,7 +470,7 @@ bool AuthorizationSessionImpl::isAuthorizedToCreateRole(const RoleName& roleName
     // The user may create a role if the localhost exception is enabled, and they already own the
     // role. This implies they have obtained the role through an external authorization mechanism.
     if (_externalState->shouldAllowLocalhost()) {
-        if (_authenticatedUser && _authenticatedUser.get()->hasRole(roleName)) {
+        if (_authenticatedUser && _authenticatedUser.value()->hasRole(roleName)) {
             return true;
         }
         LOGV2(20241,
@@ -646,7 +646,7 @@ StatusWith<PrivilegeVector> AuthorizationSessionImpl::checkAuthorizedToListColle
 
 bool AuthorizationSessionImpl::isAuthenticatedAsUserWithRole(const RoleName& roleName) {
     _contract.addAccessCheck(AccessCheckEnum::kIsAuthenticatedAsUserWithRole);
-    return (_authenticatedUser && _authenticatedUser.get()->hasRole(roleName));
+    return (_authenticatedUser && _authenticatedUser.value()->hasRole(roleName));
 }
 
 bool AuthorizationSessionImpl::shouldIgnoreAuthChecks() {
@@ -666,7 +666,7 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
         return;
     }
 
-    auto currentUser = _authenticatedUser.get();
+    auto currentUser = _authenticatedUser.value();
     const auto& name = currentUser->getName();
 
     const auto clearUser = [&] {
@@ -777,7 +777,7 @@ bool AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(StringD
         return false;
     }
 
-    const auto& user = _authenticatedUser.get();
+    const auto& user = _authenticatedUser.value();
     // First lookup any Privileges on this database specifying Database resources
     if (user->hasActionsForResource(ResourcePattern::forDatabaseName(db))) {
         return true;
@@ -849,7 +849,7 @@ bool AuthorizationSessionImpl::isAuthorizedForAnyActionOnResource(const Resource
     const int resourceSearchListLength =
         buildResourceSearchList(resource, resourceSearchList.data());
 
-    const auto& user = _authenticatedUser.get();
+    const auto& user = _authenticatedUser.value();
     for (int i = 0; i < resourceSearchListLength; ++i) {
         if (user->hasActionsForResource(resourceSearchList[i])) {
             return true;
@@ -888,7 +888,7 @@ bool AuthorizationSessionImpl::_isAuthorizedForPrivilege(const Privilege& privil
         return false;
     }
 
-    const auto& user = _authenticatedUser.get();
+    const auto& user = _authenticatedUser.value();
     for (int i = 0; i < resourceSearchListLength; ++i) {
         ActionSet userActions = user->getActionsForResource(resourceSearchList[i]);
         unmetRequirements.removeAllActionsFromSet(userActions);
@@ -1063,7 +1063,7 @@ void AuthorizationSessionImpl::_updateInternalAuthorizationState() {
     if (_authenticatedUser == boost::none) {
         _authenticationMode = AuthenticationMode::kNone;
     } else {
-        RoleNameIterator roles = _authenticatedUser.get()->getIndirectRoles();
+        RoleNameIterator roles = _authenticatedUser.value()->getIndirectRoles();
         while (roles.more()) {
             RoleName roleName = roles.next();
             _authenticatedRoleNames.push_back(RoleName(roleName.getRole(), roleName.getDB()));

@@ -485,13 +485,13 @@ std::vector<DebugPrinter::Block> ColumnScanStage::debugPrint() const {
     auto ret = PlanStage::debugPrint();
 
     if (_reconstructedRecordSlot) {
-        DebugPrinter::addIdentifier(ret, _reconstructedRecordSlot.get());
+        DebugPrinter::addIdentifier(ret, _reconstructedRecordSlot.value());
     } else {
         DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
     }
 
     if (_recordIdSlot) {
-        DebugPrinter::addIdentifier(ret, _recordIdSlot.get());
+        DebugPrinter::addIdentifier(ret, _recordIdSlot.value());
     } else {
         DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
     }

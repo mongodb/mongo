@@ -323,7 +323,7 @@ StatusWith<repl::ReadConcernArgs> _extractReadConcern(OperationContext* opCtx,
                     const auto readConcernSource = rwcDefaults.getDefaultReadConcernSource();
                     customDefaultWasApplied =
                         (readConcernSource &&
-                         readConcernSource.get() == DefaultReadConcernSourceEnum::kGlobal);
+                         readConcernSource.value() == DefaultReadConcernSourceEnum::kGlobal);
 
                     applyDefaultReadConcern(*rcDefault);
                 }
@@ -1408,7 +1408,7 @@ void ExecCommandDatabase::_initiateCommand() {
                 str::stream() << "Command " << command->getName()
                               << " is not supported in multitenancy mode",
                 command->allowedWithSecurityToken());
-        _tokenAuthorizationSessionGuard.emplace(opCtx, request.validatedTenancyScope.get());
+        _tokenAuthorizationSessionGuard.emplace(opCtx, request.validatedTenancyScope.value());
     }
 
     if (isHello()) {

@@ -414,7 +414,7 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
         // dropping the wrong collection.
         if (!targetColl && uuidToDrop) {
             invariant(options.dropTarget);
-            auto collToDropBasedOnUUID = getNamespaceFromUUID(opCtx, uuidToDrop.get());
+            auto collToDropBasedOnUUID = getNamespaceFromUUID(opCtx, uuidToDrop.value());
             if (collToDropBasedOnUUID && !collToDropBasedOnUUID->isDropPendingNamespace()) {
                 invariant(collToDropBasedOnUUID->db() == target.db());
                 targetColl = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
@@ -924,7 +924,7 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
     NamespaceString sourceNss(sourceNsElt.valueStringData());
     NamespaceString targetNss(targetNsElt.valueStringData());
     if (uuidToRename) {
-        auto nss = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, uuidToRename.get());
+        auto nss = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, uuidToRename.value());
         if (nss)
             sourceNss = *nss;
     }
@@ -965,7 +965,7 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
             dropTargetNss = targetNss;
 
         if (uuidToDrop)
-            dropTargetNss = getNamespaceFromUUID(opCtx, uuidToDrop.get());
+            dropTargetNss = getNamespaceFromUUID(opCtx, uuidToDrop.value());
 
         // Downgrade renameCollection to dropCollection.
         if (dropTargetNss) {

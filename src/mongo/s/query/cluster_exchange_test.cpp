@@ -183,7 +183,7 @@ TEST_F(ClusterExchangeTest, GroupFollowedByMergeIsEligbleForExchange) {
         ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kKeyRange);
         ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(), BSON("_id" << 1));
         ASSERT_EQ(exchangeSpec->consumerShards.size(), 2UL);  // One for each shard.
-        const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().get();
+        const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().value();
         ASSERT_EQ(boundaries.size(), 3UL);
 
         ASSERT_BSONOBJ_EQ(boundaries[0], BSON("_id" << MINKEY));
@@ -219,8 +219,8 @@ TEST_F(ClusterExchangeTest, RenamesAreEligibleForExchange) {
         ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kKeyRange);
         ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(), BSON("_id" << 1));
         ASSERT_EQ(exchangeSpec->consumerShards.size(), 2UL);  // One for each shard.
-        const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().get();
-        const auto& consumerIds = exchangeSpec->exchangeSpec.getConsumerIds().get();
+        const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().value();
+        const auto& consumerIds = exchangeSpec->exchangeSpec.getConsumerIds().value();
         ASSERT_EQ(boundaries.size(), 3UL);
 
         ASSERT_BSONOBJ_EQ(boundaries[0], BSON("_id" << MINKEY));
@@ -258,8 +258,8 @@ TEST_F(ClusterExchangeTest, MatchesAreEligibleForExchange) {
         ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kKeyRange);
         ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(), BSON("_id" << 1));
         ASSERT_EQ(exchangeSpec->consumerShards.size(), 2UL);  // One for each shard.
-        const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().get();
-        const auto& consumerIds = exchangeSpec->exchangeSpec.getConsumerIds().get();
+        const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().value();
+        const auto& consumerIds = exchangeSpec->exchangeSpec.getConsumerIds().value();
         ASSERT_EQ(boundaries.size(), 3UL);
 
         ASSERT_BSONOBJ_EQ(boundaries[0], BSON("_id" << MINKEY));
@@ -302,8 +302,8 @@ TEST_F(ClusterExchangeTest, SortThenGroupIsEligibleForExchange) {
         ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kKeyRange);
         ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(), BSON("x" << 1));
         ASSERT_EQ(exchangeSpec->consumerShards.size(), 2UL);  // One for each shard.
-        const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().get();
-        const auto& consumerIds = exchangeSpec->exchangeSpec.getConsumerIds().get();
+        const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().value();
+        const auto& consumerIds = exchangeSpec->exchangeSpec.getConsumerIds().value();
         ASSERT_EQ(boundaries.size(), 3UL);
 
         ASSERT_BSONOBJ_EQ(boundaries[0], BSON("x" << MINKEY));
@@ -348,8 +348,8 @@ TEST_F(ClusterExchangeTest, SortThenGroupIsEligibleForExchangeHash) {
                           BSON("x"
                                << "hashed"));
         ASSERT_EQ(exchangeSpec->consumerShards.size(), 2UL);  // One for each shard.
-        const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().get();
-        const auto& consumerIds = exchangeSpec->exchangeSpec.getConsumerIds().get();
+        const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().value();
+        const auto& consumerIds = exchangeSpec->exchangeSpec.getConsumerIds().value();
         ASSERT_EQ(boundaries.size(), 3UL);
 
         ASSERT_BSONOBJ_EQ(boundaries[0], BSON("x" << MINKEY));
@@ -428,8 +428,8 @@ TEST_F(ClusterExchangeTest, WordCountUseCaseExample) {
         ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kKeyRange);
         ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(), BSON("_id" << 1));
         ASSERT_EQ(exchangeSpec->consumerShards.size(), 2UL);  // One for each shard.
-        const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().get();
-        const auto& consumerIds = exchangeSpec->exchangeSpec.getConsumerIds().get();
+        const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().value();
+        const auto& consumerIds = exchangeSpec->exchangeSpec.getConsumerIds().value();
         ASSERT_EQ(boundaries.size(), 3UL);
 
         ASSERT_BSONOBJ_EQ(boundaries[0], BSON("_id" << MINKEY));
@@ -495,8 +495,8 @@ TEST_F(ClusterExchangeTest, WordCountUseCaseExampleShardedByWord) {
         ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kKeyRange);
         ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(), BSON("_id" << 1));
         ASSERT_EQ(exchangeSpec->consumerShards.size(), 2UL);  // One for each shard.
-        const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().get();
-        const auto& consumerIds = exchangeSpec->exchangeSpec.getConsumerIds().get();
+        const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().value();
+        const auto& consumerIds = exchangeSpec->exchangeSpec.getConsumerIds().value();
         ASSERT_EQ(boundaries.size(), 4UL);
         ASSERT_EQ(consumerIds.size(), 3UL);
 
@@ -579,8 +579,8 @@ TEST_F(ClusterExchangeTest, CompoundShardKeyThreeShards) {
         ASSERT(exchangeSpec->exchangeSpec.getPolicy() == ExchangePolicyEnum::kKeyRange);
         ASSERT_BSONOBJ_EQ(exchangeSpec->exchangeSpec.getKey(), BSON("_id" << 1 << "_id" << 1));
         ASSERT_EQ(exchangeSpec->consumerShards.size(), 3UL);  // One for each shard.
-        const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().get();
-        const auto& consumerIds = exchangeSpec->exchangeSpec.getConsumerIds().get();
+        const auto& boundaries = exchangeSpec->exchangeSpec.getBoundaries().value();
+        const auto& consumerIds = exchangeSpec->exchangeSpec.getConsumerIds().value();
         ASSERT_EQ(boundaries.size(), chunks.size() + 1);
         ASSERT_EQ(consumerIds.size(), chunks.size());
 

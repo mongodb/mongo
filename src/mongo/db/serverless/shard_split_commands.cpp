@@ -166,7 +166,7 @@ public:
             uassert(ErrorCodes::CommandFailed,
                     "Failed to abort shard split",
                     state.abortReason &&
-                        state.abortReason.get() == ErrorCodes::TenantMigrationAborted);
+                        state.abortReason.value() == ErrorCodes::TenantMigrationAborted);
 
             uassert(ErrorCodes::TenantMigrationCommitted,
                     "Failed to abort : shard split already committed",
@@ -235,7 +235,7 @@ public:
                     str::stream() << "Could not find shard split with id " << cmd.getMigrationId(),
                     optionalDonor);
 
-            auto donorPtr = optionalDonor.get();
+            auto donorPtr = optionalDonor.value();
 
             auto decision = donorPtr->decisionFuture().get(opCtx);
 

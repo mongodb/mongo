@@ -628,7 +628,7 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
     // the global retryWrites value. This is checked in sessions.js by using the injected
     // _shouldRetryWrites() function, which returns true if the --retryWrites flag was passed.
     if (retryWrites) {
-        o.setBoolean(InternedString::_retryWrites, retryWrites.get());
+        o.setBoolean(InternedString::_retryWrites, retryWrites.value());
     }
 
     args.rval().setObjectOrNull(thisv);

@@ -556,7 +556,7 @@ private:
                 return;
             }
             updateState->updateInProgress = true;
-            update = updateState->nextUpdateToSend.get();
+            update = updateState->nextUpdateToSend.value();
             updateState->nextUpdateToSend = boost::none;
         }
 

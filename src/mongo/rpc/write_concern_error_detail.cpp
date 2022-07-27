@@ -84,7 +84,7 @@ bool WriteConcernErrorDetail::parseBSON(const BSONObj& source, string* errMsg) {
     try {
         auto wce = WriteConcernError::parse({"writeConcernError"}, source);
         _status = Status(ErrorCodes::Error(wce.getCode()), wce.getErrmsg(), source);
-        if ((_isErrInfoSet = wce.getErrInfo().is_initialized())) {
+        if ((_isErrInfoSet = wce.getErrInfo().has_value())) {
             _errInfo = wce.getErrInfo().value().getOwned();
         }
     } catch (DBException& ex) {

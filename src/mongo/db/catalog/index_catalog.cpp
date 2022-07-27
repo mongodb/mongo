@@ -72,7 +72,7 @@ const IndexCatalogEntry* ReadyIndexesIterator::_advance() {
                 _opCtx->recoveryUnit()->getPointInTimeReadTimestamp(_opCtx).get_value_or(
                     _opCtx->recoveryUnit()->getCatalogConflictingTimestamp());
 
-            if (!mySnapshot.isNull() && mySnapshot < minSnapshot.get()) {
+            if (!mySnapshot.isNull() && mySnapshot < minSnapshot.value()) {
                 // This index isn't finished in my snapshot.
                 continue;
             }

@@ -450,7 +450,7 @@ FaultManager::~FaultManager() {
         for (auto& pair : _healthCheckContexts) {
             auto cbHandle = pair.second.callbackHandle;
             if (cbHandle) {
-                _taskExecutor->cancel(cbHandle.get());
+                _taskExecutor->cancel(cbHandle.value());
             }
         }
     }

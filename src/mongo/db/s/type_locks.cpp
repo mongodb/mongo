@@ -106,11 +106,11 @@ StatusWith<LocksType> LocksType::fromBSON(const BSONObj& source) {
 }
 
 Status LocksType::validate() const {
-    if (!_name.is_initialized() || _name->empty()) {
+    if (!_name.has_value() || _name->empty()) {
         return {ErrorCodes::NoSuchKey, str::stream() << "missing " << name.name() << " field"};
     }
 
-    if (!_state.is_initialized()) {
+    if (!_state.has_value()) {
         return {ErrorCodes::NoSuchKey, str::stream() << "missing " << state.name() << " field"};
     }
 
@@ -124,21 +124,21 @@ Status LocksType::validate() const {
 
     // if the lock is locked, check the remaining fields
     if (lockState != State::UNLOCKED) {
-        if (!_process.is_initialized() || _process->empty()) {
+        if (!_process.has_value() || _process->empty()) {
             return {ErrorCodes::NoSuchKey,
                     str::stream() << "missing " << process.name() << " field"};
         }
 
-        if (!_lockID.is_initialized()) {
+        if (!_lockID.has_value()) {
             return {ErrorCodes::NoSuchKey,
                     str::stream() << "missing " << lockID.name() << " field"};
         }
 
-        if (!_who.is_initialized() || _who->empty()) {
+        if (!_who.has_value() || _who->empty()) {
             return {ErrorCodes::NoSuchKey, str::stream() << "missing " << who.name() << " field"};
         }
 
-        if (!_why.is_initialized() || _why->empty()) {
+        if (!_why.has_value() || _why->empty()) {
             return {ErrorCodes::NoSuchKey, str::stream() << "missing " << why.name() << " field"};
         }
     }

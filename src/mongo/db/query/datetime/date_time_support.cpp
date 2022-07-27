@@ -1202,7 +1202,7 @@ Date_t dateAdd(Date_t date, TimeUnit unit, long long amount, const TimeZone& tim
     auto intervalInDays = daysToAdd(localTime.get(), unit, amount);
     if (intervalInDays) {
         unit = TimeUnit::day;
-        amount = intervalInDays.get();
+        amount = intervalInDays.value();
     }
 
     auto interval = getTimelibRelTime(unit, amount);

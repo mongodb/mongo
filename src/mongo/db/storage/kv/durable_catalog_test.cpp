@@ -113,7 +113,7 @@ public:
             std::move(coll.second));
         CollectionCatalog::write(operationContext(), [&](CollectionCatalog& catalog) {
             catalog.registerCollection(
-                operationContext(), options.uuid.get(), std::move(collection));
+                operationContext(), options.uuid.value(), std::move(collection));
         });
 
         wuow.commit();
@@ -645,7 +645,7 @@ TEST_F(ImportCollectionTest, ImportCollection) {
               idxIdent);
 
     // Test that a collection UUID is generated for import.
-    ASSERT_NE(md->options.uuid.get(), importResult.uuid);
+    ASSERT_NE(md->options.uuid.value(), importResult.uuid);
     // Substitute in the generated UUID and check that the rest of fields in the catalog entry
     // match.
     md->options.uuid = importResult.uuid;

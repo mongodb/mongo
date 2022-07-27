@@ -74,8 +74,8 @@ void checkIfEqual(IndexBuildEntry lhs, IndexBuildEntry rhs) {
     ASSERT_TRUE(std::equal(lhsIndexNames.begin(), lhsIndexNames.end(), rhsIndexNames.begin()));
 
     if (lhs.getCommitReadyMembers() && rhs.getCommitReadyMembers()) {
-        auto lhsMembers = lhs.getCommitReadyMembers().get();
-        auto rhsMembers = rhs.getCommitReadyMembers().get();
+        auto lhsMembers = lhs.getCommitReadyMembers().value();
+        auto rhsMembers = rhs.getCommitReadyMembers().value();
         ASSERT_TRUE(std::equal(lhsMembers.begin(), lhsMembers.end(), rhsMembers.begin()));
     } else {
         ASSERT_FALSE(lhs.getCommitReadyMembers());

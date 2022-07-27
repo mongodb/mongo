@@ -171,11 +171,11 @@ TEST_F(TaskExecutorCursorFixture, SingleBatchWorks) {
 
     ASSERT_BSONOBJ_EQ(findCmd, scheduleSuccessfulCursorResponse("firstBatch", 1, 2, cursorId));
 
-    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 1);
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 1);
 
     ASSERT_FALSE(hasReadyRequests());
 
-    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 2);
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 2);
 
     ASSERT_FALSE(tec.getNext(opCtx.get()));
 }
@@ -194,9 +194,9 @@ TEST_F(TaskExecutorCursorFixture, MultipleCursorsSingleBatchSucceeds) {
 
     ASSERT_BSONOBJ_EQ(aggCmd, scheduleSuccessfulMultiCursorResponse("firstBatch", 1, 2, {0, 0}));
 
-    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 1);
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 1);
 
-    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 2);
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 2);
 
     ASSERT_FALSE(tec.getNext(opCtx.get()));
 
@@ -204,8 +204,8 @@ TEST_F(TaskExecutorCursorFixture, MultipleCursorsSingleBatchSucceeds) {
     ASSERT_EQUALS(cursorVec.size(), 1);
     auto secondCursor = std::move(cursorVec[0]);
 
-    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).get()["x"].Int(), 2);
-    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).get()["x"].Int(), 4);
+    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).value()["x"].Int(), 2);
+    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).value()["x"].Int(), 4);
     ASSERT_FALSE(hasReadyRequests());
 
     ASSERT_FALSE(secondCursor.getNext(opCtx.get()));
@@ -223,9 +223,9 @@ TEST_F(TaskExecutorCursorFixture, MultipleCursorsGetMoreWorks) {
 
     ASSERT_BSONOBJ_EQ(aggCmd, scheduleSuccessfulMultiCursorResponse("firstBatch", 1, 2, cursorIds));
 
-    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 1);
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 1);
 
-    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 2);
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 2);
 
     auto cursorVec = tec.releaseAdditionalCursors();
     ASSERT_EQUALS(cursorVec.size(), 1);
@@ -245,8 +245,8 @@ TEST_F(TaskExecutorCursorFixture, MultipleCursorsGetMoreWorks) {
     // Repeat for second cursor.
     auto secondCursor = std::move(cursorVec[0]);
 
-    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).get()["x"].Int(), 2);
-    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).get()["x"].Int(), 4);
+    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).value()["x"].Int(), 2);
+    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).value()["x"].Int(), 4);
 
     ASSERT_THROWS_CODE(opCtx->runWithDeadline(Date_t::now() + Milliseconds(100),
                                               ErrorCodes::ExceededTimeLimit,
@@ -258,20 +258,20 @@ TEST_F(TaskExecutorCursorFixture, MultipleCursorsGetMoreWorks) {
                                      << "test"),
                       scheduleSuccessfulCursorResponse("nextBatch", 6, 8, cursorIds[1]));
     // Read second batch on both cursors.
-    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 3);
-    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 4);
-    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 5);
-    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).get()["x"].Int(), 6);
-    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).get()["x"].Int(), 7);
-    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).get()["x"].Int(), 8);
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 3);
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 4);
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 5);
+    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).value()["x"].Int(), 6);
+    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).value()["x"].Int(), 7);
+    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).value()["x"].Int(), 8);
 
     // Schedule EOF on both cursors.
     scheduleSuccessfulCursorResponse("nextBatch", 6, 6, 0);
     scheduleSuccessfulCursorResponse("nextBatch", 12, 12, 0);
 
     // Read final document.
-    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 6);
-    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).get()["x"].Int(), 12);
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 6);
+    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).value()["x"].Int(), 12);
 
     // Shouldn't have any more requests, both cursors are closed.
     ASSERT_FALSE(hasReadyRequests());
@@ -353,11 +353,11 @@ TEST_F(TaskExecutorCursorFixture, MultipleBatchesWorks) {
 
     scheduleSuccessfulCursorResponse("firstBatch", 1, 2, cursorId);
 
-    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 1);
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 1);
 
     ASSERT(hasReadyRequests());
 
-    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 2);
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 2);
 
     // If we try to getNext() at this point, we are interruptible and can timeout
     ASSERT_THROWS_CODE(opCtx->runWithDeadline(Date_t::now() + Milliseconds(100),
@@ -372,9 +372,9 @@ TEST_F(TaskExecutorCursorFixture, MultipleBatchesWorks) {
                                      << "batchSize" << 3),
                       scheduleSuccessfulCursorResponse("nextBatch", 3, 5, cursorId));
 
-    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 3);
-    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 4);
-    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 5);
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 3);
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 4);
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 5);
 
     cursorId = 0;
     scheduleSuccessfulCursorResponse("nextBatch", 6, 6, cursorId);
@@ -382,7 +382,7 @@ TEST_F(TaskExecutorCursorFixture, MultipleBatchesWorks) {
     // We don't issue extra getmores after returning a 0 cursor id
     ASSERT_FALSE(hasReadyRequests());
 
-    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 6);
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 6);
 
     ASSERT_FALSE(tec.getNext(opCtx.get()));
 }
@@ -423,7 +423,7 @@ TEST_F(TaskExecutorCursorFixture, EmptyFirstBatch) {
     });
 
     // Verify that the first doc is the doc from the second batch.
-    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 1);
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 1);
 
     th.join();
 }
@@ -451,7 +451,7 @@ TEST_F(TaskExecutorCursorFixture, EmptyNonInitialBatch) {
     // Schedule a cursor response with a non-empty "firstBatch".
     ASSERT_BSONOBJ_EQ(findCmd, scheduleSuccessfulCursorResponse("firstBatch", 1, 1, cursorId));
 
-    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 1);
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 1);
 
     // Schedule two consecutive cursor responses with empty "nextBatch". Use end < start so
     // we don't append any doc to "nextBatch".
@@ -478,7 +478,7 @@ TEST_F(TaskExecutorCursorFixture, EmptyNonInitialBatch) {
     });
 
     // Verify that the next doc is the doc from the fourth batch.
-    ASSERT_EQUALS(tec.getNext(opCtx.get()).get()["x"].Int(), 2);
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 2);
 
     th.join();
 }
@@ -510,7 +510,7 @@ TEST_F(TaskExecutorCursorFixture, LsidIsPassed) {
                            << "batchSize" << 1 << "lsid" << lsid.toBSON()),
                       scheduleSuccessfulCursorResponse("firstBatch", 1, 1, cursorId));
 
-    ASSERT_EQUALS(tec->getNext(opCtx.get()).get()["x"].Int(), 1);
+    ASSERT_EQUALS(tec->getNext(opCtx.get()).value()["x"].Int(), 1);
 
     // lsid in the getmore
     ASSERT_BSONOBJ_EQ(BSON("getMore" << 1LL << "collection"

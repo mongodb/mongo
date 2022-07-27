@@ -189,7 +189,7 @@ private:
             return;
         }
 
-        auto newAvgRtt = duration_cast<Milliseconds>(newServerDescription->getRtt().get());
+        auto newAvgRtt = duration_cast<Milliseconds>(newServerDescription->getRtt().value());
         if (newAvgRtt.compare(duration_cast<Milliseconds>(Milliseconds(_newAvgRtt))) != 0) {
             std::stringstream errorMessage;
             errorMessage << "new average RTT is incorrect, got '" << newAvgRtt

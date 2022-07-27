@@ -196,7 +196,7 @@ void onTransitionToBlocking(OperationContext* opCtx, const ShardSplitDonorDocume
         // Both primaries and secondaries call startBlockingReadsAfter in the op observer, since
         // startBlockingReadsAfter just needs to be called before the "start blocking" write's oplog
         // hole is filled.
-        mtab->startBlockingReadsAfter(donorStateDoc.getBlockTimestamp().get());
+        mtab->startBlockingReadsAfter(donorStateDoc.getBlockTimestamp().value());
     }
 }
 
@@ -211,12 +211,12 @@ void onTransitionToCommitted(OperationContext* opCtx,
     auto tenants = donorStateDoc.getTenantIds();
     invariant(tenants);
 
-    for (const auto& tenantId : tenants.get()) {
+    for (const auto& tenantId : tenants.value()) {
         auto mtab = tenant_migration_access_blocker::getTenantMigrationDonorAccessBlocker(
             opCtx->getServiceContext(), tenantId);
         invariant(mtab);
 
-        mtab->setCommitOpTime(opCtx, donorStateDoc.getCommitOrAbortOpTime().get());
+        mtab->setCommitOpTime(opCtx, donorStateDoc.getCommitOrAbortOpTime().value());
     }
 }
 
@@ -236,12 +236,12 @@ void onTransitionToAborted(OperationContext* opCtx, const ShardSplitDonorDocumen
         return;
     }
 
-    for (const auto& tenantId : tenants.get()) {
+    for (const auto& tenantId : tenants.value()) {
         auto mtab = tenant_migration_access_blocker::getTenantMigrationDonorAccessBlocker(
             opCtx->getServiceContext(), tenantId);
         invariant(mtab);
 
-        mtab->setAbortOpTime(opCtx, donorStateDoc.getCommitOrAbortOpTime().get());
+        mtab->setAbortOpTime(opCtx, donorStateDoc.getCommitOrAbortOpTime().value());
     }
 }
 
@@ -258,7 +258,7 @@ public:
     void commit(boost::optional<Timestamp>) override {
         if (_donorStateDoc.getExpireAt()) {
             if (_donorStateDoc.getTenantIds()) {
-                auto tenantIds = _donorStateDoc.getTenantIds().get();
+                auto tenantIds = _donorStateDoc.getTenantIds().value();
                 for (auto tenantId : tenantIds) {
                     auto mtab =
                         tenant_migration_access_blocker::getTenantMigrationDonorAccessBlocker(
@@ -286,7 +286,7 @@ public:
                         // design the donor never marks its state doc as garbage collectable
                         // before the migration decision is majority committed).
                         mtab->onMajorityCommitPointUpdate(
-                            _donorStateDoc.getCommitOrAbortOpTime().get());
+                            _donorStateDoc.getCommitOrAbortOpTime().value());
                     }
 
                     if (_donorStateDoc.getState() == ShardSplitDonorStateEnum::kAborted) {

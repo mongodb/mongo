@@ -391,7 +391,7 @@ MozJSImplScope::MozRuntime::MozRuntime(const MozJSScriptEngine* engine,
             //
             // TODO: What if we are running on a platform with very
             // large pages, like 4MB?
-            const auto available_stack_space = available.get();
+            const auto available_stack_space = available.value();
 
 #if defined(__powerpc64__) && defined(MONGO_CONFIG_DEBUG_BUILD)
             // From experimentation, we need a larger reservation of 96k since debug ppc64le

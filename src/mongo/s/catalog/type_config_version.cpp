@@ -69,19 +69,19 @@ void VersionType::cloneTo(VersionType* other) const {
 }
 
 Status VersionType::validate() const {
-    if (!_minCompatibleVersion.is_initialized()) {
+    if (!_minCompatibleVersion.has_value()) {
         return {ErrorCodes::NoSuchKey,
                 str::stream() << "missing " << minCompatibleVersion.name() << " field"};
     }
 
-    if (!_currentVersion.is_initialized()) {
+    if (!_currentVersion.has_value()) {
         return {ErrorCodes::NoSuchKey,
                 str::stream() << "missing " << currentVersion.name() << " field"};
     }
 
     // UpgradeHistory::UpgradeHistory_NoEpochVersion is the last version without a cluster id
     if (getCurrentVersion() > UpgradeHistory::UpgradeHistory_NoEpochVersion &&
-        !_clusterId.is_initialized()) {
+        !_clusterId.has_value()) {
         return {ErrorCodes::NoSuchKey, str::stream() << "missing " << clusterId.name() << " field"};
     }
 

@@ -875,7 +875,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::lowerScanNode(
 
         sbe::ScanCallbacks callbacks({}, {}, {});
         if (useParallelScan) {
-            return sbe::makeS<sbe::ParallelScanStage>(nss.uuid().get(),
+            return sbe::makeS<sbe::ParallelScanStage>(nss.uuid().value(),
                                                       rootSlot,
                                                       ridSlot,
                                                       boost::none,
@@ -888,7 +888,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::lowerScanNode(
                                                       planNodeId,
                                                       callbacks);
         } else {
-            return sbe::makeS<sbe::ScanStage>(nss.uuid().get(),
+            return sbe::makeS<sbe::ScanStage>(nss.uuid().value(),
                                               rootSlot,
                                               ridSlot,
                                               boost::none,
@@ -1014,7 +1014,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const IndexScanNode& n, co
     // Unused.
     boost::optional<sbe::value::SlotId> resultSlot;
 
-    return sbe::makeS<sbe::IndexScanStage>(nss.uuid().get(),
+    return sbe::makeS<sbe::IndexScanStage>(nss.uuid().value(),
                                            indexDefName,
                                            !indexSpec.isReverseOrder(),
                                            resultSlot,
@@ -1048,7 +1048,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const SeekNode& n,
 
     sbe::ScanCallbacks callbacks({}, {}, {});
     const PlanNodeId planNodeId = _nodeToGroupPropsMap.at(&n)._planNodeId;
-    return sbe::makeS<sbe::ScanStage>(nss.uuid().get(),
+    return sbe::makeS<sbe::ScanStage>(nss.uuid().value(),
                                       rootSlot,
                                       ridSlot,
                                       boost::none,

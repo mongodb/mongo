@@ -309,7 +309,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
             txnBob.append("_id", sessionId->toBSON());
             auto txnObj = txnBob.obj();
 
-            DocID txnDoc(txnObj, txnObj.firstElement(), transactionTableUUID.get());
+            DocID txnDoc(txnObj, txnObj.firstElement(), transactionTableUUID.value());
             txnDoc.ns = NamespaceString::kSessionTransactionsTableNamespace.ns();
 
             fixUpInfo.docsToRefetch.insert(txnDoc);
@@ -400,7 +400,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                         "Missing index name in dropIndexes operation on rollback.");
                 }
 
-                BSONObj obj2 = oplogEntry.getObject2().get().getOwned();
+                BSONObj obj2 = oplogEntry.getObject2().value().getOwned();
 
                 // Inserts the index name and the index spec of the index to be created into the map
                 // of index name and index specs that need to be created for the given collection.

@@ -65,10 +65,10 @@ void notifyChangeStreamsOnReshardCollectionComplete(OperationContext* opCtx,
 
     cmdBuilder.append("unique", doc.getUnique().get_value_or(false));
     if (doc.getNumInitialChunks()) {
-        cmdBuilder.append("numInitialChunks", doc.getNumInitialChunks().get());
+        cmdBuilder.append("numInitialChunks", doc.getNumInitialChunks().value());
     }
     if (doc.getCollation()) {
-        cmdBuilder.append("collation", doc.getCollation().get());
+        cmdBuilder.append("collation", doc.getCollation().value());
     }
 
     if (doc.getZones()) {

@@ -680,7 +680,7 @@ TEST(IDLVariantTests, TestVariantOptional) {
 
     // The optional key is absent.
     auto parsed = One_variant_optional::parse({"root"}, BSONObj());
-    ASSERT_FALSE(parsed.getValue().is_initialized());
+    ASSERT_FALSE(parsed.getValue().has_value());
     ASSERT_BSONOBJ_EQ(BSONObj(), parsed.toBSON());
 }
 
@@ -1302,8 +1302,8 @@ TEST(IDLFieldTests, TestOptionalFields) {
         assert_same_types<decltype(testStruct.getField5()),
                           boost::optional<std::array<std::uint8_t, 16>>>();
 
-        ASSERT_EQUALS("Foo", testStruct.getField1().get());
-        ASSERT_FALSE(testStruct.getField2().is_initialized());
+        ASSERT_EQUALS("Foo", testStruct.getField1().value());
+        ASSERT_FALSE(testStruct.getField2().has_value());
     }
 
     // Positive: Serialize struct with only string field
@@ -1324,8 +1324,8 @@ TEST(IDLFieldTests, TestOptionalFields) {
     {
         auto testDoc = BSON("field2" << 123);
         auto testStruct = Optional_field::parse(ctxt, testDoc);
-        ASSERT_FALSE(testStruct.getField1().is_initialized());
-        ASSERT_EQUALS(123, testStruct.getField2().get());
+        ASSERT_FALSE(testStruct.getField1().has_value());
+        ASSERT_EQUALS(123, testStruct.getField2().value());
     }
 
     // Positive: Serialize struct with only int field
@@ -1355,11 +1355,11 @@ TEST(IDLFieldTests, TestAlwaysSerializeFields) {
     assert_same_types<decltype(testStruct.getField4()), const boost::optional<mongo::BSONObj>&>();
     assert_same_types<decltype(testStruct.getField5()), const boost::optional<mongo::BSONObj>&>();
 
-    ASSERT_EQUALS("Foo", testStruct.getField1().get());
-    ASSERT_FALSE(testStruct.getField2().is_initialized());
-    ASSERT_BSONOBJ_EQ(BSON("a" << 1234), testStruct.getField3().get());
-    ASSERT_FALSE(testStruct.getField4().is_initialized());
-    ASSERT_FALSE(testStruct.getField5().is_initialized());
+    ASSERT_EQUALS("Foo", testStruct.getField1().value());
+    ASSERT_FALSE(testStruct.getField2().has_value());
+    ASSERT_BSONOBJ_EQ(BSON("a" << 1234), testStruct.getField3().value());
+    ASSERT_FALSE(testStruct.getField4().has_value());
+    ASSERT_FALSE(testStruct.getField5().has_value());
 
     BSONObjBuilder builder;
     testStruct.serialize(&builder);
@@ -1378,11 +1378,11 @@ void TestWeakType(TestT test_value) {
                                  << "field4" << test_value << "field5" << test_value);
     auto testStruct = Optional_field::parse(ctxt, testDoc);
 
-    ASSERT_FALSE(testStruct.getField1().is_initialized());
-    ASSERT_FALSE(testStruct.getField2().is_initialized());
-    ASSERT_FALSE(testStruct.getField3().is_initialized());
-    ASSERT_FALSE(testStruct.getField4().is_initialized());
-    ASSERT_FALSE(testStruct.getField5().is_initialized());
+    ASSERT_FALSE(testStruct.getField1().has_value());
+    ASSERT_FALSE(testStruct.getField2().has_value());
+    ASSERT_FALSE(testStruct.getField3().has_value());
+    ASSERT_FALSE(testStruct.getField4().has_value());
+    ASSERT_FALSE(testStruct.getField5().has_value());
 }
 
 // Positive: struct strict, and optional field works
@@ -1546,11 +1546,11 @@ TEST(IDLArrayTests, TestSimpleOptionalArrays) {
                       const boost::optional<std::vector<std::array<std::uint8_t, 16>>>&>();
 
     std::vector<StringData> field1{"Foo", "Bar", "???"};
-    ASSERT_TRUE(field1 == testStruct.getField1().get());
+    ASSERT_TRUE(field1 == testStruct.getField1().value());
     std::vector<std::int32_t> field2{1, 2, 3};
-    ASSERT_TRUE(field2 == testStruct.getField2().get());
+    ASSERT_TRUE(field2 == testStruct.getField2().value());
     std::vector<double> field3{1.2, 3.4, 5.6};
-    ASSERT_TRUE(field3 == testStruct.getField3().get());
+    ASSERT_TRUE(field3 == testStruct.getField3().value());
 
     // Positive: Test we can roundtrip from the just parsed document
     {
@@ -1731,9 +1731,9 @@ TEST(IDLArrayTests, TestArraysOfComplexTypes) {
     ASSERT_EQUALS(testStruct.getField6().size(), 2u);
     ASSERT_EQUALS(testStruct.getField6()[0].getValue(), "hello");
     ASSERT_EQUALS(testStruct.getField6()[1].getValue(), "world");
-    ASSERT_EQUALS(testStruct.getField6o().get().size(), 2u);
-    ASSERT_EQUALS(testStruct.getField6o().get()[0].getValue(), "goodbye");
-    ASSERT_EQUALS(testStruct.getField6o().get()[1].getValue(), "world");
+    ASSERT_EQUALS(testStruct.getField6o().value().size(), 2u);
+    ASSERT_EQUALS(testStruct.getField6o().value()[0].getValue(), "goodbye");
+    ASSERT_EQUALS(testStruct.getField6o().value()[1].getValue(), "world");
 }
 
 template <typename ParserT, BinDataType bindata_type>
@@ -2475,7 +2475,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS) {
     auto testStruct = BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMR(testDoc));
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getField2(), "five");
-    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().nss().get(), NamespaceString("db.coll1"));
+    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().nss().value(), NamespaceString("db.coll1"));
 
     assert_same_types<decltype(testStruct.getNamespaceOrUUID()), const NamespaceStringOrUUID&>();
 
@@ -2521,7 +2521,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS_WithTenant) {
     const auto kTenantId = TenantId(OID::gen());
     auto testStruct =
         BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMRWithTenant(testDoc, kTenantId));
-    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().nss().get(),
+    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().nss().value(),
                   NamespaceString(kTenantId, "db.coll1"));
 
     assert_same_types<decltype(testStruct.getNamespaceOrUUID()), const NamespaceStringOrUUID&>();
@@ -2545,7 +2545,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID) {
     auto testStruct = BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMR(testDoc));
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getField2(), "five");
-    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().uuid().get(), uuid);
+    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().uuid().value(), uuid);
 
     assert_same_types<decltype(testStruct.getNamespaceOrUUID()), const NamespaceStringOrUUID&>();
 
@@ -2593,7 +2593,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID_WithTenant) {
     const auto kTenantId = TenantId(OID::gen());
     auto testStruct =
         BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMRWithTenant(testDoc, kTenantId));
-    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().dbName().get(), DatabaseName(kTenantId, "db"));
+    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().dbName().value(), DatabaseName(kTenantId, "db"));
 
     assert_same_types<decltype(testStruct.getNamespaceOrUUID()), const NamespaceStringOrUUID&>();
 
@@ -3808,7 +3808,7 @@ TEST(IDLCommand, BasicNamespaceConstGetterCommand_TestNonConstGetterGeneration) 
 
     auto testStruct = BasicNamespaceConstGetterCommand::parse(ctxt, makeOMR(testDoc));
     ASSERT_EQUALS(testStruct.getField1(), 3);
-    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().uuid().get(), uuid);
+    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().uuid().value(), uuid);
 
     // Verify that both const and non-const getters are generated.
     assert_same_types<decltype(

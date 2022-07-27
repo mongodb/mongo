@@ -202,8 +202,8 @@ void ReplIndexBuildState::onOplogAbort(OperationContext* opCtx, const NamespaceS
     LOGV2(3856206,
           "Aborting index build from oplog entry",
           "buildUUID"_attr = buildUUID,
-          "abortTimestamp"_attr = _indexBuildState.getTimestamp().get(),
-          "abortReason"_attr = _indexBuildState.getAbortReason().get(),
+          "abortTimestamp"_attr = _indexBuildState.getTimestamp().value(),
+          "abortReason"_attr = _indexBuildState.getAbortReason().value(),
           "collectionUUID"_attr = collectionUUID);
 }
 
@@ -436,7 +436,7 @@ Status ReplIndexBuildState::onConflictWithNewIndexBuild(const ReplIndexBuildStat
     }
     if (existingIndexBuildState.isAborted()) {
         if (auto abortReason = existingIndexBuildState.getAbortReason()) {
-            ss << ", abort reason: " << abortReason.get();
+            ss << ", abort reason: " << abortReason.value();
         }
         aborted = true;
     }

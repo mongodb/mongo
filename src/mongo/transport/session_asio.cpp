@@ -719,7 +719,7 @@ Future<bool> TransportLayerASIO::ASIOSession::maybeHandshakeSSLForIngress(
         };
         return doHandshake().then([this](size_t size) {
             if (_sslSocket->get_sni()) {
-                auto sniName = _sslSocket->get_sni().get();
+                auto sniName = _sslSocket->get_sni().value();
                 LOGV2_DEBUG(
                     4908000, 2, "Client connected with SNI extension", "sniName"_attr = sniName);
             } else {

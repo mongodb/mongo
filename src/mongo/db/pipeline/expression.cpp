@@ -1723,11 +1723,11 @@ Value ExpressionDateFromString::evaluate(const Document& root, Variables* variab
             }
 
             return Value(getExpressionContext()->timeZoneDatabase->fromString(
-                dateTimeString, timeZone.get(), formatValue.getStringData()));
+                dateTimeString, timeZone.value(), formatValue.getStringData()));
         }
 
         return Value(
-            getExpressionContext()->timeZoneDatabase->fromString(dateTimeString, timeZone.get()));
+            getExpressionContext()->timeZoneDatabase->fromString(dateTimeString, timeZone.value()));
     } catch (const ExceptionFor<ErrorCodes::ConversionFailure>&) {
         if (_onError) {
             return _onError->evaluate(root, variables);
@@ -7544,7 +7544,7 @@ Value ExpressionDateArithmetics::evaluate(const Document& root, Variables* varia
             amount.integral64Bit());
 
     return evaluateDateArithmetics(
-        startDate.coerceToDate(), unit, amount.coerceToLong(), timezone.get());
+        startDate.coerceToDate(), unit, amount.coerceToLong(), timezone.value());
 }
 
 /* ----------------------- ExpressionDateAdd ---------------------------- */

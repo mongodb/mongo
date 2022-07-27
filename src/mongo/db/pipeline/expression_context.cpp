@@ -241,37 +241,38 @@ void ExpressionContext::startExpressionCounters() {
 
 void ExpressionContext::incrementMatchExprCounter(StringData name) {
     if (enabledCounters && _expressionCounters) {
-        ++_expressionCounters.get().matchExprCountersMap[name];
+        ++_expressionCounters.value().matchExprCountersMap[name];
     }
 }
 
 void ExpressionContext::incrementAggExprCounter(StringData name) {
     if (enabledCounters && _expressionCounters) {
-        ++_expressionCounters.get().aggExprCountersMap[name];
+        ++_expressionCounters.value().aggExprCountersMap[name];
     }
 }
 
 void ExpressionContext::incrementGroupAccumulatorExprCounter(StringData name) {
     if (enabledCounters && _expressionCounters) {
-        ++_expressionCounters.get().groupAccumulatorExprCountersMap[name];
+        ++_expressionCounters.value().groupAccumulatorExprCountersMap[name];
     }
 }
 
 void ExpressionContext::incrementWindowAccumulatorExprCounter(StringData name) {
     if (enabledCounters && _expressionCounters) {
-        ++_expressionCounters.get().windowAccumulatorExprCountersMap[name];
+        ++_expressionCounters.value().windowAccumulatorExprCountersMap[name];
     }
 }
 
 void ExpressionContext::stopExpressionCounters() {
     if (enabledCounters && _expressionCounters) {
         operatorCountersMatchExpressions.mergeCounters(
-            _expressionCounters.get().matchExprCountersMap);
-        operatorCountersAggExpressions.mergeCounters(_expressionCounters.get().aggExprCountersMap);
+            _expressionCounters.value().matchExprCountersMap);
+        operatorCountersAggExpressions.mergeCounters(
+            _expressionCounters.value().aggExprCountersMap);
         operatorCountersGroupAccumulatorExpressions.mergeCounters(
-            _expressionCounters.get().groupAccumulatorExprCountersMap);
+            _expressionCounters.value().groupAccumulatorExprCountersMap);
         operatorCountersWindowAccumulatorExpressions.mergeCounters(
-            _expressionCounters.get().windowAccumulatorExprCountersMap);
+            _expressionCounters.value().windowAccumulatorExprCountersMap);
     }
     _expressionCounters = boost::none;
 }

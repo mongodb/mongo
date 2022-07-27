@@ -129,8 +129,7 @@ Status isSpecOKClusteredIndexCheck(const BSONObj& indexSpec,
     }
 
     auto name = indexSpec.getStringField("name");
-    bool namesMatch =
-        !collInfo.is_initialized() || collInfo->getIndexSpec().getName().get() == name;
+    bool namesMatch = !collInfo.has_value() || collInfo->getIndexSpec().getName().value() == name;
 
 
     if (!keysMatch && !namesMatch) {
@@ -248,7 +247,7 @@ Status IndexCatalogImpl::init(OperationContext* opCtx, Collection* collection) {
             // to non _id indexes to the recovery timestamp. The _id index is left visible. It's
             // assumed if the collection is visible, it's _id is valid to be used.
             if (recoveryTs && !entry->descriptor()->isIdIndex()) {
-                entry->setMinimumVisibleSnapshot(recoveryTs.get());
+                entry->setMinimumVisibleSnapshot(recoveryTs.value());
             }
         }
     }
@@ -1292,7 +1291,7 @@ public:
     void commit(boost::optional<Timestamp> commitTime) final {
         if (commitTime) {
             HistoricalIdentTracker::get(_opCtx).recordDrop(
-                _entry->getIdent(), _nss, _uuid, commitTime.get());
+                _entry->getIdent(), _nss, _uuid, commitTime.value());
         }
 
         _entry->setDropped();

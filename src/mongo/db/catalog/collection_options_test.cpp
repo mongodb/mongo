@@ -313,7 +313,7 @@ TEST(CollectionOptions, ParseUUID) {
     // Check successful parse and roundtrip.
     options =
         assertGet(CollectionOptions::parse(uuid.toBSON(), CollectionOptions::parseForStorage));
-    ASSERT(options.uuid.get() == uuid);
+    ASSERT(options.uuid.value() == uuid);
 
     // Check that a collection options containing a UUID passes validation.
     ASSERT_OK(options.validateForStorage());

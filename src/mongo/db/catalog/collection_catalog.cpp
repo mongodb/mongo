@@ -172,7 +172,7 @@ public:
                     // fine because the collection should not be visible in the catalog until we
                     // call setCommitted(true).
                     if (commitTime) {
-                        collPtr->setMinimumVisibleSnapshot(commitTime.get());
+                        collPtr->setMinimumVisibleSnapshot(commitTime.value());
                     }
                     collPtr->setCommitted(true);
                     break;
@@ -180,7 +180,7 @@ public:
                 case UncommittedCatalogUpdates::Entry::Action::kReplacedViewsForDatabase: {
                     writeJobs.push_back(
                         [dbName = entry.nss.dbName(),
-                         &viewsForDb = entry.viewsForDb.get()](CollectionCatalog& catalog) {
+                         &viewsForDb = entry.viewsForDb.value()](CollectionCatalog& catalog) {
                             catalog._replaceViewsForDatabase(dbName, std::move(viewsForDb));
                         });
                     break;
@@ -920,8 +920,8 @@ boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(OperationCon
     auto foundIt = _catalog.find(uuid);
     if (foundIt != _catalog.end()) {
         boost::optional<NamespaceString> ns = foundIt->second->ns();
-        invariant(!ns.get().isEmpty());
-        return _collections.find(ns.get())->second->isCommitted() ? ns : boost::none;
+        invariant(!ns.value().isEmpty());
+        return _collections.find(ns.value())->second->isCommitted() ? ns : boost::none;
     }
 
     // Only in the case that the catalog is closed and a UUID is currently unknown, resolve it

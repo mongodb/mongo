@@ -75,9 +75,9 @@ void reopenAllDatabasesAndReloadCollectionCatalog(
             23992, 1, "openCatalog: dbholder reopening database", "db"_attr = dbName);
         auto db = databaseHolder->openDb(opCtx, dbName);
         invariant(db, str::stream() << "failed to reopen database " << dbName.toString());
-        for (auto&& collNss : catalogWriter.get()->getAllCollectionNamesFromDb(opCtx, dbName)) {
+        for (auto&& collNss : catalogWriter.value()->getAllCollectionNamesFromDb(opCtx, dbName)) {
             // Note that the collection name already includes the database component.
-            auto collection = catalogWriter.get()->lookupCollectionByNamespace(opCtx, collNss);
+            auto collection = catalogWriter.value()->lookupCollectionByNamespace(opCtx, collNss);
             invariant(collection,
                       str::stream()
                           << "failed to get valid collection pointer for namespace " << collNss);
@@ -95,8 +95,8 @@ void reopenAllDatabasesAndReloadCollectionCatalog(
                 auto minVisible = std::min(stableTimestamp,
                                            minVisibleTimestampMap.find(collection->uuid())->second);
                 auto writableCollection =
-                    catalogWriter.get()->lookupCollectionByUUIDForMetadataWrite(opCtx,
-                                                                                collection->uuid());
+                    catalogWriter.value()->lookupCollectionByUUIDForMetadataWrite(
+                        opCtx, collection->uuid());
                 writableCollection->setMinimumVisibleSnapshot(minVisible);
             }
 

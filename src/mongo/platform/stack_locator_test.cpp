@@ -49,12 +49,12 @@ TEST(StackLocator, StacLocatorFindsStackOfTestExecutorThread) {
 
     const auto available = locator.available();
     ASSERT_TRUE(available);
-    ASSERT_TRUE(available.get() > 0);
+    ASSERT_TRUE(available.value() > 0);
 
     const auto size = locator.size();
     ASSERT_TRUE(size);
-    ASSERT_TRUE(size.get() > 0);
-    ASSERT_TRUE(size.get() > available.get());
+    ASSERT_TRUE(size.value() > 0);
+    ASSERT_TRUE(size.value() > available.value());
 }
 
 TEST(StackLocator, StacksGrowsDown) {
@@ -101,7 +101,7 @@ struct LocatorThreadHelper {
         const StackLocator locator;
         located = static_cast<bool>(locator.available());
         if (located)
-            size = locator.size().get();
+            size = locator.size().value();
     }
 
     bool located = false;

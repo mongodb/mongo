@@ -719,7 +719,7 @@ StatusWith<TransportLayerASIO::ASIOSessionHandle> TransportLayerASIO::_doSyncCon
         std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext;
 #ifdef MONGO_CONFIG_SSL
         if (transientSSLParams) {
-            auto statusOrContext = createTransientSSLContext(transientSSLParams.get());
+            auto statusOrContext = createTransientSSLContext(transientSSLParams.value());
             uassertStatusOK(statusOrContext.getStatus());
             transientSSLContext = std::move(statusOrContext.getValue());
         }

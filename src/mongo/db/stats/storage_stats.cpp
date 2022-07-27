@@ -163,7 +163,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
             collation = collator->getSpec().toBSON();
         }
         auto clusteredSpec = clustered_util::formatClusterKeyForListIndexes(
-            collection->getClusteredInfo().get(), collation);
+            collection->getClusteredInfo().value(), collation);
         auto indexSpec = collection->getClusteredInfo()->getIndexSpec();
         auto nameOptional = indexSpec.getName();
         // An index name is always expected.

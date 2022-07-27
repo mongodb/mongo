@@ -2390,10 +2390,10 @@ std::shared_ptr<const HelloResponse> ReplicationCoordinatorImpl::awaitHelloRespo
                 "Waiting for a hello response from a topology change or until deadline: "
                 "{deadline}. Current TopologyVersion counter is {currentTopologyVersionCounter}",
                 "Waiting for a hello response from a topology change or until deadline",
-                "deadline"_attr = deadline.get(),
+                "deadline"_attr = deadline.value(),
                 "currentTopologyVersionCounter"_attr = topologyVersion.getCounter());
     auto statusWithHello =
-        futureGetNoThrowWithDeadline(opCtx, future, deadline.get(), opCtx->getTimeoutError());
+        futureGetNoThrowWithDeadline(opCtx, future, deadline.value(), opCtx->getTimeoutError());
     auto status = statusWithHello.getStatus();
 
     if (MONGO_unlikely(hangAfterWaitingForTopologyChangeTimesOut.shouldFail())) {
@@ -3796,7 +3796,7 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
                     ReadWriteConcernDefaults::get(opCtx->getServiceContext()).getDefault(opCtx);
                 const auto wcDefault = rwcDefaults.getDefaultWriteConcern();
                 if (wcDefault) {
-                    auto validateWCStatus = newConfig.validateWriteConcern(wcDefault.get());
+                    auto validateWCStatus = newConfig.validateWriteConcern(wcDefault.value());
                     if (!validateWCStatus.isOK()) {
                         return Status(ErrorCodes::NewReplicaSetConfigurationIncompatible,
                                       str::stream() << "May not remove custom write concern "
@@ -4987,16 +4987,16 @@ ReplicationCoordinatorImpl::_setCurrentRSConfig(WithLock lk,
     }
 
     // Wake up writeConcern waiters that are no longer satisfiable due to the rsConfig change.
-    _replicationWaiterList.setValueIf_inlock(
-        [this](const OpTime& opTime, const SharedWaiterHandle& waiter) {
-            invariant(waiter->writeConcern);
-            // This throws if a waiter's writeConcern is no longer satisfiable, in which case
-            // setValueIf_inlock will fulfill the waiter's promise with the error status.
-            uassertStatusOK(_checkIfWriteConcernCanBeSatisfied_inlock(waiter->writeConcern.get()));
-            // Return false meaning that the waiter is still satisfiable and thus can remain in the
-            // waiter list.
-            return false;
-        });
+    _replicationWaiterList.setValueIf_inlock([this](const OpTime& opTime,
+                                                    const SharedWaiterHandle& waiter) {
+        invariant(waiter->writeConcern);
+        // This throws if a waiter's writeConcern is no longer satisfiable, in which case
+        // setValueIf_inlock will fulfill the waiter's promise with the error status.
+        uassertStatusOK(_checkIfWriteConcernCanBeSatisfied_inlock(waiter->writeConcern.value()));
+        // Return false meaning that the waiter is still satisfiable and thus can remain in the
+        // waiter list.
+        return false;
+    });
 
     _cancelCatchupTakeover_inlock();
     _cancelPriorityTakeover_inlock();
@@ -5038,7 +5038,7 @@ void ReplicationCoordinatorImpl::_wakeReadyWaiters(WithLock lk, boost::optional<
     _replicationWaiterList.setValueIf_inlock(
         [this](const OpTime& opTime, const SharedWaiterHandle& waiter) {
             invariant(waiter->writeConcern);
-            return _doneWaitingForReplication_inlock(opTime, waiter->writeConcern.get());
+            return _doneWaitingForReplication_inlock(opTime, waiter->writeConcern.value());
         },
         opTime);
 }
@@ -6241,7 +6241,7 @@ void ReplicationCoordinatorImpl::_validateDefaultWriteConcernOnShardStartup(With
         // flag is set as we record it during sharding initialization phase, as on restarting a
         // shard node for upgrading or any other reason, sharding initialization happens before
         // config initialization.
-        if (_wasCWWCSetOnConfigServerOnStartup && !_wasCWWCSetOnConfigServerOnStartup.get() &&
+        if (_wasCWWCSetOnConfigServerOnStartup && !_wasCWWCSetOnConfigServerOnStartup.value() &&
             !_rsConfig.isImplicitDefaultWriteConcernMajority()) {
             auto msg =
                 "Cannot start shard because the implicit default write concern on this shard is "

@@ -118,7 +118,7 @@ void setPrePostImageTs(const ProcessOplogResult& lastResult, repl::MutableOplogE
     // the appropriate no-op. This code on the destination patches up the CRUD operation oplog entry
     // to look like the classic format.
     if (entry->getNeedsRetryImage()) {
-        switch (entry->getNeedsRetryImage().get()) {
+        switch (entry->getNeedsRetryImage().value()) {
             case repl::RetryImageEnum::kPreImage:
                 entry->setPreImageOpTime({repl::OpTime()});
                 break;

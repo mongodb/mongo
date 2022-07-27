@@ -89,12 +89,12 @@ void DurableHistoryRegistry::reconcilePins(OperationContext* opCtx) {
                            "ts"_attr = pinTs);
         if (pinTs) {
             auto swTimestamp =
-                engine->pinOldestTimestamp(opCtx, pin->getName(), pinTs.get(), false);
+                engine->pinOldestTimestamp(opCtx, pin->getName(), pinTs.value(), false);
             if (!swTimestamp.isOK()) {
                 LOGV2_WARNING(5384105,
                               "Unable to repin oldest timestamp",
                               "service"_attr = pin->getName(),
-                              "request"_attr = pinTs.get(),
+                              "request"_attr = pinTs.value(),
                               "error"_attr = swTimestamp.getStatus());
             }
         } else {

@@ -253,7 +253,7 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
             shardVersion.majorVersion() > 0);
 
     // Compute the max bound in case only `min` is set (moveRange)
-    if (!_args.getMax().is_initialized()) {
+    if (!_args.getMax().has_value()) {
         // TODO SERVER-64926 do not assume min always present
         const auto& min = *_args.getMin();
 

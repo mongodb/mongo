@@ -725,7 +725,7 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleExhaust
             stdx::unique_lock<Latch> lk(_mutex);
             if (_inShutdown_inlock() || cbState->exhaustErased.load()) {
                 if (cbState->exhaustIter) {
-                    _poolInProgressQueue.erase(cbState->exhaustIter.get());
+                    _poolInProgressQueue.erase(cbState->exhaustIter.value());
                     cbState->exhaustIter = boost::none;
                 }
                 return;
@@ -740,7 +740,7 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleExhaust
                 cbState->exhaustErased.store(1);
 
                 if (cbState->exhaustIter) {
-                    _poolInProgressQueue.erase(cbState->exhaustIter.get());
+                    _poolInProgressQueue.erase(cbState->exhaustIter.value());
                     cbState->exhaustIter = boost::none;
                 }
 
@@ -781,7 +781,7 @@ void ThreadPoolTaskExecutor::scheduleExhaustIntoPool_inlock(std::shared_ptr<Call
                                                             stdx::unique_lock<Latch> lk) {
     _poolInProgressQueue.push_back(cbState);
     cbState->exhaustIter = --_poolInProgressQueue.end();
-    auto expectedExhaustIter = cbState->exhaustIter.get();
+    auto expectedExhaustIter = cbState->exhaustIter.value();
     lk.unlock();
 
     if (cbState->baton) {
@@ -853,7 +853,7 @@ void ThreadPoolTaskExecutor::runCallbackExhaust(std::shared_ptr<CallbackState> c
     // 'expectedExhaustIter' so that we can still remove this task from the 'poolInProgressQueue' if
     // this happens, but we do not want to reset the 'exhaustIter' value in this case.
     if (cbState->exhaustIter) {
-        if (cbState->exhaustIter.get() == expectedExhaustIter) {
+        if (cbState->exhaustIter.value() == expectedExhaustIter) {
             cbState->exhaustIter = boost::none;
         }
         _poolInProgressQueue.erase(expectedExhaustIter);

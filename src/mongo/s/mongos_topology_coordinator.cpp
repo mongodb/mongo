@@ -171,11 +171,11 @@ std::shared_ptr<const MongosHelloResponse> MongosTopologyCoordinator::awaitHello
     LOGV2_DEBUG(4695502,
                 1,
                 "Waiting for a hello response from a topology change or until deadline",
-                "deadline"_attr = deadline.get(),
+                "deadline"_attr = deadline.value(),
                 "currentMongosTopologyVersionCounter"_attr = _topologyVersion.getCounter());
 
     auto statusWithHello =
-        futureGetNoThrowWithDeadline(opCtx, future, deadline.get(), opCtx->getTimeoutError());
+        futureGetNoThrowWithDeadline(opCtx, future, deadline.value(), opCtx->getTimeoutError());
     auto status = statusWithHello.getStatus();
 
     setCustomErrorInHelloResponseMongoS.execute([&](const BSONObj& data) {

@@ -109,9 +109,9 @@ public:
             // have a value for limit, otherwise, we apply it only once we have collected all
             // counts.
             if (countRequest.getLimit() && countRequest.getSkip()) {
-                const auto limit = countRequest.getLimit().get();
+                const auto limit = countRequest.getLimit().value();
                 if (limit != 0) {
-                    countRequest.setLimit(limit + countRequest.getSkip().get());
+                    countRequest.setLimit(limit + countRequest.getSkip().value());
                 }
             }
             countRequest.setSkip(boost::none);

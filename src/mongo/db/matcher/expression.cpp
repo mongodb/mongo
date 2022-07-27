@@ -191,11 +191,11 @@ MatchExpression::ErrorAnnotation::SchemaAnnotations::SchemaAnnotations(
 void MatchExpression::ErrorAnnotation::SchemaAnnotations::appendElements(
     BSONObjBuilder& builder) const {
     if (title) {
-        builder << JSONSchemaParser::kSchemaTitleKeyword << title.get();
+        builder << JSONSchemaParser::kSchemaTitleKeyword << title.value();
     }
 
     if (description) {
-        builder << JSONSchemaParser::kSchemaDescriptionKeyword << description.get();
+        builder << JSONSchemaParser::kSchemaDescriptionKeyword << description.value();
     }
 }
 }  // namespace mongo

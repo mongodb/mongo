@@ -89,8 +89,8 @@ public:
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
             const auto& collMod = request().getCollModRequest();
-            if (collMod.getTimeseries() && collMod.getTimeseries().get().getGranularity()) {
-                auto granularity = collMod.getTimeseries().get().getGranularity().get();
+            if (collMod.getTimeseries() && collMod.getTimeseries().value().getGranularity()) {
+                auto granularity = collMod.getTimeseries().value().getGranularity().value();
                 ShardingCatalogManager::get(opCtx)->updateTimeSeriesGranularity(
                     opCtx, ns(), granularity);
             }

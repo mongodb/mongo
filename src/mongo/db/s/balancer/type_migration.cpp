@@ -178,10 +178,10 @@ BSONObj MigrationType::toBSON() const {
 
     builder.append(waitForDelete.name(), _waitForDelete);
     builder.append(forceJumbo.name(), _forceJumbo);
-    if (_maxChunkSizeBytes.is_initialized()) {
+    if (_maxChunkSizeBytes.has_value()) {
         builder.appendNumber(maxChunkSizeBytes.name(), static_cast<long long>(*_maxChunkSizeBytes));
     }
-    if (_secondaryThrottle.is_initialized()) {
+    if (_secondaryThrottle.has_value()) {
         _secondaryThrottle->append(&builder);
     }
     return builder.obj();

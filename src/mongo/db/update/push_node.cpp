@@ -179,9 +179,9 @@ BSONObj PushNode::operatorValue() const {
                 eachBuilder << value;
         }
         if (_slice)
-            subBuilder << "$slice" << _slice.get();
+            subBuilder << "$slice" << _slice.value();
         if (_position)
-            subBuilder << "$position" << _position.get();
+            subBuilder << "$position" << _position.value();
         if (_sort) {
             // The sort pattern is stored in a dummy enclosing object that we must unwrap.
             if (_sort->useWholeValue)
@@ -214,15 +214,16 @@ ModifierNode::ModifyResult PushNode::insertElementsWithPosition(
     if (arraySize == 0) {
         invariant(array->pushBack(firstElementToInsert));
         result = ModifyResult::kNormalUpdate;
-    } else if (!position || position.get() > arraySize) {
+    } else if (!position || position.value() > arraySize) {
         invariant(array->pushBack(firstElementToInsert));
         result = ModifyResult::kArrayAppendUpdate;
-    } else if (position.get() > 0) {
-        auto insertAfter = getNthChild(*array, position.get() - 1);
+    } else if (position.value() > 0) {
+        auto insertAfter = getNthChild(*array, position.value() - 1);
         invariant(insertAfter.addSiblingRight(firstElementToInsert));
         result = ModifyResult::kNormalUpdate;
-    } else if (position.get() < 0 && safeApproximateAbs(position.get()) < arraySize) {
-        auto insertAfter = getNthChild(*array, arraySize - safeApproximateAbs(position.get()) - 1);
+    } else if (position.value() < 0 && safeApproximateAbs(position.value()) < arraySize) {
+        auto insertAfter =
+            getNthChild(*array, arraySize - safeApproximateAbs(position.value()) - 1);
         invariant(insertAfter.addSiblingRight(firstElementToInsert));
         result = ModifyResult::kNormalUpdate;
     } else {
@@ -270,11 +271,11 @@ ModifierNode::ModifyResult PushNode::performPush(mutablebson::Element* element,
     }
 
     if (_slice) {
-        const auto sliceAbs = safeApproximateAbs(_slice.get());
+        const auto sliceAbs = safeApproximateAbs(_slice.value());
 
         while (static_cast<long long>(countChildren(*element)) > sliceAbs) {
             result = ModifyResult::kNormalUpdate;
-            if (_slice.get() >= 0) {
+            if (_slice.value() >= 0) {
                 invariant(element->popBack());
             } else {
                 // A negative value in '_slice' trims the array down to abs(_slice) but removes

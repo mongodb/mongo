@@ -378,7 +378,7 @@ SpeculativeAuthType speculateAuth(BSONObjBuilder* isMasterRequest,
         return SpeculativeAuthType::kNone;
     }
 
-    auto params = std::move(optParams.get());
+    auto params = std::move(optParams.value());
 
     auto ret = _speculateAuth(isMasterRequest,
                               mechanism,

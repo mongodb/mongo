@@ -227,7 +227,7 @@ TEST(CursorResponseTest, parseFromBSONVarsFieldCorrect) {
     ASSERT_BSONOBJ_EQ(response.getBatch()[0], BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(response.getBatch()[1], BSON("_id" << 2));
     ASSERT_TRUE(response.getVarsField());
-    ASSERT_BSONOBJ_EQ(response.getVarsField().get(), varsContents);
+    ASSERT_BSONOBJ_EQ(response.getVarsField().value(), varsContents);
 }
 
 TEST(CursorResponseTest, parseFromBSONVarsFieldWrongType) {
@@ -255,7 +255,7 @@ TEST(CursorResponseTest, parseFromBSONMultipleVars) {
     ASSERT_BSONOBJ_EQ(response.getBatch()[0], BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(response.getBatch()[1], BSON("_id" << 2));
     ASSERT_TRUE(response.getVarsField());
-    ASSERT_BSONOBJ_EQ(response.getVarsField().get(), varsContents);
+    ASSERT_BSONOBJ_EQ(response.getVarsField().value(), varsContents);
 }
 
 TEST(CursorResponseTest, roundTripThroughCursorResponseBuilderWithPartialResultsReturned) {

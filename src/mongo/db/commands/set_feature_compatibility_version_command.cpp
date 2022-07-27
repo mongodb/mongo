@@ -302,7 +302,7 @@ public:
                 auto fcvObj =
                     FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(opCtx);
                 auto fcvDoc = FeatureCompatibilityVersionDocument::parse(
-                    IDLParserContext("featureCompatibilityVersionDocument"), fcvObj.get());
+                    IDLParserContext("featureCompatibilityVersionDocument"), fcvObj.value());
                 changeTimestamp = fcvDoc.getChangeTimestamp();
                 uassert(5722800,
                         "The 'changeTimestamp' field is missing in the FCV document persisted by "

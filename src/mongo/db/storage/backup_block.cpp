@@ -134,7 +134,7 @@ void BackupBlock::_initialize(OperationContext* opCtx,
     // Check if the ident had a different value at the checkpoint timestamp. If so, we want to use
     // that instead as that will be the ident's value when restoring from the backup.
     boost::optional<std::pair<NamespaceString, UUID>> historicalEntry =
-        HistoricalIdentTracker::get(opCtx).lookup(_filenameStem, checkpointTimestamp.get());
+        HistoricalIdentTracker::get(opCtx).lookup(_filenameStem, checkpointTimestamp.value());
     if (historicalEntry) {
         _uuid = historicalEntry->second;
         _setNamespaceString(historicalEntry->first);

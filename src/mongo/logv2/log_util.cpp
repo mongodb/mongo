@@ -70,7 +70,7 @@ Status rotateLogs(bool renameFiles,
     LOGV2(23166, "Log rotation initiated", "suffix"_attr = suffix, "logType"_attr = logType);
 
     if (logType) {
-        auto it = logRotateCallbacks.find(logType.get());
+        auto it = logRotateCallbacks.find(logType.value());
         if (it == logRotateCallbacks.end()) {
             LOGV2_WARNING(6221500, "Unknown log type for rotate", "logType"_attr = logType);
             return Status(ErrorCodes::NoSuchKey, "Unknown log type for rotate");

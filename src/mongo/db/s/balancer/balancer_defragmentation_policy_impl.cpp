@@ -813,7 +813,7 @@ private:
                 _abort(DefragmentationPhaseEnum::kMergeAndMeasureChunks);
                 return;
             }
-            const uint64_t estimatedChunkSize = chunk.getEstimatedSizeBytes().get();
+            const uint64_t estimatedChunkSize = chunk.getEstimatedSizeBytes().value();
             _collectionChunks.emplace_back(chunk.getRange(), chunk.getShard(), estimatedChunkSize);
         }
 
@@ -1189,7 +1189,7 @@ public:
         // with no estimated size.
         for (const auto& chunk : collectionChunks) {
             auto chunkSize = chunk.getEstimatedSizeBytes();
-            if (!chunkSize || (uint64_t)chunkSize.get() > maxChunkSizeBytes) {
+            if (!chunkSize || (uint64_t)chunkSize.value() > maxChunkSizeBytes) {
                 pendingActionsByShards[chunk.getShard()].rangesToFindSplitPoints.emplace_back(
                     chunk.getMin(), chunk.getMax());
             }
@@ -1668,10 +1668,10 @@ void BalancerDefragmentationPolicyImpl::_initializeCollectionState(WithLock,
         return;
     }
     auto phaseToBuild = coll.getDefragmentationPhase()
-        ? coll.getDefragmentationPhase().get()
+        ? coll.getDefragmentationPhase().value()
         : DefragmentationPhaseEnum::kMergeAndMeasureChunks;
-    auto collectionPhase = _transitionPhases(
-        opCtx, coll, phaseToBuild, !coll.getDefragmentationPhase().is_initialized());
+    auto collectionPhase =
+        _transitionPhases(opCtx, coll, phaseToBuild, !coll.getDefragmentationPhase().has_value());
     while (collectionPhase && collectionPhase->isComplete() &&
            MONGO_likely(!skipDefragmentationPhaseTransition.shouldFail())) {
         collectionPhase = _transitionPhases(opCtx, coll, collectionPhase->getNextPhase());

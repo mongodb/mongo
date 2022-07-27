@@ -266,11 +266,11 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
     findCommand->setProjection(getDistinctProjection(std::string(parsedDistinct.getKey())));
 
     if (auto query = parsedDistinct.getQuery()) {
-        findCommand->setFilter(query.get().getOwned());
+        findCommand->setFilter(query.value().getOwned());
     }
 
     if (auto collation = parsedDistinct.getCollation()) {
-        findCommand->setCollation(collation.get().getOwned());
+        findCommand->setCollation(collation.value().getOwned());
     }
 
     // The IDL parser above does not handle generic command arguments. Since the underlying query

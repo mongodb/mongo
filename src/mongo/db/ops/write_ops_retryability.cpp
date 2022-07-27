@@ -58,7 +58,7 @@ void validateFindAndModifyRetryability(const write_ops::FindAndModifyCommandRequ
                                        const repl::OplogEntry& oplogWithCorrectLinks) {
     auto opType = oplogEntry.getOpType();
     auto ts = oplogEntry.getTimestamp();
-    const bool needsRetryImage = oplogEntry.getNeedsRetryImage().is_initialized();
+    const bool needsRetryImage = oplogEntry.getNeedsRetryImage().has_value();
 
     if (opType == repl::OpTypeEnum::kDelete) {
         uassert(
@@ -119,8 +119,8 @@ BSONObj extractPreOrPostImage(OperationContext* opCtx, const repl::OplogEntry& o
     DBDirectClient client(opCtx);
     if (oplog.getNeedsRetryImage()) {
         // Extract image from side collection.
-        LogicalSessionId sessionId = oplog.getSessionId().get();
-        TxnNumber txnNumber = oplog.getTxnNumber().get();
+        LogicalSessionId sessionId = oplog.getSessionId().value();
+        TxnNumber txnNumber = oplog.getTxnNumber().value();
         Timestamp ts = oplog.getTimestamp();
         auto curOp = CurOp::get(opCtx);
         const std::string existingNS = curOp->getNS();

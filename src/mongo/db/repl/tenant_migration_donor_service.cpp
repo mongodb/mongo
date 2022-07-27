@@ -298,7 +298,7 @@ TenantMigrationDonorService::Instance::Instance(ServiceContext* const serviceCon
         // The migration was resumed on stepup.
 
         if (_stateDoc.getAbortReason()) {
-            auto abortReasonBson = _stateDoc.getAbortReason().get();
+            auto abortReasonBson = _stateDoc.getAbortReason().value();
             auto code = abortReasonBson["code"].Int();
             auto errmsg = abortReasonBson["errmsg"].String();
             _abortReason = Status(ErrorCodes::Error(code), errmsg);
@@ -403,7 +403,7 @@ boost::optional<BSONObj> TenantMigrationDonorService::Instance::reportForCurrent
     bob.append("readPreference", _readPreference.toInnerBSON());
     bob.append("receivedCancellation", _abortRequested);
     if (_durableState) {
-        bob.append("lastDurableState", _durableState.get().state);
+        bob.append("lastDurableState", _durableState.value().state);
     } else {
         bob.appendUndefined("lastDurableState");
     }
@@ -589,7 +589,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
 
                                    invariant(_abortReason);
                                    BSONObjBuilder bob;
-                                   _abortReason.get().serializeErrorToBSON(&bob);
+                                   _abortReason.value().serializeErrorToBSON(&bob);
                                    _stateDoc.setAbortReason(bob.obj());
                                    break;
                                }
@@ -626,7 +626,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
                    });
 
                invariant(updateOpTime);
-               return updateOpTime.get();
+               return updateOpTime.value();
            })
         .until([](StatusWith<repl::OpTime> swOpTime) { return swOpTime.getStatus().isOK(); })
         .withBackoffBetweenIterations(kExponentialBackoff)

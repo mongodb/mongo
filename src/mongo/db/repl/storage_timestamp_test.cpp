@@ -431,7 +431,7 @@ public:
             printStackTrace();
             FAIL("Did not find any documents.");
         }
-        return optRecord.get().data.toBson();
+        return optRecord.value().data.toBson();
     }
 
     std::shared_ptr<BSONCollectionCatalogEntry::MetaData> getMetaDataAtTime(

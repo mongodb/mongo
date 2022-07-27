@@ -116,7 +116,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
         uassert(6050204,
                 "Maximum one of 'partitionBy' and 'partitionByFields can be specified in '$fill'",
                 !spec.getPartitionByFields());
-        auto partitionByField = partitionByUnparsedExpr.get();
+        auto partitionByField = partitionByUnparsedExpr.value();
         if (std::string* partitionByString = stdx::get_if<std::string>(&partitionByField)) {
             setWindowFieldsSpec.append("partitionBy", *partitionByString);
         } else

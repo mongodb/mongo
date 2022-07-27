@@ -410,7 +410,7 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
         if (upsertedId) {
             auto upsertDetail = std::make_unique<BatchedUpsertDetail>();
             upsertDetail->setIndex(0);
-            upsertDetail->setUpsertedID(upsertedId.get());
+            upsertDetail->setUpsertedID(upsertedId.value());
             response->addToUpsertDetails(upsertDetail.release());
         } else {
             response->setNModified(response->getNModified() + 1);
@@ -615,10 +615,10 @@ bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
     CurOp::get(opCtx)->debug().nShards =
         stats.getTargetedShards().size() + (updatedShardKey ? 1 : 0);
 
-    if (stats.getNumShardsOwningChunks().is_initialized())
+    if (stats.getNumShardsOwningChunks().has_value())
         updateHostsTargetedMetrics(opCtx,
                                    _batchedRequest.getBatchType(),
-                                   stats.getNumShardsOwningChunks().get(),
+                                   stats.getNumShardsOwningChunks().value(),
                                    stats.getTargetedShards().size() + (updatedShardKey ? 1 : 0));
 
     if (auto txnRouter = TransactionRouter::get(opCtx)) {

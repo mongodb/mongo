@@ -214,7 +214,7 @@ BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
             invariant(_collectionOptions.clusteredIndex);
             invariant(spec.getBoolField("clustered") == true);
             invariant(clustered_util::formatClusterKeyForListIndexes(
-                          _collectionOptions.clusteredIndex.get(), _collectionOptions.collation)
+                          _collectionOptions.clusteredIndex.value(), _collectionOptions.collation)
                           .woCompare(spec) == 0);
             // Skip if the spec is for the collection's clusteredIndex.
         } else if (spec.hasField("buildUUID")) {
@@ -323,7 +323,7 @@ void CollectionCloner::runQuery() {
         // Resume the query from where we left off.
         LOGV2_DEBUG(21133, 1, "Collection cloner will resume the last successful query");
         findCmd.setRequestResumeToken(true);
-        findCmd.setResumeAfter(_resumeToken.get());
+        findCmd.setResumeAfter(_resumeToken.value());
     } else {
         // New attempt at a resumable query.
         LOGV2_DEBUG(21134, 1, "Collection cloner will run a new query");

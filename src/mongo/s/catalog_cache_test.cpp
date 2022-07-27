@@ -323,7 +323,7 @@ TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
         ASSERT_OK(swChunkManager.getStatus());
 
         const auto& chunkManager = swChunkManager.getValue();
-        ASSERT(chunkManager.getTimeseriesFields().is_initialized());
+        ASSERT(chunkManager.getTimeseriesFields().has_value());
         ASSERT(chunkManager.getTimeseriesFields()->getGranularity() ==
                BucketGranularityEnum::Seconds);
     }
@@ -348,7 +348,7 @@ TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
         ASSERT_OK(swChunkManager.getStatus());
 
         const auto& chunkManager = swChunkManager.getValue();
-        ASSERT(chunkManager.getTimeseriesFields().is_initialized());
+        ASSERT(chunkManager.getTimeseriesFields().has_value());
         ASSERT(chunkManager.getTimeseriesFields()->getGranularity() ==
                BucketGranularityEnum::Hours);
     }

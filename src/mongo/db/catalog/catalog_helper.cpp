@@ -81,7 +81,7 @@ void assertIsPrimaryShardForDb(OperationContext* opCtx, const StringData& dbName
     AutoGetDb autoDb(opCtx, dbName, MODE_IS);
     invariant(autoDb.getDb());
 
-    const auto primaryShardId = DatabaseHolder::get(opCtx)->getDbPrimary(opCtx, dbName).get();
+    const auto primaryShardId = DatabaseHolder::get(opCtx)->getDbPrimary(opCtx, dbName).value();
     const auto thisShardId = ShardingState::get(opCtx)->shardId();
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "This is not the primary shard for the database " << dbName

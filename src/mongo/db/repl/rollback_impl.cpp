@@ -926,7 +926,7 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
             // We call BSONElement::wrap() on each _id element to create a new BSONObj with an owned
             // buffer, as the underlying storage may be gone when we access this map to write
             // rollback files.
-            _observerInfo.rollbackDeletedIdsMap[uuid.get()].insert(idElem.wrap());
+            _observerInfo.rollbackDeletedIdsMap[uuid.value()].insert(idElem.wrap());
             const auto cmdName = opType == OpTypeEnum::kInsert ? kInsertCmdName : kUpdateCmdName;
             ++_observerInfo.rollbackCommandCounts[cmdName];
         }
@@ -955,16 +955,16 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
         }
 
         // Rolling back an insert must decrement the count by 1.
-        _countDiffs[oplogEntry.getUuid().get()] -= 1;
+        _countDiffs[oplogEntry.getUuid().value()] -= 1;
     } else if (opType == OpTypeEnum::kDelete) {
         // Rolling back a delete must increment the count by 1.
-        _countDiffs[oplogEntry.getUuid().get()] += 1;
+        _countDiffs[oplogEntry.getUuid().value()] += 1;
     } else if (opType == OpTypeEnum::kCommand) {
         if (oplogEntry.getCommandType() == OplogEntry::CommandType::kCreate) {
             // If we roll back a create, then we do not need to change the size of that uuid.
-            _countDiffs.erase(oplogEntry.getUuid().get());
-            _pendingDrops.erase(oplogEntry.getUuid().get());
-            _newCounts.erase(oplogEntry.getUuid().get());
+            _countDiffs.erase(oplogEntry.getUuid().value());
+            _pendingDrops.erase(oplogEntry.getUuid().value());
+            _newCounts.erase(oplogEntry.getUuid().value());
         } else if (oplogEntry.getCommandType() == OplogEntry::CommandType::kImportCollection) {
             auto importEntry = mongo::ImportCollectionOplogEntry::parse(
                 IDLParserContext("importCollectionOplogEntry"), oplogEntry.getObject());
@@ -988,7 +988,7 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
             // collection is managed by the storage engine and is not accessible through the UUID
             // catalog.
             // Adding a _newCounts entry ensures that the count will be set after the rollback.
-            const auto uuid = oplogEntry.getUuid().get();
+            const auto uuid = oplogEntry.getUuid().value();
             invariant(_countDiffs.find(uuid) == _countDiffs.end(),
                       str::stream() << "Unexpected existing count diff for " << uuid.toString()
                                     << " op: " << redact(oplogEntry.toBSONForLogging()));

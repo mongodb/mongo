@@ -175,7 +175,7 @@ void checkForHolesAndOverlapsInChunks(std::vector<ReshardedChunk>& chunks,
         if (prevMax) {
             uassert(ErrorCodes::BadValue,
                     "Chunk ranges must be contiguous",
-                    SimpleBSONObjComparator::kInstance.evaluate(prevMax.get() == chunk.getMin()));
+                    SimpleBSONObjComparator::kInstance.evaluate(prevMax.value() == chunk.getMin()));
         }
         prevMax = boost::optional<BSONObj>(chunk.getMax());
     }
@@ -202,7 +202,7 @@ Timestamp getHighestMinFetchTimestamp(const std::vector<DonorShardEntry>& donorS
         uassert(4957300,
                 "All donors must have a minFetchTimestamp, but donor {} does not."_format(
                     StringData{donor.getId()}),
-                donorFetchTimestamp.is_initialized());
+                donorFetchTimestamp.has_value());
         if (maxMinFetchTimestamp < donorFetchTimestamp.value()) {
             maxMinFetchTimestamp = donorFetchTimestamp.value();
         }
@@ -221,7 +221,7 @@ void checkForOverlappingZones(std::vector<ReshardingZoneType>& zones) {
         if (prevMax) {
             uassert(ErrorCodes::BadValue,
                     "Zone ranges must not overlap",
-                    SimpleBSONObjComparator::kInstance.evaluate(prevMax.get() <= zone.getMin()));
+                    SimpleBSONObjComparator::kInstance.evaluate(prevMax.value() <= zone.getMin()));
         }
         prevMax = boost::optional<BSONObj>(zone.getMax());
     }

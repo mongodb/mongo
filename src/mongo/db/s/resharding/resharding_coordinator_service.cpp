@@ -355,13 +355,14 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
             BSONObj setFields =
                 BSON("uuid" << coordinatorDoc.getReshardingUUID() << "key"
                             << coordinatorDoc.getReshardingKey().toBSON() << "lastmodEpoch"
-                            << newCollectionEpoch.get() << "lastmod"
+                            << newCollectionEpoch.value() << "lastmod"
                             << opCtx->getServiceContext()->getPreciseClockSource()->now()
                             << "reshardingFields.state"
                             << CoordinatorState_serializer(coordinatorDoc.getState()).toString()
                             << "reshardingFields.recipientFields" << recipientFields.toBSON());
             if (newCollectionTimestamp.has_value()) {
-                setFields = setFields.addFields(BSON("timestamp" << newCollectionTimestamp.get()));
+                setFields =
+                    setFields.addFields(BSON("timestamp" << newCollectionTimestamp.value()));
             }
 
             return BSON("$set" << setFields);
@@ -441,7 +442,7 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
             case CoordinatorStateEnum::kPreparingToDonate: {
                 // Insert new entry for the temporary nss into config.collections
                 auto collType = resharding::createTempReshardingCollectionType(
-                    opCtx, coordinatorDoc, chunkVersion.get(), collation.get());
+                    opCtx, coordinatorDoc, chunkVersion.value(), collation.value());
                 return BatchedCommandRequest::buildInsertOp(
                     CollectionType::ConfigNS, std::vector<BSONObj>{collType.toBSON()});
             }
@@ -465,11 +466,11 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
                              "reshardingFields.state"
                              << CoordinatorState_serializer(nextState).toString()
                              << "reshardingFields.recipientFields.approxDocumentsToCopy"
-                             << coordinatorDoc.getApproxDocumentsToCopy().get()
+                             << coordinatorDoc.getApproxDocumentsToCopy().value()
                              << "reshardingFields.recipientFields.approxBytesToCopy"
-                             << coordinatorDoc.getApproxBytesToCopy().get()
+                             << coordinatorDoc.getApproxBytesToCopy().value()
                              << "reshardingFields.recipientFields.cloneTimestamp"
-                             << coordinatorDoc.getCloneTimestamp().get()
+                             << coordinatorDoc.getCloneTimestamp().value()
                              << "reshardingFields.recipientFields.donorShards"
                              << donorShardsBuilder.arr() << "lastmod"
                              << opCtx->getServiceContext()->getPreciseClockSource()->now())),

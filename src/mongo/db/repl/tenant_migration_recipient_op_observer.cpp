@@ -94,12 +94,12 @@ void onSetRejectReadsBeforeTimestamp(OperationContext* opCtx,
         auto mtab = tenant_migration_access_blocker::getTenantMigrationRecipientAccessBlocker(
             opCtx->getServiceContext(), recipientStateDoc.getTenantId());
         invariant(mtab);
-        mtab->startRejectingReadsBefore(recipientStateDoc.getRejectReadsBeforeTimestamp().get());
+        mtab->startRejectingReadsBefore(recipientStateDoc.getRejectReadsBeforeTimestamp().value());
     } else {
         tenant_migration_access_blocker::startRejectingReadsBefore(
             opCtx,
             recipientStateDoc.getId(),
-            recipientStateDoc.getRejectReadsBeforeTimestamp().get());
+            recipientStateDoc.getRejectReadsBeforeTimestamp().value());
     }
 }
 }  // namespace
@@ -285,7 +285,7 @@ void TenantMigrationRecipientOpObserver::onDelete(OperationContext* opCtx,
     if (nss == NamespaceString::kTenantMigrationRecipientsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         if (tenantIdToDeleteDecoration(opCtx)) {
-            auto tenantId = tenantIdToDeleteDecoration(opCtx).get();
+            auto tenantId = tenantIdToDeleteDecoration(opCtx).value();
             LOGV2_INFO(8423337,
                        "Removing expired 'multitenant migration' migration",
                        "tenantId"_attr = tenantId);
@@ -296,7 +296,7 @@ void TenantMigrationRecipientOpObserver::onDelete(OperationContext* opCtx,
         }
 
         if (migrationIdToDeleteDecoration(opCtx)) {
-            auto migrationId = migrationIdToDeleteDecoration(opCtx).get();
+            auto migrationId = migrationIdToDeleteDecoration(opCtx).value();
             LOGV2_INFO(6114101,
                        "Removing expired 'shard merge' migration",
                        "migrationId"_attr = migrationId);

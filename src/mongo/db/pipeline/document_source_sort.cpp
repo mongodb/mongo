@@ -436,7 +436,7 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::createBoundedSort(
     }
 
     if (limit) {
-        opts.Limit(limit.get());
+        opts.Limit(limit.value());
     }
 
     if (boundBase == kMin) {

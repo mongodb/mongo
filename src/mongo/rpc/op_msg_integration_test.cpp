@@ -1333,7 +1333,7 @@ public:
 
         auto uri = swURI.getValue();
         if (helloOk.has_value()) {
-            uri.setHelloOk(helloOk.get());
+            uri.setHelloOk(helloOk.value());
         }
 
         auto swConn = connStr.connect(_appName, 0, &uri);

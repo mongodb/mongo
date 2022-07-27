@@ -101,7 +101,7 @@ public:
             const auto& nss = request().getNamespaceOrUUID().nss();
             uassert(
                 ErrorCodes::BadValue, "Mongos requires a namespace for listIndexes command", nss);
-            return nss.get();
+            return nss.value();
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const final {

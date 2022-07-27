@@ -72,7 +72,7 @@ protected:
         _storageInterface.insertDocumentsFn = [this](OperationContext* opCtx,
                                                      const NamespaceStringOrUUID& nsOrUUID,
                                                      const std::vector<InsertStatement>& ops) {
-            const auto collInfo = &_collections[nsOrUUID.nss().get()];
+            const auto collInfo = &_collections[nsOrUUID.nss().value()];
             collInfo->numDocsInserted += ops.size();
             return Status::OK();
         };

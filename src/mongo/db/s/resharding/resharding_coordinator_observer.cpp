@@ -162,7 +162,7 @@ void ReshardingCoordinatorObserver::onReshardingParticipantTransition(
     const ReshardingCoordinatorDocument& updatedStateDoc) {
     stdx::lock_guard<Latch> lk(_mutex);
     if (auto abortReason = getAbortReasonIfExists(updatedStateDoc)) {
-        _onAbortOrStepdown(lk, abortReason.get());
+        _onAbortOrStepdown(lk, abortReason.value());
         // Don't exit early since the coordinator waits for all participants to report state 'done'.
     }
 

@@ -231,8 +231,8 @@ BSONObj ActiveMigrationsRegistry::getActiveMigrationStatusReport(OperationContex
     // desireable for reporting, and then diagnosing, migrations that are stuck.
     if (nss) {
         // Lock the collection so nothing changes while we're getting the migration report.
-        AutoGetCollection autoColl(opCtx, nss.get(), MODE_IS);
-        auto csr = CollectionShardingRuntime::get(opCtx, nss.get());
+        AutoGetCollection autoColl(opCtx, nss.value(), MODE_IS);
+        auto csr = CollectionShardingRuntime::get(opCtx, nss.value());
         auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
 
         if (auto msm = MigrationSourceManager::get(csr, csrLock)) {

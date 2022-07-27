@@ -258,11 +258,11 @@ void assertSessionIdMetadata(BSONObj obj,
 void assertAPIParameters(BSONObj obj, boost::optional<APIParameters> expectedParams) {
     if (expectedParams) {
         ASSERT_EQ(obj[APIParametersFromClient::kApiVersionFieldName].String(),
-                  expectedParams->getAPIVersion().get());
+                  expectedParams->getAPIVersion().value());
         ASSERT_EQ(obj[APIParametersFromClient::kApiStrictFieldName].Bool(),
-                  expectedParams->getAPIStrict().get());
+                  expectedParams->getAPIStrict().value());
         ASSERT_EQ(obj[APIParametersFromClient::kApiDeprecationErrorsFieldName].Bool(),
-                  expectedParams->getAPIDeprecationErrors().get());
+                  expectedParams->getAPIDeprecationErrors().value());
     } else {
         ASSERT(obj[APIParametersFromClient::kApiVersionFieldName].eoo());
         ASSERT(obj[APIParametersFromClient::kApiStrictFieldName].eoo());

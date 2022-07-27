@@ -206,7 +206,7 @@ auto translateOutReduce(boost::intrusive_ptr<ExpressionContext> expCtx,
     if (finalizeCode && finalizeCode->hasCode()) {
         auto finalizeObj = BSON("args" << BSON_ARRAY("$_id"
                                                      << "$value")
-                                       << "body" << finalizeCode->getCode().get() << "lang"
+                                       << "body" << finalizeCode->getCode().value() << "lang"
                                        << ExpressionFunction::kJavaScript);
         auto finalizeSpec =
             BSON(DocumentSourceProject::kStageName

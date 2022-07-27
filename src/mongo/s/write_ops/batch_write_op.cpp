@@ -293,7 +293,7 @@ int getEncryptionInformationSize(const BatchedCommandRequest& req) {
     if (!req.getWriteCommandRequestBase().getEncryptionInformation()) {
         return 0;
     }
-    return req.getWriteCommandRequestBase().getEncryptionInformation().get().toBSON().objsize();
+    return req.getWriteCommandRequestBase().getEncryptionInformation().value().toBSON().objsize();
 }
 
 }  // namespace

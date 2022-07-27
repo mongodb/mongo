@@ -222,7 +222,8 @@ void _doLogImpl(int32_t id,
                 record.attribute_values().insert(
                     attributes::tenant(),
                     boost::log::attribute_value(
-                        new boost::log::attributes::attribute_value_impl<TenantId>(tenant.get())));
+                        new boost::log::attributes::attribute_value_impl<TenantId>(
+                            tenant.value())));
             }
         }
 

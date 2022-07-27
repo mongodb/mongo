@@ -93,7 +93,7 @@ TEST(ClientMetadataTest, TestLoopbackTest) {
         auto obj = builder.obj();
         auto swParseStatus = ClientMetadata::parse(obj[kMetadataDoc]);
         ASSERT_OK(swParseStatus.getStatus());
-        ASSERT_EQUALS("g", swParseStatus.getValue().get().getApplicationName());
+        ASSERT_EQUALS("g", swParseStatus.getValue().value().getApplicationName());
 
         auto pid = ProcessId::getCurrent().toString();
 
@@ -147,7 +147,7 @@ TEST(ClientMetadataTest, TestLoopbackTest) {
 
         auto swParse = ClientMetadata::parse(obj[kMetadataDoc]);
         ASSERT_OK(swParse.getStatus());
-        ASSERT_EQUALS("f", swParse.getValue().get().getApplicationName());
+        ASSERT_EQUALS("f", swParse.getValue().value().getApplicationName());
     }
 }
 
@@ -312,12 +312,12 @@ TEST(ClientMetadataTest, TestMongoSAppend) {
     auto obj = builder.obj();
     auto swParseStatus = ClientMetadata::parse(obj[kMetadataDoc]);
     ASSERT_OK(swParseStatus.getStatus());
-    ASSERT_EQUALS("g", swParseStatus.getValue().get().getApplicationName());
+    ASSERT_EQUALS("g", swParseStatus.getValue().value().getApplicationName());
 
-    swParseStatus.getValue().get().setMongoSMetadata("h", "i", "j");
-    ASSERT_EQUALS("g", swParseStatus.getValue().get().getApplicationName());
+    swParseStatus.getValue().value().setMongoSMetadata("h", "i", "j");
+    ASSERT_EQUALS("g", swParseStatus.getValue().value().getApplicationName());
 
-    auto doc = swParseStatus.getValue().get().getDocument();
+    auto doc = swParseStatus.getValue().value().getDocument();
 
     constexpr auto kMongos = "mongos"_sd;
     constexpr auto kClient = "client"_sd;

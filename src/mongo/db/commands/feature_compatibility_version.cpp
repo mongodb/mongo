@@ -278,7 +278,7 @@ void FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
 
     auto fcvObj = findFeatureCompatibilityVersionDocument(opCtx);
     auto fcvDoc = FeatureCompatibilityVersionDocument::parse(
-        IDLParserContext("featureCompatibilityVersionDocument"), fcvObj.get());
+        IDLParserContext("featureCompatibilityVersionDocument"), fcvObj.value());
     auto previousTimestamp = fcvDoc.getChangeTimestamp();
 
     if (setFCVPhase == SetFCVPhaseEnum::kStart) {

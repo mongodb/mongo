@@ -73,7 +73,7 @@ void WindowFunctionExecRemovableDocument::initialize() {
     int lowerBoundForInit = _lowerBound > 0 ? _lowerBound : 0;
     // Run the loop until we hit the out of partition break (right unbounded) or we hit the upper
     // bound.
-    for (int i = lowerBoundForInit; !_upperBound || i <= _upperBound.get(); ++i) {
+    for (int i = lowerBoundForInit; !_upperBound || i <= _upperBound.value(); ++i) {
         // If this is false, we're over the end of the partition.
         if (auto doc = (this->_iter)[i]) {
             addValue(_input->evaluate(*doc, &_input->getExpressionContext()->variables));
@@ -93,7 +93,7 @@ void WindowFunctionExecRemovableDocument::update() {
     // If there is no upper bound, the whole partition is loaded by initialize.
     if (_upperBound) {
         // If this is false, we're over the end of the partition.
-        if (auto doc = (this->_iter)[_upperBound.get()]) {
+        if (auto doc = (this->_iter)[_upperBound.value()]) {
             addValue(_input->evaluate(*doc, &_input->getExpressionContext()->variables));
         }
     }

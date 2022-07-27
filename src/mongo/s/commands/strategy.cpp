@@ -538,7 +538,7 @@ void ParseAndRunCommand::_parseCommand() {
     Client* client = opCtx->getClient();
     const auto session = client->session();
     if (session) {
-        if (!opCtx->isExhaust() || !_isHello.get()) {
+        if (!opCtx->isExhaust() || !_isHello.value()) {
             InExhaustHello::get(session.get())->setInExhaust(false, _commandName);
         }
     }
@@ -632,7 +632,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     if (MONGO_unlikely(
             hangBeforeCheckingMongosShutdownInterrupt.shouldFail([&](const BSONObj& data) {
                 if (data.hasField("cmdName") && data.hasField("ns")) {
-                    std::string cmdNS = _parc->_ns.get();
+                    std::string cmdNS = _parc->_ns.value();
                     return ((data.getStringField("cmdName") == _parc->_commandName) &&
                             (data.getStringField("ns") == cmdNS));
                 }
@@ -650,7 +650,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
         return Status(ErrorCodes::SkipCommandExecution, status.reason());
     };
 
-    if (_parc->_isHello.get()) {
+    if (_parc->_isHello.value()) {
         // Preload generic ClientMetadata ahead of our first hello request. After the first
         // request, metaElement should always be empty.
         auto metaElem = request.body[kMetadataDocumentName];
@@ -812,7 +812,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
                 const auto readConcernSource = rwcDefaults.getDefaultReadConcernSource();
                 customDefaultReadConcernWasApplied =
                     (readConcernSource &&
-                     readConcernSource.get() == DefaultReadConcernSourceEnum::kGlobal);
+                     readConcernSource.value() == DefaultReadConcernSourceEnum::kGlobal);
 
                 applyDefaultReadConcern(*rcDefault);
             }

@@ -181,7 +181,7 @@ repl::OplogEntry makeRewrittenOplogInSession(repl::OpTime opTime,
                           *original.getTxnNumber(),
                           original.getStatementIds(),  // statement ids
                           original.getPrevWriteOpTimeInTransaction()
-                              .get());  // optime of previous write within same transaction
+                              .value());  // optime of previous write within same transaction
 };
 
 repl::DurableReplOperation makeDurableReplOp(
@@ -722,8 +722,8 @@ TEST_F(SessionCatalogMigrationSourceTest, ForgeImageEntriesWhenFetchingEntriesWi
     // Check that the key fields are what we expect. The destination will overwrite any unneeded
     // fields when it processes the incoming entries.
     ASSERT_BSONOBJ_EQ(preImage, nextOplogResult.oplog->getObject());
-    ASSERT_EQUALS(txnNumber, nextOplogResult.oplog->getTxnNumber().get());
-    ASSERT_EQUALS(sessionId, nextOplogResult.oplog->getSessionId().get());
+    ASSERT_EQUALS(txnNumber, nextOplogResult.oplog->getTxnNumber().value());
+    ASSERT_EQUALS(sessionId, nextOplogResult.oplog->getSessionId().value());
     ASSERT_EQUALS("n", repl::OpType_serializer(nextOplogResult.oplog->getOpType()));
     ASSERT_EQ(entry.getStatementIds().size(), nextOplogResult.oplog->getStatementIds().size());
     for (size_t i = 0; i < entry.getStatementIds().size(); i++) {

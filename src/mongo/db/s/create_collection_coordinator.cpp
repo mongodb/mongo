@@ -617,7 +617,7 @@ void CreateCollectionCoordinator::_createCollectionAndIndexes(OperationContext* 
     // We need to implicitly create a timeseries view and underlying bucket collection.
     if (_collectionEmpty && _request.getTimeseries()) {
         const auto viewName = nss().getTimeseriesViewNamespace();
-        auto createCmd = makeCreateCommand(viewName, collation, _request.getTimeseries().get());
+        auto createCmd = makeCreateCommand(viewName, collation, _request.getTimeseries().value());
 
         BSONObj createRes;
         DBDirectClient localClient(opCtx);

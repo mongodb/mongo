@@ -136,8 +136,8 @@ bool ReplicationConsistencyMarkersImpl::getInitialSyncFlag(OperationContext* opC
                 3,
                 "returning initial sync flag value of {flag}",
                 "Returning initial sync flag value",
-                "flag"_attr = flag.get());
-    return flag.get();
+                "flag"_attr = flag.value());
+    return flag.value();
 }
 
 void ReplicationConsistencyMarkersImpl::setInitialSyncFlag(OperationContext* opCtx) {
@@ -254,7 +254,7 @@ OpTime ReplicationConsistencyMarkersImpl::getAppliedThrough(OperationContext* op
                 "appliedThroughString"_attr = appliedThrough->toString(),
                 "appliedThroughBSON"_attr = appliedThrough->toBSON());
 
-    return appliedThrough.get();
+    return appliedThrough.value();
 }
 
 void ReplicationConsistencyMarkersImpl::ensureFastCountOnOplogTruncateAfterPoint(
@@ -481,17 +481,17 @@ ReplicationConsistencyMarkersImpl::refreshOplogTruncateAfterPointIfPrimary(
     // entry (it can be momentarily between oplog entry timestamps), _lastNoHolesOplogTimestamp
     // tracks the oplog entry so as to ensure we send out all updates before desisting until new
     // operations occur.
-    OpTime opTime = fassert(4455502, OpTime::parseFromOplogEntry(truncateOplogEntryBSON.get()));
+    OpTime opTime = fassert(4455502, OpTime::parseFromOplogEntry(truncateOplogEntryBSON.value()));
     _lastNoHolesOplogTimestamp = opTime.getTimestamp();
     _lastNoHolesOplogOpTimeAndWallTime = fassert(
         4455501,
-        OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplogEntry(truncateOplogEntryBSON.get()));
+        OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplogEntry(truncateOplogEntryBSON.value()));
 
     // Pass the _lastNoHolesOplogTimestamp timestamp down to the storage layer to prevent oplog
     // history lte to oplogTruncateAfterPoint from being entirely deleted. There should always be a
     // single oplog entry lte to the oplogTruncateAfterPoint. Otherwise there will not be a valid
     // oplog entry with which to update the caller.
-    _storageInterface->setPinnedOplogTimestamp(opCtx, _lastNoHolesOplogTimestamp.get());
+    _storageInterface->setPinnedOplogTimestamp(opCtx, _lastNoHolesOplogTimestamp.value());
 
     return _lastNoHolesOplogOpTimeAndWallTime;
 }

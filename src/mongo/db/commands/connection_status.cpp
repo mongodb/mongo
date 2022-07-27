@@ -52,7 +52,7 @@ public:
             ConnectionStatusReplyAuthInfo info;
             std::vector<UserName> userNames;
             if (auto userName = as->getAuthenticatedUserName()) {
-                userNames.push_back(std::move(userName.get()));
+                userNames.push_back(std::move(userName.value()));
             }
             info.setAuthenticatedUsers(std::move(userNames));
             info.setAuthenticatedUserRoles(
@@ -82,7 +82,7 @@ public:
             User::ResourcePrivilegeMap unified;
 
             if (auto authUser = as->getAuthenticatedUser()) {
-                for (const auto& privIter : authUser.get()->getPrivileges()) {
+                for (const auto& privIter : authUser.value()->getPrivileges()) {
                     auto it = unified.find(privIter.first);
                     if (it == unified.end()) {
                         unified[privIter.first] = privIter.second;

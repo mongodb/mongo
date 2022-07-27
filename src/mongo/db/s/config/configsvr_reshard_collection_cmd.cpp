@@ -111,7 +111,7 @@ public:
                     !request().getUnique().get_value_or(false));
 
             if (request().getCollation()) {
-                auto& collation = request().getCollation().get();
+                auto& collation = request().getCollation().value();
                 auto collator =
                     uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
                                         ->makeFromBSON(collation));
@@ -161,7 +161,7 @@ public:
                     // etc.
                     opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
                     reshardCollectionJoinedExistingOperation.pauseWhileSet(opCtx);
-                    existingInstance.get()->getCoordinatorDocWrittenFuture().get(opCtx);
+                    existingInstance.value()->getCoordinatorDocWrittenFuture().get(opCtx);
                     return existingInstance;
                 }
 
@@ -227,7 +227,7 @@ public:
             if (instance) {
                 // There is work to be done in order to have the collection's shard key match the
                 // requested shard key. Wait until the work is complete.
-                instance.get()->getCompletionFuture().get(opCtx);
+                instance.value()->getCompletionFuture().get(opCtx);
             }
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         }

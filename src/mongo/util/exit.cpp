@@ -71,7 +71,7 @@ void runTasks(decltype(shutdownTasks) tasks, const ShutdownTaskArgs& shutdownArg
 // prevent multiple threads from attempting to log that they are exiting. The quickExit() function
 // has its own 'quickExitMutex' to prohibit multiple threads from attempting to call _exit().
 MONGO_COMPILER_NORETURN void logAndQuickExit_inlock() {
-    ExitCode code = shutdownExitCode.get();
+    ExitCode code = shutdownExitCode.value();
     LOGV2(23138, "Shutting down with code: {exitCode}", "Shutting down", "exitCode"_attr = code);
     quickExit(code);
 }
@@ -93,7 +93,7 @@ ExitCode waitForShutdown() {
         return shutdownStarted && !shutdownTasksInProgress;
     });
 
-    return shutdownExitCode.get();
+    return shutdownExitCode.value();
 }
 
 void registerShutdownTask(unique_function<void(const ShutdownTaskArgs&)> task) {
@@ -115,7 +115,7 @@ void shutdown(ExitCode code, const ShutdownTaskArgs& shutdownArgs) {
             // Re-entrant calls to shutdown are not allowed.
             invariant(shutdownTasksThreadId != stdx::this_thread::get_id());
 
-            ExitCode originallyRequestedCode = shutdownExitCode.get();
+            ExitCode originallyRequestedCode = shutdownExitCode.value();
             if (code != originallyRequestedCode) {
                 LOGV2(23139,
                       "While running shutdown tasks with the intent to exit with code "

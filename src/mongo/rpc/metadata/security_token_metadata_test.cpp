@@ -103,7 +103,7 @@ TEST_F(SecurityTokenMetadataTest, BasicSuccess) {
     ASSERT_EQ(authedUser.getUser(), "user");
     ASSERT_EQ(authedUser.getDB(), "admin");
     ASSERT_TRUE(authedUser.getTenant() != boost::none);
-    ASSERT_EQ(authedUser.getTenant().get(), kTenantId);
+    ASSERT_EQ(authedUser.getTenant().value(), kTenantId);
 }
 
 }  // namespace

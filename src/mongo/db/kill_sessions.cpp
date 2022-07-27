@@ -82,14 +82,14 @@ getKillAllSessionsByPatternImpersonateData(const KillAllSessionsByPattern& patte
         uassert(ErrorCodes::BadValue,
                 "Too many users in impersonation data",
                 pattern.getUsers()->size() <= 1);
-        const auto& impUser = pattern.getUsers().get()[0];
+        const auto& impUser = pattern.getUsers().value()[0];
         user = UserName(impUser.getUser(), impUser.getDb());
     }
 
     if (pattern.getRoles()) {
         roles.reserve(pattern.getRoles()->size());
 
-        for (auto&& role : pattern.getRoles().get()) {
+        for (auto&& role : pattern.getRoles().value()) {
             roles.emplace_back(role.getRole(), role.getDb());
         }
     }
@@ -124,7 +124,7 @@ KillAllSessionsByPatternSet makeSessionFilterForAuthenticatedUsers(OperationCont
 
     if (auto user = as->getAuthenticatedUser()) {
         KillAllSessionsByPattern pattern;
-        pattern.setUid(user.get()->getDigest());
+        pattern.setUid(user.value()->getDigest());
         KillAllSessionsByPatternItem item{std::move(pattern), APIParameters::get(opCtx)};
         patterns.emplace(std::move(item));
     }

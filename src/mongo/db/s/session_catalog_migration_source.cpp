@@ -420,7 +420,7 @@ bool SessionCatalogMigrationSource::shouldSkipOplogEntry(const mongo::repl::Oplo
             // prevent a multi-statement transaction from being retried as a retryable write.
             return false;
         }
-        auto shardKey = shardKeyPattern.extractShardKeyFromOplogEntry(object2.get());
+        auto shardKey = shardKeyPattern.extractShardKeyFromOplogEntry(object2.value());
         return !chunkRange.containsKey(shardKey);
     }
 
@@ -506,7 +506,7 @@ bool SessionCatalogMigrationSource::_handleWriteHistory(WithLock lk, OperationCo
 
             // Skipping an entry here will also result in the pre/post images to also not be
             // sent in the migration as they're handled by 'fetchPrePostImageOplog' below.
-            if (shouldSkipOplogEntry(nextOplog.get(), _keyPattern, _chunkRange)) {
+            if (shouldSkipOplogEntry(nextOplog.value(), _keyPattern, _chunkRange)) {
                 continue;
             }
 
@@ -770,8 +770,8 @@ boost::optional<repl::OplogEntry> SessionCatalogMigrationSource::SessionOplogIte
             // Otherwise, skip the record by returning boost::none.
             auto result = [&]() -> boost::optional<repl::OplogEntry> {
                 if (!_record.getState() ||
-                    _record.getState().get() == DurableTxnStateEnum::kCommitted ||
-                    _record.getState().get() == DurableTxnStateEnum::kPrepared) {
+                    _record.getState().value() == DurableTxnStateEnum::kCommitted ||
+                    _record.getState().value() == DurableTxnStateEnum::kPrepared) {
                     return makeSentinelOplogEntry(
                         _record.getSessionId(),
                         _record.getTxnNum(),

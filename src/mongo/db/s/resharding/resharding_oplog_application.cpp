@@ -333,7 +333,7 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCt
     BSONObj oField = op.getObject();
     BSONObj o2Field;
     if (op.getObject2())
-        o2Field = op.getObject2().get();
+        o2Field = op.getObject2().value();
 
     // If the 'o2' field does not have an _id, the oplog entry is corrupted.
     auto idField = o2Field["_id"];

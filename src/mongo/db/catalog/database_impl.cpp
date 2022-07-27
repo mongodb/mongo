@@ -675,7 +675,7 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
                 return;
             }
 
-            HistoricalIdentTracker::get(opCtx).recordDrop(ident, nss, uuid, commitTime.get());
+            HistoricalIdentTracker::get(opCtx).recordDrop(ident, nss, uuid, commitTime.value());
         });
 
     CollectionCatalog::get(opCtx)->dropCollection(opCtx, collection);
@@ -737,16 +737,16 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
             writableCollection->getSharedIdent()->getIdent(),
             fromNss,
             writableCollection->uuid(),
-            commitTime.get());
+            commitTime.value());
 
         const auto readyIndexes = writableCollection->getIndexCatalog()->getAllReadyEntriesShared();
         for (const auto& readyIndex : readyIndexes) {
             HistoricalIdentTracker::get(opCtx).recordRename(
-                readyIndex->getIdent(), fromNss, writableCollection->uuid(), commitTime.get());
+                readyIndex->getIdent(), fromNss, writableCollection->uuid(), commitTime.value());
         }
 
         // Ban reading from this collection on committed reads on snapshots before now.
-        writableCollection->setMinimumVisibleSnapshot(commitTime.get());
+        writableCollection->setMinimumVisibleSnapshot(commitTime.value());
     });
 
     return status;
@@ -874,7 +874,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
           "createCollection",
           "namespace"_attr = nss,
           "uuidDisposition"_attr = (generatedUUID ? "generated" : "provided"),
-          "uuid"_attr = optionsWithUUID.uuid.get(),
+          "uuid"_attr = optionsWithUUID.uuid.value(),
           "options"_attr = options);
 
     // Create Collection object

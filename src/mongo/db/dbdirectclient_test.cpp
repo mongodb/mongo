@@ -75,7 +75,7 @@ TEST_F(DBDirectClientTest, InsertDuplicateDocumentDoesNotThrow) {
     insertOp.setDocuments({BSON("_id" << 1), BSON("_id" << 1)});
     auto insertReply = client.insert(insertOp);
     ASSERT_EQ(insertReply.getN(), 1);
-    auto writeErrors = insertReply.getWriteErrors().get();
+    auto writeErrors = insertReply.getWriteErrors().value();
     ASSERT_EQ(writeErrors.size(), 1);
     ASSERT_EQ(writeErrors[0].getStatus(), ErrorCodes::DuplicateKey);
 }
@@ -111,7 +111,7 @@ TEST_F(DBDirectClientTest, UpdateDuplicateImmutableFieldDoesNotThrow) {
     auto updateReply = client.update(updateOp);
     ASSERT_EQ(updateReply.getN(), 0);
     ASSERT_EQ(updateReply.getNModified(), 0);
-    auto writeErrors = updateReply.getWriteErrors().get();
+    auto writeErrors = updateReply.getWriteErrors().value();
     ASSERT_EQ(writeErrors.size(), 1);
     ASSERT_EQ(writeErrors[0].getStatus(), ErrorCodes::ImmutableField);
 }
@@ -152,7 +152,7 @@ TEST_F(DBDirectClientTest, DeleteDocumentIncorrectHintDoesNotThrow) {
     }()});
     auto deleteReply = client.remove(deleteOp);
     ASSERT_EQ(deleteReply.getN(), 0);
-    auto writeErrors = deleteReply.getWriteErrors().get();
+    auto writeErrors = deleteReply.getWriteErrors().value();
     ASSERT_EQ(writeErrors.size(), 1);
     ASSERT_EQ(writeErrors[0].getStatus(), ErrorCodes::BadValue);
 }

@@ -294,14 +294,14 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
         ASSERT_BSONOBJ_EQ(prePostImage, forgedImageEntry.getObject());
         ASSERT_EQUALS(nss, forgedImageEntry.getNss());
         ASSERT_EQUALS(uuid, *forgedImageEntry.getUuid());
-        ASSERT_EQUALS(txnNum, forgedImageEntry.getTxnNumber().get());
-        ASSERT_EQUALS(sessionId, forgedImageEntry.getSessionId().get());
+        ASSERT_EQUALS(txnNum, forgedImageEntry.getTxnNumber().value());
+        ASSERT_EQUALS(sessionId, forgedImageEntry.getSessionId().value());
         ASSERT_EQUALS("n", repl::OpType_serializer(forgedImageEntry.getOpType()));
         const auto stmtIds = forgedImageEntry.getStatementIds();
         ASSERT_EQUALS(1U, stmtIds.size());
         ASSERT_EQUALS(stmtId, stmtIds.front());
         ASSERT_EQUALS(ts - 1, forgedImageEntry.getTimestamp());
-        ASSERT_EQUALS(1, forgedImageEntry.getTerm().get());
+        ASSERT_EQUALS(1, forgedImageEntry.getTerm().value());
 
         // The next doc should be the doc for the original findAndModify oplog entry with the
         // 'needsRetryImage' field removed and 'preImageOpTime'/'postImageOpTime' field appended.
@@ -394,14 +394,14 @@ TEST_F(FindAndModifyImageLookupTest, ShouldForgeImageEntryWhenMatchingImageDocIs
         ASSERT_BSONOBJ_EQ(prePostImage, forgedImageEntry.getObject());
         ASSERT_EQUALS(nss, forgedImageEntry.getNss());
         ASSERT_EQUALS(uuid, *forgedImageEntry.getUuid());
-        ASSERT_EQUALS(txnNum, forgedImageEntry.getTxnNumber().get());
-        ASSERT_EQUALS(sessionId, forgedImageEntry.getSessionId().get());
+        ASSERT_EQUALS(txnNum, forgedImageEntry.getTxnNumber().value());
+        ASSERT_EQUALS(sessionId, forgedImageEntry.getSessionId().value());
         ASSERT_EQUALS("n", repl::OpType_serializer(forgedImageEntry.getOpType()));
         const auto stmtIds = forgedImageEntry.getStatementIds();
         ASSERT_EQUALS(1U, stmtIds.size());
         ASSERT_EQUALS(stmtId, stmtIds.front());
         ASSERT_EQUALS(applyOpsTs - 1, forgedImageEntry.getTimestamp());
-        ASSERT_EQUALS(1, forgedImageEntry.getTerm().get());
+        ASSERT_EQUALS(1, forgedImageEntry.getTerm().value());
 
         // The next doc should be the doc for original applyOps oplog entry but the
         // findAndModify/update operation entry should have 'needsRetryImage' field removed and

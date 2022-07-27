@@ -82,7 +82,7 @@ RemoteCommandRequestBase::RemoteCommandRequestBase(RequestId requestId,
 
     if (options.isHedgeEnabled) {
         operationKey.emplace(UUID::gen());
-        cmdObj = cmdObj.addField(BSON("clientOperationKey" << operationKey.get()).firstElement());
+        cmdObj = cmdObj.addField(BSON("clientOperationKey" << operationKey.value()).firstElement());
     }
 
     if (opCtx && APIParameters::get(opCtx).getParamsPassed()) {
@@ -172,7 +172,7 @@ std::string RemoteCommandRequestImpl<T>::toString() const {
     if (options.isHedgeEnabled) {
         invariant(operationKey);
         out << " options.hedgeCount: " << options.hedgeCount;
-        out << " operationKey: " << operationKey.get();
+        out << " operationKey: " << operationKey.value();
     }
 
     out << " cmd:" << cmdObj.toString();

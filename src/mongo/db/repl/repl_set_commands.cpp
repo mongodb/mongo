@@ -152,7 +152,7 @@ public:
                         StorageInterface::get(getGlobalServiceContext())
                             ->getLastStableRecoveryTimestamp(getGlobalServiceContext());
                     if (ts) {
-                        result.append("lastStableRecoveryTimestamp", ts.get());
+                        result.append("lastStableRecoveryTimestamp", ts.value());
                     }
                 } else {
                     LOGV2_WARNING(6100700,

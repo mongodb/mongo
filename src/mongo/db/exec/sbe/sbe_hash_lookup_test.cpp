@@ -90,7 +90,7 @@ public:
         if (collator) {
             // Setup collator and insert it into the ctx.
             collatorSlot = generateSlotId();
-            ctx->pushCorrelated(collatorSlot.get(), &collatorAccessor);
+            ctx->pushCorrelated(collatorSlot.value(), &collatorAccessor);
             collatorAccessor.reset(value::TypeTags::collator,
                                    value::bitcastFrom<CollatorInterface*>(collator));
         }

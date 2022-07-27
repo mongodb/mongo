@@ -213,7 +213,7 @@ SharedSemiFuture<void> ClusterChunksResizePolicyImpl::activate(OperationContext*
           "maxChunkSizeBytes"_attr = defaultMaxChunksSizeBytes);
 
     stdx::lock_guard<Latch> lk(_stateMutex);
-    if (!_activeRequestPromise.is_initialized()) {
+    if (!_activeRequestPromise.has_value()) {
         invariant(!_unprocessedCollections && _collectionsBeingProcessed.empty());
         _defaultMaxChunksSizeBytes = defaultMaxChunksSizeBytes;
         invariant(_defaultMaxChunksSizeBytes > 0);
@@ -236,13 +236,13 @@ SharedSemiFuture<void> ClusterChunksResizePolicyImpl::activate(OperationContext*
 
 bool ClusterChunksResizePolicyImpl::isActive() {
     stdx::lock_guard<Latch> lk(_stateMutex);
-    return _activeRequestPromise.is_initialized();
+    return _activeRequestPromise.has_value();
 }
 
 void ClusterChunksResizePolicyImpl::stop() {
     {
         stdx::lock_guard<Latch> lk(_stateMutex);
-        if (_activeRequestPromise.is_initialized()) {
+        if (_activeRequestPromise.has_value()) {
             _collectionsBeingProcessed.clear();
             _unprocessedCollections = nullptr;
             _activeRequestPromise->setFrom(
@@ -261,7 +261,7 @@ StringData ClusterChunksResizePolicyImpl::getName() const {
 boost::optional<DefragmentationAction> ClusterChunksResizePolicyImpl::getNextStreamingAction(
     OperationContext* opCtx) {
     stdx::lock_guard<Latch> lk(_stateMutex);
-    if (!_activeRequestPromise.is_initialized()) {
+    if (!_activeRequestPromise.has_value()) {
         return boost::none;
     }
 
@@ -296,7 +296,7 @@ boost::optional<DefragmentationAction> ClusterChunksResizePolicyImpl::getNextStr
             }
 
             auto nextAction = collState.popNextAction(opCtx);
-            if (nextAction.is_initialized()) {
+            if (nextAction.has_value()) {
                 return nextAction;
             }
 
@@ -378,7 +378,7 @@ void ClusterChunksResizePolicyImpl::applyActionResult(OperationContext* opCtx,
     });
 
     stdx::lock_guard<Latch> lk(_stateMutex);
-    if (!_activeRequestPromise.is_initialized()) {
+    if (!_activeRequestPromise.has_value()) {
         return;
     }
 

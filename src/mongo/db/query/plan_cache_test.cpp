@@ -480,7 +480,7 @@ TEST(PlanCacheTest, WorksValueIncreases) {
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
     auto entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->works);
-    ASSERT_EQ(entry->works.get(), 10U);
+    ASSERT_EQ(entry->works.value(), 10U);
     ASSERT_FALSE(entry->isActive);
 
     decision = createDecision(1U, 50);
@@ -495,7 +495,7 @@ TEST(PlanCacheTest, WorksValueIncreases) {
     entry = assertGet(planCache.getEntry(key));
     ASSERT_FALSE(entry->isActive);
     ASSERT_TRUE(entry->works);
-    ASSERT_EQ(entry->works.get(), 20U);
+    ASSERT_EQ(entry->works.value(), 20U);
 
     decision = createDecision(1U, 30);
     auto callbacks2 = createCallback(*cq, *decision);
@@ -509,7 +509,7 @@ TEST(PlanCacheTest, WorksValueIncreases) {
     entry = assertGet(planCache.getEntry(key));
     ASSERT_FALSE(entry->isActive);
     ASSERT_TRUE(entry->works);
-    ASSERT_EQ(entry->works.get(), 40U);
+    ASSERT_EQ(entry->works.value(), 40U);
 
     decision = createDecision(1U, 25);
     auto callbacks3 = createCallback(*cq, *decision);
@@ -528,7 +528,7 @@ TEST(PlanCacheTest, WorksValueIncreases) {
     auto&& decision1 = entry->debugInfo->decision;
     ASSERT_EQ(decision1->getStats<PlanStageStats>().candidatePlanStats[0]->common.works, 25U);
     ASSERT_TRUE(entry->works);
-    ASSERT_EQ(entry->works.get(), 25U);
+    ASSERT_EQ(entry->works.value(), 25U);
 
     ASSERT_EQUALS(planCache.size(), 1U);
 
@@ -557,7 +557,7 @@ TEST(PlanCacheTest, WorksValueIncreasesByAtLeastOne) {
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
     auto entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->works);
-    ASSERT_EQ(entry->works.get(), 3U);
+    ASSERT_EQ(entry->works.value(), 3U);
     ASSERT_FALSE(entry->isActive);
 
     decision = createDecision(1U, 50);
@@ -574,7 +574,7 @@ TEST(PlanCacheTest, WorksValueIncreasesByAtLeastOne) {
     entry = assertGet(planCache.getEntry(key));
     ASSERT_FALSE(entry->isActive);
     ASSERT_TRUE(entry->works);
-    ASSERT_EQ(entry->works.get(), 4U);
+    ASSERT_EQ(entry->works.value(), 4U);
 
     // Clear the plan cache. The inactive entry should now be removed.
     planCache.clear();
@@ -598,7 +598,7 @@ TEST(PlanCacheTest, SetIsNoopWhenNewEntryIsWorse) {
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
     auto entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->works);
-    ASSERT_EQ(entry->works.get(), 50U);
+    ASSERT_EQ(entry->works.value(), 50U);
     ASSERT_FALSE(entry->isActive);
 
     decision = createDecision(1U, 20);
@@ -611,7 +611,7 @@ TEST(PlanCacheTest, SetIsNoopWhenNewEntryIsWorse) {
     entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->isActive);
     ASSERT_TRUE(entry->works);
-    ASSERT_EQ(entry->works.get(), 20U);
+    ASSERT_EQ(entry->works.value(), 20U);
 
     decision = createDecision(1U, 100);
     auto callbacks2 = createCallback(*cq, *decision);
@@ -623,7 +623,7 @@ TEST(PlanCacheTest, SetIsNoopWhenNewEntryIsWorse) {
     entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->isActive);
     ASSERT_TRUE(entry->works);
-    ASSERT_EQ(entry->works.get(), 20U);
+    ASSERT_EQ(entry->works.value(), 20U);
 }
 
 TEST(PlanCacheTest, SetOverwritesWhenNewEntryIsBetter) {
@@ -641,7 +641,7 @@ TEST(PlanCacheTest, SetOverwritesWhenNewEntryIsBetter) {
     // After add, the planCache should have an inactive entry.
     auto entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->works);
-    ASSERT_EQ(entry->works.get(), 50U);
+    ASSERT_EQ(entry->works.value(), 50U);
     ASSERT_FALSE(entry->isActive);
 
     decision = createDecision(1U, 20);
@@ -654,7 +654,7 @@ TEST(PlanCacheTest, SetOverwritesWhenNewEntryIsBetter) {
     entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->isActive);
     ASSERT_TRUE(entry->works);
-    ASSERT_EQ(entry->works.get(), 20U);
+    ASSERT_EQ(entry->works.value(), 20U);
 
     decision = createDecision(1U, 10);
     auto callbacks2 = createCallback(*cq, *decision);
@@ -666,7 +666,7 @@ TEST(PlanCacheTest, SetOverwritesWhenNewEntryIsBetter) {
     entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->isActive);
     ASSERT_TRUE(entry->works);
-    ASSERT_EQ(entry->works.get(), 10U);
+    ASSERT_EQ(entry->works.value(), 10U);
 }
 
 TEST(PlanCacheTest, DeactivateCacheEntry) {
@@ -684,7 +684,7 @@ TEST(PlanCacheTest, DeactivateCacheEntry) {
     // After add, the planCache should have an inactive entry.
     auto entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->works);
-    ASSERT_EQ(entry->works.get(), 50U);
+    ASSERT_EQ(entry->works.value(), 50U);
     ASSERT_FALSE(entry->isActive);
 
     decision = createDecision(1U, 20);
@@ -697,7 +697,7 @@ TEST(PlanCacheTest, DeactivateCacheEntry) {
     entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->isActive);
     ASSERT_TRUE(entry->works);
-    ASSERT_EQ(entry->works.get(), 20U);
+    ASSERT_EQ(entry->works.value(), 20U);
 
     planCache.deactivate(key);
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
@@ -706,7 +706,7 @@ TEST(PlanCacheTest, DeactivateCacheEntry) {
     entry = assertGet(planCache.getEntry(key));
     ASSERT_FALSE(entry->isActive);
     ASSERT_TRUE(entry->works);
-    ASSERT_EQ(entry->works.get(), 20U);
+    ASSERT_EQ(entry->works.value(), 20U);
 }
 
 TEST(PlanCacheTest, GetMatchingStatsMatchesAndSerializesCorrectly) {
@@ -738,7 +738,7 @@ TEST(PlanCacheTest, GetMatchingStatsMatchesAndSerializesCorrectly) {
     // Define a serialization function which just serializes the number of works.
     const auto serializer = [](const PlanCacheEntry& entry) {
         ASSERT_TRUE(entry.works);
-        return BSON("works" << static_cast<int>(entry.works.get()));
+        return BSON("works" << static_cast<int>(entry.works.value()));
     };
 
     // Define a matcher which matches if the number of works exceeds 4.

@@ -78,13 +78,13 @@ protected:
         bool markAsAlreadyProcessed = false,
         boost::optional<int64_t> maxChunkSizeBytes = boost::none) {
         setupCollection(nss, shardKeyPattern, chunkList);
-        if (markAsAlreadyProcessed || maxChunkSizeBytes.is_initialized()) {
+        if (markAsAlreadyProcessed || maxChunkSizeBytes.has_value()) {
             BSONObjBuilder updateQueryBuilder;
             BSONObjBuilder setObj(updateQueryBuilder.subobjStart("$set"));
             if (markAsAlreadyProcessed) {
                 setObj.append(CollectionType::kChunksAlreadySplitForDowngradeFieldName, true);
             }
-            if (maxChunkSizeBytes.is_initialized()) {
+            if (maxChunkSizeBytes.has_value()) {
                 setObj.append(CollectionType::kMaxChunkSizeBytesFieldName, *maxChunkSizeBytes);
             }
             setObj.done();
@@ -126,7 +126,7 @@ TEST_F(ClusterChunksResizePolicyTest, ResizeAClusterWithNoChunksEndsImmediately)
     // evaluated/updated.
     auto nextAction = _clusterChunksResizePolicy.getNextStreamingAction(_opCtx);
 
-    ASSERT_FALSE(nextAction.is_initialized());
+    ASSERT_FALSE(nextAction.has_value());
     ASSERT_TRUE(completionFuture.isReady());
     ASSERT_FALSE(_clusterChunksResizePolicy.isActive());
 }
@@ -234,7 +234,7 @@ TEST_F(ClusterChunksResizePolicyTest, ThePolicyGeneratesNoActionAfterReceivingAn
 
     nextAction = _clusterChunksResizePolicy.getNextStreamingAction(_opCtx);
 
-    ASSERT_FALSE(nextAction.is_initialized());
+    ASSERT_FALSE(nextAction.has_value());
     // The process of the chunk is completed; being the only entry in config.chunks, the process of
     // the whole cluster should also be complete
     ASSERT_TRUE(completionFuture.isReady());
@@ -329,7 +329,7 @@ TEST_F(ClusterChunksResizePolicyTest,
         _opCtx, *nextAction, Status(ErrorCodes::OperationFailed, "Testing nonRetriable error"));
 
     nextAction = _clusterChunksResizePolicy.getNextStreamingAction(_opCtx);
-    ASSERT_TRUE(nextAction.is_initialized());
+    ASSERT_TRUE(nextAction.has_value());
 
     auto reissuedSplitVectorAction = stdx::get<AutoSplitVectorInfo>(*nextAction);
     ASSERT_BSONOBJ_EQ(originalSplitVectorAction.keyPattern, reissuedSplitVectorAction.keyPattern);
@@ -364,7 +364,7 @@ TEST_F(ClusterChunksResizePolicyTest, ThePolicyCompletesWhenAllActionsAreAcknowl
     auto noAction = _clusterChunksResizePolicy.getNextStreamingAction(_opCtx);
     ASSERT_TRUE(_clusterChunksResizePolicy.isActive());
     ASSERT_FALSE(completionFuture.isReady());
-    ASSERT_FALSE(noAction.is_initialized());
+    ASSERT_FALSE(noAction.has_value());
 
     // As splitVectors are acknowledged, splitChunk Actions are generated
     StatusWith<AutoSplitVectorResponse> splitVectorResult1 =
@@ -397,7 +397,7 @@ TEST_F(ClusterChunksResizePolicyTest, ThePolicyCompletesWhenAllActionsAreAcknowl
     ASSERT_EQ(1, numFullyProcessedCollections);
 
     auto nextAction = _clusterChunksResizePolicy.getNextStreamingAction(_opCtx);
-    ASSERT_FALSE(nextAction.is_initialized());
+    ASSERT_FALSE(nextAction.has_value());
     ASSERT_FALSE(_clusterChunksResizePolicy.isActive());
     ASSERT_TRUE(completionFuture.isReady());
 
@@ -419,7 +419,7 @@ TEST_F(ClusterChunksResizePolicyTest, CollectionsMarkedAsAlreadyProcessedGetIgno
     ASSERT_FALSE(completionFuture.isReady());
     auto nextAction = _clusterChunksResizePolicy.getNextStreamingAction(_opCtx);
 
-    ASSERT_FALSE(nextAction.is_initialized());
+    ASSERT_FALSE(nextAction.has_value());
     ASSERT_TRUE(completionFuture.isReady());
     ASSERT_FALSE(_clusterChunksResizePolicy.isActive());
 }

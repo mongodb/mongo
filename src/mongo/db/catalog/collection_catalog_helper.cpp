@@ -68,7 +68,7 @@ void forEachCollectionFromDb(OperationContext* opCtx,
     auto catalogForIteration = CollectionCatalog::get(opCtx);
     for (auto collectionIt = catalogForIteration->begin(opCtx, dbName);
          collectionIt != catalogForIteration->end(opCtx);) {
-        auto uuid = collectionIt.uuid().get();
+        auto uuid = collectionIt.uuid().value();
         if (predicate && !catalogForIteration->checkIfCollectionSatisfiable(uuid, predicate)) {
             ++collectionIt;
             continue;

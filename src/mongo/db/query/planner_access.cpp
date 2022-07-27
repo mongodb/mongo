@@ -156,10 +156,10 @@ std::pair<boost::optional<Timestamp>, boost::optional<Timestamp>> extractTsRange
             boost::optional<Timestamp> childMin;
             boost::optional<Timestamp> childMax;
             std::tie(childMin, childMax) = extractTsRange(me->getChild(i), false);
-            if (childMin && (!min || childMin.get() > min.get())) {
+            if (childMin && (!min || childMin.value() > min.value())) {
                 min = childMin;
             }
-            if (childMax && (!max || childMax.get() < max.get())) {
+            if (childMax && (!max || childMax.value() < max.value())) {
                 max = childMax;
             }
         }

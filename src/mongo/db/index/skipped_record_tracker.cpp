@@ -61,7 +61,7 @@ SkippedRecordTracker::SkippedRecordTracker(OperationContext* opCtx,
     // lazily initialize table when we record the first document.
     _skippedRecordsTable =
         opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStoreFromExistingIdent(
-            opCtx, ident.get());
+            opCtx, ident.value());
 }
 
 void SkippedRecordTracker::keepTemporaryTable() {
@@ -202,7 +202,7 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
                     _multikeyPaths = *multikeyPaths;
                 }
 
-                MultikeyPathTracker::mergeMultikeyPaths(&_multikeyPaths.get(), *multikeyPaths);
+                MultikeyPathTracker::mergeMultikeyPaths(&_multikeyPaths.value(), *multikeyPaths);
             }
         }
 

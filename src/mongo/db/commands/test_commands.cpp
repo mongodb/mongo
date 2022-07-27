@@ -314,7 +314,7 @@ boost::optional<Timestamp> TestingDurableHistoryPin::calculatePin(OperationConte
     Timestamp ret = Timestamp::max();
     auto cursor = autoColl->getCursor(opCtx);
     for (auto doc = cursor->next(); doc; doc = cursor->next()) {
-        const BSONObj obj = doc.get().data.toBson();
+        const BSONObj obj = doc.value().data.toBson();
         const Timestamp ts = obj["pinTs"].timestamp();
         ret = std::min(ret, ts);
     }

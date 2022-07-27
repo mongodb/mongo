@@ -681,7 +681,7 @@ bool mechanismRequiresPassword(const MongoURI& uri) {
     if (const auto authMechanisms = uri.getOption("authMechanism")) {
         constexpr std::array<StringData, 2> passwordlessMechanisms{auth::kMechanismGSSAPI,
                                                                    auth::kMechanismMongoX509};
-        const std::string& authMechanism = authMechanisms.get();
+        const std::string& authMechanism = authMechanisms.value();
         for (const auto& mechanism : passwordlessMechanisms) {
             if (mechanism.toString() == authMechanism) {
                 return false;
@@ -787,14 +787,14 @@ int mongo_main(int argc, char* argv[]) {
         if (const auto authMechanisms = parsedURI.getOption("authMechanism")) {
             std::stringstream ss;
             ss << "DB.prototype._defaultAuthenticationMechanism = \""
-               << str::escape(authMechanisms.get()) << "\";" << std::endl;
+               << str::escape(authMechanisms.value()) << "\";" << std::endl;
             mongo::shell_utils::dbConnect += ss.str();
         }
 
         if (const auto gssapiServiveName = parsedURI.getOption("gssapiServiceName")) {
             std::stringstream ss;
             ss << "DB.prototype._defaultGssapiServiceName = \""
-               << str::escape(gssapiServiveName.get()) << "\";" << std::endl;
+               << str::escape(gssapiServiveName.value()) << "\";" << std::endl;
             mongo::shell_utils::dbConnect += ss.str();
         }
 

@@ -175,7 +175,7 @@ NamespaceString OplogApplierUtils::parseUUIDOrNs(OperationContext* opCtx,
         return oplogEntry.getNss();
     }
 
-    const auto& uuid = optionalUuid.get();
+    const auto& uuid = optionalUuid.value();
     auto catalog = CollectionCatalog::get(opCtx);
     auto nss = catalog->lookupNSSByUUID(opCtx, uuid);
     uassert(ErrorCodes::NamespaceNotFound,
@@ -187,7 +187,7 @@ NamespaceString OplogApplierUtils::parseUUIDOrNs(OperationContext* opCtx,
 NamespaceStringOrUUID OplogApplierUtils::getNsOrUUID(const NamespaceString& nss,
                                                      const OplogEntry& op) {
     if (auto ui = op.getUuid()) {
-        return {nss.db().toString(), ui.get()};
+        return {nss.db().toString(), ui.value()};
     }
     return nss;
 }

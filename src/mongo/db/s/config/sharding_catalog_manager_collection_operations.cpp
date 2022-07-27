@@ -508,7 +508,7 @@ void ShardingCatalogManager::configureCollectionBalancing(
             updatedFields++;
         }
         if (defragmentCollection) {
-            bool doDefragmentation = defragmentCollection.get();
+            bool doDefragmentation = defragmentCollection.value();
             if (doDefragmentation) {
                 setBuilder.append(CollectionType::kDefragmentCollectionFieldName,
                                   doDefragmentation);
@@ -518,7 +518,7 @@ void ShardingCatalogManager::configureCollectionBalancing(
             }
         }
         if (enableAutoSplitter) {
-            bool doSplit = enableAutoSplitter.get();
+            bool doSplit = enableAutoSplitter.value();
             setBuilder.append(CollectionType::kNoAutoSplitFieldName, !doSplit);
             updatedFields++;
         }

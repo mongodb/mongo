@@ -934,7 +934,7 @@ protected:
                                                                       _ws,
                                                                       _cq,
                                                                       _plannerParams,
-                                                                      cs->decisionWorks.get(),
+                                                                      cs->decisionWorks.value(),
                                                                       std::move(root)),
                                     std::move(querySolution));
                     return result;

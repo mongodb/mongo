@@ -439,7 +439,7 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
                                   << " The CWWC on the shard is (" << cwwcOnShard << ")."};
         }
 
-        auto cwwcOnConfig = cachedCWWC.get().toBSON();
+        auto cwwcOnConfig = cachedCWWC.value().toBSON();
         BSONObjComparator comparator(
             BSONObj(), BSONObjComparator::FieldNamesMode::kConsider, nullptr);
         if (comparator.compare(cwwcOnShard, cwwcOnConfig) != 0) {

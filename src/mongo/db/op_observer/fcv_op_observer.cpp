@@ -110,7 +110,7 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
     // (Generic FCV reference): This FCV check should exist across LTS binary versions.
     const auto shouldIncrementTopologyVersion = newVersion == multiversion::GenericFCV::kLastLTS ||
         (prevVersion &&
-         prevVersion.get() == multiversion::GenericFCV::kDowngradingFromLatestToLastContinuous) ||
+         prevVersion.value() == multiversion::GenericFCV::kDowngradingFromLatestToLastContinuous) ||
         newVersion == multiversion::GenericFCV::kUpgradingFromLastLTSToLatest ||
         newVersion == multiversion::GenericFCV::kUpgradingFromLastContinuousToLatest ||
         newVersion == multiversion::GenericFCV::kUpgradingFromLastLTSToLastContinuous;
@@ -179,7 +179,7 @@ void FcvOpObserver::onDelete(OperationContext* opCtx,
     auto optDocKey = repl::documentKeyDecoration(opCtx);
     invariant(optDocKey, nss.ns());
     if (nss.isServerConfigurationCollection()) {
-        auto id = optDocKey.get().getId().firstElement();
+        auto id = optDocKey.value().getId().firstElement();
         if (id.type() == BSONType::String && id.String() == multiversion::kParameterName) {
             uasserted(40670, "removing FeatureCompatibilityVersion document is not allowed");
         }

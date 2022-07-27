@@ -520,7 +520,7 @@ TEST_F(ViewCatalogFixture, LookupRIDExistingView) {
     ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
 
     auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
-    ASSERT(getCatalog()->lookupResourceName(resourceID).get() == "db.view");
+    ASSERT(getCatalog()->lookupResourceName(resourceID).value() == "db.view");
 }
 
 TEST_F(ViewCatalogFixture, LookupRIDExistingViewRollback) {
@@ -566,7 +566,7 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterDropRollback) {
         WriteUnitOfWork wunit(operationContext());
         ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
         wunit.commit();
-        ASSERT(getCatalog()->lookupResourceName(resourceID).get() == viewName.ns());
+        ASSERT(getCatalog()->lookupResourceName(resourceID).value() == viewName.ns());
     }
 
     {
@@ -582,7 +582,7 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterDropRollback) {
         // Do not commit, rollback.
     }
     // Make sure drop was rolled back and view is still in catalog.
-    ASSERT(getCatalog()->lookupResourceName(resourceID).get() == viewName.ns());
+    ASSERT(getCatalog()->lookupResourceName(resourceID).value() == viewName.ns());
 }
 
 TEST_F(ViewCatalogFixture, LookupRIDAfterModify) {
@@ -592,7 +592,7 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterModify) {
     auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
     ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
     ASSERT_OK(modifyView(operationContext(), viewName, viewOn, emptyPipeline));
-    ASSERT(getCatalog()->lookupResourceName(resourceID).get() == viewName.ns());
+    ASSERT(getCatalog()->lookupResourceName(resourceID).value() == viewName.ns());
 }
 
 TEST_F(ViewCatalogFixture, LookupRIDAfterModifyRollback) {
@@ -604,7 +604,7 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterModifyRollback) {
         WriteUnitOfWork wunit(operationContext());
         ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
         wunit.commit();
-        ASSERT(getCatalog()->lookupResourceName(resourceID).get() == viewName.ns());
+        ASSERT(getCatalog()->lookupResourceName(resourceID).value() == viewName.ns());
     }
 
     {
@@ -621,11 +621,11 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterModifyRollback) {
                                            viewOn,
                                            emptyPipeline,
                                            view_catalog_helpers::validatePipeline));
-        ASSERT(getCatalog()->lookupResourceName(resourceID).get() == viewName.ns());
+        ASSERT(getCatalog()->lookupResourceName(resourceID).value() == viewName.ns());
         // Do not commit, rollback.
     }
     // Make sure view resource is still available after rollback.
-    ASSERT(getCatalog()->lookupResourceName(resourceID).get() == viewName.ns());
+    ASSERT(getCatalog()->lookupResourceName(resourceID).value() == viewName.ns());
 }
 
 TEST_F(ViewCatalogFixture, CreateViewThenDropAndLookup) {

@@ -156,7 +156,8 @@ public:
                      ++collIt) {
                     if (!_validateNamespace(
                             opCtx,
-                            collectionCatalog->lookupNSSByUUID(opCtx, collIt.uuid().get()).get())) {
+                            collectionCatalog->lookupNSSByUUID(opCtx, collIt.uuid().value())
+                                .value())) {
                         return;
                     }
                 }

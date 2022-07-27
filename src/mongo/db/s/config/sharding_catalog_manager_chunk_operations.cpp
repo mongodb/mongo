@@ -776,7 +776,7 @@ void ShardingCatalogManager::_mergeChunksInTransaction(
                     mergedChunk.setEstimatedSizeBytes(boost::none);
 
                     mergedChunk.setHistory(
-                        {ChunkHistory(validAfter.get(), mergedChunk.getShard())});
+                        {ChunkHistory(validAfter.value(), mergedChunk.getShard())});
 
                     entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
                         mergedChunk.toConfigBSON()));
@@ -1153,7 +1153,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
         int entriesDeleted = 0;
         while (newHistory.size() > 1 &&
                newHistory.back().getValidAfter().getSecs() + windowInSeconds <
-                   validAfter.get().getSecs()) {
+                   validAfter.value().getSecs()) {
             newHistory.pop_back();
             ++entriesDeleted;
         }
@@ -1167,16 +1167,16 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
         LOGV2_DEBUG(4778500, 1, "Deleted old chunk history entries", attrs);
     }
 
-    if (!newHistory.empty() && newHistory.front().getValidAfter() >= validAfter.get()) {
+    if (!newHistory.empty() && newHistory.front().getValidAfter() >= validAfter.value()) {
         return {ErrorCodes::IncompatibleShardingMetadata,
                 str::stream() << "The chunk history for chunk with namespace " << nss.ns()
                               << " and min key " << migratedChunk.getMin()
                               << " is corrupted. The last validAfter "
                               << newHistory.back().getValidAfter().toString()
                               << " is greater or equal to the new validAfter "
-                              << validAfter.get().toString()};
+                              << validAfter.value().toString()};
     }
-    newHistory.emplace(newHistory.begin(), ChunkHistory(validAfter.get(), toShard));
+    newHistory.emplace(newHistory.begin(), ChunkHistory(validAfter.value(), toShard));
     newMigratedChunk->setHistory(std::move(newHistory));
 
     std::shared_ptr<std::vector<ChunkType>> newSplitChunks =

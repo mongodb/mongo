@@ -295,7 +295,7 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
     }
 
     oplogEntry->setOpType(repl::OpTypeEnum::kDelete);
-    oplogEntry->setObject(repl::documentKeyDecoration(opCtx).get().getShardKeyAndId());
+    oplogEntry->setObject(repl::documentKeyDecoration(opCtx).value().getShardKeyAndId());
     oplogEntry->setFromMigrateIfTrue(fromMigrate);
     // oplogLink could have been changed to include preImageOpTime by the previous no-op write.
     oplogWriter->appendOplogEntryChainInfo(opCtx, oplogEntry, &oplogLink, {stmtId});
@@ -312,7 +312,7 @@ void writeToImageCollection(OperationContext* opCtx,
                             const BSONObj& dataImage) {
     repl::ImageEntry imageEntry;
     imageEntry.set_id(sessionId);
-    imageEntry.setTxnNumber(opCtx->getTxnNumber().get());
+    imageEntry.setTxnNumber(opCtx->getTxnNumber().value());
     imageEntry.setTs(timestamp);
     imageEntry.setImageKind(imageKind);
     imageEntry.setImage(dataImage);
@@ -820,8 +820,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         if (oplogEntry.getNeedsRetryImage()) {
             // If the oplog entry has `needsRetryImage`, copy the image into image collection.
             const BSONObj& dataImage = [&]() {
-                if (oplogEntry.getNeedsRetryImage().get() == repl::RetryImageEnum::kPreImage) {
-                    return args.updateArgs->preImageDoc.get();
+                if (oplogEntry.getNeedsRetryImage().value() == repl::RetryImageEnum::kPreImage) {
+                    return args.updateArgs->preImageDoc.value();
                 } else {
                     return args.updateArgs->updatedDoc;
                 }
@@ -829,7 +829,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
             writeToImageCollection(opCtx,
                                    *opCtx->getLogicalSessionId(),
                                    opTime.writeOpTime.getTimestamp(),
-                                   oplogEntry.getNeedsRetryImage().get(),
+                                   oplogEntry.getNeedsRetryImage().value(),
                                    dataImage);
         }
 
@@ -850,10 +850,10 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
             args.updateArgs->source != OperationSource::kFromMigrate &&
             !args.nss.isTemporaryReshardingCollection()) {
             const auto& preImageDoc = args.updateArgs->preImageDoc;
-            tassert(5868600, "PreImage must be set", preImageDoc && !preImageDoc.get().isEmpty());
+            tassert(5868600, "PreImage must be set", preImageDoc && !preImageDoc.value().isEmpty());
 
             ChangeStreamPreImageId id(args.uuid, opTime.writeOpTime.getTimestamp(), 0);
-            ChangeStreamPreImage preImage(id, opTime.wallClockTime, preImageDoc.get());
+            ChangeStreamPreImage preImage(id, opTime.wallClockTime, preImageDoc.value());
 
             // TODO SERVER-66643 Pass tenant id to the pre-images collection if running in the
             // serverless.
@@ -926,7 +926,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
                               const OplogDeleteEntryArgs& args) {
     auto optDocKey = repl::documentKeyDecoration(opCtx);
     invariant(optDocKey, nss.ns());
-    auto& documentKey = optDocKey.get();
+    auto& documentKey = optDocKey.value();
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
     const bool inMultiDocumentTransaction =
@@ -1179,15 +1179,15 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
             BSONObjBuilder oldIndexOptions;
             if (indexInfo->oldExpireAfterSeconds) {
                 auto oldExpireAfterSeconds =
-                    durationCount<Seconds>(indexInfo->oldExpireAfterSeconds.get());
+                    durationCount<Seconds>(indexInfo->oldExpireAfterSeconds.value());
                 oldIndexOptions.append("expireAfterSeconds", oldExpireAfterSeconds);
             }
             if (indexInfo->oldHidden) {
-                auto oldHidden = indexInfo->oldHidden.get();
+                auto oldHidden = indexInfo->oldHidden.value();
                 oldIndexOptions.append("hidden", oldHidden);
             }
             if (indexInfo->oldPrepareUnique) {
-                auto oldPrepareUnique = indexInfo->oldPrepareUnique.get();
+                auto oldPrepareUnique = indexInfo->oldPrepareUnique.value();
                 oldIndexOptions.append("prepareUnique", oldPrepareUnique);
             }
             o2Builder.append("indexOptions_old", oldIndexOptions.obj());

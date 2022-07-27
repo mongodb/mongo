@@ -156,7 +156,7 @@ void TracerProvider::initialize(std::unique_ptr<ClockSource> clkSource) {  // NO
 TracerProvider& TracerProvider::get() {  // NOLINT
     auto& provider = getTraceProvider();
     invariant(provider.has_value(), "not initialized");
-    return provider.get();
+    return provider.value();
 }
 
 std::shared_ptr<Tracer> TracerProvider::getTracer(std::string name) {

@@ -82,7 +82,7 @@ TEST(SequentialDocumentCacheTest, CanIterateCacheAfterFreezing) {
 
     ASSERT_DOCUMENT_EQ(*cache.getNext(), DOC("_id" << 0));
     ASSERT_DOCUMENT_EQ(*cache.getNext(), DOC("_id" << 1));
-    ASSERT_FALSE(cache.getNext().is_initialized());
+    ASSERT_FALSE(cache.getNext().has_value());
 }
 
 TEST(SequentialDocumentCacheTest, CanRestartCacheIterationAfterFreezing) {
@@ -98,13 +98,13 @@ TEST(SequentialDocumentCacheTest, CanRestartCacheIterationAfterFreezing) {
 
     ASSERT_DOCUMENT_EQ(*cache.getNext(), DOC("_id" << 0));
     ASSERT_DOCUMENT_EQ(*cache.getNext(), DOC("_id" << 1));
-    ASSERT_FALSE(cache.getNext().is_initialized());
+    ASSERT_FALSE(cache.getNext().has_value());
 
     cache.restartIteration();
 
     ASSERT_DOCUMENT_EQ(*cache.getNext(), DOC("_id" << 0));
     ASSERT_DOCUMENT_EQ(*cache.getNext(), DOC("_id" << 1));
-    ASSERT_FALSE(cache.getNext().is_initialized());
+    ASSERT_FALSE(cache.getNext().has_value());
 }
 
 DEATH_TEST(SequentialDocumentCacheTest, CannotAddDocumentsToCacheAfterFreezing, "invariant") {

@@ -596,7 +596,7 @@ TransactionParticipant::getOldestActiveTimestamp(Timestamp stableTimestamp) {
         boost::optional<Timestamp> oldestTxnTimestamp;
         auto cursor = collection->getCursor(opCtx.get());
         while (auto record = cursor->next()) {
-            auto doc = record.get().data.toBson();
+            auto doc = record.value().data.toBson();
             auto txnRecord =
                 SessionTxnRecord::parse(IDLParserContext("parse oldest active txn record"), doc);
             if (txnRecord.getState() != DurableTxnStateEnum::kPrepared &&
@@ -1615,7 +1615,7 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
             continue;
         }
 
-        transactionOperationUuids.insert(transactionOp.getUuid().get());
+        transactionOperationUuids.insert(transactionOp.getUuid().value());
     }
     auto catalog = CollectionCatalog::get(opCtx);
     for (const auto& uuid : transactionOperationUuids) {

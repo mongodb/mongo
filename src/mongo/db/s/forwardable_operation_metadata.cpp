@@ -57,11 +57,11 @@ void ForwardableOperationMetadata::setOn(OperationContext* opCtx) const {
     Client* client = opCtx->getClient();
     if (const auto& comment = getComment()) {
         stdx::lock_guard<Client> lk(*client);
-        opCtx->setComment(comment.get());
+        opCtx->setComment(comment.value());
     }
 
     if (const auto& optAuthMetadata = getImpersonatedUserMetadata()) {
-        const auto& authMetadata = optAuthMetadata.get();
+        const auto& authMetadata = optAuthMetadata.value();
         const auto& users = authMetadata.getUsers();
         if (!users.empty() || !authMetadata.getRoles().empty()) {
             fassert(ErrorCodes::InternalError, users.size() == 1);

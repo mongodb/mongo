@@ -284,7 +284,7 @@ std::unique_ptr<KMSService> GCPKMSService::create(const GcpKMS& config) {
         // Leave the CA file empty so we default to system CA but for local testing allow it to
         // inherit the CA file.
         params.sslCAFile = sslGlobalParams.sslCAFile;
-        oauthHostAndPort = parseUrl(config.getEndpoint().get());
+        oauthHostAndPort = parseUrl(config.getEndpoint().value());
     }
 
     gcpKMS->_sslManager = SSLManagerInterface::create(params, false);

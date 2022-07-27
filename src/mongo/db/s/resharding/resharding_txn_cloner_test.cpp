@@ -262,9 +262,9 @@ protected:
         auto bsonOplog = client.findOne(std::move(findCmd));
         ASSERT(!bsonOplog.isEmpty());
         auto oplogEntry = repl::MutableOplogEntry::parse(bsonOplog).getValue();
-        ASSERT_EQ(oplogEntry.getTxnNumber().get(), txnNum);
+        ASSERT_EQ(oplogEntry.getTxnNumber().value(), txnNum);
         ASSERT_BSONOBJ_EQ(oplogEntry.getObject(), BSON("$sessionMigrateInfo" << 1));
-        ASSERT_BSONOBJ_EQ(oplogEntry.getObject2().get(), BSON("$incompleteOplogHistory" << 1));
+        ASSERT_BSONOBJ_EQ(oplogEntry.getObject2().value(), BSON("$incompleteOplogHistory" << 1));
         ASSERT(oplogEntry.getOpType() == repl::OpTypeEnum::kNoop);
 
         auto bsonTxn =
@@ -355,8 +355,8 @@ protected:
         std::shared_ptr<executor::ThreadPoolTaskExecutor> cleanupExecutor,
         boost::optional<CancellationToken> customCancelToken = boost::none) {
         // Allows callers to control the cancellation of the cloner's run() function when specified.
-        auto cancelToken = customCancelToken.is_initialized()
-            ? customCancelToken.get()
+        auto cancelToken = customCancelToken.has_value()
+            ? customCancelToken.value()
             : operationContext()->getCancellationToken();
 
         auto cancelableOpCtxExecutor = std::make_shared<ThreadPool>([] {

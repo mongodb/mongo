@@ -53,8 +53,7 @@ std::shared_ptr<ReshardingCoordinatorObserver> getReshardingCoordinatorObserver(
     auto instance =
         ReshardingCoordinatorService::ReshardingCoordinator::lookup(opCtx, service, reshardingId);
 
-    iassert(
-        5400001, "ReshardingCoordinatorService instance does not exist", instance.is_initialized());
+    iassert(5400001, "ReshardingCoordinatorService instance does not exist", instance.has_value());
 
     return (*instance)->getObserver();
 }
@@ -62,7 +61,7 @@ std::shared_ptr<ReshardingCoordinatorObserver> getReshardingCoordinatorObserver(
 boost::optional<Timestamp> parseNewMinFetchTimestampValue(const BSONObj& obj) {
     auto doc = ReshardingDonorDocument::parse(IDLParserContext("Resharding"), obj);
     if (doc.getMutableState().getState() == DonorStateEnum::kDonatingInitialData) {
-        return doc.getMutableState().getMinFetchTimestamp().get();
+        return doc.getMutableState().getMinFetchTimestamp().value();
     } else {
         return boost::none;
     }
@@ -114,8 +113,8 @@ boost::optional<Timestamp> _calculatePin(OperationContext* opCtx) {
     Timestamp ret = Timestamp::max();
     auto cursor = collection->getCursor(opCtx);
     for (auto doc = cursor->next(); doc; doc = cursor->next()) {
-        if (auto fetchTs = parseNewMinFetchTimestampValue(doc.get().data.toBson()); fetchTs) {
-            ret = std::min(ret, fetchTs.get());
+        if (auto fetchTs = parseNewMinFetchTimestampValue(doc.value().data.toBson()); fetchTs) {
+            ret = std::min(ret, fetchTs.value());
         }
     }
 
@@ -136,7 +135,7 @@ void _doPin(OperationContext* opCtx) {
     }
 
     StatusWith<Timestamp> res = storageEngine->pinOldestTimestamp(
-        opCtx, ReshardingHistoryHook::kName.toString(), pin.get(), false);
+        opCtx, ReshardingHistoryHook::kName.toString(), pin.value(), false);
     if (!res.isOK()) {
         if (replCoord->getReplicationMode() != repl::ReplicationCoordinator::Mode::modeReplSet) {
             // The pin has failed, but we're in standalone mode. Ignore the error.
@@ -155,7 +154,7 @@ void _doPin(OperationContext* opCtx) {
             // is the most robust path forward. Ignore this case.
             LOGV2_WARNING(5384104,
                           "This node is unable to pin history for resharding",
-                          "requestedTs"_attr = pin.get());
+                          "requestedTs"_attr = pin.value());
         } else {
             // For recovery cases we also ignore the error. The expected scenario is the pin
             // request is no longer needed, but the write to delete the pin was rolled
@@ -164,7 +163,7 @@ void _doPin(OperationContext* opCtx) {
             // consequence to observing this error. Ignore this case.
             LOGV2(5384103,
                   "The requested pin was unavailable, but should also be unnecessary",
-                  "requestedTs"_attr = pin.get());
+                  "requestedTs"_attr = pin.value());
         }
     }
 }

@@ -124,7 +124,7 @@ MutableOplogEntry makeNoOpOplogEntry(OpTime opTime,
     oplogEntry.setObject2(o);
     oplogEntry.setWallClockTime(Date_t::now());
     if (migrationUUID) {
-        oplogEntry.setFromTenantMigration(migrationUUID.get());
+        oplogEntry.setFromTenantMigration(migrationUUID.value());
     }
     return oplogEntry;
 }
@@ -2603,7 +2603,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientAddResumeTok
         OplogEntry noopEntry(noopDoc);
         ASSERT_TRUE(noopEntry.getOpType() == OpTypeEnum::kNoop);
         ASSERT_EQUALS(noopEntry.getTimestamp(), resumeToken2);
-        ASSERT_EQUALS(noopEntry.getTerm().get(), -1);
+        ASSERT_EQUALS(noopEntry.getTerm().value(), -1);
         ASSERT_EQUALS(noopEntry.getNss(), NamespaceString(""));
     }
 
@@ -2755,7 +2755,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_WaitUntilSt
     ASSERT_TRUE(doc.getReadPreference().equals(ReadPreferenceSetting(ReadPreference::PrimaryOnly)));
     ASSERT_TRUE(doc.getState() == TenantMigrationRecipientStateEnum::kDone);
     ASSERT_TRUE(doc.getExpireAt() != boost::none);
-    ASSERT_TRUE(doc.getExpireAt().get() > opCtx->getServiceContext()->getFastClockSource()->now());
+    ASSERT_TRUE(doc.getExpireAt().value() >
+                opCtx->getServiceContext()->getFastClockSource()->now());
     ASSERT_TRUE(doc.getStartApplyingDonorOpTime() == boost::none);
     ASSERT_TRUE(doc.getStartFetchingDonorOpTime() == boost::none);
     ASSERT_TRUE(doc.getDataConsistentStopDonorOpTime() == boost::none);
@@ -2820,7 +2821,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterStartO
     ASSERT_TRUE(doc.getReadPreference().equals(ReadPreferenceSetting(ReadPreference::PrimaryOnly)));
     ASSERT_TRUE(doc.getState() == TenantMigrationRecipientStateEnum::kDone);
     ASSERT_TRUE(doc.getExpireAt() != boost::none);
-    ASSERT_TRUE(doc.getExpireAt().get() > opCtx->getServiceContext()->getFastClockSource()->now());
+    ASSERT_TRUE(doc.getExpireAt().value() >
+                opCtx->getServiceContext()->getFastClockSource()->now());
     checkStateDocPersisted(opCtx.get(), instance.get());
 }
 
@@ -2913,7 +2915,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterConsis
             doc.getReadPreference().equals(ReadPreferenceSetting(ReadPreference::PrimaryOnly)));
         ASSERT_TRUE(doc.getState() == TenantMigrationRecipientStateEnum::kDone);
         ASSERT_TRUE(doc.getExpireAt() != boost::none);
-        ASSERT_TRUE(doc.getExpireAt().get() >
+        ASSERT_TRUE(doc.getExpireAt().value() >
                     opCtx->getServiceContext()->getFastClockSource()->now());
         checkStateDocPersisted(opCtx.get(), instance.get());
     }
@@ -2998,7 +3000,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterFail) 
             doc.getReadPreference().equals(ReadPreferenceSetting(ReadPreference::PrimaryOnly)));
         ASSERT_TRUE(doc.getState() == TenantMigrationRecipientStateEnum::kDone);
         ASSERT_TRUE(doc.getExpireAt() != boost::none);
-        ASSERT_TRUE(doc.getExpireAt().get() >
+        ASSERT_TRUE(doc.getExpireAt().value() >
                     opCtx->getServiceContext()->getFastClockSource()->now());
         checkStateDocPersisted(opCtx.get(), instance.get());
     }

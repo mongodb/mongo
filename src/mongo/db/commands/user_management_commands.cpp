@@ -2514,7 +2514,7 @@ void CmdMergeAuthzCollections::Invocation::typedRun(OperationContext* opCtx) {
 
     uassert(ErrorCodes::BadValue,
             "Must provide at least one of \"tempUsersCollection\" and \"tempRolescollection\"",
-            !tempUsersColl.empty() | !tempRolesColl.empty());
+            !tempUsersColl.empty() || !tempRolesColl.empty());
 
     auto* svcCtx = opCtx->getClient()->getServiceContext();
     auto* authzManager = AuthorizationManager::get(svcCtx);

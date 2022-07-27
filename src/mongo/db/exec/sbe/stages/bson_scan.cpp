@@ -171,7 +171,7 @@ std::vector<DebugPrinter::Block> BSONScanStage::debugPrint() const {
     auto ret = PlanStage::debugPrint();
 
     if (_recordSlot) {
-        DebugPrinter::addIdentifier(ret, _recordSlot.get());
+        DebugPrinter::addIdentifier(ret, _recordSlot.value());
     }
 
     ret.emplace_back(DebugPrinter::Block("[`"));

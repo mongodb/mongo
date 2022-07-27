@@ -165,7 +165,7 @@ bool hintMatchesClusterKey(const boost::optional<ClusteredCollectionInfo>& clust
                 clusteredIndexSpec.getName());
 
         auto hintName = firstHintElt.valueStringData();
-        return hintName == clusteredIndexSpec.getName().get();
+        return hintName == clusteredIndexSpec.getName().value();
     }
 
     // An index spec is provided by the hint.

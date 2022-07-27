@@ -408,7 +408,7 @@ void TenantMigrationDonorAccessBlocker::appendInfoForServerStatus(BSONObjBuilder
 
     builder->append("state", _state.toString());
     if (_blockTimestamp) {
-        builder->append("blockTimestamp", _blockTimestamp.get());
+        builder->append("blockTimestamp", _blockTimestamp.value());
     }
     if (_commitOpTime) {
         builder->append("commitOpTime", _commitOpTime->toBSON());

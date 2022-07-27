@@ -236,7 +236,7 @@ public:
                             3,
                             "Non-debug severity levels must not pass 'debugLevel'",
                             "severity"_attr = obj[Request::kSeverityFieldName].valueStringData(),
-                            "debugLevel"_attr = optDebugLevel.get());
+                            "debugLevel"_attr = optDebugLevel.value());
             }
 
             switch (severity) {

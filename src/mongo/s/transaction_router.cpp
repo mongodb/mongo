@@ -410,7 +410,7 @@ void TransactionRouter::Observer::_reportTransactionState(OperationContext* opCt
 }
 
 bool TransactionRouter::Observer::_atClusterTimeHasBeenSet() const {
-    return o().atClusterTime.is_initialized() && o().atClusterTime->timeHasBeenSet();
+    return o().atClusterTime.has_value() && o().atClusterTime->timeHasBeenSet();
 }
 
 const LogicalSessionId& TransactionRouter::Observer::_sessionId() const {
@@ -588,7 +588,7 @@ bool TransactionRouter::AtClusterTime::canChange(StmtId currentStmtId) const {
 }
 
 bool TransactionRouter::Router::mustUseAtClusterTime() const {
-    return o().atClusterTime.is_initialized();
+    return o().atClusterTime.has_value();
 }
 
 LogicalTime TransactionRouter::Router::getSelectedAtClusterTime() const {

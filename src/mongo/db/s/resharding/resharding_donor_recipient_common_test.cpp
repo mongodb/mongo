@@ -405,7 +405,7 @@ TEST_F(ReshardingDonorRecipientCommonTest, CreateDonorServiceInstance) {
 
     ASSERT(donorStateMachine != boost::none);
 
-    donorStateMachine.get()->interrupt({ErrorCodes::InternalError, "Shut down for test"});
+    donorStateMachine.value()->interrupt({ErrorCodes::InternalError, "Shut down for test"});
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest, CreateRecipientServiceInstance) {
@@ -432,7 +432,7 @@ TEST_F(ReshardingDonorRecipientCommonTest, CreateRecipientServiceInstance) {
 
     ASSERT(recipientStateMachine != boost::none);
 
-    recipientStateMachine.get()->interrupt({ErrorCodes::InternalError, "Shut down for test"});
+    recipientStateMachine.value()->interrupt({ErrorCodes::InternalError, "Shut down for test"});
 }
 
 TEST_F(ReshardingDonorRecipientCommonTest,

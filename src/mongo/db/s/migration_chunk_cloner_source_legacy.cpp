@@ -227,8 +227,8 @@ void LogTransactionOperationsForShardingHandler::commit(boost::optional<Timestam
             continue;
         }
 
-        auto const& minKey = cloner->_args.getMin().get();
-        auto const& maxKey = cloner->_args.getMax().get();
+        auto const& minKey = cloner->_args.getMin().value();
+        auto const& maxKey = cloner->_args.getMax().value();
         auto const& shardKeyPattern = cloner->_shardKeyPattern;
 
         if (!isInRange(documentKey, minKey, maxKey, shardKeyPattern)) {

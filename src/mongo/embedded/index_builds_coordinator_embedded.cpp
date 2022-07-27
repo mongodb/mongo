@@ -64,7 +64,7 @@ IndexBuildsCoordinatorEmbedded::startIndexBuild(OperationContext* opCtx,
         invariant(statusWithOptionalResult.getValue()->isReady());
         // The requested index (specs) are already built or are being built. Return success early
         // (this is v4.0 behavior compatible).
-        return statusWithOptionalResult.getValue().get();
+        return statusWithOptionalResult.getValue().value();
     }
 
     auto status = _setUpIndexBuild(opCtx, buildUUID, Timestamp(), indexBuildOptions);

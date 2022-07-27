@@ -201,7 +201,7 @@ void TenantMigrationRecipientAccessBlocker::appendInfoForServerStatus(
 
     builder->append("state", _state.toString());
     if (_rejectBeforeTimestamp) {
-        builder->append("rejectBeforeTimestamp", _rejectBeforeTimestamp.get());
+        builder->append("rejectBeforeTimestamp", _rejectBeforeTimestamp.value());
     }
     builder->append("ttlIsBlocked", _ttlIsBlocked);
     if (_protocol == MigrationProtocolEnum::kMultitenantMigrations) {

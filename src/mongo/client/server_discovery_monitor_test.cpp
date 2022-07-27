@@ -238,7 +238,7 @@ protected:
         while (elapsed() < deadline) {
             ASSERT_FALSE(hasReadyRequests());
             if (hostAndPort) {
-                ASSERT_FALSE(_topologyListener->hasIsMasterResponse(hostAndPort.get()));
+                ASSERT_FALSE(_topologyListener->hasIsMasterResponse(hostAndPort.value()));
             }
             advanceTime(Milliseconds(1));
         }

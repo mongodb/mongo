@@ -520,7 +520,7 @@ boost::optional<BSONObj> ReshardingRecipientService::RecipientStateMachine::repo
 void ReshardingRecipientService::RecipientStateMachine::onReshardingFieldsChanges(
     OperationContext* opCtx, const TypeCollectionReshardingFields& reshardingFields) {
     if (reshardingFields.getState() == CoordinatorStateEnum::kAborting) {
-        abort(reshardingFields.getUserCanceled().get());
+        abort(reshardingFields.getUserCanceled().value());
         return;
     }
 
@@ -662,7 +662,7 @@ void ReshardingRecipientService::RecipientStateMachine::_ensureDataReplicationSt
                                              _recipientService->getInstanceCleanupExecutor(),
                                              abortToken,
                                              factory,
-                                             txnCloneTime.get())
+                                             txnCloneTime.value())
                 .share();
 
         stdx::lock_guard lk(_mutex);

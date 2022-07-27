@@ -124,12 +124,12 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
         }
 
         // We need a maximum size for the chunk.
-        if (!maxChunkSizeBytes || maxChunkSizeBytes.get() <= 0) {
+        if (!maxChunkSizeBytes || maxChunkSizeBytes.value() <= 0) {
             uasserted(ErrorCodes::InvalidOptions, "need to specify the desired max chunk size");
         }
 
         // If there's not enough data for more than one chunk, no point continuing.
-        if (dataSize < maxChunkSizeBytes.get() || recCount == 0) {
+        if (dataSize < maxChunkSizeBytes.value() || recCount == 0) {
             std::vector<BSONObj> emptyVector;
             return emptyVector;
         }
@@ -146,18 +146,18 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
         // maxChunkObjects, if provided.
         const long long avgRecSize = dataSize / recCount;
 
-        long long keyCount = maxChunkSizeBytes.get() / (2 * avgRecSize);
+        long long keyCount = maxChunkSizeBytes.value() / (2 * avgRecSize);
 
-        if (maxChunkObjects.get() && (maxChunkObjects.get() < keyCount)) {
+        if (maxChunkObjects.value() && (maxChunkObjects.value() < keyCount)) {
             LOGV2(22108,
                   "Limiting the number of documents per chunk to {maxChunkObjects} based "
                   "on the maxChunkObjects parameter for split vector command (compared to maximum "
                   "possible: {maxPossibleDocumentsPerChunk})",
                   "Limiting the number of documents per chunk for split vector command based on "
                   "the maxChunksObject parameter",
-                  "maxChunkObjects"_attr = maxChunkObjects.get(),
+                  "maxChunkObjects"_attr = maxChunkObjects.value(),
                   "maxPossibleDocumentsPerChunk"_attr = keyCount);
-            keyCount = maxChunkObjects.get();
+            keyCount = maxChunkObjects.value();
         }
 
         //
@@ -280,7 +280,8 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                 }
 
                 // Stop if we have enough split points.
-                if (maxSplitPoints && maxSplitPoints.get() && (numChunks >= maxSplitPoints.get())) {
+                if (maxSplitPoints && maxSplitPoints.value() &&
+                    (numChunks >= maxSplitPoints.value())) {
                     LOGV2(22111,
                           "Max number of requested split points reached ({numSplitPoints}) before "
                           "the end of chunk {namespace} {minKey} -->> {maxKey}",

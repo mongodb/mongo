@@ -91,7 +91,7 @@ Timestamp WiredTigerSnapshotManager::beginTransactionOnCommittedSnapshot(
         uassert(ErrorCodes::ReadConcernMajorityNotAvailableYet,
                 "Committed view disappeared while running operation",
                 _committedSnapshot);
-        return _committedSnapshot.get();
+        return _committedSnapshot.value();
     }();
 
     if (MONGO_unlikely(hangBeforeMajorityReadTransactionStarted.shouldFail())) {

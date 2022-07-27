@@ -477,7 +477,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                                                               : IndexBuildProtocol::kSinglePhase;
     auto commitQuorum = parseAndGetCommitQuorum(opCtx, protocol, cmd);
     if (commitQuorum) {
-        uassertStatusOK(replCoord->checkIfCommitQuorumCanBeSatisfied(commitQuorum.get()));
+        uassertStatusOK(replCoord->checkIfCommitQuorumCanBeSatisfied(commitQuorum.value()));
     }
 
     validateTTLOptions(opCtx, ns, cmd);
@@ -753,7 +753,7 @@ public:
                     opCtx, origCmd.getNamespace(), !isCommandOnTimeseriesBucketNamespace)) {
                 timeseriesCmdOwnership =
                     timeseries::makeTimeseriesCreateIndexesCommand(opCtx, origCmd, *options);
-                cmd = &timeseriesCmdOwnership.get();
+                cmd = &timeseriesCmdOwnership.value();
             }
 
             // If we encounter an IndexBuildAlreadyInProgress error for any of the requested index

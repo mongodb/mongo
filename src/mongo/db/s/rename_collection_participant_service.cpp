@@ -169,7 +169,7 @@ boost::optional<BSONObj> RenameParticipantInstance::reportForCurrentOp(
 
     BSONObjBuilder cmdBob;
     if (const auto& optComment = _doc.getForwardableOpMetadata().getComment()) {
-        cmdBob.append(optComment.get().firstElement());
+        cmdBob.append(optComment.value().firstElement());
     }
     BSONObjBuilder bob;
     bob.append("type", "op");

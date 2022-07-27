@@ -609,7 +609,7 @@ std::unique_ptr<DBClientConnection> TenantMigrationRecipientService::Instance::_
                                      0 /* socketTimeout */,
                                      nullptr /* uri */,
                                      nullptr /* apiParameters */,
-                                     _transientSSLParams ? &_transientSSLParams.get() : nullptr);
+                                     _transientSSLParams ? &_transientSSLParams.value() : nullptr);
     if (!swClientBase.isOK()) {
         LOGV2_ERROR(4880400,
                     "Failed to connect to migration donor",
@@ -1546,7 +1546,7 @@ TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBeforeStart
     {
         stdx::lock_guard lk(_mutex);
         invariant(_stateDoc.getStartFetchingDonorOpTime());
-        startFetchingTimestamp = _stateDoc.getStartFetchingDonorOpTime().get().getTimestamp();
+        startFetchingTimestamp = _stateDoc.getStartFetchingDonorOpTime().value().getTimestamp();
     }
 
     LOGV2_DEBUG(5535300,
@@ -1686,7 +1686,8 @@ void TenantMigrationRecipientService::Instance::_startOplogFetcher() {
         // If the oplog buffer already contains fetched documents, we must be resuming a
         // migration.
         if (auto topOfOplogBuffer = _donorOplogBuffer->lastObjectPushed(opCtx.get())) {
-            startFetchOpTime = uassertStatusOK(OpTime::parseFromOplogEntry(topOfOplogBuffer.get()));
+            startFetchOpTime =
+                uassertStatusOK(OpTime::parseFromOplogEntry(topOfOplogBuffer.value()));
             resumingFromOplogBuffer = true;
         }
     }
@@ -2032,7 +2033,7 @@ TenantMigrationRecipientService::Instance::_waitForDataToBecomeConsistent() {
     }
 
     return _tenantOplogApplier->getNotificationForOpTime(
-        _stateDoc.getDataConsistentStopDonorOpTime().get());
+        _stateDoc.getDataConsistentStopDonorOpTime().value());
 }
 
 SemiFuture<void> TenantMigrationRecipientService::Instance::_persistConsistentState() {

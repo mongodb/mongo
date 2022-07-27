@@ -147,7 +147,7 @@ std::unique_ptr<KMSService> AzureKMSService::create(const AzureKMS& config) {
         // Leave the CA file empty so we default to system CA but for local testing allow it to
         // inherit the CA file.
         params.sslCAFile = sslGlobalParams.sslCAFile;
-        identityPlatformHostAndPort = parseUrl(config.getIdentityPlatformEndpoint().get());
+        identityPlatformHostAndPort = parseUrl(config.getIdentityPlatformEndpoint().value());
     }
 
     azureKMS->_sslManager = SSLManagerInterface::create(params, false);

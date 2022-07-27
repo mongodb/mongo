@@ -124,7 +124,7 @@ void onTransitionToBlocking(OperationContext* opCtx,
     // Both primaries and secondaries call startBlockingReadsAfter in the op observer, since
     // startBlockingReadsAfter just needs to be called before the "start blocking" write's oplog
     // hole is filled.
-    mtab->startBlockingReadsAfter(donorStateDoc.getBlockTimestamp().get());
+    mtab->startBlockingReadsAfter(donorStateDoc.getBlockTimestamp().value());
 }
 
 /**
@@ -139,7 +139,7 @@ void onTransitionToCommitted(OperationContext* opCtx,
         opCtx->getServiceContext(), donorStateDoc.getTenantId());
     invariant(mtab);
 
-    mtab->setCommitOpTime(opCtx, donorStateDoc.getCommitOrAbortOpTime().get());
+    mtab->setCommitOpTime(opCtx, donorStateDoc.getCommitOrAbortOpTime().value());
 }
 
 /**
@@ -153,7 +153,7 @@ void onTransitionToAborted(OperationContext* opCtx,
     auto mtab = tenant_migration_access_blocker::getTenantMigrationDonorAccessBlocker(
         opCtx->getServiceContext(), donorStateDoc.getTenantId());
     invariant(mtab);
-    mtab->setAbortOpTime(opCtx, donorStateDoc.getCommitOrAbortOpTime().get());
+    mtab->setAbortOpTime(opCtx, donorStateDoc.getCommitOrAbortOpTime().value());
 }
 
 /**
@@ -189,7 +189,7 @@ public:
                 // here that the commit or abort opTime has been majority committed (guaranteed
                 // to be true since by design the donor never marks its state doc as garbage
                 // collectable before the migration decision is majority committed).
-                mtab->onMajorityCommitPointUpdate(_donorStateDoc.getCommitOrAbortOpTime().get());
+                mtab->onMajorityCommitPointUpdate(_donorStateDoc.getCommitOrAbortOpTime().value());
             }
 
             if (_donorStateDoc.getState() == TenantMigrationDonorStateEnum::kAborted) {
@@ -340,7 +340,7 @@ void TenantMigrationDonorOpObserver::onDelete(OperationContext* opCtx,
         if (tenantIdToDeleteDecoration(opCtx)) {
             opCtx->recoveryUnit()->onCommit([opCtx](boost::optional<Timestamp>) {
                 TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                    .remove(tenantIdToDeleteDecoration(opCtx).get(),
+                    .remove(tenantIdToDeleteDecoration(opCtx).value(),
                             TenantMigrationAccessBlocker::BlockerType::kDonor);
             });
         }
@@ -348,7 +348,8 @@ void TenantMigrationDonorOpObserver::onDelete(OperationContext* opCtx,
         if (migrationIdToDeleteDecoration(opCtx)) {
             opCtx->recoveryUnit()->onCommit([opCtx](boost::optional<Timestamp>) {
                 TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                    .removeShardMergeDonorAccessBlocker(migrationIdToDeleteDecoration(opCtx).get());
+                    .removeShardMergeDonorAccessBlocker(
+                        migrationIdToDeleteDecoration(opCtx).value());
             });
         }
     }

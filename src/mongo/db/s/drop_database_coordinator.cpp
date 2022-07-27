@@ -215,7 +215,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 }
 
                 if (_doc.getCollInfo()) {
-                    const auto& coll = _doc.getCollInfo().get();
+                    const auto& coll = _doc.getCollInfo().value();
                     LOGV2_DEBUG(5494504,
                                 2,
                                 "Completing collection drop from previous primary",

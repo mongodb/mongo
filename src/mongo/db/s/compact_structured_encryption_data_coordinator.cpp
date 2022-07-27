@@ -90,12 +90,12 @@ void doRenameOperation(const CompactStructuredEncryptionDataState& state,
         *skipCompact = true;
         return;
     } else if (hasEcocRenameNow) {
-        if (ecocRenameUuid.get() != state.getEcocRenameUuid().value()) {
+        if (ecocRenameUuid.value() != state.getEcocRenameUuid().value()) {
             LOGV2_DEBUG(6517002,
                         1,
                         "Skipping compaction due to mismatched collection uuid",
                         "ecocRenameNss"_attr = ecocRenameNss,
-                        "uuid"_attr = ecocRenameUuid.get(),
+                        "uuid"_attr = ecocRenameUuid.value(),
                         "expectedUUID"_attr = state.getEcocRenameUuid().value());
             *skipCompact = true;
         }
@@ -119,14 +119,14 @@ void doRenameOperation(const CompactStructuredEncryptionDataState& state,
                     "ecocNss"_attr = ecocNss);
         *skipCompact = true;
         return;
-    } else if (ecocUuid.get() != state.getEcocUuid().value()) {
+    } else if (ecocUuid.value() != state.getEcocUuid().value()) {
         // The generation of the collection to be compacted is different than the one which was
         // requested.
         LOGV2_DEBUG(6350491,
                     1,
                     "Skipping rename of mismatched collection uuid",
                     "ecocNss"_attr = ecocNss,
-                    "uuid"_attr = ecocUuid.get(),
+                    "uuid"_attr = ecocUuid.value(),
                     "expectedUUID"_attr = state.getEcocUuid().value());
         *skipCompact = true;
         return;
@@ -135,7 +135,7 @@ void doRenameOperation(const CompactStructuredEncryptionDataState& state,
     LOGV2(6517004,
           "Renaming the encrypted compaction collection",
           "ecocNss"_attr = ecocNss,
-          "ecocUuid"_attr = ecocUuid.get(),
+          "ecocUuid"_attr = ecocUuid.value(),
           "ecocRenameNss"_attr = ecocRenameNss);
 
     // Otherwise, perform the rename so long as the target namespace does not exist.

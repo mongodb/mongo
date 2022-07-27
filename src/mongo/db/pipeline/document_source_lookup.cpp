@@ -136,7 +136,7 @@ DocumentSourceLookUp::DocumentSourceLookUp(
     _fromExpCtx = expCtx->copyForSubPipeline(resolvedNamespace.ns, resolvedNamespace.uuid);
     _fromExpCtx->inLookup = true;
     if (fromCollator) {
-        _fromExpCtx->setCollator(std::move(fromCollator.get()));
+        _fromExpCtx->setCollator(std::move(fromCollator.value()));
         _hasExplicitCollation = true;
     }
 }
@@ -1034,7 +1034,7 @@ void DocumentSourceLookUp::serializeToArray(
                           << (indexPath ? Value(indexPath->fullPath()) : Value())));
         }
 
-        if (explain.get() >= ExplainOptions::Verbosity::kExecStats) {
+        if (explain.value() >= ExplainOptions::Verbosity::kExecStats) {
             appendSpecificExecStats(output);
         }
 

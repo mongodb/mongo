@@ -312,7 +312,7 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
         })
         .then([this, executor, token, anchor = shared_from_this()] {
             if (const auto bucketNss = metadata().getBucketNss()) {
-                return _acquireLockAsync(executor, token, bucketNss.get().ns());
+                return _acquireLockAsync(executor, token, bucketNss.value().ns());
             }
             return ExecutorFuture<void>(**executor);
         })

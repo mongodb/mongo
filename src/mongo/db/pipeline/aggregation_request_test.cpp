@@ -94,7 +94,7 @@ TEST(AggregationRequestTest, ShouldParseAllKnownOptions) {
     ASSERT_BSONOBJ_EQ(request.getUnwrappedReadPref().value_or(BSONObj()),
                       BSON("$readPreference"
                            << "nearest"));
-    ASSERT_TRUE(request.getExchange().is_initialized());
+    ASSERT_TRUE(request.getExchange().has_value());
     ASSERT_TRUE(request.getIsMapReduceCommand());
     ASSERT_EQ(*request.getCollectionUUID(), uuid);
 }

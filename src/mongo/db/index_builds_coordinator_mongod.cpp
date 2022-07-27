@@ -248,7 +248,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         auto status = Status::OK();
         if (resumeInfo) {
             status = _setUpResumeIndexBuild(
-                opCtx, dbName, collectionUUID, specs, buildUUID, resumeInfo.get());
+                opCtx, dbName, collectionUUID, specs, buildUUID, resumeInfo.value());
         } else {
             status = _setUpIndexBuildForTwoPhaseRecovery(
                 opCtx, dbName, collectionUUID, specs, buildUUID);
@@ -267,7 +267,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
             invariant(statusWithOptionalResult.getValue()->isReady());
             // The requested index (specs) are already built or are being built. Return success
             // early (this is v4.0 behavior compatible).
-            return statusWithOptionalResult.getValue().get();
+            return statusWithOptionalResult.getValue().value();
         }
 
         if (opCtx->getClient()->isFromUserConnection()) {
@@ -457,7 +457,7 @@ Status IndexBuildsCoordinatorMongod::voteCommitIndexBuild(OperationContext* opCt
         // commit quorum is disabled, do not record their entry into the commit ready nodes.
         // If we fail to retrieve the persisted commit quorum, the index build might be in the
         // middle of tearing down.
-        Lock::SharedLock commitQuorumLk(opCtx->lockState(), replState->commitQuorumLock.get());
+        Lock::SharedLock commitQuorumLk(opCtx->lockState(), replState->commitQuorumLock.value());
         auto commitQuorum =
             uassertStatusOK(indexbuildentryhelpers::getCommitQuorum(opCtx, buildUUID));
         if (commitQuorum.numNodes == CommitQuorumOptions::kDisabled) {
@@ -499,7 +499,7 @@ void IndexBuildsCoordinatorMongod::_signalIfCommitQuorumIsSatisfied(
 
     // Acquire the commitQuorumLk in shared mode to make sure commit quorum value did not change
     // after reading it from config.system.indexBuilds collection.
-    Lock::SharedLock commitQuorumLk(opCtx->lockState(), replState->commitQuorumLock.get());
+    Lock::SharedLock commitQuorumLk(opCtx->lockState(), replState->commitQuorumLock.value());
 
     // Read the index builds entry from config.system.indexBuilds collection.
     auto swIndexBuildEntry =
@@ -513,7 +513,7 @@ void IndexBuildsCoordinatorMongod::_signalIfCommitQuorumIsSatisfied(
         return;
 
     bool commitQuorumSatisfied = repl::ReplicationCoordinator::get(opCtx)->isCommitQuorumSatisfied(
-        indexBuildEntry.getCommitQuorum(), voteMemberList.get());
+        indexBuildEntry.getCommitQuorum(), voteMemberList.value());
 
     if (!commitQuorumSatisfied)
         return;
@@ -546,7 +546,7 @@ bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(
 
     // Acquire the commitQuorumLk in shared mode to make sure commit quorum value did not change
     // after reading it from config.system.indexBuilds collection.
-    Lock::SharedLock commitQuorumLk(opCtx->lockState(), replState->commitQuorumLock.get());
+    Lock::SharedLock commitQuorumLk(opCtx->lockState(), replState->commitQuorumLock.value());
 
     // Read the commit quorum value from config.system.indexBuilds collection.
     auto commitQuorum = uassertStatusOKWithContext(
@@ -874,7 +874,7 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
     // About to update the commit quorum value on-disk. So, take the lock in exclusive mode to
     // prevent readers from reading the commit quorum value and making decision on commit quorum
     // satisfied with the stale read commit quorum value.
-    Lock::ExclusiveLock commitQuorumLk(opCtx->lockState(), replState->commitQuorumLock.get());
+    Lock::ExclusiveLock commitQuorumLk(opCtx->lockState(), replState->commitQuorumLock.value());
     {
         if (auto action = replState->getNextActionNoWait()) {
             return Status(ErrorCodes::CommandFailed,

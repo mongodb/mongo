@@ -110,7 +110,7 @@ StatusWith<MigrationSecondaryThrottleOptions> MigrationSecondaryThrottleOptions:
         writeConcernBSON = writeConcernElem.Obj().getOwned();
     }
 
-    invariant(writeConcernBSON.is_initialized());
+    invariant(writeConcernBSON.has_value());
 
     // Make sure the write concern parses correctly
     auto sw = WriteConcernOptions::parse(*writeConcernBSON);

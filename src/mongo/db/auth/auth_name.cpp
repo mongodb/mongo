@@ -153,7 +153,7 @@ template <typename T>
 void AuthName<T>::appendToBSON(BSONObjBuilder* bob, bool encodeTenant) const {
     *bob << T::kFieldName << getName() << "db"_sd << getDB();
     if (encodeTenant && _tenant) {
-        *bob << kTenantFieldName << _tenant.get();
+        *bob << kTenantFieldName << _tenant.value();
     }
 }
 

@@ -167,12 +167,12 @@ void FreeMonProcessor::run() {
 
         while (true) {
             auto item = _queue.dequeue(client->getServiceContext()->getPreciseClockSource());
-            if (!item.is_initialized()) {
+            if (!item.has_value()) {
                 // Shutdown was triggered
                 return;
             }
 
-            auto msg = item.get();
+            auto msg = item.value();
 
             // Do work here
             switch (msg->getType()) {
@@ -279,13 +279,13 @@ void FreeMonProcessor::readState(OperationContext* opCtx, bool updateInMemory) {
 
     _lastReadState = state;
 
-    if (state.is_initialized()) {
-        invariant(state.get().getVersion() == kStorageVersion);
+    if (state.has_value()) {
+        invariant(state.value().getVersion() == kStorageVersion);
 
         if (updateInMemory) {
-            _state = state.get();
+            _state = state.value();
         }
-    } else if (!state.is_initialized()) {
+    } else if (!state.has_value()) {
         // Default the state
         auto state = _state.synchronize();
         state->setVersion(kStorageVersion);
@@ -355,12 +355,12 @@ void FreeMonProcessor::doServerRegister(
         // record the registration id until after becoming primary
         // 2. a standalone which has never been registered
         //
-        if (!state.is_initialized()) {
+        if (!state.has_value()) {
             _registerOnTransitionToPrimary = regType;
         } else {
             // We are standalone or secondary, if we have a registration id, then send a
             // registration notification, else wait for the user to register us.
-            if (state.get().getState() == StorageStateEnum::enabled) {
+            if (state.value().getState() == StorageStateEnum::enabled) {
                 enqueue(FreeMonRegisterCommandMessage::createNow(
                     {msg->getPayload().second, boost::none}));
             }
@@ -426,7 +426,7 @@ void FreeMonProcessor::doCommandRegister(Client* client,
     FreeMonRegistrationRequest req;
 
     if (msg->getPayload().second) {
-        req.setId(StringData(msg->getPayload().second.get()));
+        req.setId(StringData(msg->getPayload().second.value()));
     } else {
         auto regid = _state->getRegistrationId();
         if (!regid.empty()) {
@@ -504,10 +504,10 @@ Status FreeMonProcessor::validateRegistrationResponse(const FreeMonRegistrationR
                                     << kInformationalMessageMaxLength << "'");
     }
 
-    if (resp.getUserReminder().is_initialized() &&
-        resp.getUserReminder().get().size() >= kUserReminderMaxLength) {
+    if (resp.getUserReminder().has_value() &&
+        resp.getUserReminder().value().size() >= kUserReminderMaxLength) {
         return Status(ErrorCodes::FreeMonHttpPermanentFailure,
-                      str::stream() << "UserReminder is '" << resp.getUserReminder().get().size()
+                      str::stream() << "UserReminder is '" << resp.getUserReminder().value().size()
                                     << "' bytes in length, maximum allowed length is '"
                                     << kUserReminderMaxLength << "'");
     }
@@ -547,34 +547,34 @@ Status FreeMonProcessor::validateMetricsResponse(const FreeMonMetricsResponse& r
                                     << "), received '" << resp.getVersion() << "'");
     }
 
-    if (resp.getId().is_initialized() && resp.getId().get().size() >= kRegistrationIdMaxLength) {
+    if (resp.getId().has_value() && resp.getId().value().size() >= kRegistrationIdMaxLength) {
         return Status(ErrorCodes::FreeMonHttpPermanentFailure,
-                      str::stream() << "Id is '" << resp.getId().get().size()
+                      str::stream() << "Id is '" << resp.getId().value().size()
                                     << "' bytes in length, maximum allowed length is '"
                                     << kRegistrationIdMaxLength << "'");
     }
 
-    if (resp.getInformationalURL().is_initialized() &&
-        resp.getInformationalURL().get().size() >= kInformationalURLMaxLength) {
+    if (resp.getInformationalURL().has_value() &&
+        resp.getInformationalURL().value().size() >= kInformationalURLMaxLength) {
         return Status(ErrorCodes::FreeMonHttpPermanentFailure,
                       str::stream()
-                          << "InformationURL is '" << resp.getInformationalURL().get().size()
+                          << "InformationURL is '" << resp.getInformationalURL().value().size()
                           << "' bytes in length, maximum allowed length is '"
                           << kInformationalURLMaxLength << "'");
     }
 
-    if (resp.getMessage().is_initialized() &&
-        resp.getMessage().get().size() >= kInformationalMessageMaxLength) {
+    if (resp.getMessage().has_value() &&
+        resp.getMessage().value().size() >= kInformationalMessageMaxLength) {
         return Status(ErrorCodes::FreeMonHttpPermanentFailure,
-                      str::stream() << "Message is '" << resp.getMessage().get().size()
+                      str::stream() << "Message is '" << resp.getMessage().value().size()
                                     << "' bytes in length, maximum allowed length is '"
                                     << kInformationalMessageMaxLength << "'");
     }
 
-    if (resp.getUserReminder().is_initialized() &&
-        resp.getUserReminder().get().size() >= kUserReminderMaxLength) {
+    if (resp.getUserReminder().has_value() &&
+        resp.getUserReminder().value().size() >= kUserReminderMaxLength) {
         return Status(ErrorCodes::FreeMonHttpPermanentFailure,
-                      str::stream() << "UserReminder is '" << resp.getUserReminder().get().size()
+                      str::stream() << "UserReminder is '" << resp.getUserReminder().value().size()
                                     << "' bytes in length, maximum allowed length is '"
                                     << kUserReminderMaxLength << "'");
     }
@@ -640,8 +640,8 @@ void FreeMonProcessor::doAsyncRegisterComplete(
         auto state = _state.synchronize();
         state->setRegistrationId(resp.getId());
 
-        if (resp.getUserReminder().is_initialized()) {
-            state->setUserReminder(resp.getUserReminder().get());
+        if (resp.getUserReminder().has_value()) {
+            state->setUserReminder(resp.getUserReminder().value());
         } else {
             state->setUserReminder("");
         }
@@ -846,20 +846,20 @@ void FreeMonProcessor::doAsyncMetricsComplete(
     {
         auto state = _state.synchronize();
 
-        if (resp.getId().is_initialized()) {
-            state->setRegistrationId(resp.getId().get());
+        if (resp.getId().has_value()) {
+            state->setRegistrationId(resp.getId().value());
         }
 
-        if (resp.getUserReminder().is_initialized()) {
-            state->setUserReminder(resp.getUserReminder().get());
+        if (resp.getUserReminder().has_value()) {
+            state->setUserReminder(resp.getUserReminder().value());
         }
 
-        if (resp.getInformationalURL().is_initialized()) {
-            state->setInformationalURL(resp.getInformationalURL().get());
+        if (resp.getInformationalURL().has_value()) {
+            state->setInformationalURL(resp.getInformationalURL().value());
         }
 
-        if (resp.getMessage().is_initialized()) {
-            state->setMessage(resp.getMessage().get());
+        if (resp.getMessage().has_value()) {
+            state->setMessage(resp.getMessage().value());
         }
     }
 
@@ -871,7 +871,7 @@ void FreeMonProcessor::doAsyncMetricsComplete(
     _metricsRetry->setMin(Seconds(resp.getReportingInterval()));
     _metricsRetry->reset();
 
-    if (resp.getResendRegistration().is_initialized() && resp.getResendRegistration()) {
+    if (resp.getResendRegistration().has_value() && resp.getResendRegistration()) {
         enqueue(FreeMonRegisterCommandMessage::createNow({_tags, boost::none}));
     } else {
         // Enqueue next metrics upload

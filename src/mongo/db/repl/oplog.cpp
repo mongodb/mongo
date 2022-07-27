@@ -794,7 +794,7 @@ NamespaceString extractNsFromUUIDorNs(OperationContext* opCtx,
                                       const NamespaceString& ns,
                                       const boost::optional<UUID>& ui,
                                       const BSONObj& cmd) {
-    return ui ? extractNsFromUUID(opCtx, ui.get()) : extractNs(ns.db(), cmd);
+    return ui ? extractNsFromUUID(opCtx, ui.value()) : extractNs(ns.db(), cmd);
 }
 
 using OpApplyFn = std::function<Status(
@@ -1001,28 +1001,28 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
           const auto& cmd = entry.getObject();
           return dropIndexesForApplyOps(
-              opCtx, extractNsFromUUID(opCtx, entry.getUuid().get()), cmd);
+              opCtx, extractNsFromUUID(opCtx, entry.getUuid().value()), cmd);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"deleteIndexes",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
           const auto& cmd = entry.getObject();
           return dropIndexesForApplyOps(
-              opCtx, extractNsFromUUID(opCtx, entry.getUuid().get()), cmd);
+              opCtx, extractNsFromUUID(opCtx, entry.getUuid().value()), cmd);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"dropIndex",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
           const auto& cmd = entry.getObject();
           return dropIndexesForApplyOps(
-              opCtx, extractNsFromUUID(opCtx, entry.getUuid().get()), cmd);
+              opCtx, extractNsFromUUID(opCtx, entry.getUuid().value()), cmd);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"dropIndexes",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
           const auto& cmd = entry.getObject();
           return dropIndexesForApplyOps(
-              opCtx, extractNsFromUUID(opCtx, entry.getUuid().get()), cmd);
+              opCtx, extractNsFromUUID(opCtx, entry.getUuid().value()), cmd);
       },
       {ErrorCodes::NamespaceNotFound, ErrorCodes::IndexNotFound}}},
     {"renameCollection",
@@ -1177,10 +1177,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
     CollectionPtr collection = nullptr;
     if (auto uuid = op.getUuid()) {
         auto catalog = CollectionCatalog::get(opCtx);
-        collection = catalog->lookupCollectionByUUID(opCtx, uuid.get());
+        collection = catalog->lookupCollectionByUUID(opCtx, uuid.value());
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "Failed to apply operation due to missing collection ("
-                              << uuid.get() << "): " << redact(opOrGroupedInserts.toBSON()),
+                              << uuid.value() << "): " << redact(opOrGroupedInserts.toBSON()),
                 collection);
         requestNss = collection->ns();
         dassert(opCtx->lockState()->isCollectionLockedForMode(requestNss, MODE_IX));
@@ -1210,7 +1210,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
     BSONObj o2;
     if (op.getObject2())
-        o2 = op.getObject2().get();
+        o2 = op.getObject2().value();
 
     const IndexCatalog* indexCatalog =
         collection == nullptr ? nullptr : collection->getIndexCatalog();
@@ -1292,7 +1292,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     for (const auto iOp : insertOps) {
                         invariant(iOp->getTerm());
                         insertObjs.emplace_back(
-                            iOp->getObject(), iOp->getTimestamp(), iOp->getTerm().get());
+                            iOp->getObject(), iOp->getTimestamp(), iOp->getTerm().value());
                     }
                 } else {
                     // Applying grouped inserts on the primary as part of a tenant migration.
@@ -1380,7 +1380,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     InsertStatement insertStmt(o);
                     if (assignOperationTimestamp) {
                         invariant(op.getTerm());
-                        insertStmt.oplogSlot = OpTime(op.getTimestamp(), op.getTerm().get());
+                        insertStmt.oplogSlot = OpTime(op.getTimestamp(), op.getTerm().value());
                     } else if (!repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(
                                    opCtx, collection->ns())) {
                         // Primaries processing inserts always pre-allocate timestamps. For parity,
@@ -1638,10 +1638,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
                 if (op.getNeedsRetryImage()) {
                     writeToImageCollection(opCtx,
-                                           op.getSessionId().get(),
-                                           op.getTxnNumber().get(),
+                                           op.getSessionId().value(),
+                                           op.getTxnNumber().value(),
                                            op.getApplyOpsTimestamp().value_or(op.getTimestamp()),
-                                           op.getNeedsRetryImage().get(),
+                                           op.getNeedsRetryImage().value(),
                                            // If we did not request an image because we're in
                                            // initial sync, the value passed in here is conveniently
                                            // the empty BSONObj.
@@ -1733,8 +1733,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     // is responsible for whether to retry. The motivation here is to simply reduce
                     // the number of states related documents in the two collections can be in.
                     writeToImageCollection(opCtx,
-                                           op.getSessionId().get(),
-                                           op.getTxnNumber().get(),
+                                           op.getSessionId().value(),
+                                           op.getTxnNumber().value(),
                                            op.getApplyOpsTimestamp().value_or(op.getTimestamp()),
                                            repl::RetryImageEnum::kPreImage,
                                            result.requestedPreImage.value_or(BSONObj()),

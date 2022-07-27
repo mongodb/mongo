@@ -117,7 +117,7 @@ public:
     OpMsgRequest makeCommand(std::string coll, std::vector<BSONObj> updates) override {
         std::vector<BSONObj> args;
         if (shardVersion) {
-            args.push_back(shardVersion.get());
+            args.push_back(shardVersion.value());
         }
         auto request = CommandMirroringTest::makeCommand(coll, args);
 

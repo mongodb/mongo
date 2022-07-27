@@ -606,7 +606,7 @@ void AuthorizationManagerImpl::_pinnedUsersThreadRoutine() noexcept try {
             _pinnedUsersCond, lk, timeout, [&] { return _usersToPin.has_value(); });
 
         if (waitRes) {
-            usersToPin = std::move(_usersToPin.get());
+            usersToPin = std::move(_usersToPin.value());
             _usersToPin = boost::none;
         }
         lk.unlock();

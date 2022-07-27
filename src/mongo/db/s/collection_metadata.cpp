@@ -71,7 +71,7 @@ boost::optional<ShardKeyPattern> CollectionMetadata::getReshardingKeyIfShouldFor
 
     // Used a switch statement so that the compiler warns anyone who modifies the coordinator
     // states enum.
-    switch (reshardingFields.get().getState()) {
+    switch (reshardingFields.value().getState()) {
         case CoordinatorStateEnum::kUnused:
         case CoordinatorStateEnum::kInitializing:
         case CoordinatorStateEnum::kBlockingWrites:

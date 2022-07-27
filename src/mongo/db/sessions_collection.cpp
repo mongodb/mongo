@@ -130,10 +130,10 @@ void runBulkCmd(StringData label,
     auto makeBatch = [&] {
         buf.reset();
         batchBuilder.emplace(buf);
-        initBatch(&(batchBuilder.get()));
+        initBatch(&(batchBuilder.value()));
         entries.emplace(batchBuilder->subarrayStart(label));
 
-        return &(entries.get());
+        return &(entries.value());
     };
 
     auto sendLocalBatch = [&](BSONArrayBuilder*) {

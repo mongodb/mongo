@@ -275,7 +275,7 @@ public:
     }
 
     const ChunkManager& chunkManager() {
-        return _cm.get();
+        return _cm.value();
     }
 
     const std::vector<NamespaceString>& stashCollections() {

@@ -179,7 +179,7 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection) {
             [entry = indexCatalogEntry, coll = collection](boost::optional<Timestamp> commitTime) {
                 // This will prevent the unfinished index from being visible on index iterators.
                 if (commitTime) {
-                    entry->setMinimumVisibleSnapshot(commitTime.get());
+                    entry->setMinimumVisibleSnapshot(commitTime.value());
                 }
             });
     }
@@ -270,7 +270,7 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
                   "commitTimestamp"_attr = commitTime);
 
             if (commitTime) {
-                entry->setMinimumVisibleSnapshot(commitTime.get());
+                entry->setMinimumVisibleSnapshot(commitTime.value());
             }
 
             // Add the index to the TTLCollectionCache upon successfully committing the index build.

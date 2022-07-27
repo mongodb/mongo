@@ -89,7 +89,7 @@ boost::intrusive_ptr<ExpressionInternalFLEEqual> generateFleEqualMatch(StringDat
         expCtx,
         ExpressionFieldPath::createPathFromString(
             expCtx, path.toString(), expCtx->variablesParseState),
-        tokens.serverToken.get().data,
+        tokens.serverToken.value().data,
         tokens.maxCounter.value_or(0LL),
         tokens.edcToken.data);
 }
@@ -110,7 +110,7 @@ std::unique_ptr<ExpressionInternalFLEEqual> generateFleEqualMatchUnique(StringDa
         expCtx,
         ExpressionFieldPath::createPathFromString(
             expCtx, path.toString(), expCtx->variablesParseState),
-        tokens.serverToken.get().data,
+        tokens.serverToken.value().data,
         tokens.maxCounter.value_or(0LL),
         tokens.edcToken.data);
 }
@@ -144,20 +144,20 @@ static stdx::unordered_map<std::type_index, std::function<void(FLEQueryRewriter*
 
 void rewriteMatch(FLEQueryRewriter* rewriter, DocumentSourceMatch* source) {
     if (auto rewritten = rewriter->rewriteMatchExpression(source->getQuery())) {
-        source->rebuild(rewritten.get());
+        source->rebuild(rewritten.value());
     }
 }
 
 void rewriteGeoNear(FLEQueryRewriter* rewriter, DocumentSourceGeoNear* source) {
     if (auto rewritten = rewriter->rewriteMatchExpression(source->getQuery())) {
-        source->setQuery(rewritten.get());
+        source->setQuery(rewritten.value());
     }
 }
 
 void rewriteGraphLookUp(FLEQueryRewriter* rewriter, DocumentSourceGraphLookUp* source) {
     if (auto filter = source->getAdditionalFilter()) {
-        if (auto rewritten = rewriter->rewriteMatchExpression(filter.get())) {
-            source->setAdditionalFilter(rewritten.get());
+        if (auto rewritten = rewriter->rewriteMatchExpression(filter.value())) {
+            source->setAdditionalFilter(rewritten.value());
         }
     }
 
@@ -396,7 +396,7 @@ BSONObj rewriteEncryptedFilter(const FLEStateCollectionReader& escReader,
 
     if (auto rewritten =
             FLEQueryRewriter(expCtx, escReader, eccReader, mode).rewriteMatchExpression(filter)) {
-        return rewritten.get();
+        return rewritten.value();
     }
 
     return filter;
@@ -514,8 +514,8 @@ BSONObj rewriteEncryptedFilterInsideTxn(FLEQueryInterface* queryImpl,
         auto docCount = queryImpl->countDocuments(nss);
         return TxnCollectionReader(docCount, queryImpl, nss);
     };
-    auto escReader = makeCollectionReader(queryImpl, efc.getEscCollection().get());
-    auto eccReader = makeCollectionReader(queryImpl, efc.getEccCollection().get());
+    auto escReader = makeCollectionReader(queryImpl, efc.getEscCollection().value());
+    auto eccReader = makeCollectionReader(queryImpl, efc.getEccCollection().value());
 
     return rewriteEncryptedFilter(escReader, eccReader, expCtx, filter, mode);
 }
@@ -549,7 +549,7 @@ void processFindCommand(OperationContext* opCtx,
     findCommand->setFilter(rewriteQuery(opCtx,
                                         expCtx,
                                         nss,
-                                        findCommand->getEncryptionInformation().get(),
+                                        findCommand->getEncryptionInformation().value(),
                                         findCommand->getFilter().getOwned(),
                                         getTransaction,
                                         HighCardinalityModeAllowed::kAllow));
@@ -574,7 +574,7 @@ void processCountCommand(OperationContext* opCtx,
     countCommand->setQuery(rewriteQuery(opCtx,
                                         expCtx,
                                         nss,
-                                        countCommand->getEncryptionInformation().get(),
+                                        countCommand->getEncryptionInformation().value(),
                                         countCommand->getQuery().getOwned(),
                                         getTxn,
                                         HighCardinalityModeAllowed::kAllow));

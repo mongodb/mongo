@@ -66,11 +66,11 @@ StatusWith<LockpingsType> LockpingsType::fromBSON(const BSONObj& source) {
 }
 
 Status LockpingsType::validate() const {
-    if (!_process.is_initialized() || _process->empty()) {
+    if (!_process.has_value() || _process->empty()) {
         return {ErrorCodes::NoSuchKey, str::stream() << "missing " << process.name() << " field"};
     }
 
-    if (!_ping.is_initialized()) {
+    if (!_ping.has_value()) {
         return {ErrorCodes::NoSuchKey, str::stream() << "missing " << ping.name() << " field"};
     }
 

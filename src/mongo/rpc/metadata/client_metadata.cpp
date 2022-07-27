@@ -440,7 +440,7 @@ const ClientMetadata* ClientMetadata::getForClient(Client* client) noexcept {
         // If we haven't finalized, it's still okay to return our existing value.
         return nullptr;
     }
-    return &state.meta.get();
+    return &state.meta.value();
 }
 
 const ClientMetadata* ClientMetadata::getForOperation(OperationContext* opCtx) noexcept {
@@ -449,7 +449,7 @@ const ClientMetadata* ClientMetadata::getForOperation(OperationContext* opCtx) n
         return nullptr;
     }
     invariant(state.meta);
-    return &state.meta.get();
+    return &state.meta.value();
 }
 
 const ClientMetadata* ClientMetadata::get(Client* client) noexcept {

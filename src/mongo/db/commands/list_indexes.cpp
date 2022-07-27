@@ -229,7 +229,7 @@ public:
                 return NamespaceString(request().getDbName(), "");
             }
             invariant(nss.nss());
-            return nss.nss().get();
+            return nss.nss().value();
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const final {

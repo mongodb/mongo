@@ -93,7 +93,7 @@ void writeAuthDataToImpersonatedUserMetadata(OperationContext* opCtx, BSONObjBui
 
     ImpersonatedUserMetadata metadata;
     if (userName) {
-        metadata.setUsers({userName.get()});
+        metadata.setUsers({userName.value()});
     } else {
         metadata.setUsers({});
     }

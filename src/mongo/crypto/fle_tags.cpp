@@ -135,7 +135,7 @@ std::vector<PrfBlock> readTagsWithContention(const FLEStateCollectionReader& esc
     //     n => n inserts for this field value pair.
     //     none => compaction => query ESC for null document to find # of inserts.
     auto insertCounter = ESCCollection::emuBinary(esc, escTag, escVal);
-    if (insertCounter && insertCounter.get() == 0) {
+    if (insertCounter && insertCounter.value() == 0) {
         return std::move(binaryTags);
     }
 
@@ -208,11 +208,11 @@ std::vector<PrfBlock> readTags(const FLEStateCollectionReader& esc,
     // The output of readTags will be used as the argument to a $in expression, so make sure we
     // don't exceed the configured memory limit.
     auto limit = static_cast<size_t>(internalQueryFLERewriteMemoryLimit.load());
-    if (!cm || cm.get() == 0) {
+    if (!cm || cm.value() == 0) {
         auto binaryTags = readTagsWithContention(esc, ecc, s, c, d, 0, limit, {});
     }
     std::vector<PrfBlock> binaryTags;
-    for (auto i = 0; i <= cm.get(); i++) {
+    for (auto i = 0; i <= cm.value(); i++) {
         binaryTags = readTagsWithContention(esc, ecc, s, c, d, i, limit, std::move(binaryTags));
     }
     return binaryTags;

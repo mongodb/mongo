@@ -53,7 +53,7 @@ boost::optional<UserHandle> getAuthenticatedUser(Client* client) {
     auto optUser = AuthorizationSession::get(client)->getAuthenticatedUser();
     uassert(ErrorCodes::Unauthorized, "Logical sessions require authentication", optUser);
 
-    return optUser.get();
+    return optUser.value();
 }
 }  // namespace
 
@@ -67,9 +67,9 @@ SHA256Block getLogicalSessionUserDigestForLoggedInUser(const OperationContext* o
     if (auto user = getAuthenticatedUser(opCtx->getClient())) {
         uassert(ErrorCodes::BadValue,
                 "Username too long to use with logical sessions",
-                user.get()->getName().getDisplayNameLength() <
+                user.value()->getName().getDisplayNameLength() <
                     kMaximumUserNameLengthForLogicalSessions);
-        return user.get()->getDigest();
+        return user.value()->getDigest();
     } else {
         return kNoAuthDigest;
     }
@@ -192,8 +192,8 @@ LogicalSessionRecord makeLogicalSessionRecord(OperationContext* opCtx, Date_t la
     LogicalSessionRecord lsr{};
 
     if (auto user = getAuthenticatedUser(opCtx->getClient())) {
-        id.setUid(user.get()->getDigest());
-        lsr.setUser(StringData(user.get()->getName().getDisplayName()));
+        id.setUid(user.value()->getDigest());
+        lsr.setUser(StringData(user.value()->getName().getDisplayName()));
     } else {
         id.setUid(kNoAuthDigest);
     }
@@ -225,8 +225,8 @@ LogicalSessionRecord makeLogicalSessionRecord(OperationContext* opCtx,
     auto lsr = makeLogicalSessionRecord(lsid, lastUse);
 
     if (auto user = getAuthenticatedUser(opCtx->getClient())) {
-        if (user.get()->getDigest() == lsid.getUid()) {
-            lsr.setUser(StringData(user.get()->getName().getDisplayName()));
+        if (user.value()->getDigest() == lsid.getUid()) {
+            lsr.setUser(StringData(user.value()->getName().getDisplayName()));
         }
     }
 

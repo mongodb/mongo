@@ -284,7 +284,7 @@ std::string stringifyForDebug(OperationContext* opCtx,
     auto optOplogReadTimestampInt = opCtx->recoveryUnit()->getOplogVisibilityTs();
     if (optOplogReadTimestampInt) {
         output << "Latest oplog visibility timestamp: "
-               << Timestamp(optOplogReadTimestampInt.get());
+               << Timestamp(optOplogReadTimestampInt.value());
     }
 
     if (record) {

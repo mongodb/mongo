@@ -242,8 +242,8 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
 
     // This function only handles time and measurement predicates--not metadata.
     if (bucketSpec.metaField() &&
-        (matchExprPath == bucketSpec.metaField().get() ||
-         expression::isPathPrefixOf(bucketSpec.metaField().get(), matchExprPath))) {
+        (matchExprPath == bucketSpec.metaField().value() ||
+         expression::isPathPrefixOf(bucketSpec.metaField().value(), matchExprPath))) {
         tasserted(
             6707200,
             str::stream() << "createComparisonPredicate() does not handle metadata predicates: "
@@ -452,8 +452,8 @@ std::unique_ptr<MatchExpression> BucketSpec::createPredicatesOnBucketLevelField(
     // handle it here.
     const auto matchExprPath = matchExpr->path();
     if (!matchExprPath.empty() && bucketSpec.metaField() &&
-        (matchExprPath == bucketSpec.metaField().get() ||
-         expression::isPathPrefixOf(bucketSpec.metaField().get(), matchExprPath))) {
+        (matchExprPath == bucketSpec.metaField().value() ||
+         expression::isPathPrefixOf(bucketSpec.metaField().value(), matchExprPath))) {
 
         if (haveComputedMetaField)
             return handleIneligible(policy, matchExpr, "can't handle a computed meta field");
@@ -464,7 +464,7 @@ std::unique_ptr<MatchExpression> BucketSpec::createPredicatesOnBucketLevelField(
         auto result = matchExpr->shallowClone();
         expression::applyRenamesToExpression(
             result.get(),
-            {{bucketSpec.metaField().get(), timeseries::kBucketMetaFieldName.toString()}});
+            {{bucketSpec.metaField().value(), timeseries::kBucketMetaFieldName.toString()}});
         return result;
     }
 

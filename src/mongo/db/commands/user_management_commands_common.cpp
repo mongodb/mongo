@@ -226,7 +226,7 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const UpdateUserCommand& 
                 as->isAuthorizedForActionsOnResource(ResourcePattern::forAnyNormalResource(),
                                                      ActionType::revokeRole));
 
-        auto resolvedRoles = resolveRoleNames(possibleRoles.get(), dbname);
+        auto resolvedRoles = resolveRoleNames(possibleRoles.value(), dbname);
         uassertStatusOK(checkAuthorizedToGrantRoles(as, resolvedRoles));
     }
 
@@ -267,11 +267,11 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const UpdateRoleCommand& 
                                                  ActionType::revokeRole));
 
     if (auto roles = request.getRoles()) {
-        auto resolvedRoles = resolveRoleNames(roles.get(), dbname);
+        auto resolvedRoles = resolveRoleNames(roles.value(), dbname);
         uassertStatusOK(checkAuthorizedToGrantRoles(as, resolvedRoles));
     }
     if (auto privs = request.getPrivileges()) {
-        uassertStatusOK(checkAuthorizedToGrantPrivileges(as, privs.get()));
+        uassertStatusOK(checkAuthorizedToGrantPrivileges(as, privs.value()));
     }
     uassertStatusOK(checkAuthorizedToSetRestrictions(
         as, request.getAuthenticationRestrictions() != boost::none, dbname));

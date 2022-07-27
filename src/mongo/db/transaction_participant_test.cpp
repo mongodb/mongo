@@ -1527,9 +1527,9 @@ TEST_F(TxnParticipantTest, CorrectlyStashAPIParameters) {
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     auto defaultAPIParams = txnParticipant.getAPIParameters(opCtx());
-    ASSERT_FALSE(defaultAPIParams.getAPIVersion().is_initialized());
-    ASSERT_FALSE(defaultAPIParams.getAPIStrict().is_initialized());
-    ASSERT_FALSE(defaultAPIParams.getAPIDeprecationErrors().is_initialized());
+    ASSERT_FALSE(defaultAPIParams.getAPIVersion().has_value());
+    ASSERT_FALSE(defaultAPIParams.getAPIStrict().has_value());
+    ASSERT_FALSE(defaultAPIParams.getAPIDeprecationErrors().has_value());
 
     txnParticipant.unstashTransactionResources(opCtx(), "insert");
 
@@ -3146,8 +3146,8 @@ TEST_F(TransactionsMetricsTest, UseAPIParametersOnOpCtxForARetryableWrite) {
     // retryable write.
     APIParameters storedAPIParameters = txnParticipant.getAPIParameters(opCtx());
     ASSERT_EQ("3", *storedAPIParameters.getAPIVersion());
-    ASSERT_FALSE(storedAPIParameters.getAPIStrict().is_initialized());
-    ASSERT_FALSE(storedAPIParameters.getAPIDeprecationErrors().is_initialized());
+    ASSERT_FALSE(storedAPIParameters.getAPIStrict().has_value());
+    ASSERT_FALSE(storedAPIParameters.getAPIDeprecationErrors().has_value());
 
     // Stash secondAPIParameters.
     txnParticipant.stashTransactionResources(opCtx());
@@ -3160,8 +3160,8 @@ TEST_F(TransactionsMetricsTest, UseAPIParametersOnOpCtxForARetryableWrite) {
     // parameters in TxnResources.
     storedAPIParameters = txnParticipant.getAPIParameters(opCtx());
     ASSERT_EQ("4", *storedAPIParameters.getAPIVersion());
-    ASSERT_FALSE(storedAPIParameters.getAPIStrict().is_initialized());
-    ASSERT_FALSE(storedAPIParameters.getAPIDeprecationErrors().is_initialized());
+    ASSERT_FALSE(storedAPIParameters.getAPIStrict().has_value());
+    ASSERT_FALSE(storedAPIParameters.getAPIDeprecationErrors().has_value());
 }
 
 namespace {
@@ -4481,7 +4481,7 @@ TEST_F(TxnParticipantTest, OldestActiveTransactionTimestamp) {
         ASSERT(coll);
         auto cursor = coll->getCursor(opCtx());
         while (auto record = cursor->next()) {
-            auto bson = record.get().data.toBson();
+            auto bson = record.value().data.toBson();
             if (bson["state"].String() != "prepared"_sd) {
                 continue;
             }

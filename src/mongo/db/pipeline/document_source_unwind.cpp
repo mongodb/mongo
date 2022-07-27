@@ -253,7 +253,7 @@ bool DocumentSourceUnwind::canPushLimitBack(const DocumentSourceLimit* limit) co
     // If _smallestLimitPushedDown is boost::none, then we have not yet pushed a limit down. So no
     // matter what the limit is, we should duplicate and push down. Otherwise we should only push
     // the limit down if it is smaller than the smallest limit we have pushed down so far.
-    return !_smallestLimitPushedDown || limit->getLimit() < _smallestLimitPushedDown.get();
+    return !_smallestLimitPushedDown || limit->getLimit() < _smallestLimitPushedDown.value();
 }
 
 Pipeline::SourceContainer::iterator DocumentSourceUnwind::doOptimizeAt(
@@ -273,7 +273,7 @@ Pipeline::SourceContainer::iterator DocumentSourceUnwind::doOptimizeAt(
         if (nextSort->hasLimit()) {
             container->insert(
                 std::next(next),
-                DocumentSourceLimit::create(nextSort->getContext(), nextSort->getLimit().get()));
+                DocumentSourceLimit::create(nextSort->getContext(), nextSort->getLimit().value()));
         }
         std::swap(*itr, *next);
         return itr == container->begin() ? itr : std::prev(itr);

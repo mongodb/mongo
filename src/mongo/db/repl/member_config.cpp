@@ -116,7 +116,7 @@ void MemberConfig::addTagInfo(ReplSetTagConfig* tagConfig) {
     // Parse "tags" field.
     //
     if (getTags()) {
-        for (auto&& tag : getTags().get()) {
+        for (auto&& tag : getTags().value()) {
             if (tag.type() != String) {
                 uasserted(ErrorCodes::TypeMismatch,
                           str::stream()
@@ -198,8 +198,8 @@ BSONObj MemberConfig::toBSON(bool omitNewlyAddedField) const {
 
     if (!omitNewlyAddedField && getNewlyAdded()) {
         // We should never have _newlyAdded if automatic reconfigs aren't enabled.
-        invariant(getNewlyAdded().get());
-        configBuilder.append(kNewlyAddedFieldName, getNewlyAdded().get());
+        invariant(getNewlyAdded().value());
+        configBuilder.append(kNewlyAddedFieldName, getNewlyAdded().value());
     }
 
     configBuilder.append(kBuildIndexesFieldName, getBuildIndexes());
@@ -212,7 +212,7 @@ BSONObj MemberConfig::toBSON(bool omitNewlyAddedField) const {
     _splitHorizon.toBSON(configBuilder);
 
     if (getSecondaryDelaySecs()) {
-        configBuilder.append(kSecondaryDelaySecsFieldName, getSecondaryDelaySecs().get());
+        configBuilder.append(kSecondaryDelaySecsFieldName, getSecondaryDelaySecs().value());
     }
 
     configBuilder.append(kVotesFieldName, MemberConfigBase::getVotes() ? 1 : 0);

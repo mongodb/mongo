@@ -333,7 +333,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, LastShutdownState l
             // `recoveryTimestamp`. Choose the `oldestTimestamp` for collections that existed at the
             // `oldestTimestamp` and conservatively choose the `recoveryTimestamp` for everything
             // else.
-            minVisibleTs = recoveryTs.get();
+            minVisibleTs = recoveryTs.value();
             if (existedAtOldestTs.find(entry.catalogId) != existedAtOldestTs.end()) {
                 // Collections found at the `oldestTimestamp` on startup can have their minimum
                 // visible timestamp pulled back to that value.
@@ -387,7 +387,7 @@ void StorageEngineImpl::_initCollection(OperationContext* opCtx,
     collection->setMinimumVisibleSnapshot(minVisibleTs);
 
     CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-        catalog.registerCollection(opCtx, md->options.uuid.get(), std::move(collection));
+        catalog.registerCollection(opCtx, md->options.uuid.value(), std::move(collection));
     });
 }
 
@@ -488,7 +488,7 @@ bool StorageEngineImpl::_handleInternalIdent(OperationContext* opCtx,
     auto cursor = rs->getCursor(opCtx);
     auto record = cursor->next();
     if (record) {
-        auto doc = record.get().data.toBson();
+        auto doc = record.value().data.toBson();
 
         // Parse the documents here so that we can restart the build if the document doesn't
         // contain all the necessary information to be able to resume building the index.
@@ -972,7 +972,7 @@ Status StorageEngineImpl::repairRecordStore(OperationContext* opCtx,
 
     // After repairing, re-initialize the collection with a valid RecordStore.
     CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-        auto uuid = catalog.lookupUUIDByNSS(opCtx, nss).get();
+        auto uuid = catalog.lookupUUIDByNSS(opCtx, nss).value();
         catalog.deregisterCollection(opCtx, uuid);
     });
 

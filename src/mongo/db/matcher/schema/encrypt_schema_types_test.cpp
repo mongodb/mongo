@@ -102,8 +102,8 @@ TEST(EncryptSchemaTest, ParseFullEncryptObjectFromBSON) {
     MatcherTypeSet resultMatcherSet;
     resultMatcherSet.bsonTypes.insert(BSONType::NumberInt);
     ASSERT_TRUE(encryptInfo.getBsonType() == BSONTypeSet(resultMatcherSet));
-    ASSERT_TRUE(encryptInfo.getAlgorithm().get() == FleAlgorithmEnum::kDeterministic);
-    EncryptSchemaKeyId keyid = encryptInfo.getKeyId().get();
+    ASSERT_TRUE(encryptInfo.getAlgorithm().value() == FleAlgorithmEnum::kDeterministic);
+    EncryptSchemaKeyId keyid = encryptInfo.getKeyId().value();
     ASSERT_TRUE(keyid.type() == EncryptSchemaKeyId::Type::kJSONPointer);
     ASSERT_EQ(keyid.jsonPointer().toString(), "/pointer");
 }

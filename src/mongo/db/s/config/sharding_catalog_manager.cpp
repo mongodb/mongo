@@ -152,7 +152,7 @@ BSONObj commitOrAbortTransaction(OperationContext* opCtx,
     newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
     AuthorizationSession::get(newOpCtx.get()->getClient())
         ->grantInternalAuthorization(newOpCtx.get()->getClient());
-    newOpCtx.get()->setLogicalSessionId(opCtx->getLogicalSessionId().get());
+    newOpCtx.get()->setLogicalSessionId(opCtx->getLogicalSessionId().value());
     newOpCtx.get()->setTxnNumber(txnNumber);
 
     BSONObjBuilder bob;
@@ -639,7 +639,7 @@ void ShardingCatalogManager::insertConfigDocuments(OperationContext* opCtx,
         }());
 
         if (txnNumber) {
-            writeToConfigDocumentInTxn(opCtx, nss, request, txnNumber.get());
+            writeToConfigDocumentInTxn(opCtx, nss, request, txnNumber.value());
         } else {
             uassertStatusOK(
                 getStatusFromWriteCommandReply(executeConfigRequest(opCtx, nss, request)));

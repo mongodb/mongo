@@ -94,7 +94,7 @@ void warnEncryptedCollectionsIfNeeded(OperationContext* opCtx, const CollectionP
     }
 
     auto catalog = CollectionCatalog::get(opCtx);
-    auto efc = coll->getCollectionOptions().encryptedFieldConfig.get();
+    auto efc = coll->getCollectionOptions().encryptedFieldConfig.value();
 
     std::vector<std::string> leaked;
 

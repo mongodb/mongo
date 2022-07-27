@@ -589,8 +589,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
             const auto durableBuildUUID = collection->getIndexBuildUUID(indexNames[i]);
 
             // A build UUID is present if and only if we are rebuilding a two-phase build.
-            invariant((protocol == IndexBuildProtocol::kTwoPhase) ==
-                      durableBuildUUID.is_initialized());
+            invariant((protocol == IndexBuildProtocol::kTwoPhase) == durableBuildUUID.has_value());
             // When a buildUUID is present, it must match the build UUID parameter to this
             // function.
             invariant(!durableBuildUUID || *durableBuildUUID == buildUUID,
@@ -1574,7 +1573,7 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
               "Index build: resuming",
               "buildUUID"_attr = buildUUID,
               "collectionUUID"_attr = collUUID,
-              logAttrs(nss.get()),
+              logAttrs(nss.value()),
               "details"_attr = resumeInfo.toBSON());
 
         try {
@@ -1634,7 +1633,7 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
               "Index build: restarting",
               "buildUUID"_attr = buildUUID,
               "collectionUUID"_attr = build.collUUID,
-              logAttrs(nss.get()));
+              logAttrs(nss.value()));
         IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions;
         // Indicate that the initialization should not generate oplog entries or timestamps for the
         // first catalog write, and that the original durable catalog entries should be dropped and
@@ -2045,7 +2044,7 @@ IndexBuildsCoordinator::PostSetupAction IndexBuildsCoordinator::_setUpIndexBuild
             // Persist the commit quorum value in the config.system.indexBuilds collection.
             IndexBuildEntry indexBuildEntry(replState->buildUUID,
                                             replState->collectionUUID,
-                                            indexBuildOptions.commitQuorum.get(),
+                                            indexBuildOptions.commitQuorum.value(),
                                             replState->indexNames);
             uassertStatusOK(indexbuildentryhelpers::addIndexBuildEntry(opCtx, indexBuildEntry));
 
@@ -2328,7 +2327,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
             PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
 
         if (resumeInfo) {
-            _resumeIndexBuildFromPhase(opCtx, replState, indexBuildOptions, resumeInfo.get());
+            _resumeIndexBuildFromPhase(opCtx, replState, indexBuildOptions, resumeInfo.value());
         } else {
             _buildIndex(opCtx, replState, indexBuildOptions);
         }

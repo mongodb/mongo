@@ -165,7 +165,7 @@ std::string RemoteCommandOnAnyResponse::toString() const {
                   data.toString(),
                   target ? StringData(target->toString()) : "[none]"_sd,
                   status.toString(),
-                  elapsed ? StringData(elapsed.get().toString()) : "n/a"_sd,
+                  elapsed ? StringData(elapsed.value().toString()) : "n/a"_sd,
                   moreToCome);
 }
 

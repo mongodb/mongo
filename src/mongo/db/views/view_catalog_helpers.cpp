@@ -171,7 +171,7 @@ StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
             return StatusWith<ResolvedView>(
                 {*resolvedNss,
                  std::move(resolvedPipeline),
-                 collation ? std::move(collation.get()) : CollationSpec::kSimpleSpec,
+                 collation ? std::move(collation.value()) : CollationSpec::kSimpleSpec,
                  tsOptions,
                  mixedData});
         }
@@ -216,7 +216,7 @@ StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
             curOp->debug().addResolvedViews(dependencyChain, resolvedPipeline);
 
             return StatusWith<ResolvedView>(
-                {*resolvedNss, std::move(resolvedPipeline), std::move(collation.get())});
+                {*resolvedNss, std::move(resolvedPipeline), std::move(collation.value())});
         }
     }
 

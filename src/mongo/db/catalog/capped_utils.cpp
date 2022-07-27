@@ -104,7 +104,7 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
     opCtx->recoveryUnit()->onCommit([writableCollection](auto commitTime) {
         // Ban reading from this collection on snapshots before now.
         if (commitTime) {
-            writableCollection->setMinimumVisibleSnapshot(commitTime.get());
+            writableCollection->setMinimumVisibleSnapshot(commitTime.value());
         }
     });
 

@@ -69,7 +69,7 @@ bool metadataOverlapsRange(const boost::optional<CollectionMetadata>& metadata,
     if (!metadata) {
         return false;
     }
-    return metadataOverlapsRange(metadata.get(), range);
+    return metadataOverlapsRange(metadata.value(), range);
 }
 
 }  // namespace
@@ -105,7 +105,7 @@ public:
     // boost::none
     const CollectionMetadata& get() {
         invariant(_metadataTracker->metadata);
-        return _metadataTracker->metadata.get();
+        return _metadataTracker->metadata.value();
     }
 
 private:
@@ -178,7 +178,7 @@ void MetadataManager::setFilteringMetadata(CollectionMetadata remoteMetadata) {
     invariant(!_metadata.empty());
     // The active metadata should always be available (not boost::none)
     invariant(_metadata.back()->metadata);
-    const auto& activeMetadata = _metadata.back()->metadata.get();
+    const auto& activeMetadata = _metadata.back()->metadata.value();
 
     const auto remoteCollVersion = remoteMetadata.getCollVersion();
     const auto activeCollVersion = activeMetadata.getCollVersion();

@@ -128,7 +128,7 @@ protected:
                                 std::move(uuid),
                                 shardKey);
         if (reshardingFields)
-            collType.setReshardingFields(std::move(reshardingFields.get()));
+            collType.setReshardingFields(std::move(reshardingFields.value()));
 
         if (coordinatorDoc.getState() == CoordinatorStateEnum::kDone ||
             coordinatorDoc.getState() == CoordinatorStateEnum::kAborting) {
@@ -262,8 +262,8 @@ protected:
         ASSERT(coordinatorDoc.getActive());
         if (expectedCoordinatorDoc.getCloneTimestamp()) {
             ASSERT(coordinatorDoc.getCloneTimestamp());
-            ASSERT_EQUALS(coordinatorDoc.getCloneTimestamp().get(),
-                          expectedCoordinatorDoc.getCloneTimestamp().get());
+            ASSERT_EQUALS(coordinatorDoc.getCloneTimestamp().value(),
+                          expectedCoordinatorDoc.getCloneTimestamp().value());
         } else {
             ASSERT(!coordinatorDoc.getCloneTimestamp());
         }
@@ -271,8 +271,8 @@ protected:
         // Confirm the (non)existence of the CoordinatorDocument abortReason.
         if (expectedCoordinatorDoc.getAbortReason()) {
             ASSERT(coordinatorDoc.getAbortReason());
-            ASSERT_BSONOBJ_EQ(coordinatorDoc.getAbortReason().get(),
-                              expectedCoordinatorDoc.getAbortReason().get());
+            ASSERT_BSONOBJ_EQ(coordinatorDoc.getAbortReason().value(),
+                              expectedCoordinatorDoc.getAbortReason().value());
         } else {
             ASSERT(!coordinatorDoc.getAbortReason());
         }
@@ -297,8 +297,8 @@ protected:
             ASSERT(onDiskIt != onDiskDonorShards.end());
             if (it->getMutableState().getMinFetchTimestamp()) {
                 ASSERT(onDiskIt->getMutableState().getMinFetchTimestamp());
-                ASSERT_EQUALS(onDiskIt->getMutableState().getMinFetchTimestamp().get(),
-                              it->getMutableState().getMinFetchTimestamp().get());
+                ASSERT_EQUALS(onDiskIt->getMutableState().getMinFetchTimestamp().value(),
+                              it->getMutableState().getMinFetchTimestamp().value());
             } else {
                 ASSERT(!onDiskIt->getMutableState().getMinFetchTimestamp());
             }
@@ -346,7 +346,7 @@ protected:
             return;
 
         ASSERT(onDiskEntry.getReshardingFields());
-        auto onDiskReshardingFields = onDiskEntry.getReshardingFields().get();
+        auto onDiskReshardingFields = onDiskEntry.getReshardingFields().value();
         ASSERT(onDiskReshardingFields.getReshardingUUID() ==
                expectedReshardingFields->getReshardingUUID());
         ASSERT(onDiskReshardingFields.getState() == expectedReshardingFields->getState());
@@ -396,10 +396,10 @@ protected:
 
         ASSERT_EQUALS(onDiskEntry.getAllowMigrations(), expectedCollType->getAllowMigrations());
 
-        auto expectedReshardingFields = expectedCollType->getReshardingFields().get();
+        auto expectedReshardingFields = expectedCollType->getReshardingFields().value();
         ASSERT(onDiskEntry.getReshardingFields());
 
-        auto onDiskReshardingFields = onDiskEntry.getReshardingFields().get();
+        auto onDiskReshardingFields = onDiskEntry.getReshardingFields().value();
         ASSERT_EQUALS(onDiskReshardingFields.getReshardingUUID(),
                       expectedReshardingFields.getReshardingUUID());
         ASSERT(onDiskReshardingFields.getState() == expectedReshardingFields.getState());
@@ -410,8 +410,9 @@ protected:
 
         if (expectedReshardingFields.getRecipientFields()->getCloneTimestamp()) {
             ASSERT(onDiskReshardingFields.getRecipientFields()->getCloneTimestamp());
-            ASSERT_EQUALS(onDiskReshardingFields.getRecipientFields()->getCloneTimestamp().get(),
-                          expectedReshardingFields.getRecipientFields()->getCloneTimestamp().get());
+            ASSERT_EQUALS(
+                onDiskReshardingFields.getRecipientFields()->getCloneTimestamp().value(),
+                expectedReshardingFields.getRecipientFields()->getCloneTimestamp().value());
         } else {
             ASSERT(!onDiskReshardingFields.getRecipientFields()->getCloneTimestamp());
         }

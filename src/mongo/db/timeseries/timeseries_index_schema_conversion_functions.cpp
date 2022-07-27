@@ -387,7 +387,7 @@ boost::optional<BSONObj> createTimeseriesIndexFromBucketsIndex(
             // exists, and modifies the kKeyFieldName field to timeseriesKeyValue.
             BSONObj intermediateObj =
                 bucketsIndex.removeFields(StringDataSet{kOriginalSpecFieldName});
-            return intermediateObj.addFields(BSON(kKeyFieldName << timeseriesKeyValue.get()),
+            return intermediateObj.addFields(BSON(kKeyFieldName << timeseriesKeyValue.value()),
                                              StringDataSet{kKeyFieldName});
         }
     }

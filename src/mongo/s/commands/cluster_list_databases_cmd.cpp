@@ -90,8 +90,8 @@ public:
                 if (authDB) {
                     uassert(ErrorCodes::Unauthorized,
                             "Insufficient permissions to list all databases",
-                            authDB.get() || mayListAllDatabases);
-                    return authDB.get();
+                            authDB.value() || mayListAllDatabases);
+                    return authDB.value();
                 }
 
                 // By default, list all databases if we can, otherwise

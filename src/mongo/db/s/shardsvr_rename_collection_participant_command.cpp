@@ -193,8 +193,9 @@ public:
             if (optRenameCollectionParticipant) {
                 uassert(ErrorCodes::CommandFailed,
                         "Provided UUID does not match",
-                        optRenameCollectionParticipant.get()->sourceUUID() == req.getSourceUUID());
-                optRenameCollectionParticipant.get()->getUnblockCrudFuture().get(opCtx);
+                        optRenameCollectionParticipant.value()->sourceUUID() ==
+                            req.getSourceUUID());
+                optRenameCollectionParticipant.value()->getUnblockCrudFuture().get(opCtx);
             }
 
             // Since no write that generated a retryable write oplog entry with this sessionId

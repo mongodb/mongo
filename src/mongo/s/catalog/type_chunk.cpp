@@ -514,7 +514,7 @@ void ChunkType::setShard(const ShardId& shard) {
 void ChunkType::setEstimatedSizeBytes(const boost::optional<int64_t>& estimatedSize) {
     uassert(ErrorCodes::BadValue,
             "estimatedSizeBytes cannot be negative",
-            !estimatedSize.is_initialized() || estimatedSize.get() >= 0);
+            !estimatedSize.has_value() || estimatedSize.value() >= 0);
     _estimatedSizeBytes = estimatedSize;
 }
 
@@ -533,19 +533,19 @@ void ChunkType::addHistoryToBSON(BSONObjBuilder& builder) const {
 }
 
 Status ChunkType::validate() const {
-    if (!_min.is_initialized() || _min->isEmpty()) {
+    if (!_min.has_value() || _min->isEmpty()) {
         return Status(ErrorCodes::NoSuchKey, str::stream() << "missing " << min.name() << " field");
     }
 
-    if (!_max.is_initialized() || _max->isEmpty()) {
+    if (!_max.has_value() || _max->isEmpty()) {
         return Status(ErrorCodes::NoSuchKey, str::stream() << "missing " << max.name() << " field");
     }
 
-    if (!_version.is_initialized() || !_version->isSet()) {
+    if (!_version.has_value() || !_version->isSet()) {
         return Status(ErrorCodes::NoSuchKey, str::stream() << "missing version field");
     }
 
-    if (!_shard.is_initialized() || !_shard->isValid()) {
+    if (!_shard.has_value() || !_shard->isValid()) {
         return Status(ErrorCodes::NoSuchKey,
                       str::stream() << "missing " << shard.name() << " field");
     }

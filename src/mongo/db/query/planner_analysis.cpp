@@ -630,9 +630,9 @@ void removeInclusionProjectionBelowGroupRecursive(QuerySolutionNode* solnRoot) {
             // Multiple $group stages may be pushed down. So, if the child is a GROUP, then recurse.
             return removeInclusionProjectionBelowGroupRecursive(projectNodeCandidate);
         } else if (auto projection = attemptToGetProjectionFromQuerySolution(*projectNodeCandidate);
-                   projection && projection.get()->isInclusionOnly()) {
+                   projection && projection.value()->isInclusionOnly()) {
             // Check to see if the projectNode's field set is a super set of the groupNodes.
-            if (!isSubset(groupNode->requiredFields, projection.get()->getRequiredFields())) {
+            if (!isSubset(groupNode->requiredFields, projection.value()->getRequiredFields())) {
                 // The dependency set of the GROUP stage is wider than the projectNode field set.
                 return;
             }
@@ -988,7 +988,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
             solnSortPattern = providedSorts.getBaseSortPattern();
         }
 
-        if (sortMatchesTraversalPreference(params.traversalPreference.get(), solnSortPattern) &&
+        if (sortMatchesTraversalPreference(params.traversalPreference.value(), solnSortPattern) &&
             QueryPlannerCommon::scanDirectionsEqual(solnRoot.get(),
                                                     -params.traversalPreference->direction)) {
             QueryPlannerCommon::reverseScans(solnRoot.get(), true);

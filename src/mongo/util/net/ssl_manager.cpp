@@ -363,10 +363,10 @@ void logSSLInfo(const SSLInformationToLog& info,
         logCert(info.server, "Server", logNumPEM);
     }
     if (info.cluster.has_value()) {
-        logCert(info.cluster.get(), "Cluster", logNumCluster);
+        logCert(info.cluster.value(), "Cluster", logNumCluster);
     }
     if (info.crl.has_value()) {
-        logCRL(info.crl.get(), logNumCrl);
+        logCRL(info.crl.value(), logNumCrl);
     }
 }
 

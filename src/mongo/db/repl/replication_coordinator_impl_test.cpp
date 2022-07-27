@@ -1179,7 +1179,7 @@ TEST_F(ReplCoordTest, NodeCalculatesDefaultWriteConcernOnStartupExistingLocalCon
                        HostAndPort("node1", 12345));
     auto& rwcDefaults = ReadWriteConcernDefaults::get(getServiceContext());
     ASSERT(rwcDefaults.getImplicitDefaultWriteConcernMajority_forTest());
-    ASSERT(rwcDefaults.getImplicitDefaultWriteConcernMajority_forTest().get());
+    ASSERT(rwcDefaults.getImplicitDefaultWriteConcernMajority_forTest().value());
 }
 
 
@@ -1200,7 +1200,7 @@ TEST_F(ReplCoordTest,
                        HostAndPort("node1", 12345));
     auto& rwcDefaults = ReadWriteConcernDefaults::get(getServiceContext());
     ASSERT(rwcDefaults.getImplicitDefaultWriteConcernMajority_forTest());
-    ASSERT_FALSE(rwcDefaults.getImplicitDefaultWriteConcernMajority_forTest().get());
+    ASSERT_FALSE(rwcDefaults.getImplicitDefaultWriteConcernMajority_forTest().value());
 }
 
 
@@ -1261,7 +1261,7 @@ TEST_F(ReplCoordTest, NodeCalculatesDefaultWriteConcernOnStartupNewConfigMajorit
 
     auto& rwcDefaults = ReadWriteConcernDefaults::get(getServiceContext());
     ASSERT(rwcDefaults.getImplicitDefaultWriteConcernMajority_forTest());
-    ASSERT(rwcDefaults.getImplicitDefaultWriteConcernMajority_forTest().get());
+    ASSERT(rwcDefaults.getImplicitDefaultWriteConcernMajority_forTest().value());
 }
 
 
@@ -1322,7 +1322,7 @@ TEST_F(ReplCoordTest, NodeCalculatesDefaultWriteConcernOnStartupNewConfigNoMajor
 
     auto& rwcDefaults = ReadWriteConcernDefaults::get(getServiceContext());
     ASSERT(rwcDefaults.getImplicitDefaultWriteConcernMajority_forTest());
-    ASSERT_FALSE(rwcDefaults.getImplicitDefaultWriteConcernMajority_forTest().get());
+    ASSERT_FALSE(rwcDefaults.getImplicitDefaultWriteConcernMajority_forTest().value());
 }
 
 
@@ -3622,7 +3622,7 @@ TEST_F(ReplCoordTest, AwaitHelloResponseReturnsOnStepDown) {
         expectedCounter = topologyVersionAfterDisablingWrites->getCounter() + 1;
         deadline = getNet()->now() + maxAwaitTime;
         const auto responseStepdownComplete = awaitHelloWithNewOpCtx(
-            getReplCoord(), topologyVersionAfterDisablingWrites.get(), {}, deadline);
+            getReplCoord(), topologyVersionAfterDisablingWrites.value(), {}, deadline);
         const auto topologyVersionStepDownComplete = responseStepdownComplete->getTopologyVersion();
         ASSERT_EQUALS(topologyVersionStepDownComplete->getCounter(), expectedCounter);
         ASSERT_EQUALS(topologyVersionStepDownComplete->getProcessId(), expectedProcessId);
@@ -4981,7 +4981,7 @@ TEST_F(ReplCoordTest, AwaitHelloResponseReturnsOnElectionWin) {
         // The server TopologyVersion will increment again once we exit drain mode.
         expectedCounter = topologyVersionAfterElection->getCounter() + 1;
         const auto responseAfterDrainComplete = awaitHelloWithNewOpCtx(
-            getReplCoord(), topologyVersionAfterElection.get(), {}, deadline);
+            getReplCoord(), topologyVersionAfterElection.value(), {}, deadline);
         const auto topologyVersionAfterDrainComplete =
             responseAfterDrainComplete->getTopologyVersion();
         ASSERT_EQUALS(topologyVersionAfterDrainComplete->getCounter(), expectedCounter);
@@ -5075,7 +5075,7 @@ TEST_F(ReplCoordTest, AwaitHelloResponseReturnsOnElectionWinWithReconfig) {
         // The server TopologyVersion will increment once we finish reconfig.
         expectedCounter = topologyVersionAfterElection->getCounter() + 1;
         const auto responseAfterReconfig = awaitHelloWithNewOpCtx(
-            getReplCoord(), topologyVersionAfterElection.get(), {}, deadline);
+            getReplCoord(), topologyVersionAfterElection.value(), {}, deadline);
         const auto topologyVersionAfterReconfig = responseAfterReconfig->getTopologyVersion();
         ASSERT_EQUALS(topologyVersionAfterReconfig->getCounter(), expectedCounter);
         ASSERT_EQUALS(topologyVersionAfterReconfig->getProcessId(), expectedProcessId);
@@ -5090,7 +5090,7 @@ TEST_F(ReplCoordTest, AwaitHelloResponseReturnsOnElectionWinWithReconfig) {
         // The server TopologyVersion will increment again once we exit drain mode.
         expectedCounter = topologyVersionAfterReconfig->getCounter() + 1;
         const auto responseAfterDrainComplete = awaitHelloWithNewOpCtx(
-            getReplCoord(), topologyVersionAfterReconfig.get(), {}, deadline);
+            getReplCoord(), topologyVersionAfterReconfig.value(), {}, deadline);
         const auto topologyVersionAfterDrainComplete =
             responseAfterDrainComplete->getTopologyVersion();
         ASSERT_EQUALS(topologyVersionAfterDrainComplete->getCounter(), expectedCounter);

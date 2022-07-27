@@ -237,7 +237,7 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(
     // we pass down to the logical session cache and vivify the record (updating last use).
     if (cursor->getSessionId()) {
         auto vivifyCursorStatus =
-            LogicalSessionCache::get(opCtx)->vivify(opCtx, cursor->getSessionId().get());
+            LogicalSessionCache::get(opCtx)->vivify(opCtx, cursor->getSessionId().value());
         if (!vivifyCursorStatus.isOK()) {
             return vivifyCursorStatus;
         }

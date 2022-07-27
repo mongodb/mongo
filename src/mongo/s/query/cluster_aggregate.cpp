@@ -387,7 +387,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             // After this rewriting, the encryption info does not need to be kept around.
             pipeline = processFLEPipelineS(opCtx,
                                            namespaces.executionNss,
-                                           request.getEncryptionInformation().get(),
+                                           request.getEncryptionInformation().value(),
                                            std::move(pipeline));
             request.setEncryptionInformation(boost::none);
         }

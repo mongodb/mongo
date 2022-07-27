@@ -1050,7 +1050,7 @@ TEST_F(ShardSplitRecipientCleanupTest, ShardSplitRecipientCleanup) {
         ASSERT_TRUE(hasActiveSplitForTenants(opCtx.get(), _tenantIds));
 
         ASSERT_TRUE(optionalDonor);
-        auto serviceInstance = optionalDonor.get();
+        auto serviceInstance = optionalDonor.value();
         ASSERT(serviceInstance.get());
 
         _pauseBeforeRecipientCleanupFp.reset();

@@ -134,11 +134,11 @@ TopologyVersion appendReplicationInfo(OperationContext* opCtx,
 
             auto cwwc = ReadWriteConcernDefaults::get(opCtx).getCWWC(opCtx);
             if (cwwc) {
-                result->append(HelloCommandReply::kCwwcFieldName, cwwc.get().toBSON());
+                result->append(HelloCommandReply::kCwwcFieldName, cwwc.value().toBSON());
             }
         }
 
-        return helloResponse->getTopologyVersion().get();
+        return helloResponse->getTopologyVersion().value();
     }
 
     auto currentTopologyVersion = replCoord->getTopologyVersion();
@@ -428,7 +428,7 @@ public:
             LOGV2_DEBUG(23904,
                         3,
                         "Using maxAwaitTimeMS for awaitable hello protocol",
-                        "maxAwaitTimeMS"_attr = maxAwaitTimeMS.get());
+                        "maxAwaitTimeMS"_attr = maxAwaitTimeMS.value());
 
             curOp->pauseTimer();
             timerGuard.emplace([curOp]() { curOp->resumeTimer(); });

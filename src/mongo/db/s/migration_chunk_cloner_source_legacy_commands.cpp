@@ -316,7 +316,7 @@ public:
             WriteConcernOptions majorityWC{WriteConcernOptions::kMajority,
                                            WriteConcernOptions::SyncMode::UNSET,
                                            WriteConcernOptions::kNoTimeout};
-            uassertStatusOK(waitForWriteConcern(opCtx, opTime.get(), majorityWC, &wcResult));
+            uassertStatusOK(waitForWriteConcern(opCtx, opTime.value(), majorityWC, &wcResult));
 
             auto rollbackIdAtMigrationInit = [&]() {
                 AutoGetActiveCloner autoCloner(opCtx, migrationSessionId, false);

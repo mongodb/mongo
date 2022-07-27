@@ -872,7 +872,7 @@ public:
             std::move(entry._node));
 
         if (source->indexPath().has_value()) {
-            const FieldPath indexFieldPath = source->indexPath().get();
+            const FieldPath indexFieldPath = source->indexPath().value();
             if (indexFieldPath.getPathLength() > 0) {
                 ABT indexPath = translateFieldPath(
                     indexFieldPath,

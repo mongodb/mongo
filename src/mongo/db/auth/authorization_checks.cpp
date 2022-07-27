@@ -225,7 +225,7 @@ Status checkAuthForCreate(OperationContext* opCtx,
 
         // Parse the viewOn namespace and the pipeline. If no pipeline was specified, use the empty
         // pipeline.
-        NamespaceString viewOnNs(ns.db(), optViewOn.get());
+        NamespaceString viewOnNs(ns.db(), optViewOn.value());
         auto pipeline = cmd.getPipeline().get_value_or(std::vector<BSONObj>());
         BSONArrayBuilder pipelineArray;
         for (const auto& stage : pipeline) {

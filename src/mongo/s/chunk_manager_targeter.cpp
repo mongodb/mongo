@@ -421,7 +421,7 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetUpdate(OperationContext* 
                 !isUpsert);
 
         // Since this is a timeseries query, we may need to rename the metaField.
-        if (auto metaField = _cm.getTimeseriesFields().get().getMetaField()) {
+        if (auto metaField = _cm.getTimeseriesFields().value().getMetaField()) {
             query = timeseries::translateQuery(query, *metaField);
         } else {
             // We want to avoid targeting the query incorrectly if no metaField is defined on the
@@ -627,14 +627,14 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetAllShards(OperationContex
 }
 
 void ChunkManagerTargeter::noteCouldNotTarget() {
-    dassert(!_lastError || _lastError.get() == LastErrorType::kCouldNotTarget);
+    dassert(!_lastError || _lastError.value() == LastErrorType::kCouldNotTarget);
     _lastError = LastErrorType::kCouldNotTarget;
 }
 
 void ChunkManagerTargeter::noteStaleShardResponse(OperationContext* opCtx,
                                                   const ShardEndpoint& endpoint,
                                                   const StaleConfigInfo& staleInfo) {
-    dassert(!_lastError || _lastError.get() == LastErrorType::kStaleShardVersion);
+    dassert(!_lastError || _lastError.value() == LastErrorType::kStaleShardVersion);
     Grid::get(opCtx)->catalogCache()->invalidateShardOrEntireCollectionEntryForShardedCollection(
         staleInfo.getNss(), staleInfo.getVersionWanted(), endpoint.shardName);
 
@@ -652,7 +652,7 @@ void ChunkManagerTargeter::noteStaleShardResponse(OperationContext* opCtx,
 void ChunkManagerTargeter::noteStaleDbResponse(OperationContext* opCtx,
                                                const ShardEndpoint& endpoint,
                                                const StaleDbRoutingVersion& staleInfo) {
-    dassert(!_lastError || _lastError.get() == LastErrorType::kStaleDbVersion);
+    dassert(!_lastError || _lastError.value() == LastErrorType::kStaleDbVersion);
     Grid::get(opCtx)->catalogCache()->onStaleDatabaseVersion(_nss.db(),
                                                              staleInfo.getVersionWanted());
     _lastError = LastErrorType::kStaleDbVersion;
@@ -670,16 +670,16 @@ bool ChunkManagerTargeter::refreshIfNeeded(OperationContext* opCtx) {
     LOGV2_DEBUG(22912,
                 4,
                 "ChunkManagerTargeter checking if refresh is needed",
-                "couldNotTarget"_attr = _lastError.get() == LastErrorType::kCouldNotTarget,
-                "staleShardVersion"_attr = _lastError.get() == LastErrorType::kStaleShardVersion,
-                "staleDbVersion"_attr = _lastError.get() == LastErrorType::kStaleDbVersion);
+                "couldNotTarget"_attr = _lastError.value() == LastErrorType::kCouldNotTarget,
+                "staleShardVersion"_attr = _lastError.value() == LastErrorType::kStaleShardVersion,
+                "staleDbVersion"_attr = _lastError.value() == LastErrorType::kStaleDbVersion);
 
     // Get the latest metadata information from the cache if there were issues
     auto lastManager = _cm;
     _cm = _init(opCtx, false);
     auto metadataChanged = isMetadataDifferent(lastManager, _cm);
 
-    if (_lastError.get() == LastErrorType::kCouldNotTarget && !metadataChanged) {
+    if (_lastError.value() == LastErrorType::kCouldNotTarget && !metadataChanged) {
         // If we couldn't target and we dind't already update the metadata we must force a refresh
         _cm = _init(opCtx, true);
         metadataChanged = isMetadataDifferent(lastManager, _cm);

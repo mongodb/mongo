@@ -4190,7 +4190,7 @@ TEST_F(PipelineDeferredMergeSortTest, StageWithDeferredSortDoesNotSplit) {
 
     // Verify the sort is correct.
     ASSERT(splitPipeline.shardCursorsSortSpec);
-    ASSERT_BSONOBJ_EQ(splitPipeline.shardCursorsSortSpec.get(), BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(splitPipeline.shardCursorsSortSpec.value(), BSON("a" << 1));
 }
 
 TEST_F(PipelineDeferredMergeSortTest, EarliestSortIsSelectedIfDeferred) {
@@ -4214,7 +4214,7 @@ TEST_F(PipelineDeferredMergeSortTest, EarliestSortIsSelectedIfDeferred) {
 
     // Verify the sort is correct.
     ASSERT(splitPipeline.shardCursorsSortSpec);
-    ASSERT_BSONOBJ_EQ(splitPipeline.shardCursorsSortSpec.get(), BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(splitPipeline.shardCursorsSortSpec.value(), BSON("a" << 1));
 }
 
 TEST_F(PipelineDeferredMergeSortTest, StageThatCantSwapGoesToMergingHalf) {
@@ -4237,7 +4237,7 @@ TEST_F(PipelineDeferredMergeSortTest, StageThatCantSwapGoesToMergingHalf) {
 
     // Verify the sort is correct.
     ASSERT(splitPipeline.shardCursorsSortSpec);
-    ASSERT_BSONOBJ_EQ(splitPipeline.shardCursorsSortSpec.get(), BSON("a" << 1));
+    ASSERT_BSONOBJ_EQ(splitPipeline.shardCursorsSortSpec.value(), BSON("a" << 1));
 }
 }  // namespace DeferredSort
 }  // namespace Sharded

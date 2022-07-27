@@ -438,7 +438,7 @@ CollectionImpl::CollectionImpl(OperationContext* opCtx,
                                std::unique_ptr<RecordStore> recordStore)
     : _ns(nss),
       _catalogId(std::move(catalogId)),
-      _uuid(options.uuid.get()),
+      _uuid(options.uuid.value()),
       _shared(std::make_shared<SharedState>(this, std::move(recordStore), options)),
       _indexCatalog(std::make_unique<IndexCatalogImpl>()) {}
 
@@ -1237,7 +1237,7 @@ void CollectionImpl::_cappedDeleteAsNeeded(OperationContext* opCtx,
 }
 
 void CollectionImpl::setMinimumVisibleSnapshot(Timestamp newMinimumVisibleSnapshot) {
-    if (!_minVisibleSnapshot || (newMinimumVisibleSnapshot > _minVisibleSnapshot.get())) {
+    if (!_minVisibleSnapshot || (newMinimumVisibleSnapshot > _minVisibleSnapshot.value())) {
         _minVisibleSnapshot = newMinimumVisibleSnapshot;
     }
 }
@@ -1346,7 +1346,7 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
                                  checkRecordId);
     _shared->_recordStore->deleteRecord(opCtx, loc);
     if (deletedDoc) {
-        deleteArgs.deletedDoc = &(deletedDoc.get());
+        deleteArgs.deletedDoc = &(deletedDoc.value());
     }
     getGlobalServiceContext()->getOpObserver()->onDelete(opCtx, ns(), uuid(), stmtId, deleteArgs);
 
@@ -1606,7 +1606,7 @@ bool CollectionImpl::doesTimeseriesBucketsDocContainMixedSchemaData(
 }
 
 bool CollectionImpl::isClustered() const {
-    return getClusteredInfo().is_initialized();
+    return getClusteredInfo().has_value();
 }
 
 boost::optional<ClusteredCollectionInfo> CollectionImpl::getClusteredInfo() const {

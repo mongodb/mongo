@@ -354,7 +354,7 @@ Status insertDocumentsSingleBatch(OperationContext* opCtx,
     } else {
         autoColl.emplace(opCtx, nsOrUUID, MODE_IX);
         auto collectionResult = getCollection(
-            autoColl.get(), nsOrUUID, "The collection must exist before inserting documents.");
+            autoColl.value(), nsOrUUID, "The collection must exist before inserting documents.");
         if (!collectionResult.isOK()) {
             return collectionResult.getStatus();
         }

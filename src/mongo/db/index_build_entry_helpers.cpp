@@ -101,7 +101,7 @@ std::pair<const BSONObj, const BSONObj> buildIndexBuildEntryFilterAndUpdate(
     // '$addToSet' to prevent any duplicate entries written to "commitReadyMembers" field.
     if (auto commitReadyMembers = indexBuildEntry.getCommitReadyMembers()) {
         BSONArrayBuilder arrayBuilder;
-        for (const auto& item : commitReadyMembers.get()) {
+        for (const auto& item : commitReadyMembers.value()) {
             arrayBuilder.append(item.toString());
         }
         const auto commitReadyMemberList = BSON(IndexBuildEntry::kCommitReadyMembersFieldName

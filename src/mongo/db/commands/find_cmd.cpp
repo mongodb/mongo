@@ -89,7 +89,7 @@ std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(Operation
     // Rewrite any FLE find payloads that exist in the query if this is a FLE 2 query.
     if (shouldDoFLERewrite(findCommand)) {
         invariant(findCommand->getNamespaceOrUUID().nss());
-        processFLEFindD(opCtx, findCommand->getNamespaceOrUUID().nss().get(), findCommand.get());
+        processFLEFindD(opCtx, findCommand->getNamespaceOrUUID().nss().value(), findCommand.get());
     }
 
     if (findCommand->getMirrored().value_or(false)) {
@@ -464,7 +464,7 @@ public:
             const auto& nss = ctx->getNss();
 
             uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "UUID " << findCommand->getNamespaceOrUUID().uuid().get()
+                    str::stream() << "UUID " << findCommand->getNamespaceOrUUID().uuid().value()
                                   << " specified in query request not found",
                     ctx || !findCommand->getNamespaceOrUUID().uuid());
 

@@ -52,7 +52,7 @@ protected:
         ASSERT_TRUE(compressionResult.compressedBucket.has_value());
         ASSERT_FALSE(compressionResult.decompressionFailed);
 
-        test(compressionResult.compressedBucket.get());
+        test(compressionResult.compressedBucket.value());
     }
 };
 

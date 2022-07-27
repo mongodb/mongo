@@ -110,7 +110,7 @@ std::shared_ptr<RoutingTableHistory> createUpdatedRoutingTableHistory(
             return 0;
         }
         if (collectionAndChunks.maxChunkSizeBytes) {
-            invariant(collectionAndChunks.maxChunkSizeBytes.get() > 0);
+            invariant(collectionAndChunks.maxChunkSizeBytes.value() > 0);
             return uint64_t(*collectionAndChunks.maxChunkSizeBytes);
         }
         return boost::none;
@@ -431,7 +431,7 @@ void CatalogCache::onStaleDatabaseVersion(const StringData dbName,
                                           const boost::optional<DatabaseVersion>& databaseVersion) {
     if (databaseVersion) {
         const auto version =
-            ComparableDatabaseVersion::makeComparableDatabaseVersion(databaseVersion.get());
+            ComparableDatabaseVersion::makeComparableDatabaseVersion(databaseVersion.value());
         LOGV2_FOR_CATALOG_REFRESH(4899101,
                                   2,
                                   "Registering new database version",

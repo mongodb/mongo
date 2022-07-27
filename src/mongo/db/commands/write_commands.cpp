@@ -1485,7 +1485,7 @@ public:
             OperationSource source = OperationSource::kStandard;
 
             if (request().getEncryptionInformation().has_value() &&
-                !request().getEncryptionInformation().get().getCrudProcessed()) {
+                !request().getEncryptionInformation().value().getCrudProcessed()) {
                 return processFLEUpdate(opCtx, request());
             }
 

@@ -369,7 +369,7 @@ bool MigrationDestinationManager::isActive() const {
 }
 
 bool MigrationDestinationManager::_isActive(WithLock) const {
-    return _sessionId.is_initialized();
+    return _sessionId.has_value();
 }
 
 void MigrationDestinationManager::report(BSONObjBuilder& b,
@@ -389,7 +389,7 @@ void MigrationDestinationManager::report(BSONObjBuilder& b,
     }
     stdx::lock_guard<Latch> sl(_mutex);
 
-    b.appendBool("active", _sessionId.is_initialized());
+    b.appendBool("active", _sessionId.has_value());
 
     if (_sessionId) {
         b.append("sessionId", _sessionId->toString());
@@ -1372,7 +1372,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                     }
 
                     migrationutil::persistUpdatedNumOrphans(
-                        opCtx, _migrationId.get(), *_collectionUuid, batchNumCloned);
+                        opCtx, _migrationId.value(), *_collectionUuid, batchNumCloned);
 
                     {
                         stdx::lock_guard<Latch> statsLock(_mutex);
@@ -1821,7 +1821,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
 
     if (changeInOrphans != 0) {
         migrationutil::persistUpdatedNumOrphans(
-            opCtx, _migrationId.get(), *_collectionUuid, changeInOrphans);
+            opCtx, _migrationId.value(), *_collectionUuid, changeInOrphans);
     }
     return didAnything;
 }

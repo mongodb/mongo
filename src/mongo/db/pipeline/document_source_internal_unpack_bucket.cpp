@@ -133,7 +133,7 @@ bool checkMetadataSortReorder(
             return false;
         }
         if (sortKey.fieldPath->getFieldName(0) != metaFieldStr) {
-            if (lastpointTimeField && sortKey.fieldPath->fullPath() == lastpointTimeField.get()) {
+            if (lastpointTimeField && sortKey.fieldPath->fullPath() == lastpointTimeField.value()) {
                 // If we are checking the sort pattern for the lastpoint case, 'time' is allowed.
                 timeFound = true;
                 continue;
@@ -169,7 +169,7 @@ boost::intrusive_ptr<DocumentSourceSort> createMetadataSortForReorder(
     std::vector<SortPattern::SortPatternPart> updatedPattern;
 
     if (groupIdField) {
-        auto groupId = FieldPath(groupIdField.get());
+        auto groupId = FieldPath(groupIdField.value());
         SortPattern::SortPatternPart patternPart;
         patternPart.isAscending = !flipSort;
         patternPart.fieldPath = groupId;
@@ -180,16 +180,16 @@ boost::intrusive_ptr<DocumentSourceSort> createMetadataSortForReorder(
     for (const auto& entry : sortPattern) {
         updatedPattern.push_back(entry);
 
-        if (lastpointTimeField && entry.fieldPath->fullPath() == lastpointTimeField.get()) {
+        if (lastpointTimeField && entry.fieldPath->fullPath() == lastpointTimeField.value()) {
             updatedPattern.back().fieldPath =
                 FieldPath((entry.isAscending ? timeseries::kControlMinFieldNamePrefix
                                              : timeseries::kControlMaxFieldNamePrefix) +
-                          lastpointTimeField.get());
+                          lastpointTimeField.value());
             updatedPattern.push_back(SortPattern::SortPatternPart{
                 entry.isAscending,
                 FieldPath((entry.isAscending ? timeseries::kControlMaxFieldNamePrefix
                                              : timeseries::kControlMinFieldNamePrefix) +
-                          lastpointTimeField.get()),
+                          lastpointTimeField.value()),
                 nullptr});
         } else {
             auto updated = FieldPath(timeseries::kBucketMetaFieldName);
@@ -523,7 +523,7 @@ bool DocumentSourceInternalUnpackBucket::pushDownComputedMetaProjection(
         (nextTransform->getType() == TransformerInterface::TransformerType::kInclusionProjection ||
          nextTransform->getType() == TransformerInterface::TransformerType::kComputedProjection)) {
 
-        auto& metaName = _bucketUnpacker.bucketSpec().metaField().get();
+        auto& metaName = _bucketUnpacker.bucketSpec().metaField().value();
         auto [addFieldsSpec, deleteStage] =
             nextTransform->extractComputedProjections(metaName,
                                                       timeseries::kBucketMetaFieldName.toString(),
@@ -625,7 +625,7 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractProjectForPu
         _bucketUnpacker.bucketSpec().metaField() && nextProject &&
         nextProject->getType() == TransformerInterface::TransformerType::kExclusionProjection) {
         return nextProject->extractProjectOnFieldAndRename(
-            _bucketUnpacker.bucketSpec().metaField().get(), timeseries::kBucketMetaFieldName);
+            _bucketUnpacker.bucketSpec().metaField().value(), timeseries::kBucketMetaFieldName);
     }
 
     return {BSONObj{}, false};
@@ -652,7 +652,7 @@ DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContain
 
     const auto& idPath = exprIdPath->getFieldPath();
     if (idPath.getPathLength() < 2 ||
-        idPath.getFieldName(1) != _bucketUnpacker.bucketSpec().metaField().get()) {
+        idPath.getFieldName(1) != _bucketUnpacker.bucketSpec().metaField().value()) {
         return {};
     }
 
@@ -738,7 +738,7 @@ DocumentSourceInternalUnpackBucket::rewriteGroupByMinMax(Pipeline::SourceContain
 bool DocumentSourceInternalUnpackBucket::haveComputedMetaField() const {
     return _bucketUnpacker.bucketSpec().metaField() &&
         _bucketUnpacker.bucketSpec().fieldIsComputed(
-            _bucketUnpacker.bucketSpec().metaField().get());
+            _bucketUnpacker.bucketSpec().metaField().value());
 }
 
 template <TopBottomSense sense, bool single>
@@ -894,7 +894,7 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(Pipeline::SourceConta
         return false;
     }
 
-    auto metaField = maybeMetaField.get();
+    auto metaField = maybeMetaField.value();
     if (!checkMetadataSortReorder(sortStage->getSortKeyPattern(), metaField, timeField)) {
         return false;
     }
@@ -1008,7 +1008,7 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
     if (auto sortPtr = dynamic_cast<DocumentSourceSort*>(std::next(itr)->get())) {
         if (auto metaField = _bucketUnpacker.bucketSpec().metaField();
             metaField && !haveComputedMetaField) {
-            if (checkMetadataSortReorder(sortPtr->getSortKeyPattern(), metaField.get())) {
+            if (checkMetadataSortReorder(sortPtr->getSortKeyPattern(), metaField.value())) {
                 // We have a sort on metadata field following this stage. Reorder the two stages
                 // and return a pointer to the preceding stage.
                 auto sortForReorder = createMetadataSortForReorder(*sortPtr);
