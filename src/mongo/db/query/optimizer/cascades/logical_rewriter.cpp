@@ -655,16 +655,27 @@ static void convertFilterToSargableNode(ABT::reference_type node,
         return;
     }
 
-    for (const auto& [key, req] : conversion->_reqMap) {
+    // Remove any partial schema requirments which do not constrain their input
+    for (auto it = conversion->_reqMap.cbegin(); it != conversion->_reqMap.cend();) {
         uassert(6624111,
                 "Filter partial schema requirement must contain a variable name.",
-                !key._projectionName.empty());
+                !it->first._projectionName.empty());
         uassert(6624112,
                 "Filter partial schema requirement cannot bind.",
-                !req.hasBoundProjectionName());
-        uassert(6624113,
-                "Filter partial schema requirement must have a range.",
-                !isIntervalReqFullyOpenDNF(req.getIntervals()));
+                !it->second.hasBoundProjectionName());
+        if (isIntervalReqFullyOpenDNF(it->second.getIntervals())) {
+            it = conversion->_reqMap.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    // If the filter has no constraints after removing no-ops, then rewrite the filter with a
+    // predicate using the constant True.
+    if (conversion->_reqMap.empty()) {
+        ctx.addNode(make<FilterNode>(Constant::boolean(true), filterNode.getChild()),
+                    isSubstitution);
+        return;
     }
 
     // If in substitution mode, disallow retaining original predicate. If in exploration mode, only

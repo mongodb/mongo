@@ -1492,5 +1492,41 @@ TEST(LogicalRewriter, SargableCE) {
         phaseManager.getMemo());
 }
 
+TEST(LogicalRewriter, RemoveNoopFilter) {
+    using namespace properties;
+    PrefixId prefixId;
+
+    ABT scanNode = make<ScanNode>("ptest", "test");
+
+    ABT filterANode = make<FilterNode>(
+        make<EvalFilter>(make<PathGet>("a", make<PathCompare>(Operations::Gte, Constant::minKey())),
+                         make<Variable>("ptest")),
+        std::move(scanNode));
+
+    ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"ptest"}},
+                                  std::move(filterANode));
+
+    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase},
+                                 prefixId,
+                                 {{{"test", {{}, {}}}}},
+                                 DebugInfo::kDefaultForTests);
+    ABT latest = std::move(rootNode);
+    ASSERT_TRUE(phaseManager.optimize(latest));
+
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       ptest\n"
+        "|   RefBlock: \n"
+        "|       Variable [ptest]\n"
+        "Filter []\n"
+        "|   Const [true]\n"
+        "Scan [test]\n"
+        "    BindBlock:\n"
+        "        [ptest]\n"
+        "            Source []\n",
+        latest);
+}
+
 }  // namespace
 }  // namespace mongo::optimizer
