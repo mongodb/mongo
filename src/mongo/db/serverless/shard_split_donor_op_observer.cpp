@@ -392,7 +392,11 @@ void ShardSplitDonorOpObserver::aboutToDelete(OperationContext* opCtx,
             donorStateDoc.getExpireAt() ||
                 serverless::shouldRemoveStateDocumentOnRecipient(opCtx, donorStateDoc));
 
-    if (donorStateDoc.getTenantIds()) {
+    // To support back-to-back split retries, when a split is aborted, we remove its
+    // TenantMigrationDonorAccessBlockers as soon as its donor state doc is marked as garbage
+    // collectable. So onDelete should skip removing the TenantMigrationDonorAccessBlockers for
+    // aborted splits.
+    if (donorStateDoc.getState() != ShardSplitDonorStateEnum::kAborted) {
         auto tenantIds = *donorStateDoc.getTenantIds();
         std::vector<std::string> result;
         result.reserve(tenantIds.size());

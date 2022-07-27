@@ -79,11 +79,10 @@ const test =
 
     assertMigrationState(donorPrimary, operation.migrationId, "blocking");
 
-    const abortMigrationThread = operation.abortAsync();
+    operation.abort();
 
     fp.off();
 
-    abortMigrationThread.join();
     commitAsyncRes.join();
 
     assertMigrationState(donorPrimary, operation.migrationId, "aborted");
