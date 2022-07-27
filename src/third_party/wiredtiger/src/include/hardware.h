@@ -41,14 +41,14 @@
         } while (!__wt_atomic_cas16(&(p)->flags_atomic, __orig, __orig | (uint16_t)(mask))); \
     } while (0)
 
-#define F_CLR_ATOMIC_16(p, mask)                                                              \
-    do {                                                                                      \
-        uint16_t __orig;                                                                      \
-        if (!F_ISSET_ATOMIC_16(p, mask))                                                      \
-            break;                                                                            \
-        do {                                                                                  \
-            __orig = (p)->flags_atomic;                                                       \
-        } while (!__wt_atomic_cas16(&(p)->flags_atomic, __orig, __orig & ~(uint16_t)(mask))); \
+#define F_CLR_ATOMIC_16(p, mask)                                                                \
+    do {                                                                                        \
+        uint16_t __orig;                                                                        \
+        if (!F_ISSET_ATOMIC_16(p, mask))                                                        \
+            break;                                                                              \
+        do {                                                                                    \
+            __orig = (p)->flags_atomic;                                                         \
+        } while (!__wt_atomic_cas16(&(p)->flags_atomic, __orig, __orig & (uint16_t)(~(mask)))); \
     } while (0)
 
 /*
