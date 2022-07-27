@@ -519,7 +519,7 @@ TEST_F(ViewCatalogFixture, LookupRIDExistingView) {
 
     ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
 
-    auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
+    auto resourceID = ResourceId(RESOURCE_COLLECTION, NamespaceString(boost::none, "db.view"));
     ASSERT(getCatalog()->lookupResourceName(resourceID).value() == "db.view");
 }
 
@@ -542,7 +542,7 @@ TEST_F(ViewCatalogFixture, LookupRIDExistingViewRollback) {
                                            emptyCollation,
                                            view_catalog_helpers::validatePipeline));
     }
-    auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
+    auto resourceID = ResourceId(RESOURCE_COLLECTION, NamespaceString(boost::none, "db.view"));
     ASSERT(!getCatalog()->lookupResourceName(resourceID));
 }
 
@@ -553,7 +553,7 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterDrop) {
     ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
     ASSERT_OK(dropView(operationContext(), viewName));
 
-    auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
+    auto resourceID = ResourceId(RESOURCE_COLLECTION, NamespaceString(boost::none, "db.view"));
     ASSERT(!getCatalog()->lookupResourceName(resourceID));
 }
 
@@ -561,7 +561,7 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterDropRollback) {
     const NamespaceString viewName("db.view");
     const NamespaceString viewOn("db.coll");
 
-    auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
+    auto resourceID = ResourceId(RESOURCE_COLLECTION, NamespaceString(boost::none, "db.view"));
     {
         WriteUnitOfWork wunit(operationContext());
         ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
@@ -589,7 +589,7 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterModify) {
     const NamespaceString viewName("db.view");
     const NamespaceString viewOn("db.coll");
 
-    auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
+    auto resourceID = ResourceId(RESOURCE_COLLECTION, NamespaceString(boost::none, "db.view"));
     ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
     ASSERT_OK(modifyView(operationContext(), viewName, viewOn, emptyPipeline));
     ASSERT(getCatalog()->lookupResourceName(resourceID).value() == viewName.ns());
@@ -599,7 +599,7 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterModifyRollback) {
     const NamespaceString viewName("db.view");
     const NamespaceString viewOn("db.coll");
 
-    auto resourceID = ResourceId(RESOURCE_COLLECTION, "db.view"_sd);
+    auto resourceID = ResourceId(RESOURCE_COLLECTION, NamespaceString(boost::none, "db.view"));
     {
         WriteUnitOfWork wunit(operationContext());
         ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));

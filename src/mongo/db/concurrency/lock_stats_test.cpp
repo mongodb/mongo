@@ -39,7 +39,7 @@ namespace mongo {
 class LockStatsTest : public ServiceContextTest {};
 
 TEST_F(LockStatsTest, NoWait) {
-    const ResourceId resId(RESOURCE_COLLECTION, std::string("LockStats.NoWait"));
+    const ResourceId resId(RESOURCE_COLLECTION, NamespaceString(boost::none, "LockStats.NoWait"));
 
     resetGlobalLockStats();
 
@@ -58,7 +58,7 @@ TEST_F(LockStatsTest, NoWait) {
 }
 
 TEST_F(LockStatsTest, Wait) {
-    const ResourceId resId(RESOURCE_COLLECTION, std::string("LockStats.Wait"));
+    const ResourceId resId(RESOURCE_COLLECTION, NamespaceString(boost::none, "LockStats.Wait"));
 
     resetGlobalLockStats();
 
@@ -92,7 +92,8 @@ TEST_F(LockStatsTest, Wait) {
 }
 
 TEST_F(LockStatsTest, Reporting) {
-    const ResourceId resId(RESOURCE_COLLECTION, std::string("LockStats.Reporting"));
+    const ResourceId resId(RESOURCE_COLLECTION,
+                           NamespaceString(boost::none, "LockStats.Reporting"));
 
     resetGlobalLockStats();
 
@@ -110,7 +111,8 @@ TEST_F(LockStatsTest, Reporting) {
 }
 
 TEST_F(LockStatsTest, Subtraction) {
-    const ResourceId resId(RESOURCE_COLLECTION, std::string("LockStats.Subtraction"));
+    const ResourceId resId(RESOURCE_COLLECTION,
+                           NamespaceString(boost::none, "LockStats.Subtraction"));
 
     resetGlobalLockStats();
 

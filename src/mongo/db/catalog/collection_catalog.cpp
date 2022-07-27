@@ -132,14 +132,11 @@ public:
                         [& from = entry.nss, &to = entry.renameTo](CollectionCatalog& catalog) {
                             catalog._collections.erase(from);
 
-                            auto fromStr = from.ns();
-                            auto toStr = to.ns();
+                            ResourceId oldRid = ResourceId(RESOURCE_COLLECTION, from);
+                            ResourceId newRid = ResourceId(RESOURCE_COLLECTION, to);
 
-                            ResourceId oldRid = ResourceId(RESOURCE_COLLECTION, fromStr);
-                            ResourceId newRid = ResourceId(RESOURCE_COLLECTION, toStr);
-
-                            catalog.removeResource(oldRid, fromStr);
-                            catalog.addResource(newRid, toStr);
+                            catalog.removeResource(oldRid, from);
+                            catalog.addResource(newRid, to);
                         });
                     break;
                 }
@@ -187,16 +184,16 @@ public:
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kAddViewResource: {
                     writeJobs.push_back([& viewName = entry.nss](CollectionCatalog& catalog) {
-                        auto viewRid = ResourceId(RESOURCE_COLLECTION, viewName.ns());
-                        catalog.addResource(viewRid, viewName.ns());
+                        auto viewRid = ResourceId(RESOURCE_COLLECTION, viewName);
+                        catalog.addResource(viewRid, viewName);
                         catalog.deregisterUncommittedView(viewName);
                     });
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kRemoveViewResource: {
                     writeJobs.push_back([& viewName = entry.nss](CollectionCatalog& catalog) {
-                        auto viewRid = ResourceId(RESOURCE_COLLECTION, viewName.ns());
-                        catalog.removeResource(viewRid, viewName.ns());
+                        auto viewRid = ResourceId(RESOURCE_COLLECTION, viewName);
+                        catalog.removeResource(viewRid, viewName);
                     });
                     break;
                 }
@@ -692,8 +689,8 @@ void CollectionCatalog::onOpenDatabase(OperationContext* opCtx,
 
 void CollectionCatalog::onCloseDatabase(OperationContext* opCtx, DatabaseName dbName) {
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
-    auto rid = ResourceId(RESOURCE_DATABASE, dbName.toString());
-    removeResource(rid, dbName.toString());
+    auto rid = ResourceId(RESOURCE_DATABASE, dbName);
+    removeResource(rid, dbName);
     _viewsForDatabase.erase(dbName);
 }
 
@@ -1172,11 +1169,11 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
 
     invariant(static_cast<size_t>(_stats.internal + _stats.userCollections) == _collections.size());
 
-    auto dbRid = ResourceId(RESOURCE_DATABASE, nss.dbName().toStringWithTenantId());
-    addResource(dbRid, nss.dbName().toString());
+    auto dbRid = ResourceId(RESOURCE_DATABASE, nss.dbName());
+    addResource(dbRid, nss.dbName());
 
-    auto collRid = ResourceId(RESOURCE_COLLECTION, nss.ns());
-    addResource(collRid, nss.ns());
+    auto collRid = ResourceId(RESOURCE_COLLECTION, nss);
+    addResource(collRid, nss);
 }
 
 std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(OperationContext* opCtx,
@@ -1213,8 +1210,8 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(OperationCon
 
     coll->onDeregisterFromCatalog(opCtx);
 
-    auto collRid = ResourceId(RESOURCE_COLLECTION, ns.ns());
-    removeResource(collRid, ns.ns());
+    auto collRid = ResourceId(RESOURCE_COLLECTION, ns);
+    removeResource(collRid, ns);
 
     return coll;
 }
@@ -1334,9 +1331,8 @@ boost::optional<std::string> CollectionCatalog::lookupResourceName(const Resourc
     return *namespaces.begin();
 }
 
-void CollectionCatalog::removeResource(const ResourceId& rid, const std::string& entry) {
-    invariant(rid.getType() == RESOURCE_DATABASE || rid.getType() == RESOURCE_COLLECTION);
 
+void CollectionCatalog::_removeResource(const ResourceId& rid, const std::string& entry) {
     auto search = _resourceInformation.find(rid);
     if (search == _resourceInformation.end()) {
         return;
@@ -1351,9 +1347,17 @@ void CollectionCatalog::removeResource(const ResourceId& rid, const std::string&
     }
 }
 
-void CollectionCatalog::addResource(const ResourceId& rid, const std::string& entry) {
-    invariant(rid.getType() == RESOURCE_DATABASE || rid.getType() == RESOURCE_COLLECTION);
+void CollectionCatalog::removeResource(const ResourceId& rid, const NamespaceString& nss) {
+    invariant(rid.getType() == RESOURCE_COLLECTION);
+    _removeResource(rid, nss.toStringWithTenantId());
+}
 
+void CollectionCatalog::removeResource(const ResourceId& rid, const DatabaseName& dbName) {
+    invariant(rid.getType() == RESOURCE_DATABASE);
+    _removeResource(rid, dbName.toStringWithTenantId());
+}
+
+void CollectionCatalog::_addResource(const ResourceId& rid, const std::string& entry) {
     auto search = _resourceInformation.find(rid);
     if (search == _resourceInformation.end()) {
         std::set<std::string> newSet = {entry};
@@ -1367,6 +1371,16 @@ void CollectionCatalog::addResource(const ResourceId& rid, const std::string& en
     }
 
     namespaces.insert(entry);
+}
+
+void CollectionCatalog::addResource(const ResourceId& rid, const NamespaceString& nss) {
+    invariant(rid.getType() == RESOURCE_COLLECTION);
+    _addResource(rid, nss.toStringWithTenantId());
+}
+
+void CollectionCatalog::addResource(const ResourceId& rid, const DatabaseName& dbName) {
+    invariant(rid.getType() == RESOURCE_DATABASE);
+    _addResource(rid, dbName.toStringWithTenantId());
 }
 
 void CollectionCatalog::invariantHasExclusiveAccessToCollection(OperationContext* opCtx,

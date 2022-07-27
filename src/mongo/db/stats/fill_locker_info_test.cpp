@@ -83,8 +83,9 @@ TEST(FillLockerInfo, DoesReportLockStats) {
 DEATH_TEST(FillLockerInfo, ShouldFailIfLocksAreNotSortedAppropriately, "Invariant failure") {
     LockerInfo info;
     // The global lock is supposed to come before the database lock.
-    info.locks = {OneLock{ResourceId(RESOURCE_DATABASE, "TestDB"_sd), MODE_X},
-                  OneLock{resourceIdGlobal, MODE_IX}};
+    info.locks = {
+        OneLock{ResourceId(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB")), MODE_X},
+        OneLock{resourceIdGlobal, MODE_IX}};
 
     BSONObjBuilder infoBuilder;
     fillLockerInfo(info, infoBuilder);

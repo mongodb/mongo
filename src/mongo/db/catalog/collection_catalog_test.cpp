@@ -164,26 +164,26 @@ class CollectionCatalogResourceMapTest : public unittest::Test {
 public:
     void setUp() {
         // The first and second collection namespaces map to the same ResourceId.
-        firstCollection = "1661880728";
-        secondCollection = "1626936312";
+        firstCollection = NamespaceString(boost::none, "1661880728");
+        secondCollection = NamespaceString(boost::none, "1626936312");
 
         firstResourceId = ResourceId(RESOURCE_COLLECTION, firstCollection);
         secondResourceId = ResourceId(RESOURCE_COLLECTION, secondCollection);
         ASSERT_EQ(firstResourceId, secondResourceId);
 
-        thirdCollection = "2930102946";
+        thirdCollection = NamespaceString(boost::none, "2930102946");
         thirdResourceId = ResourceId(RESOURCE_COLLECTION, thirdCollection);
         ASSERT_NE(firstResourceId, thirdResourceId);
     }
 
 protected:
-    std::string firstCollection;
+    NamespaceString firstCollection;
     ResourceId firstResourceId;
 
-    std::string secondCollection;
+    NamespaceString secondCollection;
     ResourceId secondResourceId;
 
-    std::string thirdCollection;
+    NamespaceString thirdCollection;
     ResourceId thirdResourceId;
 
     CollectionCatalog catalog;
@@ -206,10 +206,10 @@ TEST_F(CollectionCatalogResourceMapTest, InsertTest) {
     catalog.addResource(thirdResourceId, thirdCollection);
 
     resource = catalog.lookupResourceName(firstResourceId);
-    ASSERT_EQ(firstCollection, *resource);
+    ASSERT_EQ(firstCollection.toStringWithTenantId(), *resource);
 
     resource = catalog.lookupResourceName(thirdResourceId);
-    ASSERT_EQ(thirdCollection, resource);
+    ASSERT_EQ(thirdCollection.toStringWithTenantId(), resource);
 }
 
 TEST_F(CollectionCatalogResourceMapTest, RemoveTest) {
@@ -217,9 +217,9 @@ TEST_F(CollectionCatalogResourceMapTest, RemoveTest) {
     catalog.addResource(thirdResourceId, thirdCollection);
 
     // This fails to remove the resource because of an invalid namespace.
-    catalog.removeResource(firstResourceId, "BadNamespace");
+    catalog.removeResource(firstResourceId, NamespaceString(boost::none, "BadNamespace"));
     boost::optional<std::string> resource = catalog.lookupResourceName(firstResourceId);
-    ASSERT_EQ(firstCollection, *resource);
+    ASSERT_EQ(firstCollection.toStringWithTenantId(), *resource);
 
     catalog.removeResource(firstResourceId, firstCollection);
     catalog.removeResource(firstResourceId, firstCollection);
@@ -248,12 +248,12 @@ TEST_F(CollectionCatalogResourceMapTest, CollisionTest) {
     // We remove a namespace, resolving the collision.
     catalog.removeResource(firstResourceId, firstCollection);
     resource = catalog.lookupResourceName(secondResourceId);
-    ASSERT_EQ(secondCollection, *resource);
+    ASSERT_EQ(secondCollection.toStringWithTenantId(), *resource);
 
     // Adding the same namespace twice does not create a collision.
     catalog.addResource(secondResourceId, secondCollection);
     resource = catalog.lookupResourceName(secondResourceId);
-    ASSERT_EQ(secondCollection, *resource);
+    ASSERT_EQ(secondCollection.toStringWithTenantId(), *resource);
 
     // The map should function normally for entries without collisions.
     catalog.addResource(firstResourceId, firstCollection);
@@ -262,7 +262,7 @@ TEST_F(CollectionCatalogResourceMapTest, CollisionTest) {
 
     catalog.addResource(thirdResourceId, thirdCollection);
     resource = catalog.lookupResourceName(thirdResourceId);
-    ASSERT_EQ(thirdCollection, *resource);
+    ASSERT_EQ(thirdCollection.toStringWithTenantId(), *resource);
 
     catalog.removeResource(thirdResourceId, thirdCollection);
     resource = catalog.lookupResourceName(thirdResourceId);
@@ -294,7 +294,7 @@ public:
              it != catalog.end(&opCtx);
              it++) {
             auto coll = *it;
-            std::string collName = coll->ns().ns();
+            auto collName = coll->ns();
             ResourceId rid(RESOURCE_COLLECTION, collName);
 
             ASSERT_NE(catalog.lookupResourceName(rid), boost::none);
@@ -338,49 +338,49 @@ protected:
 TEST_F(CollectionCatalogResourceTest, RemoveAllResources) {
     catalog.deregisterAllCollectionsAndViews();
 
-    const std::string dbName = "resourceDb";
+    const DatabaseName dbName = DatabaseName(boost::none, "resourceDb");
     auto rid = ResourceId(RESOURCE_DATABASE, dbName);
     ASSERT_EQ(boost::none, catalog.lookupResourceName(rid));
 
     for (int i = 0; i < 5; i++) {
         NamespaceString nss("resourceDb", "coll" + std::to_string(i));
-        rid = ResourceId(RESOURCE_COLLECTION, nss.ns());
+        rid = ResourceId(RESOURCE_COLLECTION, nss);
         ASSERT_EQ(boost::none, catalog.lookupResourceName((rid)));
     }
 }
 
 TEST_F(CollectionCatalogResourceTest, LookupDatabaseResource) {
-    const std::string dbName = "resourceDb";
+    const DatabaseName dbName = DatabaseName(boost::none, "resourceDb");
     auto rid = ResourceId(RESOURCE_DATABASE, dbName);
     boost::optional<std::string> ridStr = catalog.lookupResourceName(rid);
 
     ASSERT(ridStr);
-    ASSERT(ridStr->find(dbName) != std::string::npos);
+    ASSERT(ridStr->find(dbName.toStringWithTenantId()) != std::string::npos);
 }
 
 TEST_F(CollectionCatalogResourceTest, LookupMissingDatabaseResource) {
-    const std::string dbName = "missingDb";
+    const DatabaseName dbName = DatabaseName(boost::none, "missingDb");
     auto rid = ResourceId(RESOURCE_DATABASE, dbName);
     ASSERT(!catalog.lookupResourceName(rid));
 }
 
 TEST_F(CollectionCatalogResourceTest, LookupCollectionResource) {
-    const std::string collNs = "resourceDb.coll1";
+    const NamespaceString collNs = NamespaceString(boost::none, "resourceDb.coll1");
     auto rid = ResourceId(RESOURCE_COLLECTION, collNs);
     boost::optional<std::string> ridStr = catalog.lookupResourceName(rid);
 
     ASSERT(ridStr);
-    ASSERT(ridStr->find(collNs) != std::string::npos);
+    ASSERT(ridStr->find(collNs.toStringWithTenantId()) != std::string::npos);
 }
 
 TEST_F(CollectionCatalogResourceTest, LookupMissingCollectionResource) {
-    const std::string dbName = "resourceDb.coll5";
-    auto rid = ResourceId(RESOURCE_COLLECTION, dbName);
+    const NamespaceString nss = NamespaceString(boost::none, "resourceDb.coll5");
+    auto rid = ResourceId(RESOURCE_COLLECTION, nss);
     ASSERT(!catalog.lookupResourceName(rid));
 }
 
 TEST_F(CollectionCatalogResourceTest, RemoveCollection) {
-    const std::string collNs = "resourceDb.coll1";
+    const NamespaceString collNs = NamespaceString(boost::none, "resourceDb.coll1");
     auto coll = catalog.lookupCollectionByNamespace(&opCtx, NamespaceString(collNs));
     catalog.deregisterCollection(&opCtx, coll->uuid());
     auto rid = ResourceId(RESOURCE_COLLECTION, collNs);
@@ -604,7 +604,7 @@ TEST_F(CollectionCatalogTest, CollectionCatalogEpoch) {
 
 DEATH_TEST_F(CollectionCatalogResourceTest, AddInvalidResourceType, "invariant") {
     auto rid = ResourceId(RESOURCE_GLOBAL, 0);
-    catalog.addResource(rid, "");
+    catalog.addResource(rid, NamespaceString(boost::none, ""));
 }
 
 TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {

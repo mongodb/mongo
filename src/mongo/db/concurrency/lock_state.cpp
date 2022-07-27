@@ -633,7 +633,7 @@ bool LockerImpl::isDbLockedForMode(const DatabaseName& dbName, LockMode mode) co
     if (isR() && isSharedLockMode(mode))
         return true;
 
-    const ResourceId resIdDb(RESOURCE_DATABASE, dbName.toStringWithTenantId());
+    const ResourceId resIdDb(RESOURCE_DATABASE, dbName);
     return isLockHeldForMode(resIdDb, mode);
 }
 
@@ -645,7 +645,7 @@ bool LockerImpl::isCollectionLockedForMode(const NamespaceString& nss, LockMode 
     if (isR() && isSharedLockMode(mode))
         return true;
 
-    const ResourceId resIdDb(RESOURCE_DATABASE, nss.dbName().toStringWithTenantId());
+    const ResourceId resIdDb(RESOURCE_DATABASE, nss.dbName());
 
     LockMode dbMode = getLockMode(resIdDb);
     if (!shouldConflictWithSecondaryBatchApplication())
@@ -660,7 +660,7 @@ bool LockerImpl::isCollectionLockedForMode(const NamespaceString& nss, LockMode 
             return isSharedLockMode(mode);
         case MODE_IX:
         case MODE_IS: {
-            const ResourceId resIdColl(RESOURCE_COLLECTION, nss.ns());
+            const ResourceId resIdColl(RESOURCE_COLLECTION, nss);
             return isLockHeldForMode(resIdColl, mode);
         } break;
         case LockModesCount:

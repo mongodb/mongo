@@ -994,7 +994,7 @@ Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
         // increasing cluster key natively guarantee preservation of the insertion order, and don't
         // need serialisation. We allow concurrent inserts for clustered capped collections.
         Lock::ResourceLock heldUntilEndOfWUOW{
-            opCtx->lockState(), ResourceId(RESOURCE_METADATA, _ns.ns()), MODE_X};
+            opCtx->lockState(), ResourceId(RESOURCE_METADATA, _ns), MODE_X};
     }
 
     std::vector<Record> records;
@@ -1120,8 +1120,7 @@ void CollectionImpl::_cappedDeleteAsNeeded(OperationContext* opCtx,
         // '_cappedFirstRecord' until the outermost WriteUnitOfWork commits or aborts. Locking the
         // metadata resource exclusively on the collection gives us that guarantee as it uses
         // two-phase locking semantics.
-        invariant(opCtx->lockState()->getLockMode(ResourceId(RESOURCE_METADATA, _ns.ns())) ==
-                  MODE_X);
+        invariant(opCtx->lockState()->getLockMode(ResourceId(RESOURCE_METADATA, _ns)) == MODE_X);
     } else {
         // Capped deletes not performed under the capped lock need the '_cappedFirstRecordMutex'
         // mutex.
@@ -1305,7 +1304,7 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
         // '_cappedFirstRecord'.
         // See SERVER-21646.
         Lock::ResourceLock heldUntilEndOfWUOW{
-            opCtx->lockState(), ResourceId(RESOURCE_METADATA, _ns.ns()), MODE_X};
+            opCtx->lockState(), ResourceId(RESOURCE_METADATA, _ns), MODE_X};
     }
 
     std::vector<OplogSlot> oplogSlots;
@@ -1417,7 +1416,7 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
         // '_cappedFirstRecord'.
         // See SERVER-21646.
         Lock::ResourceLock heldUntilEndOfWUOW{
-            opCtx->lockState(), ResourceId(RESOURCE_METADATA, _ns.ns()), MODE_X};
+            opCtx->lockState(), ResourceId(RESOURCE_METADATA, _ns), MODE_X};
     }
 
     SnapshotId sid = opCtx->recoveryUnit()->getSnapshotId();

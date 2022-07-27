@@ -522,20 +522,24 @@ public:
     boost::optional<std::string> lookupResourceName(const ResourceId& rid) const;
 
     /**
-     * Removes an existing ResourceId 'rid' with namespace 'entry' from the map.
-     *
-     * TODO SERVER-67442 Create versions of removeResource that take in NamespaceString and
-     * DatabaseName and make the method that takes in a string private.
+     * Removes an existing ResourceId 'rid' with namespace 'nss' from the map.
      */
-    void removeResource(const ResourceId& rid, const std::string& entry);
+    void removeResource(const ResourceId& rid, const NamespaceString& nss);
 
     /**
-     * Inserts a new ResourceId 'rid' into the map with namespace 'entry'.
-     *
-     * TODO SERVER-67442 Create versions of addResource that take in NamespaceString and
-     * DatabaseName and make the method that takes in a string private.
+     * Removes an existing ResourceId 'rid' with database name 'dbName' from the map.
      */
-    void addResource(const ResourceId& rid, const std::string& entry);
+    void removeResource(const ResourceId& rid, const DatabaseName& dbName);
+
+    /**
+     * Inserts a new ResourceId 'rid' into the map with namespace 'nss'.
+     */
+    void addResource(const ResourceId& rid, const NamespaceString& nss);
+
+    /**
+     * Inserts a new ResourceId 'rid' into the map with database name 'dbName'.
+     */
+    void addResource(const ResourceId& rid, const DatabaseName& dbName);
 
     /**
      * Ensures we have a MODE_X lock on a collection or MODE_IX lock for newly created collections.
@@ -585,6 +589,15 @@ private:
      */
     bool _alreadyClonedForBatchedWriter(const std::shared_ptr<Collection>& collection) const;
 
+    /**
+     * Inserts a new ResourceId 'rid' into the map with namespace 'entry'.
+     */
+    void _addResource(const ResourceId& rid, const std::string& entry);
+
+    /**
+     * Removes an existing ResourceId 'rid' with namespace 'entry' from the map.
+     */
+    void _removeResource(const ResourceId& rid, const std::string& entry);
 
     /**
      * Throws 'WriteConflictException' if given namespace is already registered with the catalog, as

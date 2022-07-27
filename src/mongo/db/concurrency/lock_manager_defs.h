@@ -41,6 +41,7 @@
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
 #include "mongo/config.h"
+#include "mongo/db/namespace_string.h"
 
 namespace mongo {
 
@@ -231,9 +232,15 @@ class ResourceId {
 
 public:
     ResourceId() : _fullHash(0) {}
-    ResourceId(ResourceType type, StringData ns) : _fullHash(fullHash(type, hashStringData(ns))) {}
-    ResourceId(ResourceType type, const std::string& ns)
-        : _fullHash(fullHash(type, hashStringData(ns))) {}
+    ResourceId(ResourceType type, const NamespaceString& nss)
+        : _fullHash(fullHash(type, hashStringData(nss.toStringWithTenantId()))) {}
+    ResourceId(ResourceType type, const DatabaseName& dbName)
+        : _fullHash(fullHash(type, hashStringData(dbName.toStringWithTenantId()))) {}
+    ResourceId(ResourceType type, const std::string& str)
+        : _fullHash(fullHash(type, hashStringData(str))) {
+        // Resources of type database or collection must never be passed as a raw string
+        invariant(type != RESOURCE_DATABASE && type != RESOURCE_COLLECTION);
+    }
     ResourceId(ResourceType type, uint64_t hashId) : _fullHash(fullHash(type, hashId)) {}
 
     bool isValid() const {

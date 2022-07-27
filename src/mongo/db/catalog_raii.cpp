@@ -107,14 +107,13 @@ void verifyDbAndCollection(OperationContext* opCtx,
  */
 struct ResourceIdNssComparator {
     bool operator()(const NamespaceString& lhs, const NamespaceString& rhs) const {
-        return ResourceId(RESOURCE_COLLECTION, lhs.ns()) <
-            ResourceId(RESOURCE_COLLECTION, rhs.ns());
+        return ResourceId(RESOURCE_COLLECTION, lhs) < ResourceId(RESOURCE_COLLECTION, rhs);
     }
 };
 
 /**
  * Fills the input 'collLocks' with CollectionLocks, acquiring locks on namespaces 'nsOrUUID' and
- * 'secondaryNssOrUUIDs' in ResourceId(RESOURCE_COLLECTION, nss.ns()) order.
+ * 'secondaryNssOrUUIDs' in ResourceId(RESOURCE_COLLECTION, nss) order.
  *
  * The namespaces will be resolved, the locks acquired, and then the namespaces will be checked for
  * changes in case there is a race with rename and a UUID no longer matches the locked namespace.
@@ -142,7 +141,7 @@ void acquireCollectionLocksInResourceIdOrder(
         verifyTemp.clear();
 
         // Create a single set with all the resolved namespaces sorted by ascending
-        // ResourceId(RESOURCE_COLLECTION, nss.ns()).
+        // ResourceId(RESOURCE_COLLECTION, nss).
         temp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID));
         for (const auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
             invariant(secondaryNssOrUUID.db() == nsOrUUID.db(),

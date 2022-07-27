@@ -1078,7 +1078,7 @@ TEST_F(DConcurrencyTestFixture, DBLockTakesS) {
     getClient()->swapLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
     Lock::DBLock dbRead(opCtx.get(), DatabaseName(boost::none, "db"), MODE_S);
 
-    const ResourceId resIdDb(RESOURCE_DATABASE, std::string("db"));
+    const ResourceId resIdDb(RESOURCE_DATABASE, DatabaseName(boost::none, "db"));
     ASSERT(opCtx->lockState()->getLockMode(resIdDb) == MODE_S);
 }
 
@@ -1087,7 +1087,7 @@ TEST_F(DConcurrencyTestFixture, DBLockTakesX) {
     getClient()->swapLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
     Lock::DBLock dbWrite(opCtx.get(), DatabaseName(boost::none, "db"), MODE_X);
 
-    const ResourceId resIdDb(RESOURCE_DATABASE, std::string("db"));
+    const ResourceId resIdDb(RESOURCE_DATABASE, DatabaseName(boost::none, "db"));
     ASSERT(opCtx->lockState()->getLockMode(resIdDb) == MODE_X);
 }
 
@@ -2281,7 +2281,7 @@ TEST_F(DConcurrencyTestFixture, FailPointInLockDoesNotFailUninterruptibleNonInte
     LockerImpl locker3(opCtx->getServiceContext());
 
     // Granted MODE_X lock, fail incoming MODE_S and MODE_X.
-    const ResourceId resId(RESOURCE_COLLECTION, "TestDB.collection"_sd);
+    const ResourceId resId(RESOURCE_COLLECTION, NamespaceString(boost::none, "TestDB.collection"));
 
     locker1.lockGlobal(opCtx.get(), MODE_IX);
 
