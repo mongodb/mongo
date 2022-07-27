@@ -90,11 +90,22 @@ public:
 
     RecordId() : _format(Format::kNull){};
 
+// We believe that due to https://gcc.gnu.org/bugzilla/show_bug.cgi?id=106092 GCC 11.2 gives an
+// invalid error for freeing a non-heap pointer in the destructor. As it is a false positive we
+// manually disable the warning here. Note that this pragma doesn't work on Clang so we must verify
+// that only GCC can read this.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wfree-nonheap-object"
+#endif
     ~RecordId() {
         if (_format == Format::kBigStr) {
             free(_data.heapStr.stringPtr);
         }
     }
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
     RecordId(RecordId&& other) {
         std::memcpy(this, &other, sizeof(RecordId));
