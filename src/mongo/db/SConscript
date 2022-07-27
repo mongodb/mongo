@@ -863,9 +863,6 @@ env.Library(
         'transaction_participant.idl',
         'transactions_stats.idl',
     ],
-    LIBDEPS=[
-        'repl/oplog_entry',
-    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
