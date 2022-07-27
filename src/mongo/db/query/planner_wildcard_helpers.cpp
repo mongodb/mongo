@@ -418,9 +418,11 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
     }
 }
 
-BoundsTightness translateWildcardIndexBoundsAndTightness(const IndexEntry& index,
-                                                         BoundsTightness tightnessIn,
-                                                         OrderedIntervalList* oil) {
+BoundsTightness translateWildcardIndexBoundsAndTightness(
+    const IndexEntry& index,
+    BoundsTightness tightnessIn,
+    OrderedIntervalList* oil,
+    interval_evaluation_tree::Builder* ietBuilder) {
     // This method should only ever be called for a $** IndexEntry. We expect to be called during
     // planning, *before* finishWildcardIndexScanNode has been invoked. The IndexEntry should thus
     // only have a single keyPattern field and multikeyPath entry, but this is sufficient to
@@ -440,6 +442,10 @@ BoundsTightness translateWildcardIndexBoundsAndTightness(const IndexEntry& index
     // skip this document. We must also set the tightness to INEXACT_FETCH to avoid false positives.
     if (boundsOverlapObjectTypeBracket(*oil) && !oil->intervals.front().isMinToMax()) {
         oil->intervals = {IndexBoundsBuilder::allValues()};
+        if (ietBuilder) {
+            ietBuilder->reset();
+            ietBuilder->addConst(*oil);
+        }
         return BoundsTightness::INEXACT_FETCH;
     }
 

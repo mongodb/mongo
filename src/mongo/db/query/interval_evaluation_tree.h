@@ -127,6 +127,8 @@ public:
     void addEval(const MatchExpression& expr, const OrderedIntervalList& oil);
     void addConst(const OrderedIntervalList& oil);
 
+    void reset();
+
     boost::optional<IET> done() const;
 
 private:

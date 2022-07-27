@@ -90,6 +90,13 @@ assertExpectedDocAnswersWildcardIndexQuery(
     true,
     {$_path: [`["b.a", "b.a"]`, `["b.a.", "b.a/")`], "b.a": [`[MinKey, MaxKey]`]});
 
+// A $type of 'object' will match an array of objects with size 3.
+assertExpectedDocAnswersWildcardIndexQuery(
+    {a: [{b: 2}, {c: 3}, {d: 4}]},
+    {$and: [{"a": {$type: 'object'}}, {"a": {$size: NumberLong("3")}}]},
+    true,
+    {$_path: [`["a", "a"]`, `["a.", "a/")`], "a": [`[MinKey, MaxKey]`]});
+
 // A $type of 'array' will match an empty array.
 assertExpectedDocAnswersWildcardIndexQuery(
     {a: [[]]},

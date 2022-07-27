@@ -273,7 +273,8 @@ void IndexBoundsBuilder::translate(const MatchExpression* expr,
     // adjusted regardless of the predicate. Having filled out the initial bounds, we apply any
     // necessary changes to the tightness here.
     if (index.type == IndexType::INDEX_WILDCARD) {
-        *tightnessOut = wcp::translateWildcardIndexBoundsAndTightness(index, *tightnessOut, oilOut);
+        *tightnessOut =
+            wcp::translateWildcardIndexBoundsAndTightness(index, *tightnessOut, oilOut, ietBuilder);
     }
 }
 

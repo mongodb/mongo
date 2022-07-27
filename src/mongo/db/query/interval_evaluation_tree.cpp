@@ -260,6 +260,12 @@ void Builder::addConst(const OrderedIntervalList& oil) {
     _intervals.push(makeInterval<ConstNode>(oil));
 }
 
+void Builder::reset() {
+    while (!_intervals.empty()) {
+        _intervals.pop();
+    }
+}
+
 boost::optional<IET> Builder::done() const {
     if (_intervals.empty()) {
         return boost::none;

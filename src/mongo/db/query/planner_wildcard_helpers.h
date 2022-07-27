@@ -60,11 +60,13 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
  * planner for $** indexes. For instance, if the query traverses through one or more arrays via
  * specific indices, then we must enforce INEXACT_FETCH to ensure correctness, regardless of the
  * predicate. Given an IndexEntry representing an expanded $** index, we apply any necessary
- * changes to the bounds and tightness here.
+ * changes to the bounds, tightness, and interval evaluation tree here.
  */
-BoundsTightness translateWildcardIndexBoundsAndTightness(const IndexEntry& index,
-                                                         BoundsTightness tightnessIn,
-                                                         OrderedIntervalList* oil);
+BoundsTightness translateWildcardIndexBoundsAndTightness(
+    const IndexEntry& index,
+    BoundsTightness tightnessIn,
+    OrderedIntervalList* oil,
+    interval_evaluation_tree::Builder* ietBuilder);
 
 /**
  * During planning, the expanded $** IndexEntry's keyPattern and bounds are in the single-field
