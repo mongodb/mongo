@@ -310,10 +310,15 @@ TEST_F(QueryPlannerColumnarTest, MultiplePredicatesAllowedWithColumnarIndex) {
     runQuerySortProj(BSON("a" << 2 << "b" << 3), BSONObj(), BSON("a" << 1 << "_id" << 0));
     assertNumSolutions(1U);
     assertSolutionExists(R"({
-        column_scan: {
-            filtersByPath: {a: {a: {$eq: 2}}, b: {b: {$eq: 3}}},
-            outputFields: ['a'],
-            matchFields: ['a', 'b']
+        proj: {
+            spec: {a: 1, _id: 0},
+            node: {
+                column_scan: {
+                    filtersByPath: {a: {a: {$eq: 2}}, b: {b: {$eq: 3}}},
+                    outputFields: ['a'],
+                    matchFields: ['a', 'b']
+                }
+            }
         }
     })");
 }
@@ -374,10 +379,15 @@ TEST_F(QueryPlannerColumnarTest, NumberOfFieldsComputedUsingSetSize) {
                      BSON("a" << 1 << "b" << 1 << "_id" << 0));
     assertNumSolutions(1U);
     assertSolutionExists(R"({
-        column_scan: {
-            filtersByPath: {a: {a: {$eq: 2}}, b: {b: {$eq: 3}}, c: {c: {$eq: 4}}},
-            outputFields: ['a', 'b'],
-            matchFields: ['a', 'b', 'c']
+        proj: {
+            spec: {a: 1, b: 1, _id: 0},
+            node: {
+                column_scan: {
+                    filtersByPath: {a: {a: {$eq: 2}}, b: {b: {$eq: 3}}, c: {c: {$eq: 4}}},
+                    outputFields: ['a', 'b'],
+                    matchFields: ['a', 'b', 'c']
+                }
+            }
         }
     })");
 }
@@ -393,15 +403,20 @@ TEST_F(QueryPlannerColumnarTest, ComplexPredicateSplitDemo) {
     runQuerySortProj(complexPredicate, BSONObj(), BSON("a" << 1 << "_id" << 0));
     assertNumSolutions(1U);
     assertSolutionExists(R"({
-        column_scan: {
-            filtersByPath: {
-                a: {$and: [{a: {$gte: 0}}, {a: {$lt: 10}}]},
-                'addresses.zip': {'addresses.zip': {$in: ['12345', '01234']}},
-                unsubscribed: {unsubscribed: {$eq: false}},
-                specialAddress: {specialAddress: {$exists: true}}
-            },
-            outputFields: ['a'],
-            matchFields: ['a', 'addresses.zip', 'unsubscribed', 'specialAddress']
+        proj: {
+            spec: {a: 1, _id: 0},
+            node: {
+                column_scan: {
+                    filtersByPath: {
+                        a: {$and: [{a: {$gte: 0}}, {a: {$lt: 10}}]},
+                        'addresses.zip': {'addresses.zip': {$in: ['12345', '01234']}},
+                        unsubscribed: {unsubscribed: {$eq: false}},
+                        specialAddress: {specialAddress: {$exists: true}}
+                    },
+                    outputFields: ['a'],
+                    matchFields: ['a', 'addresses.zip', 'unsubscribed', 'specialAddress']
+                }
+            }
         }
     })");
 }
@@ -419,19 +434,24 @@ TEST_F(QueryPlannerColumnarTest, ComplexPredicateSplitsIntoParts) {
     })");
     runQuerySortProj(complexPredicate, BSONObj(), BSON("a" << 1 << "_id" << 0));
     assertSolutionExists(R"({
-        column_scan: {
-            filtersByPath: {
-                a: {a: {$gte: 0, $lt: 10}},
-                "addresses.zip": {"addresses.zip": {$in: ['12345', '01234']}},
-                unsubscribed: {unsubscribed: false}
-            },
-            outputFields: ['a'],
-            postAssemblyFilter: {
-                specialAddress: {$exists: false},
-                doNotContact: {$exists: false}
-            },
-            matchFields:
-                ['a', 'addresses.zip', 'unsubscribed', 'specialAddress', 'doNotContact']
+        proj: {
+            spec: {a: 1, _id: 0},
+            node: {
+                column_scan: {
+                    filtersByPath: {
+                        a: {a: {$gte: 0, $lt: 10}},
+                        "addresses.zip": {"addresses.zip": {$in: ['12345', '01234']}},
+                        unsubscribed: {unsubscribed: false}
+                    },
+                    outputFields: ['a'],
+                    postAssemblyFilter: {
+                        specialAddress: {$exists: false},
+                        doNotContact: {$exists: false}
+                    },
+                    matchFields:
+                        ['a', 'addresses.zip', 'unsubscribed', 'specialAddress', 'doNotContact']
+                }
+            }
         }
     })");
 }
@@ -494,10 +514,15 @@ TEST_F(QueryPlannerColumnarTest, MatchGroupTest) {
 
     assertNumSolutions(1U);
     assertSolutionExists(R"({
-        column_scan: {
-            filtersByPath: {name: {name: {$eq: 'bob'}}},
-            outputFields: ['foo', 'x'],
-            matchFields: ['name']
+        proj: {
+            spec: {foo: 1, x: 1, _id: 0},
+            node: {
+                column_scan: {
+                    filtersByPath: {name: {name: {$eq: 'bob'}}},
+                    outputFields: ['foo', 'x'],
+                    matchFields: ['name']
+                }
+            }
         }
     })");
 
@@ -702,12 +727,17 @@ TEST_F(QueryPlannerColumnarTest, FullPredicateOption) {
     })");
     runQuerySortProj(predicate, BSONObj(), BSON("a" << 1 << "_id" << 0));
     assertSolutionExists(R"({
-        column_scan: {
-            outputFields: ['a'],
-            matchFields: ['specialAddress', 'doNotContact'],
-            postAssemblyFilter: {
-                specialAddress: {$exists: true},
-                doNotContact: {$exists: true}
+        proj: {
+            spec: {a: 1, _id: 0},
+            node: {
+                column_scan: {
+                    outputFields: ['a'],
+                    matchFields: ['specialAddress', 'doNotContact'],
+                    postAssemblyFilter: {
+                        specialAddress: {$exists: true},
+                        doNotContact: {$exists: true}
+                    }
+                }
             }
         }
     })");

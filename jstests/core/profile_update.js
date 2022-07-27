@@ -1,4 +1,6 @@
 // @tags: [
+//   # Asserts on the number of index keys modified.
+//   assumes_no_implicit_index_creation,
 //   does_not_support_stepdowns,
 //   requires_non_retryable_writes,
 //   requires_profiling,

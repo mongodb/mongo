@@ -908,6 +908,7 @@ buildvariants:
     - windows-2016-dc
   - name: .jscore .common !.sharding
   - name: jsCore_auth
+  - name: jsCore_column_store_indexes
   - name: jsCore_ese
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
@@ -1475,6 +1476,7 @@ buildvariants:
     distros:
     - rhel80-medium
   - name: .jscore .common
+  - name: jsCore_column_store_indexes
   - name: jsCore_minimum_batch_size
   - name: jsCore_repeat_queries
   - name: jsCore_txns_large_txns_format
@@ -1577,7 +1579,7 @@ buildvariants:
   - name: .integration
     distros:
     - rhel80-medium
-  - name: .jscore .common !jsCore
+  - name: .jscore .common !jsCore !.sbe_only
   - name: .jstestfuzz !.flow_control
   - name: .lint
   - name: .misc_js
@@ -2034,7 +2036,7 @@ buildvariants:
     distros:
     - ubuntu1804-xlarge
   - name: jsCore
-  - name: .aggregation !.encrypt !.feature_flag_guarded
+  - name: .aggregation !.encrypt
   - name: replica_sets_jscore_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharding_gen
@@ -2247,6 +2249,7 @@ buildvariants:
   - name: initial_sync_fuzzer_gen
   - name: .integration !.standalone !.audit
   - name: .jscore .common
+  - name: jsCore_column_store_indexes
   - name: jsCore_minimum_batch_size
   - name: jsCore_txns_large_txns_format
   - name: json_schema
@@ -2326,7 +2329,7 @@ buildvariants:
   - name: external_auth_aws
   - name: initial_sync_fuzzer_gen
   - name: .integration !.standalone !.audit
-  - name: .jscore .common
+  - name: .jscore .common !.sbe_only
   - name: jsCore_minimum_batch_size
   - name: jsCore_txns_large_txns_format
   - name: json_schema
@@ -2405,6 +2408,7 @@ buildvariants:
   - name: initial_sync_fuzzer_gen
   - name: .integration !.audit
   - name: .jscore .common
+  - name: jsCore_column_store_indexes
   - name: jsCore_minimum_batch_size
   - name: jsCore_txns_large_txns_format
   - name: json_schema
@@ -2478,7 +2482,7 @@ buildvariants:
   - name: free_monitoring
   - name: initial_sync_fuzzer_gen
   - name: .integration !.audit
-  - name: .jscore .common
+  - name: .jscore .common !.sbe_only
   - name: jsCore_minimum_batch_size
   - name: jsCore_txns_large_txns_format
   - name: json_schema
@@ -2580,6 +2584,7 @@ buildvariants:
     - rhel80-xlarge
   - name: jsCore
   - name: jsCore_txns
+  - name: jsCore_column_store_indexes
 # Disabling these tests as they are not aware of feature flags.
 #  - name: compile_test_and_package_parallel_unittest_stream_TG
 #    distros:

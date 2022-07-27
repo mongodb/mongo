@@ -4,6 +4,9 @@
 // @tags: [
 //   assumes_unsharded_collection,
 //   requires_fastcount,
+//   # The test assumes it is in control of which indexes exist and makes some assertions on explain
+//   # plans.
+//   assumes_no_implicit_index_creation,
 // ]
 (function() {
 "use strict";

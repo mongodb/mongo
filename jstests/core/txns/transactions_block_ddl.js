@@ -1,5 +1,5 @@
 // Test that open transactions block DDL operations on the involved collections.
-// @tags: [uses_transactions]
+// @tags: [uses_rename, uses_transactions]
 (function() {
 "use strict";
 

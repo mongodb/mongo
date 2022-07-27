@@ -1,45 +1,67 @@
 // Cannot implicitly shard accessed collections because of not being able to create unique index
 // using hashed shard key pattern.
-// @tags: [cannot_create_unique_index_when_using_hashed_shard_key]
+// @tags: [
+//     cannot_create_unique_index_when_using_hashed_shard_key,
+//     # Uses $indexStats which is not supported in a transaction.
+//     does_not_support_transactions,
+// ]
+(function() {
+"use strict";
 
-t = db.indexapi;
-t.drop();
+const coll = db.indexapi;
+coll.drop();
 
-key = {
+const kTestKeyPattern = {
     x: 1
 };
 
-c = {
-    ns: t._fullName,
-    key: key,
-    name: t._genIndexName(key)
+const indexSpecObj = {
+    ns: coll._fullName,
+    key: kTestKeyPattern,
+    name: coll._genIndexName(kTestKeyPattern)
 };
-assert.eq(c, t._indexSpec({x: 1}), "A");
+assert.eq(indexSpecObj, coll._indexSpec(kTestKeyPattern));
 
-c.name = "bob";
-assert.eq(c, t._indexSpec({x: 1}, "bob"), "B");
+indexSpecObj.name = "bob";
+assert.eq(indexSpecObj, coll._indexSpec(kTestKeyPattern, "bob"));
 
-c.name = t._genIndexName(key);
-assert.eq(c, t._indexSpec({x: 1}), "C");
+indexSpecObj.name = coll._genIndexName(kTestKeyPattern);
+assert.eq(indexSpecObj, coll._indexSpec(kTestKeyPattern));
 
-c.unique = true;
-assert.eq(c, t._indexSpec({x: 1}, true), "D");
-assert.eq(c, t._indexSpec({x: 1}, [true]), "E");
-assert.eq(c, t._indexSpec({x: 1}, {unique: true}), "F");
+indexSpecObj.unique = true;
+assert.eq(indexSpecObj, coll._indexSpec(kTestKeyPattern, true));
+assert.eq(indexSpecObj, coll._indexSpec(kTestKeyPattern, [true]));
+assert.eq(indexSpecObj, coll._indexSpec(kTestKeyPattern, {unique: true}));
 
-c.dropDups = true;
-assert.eq(c, t._indexSpec({x: 1}, [true, true]), "G");
-assert.eq(c, t._indexSpec({x: 1}, {unique: true, dropDups: true}), "F");
+indexSpecObj.dropDups = true;
+assert.eq(indexSpecObj, coll._indexSpec(kTestKeyPattern, [true, true]));
+assert.eq(indexSpecObj, coll._indexSpec(kTestKeyPattern, {unique: true, dropDups: true}));
 
-t.createIndex({x: 1}, {unique: true});
-idx = t.getIndexes();
-assert.eq(2, idx.length, "M1");
-assert.eq(key, idx[1].key, "M2");
-assert(idx[1].unique, "M3");
+function getSingleIndexWithKeyPattern(keyPattern) {
+    let allIndexes = coll.aggregate([
+                             {$indexStats: {}},
+                             {$match: {key: keyPattern}},
+                             // Unnest the "$spec" field into top-level.
+                             {$replaceWith: {$mergeObjects: ["$$ROOT", "$spec"]}}
+                         ])
+                         .toArray();
+    assert.eq(allIndexes.length, 1);
+    return allIndexes[0];
+}
 
-t.drop();
-t.createIndex({x: 1}, {unique: 1});
-idx = t.getIndexes();
-assert.eq(2, idx.length, "M1");
-assert.eq(key, idx[1].key, "M2");
-assert(idx[1].unique, "M3");
+coll.createIndex(kTestKeyPattern, {unique: true});
+let allIndexes = coll.getIndexes();
+assert.eq(2, allIndexes.length);
+assert.sameMembers([kTestKeyPattern, {_id: 1}], allIndexes.map(entry => entry.key));
+let xIndex = getSingleIndexWithKeyPattern(kTestKeyPattern);
+assert.eq(xIndex.key, kTestKeyPattern);
+assert(xIndex.unique, xIndex);
+
+coll.drop();
+coll.createIndex(kTestKeyPattern, {unique: 1});
+allIndexes = coll.getIndexes();
+assert.eq(2, allIndexes.length);
+xIndex = getSingleIndexWithKeyPattern(kTestKeyPattern);
+assert.eq(kTestKeyPattern, xIndex.key);
+assert(xIndex.unique);
+}());

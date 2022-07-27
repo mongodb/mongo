@@ -6,6 +6,9 @@
  * order to apply the SHARDING_FILTER stage.
  * @tags: [
  *   assumes_unsharded_collection,
+ *   # The test assumes it is in control of which indexes exist and makes some assertions on explain
+ *   # plans.
+ *   assumes_no_implicit_index_creation,
  * ]
  */
 (function() {

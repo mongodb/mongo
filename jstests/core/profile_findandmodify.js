@@ -1,5 +1,7 @@
 // Confirms that profiled findAndModify execution contains all expected metrics with proper values.
 // @tags: [
+//   # Asserts on the number of index keys modified.
+//   assumes_no_implicit_index_creation,
 //   requires_profiling,
 // ]
 

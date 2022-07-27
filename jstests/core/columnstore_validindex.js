@@ -5,11 +5,10 @@
  *   requires_background_index,
  *   # Columnstore indexes are new in 6.1.
  *   requires_fcv_61,
- *   # Columnstore indexes are incompatible with clustered collections.
- *   incompatible_with_clustered_collection,
- *   # We could potentially need to resume an index build in the event of a stepdown, which is not
- *   # yet implemented.
+ *   # TODO SERVER-66925 We could potentially need to resume an index build in the event of a
+ *   # stepdown, which is not yet implemented.
  *   does_not_support_stepdowns,
+ *   uses_column_store_indexes,
  * ]
  */
 (function() {

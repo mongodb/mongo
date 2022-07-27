@@ -429,7 +429,12 @@ std::unique_ptr<QuerySolutionNode> analyzeProjection(const CanonicalQuery& query
         // the time if say we needed an extra field for a sort or for shard filtering.
         const auto* columnScan = treeSourceIsColumnScan(solnRoot.get());
         if (columnScan &&
-            columnScan->outputFields.size() == projection.getRequiredFields().size()) {
+            columnScan->outputFields.size() == projection.getRequiredFields().size() &&
+            // TODO SERVER-64258 once filtering is supported we should be able to have meaningful
+            // support for matched but not output fields. Until then, any match fields are treated
+            // as output fields.
+            (columnScan->matchFields.empty() ||
+             columnScan->allFields.size() == columnScan->outputFields.size())) {
             // No projection needed. We already checked that all necessary fields are provided, so
             // if the set sizes match, they match exactly.
             return solnRoot;

@@ -68,7 +68,8 @@ selector:
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
-  - incompatible_with_clustered_collection
+  # Columnstore indexes are incompatible with clustered collections.
+  - uses_column_store_index
 
 executor:
   archive:

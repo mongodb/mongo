@@ -2,6 +2,8 @@
 // expected.
 // @tags: [
 //   assumes_no_implicit_collection_creation_after_drop,
+//   # Asserts that some queries use a collection scan.
+//   assumes_no_implicit_index_creation,
 //   does_not_support_stepdowns,
 //   requires_capped,
 //   requires_non_retryable_commands,

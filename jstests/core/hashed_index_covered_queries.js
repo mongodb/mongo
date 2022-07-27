@@ -4,6 +4,8 @@
  *
  * @tags: [
  *   assumes_unsharded_collection,
+ *   # Assumes some queries will use a collection scan.
+ *   assumes_no_implicit_index_creation,
  * ]
  */
 (function() {

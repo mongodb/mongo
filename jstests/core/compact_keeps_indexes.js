@@ -6,6 +6,7 @@
 //   incompatible_with_embedded,
 //   uses_multiple_connections,
 //   uses_parallel_shell,
+//   uses_compact,
 // ]
 
 (function() {

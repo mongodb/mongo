@@ -1,6 +1,11 @@
-// Cannot implicitly shard accessed collections because of collection existing when none
-// expected.
-// @tags: [assumes_no_implicit_collection_creation_after_drop, requires_getmore]
+// @tags: [
+//     # Cannot implicitly shard accessed collections because of collection existing when none
+//     # expected.
+//     assumes_no_implicit_collection_creation_after_drop,
+//     # Asserts on the output of listIndexes.
+//     assumes_no_implicit_index_creation,
+//     requires_getmore
+// ]
 
 // Basic functional tests for the listIndexes command.
 

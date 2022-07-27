@@ -17,6 +17,8 @@ selector:
   # Column Store Indexes are known to mess up projection field order and it is fundamental to the
   # design so we accept these tests will fail.
   - tests_projection_field_order
+  # Avoid creating a double index.
+  - uses_column_store_indexes
 
 executor:
   archive:

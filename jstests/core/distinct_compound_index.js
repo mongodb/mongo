@@ -1,6 +1,8 @@
 // @tags: [
 //   assumes_balancer_off,
 //   assumes_unsharded_collection,
+//   # Asserts that some queries use a collection scan.
+//   assumes_no_implicit_index_creation,
 // ]
 (function() {
 "use strict";

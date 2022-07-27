@@ -4,6 +4,8 @@
  * their signature parameters differ.
  *
  * @tags: [
+ *   # Asserts on the 'numIndexesAfter' part of the createIndexes command response.
+ *   assumes_no_implicit_index_creation,
  *   requires_non_retryable_writes,
  * ]
  */

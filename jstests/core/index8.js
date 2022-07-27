@@ -1,6 +1,11 @@
-// Cannot implicitly shard accessed collections because of not being able to create unique index
-// using hashed shard key pattern.
-// @tags: [cannot_create_unique_index_when_using_hashed_shard_key, requires_fastcount]
+// @tags: [
+//     # Asserts on the output of listIndexes.
+//     assumes_no_implicit_index_creation,
+//     # Cannot implicitly shard accessed collections because of not being able to create unique
+//     # index using hashed shard key pattern.
+//     cannot_create_unique_index_when_using_hashed_shard_key,
+//     requires_fastcount
+// ]
 
 // Test key uniqueness
 (function() {

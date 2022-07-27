@@ -157,7 +157,8 @@ assert.eq(
 // one path is a prefix of the other path.
 assert.eq(
     coll.find({}, {_id: 1}).sort({"a.c": 1, a: 1, _id: 1}).toArray(),
-    [{_id: 2}, {_id: 5}, {_id: 1}, {_id: 4}, {_id: 6}, {_id: 3}, {_id: 8}, {_id: 7}, {_id: 9}]);
+    [{_id: 2}, {_id: 5}, {_id: 1}, {_id: 4}, {_id: 6}, {_id: 3}, {_id: 8}, {_id: 7}, {_id: 9}],
+    () => tojson(coll.find({}, {_id: 1}).sort({"a.c": 1, a: 1, _id: 1}).explain()));
 assert.eq(
     coll.find({}, {_id: 1}).sort({"a.c": 1, a: -1, _id: 1}).toArray(),
     [{_id: 3}, {_id: 6}, {_id: 1}, {_id: 4}, {_id: 2}, {_id: 5}, {_id: 9}, {_id: 7}, {_id: 8}]);

@@ -2,6 +2,8 @@
  * Tests that sparse indexes are not allowed on a time-series measurement field.
  *
  * @tags: [
+ *     # This test makes assertions on listIndexes and on the order of the indexes returned.
+ *     assumes_no_implicit_index_creation,
  *     does_not_support_stepdowns,
  *     does_not_support_transactions,
  *     requires_find_command,

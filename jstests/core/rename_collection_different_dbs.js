@@ -2,14 +2,16 @@
  * Test renameCollection functionality across different databases.
  *
  * @tags: [
- *   # Rename between DBs with different shard primary is not supported
- *   assumes_unsharded_collection,
- *   requires_non_retryable_commands,
- *   requires_collstats,
- *   requires_capped,
  *   # On sharded cluster primary shard for database can land in different
  *   # shards and rename across different primary shards is not allowed.
- *   assumes_against_mongod_not_mongos
+ *   assumes_against_mongod_not_mongos,
+ *   assumes_no_implicit_index_creation,
+ *   # Rename between DBs with different shard primary is not supported
+ *   assumes_unsharded_collection,
+ *   requires_capped,
+ *   requires_collstats,
+ *   requires_non_retryable_commands,
+ *   uses_rename,
  * ]
  */
 

@@ -2,6 +2,8 @@
  * Basic tests for the $listCatalog aggregation stage.
  *
  * @tags: [
+ *     # Asserts on number of indexes.
+ *     assumes_no_implicit_index_creation,
  *     # Time-series collection inserts are not supported in multi-document transactions.
  *     does_not_support_transactions,
  *     requires_fcv_60,

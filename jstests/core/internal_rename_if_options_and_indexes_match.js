@@ -5,10 +5,11 @@
 // directly against shardsvrs.
 // @tags: [
 //   assumes_against_mongod_not_mongos,
+//   directly_against_shardsvrs_incompatible,
 //   incompatible_with_embedded,
 //   requires_capped,
 //   requires_non_retryable_commands,
-//   directly_against_shardsvrs_incompatible,
+//   uses_rename,
 // ]
 
 (function() {

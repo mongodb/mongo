@@ -61,6 +61,11 @@ public:
         return std::move(_jsFunction);
     }
 
+protected:
+    void _doAddDependencies(DepsTracker* deps) const {
+        deps->needWholeDocument = true;
+    }
+
 private:
     void validateState() const {
         tassert(6403600, "JsFunction is unavailable", _jsFunction);

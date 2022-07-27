@@ -5070,6 +5070,19 @@ tasks:
   - func: "run tests"
 
 - <<: *task_template
+  name: jsCore_column_store_indexes
+  # TODO SERVER-61644 Remove the 'feature_flag_guarded' tag and ensure this suite is run on all
+  # variants.
+  depends_on:
+  - name: jsCore
+  tags: ["jscore", "sbe_only", "feature_flag_guarded"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      suite: core_column_store_indexes
+
+- <<: *task_template
   name: mongosTest
   tags: ["misc_js", "non_read_maj", "non_live_record"]
   commands:
