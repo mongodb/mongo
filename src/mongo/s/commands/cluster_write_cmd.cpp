@@ -144,7 +144,7 @@ boost::optional<WouldChangeOwningShardInfo> getWouldChangeOwningShardErrorInfo(
     }
 }
 
-void handleWouldChangeOwningShardErrorRetryableWrite(OperationContext* opCtx,
+void handleWouldChangeOwningShardErrorNonTransaction(OperationContext* opCtx,
                                                      BatchedCommandRequest* request,
                                                      BatchedCommandResponse* response) {
     // Strip write concern because this command will be sent as part of a
@@ -294,18 +294,24 @@ bool handleWouldChangeOwningShardError(OperationContext* opCtx,
 
     if (feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
             serverGlobalParams.featureCompatibility)) {
-        if (isRetryableWrite) {
-            if (MONGO_unlikely(hangAfterThrowWouldChangeOwningShardRetryableWrite.shouldFail())) {
-                LOGV2(5918603, "Hit hangAfterThrowWouldChangeOwningShardRetryableWrite failpoint");
-                hangAfterThrowWouldChangeOwningShardRetryableWrite.pauseWhileSet(opCtx);
-            }
-
-            handleWouldChangeOwningShardErrorRetryableWrite(opCtx, request, response);
-        } else {
+        if (txnRouter) {
             auto updateResult = handleWouldChangeOwningShardErrorTransaction(
                 opCtx, request, response, *wouldChangeOwningShardErrorInfo);
             updatedShardKey = updateResult.updatedShardKey;
             upsertedId = std::move(updateResult.upsertedId);
+        } else {
+            // Updating a document's shard key such that its owning shard changes must be run in a
+            // transaction. If this update is not already in a transaction, complete the update
+            // using an internal transaction.
+            if (isRetryableWrite) {
+                if (MONGO_unlikely(
+                        hangAfterThrowWouldChangeOwningShardRetryableWrite.shouldFail())) {
+                    LOGV2(5918603,
+                          "Hit hangAfterThrowWouldChangeOwningShardRetryableWrite failpoint");
+                    hangAfterThrowWouldChangeOwningShardRetryableWrite.pauseWhileSet(opCtx);
+                }
+            }
+            handleWouldChangeOwningShardErrorNonTransaction(opCtx, request, response);
         }
     } else {
         // TODO SERVER-67429: Delete this branch.
