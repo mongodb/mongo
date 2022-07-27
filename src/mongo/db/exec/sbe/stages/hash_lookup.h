@@ -181,7 +181,7 @@ private:
     const value::SlotVector _innerProjects;
     const value::SlotMap<std::unique_ptr<EExpression>> _innerAggs;
     const boost::optional<value::SlotId> _collatorSlot;
-    CollatorInterface* _collator;
+    CollatorInterface* _collator{nullptr};
 
     value::SlotAccessorMap _outAccessorMap;
     value::SlotAccessorMap _outInnerProjectAccessorMap;
