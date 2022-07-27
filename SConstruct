@@ -19,7 +19,6 @@ from glob import glob
 from pkg_resources import parse_version
 
 import SCons
-import SCons.Script
 
 # This must be first, even before EnsureSConsVersion, if
 # we are to avoid bulk loading all tools in the DefaultEnvironment.
@@ -56,18 +55,8 @@ print('scons: running with args {}'.format(scons_invocation))
 
 atexit.register(mongo.print_build_failures)
 
-# An extra instance of the SCons parser is used to manually validate options
-# flags. We use it detect some common misspellings/unknown options and
-# communicate with the user more effectively than just allowing Configure to
-# fail.
-# This is to work around issue #4187
-# (https://github.com/SCons/scons/issues/4187). Upon a future upgrade to SCons
-# that incorporates #4187, we should replace this solution with that.
-_parser = SCons.Script.SConsOptions.Parser("")
-
 
 def add_option(name, **kwargs):
-    _parser.add_option('--' + name, **{"default": None, **kwargs})
 
     if 'dest' not in kwargs:
         kwargs['dest'] = name
@@ -893,27 +882,6 @@ for vf in variables_files:
     if not os.path.isfile(vf):
         fatal_error(None, f"Specified variables file '{vf}' does not exist")
     print(f"Using variable customization file {vf}")
-
-# Critically, this approach is technically incorrect. While all MongoDB
-# SConscript files use our add_option wrapper, builtin tools can
-# access SCons's GetOption/AddOption methods directly, causing their options
-# to not be validated by this block.
-(_, leftover) = _parser.parse_args(sys.argv)
-# leftover contains unrecognized options, including environment variables,and
-# the argv[0]. If we only look at flags starting with --, and we skip the first
-# leftover value (argv[0]), anything that remains is an invalid option
-invalid_options = list(filter(lambda x: x.startswith("--"), leftover[1:]))
-if len(invalid_options) > 0:
-    # users frequently misspell "variables-files" (note two `s`s) as
-    # "variable-files" or "variables-file". Detect and help them out.
-    for opt in invalid_options:
-        bad_var_file_opts = ["--variable-file", "--variables-file", "--variable-files"]
-        if opt in bad_var_file_opts or any(
-            [opt.startswith(f"{bad_opt}=") for bad_opt in bad_var_file_opts]):
-            print(
-                f"WARNING: You supplied the invalid parameter '{opt}' to SCons. Did you mean --variables-files (both words plural)?"
-            )
-    fatal_error(None, f"ERROR: unknown options supplied to scons: {invalid_options}")
 
 env_vars = Variables(
     files=variables_files,
