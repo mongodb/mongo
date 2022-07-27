@@ -90,9 +90,7 @@ function getSessionsCollSizeInShard(shardStats) {
     return shardStats['storageStats']['size'] - orphansSize;
 }
 
-function waitUntilBalancedAndVerify(shards) {
-    st.awaitBalance(kSessionsCollName, kConfigDbName, 90000, 1000);
-    const kMaxChunkSizeBytes = st.config.collections.findOne({_id: kSessionsNs}).maxChunkSizeBytes;
+function printSessionsCollectionDistribution(shards) {
     const numDocsOnShards = shards.map(shard => getNumSessionDocs(shard));
     const collStatsPipeline = [
         {'$collStats': {'storageStats': {}}},
@@ -110,24 +108,24 @@ function waitUntilBalancedAndVerify(shards) {
     const collSizeDistribution =
         collectionStorageStats.map(shardStats => getSessionsCollSizeInShard(shardStats));
     const numChunksOnShard = shards.map(shard => getNumChunksOnShard(shard.shardName));
+    const kMaxChunkSizeBytes = st.config.collections.findOne({_id: kSessionsNs}).maxChunkSizeBytes;
+
     jsTest.log(`Sessions distribution across shards ${tojson(shards)}: #docs = ${
         tojson(numDocsOnShards)}, #chunks = ${tojson(numChunksOnShard)}, size = ${
-        tojson(collSizeDistribution)}`);
-    /*
-     * The tolerance value is the sum of two contributors:
-     * - a collection is considered balanced when the max difference in data size between two shards
-     * is below 2 * maxChunkSize
-     * - The deletion of orphaned documents and the update of the counter tracking them are not
-     * atomic (the expected worst case is a size overestimate of maxChunkSize for each shard)
-     */
-    const imbalanceTolerance = 3 * kMaxChunkSizeBytes;
-    assert.lte(Math.max(...collSizeDistribution) - Math.min(...collSizeDistribution),
-               imbalanceTolerance);
+        tojson(collSizeDistribution)}, #maxChunkSize: ${tojson(kMaxChunkSizeBytes)}`);
+}
+
+function waitUntilBalancedAndVerify(shards) {
+    const coll = st.s.getCollection(kSessionsNs);
+    st.awaitBalance(
+        kSessionsCollName, kConfigDbName, 9 * 60000 /* 9min timeout */, 1000 /* 1s interval */);
+    printSessionsCollectionDistribution(shards);
+    st.verifyCollectionIsBalanced(coll);
 }
 
 const kMinNumChunks = 100;
 const kExpectedNumChunks = 128;  // the balancer rounds kMinNumChunks to the next power of 2.
-const kNumSessions = 10000;
+const kNumSessions = 2000;
 const kBalancerTimeoutMS = 5 * 60 * 1000;
 
 let numShards = 2;

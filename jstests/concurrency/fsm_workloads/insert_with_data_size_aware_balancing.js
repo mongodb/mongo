@@ -9,6 +9,7 @@
  *   requires_sharding,
  *   assumes_balancer_on,
  *   featureFlagBalanceAccordingToDataSize,
+ *   # TODO SERVER-67813 review tag when data size aware balancing lands in v6.0
  *   requires_fcv_61,
  *  ]
  */
@@ -106,55 +107,9 @@ var $config = (function() {
                 testedAtLeastOneCollection = true;
 
                 // Wait for collection to be considered balanced
-                assert.soon(
-                    function() {
-                        return assert
-                            .commandWorked(mongos.adminCommand({balancerCollectionStatus: ns}))
-                            .balancerCompliant;
-                    },
-                    'Timed out waiting for collections to be balanced',
-                    60000 * 5 /* timeout (5 minutes) */,
-                    1000 /* interval */);
-
-                const statsPipeline = [
-                    {'$collStats': {'storageStats': {}}},
-                    {
-                        '$project': {
-                            'shard': true,
-                            'storageStats': {
-                                'count': true,
-                                'size': true,
-                                'avgObjSize': true,
-                                'numOrphanDocs': true
-                            }
-                        }
-                    }
-                ];
-
-                // Get stats for the collection from each shard
-                const storageStats = coll.aggregate(statsPipeline).toArray();
-                let minSizeOnShardForCollection = Number.MAX_VALUE;
-                let maxSizeOnShardForCollection = Number.MIN_VALUE;
-
-                storageStats.forEach(function(shardStats) {
-                    const orphansSize = shardStats['storageStats']['numOrphanDocs'] *
-                        shardStats['storageStats']['avgObjSize'];
-                    const size = shardStats['storageStats']['size'] - orphansSize;
-                    if (size > maxSizeOnShardForCollection) {
-                        maxSizeOnShardForCollection = size;
-                    }
-                    if (size < minSizeOnShardForCollection) {
-                        minSizeOnShardForCollection = size;
-                    }
-                });
-
-                // Check that there is no imbalance
-                const collEntry = cluster.getDB('config').collections.findOne({'_id': ns});
-                const errMsg = "ns=" + ns + ' , collEntry=' + JSON.stringify(collEntry) +
-                    ', storageStats=' + JSON.stringify(storageStats);
-                assert.lte(maxSizeOnShardForCollection - minSizeOnShardForCollection,
-                           2 * collEntry.maxChunkSizeBytes,
-                           errMsg);
+                sh.awaitCollectionBalance(
+                    coll, 5 * 60000 /* 5min timeout */, 1000 /* 1s interval */);
+                sh.verifyCollectionIsBalanced(coll);
             }
 
             assert(testedAtLeastOneCollection);
