@@ -69,7 +69,7 @@ SharedSemiFuture<void> removeDocumentsInRange(
  * returns an error.
  */
 Status deleteRangeInBatches(OperationContext* opCtx,
-                            const NamespaceString& nss,
+                            const DatabaseName& dbName,
                             const UUID& collectionUuid,
                             const BSONObj& keyPattern,
                             const ChunkRange& range,

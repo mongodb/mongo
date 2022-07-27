@@ -74,42 +74,6 @@ MONGO_FAIL_POINT_DEFINE(throwWriteConflictExceptionInDeleteRange);
 MONGO_FAIL_POINT_DEFINE(throwInternalErrorInDeleteRange);
 
 /**
- * Returns whether the currentCollection has the same UUID as the expectedCollectionUuid. Used to
- * ensure that the collection has not been dropped or dropped and recreated since the range was
- * enqueued for deletion.
- */
-bool collectionUuidHasChanged(const NamespaceString& nss,
-                              const CollectionPtr& currentCollection,
-                              UUID expectedCollectionUuid) {
-
-    if (!currentCollection) {
-        LOGV2_DEBUG(23763,
-                    1,
-                    "Abandoning range deletion task for {namespace} with UUID "
-                    "{expectedCollectionUuid} because the collection has been dropped",
-                    "Abandoning range deletion task for because the collection has been dropped",
-                    "namespace"_attr = nss.ns(),
-                    "expectedCollectionUuid"_attr = expectedCollectionUuid);
-        return true;
-    }
-
-    if (currentCollection->uuid() != expectedCollectionUuid) {
-        LOGV2_DEBUG(
-            23764,
-            1,
-            "Abandoning range deletion task for {namespace} with UUID {expectedCollectionUUID} "
-            "because UUID of {namespace} has changed (current is {currentCollectionUUID})",
-            "Abandoning range deletion task because UUID has changed",
-            "namespace"_attr = nss.ns(),
-            "expectedCollectionUUID"_attr = expectedCollectionUuid,
-            "currentCollectionUUID"_attr = currentCollection->uuid());
-        return true;
-    }
-
-    return false;
-}
-
-/**
  * Performs the deletion of up to numDocsToRemovePerBatch entries within the range in progress. Must
  * be called under the collection lock.
  *
@@ -283,7 +247,11 @@ void markRangeDeletionTaskAsProcessing(OperationContext* opCtx, const UUID& migr
     static const auto update =
         BSON("$set" << BSON(RangeDeletionTask::kProcessingFieldName << true));
 
-    store.update(opCtx, query, update, WriteConcerns::kLocalWriteConcern);
+    try {
+        store.update(opCtx, query, update, WriteConcerns::kLocalWriteConcern);
+    } catch (const ExceptionFor<ErrorCodes::NoMatchingDocument>&) {
+        // The collection may have been dropped or the document could have been manually deleted
+    }
 }
 
 /**
@@ -301,7 +269,7 @@ ExecutorFuture<void> deleteRangeInBatchesWithExecutor(
         return withTemporaryOperationContext(
             [=](OperationContext* opCtx) {
                 return deleteRangeInBatches(
-                    opCtx, nss, collectionUuid, keyPattern, range, migrationId);
+                    opCtx, nss.db(), collectionUuid, keyPattern, range, migrationId);
             },
             nss);
     });
@@ -361,7 +329,7 @@ std::vector<RangeDeletionTask> getPersistentRangeDeletionTasks(OperationContext*
 }  // namespace
 
 Status deleteRangeInBatches(OperationContext* opCtx,
-                            const NamespaceString& nss,
+                            const DatabaseName& dbName,
                             const UUID& collectionUuid,
                             const BSONObj& keyPattern,
                             const ChunkRange& range,
@@ -379,38 +347,46 @@ Status deleteRangeInBatches(OperationContext* opCtx,
 
             Milliseconds delayBetweenBatches(rangeDeleterBatchDelayMS.load());
 
-            LOGV2_DEBUG(5346200,
-                        1,
-                        "Starting batch deletion",
-                        "namespace"_attr = nss,
-                        "range"_attr = redact(range.toString()),
-                        "numDocsToRemovePerBatch"_attr = numDocsToRemovePerBatch,
-                        "delayBetweenBatches"_attr = delayBetweenBatches);
-
             ensureRangeDeletionTaskStillExists(opCtx, migrationId);
 
+            markRangeDeletionTaskAsProcessing(opCtx, migrationId);
+
             int numDeleted;
-            {
-                AutoGetCollection collection(opCtx, nss, MODE_IX);
+            const auto nss = [&]() {
+                try {
+                    AutoGetCollection collection(
+                        opCtx, NamespaceStringOrUUID{dbName.toString(), collectionUuid}, MODE_IX);
 
-                // Ensure the collection exists and has not been dropped or dropped
-                // and recreated
-                uassert(ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist,
+                    LOGV2_DEBUG(6777800,
+                                1,
+                                "Starting batch deletion",
+                                "namespace"_attr = collection.getNss(),
+                                "collectionUUID"_attr = collectionUuid,
+                                "range"_attr = redact(range.toString()),
+                                "numDocsToRemovePerBatch"_attr = numDocsToRemovePerBatch,
+                                "delayBetweenBatches"_attr = delayBetweenBatches);
+
+                    numDeleted = uassertStatusOK(deleteNextBatch(opCtx,
+                                                                 collection.getCollection(),
+                                                                 keyPattern,
+                                                                 range,
+                                                                 numDocsToRemovePerBatch));
+
+                    return collection.getNss();
+                } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                    // Throw specific error code that stops range deletions in case of errors
+                    uasserted(
+                        ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist,
                         "Collection has been dropped since enqueuing this range "
-                        "deletion task. No need to delete documents.",
-                        !collectionUuidHasChanged(nss, collection.getCollection(), collectionUuid));
-
-                markRangeDeletionTaskAsProcessing(opCtx, migrationId);
-
-                numDeleted = uassertStatusOK(deleteNextBatch(
-                    opCtx, collection.getCollection(), keyPattern, range, numDocsToRemovePerBatch));
-
-                migrationutil::persistUpdatedNumOrphans(
-                    opCtx, migrationId, collectionUuid, -numDeleted);
-
-                if (MONGO_unlikely(hangAfterDoingDeletion.shouldFail())) {
-                    hangAfterDoingDeletion.pauseWhileSet(opCtx);
+                        "deletion task. No need to delete documents.");
                 }
+            }();
+
+            migrationutil::persistUpdatedNumOrphans(
+                opCtx, migrationId, collectionUuid, -numDeleted);
+
+            if (MONGO_unlikely(hangAfterDoingDeletion.shouldFail())) {
+                hangAfterDoingDeletion.pauseWhileSet(opCtx);
             }
 
             LOGV2_DEBUG(23769,
