@@ -43,21 +43,11 @@ const docs = [
 assert.commandWorked(t.insert(docs));
 
 const runTest = (filter, expected) => {
-    try {
-        // Disable pipeline optimization because it is unclear if pipeline optimization is masking
-        // some bugs in ABT translation
-        assert.commandWorked(db.adminCommand(
-            {'configureFailPoint': 'disablePipelineOptimization', 'mode': 'alwaysOn'}));
-
-        const result = t.aggregate({$match: filter}).toArray();
-        assertArrayEq({
-            actual: result,
-            expected: expected,
-        });
-    } finally {
-        assert.commandWorked(
-            db.adminCommand({'configureFailPoint': 'disablePipelineOptimization', 'mode': 'off'}));
-    }
+    const result = t.aggregate({$match: filter}).toArray();
+    assertArrayEq({
+        actual: result,
+        expected: expected,
+    });
 };
 const tests = [
     // Number
@@ -130,7 +120,25 @@ const tests = [
 
 ];
 
-for (const testData of tests) {
-    runTest(testData.filter, testData.expected);
+const hasTestCommandsEnabled =
+    assert.commandWorked(db.adminCommand({getParameter: 1, enableTestCommands: 1}))
+        .enableTestCommands;
+try {
+    // Disable pipeline optimization because it is unclear if pipeline optimization is masking
+    // some bugs in ABT translation
+    if (hasTestCommandsEnabled) {
+        jsTestLog('Disabling pipeline optimization for type bracket queries');
+        assert.commandWorked(db.adminCommand(
+            {'configureFailPoint': 'disablePipelineOptimization', 'mode': 'alwaysOn'}));
+    }
+
+    for (const testData of tests) {
+        runTest(testData.filter, testData.expected);
+    }
+} finally {
+    if (hasTestCommandsEnabled) {
+        assert.commandWorked(
+            db.adminCommand({'configureFailPoint': 'disablePipelineOptimization', 'mode': 'off'}));
+    }
 }
 }());

@@ -1,9 +1,15 @@
+/**
+ * SERVER-20319 Min/MaxKey check type of singleton
+ *
+ * Make sure swapping min/max key's prototype doesn't blow things up.
+ *
+ * @tags: [
+ *  no_selinux,
+ *  ]
+ */
+
 (function() {
 "use strict";
-
-// SERVER-20319 Min/MaxKey check type of singleton
-//
-// make sure swapping min/max key's prototype doesn't blow things up
 
 assert.throws(function() {
     MinKey().__proto__.singleton = 1000;
