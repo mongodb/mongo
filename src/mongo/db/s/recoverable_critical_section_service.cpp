@@ -98,8 +98,6 @@ void RecoverableCriticalSectionService::acquireRecoverableCriticalSectionBlockWr
 
     {
         Lock::GlobalLock lk(opCtx, MODE_IX);
-        // TODO SERVER-68084 add the AutoGetCollectionViewMode::kViewsPermitted parameter to
-        // construct cCollLock.
         AutoGetCollection cCollLock(opCtx, nss, MODE_S);
 
         DBDirectClient dbClient(opCtx);
@@ -186,8 +184,6 @@ void RecoverableCriticalSectionService::promoteRecoverableCriticalSectionToBlock
     invariant(!opCtx->lockState()->isLocked());
 
     {
-        // TODO SERVER-68084 add the AutoGetCollectionViewMode::kViewsPermitted parameter to
-        // construct cCollLock.
         AutoGetCollection cCollLock(opCtx, nss, MODE_X);
 
         DBDirectClient dbClient(opCtx);
@@ -288,8 +284,6 @@ void RecoverableCriticalSectionService::releaseRecoverableCriticalSection(
     invariant(!opCtx->lockState()->isLocked());
 
     {
-        // TODO SERVER-68084 add the AutoGetCollectionViewMode::kViewsPermitted parameter to
-        // construct cCollLock.
         AutoGetCollection collLock(opCtx, nss, MODE_X);
 
         DBDirectClient dbClient(opCtx);

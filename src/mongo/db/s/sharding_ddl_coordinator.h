@@ -87,6 +87,17 @@ public:
         return _completionPromise.getFuture();
     }
 
+    const NamespaceString& originalNss() const {
+        return _coordId.getNss();
+    }
+
+    const NamespaceString& nss() const {
+        if (const auto& bucketNss = metadata().getBucketNss()) {
+            return bucketNss.get();
+        }
+        return originalNss();
+    }
+
     DDLCoordinatorTypeEnum operationType() const {
         return _coordId.getOperationType();
     }
@@ -101,17 +112,6 @@ public:
     }
 
 protected:
-    const NamespaceString& originalNss() const {
-        return _coordId.getNss();
-    }
-
-    virtual const NamespaceString& nss() const {
-        if (const auto& bucketNss = metadata().getBucketNss()) {
-            return bucketNss.get();
-        }
-        return originalNss();
-    }
-
     virtual std::vector<StringData> _acquireAdditionalLocks(OperationContext* opCtx) {
         return {};
     };
