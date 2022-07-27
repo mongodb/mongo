@@ -719,7 +719,7 @@ env.Library(
         "txn_cmds.idl",
         "txn_two_phase_commit_cmds.idl",
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/idl/idl_parser',
