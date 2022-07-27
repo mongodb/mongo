@@ -45,7 +45,7 @@ const nonTestClusterParametersDefault = [
             expireAfterSeconds: "off",
         },
     },
-    {_id: "changeStreams", enabled: false, expireAfterSeconds: NumberLong(0)}
+    {_id: "changeStreams", expireAfterSeconds: NumberLong(3600)}
 ];
 const clusterParametersDefault =
     testOnlyClusterParametersDefault.concat(nonTestClusterParametersDefault);
@@ -73,7 +73,6 @@ const nonTestClusterParametersInsert = [
     },
     {
         _id: "changeStreams",
-        enabled: true,
         expireAfterSeconds: 30,
     }
 ];
@@ -101,7 +100,7 @@ const nonTestClusterParametersUpdate = [
             expireAfterSeconds: "off",
         },
     },
-    {_id: "changeStreams", enabled: false, expireAfterSeconds: NumberLong(0)}
+    {_id: "changeStreams", expireAfterSeconds: NumberLong(10)}
 ];
 const clusterParametersUpdate =
     testOnlyClusterParametersUpdate.concat(nonTestClusterParametersUpdate);

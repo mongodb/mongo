@@ -38,23 +38,9 @@ namespace mongo {
 
 Status validateChangeStreamsClusterParameter(
     const ChangeStreamsClusterParameterStorage& clusterParameter) {
-    LOGV2_DEBUG(6594801,
-                1,
-                "Validating change streams cluster parameter",
-                "enabled"_attr = clusterParameter.getEnabled(),
-                "expireAfterSeconds"_attr = clusterParameter.getExpireAfterSeconds());
-    if (clusterParameter.getEnabled()) {
-        if (clusterParameter.getExpireAfterSeconds() <= 0) {
-            return Status(ErrorCodes::BadValue,
-                          "Expected a positive integer for 'expireAfterSeconds' field if 'enabled' "
-                          "field is true");
-        }
-    } else {
-        if (clusterParameter.getExpireAfterSeconds() != 0) {
-            return Status(
-                ErrorCodes::BadValue,
-                "Expected a zero value for 'expireAfterSeconds' if 'enabled' field is false");
-        }
+    if (clusterParameter.getExpireAfterSeconds() <= 0) {
+        return Status(ErrorCodes::BadValue,
+                      "Expected a positive integer for 'expireAfterSeconds' field");
     }
     return Status::OK();
 }

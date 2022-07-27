@@ -15,94 +15,57 @@
 // expected response.
 function assertGetResponse(db, expectedChangeStreamParam) {
     const response = assert.commandWorked(db.runCommand({getClusterParameter: "changeStreams"}));
-    const enabled = response.clusterParameters[0].enabled;
-    assert.eq(enabled, expectedChangeStreamParam.enabled, response);
-    if (enabled) {
-        // TODO SERVER-67145: For some reason the default 'expireAfterSeconds' is not serialized in
-        // mongoS.
-        assert.eq(response.clusterParameters[0].expireAfterSeconds,
-                  expectedChangeStreamParam.expireAfterSeconds,
-                  response);
-    }
+    assert.eq(response.clusterParameters[0].expireAfterSeconds,
+              expectedChangeStreamParam.expireAfterSeconds,
+              response);
 }
 
 // Tests the 'changeStreams' cluster-wide configuration parameter with the 'admin' database.
 function testWithAdminDB(conn) {
     const adminDB = conn.getDB("admin");
 
-    // Change streams are initialy disabled.
-    assertGetResponse(adminDB, {enabled: false, expireAfterSeconds: NumberLong(0)});
-
-    // TODO SERVER-67293: Make 'enabled' field requiered; setting 'changeStreams' parameter without
-    // 'enabled' field should fail.
-    // TODO SERVER-67146: The expected error on missing 'enabled' field should be 'BadValue' or
-    // 'InvaludClusterParameter'.
-
-    // Invalid string value for the 'enabled' parameter should fail.
-    assert.commandFailedWithCode(
-        adminDB.runCommand({setClusterParameter: {changeStreams: {enabled: "yes"}}}),
-        ErrorCodes.TypeMismatch);
-
-    // Enabling change streams without 'expireAfterSeconds' should fail.
-    assert.commandFailedWithCode(
-        adminDB.runCommand({setClusterParameter: {changeStreams: {enabled: true}}}),
-        ErrorCodes.BadValue);
-
     // Invalid string value for the 'expireAfterSeconds' parameter should fail.
     assert.commandFailedWithCode(
-        adminDB.runCommand(
-            {setClusterParameter: {changeStreams: {enabled: true, expireAfterSeconds: "off"}}}),
+        adminDB.runCommand({setClusterParameter: {changeStreams: {expireAfterSeconds: "off"}}}),
         ErrorCodes.TypeMismatch);
 
     // A negative value of 'expireAfterSeconds' should fail.
-    assert.commandFailedWithCode(adminDB.runCommand({
-        setClusterParameter: {changeStreams: {enabled: true, expireAfterSeconds: NumberLong(-1)}}
-    }),
-                                 ErrorCodes.BadValue);
+    assert.commandFailedWithCode(
+        adminDB.runCommand(
+            {setClusterParameter: {changeStreams: {expireAfterSeconds: NumberLong(-1)}}}),
+        ErrorCodes.BadValue);
 
     // A zero value of 'expireAfterSeconds' should fail.
-    assert.commandFailedWithCode(adminDB.runCommand({
-        setClusterParameter: {changeStreams: {enabled: true, expireAfterSeconds: NumberLong(0)}}
-    }),
-                                 ErrorCodes.BadValue);
+    assert.commandFailedWithCode(
+        adminDB.runCommand(
+            {setClusterParameter: {changeStreams: {expireAfterSeconds: NumberLong(0)}}}),
+        ErrorCodes.BadValue);
 
-    // Enabling change streams with success.
-    assert.commandWorked(adminDB.runCommand({
-        setClusterParameter: {changeStreams: {enabled: true, expireAfterSeconds: NumberLong(3600)}}
-    }));
-    assertGetResponse(adminDB, {enabled: true, expireAfterSeconds: NumberLong(3600)});
+    // A positive value of 'expireAfterSeconds' should succeed.
+    assert.commandWorked(adminDB.runCommand(
+        {setClusterParameter: {changeStreams: {expireAfterSeconds: NumberLong(36)}}}));
+    assertGetResponse(adminDB, {expireAfterSeconds: NumberLong(36)});
 
-    // Modifying expireAfterSeconds while enabled should succeed.
-    assert.commandWorked(adminDB.runCommand({
-        setClusterParameter: {changeStreams: {enabled: true, expireAfterSeconds: NumberLong(100)}}
-    }));
-    assertGetResponse(adminDB, {enabled: true, expireAfterSeconds: NumberLong(100)});
+    // An empty parameter to 'changeStreams' cluster parameter should reset the 'expireAfterSeconds'
+    // to the default value.
+    // TODO SERVER-67145 uncomment this code.
+    // assert.commandWorked(adminDB.runCommand({setClusterParameter: {changeStreams: {}}}));
+    // assertGetResponse(adminDB, {expireAfterSeconds: NumberLong(3600)});
 
-    // Disabling with (non-zero) 'expireAfterSeconds' should fail.
-    assert.commandFailedWithCode(adminDB.runCommand({
-        setClusterParameter: {changeStreams: {enabled: false, expireAfterSeconds: NumberLong(1)}}
-    }),
-                                 ErrorCodes.BadValue);
-
-    // Disabling without 'expireAfterSeconds' should succeed.
-    assert.commandWorked(
-        adminDB.runCommand({setClusterParameter: {changeStreams: {enabled: false}}}));
-    assertGetResponse(adminDB, {enabled: false, expireAfterSeconds: NumberLong(0)});
-
-    // Disabling again should succeed.
-    assert.commandWorked(
-        adminDB.runCommand({setClusterParameter: {changeStreams: {enabled: false}}}));
-    assertGetResponse(adminDB, {enabled: false, expireAfterSeconds: NumberLong(0)});
+    // Modifying expireAfterSeconds should succeed.
+    assert.commandWorked(adminDB.runCommand(
+        {setClusterParameter: {changeStreams: {expireAfterSeconds: NumberLong(100)}}}));
+    assertGetResponse(adminDB, {expireAfterSeconds: NumberLong(100)});
 }
 
 function testWithoutAdminDB(conn) {
     const db = conn.getDB(jsTestName());
     assert.commandFailedWithCode(db.runCommand({getClusterParameter: "changeStreams"}),
                                  ErrorCodes.Unauthorized);
-    assert.commandFailedWithCode(db.runCommand({
-        setClusterParameter: {changeStreams: {enabled: true, expireAfterSeconds: NumberLong(3600)}}
-    }),
-                                 ErrorCodes.Unauthorized);
+    assert.commandFailedWithCode(
+        db.runCommand(
+            {setClusterParameter: {changeStreams: {expireAfterSeconds: NumberLong(3600)}}}),
+        ErrorCodes.Unauthorized);
 }
 
 // Tests the set and get change streams parameter on the replica-set.
@@ -132,11 +95,11 @@ function testWithoutAdminDB(conn) {
 
     // Test that setClusterParameter cannot be issued directly on shards in the sharded cluster,
     // while getClusterParameter can.
-    assert.commandFailedWithCode(adminDB.runCommand({
-        setClusterParameter: {changeStreams: {enabled: true, expireAfterSeconds: NumberLong(3600)}}
-    }),
-                                 ErrorCodes.NotImplemented);
-    assertGetResponse(adminDB, {enabled: false, expireAfterSeconds: NumberLong(0)});
+    assert.commandFailedWithCode(
+        adminDB.runCommand(
+            {setClusterParameter: {changeStreams: {expireAfterSeconds: NumberLong(40)}}}),
+        ErrorCodes.NotImplemented);
+    assertGetResponse(adminDB, {expireAfterSeconds: NumberLong(3600)});
 
     // Run the set and get commands on the mongoS.
     testWithAdminDB(st.s);

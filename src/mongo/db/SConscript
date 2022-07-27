@@ -2596,7 +2596,6 @@ if wiredtiger:
         source=[
             'cancelable_operation_context_test.cpp',
             'catalog_raii_test.cpp',
-            'change_streams_cluster_parameter_test.cpp',
             'client_strand_test.cpp',
             'client_context_test.cpp',
             'collection_index_usage_tracker_test.cpp',

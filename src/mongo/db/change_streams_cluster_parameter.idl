@@ -43,16 +43,12 @@ structs:
     chained_structs:
       ClusterServerParameter: clusterServerParameter
     fields:
-      enabled:
-        description: "Enable or disable change streams."
-        type: bool
-        default: false
       expireAfterSeconds:
         description: "The number of seconds to retain the change events. This value will be a
         non-zero positive value if the change stream is enabled and a zero value if the change
         stream is disabled."
         type: safeInt64
-        default: 0
+        default: 60 * 60
 
 server_parameters:
   changeStreams:
