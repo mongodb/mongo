@@ -116,17 +116,16 @@ function runTest(conn, enabled, rst = undefined) {
         // Negative test, logMessage requires logMessage privilege on cluster (not granted)
         assert.commandFailed(tokenDB.runCommand({logMessage: 'This is a test'}));
 
-        // CRUD operations not yet supported in multitenancy using security token.
-        assert.writeError(tokenConn.getDB('test').coll1.insert({x: 1}));
+        assert.commandWorked(tokenConn.getDB('test').coll1.insert({x: 1}));
 
         const log = checkLog.getGlobalLog(conn).map((l) => JSON.parse(l));
 
-        // We successfully dispatched 2 commands as a token auth'd user.
-        // The failed commands did not dispatch because they are forbidden in multitenancy.
-        // We should see two post-operation logout events.
+        // We successfully dispatched 3 commands as a token auth'd user.
+        // The failed command did not dispatch because they are forbidden in multitenancy.
+        // We should see three post-operation logout events.
         const logoutMessages = log.filter((l) => (l.id === kLogoutMessageID));
         assert.eq(logoutMessages.length,
-                  2,
+                  3,
                   'Unexpected number of logout messages: ' + tojson(logoutMessages));
 
         // None of those authorization sessions should remain active into their next requests.

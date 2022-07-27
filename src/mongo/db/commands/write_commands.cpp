@@ -497,6 +497,10 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
     void snipForLogging(mutablebson::Document* cmdObj) const final {
         redactTooLongLog(cmdObj, "documents");
     }
@@ -1384,6 +1388,10 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
     void snipForLogging(mutablebson::Document* cmdObj) const final {
         redactTooLongLog(cmdObj, "updates");
     }
@@ -1628,6 +1636,10 @@ class CmdDelete final : public write_ops::DeleteCmdVersion1Gen<CmdDelete> {
 public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kNever;
+    }
+
+    bool allowedWithSecurityToken() const final {
+        return true;
     }
 
     void snipForLogging(mutablebson::Document* cmdObj) const final {

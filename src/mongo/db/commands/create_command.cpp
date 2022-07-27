@@ -81,6 +81,10 @@ public:
         return false;
     }
 
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
     bool collectsResourceConsumptionMetrics() const final {
         return true;
     }

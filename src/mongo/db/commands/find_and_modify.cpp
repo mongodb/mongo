@@ -288,6 +288,10 @@ public:
         return true;
     }
 
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
     class Invocation final : public InvocationBaseGen {
     public:
         using InvocationBaseGen::InvocationBaseGen;

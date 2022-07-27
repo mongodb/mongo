@@ -182,6 +182,9 @@ public:
         return AllowedOnSecondary::kOptIn;
     }
 
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
     bool maintenanceOk() const override {
         return false;
     }
