@@ -433,4 +433,42 @@ TEST(BSONValidateFast, MaxNestingDepth) {
     Status status = validateBSON(tooDeepNesting.objdata(), tooDeepNesting.objsize());
     ASSERT_EQ(status.code(), ErrorCodes::Overflow);
 }
+
+TEST(BSONValidateExtended, DeprecatedTypes) {
+    BSONObj obj = BSON("a" << BSONUndefined);
+    Status status = validateBSON(obj.objdata(), obj.objsize(), BSONValidateMode::kExtended);
+    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+    status = validateBSON(obj.objdata(), obj.objsize(), BSONValidateMode::kFull);
+    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+
+    obj = BSON("b" << BSONDBRef("db", OID("dbdbdbdbdbdbdbdbdbdbdbdb")));
+    status = validateBSON(obj.objdata(), obj.objsize(), BSONValidateMode::kExtended);
+    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+    status = validateBSON(obj.objdata(), obj.objsize(), BSONValidateMode::kFull);
+    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+
+    obj = BSON("c" << BSONSymbol("symbol"));
+    status = validateBSON(obj.objdata(), obj.objsize(), BSONValidateMode::kExtended);
+    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+    status = validateBSON(obj.objdata(), obj.objsize(), BSONValidateMode::kFull);
+    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+
+    obj = BSON("d" << BSONCodeWScope("(function(){})();", BSON("a" << 1)));
+    status = validateBSON(obj.objdata(), obj.objsize(), BSONValidateMode::kExtended);
+    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+    status = validateBSON(obj.objdata(), obj.objsize(), BSONValidateMode::kFull);
+    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+
+    obj = BSON("e" << BSONBinData("", 0, ByteArrayDeprecated));
+    status = validateBSON(obj.objdata(), obj.objsize(), BSONValidateMode::kExtended);
+    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+    status = validateBSON(obj.objdata(), obj.objsize(), BSONValidateMode::kFull);
+    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+
+    obj = BSON("f" << BSONBinData("", 0, bdtUUID));
+    status = validateBSON(obj.objdata(), obj.objsize(), BSONValidateMode::kExtended);
+    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+    status = validateBSON(obj.objdata(), obj.objsize(), BSONValidateMode::kFull);
+    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+}
 }  // namespace

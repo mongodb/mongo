@@ -82,6 +82,7 @@ static constexpr ValidationStyle kTypeInfoTable alignas(32)[32] = {
 MONGO_STATIC_ASSERT(sizeof(kTypeInfoTable) == 32);
 
 constexpr ErrorCodes::Error InvalidBSON = ErrorCodes::InvalidBSON;
+constexpr ErrorCodes::Error NonConformantBSON = ErrorCodes::NonConformantBSON;
 
 class DefaultValidator {
 public:
@@ -95,7 +96,24 @@ public:
 class ExtendedValidator {
 public:
     void checkNonConformantElem(const char* ptr, uint8_t type) {
-        // TODO: Add checks for different BSON types.
+        switch (type) {
+            case BSONType::Undefined:
+            case BSONType::DBRef:
+            case BSONType::Symbol:
+            case BSONType::CodeWScope:
+                uasserted(NonConformantBSON, fmt::format("Use of deprecated BSON type {}", type));
+                break;
+            case BSONType::BinData:
+                uint8_t subtype =
+                    ConstDataView(ptr + sizeof(uint32_t)).read<LittleEndian<uint8_t>>();
+                switch (subtype) {
+                    case BinDataType::ByteArrayDeprecated:
+                    case BinDataType::bdtUUID:
+                        uasserted(
+                            NonConformantBSON,
+                            fmt::format("Use of deprecated BSON binary data subtype {}", subtype));
+                }
+        }
     }
 
     void checkUTF8Char() {}
@@ -103,10 +121,10 @@ public:
     void checkDuplicateFieldName() {}
 };
 
-class FullValidator : public ExtendedValidator {
+class FullValidator : private ExtendedValidator {
 public:
     void checkNonConformantElem(const char* ptr, uint8_t type) {
-        // TODO: Add checks for different BSON types.
+        ExtendedValidator::checkNonConformantElem(ptr, type);
     }
 
     void checkUTF8Char() {}

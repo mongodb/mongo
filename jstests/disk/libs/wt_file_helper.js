@@ -244,11 +244,12 @@ let truncateUriAndRestartMongod = function(uri, conn, mongodOptions) {
  * Stops the given mongod, dumps the table with the uri, modifies the content, and loads it back to
  * the table.
  */
+let count = 0;
 let rewriteTable = function(uri, conn, modifyData) {
     MongoRunner.stopMongod(conn, null, {skipValidation: true});
     const separator = _isWindows() ? '\\' : '/';
     const tempDumpFile = conn.dbpath + separator + "temp_dump";
-    const newTableFile = conn.dbpath + separator + "new_table_file";
+    const newTableFile = conn.dbpath + separator + "new_table_file" + count++;
     runWiredTigerTool("-h",
                       conn.dbpath,
                       "-r",
@@ -288,4 +289,21 @@ let insertDocDuplicateFieldName = function(coll, uri, conn, numDocs) {
         }
     };
     rewriteTable(uri, conn, makeDuplicateFieldNames);
+};
+
+let insertDocSymbolField = function(coll, uri, conn, numDocs) {
+    for (let i = 0; i < numDocs; ++i) {
+        coll.insert({a: "aaaaaaa"});
+    }
+    let makeSymbolField = function(lines) {
+        // The offset of the type of field 'a' in the hex string dumped by wt tool.
+        const offsetToFieldAType = 43;
+        // Each record takes two lines with a key and a value. We will only modify the values.
+        for (let i = wtHeaderLines; i < lines.length; i += 2) {
+            // Switch the field type from string to symbol.
+            lines[i] = lines[i].substring(0, offsetToFieldAType) + "e" +
+                lines[i].substring(offsetToFieldAType + 1);
+        }
+    };
+    rewriteTable(uri, conn, makeSymbolField);
 };
