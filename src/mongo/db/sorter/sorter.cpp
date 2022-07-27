@@ -1465,10 +1465,11 @@ std::pair<Key, Value> BoundedSorter<Key, Value, Comparator, BoundMaker>::next() 
         _heap.pop();
 
         auto memUsage = result.first.memUsageForSorter() + result.second.memUsageForSorter();
-        tassert(6409301,
-                "Memory usage for BoundedSorter is invalid",
-                memUsage >= 0 && static_cast<size_t>(memUsage) <= _memUsed);
-        _memUsed -= memUsage;
+        if (static_cast<int64_t>(memUsage) > static_cast<int64_t>(_memUsed)) {
+            _memUsed = 0;
+        } else {
+            _memUsed -= memUsage;
+        }
     };
 
     auto pullFromSpilled = [this, &result]() {
