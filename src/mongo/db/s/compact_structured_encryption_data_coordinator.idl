@@ -47,7 +47,7 @@ enums:
 structs:
     CompactStructuredEncryptionDataState:
         description: "Represents the state of the compactStructuredEncryptionData pipeline"
-        strict: true
+        strict: false
         chained_structs:
             ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
         fields:
