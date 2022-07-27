@@ -4,7 +4,6 @@
  *  -- SERVER-11983: Don't create _id field on capped updates
  * @tags: [
  *   requires_capped,
- *   requires_fcv_53,
  *   uses_testing_only_commands,
  *   # godinsert and can't run under replication
  *   assumes_standalone_mongod,

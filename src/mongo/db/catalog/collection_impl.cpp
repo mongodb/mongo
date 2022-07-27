@@ -1426,25 +1426,6 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
     if (!oldId.eoo() && SimpleBSONElementComparator::kInstance.evaluate(oldId != newDoc["_id"]))
         uasserted(13596, "in Collection::updateDocument _id mismatch");
 
-    // TODO(SERVER-62496): Remove this block once kLastLTS is 6.0. As of 5.3, changing the size of
-    // a document in a capped collection is permitted.
-    // The MMAPv1 storage engine implements capped collections in a way that does not allow records
-    // to grow beyond their original size. If MMAPv1 part of a replicaset with storage engines that
-    // do not have this limitation, replication could result in errors, so it is necessary to set a
-    // uniform rule here. Similarly, it is not sufficient to disallow growing records, because this
-    // happens when secondaries roll back an update shrunk a record. Exactly replicating legacy
-    // MMAPv1 behavior would require padding shrunk documents on all storage engines. Instead forbid
-    // all size changes.
-    const auto oldSize = oldDoc.value().objsize();
-    if (_shared->_isCapped && oldSize != newDoc.objsize() &&
-        (!serverGlobalParams.featureCompatibility.isVersionInitialized() ||
-         serverGlobalParams.featureCompatibility.isLessThan(
-             multiversion::FeatureCompatibilityVersion::kVersion_5_3))) {
-        uasserted(ErrorCodes::CannotGrowDocumentInCappedNamespace,
-                  str::stream() << "Cannot change the size of a document in a capped collection: "
-                                << oldSize << " != " << newDoc.objsize());
-    }
-
     // The preImageDoc may not be boost::none if this update was a retryable findAndModify or if
     // the update may have changed the shard key. For non-in-place updates we always set the
     // preImageDoc here to an owned copy of the pre-image.
