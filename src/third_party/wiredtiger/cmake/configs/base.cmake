@@ -12,17 +12,9 @@ set(default_enable_tcmalloc ${HAVE_LIBTCMALLOC})
 set(default_enable_debug_info ON)
 set(default_enable_static OFF)
 set(default_enable_shared ON)
-set(default_have_unittest ON)
 
 if("${CMAKE_BUILD_TYPE}" MATCHES "^(Release|RelWithDebInfo)$")
     set(default_have_diagnostics OFF)
-endif()
-
-# Disable unittests when building MSan, reports an use-of-uninitalized-value error due
-# libstdc++ not being built with the sanitizer.
-# See https://github.com/catchorg/Catch2/issues/899.
-if("${CMAKE_BUILD_TYPE}" STREQUAL "MSan")
-    set(default_have_unittest OFF)
 endif()
 
 # Enable python if we have the minimum version.
@@ -118,8 +110,8 @@ config_bool(
 
 config_bool(
     HAVE_UNITTEST
-    "Enable WiredTiger unit tests"
-    DEFAULT ${default_have_unittest}
+    "Enable C++ Catch2 based WiredTiger unit tests"
+    DEFAULT OFF
 )
 
 config_bool(

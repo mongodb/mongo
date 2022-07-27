@@ -99,7 +99,7 @@ There are a number of additional configuration options you can pass to the CMake
 * `-DENABLE_SODIUM=1` : Build the libsodium encryptor extension
 * `-DHAVE_DIAGNOSTIC=1` : Enable WiredTiger diagnostics (enabled by default for non Release build types)
 * `-DHAVE_REF_TRACK=1` : Enable WiredTiger to track recent state transitions for WT_REF structures (always enabled in diagnostic build)
-* `-DHAVE_UNITTEST=1` : Enable WiredTiger unit tests (enabled by default)
+* `-DHAVE_UNITTEST=1` : Enable WiredTiger C++ Catch2 based unit tests
 * `-DHAVE_ATTACH=1` : Enable to pause for debugger attach on failure
 * `-DENABLE_PYTHON=1` : Compile the python API (enabled by default if python is available)
 * `-DCMAKE_INSTALL_PREFIX=<path-to-install-directory>` : Path to install directory

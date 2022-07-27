@@ -102,7 +102,6 @@ functions:
 
         # Define common config flags for the tasks to make it cleaner when configuring the tasks.
         # Note that the config flags are resolved prior to changing to cmake_build directory.
-        # Unittest is enabled by default in cmake but disabled here because it causes failures in the s_all processing.
         DEFINED_EVERGREEN_CONFIG_FLAGS="${CMAKE_BUILD_TYPE|} \
           ${CMAKE_INSTALL_PREFIX|} \
           ${CMAKE_PREFIX_PATH|} \
@@ -114,7 +113,7 @@ functions:
           ${HAVE_BUILTIN_EXTENSION_ZLIB|} \
           ${HAVE_BUILTIN_EXTENSION_ZSTD|} \
           ${HAVE_FTRUNCATE|} \
-          ${HAVE_UNITTEST|-DHAVE_UNITTEST=0} \
+          ${HAVE_UNITTEST} \
           ${NON_BARRIER_DIAGNOSTIC_YIELDS|} \
           ${HAVE_DIAGNOSTIC|} \
           ${GNU_C_VERSION|} \
