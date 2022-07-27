@@ -329,8 +329,8 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
     auto criticalSectionWithoutCatchupTimer = std::make_shared<Timer>();
 
     const bool shouldRemoveStateDocumentOnRecipient = [&]() {
-        stdx::lock_guard<Latch> lg(_mutex);
         auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+        stdx::lock_guard<Latch> lg(_mutex);
         return serverless::shouldRemoveStateDocumentOnRecipient(opCtx.get(), _stateDoc);
     }();
 
