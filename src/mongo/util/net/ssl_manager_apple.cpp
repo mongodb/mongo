@@ -1889,8 +1889,6 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("EndStartupOptionHandling"))
     kMongoDBRolesOID = ::CFStringCreateWithCString(
         nullptr, mongodbRolesOID.identifier.c_str(), ::kCFStringEncodingUTF8);
 
-    // TODO SERVER-67419 This retry logic is a workaround; reconsider this approach after
-    // investigation.
     constexpr int kMaxRetries = 10;
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
         for (int i = 0; i < kMaxRetries; i++) {
