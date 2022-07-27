@@ -254,6 +254,36 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "analyze",
+          command: {analyze: "x"},
+          setup: function(db) {
+              assert.commandWorked(db.x.insert({}));
+          },
+          teardown: function(db) {
+              db.x.drop();
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: roles_dbAdmin,
+                privileges: [{
+                    resource: {db: firstDbName, collection: "x"},
+                    actions: ["analyze"]
+                }],
+                expectFail: true
+              },
+              {
+                runOnDb: secondDbName,
+                roles: roles_dbAdminAny,
+                privileges: [{
+                    resource: {db: secondDbName, collection: "x"},
+                    actions: ["analyze"]
+                }],
+                expectFail: true
+              },
+          ]
+        },
+        {
           testname: "clusterAbortTransaction",
           command: {clusterAbortTransaction: 1},
           skipSharded: true,

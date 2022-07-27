@@ -152,6 +152,7 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
 
     // DB admin role
     dbAdminRoleActions
+        << ActionType::analyze
         << ActionType::bypassDocumentValidation
         << ActionType::collMod
         << ActionType::collStats  // clusterMonitor gets this also

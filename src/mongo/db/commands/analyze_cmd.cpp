@@ -29,6 +29,7 @@
 
 #include <string>
 
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/query/analyze_command_gen.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
@@ -76,7 +77,12 @@ public:
 
     private:
         void doCheckAuthorization(OperationContext* opCtx) const override {
-            // TODO SERVER-67656
+            auto* authzSession = AuthorizationSession::get(opCtx->getClient());
+            const NamespaceString& ns = request().getNamespace();
+
+            uassert(ErrorCodes::Unauthorized,
+                    str::stream() << "Not authorized to call analyze on collection " << ns,
+                    authzSession->isAuthorizedForActionsOnNamespace(ns, ActionType::analyze));
         }
     };
 

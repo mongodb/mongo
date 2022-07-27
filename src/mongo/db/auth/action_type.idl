@@ -45,6 +45,7 @@ enums:
         values:
            addShard :  "addShard"
            advanceClusterTime :  "advanceClusterTime"
+           analyze :  "analyze"
            anyAction :  "anyAction"         # Special ActionType that represents *all* actions
            appendOplogNote :  "appendOplogNote"
            applicationMessage :  "applicationMessage"
