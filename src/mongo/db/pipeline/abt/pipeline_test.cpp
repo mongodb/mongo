@@ -1850,11 +1850,8 @@ TEST(ABTTranslate, RangeIndex) {
                                  metadata,
                                  DebugInfo::kDefaultForTests);
 
-    // Demonstrate we can get an intersection plan, even though it might not be the best one under
-    // the heuristic CE.
-    phaseManager.getHints()._disableScan = true;
-
     ABT optimized = std::move(translated);
+    phaseManager.getHints()._disableScan = true;
     ASSERT_TRUE(phaseManager.optimize(optimized));
 
     ASSERT_EXPLAIN_V2(
@@ -2362,7 +2359,6 @@ TEST(ABTTranslate, PartialIndex) {
             make<Variable>(scanProjName)),
         true /*isFilterContext*/);
     ASSERT_TRUE(conversionResult.has_value());
-    ASSERT_FALSE(conversionResult->_hasEmptyInterval);
     ASSERT_FALSE(conversionResult->_retainPredicate);
 
     Metadata metadata = {
@@ -2433,7 +2429,6 @@ TEST(ABTTranslate, PartialIndexNegative) {
             make<Variable>(scanProjName)),
         true /*isFilterContext*/);
     ASSERT_TRUE(conversionResult.has_value());
-    ASSERT_FALSE(conversionResult->_hasEmptyInterval);
     ASSERT_FALSE(conversionResult->_retainPredicate);
 
     Metadata metadata = {

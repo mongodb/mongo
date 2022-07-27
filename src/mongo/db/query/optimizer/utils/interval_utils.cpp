@@ -266,7 +266,11 @@ boost::optional<IntervalReqExpr::Node> intersectDNFIntervals(
             auto conjunction =
                 IntervalReqExpr::make<IntervalReqExpr::Conjunction>(IntervalReqExpr::makeSeq(
                     IntervalReqExpr::make<IntervalReqExpr::Atom>(std::move(interval))));
-            disjuncts.emplace_back(conjunction);
+
+            // Remove redundant conjunctions.
+            if (std::find(disjuncts.cbegin(), disjuncts.cend(), conjunction) == disjuncts.cend()) {
+                disjuncts.emplace_back(conjunction);
+            }
         }
     }
 

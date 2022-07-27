@@ -281,17 +281,17 @@ PartialSchemaKeyCE& CardinalityEstimate::getPartialSchemaKeyCEMap() {
 IndexingAvailability::IndexingAvailability(GroupIdType scanGroupId,
                                            ProjectionName scanProjection,
                                            std::string scanDefName,
-                                           const bool possiblyEqPredsOnly,
+                                           const bool eqPredsOnly,
                                            opt::unordered_set<std::string> satisfiedPartialIndexes)
     : _scanGroupId(scanGroupId),
       _scanProjection(std::move(scanProjection)),
       _scanDefName(std::move(scanDefName)),
-      _possiblyEqPredsOnly(possiblyEqPredsOnly),
+      _eqPredsOnly(eqPredsOnly),
       _satisfiedPartialIndexes(std::move(satisfiedPartialIndexes)) {}
 
 bool IndexingAvailability::operator==(const IndexingAvailability& other) const {
     return _scanGroupId == other._scanGroupId && _scanProjection == other._scanProjection &&
-        _scanDefName == other._scanDefName && _possiblyEqPredsOnly == other._possiblyEqPredsOnly &&
+        _scanDefName == other._scanDefName && _eqPredsOnly == other._eqPredsOnly &&
         _satisfiedPartialIndexes == other._satisfiedPartialIndexes;
 }
 
@@ -315,12 +315,12 @@ opt::unordered_set<std::string>& IndexingAvailability::getSatisfiedPartialIndexe
     return _satisfiedPartialIndexes;
 }
 
-bool IndexingAvailability::getPossiblyEqPredsOnly() const {
-    return _possiblyEqPredsOnly;
+bool IndexingAvailability::getEqPredsOnly() const {
+    return _eqPredsOnly;
 }
 
-void IndexingAvailability::setPossiblyEqPredsOnly(const bool value) {
-    _possiblyEqPredsOnly = value;
+void IndexingAvailability::setEqPredsOnly(const bool value) {
+    _eqPredsOnly = value;
 }
 
 CollectionAvailability::CollectionAvailability(opt::unordered_set<std::string> scanDefSet)

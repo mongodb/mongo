@@ -158,9 +158,9 @@ IntervalReqExpr::Node& PartialSchemaRequirement::getIntervals() {
 /**
  * Helper class used to compare PartialSchemaKey objects.
  */
-class Path3WCompare {
+class IndexPath3WCompare {
 public:
-    Path3WCompare() {}
+    IndexPath3WCompare() {}
 
     int compareTags(const ABT& n, const ABT& other) {
         const auto t1 = n.tagOf();
@@ -194,10 +194,14 @@ public:
     }
 
     static int compare(const ABT& node, const ABT& other) {
-        Path3WCompare instance;
+        IndexPath3WCompare instance;
         return node.visit(instance, other);
     }
 };
+
+bool IndexPath3WComparator::operator()(const ABT& path1, const ABT& path2) const {
+    return IndexPath3WCompare::compare(path1, path2) < 0;
+}
 
 bool PartialSchemaKeyLessComparator::operator()(const PartialSchemaKey& k1,
                                                 const PartialSchemaKey& k2) const {
@@ -205,7 +209,7 @@ bool PartialSchemaKeyLessComparator::operator()(const PartialSchemaKey& k1,
     if (projCmp != 0) {
         return projCmp < 0;
     }
-    return Path3WCompare::compare(k1._path, k2._path) < 0;
+    return IndexPath3WCompare::compare(k1._path, k2._path) < 0;
 }
 
 ResidualRequirement::ResidualRequirement(PartialSchemaKey key,

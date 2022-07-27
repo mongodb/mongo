@@ -85,6 +85,7 @@ public:
     const DistributionAndPaths& getDistributionAndPaths() const;
 
     const PartialSchemaRequirements& getPartialReqMap() const;
+    PartialSchemaRequirements& getPartialReqMap();
 
 private:
     const IndexCollationSpec _collationSpec;
@@ -96,7 +97,7 @@ private:
     const DistributionAndPaths _distributionAndPaths;
 
     // Requirements map for partial filter expression.
-    const PartialSchemaRequirements _partialReqMap;
+    PartialSchemaRequirements _partialReqMap;
 };
 
 // Used to specify parameters to scan node, such as collection name, or file where collection is
@@ -121,6 +122,8 @@ public:
     const opt::unordered_map<std::string, IndexDefinition>& getIndexDefs() const;
     opt::unordered_map<std::string, IndexDefinition>& getIndexDefs();
 
+    const IndexPathSet& getNonMultiKeyPathSet() const;
+
     bool exists() const;
 
     CEType getCE() const;
@@ -133,6 +136,11 @@ private:
      * Indexes associated with this collection.
      */
     opt::unordered_map<std::string, IndexDefinition> _indexDefs;
+
+    /**
+     * Which index paths are NOT multi-key.
+     */
+    IndexPathSet _nonMultiKeyPathSet;
 
     /**
      * True if the collection exists.

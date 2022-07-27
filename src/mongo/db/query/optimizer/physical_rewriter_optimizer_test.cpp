@@ -221,7 +221,7 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
         "|   |       projections: \n"
         "|   |           p1\n"
         "|   |       indexingAvailability: \n"
-        "|   |           [groupId: 0, scanProjection: p1, scanDefName: test, possiblyEqPredsOnly]\n"
+        "|   |           [groupId: 0, scanProjection: p1, scanDefName: test, eqPredsOnly]\n"
         "|   |       collectionAvailability: \n"
         "|   |           test\n"
         "|   |       distributionAvailability: \n"
@@ -1016,7 +1016,7 @@ TEST(PhysRewriter, FilterIndexing2NonSarg) {
 
     ABT optimized = rootNode;
     ASSERT_TRUE(phaseManager.optimize(optimized));
-    ASSERT_BETWEEN(15, 20, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(10, 15, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Demonstrate non-sargable evaluation and filter are moved under the NLJ+seek,
     ASSERT_EXPLAIN_V2(
@@ -1100,7 +1100,7 @@ TEST(PhysRewriter, FilterIndexing3) {
 
     ABT optimized = std::move(rootNode);
     ASSERT_TRUE(phaseManager.optimize(optimized));
-    ASSERT_EQ(5, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_EQ(4, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // We dont need a Seek if we dont have multi-key paths.
     ASSERT_EXPLAIN_V2(
@@ -1268,7 +1268,7 @@ TEST(PhysRewriter, FilterIndexing4) {
     phaseManager.getHints()._disableHashJoinRIDIntersect = true;
 
     ASSERT_TRUE(phaseManager.optimize(optimized));
-    ASSERT_BETWEEN(65, 110, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(30, 50, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -1442,7 +1442,7 @@ TEST(PhysRewriter, FilterIndexing6) {
 
     ABT optimized = std::move(rootNode);
     ASSERT_TRUE(phaseManager.optimize(optimized));
-    ASSERT_BETWEEN(9, 15, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(5, 10, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // We can cover both fields with the index, and do not need a separate sort on "b".
     ASSERT_EXPLAIN_V2(
@@ -1611,6 +1611,7 @@ TEST(PhysRewriter, FilterIndexingVariable) {
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
+    phaseManager.getHints()._disableScan = true;
     ASSERT_TRUE(phaseManager.optimize(optimized));
     ASSERT_EQ(4, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
@@ -2392,7 +2393,7 @@ TEST(PhysRewriter, CompoundIndex1) {
 
     ABT optimized = rootNode;
     ASSERT_TRUE(phaseManager.optimize(optimized));
-    ASSERT_BETWEEN(60, 130, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(25, 35, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     const BSONObj& explainRoot = ExplainGenerator::explainBSONObj(optimized);
     ASSERT_BSON_PATH("\"BinaryJoin\"", explainRoot, "child.nodeType");
@@ -2480,7 +2481,7 @@ TEST(PhysRewriter, CompoundIndex2) {
     ABT optimized = rootNode;
 
     ASSERT_TRUE(phaseManager.optimize(optimized));
-    ASSERT_BETWEEN(100, 210, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(40, 60, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     const BSONObj& explainRoot = ExplainGenerator::explainBSONObj(optimized);
     ASSERT_BSON_PATH("\"BinaryJoin\"", explainRoot, "child.nodeType");
@@ -2566,6 +2567,7 @@ TEST(PhysRewriter, CompoundIndex3) {
     ASSERT_TRUE(phaseManager.optimize(optimized));
     ASSERT_BETWEEN(70, 130, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
+    // Demonstrate we have a merge join because we have point predicates.
     ASSERT_EXPLAIN_V2(
         "Root []\n"
         "|   |   projections: \n"
@@ -2674,19 +2676,49 @@ TEST(PhysRewriter, CompoundIndex4Negative) {
 
     ABT optimized = rootNode;
     ASSERT_TRUE(phaseManager.optimize(optimized));
-    ASSERT_BETWEEN(20, 30, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(5, 10, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Index intersection via merge join relies on the fact that the RIDs of equal keys are sorted.
     // Demonstrate that we do not get a merge join when the lookup keys on both intersected indexes
     // do not cover all field indexes. In this case there is no guarantee that the RIDs of all
     // matching keys will be sorted, and therefore they cannot be merge-joined.
-    const BSONObj& explainRoot = ExplainGenerator::explainBSONObj(optimized);
-    ASSERT_BSON_PATH("\"BinaryJoin\"", explainRoot, "child.nodeType");
-    ASSERT_BSON_PATH("\"Filter\"", explainRoot, "child.rightChild.nodeType");
-    ASSERT_BSON_PATH("\"LimitSkip\"", explainRoot, "child.rightChild.child.nodeType");
-    ASSERT_BSON_PATH("\"Seek\"", explainRoot, "child.rightChild.child.child.nodeType");
-    ASSERT_BSON_PATH("\"IndexScan\"", explainRoot, "child.leftChild.nodeType");
-    ASSERT_BSON_PATH("\"index1\"", explainRoot, "child.leftChild.indexDefName");
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       root\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
+        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   Filter []\n"
+        "|   |   EvalFilter []\n"
+        "|   |   |   Variable [pa]\n"
+        "|   |   PathCompare [Eq]\n"
+        "|   |   Const [1]\n"
+        "|   Evaluation []\n"
+        "|   |   BindBlock:\n"
+        "|   |       [pa]\n"
+        "|   |           EvalPath []\n"
+        "|   |           |   Variable [evalTemp_2]\n"
+        "|   |           PathIdentity []\n"
+        "|   LimitSkip []\n"
+        "|   |   limitSkip:\n"
+        "|   |       limit: 1\n"
+        "|   |       skip: 0\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': evalTemp_2}, c1]\n"
+        "|   |   BindBlock:\n"
+        "|   |       [evalTemp_2]\n"
+        "|   |           Source []\n"
+        "|   |       [root]\n"
+        "|   |           Source []\n"
+        "|   RefBlock: \n"
+        "|       Variable [rid_0]\n"
+        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index2, interval: {[Const "
+        "[2], Const [2]], [Const [minKey], Const [maxKey]]}]\n"
+        "    BindBlock:\n"
+        "        [rid_0]\n"
+        "            Source []\n",
+        optimized);
 }
 
 TEST(PhysRewriter, IndexBoundsIntersect) {
@@ -2705,19 +2737,14 @@ TEST(PhysRewriter, IndexBoundsIntersect) {
 
     ABT filterNode2 = make<FilterNode>(
         make<EvalFilter>(
-            make<PathComposeA>(
-                make<PathComposeM>(
-                    make<PathGet>(
-                        "a",
-                        make<PathTraverse>(make<PathCompare>(Operations::Gt, Constant::int64(70)),
-                                           PathTraverse::kSingleLevel)),
-                    make<PathGet>(
-                        "a",
-                        make<PathTraverse>(make<PathCompare>(Operations::Lt, Constant::int64(90)),
-                                           PathTraverse::kSingleLevel))),
+            make<PathComposeM>(
                 make<PathGet>(
                     "a",
-                    make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(100)),
+                    make<PathTraverse>(make<PathCompare>(Operations::Gt, Constant::int64(70)),
+                                       PathTraverse::kSingleLevel)),
+                make<PathGet>(
+                    "a",
+                    make<PathTraverse>(make<PathCompare>(Operations::Lt, Constant::int64(90)),
                                        PathTraverse::kSingleLevel))),
             make<Variable>("root")),
         std::move(filterNode1));
@@ -2733,93 +2760,44 @@ TEST(PhysRewriter, IndexBoundsIntersect) {
         {{{"c1",
            ScanDefinition{{},
                           {{"index1",
-                            IndexDefinition{{{makeIndexPath("a"), CollationOp::Ascending},
-                                             {makeIndexPath("b"), CollationOp::Ascending}},
+                            IndexDefinition{{{makeIndexPath("b"), CollationOp::Ascending},
+                                             {makeIndexPath("a"), CollationOp::Ascending}},
                                             true /*isMultiKey*/}}}}}}},
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
     ASSERT_TRUE(phaseManager.optimize(optimized));
-    ASSERT_BETWEEN(10, 15, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(30, 40, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
+    // Demonstrate that the predicates >70 and <90 are NOT combined into the same interval (70, 90).
     ASSERT_EXPLAIN_V2(
         "Root []\n"
         "|   |   projections: \n"
         "|   RefBlock: \n"
-        "Filter []\n"
-        "|   EvalFilter []\n"
-        "|   |   Variable [evalTemp_1]\n"
-        "|   PathCompare [Eq]\n"
-        "|   Const [1]\n"
-        "GroupBy []\n"
-        "|   |   groupings: \n"
-        "|   |       RefBlock: \n"
-        "|   |           Variable [rid_0]\n"
-        "|   aggregations: \n"
-        "|       [evalTemp_1]\n"
-        "|           FunctionCall [$first]\n"
-        "|           Variable [disjunction_0]\n"
-        "Union []\n"
+        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   Filter []\n"
+        "|   |   EvalFilter []\n"
+        "|   |   |   Variable [evalTemp_15]\n"
+        "|   |   PathTraverse [1]\n"
+        "|   |   PathCompare [Gt]\n"
+        "|   |   Const [70]\n"
+        "|   LimitSkip []\n"
+        "|   |   limitSkip:\n"
+        "|   |       limit: 1\n"
+        "|   |       skip: 0\n"
+        "|   Seek [ridProjection: rid_0, {'a': evalTemp_15}, c1]\n"
         "|   |   BindBlock:\n"
-        "|   |       [disjunction_0]\n"
+        "|   |       [evalTemp_15]\n"
         "|   |           Source []\n"
-        "|   |       [rid_0]\n"
-        "|   |           Source []\n"
-        "|   IndexScan [{'<indexKey> 1': disjunction_0, '<rid>': rid_0}, scanDefName: c1, "
-        "indexDefName: index1, interval: {[Const [100], Const [100]], [Const [minKey], Const "
-        "[maxKey]]}]\n"
-        "|       BindBlock:\n"
-        "|           [disjunction_0]\n"
-        "|               Source []\n"
-        "|           [rid_0]\n"
-        "|               Source []\n"
-        "Filter []\n"
-        "|   EvalFilter []\n"
-        "|   |   FunctionCall [getArraySize]\n"
-        "|   |   Variable [sides_0]\n"
-        "|   PathCompare [Eq]\n"
-        "|   Const [2]\n"
-        "GroupBy []\n"
-        "|   |   groupings: \n"
-        "|   |       RefBlock: \n"
-        "|   |           Variable [rid_0]\n"
-        "|   aggregations: \n"
-        "|       [disjunction_0]\n"
-        "|           FunctionCall [$first]\n"
-        "|           Variable [conjunction_0]\n"
-        "|       [sides_0]\n"
-        "|           FunctionCall [$addToSet]\n"
-        "|           Variable [sideId_0]\n"
-        "Union []\n"
-        "|   |   BindBlock:\n"
-        "|   |       [conjunction_0]\n"
-        "|   |           Source []\n"
-        "|   |       [rid_0]\n"
-        "|   |           Source []\n"
-        "|   |       [sideId_0]\n"
-        "|   |           Source []\n"
-        "|   Evaluation []\n"
-        "|   |   BindBlock:\n"
-        "|   |       [sideId_0]\n"
-        "|   |           Const [1]\n"
-        "|   IndexScan [{'<indexKey> 1': conjunction_0, '<rid>': rid_0}, scanDefName: c1, "
-        "indexDefName: index1, interval: {[Const [minKey], Const [90]), [Const [minKey], Const "
-        "[maxKey]]}]\n"
-        "|       BindBlock:\n"
-        "|           [conjunction_0]\n"
-        "|               Source []\n"
-        "|           [rid_0]\n"
-        "|               Source []\n"
-        "Evaluation []\n"
-        "|   BindBlock:\n"
-        "|       [sideId_0]\n"
-        "|           Const [0]\n"
-        "IndexScan [{'<indexKey> 1': conjunction_0, '<rid>': rid_0}, scanDefName: c1, "
-        "indexDefName: index1, interval: {(Const [70], Const [maxKey]], [Const [minKey], Const "
-        "[maxKey]]}]\n"
+        "|   RefBlock: \n"
+        "|       Variable [rid_0]\n"
+        "Unique []\n"
+        "|   projections: \n"
+        "|       rid_0\n"
+        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const "
+        "[1], Const [1]], [Const [minKey], Const [90])}]\n"
         "    BindBlock:\n"
-        "        [conjunction_0]\n"
-        "            Source []\n"
         "        [rid_0]\n"
         "            Source []\n",
         optimized);
@@ -2867,8 +2845,10 @@ TEST(PhysRewriter, IndexBoundsIntersect1) {
 
     ABT optimized = rootNode;
     ASSERT_TRUE(phaseManager.optimize(optimized));
-    ASSERT_BETWEEN(15, 20, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(5, 10, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
+    // Demonstrate we can intersect the intervals since we have non-multikey paths, and the
+    // collation requirement is satisfied via the index scan.
     ASSERT_EXPLAIN_V2(
         "Root []\n"
         "|   |   projections: \n"
@@ -2980,114 +2960,6 @@ TEST(PhysRewriter, IndexBoundsIntersect3) {
                         "b", make<PathTraverse>(make<PathIdentity>(), PathTraverse::kSingleLevel)),
                     PathTraverse::kSingleLevel))},
         kDefaultSelectivity);
-
-    ABT scanNode = make<ScanNode>("root", "c1");
-
-    ABT filterNode = make<FilterNode>(
-        make<EvalFilter>(
-            make<PathGet>(
-                "a",
-                make<PathTraverse>(
-                    make<PathComposeM>(
-                        make<PathGet>("b",
-                                      make<PathTraverse>(
-                                          make<PathCompare>(Operations::Gt, Constant::int64(70)),
-                                          PathTraverse::kSingleLevel)),
-                        make<PathGet>("b",
-                                      make<PathTraverse>(
-                                          make<PathCompare>(Operations::Lt, Constant::int64(90)),
-                                          PathTraverse::kSingleLevel))),
-                    PathTraverse::kSingleLevel)),
-            make<Variable>("root")),
-        std::move(scanNode));
-
-    ABT rootNode =
-        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
-
-    OptPhaseManager phaseManager(
-        {OptPhaseManager::OptPhase::MemoSubstitutionPhase,
-         OptPhaseManager::OptPhase::MemoExplorationPhase,
-         OptPhaseManager::OptPhase::MemoImplementationPhase},
-        prefixId,
-        false /*requireRID*/,
-        {{{"c1",
-           ScanDefinition{
-               {},
-               {{"index1",
-                 IndexDefinition{{{makeIndexPath(FieldPathType{"a", "b"}, true /*isMultiKey*/),
-                                   CollationOp::Ascending}},
-                                 true /*isMultiKey*/}}}}}}},
-        std::make_unique<HintedCE>(std::move(hints)),
-        std::make_unique<DefaultCosting>(),
-        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
-
-    ABT optimized = rootNode;
-    ASSERT_TRUE(phaseManager.optimize(optimized));
-    ASSERT_EQ(4, phaseManager.getMemo().getStats()._physPlanExplorationCount);
-
-    // We intersect indexes because the outer composition is over the same field ("b").
-    ASSERT_EXPLAIN_V2(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       root\n"
-        "|   RefBlock: \n"
-        "|       Variable [root]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
-        "|   |   Const [true]\n"
-        "|   LimitSkip []\n"
-        "|   |   limitSkip:\n"
-        "|   |       limit: 1\n"
-        "|   |       skip: 0\n"
-        "|   Seek [ridProjection: rid_0, {'<root>': root}, c1]\n"
-        "|   |   BindBlock:\n"
-        "|   |       [root]\n"
-        "|   |           Source []\n"
-        "|   RefBlock: \n"
-        "|       Variable [rid_0]\n"
-        "Filter []\n"
-        "|   EvalFilter []\n"
-        "|   |   FunctionCall [getArraySize]\n"
-        "|   |   Variable [sides_0]\n"
-        "|   PathCompare [Eq]\n"
-        "|   Const [2]\n"
-        "GroupBy []\n"
-        "|   |   groupings: \n"
-        "|   |       RefBlock: \n"
-        "|   |           Variable [rid_0]\n"
-        "|   aggregations: \n"
-        "|       [sides_0]\n"
-        "|           FunctionCall [$addToSet]\n"
-        "|           Variable [sideId_0]\n"
-        "Union []\n"
-        "|   |   BindBlock:\n"
-        "|   |       [rid_0]\n"
-        "|   |           Source []\n"
-        "|   |       [sideId_0]\n"
-        "|   |           Source []\n"
-        "|   Evaluation []\n"
-        "|   |   BindBlock:\n"
-        "|   |       [sideId_0]\n"
-        "|   |           Const [1]\n"
-        "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const "
-        "[minKey], Const [90])}]\n"
-        "|       BindBlock:\n"
-        "|           [rid_0]\n"
-        "|               Source []\n"
-        "Evaluation []\n"
-        "|   BindBlock:\n"
-        "|       [sideId_0]\n"
-        "|           Const [0]\n"
-        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {(Const "
-        "[70], Const [maxKey]]}]\n"
-        "    BindBlock:\n"
-        "        [rid_0]\n"
-        "            Source []\n",
-        optimized);
-}
-
-TEST(PhysRewriter, IndexBoundsIntersect4) {
-    using namespace properties;
-    PrefixId prefixId;
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -4341,7 +4213,7 @@ TEST(PhysRewriter, LocalLimitSkip) {
         "|   |       projections: \n"
         "|   |           root\n"
         "|   |       indexingAvailability: \n"
-        "|   |           [groupId: 0, scanProjection: root, scanDefName: c1, possiblyEqPredsOnly]\n"
+        "|   |           [groupId: 0, scanProjection: root, scanDefName: c1, eqPredsOnly]\n"
         "|   |       collectionAvailability: \n"
         "|   |           c1\n"
         "|   |       distributionAvailability: \n"
@@ -4368,7 +4240,7 @@ TEST(PhysRewriter, LocalLimitSkip) {
         "|   |       projections: \n"
         "|   |           root\n"
         "|   |       indexingAvailability: \n"
-        "|   |           [groupId: 0, scanProjection: root, scanDefName: c1, possiblyEqPredsOnly]\n"
+        "|   |           [groupId: 0, scanProjection: root, scanDefName: c1, eqPredsOnly]\n"
         "|   |       collectionAvailability: \n"
         "|   |           c1\n"
         "|   |       distributionAvailability: \n"
@@ -4393,7 +4265,7 @@ TEST(PhysRewriter, LocalLimitSkip) {
         "|   |       projections: \n"
         "|   |           root\n"
         "|   |       indexingAvailability: \n"
-        "|   |           [groupId: 0, scanProjection: root, scanDefName: c1, possiblyEqPredsOnly]\n"
+        "|   |           [groupId: 0, scanProjection: root, scanDefName: c1, eqPredsOnly]\n"
         "|   |       collectionAvailability: \n"
         "|   |           c1\n"
         "|   |       distributionAvailability: \n"
@@ -4570,7 +4442,6 @@ TEST(PhysRewriter, PartialIndex1) {
             make<Variable>("root")),
         true /*isFilterContext*/);
     ASSERT_TRUE(conversionResult.has_value());
-    ASSERT_FALSE(conversionResult->_hasEmptyInterval);
     ASSERT_FALSE(conversionResult->_retainPredicate);
 
     OptPhaseManager phaseManager(
@@ -4651,7 +4522,6 @@ TEST(PhysRewriter, PartialIndex2) {
             make<Variable>("root")),
         true /*isFilterContext*/);
     ASSERT_TRUE(conversionResult.has_value());
-    ASSERT_FALSE(conversionResult->_hasEmptyInterval);
     ASSERT_FALSE(conversionResult->_retainPredicate);
 
     OptPhaseManager phaseManager(
@@ -4731,7 +4601,6 @@ TEST(PhysRewriter, PartialIndexReject) {
             make<Variable>("root")),
         true /*isFilterContext*/);
     ASSERT_TRUE(conversionResult.has_value());
-    ASSERT_FALSE(conversionResult->_hasEmptyInterval);
     ASSERT_FALSE(conversionResult->_retainPredicate);
 
     OptPhaseManager phaseManager(

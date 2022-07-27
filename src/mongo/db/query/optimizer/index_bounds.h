@@ -117,14 +117,34 @@ private:
     IntervalReqExpr::Node _intervals;
 };
 
+/**
+ * This comparator can only compare paths with Get, Traverse, and Id.
+ */
+struct IndexPath3WComparator {
+    bool operator()(const ABT& path1, const ABT& path2) const;
+};
+
+using IndexPathSet = std::set<ABT, IndexPath3WComparator>;
+
 struct PartialSchemaKeyLessComparator {
     bool operator()(const PartialSchemaKey& k1, const PartialSchemaKey& k2) const;
 };
 
-// Map from referred (or input) projection name to list of requirements for that projection.
+/**
+ * Map from referred (or input) projection name to list of requirements for that projection.
+ * Only one instance of a path without Traverse elements (non-multikey) is allowed. By contrast
+ * several instances of paths with Traverse elements (multikey) are allowed. For example: Get "a"
+ * Get "b" Id is allowed just once while Get "a" Traverse Get "b" Id is allowed multiple times.
+ */
 using PartialSchemaRequirements =
-    std::map<PartialSchemaKey, PartialSchemaRequirement, PartialSchemaKeyLessComparator>;
+    std::multimap<PartialSchemaKey, PartialSchemaRequirement, PartialSchemaKeyLessComparator>;
 
+/**
+ * Used to track cardinality estimates per predicate inside a PartialSchemaRequirement.
+ * We currently have a single estimate per PartialSchemaKey for all matching entries in the primary
+ * map.
+ * TODO: SERVER-68092 Relax constraint described above.
+ */
 using PartialSchemaKeyCE = std::map<PartialSchemaKey, CEType, PartialSchemaKeyLessComparator>;
 using ResidualKeyMap = std::map<PartialSchemaKey, PartialSchemaKey, PartialSchemaKeyLessComparator>;
 

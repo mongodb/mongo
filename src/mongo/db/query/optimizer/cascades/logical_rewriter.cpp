@@ -537,6 +537,7 @@ struct SubstituteMerge<LimitSkipNode, LimitSkipNode> {
 
 static boost::optional<ABT> mergeSargableNodes(
     const properties::IndexingAvailability& indexingAvailability,
+    const IndexPathSet& nonMultiKeyPaths,
     const SargableNode& aboveNode,
     const SargableNode& belowNode,
     RewriteContext& ctx) {
@@ -552,19 +553,22 @@ static boost::optional<ABT> mergeSargableNodes(
     if (!intersectPartialSchemaReq(mergedReqs, aboveNode.getReqMap(), projectionRenames)) {
         return {};
     }
+
+    const ProjectionName& scanProjName = indexingAvailability.getScanProjection();
+    bool hasEmptyInterval =
+        simplifyPartialSchemaReqPaths(scanProjName, nonMultiKeyPaths, mergedReqs);
+    if (hasEmptyInterval) {
+        return createEmptyValueScanNode(ctx);
+    }
+
     if (mergedReqs.size() > LogicalRewriter::kMaxPartialSchemaReqCount) {
         return {};
     }
 
     const ScanDefinition& scanDef =
         ctx.getMetadata()._scanDefs.at(indexingAvailability.getScanDefName());
-    bool hasEmptyInterval = false;
-    auto candidateIndexMap = computeCandidateIndexMap(ctx.getPrefixId(),
-                                                      indexingAvailability.getScanProjection(),
-                                                      mergedReqs,
-                                                      scanDef,
-                                                      hasEmptyInterval);
-
+    auto candidateIndexMap = computeCandidateIndexMap(
+        ctx.getPrefixId(), scanProjName, mergedReqs, scanDef, hasEmptyInterval);
     if (hasEmptyInterval) {
         return createEmptyValueScanNode(ctx);
     }
@@ -583,11 +587,22 @@ struct SubstituteMerge<SargableNode, SargableNode> {
                     ABT::reference_type belowNode,
                     RewriteContext& ctx) const {
         using namespace properties;
-        const auto& result =
-            mergeSargableNodes(getPropertyConst<IndexingAvailability>(ctx.getAboveLogicalProps()),
-                               *aboveNode.cast<SargableNode>(),
-                               *belowNode.cast<SargableNode>(),
-                               ctx);
+
+        const LogicalProps& props = ctx.getAboveLogicalProps();
+        tassert(6624170,
+                "At this point we should have IndexingAvailability",
+                hasProperty<IndexingAvailability>(props));
+
+        const auto& indexingAvailability = getPropertyConst<IndexingAvailability>(props);
+        const ScanDefinition& scanDef =
+            ctx.getMetadata()._scanDefs.at(indexingAvailability.getScanDefName());
+        tassert(6624171, "At this point the collection must exist", scanDef.exists());
+
+        const auto& result = mergeSargableNodes(indexingAvailability,
+                                                scanDef.getNonMultiKeyPathSet(),
+                                                *aboveNode.cast<SargableNode>(),
+                                                *belowNode.cast<SargableNode>(),
+                                                ctx);
         if (result) {
             ctx.addNode(*result, true /*substitute*/);
         }
@@ -639,21 +654,17 @@ static void convertFilterToSargableNode(ABT::reference_type node,
     if (!conversion) {
         return;
     }
-    if (conversion->_hasEmptyInterval) {
-        addEmptyValueScanNode(ctx);
-        return;
-    }
 
-    for (const auto& entry : conversion->_reqMap) {
+    for (const auto& [key, req] : conversion->_reqMap) {
         uassert(6624111,
                 "Filter partial schema requirement must contain a variable name.",
-                !entry.first._projectionName.empty());
+                !key._projectionName.empty());
         uassert(6624112,
                 "Filter partial schema requirement cannot bind.",
-                !entry.second.hasBoundProjectionName());
+                !req.hasBoundProjectionName());
         uassert(6624113,
                 "Filter partial schema requirement must have a range.",
-                !isIntervalReqFullyOpenDNF(entry.second.getIntervals()));
+                !isIntervalReqFullyOpenDNF(req.getIntervals()));
     }
 
     // If in substitution mode, disallow retaining original predicate. If in exploration mode, only
@@ -666,12 +677,20 @@ static void convertFilterToSargableNode(ABT::reference_type node,
         return;
     }
 
-    bool hasEmptyInterval = false;
-    auto candidateIndexMap = computeCandidateIndexMap(ctx.getPrefixId(),
-                                                      indexingAvailability.getScanProjection(),
-                                                      conversion->_reqMap,
-                                                      scanDef,
-                                                      hasEmptyInterval);
+    const ProjectionName& scanProjName = indexingAvailability.getScanProjection();
+    bool hasEmptyInterval = simplifyPartialSchemaReqPaths(
+        scanProjName, scanDef.getNonMultiKeyPathSet(), conversion->_reqMap);
+    if (hasEmptyInterval) {
+        addEmptyValueScanNode(ctx);
+        return;
+    }
+    if (conversion->_reqMap.size() > LogicalRewriter::kMaxPartialSchemaReqCount) {
+        // Too many requirements.
+        return;
+    }
+
+    auto candidateIndexMap = computeCandidateIndexMap(
+        ctx.getPrefixId(), scanProjName, conversion->_reqMap, scanDef, hasEmptyInterval);
 
     if (hasEmptyInterval) {
         addEmptyValueScanNode(ctx);
@@ -694,6 +713,7 @@ static void convertFilterToSargableNode(ABT::reference_type node,
                     if (auto childSargableNode = childNode.cast<SargableNode>();
                         childSargableNode != nullptr) {
                         const auto& result = mergeSargableNodes(indexingAvailability,
+                                                                scanDef.getNonMultiKeyPathSet(),
                                                                 *sargableNode.cast<SargableNode>(),
                                                                 *childSargableNode,
                                                                 ctx);
@@ -836,18 +856,13 @@ struct SubstituteConvert<EvaluationNode> {
             // For evaluation nodes we expect to create a single entry.
             return;
         }
-        if (conversion->_hasEmptyInterval) {
-            addEmptyValueScanNode(ctx);
-            return;
-        }
 
-        for (auto& entry : conversion->_reqMap) {
-            PartialSchemaRequirement& req = entry.second;
+        for (auto& [key, req] : conversion->_reqMap) {
             req.setBoundProjectionName(evalNode.getProjectionName());
 
             uassert(6624114,
                     "Eval partial schema requirement must contain a variable name.",
-                    !entry.first._projectionName.empty());
+                    !key._projectionName.empty());
             uassert(6624115,
                     "Eval partial schema requirement cannot have a range",
                     isIntervalReqFullyOpenDNF(req.getIntervals()));
@@ -904,8 +919,7 @@ struct ExploreConvert<SargableNode> {
 
         const std::string& scanDefName = indexingAvailability.getScanDefName();
         const ScanDefinition& scanDef = ctx.getMetadata()._scanDefs.at(scanDefName);
-        const size_t indexCount = scanDef.getIndexDefs().size();
-        if (indexCount == 0) {
+        if (scanDef.getIndexDefs().empty()) {
             // Do not insert RIDIntersect if we do not have indexes available.
             return;
         }
@@ -913,8 +927,7 @@ struct ExploreConvert<SargableNode> {
         const auto aboveNodeId = ctx.getAboveNodeId();
         auto& sargableSplitCountMap = ctx.getSargableSplitCountMap();
         const size_t splitCount = sargableSplitCountMap[aboveNodeId];
-        if ((1ull << splitCount) >
-            roundUpToNextPow2(indexCount, LogicalRewriter::kMaxSargableNodeSplitCount)) {
+        if (splitCount > LogicalRewriter::kMaxSargableNodeSplitCount) {
             // We cannot split this node further.
             return;
         }

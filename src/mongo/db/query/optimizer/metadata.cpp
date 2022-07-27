@@ -29,7 +29,7 @@
 
 #include "mongo/db/query/optimizer/metadata.h"
 
-#include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/utils/utils.h"
 
 
 namespace mongo::optimizer {
@@ -103,6 +103,10 @@ const PartialSchemaRequirements& IndexDefinition::getPartialReqMap() const {
     return _partialReqMap;
 }
 
+PartialSchemaRequirements& IndexDefinition::getPartialReqMap() {
+    return _partialReqMap;
+}
+
 ScanDefinition::ScanDefinition() : ScanDefinition(OptionsMapType{}, {}) {}
 
 ScanDefinition::ScanDefinition(OptionsMapType options,
@@ -121,7 +125,24 @@ ScanDefinition::ScanDefinition(OptionsMapType options,
       _distributionAndPaths(std::move(distributionAndPaths)),
       _indexDefs(std::move(indexDefs)),
       _exists(exists),
-      _ce(ce) {}
+      _ce(ce) {
+    // Collect non-multiKeyPaths from each index.
+    for (const auto& [indexDefName, indexDef] : _indexDefs) {
+        for (const auto& collation : indexDef.getCollationSpec()) {
+            if (!checkPathContainsTraverse(collation._path)) {
+                _nonMultiKeyPathSet.insert(collation._path);
+            }
+        }
+    }
+
+    // Simplify partial filter requirements using the non-multikey paths.
+    for (auto& [indexDefName, indexDef] : _indexDefs) {
+        [[maybe_unused]] const bool hasEmptyInterval = simplifyPartialSchemaReqPaths(
+            "" /*scanProjName*/, _nonMultiKeyPathSet, indexDef.getPartialReqMap());
+        // If "hasEmptyInterval" is set, we have a partial filter index with an unsatisfiable
+        // condition, which is thus guaranteed to never contain any documents.
+    }
+}
 
 const ScanDefinition::OptionsMapType& ScanDefinition::getOptionsMap() const {
     return _options;
@@ -137,6 +158,10 @@ const opt::unordered_map<std::string, IndexDefinition>& ScanDefinition::getIndex
 
 opt::unordered_map<std::string, IndexDefinition>& ScanDefinition::getIndexDefs() {
     return _indexDefs;
+}
+
+const IndexPathSet& ScanDefinition::getNonMultiKeyPathSet() const {
+    return _nonMultiKeyPathSet;
 }
 
 bool ScanDefinition::exists() const {

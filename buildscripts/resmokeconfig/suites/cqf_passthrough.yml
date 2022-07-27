@@ -5,10 +5,6 @@ selector:
   - jstests/aggregation/**/*.js
   - jstests/core/**/*.js
   exclude_files:
-  # TODO SERVER-67427 Fix conjunctions over an array field.
-  - jstests/core/all2.js
-  - jstests/core/index_check2.js
-  - jstests/core/or5.js
   # TODO SERVER-67369 enable once full type bracketing is supported.
   - jstests/core/array_comparison_correctness.js
   - jstests/core/arrayfind10.js

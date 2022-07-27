@@ -37,7 +37,7 @@ using PartialSchemaSelHints =
     std::map<PartialSchemaKey, SelectivityType, PartialSchemaKeyLessComparator>;
 
 /**
- * Estimation based on hints. The hints are organized in a PartialSchemaKeyCE structure.
+ * Estimation based on hints. The hints are organized in a PartialSchemaSelHints structure.
  * SargableNodes are estimated based on the matching PartialSchemaKeys.
  */
 class HintedCE : public CEInterface {

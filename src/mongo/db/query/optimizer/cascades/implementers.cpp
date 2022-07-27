@@ -429,7 +429,6 @@ public:
         const CEType currentCE = ceProperty.getEstimate();
         const PartialSchemaKeyCE& partialSchemaKeyCEMap = ceProperty.getPartialSchemaKeyCEMap();
 
-        ProjectionRenames projectionRenames;
         if (indexReqTarget == IndexReqTarget::Index) {
             ProjectionCollationSpec requiredCollation;
             if (hasProperty<CollationRequirement>(_physProps)) {
@@ -543,10 +542,6 @@ public:
                                               nodeCEMap);
                 }
 
-                applyProjectionRenames(projectionRenames, physNode, [&](const ABT& node) {
-                    nodeCEMap.emplace(node.cast<Node>(), indexCE);
-                });
-
                 lowerPartialSchemaRequirements(
                     indexCE, scanGroupCE, residualRequirements, physNode, nodeCEMap);
 
@@ -576,6 +571,7 @@ public:
                 fieldProjectionMap._ridProjection = ridProjName;
             }
 
+            ProjectionRenames projectionRenames;
             ResidualRequirements residualRequirements;
             computePhysicalScanParams(_prefixId,
                                       reqMap,
@@ -763,7 +759,7 @@ public:
                                            this,
                                            isIndex,
                                            dedupRID,
-                                           indexingAvailability.getPossiblyEqPredsOnly(),
+                                           indexingAvailability.getEqPredsOnly(),
                                            std::cref(ridProjName),
                                            std::cref(collationLeftRightSplit),
                                            std::cref(collationRightLeftSplit),

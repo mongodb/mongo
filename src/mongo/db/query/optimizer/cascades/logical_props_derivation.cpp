@@ -85,7 +85,7 @@ static void populateDistributionPaths(const PartialSchemaRequirements& req,
                 distributions.emplace(distributionAndPaths._type,
                                       std::move(distributionProjections));
             }
-            [[fallthrough]];
+            break;
         }
 
         default:
@@ -93,7 +93,7 @@ static void populateDistributionPaths(const PartialSchemaRequirements& req,
     }
 }
 
-static bool computePossiblyEqPredsOnly(const PartialSchemaRequirements& reqMap) {
+static bool computeEqPredsOnly(const PartialSchemaRequirements& reqMap) {
     PartialSchemaRequirements equalitiesReqMap;
     PartialSchemaRequirements fullyOpenReqMap;
 
@@ -114,12 +114,8 @@ static bool computePossiblyEqPredsOnly(const PartialSchemaRequirements& reqMap) 
         }
     }
 
-    PartialSchemaKeySet resultKeySet;
-    PartialSchemaRequirement req_unused;
     for (const auto& [key, req] : fullyOpenReqMap) {
-        findMatchingSchemaRequirement(
-            key, equalitiesReqMap, resultKeySet, req_unused, false /*setIntervalsAndBoundProj*/);
-        if (resultKeySet.empty()) {
+        if (equalitiesReqMap.count(key) == 0) {
             // No possible match for fully open requirement.
             return false;
         }
@@ -147,7 +143,7 @@ public:
             makeLogicalProps(IndexingAvailability(_groupId,
                                                   node.getProjectionName(),
                                                   node.getScanDefName(),
-                                                  true /*possiblyEqPredsOnly*/,
+                                                  true /*eqPredsOnly*/,
                                                   {} /*satisfiedPartialIndexes*/),
                              CollectionAvailability({node.getScanDefName()}),
                              DistributionAvailability(std::move(distributions))));
@@ -174,7 +170,7 @@ public:
         // Propagate indexing, collection, and distribution availabilities.
         LogicalProps result = std::move(childResult);
         if (hasProperty<IndexingAvailability>(result)) {
-            getProperty<IndexingAvailability>(result).setPossiblyEqPredsOnly(false);
+            getProperty<IndexingAvailability>(result).setEqPredsOnly(false);
         }
         addCentralizedAndRoundRobinDistributions(result);
         return maybeUpdateNodePropsMap(node, std::move(result));
@@ -188,7 +184,7 @@ public:
         // when the memo group is created.
         LogicalProps result = std::move(childResult);
         if (hasProperty<IndexingAvailability>(result)) {
-            getProperty<IndexingAvailability>(result).setPossiblyEqPredsOnly(false);
+            getProperty<IndexingAvailability>(result).setEqPredsOnly(false);
         }
         addCentralizedAndRoundRobinDistributions(result);
         return maybeUpdateNodePropsMap(node, std::move(result));
@@ -217,9 +213,8 @@ public:
                                       distributions);
         }
 
-        if (indexingAvailability.getPossiblyEqPredsOnly()) {
-            indexingAvailability.setPossiblyEqPredsOnly(
-                computePossiblyEqPredsOnly(node.getReqMap()));
+        if (indexingAvailability.getEqPredsOnly()) {
+            indexingAvailability.setEqPredsOnly(computeEqPredsOnly(node.getReqMap()));
         }
 
         auto& satisfiedPartialIndexes =

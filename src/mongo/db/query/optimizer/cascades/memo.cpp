@@ -659,13 +659,42 @@ void Memo::estimateCE(const GroupIdType groupId, const bool useHeuristicCE) {
 
     if (auto sargablePtr = nodeRef.cast<SargableNode>(); sargablePtr != nullptr) {
         auto& partialSchemaKeyCEMap = ceProp.getPartialSchemaKeyCEMap();
+        invariant(partialSchemaKeyCEMap.empty());
+
+        struct CEEntry {
+            PartialSchemaKey _key;
+            CEType _ce;
+            size_t _count = 1;
+        };
+        boost::optional<CEEntry> prevEntry;
+
+        const auto addEntryFn = [&]() {
+            // We take a geometric average of the entries with the same key.
+            partialSchemaKeyCEMap.emplace(prevEntry->_key,
+                                          std::pow(prevEntry->_ce, 1.0 / prevEntry->_count));
+        };
+
         for (const auto& [key, req] : sargablePtr->getReqMap()) {
             ABT singularReq = make<SargableNode>(PartialSchemaRequirements{{key, req}},
                                                  CandidateIndexMap{},
                                                  sargablePtr->getTarget(),
                                                  sargablePtr->getChild());
             const CEType singularEst = ceEstimator->deriveCE(*this, props, singularReq.ref());
-            partialSchemaKeyCEMap.emplace(key, singularEst);
+
+            if (prevEntry) {
+                if (prevEntry->_key == key) {
+                    prevEntry->_ce *= singularEst;
+                    prevEntry->_count++;
+                } else {
+                    addEntryFn();
+                    prevEntry = {{key, singularEst}};
+                };
+            } else {
+                prevEntry = {{key, singularEst}};
+            }
+        }
+        if (prevEntry) {
+            addEntryFn();
         }
     }
 

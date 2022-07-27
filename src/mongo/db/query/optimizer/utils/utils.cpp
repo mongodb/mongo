@@ -39,17 +39,6 @@
 
 namespace mongo::optimizer {
 
-size_t roundUpToNextPow2(const size_t v, const size_t maxPower) {
-    if (v == 0) {
-        return 0;
-    }
-
-    size_t result = 1;
-    for (size_t power = 0; result < v && power < maxPower; result <<= 1, power++) {
-    }
-    return result;
-}
-
 std::vector<ABT::reference_type> collectComposed(const ABT& n) {
     if (auto comp = n.cast<PathComposeM>(); comp) {
         auto lhs = collectComposed(comp->getPath1());
@@ -345,7 +334,6 @@ PartialSchemaReqConversion::PartialSchemaReqConversion(PartialSchemaRequirements
       _reqMap(std::move(reqMap)),
       _hasIntersected(false),
       _hasTraversed(false),
-      _hasEmptyInterval(false),
       _retainPredicate(false) {}
 
 PartialSchemaReqConversion::PartialSchemaReqConversion(ABT bound)
@@ -353,7 +341,6 @@ PartialSchemaReqConversion::PartialSchemaReqConversion(ABT bound)
       _reqMap(),
       _hasIntersected(false),
       _hasTraversed(false),
-      _hasEmptyInterval(false),
       _retainPredicate(false) {}
 
 /**
@@ -369,8 +356,7 @@ public:
         if (!pathResult || !inputResult) {
             return {};
         }
-        if (pathResult->_bound.has_value() || !inputResult->_bound.has_value() ||
-            !inputResult->_reqMap.empty()) {
+        if (pathResult->_bound || !inputResult->_bound || !inputResult->_reqMap.empty()) {
             return {};
         }
 
@@ -386,7 +372,6 @@ public:
             }
 
             PartialSchemaReqConversion result{std::move(newMap)};
-            result._hasEmptyInterval = pathResult->_hasEmptyInterval;
             result._retainPredicate = pathResult->_retainPredicate;
             return result;
         }
@@ -408,43 +393,23 @@ public:
         return handleEvalPathAndEvalFilter(std::move(pathResult), std::move(inputResult));
     }
 
-    static ResultType handleComposition(const bool isMultiplicative,
-                                        ResultType leftResult,
-                                        ResultType rightResult) {
+    template <bool isMultiplicative>
+    static ResultType handleComposition(ResultType leftResult, ResultType rightResult) {
         if (!leftResult || !rightResult) {
             return {};
         }
-        if (leftResult->_bound.has_value() || rightResult->_bound.has_value()) {
+        if (leftResult->_bound || rightResult->_bound) {
             return {};
         }
 
         auto& leftReqMap = leftResult->_reqMap;
         auto& rightReqMap = rightResult->_reqMap;
-        if (isMultiplicative) {
-            {
-                ProjectionRenames projectionRenames;
-                if (!intersectPartialSchemaReq(leftReqMap, rightReqMap, projectionRenames)) {
-                    return {};
-                }
-                if (!projectionRenames.empty()) {
-                    return {};
-                }
+        if constexpr (isMultiplicative) {
+            ProjectionRenames projectionRenames;
+            if (!intersectPartialSchemaReq(leftReqMap, rightReqMap, projectionRenames)) {
+                return {};
             }
-
-            if (!leftResult->_hasTraversed && !rightResult->_hasTraversed) {
-                // Intersect intervals only if we have not traversed. E.g. (-inf, 90) ^ (70, +inf)
-                // becomes (70, 90).
-                for (auto& [key, req] : leftReqMap) {
-                    auto newIntervals = intersectDNFIntervals(req.getIntervals());
-                    if (newIntervals) {
-                        req.getIntervals() = std::move(newIntervals.get());
-                    } else {
-                        leftResult->_hasEmptyInterval = true;
-                        break;
-                    }
-                }
-            } else if (leftReqMap.size() > 1) {
-                // Reject if we have traversed, and composed requirements are more than one.
+            if (!projectionRenames.empty()) {
                 return {};
             }
 
@@ -452,22 +417,32 @@ public:
             return leftResult;
         }
 
-        // We can only perform additive composition (OR) if we have a single matching key on both
-        // sides.
-        if (leftReqMap.size() != 1 || rightReqMap.size() != 1) {
-            return {};
-        }
-
         auto leftEntry = leftReqMap.begin();
         auto rightEntry = rightReqMap.begin();
         auto& [leftKey, leftReq] = *leftEntry;
         auto& [rightKey, rightReq] = *rightEntry;
 
-        if (leftKey == rightKey) {
-            combineIntervalsDNF(false /*intersect*/,
-                                leftEntry->second.getIntervals(),
-                                rightEntry->second.getIntervals());
+        if (leftReqMap.count(leftKey) == leftReqMap.size() &&
+            rightReqMap.count(leftKey) == rightReqMap.size()) {
+            // We have a single matching key.
+
+            PartialSchemaRequirements resultMap;
+            for (const auto& rightEntry1 : rightReqMap) {
+                auto tempMap = leftReqMap;
+                for (auto& leftEntry1 : tempMap) {
+                    combineIntervalsDNF(false /*intersect*/,
+                                        leftEntry1.second.getIntervals(),
+                                        rightEntry1.second.getIntervals());
+                }
+                resultMap.merge(std::move(tempMap));
+            }
+
+            leftReqMap = std::move(resultMap);
             return leftResult;
+        }
+
+        if (leftReqMap.size() != 1 || rightReqMap.size() != 1) {
+            return {};
         }
 
         // Here we can combine if paths differ only by a Traverse element and both intervals
@@ -549,8 +524,8 @@ public:
             return {};
         }
 
-        return handleComposition(
-            true /*isMultiplicative*/, std::move(leftResult), std::move(rightResult));
+        return handleComposition<true /*isMultiplicative*/>(std::move(leftResult),
+                                                            std::move(rightResult));
     }
 
     ResultType transport(const ABT& n,
@@ -577,8 +552,8 @@ public:
                  PartialSchemaRequirement{"" /*boundProjectionName*/, std::move(intervalExpr)}}}}};
         }
 
-        return handleComposition(
-            false /*isMultiplicative*/, std::move(leftResult), std::move(rightResult));
+        return handleComposition<false /*isMultiplicative*/>(std::move(leftResult),
+                                                             std::move(rightResult));
     }
 
     template <class T>
@@ -586,7 +561,7 @@ public:
         if (!inputResult) {
             return {};
         }
-        if (inputResult->_bound.has_value()) {
+        if (inputResult->_bound) {
             return {};
         }
 
@@ -707,21 +682,155 @@ private:
     const bool _isFilterContext;
 };
 
+/**
+ * Check if an index path contains a Traverse element.
+ */
+class PathTraverseChecker {
+public:
+    PathTraverseChecker() {}
+
+    bool transport(const ABT& /*n*/, const PathTraverse& /*node*/, bool /*childResult*/) {
+        return true;
+    }
+
+    bool transport(const ABT& /*n*/, const PathGet& /*node*/, bool childResult) {
+        return childResult;
+    }
+
+    bool transport(const ABT& /*n*/, const PathIdentity& /*node*/) {
+        return false;
+    }
+
+    template <typename T, typename... Ts>
+    bool transport(const ABT& /*n*/, const T& /*node*/, Ts&&...) {
+        uasserted(6624153, "Index paths only consist of Get, Traverse, and Id nodes.");
+        return false;
+    }
+
+    bool check(const ABT& path) {
+        return algebra::transport<true>(path, *this);
+    }
+};
+
+bool checkPathContainsTraverse(const ABT& path) {
+    return PathTraverseChecker{}.check(path);
+}
+
+/**
+ * Erases Traverse elements from an index path.
+ */
+class PathTraverseEraser {
+public:
+    PathTraverseEraser() {}
+
+    void transport(ABT& n, const PathTraverse& /*node*/, ABT& childResult) {
+        n = std::move(childResult);
+        _erased = true;
+    }
+
+    template <typename T, typename... Ts>
+    void transport(const ABT& /*n*/, const T& /*node*/, Ts&&...) {
+        // Noop.
+    }
+
+    bool eraseTraverse(ABT& path) {
+        algebra::transport<true>(path, *this);
+        return _erased;
+    }
+
+private:
+    bool _erased = false;
+};
+
 boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(
     const ABT& expr, const bool isFilterContext) {
     PartialSchemaReqConverter converter(isFilterContext);
     auto result = converter.convert(expr);
-    if (!result || result->_reqMap.empty()) {
+    if (!result) {
         return {};
     }
 
-    for (const auto& entry : result->_reqMap) {
-        if (entry.first.emptyPath() && isIntervalReqFullyOpenDNF(entry.second.getIntervals())) {
+    auto& reqMap = result->_reqMap;
+    if (reqMap.empty()) {
+        return {};
+    }
+
+    for (const auto& [key, req] : reqMap) {
+        if (key.emptyPath() && isIntervalReqFullyOpenDNF(req.getIntervals())) {
             // We need to determine either path or interval (or both).
             return {};
         }
     }
     return result;
+}
+
+bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
+                                   const IndexPathSet& nonMultiKeyPaths,
+                                   PartialSchemaRequirements& reqMap) {
+    PartialSchemaRequirements result;
+    boost::optional<std::pair<PartialSchemaKey, PartialSchemaRequirement>> prevEntry;
+
+    const auto intersectFn = [](IntervalReqExpr::Node& intervals) {
+        auto intersected = intersectDNFIntervals(intervals);
+        if (!intersected) {
+            // Empty interval.
+            return false;
+        }
+
+        intervals = std::move(*intersected);
+        return true;
+    };
+
+    // Simplify paths by eliminating unnecessary Traverse elements.
+    for (const auto& [key, req] : reqMap) {
+        PartialSchemaKey newKey = key;
+        bool updateToNonMultiKey = false;
+
+        if (key._projectionName == scanProjName) {
+            ABT pathNoTraverse = newKey._path;
+            const bool erasedTraverse = PathTraverseEraser{}.eraseTraverse(pathNoTraverse);
+            if (erasedTraverse &&
+                nonMultiKeyPaths.find(pathNoTraverse) != nonMultiKeyPaths.cend()) {
+                updateToNonMultiKey = true;
+                newKey._path = std::move(pathNoTraverse);
+            }
+        }
+
+        if (prevEntry) {
+            if (updateToNonMultiKey && prevEntry->first == newKey) {
+                auto& prevReq = prevEntry->second;
+                if (req.hasBoundProjectionName()) {
+                    tassert(6624168,
+                            "Should not be seeing more than one bound projection per key",
+                            !prevReq.hasBoundProjectionName());
+                    prevReq.setBoundProjectionName(req.getBoundProjectionName());
+                }
+
+                combineIntervalsDNF(true /*intersect*/, prevReq.getIntervals(), req.getIntervals());
+                if (!intersectFn(prevReq.getIntervals())) {
+                    return true;
+                }
+            } else {
+                result.insert(std::move(*prevEntry));
+                prevEntry.reset({std::move(newKey), req});
+            }
+        } else {
+            prevEntry.reset({std::move(newKey), req});
+        }
+    }
+    if (prevEntry) {
+        result.insert(std::move(*prevEntry));
+    }
+
+    // Intersect intervals.
+    for (auto& [key, req] : result) {
+        if (!intersectFn(req.getIntervals())) {
+            return true;
+        }
+    }
+
+    reqMap = std::move(result);
+    return false;
 }
 
 static bool intersectPartialSchemaReq(PartialSchemaRequirements& reqMap,
@@ -733,22 +842,53 @@ static bool intersectPartialSchemaReq(PartialSchemaRequirements& reqMap,
         PartialSchemaKey newKey;
         PartialSchemaRequirement newReq;
 
+        const bool pathIsId = key._path.is<PathIdentity>();
+        const bool pathHasTraverse = !pathIsId && checkPathContainsTraverse(key._path);
         const bool reqHasBoundProj = req.hasBoundProjectionName();
         {
+            bool first = true;
+            bool success = false;
+
             // Look for exact match on the path, and if found combine intervals.
-            auto it = reqMap.find(key);
-            if (it != reqMap.cend()) {
+            auto itRange = reqMap.equal_range(key);
+            for (auto it = itRange.first; it != itRange.second; it++) {
+                uassert(
+                    6624169, "Multiple matches for non-multikey path", first || pathHasTraverse);
+
                 PartialSchemaRequirement& existingReq = it->second;
-                if (reqHasBoundProj) {
-                    if (existingReq.hasBoundProjectionName()) {
-                        projectionRenames.emplace(req.getBoundProjectionName(),
-                                                  existingReq.getBoundProjectionName());
-                    } else {
-                        existingReq.setBoundProjectionName(req.getBoundProjectionName());
+                if (pathHasTraverse) {
+                    auto existingIntervals = existingReq.getIntervals();
+                    combineIntervalsDNF(true /*intersect*/, existingIntervals, req.getIntervals());
+                    if (existingIntervals == existingReq.getIntervals()) {
+                        // Existing interval subsumes the new one.
+                        success = true;
+                    }
+                } else {
+                    // Non-multikey path. Directly intersect and simplify intervals.
+                    combineIntervalsDNF(
+                        true /*intersect*/, existingReq.getIntervals(), req.getIntervals());
+                    success = true;
+                }
+
+                if (success) {
+                    if (reqHasBoundProj) {
+                        if (existingReq.hasBoundProjectionName()) {
+                            projectionRenames.emplace(req.getBoundProjectionName(),
+                                                      existingReq.getBoundProjectionName());
+                        } else {
+                            existingReq.setBoundProjectionName(req.getBoundProjectionName());
+                        }
+                    }
+                    if (pathHasTraverse) {
+                        // Do not iterate further for multi-key paths.
+                        break;
                     }
                 }
-                combineIntervalsDNF(
-                    true /*intersect*/, existingReq.getIntervals(), req.getIntervals());
+
+                first = false;
+            }
+
+            if (success) {
                 return true;
             }
         }
@@ -773,16 +913,6 @@ static bool intersectPartialSchemaReq(PartialSchemaRequirements& reqMap,
                 PathAppender appender(key._path);
                 appender.append(newKey._path);
 
-                combineIntervalsDNF(
-                    true /*intersect*/, newReq.getIntervals(), existingReq.getIntervals());
-
-                if (key._path.is<PathIdentity>()) {
-                    newReq.setBoundProjectionName(existingReq.getBoundProjectionName());
-                    reqMap.erase(it++);
-                } else if (!isIntervalReqFullyOpenDNF(existingReq.getIntervals())) {
-                    return false;
-                }
-
                 merged = true;
                 break;
             } else {
@@ -795,7 +925,7 @@ static bool intersectPartialSchemaReq(PartialSchemaRequirements& reqMap,
             key = std::move(newKey);
             req = std::move(newReq);
         } else {
-            reqMap[key] = req;
+            reqMap.emplace(std::move(key), std::move(req));
             break;
         }
     };
@@ -850,14 +980,7 @@ public:
     ResultType operator()(const ABT& n, const PathGet& node, const ABT& other) {
         if (auto otherGet = other.cast<PathGet>();
             otherGet != nullptr && otherGet->name() == node.name()) {
-            if (auto otherChildTraverse = otherGet->getPath().cast<PathTraverse>();
-                otherChildTraverse != nullptr && !node.getPath().is<PathTraverse>()) {
-                // If a query path has a Traverse, but the index path doesn't, the query can
-                // still be evaluated by this index. Skip the Traverse node, and continue matching.
-                return node.getPath().visit(*this, otherChildTraverse->getPath());
-            } else {
-                return node.getPath().visit(*this, otherGet->getPath());
-            }
+            return node.getPath().visit(*this, otherGet->getPath());
         }
         return {};
     }
@@ -885,73 +1008,6 @@ public:
     }
 };
 
-/**
- * Check if a path contains a Traverse node over the last path component.
- */
-class PathTraverseChecker {
-public:
-    PathTraverseChecker() {}
-
-    /**
-     * PathIdentity is always the last node in a path.
-     * Return true if either 'node' is a PathTraverse just before the last node.
-     * If the input Traverse node is somewhere in the middle of the path, return
-     * the result of its child.
-     */
-    bool transport(const ABT& /*n*/, const PathTraverse& node, bool childResult) {
-        return node.getPath().is<PathIdentity>() || childResult;
-    }
-
-    bool transport(const ABT& /*n*/, const PathGet& node, bool childResult) {
-        return childResult;
-    }
-
-    bool transport(const ABT& /*n*/, const PathIdentity& node) {
-        return false;
-    }
-
-    template <typename T, typename... Ts>
-    bool transport(const ABT& /*n*/, const T& /*node*/, Ts&&...) {
-        uasserted(6624153, "Index paths only consist of Get, Traverse, and Id nodes.");
-        return false;
-    }
-
-    /**
-     * Return true if the node before the last one in 'path' is a PathTraverse.
-     * Return false otherwise.
-     */
-    bool check(const ABT& path) {
-        return algebra::transport<true>(path, *this);
-    }
-};
-
-void findMatchingSchemaRequirement(const PartialSchemaKey& indexKey,
-                                   const PartialSchemaRequirements& reqMap,
-                                   PartialSchemaKeySet& keySet,
-                                   PartialSchemaRequirement& req,
-                                   const bool setIntervalsAndBoundProj) {
-    for (const auto& [queryKey, queryReq] : reqMap) {
-        const auto pathSuffixResult = PathSuffixExtactor::check(queryKey._path, indexKey._path);
-        if (pathSuffixResult.has_value() && pathSuffixResult->is<PathIdentity>()) {
-            keySet.insert(queryKey);
-
-            if (setIntervalsAndBoundProj) {
-                // Combine all matching requirements into a single entry.
-                if (queryReq.hasBoundProjectionName()) {
-                    uassert(6624154, "Unexpected bound projection", !req.hasBoundProjectionName());
-                    req.setBoundProjectionName(queryReq.getBoundProjectionName());
-                }
-                if (!isIntervalReqFullyOpenDNF(queryReq.getIntervals())) {
-                    uassert(6624350,
-                            "Unexpected intervals",
-                            isIntervalReqFullyOpenDNF(req.getIntervals()));
-                    req.getIntervals() = queryReq.getIntervals();
-                }
-            }
-        }
-    }
-}
-
 CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
                                            const ProjectionName& scanProjectionName,
                                            const PartialSchemaRequirements& reqMap,
@@ -969,6 +1025,7 @@ CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
         opt::unordered_set<size_t> fieldsToCollate;
         size_t intervalPrefixSize = 0;
 
+        // Contains one instance for each unmatched key.
         PartialSchemaKeySet unsatisfiedKeys;
         for (const auto& [key, req] : reqMap) {
             unsatisfiedKeys.insert(key);
@@ -987,43 +1044,14 @@ CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
             const auto& indexCollationEntry = indexCollationSpec.at(indexField);
             PartialSchemaKey indexKey{scanProjectionName, indexCollationEntry._path};
 
-            PartialSchemaKeySet keySet;
-            PartialSchemaRequirement req;
-            findMatchingSchemaRequirement(indexKey, reqMap, keySet, req);
-            if (!keySet.empty() && isPrefix) {
+            if (reqMap.count(indexKey) == 1 && isPrefix) {
                 hasExactMatch = true;
-                const PartialSchemaKey& queryKey = *keySet.begin();
-                for (const auto& key : keySet) {
-                    unsatisfiedKeys.erase(key);
-                }
 
-                // The interval derived from the query (not from the index).
+                unsatisfiedKeys.erase(indexKey);
+                const PartialSchemaRequirement& req = reqMap.find(indexKey)->second;
                 const auto& requiredInterval = req.getIntervals();
 
-                PathTraverseChecker pathChecker;
-                const bool indexPathContainsArrays = pathChecker.check(indexCollationEntry._path);
-                bool combineSuccess = false;
-                if (indexPathContainsArrays) {
-                    combineSuccess = combineMultiKeyIntervalsDNF(intervals, requiredInterval);
-                } else {
-                    auto intersectedIntervals = intersectDNFIntervals(requiredInterval);
-                    if (intersectedIntervals.has_value()) {
-                        combineSuccess =
-                            combineMultiKeyIntervalsDNF(intervals, intersectedIntervals.get());
-                    } else {
-                        if (indexDef.getPartialReqMap().empty()) {
-                            hasEmptyInterval = true;
-                            return {};
-                        } else {
-                            // This is a partial index, so skip the empty interval, but consider the
-                            // remaining indexes.
-                            indexSuitable = false;
-                            break;
-                        }
-                    }
-                }
-
-                if (combineSuccess) {
+                if (combineMultiKeyIntervalsDNF(intervals, requiredInterval)) {
                     intervalPrefixSize++;
                 } else {
                     if (!combineMultiKeyIntervalsDNF(intervals,
@@ -1037,13 +1065,13 @@ CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
                                                      make<PathIdentity>()};
                         residualRequirements.emplace(
                             residualKey, PartialSchemaRequirement{"", req.getIntervals()});
-                        residualKeyMap.emplace(std::move(residualKey), queryKey);
+                        residualKeyMap.emplace(std::move(residualKey), indexKey);
                         residualRequirementsTempProjections.insert(req.getBoundProjectionName());
                     } else {
                         ProjectionName tempProj = prefixId.getNextId("evalTemp");
                         PartialSchemaKey residualKey{tempProj, make<PathIdentity>()};
                         residualRequirements.emplace(residualKey, req);
-                        residualKeyMap.emplace(std::move(residualKey), queryKey);
+                        residualKeyMap.emplace(std::move(residualKey), indexKey);
                         residualRequirementsTempProjections.insert(tempProj);
 
                         // Include bounds projection into index spec.
@@ -1074,10 +1102,16 @@ CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
                 for (const auto& queryKey : unsatisfiedKeys) {
                     const auto pathPrefixResult =
                         PathSuffixExtactor::check(queryKey._path, indexCollationEntry._path);
-                    if (pathPrefixResult.has_value()) {
+                    if (pathPrefixResult) {
                         ProjectionName tempProj = prefixId.getNextId("evalTemp");
                         PartialSchemaKey residualKey{tempProj, pathPrefixResult.get()};
-                        residualRequirements.emplace(residualKey, reqMap.at(queryKey));
+
+                        {
+                            auto range = reqMap.equal_range(queryKey);
+                            for (auto it = range.first; it != range.second; it++) {
+                                residualRequirements.emplace(residualKey, it->second);
+                            }
+                        }
                         residualKeyMap.emplace(std::move(residualKey), queryKey);
                         residualRequirementsTempProjections.insert(tempProj);
 
@@ -1118,7 +1152,6 @@ CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
             continue;
         }
 
-        uassert(6624161, "Invalid map sizes", residualRequirements.size() == residualKeyMap.size());
         result.emplace(indexDefName,
                        CandidateIndexEntry{std::move(indexProjectionMap),
                                            std::move(intervals),

@@ -14,6 +14,7 @@ for (let i = 0; i < 10; i++) {
     assert.commandWorked(t.insert({a: 2, b: 1}));
     assert.commandWorked(t.insert({a: [2], b: 1}));
     assert.commandWorked(t.insert({a: [[2]], b: 1}));
+    assert.commandWorked(t.insert({a: [0, 1], b: 1}));
 }
 
 assert.commandWorked(t.createIndex({a: 1}));
@@ -22,6 +23,13 @@ assert.commandWorked(t.createIndex({a: 1}));
     const res = t.explain("executionStats").aggregate([{$match: {a: {$eq: [2]}}}]);
     assert.eq(20, res.executionStats.nReturned);
     assert.eq("PhysicalScan", res.queryPlanner.winningPlan.optimizerPlan.child.child.nodeType);
+}
+
+{
+    // These two predicates don't make a contradiction, because they can match different array
+    // elements. Make sure we don't incorrectly simplify this to always-false.
+    const res = t.explain("executionStats").aggregate([{$match: {a: 0}}, {$match: {a: 1}}]);
+    assert.eq(10, res.executionStats.nReturned);
 }
 
 // Generate enough documents for index to be preferable.

@@ -187,14 +187,17 @@ static opt::unordered_map<std::string, optimizer::IndexDefinition> buildIndexSpe
                 ExtensionsCallbackNoop(),
                 MatchExpressionParser::kBanAllSpecialFeatures);
 
-            ABT exprABT = generateMatchExpression(expr.get(), false /*allowAggExpression*/, "", "");
+            ABT exprABT = generateMatchExpression(expr.get(),
+                                                  false /*allowAggExpression*/,
+                                                  "" /*rootProjection*/,
+                                                  "" /*uniquePrefix*/);
             exprABT = make<EvalFilter>(std::move(exprABT), make<Variable>(scanProjName));
 
             // TODO: simplify expression.
 
             auto conversion = convertExprToPartialSchemaReq(exprABT, true /*isFilterContext*/);
-            if (!conversion || conversion->_hasEmptyInterval) {
-                // Unsatisfiable partial index filter?
+            if (!conversion) {
+                // TODO: should this conversion be always possible?
                 continue;
             }
             tassert(6624257,

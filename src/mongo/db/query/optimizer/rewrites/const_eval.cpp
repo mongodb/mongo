@@ -415,7 +415,7 @@ void ConstEval::transport(ABT& n, const BinaryOp& op, ABT& lhs, ABT& rhs) {
                     }
                 }
             }
-            [[fallthrough]];
+            break;
         }
 
         default:

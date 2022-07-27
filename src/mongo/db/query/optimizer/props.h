@@ -396,7 +396,7 @@ public:
     IndexingAvailability(GroupIdType scanGroupId,
                          ProjectionName scanProjection,
                          std::string scanDefName,
-                         bool possiblyEqPredsOnly,
+                         bool eqPredsOnly,
                          opt::unordered_set<std::string> satisfiedPartialIndexes);
 
     bool operator==(const IndexingAvailability& other) const;
@@ -408,19 +408,17 @@ public:
     const opt::unordered_set<std::string>& getSatisfiedPartialIndexes() const;
     opt::unordered_set<std::string>& getSatisfiedPartialIndexes();
 
-    bool getPossiblyEqPredsOnly() const;
-    void setPossiblyEqPredsOnly(bool value);
+    bool getEqPredsOnly() const;
+    void setEqPredsOnly(bool value);
 
 private:
     const GroupIdType _scanGroupId;
     const ProjectionName _scanProjection;
     const std::string _scanDefName;
 
-    // Specifies if all predicates in the current group and child group are "possibly" equalities.
+    // Specifies if all predicates in the current group and child group are equalities.
     // This is determined based on SargableNode exclusively containing equality intervals.
-    // The "possibly" part is due to 'Get "a" Id' being equivalent 'Get "a" Traverse Id' with a
-    // multi-key index.
-    bool _possiblyEqPredsOnly;
+    bool _eqPredsOnly;
 
     // Set of indexes with partial indexes whose partial filters are satisfied for the current
     // group.

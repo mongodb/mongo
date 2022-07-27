@@ -78,7 +78,7 @@ public:
     }
 
 private:
-    CEHintedTransport(const Memo& memo, const PartialSchemaKeyCE& hints)
+    CEHintedTransport(const Memo& memo, const PartialSchemaSelHints& hints)
         : _heuristicCE(), _hints(hints) {}
 
     HeuristicCE _heuristicCE;

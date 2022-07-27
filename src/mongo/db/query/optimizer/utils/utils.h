@@ -60,8 +60,6 @@ inline size_t computeHashSeq(const Args&... seq) {
     return result;
 }
 
-size_t roundUpToNextPow2(size_t v, size_t maxPower);
-
 std::vector<ABT::reference_type> collectComposed(const ABT& n);
 
 /**
@@ -169,9 +167,6 @@ struct PartialSchemaReqConversion {
     // Have we added a PathTraverse.
     bool _hasTraversed;
 
-    // If we have determined that we have a contradiction.
-    bool _hasEmptyInterval;
-
     // If true, retain original predicate after the conversion. In this case, the requirement map
     // might capture only a part of the predicate.
     // TODO: consider generalizing to retain only a part of the predicate.
@@ -187,6 +182,19 @@ struct PartialSchemaReqConversion {
 boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(const ABT& expr,
                                                                           bool isFilterContext);
 
+/**
+ * Given a set of non-multikey paths, remove redundant Traverse elements from paths in a Partial
+ * Schema Requirement structure. Returns true if we have an empty result after simplification.
+ */
+bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
+                                   const IndexPathSet& nonMultiKeyPaths,
+                                   PartialSchemaRequirements& reqMap);
+
+/**
+ * Check if a path contains a Traverse element.
+ */
+bool checkPathContainsTraverse(const ABT& path);
+
 bool intersectPartialSchemaReq(PartialSchemaRequirements& target,
                                const PartialSchemaRequirements& source,
                                ProjectionRenames& projectionRenames);
@@ -201,17 +209,6 @@ std::string encodeIndexKeyName(size_t indexField);
  * Decode an field name as an index field.
  */
 size_t decodeIndexKeyName(const std::string& fieldName);
-
-/**
- * Given a partial schema key that specifies an index path, and a map of partial requirements
- * created from sargable query conditions, return the partial requirement that matches the
- * index path (and thus can be evaluated via this path).
- */
-void findMatchingSchemaRequirement(const PartialSchemaKey& indexKey,
-                                   const PartialSchemaRequirements& reqMap,
-                                   PartialSchemaKeySet& keySet,
-                                   PartialSchemaRequirement& req,
-                                   bool setIntervalsAndBoundProj = true);
 
 /**
  * Compute a mapping [indexName -> CandidateIndexEntry] that describes intervals that could be

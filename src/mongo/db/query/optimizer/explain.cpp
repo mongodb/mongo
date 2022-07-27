@@ -1621,7 +1621,7 @@ public:
                 .separator(", ")
                 .fieldName("scanDefName")
                 .print(prop.getScanDefName());
-            printBooleanFlag(printer, "possiblyEqPredsOnly", prop.getPossiblyEqPredsOnly());
+            printBooleanFlag(printer, "eqPredsOnly", prop.getEqPredsOnly());
             printer.separator("]");
 
             if (!prop.getSatisfiedPartialIndexes().empty()) {
