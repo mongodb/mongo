@@ -751,6 +751,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
+        '$BUILD_DIR/mongo/db/session_catalog',
         '$BUILD_DIR/mongo/db/storage/journal_flusher',
         '$BUILD_DIR/mongo/idl/server_parameter',
         'delayable_timeout_callback',

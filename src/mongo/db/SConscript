@@ -865,7 +865,6 @@ env.Library(
     ],
     LIBDEPS=[
         'repl/oplog_entry',
-        'session_catalog',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
@@ -876,7 +875,13 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/index/index_access_method',
+        '$BUILD_DIR/mongo/db/repl/apply_ops_command_info',
+        '$BUILD_DIR/mongo/db/repl/repl_server_parameters',
         '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
+        '$BUILD_DIR/mongo/db/stats/fill_locker_info',
+        '$BUILD_DIR/mongo/db/stats/top',
+        '$BUILD_DIR/mongo/db/stats/transaction_stats',
+        '$BUILD_DIR/mongo/db/update/update_driver',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/mongo/s/sharding_router_api',
@@ -890,12 +895,7 @@ env.Library(
         'multitenancy',
         'not_primary_error_tracker',
         'query_exec',
-        'repl/apply_ops_command_info',
-        'repl/repl_server_parameters',
-        'stats/fill_locker_info',
-        'stats/top',
-        'stats/transaction_stats',
-        'update/update_driver',
+        'session_catalog',
     ],
 )
 
@@ -964,6 +964,7 @@ env.Library(
         "$BUILD_DIR/mongo/util/concurrency/thread_pool",
         'fle_crud',
         'logical_session_id',
+        'session_catalog',
         'transaction',
     ],
 )
