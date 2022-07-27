@@ -672,3 +672,9 @@ feature_flags:
         description: When enabled, multitenant migration can use the shard split commands.
         cpp_varname: feature_flags::gShardSplit
         default: false
+
+    featureFlagDowngradingToUpgrading:
+        description: When enabled, 
+                     allow kDowngradingFromLatestToLastLTS -> kUpgrading -> kUpgraded path.
+        cpp_varname: feature_flags::gDowngradingToUpgrading
+        default: false
