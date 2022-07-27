@@ -600,21 +600,12 @@ var ShardingTest = function(params) {
     };
 
     /**
-     * Waits up to one minute for the difference in chunks between the most loaded shard and
-     * least loaded shard to be 0 or 1, indicating that the collection is well balanced. This should
-     * only be called after creating a big enough chunk difference to trigger balancing.
-     */
+     * Waits up to the specified timeout (with a default of 60s) for the collection to be
+     * considered well balanced.
+     **/
     this.awaitBalance = function(collName, dbName, timeToWait, interval) {
-        timeToWait = timeToWait || 60000;
-        interval = interval || 200;
-
-        const mongos = this.s;
-        assert.soon(function() {
-            return assert
-                .commandWorked(
-                    mongos.adminCommand({balancerCollectionStatus: dbName + '.' + collName}))
-                .balancerCompliant;
-        }, 'Timed out waiting for the collection to be balanced', timeToWait, interval);
+        const coll = this.s.getCollection(dbName + "." + collName);
+        this.awaitCollectionBalance(coll, timeToWait, interval);
     };
 
     this.getShard = function(coll, query, includeEmpty) {

@@ -180,20 +180,9 @@ function testAllowMigrationsFalseDisablesBalancer(allowMigrations, collBSetNoBal
     }));
 
     st.startBalancer();
-    assert.soon(() => {
-        st.awaitBalancerRound();
-        const shard0Chunks =
-            findChunksUtil
-                .findChunksByNs(configDB, collA.getFullName(), {shard: st.shard0.shardName})
-                .itcount();
-        const shard1Chunks =
-            findChunksUtil
-                .findChunksByNs(configDB, collA.getFullName(), {shard: st.shard1.shardName})
-                .itcount();
-        jsTestLog(`shard0 chunks ${shard0Chunks}, shard1 chunks ${shard1Chunks}`);
-        return shard0Chunks == 2 && shard1Chunks == 2;
-    }, `Balancer failed to balance ${collA.getFullName()}`, 1000 * 60 * 10);
+    st.awaitBalance(collAName, dbName, 10 * 60000 /* 10min timeout */);
     st.stopBalancer();
+    st.verifyCollectionIsBalanced(collA);
 
     const collABalanceStatus =
         assert.commandWorked(st.s.adminCommand({balancerCollectionStatus: collA.getFullName()}));

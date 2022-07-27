@@ -96,6 +96,9 @@ sh.help = function() {
         "returns wheter the specified collection is balanced or the balancer needs to take more actions on it");
     print("\tsh.configureCollectionBalancing(fullName, params)       " +
           "configure balancing settings for a specific collection");
+    print("\tsh.awaitCollectionBalance(coll)         waits for a collection to be balanced");
+    print(
+        "\tsh.verifyCollectionIsBalanced(coll)       verifies that a collection is well balanced by checking the actual data size on each shard");
 };
 
 sh.status = function(verbose, configDB) {
@@ -312,6 +315,112 @@ sh.enableBalancing = function(coll) {
         {_id: coll + ""},
         {$set: {"noBalance": false}},
         {writeConcern: {w: 'majority', wtimeout: 60000}}));
+};
+
+sh.awaitCollectionBalance = function(coll, timeout, interval) {
+    if (coll === undefined) {
+        throw Error("Must specify collection");
+    }
+    timeout = timeout || 60000;
+    interval = interval || 200;
+
+    const ns = coll.getFullName();
+    const orphanDocsPipeline = [
+        {'$collStats': {'storageStats': {}}},
+        {'$project': {'shard': true, 'storageStats': {'numOrphanDocs': true}}},
+        {'$group': {'_id': null, 'totalNumOrphanDocs': {'$sum': '$storageStats.numOrphanDocs'}}}
+    ];
+
+    var oldDb = db;
+    try {
+        db = coll.getDB();
+
+        assert.soon(
+            function() {
+                assert.soon(function() {
+                    return assert
+                        .commandWorked(sh._adminCommand({balancerCollectionStatus: ns}, true))
+                        .balancerCompliant;
+                }, 'Timed out waiting for the collection to be balanced', timeout, interval);
+
+                // (SERVER-67301) Wait for orphans counter to be 0 to account for potential stale
+                // orphans count
+                sh.disableBalancing(coll);
+                assert.soon(function() {
+                    return coll.aggregate(orphanDocsPipeline).toArray()[0].totalNumOrphanDocs === 0;
+                }, 'Timed out waiting for orphans counter to be 0', timeout, interval);
+                sh.enableBalancing(coll);
+
+                return assert.commandWorked(sh._adminCommand({balancerCollectionStatus: ns}, true))
+                    .balancerCompliant;
+            },
+            'Timed out waiting for collection to be balanced and orphans counter to be 0',
+            timeout,
+            interval);
+    } finally {
+        db = oldDb;
+    }
+};
+
+/**
+ * Verifies if given collection is properly balanced according to the data size aware balancing
+ * policy
+ */
+sh.verifyCollectionIsBalanced = function(coll) {
+    if (coll === undefined) {
+        throw Error("Must specify collection");
+    }
+
+    var oldDb = db;
+    try {
+        db = coll.getDB();
+
+        const configDB = sh._getConfigDB();
+        const ns = coll.getFullName();
+        const collection = configDB.collections.findOne({_id: ns});
+
+        let collSizeOnShards = [];
+        let shards = [];
+        const collStatsPipeline = [
+            {'$collStats': {'storageStats': {}}},
+            {
+                '$project': {
+                    'shard': true,
+                    'storageStats':
+                        {'count': true, 'size': true, 'avgObjSize': true, 'numOrphanDocs': true}
+                }
+            },
+            {'$sort': {'shard': 1}}
+        ];
+
+        let kChunkSize = 1024 * 1024 *
+            assert.commandWorked(sh._adminCommand({balancerCollectionStatus: ns})).chunkSize;
+        // TODO SERVER-67898 delete kChunkSize overwrite after completing the ticket
+        if (kChunkSize == 0) {
+            kChunkSize = collection.maxChunkSizeBytes;
+        }
+
+        // Get coll size per shard
+        const storageStats = coll.aggregate(collStatsPipeline).toArray();
+        coll.aggregate(collStatsPipeline).forEach((shardStats) => {
+            shards.push(shardStats['shard']);
+            const collSize = (shardStats['storageStats']['count'] -
+                              shardStats['storageStats']['numOrphanDocs']) *
+                shardStats['storageStats']['avgObjSize'];
+            collSizeOnShards.push(collSize);
+        });
+
+        let errorMsg = "Collection not balanced. collection= " + tojson(collection) +
+            ", shards= " + tojson(shards) + ", collSizeOnShards=" + tojson(collSizeOnShards) +
+            ", storageStats=" + tojson(storageStats) + ", kChunkSize=" + tojson(kChunkSize);
+
+        assert.lte((Math.max(...collSizeOnShards) - Math.min(...collSizeOnShards)),
+                   3 * kChunkSize,
+                   errorMsg);
+
+    } finally {
+        db = oldDb;
+    }
 };
 
 /*

@@ -747,7 +747,7 @@ bool BalancerPolicy::_singleZoneBalanceBasedOnDataSize(
                 "toShardDataSize"_attr = toSize,
                 "maxChunkSizeBytes"_attr = collDataSizeInfo.maxChunkSizeBytes);
 
-    if (fromSize - toSize < 2 * collDataSizeInfo.maxChunkSizeBytes) {
+    if (fromSize - toSize < 3 * collDataSizeInfo.maxChunkSizeBytes) {
         // Do not balance if the collection's size differs too few between the chosen shards
         return false;
     }
