@@ -43,6 +43,15 @@ class ReplicaSetNodeProcessInterface final : public NonShardServerProcessInterfa
 public:
     using NonShardServerProcessInterface::NonShardServerProcessInterface;
 
+    std::unique_ptr<WriteSizeEstimator> getWriteSizeEstimator(
+        OperationContext* opCtx, const NamespaceString& ns) const override {
+        if (_canWriteLocally(opCtx, ns)) {
+            return std::make_unique<LocalWriteSizeEstimator>();
+        } else {
+            return std::make_unique<TargetPrimaryWriteSizeEstimator>();
+        }
+    }
+
     static std::shared_ptr<executor::TaskExecutor> getReplicaSetNodeExecutor(
         ServiceContext* service);
 

@@ -44,24 +44,31 @@ class DocumentSourceMerge final : public DocumentSourceWriter<MongoProcessInterf
 public:
     static constexpr StringData kStageName = "$merge"_sd;
 
-    // A descriptor for a merge strategy. Holds a merge strategy function and a set of actions
-    // the client should be authorized to perform in order to be able to execute a merge operation
-    // using this merge strategy.
+    using BatchTransform = std::function<void(MongoProcessInterface::BatchObject&)>;
+
+    // A descriptor for a merge strategy. Holds a merge strategy function and a set of actions the
+    // client should be authorized to perform in order to be able to execute a merge operation using
+    // this merge strategy. If a 'BatchTransform' function is provided, it will be called when
+    // constructing a batch object to transform updates.
     struct MergeStrategyDescriptor {
         using WhenMatched = MergeWhenMatchedModeEnum;
         using WhenNotMatched = MergeWhenNotMatchedModeEnum;
         using MergeMode = std::pair<WhenMatched, WhenNotMatched>;
+        using UpsertType = MongoProcessInterface::UpsertType;
         // A function encapsulating a merge strategy for the $merge stage based on the pair of
         // whenMatched/whenNotMatched modes.
         using MergeStrategy = std::function<void(const boost::intrusive_ptr<ExpressionContext>&,
                                                  const NamespaceString&,
                                                  const WriteConcernOptions&,
                                                  boost::optional<OID>,
-                                                 BatchedObjects&&)>;
+                                                 BatchedObjects&&,
+                                                 UpsertType upsert)>;
 
         MergeMode mode;
         ActionSet actions;
         MergeStrategy strategy;
+        BatchTransform transform;
+        UpsertType upsertType;
     };
 
     /**
