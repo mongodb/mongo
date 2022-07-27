@@ -2951,11 +2951,11 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
 }
 
 static const char *const __stats_join_desc[] = {
-  ": accesses to the main table",
-  ": bloom filter false positives",
-  ": checks that conditions of membership are satisfied",
-  ": items inserted into a bloom filter",
-  ": items iterated",
+  "join: accesses to the main table",
+  "join: bloom filter false positives",
+  "join: checks that conditions of membership are satisfied",
+  "join: items inserted into a bloom filter",
+  "join: items iterated",
 };
 
 int
