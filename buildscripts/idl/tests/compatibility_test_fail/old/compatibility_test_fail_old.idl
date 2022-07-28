@@ -133,6 +133,9 @@ structs:
     StructCommandParameterType:
         description: "This is a struct command parameter type"
 
+    NewlyAddedStableField:
+        description: "This struct contains a field that is added as stable in the new command"
+
     UnstableNewFieldReply:
         description: "This reply contains a field that is stable in the old command but is
                       unstable in the new command."
@@ -140,6 +143,23 @@ structs:
             unstableNewField:
                 type: string
                 unstable: false
+
+    StableNewReplyField:
+        description: "This struct contains a reply field that is unstable in the old command but is
+                      stable in the new command."
+        fields:
+            stableNewReplyField:
+                type: string
+                unstable: true
+
+    StableNewField:
+        description: "This struct contains a field that is unstable in the old command but is
+                      stable in the new command."
+        fields:
+            stableNewField:
+                type: string
+                unstable: true
+                optional: true
 
     OptionalNewFieldReply:
         description: "This reply contains a field that is required in the old command but is
@@ -817,6 +837,15 @@ commands:
         api_version: "1"
         reply_type: OkReply
 
+    newStableParameterAdded:
+        description: "new command fails because it adds a new parameter as a stable field"
+        command_name: newStableParameterAdded
+        namespace: ignored
+        cpp_name: newStableParameterAdded
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
     commandParameterUnstable:
         description: "new unstable command parameter fails because it is stable
                       in the corresponding old command"
@@ -1268,6 +1297,25 @@ commands:
         strict: true
         api_version: "1"
         reply_type: UnstableNewFieldReply
+
+    unstableToStableReplyField:
+        description: "new command fails because it contains a stable reply field that is unstable
+                      in the corresponding old command"
+        command_name: unstableToStableReplyField
+        namespace: ignored
+        cpp_name: unstableToStableReplyField
+        strict: true
+        api_version: "1"
+        reply_type: StableNewReplyField
+
+    newStableReplyFieldAdded:
+        description: "new command fails because it adds a new reply as a stable field"
+        command_name: newStableReplyFieldAdded
+        namespace: ignored
+        cpp_name: newStableReplyFieldAdded
+        strict: true
+        api_version: "1"
+        reply_type: NewlyAddedStableField
 
     newReplyFieldOptional:
         description: "new command fails because it contains an optional reply field that is
@@ -1832,6 +1880,17 @@ commands:
         api_version: "1"
         reply_type: OkReply
 
+    unstableToStableTypeField:
+        description: "new command fails because has a stable type that is unstable in the corresponding
+                      old command"
+        command_name: unstableToStableTypeField
+        namespace: type
+        cpp_name: unstableToStableTypeField
+        type: StableNewField
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
     newTypeNotSuperset:
         description: "new command fails because its type is not a superset
                       of the old type"
@@ -1894,6 +1953,16 @@ commands:
         namespace: type
         type: StructFieldTypeRecursiveReplyOne
         cpp_name: newTypeStructRecursive
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    newStableTypeFieldAdded:
+        description: "new command fails because it adds a new type as a stable field"
+        command_name: newStableTypeFieldAdded
+        namespace: type
+        type: NewlyAddedStableField
+        cpp_name: newStableTypeFieldAdded
         strict: true
         api_version: "1"
         reply_type: OkReply
@@ -2064,6 +2133,20 @@ commands:
         strict: true
         api_version: "1"
         reply_type: VariantStructRecursiveReplyWithArray
+
+    unstableToStableParamField:
+        description: "new command fails because contains a stable parameter that is unstable in the
+                      corresponding old command"
+        command_name: unstableToStableParamField
+        namespace: ignored
+        cpp_name: unstableToStableParamField
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            stableNewParam:
+                type: string
+                unstable: true
 
     newParamVariantNotSuperset:
         description: "new command fails because its parameter type is a variant type that is not

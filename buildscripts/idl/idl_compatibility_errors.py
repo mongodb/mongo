@@ -124,6 +124,12 @@ ERROR_ID_NEW_COMMAND_TYPE_FIELD_REQUIRES_UNSTABLE = "ID0079"
 ERROR_ID_NEW_REPLY_CHAINED_TYPE_NOT_SUBSET = "ID0080"
 ERROR_ID_NEW_COMMAND_PARAMETER_CHAINED_TYPE_NOT_SUPERSET = "ID0081"
 ERROR_ID_NEW_COMMAND_CHAINED_TYPE_NOT_SUPERSET = "ID0082"
+ERROR_ID_UNSTABLE_REPLY_FIELD_CHANGED_TO_STABLE = "ID0083"
+ERROR_ID_UNSTABLE_COMMAND_PARAM_FIELD_CHANGED_TO_STABLE = "ID0084"
+ERROR_ID_UNSTABLE_COMMAND_TYPE_FIELD_CHANGED_TO_STABLE = "ID0085"
+ERROR_ID_NEW_REPLY_FIELD_ADDED_AS_STABLE = "ID0086"
+ERROR_ID_NEW_COMMAND_PARAM_FIELD_ADDED_AS_STABLE = "ID0087"
+ERROR_ID_NEW_COMMAND_TYPE_FIELD_ADDED_AS_STABLE = "ID0088"
 
 
 class IDLCompatibilityCheckerError(Exception):
@@ -1118,6 +1124,53 @@ class IDLCompatibilityContext(object):
                 ERROR_ID_NEW_COMMAND_TYPE_FIELD_REQUIRES_UNSTABLE, command_name,
                 ("The new definition of '%s' has command type field '%s' that requires specifying "
                  "a value for the 'unstable' field") % (command_name, field_name), file)
+
+    def add_unstable_reply_field_changed_to_stable_error(self, command_name: str, field_name: str,
+                                                         file: str) -> None:
+        """Add an error that a reply field may not change from unstable to stable."""
+        self._add_error(ERROR_ID_UNSTABLE_REPLY_FIELD_CHANGED_TO_STABLE, command_name, (
+            "The command '%s' has reply field '%s' which is unstable and may not be changed to stable in "
+            "the new definition unless explicitly allowed.") % (command_name, field_name), file)
+
+    def add_unstable_param_or_type_field_to_stable_error(self, command_name: str, field_name: str,
+                                                         file: str,
+                                                         is_command_parameter: bool) -> None:
+        """Add an error that a command parameter or type field may not change from unstable to stable."""
+        if is_command_parameter:
+            self._add_error(
+                ERROR_ID_UNSTABLE_COMMAND_PARAM_FIELD_CHANGED_TO_STABLE, command_name,
+                ("The command '%s' has command parameter field '%s' which is unstable and may "
+                 "not be changed to stable in the new definition unless explicitly allowed.") %
+                (command_name, field_name), file)
+        else:
+            self._add_error(
+                ERROR_ID_UNSTABLE_COMMAND_TYPE_FIELD_CHANGED_TO_STABLE, command_name,
+                ("The command '%s' has command type field '%s' which is unstable and may "
+                 "not be changed to stable in the new definition unless explicitly allowed.") %
+                (command_name, field_name), file)
+
+    def add_new_reply_field_added_as_stable_error(self, command_name: str, field_name: str,
+                                                  file: str) -> None:
+        """Add an error that a new reply field may not be added as stable unless explicitly allowed."""
+        self._add_error(
+            ERROR_ID_NEW_REPLY_FIELD_ADDED_AS_STABLE, command_name,
+            ("The command '%s' has newly-added reply field '%s' which may not be defined as stable "
+             "unless that addition is explicitly allowed.") % (command_name, field_name), file)
+
+    def add_new_param_or_type_field_added_as_stable_error(self, command_name: str, field_name: str,
+                                                          file: str,
+                                                          is_command_parameter: bool) -> None:
+        """Add an error that a new command param or type field may not be added as stable unless explicitly allowed."""
+        if is_command_parameter:
+            self._add_error(
+                ERROR_ID_NEW_COMMAND_PARAM_FIELD_ADDED_AS_STABLE, command_name,
+                ("The command '%s' has newly-added param '%s' which may not be defined as stable "
+                 "unless that addition is explicitly allowed.") % (command_name, field_name), file)
+        else:
+            self._add_error(
+                ERROR_ID_NEW_COMMAND_TYPE_FIELD_ADDED_AS_STABLE, command_name,
+                ("The command '%s' has newly-added type '%s' which may not be defined as stable "
+                 "unless that addition is explicitly allowed.") % (command_name, field_name), file)
 
 
 def _assert_unique_error_messages() -> None:

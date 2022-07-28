@@ -210,6 +210,91 @@ IGNORE_STABLE_TO_UNSTABLE_LIST: List[str] = [
     'delete-param-runtimeConstants',
 ]
 
+# Once a field is part of the stable API, either by direct addition or by changing it from unstable
+# to stable, it cannot removed from the stable API within this API version. Given this impact, we
+# want to make sure such changes are always intentional. Therefore, the checker will throw errors
+# unless the field is also added to this list below, with which the author ackhowledges they are
+# aware of the above implications.
+ALLOWED_STABLE_FIELDS_LIST: List[str] = [
+    # This list is only used in unit-tests. These cases modify fields from unstable to stable.
+    'oldReplyFieldTypeBsonAnyUnstable-reply-oldBsonSerializationTypeAnyUnstableReplyField',
+    'newReplyFieldTypeBsonAnyUnstable-reply-newBsonSerializationTypeAnyUnstableReplyField',
+    'replyFieldTypeBsonAnyNotAllowedUnstable-reply-bsonSerializationTypeAnyUnstableReplyField',
+    'replyFieldCppTypeNotEqualUnstable-reply-cppTypeNotEqualReplyUnstableField',
+    'newReplyFieldStable-reply-stableNewField',
+    'importedReplyCommand-reply-stableNewField',
+    'newReplyFieldTypeStructRecursiveOne-reply-stableNewField',
+    'commandParameterStableRequiredNoDefault-param-newRequiredStableParam',
+    'oldCommandParamTypeBsonAnyUnstable-param-bsonTypeAnyUnstableParam',
+    'newCommandParamTypeBsonAnyUnstable-param-bsonTypeAnyUnstableParam',
+    'commandParamTypeBsonAnyNotAllowedUnstable-param-bsonTypeAnyUnstableParam',
+    'commandParameterCppTypeNotEqualUnstable-param-cppTypeNotEqualParam',
+    'oldTypeBsonAnyUnstable-param-oldBsonSerializationTypeAnyUnstableStructField',
+    'newTypeBsonAnyUnstable-param-newBsonSerializationTypeAnyUnstableStructField',
+    'typeBsonAnyNotAllowedUnstable-param-bsonSerializationTypeAnyUnstableStructField',
+    'commandCppTypeNotEqualUnstable-param-cppTypeNotEqualStructUnstableField',
+    'newlyAddedTypeFieldBsonAnyNotAllowed-param-newlyAddedBsonSerializationTypeAnyStructField',
+    'typeWithIncompatibleChainedStruct-param-newBsonSerializationTypeAnyUnstableStructField',
+    'addedCommandParameterStable-param-newOptionalStableParam',
+    'addedCommandParameterStableWithDefault-param-newStableParamWithDefault',
+    'newCommandParameterTypeStructRecursiveOne-param-unstableToStableOptionalField',
+    'oldUnstableParamTypeChanges-param-oldUnstableTypeChangesParam',
+    'oldUnstableTypeChanges-param-oldUnstableTypeChangesField',
+    'newTypeFieldStableOptional-param-stableOptionalTypeField',
+    'newTypeFieldStableWithDefault-param-stableWithDefaultTypeField',
+
+    # This list is only used in unit-tests. These cases add new fields as stable.
+    'newlyAddedReplyFieldTypeBsonAnyNotAllowed-reply-newlyAddedBsonSerializationTypeAnyReplyField',
+    'newReplyFieldAdded-reply-addedNewField',
+    'replyFieldVariantDifferentStructIgnoreList-reply-fieldOne',
+    'replyFieldNonEnumToEnumIgnoreList-reply-replyField',
+    'newlyAddedReplyFieldTypeBsonAnyAllowed-reply-newlyAddedBsonSerializationTypeAnyReplyField',
+    'newReplyOptionalBool-reply-ok2',
+    'commandWithNewArrayTypeParameterAndArrayTypeReply-reply-newArrayTypeField',
+    'commandWithNewNestedArrayTypeParameterAndNestedArrayTypeReply-reply-newStructWithArrayTypeField',
+    'addedNewReplyFieldMissingUnstableField-reply-missingUnstableFieldAddedNewField',
+    'newlyAddedParamBsonAnyNotAllowed-param-newlyAddedBsonAnyNotAllowedParam',
+    'addedNewCommandParameterRequired-param-newRequiredParam',
+    'newTypeFieldAddedRequired-param-addedRequiredTypeField',
+    'arrayCommandParameterTypeError-param-fieldOne',
+    'addedNewParameterMissingUnstableField-param-missingUnstableFieldAddedNewParameter',
+    'addedNewCommandTypeFieldMissingUnstableField-param-missingUnstableFieldAddedNewField',
+    'addedCommandParameter-param-newParameter',
+    'newlyAddedParamBsonAnyAllowList-param-newlyAddedBsonAnyAllowListParam',
+    'newlyAddedTypeFieldBsonAnyAllowList-param-newlyAddedBsonSerializationTypeAnyStructField',
+    'newTypeFieldAddedOptional-param-addedOptionalTypeField',
+    'newParameterOptionalBool-param-flag',
+    'newCommandTypeOptionalBool-param-ok2',
+    'commandWithNewArrayTypeParameterAndArrayTypeReply-param-newArrayTypeParameter',
+    'commandWithNewNestedArrayTypeParameterAndNestedArrayTypeReply-param-newNestedArrayTypeParameter',
+
+    # Add real use cases for allowed new stable or unstable-to-stable fields after this line.
+    # Changes relative to 5.0:
+    'collMod-param-isTimeseriesNamespace',
+    'collMod-param-cappedSize',
+    'collMod-param-cappedMax',
+    'createIndexes-param-isTimeseriesNamespace',
+    'dropIndexes-param-isTimeseriesNamespace',
+    'listIndexes-param-isTimeseriesNamespace',
+    'listIndexes-reply-clustered',
+    'create-param-encryptedFields',
+    'create-param-bucketRoundingSeconds',
+    'encryptedFields-param-encryptedFields',
+    'endSessions-param-txnNumber',
+    'endSessions-param-txnUUID',
+    'refreshSessions-param-txnNumber',
+    'refreshSessions-param-txnUUID',
+    'insert-param-isTimeseriesNamespace',
+    'update-param-isTimeseriesNamespace',
+    'delete-param-isTimeseriesNamespace',
+    'findAndModify-param-stmtId',
+    'aggregate-param-$_generateV2ResumeTokens',
+    'hello-param-loadBalanced',
+    'hello-reply-serviceId',
+    'hello-reply-isImplicitDefaultMajorityWC',
+    'hello-reply-cwwc',
+]
+
 SKIPPED_FILES = [
     "unittest.idl", "mozILocalization.idl", "mozILocaleService.idl", "mozIOSPreferences.idl",
     "nsICollation.idl", "nsIStringBundle.idl", "nsIScriptableUConv.idl", "nsITextToSubURI.idl"
@@ -582,6 +667,11 @@ def check_reply_field(ctxt: IDLCompatibilityContext, old_field: syntax.Field,
                 ctxt.add_reply_field_contains_validator_error(cmd_name, new_field.name,
                                                               new_idl_file_path)
 
+    # A reply field may not change from unstable to stable unless explicitly allowed to.
+    if old_field.unstable and not new_field.unstable and ignore_list_name not in ALLOWED_STABLE_FIELDS_LIST:
+        ctxt.add_unstable_reply_field_changed_to_stable_error(cmd_name, new_field.name,
+                                                              new_idl_file_path)
+
     old_field_compatibility = FieldCompatibility(old_field_type, old_idl_file, old_idl_file_path,
                                                  old_field.unstable, old_field.optional)
     new_field_compatibility = FieldCompatibility(new_field_type, new_idl_file, new_idl_file_path,
@@ -652,6 +742,9 @@ def check_reply_fields(ctxt: IDLCompatibilityContext, old_reply: syntax.Struct,
 
         if newly_added:
             allow_name: str = cmd_name + "-reply-" + new_field.name
+            if not new_field.unstable and allow_name not in ALLOWED_STABLE_FIELDS_LIST:
+                ctxt.add_new_reply_field_added_as_stable_error(cmd_name, new_field.name,
+                                                               new_idl_file_path)
 
             new_field_type = get_field_type(new_field, new_idl_file, new_idl_file_path)
             # If we encounter a bson_serialization_type of None, we skip checking if 'any' is used.
@@ -954,6 +1047,11 @@ def check_command_params_or_type_struct_fields(
                 newly_added = False
 
         if newly_added:
+            allow_stable_name: str = cmd_name + "-param-" + new_field.name
+            if not new_field.unstable and allow_stable_name not in ALLOWED_STABLE_FIELDS_LIST:
+                ctxt.add_new_param_or_type_field_added_as_stable_error(
+                    cmd_name, new_field.name, new_idl_file_path, is_command_parameter)
+
             new_field_type = get_field_type(new_field, new_idl_file, new_idl_file_path)
             new_field_optional = new_field.optional or (new_field_type
                                                         and new_field_type.name == 'optionalBool')
@@ -988,6 +1086,12 @@ def check_command_param_or_type_struct_field(
     if not old_field.unstable and new_field.unstable and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:
         ctxt.add_new_param_or_command_type_field_unstable_error(
             cmd_name, old_field.name, old_idl_file_path, type_name, is_command_parameter)
+
+    # A command param or type field may not change from unstable to stable unless explicitly allowed to.
+    if old_field.unstable and not new_field.unstable and ignore_list_name not in ALLOWED_STABLE_FIELDS_LIST:
+        ctxt.add_unstable_param_or_type_field_to_stable_error(
+            cmd_name, old_field.name, old_idl_file_path, is_command_parameter)
+
     # If old field is unstable and new field is stable, the new field should either be optional or
     # have a default value.
     old_field_type = get_field_type(old_field, old_idl_file, old_idl_file_path)
