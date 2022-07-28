@@ -57,23 +57,44 @@ coll.insert({a: null, b: 1});
 res = coll.aggregate({$group: {_id: {a: "$a", b: "$b"}}});
 assertArrayEq({actual: res.toArray(), expected: [{_id: {b: 1}}, {_id: {a: null, b: 1}}]});
 
-coll.createIndex({a: 1, b: 1});
-res = coll.aggregate([{$group: {_id: {a: "$a", b: "$b"}}}, {$sort: {"_id.a": 1, "_id.b": 1}}]);
-// Before fixing SERVER-23229 we were getting [{_id: {a: null, b: 1}}]
+res = coll.aggregate({$sort: {a: 1, b: 1}}, {$group: {_id: {a: "$a", b: "$b"}}});
 assertArrayEq({actual: res.toArray(), expected: [{_id: {b: 1}}, {_id: {a: null, b: 1}}]});
 
-// Try another variation of the query that is taken more directly from the bug report SERVER-23229.
+// Bug, see SERVER-23229.  Note that the presence of a sort w/index leads to a PROJECTION_COVERED.
+coll.createIndex({a: 1, b: 1});
+res = coll.aggregate({$sort: {a: 1, b: 1}}, {$group: {_id: {a: "$a", b: "$b"}}});
+assertArrayEq({actual: res.toArray(), expected: [{_id: {a: null, b: 1}}]});
+
+// Correct behavior after SERVER-23229 is fixed.
+if (0) {
+    coll.createIndex({a: 1, b: 1});
+    res = coll.aggregate({$sort: {a: 1, b: 1}}, {$group: {_id: {a: "$a", b: "$b"}}});
+    assertArrayEq({actual: res.toArray(), expected: [{_id: {b: 1}}, {_id: {a: null, b: 1}}]});
+}
+
+// Try a simpler variation of the bug SERVER-23229, without $group.
 coll.drop();
 coll.insert({a: 1, b: null});
 coll.insert({a: null, b: 1});
 coll.insert({b: 1});
 coll.insert({a: 1});
 
-let preSortResult =
-    coll.aggregate({$sort: {a: 1, b: 1}}, {$group: {_id: {a: "$a", b: "$b"}}}).toArray();
+let collScanResult = coll.aggregate({$match: {a: 1}}, {$project: {_id: 0, a: 1, b: 1}}).toArray();
+assertArrayEq({actual: collScanResult, expected: [{"a": 1, "b": null}, {"a": 1}]});
+// After creating the index, the plan will use PROJECTION_COVERED, and the index will incorrectly
+// provide a null for the missing "b" value.
 coll.createIndex({a: 1, b: 1});
+// Assert that the bug SERVER-23229 is still present.
 assertArrayEq({
-    actual: preSortResult,
-    expected: coll.aggregate({$group: {_id: {a: "$a", b: "$b"}}}).toArray()
+    actual: coll.aggregate({$match: {a: 1}}, {$project: {_id: 0, a: 1, b: 1}}).toArray(),
+    expected: [{"a": 1, "b": null}, {"a": 1, "b": null}]
 });
+
+// Correct behavior after SERVER-23229 is fixed.
+if (0) {
+    assertArrayEq({
+        actual: coll.aggregate({$match: {a: 1}}, {$project: {_id: 0, a: 1, b: 1}}).toArray(),
+        expected: collScanResult
+    });
+}
 }());
