@@ -99,36 +99,26 @@ TEST_F(MemoryUsageTrackerTest, UpdateUsageUpdatesGlobal) {
     ASSERT_EQ(_tracker.maxMemoryBytes(), 150LL);
 }
 
-// TODO SERVER-61281: Need to add back the DEATH_TEST_F removed in SERVER-65473, once
-// MemoryUsageTracker.update() no longer underflows.
-
-TEST_F(MemoryUsageTrackerTest, UpdateFunctionUsageToNegativeIsDisallowed) {
+DEATH_TEST_F(MemoryUsageTrackerTest,
+             UpdateFunctionUsageToNegativeIsDisallowed,
+             "Underflow on memory tracking") {
     _funcTracker.set(50LL);
     ASSERT_EQ(_funcTracker.currentMemoryBytes(), 50LL);
     ASSERT_EQ(_funcTracker.maxMemoryBytes(), 50LL);
     ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
     ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
 
-    // TODO SERVER-61281: This should throw an assertion once accurate tracking is implemented and
-    // no underflow should happen. That assertion would make sure "Underflow in memory tracking"
-    // is reported.
-
     _funcTracker.update(-100);
-    ASSERT_EQ(_funcTracker.currentMemoryBytes(), 0LL);
-    ASSERT_EQ(_tracker.currentMemoryBytes(), 0LL);
 }
 
-TEST_F(MemoryUsageTrackerTest, UpdateMemUsageToNegativeIsDisallowed) {
+DEATH_TEST_F(MemoryUsageTrackerTest,
+             UpdateMemUsageToNegativeIsDisallowed,
+             "Underflow on memory tracking") {
     _tracker.set(50LL);
     ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
     ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
 
-    // TODO SERVER-61281: This should throw an assertion once accurate tracking is implemented and
-    // no underflow should happen. That assertion would make sure "Underflow in memory tracking"
-    // is reported.
-
     _tracker.update(-100);
-    ASSERT_EQ(_tracker.currentMemoryBytes(), 0LL);
 }
 
 }  // namespace

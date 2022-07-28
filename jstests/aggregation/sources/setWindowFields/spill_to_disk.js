@@ -24,12 +24,12 @@ const coll = db[jsTestName()];
 coll.drop();
 // Doc size was found through logging the size in the SpillableCache. Partition sizes were chosen
 // arbitrarily.
-let avgDocSize = 274;
+let avgDocSize = 171;
 let smallPartitionSize = 6;
 let largePartitionSize = 21;
 setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()),
                        "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
-                       avgDocSize * smallPartitionSize + 1);
+                       avgDocSize * smallPartitionSize + 50);
 
 seedWithTickerData(coll, 10);
 
