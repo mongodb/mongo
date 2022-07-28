@@ -40,6 +40,7 @@ import abt_calibrator
 import workload_execution
 from workload_execution import Query, QueryParameters
 import parameters_extractor
+from random_generator_config import distributions
 
 __all__ = []
 
@@ -80,17 +81,14 @@ def main():
 
         # 3. Collecting data for calibration (optional).
         # It runs the pipelines and stores explains to the database.
-        requests = [
-            Query(pipeline=[{'$match': {'f_5': 7}}], keys_length_in_bytes=2),
-            Query(pipeline=[{'$match': {'f_1': 5}}], keys_length_in_bytes=2),
-            Query(pipeline=[{'$match': {'f_7': 4}}], keys_length_in_bytes=2),
-            Query(pipeline=[{'$match': {'f_5': 7}}], keys_length_in_bytes=2),
-            Query(pipeline=[{'$match': {'f_1': 5}}], keys_length_in_bytes=2),
-            Query(pipeline=[{'$match': {'f_2': generator.gen_random_string()}}],
-                  keys_length_in_bytes=generator.config.string_length + 2),
-            Query(pipeline=[{'$match': {'f_5': generator.gen_random_string()}}],
-                  keys_length_in_bytes=generator.config.string_length + 2),
-        ]
+        requests = []
+        for val in distributions['string_choice'].get_values():
+            keys_length = len(val) + 2
+            for i in range(1, 5):
+                requests.append(
+                    Query(pipeline=[{'$match': {f'choice{i}': val}}],
+                          keys_length_in_bytes=keys_length))
+
         workload_execution.execute(database, config.workload_execution, generator.collection_infos,
                                    requests)
 
@@ -106,6 +104,8 @@ def main():
 
         parameters = parameters_extractor.extract_parameters(config.abt_calibrator, database, [])
         save_to_csv(parameters, 'parameters.csv')
+
+    print("DONE!")
 
 
 if __name__ == '__main__':

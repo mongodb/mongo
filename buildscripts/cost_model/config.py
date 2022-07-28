@@ -31,7 +31,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 import os
-from typing import Mapping
+from typing import Mapping, Sequence
 
 
 @dataclass
@@ -114,34 +114,67 @@ class DataGeneratorConfig:
     """Data Generator configuration."""
 
     enabled: bool
-    string_length: int
     collection_cardinalities: list[int]
-    collection_fields_counts: list[int]
     data_types: list[DataType]
+    collection_templates: list[CollectionTemplate]
     batch_size: int
 
     @staticmethod
     def create(json_config: dict[str, any]) -> DataGeneratorConfig:
         """Create new configuration object from JSON."""
 
-        default = DataGeneratorConfig(enabled=False, string_length=8, collection_cardinalities=[],
-                                      collection_fields_counts=[], data_types=[], batch_size=10000)
+        default = DataGeneratorConfig(enabled=False, collection_cardinalities=[], data_types=[],
+                                      collection_templates=[], batch_size=10000)
         if json_config is None:
             return default
 
         enabled = json_config.get('enabled', default.enabled)
-        string_length = json_config.get('stringLength', default.string_length)
         collection_cardinalities = json_config.get('collectionCardinalities',
                                                    default.collection_cardinalities)
-        collection_fields_count = json_config.get('collectionFieldsCounts',
-                                                  default.collection_fields_counts)
         data_types_str = json_config.get('dataTypes', default.data_types)
         data_types = [DataType.parse(dt, 'dataTypes') for dt in data_types_str]
+
+        collection_templates = [
+            CollectionTemplate.create(jc)
+            for jc in json_config.get("collectionTemplates", default.collection_templates)
+        ]
+
         batch_size = json_config.get('batchSize', default.batch_size)
-        return DataGeneratorConfig(enabled=enabled, string_length=string_length,
-                                   collection_cardinalities=collection_cardinalities,
-                                   collection_fields_counts=collection_fields_count,
-                                   data_types=data_types, batch_size=batch_size)
+        return DataGeneratorConfig(
+            enabled=enabled, collection_cardinalities=collection_cardinalities,
+            data_types=data_types, collection_templates=collection_templates, batch_size=batch_size)
+
+
+@dataclass
+class CollectionTemplate:
+    """Collection template used to generate a collection with random data."""
+
+    name: str
+    fields: Sequence[FieldTemplate]
+
+    @staticmethod
+    def create(json_config: dict[str, any]) -> CollectionTemplate:
+        """Create new template object from JSON."""
+        name = json_config['name']
+        fields = [FieldTemplate.create(jc) for jc in json_config['fields']]
+        return CollectionTemplate(name=name, fields=fields)
+
+
+@dataclass
+class FieldTemplate:
+    """Field template used to generate a collection with random data."""
+
+    name: str
+    data_type: DataType
+    distribution: str
+
+    @staticmethod
+    def create(json_config: dict[str, any]) -> FieldTemplate:
+        """Create new template object from JSON."""
+        name = json_config['name']
+        data_type = DataType.parse(json_config['type'], 'type')
+        distribution = json_config['distribution']
+        return FieldTemplate(name=name, data_type=data_type, distribution=distribution)
 
 
 class DataType(Enum):

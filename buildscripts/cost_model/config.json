@@ -8,22 +8,109 @@
     },
     "dataGenerator": {
         "enabled": true,
-        "stringLength": 64,
         "collectionCardinalities": [
             100,
-            200
+            200,
+            500
         ],
-        "collectionFieldsCounts": [
-            1,
-            5,
-            10
-        ],
-        "dataTypes": [
-            "int",
-            "str",
-            "arr"
-        ],
-        "batchSize": 10000
+        "batchSize": 10000,
+        "collectionTemplates": [
+            {
+                "name": "c_str",
+                "fields": [
+                    {
+                        "name": "choice1",
+                        "type": "str",
+                        "distribution": "string_choice"
+                    }
+                ]
+            },
+            {
+                "name": "c_str_5",
+                "fields": [
+                    {
+                        "name": "choice1",
+                        "type": "str",
+                        "distribution": "string_choice"
+                    },
+                    {
+                        "name": "mixed1",
+                        "type": "str",
+                        "distribution": "string_mixed"
+                    },
+                    {
+                        "name": "uniform1",
+                        "type": "str",
+                        "distribution": "string_uniform"
+                    },
+                    {
+                        "name": "choice2",
+                        "type": "str",
+                        "distribution": "string_choice"
+                    },
+                    {
+                        "name": "mixed2",
+                        "type": "str",
+                        "distribution": "string_mixed"
+                    }
+                ]
+            },
+            {
+                "name": "c_str_10",
+                "fields": [
+                    {
+                        "name": "choice1",
+                        "type": "str",
+                        "distribution": "string_choice"
+                    },
+                    {
+                        "name": "mixed1",
+                        "type": "str",
+                        "distribution": "string_mixed"
+                    },
+                    {
+                        "name": "uniform1",
+                        "type": "str",
+                        "distribution": "string_uniform"
+                    },
+                    {
+                        "name": "choice2",
+                        "type": "str",
+                        "distribution": "string_choice"
+                    },
+                    {
+                        "name": "mixed2",
+                        "type": "str",
+                        "distribution": "string_mixed"
+                    },
+                    {
+                        "name": "uniform2",
+                        "type": "str",
+                        "distribution": "string_uniform"
+                    },
+                    {
+                        "name": "choice3",
+                        "type": "str",
+                        "distribution": "string_choice"
+                    },
+                    {
+                        "name": "mixed3",
+                        "type": "str",
+                        "distribution": "string_mixed"
+                    },
+                    {
+                        "name": "uniform3",
+                        "type": "str",
+                        "distribution": "string_uniform"
+                    },
+                    {
+                        "name": "choice4",
+                        "type": "str",
+                        "distribution": "string_choice"
+                    }
+                ]
+            }
+        ]
     },
     "abtCalibrator": {
         "enabled": true,
