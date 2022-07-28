@@ -434,6 +434,28 @@ __verify_tree(
         WT_RET(__wt_debug_page(session, NULL, ref, NULL));
 #endif
 
+    /* Make sure the page we got belongs in this kind of tree. */
+    switch (S2BT(session)->type) {
+    case BTREE_COL_FIX:
+        if (page->type != WT_PAGE_COL_INT && page->type != WT_PAGE_COL_FIX)
+            WT_RET_MSG(session, WT_ERROR,
+              "page at %s is a %s, which does not belong in a fixed-length column-store tree",
+              __verify_addr_string(session, ref, vs->tmp1), __wt_page_type_string(page->type));
+        break;
+    case BTREE_COL_VAR:
+        if (page->type != WT_PAGE_COL_INT && page->type != WT_PAGE_COL_VAR)
+            WT_RET_MSG(session, WT_ERROR,
+              "page at %s is a %s, which does not belong in a variable-length column-store tree",
+              __verify_addr_string(session, ref, vs->tmp1), __wt_page_type_string(page->type));
+        break;
+    case BTREE_ROW:
+        if (page->type != WT_PAGE_ROW_INT && page->type != WT_PAGE_ROW_LEAF)
+            WT_RET_MSG(session, WT_ERROR,
+              "page at %s is a %s, which does not belong in a row-store tree",
+              __verify_addr_string(session, ref, vs->tmp1), __wt_page_type_string(page->type));
+        break;
+    }
+
     /* Column-store key order checks: check the page's record number. */
     switch (page->type) {
     case WT_PAGE_COL_FIX:
