@@ -94,12 +94,9 @@ def _access_member(field):
     # type: (ast.Field) -> str
     """Get the declaration to access a member for a field."""
     member_name = _get_field_member_name(field)
-
-    if not field.optional:
-        return '%s' % (member_name)
-
-    # optional types need a method call to access their values
-    return '%s.get()' % (member_name)
+    if field.optional:
+        member_name = '(*%s)' % (member_name)
+    return member_name
 
 
 def _get_bson_type_check(bson_element, ctxt_name, ast_type):
@@ -1547,7 +1544,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         elif [arg for arg in constructor.args if arg.name == 'nssOrUUID']:
             if [field for field in struct.fields if field.serialize_op_msg_request_only]:
                 initializers.append(
-                    '_dbName(nssOrUUID.uuid() ? nssOrUUID.dbname() : nssOrUUID.nss().get().db().toString())'
+                    '_dbName(nssOrUUID.uuid() ? nssOrUUID.dbname() : nssOrUUID.nss()->db().toString())'
                 )
                 initializes_db_name = True
 
@@ -2039,7 +2036,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         optional_block_start = None
         if field.optional:
-            optional_block_start = 'if (%s.is_initialized()) {' % (member_name)
+            optional_block_start = 'if (%s) {' % (member_name)
         elif field.type.is_struct or needs_custom_serializer or field.type.is_array:
             # Introduce a new scope for required nested object serialization.
             optional_block_start = '{'
@@ -2156,7 +2153,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
             optional_block_start = '{'
             if field.optional:
-                optional_block_start = 'if (%s.is_initialized()) {' % (member_name)
+                optional_block_start = 'if (%s) {' % (member_name)
 
             with self._block(optional_block_start, '}'):
                 self._writer.write_line('OpMsg::DocumentSequence documentSequence;')
