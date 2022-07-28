@@ -131,8 +131,7 @@ private:
 
     std::pair<BSONObj, int> makeBatchObject(Document&& doc) const override {
         auto obj = doc.toBson();
-        tassert(6628900, "_writeSizeEstimator should be initialized", _writeSizeEstimator);
-        return {obj, _writeSizeEstimator->estimateInsertSizeBytes(obj)};
+        return {obj, obj.objsize()};
     }
 
     void waitWhileFailPointEnabled() override;

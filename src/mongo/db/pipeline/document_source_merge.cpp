@@ -62,7 +62,7 @@ using MergeStrategy = MergeStrategyDescriptor::MergeStrategy;
 using MergeStrategyDescriptorsMap = std::map<const MergeMode, const MergeStrategyDescriptor>;
 using WhenMatched = MergeStrategyDescriptor::WhenMatched;
 using WhenNotMatched = MergeStrategyDescriptor::WhenNotMatched;
-using BatchTransform = DocumentSourceMerge::BatchTransform;
+using BatchTransform = std::function<void(DocumentSourceMerge::BatchedObjects&)>;
 using UpdateModification = write_ops::UpdateModification;
 using UpsertType = MongoProcessInterface::UpsertType;
 
@@ -86,15 +86,17 @@ const auto kDefaultPipelineLet = BSON("new"
                                       << "$$ROOT");
 
 /**
- * Creates a merge strategy which uses update semantics to perform a merge operation.
+ * Creates a merge strategy which uses update semantics to perform a merge operation. If
+ * 'BatchTransform' function is provided, it will be called to transform batched objects before
+ * passing them to the 'update'.
  */
-MergeStrategy makeUpdateStrategy() {
-    return [](const auto& expCtx,
-              const auto& ns,
-              const auto& wc,
-              auto epoch,
-              auto&& batch,
-              UpsertType upsert) {
+MergeStrategy makeUpdateStrategy(UpsertType upsert, BatchTransform transform) {
+    return [upsert, transform](
+               const auto& expCtx, const auto& ns, const auto& wc, auto epoch, auto&& batch) {
+        if (transform) {
+            transform(batch);
+        }
+
         constexpr auto multi = false;
         uassertStatusOK(expCtx->mongoProcessInterface->update(
             expCtx, ns, std::move(batch), wc, upsert, multi, epoch));
@@ -106,15 +108,16 @@ MergeStrategy makeUpdateStrategy() {
  * that each document in the batch has a matching document in the 'ns' collection (note that a
  * matching document may not be modified as a result of an update operation, yet it still will be
  * counted as matching). If at least one document doesn't have a match, this strategy returns an
- * error.
+ * error. If 'BatchTransform' function is provided, it will be called to transform batched objects
+ * before passing them to the 'update'.
  */
-MergeStrategy makeStrictUpdateStrategy() {
-    return [](const auto& expCtx,
-              const auto& ns,
-              const auto& wc,
-              auto epoch,
-              auto&& batch,
-              UpsertType upsert) {
+MergeStrategy makeStrictUpdateStrategy(UpsertType upsert, BatchTransform transform) {
+    return [upsert, transform](
+               const auto& expCtx, const auto& ns, const auto& wc, auto epoch, auto&& batch) {
+        if (transform) {
+            transform(batch);
+        }
+
         const int64_t batchSize = batch.size();
         constexpr auto multi = false;
         auto updateResult = uassertStatusOK(expCtx->mongoProcessInterface->update(
@@ -130,12 +133,7 @@ MergeStrategy makeStrictUpdateStrategy() {
  * Creates a merge strategy which uses insert semantics to perform a merge operation.
  */
 MergeStrategy makeInsertStrategy() {
-    return [](const auto& expCtx,
-              const auto& ns,
-              const auto& wc,
-              auto epoch,
-              auto&& batch,
-              UpsertType upsertType) {
+    return [](const auto& expCtx, const auto& ns, const auto& wc, auto epoch, auto&& batch) {
         std::vector<BSONObj> objectsToInsert(batch.size());
         // The batch stores replacement style updates, but for this "insert" style of $merge we'd
         // like to just insert the new document without attempting any sort of replacement.
@@ -148,13 +146,15 @@ MergeStrategy makeInsertStrategy() {
 }
 
 /**
- * Creates a batched object transformation function which wraps 'obj' into the given 'updateOp'
- * operator.
+ * Creates a batched objects transformation function which wraps each element of the
+ * 'batch.modifications' array into the given 'updateOp' operator.
  */
 BatchTransform makeUpdateTransform(const std::string& updateOp) {
-    return [updateOp](auto& obj) {
-        std::get<UpdateModification>(obj) = UpdateModification::parseFromClassicUpdate(
-            BSON(updateOp << std::get<UpdateModification>(obj).getUpdateReplacement()));
+    return [updateOp](auto& batch) {
+        for (auto&& obj : batch) {
+            std::get<UpdateModification>(obj) = UpdateModification::parseFromClassicUpdate(
+                BSON(updateOp << std::get<UpdateModification>(obj).getUpdateReplacement()));
+        }
     };
 }
 
@@ -178,67 +178,48 @@ const MergeStrategyDescriptorsMap& getDescriptors() {
         {kReplaceInsertMode,
          {kReplaceInsertMode,
           {ActionType::insert, ActionType::update},
-          makeUpdateStrategy(),
-          {},
-          UpsertType::kGenerateNewDoc}},
+          makeUpdateStrategy(UpsertType::kGenerateNewDoc, {})}},
         // whenMatched: replace, whenNotMatched: fail
         {kReplaceFailMode,
-         {kReplaceFailMode,
-          {ActionType::update},
-          makeStrictUpdateStrategy(),
-          {},
-          UpsertType::kNone}},
+         {kReplaceFailMode, {ActionType::update}, makeStrictUpdateStrategy(UpsertType::kNone, {})}},
         // whenMatched: replace, whenNotMatched: discard
         {kReplaceDiscardMode,
-         {kReplaceDiscardMode, {ActionType::update}, makeUpdateStrategy(), {}, UpsertType::kNone}},
+         {kReplaceDiscardMode, {ActionType::update}, makeUpdateStrategy(UpsertType::kNone, {})}},
         // whenMatched: merge, whenNotMatched: insert
         {kMergeInsertMode,
          {kMergeInsertMode,
           {ActionType::insert, ActionType::update},
-          makeUpdateStrategy(),
-          makeUpdateTransform("$set"),
-          UpsertType::kGenerateNewDoc}},
+          makeUpdateStrategy(UpsertType::kGenerateNewDoc, makeUpdateTransform("$set"))}},
         // whenMatched: merge, whenNotMatched: fail
         {kMergeFailMode,
          {kMergeFailMode,
           {ActionType::update},
-          makeStrictUpdateStrategy(),
-          makeUpdateTransform("$set"),
-          UpsertType::kNone}},
+          makeStrictUpdateStrategy(UpsertType::kNone, makeUpdateTransform("$set"))}},
         // whenMatched: merge, whenNotMatched: discard
         {kMergeDiscardMode,
          {kMergeDiscardMode,
           {ActionType::update},
-          makeUpdateStrategy(),
-          makeUpdateTransform("$set"),
-          UpsertType::kNone}},
+          makeUpdateStrategy(UpsertType::kNone, makeUpdateTransform("$set"))}},
         // whenMatched: keepExisting, whenNotMatched: insert
         {kKeepExistingInsertMode,
          {kKeepExistingInsertMode,
           {ActionType::insert, ActionType::update},
-          makeUpdateStrategy(),
-          makeUpdateTransform("$setOnInsert"),
-          UpsertType::kGenerateNewDoc}},
+          makeUpdateStrategy(UpsertType::kGenerateNewDoc, makeUpdateTransform("$setOnInsert"))}},
         // whenMatched: [pipeline], whenNotMatched: insert
         {kPipelineInsertMode,
          {kPipelineInsertMode,
           {ActionType::insert, ActionType::update},
-          makeUpdateStrategy(),
-          {},
-          UpsertType::kInsertSuppliedDoc}},
+          makeUpdateStrategy(UpsertType::kInsertSuppliedDoc, {})}},
         // whenMatched: [pipeline], whenNotMatched: fail
         {kPipelineFailMode,
          {kPipelineFailMode,
           {ActionType::update},
-          makeStrictUpdateStrategy(),
-          {},
-          UpsertType::kNone}},
+          makeStrictUpdateStrategy(UpsertType::kNone, {})}},
         // whenMatched: [pipeline], whenNotMatched: discard
         {kPipelineDiscardMode,
-         {kPipelineDiscardMode, {ActionType::update}, makeUpdateStrategy(), {}, UpsertType::kNone}},
+         {kPipelineDiscardMode, {ActionType::update}, makeUpdateStrategy(UpsertType::kNone, {})}},
         // whenMatched: fail, whenNotMatched: insert
-        {kFailInsertMode,
-         {kFailInsertMode, {ActionType::insert}, makeInsertStrategy(), {}, UpsertType::kNone}}};
+        {kFailInsertMode, {kFailInsertMode, {ActionType::insert}, makeInsertStrategy()}}};
     return mergeStrategyDescriptors;
 }
 
@@ -564,14 +545,8 @@ std::pair<DocumentSourceMerge::BatchObject, int> DocumentSourceMerge::makeBatchO
     auto mergeOnFields = extractMergeOnFieldsFromDoc(doc, _mergeOnFields);
     auto mod = makeBatchUpdateModification(doc);
     auto vars = resolveLetVariablesIfNeeded(doc);
-    BatchObject batchObject{std::move(mergeOnFields), std::move(mod), std::move(vars)};
-    if (_descriptor.transform) {
-        _descriptor.transform(batchObject);
-    }
-
-    tassert(6628901, "_writeSizeEstimator should be initialized", _writeSizeEstimator);
-    return {batchObject,
-            _writeSizeEstimator->estimateUpdateSizeBytes(batchObject, _descriptor.upsertType)};
+    auto modSize = mod.objsize() + (vars ? vars->objsize() : 0);
+    return {{std::move(mergeOnFields), std::move(mod), std::move(vars)}, modSize};
 }
 
 void DocumentSourceMerge::spill(BatchedObjects&& batch) try {
@@ -580,8 +555,7 @@ void DocumentSourceMerge::spill(BatchedObjects&& batch) try {
         ? boost::optional<OID>(_targetCollectionVersion->epoch())
         : boost::none;
 
-    _descriptor.strategy(
-        pExpCtx, _outputNs, _writeConcern, targetEpoch, std::move(batch), _descriptor.upsertType);
+    _descriptor.strategy(pExpCtx, _outputNs, _writeConcern, targetEpoch, std::move(batch));
 } catch (const ExceptionFor<ErrorCodes::ImmutableField>& ex) {
     uassertStatusOKWithContext(ex.toStatus(),
                                "$merge failed to update the matching document, did you "
