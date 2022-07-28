@@ -1506,6 +1506,7 @@ del envDict
 env.AddMethod(lambda env, name, **kwargs: add_option(name, **kwargs), 'AddOption')
 
 if get_option('build-metrics'):
+    env['BUILD_METRICS_ARTIFACTS_DIR'] = '$BUILD_ROOT/$VARIANT_DIR'
     env.Tool('build_metrics')
     env.AddBuildMetricsMetaData('evg_id', env.get("BUILD_METRICS_EVG_TASK_ID", "UNKNOWN"))
     env.AddBuildMetricsMetaData('variant', env.get("BUILD_METRICS_EVG_BUILD_VARIANT", "UNKNOWN"))

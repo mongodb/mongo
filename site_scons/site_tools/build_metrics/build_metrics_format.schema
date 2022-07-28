@@ -7,6 +7,18 @@
         "memory": {
             "type": "integer",
             "description": "Virtual memory used in bytes"
+        },
+        "bytes": {
+            "type": "integer",
+            "description": "Size in bytes",
+            "minimum": 0
+        },
+        "binsize": {
+            "type": "object",
+            "properties": {
+                "filesize": { "$ref": "#/$defs/bytes" },
+                "vmsize": { "$ref": "#/$defs/bytes" }
+            }
         }
     },
     "type" : "object",
@@ -32,6 +44,41 @@
                 "max": { "$ref": "#/$defs/memory" },
                 "arithmetic_mean": {"type": "number"},
                 "start_mem": { "$ref": "#/$defs/memory" }
+            }
+        },
+        "artifact_metrics": {
+            "type": "object",
+            "properties": {
+                "total_artifact_size": { "$ref": "#/$defs/bytes" },
+                "num_artifacts": { "type": "integer" },
+                "artifacts": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["array_index", "name", "type", "size"],
+                        "properties": {
+                            "array_index": { "type": "integer" },
+                            "name": { "type": "string" },
+                            "type": {
+                                "type": "string",
+                                "enum": ["Object", "Library", "Program", "text", "json", "archive", "unknown"]
+                            },
+                            "size": { "$ref": "#/$defs/bytes" },
+                            "bin_metrics": {
+                                "type": "object",
+                                "properties": {
+                                    "text": { "$ref": "#/$defs/binsize" },
+                                    "data": { "$ref": "#/$defs/binsize" },
+                                    "rodata": { "$ref": "#/$defs/binsize" },
+                                    "bss": { "$ref": "#/$defs/binsize" },
+                                    "debug": { "$ref": "#/$defs/binsize" },
+                                    "symtab": { "$ref": "#/$defs/binsize" },
+                                    "dyntab": { "$ref": "#/$defs/binsize" }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "build_tasks" : {

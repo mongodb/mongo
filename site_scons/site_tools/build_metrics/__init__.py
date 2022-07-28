@@ -26,6 +26,7 @@ import json
 import os
 import sys
 import time
+from timeit import default_timer as timer
 
 from jsonschema import validate
 import psutil
@@ -33,6 +34,7 @@ import psutil
 from .util import add_meta_data, get_build_metric_dict, CaptureAtexits
 from .memory import MemoryMonitor
 from .per_action_metrics import PerActionMetrics
+from .artifacts import CollectArtifacts
 
 _SEC_TO_NANOSEC_FACTOR = 1000000000.0
 _METRICS_COLLECTORS = []
@@ -42,7 +44,10 @@ def finalize_build_metrics(env):
     metrics = get_build_metric_dict()
     metrics['end_time'] = time.time_ns()
     for m in _METRICS_COLLECTORS:
+        start_time = timer()
+        sys.stdout.write(f"Processing {m.get_name()}...")
         key, value = m.finalize()
+        sys.stdout.write(f" {timer() - start_time}s\n")
         metrics[key] = value
 
     with open(os.path.join(os.path.dirname(__file__), "build_metrics_format.schema")) as f:
@@ -81,8 +86,19 @@ def generate(env, **kwargs):
     _METRICS_COLLECTORS = [
         MemoryMonitor(psutil.Process().memory_info().vms),
         PerActionMetrics(),
+        CollectArtifacts(env)
     ]
 
 
 def exists(env):
     return True
+
+
+def options(opts):
+    """
+    Add command line Variables for build metrics tool.
+    """
+    opts.AddVariables(
+        ("BUILD_METRICS_ARTIFACTS_DIR", "Path to scan for artifacts after the build has stopped."),
+        ("BUILD_METRICS_BLOATY", "Path to the bloaty bin"),
+    )

@@ -124,6 +124,9 @@ class PerActionMetrics(BuildMetricsCollector):
 
         SCons.Action.FunctionAction.execute = build_metrics_FunctionAction_execute
 
+    def get_name(self):
+        return "Per-Action Metrics"
+
     def get_mem_cpu(self, proc):
         with proc.oneshot():
             cpu = (proc.cpu_times().system + proc.cpu_times().user)

@@ -19,6 +19,9 @@ class MemoryMonitor(BuildMetricsCollector):
         self._thread = threading.Thread(target=self.memory_monitor, daemon=True)
         self._thread.start()
 
+    def get_name(self):
+        return "System Memory Monitor"
+
     def finalize(self):
         self._stop = True
         self._record_data_point()
