@@ -432,6 +432,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/util/bson_column',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/db_raii',
