@@ -245,7 +245,9 @@ void markRangeDeletionTaskAsProcessing(OperationContext* opCtx, const UUID& migr
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
     auto query = BSON(RangeDeletionTask::kIdFieldName << migrationId);
     static const auto update =
-        BSON("$set" << BSON(RangeDeletionTask::kProcessingFieldName << true));
+        BSON("$set" << BSON(RangeDeletionTask::kProcessingFieldName
+                            << true << RangeDeletionTask::kWhenToCleanFieldName
+                            << CleanWhen_serializer(CleanWhenEnum::kNow)));
 
     try {
         store.update(opCtx, query, update, WriteConcerns::kLocalWriteConcern);
