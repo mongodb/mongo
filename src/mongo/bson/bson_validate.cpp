@@ -112,6 +112,14 @@ public:
                         uasserted(
                             NonConformantBSON,
                             fmt::format("Use of deprecated BSON binary data subtype {}", subtype));
+                        break;
+                    case BinDataType::MD5Type:
+                        constexpr uint32_t md5Length = 16;
+                        auto md5Size = ConstDataView(ptr).read<LittleEndian<uint32_t>>();
+                        uassert(NonConformantBSON,
+                                fmt::format("MD5 must be 16 bytes, got {} instead.", md5Size),
+                                md5Size == md5Length);
+                        break;
                 }
         }
     }

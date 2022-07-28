@@ -198,6 +198,23 @@ TEST(BSONValidate, Fuzz) {
     }
 }
 
+TEST(BSONValidateExtended, MD5Size) {
+    // 16 byte string.
+    auto properSizeMD5 = "aaaaaaaaaaaaaaaa";
+    BSONObj x1 = BSON("md5" << BSONBinData(properSizeMD5, 16, MD5Type));
+    ASSERT_OK(validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kExtended));
+    ASSERT_OK(validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kFull));
+
+    // 15 byte string.
+    auto improperSizeMD5 = "aaaaaaaaaaaaaaa";
+    BSONObj x2 = BSON("md5" << BSONBinData(improperSizeMD5, 15, MD5Type));
+    Status status = validateBSON(x2.objdata(), x2.objsize(), mongo::BSONValidateMode::kExtended);
+    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+    status = validateBSON(x2.objdata(), x2.objsize(), mongo::BSONValidateMode::kFull);
+    ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+}
+
+
 TEST(BSONValidateFast, Empty) {
     BSONObj x;
     ASSERT_OK(validateBSON(x.objdata(), x.objsize()));
