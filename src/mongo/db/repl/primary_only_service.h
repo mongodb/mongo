@@ -366,9 +366,9 @@ private:
     public:
         ActiveInstance(std::shared_ptr<Instance> instance,
                        CancellationSource source,
-                       SemiFuture<void> instanceComplete)
+                       SemiFuture<void> runCompleteFuture)
             : _instance(std::move(instance)),
-              _instanceComplete(std::move(instanceComplete)),
+              _runCompleteFuture(std::move(runCompleteFuture)),
               _source(std::move(source)) {
             invariant(_instance);
         }
@@ -383,7 +383,7 @@ private:
          * Blocking call that returns once the instance has finished running.
          */
         void waitForCompletion() const {
-            _instanceComplete.wait();
+            _runCompleteFuture.wait();
         }
 
         std::shared_ptr<Instance> getInstance() const {
@@ -399,7 +399,7 @@ private:
         const std::shared_ptr<Instance> _instance;
 
         // A future that will be resolved when the passed in Instance has finished running.
-        const SemiFuture<void> _instanceComplete;
+        const SemiFuture<void> _runCompleteFuture;
 
         // Each instance of a PrimaryOnlyService will own a CancellationSource for memory management
         // purposes. Any memory associated with an instance's CancellationSource will be cleaned up

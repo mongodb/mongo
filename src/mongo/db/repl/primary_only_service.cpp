@@ -761,7 +761,7 @@ void PrimaryOnlyService::_rebuildInstances(long long term) {
 std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::_insertNewInstance(
     WithLock wl, std::shared_ptr<Instance> instance, InstanceID instanceID) {
     CancellationSource instanceSource(_source.token());
-    auto instanceCompleteFuture =
+    auto runCompleteFuture =
         ExecutorFuture<void>(**_scopedExecutor)
             .then([serviceName = getServiceName(),
                    instance,
@@ -780,10 +780,8 @@ std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::_insertNewInst
             })
             .semi();
 
-    auto [it, inserted] = _activeInstances.try_emplace(instanceID,
-                                                       std::move(instance),
-                                                       std::move(instanceSource),
-                                                       std::move(instanceCompleteFuture));
+    auto [it, inserted] = _activeInstances.try_emplace(
+        instanceID, std::move(instance), std::move(instanceSource), std::move(runCompleteFuture));
     invariant(inserted);
     return it->second.getInstance();
 }
