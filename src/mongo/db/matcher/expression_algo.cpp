@@ -795,14 +795,16 @@ bool isIndependentOf(const MatchExpression& expr, const std::set<std::string>& p
 
     auto depsTracker = DepsTracker{};
     expr.addDependencies(&depsTracker);
-    return std::none_of(
-        depsTracker.fields.begin(), depsTracker.fields.end(), [&pathSet](auto&& field) {
-            return pathSet.find(field) != pathSet.end() ||
-                std::any_of(pathSet.begin(), pathSet.end(), [&field](auto&& path) {
-                       return expression::isPathPrefixOf(field, path) ||
-                           expression::isPathPrefixOf(path, field);
-                   });
-        });
+    // Match expressions that generate random numbers can't be safely split out and pushed down.
+    return !depsTracker.needRandomGenerator &&
+        std::none_of(
+            depsTracker.fields.begin(), depsTracker.fields.end(), [&pathSet](auto&& field) {
+                return pathSet.find(field) != pathSet.end() ||
+                    std::any_of(pathSet.begin(), pathSet.end(), [&field](auto&& path) {
+                           return expression::isPathPrefixOf(field, path) ||
+                               expression::isPathPrefixOf(path, field);
+                       });
+            });
 }
 
 bool isOnlyDependentOn(const MatchExpression& expr, const std::set<std::string>& pathSet) {
@@ -814,11 +816,13 @@ bool isOnlyDependentOn(const MatchExpression& expr, const std::set<std::string>&
 
     auto depsTracker = DepsTracker{};
     expr.addDependencies(&depsTracker);
-    return std::all_of(depsTracker.fields.begin(), depsTracker.fields.end(), [&](auto&& field) {
-        return std::any_of(pathSet.begin(), pathSet.end(), [&](auto&& path) {
-            return path == field || isPathPrefixOf(path, field);
+    // Match expressions that generate random numbers can't be safely split out and pushed down.
+    return !depsTracker.needRandomGenerator &&
+        std::all_of(depsTracker.fields.begin(), depsTracker.fields.end(), [&](auto&& field) {
+            return std::any_of(pathSet.begin(), pathSet.end(), [&](auto&& path) {
+                return path == field || isPathPrefixOf(path, field);
+            });
         });
-    });
 }
 
 std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchExpressionBy(
