@@ -16,9 +16,6 @@ const st = new ShardingTest({mongos: 1, shards: 3});
 
 enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(st);
 
-const updateDocumentShardKeyUsingTransactionApiEnabled =
-    isUpdateDocumentShardKeyUsingTransactionApiEnabled(st.s);
-
 const kDbName = 'update_compound_sk';
 const ns = kDbName + '.coll';
 const session = st.s.startSession({retryWrites: true});
@@ -86,22 +83,6 @@ function assertUpdateWorkedWithNoMatchingDoc(query, update, isUpsert, inTransact
     // anything.
     assert.eq(isUpsert ? 1 : 0,
               st.s.getDB(kDbName).coll.find(update["$set"] ? update["$set"] : update).itcount());
-}
-
-/**
- * Updates to a document's shard key that would change the document's owning shard will succeed if
- * the updateDocumentShardKeyUsingTransactionApi feature flag is enabled.
- */
-function assertWCOSUpdateResult(res, expectedUpdatedDoc) {
-    const numDocsUpdated = st.s.getDB(kDbName).coll.find(expectedUpdatedDoc).itcount();
-
-    if (updateDocumentShardKeyUsingTransactionApiEnabled) {
-        assert.commandWorked(res);
-        assert.eq(1, numDocsUpdated);
-    } else {
-        assert.commandFailedWithCode(res, ErrorCodes.IllegalOperation);
-        assert.eq(0, numDocsUpdated);
-    }
 }
 
 //
@@ -172,29 +153,23 @@ assert.commandFailedWithCode(
 //
 
 // Case when upsert needs to insert a new document and the new document should belong in a shard
-// other than the one targeted by the update. These upserts can only succeed when the
-// updateDocumentShardKeyUsingTransactionApi feature flag is enabled or if not enabled, when the
-// upsert is run in a multi-statement transaction or with retryWrites: true.
+// other than the one targeted by the update. These upserts can only succeed in a
+// multi-statement transaction or with retryWrites: true.
 const updateDoc = {
     x: 1110,
     y: 55,
     z: 3,
     replStyleUpdate: true
 };
-const updateRes = st.s.getDB(kDbName).coll.update({x: 4, y: 0, z: 0}, updateDoc, {upsert: true});
-assertWCOSUpdateResult(updateRes, updateDoc);
+assert.commandFailedWithCode(
+    st.s.getDB(kDbName).coll.update({x: 4, y: 0, z: 0}, updateDoc, {upsert: true}),
+    ErrorCodes.IllegalOperation);
 
-const updateDocTxn = {
-    x: 1110,
-    y: 55,
-    z: 4,
-    replStyleUpdate: true
-};
+// The above upsert works with transactions.
 session.startTransaction();
-assertUpdateWorkedWithNoMatchingDoc(
-    {x: 4, y: 0, z: 0}, updateDocTxn, true /*isUpsert*/, true /*inTransaction*/);
+assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0, z: 0}, updateDoc, true, true);
 assert.commandWorked(session.commitTransaction_forTesting());
-assert.eq(1, sessionDB.coll.find(updateDocTxn).itcount());
+assert.eq(1, sessionDB.coll.find(updateDoc).itcount());
 
 // Full shard key not specified in query.
 
@@ -282,26 +257,20 @@ assert.commandFailedWithCode(st.s.getDB(kDbName).coll.update(
 // Test upsert-specific behaviours.
 
 // Case when upsert needs to insert a new document and the new document should belong in a shard
-// other than the one targeted by the update. These upserts can only succeed when the
-// updateDocumentShardKeyUsingTransactionApi feature flag is enabled or if not enabled, when the
-// upsert is run in a multi-statement transaction or with retryWrites: true.
-const upsertDoc = {
-    x: 2110,
-    y: 55,
-    z: 3,
-    opStyle: true
+// other than the one targeted by the update. These upserts can only succeed in a
+// multi-statement transaction or with retryWrites: true.
+const update = {
+    "$set": {x: 2110, y: 55, z: 3, opStyle: true}
 };
-const upsertRes =
-    st.s.getDB(kDbName).coll.update({x: 4, y: 0, z: 0, opStyle: true}, upsertDoc, {upsert: true});
-assertWCOSUpdateResult(upsertRes, upsertDoc);
+assert.commandFailedWithCode(
+    st.s.getDB(kDbName).coll.update({x: 4, y: 0, z: 0, opStyle: true}, update, {upsert: true}),
+    ErrorCodes.IllegalOperation);
 
-const upsertDocTxn = {
-    "$set": {x: 2110, y: 55, z: 4, opStyle: true}
-};
+// The above upsert works with transactions.
 session.startTransaction();
-assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0, z: 0, opStyle: true}, upsertDocTxn, true, true);
+assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0, z: 0, opStyle: true}, update, true, true);
 assert.commandWorked(session.commitTransaction_forTesting());
-assert.eq(1, sessionDB.coll.find(upsertDocTxn["$set"]).itcount());
+assert.eq(1, sessionDB.coll.find(update["$set"]).itcount());
 
 // Full shard key not specified in query.
 
@@ -403,44 +372,35 @@ assert.commandFailedWithCode(
 // Test upsert-specific behaviours.
 
 // Case when upsert needs to insert a new document and the new document should belong in a shard
-// other than the one targeted by the update. These upserts can only succeed when run in a
-// multi-statement transaction or with retryWrites: true or if the
-// updateDocumentShardKeyUsingTransactionApi feature flag is enabled.
-const upsertProjectDoc = {
-    x: 2111,
-    y: 55,
-    z: 3
-};
-const upsertProjectRes = st.s.getDB(kDbName).coll.update({x: 4, y: 0, z: 0},
-                                                         [{
-                                                             "$project": {
-                                                                 x: {$literal: 2111},
-                                                                 y: {$literal: 55},
-                                                                 z: {$literal: 3},
-                                                                 pipelineUpdate: {$literal: true}
-                                                             }
-                                                         }],
-                                                         {upsert: true});
-assertWCOSUpdateResult(upsertProjectRes, upsertProjectDoc);
+// other than the one targeted by the update. These upserts can only succeed in a
+// multi-statement transaction or with retryWrites: true.
+assert.commandFailedWithCode(
+    st.s.getDB(kDbName).coll.update({x: 4, y: 0, z: 0},
+                                    [{
+                                        "$project": {
+                                            x: {$literal: 2111},
+                                            y: {$literal: 55},
+                                            z: {$literal: 3},
+                                            pipelineUpdate: {$literal: true}
+                                        }
+                                    }],
+                                    {upsert: true}),
+    ErrorCodes.IllegalOperation);
 
-const upsertProjectTxnDoc = {
-    x: 2111,
-    y: 55,
-    z: 4
-};
+// The above upsert works with transactions.
 session.startTransaction();
 assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0, z: 0, pipelineUpdate: true},
                                     [{
                                         "$project": {
                                             x: {$literal: 2111},
                                             y: {$literal: 55},
-                                            z: {$literal: 4},
+                                            z: {$literal: 3},
                                             pipelineUpdate: {$literal: true}
                                         }
                                     }],
                                     true);
 assert.commandWorked(session.commitTransaction_forTesting());
-assert.eq(1, sessionDB.coll.find(upsertProjectTxnDoc).itcount());
+assert.eq(1, sessionDB.coll.find({x: 2111, y: 55, z: 3, pipelineUpdate: true}).itcount());
 
 // Full shard key not specified in query.
 assert.commandFailedWithCode(st.s.getDB(kDbName).coll.update(

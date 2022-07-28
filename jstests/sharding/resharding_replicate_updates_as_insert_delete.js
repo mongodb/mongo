@@ -52,18 +52,10 @@ reshardingTest.withReshardingInBackground(  //
         const tempColl = mongos.getCollection(tempNs);
         assert.soon(() => tempColl.findOne(docToUpdate) !== null);
 
-        // When the updateDocumentShardKeyUsingTransactionApi feature flag is enabled, ordinary
-        // updates that modify a document's shard key will complete.
-        assert.commandWorked(testColl.insert({_id: 1, x: 2, s: 2, y: 2}));
-        const updateRes = testColl.update({_id: 1, x: 2, s: 2}, {$set: {y: 10}});
-        if (updateDocumentShardKeyUsingTransactionApiEnabled) {
-            assert.commandWorked(updateRes);
-        } else {
-            assert.commandFailedWithCode(
-                updateRes,
-                ErrorCodes.IllegalOperation,
-                'was able to update value under new shard key as ordinary write');
-        }
+        assert.commandFailedWithCode(
+            testColl.update({_id: 0, x: 2, s: 2}, {$set: {y: 10}}),
+            ErrorCodes.IllegalOperation,
+            'was able to update value under new shard key as ordinary write');
 
         const session = testColl.getMongo().startSession({retryWrites: true});
         const sessionColl =

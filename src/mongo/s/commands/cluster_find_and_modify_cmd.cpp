@@ -144,7 +144,7 @@ BSONObj getShardKey(OperationContext* opCtx,
     return shardKey;
 }
 
-void handleWouldChangeOwningShardErrorNonTransaction(
+void handleWouldChangeOwningShardErrorRetryableWrite(
     OperationContext* opCtx,
     const ShardId& shardId,
     const NamespaceString& nss,
@@ -519,8 +519,7 @@ private:
                             const NamespaceString& nss,
                             const BSONObj& cmdObj,
                             BSONObjBuilder* result) {
-        auto txnRouter = TransactionRouter::get(opCtx);
-        bool isRetryableWrite = opCtx->getTxnNumber() && !txnRouter;
+        bool isRetryableWrite = opCtx->getTxnNumber() && !TransactionRouter::get(opCtx);
 
         const auto response = [&] {
             std::vector<AsyncRequestsSender::Request> requests;
@@ -575,15 +574,13 @@ private:
                 // Strip runtime constants because they will be added again when this command is
                 // recursively sent through the service entry point.
                 parsedRequest.setLegacyRuntimeConstants(boost::none);
-                if (txnRouter) {
+                if (isRetryableWrite) {
+                    parsedRequest.setStmtId(0);
+                    handleWouldChangeOwningShardErrorRetryableWrite(
+                        opCtx, shardId, nss, parsedRequest, result);
+                } else {
                     handleWouldChangeOwningShardErrorTransaction(
                         opCtx, nss, responseStatus, parsedRequest, result);
-                } else {
-                    if (isRetryableWrite) {
-                        parsedRequest.setStmtId(0);
-                    }
-                    handleWouldChangeOwningShardErrorNonTransaction(
-                        opCtx, shardId, nss, parsedRequest, result);
                 }
             } else {
                 // TODO SERVER-67429: Remove this branch.
