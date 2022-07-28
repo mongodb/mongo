@@ -137,17 +137,16 @@ public:
                 // Prevent maxChunkSizeBytes overflow. Check aimed to avoid fuzzer failures
                 // since users are definitely not expected to specify maxChunkSize in exabytes.
                 uassert(ErrorCodes::InvalidOptions,
-                        str::stream()
-                            << "The specified maxChunkSize in MB is too big: " << maxChunkSizeMB,
-                        maxChunkSizeMB <= (LLONG_MAX >> 20));
+                        str::stream() << "maxChunkSize must lie within the range [1MB, 1024MB]",
+                        maxChunkSizeMB >= 1 && maxChunkSizeMB <= 1024);
                 ret = maxChunkSizeMB << 20;
             } else if (maxSizeBytesElem.isNumber()) {
                 ret = maxSizeBytesElem.safeNumberLong();
+                uassert(ErrorCodes::InvalidOptions,
+                        "The specified max chunk size must lie within the range [1MB, 1024MB]",
+                        *ret >= 1024 * 1024 && *ret <= 1024 * 1024 * 1024);
             }
 
-            uassert(ErrorCodes::InvalidOptions,
-                    "The specified max chunk size must be at least 1MB",
-                    ret == boost::none || *ret >= 1024 * 1024);
             return ret;
         }();
 

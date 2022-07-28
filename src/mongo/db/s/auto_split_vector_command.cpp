@@ -41,7 +41,8 @@
 namespace mongo {
 namespace {
 
-static constexpr int64_t kSmallestChunkSizeSupported = 1024 * 1024;
+static constexpr int64_t kSmallestChunkSizeBytesSupported = 1024 * 1024;
+static constexpr int64_t kBiggestChunkSizeBytesSupported = 1024 * 1024 * 1024;
 
 class AutoSplitVectorCommand final : public TypedCommand<AutoSplitVectorCommand> {
 public:
@@ -77,9 +78,11 @@ public:
             const auto& req = request();
 
             uassert(ErrorCodes::ErrorCodes::InvalidOptions,
-                    str::stream() << "maxChunksSizeBytes cannot be smaller than "
-                                  << kSmallestChunkSizeSupported,
-                    req.getMaxChunkSizeBytes() >= kSmallestChunkSizeSupported);
+                    str::stream() << "maxChunksSizeBytes must lie within the range ["
+                                  << kSmallestChunkSizeBytesSupported / (1024 * 1024) << "MB, "
+                                  << kBiggestChunkSizeBytesSupported / (1024 * 1024) << "MB]",
+                    req.getMaxChunkSizeBytes() >= kSmallestChunkSizeBytesSupported &&
+                        req.getMaxChunkSizeBytes() <= kBiggestChunkSizeBytesSupported);
 
             auto [splitPoints, continuation] = autoSplitVector(opCtx,
                                                                ns(),
