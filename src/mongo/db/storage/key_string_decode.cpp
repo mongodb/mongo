@@ -264,15 +264,8 @@ int ksDecodeMain(int argc, char* argv[]) try {
     }
 
     if (environment.count("pattern")) {
-        moe::Value val;
-        Status status = environment.get(moe::Key("p"), &val);
-        if (status.isOK()) {
-            std::string strVal;
-            uassertStatusOK(val.get(&strVal));
-            options.keyPattern = fromjson(strVal);
-        } else if (ErrorCodes::NoSuchKey != status.code()) {
-            uassertStatusOK(status);
-        }
+        std::string strVal = environment["pattern"].as<std::string>();
+        options.keyPattern = fromjson(strVal);
     }
 
     if (environment.count("typeBits")) {
