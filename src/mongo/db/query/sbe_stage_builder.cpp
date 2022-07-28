@@ -1207,25 +1207,47 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto child = sn->children[0].get();
 
     const auto isCoveredQuery = reqs.getIndexKeyBitset().has_value();
+
+    // Decide whether to use IndexKeySlots when building the child:
+    // - If the query is covered, we must use IndexKeySlots.
+    // - If this is a SORT->IXSCAN and kResult wasn't requested, we prefer to use IndexKeySlots.
+    // - Otherwise, use the kResult slot.
+    bool useIndexKeySlots =
+        isCoveredQuery || (!reqs.has(kResult) && child->getType() == STAGE_IXSCAN);
+
+    auto parentIndexKeyBitset = reqs.getIndexKeyBitset().get_value_or({});
     BSONObj indexKeyPattern;
-    sbe::IndexKeysInclusionSet sortPatternKeyBitSet;
-    if (isCoveredQuery) {
-        // If query is covered, we need to request index key for each part of the sort pattern.
+    sbe::IndexKeysInclusionSet sortPatternKeyBitset;
+    StringMap<size_t> sortSlotPosMap;
+
+    if (useIndexKeySlots) {
+        // If we're using IndexKeySlots, set IndexKeyBitset to request each part of the index
+        // requested by the parent and to request each part of the sort pattern.
         auto indexScan = static_cast<const IndexScanNode*>(getLoneNodeByType(child, STAGE_IXSCAN));
-        tassert(5601701, "Expected index scan below sort for covered query", indexScan);
+        tassert(5601701, "Expected index scan below sort", indexScan);
         indexKeyPattern = indexScan->index.keyPattern;
 
-        StringDataSet sortPaths;
+        StringDataSet sortPathsSet;
         for (const auto& part : sortPattern) {
-            sortPaths.insert(part.fieldPath->fullPath());
+            sortPathsSet.insert(part.fieldPath->fullPath());
         }
 
-        std::vector<std::string> foundPaths;
-        std::tie(sortPatternKeyBitSet, foundPaths) =
-            makeIndexKeyInclusionSet(indexKeyPattern, sortPaths);
-        *childReqs.getIndexKeyBitset() |= sortPatternKeyBitSet;
+        // 'sortPatternKeyBitset' will contain a bit pattern indicating which parts of the index
+        // pattern are needed for sorting. 'sortPaths' will contain the field paths used in the
+        // sort pattern, ordered according to the index pattern.
+        std::vector<std::string> sortPaths;
+        std::tie(sortPatternKeyBitset, sortPaths) =
+            makeIndexKeyInclusionSet(indexKeyPattern, sortPathsSet);
+        childReqs.getIndexKeyBitset() = sortPatternKeyBitset | parentIndexKeyBitset;
+
+        // Build a map that maps each field path to its position in 'sortPaths'. This will help us
+        // later when we need to convert the output of makeIndexKeyOutputSlotsMatchingParentReqs()
+        // from the index pattern's order to sort pattern's order.
+        for (size_t i = 0; i < sortPaths.size(); ++i) {
+            sortSlotPosMap.emplace(std::move(sortPaths[i]), i);
+        }
     } else {
-        // If query is not covered, child is required to produce whole document for sorting.
+        // Otherwise, set kResult.
         childReqs.set(kResult);
     }
 
@@ -1253,43 +1275,90 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     sbe::value::SlotVector orderBy;
-    orderBy.reserve(sortPattern.size());
 
     // Slots for sort stage to forward to parent stage. Values in these slots are not used during
     // sorting.
     auto forwardedSlots = sbe::makeSV();
 
-    // We do not support covered queries on array fields for multikey indexes. This means that if
-    // the query is covered, index keys cannot contain arrays. Since traversal logic and
-    // 'generateSortKey' call below is needed only for arrays, we can omit it for covered queries.
-    if (isCoveredQuery) {
+    if (useIndexKeySlots) {
+        // Handle the case where we are using IndexKeySlots.
         auto indexKeySlots = *outputs.extractIndexKeySlots();
 
         // Currently, 'indexKeySlots' contains slots for two kinds of index keys:
         //  1. Keys requested for sort pattern
-        //  2. Keys requested by parent
-        // We need to filter first category of slots into 'orderBy' vector, since sort stage will
-        // use them for sorting. Second category of slots goes into 'outputs' to be used by parent.
-        auto& parentIndexKeyBitset = *reqs.getIndexKeyBitset();
+        //  2. Keys requested by parent (if any)
+        // The first category of slots needs to go into the 'orderBy' vector. The second category
+        // of slots goes into 'outputs' to be used by the parent.
         auto& childIndexKeyBitset = *childReqs.getIndexKeyBitset();
 
-        orderBy = makeIndexKeyOutputSlotsMatchingParentReqs(
-            indexKeyPattern, sortPatternKeyBitSet, childIndexKeyBitset, indexKeySlots);
+        // The query planner does not support covered queries or SORT->IXSCAN plans on array fields
+        // for multikey indexes. Therefore we don't have to generate the parallel arrays check or
+        // the sort key traversal logic.
+        auto sortIndexKeySlots = makeIndexKeyOutputSlotsMatchingParentReqs(
+            indexKeyPattern, sortPatternKeyBitset, childIndexKeyBitset, indexKeySlots);
 
-        auto indexKeySlotsForParent = makeIndexKeyOutputSlotsMatchingParentReqs(
-            indexKeyPattern, parentIndexKeyBitset, childIndexKeyBitset, indexKeySlots);
-        outputs.setIndexKeySlots(std::move(indexKeySlotsForParent));
+        // 'sortIndexKeySlots' is ordered according to the index pattern, but 'orderBy' needs to
+        // be ordered according to the sort pattern. We use 'sortIndexKeySlots' to convert from
+        // the index pattern's order to the sort pattern's order.
+        orderBy.reserve(sortPattern.size());
+        for (const auto& part : sortPattern) {
+            auto it = sortSlotPosMap.find(part.fieldPath->fullPath());
+            tassert(6843200,
+                    str::stream() << "Did not find sort path '" << part.fieldPath->fullPath()
+                                  << "' in sort path map",
+                    it != sortSlotPosMap.end());
 
-        // In forwarded slots we need to include all slots requested by parent excluding slots from
-        // 'orderBy' vector.
-        auto forwardedIndexKeyBitset = parentIndexKeyBitset & (~sortPatternKeyBitSet);
-        forwardedSlots = makeIndexKeyOutputSlotsMatchingParentReqs(indexKeyPattern,
-                                                                   forwardedIndexKeyBitset,
-                                                                   childIndexKeyBitset,
-                                                                   std::move(indexKeySlots));
+            auto slotPos = it->second;
+            tassert(6843201,
+                    str::stream() << "Sort path map for '" << part.fieldPath->fullPath()
+                                  << "' returned an index '" << slotPos
+                                  << "' that is out of bounds",
+                    slotPos >= 0 && slotPos < sortIndexKeySlots.size());
+
+            orderBy.push_back(sortIndexKeySlots[slotPos]);
+        }
+
+        // If a collation is set, generate a ProjectStage that calls collComparisonKey() on each
+        // field in the sort pattern. The "comparison keys" returned by collComparisonKey() will
+        // be used in 'orderBy' instead of the fields' actual values.
+        if (collatorSlot) {
+            sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projectMap;
+            auto makeSortKey = [&](sbe::value::SlotId inputSlot) {
+                return makeFunction(
+                    "collComparisonKey"_sd, makeVariable(inputSlot), makeVariable(*collatorSlot));
+            };
+
+            for (size_t idx = 0; idx < orderBy.size(); ++idx) {
+                auto sortKeySlot{_slotIdGenerator.generate()};
+                projectMap.emplace(sortKeySlot, makeSortKey(orderBy[idx]));
+                orderBy[idx] = sortKeySlot;
+            }
+
+            inputStage = sbe::makeS<sbe::ProjectStage>(
+                std::move(inputStage), std::move(projectMap), root->nodeId());
+        }
+
+        if (parentIndexKeyBitset.any()) {
+            auto parentIndexKeySlots = makeIndexKeyOutputSlotsMatchingParentReqs(
+                indexKeyPattern, parentIndexKeyBitset, childIndexKeyBitset, indexKeySlots);
+
+            // The 'forwardedSlots' vector should include all slots requested by parent excluding
+            // any slots that appear in the 'orderBy' vector.
+            sbe::value::SlotSet orderBySlotsSet(orderBy.begin(), orderBy.end());
+            for (auto slot : parentIndexKeySlots) {
+                if (!orderBySlotsSet.count(slot)) {
+                    forwardedSlots.push_back(slot);
+                }
+            }
+
+            // Make sure to store all of the slots requested by the parent into 'outputs'.
+            outputs.setIndexKeySlots(std::move(parentIndexKeySlots));
+        }
     } else if (!hasPartsWithCommonPrefix) {
+        // Handle the case where we are using kResult and there are no common prefixes.
         sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projectMap;
 
+        orderBy.reserve(sortPattern.size());
         for (const auto& part : sortPattern) {
             // Get the top-level field for this sort part. If the field doesn't exist, according to
             // MQL's sorting semantics we should use Null.
@@ -1388,7 +1457,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             orderBy[idx] = sortKeySlot;
         }
     } else {
-        // Handle the case where two or more parts of the sort pattern have a common prefix.
+        // Handle the case where we are using kResult and two or more parts of the sort pattern
+        // have a common prefix.
         orderBy = _slotIdGenerator.generateMultiple(1);
         direction = {sbe::value::SortDirection::Ascending};
 
@@ -1399,6 +1469,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
         auto collatorSlot = _data.env->getSlotIfExists("collator"_sd);
 
+        // generateSortKey() will handle the parallel arrays check and sort key traversal for us,
+        // so we don't need to generate our own sort key traversal logic in the SBE plan.
         inputStage =
             sbe::makeProjectStage(std::move(inputStage),
                                   root->nodeId(),
