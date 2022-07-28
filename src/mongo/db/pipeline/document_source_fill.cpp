@@ -124,11 +124,11 @@ std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
     }
 
     if (auto&& partitionByFields = spec.getPartitionByFields()) {
-        BSONObjBuilder partitionBySpec;
+        MutableDocument partitionBySpec;
         for (const auto& fieldName : partitionByFields.value()) {
-            partitionBySpec.append(fieldName, "$" + fieldName);
+            partitionBySpec.setNestedField(fieldName, Value("$" + fieldName));
         }
-        setWindowFieldsSpec.append("partitionBy", partitionBySpec.obj());
+        setWindowFieldsSpec.append("partitionBy", partitionBySpec.freeze().toBson());
     }
 
     std::list<boost::intrusive_ptr<DocumentSource>> finalSources;
