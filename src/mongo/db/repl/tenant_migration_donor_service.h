@@ -117,11 +117,11 @@ public:
         }
 
         /**
-         * Returns a Future that will be resolved when all work associated with this Instance has
-         * completed running.
+         * Returns a Future that will be resolved when the instance has been durably marked garbage
+         * collectable.
          */
-        SharedSemiFuture<void> getCompletionFuture() const {
-            return _completionPromise.getFuture();
+        SharedSemiFuture<void> getForgetMigrationDurableFuture() const {
+            return _forgetMigrationDurablePromise.getFuture();
         }
 
         /**
@@ -321,8 +321,8 @@ public:
         // Promise that is resolved when the donor receives the donorForgetMigration command.
         SharedPromise<void> _receiveDonorForgetMigrationPromise;
 
-        // Promise that is resolved when the chain of work kicked off by run() has completed.
-        SharedPromise<void> _completionPromise;
+        // Promise that is resolved when the instance has been durably marked garbage collectable.
+        SharedPromise<void> _forgetMigrationDurablePromise;
 
         // Promise that is resolved when the donor has majority-committed the write to commit or
         // abort.

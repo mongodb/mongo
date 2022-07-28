@@ -204,7 +204,7 @@ public:
                         durableState->state == TenantMigrationDonorStateEnum::kAborted);
 
             donorPtr->onReceiveDonorForgetMigration();
-            donorPtr->getCompletionFuture().get(opCtx);
+            donorPtr->getForgetMigrationDurableFuture().get(opCtx);
         }
 
     private:

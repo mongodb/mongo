@@ -6,6 +6,8 @@
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,
+ *   # The currentOp output field 'migrationCompleted' was renamed to 'garbageCollectable'.
+ *   requires_fcv_61,
  *   serverless,
  * ]
  */
@@ -37,14 +39,14 @@ function checkStandardFieldsOK(ops, {
     migrationId,
     lastDurableState,
     tenantMigrationTest,
-    migrationCompleted = false,
+    garbageCollectable = false,
 }) {
     assert.eq(ops.length, 1);
     const [op] = ops;
     assert.eq(bsonWoCompare(op.instanceID, migrationId), 0);
     assert.eq(bsonWoCompare(op.readPreference, kReadPreference), 0);
     assert.eq(op.lastDurableState, lastDurableState);
-    assert.eq(op.migrationCompleted, migrationCompleted);
+    assert.eq(op.garbageCollectable, garbageCollectable);
     assert(op.migrationStart instanceof Date);
     assert.eq(op.recipientConnectionString, tenantMigrationTest.getRecipientRst().getURL());
 
@@ -225,7 +227,7 @@ function checkStandardFieldsOK(ops, {
         migrationId,
         lastDurableState: migrationStates.kCommitted,
         tenantMigrationTest,
-        migrationCompleted: true,
+        garbageCollectable: true,
     });
     assert(res.inprog[0].startMigrationDonorTimestamp instanceof Timestamp);
     assert(res.inprog[0].blockTimestamp instanceof Timestamp);

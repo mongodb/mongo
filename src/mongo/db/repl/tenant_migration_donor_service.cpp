@@ -394,7 +394,7 @@ boost::optional<BSONObj> TenantMigrationDonorService::Instance::reportForCurrent
     // sessions and they run in a background thread pool.
     BSONObjBuilder bob;
     bob.append("desc", "tenant donor migration");
-    bob.append("migrationCompleted", _completionPromise.getFuture().isReady());
+    bob.append("garbageCollectable", _forgetMigrationDurablePromise.getFuture().isReady());
     _migrationUuid.appendToBuilder(&bob, "instanceID"_sd);
     if (getProtocol() == MigrationProtocolEnum::kMultitenantMigrations) {
         bob.append("tenantId", _tenantId);
@@ -473,7 +473,7 @@ void TenantMigrationDonorService::Instance::interrupt(Status status) {
     // Resolve any unresolved promises to avoid hanging.
     setPromiseErrorIfNotReady(lg, _initialDonorStateDurablePromise, status);
     setPromiseErrorIfNotReady(lg, _receiveDonorForgetMigrationPromise, status);
-    setPromiseErrorIfNotReady(lg, _completionPromise, status);
+    setPromiseErrorIfNotReady(lg, _forgetMigrationDurablePromise, status);
     setPromiseErrorIfNotReady(lg, _decisionPromise, status);
 
     if (auto fetcher = _recipientKeysFetcher.lock()) {
@@ -937,8 +937,9 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                        self = shared_from_this(),
                        token,
                        scopedCounter{std::move(scopedOutstandingMigrationCounter)}](Status status) {
-            // Don't set the completion promise if the instance has been canceled. We assume
-            // whatever canceled the token will also set the promise with an appropriate error.
+            // Don't set the forget migration durable promise if the instance has been canceled. We
+            // assume whatever canceled the token will also set the promise with an appropriate
+            // error.
             checkForTokenInterrupt(token);
 
             stdx::lock_guard<Latch> lg(_mutex);
@@ -948,8 +949,8 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                   "migrationId"_attr = _migrationUuid,
                   "expireAt"_attr = _stateDoc.getExpireAt(),
                   "status"_attr = status);
+            setPromiseFromStatusIfNotReady(lg, _forgetMigrationDurablePromise, status);
 
-            setPromiseFromStatusIfNotReady(lg, _completionPromise, status);
             LOGV2(5006601,
                   "Tenant migration completed",
                   "migrationId"_attr = _migrationUuid,
