@@ -271,6 +271,7 @@ def _bind_struct_common(ctxt, parsed_spec, struct, ast_struct):
     ast_struct.qualified_cpp_name = _get_struct_qualified_cpp_name(struct)
     ast_struct.allow_global_collection_name = struct.allow_global_collection_name
     ast_struct.non_const_getter = struct.non_const_getter
+    ast_struct.is_command_reply = struct.is_command_reply
 
     # Validate naming restrictions
     if ast_struct.name.startswith("array<"):

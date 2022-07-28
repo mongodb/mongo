@@ -36,7 +36,7 @@ import re
 import sys
 import textwrap
 from abc import ABCMeta, abstractmethod
-from typing import Dict, Iterable, List, Mapping, Tuple, Union
+from typing import Dict, Iterable, List, Mapping, Tuple, Union, cast
 
 from . import (ast, bson, common, cpp_types, enum_types, generic_field_list_types, struct_types,
                writer)
@@ -589,6 +589,12 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         set_has = f'{_get_has_field_member_name(field)} = true;' if is_serial else ''
         self._writer.write_line(f'void {memfn}({param_type} value) {{ {body} {set_has} }}')
 
+    def gen_constexpr_getters(self):
+        # type: () -> None
+        """Generate the getters for constexpr data."""
+        self._writer.write_line(
+            'constexpr bool getIsCommandReply() const { return _isCommandReply; }')
+
     def gen_member(self, field):
         # type: (ast.Field) -> None
         """Generate the C++ class member definition for a field."""
@@ -608,6 +614,12 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 self._writer.write_line('%s %s{%s};' % (member_type, member_name, field.default))
         else:
             self._writer.write_line('%s %s;' % (member_type, member_name))
+
+    def gen_constexpr_members(self, struct):
+        # type: (ast.Struct) -> None
+        """Generate the C++ class member definition for constexpr data."""
+        cpp_string_val = "true" if struct.is_command_reply else "false"
+        self._writer.write_line(f'static constexpr bool _isCommandReply{{{cpp_string_val}}};')
 
     def gen_serializer_member(self, field):
         # type: (ast.Field) -> None
@@ -1038,10 +1050,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                 self.gen_enum_functions(idl_enum)
                 self._writer.write_empty_line()
 
-            spec_and_structs = spec.structs
-            spec_and_structs += spec.commands
+            all_structs = spec.structs + cast(List[ast.Struct], spec.commands)
 
-            for struct in spec_and_structs:
+            for struct in all_structs:
                 self.gen_description_comment(struct.description)
                 with self.gen_class_declaration_block(struct.cpp_name):
                     self.write_unindented_line('public:')
@@ -1078,6 +1089,11 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                             self.gen_getter(struct, field)
                             if not struct.immutable and not field.chained_struct_field:
                                 self.gen_setter(field)
+
+                    # Generate getters for any constexpr/compile-time struct data
+                    self.write_empty_line()
+                    self.gen_constexpr_getters()
+
                     self.write_unindented_line('protected:')
                     self.gen_protected_serializer_methods(struct)
 
@@ -1111,6 +1127,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                     for field in struct.fields:
                         if _is_required_serializer_field(field):
                             self.gen_serializer_member(field)
+
+                    # Write constexpr struct data
+                    self.gen_constexpr_members(struct)
 
                 self.write_empty_line()
 
@@ -1656,6 +1675,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 command_predicate = None
                 if isinstance(struct, ast.Command):
                     command_predicate = "!mongo::isGenericArgument(fieldName)"
+
+                # Ditto for command replies
+                if struct.is_command_reply:
+                    command_predicate = "!mongo::isGenericReply(fieldName)"
 
                 with self._block('else {', '}'):
                     with self._predicate(command_predicate):
@@ -2670,7 +2693,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self.gen_description_comment(idl_enum.description)
                 self.gen_enum_definition(idl_enum)
 
-            for struct in spec.structs:
+            all_structs = spec.structs + cast(List[ast.Struct], spec.commands)
+
+            for struct in all_structs:
                 self.gen_string_constants_definitions(struct)
                 self.write_empty_line()
 

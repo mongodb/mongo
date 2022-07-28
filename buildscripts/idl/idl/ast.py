@@ -145,6 +145,7 @@ class Struct(common.SourceLocation):
         self.allow_global_collection_name = False  # type: bool
         self.non_const_getter = False  # type: bool
         self.cpp_validator_func = None  # type: str
+        self.is_command_reply = False  # type: bool
         super(Struct, self).__init__(file_name, line, column)
 
 

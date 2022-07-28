@@ -179,6 +179,7 @@ structs:
 
     reply_type_struct:
         description: Used for testing the IDL command reply_type field
+        is_command_reply: true
         fields:
             reply_field: int
 

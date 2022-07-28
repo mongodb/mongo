@@ -3896,6 +3896,32 @@ TEST(IDLTypeCommand, TestCommandWithIDLAnyTypeOwnedField) {
                                                         << "b"))["anyTypeField"]);
 }
 
+TEST(IDLTypeCommand, ReplyTypeKnowsItIsReplyAtCompileTime) {
+    Reply_type_struct reply;
+    static_assert(reply.getIsCommandReply());
+    StructWithEnum nonReply;
+    static_assert(!nonReply.getIsCommandReply());
+}
+
+TEST(IDLTypeCommand, ReplyTypeCanParseWithGenericFields) {
+    // $clusterTime is not a field of Rely_type_struct, but is
+    // a field that could be part of any reply.
+    StringData genericField = "$clusterTime"_sd;
+    // This field is not part of Reply_type_struct and is also
+    // not a generic field.
+    StringData nonGenericField = "xyz123"_sd;
+    IDLParserContext ctxt("root");
+    // This contains only fields part of Reply_type_struct and generic fields
+    auto bsonValidReply = BSON("reply_field" << 42 << genericField << 1);
+    auto parsed = CommandWithReplyType::Reply::parse(ctxt, bsonValidReply);
+    ASSERT(parsed.getIsCommandReply());
+    ASSERT_EQ(parsed.getReply_field(), 42);
+
+    // This contains a field not part of Reply_type struct, so shouldn't parse
+    auto bsonInvalidReply = BSON("reply_field" << 42 << nonGenericField << 1);
+    ASSERT_THROWS(CommandWithReplyType::Reply::parse(ctxt, bsonInvalidReply), DBException);
+}
+
 TEST(IDLCommand, TestCommandTypeNamespaceCommand_WithTenant) {
     IDLParserContext ctxt("root");
 

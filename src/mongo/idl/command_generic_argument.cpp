@@ -37,6 +37,11 @@ bool isGenericArgument(StringData arg) {
     return Generic_args_api_v1::hasField(arg) || Generic_args_unstable_v1::hasField(arg);
 }
 
+bool isGenericReply(StringData arg) {
+    return Generic_reply_fields_api_v1::hasField(arg) ||
+        Generic_reply_fields_unstable_v1::hasField(arg);
+}
+
 bool shouldForwardToShards(StringData arg) {
     return Generic_args_api_v1::shouldForwardToShards(arg) &&
         Generic_args_unstable_v1::shouldForwardToShards(arg);

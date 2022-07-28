@@ -41,57 +41,64 @@ using namespace fmt::literals;
 // SERVER-51848. We will test that the IDL definitions match these old C++ definitions.
 struct SpecialArgRecord {
     StringData name;
-    bool isGeneric;
+    bool isGenericArgument;
+    bool isGenericReply;
     bool stripFromRequest;
     bool stripFromReply;
 };
 
 // clang-format off
 static constexpr std::array<SpecialArgRecord, 34> specials{{
-    //                                       /-isGeneric
-    //                                       |  /-stripFromRequest
-    //                                       |  |  /-stripFromReply
-    {"apiVersion"_sd,                        1, 1, 0},
-    {"apiStrict"_sd,                         1, 1, 0},
-    {"apiDeprecationErrors"_sd,              1, 1, 0},
-    {"$audit"_sd,                            1, 1, 0},
-    {"$client"_sd,                           1, 1, 0},
-    {"$configServerState"_sd,                1, 1, 1},
-    {"$db"_sd,                               1, 1, 0},
-    {"allowImplicitCollectionCreation"_sd,   1, 1, 0},
-    {"$oplogQueryData"_sd,                   1, 1, 1},
-    {"$queryOptions"_sd,                     1, 0, 0},
-    {"$readPreference"_sd,                   1, 1, 0},
-    {"$replData"_sd,                         1, 1, 1},
-    {"$clusterTime"_sd,                      1, 1, 1},
-    {"maxTimeMS"_sd,                         1, 0, 0},
-    {"readConcern"_sd,                       1, 0, 0},
-    {"databaseVersion"_sd,                   1, 1, 0},
-    {"shardVersion"_sd,                      1, 1, 0},
-    {"tracking_info"_sd,                     1, 1, 0},
-    {"writeConcern"_sd,                      1, 0, 0},
-    {"lsid"_sd,                              1, 0, 0},
-    {"clientOperationKey"_sd,                1, 0, 0},
-    {"txnNumber"_sd,                         1, 0, 0},
-    {"autocommit"_sd,                        1, 0, 0},
-    {"coordinator"_sd,                       1, 0, 0},
-    {"startTransaction"_sd,                  1, 0, 0},
-    {"stmtId"_sd,                            1, 0, 0},
-    {"$gleStats"_sd,                         0, 0, 1},
-    {"operationTime"_sd,                     0, 0, 1},
-    {"lastCommittedOpTime"_sd,               0, 0, 1},
-    {"readOnly"_sd,                          0, 0, 1},
-    {"comment"_sd,                           1, 0, 0},
-    {"maxTimeMSOpOnly"_sd,                   1, 1, 0},
-    {"$configTime"_sd,                       1, 1, 1},
-    {"$topologyTime"_sd,                     1, 1, 1}}};
+    //                                       /-isGenericArgument
+    //                                       |  /-isGenericReply
+    //                                       |  |  /-stripFromRequest
+    //                                       |  |  |  /-stripFromReply
+    {"apiVersion"_sd,                        1, 0, 1, 0},
+    {"apiStrict"_sd,                         1, 0, 1, 0},
+    {"apiDeprecationErrors"_sd,              1, 0, 1, 0},
+    {"$audit"_sd,                            1, 0, 1, 0},
+    {"$client"_sd,                           1, 0, 1, 0},
+    {"$configServerState"_sd,                1, 1, 1, 1},
+    {"$db"_sd,                               1, 0, 1, 0},
+    {"allowImplicitCollectionCreation"_sd,   1, 0, 1, 0},
+    {"$oplogQueryData"_sd,                   1, 1, 1, 1},
+    {"$queryOptions"_sd,                     1, 0, 0, 0},
+    {"$readPreference"_sd,                   1, 0, 1, 0},
+    {"$replData"_sd,                         1, 1, 1, 1},
+    {"$clusterTime"_sd,                      1, 1, 1, 1},
+    {"maxTimeMS"_sd,                         1, 0, 0, 0},
+    {"readConcern"_sd,                       1, 0, 0, 0},
+    {"databaseVersion"_sd,                   1, 0, 1, 0},
+    {"shardVersion"_sd,                      1, 0, 1, 0},
+    {"tracking_info"_sd,                     1, 0, 1, 0},
+    {"writeConcern"_sd,                      1, 0, 0, 0},
+    {"lsid"_sd,                              1, 0, 0, 0},
+    {"clientOperationKey"_sd,                1, 0, 0, 0},
+    {"txnNumber"_sd,                         1, 0, 0, 0},
+    {"autocommit"_sd,                        1, 0, 0, 0},
+    {"coordinator"_sd,                       1, 0, 0, 0},
+    {"startTransaction"_sd,                  1, 0, 0, 0},
+    {"stmtId"_sd,                            1, 0, 0, 0},
+    {"$gleStats"_sd,                         0, 1, 0, 1},
+    {"operationTime"_sd,                     0, 1, 0, 1},
+    {"lastCommittedOpTime"_sd,               0, 1, 0, 1},
+    {"readOnly"_sd,                          0, 1, 0, 1},
+    {"comment"_sd,                           1, 0, 0, 0},
+    {"maxTimeMSOpOnly"_sd,                   1, 0, 1, 0},
+    {"$configTime"_sd,                       1, 1, 1, 1},
+    {"$topologyTime"_sd,                     1, 1, 1, 1}}};
 // clang-format on
 
 TEST(CommandGenericArgument, AllGenericArgumentsAndReplyFields) {
     for (const auto& record : specials) {
-        if (isGenericArgument(record.name) != record.isGeneric) {
+        if (isGenericArgument(record.name) != record.isGenericArgument) {
             FAIL("isGenericArgument('{}') should be {}, but it's {}"_format(
-                record.name, record.isGeneric, isGenericArgument(record.name)));
+                record.name, record.isGenericArgument, isGenericArgument(record.name)));
+        }
+
+        if (isGenericReply(record.name) != record.isGenericReply) {
+            FAIL("isGenericReply('{}') should be {}, but it's {}"_format(
+                record.name, record.isGenericReply, isGenericReply(record.name)));
         }
 
         if (shouldForwardToShards(record.name) == record.stripFromRequest) {

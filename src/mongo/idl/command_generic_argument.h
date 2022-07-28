@@ -41,6 +41,13 @@ namespace mongo {
 bool isGenericArgument(StringData arg);
 
 /**
+ * Returns true if the provided reply field is one that is handled by the command processing layer
+ * and should generally be ignored by individual command implementations. In particular,
+ * replies that fail on unrecognized fields must not fail for any of these.
+ */
+bool isGenericReply(StringData arg);
+
+/**
  * Returns true if arg should be forwarded to shards.
  *
  * See 'CommandHelpers::filterCommandRequestForPassthrough'.
