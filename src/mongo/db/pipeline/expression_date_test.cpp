@@ -1624,8 +1624,9 @@ TEST_F(ExpressionDateDiffTest, EvaluatesExpression) {
          Value{"century"_sd},
          utc,
          null,
-         5439014,  // Error code.
-         "$dateDiff parameter 'unit' value cannot be recognized as a time unit: century"},
+         ErrorCodes::FailedToParse,  // Error code.
+         "$dateDiff parameter 'unit' value parsing failed :: caused by :: unknown time unit value: "
+         "century"},
         {// Invalid 'timezone' value.
          anyDate,
          anyDate,
@@ -1992,9 +1993,9 @@ TEST_F(ExpressionDateArithmeticsTest, ThrowsExceptionOnInvalidInput) {
             {BSON(expName << BSON("startDate"
                                   << "myDate"
                                   << "unit" << 123 << "amount" << 1)),
-             5166403},
+             5439013},
             {BSON(expName << BSON("startDate" << Date_t{} << "unit" << 123 << "amount" << 1)),
-             5166404},
+             5439013},
             {BSON(expName << BSON("startDate" << Date_t{} << "unit"
                                               << "decade"
                                               << "amount" << 1)),

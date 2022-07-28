@@ -158,6 +158,7 @@ const testCases = [
         pipeline: aggregationPipelineWithDateTrunc,
         inputDocuments: [{date: "Invalid", binSize: "Invalid", timeZone: "Invalid"}],
         expectedResults: [{date_trunc: null}],
+        expectedErrorCode: 5439017,
     },
     {
         // Invalid 'unit' type.
@@ -169,7 +170,7 @@ const testCases = [
         // Invalid 'unit' value.
         pipeline: aggregationPipelineWithDateTrunc,
         inputDocuments: [{date: someDate, unit: "century", binSize: 1, timeZone: "UTC"}],
-        expectedErrorCode: 5439014,
+        expectedErrorCode: ErrorCodes.FailedToParse,
     },
     {
         // Null 'binSize'.
@@ -251,7 +252,7 @@ const testCases = [
         // Missing 'timezone' value in the document, invalid other fields.
         pipeline: aggregationPipelineWithDateTrunc,
         inputDocuments: [{date: 1, unit: "century", binSize: "1"}],
-        expectedResults: [{date_trunc: null}],
+        expectedErrorCode: [ErrorCodes.FailedToParse, 5439017],
     },
     {
         // Invalid 'timezone' type.
@@ -276,6 +277,7 @@ const testCases = [
         pipeline: aggregationPipelineWithDateTruncAndStartOfWeek,
         inputDocuments: [{date: 1, unit: "week", binSize: "", timeZone: 1}],
         expectedResults: [{date_trunc: null}],
+        expectedErrorCode: 5439017,
     },
     {
         // Invalid 'startOfWeek' type.

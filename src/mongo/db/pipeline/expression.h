@@ -706,6 +706,13 @@ public:
     }
 
     /**
+     * Returns true if 'expression' is an instance of an ExpressionConstant.
+     */
+    static bool isConstant(boost::intrusive_ptr<Expression> expression) {
+        return dynamic_cast<ExpressionConstant*>(expression.get());
+    }
+
+    /**
      * Returns true if every expression in 'expressions' is either a nullptr or an instance of an
      * ExpressionConstant.
      */
@@ -758,25 +765,14 @@ public:
         }
         auto date = dateVal.coerceToDate();
 
-        if (!_timeZone) {
-            return evaluateDate(date, TimeZoneDatabase::utcZone());
+        boost::optional<TimeZone> timeZone = _parsedTimeZone;
+        if (!timeZone) {
+            timeZone = makeTimeZone(_timeZone, root, variables);
+            if (!timeZone) {
+                return Value(BSONNULL);
+            }
         }
-        auto timeZoneId = _timeZone->evaluate(root, variables);
-        if (timeZoneId.nullish()) {
-            return Value(BSONNULL);
-        }
-
-        uassert(40533,
-                str::stream() << _opName
-                              << " requires a string for the timezone argument, but was given a "
-                              << typeName(timeZoneId.getType()) << " (" << timeZoneId.toString()
-                              << ")",
-                timeZoneId.getType() == BSONType::String);
-
-        invariant(getExpressionContext()->timeZoneDatabase);
-        auto timeZone =
-            getExpressionContext()->timeZoneDatabase->getTimeZone(timeZoneId.getString());
-        return evaluateDate(date, timeZone);
+        return evaluateDate(date, *timeZone);
     }
 
     /**
@@ -799,6 +795,10 @@ public:
             // Everything is a constant, so we can turn into a constant.
             return ExpressionConstant::create(
                 getExpressionContext(), evaluate(Document{}, &(getExpressionContext()->variables)));
+        }
+        if (ExpressionConstant::isNullOrConstant(_timeZone)) {
+            _parsedTimeZone =
+                makeTimeZone(_timeZone, Document{}, &(getExpressionContext()->variables));
         }
         return this;
     }
@@ -881,14 +881,40 @@ protected:
      */
     virtual Value evaluateDate(Date_t date, const TimeZone& timezone) const = 0;
 
+    boost::optional<TimeZone> makeTimeZone(boost::intrusive_ptr<Expression> timeZone,
+                                           const Document& root,
+                                           Variables* variables) const {
+        if (!timeZone) {
+            return mongo::TimeZoneDatabase::utcZone();
+        }
+        auto timeZoneId = timeZone->evaluate(root, variables);
+        if (timeZoneId.nullish()) {
+            return {};
+        }
+
+        uassert(40533,
+                str::stream() << _opName
+                              << " requires a string for the timezone argument, but was given a "
+                              << typeName(timeZoneId.getType()) << " (" << timeZoneId.toString()
+                              << ")",
+                timeZoneId.getType() == BSONType::String);
+
+        invariant(getExpressionContext()->timeZoneDatabase);
+        return getExpressionContext()->timeZoneDatabase->getTimeZone(timeZoneId.getString());
+    }
+
 private:
     // The name of this expression, e.g. $week or $month.
     StringData _opName;
 
     // The expression representing the date argument.
     boost::intrusive_ptr<Expression>& _date;
+
     // The expression representing the timezone argument.
     boost::intrusive_ptr<Expression>& _timeZone;
+
+    // Pre-parsed timezone, if the above expression is a constant.
+    boost::optional<TimeZone> _parsedTimeZone;
 };
 
 class ExpressionAbs final : public ExpressionSingleNumericArg<ExpressionAbs> {
@@ -1381,6 +1407,10 @@ protected:
 private:
     boost::intrusive_ptr<Expression>& _dateString;
     boost::intrusive_ptr<Expression>& _timeZone;
+
+    // Pre-parsed timezone, if the above expression is a constant.
+    boost::optional<TimeZone> _parsedTimeZone;
+
     boost::intrusive_ptr<Expression>& _format;
     boost::intrusive_ptr<Expression>& _onNull;
     boost::intrusive_ptr<Expression>& _onError;
@@ -1464,6 +1494,9 @@ private:
     boost::intrusive_ptr<Expression>& _isoDayOfWeek;
     boost::intrusive_ptr<Expression>& _timeZone;
 
+    // Pre-parsed timezone, if the above expression is a constant.
+    boost::optional<TimeZone> _parsedTimeZone;
+
     // Some date conversions spend a long time iterating through date tables when dealing with large
     // input numbers, so we place a reasonable limit on the magnitude of any argument to
     // $dateFromParts: inputs that fit within a 16-bit int are permitted.
@@ -1505,6 +1538,10 @@ private:
 
     boost::intrusive_ptr<Expression>& _date;
     boost::intrusive_ptr<Expression>& _timeZone;
+
+    // Pre-parsed timezone, if the above expression is a constant.
+    boost::optional<TimeZone> _parsedTimeZone;
+
     boost::intrusive_ptr<Expression>& _iso8601;
 };
 
@@ -1538,6 +1575,10 @@ private:
     boost::intrusive_ptr<Expression>& _format;
     boost::intrusive_ptr<Expression>& _date;
     boost::intrusive_ptr<Expression>& _timeZone;
+
+    // Pre-parsed timezone, if the above expression is a constant.
+    boost::optional<TimeZone> _parsedTimeZone;
+
     boost::intrusive_ptr<Expression>& _onNull;
 };
 
@@ -1673,13 +1714,22 @@ private:
     // values: enumerators from TimeUnit enumeration.
     boost::intrusive_ptr<Expression>& _unit;
 
+    // Pre-parsed time unit, if the above expression is a constant.
+    boost::optional<TimeUnit> _parsedUnit;
+
     // Timezone to use for the difference calculation. Accepted type: std::string. If not specified,
     // UTC is used.
     boost::intrusive_ptr<Expression>& _timeZone;
 
+    // Pre-parsed timezone, if the above expression is a constant.
+    boost::optional<TimeZone> _parsedTimeZone;
+
     // First/start day of the week to use for the date difference calculation when time unit is the
     // week. Accepted type: std::string. If not specified, "sunday" is used.
     boost::intrusive_ptr<Expression>& _startOfWeek;
+
+    // Pre-parsed start of week, if the above expression is a constant.
+    boost::optional<DayOfWeek> _parsedStartOfWeek;
 };
 
 class ExpressionDivide final : public ExpressionFixedArity<ExpressionDivide, 2> {
@@ -3990,11 +4040,17 @@ private:
     // Unit of time: year, quarter, week, etc.
     boost::intrusive_ptr<Expression>& _unit;
 
+    // Pre-parsed time unit, if the above expression is a constant.
+    boost::optional<TimeUnit> _parsedUnit;
+
     // Amount of units to be added or subtracted.
     boost::intrusive_ptr<Expression>& _amount;
 
     // The expression representing the timezone argument.
     boost::intrusive_ptr<Expression>& _timeZone;
+
+    // Pre-parsed timezone, if the above expression is a constant.
+    boost::optional<TimeZone> _parsedTimeZone;
 
     // The name of this expression, e.g. $dateAdd or $dateSubtract.
     StringData _opName;
@@ -4137,18 +4193,30 @@ private:
     // enumerators from TimeUnit enumeration.
     boost::intrusive_ptr<Expression>& _unit;
 
+    // Pre-parsed time unit, if the above expression is a constant.
+    boost::optional<TimeUnit> _parsedUnit;
+
     // Size of bins in time units '_unit'. Accepted BSON types: NumberInt, NumberLong, NumberDouble,
     // NumberDecimal. Accepted are only values that can be coerced to a 64-bit integer without loss.
     // If not specified, 1 is used.
     boost::intrusive_ptr<Expression>& _binSize;
 
+    // Pre-parsed bin size, if the above expression is a constant.
+    boost::optional<long long> _parsedBinSize;
+
     // Timezone to use for the truncation operation. Accepted BSON type: String. If not specified,
     // UTC is used.
     boost::intrusive_ptr<Expression>& _timeZone;
 
+    // Pre-parsed timezone, if the above expression is a constant.
+    boost::optional<TimeZone> _parsedTimeZone;
+
     // First/start day of the week to use for date truncation when the time unit is the week.
     // Accepted BSON type: String. If not specified, "sunday" is used.
     boost::intrusive_ptr<Expression>& _startOfWeek;
+
+    // Pre-parsed start of week, if the above expression is a constant.
+    boost::optional<DayOfWeek> _parsedStartOfWeek;
 };
 
 class ExpressionGetField final : public Expression {

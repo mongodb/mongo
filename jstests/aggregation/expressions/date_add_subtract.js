@@ -7,22 +7,34 @@
 (function() {
 "use strict";
 
-load("jstests/aggregation/extras/utils.js");        // For assertErrorCode.
-load("jstests/libs/sbe_assert_error_override.js");  // For mapping of error codes in SBE.
+load("jstests/libs/aggregation_pipeline_utils.js");  // For executeAggregationTestCase.
+load("jstests/libs/sbe_assert_error_override.js");   // For mapping of error codes in SBE.
 
 const coll = db.date_add_subtract;
 coll.drop();
 
-assert.commandWorked(coll.insert(
-    [{_id: 1, date: ISODate("2020-12-31T12:10:05"), unit: "month", timezone: "Europe/Paris"}]));
-
-function runAndAssert(dateArithmeticsSpec, expectedResult) {
-    assert.eq(expectedResult,
-              coll.aggregate([{$project: {_id: 0, newDate: dateArithmeticsSpec}}]).toArray());
+function runAndAssert(date, result) {
+    runTest({dateArithmeticsSpec: date, expectedResult: result});
 }
 
-function runAndAssertErrorCode(dateArithmeticsSpec, expectedErrorCode) {
-    assertErrorCode(coll, [{$project: {newDate: dateArithmeticsSpec}}], expectedErrorCode);
+function runAndAssertErrorCode(date, errorCode) {
+    runTest({dateArithmeticsSpec: date, expectedErrorCode: errorCode});
+}
+
+function runAndAssertResultOrErrorCode(date, result, errorCode) {
+    runTest({dateArithmeticsSpec: date, expectedErrorCode: errorCode, expectedResult: result});
+}
+
+function runTest({dateArithmeticsSpec, expectedResult, expectedErrorCode}) {
+    executeAggregationTestCase(coll, {
+        pipeline: [{$project: {_id: 0, newDate: dateArithmeticsSpec}}],
+        inputDocuments: [
+            {_id: 1, date: ISODate("2020-12-31T12:10:05"), unit: "month", timezone: "Europe/Paris"}
+        ],
+        expectedErrorCode: expectedErrorCode,
+        expectedResults: expectedResult
+
+    });
 }
 
 (function testDateAddWithValidInputs() {
@@ -40,15 +52,17 @@ function runAndAssertErrorCode(dateArithmeticsSpec, expectedErrorCode) {
                  [{newDate: null}]);
 
     // Test combination of null and invalid arguments.
-    runAndAssert({$dateAdd: {startDate: "$dateSent", unit: "workday", amount: 1}},
-                 [{newDate: null}]);
+    runAndAssertResultOrErrorCode({$dateAdd: {startDate: "$dateSent", unit: "workday", amount: 1}},
+                                  [{newDate: null}],
+                                  ErrorCodes.FailedToParse);
 
     runAndAssert({$dateAdd: {startDate: "New year day", unit: "$timeunit", amount: 1}},
                  [{newDate: null}]);
 
-    runAndAssert(
+    runAndAssertResultOrErrorCode(
         {$dateAdd: {startDate: "$date", unit: "workday", amount: "$amount", timezone: "Unknown"}},
-        [{newDate: null}]);
+        [{newDate: null}],
+        ErrorCodes.FailedToParse);
 
     runAndAssert({$dateAdd: {startDate: "$date", unit: "$unit", amount: 1.5, timezone: null}},
                  [{newDate: null}]);

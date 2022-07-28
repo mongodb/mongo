@@ -122,6 +122,22 @@ struct ParserRegistration {
 };
 
 /**
+ * Calls function 'function' with zero parameters and returns the result. If AssertionException is
+ * raised during the call of 'function', adds all the context 'errorContext' to the exception.
+ */
+template <typename F, class... Args>
+auto addContextToAssertionException(F&& function, Args... errorContext) {
+    try {
+        return function();
+    } catch (AssertionException& exception) {
+        str::stream ss;
+        ((ss << errorContext), ...);
+        exception.addContext(ss);
+        throw;
+    }
+}
+
+/**
  * Converts 'value' to TimeUnit for an expression named 'expressionName'. It assumes that the
  * parameter is named "unit". Throws an AssertionException if 'value' contains an invalid value.
  */
@@ -130,12 +146,9 @@ TimeUnit parseTimeUnit(const Value& value, StringData expressionName) {
             str::stream() << expressionName << " requires 'unit' to be a string, but got "
                           << typeName(value.getType()),
             BSONType::String == value.getType());
-    uassert(5439014,
-            str::stream() << expressionName
-                          << " parameter 'unit' value cannot be recognized as a time unit: "
-                          << value.getStringData(),
-            isValidTimeUnit(value.getStringData()));
-    return parseTimeUnit(value.getStringData());
+    return addContextToAssertionException([&]() { return parseTimeUnit(value.getStringData()); },
+                                          expressionName,
+                                          " parameter 'unit' value parsing failed"_sd);
 }
 
 /**
@@ -153,24 +166,6 @@ DayOfWeek parseDayOfWeek(const Value& value, StringData expressionName, StringDa
                           << value.getStringData(),
             isValidDayOfWeek(value.getStringData()));
     return parseDayOfWeek(value.getStringData());
-}
-
-bool isTimeUnitWeek(const Value& unit) {
-    return BSONType::String == unit.getType() && unit.getStringData() == "week"_sd;
-}
-
-/**
- * Calls function 'function' with zero parameters and returns the result. If AssertionException is
- * raised during the call of 'function', adds a context 'errorContext' to the exception.
- */
-template <typename F>
-auto addContextToAssertionException(F&& function, StringData errorContext) {
-    try {
-        return function();
-    } catch (AssertionException& exception) {
-        exception.addContext(str::stream() << errorContext);
-        throw;
-    }
 }
 
 StringMap<ParserRegistration> parserMap;
@@ -1404,6 +1399,15 @@ intrusive_ptr<Expression> ExpressionDateFromParts::optimize() {
         return ExpressionConstant::create(
             getExpressionContext(), evaluate(Document{}, &(getExpressionContext()->variables)));
     }
+    if (ExpressionConstant::isNullOrConstant(_timeZone)) {
+        _parsedTimeZone = makeTimeZone(getExpressionContext()->timeZoneDatabase,
+                                       Document{},
+                                       _timeZone.get(),
+                                       &(getExpressionContext()->variables));
+        if (!_parsedTimeZone) {
+            return ExpressionConstant::create(getExpressionContext(), Value(BSONNULL));
+        }
+    }
 
     return this;
 }
@@ -1484,11 +1488,13 @@ Value ExpressionDateFromParts::evaluate(const Document& root, Variables* variabl
         return Value(BSONNULL);
     }
 
-    auto timeZone =
-        makeTimeZone(getExpressionContext()->timeZoneDatabase, root, _timeZone.get(), variables);
-
+    boost::optional<TimeZone> timeZone = _parsedTimeZone;
     if (!timeZone) {
-        return Value(BSONNULL);
+        timeZone = makeTimeZone(
+            getExpressionContext()->timeZoneDatabase, root, _timeZone.get(), variables);
+        if (!timeZone) {
+            return Value(BSONNULL);
+        }
     }
 
     if (_year) {
@@ -1662,6 +1668,12 @@ intrusive_ptr<Expression> ExpressionDateFromString::optimize() {
         return ExpressionConstant::create(
             getExpressionContext(), evaluate(Document{}, &(getExpressionContext()->variables)));
     }
+    if (ExpressionConstant::isNullOrConstant(_timeZone)) {
+        _parsedTimeZone = makeTimeZone(getExpressionContext()->timeZoneDatabase,
+                                       Document{},
+                                       _timeZone.get(),
+                                       &(getExpressionContext()->variables));
+    }
     return this;
 }
 
@@ -1696,8 +1708,11 @@ Value ExpressionDateFromString::evaluate(const Document& root, Variables* variab
 
     // Evaluate the timezone parameter before checking for nullish input, as this will throw an
     // exception for an invalid timezone string.
-    auto timeZone =
-        makeTimeZone(getExpressionContext()->timeZoneDatabase, root, _timeZone.get(), variables);
+    boost::optional<TimeZone> timeZone = _parsedTimeZone;
+    if (!timeZone) {
+        timeZone = makeTimeZone(
+            getExpressionContext()->timeZoneDatabase, root, _timeZone.get(), variables);
+    }
 
     // Behavior for nullish input takes precedence over other nullish elements.
     if (dateString.nullish()) {
@@ -1819,6 +1834,15 @@ intrusive_ptr<Expression> ExpressionDateToParts::optimize() {
         return ExpressionConstant::create(
             getExpressionContext(), evaluate(Document{}, &(getExpressionContext()->variables)));
     }
+    if (ExpressionConstant::isNullOrConstant(_timeZone)) {
+        _parsedTimeZone = makeTimeZone(getExpressionContext()->timeZoneDatabase,
+                                       Document{},
+                                       _timeZone.get(),
+                                       &(getExpressionContext()->variables));
+        if (!_parsedTimeZone) {
+            return ExpressionConstant::create(getExpressionContext(), Value(BSONNULL));
+        }
+    }
 
     return this;
 }
@@ -1854,10 +1878,13 @@ boost::optional<int> ExpressionDateToParts::evaluateIso8601Flag(const Document& 
 Value ExpressionDateToParts::evaluate(const Document& root, Variables* variables) const {
     const Value date = _date->evaluate(root, variables);
 
-    auto timeZone =
-        makeTimeZone(getExpressionContext()->timeZoneDatabase, root, _timeZone.get(), variables);
+    boost::optional<TimeZone> timeZone = _parsedTimeZone;
     if (!timeZone) {
-        return Value(BSONNULL);
+        timeZone = makeTimeZone(
+            getExpressionContext()->timeZoneDatabase, root, _timeZone.get(), variables);
+        if (!timeZone) {
+            return Value(BSONNULL);
+        }
     }
 
     auto iso8601 = evaluateIso8601Flag(root, variables);
@@ -1977,6 +2004,12 @@ intrusive_ptr<Expression> ExpressionDateToString::optimize() {
         return ExpressionConstant::create(
             getExpressionContext(), evaluate(Document{}, &(getExpressionContext()->variables)));
     }
+    if (ExpressionConstant::isNullOrConstant(_timeZone)) {
+        _parsedTimeZone = makeTimeZone(getExpressionContext()->timeZoneDatabase,
+                                       Document{},
+                                       _timeZone.get(),
+                                       &(getExpressionContext()->variables));
+    }
 
     return this;
 }
@@ -2011,8 +2044,11 @@ Value ExpressionDateToString::evaluate(const Document& root, Variables* variable
 
     // Evaluate the timezone parameter before checking for nullish input, as this will throw an
     // exception for an invalid timezone string.
-    auto timeZone =
-        makeTimeZone(getExpressionContext()->timeZoneDatabase, root, _timeZone.get(), variables);
+    boost::optional<TimeZone> timeZone = _parsedTimeZone;
+    if (!timeZone) {
+        timeZone = makeTimeZone(
+            getExpressionContext()->timeZoneDatabase, root, _timeZone.get(), variables);
+    }
 
     if (date.nullish()) {
         return _onNull ? _onNull->evaluate(root, variables) : Value(BSONNULL);
@@ -2125,6 +2161,34 @@ boost::intrusive_ptr<Expression> ExpressionDateDiff::optimize() {
         return ExpressionConstant::create(
             getExpressionContext(), evaluate(Document{}, &(getExpressionContext()->variables)));
     }
+    if (ExpressionConstant::isConstant(_unit)) {
+        const Value unitValue = _unit->evaluate(Document{}, &(getExpressionContext()->variables));
+        if (unitValue.nullish()) {
+            return ExpressionConstant::create(getExpressionContext(), Value(BSONNULL));
+        }
+        _parsedUnit = parseTimeUnit(unitValue, "$dateDiff"_sd);
+    }
+    if (ExpressionConstant::isConstant(_startOfWeek)) {
+        const Value startOfWeekValue =
+            _startOfWeek->evaluate(Document{}, &(getExpressionContext()->variables));
+        if (startOfWeekValue.nullish()) {
+            return ExpressionConstant::create(getExpressionContext(), Value(BSONNULL));
+        }
+        _parsedStartOfWeek = parseDayOfWeek(startOfWeekValue, "$dateDiff"_sd, "startOfWeek"_sd);
+    }
+    if (ExpressionConstant::isNullOrConstant(_timeZone)) {
+        _parsedTimeZone = addContextToAssertionException(
+            [&]() {
+                return makeTimeZone(getExpressionContext()->timeZoneDatabase,
+                                    Document{},
+                                    _timeZone.get(),
+                                    &(getExpressionContext()->variables));
+            },
+            "$dateDiff parameter 'timezone' value parsing failed"_sd);
+        if (!_parsedTimeZone) {
+            return ExpressionConstant::create(getExpressionContext(), Value(BSONNULL));
+        }
+    }
     return this;
 };
 
@@ -2155,33 +2219,46 @@ Value ExpressionDateDiff::evaluate(const Document& root, Variables* variables) c
     if (endDateValue.nullish()) {
         return Value(BSONNULL);
     }
-    const Value unitValue = _unit->evaluate(root, variables);
-    if (unitValue.nullish()) {
-        return Value(BSONNULL);
+
+    TimeUnit unit;
+    if (_parsedUnit) {
+        unit = *_parsedUnit;
+    } else {
+        const Value unitValue = _unit->evaluate(root, variables);
+        if (unitValue.nullish()) {
+            return Value(BSONNULL);
+        }
+        unit = parseTimeUnit(unitValue, "$dateDiff"_sd);
     }
-    const auto startOfWeekParameterActive = _startOfWeek && isTimeUnitWeek(unitValue);
-    Value startOfWeekValue{};
-    if (startOfWeekParameterActive) {
-        startOfWeekValue = _startOfWeek->evaluate(root, variables);
-        if (startOfWeekValue.nullish()) {
+
+    DayOfWeek startOfWeek = kStartOfWeekDefault;
+    if (unit == TimeUnit::week) {
+        if (_parsedStartOfWeek) {
+            startOfWeek = *_parsedStartOfWeek;
+        } else if (_startOfWeek) {
+            const Value startOfWeekValue = _startOfWeek->evaluate(root, variables);
+            if (startOfWeekValue.nullish()) {
+                return Value(BSONNULL);
+            }
+            startOfWeek = parseDayOfWeek(startOfWeekValue, "$dateDiff"_sd, "startOfWeek"_sd);
+        }
+    }
+
+    boost::optional<TimeZone> timezone = _parsedTimeZone;
+    if (!timezone) {
+        timezone = addContextToAssertionException(
+            [&]() {
+                return makeTimeZone(
+                    getExpressionContext()->timeZoneDatabase, root, _timeZone.get(), variables);
+            },
+            "$dateDiff parameter 'timezone' value parsing failed"_sd);
+        if (!timezone) {
             return Value(BSONNULL);
         }
     }
-    const auto timezone = addContextToAssertionException(
-        [&]() {
-            return makeTimeZone(
-                getExpressionContext()->timeZoneDatabase, root, _timeZone.get(), variables);
-        },
-        "$dateDiff parameter 'timezone' value parsing failed"_sd);
-    if (!timezone) {
-        return Value(BSONNULL);
-    }
+
     const Date_t startDate = convertToDate(startDateValue, "startDate"_sd);
     const Date_t endDate = convertToDate(endDateValue, "endDate"_sd);
-    const TimeUnit unit = parseTimeUnit(unitValue, "$dateDiff"_sd);
-    const DayOfWeek startOfWeek = startOfWeekParameterActive
-        ? parseDayOfWeek(startOfWeekValue, "$dateDiff"_sd, "startOfWeek"_sd)
-        : kStartOfWeekDefault;
     return Value{dateDiff(startDate, endDate, unit, *timezone, startOfWeek)};
 }
 
@@ -7500,6 +7577,22 @@ boost::intrusive_ptr<Expression> ExpressionDateArithmetics::optimize() {
         return ExpressionConstant::create(
             getExpressionContext(), evaluate(Document{}, &(getExpressionContext()->variables)));
     }
+    if (ExpressionConstant::isConstant(_unit)) {
+        const Value unitVal = _unit->evaluate(Document{}, &(getExpressionContext()->variables));
+        if (unitVal.nullish()) {
+            return ExpressionConstant::create(getExpressionContext(), Value(BSONNULL));
+        }
+        _parsedUnit = parseTimeUnit(unitVal, _opName);
+    }
+    if (ExpressionConstant::isNullOrConstant(_timeZone)) {
+        _parsedTimeZone = makeTimeZone(getExpressionContext()->timeZoneDatabase,
+                                       Document{},
+                                       _timeZone.get(),
+                                       &(getExpressionContext()->variables));
+        if (!_parsedTimeZone) {
+            return ExpressionConstant::create(getExpressionContext(), Value(BSONNULL));
+        }
+    }
     return intrusive_ptr<Expression>(this);
 }
 
@@ -7517,28 +7610,36 @@ Value ExpressionDateArithmetics::evaluate(const Document& root, Variables* varia
     if (startDate.nullish()) {
         return Value(BSONNULL);
     }
-    auto unitVal = _unit->evaluate(root, variables);
-    if (unitVal.nullish()) {
-        return Value(BSONNULL);
+
+    TimeUnit unit;
+    if (_parsedUnit) {
+        unit = *_parsedUnit;
+    } else {
+        const Value unitVal = _unit->evaluate(root, variables);
+        if (unitVal.nullish()) {
+            return Value(BSONNULL);
+        }
+        unit = parseTimeUnit(unitVal, _opName);
     }
+
     auto amount = _amount->evaluate(root, variables);
     if (amount.nullish()) {
         return Value(BSONNULL);
     }
+
     // Get the TimeZone object for the timezone parameter, if it is specified, or UTC otherwise.
-    auto timezone =
-        makeTimeZone(getExpressionContext()->timeZoneDatabase, root, _timeZone.get(), variables);
+    boost::optional<TimeZone> timezone = _parsedTimeZone;
     if (!timezone) {
-        return Value(BSONNULL);
+        timezone = makeTimeZone(
+            getExpressionContext()->timeZoneDatabase, root, _timeZone.get(), variables);
+        if (!timezone) {
+            return Value(BSONNULL);
+        }
     }
 
     uassert(5166403,
             str::stream() << _opName << " requires startDate to be convertible to a date",
             startDate.coercibleToDate());
-    uassert(5166404,
-            str::stream() << _opName << " expects string defining the time unit",
-            unitVal.getType() == BSONType::String);
-    auto unit = parseTimeUnit(unitVal.getString());
     uassert(5166405,
             str::stream() << _opName << " expects integer amount of time units",
             amount.integral64Bit());
@@ -7680,6 +7781,42 @@ boost::intrusive_ptr<Expression> ExpressionDateTrunc::optimize() {
         return ExpressionConstant::create(
             getExpressionContext(), evaluate(Document{}, &(getExpressionContext()->variables)));
     }
+    if (ExpressionConstant::isConstant(_unit)) {
+        const Value unitValue = _unit->evaluate(Document{}, &(getExpressionContext()->variables));
+        if (unitValue.nullish()) {
+            return ExpressionConstant::create(getExpressionContext(), Value(BSONNULL));
+        }
+        _parsedUnit = parseTimeUnit(unitValue, "$dateTrunc"_sd);
+    }
+    if (ExpressionConstant::isConstant(_startOfWeek)) {
+        const Value startOfWeekValue =
+            _startOfWeek->evaluate(Document{}, &(getExpressionContext()->variables));
+        if (startOfWeekValue.nullish()) {
+            return ExpressionConstant::create(getExpressionContext(), Value(BSONNULL));
+        }
+        _parsedStartOfWeek = parseDayOfWeek(startOfWeekValue, "$dateTrunc"_sd, "startOfWeek"_sd);
+    }
+    if (ExpressionConstant::isNullOrConstant(_timeZone)) {
+        _parsedTimeZone = addContextToAssertionException(
+            [&]() {
+                return makeTimeZone(getExpressionContext()->timeZoneDatabase,
+                                    Document{},
+                                    _timeZone.get(),
+                                    &(getExpressionContext()->variables));
+            },
+            "$dateTrunc parameter 'timezone' value parsing failed"_sd);
+        if (!_parsedTimeZone) {
+            return ExpressionConstant::create(getExpressionContext(), Value(BSONNULL));
+        }
+    }
+    if (ExpressionConstant::isConstant(_binSize)) {
+        const Value binSizeValue =
+            _binSize->evaluate(Document{}, &(getExpressionContext()->variables));
+        if (binSizeValue.nullish()) {
+            return ExpressionConstant::create(getExpressionContext(), Value(BSONNULL));
+        }
+        _parsedBinSize = convertToBinSize(binSizeValue);
+    }
     return this;
 };
 
@@ -7719,42 +7856,57 @@ Value ExpressionDateTrunc::evaluate(const Document& root, Variables* variables) 
     if (dateValue.nullish()) {
         return Value(BSONNULL);
     }
-    const Value unitValue = _unit->evaluate(root, variables);
-    if (unitValue.nullish()) {
-        return Value(BSONNULL);
-    }
-    Value binSizeValue;
-    if (_binSize) {
-        binSizeValue = _binSize->evaluate(root, variables);
+
+    unsigned long long binSize = 1;
+    if (_parsedBinSize) {
+        binSize = *_parsedBinSize;
+    } else if (_binSize) {
+        const Value binSizeValue = _binSize->evaluate(root, variables);
         if (binSizeValue.nullish()) {
             return Value(BSONNULL);
         }
+        binSize = convertToBinSize(binSizeValue);
     }
-    const bool startOfWeekParameterActive = _startOfWeek && isTimeUnitWeek(unitValue);
-    Value startOfWeekValue{};
-    if (startOfWeekParameterActive) {
-        startOfWeekValue = _startOfWeek->evaluate(root, variables);
-        if (startOfWeekValue.nullish()) {
+
+    TimeUnit unit;
+    if (_parsedUnit) {
+        unit = *_parsedUnit;
+    } else {
+        const Value unitValue = _unit->evaluate(root, variables);
+        if (unitValue.nullish()) {
             return Value(BSONNULL);
         }
+        unit = parseTimeUnit(unitValue, "$dateTrunc"_sd);
     }
-    const auto timezone = addContextToAssertionException(
-        [&]() {
-            return makeTimeZone(
-                getExpressionContext()->timeZoneDatabase, root, _timeZone.get(), variables);
-        },
-        "$dateTrunc parameter 'timezone' value parsing failed"_sd);
+
+    DayOfWeek startOfWeek = kStartOfWeekDefault;
+    if (unit == TimeUnit::week) {
+        if (_parsedStartOfWeek) {
+            startOfWeek = *_parsedStartOfWeek;
+        } else if (_startOfWeek) {
+            const Value startOfWeekValue = _startOfWeek->evaluate(root, variables);
+            if (startOfWeekValue.nullish()) {
+                return Value(BSONNULL);
+            }
+            startOfWeek = parseDayOfWeek(startOfWeekValue, "$dateTrunc"_sd, "startOfWeek"_sd);
+        }
+    }
+
+    boost::optional<TimeZone> timezone = _parsedTimeZone;
     if (!timezone) {
-        return Value(BSONNULL);
+        timezone = addContextToAssertionException(
+            [&]() {
+                return makeTimeZone(
+                    getExpressionContext()->timeZoneDatabase, root, _timeZone.get(), variables);
+            },
+            "$dateTrunc parameter 'timezone' value parsing failed"_sd);
+        if (!timezone) {
+            return Value(BSONNULL);
+        }
     }
 
     // Convert parameter values.
     const Date_t date = convertToDate(dateValue);
-    const TimeUnit unit = parseTimeUnit(unitValue, "$dateTrunc"_sd);
-    const unsigned long long binSize = _binSize ? convertToBinSize(binSizeValue) : 1;
-    const DayOfWeek startOfWeek = startOfWeekParameterActive
-        ? parseDayOfWeek(startOfWeekValue, "$dateTrunc"_sd, "startOfWeek"_sd)
-        : kStartOfWeekDefault;
     return Value{truncateDate(date, unit, binSize, *timezone, startOfWeek)};
 }
 

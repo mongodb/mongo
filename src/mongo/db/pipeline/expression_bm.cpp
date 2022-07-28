@@ -89,14 +89,18 @@ void testDateDiffExpression(long long startDate,
     // Build a $dateDiff expression.
     BSONObjBuilder objBuilder;
     objBuilder << "startDate" << Date_t::fromMillisSinceEpoch(startDate) << "endDate"
-               << Date_t::fromMillisSinceEpoch(endDate) << "unit" << unit;
+               << "$endDate"
+               << "unit" << unit;
     if (timezone) {
         objBuilder << "timezone" << *timezone;
     }
     if (startOfWeek) {
         objBuilder << "startOfWeek" << *startOfWeek;
     }
-    benchmarkExpression(BSON("$dateDiff" << objBuilder.obj()), state);
+    benchmarkExpression(
+        BSON("$dateDiff" << objBuilder.obj()),
+        state,
+        std::vector<Document>(1, {{"endDate"_sd, Date_t::fromMillisSinceEpoch(endDate)}}));
 }
 
 void BM_DateDiffEvaluateMinute300Years(benchmark::State& state) {
@@ -149,12 +153,16 @@ void testDateAddExpression(long long startDate,
                            boost::optional<std::string> timezone,
                            benchmark::State& state) {
     BSONObjBuilder objBuilder;
-    objBuilder << "startDate" << Date_t::fromMillisSinceEpoch(startDate) << "unit" << unit
-               << "amount" << amount;
+    objBuilder << "startDate"
+               << "$startDate"
+               << "unit" << unit << "amount" << amount;
     if (timezone) {
         objBuilder << "timezone" << *timezone;
     }
-    benchmarkExpression(BSON("$dateAdd" << objBuilder.obj()), state);
+    benchmarkExpression(
+        BSON("$dateAdd" << objBuilder.obj()),
+        state,
+        std::vector<Document>(1, {{"startDate"_sd, Date_t::fromMillisSinceEpoch(startDate)}}));
 }
 
 void BM_DateAddEvaluate10Days(benchmark::State& state) {
@@ -217,15 +225,19 @@ void testDateTruncExpression(long long date,
                              benchmark::State& state) {
     // Build a $dateTrunc expression.
     BSONObjBuilder objBuilder;
-    objBuilder << "date" << Date_t::fromMillisSinceEpoch(date) << "unit" << unit << "binSize"
-               << static_cast<long long>(binSize);
+    objBuilder << "date"
+               << "$date"
+               << "unit" << unit << "binSize" << static_cast<long long>(binSize);
     if (timezone) {
         objBuilder << "timezone" << *timezone;
     }
     if (startOfWeek) {
         objBuilder << "startOfWeek" << *startOfWeek;
     }
-    benchmarkExpression(BSON("$dateTrunc" << objBuilder.obj()), state);
+    benchmarkExpression(
+        BSON("$dateTrunc" << objBuilder.obj()),
+        state,
+        std::vector<Document>(1, {{"date"_sd, Date_t::fromMillisSinceEpoch(date)}}));
 }
 
 void BM_DateTruncEvaluateMinute15NewYork(benchmark::State& state) {
