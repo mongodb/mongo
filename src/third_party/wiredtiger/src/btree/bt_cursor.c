@@ -2067,6 +2067,9 @@ retry:
         value = (const uint8_t *)start->iface.value.data;
         if (*value != 0)
             WT_ERR(rmfunc(start, NULL, WT_UPDATE_TOMBSTONE));
+        else
+            /* Removes skipped because the row is already deleted require a conflict check. */
+            WT_ERR(__curfile_update_check(start));
 
         if (stop != NULL && __cursor_equals(start, stop))
             return (0);
