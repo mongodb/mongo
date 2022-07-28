@@ -172,6 +172,7 @@ public:
     /**
      * Asynchronously requests the resize of all the chunks defined in the cluster, so that
      * the "Collection Max Chunk Size" constraint existing in FCV 5.0 is enforced.
+     * TODO SERVER-65332 remove the function once 6.1 branches out.
      */
     SharedSemiFuture<void> applyLegacyChunkSizeConstraintsOnClusterData(OperationContext* opCtx);
 

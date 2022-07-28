@@ -5,6 +5,7 @@
  *  # This test does not support stepdowns of CSRS because of how it uses failpoints
  *  # to control phase transition
  *  does_not_support_stepdowns,
+ *  requires_fcv_61,
  * ]
  */
 
@@ -126,6 +127,41 @@ jsTest.log("Test command chunk size bounds.");
         chunkSize: -1,
     }),
                                  ErrorCodes.InvalidOptions);
+}
+
+jsTest.log("Test command - apply default value to chunkSize");
+{
+    st.stopBalancer();
+    let getMaxChunkSizeFor = (nss) => {
+        return st.s.getDB("config").collections.findOne({_id: nss}).maxChunkSizeBytes;
+    };
+
+    // Generic Behavior
+    assert.commandWorked(st.s.adminCommand({
+        configureCollectionBalancing: coll1Name,
+        chunkSize: 1024,
+    }));
+    assert.eq(1024 * 1024 * 1024, getMaxChunkSizeFor(coll1Name));
+
+    assert.commandWorked(st.s.adminCommand({
+        configureCollectionBalancing: coll1Name,
+        chunkSize: 0,
+    }));
+    assert.eq(undefined, getMaxChunkSizeFor(coll1Name));
+
+    // Specific treatment for config.system.sessions
+    const sessionsCollName = "config.system.sessions";
+    assert.commandWorked(st.s.adminCommand({
+        configureCollectionBalancing: sessionsCollName,
+        chunkSize: 1024,
+    }));
+    assert.eq(1024 * 1024 * 1024, getMaxChunkSizeFor(sessionsCollName));
+
+    assert.commandWorked(st.s.adminCommand({
+        configureCollectionBalancing: sessionsCollName,
+        chunkSize: 0,
+    }));
+    assert.eq(200000, getMaxChunkSizeFor(sessionsCollName));
 }
 
 jsTest.log("Begin and end defragmentation with balancer off.");

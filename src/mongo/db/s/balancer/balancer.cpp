@@ -1125,15 +1125,8 @@ void Balancer::abortCollectionDefragmentation(OperationContext* opCtx, const Nam
 
 SharedSemiFuture<void> Balancer::applyLegacyChunkSizeConstraintsOnClusterData(
     OperationContext* opCtx) {
-    // Remove the maxChunkSizeBytes from config.system.collections to make it compatible with
-    // the balancing strategy based on the number of collection chunks
     try {
-        ShardingCatalogManager::get(opCtx)->configureCollectionBalancing(
-            opCtx,
-            NamespaceString::kLogicalSessionsNamespace,
-            0,
-            boost::none /*defragmentCollection*/,
-            false /*enableAutoSplitter*/);
+        ShardingCatalogManager::get(opCtx)->applyLegacyConfigurationToSessionsCollection(opCtx);
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotSharded>&) {
         // config.system.collections does not appear in config.collections; continue.
     }
