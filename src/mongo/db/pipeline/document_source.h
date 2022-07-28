@@ -99,18 +99,18 @@ class Document;
                                            true)
 
 /**
- * Like REGISTER_DOCUMENT_SOURCE, except the parser will only be enabled when FCV >= minVersion.
- * We store minVersion in the parserMap, so that changing FCV at runtime correctly enables/disables
- * the parser.
+ * Like REGISTER_DOCUMENT_SOURCE, except the parser will only be registered when featureFlag is
+ * enabled. We store featureFlag in the parserMap, so that it can be checked at runtime
+ * to correctly enable/disable the parser.
  */
-#define REGISTER_DOCUMENT_SOURCE_WITH_MIN_VERSION(                      \
-    key, liteParser, fullParser, allowedWithApiStrict, minVersion)      \
+#define REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(                     \
+    key, liteParser, fullParser, allowedWithApiStrict, featureFlag)     \
     REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(key,                         \
                                            liteParser,                  \
                                            fullParser,                  \
                                            allowedWithApiStrict,        \
                                            AllowedWithClientType::kAny, \
-                                           minVersion,                  \
+                                           featureFlag,                 \
                                            true)
 
 /**
@@ -126,8 +126,8 @@ class Document;
                                            condition)
 
 /**
- * Like REGISTER_DOCUMENT_SOURCE_WITH_MIN_VERSION, except you can also specify a condition,
- * evaluated during startup, that decides whether to register the parser.
+ * You can specify a condition, evaluated during startup,
+ * that decides whether to register the parser.
  *
  * For example, you could check a feature flag, and register the parser only when it's enabled.
  *
@@ -137,23 +137,25 @@ class Document;
  *
  * This is the most general REGISTER_DOCUMENT_SOURCE* macro, which all others should delegate to.
  */
-#define REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(                                                  \
-    key, liteParser, fullParser, allowedWithApiStrict, clientType, minVersion, ...)              \
-    MONGO_INITIALIZER_GENERAL(addToDocSourceParserMap_##key,                                     \
-                              ("BeginDocumentSourceRegistration"),                               \
-                              ("EndDocumentSourceRegistration"))                                 \
-    (InitializerContext*) {                                                                      \
-        if (!__VA_ARGS__) {                                                                      \
-            DocumentSource::registerParser("$" #key, DocumentSource::parseDisabled, minVersion); \
-            LiteParsedDocumentSource::registerParser("$" #key,                                   \
-                                                     LiteParsedDocumentSource::parseDisabled,    \
-                                                     allowedWithApiStrict,                       \
-                                                     clientType);                                \
-            return;                                                                              \
-        }                                                                                        \
-        LiteParsedDocumentSource::registerParser(                                                \
-            "$" #key, liteParser, allowedWithApiStrict, clientType);                             \
-        DocumentSource::registerParser("$" #key, fullParser, minVersion);                        \
+#define REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(                                                   \
+    key, liteParser, fullParser, allowedWithApiStrict, clientType, featureFlag, ...)              \
+    MONGO_INITIALIZER_GENERAL(addToDocSourceParserMap_##key,                                      \
+                              ("BeginDocumentSourceRegistration"),                                \
+                              ("EndDocumentSourceRegistration"))                                  \
+    (InitializerContext*) {                                                                       \
+        if (!__VA_ARGS__ ||                                                                       \
+            (boost::optional<FeatureFlag>(featureFlag) != boost::none &&                          \
+             !boost::optional<FeatureFlag>(featureFlag)->isEnabledAndIgnoreFCV())) {              \
+            DocumentSource::registerParser("$" #key, DocumentSource::parseDisabled, featureFlag); \
+            LiteParsedDocumentSource::registerParser("$" #key,                                    \
+                                                     LiteParsedDocumentSource::parseDisabled,     \
+                                                     allowedWithApiStrict,                        \
+                                                     clientType);                                 \
+            return;                                                                               \
+        }                                                                                         \
+        LiteParsedDocumentSource::registerParser(                                                 \
+            "$" #key, liteParser, allowedWithApiStrict, clientType);                              \
+        DocumentSource::registerParser("$" #key, fullParser, featureFlag);                        \
     }
 
 /**
@@ -481,10 +483,9 @@ public:
      * DO NOT call this method directly. Instead, use the REGISTER_DOCUMENT_SOURCE macro defined in
      * this file.
      */
-    static void registerParser(
-        std::string name,
-        Parser parser,
-        boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion);
+    static void registerParser(std::string name,
+                               Parser parser,
+                               boost::optional<FeatureFlag> featureFlag);
     /**
      * Convenience wrapper for the common case, when DocumentSource::Parser returns a list of one
      * DocumentSource.
@@ -492,10 +493,9 @@ public:
      * DO NOT call this method directly. Instead, use the REGISTER_DOCUMENT_SOURCE macro defined in
      * this file.
      */
-    static void registerParser(
-        std::string name,
-        SimpleParser simpleParser,
-        boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion);
+    static void registerParser(std::string name,
+                               SimpleParser simpleParser,
+                               boost::optional<FeatureFlag> featureFlag);
 
     /**
      * Returns true if the DocumentSource has a query.

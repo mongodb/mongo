@@ -147,7 +147,7 @@ REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(
     DocumentSourceSort::parseBoundedSort,
     AllowedWithApiStrict::kNeverInVersion1,
     AllowedWithClientType::kAny,
-    feature_flags::gFeatureFlagBucketUnpackWithSort.getVersion(),
+    feature_flags::gFeatureFlagBucketUnpackWithSort,
     feature_flags::gFeatureFlagBucketUnpackWithSort.isEnabledAndIgnoreFCV());
 
 DocumentSource::GetNextResult::ReturnStatus DocumentSourceSort::timeSorterPeek() {

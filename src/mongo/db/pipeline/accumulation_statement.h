@@ -51,17 +51,22 @@ namespace mongo {
                                        boost::none,                   \
                                        true)
 
-#define REGISTER_ACCUMULATOR_WITH_MIN_VERSION(key, factory, minVersion) \
-    REGISTER_ACCUMULATOR_CONDITIONALLY(key,                             \
-                                       factory,                         \
-                                       AllowedWithApiStrict::kAlways,   \
-                                       AllowedWithClientType::kAny,     \
-                                       minVersion,                      \
-                                       true)
+/**
+ * Like REGISTER_ACCUMULATOR, except the accumulator will only be registered when featureFlag is
+ * enabled. We store featureFlag in the parseMap, so that it can be checked at runtime
+ * to correctly enable/disable the accumulator.
+ */
+#define REGISTER_ACCUMULATOR_WITH_FEATURE_FLAG(key, factory, featureFlag) \
+    REGISTER_ACCUMULATOR_CONDITIONALLY(key,                               \
+                                       factory,                           \
+                                       AllowedWithApiStrict::kAlways,     \
+                                       AllowedWithClientType::kAny,       \
+                                       featureFlag,                       \
+                                       featureFlag.isEnabledAndIgnoreFCV())
 
 /**
- * Like REGISTER_ACCUMULATOR_WITH_MIN_VERSION, except you can also specify a condition,
- * evaluated during startup, that decides whether to register the parser.
+ * You can specify a condition, evaluated during startup,
+ * that decides whether to register the parser.
  *
  * For example, you could check a feature flag, and register the parser only when it's enabled.
  *
@@ -71,17 +76,17 @@ namespace mongo {
  *
  * This is the most general REGISTER_ACCUMULATOR* macro, which all others should delegate to.
  */
-#define REGISTER_ACCUMULATOR_CONDITIONALLY(                                                  \
-    key, factory, allowedWithApiStrict, allowedClientType, minVersion, ...)                  \
-    MONGO_INITIALIZER_GENERAL(addToAccumulatorFactoryMap_##key,                              \
-                              ("BeginAccumulatorRegistration"),                              \
-                              ("EndAccumulatorRegistration"))                                \
-    (InitializerContext*) {                                                                  \
-        if (!(__VA_ARGS__)) {                                                                \
-            return;                                                                          \
-        }                                                                                    \
-        AccumulationStatement::registerAccumulator(                                          \
-            "$" #key, (factory), (allowedWithApiStrict), (allowedClientType), (minVersion)); \
+#define REGISTER_ACCUMULATOR_CONDITIONALLY(                                                   \
+    key, factory, allowedWithApiStrict, allowedClientType, featureFlag, ...)                  \
+    MONGO_INITIALIZER_GENERAL(addToAccumulatorFactoryMap_##key,                               \
+                              ("BeginAccumulatorRegistration"),                               \
+                              ("EndAccumulatorRegistration"))                                 \
+    (InitializerContext*) {                                                                   \
+        if (!(__VA_ARGS__)) {                                                                 \
+            return;                                                                           \
+        }                                                                                     \
+        AccumulationStatement::registerAccumulator(                                           \
+            "$" #key, (factory), (allowedWithApiStrict), (allowedClientType), (featureFlag)); \
     }
 
 /**
@@ -208,13 +213,10 @@ public:
 
     /**
      * Associates a Parser with information regarding which contexts it can be used in, including
-     * API Version and FCV.
+     * API Version and feature flag.
      */
-    using ParserRegistration =
-        std::tuple<Parser,
-                   AllowedWithApiStrict,
-                   AllowedWithClientType,
-                   boost::optional<multiversion::FeatureCompatibilityVersion>>;
+    using ParserRegistration = std::
+        tuple<Parser, AllowedWithApiStrict, AllowedWithClientType, boost::optional<FeatureFlag>>;
 
     AccumulationStatement(std::string fieldName, AccumulationExpression expr)
         : fieldName(std::move(fieldName)), expr(std::move(expr)) {}
@@ -239,12 +241,11 @@ public:
      * DO NOT call this method directly. Instead, use the REGISTER_ACCUMULATOR macro defined in this
      * file.
      */
-    static void registerAccumulator(
-        std::string name,
-        Parser parser,
-        AllowedWithApiStrict allowedWithApiStrict,
-        AllowedWithClientType allowedWithClientType,
-        boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion);
+    static void registerAccumulator(std::string name,
+                                    Parser parser,
+                                    AllowedWithApiStrict allowedWithApiStrict,
+                                    AllowedWithClientType allowedWithClientType,
+                                    boost::optional<FeatureFlag> featureFlag);
 
     /**
      * Retrieves the Parser for the accumulator specified by the given name, and raises an error if
