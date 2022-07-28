@@ -8,8 +8,8 @@ taken from the network, parsed, sanitized, then finally run on databases.
 [Service entry points][service_entry_point_h] fulfill the transition from the
 transport layer into command implementations. For each incoming connection
 from a client (in the form of a [session][session_h] object), a new dedicated
-thread is spawned then detached, and is also assigned a new [service state
-machine][service_state_machine_h], responsible for maintaining the state of a
+thread is spawned then detached, and is also assigned a new [session workflow]
+[session_workflow_h], responsible for maintaining the workflow of a
 single client connection during its lifetime. Central to the entry point is the
 `handleRequest()` function, which manages the server-side logic of processing
 requests and returns a response message indicating the result of the
@@ -72,7 +72,7 @@ For details on transport internals, including ingress networking, see [this docu
 
 [service_entry_point_h]: ../src/mongo/transport/service_entry_point.h
 [session_h]: ../src/mongo/transport/session.h
-[service_state_machine_h]: ../src/mongo/transport/service_state_machine.h
+[session_workflow_h]: ../src/mongo/transport/session_workflow.h
 [service_entry_point_mongos_h]: ../src/mongo/s/service_entry_point_mongos.h
 [service_entry_point_mongod_h]: ../src/mongo/db/service_entry_point_mongod.h
 [read_concern]: https://docs.mongodb.com/manual/reference/read-concern/

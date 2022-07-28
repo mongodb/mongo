@@ -833,7 +833,7 @@ Future<void> InvokeCommand::run() {
     return makeReadyFutureWith([&] {
                auto execContext = _ecd->getExecutionContext();
                // TODO SERVER-53761: find out if we can do this more asynchronously. The client
-               // Strand is locked to current thread in ServiceStateMachine::Impl::startNewLoop().
+               // Strand is locked to current thread in SessionWorkflow::Impl::startNewLoop().
                tenant_migration_access_blocker::checkIfCanReadOrBlock(execContext->getOpCtx(),
                                                                       execContext->getRequest())
                    .get(execContext->getOpCtx());

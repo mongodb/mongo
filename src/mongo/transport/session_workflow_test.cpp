@@ -49,7 +49,7 @@
 #include "mongo/transport/service_entry_point_impl.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_utils.h"
-#include "mongo/transport/service_state_machine.h"
+#include "mongo/transport/session_workflow.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -102,7 +102,7 @@ const Status kShutdownError{ErrorCodes::ShutdownInProgress, "Something is shutti
 const Status kArbitraryError{ErrorCodes::InternalError, "Something happened"};
 
 /**
- * FailureCondition represents a set of the ways any state in the ServiceStateMachine can fail.
+ * FailureCondition represents a set of the ways any state in the SessionWorkflow can fail.
  */
 enum class FailureCondition {
     kNone,
@@ -137,9 +137,9 @@ std::ostream& operator<<(std::ostream& os, FailureCondition fail) {
 }
 
 /**
- * SessionState represents the externally observable state of the ServiceStateMachine. These
- * states map relatively closely to the internals of the ServiceStateMachine::Impl. That said,
- * this enum represents the ServiceStateMachineTest's external understanding of the internal
+ * SessionState represents the externally observable state of the SessionWorkflow. These
+ * states map relatively closely to the internals of the SessionWorkflow::Impl. That said,
+ * this enum represents the SessionWorkflowTest's external understanding of the internal
  * state.
  */
 enum class SessionState {
@@ -175,8 +175,8 @@ std::ostream& operator<<(std::ostream& os, SessionState state) {
 }
 
 /**
- * RequestKind represents the type of operation of the ServiceStateMachine. Depending on various
- * message flags and conditions, the ServiceStateMachine will transition between states
+ * RequestKind represents the type of operation of the SessionWorkflow. Depending on various
+ * message flags and conditions, the SessionWorkflow will transition between states
  * differently.
  */
 enum class RequestKind {
@@ -203,11 +203,11 @@ std::ostream& operator<<(std::ostream& os, RequestKind kind) {
 }
 
 /**
- * The ServiceStateMachineTest is a fixture that mocks the external inputs into the
- * ServiceStateMachine so as to provide a deterministic way to evaluate the state machine
+ * The SessionWorkflowTest is a fixture that mocks the external inputs into the
+ * SessionWorkflow so as to provide a deterministic way to evaluate the session workflow
  * implemenation.
  */
-class ServiceStateMachineTest : public LockerNoopServiceContextTest {
+class SessionWorkflowTest : public LockerNoopServiceContextTest {
 public:
     class ServiceEntryPoint;
     class Session;
@@ -218,7 +218,7 @@ public:
      */
     static std::shared_ptr<ThreadPool> makeThreadPool() {
         auto options = ThreadPool::Options{};
-        options.poolName = "ServiceStateMachineTest";
+        options.poolName = "SessionWorkflowTest";
 
         return std::make_shared<ThreadPool>(std::move(options));
     }
@@ -227,14 +227,14 @@ public:
     void tearDown() override;
 
     /**
-     * This function blocks until the ServiceStateMachineTest observes a state change.
+     * This function blocks until the SessionWorkflowTest observes a state change.
      */
     SessionState popSessionState() {
         return _stateQueue.pop();
     }
 
     /**
-     * This function asserts that the ServiceStateMachineTest has not yet observed a state change.
+     * This function asserts that the SessionWorkflowTest has not yet observed a state change.
      *
      * Note that this function does not guarantee that it will not observe a state change in the
      * future.
@@ -247,7 +247,7 @@ public:
 
     /**
      * This function stores an external response to be delivered out of line to the
-     * ServiceStateMachine.
+     * SessionWorkflow.
      */
     template <SessionState kState, typename ResultT>
     void setResult(ResultT result) {
@@ -304,12 +304,12 @@ public:
     void initNewSession();
 
     /**
-     * Launch a ServiceStateMachine for the current session.
+     * Launch a SessionWorkflow for the current session.
      */
     void startSession();
 
     /**
-     * Wait for the current Session and ServiceStateMachine to end.
+     * Wait for the current Session and SessionWorkflow to end.
      */
     void joinSession();
 
@@ -462,9 +462,8 @@ private:
      * Observe the end of the session.
      */
     void _cleanup(const transport::SessionHandle& session) {
-        invariant(
-            session == _session,
-            "This fixture and the ServiceStateMachine should have handles to the same Session");
+        invariant(session == _session,
+                  "This fixture and the SessionWorkflow should have handles to the same Session");
 
         _stateQueue.push(SessionState::kEnd);
     }
@@ -473,13 +472,13 @@ private:
         ++_onClientDisconnectCalled;
     }
 
-    ServiceStateMachineTest::ServiceEntryPoint* _sep;
+    SessionWorkflowTest::ServiceEntryPoint* _sep;
 
     const std::shared_ptr<ThreadPool> _threadPool = makeThreadPool();
 
     std::unique_ptr<StateResult> _stateResult;
 
-    std::shared_ptr<ServiceStateMachineTest::Session> _session;
+    std::shared_ptr<SessionWorkflowTest::Session> _session;
     SingleProducerSingleConsumerQueue<SessionState> _stateQueue;
 
     int _onClientDisconnectCalled{0};
@@ -488,9 +487,9 @@ private:
 /**
  * This class is a simple wrapper that delegates Session behavior to the fixture.
  */
-class ServiceStateMachineTest::Session final : public transport::MockSessionBase {
+class SessionWorkflowTest::Session final : public transport::MockSessionBase {
 public:
-    explicit Session(ServiceStateMachineTest* fixture)
+    explicit Session(SessionWorkflowTest* fixture)
         : transport::MockSessionBase(), _fixture{fixture} {}
     ~Session() override = default;
 
@@ -539,19 +538,19 @@ public:
     }
 
 private:
-    ServiceStateMachineTest* const _fixture;
+    SessionWorkflowTest* const _fixture;
 };
 
 /**
  * This class is a simple wrapper that delegates ServiceEntryPoint behavior to the fixture.
  *
  * TODO(SERVER-54143) ServiceEntryPointImpl does a surprising amount of management for
- * ServiceStateMachines. Once we separate that concern, we should be able to define onEndSession as
+ * SessionWorkflows. Once we separate that concern, we should be able to define onEndSession as
  * a hook or override for that type and derive from ServiceEntryPoint instead.
  */
-class ServiceStateMachineTest::ServiceEntryPoint final : public ServiceEntryPointImpl {
+class SessionWorkflowTest::ServiceEntryPoint final : public ServiceEntryPointImpl {
 public:
-    explicit ServiceEntryPoint(ServiceStateMachineTest* fixture)
+    explicit ServiceEntryPoint(SessionWorkflowTest* fixture)
         : ServiceEntryPointImpl(fixture->getServiceContext()), _fixture(fixture) {}
     ~ServiceEntryPoint() override = default;
 
@@ -578,7 +577,7 @@ public:
     }
 
 private:
-    ServiceStateMachineTest* const _fixture;
+    SessionWorkflowTest* const _fixture;
 };
 
 /**
@@ -586,8 +585,8 @@ private:
  */
 class StepRunner {
     /**
-     * This is a simple data structure describing the external response for one state in the service
-     * state machine.
+     * This is a simple data structure describing the external response for one state in the
+     * session workflow.
      */
     struct Step {
         SessionState state;
@@ -597,7 +596,7 @@ class StepRunner {
     using StepList = std::vector<Step>;
 
 public:
-    StepRunner(ServiceStateMachineTest* fixture) : _fixture{fixture} {}
+    StepRunner(SessionWorkflowTest* fixture) : _fixture{fixture} {}
     ~StepRunner() {
         invariant(_runCount > 0, "StepRunner expects to be run at least once");
     }
@@ -637,7 +636,7 @@ public:
     }
 
     /**
-     * Mark an additional expected state in the service state machine.
+     * Mark an additional expected state in the session workflow.
      */
     template <SessionState kState, RequestKind kKind>
     void expectNextState() {
@@ -649,7 +648,7 @@ public:
     }
 
     /**
-     * Mark the final expected state in the service state machine.
+     * Mark the final expected state in the session workflow.
      */
     template <SessionState kState>
     void expectFinalState() {
@@ -725,43 +724,43 @@ public:
     }
 
 private:
-    ServiceStateMachineTest* const _fixture;
+    SessionWorkflowTest* const _fixture;
 
     boost::optional<SessionState> _finalState;
     StepList _steps;
 
     // This variable is currently used as a post-condition to make sure that the StepRunner has been
     // run. In the current form, it could be a boolean. That said, if you need to stress test the
-    // ServiceStateMachine, you will want to check this variable to make sure you have run as many
+    // SessionWorkflow, you will want to check this variable to make sure you have run as many
     // times as you expect.
     size_t _runCount = 0;
 };
 
-void ServiceStateMachineTest::initNewSession() {
+void SessionWorkflowTest::initNewSession() {
     assertNoSessionState();
 
     _session = std::make_shared<Session>(this);
     _stateResult->isConnected.store(true);
 }
 
-void ServiceStateMachineTest::joinSession() {
+void SessionWorkflowTest::joinSession() {
     ASSERT(_sep->waitForNoSessions(Seconds{1}));
 
     assertNoSessionState();
 }
 
-void ServiceStateMachineTest::startSession() {
+void SessionWorkflowTest::startSession() {
     _sep->startSession(_session);
 }
 
-void ServiceStateMachineTest::terminateViaServiceEntryPoint() {
+void SessionWorkflowTest::terminateViaServiceEntryPoint() {
     _sep->endAllSessionsNoTagMask();
 }
 
-void ServiceStateMachineTest::setUp() {
+void SessionWorkflowTest::setUp() {
     ServiceContextTest::setUp();
 
-    auto sep = std::make_unique<ServiceStateMachineTest::ServiceEntryPoint>(this);
+    auto sep = std::make_unique<SessionWorkflowTest::ServiceEntryPoint>(this);
     _sep = sep.get();
     getServiceContext()->setServiceEntryPoint(std::move(sep));
     invariant(_sep->start());
@@ -771,7 +770,7 @@ void ServiceStateMachineTest::setUp() {
     _stateResult = std::make_unique<StateResult>();
 }
 
-void ServiceStateMachineTest::tearDown() {
+void SessionWorkflowTest::tearDown() {
     ON_BLOCK_EXIT([&] { ServiceContextTest::tearDown(); });
 
     endSession();
@@ -784,14 +783,14 @@ void ServiceStateMachineTest::tearDown() {
 }
 
 template <bool useDedicatedThread>
-class DedicatedThreadOverrideTest : public ServiceStateMachineTest {
+class DedicatedThreadOverrideTest : public SessionWorkflowTest {
     ScopedValueOverride<bool> _svo{gInitialUseDedicatedThread, useDedicatedThread};
 };
 
-using ServiceStateMachineWithBorrowedThreadsTest = DedicatedThreadOverrideTest<false>;
-using ServiceStateMachineWithDedicatedThreadsTest = DedicatedThreadOverrideTest<true>;
+using SessionWorkflowWithBorrowedThreadsTest = DedicatedThreadOverrideTest<false>;
+using SessionWorkflowWithDedicatedThreadsTest = DedicatedThreadOverrideTest<true>;
 
-TEST_F(ServiceStateMachineTest, StartThenEndSession) {
+TEST_F(SessionWorkflowTest, StartThenEndSession) {
     initNewSession();
     startSession();
 
@@ -800,13 +799,13 @@ TEST_F(ServiceStateMachineTest, StartThenEndSession) {
     endSession();
 }
 
-TEST_F(ServiceStateMachineTest, EndBeforeStartSession) {
+TEST_F(SessionWorkflowTest, EndBeforeStartSession) {
     initNewSession();
     endSession();
     startSession();
 }
 
-TEST_F(ServiceStateMachineTest, OnClientDisconnectCalledOnCleanup) {
+TEST_F(SessionWorkflowTest, OnClientDisconnectCalledOnCleanup) {
     initNewSession();
     startSession();
     ASSERT_EQ(popSessionState(), SessionState::kSource);
@@ -817,7 +816,7 @@ TEST_F(ServiceStateMachineTest, OnClientDisconnectCalledOnCleanup) {
     ASSERT_EQ(onClientDisconnectCalledTimes(), 1);
 }
 
-TEST_F(ServiceStateMachineWithDedicatedThreadsTest, DefaultLoop) {
+TEST_F(SessionWorkflowWithDedicatedThreadsTest, DefaultLoop) {
     auto runner = StepRunner(this);
 
     runner.expectNextState<SessionState::kSource, RequestKind::kDefault>();
@@ -828,7 +827,7 @@ TEST_F(ServiceStateMachineWithDedicatedThreadsTest, DefaultLoop) {
     runner.run();
 }
 
-TEST_F(ServiceStateMachineWithDedicatedThreadsTest, ExhaustLoop) {
+TEST_F(SessionWorkflowWithDedicatedThreadsTest, ExhaustLoop) {
     auto runner = StepRunner(this);
 
     runner.expectNextState<SessionState::kSource, RequestKind::kExhaust>();
@@ -841,7 +840,7 @@ TEST_F(ServiceStateMachineWithDedicatedThreadsTest, ExhaustLoop) {
     runner.run();
 }
 
-TEST_F(ServiceStateMachineWithDedicatedThreadsTest, MoreToComeLoop) {
+TEST_F(SessionWorkflowWithDedicatedThreadsTest, MoreToComeLoop) {
     auto runner = StepRunner(this);
 
     runner.expectNextState<SessionState::kSource, RequestKind::kMoreToCome>();
@@ -854,7 +853,7 @@ TEST_F(ServiceStateMachineWithDedicatedThreadsTest, MoreToComeLoop) {
     runner.run();
 }
 
-TEST_F(ServiceStateMachineWithBorrowedThreadsTest, DefaultLoop) {
+TEST_F(SessionWorkflowWithBorrowedThreadsTest, DefaultLoop) {
     auto runner = StepRunner(this);
 
     runner.expectNextState<SessionState::kPoll, RequestKind::kDefault>();
@@ -866,7 +865,7 @@ TEST_F(ServiceStateMachineWithBorrowedThreadsTest, DefaultLoop) {
     runner.run();
 }
 
-TEST_F(ServiceStateMachineWithBorrowedThreadsTest, ExhaustLoop) {
+TEST_F(SessionWorkflowWithBorrowedThreadsTest, ExhaustLoop) {
     auto runner = StepRunner(this);
 
     runner.expectNextState<SessionState::kPoll, RequestKind::kExhaust>();
@@ -880,7 +879,7 @@ TEST_F(ServiceStateMachineWithBorrowedThreadsTest, ExhaustLoop) {
     runner.run();
 }
 
-TEST_F(ServiceStateMachineWithBorrowedThreadsTest, MoreToComeLoop) {
+TEST_F(SessionWorkflowWithBorrowedThreadsTest, MoreToComeLoop) {
     auto runner = StepRunner(this);
 
     runner.expectNextState<SessionState::kPoll, RequestKind::kMoreToCome>();

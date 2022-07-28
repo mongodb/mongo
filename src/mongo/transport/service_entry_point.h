@@ -111,7 +111,7 @@ public:
     /**
      * Optional handler which is invoked after a client disconnect. A client disconnect occurs when
      * the connection between the mongo process and client is closed for any reason, and is defined
-     * by the destruction and cleanup of the ServiceStateMachine that manages the client.
+     * by the destruction and cleanup of the SessionWorkflow that manages the client.
      */
     virtual void onClientDisconnect(Client* client) {}
 

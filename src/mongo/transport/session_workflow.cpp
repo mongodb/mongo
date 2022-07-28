@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/transport/service_state_machine.h"
+#include "mongo/transport/session_workflow.h"
 
 #include <memory>
 
@@ -121,10 +121,10 @@ Message makeExhaustMessage(Message requestMsg, DbResponse* dbresponse) {
 }
 }  // namespace
 
-class ServiceStateMachine::Impl {
+class SessionWorkflow::Impl {
 public:
-    Impl(ServiceStateMachine* ssm, ServiceContext::UniqueClient client)
-        : _ssm{ssm},
+    Impl(SessionWorkflow* workflow, ServiceContext::UniqueClient client)
+        : _workflow{workflow},
           _serviceContext{client->getServiceContext()},
           _sep{_serviceContext->getServiceEntryPoint()},
           _clientStrand{ClientStrand::make(std::move(client))} {}
@@ -172,14 +172,14 @@ public:
     void cleanupSession(const Status& status);
 
     /*
-     * Schedules a new loop for this state machine on a service executor. The status argument
+     * Schedules a new loop for this session workflow on a service executor. The status argument
      * specifies whether the last execution of the loop, if any, was successful.
      */
     void scheduleNewLoop(Status status);
 
     /*
-     * Starts a new loop by running an iteration for this state machine (e.g., source, process and
-     * then sink).
+     * Starts a new loop by running an iteration for this session workflow (e.g., source, process
+     * and then sink).
      */
     void startNewLoop(const Status& execStatus);
 
@@ -203,12 +203,12 @@ public:
     }
 
 private:
-    /** Alias: refers to this Impl, but holds a ref to the enclosing SSM. */
+    /** Alias: refers to this Impl, but holds a ref to the enclosing workflow. */
     std::shared_ptr<Impl> shared_from_this() {
-        return {_ssm->shared_from_this(), this};
+        return {_workflow->shared_from_this(), this};
     }
 
-    ServiceStateMachine* const _ssm;
+    SessionWorkflow* const _workflow;
     ServiceContext* const _serviceContext;
     ServiceEntryPoint* const _sep;
 
@@ -223,7 +223,7 @@ private:
     ServiceContext::UniqueOperationContext _opCtx;
 };
 
-void ServiceStateMachine::Impl::sourceMessage() {
+void SessionWorkflow::Impl::sourceMessage() {
     invariant(_inMessage.empty());
 
     // Reset the compressor only before sourcing a new message. This ensures the same compressor,
@@ -247,8 +247,7 @@ void ServiceStateMachine::Impl::sourceMessage() {
 
     if (status.isOK()) {
         // If the sourceMessage succeeded then we can move to on to process the message. We simply
-        // return from here and the future chain in startNewLoop() will continue to the next state
-        // normally.
+        // return from here and the future chain in startNewLoop() will continue normally.
         return;
     } else if (ErrorCodes::isInterruption(status.code()) ||
                ErrorCodes::isNetworkError(status.code())) {
@@ -275,14 +274,13 @@ void ServiceStateMachine::Impl::sourceMessage() {
     uassertStatusOK(status);
 }
 
-void ServiceStateMachine::Impl::sinkMessage() {
+void SessionWorkflow::Impl::sinkMessage() {
     // Sink our response to the client
     //
     // If there was an error sinking the message to the client, then we should print an error and
     // end the session.
     //
-    // Otherwise, update the current state depending on whether we're in exhaust or not and return
-    // from this function to let startNewLoop() continue the future chaining of state transitions.
+    // Otherwise, return from this function to let startNewLoop() continue the future chaining.
     if (auto status = session()->sinkMessage(std::exchange(_outMessage, {})); !status.isOK()) {
         LOGV2(22989,
               "Error sending response to client. Ending connection from remote",
@@ -299,7 +297,7 @@ void ServiceStateMachine::Impl::sinkMessage() {
     executor()->yieldIfAppropriate();
 }
 
-Future<void> ServiceStateMachine::Impl::processMessage() {
+Future<void> SessionWorkflow::Impl::processMessage() {
     invariant(!_inMessage.empty());
 
     TrafficRecorder::get(_serviceContext)
@@ -395,13 +393,13 @@ Future<void> ServiceStateMachine::Impl::processMessage() {
         });
 }
 
-void ServiceStateMachine::Impl::start() {
-    invariant(!_inExhaust, "Cannot start the state machine in exhaust mode");
+void SessionWorkflow::Impl::start() {
+    invariant(!_inExhaust, "Cannot start the session workflow in exhaust mode");
 
     scheduleNewLoop(Status::OK());
 }
 
-void ServiceStateMachine::Impl::scheduleNewLoop(Status status) try {
+void SessionWorkflow::Impl::scheduleNewLoop(Status status) try {
     // We may or may not have an operation context, but it should definitely be gone now.
     _opCtx.reset();
 
@@ -422,7 +420,7 @@ void ServiceStateMachine::Impl::scheduleNewLoop(Status status) try {
     } catch (const DBException& ex) {
         LOGV2_WARNING_OPTIONS(22993,
                               {logv2::LogComponent::kExecutor},
-                              "Unable to schedule a new loop for the service state machine",
+                              "Unable to schedule a new loop for the session workflow",
                               "error"_attr = ex.toStatus());
         throw;
     }
@@ -432,7 +430,7 @@ void ServiceStateMachine::Impl::scheduleNewLoop(Status status) try {
     cleanupSession(ex.toStatus());
 }
 
-void ServiceStateMachine::Impl::startNewLoop(const Status& executorStatus) {
+void SessionWorkflow::Impl::startNewLoop(const Status& executorStatus) {
     if (!executorStatus.isOK()) {
         cleanupSession(executorStatus);
         return;
@@ -455,14 +453,14 @@ void ServiceStateMachine::Impl::startNewLoop(const Status& executorStatus) {
         });
 }
 
-void ServiceStateMachine::Impl::terminate() {
+void SessionWorkflow::Impl::terminate() {
     if (_isTerminated.swap(true))
         return;
 
     session()->end();
 }
 
-void ServiceStateMachine::Impl::terminateIfTagsDontMatch(transport::Session::TagMask tags) {
+void SessionWorkflow::Impl::terminateIfTagsDontMatch(transport::Session::TagMask tags) {
     if (_isTerminated.load())
         return;
 
@@ -479,7 +477,7 @@ void ServiceStateMachine::Impl::terminateIfTagsDontMatch(transport::Session::Tag
     terminate();
 }
 
-void ServiceStateMachine::Impl::cleanupExhaustResources() noexcept try {
+void SessionWorkflow::Impl::cleanupExhaustResources() noexcept try {
     if (!_inExhaust) {
         return;
     }
@@ -503,30 +501,30 @@ void ServiceStateMachine::Impl::cleanupExhaustResources() noexcept try {
           "error"_attr = e.toStatus());
 }
 
-void ServiceStateMachine::Impl::cleanupSession(const Status& status) {
+void SessionWorkflow::Impl::cleanupSession(const Status& status) {
     LOGV2_DEBUG(5127900, 2, "Ending session", "error"_attr = status);
     cleanupExhaustResources();
     _sep->onClientDisconnect(client());
 }
 
-ServiceStateMachine::ServiceStateMachine(PassKeyTag, ServiceContext::UniqueClient client)
+SessionWorkflow::SessionWorkflow(PassKeyTag, ServiceContext::UniqueClient client)
     : _impl{std::make_unique<Impl>(this, std::move(client))} {}
 
-ServiceStateMachine::~ServiceStateMachine() = default;
+SessionWorkflow::~SessionWorkflow() = default;
 
-Client* ServiceStateMachine::client() const {
+Client* SessionWorkflow::client() const {
     return _impl->client();
 }
 
-void ServiceStateMachine::start() {
+void SessionWorkflow::start() {
     _impl->start();
 }
 
-void ServiceStateMachine::terminate() {
+void SessionWorkflow::terminate() {
     _impl->terminate();
 }
 
-void ServiceStateMachine::terminateIfTagsDontMatch(transport::Session::TagMask tags) {
+void SessionWorkflow::terminateIfTagsDontMatch(transport::Session::TagMask tags) {
     _impl->terminateIfTagsDontMatch(tags);
 }
 

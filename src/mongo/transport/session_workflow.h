@@ -40,42 +40,38 @@ namespace mongo {
 namespace transport {
 
 /*
- * The ServiceStateMachine holds the state of a single client connection and represents the
- * lifecycle of each user request as a state machine. It is the glue between the stateless
- * ServiceEntryPoint and TransportLayer that ties network and database logic together for a
- * user.
+ * The SessionWorkflow manages the work of a single session and represents the
+ * lifecycle of each user request. It is the glue between ServiceEntryPoint and TransportLayer
+ * that ties network and database logic together for a user.
  *
- * A `ServiceStateMachine` must be managed by a `shared_ptr`, so we force all instances
+ * A `SessionWorkflow` must be managed by a `shared_ptr`, so we force all instances
  * to be created by the static `make` function.
  */
-class ServiceStateMachine : public std::enable_shared_from_this<ServiceStateMachine> {
+class SessionWorkflow : public std::enable_shared_from_this<SessionWorkflow> {
     struct PassKeyTag {
         explicit PassKeyTag() = default;
     };
     class Impl;
-    ServiceStateMachine(ServiceStateMachine&) = delete;
-    ServiceStateMachine& operator=(ServiceStateMachine&) = delete;
+    SessionWorkflow(SessionWorkflow&) = delete;
+    SessionWorkflow& operator=(SessionWorkflow&) = delete;
 
-    ServiceStateMachine(ServiceStateMachine&&) = delete;
-    ServiceStateMachine& operator=(ServiceStateMachine&&) = delete;
+    SessionWorkflow(SessionWorkflow&&) = delete;
+    SessionWorkflow& operator=(SessionWorkflow&&) = delete;
 
 public:
     /** Factory function: The only public way to create instances. */
-    static std::shared_ptr<ServiceStateMachine> make(ServiceContext::UniqueClient client) {
-        return std::make_shared<ServiceStateMachine>(PassKeyTag{}, std::move(client));
+    static std::shared_ptr<SessionWorkflow> make(ServiceContext::UniqueClient client) {
+        return std::make_shared<SessionWorkflow>(PassKeyTag{}, std::move(client));
     }
 
     /** Public must use `make` to create instances. */
-    ServiceStateMachine(PassKeyTag, ServiceContext::UniqueClient client);
+    SessionWorkflow(PassKeyTag, ServiceContext::UniqueClient client);
 
-    ~ServiceStateMachine();
+    ~SessionWorkflow();
 
     /** Returns the Client given in the constructor. */
     Client* client() const;
 
-    /*
-     * start() schedules a call to _runOnce() in the future.
-     */
     void start();
 
     /*

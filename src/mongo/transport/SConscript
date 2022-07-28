@@ -118,7 +118,7 @@ env.Library(
     source=[
         'service_entry_point_impl.cpp',
         'service_entry_point_impl.idl',
-        'service_state_machine.cpp',
+        'session_workflow.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authentication_restriction',
@@ -191,7 +191,7 @@ tlEnv.CppUnitTest(
         'transport_layer_asio_test.cpp',
         'service_executor_test.cpp',
         'max_conns_override_test.cpp',
-        'service_state_machine_test.cpp',
+        'session_workflow_test.cpp',
         'proxy_protocol_header_parser_test.cpp',
     ],
     LIBDEPS=[
