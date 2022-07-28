@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/remote_command_retry_policy.h"
 #include "mongo/executor/remote_command_runner.h"
 #include "mongo/executor/remote_command_targeter.h"
@@ -43,6 +44,7 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/net/hostandport.h"
 #include <memory>
 
 namespace mongo {
@@ -100,35 +102,42 @@ private:
  * Mock a successful network response to hello command.
  */
 TEST_F(RemoteCommandRunnerTestFixture, SuccessfulHello) {
+    std::unique_ptr<RemoteCommandHostTargeter> targeter =
+        std::make_unique<RemoteCommandLocalHostTargeter>();
     HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
 
-    SemiFuture<HelloCommandReply> resultFuture =
-        doRequest(helloCmd, nullptr, getExecutorPtr(), _cancellationToken);
+    SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> resultFuture =
+        doRequest(helloCmd, nullptr, std::move(targeter), getExecutorPtr(), _cancellationToken);
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
+        ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), request.target);
         return helloReply.toBSON();
     });
 
-    HelloCommandReply res = resultFuture.get();
+    RemoteCommandRunnerResponse res = resultFuture.get();
 
-    ASSERT_BSONOBJ_EQ(res.toBSON(), helloReply.toBSON());
+    ASSERT_BSONOBJ_EQ(res.response.toBSON(), helloReply.toBSON());
+    ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), res.targetUsed);
 }
 
 /*
  * Mock error on local host side.
  */
 TEST_F(RemoteCommandRunnerTestFixture, LocalError) {
+    std::unique_ptr<RemoteCommandHostTargeter> targeter =
+        std::make_unique<RemoteCommandLocalHostTargeter>();
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
 
-    SemiFuture<HelloCommandReply> resultFuture =
-        doRequest(helloCmd, nullptr, getExecutorPtr(), _cancellationToken);
+    SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> resultFuture =
+        doRequest(helloCmd, nullptr, std::move(targeter), getExecutorPtr(), _cancellationToken);
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
+        ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), request.target);
         return Status(ErrorCodes::NetworkTimeout, "mock");
     });
 
@@ -139,14 +148,17 @@ TEST_F(RemoteCommandRunnerTestFixture, LocalError) {
  * Mock error on remote host.
  */
 TEST_F(RemoteCommandRunnerTestFixture, RemoteError) {
+    std::unique_ptr<RemoteCommandHostTargeter> targeter =
+        std::make_unique<RemoteCommandLocalHostTargeter>();
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
 
-    SemiFuture<HelloCommandReply> resultFuture =
-        doRequest(helloCmd, nullptr, getExecutorPtr(), _cancellationToken);
+    SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> resultFuture =
+        doRequest(helloCmd, nullptr, std::move(targeter), getExecutorPtr(), _cancellationToken);
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
+        ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), request.target);
         return createErrorResponse(Status(ErrorCodes::BadValue, "mock"));
     });
 
@@ -157,6 +169,8 @@ TEST_F(RemoteCommandRunnerTestFixture, RemoteError) {
  * Mock write concern error on remote host.
  */
 TEST_F(RemoteCommandRunnerTestFixture, WriteConcernError) {
+    std::unique_ptr<RemoteCommandHostTargeter> targeter =
+        std::make_unique<RemoteCommandLocalHostTargeter>();
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
 
@@ -165,11 +179,12 @@ TEST_F(RemoteCommandRunnerTestFixture, WriteConcernError) {
     const BSONObj resWithWriteConcernError =
         BSON("ok" << 1 << "writeConcernError" << writeConcernError);
 
-    SemiFuture<HelloCommandReply> resultFuture =
-        doRequest(helloCmd, nullptr, getExecutorPtr(), _cancellationToken);
+    SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> resultFuture =
+        doRequest(helloCmd, nullptr, std::move(targeter), getExecutorPtr(), _cancellationToken);
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
+        ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), request.target);
         return resWithWriteConcernError;
     });
 
@@ -180,6 +195,8 @@ TEST_F(RemoteCommandRunnerTestFixture, WriteConcernError) {
  * Mock write error on remote host.
  */
 TEST_F(RemoteCommandRunnerTestFixture, WriteError) {
+    std::unique_ptr<RemoteCommandHostTargeter> targeter =
+        std::make_unique<RemoteCommandLocalHostTargeter>();
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
 
@@ -188,11 +205,13 @@ TEST_F(RemoteCommandRunnerTestFixture, WriteError) {
                                            << writeErrorExtraInfo << "errmsg"
                                            << "Document failed validation");
     const BSONObj resWithWriteError = BSON("ok" << 1 << "writeErrors" << BSON_ARRAY(writeError));
-    SemiFuture<HelloCommandReply> resultFuture =
-        doRequest(helloCmd, nullptr, getExecutorPtr(), _cancellationToken);
+    SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> resultFuture =
+        doRequest(helloCmd, nullptr, std::move(targeter), getExecutorPtr(), _cancellationToken);
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
+        ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), request.target);
+
         return resWithWriteError;
     });
 
@@ -209,6 +228,18 @@ TEST_F(RemoteCommandRunnerTestFixture, LocalTargeter) {
 
     ASSERT_EQ(target.size(), 1);
     ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), target[0]);
+}
+
+/*
+ * Basic Targeter that wraps a single HostAndPort.
+ */
+TEST_F(RemoteCommandRunnerTestFixture, HostAndPortTargeter) {
+    RemoteCommandFixedTargeter t{HostAndPort("FakeHost1", 12345)};
+    auto targetFuture = t.resolve(_cancellationToken);
+    auto target = targetFuture.get();
+
+    ASSERT_EQ(target.size(), 1);
+    ASSERT_EQ(HostAndPort("FakeHost1", 12345), target[0]);
 }
 
 /*

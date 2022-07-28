@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/remote_command_targeter.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
@@ -46,42 +47,60 @@ namespace remote_command_runner {
 
 
 namespace detail {
+struct RemoteCommandInternalResponse {
+    BSONObj response;
+    HostAndPort targetUsed;
+};
+
 /**
  * Executes the BSON command asynchronously on the given target.
  *
  * Do not call directly - this is not part of the public API.
  */
-ExecutorFuture<BSONObj> _doRequest(StringData dbName,
-                                   BSONObj cmdBSON,
-                                   HostAndPort target,
-                                   OperationContext* opCtx,
-                                   std::shared_ptr<executor::TaskExecutor> exec,
-                                   CancellationToken token);
+ExecutorFuture<RemoteCommandInternalResponse> _doRequest(
+    StringData dbName,
+    BSONObj cmdBSON,
+    std::unique_ptr<RemoteCommandHostTargeter> targeter,
+    OperationContext* opCtx,
+    std::shared_ptr<executor::TaskExecutor> exec,
+    CancellationToken token);
 }  // namespace detail
+
+template <typename CommandReplyType>
+struct RemoteCommandRunnerResponse {
+    CommandReplyType response;
+    HostAndPort targetUsed;
+};
 
 /**
  * Execute the command asynchronously on the given target with the provided executor.
  * Returns a SemiFuture with the reply from the IDL command, or throws an error.
  */
 template <typename CommandType>
-SemiFuture<typename CommandType::Reply> doRequest(CommandType cmd,
-                                                  OperationContext* opCtx,
-                                                  std::shared_ptr<executor::TaskExecutor> exec,
-                                                  CancellationToken token) {
-    const HostAndPort target = HostAndPort("FakeShard1Host", 12345);
-
+SemiFuture<RemoteCommandRunnerResponse<typename CommandType::Reply>> doRequest(
+    CommandType cmd,
+    OperationContext* opCtx,
+    std::unique_ptr<RemoteCommandHostTargeter> targeter,
+    std::shared_ptr<executor::TaskExecutor> exec,
+    CancellationToken token) {
     /* Execute the command after extracting the db name and bson from the CommandType. Wrapping this
      * function allows us to seperate the CommandType parsing logic from the implementation details
      * of executing the remote command asynchronously.
      */
-    auto resFuture =
-        detail::_doRequest(cmd.getDbName(), cmd.toBSON({}), target, opCtx, exec, token);
+    auto resFuture = detail::_doRequest(
+        cmd.getDbName(), cmd.toBSON({}), std::move(targeter), opCtx, exec, token);
 
     return std::move(resFuture)
-        .then([&, exec = std::move(exec)](BSONObj r) {
+        .then([](detail::RemoteCommandInternalResponse r) {
             // TODO SERVER-67661: Make IDL reply types have string representation for logging
-            auto res = CommandType::Reply::parse(IDLParserContext("RemoteCommandRunner"), r);
-            return res;
+            auto res =
+                CommandType::Reply::parse(IDLParserContext("RemoteCommandRunner"), r.response);
+
+            struct RemoteCommandRunnerResponse<typename CommandType::Reply> fullRes = {
+                res, r.targetUsed
+            };
+
+            return fullRes;
         })
         .semi();
 }

@@ -77,6 +77,27 @@ public:
 
     void onRemoteCommandError(HostAndPort h, Status s) override final {}
 };
+
+/**
+ * Basic RemoteCommandHostTargeter that wraps a single HostAndPort. Use when you need to make a call
+ * to the doRequest function but already know what HostAndPort to target.
+ */
+class RemoteCommandFixedTargeter : public RemoteCommandHostTargeter {
+public:
+    RemoteCommandFixedTargeter(HostAndPort host) : _host(host){};
+
+    SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) override final {
+        std::vector<HostAndPort> hostList{_host};
+
+        return SemiFuture<std::vector<HostAndPort>>::makeReady(hostList);
+    }
+
+    void onRemoteCommandError(HostAndPort h, Status s) override final {}
+
+private:
+    HostAndPort _host;
+};
+
 }  // namespace remote_command_runner
 }  // namespace executor
 }  // namespace mongo

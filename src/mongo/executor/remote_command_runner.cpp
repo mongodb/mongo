@@ -28,34 +28,51 @@
  */
 
 #include "mongo/executor/remote_command_runner.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/future.h"
+#include "mongo/util/net/hostandport.h"
+#include <vector>
 
 namespace mongo {
 namespace executor {
 namespace remote_command_runner {
 namespace detail {
-ExecutorFuture<BSONObj> _doRequest(StringData dbName,
-                                   BSONObj cmdBSON,
-                                   HostAndPort target,
-                                   OperationContext* opCtx,
-                                   std::shared_ptr<executor::TaskExecutor> exec,
-                                   CancellationToken token) {
-    executor::RemoteCommandRequest executorRequest(
-        target, dbName.toString(), cmdBSON, rpc::makeEmptyMetadata(), opCtx);
-    ExecutorFuture<executor::RemoteCommandResponse> f =
-        exec->scheduleRemoteCommand(executorRequest, token);
-    return std::move(f).then([&, exec = std::move(exec)](executor::RemoteCommandResponse r) {
-        uassertStatusOK(r.status);                            // check local error
-        uassertStatusOK(getStatusFromCommandResult(r.data));  // check remote error
-        uassertStatusOK(
-            getWriteConcernStatusFromCommandResult(r.data));  // check remote write concern error
-        uassertStatusOK(
-            getFirstWriteErrorStatusFromCommandResult(r.data));  // check remote write error
+ExecutorFuture<RemoteCommandInternalResponse> _doRequest(
+    StringData dbName,
+    BSONObj cmdBSON,
+    std::unique_ptr<RemoteCommandHostTargeter> targeter,
+    OperationContext* opCtx,
+    std::shared_ptr<executor::TaskExecutor> exec,
+    CancellationToken token) {
 
-        // TODO SERVER-67649: Teach IDL to accept generic reply fields when parsing a reply.
-        BSONObj newR = r.data.removeField("ok");
+    return targeter->resolve(token)
+        .thenRunOn(exec)
+        .then([dbName, cmdBSON, opCtx, exec = std::move(exec), token](
+                  std::vector<HostAndPort> targets) {
+            uassert(ErrorCodes::HostNotFound, "No hosts availables", targets.size() != 0);
 
-        return newR;
-    });
+            executor::RemoteCommandRequestOnAny executorRequest(
+                targets, dbName.toString(), cmdBSON, rpc::makeEmptyMetadata(), opCtx);
+
+            return exec->scheduleRemoteCommandOnAny(executorRequest, token);
+        })
+        .then([](TaskExecutor::ResponseOnAnyStatus r) {
+            uassertStatusOK(r.status);
+            uassertStatusOK(getStatusFromCommandResult(r.data));
+            uassertStatusOK(getWriteConcernStatusFromCommandResult(r.data));
+            uassertStatusOK(getFirstWriteErrorStatusFromCommandResult(r.data));
+
+            // TODO SERVER-67649: Teach IDL to accept generic reply fields when parsing a reply.
+            BSONObj newR = r.data.removeField("ok");
+
+            struct RemoteCommandInternalResponse res = {
+                newR,            // response
+                r.target.get(),  // targetUsed
+            };
+            return res;
+        });
 }
 }  // namespace detail
 }  // namespace remote_command_runner
