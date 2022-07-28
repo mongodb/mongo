@@ -85,8 +85,9 @@ TEST(ABTTranslate, MatchWithInSingletonList) {
         singletonListIn);
 }
 
+
 TEST(ABTTranslate, MatchWithInList) {
-    // A $match with $in and a list of equalities becomes a series of nested comparisons.
+    // A $match with $in and a list of equalities becomes a comparison to an EqMember list.
     ABT listIn = translatePipeline("[{$match: {a: {$in: [1, 2, 3]}}}]");
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -99,14 +100,8 @@ TEST(ABTTranslate, MatchWithInList) {
         "|   |   Variable [scan_0]\n"
         "|   PathGet [a]\n"
         "|   PathTraverse [1]\n"
-        "|   PathComposeA []\n"
-        "|   |   PathCompare [Eq]\n"
-        "|   |   Const [3]\n"
-        "|   PathComposeA []\n"
-        "|   |   PathCompare [Eq]\n"
-        "|   |   Const [2]\n"
-        "|   PathCompare [Eq]\n"
-        "|   Const [1]\n"
+        "|   PathCompare [EqMember]\n"
+        "|   Const [[1, 2, 3]]\n"
         "Scan [collection]\n"
         "    BindBlock:\n"
         "        [scan_0]\n"
@@ -128,14 +123,8 @@ TEST(ABTTranslate, MatchWithInDuplicateElementsRemoved) {
         "|   |   Variable [scan_0]\n"
         "|   PathGet [a]\n"
         "|   PathTraverse [1]\n"
-        "|   PathComposeA []\n"
-        "|   |   PathCompare [Eq]\n"
-        "|   |   Const [\"ghi\"]\n"
-        "|   PathComposeA []\n"
-        "|   |   PathCompare [Eq]\n"
-        "|   |   Const [\"def\"]\n"
-        "|   PathCompare [Eq]\n"
-        "|   Const [\"abc\"]\n"
+        "|   PathCompare [EqMember]\n"
+        "|   Const [[\"abc\", \"def\", \"ghi\"]]\n"
         "Scan [collection]\n"
         "    BindBlock:\n"
         "        [scan_0]\n"
@@ -190,14 +179,8 @@ TEST(ABTTranslate, MatchWithElemMatchAndIn) {
         "|   PathComposeM []\n"
         "|   |   PathArr []\n"
         "|   PathTraverse [1]\n"
-        "|   PathComposeA []\n"
-        "|   |   PathCompare [Eq]\n"
-        "|   |   Const [3]\n"
-        "|   PathComposeA []\n"
-        "|   |   PathCompare [Eq]\n"
-        "|   |   Const [2]\n"
-        "|   PathCompare [Eq]\n"
-        "|   Const [1]\n"
+        "|   PathCompare [EqMember]\n"
+        "|   Const [[1, 2, 3]]\n"
         "Scan [collection]\n"
         "    BindBlock:\n"
         "        [scan_0]\n"
@@ -245,7 +228,8 @@ TEST(ABTTranslate, MatchWithOrConvertedToIn) {
         "        [scan_0]\n"
         "            Source []\n",
         orTranslated);
-    ASSERT(orTranslated == inTranslated);
+    // TODO SERVER-67819 Support indexing for eqMember op type
+    // ASSERT(orTranslated == inTranslated);
 }
 
 TEST(ABTTranslate, SortLimitSkip) {

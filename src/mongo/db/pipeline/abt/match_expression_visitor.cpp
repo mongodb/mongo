@@ -167,32 +167,68 @@ public:
             return;
         }
 
-        // Additively compose equality comparisons, creating one for each constant in 'equalities'.
         ABT result = make<PathIdentity>();
-        ABT nonTraversedResult = make<PathIdentity>();
+
+        const auto [tagTraverse, valTraverse] = sbe::value::makeNewArray();
+        sbe::value::ValueGuard arrGuard{tagTraverse, valTraverse};
+        auto arrTraversePtr = sbe::value::getArrayView(valTraverse);
+        arrTraversePtr->reserve(equalities.size());
+
+        const auto [tagArraysOnly, valArraysOnly] = sbe::value::makeNewArray();
+        sbe::value::ValueGuard arrOnlyGuard{tagArraysOnly, valArraysOnly};
+        auto arraysOnlyPtr = sbe::value::getArrayView(valArraysOnly);
+        bool addNullPathDefault = false;
+        arraysOnlyPtr->reserve(equalities.size());
+
         for (const auto& pred : equalities) {
             const auto [tag, val] = convertFrom(Value(pred));
-            ABT comparison = make<PathCompare>(Operations::Eq, make<Constant>(tag, val));
+            arrTraversePtr->push_back(tag, val);
+
             if (tag == sbe::value::TypeTags::Null) {
-                // Handle null and missing.
-                maybeComposePath<PathComposeA>(result, make<PathDefault>(Constant::boolean(true)));
+                addNullPathDefault = true;
             } else if (tag == sbe::value::TypeTags::Array) {
-                maybeComposePath<PathComposeA>(nonTraversedResult, comparison);
+                const auto [tag2, val2] = sbe::value::copyValue(tag, val);
+                arraysOnlyPtr->push_back(tag2, val2);
             }
-            maybeComposePath<PathComposeA>(result, std::move(comparison));
         }
 
-        // The path can be empty if we are within an $elemMatch. In this case elemMatch would insert
-        // a traverse.
+        // If there is only one term in the match expression, we don't need to use EqMember
+        if (arrTraversePtr->size() == 1) {
+            const auto [tagSingle, valSingle] = sbe::value::copyValue(
+                arrTraversePtr->getAt(0).first, arrTraversePtr->getAt(0).second);
+            result = make<PathCompare>(Operations::Eq, make<Constant>(tagSingle, valSingle));
+        } else {
+            result =
+                make<PathCompare>(Operations::EqMember, make<Constant>(tagTraverse, valTraverse));
+            arrGuard.reset();
+        }
+
+        if (addNullPathDefault) {
+            maybeComposePath<PathComposeA>(result, make<PathDefault>(Constant::boolean(true)));
+        }
+
+        // The path can be empty if we are within an $elemMatch. In this case elemMatch would
+        // insert a traverse.
         if (!expr->path().empty()) {
-            // When the path we are comparing is a path to an array, the comparison is considered
-            // true if it evaluates to true for the array itself or for any of the array’s elements.
-            // 'result' evaluates the comparison on the array elements, and 'nonTraversedResult'
-            // evaluates the comparison on the array itself.
-
+            // When the path we are comparing is a path to an array, the comparison is
+            // considered true if it evaluates to true for the array itself or for any of the
+            // array’s elements. 'result' evaluates comparison on the array elements, and
+            // 'arraysOnly' evaluates the comparison on the array itself.
             result = make<PathTraverse>(std::move(result), PathTraverse::kSingleLevel);
-            maybeComposePath<PathComposeA>(result, std::move(nonTraversedResult));
 
+            if (arraysOnlyPtr->size() == 1) {
+                const auto [tagSingle, valSingle] = sbe::value::copyValue(
+                    arraysOnlyPtr->getAt(0).first, arraysOnlyPtr->getAt(0).second);
+                maybeComposePath<PathComposeA>(
+                    result,
+                    make<PathCompare>(Operations::Eq, make<Constant>(tagSingle, valSingle)));
+            } else if (arraysOnlyPtr->size() > 0) {
+                maybeComposePath<PathComposeA>(
+                    result,
+                    make<PathCompare>(Operations::EqMember,
+                                      make<Constant>(tagArraysOnly, valArraysOnly)));
+                arrOnlyGuard.reset();
+            }
             result = generateFieldPath(FieldPath(expr->path().toString()), std::move(result));
         }
         _ctx.push(std::move(result));

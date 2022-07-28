@@ -25,6 +25,7 @@ const docs = [
     {_id: 10, a: [{c: 1}]},
     {_id: 11, a: [[{c: 1}]]},
     {_id: 12, a: [[[1]]]},
+    {_id: 13, a: [null]},
 ];
 
 assert.commandWorked(coll.insert(docs));
@@ -41,7 +42,7 @@ const runTest = (filter, expected) => {
 
 const tests = [
     // Test comparison to null.
-    {filter: {a: {$in: [null]}}, expected: [docs[0], docs[1]]},
+    {filter: {a: {$in: [null]}}, expected: [docs[0], docs[1], docs[13]]},
 
     // Test empty in-list.
     {filter: {a: {$in: []}}, expected: []},
@@ -74,7 +75,7 @@ const tests = [
     // Test $type.
     {
         filter: {a: {$type: "array"}},
-        expected: [docs[4], docs[5], docs[6], docs[7], docs[10], docs[11], docs[12]]
+        expected: [docs[4], docs[5], docs[6], docs[7], docs[10], docs[11], docs[12], docs[13]]
     },
     {filter: {a: {$type: "double"}}, expected: [docs[2], docs[3], docs[5]]},
     {filter: {a: {$type: "object"}}, expected: [docs[8], docs[9], docs[10]]},
