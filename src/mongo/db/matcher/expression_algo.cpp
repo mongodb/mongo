@@ -420,14 +420,16 @@ bool isIndependentOf(const MatchExpression& expr, const std::set<std::string>& p
 
     auto depsTracker = DepsTracker{};
     expr.addDependencies(&depsTracker);
-    return std::none_of(
-        depsTracker.fields.begin(), depsTracker.fields.end(), [&pathSet](auto&& field) {
-            return pathSet.find(field) != pathSet.end() ||
-                std::any_of(pathSet.begin(), pathSet.end(), [&field](auto&& path) {
-                       return expression::isPathPrefixOf(field, path) ||
-                           expression::isPathPrefixOf(path, field);
-                   });
-        });
+    // Match expressions that generate random numbers can't be safely split out and pushed down.
+    return !depsTracker.needRandomGenerator &&
+        std::none_of(
+            depsTracker.fields.begin(), depsTracker.fields.end(), [&pathSet](auto&& field) {
+                return pathSet.find(field) != pathSet.end() ||
+                    std::any_of(pathSet.begin(), pathSet.end(), [&field](auto&& path) {
+                           return expression::isPathPrefixOf(field, path) ||
+                               expression::isPathPrefixOf(path, field);
+                       });
+            });
 }
 
 bool isOnlyDependentOn(const MatchExpression& expr, const std::set<std::string>& roots) {
@@ -439,8 +441,9 @@ bool isOnlyDependentOn(const MatchExpression& expr, const std::set<std::string>&
 
     auto depsTracker = DepsTracker{};
     expr.addDependencies(&depsTracker);
-    return std::all_of(
-        depsTracker.fields.begin(), depsTracker.fields.end(), [&roots](auto&& field) {
+    // Match expressions that generate random numbers can't be safely split out and pushed down.
+    return !depsTracker.needRandomGenerator &&
+        std::all_of(depsTracker.fields.begin(), depsTracker.fields.end(), [&roots](auto&& field) {
             auto fieldRef = FieldRef{field};
             return !fieldRef.empty() && roots.find(fieldRef.getPart(0).toString()) != roots.end();
         });

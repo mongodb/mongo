@@ -98,6 +98,8 @@ last-continuous:
       test_file: jstests/core/internal_apply_oplog_update.js
     - ticket: SERVER-67532
       test_file: jstests/replsets/optime.js
+    - ticket: SERVER-66072
+      test_file: jstests/aggregation/match_no_swap_rand.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -356,6 +358,8 @@ last-lts:
       test_file: jstests/core/internal_apply_oplog_update.js
     - ticket: SERVER-67532
       test_file: jstests/replsets/optime.js
+    - ticket: SERVER-66072
+      test_file: jstests/aggregation/match_no_swap_rand.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
