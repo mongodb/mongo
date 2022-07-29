@@ -43,7 +43,7 @@ structs:
         fields:
             shardVersion:
                 type: ChunkVersion
-                description: "Collection version at the end of the migration."
+                description: "Placement information at the end of the migration."
 
     MigratedChunkType:
         description: "ChunkType describing a migrated chunk"
@@ -77,7 +77,7 @@ commands:
                 description: "ChunkType describing a migrated chunk"
 
             fromShardCollectionVersion:
-                type: ChunkVersion 
+                type: ChunkVersion
                 description: "{ shardVersionField: <version> }" 
                 
             validAfter:

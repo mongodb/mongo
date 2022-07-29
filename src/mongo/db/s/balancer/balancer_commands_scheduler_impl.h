@@ -291,7 +291,7 @@ public:
             .append(kEpoch, _version.epoch())
             .append(kTimestamp, _version.getTimestamp());
 
-        _version.serializeToBSON(ChunkVersion::kShardVersionField, &commandBuilder);
+        _version.serialize(ChunkVersion::kChunkVersionField, &commandBuilder);
 
         return commandBuilder.obj();
     }
@@ -366,7 +366,7 @@ public:
             .append(kMaxValue, _upperBoundKey)
             .append(kEstimatedValue, _estimatedValue);
 
-        _version.serializeToBSON(ChunkVersion::kShardVersionField, &commandBuilder);
+        _version.serialize(ChunkVersion::kChunkVersionField, &commandBuilder);
 
         return commandBuilder.obj();
     }

@@ -52,3 +52,10 @@ types:
         serializer: "mongo::DatabaseVersion::toBSON"
         deserializer: "mongo::DatabaseVersion"
 
+    shard_version:
+        bson_serialization_type: any
+        description: An object representing a shard version for a collection.
+        cpp_type: ShardVersion
+        serializer: "mongo::ShardVersion::serialize"
+        deserializer: "mongo::ShardVersion::parse"
+

@@ -174,7 +174,7 @@ BSONObj MigrationType::toBSON() const {
     builder.append(fromShard.name(), _fromShard.toString());
     builder.append(toShard.name(), _toShard.toString());
 
-    _chunkVersion.serializeToBSON(chunkVersion.name(), &builder);
+    _chunkVersion.serialize(chunkVersion.name(), &builder);
 
     builder.append(waitForDelete.name(), _waitForDelete);
     builder.append(forceJumbo.name(), _forceJumbo);

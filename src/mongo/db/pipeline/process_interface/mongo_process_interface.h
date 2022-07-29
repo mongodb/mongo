@@ -58,6 +58,7 @@
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/shard_version.h"
 
 namespace mongo {
 
@@ -433,7 +434,7 @@ public:
      * request to be sent to the config servers. If another thread has already requested a refresh,
      * it will instead wait for that response.
      */
-    virtual boost::optional<ChunkVersion> refreshAndGetCollectionVersion(
+    virtual boost::optional<ShardVersion> refreshAndGetCollectionVersion(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss) const = 0;
 

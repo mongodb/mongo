@@ -64,7 +64,7 @@ public:
         return nullptr;
     }
 
-    boost::optional<ChunkVersion> refreshAndGetCollectionVersion(
+    boost::optional<ShardVersion> refreshAndGetCollectionVersion(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss) const final {
         return boost::none;  // Nothing is sharded here.

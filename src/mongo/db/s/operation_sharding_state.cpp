@@ -61,13 +61,14 @@ void OperationShardingState::setShardRole(OperationContext* opCtx,
     auto& oss = OperationShardingState::get(opCtx);
 
     if (shardVersion) {
-        auto emplaceResult = oss._shardVersions.try_emplace(nss.ns(), *shardVersion);
+        ShardVersion fullShardVersion(*shardVersion);
+        auto emplaceResult = oss._shardVersions.try_emplace(nss.ns(), fullShardVersion);
         auto& tracker = emplaceResult.first->second;
         if (!emplaceResult.second) {
             uassert(640570,
                     str::stream() << "Illegal attempt to change the expected shard version for "
-                                  << nss << " from " << tracker.v << " to " << *shardVersion,
-                    tracker.v == *shardVersion);
+                                  << nss << " from " << tracker.v << " to " << fullShardVersion,
+                    tracker.v == fullShardVersion);
         }
         invariant(++tracker.recursion > 0);
     }
@@ -86,7 +87,7 @@ void OperationShardingState::setShardRole(OperationContext* opCtx,
     }
 }
 
-boost::optional<ChunkVersion> OperationShardingState::getShardVersion(const NamespaceString& nss) {
+boost::optional<ShardVersion> OperationShardingState::getShardVersion(const NamespaceString& nss) {
     const auto it = _shardVersions.find(nss.ns());
     if (it != _shardVersions.end()) {
         return it->second.v;

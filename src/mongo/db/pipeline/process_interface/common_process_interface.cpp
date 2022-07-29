@@ -186,13 +186,13 @@ bool CommonProcessInterface::keyPatternNamesExactPaths(const BSONObj& keyPattern
     return nFieldsMatched == uniqueKeyPaths.size();
 }
 
-boost::optional<ChunkVersion> CommonProcessInterface::refreshAndGetCollectionVersion(
+boost::optional<ShardVersion> CommonProcessInterface::refreshAndGetCollectionVersion(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const NamespaceString& nss) const {
     const auto cm = uassertStatusOK(Grid::get(expCtx->opCtx)
                                         ->catalogCache()
                                         ->getCollectionRoutingInfoWithRefresh(expCtx->opCtx, nss));
 
-    return cm.isSharded() ? boost::make_optional(cm.getVersion()) : boost::none;
+    return cm.isSharded() ? boost::make_optional(ShardVersion(cm.getVersion())) : boost::none;
 }
 
 std::vector<FieldPath> CommonProcessInterface::_shardKeyToDocumentKeyFields(

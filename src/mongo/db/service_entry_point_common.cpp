@@ -1679,8 +1679,8 @@ void ExecCommandDatabase::_initiateCommand() {
             : _invocation->ns();
 
         boost::optional<ChunkVersion> shardVersion;
-        if (auto shardVersionElem = request.body[ChunkVersion::kShardVersionField]) {
-            shardVersion = ChunkVersion::parse(shardVersionElem);
+        if (auto shardVersionElem = request.body[ShardVersion::kShardVersionField]) {
+            shardVersion = ShardVersion::parse(shardVersionElem);
         }
 
         boost::optional<DatabaseVersion> databaseVersion;

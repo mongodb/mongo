@@ -126,7 +126,7 @@ void MigrationTestFixture::setUpMigration(const NamespaceString& ns,
     builder.append(MigrationType::max(), chunk.getMax());
     builder.append(MigrationType::toShard(), toShard.toString());
     builder.append(MigrationType::fromShard(), chunk.getShard().toString());
-    chunk.getVersion().serializeToBSON("chunkVersion", &builder);
+    chunk.getVersion().serialize("chunkVersion", &builder);
     builder.append(MigrationType::forceJumbo(), "doNotForceJumbo");
 
     MigrationType migrationType = assertGet(MigrationType::fromBSON(builder.obj()));

@@ -63,7 +63,7 @@ private:
 
 const auto kUnshardedCollection = std::make_shared<UnshardedCollection>();
 
-boost::optional<ChunkVersion> getOperationReceivedVersion(OperationContext* opCtx,
+boost::optional<ShardVersion> getOperationReceivedVersion(OperationContext* opCtx,
                                                           const NamespaceString& nss) {
     // If there is a version attached to the OperationContext, use it as the received version.
     if (OperationShardingState::isComingFromRouter(opCtx)) {
@@ -103,7 +103,7 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
     OperationContext* opCtx,
     OrphanCleanupPolicy orphanCleanupPolicy,
     bool supportNonVersionedOperations) {
-    boost::optional<ChunkVersion> optReceivedShardVersion = boost::none;
+    boost::optional<ShardVersion> optReceivedShardVersion = boost::none;
     if (!supportNonVersionedOperations) {
         optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
         // No operations should be calling getOwnershipFilter without a shard version
@@ -143,7 +143,8 @@ ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
     const auto receivedShardVersion{oss.getShardVersion(_nss)};
     uassert(
         StaleConfigInfo(_nss,
-                        receivedShardVersion ? *receivedShardVersion : ChunkVersion::IGNORED(),
+                        receivedShardVersion ? (ChunkVersion)*receivedShardVersion
+                                             : ChunkVersion::IGNORED(),
                         boost::none /* wantedVersion */,
                         ShardingState::get(_serviceContext)->shardId()),
         str::stream() << "sharding status of collection " << _nss.ns()
@@ -352,7 +353,7 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
 
     // Assume that the received shard version was IGNORED if the current operation wasn't versioned
     const auto& receivedShardVersion =
-        optReceivedShardVersion ? *optReceivedShardVersion : ChunkVersion::IGNORED();
+        optReceivedShardVersion ? (ChunkVersion)*optReceivedShardVersion : ChunkVersion::IGNORED();
 
     auto csrLock = CSRLock::lockShared(opCtx, this);
 

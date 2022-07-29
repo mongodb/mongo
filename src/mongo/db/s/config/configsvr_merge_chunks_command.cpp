@@ -97,7 +97,7 @@ public:
                                                                       request().getShard(),
                                                                       request().getValidAfter()));
             return ConfigSvrMergeResponse{
-                ChunkVersion::parse(shardAndCollVers[ChunkVersion::kShardVersionField])};
+                ChunkVersion::parse(shardAndCollVers[ChunkVersion::kChunkVersionField])};
         }
 
     private:

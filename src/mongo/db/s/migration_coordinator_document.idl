@@ -95,7 +95,8 @@ structs:
                 description: "The range being migrated."
             preMigrationChunkVersion:
                 type: ChunkVersion
-                description: "The version, at the start of the migration, of the chunk being moved."
+                description: "The data placement, at the start of the migration, of the chunk being 
+                             moved."
             decision:
                 type: Decision
                 description: "Enumeration that defines whether the migration committed or aborted."

@@ -30,6 +30,7 @@
 #include "mongo/s/stale_exception.h"
 
 #include "mongo/base/init.h"
+#include "mongo/s/shard_version.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -43,9 +44,12 @@ MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleDbRoutingVersion);
 
 void StaleConfigInfo::serialize(BSONObjBuilder* bob) const {
     bob->append("ns", _nss.ns());
-    _received.serializeToBSON("vReceived", bob);
-    if (_wanted)
-        _wanted->serializeToBSON("vWanted", bob);
+    ShardVersion receivedShardVersion(_received);
+    receivedShardVersion.serialize("vReceived", bob);
+    if (_wanted) {
+        ShardVersion wantedShardVersion(*_wanted);
+        wantedShardVersion.serialize("vWanted", bob);
+    }
 
     invariant(_shardId != "");
     bob->append("shardId", _shardId.toString());
@@ -55,12 +59,15 @@ std::shared_ptr<const ErrorExtraInfo> StaleConfigInfo::parse(const BSONObj& obj)
     auto shardId = obj["shardId"].String();
     uassert(ErrorCodes::NoSuchKey, "The shardId field is missing", !shardId.empty());
 
+    const ChunkVersion& receivedVersion = ShardVersion::parse(obj["vReceived"]);
     return std::make_shared<StaleConfigInfo>(NamespaceString(obj["ns"].String()),
-                                             ChunkVersion::parse(obj["vReceived"]),
+                                             receivedVersion,
                                              [&] {
-                                                 if (auto vWantedElem = obj["vWanted"])
-                                                     return boost::make_optional(
-                                                         ChunkVersion::parse(vWantedElem));
+                                                 if (auto vWantedElem = obj["vWanted"]) {
+                                                     const ChunkVersion& wantedVersion =
+                                                         ShardVersion::parse(vWantedElem);
+                                                     return boost::make_optional(wantedVersion);
+                                                 }
                                                  return boost::optional<ChunkVersion>();
                                              }(),
                                              ShardId(std::move(shardId)));

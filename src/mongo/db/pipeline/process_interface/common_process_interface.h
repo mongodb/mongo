@@ -66,7 +66,7 @@ public:
 
     virtual void updateClientOperationTime(OperationContext* opCtx) const final;
 
-    boost::optional<ChunkVersion> refreshAndGetCollectionVersion(
+    boost::optional<ShardVersion> refreshAndGetCollectionVersion(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const NamespaceString& nss) const override;
 

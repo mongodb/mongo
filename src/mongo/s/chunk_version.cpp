@@ -34,7 +34,7 @@
 
 namespace mongo {
 
-constexpr StringData ChunkVersion::kShardVersionField;
+constexpr StringData ChunkVersion::kChunkVersionField;
 
 bool CollectionGeneration::isSameCollection(const CollectionGeneration& other) const {
     if (_timestamp == other._timestamp) {
@@ -64,7 +64,7 @@ ChunkVersion ChunkVersion::parse(const BSONElement& element) {
                         {version.getSecs(), version.getInc()});
 }
 
-void ChunkVersion::serializeToBSON(StringData field, BSONObjBuilder* builder) const {
+void ChunkVersion::serialize(StringData field, BSONObjBuilder* builder) const {
     ChunkVersion60Format version;
     version.setGeneration({_epoch, _timestamp});
     version.setPlacement(Timestamp(majorVersion(), minorVersion()));

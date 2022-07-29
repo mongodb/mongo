@@ -56,7 +56,7 @@ structs:
         fields:
             shardVersion:
                 type: ChunkVersion
-                description: "Latest version of the shard."
+                description: "Latest data placement of the shard."
 
 commands:
     _configsvrCommitChunksMerge:

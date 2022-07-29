@@ -33,8 +33,8 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
+#include "mongo/s/shard_version.h"
 #include "mongo/util/future.h"
 #include "mongo/util/string_map.h"
 
@@ -121,7 +121,7 @@ public:
      * operation. Documents in chunks which did not belong on this shard at this shard version
      * will be filtered out.
      */
-    boost::optional<ChunkVersion> getShardVersion(const NamespaceString& nss);
+    boost::optional<ShardVersion> getShardVersion(const NamespaceString& nss);
 
     /**
      * Returns true if the client sent a databaseVersion for any namespace.
@@ -170,11 +170,11 @@ private:
 
     // Stores the shard version expected for each collection that will be accessed
     struct ShardVersionTracker {
-        ShardVersionTracker(ChunkVersion v) : v(v) {}
+        ShardVersionTracker(ShardVersion v) : v(v) {}
         ShardVersionTracker(ShardVersionTracker&&) = default;
         ShardVersionTracker(const ShardVersionTracker&) = delete;
         ShardVersionTracker& operator=(const ShardVersionTracker&) = delete;
-        ChunkVersion v;
+        ShardVersion v;
         int recursion{0};
     };
     StringMap<ShardVersionTracker> _shardVersions;

@@ -254,8 +254,8 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(
 
     boost::optional<ChunkVersion> shardVersionReceived = [&]() -> boost::optional<ChunkVersion> {
         // old versions might not have the shardVersion field
-        if (cmdResponse.response[ChunkVersion::kShardVersionField]) {
-            return ChunkVersion::parse(cmdResponse.response[ChunkVersion::kShardVersionField]);
+        if (cmdResponse.response[ChunkVersion::kChunkVersionField]) {
+            return ChunkVersion::parse(cmdResponse.response[ChunkVersion::kChunkVersionField]);
         }
         return boost::none;
     }();

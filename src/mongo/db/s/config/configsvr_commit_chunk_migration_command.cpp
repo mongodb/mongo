@@ -146,7 +146,7 @@ public:
 
             auto chunkVersionObj = uassertStatusOK(chunkVersionResponse);
 
-            return Response{ChunkVersion::parse(chunkVersionObj[ChunkVersion::kShardVersionField])};
+            return Response{ChunkVersion::parse(chunkVersionObj[ChunkVersion::kChunkVersionField])};
         }
 
     private:

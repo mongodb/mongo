@@ -62,7 +62,7 @@ void DBPrimaryRouter::appendCRUDUnshardedRoutingTokenToCommand(const ShardId& sh
         BSONObjBuilder dbvBuilder(builder->subobjStart(DatabaseVersion::kDatabaseVersionField));
         dbVersion.serialize(&dbvBuilder);
     }
-    ChunkVersion::UNSHARDED().serializeToBSON(ChunkVersion::kShardVersionField, builder);
+    ShardVersion(ChunkVersion::UNSHARDED()).serialize(ShardVersion::kShardVersionField, builder);
 }
 
 CachedDatabaseInfo DBPrimaryRouter::_getRoutingInfo(OperationContext* opCtx) const {
@@ -115,7 +115,7 @@ void CollectionRouter::appendCRUDRoutingTokenToCommand(const ShardId& shardId,
             dbVersion.serialize(&dbvBuilder);
         }
     }
-    chunkVersion.serializeToBSON(ChunkVersion::kShardVersionField, builder);
+    ShardVersion(chunkVersion).serialize(ShardVersion::kShardVersionField, builder);
 }
 
 ChunkManager CollectionRouter::_getRoutingInfo(OperationContext* opCtx) const {

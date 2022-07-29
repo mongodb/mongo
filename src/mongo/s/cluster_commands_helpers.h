@@ -119,7 +119,7 @@ BSONObj appendDbVersionIfPresent(BSONObj cmdObj, DatabaseVersion dbVersion);
 /**
  * Returns a copy of 'cmdObj' with 'version' appended.
  */
-BSONObj appendShardVersion(BSONObj cmdObj, ChunkVersion version);
+BSONObj appendShardVersion(BSONObj cmdObj, ShardVersion version);
 
 /**
  * Returns a copy of 'cmdObj' with the read/writeConcern from the OpCtx appended, unless the

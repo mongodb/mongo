@@ -32,6 +32,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/s/catalog/type_collection.h"
+        - "mongo/s/shard_version.h"
 
 imports:
     - "mongo/db/commands/rename_collection.idl"
@@ -41,7 +42,6 @@ imports:
     - "mongo/db/keypattern.idl"
     - "mongo/db/coll_mod.idl"
     - "mongo/idl/basic_types.idl"
-    - "mongo/s/chunk_version.idl"
     - "mongo/s/sharding_types.idl"
     - "mongo/s/resharding/common_types.idl"
     - "mongo/db/timeseries/timeseries.idl"
@@ -110,7 +110,7 @@ structs:
         strict: false
         fields:
             collectionVersion:
-                type: ChunkVersion
+                type: shard_version
                 description: "Latest version of the collection"
                 optional: false
 
@@ -176,7 +176,7 @@ structs:
                 description: "UUID of the created collection"
                 optional: true
             collectionVersion:
-                type: ChunkVersion
+                type: shard_version
                 description: "Latest version of the collection"
                 optional: false
 

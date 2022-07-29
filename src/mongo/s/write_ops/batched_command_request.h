@@ -34,8 +34,8 @@
 
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
+#include "mongo/s/shard_version.h"
 #include "mongo/util/overloaded_visitor.h"
 
 namespace mongo {

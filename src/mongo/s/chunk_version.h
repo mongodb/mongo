@@ -114,10 +114,10 @@ protected:
 class ChunkVersion : public CollectionGeneration, public CollectionPlacement {
 public:
     /**
-     * The name for the shard version information field, which shard-aware commands should include
-     * if they want to convey shard version.
+     * The name for the chunk version information field, which ddl operations use to send only
+     * the placement information. String is shardVersion for compatibility with previous versions.
      */
-    static constexpr StringData kShardVersionField = "shardVersion"_sd;
+    static constexpr StringData kChunkVersionField = "shardVersion"_sd;
 
     ChunkVersion(CollectionGeneration geneneration, CollectionPlacement placement)
         : CollectionGeneration(geneneration), CollectionPlacement(placement) {}
@@ -221,7 +221,7 @@ public:
     }
 
     static ChunkVersion parse(const BSONElement& element);
-    void serializeToBSON(StringData field, BSONObjBuilder* builder) const;
+    void serialize(StringData field, BSONObjBuilder* builder) const;
 
     std::string toString() const;
 };

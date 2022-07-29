@@ -83,7 +83,7 @@ void appendShortVersion(BufBuilder* out, const ChunkType& chunk) {
     bb.append(ChunkType::min(), chunk.getMin());
     bb.append(ChunkType::max(), chunk.getMax());
     if (chunk.isVersionSet()) {
-        chunk.getVersion().serializeToBSON(ChunkType::lastmod(), &bb);
+        chunk.getVersion().serialize(ChunkType::lastmod(), &bb);
     }
     bb.done();
 }
@@ -685,7 +685,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
         BSONObjBuilder b(logDetail.subobjStart("before"));
         b.append(ChunkType::min(), range.getMin());
         b.append(ChunkType::max(), range.getMax());
-        collVersion.serializeToBSON(ChunkType::lastmod(), &b);
+        collVersion.serialize(ChunkType::lastmod(), &b);
     }
 
     if (splitChunkResult.newChunks->size() == 2) {
@@ -719,8 +719,8 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
     }
 
     BSONObjBuilder response;
-    splitChunkResult.currentMaxVersion.serializeToBSON(kCollectionVersionField, &response);
-    splitChunkResult.currentMaxVersion.serializeToBSON(ChunkVersion::kShardVersionField, &response);
+    splitChunkResult.currentMaxVersion.serialize(kCollectionVersionField, &response);
+    splitChunkResult.currentMaxVersion.serialize(ChunkVersion::kChunkVersionField, &response);
     return response.obj();
 }
 
@@ -908,9 +908,9 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunksMerge(
                           << chunkRange.toString(),
             chunk.getRange() == chunkRange);
         BSONObjBuilder response;
-        collVersion.serializeToBSON(kCollectionVersionField, &response);
+        collVersion.serialize(kCollectionVersionField, &response);
         const auto currentShardVersion = getShardVersion(opCtx, coll, shardId, collVersion);
-        currentShardVersion.serializeToBSON(ChunkVersion::kShardVersionField, &response);
+        currentShardVersion.serialize(ChunkVersion::kChunkVersionField, &response);
         // Makes sure that the last thing we read in getCollectionVersion and getShardVersion gets
         // majority written before to return from this command, otherwise next RoutingInfo cache
         // refresh from the shard may not see those newest information.
@@ -965,16 +965,16 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunksMerge(
             b.append(chunkToMerge.toConfigBSON());
         }
     }
-    initialVersion.serializeToBSON("prevShardVersion", &logDetail);
-    mergeVersion.serializeToBSON("mergedVersion", &logDetail);
+    initialVersion.serialize("prevShardVersion", &logDetail);
+    mergeVersion.serialize("mergedVersion", &logDetail);
     logDetail.append("owningShard", shardId);
 
     ShardingLogging::get(opCtx)->logChange(
         opCtx, "merge", nss.ns(), logDetail.obj(), WriteConcernOptions());
 
     BSONObjBuilder response;
-    mergeVersion.serializeToBSON(kCollectionVersionField, &response);
-    mergeVersion.serializeToBSON(ChunkVersion::kShardVersionField, &response);
+    mergeVersion.serialize(kCollectionVersionField, &response);
+    mergeVersion.serialize(ChunkVersion::kChunkVersionField, &response);
     return response.obj();
 }
 
@@ -1101,10 +1101,10 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     if (currentChunk.getShard() == toShard) {
         // The commit was already done successfully
         BSONObjBuilder response;
-        currentCollectionVersion.serializeToBSON(kCollectionVersionField, &response);
+        currentCollectionVersion.serialize(kCollectionVersionField, &response);
         const auto currentShardVersion =
             getShardVersion(opCtx, coll, fromShard, currentCollectionVersion);
-        currentShardVersion.serializeToBSON(ChunkVersion::kShardVersionField, &response);
+        currentShardVersion.serialize(ChunkVersion::kChunkVersionField, &response);
         // Makes sure that the last thing we read in findChunkContainingRange, getShardVersion, and
         // getCollectionVersion gets majority written before to return from this command, otherwise
         // next RoutingInfo cache refresh from the shard may not see those newest information.
@@ -1235,13 +1235,13 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     BSONObjBuilder response;
     if (!newControlChunk) {
         // We migrated the last chunk from the donor shard.
-        newMigratedChunk->getVersion().serializeToBSON(kCollectionVersionField, &response);
+        newMigratedChunk->getVersion().serialize(kCollectionVersionField, &response);
         const ChunkVersion donorShardVersion(
             {currentCollectionVersion.epoch(), currentCollectionVersion.getTimestamp()}, {0, 0});
-        donorShardVersion.serializeToBSON(ChunkVersion::kShardVersionField, &response);
+        donorShardVersion.serialize(ChunkVersion::kChunkVersionField, &response);
     } else {
-        newControlChunk->getVersion().serializeToBSON(kCollectionVersionField, &response);
-        newControlChunk->getVersion().serializeToBSON(ChunkVersion::kShardVersionField, &response);
+        newControlChunk->getVersion().serialize(kCollectionVersionField, &response);
+        newControlChunk->getVersion().serialize(ChunkVersion::kChunkVersionField, &response);
     }
     return response.obj();
 }

@@ -374,7 +374,9 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                                                  std::move(impersonatedClientAttrs.roleNames));
         }
 
-        ScopedSetShardRole scopedSetShardRole(opCtx.get(), nss, shardVersion, dbVersion);
+        boost::optional<ChunkVersion> chunkVersion =
+            shardVersion ? boost::make_optional((ChunkVersion)*shardVersion) : boost::none;
+        ScopedSetShardRole scopedSetShardRole(opCtx.get(), nss, chunkVersion, dbVersion);
 
         {
             stdx::unique_lock<Client> lk(*opCtx->getClient());

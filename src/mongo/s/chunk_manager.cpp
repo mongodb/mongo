@@ -273,7 +273,7 @@ ChunkMap ChunkMap::createMerged(
 BSONObj ChunkMap::toBSON() const {
     BSONObjBuilder builder;
 
-    getVersion().serializeToBSON("startingVersion"_sd, &builder);
+    getVersion().serialize("startingVersion"_sd, &builder);
     builder.append("chunkCount", static_cast<int64_t>(_chunkMap.size()));
 
     {
@@ -866,7 +866,7 @@ void ComparableChunkVersion::setChunkVersion(const ChunkVersion& version) {
 std::string ComparableChunkVersion::toString() const {
     BSONObjBuilder builder;
     if (_chunkVersion)
-        _chunkVersion->serializeToBSON("chunkVersion"_sd, &builder);
+        _chunkVersion->serialize("chunkVersion"_sd, &builder);
     else
         builder.append("chunkVersion"_sd, "None");
 

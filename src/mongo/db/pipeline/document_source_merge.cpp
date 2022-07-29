@@ -460,7 +460,12 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::createFromBson(
     auto fieldPaths = convertToFieldPaths(mergeSpec.getOn());
     auto [mergeOnFields, targetCollectionVersion] =
         expCtx->mongoProcessInterface->ensureFieldsUniqueOrResolveDocumentKey(
-            expCtx, std::move(fieldPaths), mergeSpec.getTargetCollectionVersion(), targetNss);
+            expCtx,
+            std::move(fieldPaths),
+            mergeSpec.getTargetCollectionVersion()
+                ? boost::make_optional((ChunkVersion)*mergeSpec.getTargetCollectionVersion())
+                : boost::none,
+            targetNss);
 
     return DocumentSourceMerge::create(std::move(targetNss),
                                        expCtx,
@@ -529,7 +534,9 @@ Value DocumentSourceMerge::serialize(boost::optional<ExplainOptions::Verbosity> 
         }
         return mergeOnFields;
     }());
-    spec.setTargetCollectionVersion(_targetCollectionVersion);
+    spec.setTargetCollectionVersion(
+        _targetCollectionVersion ? boost::make_optional(ShardVersion(*_targetCollectionVersion))
+                                 : boost::none);
     return Value(Document{{getSourceName(), spec.toBSON()}});
 }
 

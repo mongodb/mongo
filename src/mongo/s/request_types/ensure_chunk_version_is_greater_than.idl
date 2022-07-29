@@ -54,8 +54,8 @@ commands:
                 type: object
                 optional: false
             version:
-                description: The version of the chunk, including major version, minor version, and
-                             epoch.
+                description: The data placement of the chunk, including major version, minor 
+                             version, and epoch.
                 type: ChunkVersion
                 optional: false
             collectionUUID:

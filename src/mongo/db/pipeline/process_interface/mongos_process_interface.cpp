@@ -358,7 +358,9 @@ MongosProcessInterface::ensureFieldsUniqueOrResolveDocumentKey(
     // collection was dropped a long time ago. Because of this, we are okay with piggy-backing
     // off another thread's request to refresh the cache, simply waiting for that request to
     // return instead of forcing another refresh.
-    targetCollectionVersion = refreshAndGetCollectionVersion(expCtx, outputNs);
+    boost::optional<ShardVersion> targetVersion = refreshAndGetCollectionVersion(expCtx, outputNs);
+    targetCollectionVersion =
+        targetVersion ? boost::make_optional((ChunkVersion)*targetVersion) : boost::none;
 
     auto docKeyPaths = collectDocumentKeyFieldsActingAsRouter(expCtx->opCtx, outputNs);
     return {std::set<FieldPath>(std::make_move_iterator(docKeyPaths.begin()),

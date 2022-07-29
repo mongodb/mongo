@@ -186,10 +186,11 @@ std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
         findCommandToForward->serialize(BSONObj(), &cmdBuilder);
 
         if (cm.isSharded()) {
-            cm.getVersion(shardId).serializeToBSON(ChunkVersion::kShardVersionField, &cmdBuilder);
+            ShardVersion(cm.getVersion(shardId))
+                .serialize(ShardVersion::kShardVersionField, &cmdBuilder);
         } else if (!query.nss().isOnInternalDb()) {
-            ChunkVersion::UNSHARDED().serializeToBSON(ChunkVersion::kShardVersionField,
-                                                      &cmdBuilder);
+            ShardVersion(ChunkVersion::UNSHARDED())
+                .serialize(ShardVersion::kShardVersionField, &cmdBuilder);
             cmdBuilder.append("databaseVersion", cm.dbVersion().toBSON());
         }
 

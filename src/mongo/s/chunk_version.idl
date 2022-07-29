@@ -76,5 +76,5 @@ types:
         bson_serialization_type: any
         description: An object representing a chunk version for a collection.
         cpp_type: ChunkVersion
-        serializer: ChunkVersion::serializeToBSON
+        serializer: ChunkVersion::serialize
         deserializer: ChunkVersion::parse
