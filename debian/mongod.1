@@ -3517,37 +3517,6 @@ the configuration file.
 Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)
 and MongoDB Atlas (https://cloud.mongodb.com/user#/atlas/login)\&.
 .RE
-.SS SNMP OPTIONS
-.PP
-MongoDB Enterprise on macOS does \fInot\f1 include support for SNMP due
-to SERVER\-29352 (https://jira.mongodb.org/browse/SERVER\-29352)\&.
-.PP
-\fBmongod \-\-snmp\-disabled\f1
-.RS
-.PP
-Disables SNMP access to \fBmongod\f1\f1\&. The option is incompatible
-with \fB\-\-snmp\-subagent\f1\f1 and \fB\-\-snmp\-master\f1\f1\&.
-.RE
-.PP
-\fBmongod \-\-snmp\-subagent\f1
-.RS
-.PP
-Runs SNMP as a subagent. The option is incompatible with \fB\-\-snmp\-disabled\f1\f1\&.
-.RE
-.PP
-\fBmongod \-\-snmp\-master\f1
-.RS
-.PP
-Runs SNMP as a master. The option is incompatible with \fB\-\-snmp\-disabled\f1\f1\&.
-.RE
-.RS
-.IP \(bu 2
-\fBMonitor MongoDB With SNMP on Linux\f1
-.IP \(bu 2
-\fBMonitor MongoDB Windows with SNMP\f1
-.IP \(bu 2
-\fBTroubleshoot SNMP\f1
-.RE
 .SS INMEMORY OPTIONS
 .PP
 \fBmongod \-\-inMemorySizeGB\f1
