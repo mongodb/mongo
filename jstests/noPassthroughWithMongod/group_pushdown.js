@@ -533,4 +533,17 @@ assertNoGroupPushdown(coll, basicGroup, basicGroupResults);
 // Reset 'internalQuerySlotBasedExecutionDisableGroupPushdown' to its original value.
 assert.commandWorked(db.adminCommand(
     {setParameter: 1, internalQuerySlotBasedExecutionDisableGroupPushdown: oldValue}));
+
+(function testConstNothingForIdMappedToNull() {
+    // Prepare a collection.
+    const coll = db.nothing_id;
+    coll.drop();
+    coll.insert({_id: 0});
+
+    // $$REMOVE produce Nothing constant and it should be converted to Null. Without an accumulator
+    // $group is not pushed down and we need an accumulator.
+    assert.eq(
+        coll.aggregate([{$group: {_id: "$$REMOVE", o: {$first: "$non_existent_field"}}}]).toArray(),
+        [{_id: null, o: null}]);
+})();
 })();
