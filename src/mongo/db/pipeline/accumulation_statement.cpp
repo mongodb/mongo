@@ -53,16 +53,17 @@ namespace {
 static StringMap<AccumulationStatement::ParserRegistration> parserMap;
 }  // namespace
 
-void AccumulationStatement::registerAccumulator(std::string name,
-                                                AccumulationStatement::Parser parser,
-                                                AllowedWithApiStrict allowedWithApiStrict,
-                                                AllowedWithClientType allowedWithClientType,
-                                                boost::optional<FeatureFlag> featureFlag) {
+void AccumulationStatement::registerAccumulator(
+    std::string name,
+    AccumulationStatement::Parser parser,
+    AllowedWithApiStrict allowedWithApiStrict,
+    AllowedWithClientType allowedWithClientType,
+    boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion) {
     auto it = parserMap.find(name);
     massert(28722,
             str::stream() << "Duplicate accumulator (" << name << ") registered.",
             it == parserMap.end());
-    parserMap[name] = {parser, allowedWithApiStrict, allowedWithClientType, featureFlag};
+    parserMap[name] = {parser, allowedWithApiStrict, allowedWithClientType, requiredMinVersion};
     operatorCountersGroupAccumulatorExpressions.addCounter(name);
 }
 
@@ -103,7 +104,7 @@ AccumulationStatement AccumulationStatement::parseAccumulationStatement(
             str::stream() << "The " << accName << " accumulator is a unary operator",
             specElem.type() != BSONType::Array);
 
-    auto&& [parser, allowedWithApiStrict, allowedWithClientType, featureFlag] =
+    auto&& [parser, allowedWithApiStrict, allowedWithClientType, requiredMinVersion] =
         AccumulationStatement::getParser(accName);
     auto allowedMaxVersion = expCtx->maxFeatureCompatibilityVersion;
     uassert(ErrorCodes::QueryFeatureNotAllowed,
@@ -114,8 +115,7 @@ AccumulationStatement AccumulationStatement::parseAccumulationStatement(
                           << " is not allowed in the current feature compatibility version. See "
                           << feature_compatibility_version_documentation::kCompatibilityLink
                           << " for more information.",
-            !featureFlag || !allowedMaxVersion ||
-                featureFlag->isEnabledOnVersion(*allowedMaxVersion));
+            !requiredMinVersion || !allowedMaxVersion || *requiredMinVersion <= *allowedMaxVersion);
 
     tassert(5837900, "Accumulators should only appear in a user operation", expCtx->opCtx);
     assertLanguageFeatureIsAllowed(

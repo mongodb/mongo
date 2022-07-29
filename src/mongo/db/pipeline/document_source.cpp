@@ -71,7 +71,7 @@ DocumentSource::DocumentSource(const StringData stageName,
 namespace {
 struct ParserRegistration {
     Parser parser;
-    boost::optional<FeatureFlag> featureFlag;
+    boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion;
 };
 // Used to keep track of which DocumentSources are registered under which name.
 static StringMap<ParserRegistration> parserMap;
@@ -87,18 +87,20 @@ void accumulatePipelinePlanSummaryStats(const Pipeline& pipeline,
     }
 }
 
-void DocumentSource::registerParser(string name,
-                                    Parser parser,
-                                    boost::optional<FeatureFlag> featureFlag) {
+void DocumentSource::registerParser(
+    string name,
+    Parser parser,
+    boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion) {
     auto it = parserMap.find(name);
     massert(28707,
             str::stream() << "Duplicate document source (" << name << ") registered.",
             it == parserMap.end());
-    parserMap[name] = {parser, featureFlag};
+    parserMap[name] = {parser, requiredMinVersion};
 }
-void DocumentSource::registerParser(string name,
-                                    SimpleParser simpleParser,
-                                    boost::optional<FeatureFlag> featureFlag) {
+void DocumentSource::registerParser(
+    string name,
+    SimpleParser simpleParser,
+    boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion) {
 
     Parser parser =
         [simpleParser = std::move(simpleParser)](
@@ -106,7 +108,7 @@ void DocumentSource::registerParser(string name,
             const intrusive_ptr<ExpressionContext>& expCtx) -> list<intrusive_ptr<DocumentSource>> {
         return {simpleParser(std::move(stageSpec), expCtx)};
     };
-    return registerParser(std::move(name), std::move(parser), std::move(featureFlag));
+    return registerParser(std::move(name), std::move(parser), std::move(requiredMinVersion));
 }
 bool DocumentSource::hasQuery() const {
     return false;
@@ -131,14 +133,13 @@ list<intrusive_ptr<DocumentSource>> DocumentSource::parse(
             str::stream() << "Unrecognized pipeline stage name: '" << stageName << "'",
             it != parserMap.end());
 
-    uassert(
-        ErrorCodes::QueryFeatureNotAllowed,
-        str::stream() << stageName
-                      << " is not allowed in the current feature compatibility version. See "
-                      << feature_compatibility_version_documentation::kCompatibilityLink
-                      << " for more information.",
-        !expCtx->maxFeatureCompatibilityVersion || !it->second.featureFlag ||
-            it->second.featureFlag->isEnabledOnVersion(*expCtx->maxFeatureCompatibilityVersion));
+    uassert(ErrorCodes::QueryFeatureNotAllowed,
+            str::stream() << stageName
+                          << " is not allowed in the current feature compatibility version. See "
+                          << feature_compatibility_version_documentation::kCompatibilityLink
+                          << " for more information.",
+            !expCtx->maxFeatureCompatibilityVersion || !it->second.requiredMinVersion ||
+                (*it->second.requiredMinVersion <= *expCtx->maxFeatureCompatibilityVersion));
 
     return it->second.parser(stageSpec, expCtx);
 }

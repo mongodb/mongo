@@ -118,7 +118,7 @@ struct ParserRegistration {
     Parser parser;
     AllowedWithApiStrict allowedWithApiStrict;
     AllowedWithClientType allowedWithClientType;
-    boost::optional<FeatureFlag> featureFlag;
+    boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion;
 };
 
 /**
@@ -171,17 +171,18 @@ DayOfWeek parseDayOfWeek(const Value& value, StringData expressionName, StringDa
 StringMap<ParserRegistration> parserMap;
 }  // namespace
 
-void Expression::registerExpression(string key,
-                                    Parser parser,
-                                    AllowedWithApiStrict allowedWithApiStrict,
-                                    AllowedWithClientType allowedWithClientType,
-                                    boost::optional<FeatureFlag> featureFlag) {
+void Expression::registerExpression(
+    string key,
+    Parser parser,
+    AllowedWithApiStrict allowedWithApiStrict,
+    AllowedWithClientType allowedWithClientType,
+    boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion) {
     auto op = parserMap.find(key);
     massert(17064,
             str::stream() << "Duplicate expression (" << key << ") registered.",
             op == parserMap.end());
     parserMap[key] =
-        ParserRegistration{parser, allowedWithApiStrict, allowedWithClientType, featureFlag};
+        ParserRegistration{parser, allowedWithApiStrict, allowedWithClientType, requiredMinVersion};
     // Add this expression to the global map of operator counters for expressions.
     operatorCountersAggExpressions.addCounter(key);
 }
@@ -213,8 +214,8 @@ intrusive_ptr<Expression> Expression::parseExpression(ExpressionContext* const e
                           << " is not allowed in the current feature compatibility version. See "
                           << feature_compatibility_version_documentation::kCompatibilityLink
                           << " for more information.",
-            !expCtx->maxFeatureCompatibilityVersion || !entry.featureFlag ||
-                entry.featureFlag->isEnabledOnVersion(*expCtx->maxFeatureCompatibilityVersion));
+            !expCtx->maxFeatureCompatibilityVersion || !entry.requiredMinVersion ||
+                (*entry.requiredMinVersion <= *expCtx->maxFeatureCompatibilityVersion));
 
     if (expCtx->opCtx) {
         assertLanguageFeatureIsAllowed(
@@ -3913,7 +3914,11 @@ void ExpressionInternalFLEEqual::_doAddDependencies(DepsTracker* deps) const {
     }
 }
 
-REGISTER_STABLE_EXPRESSION(_internalFleEq, ExpressionInternalFLEEqual::parse);
+REGISTER_EXPRESSION_WITH_MIN_VERSION(_internalFleEq,
+                                     ExpressionInternalFLEEqual::parse,
+                                     AllowedWithApiStrict::kAlways,
+                                     AllowedWithClientType::kAny,
+                                     multiversion::FeatureCompatibilityVersion::kVersion_6_0);
 
 intrusive_ptr<Expression> ExpressionInternalFLEEqual::parse(ExpressionContext* const expCtx,
                                                             BSONElement expr,
