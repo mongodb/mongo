@@ -45,9 +45,6 @@ parameters:
 - key: antithesis_image_tag
   description: "The docker tag to use when pushing images to Antithesis"
 
-- key: burn_in_tests
-  description: "Comma separated list of jstests to include when running burn_in_tests"
-
 ## Cron parameters.
 - key: project_required_suggested_cron
   value: "0 */4 * * *" # Every 4 hours starting at 0000 UTC
@@ -1037,36 +1034,6 @@ functions:
       optional: true
       files:
       - src/generated_resmoke_config/*.json
-
-  "generate burn in tags":
-  - *f_expansions_write
-  - *configure_evergreen_api_credentials
-  - command: subprocess.exec
-    type: test
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/burn_in_tests_generate.sh"
-  - command: archive.targz_pack
-    params:
-      target: burn_in_tags_gen.tgz
-      source_dir: src/generated_burn_in_tags_config
-      include:
-      - "*"
-  - command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: burn_in_tags_gen.tgz
-      remote_file: ${project}/${build_variant}/${revision}/burn_in_tags_gen/burn_in_tags_gen-${build_id}.tgz
-      bucket: mciuploads
-      permissions: public-read
-      content_type: application/gzip
-      display_name: Burn_in_tags Task Config - Execution ${execution}
-  - command: generate.tasks
-    params:
-      files:
-      - src/generated_burn_in_tags_config/burn_in_tags_gen.json
 
   "generate resmoke tasks":
   - *fetch_artifacts
@@ -3218,46 +3185,11 @@ tasks:
       args:
       - "src/evergreen/check_idl_compat.sh"
 
-- name: burn_in_tests_gen
+- <<: *gen_task_template
+  name: burn_in_tests_gen
   tags: []
   commands:
-  - command: manifest.load
-  - func: "git get project and add git tag"
-  - *f_expansions_write
-  - *kill_processes
-  - *cleanup_environment
-  - func: "set up venv"
-  - func: "upload pip requirements"
-  - func: "configure evergreen api credentials"
-  - command: subprocess.exec
-    type: test
-    params:
-      binary: bash
-      args:
-      - "src/evergreen/burn_in_tests.sh"
-      env:
-        BURN_IN_TESTS: ${burn_in_tests}
-  - command: archive.targz_pack
-    params:
-      target: src/burn_in_tests_gen.tgz
-      source_dir: src
-      include:
-      - burn_in_tests_gen.json
-
-  - command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/burn_in_tests_gen.tgz
-      remote_file: ${project}/${build_variant}/${revision}/burn_in_tests_gen/burn_in_tests_gen-${build_id}.tgz
-      bucket: mciuploads
-      permissions: public-read
-      content_type: application/gzip
-      display_name: Burn_in_tests Task Config - Execution ${execution}
-  - command: generate.tasks
-    params:
-      files:
-      - src/burn_in_tests_gen.json
+  - func: "generate resmoke tasks"
 
 - <<: *benchmark_template
   name: benchmarks_orphaned
@@ -4318,25 +4250,11 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
 
-- name: burn_in_tags_gen
+- <<: *gen_task_template
+  name: burn_in_tags_gen
   tags: []
-  depends_on:
-  - name: archive_dist_test
   commands:
-  - command: manifest.load
-  - func: "git get project and add git tag"
-  - *f_expansions_write
-  - *kill_processes
-  - *cleanup_environment
-  - func: "set up venv"
-  - func: "upload pip requirements"
-  - func: "configure evergreen api credentials"
-  - func: "generate burn in tags"
-    vars:
-      max_revisions: 25
-      repeat_tests_secs: 600
-      repeat_tests_min: 2
-      repeat_tests_max: 1000
+  - func: "generate resmoke tasks"
 
 - name: version_gen
   commands:
