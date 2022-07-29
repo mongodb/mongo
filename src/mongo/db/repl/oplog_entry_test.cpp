@@ -141,6 +141,7 @@ TEST(OplogEntryTest, OpTimeBaseNonStrictParsing) {
 }
 
 TEST(OplogEntryTest, InsertIncludesTidField) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     const BSONObj doc = BSON("_id" << docId << "a" << 5);
     TenantId tid(OID::gen());

@@ -37,6 +37,7 @@
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -89,7 +90,7 @@ protected:
 };
 
 TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportOffWithoutTenantOK) {
-    gMultitenancySupport = false;
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", false);
     auto body = BSON("$db"
                      << "foo");
 
@@ -98,7 +99,7 @@ TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportOffWithoutTenantOK) 
 }
 
 TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithTenantOK) {
-    gMultitenancySupport = true;
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
 
     auto kOid = OID::gen();
     auto body = BSON("ping" << 1 << "$tenant" << kOid);
@@ -110,7 +111,7 @@ TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithTenantOK) {
 }
 
 TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithSecurityTokenOK) {
-    gMultitenancySupport = true;
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
 
     const TenantId kTenantId(OID::gen());
     auto body = BSON("ping" << 1);
@@ -125,7 +126,7 @@ TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithSecurityTokenOK)
 }
 
 TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportOffWithTenantNOK) {
-    gMultitenancySupport = false;
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", false);
 
     auto kOid = OID::gen();
     auto body = BSON("ping" << 1 << "$tenant" << kOid);
@@ -138,7 +139,7 @@ TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportOffWithTenantNOK) {
 }
 
 TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithTenantNOK) {
-    gMultitenancySupport = true;
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
 
     auto kOid = OID::gen();
     auto body = BSON("ping" << 1 << "$tenant" << kOid);
@@ -152,7 +153,7 @@ TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithTenantNOK) {
 
 // TODO SERVER-66822: Re-enable this test case.
 // TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithoutTenantAndSecurityTokenNOK) {
-//     gMultitenancySupport = true;
+//     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
 //     auto body = BSON("ping" << 1);
 //     AuthorizationSessionImplTestHelper::grantUseTenant(*(client.get()));
 //     ASSERT_THROWS_CODE(ValidatedTenancyScope::create(client.get(), body, {}), DBException,
@@ -160,7 +161,7 @@ TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithTenantNOK) {
 // }
 
 TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithTenantAndSecurityTokenNOK) {
-    gMultitenancySupport = true;
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
 
     auto kOid = OID::gen();
     auto body = BSON("ping" << 1 << "$tenant" << kOid);

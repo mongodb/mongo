@@ -602,6 +602,7 @@ TEST_F(OpObserverTest, OnDropCollectionReturnsDropOpTime) {
 }
 
 TEST_F(OpObserverTest, OnDropCollectionInlcudesTenantId) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
@@ -663,6 +664,7 @@ TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
 }
 
 TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOff) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
     OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
@@ -699,6 +701,7 @@ TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOff) {
 }
 
 TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOn) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
@@ -818,6 +821,7 @@ TEST_F(OpObserverTest, ImportCollectionOplogEntry) {
 }
 
 TEST_F(OpObserverTest, ImportCollectionOplogEntryIncludesTenantId) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     OpObserverImpl opObserver(std::make_unique<OplogWriterImpl>());
     auto opCtx = cc().makeOperationContext();
@@ -862,6 +866,7 @@ TEST_F(OpObserverTest, ImportCollectionOplogEntryIncludesTenantId) {
 }
 
 TEST_F(OpObserverTest, SingleStatementInsertTestIncludesTenantId) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     auto opCtx = cc().makeOperationContext();
     const NamespaceString nss(TenantId(OID::gen()), "testDB", "testColl");
@@ -893,6 +898,7 @@ TEST_F(OpObserverTest, SingleStatementInsertTestIncludesTenantId) {
 }
 
 TEST_F(OpObserverTest, SingleStatementUpdateTestIncludesTenantId) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     auto opCtx = cc().makeOperationContext();
     const NamespaceString nss(TenantId(OID::gen()), "testDB", "testColl");
@@ -926,6 +932,7 @@ TEST_F(OpObserverTest, SingleStatementUpdateTestIncludesTenantId) {
 }
 
 TEST_F(OpObserverTest, SingleStatementDeleteTestIncludesTenantId) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     auto opCtx = cc().makeOperationContext();
     const NamespaceString nss(TenantId(OID::gen()), "testDB", "testColl");
@@ -1716,6 +1723,7 @@ TEST_F(OpObserverTransactionTest, TransactionalInsertTest) {
 }
 
 TEST_F(OpObserverTransactionTest, TransactionalInsertTestIncludesTenantId) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     const NamespaceString nss1(TenantId(OID::gen()), "testDB", "testColl");
     const NamespaceString nss2(TenantId(OID::gen()), "testDB2", "testColl2");
@@ -1838,6 +1846,7 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTest) {
 }
 
 TEST_F(OpObserverTransactionTest, TransactionalUpdateTestIncludesTenantId) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     const NamespaceString nss1(TenantId(OID::gen()), "testDB", "testColl");
     const NamespaceString nss2(TenantId(OID::gen()), "testDB2", "testColl2");
@@ -1937,6 +1946,7 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTest) {
 }
 
 TEST_F(OpObserverTransactionTest, TransactionalDeleteTestIncludesTenantId) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     const NamespaceString nss1(TenantId(OID::gen()), "testDB", "testColl");
     const NamespaceString nss2(TenantId(OID::gen()), "testDB2", "testColl2");
@@ -3045,7 +3055,7 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdate) {
 
 // Repeat the same test as above, but assert tenantId is included when available
 TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateIncludesTenantId) {
-    gMultitenancySupport = true;
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     // Setup.
     auto opCtxRaii = cc().makeOperationContext();

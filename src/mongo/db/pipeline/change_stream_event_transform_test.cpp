@@ -169,7 +169,7 @@ TEST(ChangeStreamEventTransformTest, TestUpdateTransformWithTenantId) {
     // Turn on multitenancySupport, but not featureFlagRequireTenantId. We expect the tenantId to be
     // part of the 'ns' field in the oplog entry, but it should not be a part of the db name in the
     // change event.
-    gMultitenancySupport = true;
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
 
     const auto documentKey = Document{{"x", 1}, {"y", 1}};
     const auto tenantId = TenantId(OID::gen());
@@ -214,7 +214,7 @@ TEST(ChangeStreamEventTransformTest, TestRenameTransformWithTenantId) {
     // Turn on multitenancySupport, but not featureFlagRequireTenantId. We expect the tenantId to be
     // part of the 'ns' field in the oplog entry, but it should not be a part of the db name in the
     // change event.
-    gMultitenancySupport = true;
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
 
     const auto tenantId = TenantId(OID::gen());
     NamespaceString renameFrom(tenantId, "unittests.serverless_change_stream");
@@ -273,7 +273,7 @@ TEST(ChangeStreamEventTransformTest, TestDropDatabaseTransformWithTenantId) {
     // Turn on multitenancySupport, but not featureFlagRequireTenantId. We expect the tenantId to be
     // part of the 'ns' field in the oplog entry, but it should not be a part of the db name in the
     // change event.
-    gMultitenancySupport = true;
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
 
     const auto tenantId = TenantId(OID::gen());
     NamespaceString dbToDrop(tenantId, "unittests");
@@ -311,7 +311,7 @@ TEST(ChangeStreamEventTransformTest, TestCreateTransformWithTenantId) {
     // Turn on multitenancySupport, but not featureFlagRequireTenantId. We expect the tenantId to be
     // part of the 'ns' field in the oplog entry, but it should not be a part of the db name in the
     // change event.
-    gMultitenancySupport = true;
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
 
     const auto tenantId = TenantId(OID::gen());
     NamespaceString nssWithTenant(tenantId, "unittests.serverless_change_stream");
@@ -350,7 +350,7 @@ TEST(ChangeStreamEventTransformTest, TestCreateViewTransformWithTenantId) {
     // Turn on multitenancySupport, but not featureFlagRequireTenantId. We expect the tenantId to be
     // part of the 'ns' field in the oplog entry, but it should not be a part of the db name in the
     // change event.
-    gMultitenancySupport = true;
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
 
     const auto tenantId = TenantId(OID::gen());
 

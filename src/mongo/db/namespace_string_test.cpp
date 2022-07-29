@@ -34,6 +34,7 @@
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -357,7 +358,7 @@ TEST(NamespaceStringTest, NSSNoCollectionWithTenantId) {
 }
 
 TEST(NamespaceStringTest, ParseNSSWithTenantId) {
-    gMultitenancySupport = true;
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
 
     TenantId tenantId(OID::gen());
     std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";
