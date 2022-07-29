@@ -634,5 +634,144 @@ TEST(IndexSpecWildcard, FailsWhenExclusionWithSubpath) {
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
 }
 
+TEST(IndexSpecColumnStore, SucceedsWithInclusion) {
+    auto result =
+        validateIndexSpec(kDefaultOpCtx,
+                          BSON("key" << BSON("$**"
+                                             << "columnstore")
+                                     << "name"
+                                     << "indexName"
+                                     << "columnstoreProjection" << BSON("a" << 1 << "b" << 1)));
+    ASSERT_OK(result.getStatus());
+}
+
+TEST(IndexSpecColumnStore, SucceedsWithExclusion) {
+    auto result =
+        validateIndexSpec(kDefaultOpCtx,
+                          BSON("key" << BSON("$**"
+                                             << "columnstore")
+                                     << "name"
+                                     << "indexName"
+                                     << "columnstoreProjection" << BSON("a" << 0 << "b" << 0)));
+    ASSERT_OK(result.getStatus());
+}
+
+TEST(IndexSpecColumnStore, SucceedsWithExclusionIncludingId) {
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("$**"
+                                                       << "columnstore")
+                                               << "name"
+                                               << "indexName"
+                                               << "columnstoreProjection"
+                                               << BSON("_id" << 1 << "a" << 0 << "b" << 0)));
+    ASSERT_OK(result.getStatus());
+}
+
+TEST(IndexSpecColumnStore, SucceedsWithInclusionExcludingId) {
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("$**"
+                                                       << "columnstore")
+                                               << "name"
+                                               << "indexName"
+                                               << "columnstoreProjection"
+                                               << BSON("_id" << 0 << "a" << 1 << "b" << 1)));
+    ASSERT_OK(result.getStatus());
+}
+
+TEST(IndexSpecColumnStore, FailsWithInclusionExcludingIdSubfield) {
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("$**"
+                                                       << "columnstore")
+                                               << "name"
+                                               << "indexName"
+                                               << "columnstoreProjection"
+                                               << BSON("_id.field" << 0 << "a" << 1 << "b" << 1)));
+    ASSERT_EQ(result.getStatus().code(), 31253);
+}
+
+TEST(IndexSpecColumnStore, FailsWithExclusionIncludingIdSubfield) {
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("$**"
+                                                       << "columnstore")
+                                               << "name"
+                                               << "indexName"
+                                               << "columnstoreProjection"
+                                               << BSON("_id.field" << 1 << "a" << 0 << "b" << 0)));
+    ASSERT_EQ(result.getStatus().code(), 31254);
+}
+
+TEST(IndexSpecColumnStore, FailsWithMixedProjection) {
+    auto result =
+        validateIndexSpec(kDefaultOpCtx,
+                          BSON("key" << BSON("$**"
+                                             << "columnstore")
+                                     << "name"
+                                     << "indexName"
+                                     << "columnstoreProjection" << BSON("a" << 1 << "b" << 0)));
+    ASSERT_EQ(result.getStatus().code(), 31254);
+}
+
+TEST(IndexSpecColumnStore, FailsWithComputedFieldsInProjection) {
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("$**"
+                                                       << "columnstore")
+                                               << "name"
+                                               << "indexName"
+                                               << "columnstoreProjection"
+                                               << BSON("a" << 1 << "b"
+                                                           << "string")));
+    ASSERT_EQ(result.getStatus().code(), 51271);
+}
+
+TEST(IndexSpecColumnStore, FailsWhenProjectionPluginNotColumnStore) {
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("a"
+                                                       << "columnstore")
+                                               << "name"
+                                               << "indexName"
+                                               << "columnstoreProjection" << BSON("a" << 1)));
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::CannotCreateIndex);
+}
+
+TEST(IndexSpecColumnStore, FailsWhenProjectionIsNotAnObject) {
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("$**"
+                                                       << "columnstore")
+                                               << "name"
+                                               << "indexName"
+                                               << "columnstoreProjection" << 4));
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::TypeMismatch);
+}
+
+TEST(IndexSpecColumnStore, FailsWithEmptyProjection) {
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("$**"
+                                                       << "columnstore")
+                                               << "name"
+                                               << "indexName"
+                                               << "columnstoreProjection" << BSONObj()));
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
+}
+
+TEST(IndexSpecColumnStore, FailsWhenInclusionWithSubpath) {
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("a.$**"
+                                                       << "columnstore")
+                                               << "name"
+                                               << "indexName"
+                                               << "columnstoreProjection" << BSON("a" << 1)));
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
+}
+
+TEST(IndexSpecColumnStore, FailsWhenExclusionWithSubpath) {
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("a.$**"
+                                                       << "columnstore")
+                                               << "name"
+                                               << "indexName"
+                                               << "columnstoreProjection" << BSON("b" << 0)));
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
+}
+
 }  // namespace
 }  // namespace mongo

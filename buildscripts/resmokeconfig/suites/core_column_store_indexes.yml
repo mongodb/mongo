@@ -27,7 +27,7 @@ selector:
   # design so we accept these tests will fail.
   - tests_projection_field_order
   # Avoid creating a double index.
-  - uses_column_store_indexes
+  - uses_column_store_index
   # TODO SERVER-65980 compact is not supported on column store indexes yet.
   - uses_compact
   # The rename command is not compatibile with auto-created indexes since it will try to copy over

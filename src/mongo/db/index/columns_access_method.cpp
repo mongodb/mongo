@@ -40,6 +40,7 @@
 #include "mongo/db/index/column_cell.h"
 #include "mongo/db/index/column_key_generator.h"
 #include "mongo/db/index/column_store_sorter.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/progress_meter.h"
 
@@ -56,7 +57,18 @@ inline void inc(int64_t* counter) {
 
 ColumnStoreAccessMethod::ColumnStoreAccessMethod(IndexCatalogEntry* ice,
                                                  std::unique_ptr<ColumnStore> store)
-    : _store(std::move(store)), _indexCatalogEntry(ice), _descriptor(ice->descriptor()) {}
+    : _store(std::move(store)),
+      _indexCatalogEntry(ice),
+      _descriptor(ice->descriptor()),
+      _keyGen(_descriptor->keyPattern(), _descriptor->pathProjection()) {
+    // Normalize the 'columnstoreProjection' index option to facilitate its comparison as part of
+    // index signature.
+    if (!_descriptor->pathProjection().isEmpty()) {
+        auto* projExec = getColumnstoreProjection()->exec();
+        ice->descriptor()->_setNormalizedPathProjection(
+            projExec->serializeTransformation(boost::none).toBson());
+    }
+}
 
 class ColumnStoreAccessMethod::BulkBuilder final : public IndexAccessMethod::BulkBuilder {
 public:

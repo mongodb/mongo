@@ -164,6 +164,10 @@ structs:
                 type: object_owned
                 optional: true
                 unstable: false
+            columnstoreProjection:
+                type: object_owned
+                optional: true
+                unstable: true
             coarsestIndexedLevel:
                 type: safeInt
                 optional: true

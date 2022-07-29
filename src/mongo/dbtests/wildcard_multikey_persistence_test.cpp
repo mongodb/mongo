@@ -199,7 +199,7 @@ protected:
         BSONObjBuilder bob = std::move(BSONObjBuilder() << "name" << name << "key" << key);
 
         if (!pathProjection.isEmpty())
-            bob << IndexDescriptor::kPathProjectionFieldName << pathProjection;
+            bob << IndexDescriptor::kWildcardProjectionFieldName << pathProjection;
 
         auto indexSpec = (bob << "v" << kIndexVersion << "background" << background).obj();
 

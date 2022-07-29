@@ -32,8 +32,35 @@
 #include <iosfwd>
 
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/exec/index_path_projection.h"
+#include "mongo/db/exec/projection_executor.h"
+#include "mongo/db/exec/projection_executor_builder.h"
+#include "mongo/db/query/projection_parser.h"
 #include "mongo/db/storage/column_store.h"
 #include "mongo/util/functional.h"
+
+namespace mongo {
+class ColumnKeyGenerator {
+public:
+    static constexpr StringData kSubtreeSuffix = ".$**"_sd;
+
+    ColumnKeyGenerator(BSONObj keyPattern, BSONObj pathProjection);
+
+    static ColumnStoreProjection createProjectionExecutor(BSONObj keyPattern,
+                                                          BSONObj pathProjection);
+
+    /**
+     * Returns a pointer to the key generator's underlying ProjectionExecutor.
+     */
+    const ColumnStoreProjection* getColumnstoreProjection() const {
+        return &_proj;
+    }
+
+private:
+    ColumnStoreProjection _proj;
+    const BSONObj _keyPattern;
+};
+}  // namespace mongo
 
 namespace mongo::column_keygen {
 /**

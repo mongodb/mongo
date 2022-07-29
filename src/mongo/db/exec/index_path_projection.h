@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
+#pragma once
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/field_ref.h"
 
 namespace mongo {
 
-class WildcardProjection {
+class IndexPathProjection {
 public:
-    WildcardProjection(std::unique_ptr<projection_executor::ProjectionExecutor> projExec)
+    IndexPathProjection(std::unique_ptr<projection_executor::ProjectionExecutor> projExec)
         : _exec(std::move(projExec)), _exhaustivePaths(_exec->extractExhaustivePaths()) {
         invariant(_exec);
     }
@@ -53,4 +54,8 @@ private:
     // Store this here to avoid having to recompute it repeatedly, which is expensive.
     boost::optional<std::set<FieldRef>> _exhaustivePaths;
 };
+
+using WildcardProjection = IndexPathProjection;
+using ColumnStoreProjection = IndexPathProjection;
+
 }  // namespace mongo

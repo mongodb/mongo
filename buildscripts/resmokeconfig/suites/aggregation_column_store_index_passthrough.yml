@@ -18,7 +18,7 @@ selector:
   # design so we accept these tests will fail.
   - tests_projection_field_order
   # Avoid creating a double index.
-  - uses_column_store_indexes
+  - uses_column_store_index
 
 executor:
   archive:

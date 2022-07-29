@@ -592,7 +592,7 @@ Projection parseAndAnalyze(boost::intrusive_ptr<ExpressionContext> expCtx,
                            const BSONObj& queryObj,
                            ProjectionPolicies policies,
                            bool shouldOptimize) {
-    if (!policies.findOnlyFeaturesAllowed()) {
+    if (!policies.emptyProjectionAllowed()) {
         // In agg-style syntax it is illegal to have an empty projection specification.
         uassert(51272, "projection specification must have at least one field", !obj.isEmpty());
     }

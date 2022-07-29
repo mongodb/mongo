@@ -218,7 +218,7 @@ void tryToAddColumnScan(const QueryPlannerParams& params,
         return;
     }
 
-    // TODO SERVER-63123: Check if the columnar index actually provides the fields we need.
+    // TODO SERVER-67140: Check if the columnar index actually provides the fields we need.
     std::unique_ptr<MatchExpression> residualPredicate;
     StringMap<std::unique_ptr<MatchExpression>> filterSplitByColumn;
     if (params.options & QueryPlannerParams::GENERATE_PER_COLUMN_FILTERS) {

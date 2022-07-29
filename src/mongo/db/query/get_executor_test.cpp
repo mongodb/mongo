@@ -37,9 +37,9 @@
 #include <string>
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_executor_builder.h"
-#include "mongo/db/exec/wildcard_projection.h"
 #include "mongo/db/json.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/projection_parser.h"

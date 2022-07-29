@@ -67,7 +67,12 @@ string IndexNames::findPluginName(const BSONObj& keyPattern) {
         if (String == e.type()) {
             return e.String();
         } else if ((fieldName == "$**") || fieldName.endsWith(".$**")) {
-            return IndexNames::WILDCARD;
+            if (keyPattern.firstElement().type() == String &&
+                keyPattern.firstElement().fieldNameStringData() == "columnstore"_sd) {
+                return IndexNames::COLUMN;
+            } else {
+                return IndexNames::WILDCARD;
+            }
         } else
             continue;
     }

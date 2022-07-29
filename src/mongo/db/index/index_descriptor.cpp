@@ -55,20 +55,21 @@ std::map<StringData, BSONElement> populateOptionsMapForEqualityCheck(const BSONO
 
     // These index options are not considered for equality.
     static const StringDataSet kIndexOptionsNotConsideredForEqualityCheck{
-        IndexDescriptor::kKeyPatternFieldName,         // checked specially
-        IndexDescriptor::kNamespaceFieldName,          // removed in 4.4
-        IndexDescriptor::kIndexNameFieldName,          // checked separately
-        IndexDescriptor::kIndexVersionFieldName,       // not considered for equivalence
-        IndexDescriptor::kTextVersionFieldName,        // same as index version
-        IndexDescriptor::k2dsphereVersionFieldName,    // same as index version
-        IndexDescriptor::kBackgroundFieldName,         // this is a creation time option only
-        IndexDescriptor::kDropDuplicatesFieldName,     // this is now ignored
-        IndexDescriptor::kHiddenFieldName,             // not considered for equivalence
-        IndexDescriptor::kCollationFieldName,          // checked specially
-        IndexDescriptor::kPartialFilterExprFieldName,  // checked specially
-        IndexDescriptor::kUniqueFieldName,             // checked specially
-        IndexDescriptor::kSparseFieldName,             // checked specially
-        IndexDescriptor::kPathProjectionFieldName,     // checked specially
+        IndexDescriptor::kKeyPatternFieldName,             // checked specially
+        IndexDescriptor::kNamespaceFieldName,              // removed in 4.4
+        IndexDescriptor::kIndexNameFieldName,              // checked separately
+        IndexDescriptor::kIndexVersionFieldName,           // not considered for equivalence
+        IndexDescriptor::kTextVersionFieldName,            // same as index version
+        IndexDescriptor::k2dsphereVersionFieldName,        // same as index version
+        IndexDescriptor::kBackgroundFieldName,             // this is a creation time option only
+        IndexDescriptor::kDropDuplicatesFieldName,         // this is now ignored
+        IndexDescriptor::kHiddenFieldName,                 // not considered for equivalence
+        IndexDescriptor::kCollationFieldName,              // checked specially
+        IndexDescriptor::kPartialFilterExprFieldName,      // checked specially
+        IndexDescriptor::kUniqueFieldName,                 // checked specially
+        IndexDescriptor::kSparseFieldName,                 // checked specially
+        IndexDescriptor::kWildcardProjectionFieldName,     // checked specially
+        IndexDescriptor::kColumnStoreProjectionFieldName,  // checked specially
     };
 
     BSONObjIterator it(spec);
@@ -102,7 +103,8 @@ constexpr StringData IndexDescriptor::kKeyPatternFieldName;
 constexpr StringData IndexDescriptor::kLanguageOverrideFieldName;
 constexpr StringData IndexDescriptor::kNamespaceFieldName;
 constexpr StringData IndexDescriptor::kPartialFilterExprFieldName;
-constexpr StringData IndexDescriptor::kPathProjectionFieldName;
+constexpr StringData IndexDescriptor::kWildcardProjectionFieldName;
+constexpr StringData IndexDescriptor::kColumnStoreProjectionFieldName;
 constexpr StringData IndexDescriptor::kSparseFieldName;
 constexpr StringData IndexDescriptor::kStorageEngineFieldName;
 constexpr StringData IndexDescriptor::kTextVersionFieldName;
@@ -117,7 +119,7 @@ IndexDescriptor::IndexDescriptor(const std::string& accessMethodName, BSONObj in
       _infoObj(infoObj.getOwned()),
       _numFields(infoObj.getObjectField(IndexDescriptor::kKeyPatternFieldName).nFields()),
       _keyPattern(infoObj.getObjectField(IndexDescriptor::kKeyPatternFieldName).getOwned()),
-      _projection(infoObj.getObjectField(IndexDescriptor::kPathProjectionFieldName).getOwned()),
+      _projection(createPathProjection(infoObj)),
       _indexName(infoObj.getStringField(IndexDescriptor::kIndexNameFieldName)),
       _isIdIndex(isIdIndexPattern(_keyPattern)),
       _sparse(infoObj[IndexDescriptor::kSparseFieldName].trueValue()),

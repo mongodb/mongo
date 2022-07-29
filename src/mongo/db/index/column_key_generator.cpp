@@ -43,6 +43,49 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
 
+namespace mongo {
+ColumnKeyGenerator::ColumnKeyGenerator(BSONObj keyPattern, BSONObj pathProjection)
+    : _proj(createProjectionExecutor(keyPattern, pathProjection)), _keyPattern(keyPattern){};
+
+ColumnStoreProjection ColumnKeyGenerator::createProjectionExecutor(BSONObj keyPattern,
+                                                                   BSONObj pathProjection) {
+
+    // We should never have a key pattern that contains more than a single element.
+    invariant(keyPattern.nFields() == 1);
+
+    // The keyPattern is either { "$**": "columnstore" } for all paths or { "path.$**":
+    // "columnstore" } for a single subtree. If we are indexing a single subtree, then we will
+    // project just that path.
+    auto indexRoot = keyPattern.firstElement().fieldNameStringData();
+    auto suffixPos = indexRoot.find(kSubtreeSuffix);
+    auto idPresent = indexRoot.startsWith("_id."_sd);
+
+    // If we're indexing a single subtree, we can't also specify a path projection.
+    invariant(suffixPos == std::string::npos || pathProjection.isEmpty());
+
+    // If this is a subtree projection, the projection spec is { "path.to.subtree.$**":
+    // "columnstore" }. Otherwise, we use the path projection from the original command object. For
+    // the subtree projection, we exclude the "_id" field unless the subtree is rooted off of "_id".
+    BSONObj projSpec;
+    if (suffixPos != std::string::npos) {
+        auto path = indexRoot.substr(0, suffixPos);
+        projSpec = idPresent ? BSON(path << 1) : BSON(path << 1 << "_id" << 0);
+    } else {
+        projSpec = pathProjection;
+    }
+
+    // Construct a dummy ExpressionContext for ProjectionExecutor. It's OK to set the
+    // ExpressionContext's OperationContext and CollatorInterface to 'nullptr' and the namespace
+    // string to '' here; since we ban computed fields from the projection, the ExpressionContext
+    // will never be used.
+    auto expCtx = make_intrusive<ExpressionContext>(nullptr, nullptr, NamespaceString());
+    auto policies = ProjectionPolicies::columnStoreIndexSpecProjectionPolicies();
+    auto projection = projection_ast::parseAndAnalyze(expCtx, projSpec, policies);
+    return ColumnStoreProjection{projection_executor::buildProjectionExecutor(
+        expCtx, &projection, policies, projection_executor::kDefaultBuilderParams)};
+}
+}  // namespace mongo
+
 namespace mongo::column_keygen {
 namespace {
 

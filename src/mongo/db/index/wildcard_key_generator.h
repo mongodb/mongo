@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/exec/wildcard_projection.h"
+#include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/storage/key_string.h"

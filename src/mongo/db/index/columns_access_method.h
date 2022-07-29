@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/index/column_cell.h"
+#include "mongo/db/index/column_key_generator.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/storage/column_store.h"
 
@@ -46,6 +47,13 @@ public:
 
 
     ColumnStoreAccessMethod(IndexCatalogEntry* ice, std::unique_ptr<ColumnStore>);
+
+    /**
+     * Returns a pointer to the ColumnstoreProjection owned by the underlying ColumnKeyGenerator.
+     */
+    const ColumnStoreProjection* getColumnstoreProjection() const {
+        return _keyGen.getColumnstoreProjection();
+    }
 
 
     //
@@ -111,5 +119,6 @@ private:
     const std::unique_ptr<ColumnStore> _store;
     IndexCatalogEntry* const _indexCatalogEntry;  // owned by IndexCatalog
     const IndexDescriptor* const _descriptor;
+    const ColumnKeyGenerator _keyGen;
 };
 }  // namespace mongo

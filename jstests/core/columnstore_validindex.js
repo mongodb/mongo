@@ -46,9 +46,9 @@ assert.commandFailedWithCode(
     coll.createIndex({"$**": "columnstore"}, {collation: {locale: "fr"}, name: kIndexName}),
     ErrorCodes.CannotCreateIndex);
 
-// TODO SERVER-63123 Can create a valid columnstore index with subpaths.
-assert.commandFailedWithCode(coll.createIndex({"a.$**": "columnstore"}),
-                             ErrorCodes.CannotCreateIndex);
+// Can create a valid columnstore index with subpaths.
+IndexCatalogHelpers.createIndexAndVerifyWithDrop(
+    coll, {"a.$**": "columnstore"}, {name: kIndexName});
 
 // Cannot create a columnstore index with any of the following options which could apply to other
 // indexes.
@@ -64,30 +64,37 @@ assertCannotUseOptions({v: 0});
 assertCannotUseOptions({v: 1});
 assertCannotUseOptions({unique: true});
 
-// TODO SERVER-63123 Can create a columnstore index with an inclusion projection.
-// IndexCatalogHelpers.createIndexAndVerifyWithDrop(
-// coll, {"$**": "columnstore"}, {columnstoreProjection: {a: 1, b: 1, c: 1}, name: kIndexName});
+// Can create a columnstore index with an inclusion projection.
+IndexCatalogHelpers.createIndexAndVerifyWithDrop(
+    coll, {"$**": "columnstore"}, {columnstoreProjection: {a: 1, b: 1, c: 1}, name: kIndexName});
+
+// Can create a columnstore index with an exclusion projection.
+IndexCatalogHelpers.createIndexAndVerifyWithDrop(
+    coll, {"$**": "columnstore"}, {columnstoreProjection: {a: 0, b: 0, c: 0}, name: kIndexName});
+
+// Can include _id in an exclusion.
+IndexCatalogHelpers.createIndexAndVerifyWithDrop(
+    coll,
+    {"$**": "columnstore"},
+    {columnstoreProjection: {_id: 1, a: 0, b: 0, c: 0}, name: kIndexName});
+
+// Can exclude _id in an exclusion.
+IndexCatalogHelpers.createIndexAndVerifyWithDrop(
+    coll,
+    {"$**": "columnstore"},
+    {columnstoreProjection: {_id: 0, a: 1, b: 1, c: 1}, name: kIndexName});
+
+// Cannot create column store index with wildcardProjection.
 assert.commandFailedWithCode(
-    coll.createIndex({"$**": "columnstore"},
-                     {columnstoreProjection: {a: 1, b: 1, c: 1}, name: kIndexName}),
-    ErrorCodes.InvalidIndexSpecificationOption);
-// TODO SERVER-63123 Can create a columnstore index with an exclusion projection.
-// IndexCatalogHelpers.createIndexAndVerifyWithDrop(
-// coll, {"$**": "columnstore"}, {columnstoreProjection: {a: 0, b: 0, c: 0}, name: kIndexName});
+    coll.createIndex({"$**": "columnstore"}, {wildcardProjection: {a: 1, b: 1}, name: kIndexName}),
+    ErrorCodes.BadValue);
+
+// Cannot mix wildcardProjection with columnstoreProjection.
 assert.commandFailedWithCode(
-    coll.createIndex({"$**": "columnstore"},
-                     {columnstoreProjection: {a: 0, b: 0, c: 0}, name: kIndexName}),
-    ErrorCodes.InvalidIndexSpecificationOption);
-// TODO SERVER-63123 Can include _id in an exclusion.
-// IndexCatalogHelpers.createIndexAndVerifyWithDrop(
-//     coll,
-//     {"$**": "columnstore"},
-//     {columnstoreProjection: {_id: 1, a: 0, b: 0, c: 0}, name: kIndexName});
-// TODO SERVER-63123 Can exclude _id in an exclusion.
-// IndexCatalogHelpers.createIndexAndVerifyWithDrop(
-//     coll,
-//     {"$**": "columnstore"},
-//     {columnstoreProjection: {_id: 0, a: 1, b: 1, c: 1}, name: kIndexName});
+    coll.createIndex(
+        {"$**": "columnstore"},
+        {columnstoreProjection: {a: 1, b: 1}, wildcardProjection: {a: 1, b: 1}, name: kIndexName}),
+    ErrorCodes.BadValue);
 
 // Cannot create a columnstore index with a different capitalization.
 coll.dropIndexes();
@@ -112,24 +119,24 @@ assert.commandFailedWithCode(coll.createIndex({"a.$**.$**": "columnstore"}),
 assert.commandFailedWithCode(coll.createIndex({"$**.$**": "columnstore"}),
                              ErrorCodes.CannotCreateIndex);
 
-// TODO SERVER-63123 Cannot create an columnstore index with mixed inclusion exclusion.
-// assert.commandFailedWithCode(
-//     IndexCatalogHelpers.createSingleIndex(
-//         coll, {"$**": "columnstore"}, {name: kIndexName, columnstoreProjection: {a: 1, b: 0}}),
-//     31254);
+// Cannot create an columnstore index with mixed inclusion exclusion.
+assert.commandFailedWithCode(
+    IndexCatalogHelpers.createSingleIndex(
+        coll, {"$**": "columnstore"}, {name: kIndexName, columnstoreProjection: {a: 1, b: 0}}),
+    31254);
 
-// TODO SERVER-63123 Cannot create an columnstore index with computed fields.
-// assert.commandFailedWithCode(IndexCatalogHelpers.createSingleIndex(
-//                                  coll,
-//                                  {"$**": "columnstore"},
-//                                  {name: kIndexName, columnstoreProjection: {a: 1, b: "string"}}),
-//                              51271);
+// Cannot create an columnstore index with computed fields.
+assert.commandFailedWithCode(IndexCatalogHelpers.createSingleIndex(
+                                 coll,
+                                 {"$**": "columnstore"},
+                                 {name: kIndexName, columnstoreProjection: {a: 1, b: "string"}}),
+                             51271);
 
-// TODO SERVER-63123 Cannot create an columnstore index with an empty projection.
-// assert.commandFailedWithCode(
-//     IndexCatalogHelpers.createSingleIndex(
-//         coll, {"$**": "columnstore"}, {name: kIndexName, columnstoreProjection: {}}),
-//     ErrorCodes.FailedToParse);
+// Cannot create an columnstore index with an empty projection.
+assert.commandFailedWithCode(
+    IndexCatalogHelpers.createSingleIndex(
+        coll, {"$**": "columnstore"}, {name: kIndexName, columnstoreProjection: {}}),
+    ErrorCodes.FailedToParse);
 
 // Cannot create another index type with "columnstoreProjection" projection.
 function assertCannotUseColumnstoreProjection(indexKeyPattern) {
@@ -142,31 +149,31 @@ assertCannotUseColumnstoreProjection({a: 1});
 assertCannotUseColumnstoreProjection({"$**": 1});
 assertCannotUseColumnstoreProjection({"$**": "text"});
 
-// TODO SERVER-63123 Cannot create an columnstore index with a non-object "columnstoreProjection"
-// projection. assert.commandFailedWithCode(
-//     IndexCatalogHelpers.createSingleIndex(
-//         coll, {"a.$**": "columnstore"}, {name: kIndexName, columnstoreProjection: "string"}),
-//     ErrorCodes.TypeMismatch);
+// Cannot create an columnstore index with a non-object "columnstoreProjection".
+assert.commandFailedWithCode(
+    IndexCatalogHelpers.createSingleIndex(
+        coll, {"a.$**": "columnstore"}, {name: kIndexName, columnstoreProjection: "string"}),
+    ErrorCodes.TypeMismatch);
 
-// TODO SERVER-63123 Cannot exclude an subfield of _id in an inclusion.
-// assert.commandFailedWithCode(
-//     IndexCatalogHelpers.createSingleIndex(coll, {"_id.id": 0, a: 1, b: 1, c: 1}),
-//     ErrorCodes.CannotCreateIndex);
+// Cannot exclude an subfield of _id in an inclusion.
+assert.commandFailedWithCode(
+    IndexCatalogHelpers.createSingleIndex(coll, {"_id.id": 0, a: 1, b: 1, c: 1}),
+    ErrorCodes.CannotCreateIndex);
 
-// TODO SERVER-63123 Cannot include an subfield of _id in an exclusion.
-// assert.commandFailedWithCode(
-//     IndexCatalogHelpers.createSingleIndex(coll, {"_id.id": 1, a: 0, b: 0, c: 0}),
-//     ErrorCodes.CannotCreateIndex);
+// Cannot include an subfield of _id in an exclusion.
+assert.commandFailedWithCode(
+    IndexCatalogHelpers.createSingleIndex(coll, {"_id.id": 1, a: 0, b: 0, c: 0}),
+    ErrorCodes.CannotCreateIndex);
 
-// TODO SERVER-63123 Cannot specify both a subpath and a projection.
-// assert.commandFailedWithCode(
-//     IndexCatalogHelpers.createSingleIndex(
-//         coll, {"a.$**": "columnstore"}, {name: kIndexName, columnstoreProjection: {a: 1}}),
-//     ErrorCodes.FailedToParse);
-// assert.commandFailedWithCode(
-//     IndexCatalogHelpers.createSingleIndex(
-//         coll, {"a.$**": "columnstore"}, {name: kIndexName, columnstoreProjection: {b: 0}}),
-//     ErrorCodes.FailedToParse);
+// Cannot specify both a subpath and a projection.
+assert.commandFailedWithCode(
+    IndexCatalogHelpers.createSingleIndex(
+        coll, {"a.$**": "columnstore"}, {name: kIndexName, columnstoreProjection: {a: 1}}),
+    ErrorCodes.FailedToParse);
+assert.commandFailedWithCode(
+    IndexCatalogHelpers.createSingleIndex(
+        coll, {"a.$**": "columnstore"}, {name: kIndexName, columnstoreProjection: {b: 0}}),
+    ErrorCodes.FailedToParse);
 
 // Test that you cannot create a columnstore index on a clustered collection.
 const clusteredCollName = "columnstore_clustered";

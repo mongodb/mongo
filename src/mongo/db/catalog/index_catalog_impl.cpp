@@ -764,12 +764,8 @@ Status validateColumnStoreSpec(const CollectionPtr& collection,
                 "collection"};
     }
 
-    // TODO SERVER-63123 support 'columnstoreProjection'.
-    for (auto&& notToBeSpecified : {"sparse"_sd,
-                                    "unique"_sd,
-                                    "expireAfterSeconds"_sd,
-                                    "partialFilterExpression"_sd,
-                                    "columnstoreProjection"_sd}) {
+    for (auto&& notToBeSpecified :
+         {"sparse"_sd, "unique"_sd, "expireAfterSeconds"_sd, "partialFilterExpression"_sd}) {
         if (spec.hasField(notToBeSpecified)) {
             return reportInvalidOption(notToBeSpecified, IndexNames::COLUMN);
         }

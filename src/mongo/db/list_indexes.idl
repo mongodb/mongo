@@ -40,7 +40,7 @@ imports:
 structs:
     ListIndexesReplyItem:
         description: "An item in the listIndexes command's reply"
-        # If adding new fields, the set 'allowedFieldsNames' in 
+        # If adding new fields, the set 'allowedFieldsNames' in
         # 'src/mongo/db/commands/list_indexes.cpp' should also be updated.
         fields:
             #
@@ -138,6 +138,10 @@ structs:
                 type: object_owned
                 optional: true
                 unstable: false
+            columnstoreProjection:
+                type: object_owned
+                optional: true
+                unstable: true
             coarsestIndexedLevel:
                 type: safeInt
                 optional: true
@@ -164,7 +168,7 @@ structs:
                 unstable: true
             #
             # Depending on the values of includeIndexBuildInfo and includeBuildUUIDs, indexes may
-            # appear with a combination of these three fields. Specifically, if includeIndexBuildInfo 
+            # appear with a combination of these three fields. Specifically, if includeIndexBuildInfo
             # is set, completed index builds will appear with spec, and in-progress index builds will
             # appear with both spec and indexBuildInfo, while if includeBuildUUIDs is set, in-progress
             # index builds will appear with both spec and buildUUID. They're required, but marked
@@ -202,7 +206,7 @@ structs:
     ListIndexesReply:
         description: "The listIndexes command's reply."
         fields:
-            cursor: 
+            cursor:
                 type: ListIndexesReplyCursor
                 unstable: false
             # Included so mongos can parse shards' listIndexes replies.

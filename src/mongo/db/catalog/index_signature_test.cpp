@@ -36,6 +36,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/idl/server_parameter_test_util.h"
 
 namespace mongo {
 namespace {
@@ -441,6 +442,145 @@ TEST_F(IndexSignatureTest,
     ASSERT_EQ(
         createIndex(wcProjAWithNonSigDesc->infoObj().addFields(fromjson("{name: 'wc_a_nonsig'}"))),
         ErrorCodes::IndexOptionsConflict);
+}
+
+TEST_F(IndexSignatureTest, NormalizeOnlyColumnstoreAllKeyPattern) {
+    RAIIServerParameterControllerForTest controller("featureFlagColumnstoreIndexes", true);
+
+    auto csAInclusionSpec = fromjson("{v: 2, key: {'a.$**': 'columnstore'}}");
+
+    // Verifies that the path projection is not normalized.
+    auto csAInclusionDesc = makeIndexDescriptor(csAInclusionSpec);
+    auto csAInclusionSpecAfterNormalization = normalizeIndexSpec(csAInclusionSpec);
+    ASSERT_TRUE(SimpleBSONObjComparator::kInstance.evaluate(csAInclusionSpec ==
+                                                            csAInclusionSpecAfterNormalization));
+    // Verifies that the path projection is not normalized for the created index catalog entry.
+    auto* csAInclusionIndex = unittest::assertGet(
+        createIndex(csAInclusionSpec.addFields(fromjson("{name: 'cs_a_all'}"))));
+    ASSERT_TRUE(csAInclusionIndex->descriptor()->normalizedPathProjection().isEmpty());
+}
+
+TEST_F(IndexSignatureTest,
+       CanCreateMultipleIndexesOnSameKeyPatternWithDifferentColumnstoreProjections) {
+    RAIIServerParameterControllerForTest controller("featureFlagColumnstoreIndexes", true);
+
+    // Creates a base columnstore index to verify 'columnstoreProjection' option is part of index
+    // signature.
+    auto* columnstoreIndex = unittest::assertGet(
+        createIndex(fromjson("{v: 2, name: 'cs_all', key: {'$**': 'columnstore'}}")));
+
+    // Verifies that another columnstore index with empty columnstoreProjection compares identical
+    // to 'columnstoreIndex' after normalizing the index spec.
+    auto anotherCsAllSpec = normalizeIndexSpec(fromjson("{v: 2, key: {'$**': 'columnstore'}}"));
+    auto anotherCsAllProjDesc = makeIndexDescriptor(anotherCsAllSpec);
+
+    ASSERT(anotherCsAllProjDesc->compareIndexOptions(opCtx(), coll()->ns(), columnstoreIndex) ==
+           IndexDescriptor::Comparison::kIdentical);
+
+    ASSERT_EQ(createIndex(anotherCsAllProjDesc->infoObj().addFields(fromjson("{name: 'cs_all'}"))),
+              ErrorCodes::IndexAlreadyExists);
+    ASSERT_EQ(
+        createIndex(anotherCsAllProjDesc->infoObj().addFields(fromjson("{name: 'cs_all_1'}"))),
+        ErrorCodes::IndexOptionsConflict);
+
+    // Verifies that an index with non-empty value for 'columnstoreProjection' option compares
+    // different from the base columnstore index and thus can be created.
+    auto csProjADesc =
+        makeIndexDescriptor(normalizeIndexSpec(columnstoreIndex->descriptor()->infoObj().addFields(
+            fromjson("{columnstoreProjection: {a: 1}}"))));
+    ASSERT(csProjADesc->compareIndexOptions(opCtx(), coll()->ns(), columnstoreIndex) ==
+           IndexDescriptor::Comparison::kDifferent);
+    auto* csProjAIndex = unittest::assertGet(
+        createIndex(csProjADesc->infoObj().addFields(fromjson("{name: 'cs_a'}"))));
+
+
+    // Verifies that an index with the same value for 'columnstoreProjection' option as the
+    // csProjAIndex compares identical.
+    auto anotherCsProjADesc =
+        makeIndexDescriptor(normalizeIndexSpec(columnstoreIndex->descriptor()->infoObj().addFields(
+            fromjson("{columnstoreProjection: {a: 1}}"))));
+
+    ASSERT(anotherCsProjADesc->compareIndexOptions(opCtx(), coll()->ns(), csProjAIndex) ==
+           IndexDescriptor::Comparison::kIdentical);
+
+    // Verifies that creating an index with the same value for 'columnstoreProjection' option and
+    // the same name fails with IndexAlreadyExists error.
+    ASSERT_EQ(createIndex(anotherCsProjADesc->infoObj().addFields(fromjson("{name: 'cs_a'}"))),
+              ErrorCodes::IndexAlreadyExists);
+    // Verifies that creating an index with the same value for 'columnstoreProjection' option and a
+    // different name fails with IndexOptionsConflict error.
+    ASSERT_EQ(createIndex(anotherCsProjADesc->infoObj().addFields(fromjson("{name: 'cs_a_1'}"))),
+              ErrorCodes::IndexOptionsConflict);
+
+    // Verifies that an index with a different value for 'columnstoreProjection' option compares
+    // different from the base columnstore index or 'cs_a' and thus can be created.
+    auto csProjABDesc =
+        makeIndexDescriptor(normalizeIndexSpec(columnstoreIndex->descriptor()->infoObj().addFields(
+            fromjson("{columnstoreProjection: {a: 1, b: 1}}"))));
+    ASSERT(csProjABDesc->compareIndexOptions(opCtx(), coll()->ns(), columnstoreIndex) ==
+           IndexDescriptor::Comparison::kDifferent);
+    ASSERT(csProjABDesc->compareIndexOptions(opCtx(), coll()->ns(), csProjAIndex) ==
+           IndexDescriptor::Comparison::kDifferent);
+    auto* csProjABIndex = unittest::assertGet(
+        createIndex(csProjABDesc->infoObj().addFields(fromjson("{name: 'cs_a_b'}"))));
+
+    // Verifies that an index with sub fields for 'columnstoreProjection' option compares
+    // different from the base columnstore index or 'cs_a' or 'cs_a_b' and thus can be created.
+    auto csProjASubBCDesc =
+        makeIndexDescriptor(normalizeIndexSpec(columnstoreIndex->descriptor()->infoObj().addFields(
+            fromjson("{columnstoreProjection: {a: {b: 1, c: 1}}}"))));
+    ASSERT(csProjASubBCDesc->compareIndexOptions(opCtx(), coll()->ns(), columnstoreIndex) ==
+           IndexDescriptor::Comparison::kDifferent);
+    ASSERT(csProjASubBCDesc->compareIndexOptions(opCtx(), coll()->ns(), csProjAIndex) ==
+           IndexDescriptor::Comparison::kDifferent);
+    ASSERT(csProjASubBCDesc->compareIndexOptions(opCtx(), coll()->ns(), csProjABIndex) ==
+           IndexDescriptor::Comparison::kDifferent);
+    auto* csProjASubBCIndex = unittest::assertGet(
+        createIndex(csProjASubBCDesc->infoObj().addFields(fromjson("{name: 'cs_a_sub_b_c'}"))));
+
+    // Verifies that two indexes with the same projection in different order compares identical.
+    auto csProjASubCBDesc =
+        makeIndexDescriptor(normalizeIndexSpec(columnstoreIndex->descriptor()->infoObj().addFields(
+            fromjson("{columnstoreProjection: {a: {c: 1, b: 1}}}"))));
+    ASSERT(csProjASubCBDesc->compareIndexOptions(opCtx(), coll()->ns(), csProjASubBCIndex) ==
+           IndexDescriptor::Comparison::kIdentical);
+    // Verifies that two indexes with the same projection in different order can not be created.
+    ASSERT_EQ(
+        createIndex(csProjASubCBDesc->infoObj().addFields(fromjson("{name: 'cs_a_sub_b_c'}"))),
+        ErrorCodes::IndexAlreadyExists);
+    ASSERT_EQ(
+        createIndex(csProjASubCBDesc->infoObj().addFields(fromjson("{name: 'cs_a_sub_c_b'}"))),
+        ErrorCodes::IndexOptionsConflict);
+
+    // Verifies that an index with the same value for 'columnstoreProjection' option and a
+    // non-signature index option compares equivalent as the 'csProjAIndex'
+    auto csProjAWithNonSigDesc = makeIndexDescriptor(
+        anotherCsProjADesc->infoObj().addFields(fromjson("{storageEngine: {wiredTiger: {}}}")));
+    ASSERT(csProjAWithNonSigDesc->compareIndexOptions(opCtx(), coll()->ns(), csProjAIndex) ==
+           IndexDescriptor::Comparison::kEquivalent);
+
+    // Verifies that an index with the same value for 'columnstoreProjection' option, non-signature
+    // index option, and the same name fails with IndexOptionsConflict error.
+    ASSERT_EQ(createIndex(csProjAWithNonSigDesc->infoObj().addFields(fromjson("{name: 'cs_a'}"))),
+              ErrorCodes::IndexOptionsConflict);
+    // Verifies that an index with the same value for 'columnstoreProjection' option, non-signature
+    // index option, and a different name fails with IndexOptionsConflict error too.
+    ASSERT_EQ(
+        createIndex(csProjAWithNonSigDesc->infoObj().addFields(fromjson("{name: 'cs_a_nonsig'}"))),
+        ErrorCodes::IndexOptionsConflict);
+
+    // Creates single field columnstore index to verify 'columnstoreProjection' option is part of
+    // index signature.
+    auto* singleFieldColumnstoreIndex = unittest::assertGet(
+        createIndex(fromjson("{v: 2, name: 'single_cs', key: {'a.$**': 'columnstore'}}")));
+    // Verifies that another columnstore index with empty columnstoreProjection compares identical
+    // to 'columnstoreIndex' after normalizing the index spec.
+    auto anotherSingleFieldCsAllSpec =
+        normalizeIndexSpec(fromjson("{v: 2, key: {'a.$**': 'columnstore'}}"));
+    auto anotherSingleFieldCsAllProjDesc = makeIndexDescriptor(anotherSingleFieldCsAllSpec);
+    ASSERT(anotherSingleFieldCsAllProjDesc->compareIndexOptions(
+               opCtx(), coll()->ns(), singleFieldColumnstoreIndex) ==
+           IndexDescriptor::Comparison::kIdentical);
 }
 
 }  // namespace

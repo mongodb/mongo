@@ -43,7 +43,8 @@
 namespace mongo {
 class CollatorInterface;
 class MatchExpression;
-class WildcardProjection;
+class IndexPathProjection;
+using WildcardProjection = IndexPathProjection;
 
 /**
  * A CoreIndexInfo is a representation of an index in the catalog with parsed information which is
@@ -69,6 +70,7 @@ struct CoreIndexInfo {
           collator(ci),
           wildcardProjection(wildcardProj) {
         // We always expect a projection executor for $** indexes, and none otherwise.
+        // TODO SERVER-67140: Add columnstoreProjection and invariant
         invariant((type == IndexType::INDEX_WILDCARD) == (wildcardProjection != nullptr));
     }
 
@@ -262,7 +264,7 @@ struct ColumnIndexEntry {
 
     std::string catalogName;
 
-    // TODO SERVER-63123: Projection, probably need some kind of disambiguator.
+    // TODO SERVER-67140: Projection, probably need some kind of disambiguator.
 };
 
 std::ostream& operator<<(std::ostream& stream, const IndexEntry::Identifier& ident);

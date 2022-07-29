@@ -81,7 +81,8 @@ public:
     static constexpr StringData kLanguageOverrideFieldName = "language_override"_sd;
     static constexpr StringData kNamespaceFieldName = "ns"_sd;  // Removed in 4.4
     static constexpr StringData kPartialFilterExprFieldName = "partialFilterExpression"_sd;
-    static constexpr StringData kPathProjectionFieldName = "wildcardProjection"_sd;
+    static constexpr StringData kWildcardProjectionFieldName = "wildcardProjection"_sd;
+    static constexpr StringData kColumnStoreProjectionFieldName = "columnstoreProjection"_sd;
     static constexpr StringData kSparseFieldName = "sparse"_sd;
     static constexpr StringData kStorageEngineFieldName = "storageEngine"_sd;
     static constexpr StringData kTextVersionFieldName = "textIndexVersion"_sd;
@@ -252,10 +253,26 @@ public:
     }
 
 private:
-    // This method should only ever be called by WildcardAccessMethod, to set the
-    // '_normalizedProjection' for descriptors associated with an existing IndexCatalogEntry.
+    // This method should only ever be called by WildcardAccessMethod or ColumnstoreAccessMethod, to
+    // set the '_normalizedProjection' for descriptors associated with an existing
+    // IndexCatalogEntry.
     void _setNormalizedPathProjection(BSONObj&& proj) {
         _normalizedProjection = std::move(proj);
+    }
+
+    /**
+     * Returns wildcardProjection or columnstoreProjection projection
+     */
+    BSONObj createPathProjection(const BSONObj& infoObj) const {
+        if (const auto wildcardProjection =
+                infoObj[IndexDescriptor::kWildcardProjectionFieldName]) {
+            return wildcardProjection.Obj().getOwned();
+        } else if (const auto columnStoreProjection =
+                       infoObj[IndexDescriptor::kColumnStoreProjectionFieldName]) {
+            return columnStoreProjection.Obj().getOwned();
+        } else {
+            return BSONObj();
+        }
     }
 
     // What access method should we use for this index?
@@ -291,6 +308,7 @@ private:
     friend class IndexCatalogEntryImpl;
     friend class IndexCatalogEntryContainer;
     friend class WildcardAccessMethod;
+    friend class ColumnStoreAccessMethod;
 };
 
 }  // namespace mongo

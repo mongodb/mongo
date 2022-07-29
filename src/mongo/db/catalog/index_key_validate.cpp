@@ -40,6 +40,7 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/field_ref.h"
+#include "mongo/db/index/column_key_generator.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index_names.h"
@@ -192,10 +193,17 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
                                         << "' index must be a non-zero number, not a string.");
         }
 
-        // Some special index types do not support compound indexes.
-        if (key.nFields() != 1 &&
-            (pluginName == IndexNames::WILDCARD || pluginName == IndexNames::COLUMN)) {
-            return Status(code, str::stream() << pluginName << " indexes do not allow compounding");
+        if (pluginName == IndexNames::WILDCARD || pluginName == IndexNames::COLUMN) {
+            StringData fieldName(keyElement.fieldNameStringData());
+            if (key.nFields() != 1) {
+                // Some special index types do not support compound indexes.
+                return Status(code,
+                              str::stream() << pluginName << " indexes do not allow compounding");
+            } else if ((fieldName != "$**") && !fieldName.endsWith(".$**")) {
+                // Invalid key names for wildcard or columnstore are not supported.
+                return Status(code,
+                              str::stream() << "Invalid key name for " << pluginName << " indexes");
+            }
         }
 
         // Ensure that the fields on which we are building the index are valid: a field must not
@@ -210,7 +218,7 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
             return Status(code, "Index keys cannot be an empty field.");
         }
 
-        // "$**" is acceptable for a text index or wildcard index.
+        // "$**" is acceptable for a text, wildcard, or columnstore index.
         if ((keyElement.fieldNameStringData() == "$**") &&
             ((keyElement.isNumber()) || (keyElement.str() == IndexNames::TEXT) ||
              (keyElement.str() == IndexNames::COLUMN)))
@@ -237,10 +245,10 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
             const bool mightBePartOfDbRef =
                 (i != 0) && (part == "$db" || part == "$id" || part == "$ref");
 
-            const bool isPartOfWildcard =
-                (i == numParts - 1) && (part == "$**") && (pluginName == IndexNames::WILDCARD);
+            const bool isWildcardOrColumn = (i == numParts - 1) && (part == "$**") &&
+                (pluginName == IndexNames::WILDCARD || pluginName == IndexNames::COLUMN);
 
-            if (!mightBePartOfDbRef && !isPartOfWildcard) {
+            if (!mightBePartOfDbRef && !isWildcardOrColumn) {
                 return Status(code,
                               "Index key contains an illegal field name: "
                               "field name starts with '$'.");
@@ -455,40 +463,51 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
             if (!statusWithMatcher.isOK()) {
                 return statusWithMatcher.getStatus();
             }
-        } else if (IndexDescriptor::kPathProjectionFieldName == indexSpecElemFieldName) {
+        } else if (IndexDescriptor::kWildcardProjectionFieldName == indexSpecElemFieldName ||
+                   IndexDescriptor::kColumnStoreProjectionFieldName == indexSpecElemFieldName) {
+            const bool isWildcard =
+                IndexDescriptor::kWildcardProjectionFieldName == indexSpecElemFieldName;
+            const auto indexName = isWildcard ? IndexNames::WILDCARD : IndexNames::COLUMN;
             const auto key = indexSpec.getObjectField(IndexDescriptor::kKeyPatternFieldName);
-            if (IndexNames::findPluginName(key) != IndexNames::WILDCARD) {
-                return {ErrorCodes::BadValue,
-                        str::stream()
-                            << "The field '" << IndexDescriptor::kPathProjectionFieldName
-                            << "' is only allowed in an '" << IndexNames::WILDCARD << "' index"};
+            if (IndexNames::findPluginName(key) != indexName) {
+                // For backwards compatibility, we will return BadValue for Wildcard indices.
+                auto code =
+                    isWildcard ? ErrorCodes::BadValue : ErrorCodes::InvalidIndexSpecificationOption;
+                return {code,
+                        str::stream() << "The field '" << indexSpecElemFieldName
+                                      << "' is only allowed in '" << indexName << "' indexes"};
             }
             if (indexSpecElem.type() != BSONType::Object) {
                 return {ErrorCodes::TypeMismatch,
-                        str::stream() << "The field '" << IndexDescriptor::kPathProjectionFieldName
+                        str::stream() << "The field '" << indexSpecElemFieldName
                                       << "' must be a non-empty object, but got "
                                       << typeName(indexSpecElem.type())};
             }
             if (!key.hasField("$**")) {
                 return {ErrorCodes::FailedToParse,
                         str::stream()
-                            << "The field '" << IndexDescriptor::kPathProjectionFieldName
-                            << "' is only allowed when '" << IndexDescriptor::kKeyPatternFieldName
-                            << "' is {\"$**\": ±1}"};
+                            << "The field '" << indexSpecElemFieldName << "' is only allowed when '"
+                            << IndexDescriptor::kKeyPatternFieldName
+                            << "' is {\"$**\": ±1} or {\"$**\": \"columnstore\"}"};
             }
-
             if (indexSpecElem.embeddedObject().isEmpty()) {
                 return {ErrorCodes::FailedToParse,
-                        str::stream() << "The '" << IndexDescriptor::kPathProjectionFieldName
+                        str::stream() << "The '" << indexSpecElemFieldName
                                       << "' field can't be an empty object"};
             }
             try {
-                // We use WildcardKeyGenerator::createProjectionExec to parse and validate the path
-                // projection spec.
-                WildcardKeyGenerator::createProjectionExecutor(key, indexSpecElem.embeddedObject());
+                // We use createProjectionExecutor to parse and validate the path projection spec.
+                if (isWildcard) {
+                    WildcardKeyGenerator::createProjectionExecutor(key,
+                                                                   indexSpecElem.embeddedObject());
+                } else {
+                    ColumnKeyGenerator::createProjectionExecutor(key,
+                                                                 indexSpecElem.embeddedObject());
+                }
+
             } catch (const DBException& ex) {
-                return ex.toStatus(str::stream() << "Failed to parse: "
-                                                 << IndexDescriptor::kPathProjectionFieldName);
+                return ex.toStatus(str::stream()
+                                   << "Failed to parse projection: " << indexSpecElemFieldName);
             }
         } else if (IndexDescriptor::kWeightsFieldName == indexSpecElemFieldName) {
             if (!indexSpecElem.isABSONObj() && indexSpecElem.type() != String) {
