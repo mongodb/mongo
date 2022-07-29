@@ -51,8 +51,6 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 
-#include <boost/optional/optional_io.hpp>
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 

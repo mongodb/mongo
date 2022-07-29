@@ -29,7 +29,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/optional/optional_io.hpp>
 #include <map>
 #include <string>
 #include <vector>

@@ -31,7 +31,6 @@
 
 #include <algorithm>
 #include <boost/optional.hpp>
-#include <boost/optional/optional_io.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/catalog/collection_catalog.h"

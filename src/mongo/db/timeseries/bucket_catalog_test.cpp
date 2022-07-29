@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional_io.hpp>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/create_collection.h"

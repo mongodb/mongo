@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional_io.hpp>
-
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/s/catalog/type_chunk.h"

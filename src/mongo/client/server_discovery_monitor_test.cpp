@@ -32,8 +32,6 @@
 
 #include <memory>
 
-#include <boost/optional/optional_io.hpp>
-
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_protocol_test_util.h"
 #include "mongo/client/sdam/sdam.h"

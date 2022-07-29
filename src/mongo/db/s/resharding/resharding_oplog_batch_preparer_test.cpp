@@ -29,8 +29,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/optional/optional_io.hpp>
-
 #include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/query/collation/collator_interface.h"

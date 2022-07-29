@@ -33,7 +33,6 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/base64.h"
 
-#include <boost/optional/optional_io.hpp>
 
 namespace mongo {
 namespace {

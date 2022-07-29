@@ -34,7 +34,6 @@
 #include <boost/iostreams/stream.hpp>
 #include <boost/iostreams/stream_buffer.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/optional/optional_io.hpp>
 #include <boost/program_options.hpp>
 #include <fmt/format.h>
 #include <fmt/ostream.h>

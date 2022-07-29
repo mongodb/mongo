@@ -31,7 +31,6 @@
 
 #include "mongo/db/pipeline/resume_token.h"
 
-#include <boost/optional/optional_io.hpp>
 #include <limits>
 
 #include "mongo/bson/bsonmisc.h"
@@ -41,6 +40,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/optional_util.h"
 
 namespace mongo {
 constexpr StringData ResumeToken::kDataFieldName;
@@ -90,7 +90,7 @@ std::ostream& operator<<(std::ostream& out, const ResumeTokenData& tokenData) {
     if (tokenData.version > 0) {
         out << ", fromInvalidate: " << static_cast<bool>(tokenData.fromInvalidate);
     }
-    out << ", uuid: " << tokenData.uuid;
+    out << ", uuid: " << optional_io::Extension{tokenData.uuid};
     out << ", eventIdentifier: " << tokenData.eventIdentifier << "}";
     return out;
 }

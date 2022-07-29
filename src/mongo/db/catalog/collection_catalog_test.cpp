@@ -30,7 +30,6 @@
 #include "mongo/db/catalog/collection_catalog.h"
 
 #include <algorithm>
-#include <boost/optional/optional_io.hpp>
 
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"

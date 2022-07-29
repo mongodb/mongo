@@ -30,7 +30,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/optional/optional_io.hpp>
 #include <vector>
 
 #include "mongo/db/auth/authorization_session.h"

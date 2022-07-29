@@ -28,8 +28,6 @@
  */
 #include "mongo/client/streamable_replica_set_monitor_error_handler.h"
 
-#include <boost/optional/optional_io.hpp>
-
 #include "mongo/client/sdam/sdam.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/basic.h"

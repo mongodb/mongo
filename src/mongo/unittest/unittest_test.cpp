@@ -267,6 +267,47 @@ TEST(UnitTestSelfTest, BSONElementGTE) {
     ASSERT_BSONELT_GTE(obj2.firstElement(), obj1.firstElement());
 }
 
+class UnitTestFormatTest : public mongo::unittest::Test {
+public:
+    template <template <typename...> class Optional, typename T, typename... As>
+    auto mkOptional(As&&... as) {
+        return Optional<T>(std::forward<As>(as)...);
+    }
+
+    template <template <typename...> class OptionalTemplate>
+    void runFormatTest() {
+        using mongo::unittest::extendedFormat;
+        ASSERT_EQ(extendedFormat(mkOptional<OptionalTemplate, int>()), "--");
+        ASSERT_EQ(extendedFormat(mkOptional<OptionalTemplate, std::string>()), "--");
+        ASSERT_EQ(extendedFormat(mkOptional<OptionalTemplate, int>(123)), " 123");
+        ASSERT_EQ(extendedFormat(mkOptional<OptionalTemplate, std::string>("hey")), " hey");
+    }
+
+    template <template <typename...> class OptionalTemplate, class None>
+    void runEqTest(None none) {
+        ASSERT_EQ(OptionalTemplate<int>{1}, OptionalTemplate<int>{1});
+        ASSERT_NE(OptionalTemplate<int>{1}, OptionalTemplate<int>{2});
+        ASSERT_EQ(OptionalTemplate<int>{}, OptionalTemplate<int>{});
+        ASSERT_EQ(OptionalTemplate<int>{}, none);
+    }
+};
+
+TEST_F(UnitTestFormatTest, FormatBoostOptional) {
+    runFormatTest<boost::optional>();
+}
+
+TEST_F(UnitTestFormatTest, EqBoostOptional) {
+    runEqTest<boost::optional>(boost::none);
+}
+
+TEST_F(UnitTestFormatTest, FormatStdOptional) {
+    runFormatTest<std::optional>();  // NOLINT
+}
+
+TEST_F(UnitTestFormatTest, EqStdOptional) {
+    runEqTest<std::optional>(std::nullopt);  // NOLINT
+}
+
 DEATH_TEST_REGEX(DeathTestSelfTest, TestDeath, "Invariant failure.*false") {
     invariant(false);
 }

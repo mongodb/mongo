@@ -28,7 +28,6 @@
  */
 
 #include <boost/optional/optional.hpp>
-#include <boost/optional/optional_io.hpp>
 #include <memory>
 
 #include "mongo/db/jsobj.h"

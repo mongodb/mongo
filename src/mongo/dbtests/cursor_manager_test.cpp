@@ -32,7 +32,6 @@
 #include <algorithm>
 
 #include <boost/optional/optional.hpp>
-#include <boost/optional/optional_io.hpp>
 
 #include "mongo/client/read_preference.h"
 #include "mongo/db/client.h"

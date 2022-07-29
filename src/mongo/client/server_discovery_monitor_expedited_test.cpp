@@ -28,8 +28,6 @@
  */
 #include "mongo/client/server_discovery_monitor.h"
 
-#include <boost/optional/optional_io.hpp>
-
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"

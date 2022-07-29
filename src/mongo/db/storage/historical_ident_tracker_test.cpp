@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include <boost/optional/optional_io.hpp>
-
 #include "mongo/db/storage/historical_ident_tracker.h"
 #include "mongo/unittest/unittest.h"
 

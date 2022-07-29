@@ -40,6 +40,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/optional_util.h"
 
 /**
  * This file defines infrastructure used in the ASSERT_THAT system.
@@ -108,7 +109,6 @@ namespace detail {
 template <typename T>
 std::string stringifyForAssert(const T& x);
 
-
 template <typename T>
 std::string doFormat(const T& x) {
     return format(FMT_STRING("{}"), x);
@@ -128,11 +128,6 @@ template <typename T>
 using HasToStringOp = decltype(std::declval<T>().toString());
 template <typename T>
 constexpr bool HasToString = stdx::is_detected_v<HasToStringOp, T>;
-
-template <typename T>
-using HasOstreamOp = decltype(std::declval<std::ostream&>() << std::declval<T>());
-template <typename T>
-constexpr bool HasOstream = stdx::is_detected_v<HasOstreamOp, T>;
 
 template <typename T>
 using HasBeginEndOp =
@@ -215,8 +210,8 @@ std::string lastResortFormat(const std::type_info& ti, const void* p, size_t sz)
  */
 template <typename T>
 std::string stringifyForAssert(const T& x) {
-    if constexpr (HasOstream<T>) {
-        return doOstream(x);
+    if constexpr (optional_io::canStreamWithExtension<T>) {
+        return doOstream(optional_io::Extension{x});
     } else if constexpr (HasToString<T>) {
         return x.toString();
     } else if constexpr (std::is_convertible_v<T, StringData>) {

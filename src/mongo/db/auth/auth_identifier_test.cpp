@@ -33,7 +33,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/optional/optional_io.hpp>
 #include <string>
 
 #include "mongo/base/status.h"

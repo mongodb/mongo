@@ -31,8 +31,6 @@
 #include "mongo/client/sdam/sdam_test_base.h"
 #include "mongo/client/sdam/topology_description.h"
 
-#include <boost/optional/optional_io.hpp>
-
 #include "mongo/client/sdam/server_description.h"
 #include "mongo/client/sdam/server_description_builder.h"
 #include "mongo/db/wire_version.h"

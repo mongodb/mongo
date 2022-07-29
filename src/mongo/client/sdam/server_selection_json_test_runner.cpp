@@ -35,7 +35,6 @@
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/format.hpp>
-#include <boost/optional/optional_io.hpp>
 
 #include "mongo/bson/json.h"
 #include "mongo/client/sdam/json_test_arg_parser.h"
@@ -47,6 +46,7 @@
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/ctype.h"
+#include "mongo/util/optional_util.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"

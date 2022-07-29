@@ -35,7 +35,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/format.hpp>
-#include <boost/optional/optional_io.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/bson/json.h"
 #include "mongo/client/mongo_uri.h"
@@ -45,6 +45,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/optional_util.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
@@ -142,7 +143,8 @@ private:
     template <typename T, typename U>
     std::string errorMessageNotEqual(T expected, U actual) const {
         std::stringstream errorMessage;
-        errorMessage << "expected '" << actual << "' to equal '" << expected << "'";
+        errorMessage << "expected '" << optional_io::Extension{actual} << "' to equal '"
+                     << optional_io::Extension{expected} << "'";
         return errorMessage.str();
     }
 

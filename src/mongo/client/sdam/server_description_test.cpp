@@ -29,7 +29,6 @@
 #include "mongo/client/sdam/sdam_test_base.h"
 
 #include <boost/algorithm/string.hpp>
-#include <boost/optional/optional_io.hpp>
 #include <ostream>
 #include <set>
 

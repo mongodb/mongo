@@ -28,8 +28,6 @@
  */
 #include "mongo/client/sdam/topology_manager.h"
 
-#include <boost/optional/optional_io.hpp>
-
 #include "mongo/client/sdam/sdam_test_base.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/system_clock_source.h"

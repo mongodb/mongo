@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "boost/optional/optional_io.hpp"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/db_raii.h"

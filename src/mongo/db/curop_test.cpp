@@ -29,8 +29,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <boost/optional/optional_io.hpp>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/query/query_test_service_context.h"

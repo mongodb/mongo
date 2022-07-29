@@ -29,7 +29,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include "boost/optional/optional_io.hpp"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/db_raii.h"
