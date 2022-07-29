@@ -15,56 +15,37 @@ var TimeseriesTest = class {
      * Returns whether time-series scalability improvements (like bucket reopening) are enabled.
      */
     static timeseriesScalabilityImprovementsEnabled(conn) {
-        return assert
-            .commandWorked(conn.adminCommand(
-                {getParameter: 1, featureFlagTimeseriesScalabilityImprovements: 1}))
-            .featureFlagTimeseriesScalabilityImprovements.value;
+        return FeatureFlagUtil.isEnabled(conn, "TimeseriesScalabilityImprovements");
     }
 
     /**
      * Returns whether time-series updates and deletes are supported.
      */
     static timeseriesUpdatesAndDeletesEnabled(conn) {
-        return assert
-            .commandWorked(
-                conn.adminCommand({getParameter: 1, featureFlagTimeseriesUpdatesAndDeletes: 1}))
-            .featureFlagTimeseriesUpdatesAndDeletes.value;
+        return FeatureFlagUtil.isEnabled(conn, "TimeseriesUpdatesAndDeletes");
     }
 
     /**
      * Returns whether sharded time-series updates and deletes are supported.
      */
     static shardedTimeseriesUpdatesAndDeletesEnabled(conn) {
-        return assert
-            .commandWorked(
-                conn.adminCommand({getParameter: 1, featureFlagShardedTimeSeriesUpdateDelete: 1}))
-            .featureFlagShardedTimeSeriesUpdateDelete.value;
+        return FeatureFlagUtil.isEnabled(conn, "ShardedTimeSeriesUpdateDelete");
     }
 
     static shardedtimeseriesCollectionsEnabled(conn) {
-        return assert
-            .commandWorked(conn.adminCommand({getParameter: 1, featureFlagShardedTimeSeries: 1}))
-            .featureFlagShardedTimeSeries.value;
+        return FeatureFlagUtil.isEnabled(conn, "ShardedTimeSeries");
     }
 
     static shardedTimeseriesUpdatesAndDeletesEnabled(conn) {
-        return assert
-            .commandWorked(
-                conn.adminCommand({getParameter: 1, featureFlagShardedTimeSeriesUpdateDelete: 1}))
-            .featureFlagShardedTimeSeriesUpdateDelete.value;
+        return FeatureFlagUtil.isEnabled(conn, "ShardedTimeSeriesUpdateDelete");
     }
 
     static timeseriesMetricIndexesEnabled(conn) {
-        return assert
-            .commandWorked(
-                conn.adminCommand({getParameter: 1, featureFlagTimeseriesMetricIndexes: 1}))
-            .featureFlagTimeseriesMetricIndexes.value;
+        return FeatureFlagUtil.isEnabled(conn, "TimeseriesMetricIndexes");
     }
 
     static bucketUnpackWithSortEnabled(conn) {
-        return assert
-            .commandWorked(conn.adminCommand({getParameter: 1, featureFlagBucketUnpackWithSort: 1}))
-            .featureFlagBucketUnpackWithSort.value;
+        return FeatureFlagUtil.isEnabled(conn, "BucketUnpackWithSort");
     }
 
     /**

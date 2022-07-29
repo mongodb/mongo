@@ -186,8 +186,8 @@ assert.commandWorked(bulk.execute());
 
 s.startBalancer(60000);
 
-const balanceAccordingToDataSize =
-    FeatureFlagUtil.isEnabled(s.configRS.getPrimary().getDB('admin'), "BalanceAccordingToDataSize");
+const balanceAccordingToDataSize = FeatureFlagUtil.isEnabled(
+    s.configRS.getPrimary().getDB('admin'), "BalanceAccordingToDataSize", adminUser);
 if (!balanceAccordingToDataSize) {
     assert.soon(function() {
         var d1Chunks =
