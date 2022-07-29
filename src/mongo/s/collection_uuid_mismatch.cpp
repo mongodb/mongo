@@ -60,7 +60,9 @@ Status populateCollectionUUIDMismatch(OperationContext* opCtx,
     }
 
     ListCollections listCollections;
-    listCollections.setDbName(info->db());
+    // Empty tenant id is acceptable here as command's tenant id will not be serialized to BSON.
+    // TODO SERVER-68357: Use database name of CollectionUUIDMismatchInfo.
+    listCollections.setDbName(DatabaseName(boost::none, info->db()));
     listCollections.setFilter(BSON("info.uuid" << info->collectionUUID()));
 
     auto response =

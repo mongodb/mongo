@@ -74,7 +74,7 @@ void sendSetUserWriteBlockModeCmdToAllShards(OperationContext* opCtx,
         makeShardsvrSetUserWriteBlockModeCommand(block, phase);
 
     sharding_util::sendCommandToShards(opCtx,
-                                       shardsvrSetUserWriteBlockModeCmd.getDbName(),
+                                       shardsvrSetUserWriteBlockModeCmd.getDbName().db(),
                                        CommandHelpers::appendMajorityWriteConcern(
                                            shardsvrSetUserWriteBlockModeCmd.toBSON(osi.toBSON())),
                                        allShards,

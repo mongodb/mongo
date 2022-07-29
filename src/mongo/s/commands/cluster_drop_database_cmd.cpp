@@ -67,31 +67,31 @@ public:
                     str::stream() << "Not authorized to drop database '" << request().getDbName()
                                   << "'",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnNamespace(NamespaceString(request().getDbName()),
-                                                            ActionType::dropDatabase));
+                        ->isAuthorizedForActionsOnNamespace(ns(), ActionType::dropDatabase));
         }
         Reply typedRun(OperationContext* opCtx) final {
             auto dbName = request().getDbName();
-            auto nss = NamespaceString(dbName);
 
             uassert(ErrorCodes::IllegalOperation,
                     "Cannot drop the config database",
-                    dbName != NamespaceString::kConfigDb);
+                    dbName.db() != NamespaceString::kConfigDb);
             uassert(ErrorCodes::IllegalOperation,
                     "Cannot drop the admin database",
-                    dbName != NamespaceString::kAdminDb);
+                    dbName.db() != NamespaceString::kAdminDb);
             uassert(ErrorCodes::BadValue,
                     "Must pass 1 as the 'dropDatabase' parameter",
                     request().getCommandParameter() == 1);
 
             try {
                 const CachedDatabaseInfo dbInfo =
-                    uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, dbName));
+                    uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(
+                        opCtx, dbName.toStringWithTenantId()));
 
                 // Invalidate the database metadata so the next access kicks off a full reload, even
                 // if sending the command to the config server fails due to e.g. a NetworkError.
-                ON_BLOCK_EXIT(
-                    [opCtx, dbName] { Grid::get(opCtx)->catalogCache()->purgeDatabase(dbName); });
+                ON_BLOCK_EXIT([opCtx, dbName] {
+                    Grid::get(opCtx)->catalogCache()->purgeDatabase(dbName.toStringWithTenantId());
+                });
 
                 // Send it to the primary shard
                 ShardsvrDropDatabase dropDatabaseCommand;
@@ -99,7 +99,7 @@ public:
 
                 auto cmdResponse = executeCommandAgainstDatabasePrimary(
                     opCtx,
-                    dbName,
+                    dbName.db(),
                     dbInfo,
                     CommandHelpers::appendMajorityWriteConcern(dropDatabaseCommand.toBSON({}),
                                                                opCtx->getWriteConcern()),

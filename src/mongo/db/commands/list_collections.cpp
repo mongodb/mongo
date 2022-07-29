@@ -294,9 +294,10 @@ public:
         void doCheckAuthorization(OperationContext* opCtx) const final {
             AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
 
-            auto db = request().getDbName();
+            auto dbName = request().getDbName();
             auto cmdObj = request().toBSON({});
-            uassertStatusOK(authzSession->checkAuthorizedToListCollections(db, cmdObj));
+            uassertStatusOK(authzSession->checkAuthorizedToListCollections(
+                dbName.toStringWithTenantId(), cmdObj));
         }
 
         NamespaceString ns() const final {
@@ -309,14 +310,13 @@ public:
             const auto as = AuthorizationSession::get(opCtx->getClient());
 
             const auto listCollRequest = request();
-            const auto db = listCollRequest.getDbName();
-            const DatabaseName dbName(getActiveTenant(opCtx), db);
+            const auto dbName = listCollRequest.getDbName();
             const bool nameOnly = listCollRequest.getNameOnly();
             const bool authorizedCollections = listCollRequest.getAuthorizedCollections();
 
             // The collator is null because collection objects are compared using binary comparison.
             auto expCtx = make_intrusive<ExpressionContext>(
-                opCtx, std::unique_ptr<CollatorInterface>(nullptr), NamespaceString(db));
+                opCtx, std::unique_ptr<CollatorInterface>(nullptr), ns());
 
             if (listCollRequest.getFilter()) {
                 matcher = uassertStatusOK(
@@ -327,7 +327,7 @@ public:
             // collections.
             bool includePendingDrops = listCollRequest.getIncludePendingDrops().value_or(false);
 
-            const NamespaceString cursorNss = NamespaceString::makeListCollectionsNSS(db);
+            const NamespaceString cursorNss = NamespaceString::makeListCollectionsNSS(dbName);
             std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
             std::vector<mongo::ListCollectionsReplyItem> firstBatch;
             {
@@ -345,10 +345,10 @@ public:
                 auto ws = std::make_unique<WorkingSet>();
                 auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
 
-                if (DatabaseHolder::get(opCtx)->dbExists(opCtx, DatabaseName(boost::none, db))) {
+                if (DatabaseHolder::get(opCtx)->dbExists(opCtx, dbName)) {
                     if (auto collNames = _getExactNameMatches(matcher.get())) {
                         for (auto&& collName : *collNames) {
-                            auto nss = NamespaceString(db, collName);
+                            auto nss = NamespaceString(dbName, collName);
 
                             // Only validate on a per-collection basis if the user requested
                             // a list of authorized collections
@@ -454,7 +454,7 @@ public:
                             ListCollectionsFilter::makeTypeCollectionFilter());
 
                     if (!skipViews) {
-                        catalog->iterateViews(opCtx, db, [&](const ViewDefinition& view) {
+                        catalog->iterateViews(opCtx, dbName, [&](const ViewDefinition& view) {
                             if (authorizedCollections &&
                                 !as->isAuthorizedForAnyActionOnResource(
                                     ResourcePattern::forExactNamespace(view.name()))) {
@@ -550,10 +550,9 @@ public:
                  repl::ReadConcernArgs::get(opCtx),
                  ReadPreferenceSetting::get(opCtx),
                  cmdObj,
-                 uassertStatusOK(
-                     AuthorizationSession::get(opCtx->getClient())
-                         ->checkAuthorizedToListCollections(dbName.toString(), cmdObj))});
-
+                 uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
+                                     ->checkAuthorizedToListCollections(
+                                         dbName.toStringWithTenantId(), cmdObj))});
             pinnedCursor->incNBatches();
             pinnedCursor->incNReturnedSoFar(firstBatch.size());
 

@@ -79,7 +79,7 @@ public:
         Reply typedRun(OperationContext* opCtx) {
             auto shardResponses = scatterGatherUnversionedTargetAllShards(
                 opCtx,
-                request().getDbName(),
+                request().getDbName().db(),
                 applyReadWriteConcern(
                     opCtx,
                     this,

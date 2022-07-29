@@ -136,8 +136,7 @@ public:
                     str::stream() << "Not authorized to drop database '" << request().getDbName()
                                   << "'",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnNamespace(NamespaceString(request().getDbName()),
-                                                            ActionType::dropDatabase));
+                        ->isAuthorizedForActionsOnNamespace(ns(), ActionType::dropDatabase));
         }
         Reply typedRun(OperationContext* opCtx) final {
             auto dbName = request().getDbName();
@@ -161,7 +160,8 @@ public:
                 uasserted(5255100, "Have to pass 1 as 'drop' parameter");
             }
 
-            Status status = dropDatabase(opCtx, dbName.toString());
+            // TODO SERVER-67549: pass the DatabaseName object directly.
+            Status status = dropDatabase(opCtx, dbName.toStringWithTenantId());
             if (status != ErrorCodes::NamespaceNotFound) {
                 uassertStatusOK(status);
             }

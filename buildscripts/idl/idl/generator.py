@@ -1613,7 +1613,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             struct_type_info = struct_types.get_struct_info(struct)
 
             # Generate namespace check now that "$db" has been read or defaulted
-            struct_type_info.gen_namespace_check(self._writer, tenant, "_dbName", "commandElement")
+            struct_type_info.gen_namespace_check(self._writer, "_dbName", "commandElement")
 
     def _gen_fields_deserializer_common(self, struct, bson_object, tenant=_EMPTY_TENANT):
         # type: (ast.Struct, str, str) -> _FieldUsageCheckerBase

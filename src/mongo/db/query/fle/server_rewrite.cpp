@@ -504,13 +504,13 @@ void doFLERewriteInTxn(OperationContext* opCtx,
 }  // namespace
 
 BSONObj rewriteEncryptedFilterInsideTxn(FLEQueryInterface* queryImpl,
-                                        StringData db,
+                                        const DatabaseName& dbName,
                                         const EncryptedFieldConfig& efc,
                                         boost::intrusive_ptr<ExpressionContext> expCtx,
                                         BSONObj filter,
                                         HighCardinalityModeAllowed mode) {
     auto makeCollectionReader = [&](FLEQueryInterface* queryImpl, const StringData& coll) {
-        NamespaceString nss(db, coll);
+        NamespaceString nss(dbName, coll);
         auto docCount = queryImpl->countDocuments(nss);
         return TxnCollectionReader(docCount, queryImpl, nss);
     };

@@ -97,7 +97,8 @@ public:
                     "namespace"_attr = nss,
                     "command"_attr = redact(cmdObj));
 
-        auto swDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, cmd.getDbName());
+        auto swDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(
+            opCtx, cmd.getDbName().toStringWithTenantId());
         if (swDbInfo == ErrorCodes::NamespaceNotFound) {
             uassert(CollectionUUIDMismatchInfo(cmd.getDbName().toString(),
                                                *cmd.getCollectionUUID(),

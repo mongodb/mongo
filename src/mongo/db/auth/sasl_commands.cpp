@@ -232,7 +232,7 @@ SaslReply runSaslStart(OperationContext* opCtx,
     opCtx->markKillOnClientDisconnect();
 
     // Note that while updateDatabase can throw, it should not be able to for saslStart.
-    session->updateDatabase(request.getDbName());
+    session->updateDatabase(request.getDbName().toStringWithTenantId());
     session->setMechanismName(request.getMechanism());
 
     return doSaslStart(opCtx, session, request);

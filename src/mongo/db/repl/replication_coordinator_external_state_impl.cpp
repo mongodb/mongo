@@ -1221,7 +1221,9 @@ bool ReplicationCoordinatorExternalStateImpl::isShardPartOfShardedCluster(
 bool ReplicationCoordinatorExternalStateImpl::isCWWCSetOnConfigShard(
     OperationContext* opCtx) const {
     GetDefaultRWConcern configsvrRequest;
-    configsvrRequest.setDbName(NamespaceString::kAdminDb.toString());
+    // Empty tenant id is acceptable here as command's tenant id will not be serialized to BSON.
+    // TODO SERVER-62491: Use system tenant id.
+    configsvrRequest.setDbName(DatabaseName(boost::none, NamespaceString::kAdminDb));
     auto cmdResponse = uassertStatusOK(
         Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
             opCtx,

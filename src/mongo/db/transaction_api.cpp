@@ -352,7 +352,7 @@ SemiFuture<BatchedCommandResponse> SEPTransactionClient::runCRUDOp(
 
 SemiFuture<std::vector<BSONObj>> SEPTransactionClient::exhaustiveFind(
     const FindCommandRequest& cmd) const {
-    return runCommand(cmd.getDbName(), cmd.toBSON({}))
+    return runCommand(cmd.getDbName().db(), cmd.toBSON({}))
         .thenRunOn(_executor)
         .then([this, batchSize = cmd.getBatchSize()](BSONObj reply) {
             auto cursorResponse = std::make_shared<CursorResponse>(

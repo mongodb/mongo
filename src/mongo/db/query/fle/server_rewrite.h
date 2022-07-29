@@ -111,7 +111,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> processPipeline(
  */
 BSONObj rewriteEncryptedFilterInsideTxn(
     FLEQueryInterface* queryImpl,
-    StringData db,
+    const DatabaseName& dbName,
     const EncryptedFieldConfig& efc,
     boost::intrusive_ptr<ExpressionContext> expCtx,
     BSONObj filter,

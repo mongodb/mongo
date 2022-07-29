@@ -102,6 +102,13 @@ class TestBinder(testcase.IDLTestcase):
             deserializer: foo
             serializer: foo
 
+        database_name:
+            bson_serialization_type: string
+            description: foo
+            cpp_type: foo
+            serializer: foo
+            deserializer: foo
+
     """)
 
     def test_empty(self):

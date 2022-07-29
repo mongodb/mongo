@@ -286,6 +286,14 @@ types:
         deserializer: "mongo::TenantId::parseFromBSON"
         serializer: "mongo::TenantId::serializeToBSON"
 
+    database_name:
+        bson_serialization_type: string
+        description: "A MongoDB DatabaseName"
+        cpp_type: "mongo::DatabaseName"
+        serializer: "mongo::DatabaseName::toString"
+        deserializer: "mongo::DatabaseName"
+        deserialize_with_tenant: true
+
 enums:
     CollationCaseFirst:
         description: Sort order of case differences.

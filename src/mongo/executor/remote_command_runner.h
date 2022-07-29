@@ -88,7 +88,7 @@ SemiFuture<RemoteCommandRunnerResponse<typename CommandType::Reply>> doRequest(
      * of executing the remote command asynchronously.
      */
     auto resFuture = detail::_doRequest(
-        cmd.getDbName(), cmd.toBSON({}), std::move(targeter), opCtx, exec, token);
+        cmd.getDbName().db(), cmd.toBSON({}), std::move(targeter), opCtx, exec, token);
 
     return std::move(resFuture)
         .then([](detail::RemoteCommandInternalResponse r) {

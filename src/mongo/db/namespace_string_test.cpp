@@ -39,6 +39,8 @@
 namespace mongo {
 namespace {
 
+using namespace fmt::literals;
+
 TEST(NamespaceStringTest, Oplog) {
     ASSERT(!NamespaceString::oplog("a"));
     ASSERT(!NamespaceString::oplog("a.b"));
@@ -324,6 +326,13 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
     ASSERT_EQ(nss3.toStringWithTenantId(), tenantNsStr);
     ASSERT(nss3.tenantId());
     ASSERT_EQ(*nss3.tenantId(), tenantId);
+
+    NamespaceString nss4(dbName);
+    ASSERT_EQ(nss4.ns(), "foo");
+    ASSERT_EQ(nss4.toString(), "foo");
+    ASSERT_EQ(nss4.toStringWithTenantId(), "{}_foo"_format(tenantId.toString()));
+    ASSERT(nss4.tenantId());
+    ASSERT_EQ(*nss4.tenantId(), tenantId);
 }
 
 TEST(NamespaceStringTest, NSSNoCollectionWithTenantId) {

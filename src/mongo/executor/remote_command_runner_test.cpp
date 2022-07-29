@@ -77,7 +77,7 @@ public:
      */
     template <typename CommandType>
     void initializeCommand(CommandType& c) {
-        c.setDbName("testdb");
+        c.setDbName(DatabaseName(boost::none, "testdb"));
     }
 
     /**

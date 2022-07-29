@@ -257,6 +257,12 @@ public:
         _ns = ns.toString();
     }
 
+
+    /**
+     * Constructs a NamespaceString for the given database.
+     */
+    explicit NamespaceString(DatabaseName dbName) : _dbName(std::move(dbName)), _ns(_dbName.db()) {}
+
     // TODO SERVER-65920 Remove this constructor once all constructor call sites have been updated
     // to pass tenantId explicitly
     explicit NamespaceString(StringData ns, boost::optional<TenantId> tenantId = boost::none)

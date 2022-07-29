@@ -1111,7 +1111,7 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
 
     newFindAndModifyRequest.setQuery(
         fle::rewriteEncryptedFilterInsideTxn(queryImpl,
-                                             edcNss.db(),
+                                             edcNss.dbName(),
                                              efc,
                                              expCtx,
                                              findAndModifyRequest.getQuery(),
@@ -1248,7 +1248,7 @@ write_ops::FindAndModifyCommandRequest processFindAndModifyExplain(
 
     newFindAndModifyRequest.setQuery(
         fle::rewriteEncryptedFilterInsideTxn(queryImpl,
-                                             edcNss.db(),
+                                             edcNss.dbName(),
                                              efc,
                                              expCtx,
                                              findAndModifyRequest.getQuery(),

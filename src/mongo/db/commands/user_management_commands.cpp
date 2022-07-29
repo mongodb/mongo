@@ -1035,8 +1035,7 @@ public:
 template <>
 void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
-    // TODO (SERVER-67516) cmd.getDatabaseName()
-    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
+    auto dbname = cmd.getDbName();
 
     // Validate input
     uassert(ErrorCodes::BadValue,
@@ -1146,8 +1145,7 @@ public:
 template <>
 void CmdUMCTyped<UpdateUserCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
-    // TODO (SERVER-67516) cmd.getDatabaseName()
-    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
+    auto dbname = cmd.getDbName();
     UserName userName(cmd.getCommandParameter(), dbname);
 
     uassert(ErrorCodes::BadValue,
@@ -1245,8 +1243,7 @@ CmdUMCTyped<DropUserCommand> cmdDropUser;
 template <>
 void CmdUMCTyped<DropUserCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
-    // TODO (SERVER-67516) cmd.getDatabaseName()
-    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
+    auto dbname = cmd.getDbName();
     UserName userName(cmd.getCommandParameter(), dbname);
 
     auto* serviceContext = opCtx->getClient()->getServiceContext();
@@ -1275,8 +1272,7 @@ template <>
 DropAllUsersFromDatabaseReply CmdUMCTyped<DropAllUsersFromDatabaseCommand>::Invocation::typedRun(
     OperationContext* opCtx) {
     const auto& cmd = request();
-    // TODO (SERVER-67516) cmd.getDatabaseName()
-    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
+    auto dbname = cmd.getDbName();
 
     auto* client = opCtx->getClient();
     auto* serviceContext = client->getServiceContext();
@@ -1300,8 +1296,7 @@ CmdUMCTyped<GrantRolesToUserCommand> cmdGrantRolesToUser;
 template <>
 void CmdUMCTyped<GrantRolesToUserCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
-    // TODO (SERVER-67516) cmd.getDatabaseName()
-    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
+    auto dbname = cmd.getDbName();
     UserName userName(cmd.getCommandParameter(), dbname);
 
     uassert(ErrorCodes::BadValue,
@@ -1336,8 +1331,7 @@ CmdUMCTyped<RevokeRolesFromUserCommand> cmdRevokeRolesFromUser;
 template <>
 void CmdUMCTyped<RevokeRolesFromUserCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
-    // TODO (SERVER-67516) cmd.getDatabaseName()
-    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
+    auto dbname = cmd.getDbName();
     UserName userName(cmd.getCommandParameter(), dbname);
 
     uassert(ErrorCodes::BadValue,
@@ -1374,8 +1368,7 @@ UsersInfoReply CmdUMCTyped<UsersInfoCommand, UMCInfoParams>::Invocation::typedRu
     OperationContext* opCtx) {
     const auto& cmd = request();
     const auto& arg = cmd.getCommandParameter();
-    // TODO (SERVER-67516) cmd.getDatabaseName()
-    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
+    auto dbname = cmd.getDbName();
 
     auto* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
     auto lk = uassertStatusOK(requireReadableAuthSchema26Upgrade(opCtx, authzManager));
@@ -1530,8 +1523,7 @@ CmdUMCTyped<CreateRoleCommand> cmdCreateRole;
 template <>
 void CmdUMCTyped<CreateRoleCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
-    // TODO (SERVER-67516) cmd.getDatabaseName()
-    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
+    auto dbname = cmd.getDbName();
 
     uassert(
         ErrorCodes::BadValue, "Role name must be non-empty", !cmd.getCommandParameter().empty());
@@ -1586,8 +1578,7 @@ CmdUMCTyped<UpdateRoleCommand> cmdUpdateRole;
 template <>
 void CmdUMCTyped<UpdateRoleCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
-    // TODO (SERVER-67516) cmd.getDatabaseName()
-    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
+    auto dbname = cmd.getDbName();
     RoleName roleName(cmd.getCommandParameter(), dbname);
 
     const bool hasRoles = cmd.getRoles() != boost::none;
@@ -1662,8 +1653,7 @@ CmdUMCTyped<GrantPrivilegesToRoleCommand> cmdGrantPrivilegesToRole;
 template <>
 void CmdUMCTyped<GrantPrivilegesToRoleCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
-    // TODO (SERVER-67516) cmd.getDatabaseName()
-    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
+    auto dbname = cmd.getDbName();
     RoleName roleName(cmd.getCommandParameter(), dbname);
 
     uassert(ErrorCodes::BadValue,
@@ -1712,8 +1702,7 @@ CmdUMCTyped<RevokePrivilegesFromRoleCommand> cmdRevokePrivilegesFromRole;
 template <>
 void CmdUMCTyped<RevokePrivilegesFromRoleCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
-    // TODO (SERVER-67516) cmd.getDatabaseName()
-    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
+    auto dbname = cmd.getDbName();
     RoleName roleName(cmd.getCommandParameter(), dbname);
 
     uassert(ErrorCodes::BadValue,
@@ -1767,8 +1756,7 @@ CmdUMCTyped<GrantRolesToRoleCommand> cmdGrantRolesToRole;
 template <>
 void CmdUMCTyped<GrantRolesToRoleCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
-    // TODO (SERVER-67516) cmd.getDatabaseName()
-    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
+    auto dbname = cmd.getDbName();
     RoleName roleName(cmd.getCommandParameter(), dbname);
 
     uassert(ErrorCodes::BadValue,
@@ -1808,8 +1796,7 @@ CmdUMCTyped<RevokeRolesFromRoleCommand> cmdRevokeRolesFromRole;
 template <>
 void CmdUMCTyped<RevokeRolesFromRoleCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
-    // TODO (SERVER-67516) cmd.getDatabaseName()
-    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
+    auto dbname = cmd.getDbName();
     RoleName roleName(cmd.getCommandParameter(), dbname);
 
     uassert(ErrorCodes::BadValue,
@@ -1915,8 +1902,7 @@ CmdUMCTyped<DropRoleCommand> cmdDropRole;
 template <>
 void CmdUMCTyped<DropRoleCommand>::Invocation::typedRun(OperationContext* opCtx) {
     const auto& cmd = request();
-    // TODO (SERVER-67516) cmd.getDatabaseName()
-    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
+    auto dbname = cmd.getDbName();
     RoleName roleName(cmd.getCommandParameter(), dbname);
 
     uassert(ErrorCodes::BadValue,
@@ -1984,8 +1970,7 @@ template <>
 DropAllRolesFromDatabaseReply CmdUMCTyped<DropAllRolesFromDatabaseCommand>::Invocation::typedRun(
     OperationContext* opCtx) {
     const auto& cmd = request();
-    // TODO (SERVER-67516) cmd.getDatabaseName()
-    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
+    auto dbname = cmd.getDbName();
 
     auto* client = opCtx->getClient();
     auto* serviceContext = client->getServiceContext();
@@ -2079,8 +2064,7 @@ RolesInfoReply CmdUMCTyped<RolesInfoCommand, UMCInfoParams>::Invocation::typedRu
     OperationContext* opCtx) {
     const auto& cmd = request();
     const auto& arg = cmd.getCommandParameter();
-    // TODO (SERVER-67516) cmd.getDatabaseName()
-    DatabaseName dbname(getActiveTenant(opCtx), cmd.getDbName());
+    auto dbname = cmd.getDbName();
 
     auto* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
     auto lk = uassertStatusOK(requireReadableAuthSchema26Upgrade(opCtx, authzManager));
@@ -2130,8 +2114,7 @@ void CmdUMCTyped<InvalidateUserCacheCommand, UMCInvalidateUserCacheParams>::Invo
     OperationContext* opCtx) {
     auto* authzManager = AuthorizationManager::get(opCtx->getServiceContext());
     auto lk = requireReadableAuthSchema26Upgrade(opCtx, authzManager);
-    // TODO (SERVER-67516) cmd.getDatabaseName().tenantId()
-    authzManager->invalidateUsersByTenant(opCtx, getActiveTenant(opCtx));
+    authzManager->invalidateUsersByTenant(opCtx, request().getDbName().tenantId());
 }
 
 CmdUMCTyped<GetUserCacheGenerationCommand, UMCGetUserCacheGenParams> cmdGetUserCacheGeneration;

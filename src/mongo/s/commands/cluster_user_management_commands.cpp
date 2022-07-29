@@ -86,7 +86,7 @@ Reply parseUMCReply(BSONObj obj) try {
 
 struct UserCacheInvalidatorNOOP {
     static constexpr bool kRequireUserName = false;
-    static void invalidate(OperationContext*, StringData) {}
+    static void invalidate(OperationContext*, const DatabaseName&) {}
 };
 struct UserCacheInvalidatorUser {
     static constexpr bool kRequireUserName = true;
@@ -97,13 +97,13 @@ struct UserCacheInvalidatorUser {
 };
 struct UserCacheInvalidatorDB {
     static constexpr bool kRequireUserName = false;
-    static void invalidate(OperationContext* opCtx, StringData dbname) {
+    static void invalidate(OperationContext* opCtx, const DatabaseName& dbname) {
         AuthorizationManager::get(opCtx->getServiceContext())->invalidateUsersFromDB(opCtx, dbname);
     }
 };
 struct UserCacheInvalidatorAll {
     static constexpr bool kRequireUserName = false;
-    static void invalidate(OperationContext* opCtx, StringData) {
+    static void invalidate(OperationContext* opCtx, const DatabaseName&) {
         AuthorizationManager::get(opCtx->getServiceContext())->invalidateUserCache(opCtx);
     }
 };
@@ -139,7 +139,7 @@ public:
             auto status = Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
                 opCtx,
                 Request::kCommandName,
-                cmd.getDbName(),
+                cmd.getDbName().db(),
                 applyReadWriteConcern(
                     opCtx,
                     this,
