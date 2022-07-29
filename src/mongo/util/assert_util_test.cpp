@@ -78,8 +78,6 @@ MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::NetworkError
                                      ExceptionFor<ErrorCodes::BadValue>>());
 MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::NotPrimaryError>,
                                      ExceptionFor<ErrorCodes::BadValue>>());
-MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::Interruption>,
-                                     ExceptionFor<ErrorCodes::BadValue>>());
 
 TEST(AssertUtils, UassertNamedCodeWithoutCategories) {
     ASSERT_CATCHES(ErrorCodes::BadValue, DBException);
@@ -88,7 +86,6 @@ TEST(AssertUtils, UassertNamedCodeWithoutCategories) {
     ASSERT_NOT_CATCHES(ErrorCodes::BadValue, ExceptionFor<ErrorCodes::DuplicateKey>);
     ASSERT_NOT_CATCHES(ErrorCodes::BadValue, ExceptionForCat<ErrorCategory::NetworkError>);
     ASSERT_NOT_CATCHES(ErrorCodes::BadValue, ExceptionForCat<ErrorCategory::NotPrimaryError>);
-    ASSERT_NOT_CATCHES(ErrorCodes::BadValue, ExceptionForCat<ErrorCategory::Interruption>);
 }
 
 // NotWritablePrimary - NotPrimaryError, RetriableError
@@ -101,8 +98,6 @@ MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::NetworkError
                                      ExceptionFor<ErrorCodes::NotWritablePrimary>>());
 MONGO_STATIC_ASSERT(std::is_base_of<ExceptionForCat<ErrorCategory::NotPrimaryError>,
                                     ExceptionFor<ErrorCodes::NotWritablePrimary>>());
-MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::Interruption>,
-                                     ExceptionFor<ErrorCodes::NotWritablePrimary>>());
 
 TEST(AssertUtils, UassertNamedCodeWithOneCategory) {
     ASSERT_CATCHES(ErrorCodes::NotWritablePrimary, DBException);
@@ -112,11 +107,10 @@ TEST(AssertUtils, UassertNamedCodeWithOneCategory) {
     ASSERT_NOT_CATCHES(ErrorCodes::NotWritablePrimary,
                        ExceptionForCat<ErrorCategory::NetworkError>);
     ASSERT_CATCHES(ErrorCodes::NotWritablePrimary, ExceptionForCat<ErrorCategory::NotPrimaryError>);
-    ASSERT_NOT_CATCHES(ErrorCodes::NotWritablePrimary,
-                       ExceptionForCat<ErrorCategory::Interruption>);
 }
 
 // InterruptedDueToReplStateChange - NotPrimaryError, Interruption, RetriableError
+// TODO(SERVER-56251): revise list when removing the Interruption category.
 MONGO_STATIC_ASSERT(
     std::is_same<error_details::ErrorCategoriesFor<ErrorCodes::InterruptedDueToReplStateChange>,
                  error_details::CategoryList<ErrorCategory::Interruption,
@@ -127,8 +121,6 @@ MONGO_STATIC_ASSERT(std::is_base_of<AssertionException,
 MONGO_STATIC_ASSERT(!std::is_base_of<ExceptionForCat<ErrorCategory::NetworkError>,
                                      ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>>());
 MONGO_STATIC_ASSERT(std::is_base_of<ExceptionForCat<ErrorCategory::NotPrimaryError>,
-                                    ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>>());
-MONGO_STATIC_ASSERT(std::is_base_of<ExceptionForCat<ErrorCategory::Interruption>,
                                     ExceptionFor<ErrorCodes::InterruptedDueToReplStateChange>>());
 
 TEST(AssertUtils, UassertNamedCodeWithTwoCategories) {
@@ -142,8 +134,6 @@ TEST(AssertUtils, UassertNamedCodeWithTwoCategories) {
                        ExceptionForCat<ErrorCategory::NetworkError>);
     ASSERT_CATCHES(ErrorCodes::InterruptedDueToReplStateChange,
                    ExceptionForCat<ErrorCategory::NotPrimaryError>);
-    ASSERT_CATCHES(ErrorCodes::InterruptedDueToReplStateChange,
-                   ExceptionForCat<ErrorCategory::Interruption>);
 }
 
 MONGO_STATIC_ASSERT(!error_details::isNamedCode<19999>);
@@ -155,7 +145,6 @@ TEST(AssertUtils, UassertNumericCode) {
     ASSERT_NOT_CATCHES(19999, ExceptionFor<ErrorCodes::DuplicateKey>);
     ASSERT_NOT_CATCHES(19999, ExceptionForCat<ErrorCategory::NetworkError>);
     ASSERT_NOT_CATCHES(19999, ExceptionForCat<ErrorCategory::NotPrimaryError>);
-    ASSERT_NOT_CATCHES(19999, ExceptionForCat<ErrorCategory::Interruption>);
 }
 
 TEST(AssertUtils, UassertStatusOKPreservesExtraInfo) {

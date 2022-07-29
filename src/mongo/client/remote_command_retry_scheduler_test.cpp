@@ -189,13 +189,13 @@ TEST_F(RemoteCommandRetrySchedulerTest, MakeSingleShotRetryPolicy) {
 }
 
 TEST_F(RemoteCommandRetrySchedulerTest, MakeRetryPolicy) {
-    auto policy = RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::Interruption>(
+    auto policy = RemoteCommandRetryScheduler::makeRetryPolicy<ErrorCategory::WriteConcernError>(
         5U, Milliseconds(100));
     ASSERT_EQUALS(5U, policy->getMaximumAttempts());
     ASSERT_EQUALS(Milliseconds(100), policy->getMaximumResponseElapsedTotal());
     for (int i = 0; i < int(ErrorCodes::MaxError); ++i) {
         auto error = ErrorCodes::Error(i);
-        if (ErrorCodes::isA<ErrorCategory::Interruption>(error)) {
+        if (ErrorCodes::isA<ErrorCategory::WriteConcernError>(error)) {
             ASSERT_TRUE(policy->shouldRetryOnError(error));
             continue;
         }

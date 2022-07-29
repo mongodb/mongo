@@ -123,9 +123,9 @@ TEST(Status, Accessors) {
 }
 
 TEST(Status, IsA) {
-    ASSERT(!Status(ErrorCodes::BadValue, "").isA<ErrorCategory::Interruption>());
-    ASSERT(Status(ErrorCodes::Interrupted, "").isA<ErrorCategory::Interruption>());
-    ASSERT(!Status(ErrorCodes::Interrupted, "").isA<ErrorCategory::ShutdownError>());
+    ASSERT(!Status(ErrorCodes::BadValue, "").isA<ErrorCategory::NetworkError>());
+    ASSERT(Status(ErrorCodes::HostUnreachable, "").isA<ErrorCategory::NetworkError>());
+    ASSERT(!Status(ErrorCodes::HostUnreachable, "").isA<ErrorCategory::ShutdownError>());
 }
 
 TEST(Status, OKIsAValidStatus) {

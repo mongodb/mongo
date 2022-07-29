@@ -466,7 +466,7 @@ TEST_F(PeriodicRunnerImplTest, StopProperlyInterruptsOpCtx) {
                 auto opCtx = client->makeOperationContext();
                 stdx::unique_lock<Latch> lk(mutex);
                 opCtx->waitForConditionOrInterrupt(cv, lk, [] { return false; });
-            } catch (const ExceptionForCat<ErrorCategory::Interruption>& e) {
+            } catch (const ExceptionForCat<ErrorCategory::CancellationError>& e) {
                 ASSERT_EQ(e.code(), ErrorCodes::ClientMarkedKilled);
                 killed.store(true);
                 return;
