@@ -919,30 +919,43 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
 
         PeriodicShardedIndexConsistencyChecker::get(_service).onStepUp(_service);
         TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
-    } else if (ShardingState::get(opCtx)->enabled()) {
-        Status status = ShardingStateRecovery::recover(opCtx);
-        VectorClockMutable::get(opCtx)->recoverDirect(opCtx);
+    } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        if (ShardingState::get(opCtx)->enabled()) {
+            Status status = ShardingStateRecovery::recover(opCtx);
+            VectorClockMutable::get(opCtx)->recoverDirect(opCtx);
 
-        // If the node is shutting down or it lost quorum just as it was becoming primary, don't
-        // run the sharding onStepUp machinery. The onStepDown counterpart to these methods is
-        // already idempotent, so the machinery will remain in the stepped down state.
-        if (ErrorCodes::isShutdownError(status.code()) ||
-            ErrorCodes::isNotPrimaryError(status.code())) {
-            return;
+            // If the node is shutting down or it lost quorum just as it was becoming primary, don't
+            // run the sharding onStepUp machinery. The onStepDown counterpart to these methods is
+            // already idempotent, so the machinery will remain in the stepped down state.
+            if (ErrorCodes::isShutdownError(status.code()) ||
+                ErrorCodes::isNotPrimaryError(status.code())) {
+                return;
+            }
+            fassert(40107, status);
+
+            const auto configsvrConnStr =
+                Grid::get(opCtx)->shardRegistry()->getConfigShard()->getConnString();
+            ShardingInitializationMongoD::get(opCtx)->updateShardIdentityConfigString(
+                opCtx, configsvrConnStr);
+
+            CatalogCacheLoader::get(_service).onStepUp();
+            ChunkSplitter::get(_service).onStepUp();
+            PeriodicBalancerConfigRefresher::get(_service).onStepUp(_service);
+            TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
+
+            // Note, these must be done after the configOpTime is recovered via
+            // ShardingStateRecovery::recover above, because they may trigger filtering metadata
+            // refreshes which should use the recovered configOpTime.
+            migrationutil::resubmitRangeDeletionsOnStepUp(_service);
+            migrationutil::resumeMigrationCoordinationsOnStepUp(opCtx);
+            migrationutil::resumeMigrationRecipientsOnStepUp(opCtx);
+
+            const bool scheduleAsyncRefresh = true;
+            resharding::clearFilteringMetadata(opCtx, scheduleAsyncRefresh);
         }
-        fassert(40107, status);
-
-        const auto configsvrConnStr =
-            Grid::get(opCtx)->shardRegistry()->getConfigShard()->getConnString();
-        ShardingInitializationMongoD::get(opCtx)->updateShardIdentityConfigString(opCtx,
-                                                                                  configsvrConnStr);
-
-        CatalogCacheLoader::get(_service).onStepUp();
-        ChunkSplitter::get(_service).onStepUp();
-        PeriodicBalancerConfigRefresher::get(_service).onStepUp(_service);
-        TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
-
-        // Create uuid index on config.rangeDeletions if needed
+        // The code above will only be executed after a stepdown happens, however the code below
+        // needs to be executed also on startup, and the enabled check might fail in shards during
+        // startup. Create uuid index on config.rangeDeletions if needed
         auto minKeyFieldName = RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey;
         auto maxKeyFieldName = RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey;
         Status indexStatus = createIndexOnConfigCollection(
@@ -965,16 +978,6 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
                 indexStatus.withContext("Failed to create index on config.rangeDeletions on "
                                         "shard's first transition to primary"));
         }
-
-        // Note, these must be done after the configOpTime is recovered via
-        // ShardingStateRecovery::recover above, because they may trigger filtering metadata
-        // refreshes which should use the recovered configOpTime.
-        migrationutil::resubmitRangeDeletionsOnStepUp(_service);
-        migrationutil::resumeMigrationCoordinationsOnStepUp(opCtx);
-        migrationutil::resumeMigrationRecipientsOnStepUp(opCtx);
-
-        const bool scheduleAsyncRefresh = true;
-        resharding::clearFilteringMetadata(opCtx, scheduleAsyncRefresh);
     } else {  // unsharded
         if (auto validator = LogicalTimeValidator::get(_service)) {
             validator->enableKeyGenerator(opCtx, true);
