@@ -104,6 +104,17 @@ void shardedRenameMetadata(OperationContext* opCtx,
                            const WriteConcernOptions& writeConcern);
 
 /**
+ * Ensure source collection uuid is consistent on every shard
+ * Ensure target collection is not present on any shard when `dropTarget` is false
+ */
+void checkCatalogConsistencyAcrossShardsForRename(
+    OperationContext* opCtx,
+    const NamespaceString& fromNss,
+    const NamespaceString& toNss,
+    bool dropTarget,
+    std::shared_ptr<executor::ScopedTaskExecutor> executor);
+
+/**
  * Ensures rename preconditions for collections are met:
  * - Check that the namespace of the destination collection is not too long
  * - Check that `dropTarget` is true if the destination collection exists

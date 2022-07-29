@@ -32,7 +32,6 @@
 
 #include "mongo/db/s/rename_collection_coordinator.h"
 
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -123,7 +122,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
     return ExecutorFuture<void>(**executor)
         .then(_executePhase(
             Phase::kCheckPreconditions,
-            [this, anchor = shared_from_this()] {
+            [this, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
@@ -226,6 +225,9 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                     sharding_ddl_util::checkRenamePreconditions(
                         opCtx, sourceIsSharded, toNss, _doc.getDropTarget());
+
+                    sharding_ddl_util::checkCatalogConsistencyAcrossShardsForRename(
+                        opCtx, fromNss, toNss, _doc.getDropTarget(), executor);
 
                     {
                         AutoGetCollection coll{opCtx, toNss, MODE_IS};
