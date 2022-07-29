@@ -106,6 +106,13 @@ IndexSpec& IndexSpec::unique(bool value) {
     return *this;
 }
 
+IndexSpec& IndexSpec::outOfCache(bool value) {
+    uassert(
+        ErrorCodes::InvalidOptions, kDuplicateOption, !_options.asTempObj().hasField("outOfCache"));
+    _options.append("outOfCache", value);
+    return *this;
+}
+
 IndexSpec& IndexSpec::name(const StringData& value) {
     _name = value.toString();
     _dynamicName = false;

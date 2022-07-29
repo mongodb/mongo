@@ -80,6 +80,7 @@ public:
     static constexpr StringData kKeyPatternFieldName = "key"_sd;
     static constexpr StringData kLanguageOverrideFieldName = "language_override"_sd;
     static constexpr StringData kNamespaceFieldName = "ns"_sd;  // Removed in 4.4
+    static constexpr StringData kOutOfCacheFieldName = "outOfCache"_sd;
     static constexpr StringData kPartialFilterExprFieldName = "partialFilterExpression"_sd;
     static constexpr StringData kPathProjectionFieldName = "wildcardProjection"_sd;
     static constexpr StringData kSparseFieldName = "sparse"_sd;
@@ -177,6 +178,11 @@ public:
     // May each key only occur once?
     bool unique() const {
         return _unique;
+    }
+
+    // May each key only occur once?
+    bool isOutOfCache() const {
+        return _outOfCache;
     }
 
     bool hidden() const {
@@ -277,6 +283,7 @@ private:
     bool _sparse;
     bool _unique;
     bool _hidden;
+    bool _outOfCache;
     bool _partial;
     IndexVersion _version;
     BSONObj _collation;

@@ -570,9 +570,9 @@ DBCollection.prototype._indexSpec = function(keys, options) {
         ret.unique = true;
     else if (typeof (options) == "object") {
         if (Array.isArray(options)) {
-            if (options.length > 3) {
+            if (options.length > 4) {
                 throw new Error("Index options that are supplied in array form may only specify" +
-                                " three values: name, unique, dropDups");
+                                " four values: name, unique, dropDups, outOfCache");
             }
             var nb = 0;
             for (var i = 0; i < options.length; i++) {
