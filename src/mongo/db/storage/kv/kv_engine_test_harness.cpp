@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/durable_catalog_impl.h"
@@ -1112,7 +1113,7 @@ TEST_F(DurableCatalogImplTest, Idx1) {
         WriteUnitOfWork uow(opCtx);
 
         BSONCollectionCatalogEntry::MetaData md;
-        md.ns = "a.b";
+        md.nss = NamespaceString(boost::none, "a.b");
 
         BSONCollectionCatalogEntry::IndexMetaData imd;
         imd.spec = BSON("name"
@@ -1146,7 +1147,7 @@ TEST_F(DurableCatalogImplTest, Idx1) {
         WriteUnitOfWork uow(opCtx);
 
         BSONCollectionCatalogEntry::MetaData md;
-        md.ns = "a.b";
+        md.nss = NamespaceString(boost::none, "a.b");
         putMetaData(opCtx, catalog.get(), catalogId, md);  // remove index
 
         BSONCollectionCatalogEntry::IndexMetaData imd;
@@ -1202,7 +1203,7 @@ TEST_F(DurableCatalogImplTest, DirectoryPerDb1) {
         WriteUnitOfWork uow(opCtx);
 
         BSONCollectionCatalogEntry::MetaData md;
-        md.ns = "a.b";
+        md.nss = NamespaceString(boost::none, "a.b");
 
         BSONCollectionCatalogEntry::IndexMetaData imd;
         imd.spec = BSON("name"
@@ -1254,7 +1255,7 @@ TEST_F(DurableCatalogImplTest, Split1) {
         WriteUnitOfWork uow(opCtx);
 
         BSONCollectionCatalogEntry::MetaData md;
-        md.ns = "a.b";
+        md.nss = NamespaceString(boost::none, "a.b");
 
         BSONCollectionCatalogEntry::IndexMetaData imd;
         imd.spec = BSON("name"
@@ -1306,7 +1307,7 @@ TEST_F(DurableCatalogImplTest, DirectoryPerAndSplit1) {
         WriteUnitOfWork uow(opCtx);
 
         BSONCollectionCatalogEntry::MetaData md;
-        md.ns = "a.b";
+        md.nss = NamespaceString(boost::none, "a.b");
 
         BSONCollectionCatalogEntry::IndexMetaData imd;
         imd.spec = BSON("name"
@@ -1379,6 +1380,60 @@ DEATH_TEST_REGEX_F(DurableCatalogImplTest,
         sorted = engine->getSortedDataInterface(opCtx, nss, CollectionOptions(), ident, &desc);
         ASSERT(sorted);
     }
+}
+
+TEST_F(DurableCatalogImplTest, EntryIncludesTenantIdInMultitenantEnv) {
+    gMultitenancySupport = true;
+    KVEngine* engine = helper->getEngine();
+
+    // Create a DurableCatalog and RecordStore
+    std::unique_ptr<RecordStore> rs;
+    std::unique_ptr<DurableCatalogImpl> catalog;
+    {
+        auto clientAndCtx = makeClientAndCtx("opCtx");
+        auto opCtx = clientAndCtx.opCtx();
+        WriteUnitOfWork uow(opCtx);
+        ASSERT_OK(engine->createRecordStore(
+            opCtx, NamespaceString("catalog"), "catalog", CollectionOptions()));
+        rs = engine->getRecordStore(
+            opCtx, NamespaceString("catalog"), "catalog", CollectionOptions());
+        catalog = std::make_unique<DurableCatalogImpl>(rs.get(), false, false, nullptr);
+        uow.commit();
+    }
+
+    // Insert an entry into the DurableCatalog, and ensure the tenantId is stored on the nss in the
+    // entry.
+    RecordId catalogId;
+    auto tenantId = TenantId(OID::gen());
+    const NamespaceString nss = NamespaceString(tenantId, "a.b");
+    {
+        auto clientAndCtx = makeClientAndCtx("opCtx");
+        auto opCtx = clientAndCtx.opCtx();
+        WriteUnitOfWork uow(opCtx);
+        catalogId = newCollection(opCtx, nss, CollectionOptions(), catalog.get());
+        uow.commit();
+    }
+    ASSERT_EQUALS(nss.tenantId(), catalog->getEntry(catalogId).nss.tenantId());
+    ASSERT_EQUALS(nss, catalog->getEntry(catalogId).nss);
+
+    // Re-initialize the DurableCatalog (as if it read from disk). Ensure the tenantId is still
+    // stored on the nss in the entry.
+    std::string ident = catalog->getEntry(catalogId).ident;
+    {
+        auto clientAndCtx = makeClientAndCtx("opCtx");
+        auto opCtx = clientAndCtx.opCtx();
+        Lock::GlobalLock globalLk(opCtx, MODE_IX);
+
+        WriteUnitOfWork uow(opCtx);
+        catalog = std::make_unique<DurableCatalogImpl>(rs.get(), false, false, nullptr);
+        catalog->init(opCtx);
+        uow.commit();
+    }
+    ASSERT_EQUALS(ident, catalog->getEntry(catalogId).ident);
+    ASSERT_EQUALS(nss.tenantId(), catalog->getEntry(catalogId).nss.tenantId());
+    ASSERT_EQUALS(nss, catalog->getEntry(catalogId).nss);
+
+    gMultitenancySupport = false;
 }
 
 }  // namespace

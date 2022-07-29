@@ -236,8 +236,9 @@ void DurableCatalogImpl::init(OperationContext* opCtx) {
 
         // No rollback since this is just loading already committed data.
         auto ident = obj["ident"].String();
-        auto ns = obj["ns"].String();
-        _catalogIdToEntryMap[record->id] = Entry(record->id, ident, NamespaceString(ns));
+        auto nss =
+            NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(obj["ns"].String());
+        _catalogIdToEntryMap[record->id] = Entry(record->id, ident, nss);
     }
 
     // In the unlikely event that we have used this _rand before generate a new one.
@@ -259,9 +260,10 @@ std::vector<DurableCatalog::Entry> DurableCatalogImpl::getAllCatalogEntries(
             continue;
         }
         auto ident = obj["ident"].String();
-        auto ns = obj["ns"].String();
+        auto nss =
+            NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(obj["ns"].String());
 
-        ret.emplace_back(record->id, ident, NamespaceString(ns));
+        ret.emplace_back(record->id, ident, nss);
     }
 
     return ret;
@@ -284,10 +286,10 @@ StatusWith<DurableCatalog::Entry> DurableCatalogImpl::_addEntry(OperationContext
     BSONObj obj;
     {
         BSONObjBuilder b;
-        b.append("ns", nss.ns());
+        b.append("ns", nss.toStringWithTenantId());
         b.append("ident", ident);
         BSONCollectionCatalogEntry::MetaData md;
-        md.ns = nss.ns();
+        md.nss = nss;
         md.options = options;
 
         if (options.timeseries) {
@@ -395,7 +397,7 @@ std::shared_ptr<BSONCollectionCatalogEntry::MetaData> DurableCatalogImpl::getMet
 void DurableCatalogImpl::putMetaData(OperationContext* opCtx,
                                      const RecordId& catalogId,
                                      BSONCollectionCatalogEntry::MetaData& md) {
-    NamespaceString nss(md.ns);
+    NamespaceString nss(md.nss);
     BSONObj obj = _findEntry(opCtx, catalogId);
 
     {
@@ -448,7 +450,7 @@ Status DurableCatalogImpl::_replaceEntry(OperationContext* opCtx,
     {
         BSONObjBuilder b;
 
-        b.append("ns", toNss.ns());
+        b.append("ns", toNss.toStringWithTenantId());
         b.append("md", md.toBSON());
 
         b.appendElementsUnique(old);
@@ -564,10 +566,10 @@ StatusWith<std::string> DurableCatalogImpl::newOrphanedIdent(OperationContext* o
     BSONObj obj;
     {
         BSONObjBuilder b;
-        b.append("ns", nss.ns());
+        b.append("ns", nss.toStringWithTenantId());
         b.append("ident", ident);
         BSONCollectionCatalogEntry::MetaData md;
-        md.ns = nss.ns();
+        md.nss = nss;
         // Default options with newly generated UUID.
         md.options = optionsWithUUID;
         b.append("md", md.toBSON());
@@ -587,7 +589,7 @@ StatusWith<std::string> DurableCatalogImpl::newOrphanedIdent(OperationContext* o
                 "stored meta data for orphaned collection {namespace} @ {res_getValue}",
                 logAttrs(nss),
                 "res_getValue"_attr = res.getValue());
-    return {nss.ns()};
+    return {nss.toStringWithTenantId()};
 }
 
 StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalogImpl::createCollection(

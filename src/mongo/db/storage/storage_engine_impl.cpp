@@ -636,7 +636,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
     for (DurableCatalog::Entry entry : catalogEntries) {
         std::shared_ptr<BSONCollectionCatalogEntry::MetaData> metaData =
             _catalog->getMetaData(opCtx, entry.catalogId);
-        NamespaceString nss(metaData->ns);
+        NamespaceString nss(metaData->nss);
 
         // Batch up the indexes to remove them from `metaData` outside of the iterator.
         std::vector<std::string> indexesToDrop;

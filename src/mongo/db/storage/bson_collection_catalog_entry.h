@@ -149,7 +149,7 @@ public:
          */
         bool eraseIndex(StringData name);
 
-        std::string ns;
+        NamespaceString nss;
         CollectionOptions options;
         // May include empty instances which represent indexes already dropped.
         std::vector<IndexMetaData> indexes;

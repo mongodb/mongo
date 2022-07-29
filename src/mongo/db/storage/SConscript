@@ -126,6 +126,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/multitenancy',
+        '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/server_options',
     ],
 )

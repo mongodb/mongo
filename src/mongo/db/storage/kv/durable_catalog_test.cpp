@@ -740,5 +740,27 @@ TEST_F(DurableCatalogTest, CheckTimeseriesBucketsMayHaveMixedSchemaDataFlagFCVLa
     }
 }
 
+TEST_F(DurableCatalogTest, CreateCollectionCatalogEntryHasCorrectTenantNamespace) {
+    gMultitenancySupport = true;
+
+    auto tenantId = TenantId(OID::gen());
+    const NamespaceString nss = NamespaceString(tenantId, "test.regular");
+    createCollection(nss, CollectionOptions());
+
+    auto collection = CollectionCatalog::get(operationContext())
+                          ->lookupCollectionByNamespace(operationContext(), nss);
+    RecordId catalogId = collection->getCatalogId();
+    ASSERT_EQ(getCatalog()->getEntry(catalogId).nss.tenantId(), nss.tenantId());
+    ASSERT_EQ(getCatalog()->getEntry(catalogId).nss, nss);
+
+    Lock::GlobalLock globalLock{operationContext(), MODE_IS};
+    ASSERT_EQ(getCatalog()->getMetaData(operationContext(), catalogId)->nss.tenantId(),
+              nss.tenantId());
+    ASSERT_EQ(getCatalog()->getMetaData(operationContext(), catalogId)->nss, nss);
+
+    gMultitenancySupport = false;
+}
+
+
 }  // namespace
 }  // namespace mongo

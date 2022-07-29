@@ -2030,7 +2030,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CollectionImpl::makePlanExe
 
 Status CollectionImpl::rename(OperationContext* opCtx, const NamespaceString& nss, bool stayTemp) {
     auto metadata = std::make_shared<BSONCollectionCatalogEntry::MetaData>(*_metadata);
-    metadata->ns = nss.ns();
+    metadata->nss = nss;
     if (!stayTemp)
         metadata->options.temp = false;
     Status status =
@@ -2135,7 +2135,7 @@ std::vector<std::string> CollectionImpl::repairInvalidIndexOptions(OperationCont
                 }
 
                 indexesWithInvalidOptions.push_back(std::string(index.nameStringData()));
-                index.spec = index_key_validate::repairIndexSpec(NamespaceString(md.ns), oldSpec);
+                index.spec = index_key_validate::repairIndexSpec(md.nss, oldSpec);
             }
         }
     });

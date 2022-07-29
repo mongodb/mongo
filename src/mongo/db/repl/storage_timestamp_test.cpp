@@ -3058,8 +3058,8 @@ TEST_F(StorageTimestampTest, ViewCreationSeparateTransaction) {
             << " incorrectly exists before creation. CreateTs: " << systemViewsCreateTs;
 
         systemViewsMd = getMetaDataAtTime(durableCatalog, catalogId, systemViewsCreateTs);
-        auto nss = systemViewsMd->ns;
-        ASSERT_EQ(systemViewsNss.ns(), nss);
+        auto nss = systemViewsMd->nss;
+        ASSERT_EQ(systemViewsNss, nss);
 
         assertDocumentAtTimestamp(autoColl.getCollection(), systemViewsCreateTs, BSONObj());
         assertDocumentAtTimestamp(autoColl.getCollection(),

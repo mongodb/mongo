@@ -203,7 +203,7 @@ void openCatalog(OperationContext* opCtx,
 
     // Determine which indexes need to be rebuilt. rebuildIndexesOnCollection() requires that all
     // indexes on that collection are done at once, so we use a map to group them together.
-    StringMap<IndexNameObjs> nsToIndexNameObjMap;
+    stdx::unordered_map<NamespaceString, IndexNameObjs> nsToIndexNameObjMap;
     auto catalog = CollectionCatalog::get(opCtx);
     for (StorageEngine::IndexIdentifier indexIdentifier : reconcileResult.indexesToRebuild) {
         auto indexName = indexIdentifier.indexName;
@@ -226,7 +226,7 @@ void openCatalog(OperationContext* opCtx,
             str::stream() << "expected to find a list containing exactly 1 index spec, but found "
                           << indexesToRebuild.second.size());
 
-        auto& ino = nsToIndexNameObjMap[indexIdentifier.nss.ns()];
+        auto& ino = nsToIndexNameObjMap[indexIdentifier.nss];
         ino.first.emplace_back(std::move(indexesToRebuild.first.back()));
         ino.second.emplace_back(std::move(indexesToRebuild.second.back()));
     }
