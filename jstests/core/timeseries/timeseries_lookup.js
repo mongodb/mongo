@@ -4,7 +4,7 @@
  * @tags: [
  *   does_not_support_transactions,
  *   requires_timeseries,
- *   requires_fcv_51,
+ *   requires_fcv_60,
  * ]
  */
 (function() {
