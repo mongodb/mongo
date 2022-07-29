@@ -33,27 +33,84 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingRangeDeleter
 
 namespace mongo {
+
+const auto rangeDeleterServiceDecorator = ServiceContext::declareDecoration<RangeDeleterService>();
+
+RangeDeleterService* RangeDeleterService::get(ServiceContext* serviceContext) {
+    return &rangeDeleterServiceDecorator(serviceContext);
+}
+
+RangeDeleterService* RangeDeleterService::get(OperationContext* opCtx) {
+    return get(opCtx->getServiceContext());
+}
+
+void RangeDeleterService::onStepUpComplete(OperationContext* opCtx, long long term) {
+    auto lock = _acquireMutexUnconditionally();
+    dassert(_state.load() == kDown, "Service expected to be down before stepping up");
+
+    _state.store(kInitializing);
+
+    if (_executor) {
+        // Join previously shutted down executor before reinstantiating it
+        _executor->join();
+        _executor.reset();
+
+        // Reset potential in-memory state referring a previous term
+        _rangeDeletionTasks.clear();
+    }
+
+    const std::string kExecName("RangeDeleterServiceExecutor");
+    auto net = executor::makeNetworkInterface(kExecName);
+    auto pool = std::make_unique<executor::NetworkInterfaceThreadPool>(net.get());
+    auto taskExecutor =
+        std::make_shared<executor::ThreadPoolTaskExecutor>(std::move(pool), std::move(net));
+    _executor = std::move(taskExecutor);
+    _executor->startup();
+
+    _recoverRangeDeletionsOnStepUp();
+}
+
+void RangeDeleterService::_recoverRangeDeletionsOnStepUp() {
+    // TODO SERVER-68348 Asynchronously register tasks on the range deleter service on step-up
+    _state.store(kUp);
+}
+
+void RangeDeleterService::onStepDown() {
+    auto lock = _acquireMutexUnconditionally();
+    dassert(_state.load() != kDown, "Service expected to be initializing/up before stepping down");
+
+    _executor->shutdown();
+
+    _state.store(kDown);
+}
+
 SharedSemiFuture<void> RangeDeleterService::registerTask(
     const RangeDeletionTask& rdt, SemiFuture<void>&& waitForActiveQueriesToComplete) {
 
     // Block the scheduling of the task while populating internal data structures
     SharedPromise<void> blockUntilRegistered;
 
-    std::vector<ExecutorFuture<void>> initialFutures;
-    initialFutures.push_back(blockUntilRegistered.getFuture().semi().thenRunOn(_executor));
-    initialFutures.push_back(std::move(waitForActiveQueriesToComplete).thenRunOn(_executor));
-
     auto chainCompletionFuture =
-        // Step 1: wait for the task to be registered on the service and for the draining of
-        // ongoing queries that are retaining the orphaned range
-        whenAllSucceed(std::move(initialFutures))
+        blockUntilRegistered.getFuture()
+            .semi()
             .thenRunOn(_executor)
-            .onError([&](Status s) {
-                // Invalidate the chain if a task for this range had already been registered.
-                // The above futures can only fail with this specific error (futures notifying
-                // the end of ongoing queries on a range will never be set to an error)
-                invariant(s.code() == 67635);
-                return s;
+            .onError([serializedTask = rdt.toBSON()](Status errStatus) {
+                // The above futures can only fail with those specific codes (futures notifying
+                // the end of ongoing queries on a range will never be set to an error):
+                // - 67635: the task was already previously scheduled
+                // - BrokenPromise: the executor is shutting down
+                // - Cancellation error: the node is shutting down or a stepdown happened
+                if (errStatus.code() != 67635 && errStatus != ErrorCodes::BrokenPromise &&
+                    !ErrorCodes::isCancellationError(errStatus)) {
+                    LOGV2_ERROR(6784800,
+                                "Range deletion scheduling failed with unexpected error",
+                                "error"_attr = errStatus,
+                                "rangeDeletion"_attr = serializedTask);
+                }
+                return errStatus;
+            })
+            .then([waitForOngoingQueries = std::move(waitForActiveQueriesToComplete).share()]() {
+                return waitForOngoingQueries;
             })
             .then([this, when = rdt.getWhenToClean()]() {
                 // Step 2: schedule wait for secondaries orphans cleanup delay
@@ -78,7 +135,7 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
             .share();
 
     auto [taskCompletionFuture, inserted] = [&]() -> std::pair<SharedSemiFuture<void>, bool> {
-        stdx::lock_guard<Latch> lg(_mutex);
+        auto lock = _acquireMutexFailIfServiceNotUp();
         auto [registeredTask, inserted] = _rangeDeletionTasks[rdt.getCollectionUuid()].insert(
             std::make_shared<RangeDeletion>(RangeDeletion(rdt, chainCompletionFuture)));
         auto retFuture = static_cast<RangeDeletion*>(registeredTask->get())->getCompletionFuture();
@@ -103,12 +160,12 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
 }
 
 void RangeDeleterService::deregisterTask(const UUID& collUUID, const ChunkRange& range) {
-    stdx::lock_guard<Latch> lg(_mutex);
+    auto lock = _acquireMutexFailIfServiceNotUp();
     _rangeDeletionTasks[collUUID].erase(std::make_shared<ChunkRange>(range));
 }
 
 int RangeDeleterService::getNumRangeDeletionTasksForCollection(const UUID& collectionUUID) {
-    stdx::lock_guard<Latch> lg(_mutex);
+    auto lock = _acquireMutexFailIfServiceNotUp();
     auto tasksSet = _rangeDeletionTasks.find(collectionUUID);
     if (tasksSet == _rangeDeletionTasks.end()) {
         return 0;

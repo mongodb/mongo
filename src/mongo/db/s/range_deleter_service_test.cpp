@@ -63,6 +63,9 @@ RangeDeletionWithOngoingQueries createRangeDeletionTaskForTesting(
     const BSONObj& max,
     const CleanWhenEnum whenToClean = CleanWhenEnum::kNow) {
     RangeDeletionTask rdt;
+    rdt.setId(UUID::gen());
+    rdt.setNss(NamespaceString("test.mock"));
+    rdt.setDonorShardId(ShardId("shard0"));
     rdt.setCollectionUuid(collectionUUID);
     rdt.setRange(ChunkRange(min, max));
     rdt.setWhenToClean(whenToClean);
@@ -74,9 +77,11 @@ public:
     void setUp() override {
         ShardServerTestFixture::setUp();
         opCtx = operationContext();
+        RangeDeleterService::get(opCtx)->onStepUpComplete(opCtx, 0L);
     }
 
     void tearDown() override {
+        RangeDeleterService::get(opCtx)->onStepDown();
         ShardServerTestFixture::tearDown();
     }
 
@@ -94,103 +99,103 @@ public:
 };
 
 TEST_F(RangeDeleterServiceTest, RegisterAndProcessSingleTask) {
-    RangeDeleterService rds;
+    auto rds = RangeDeleterService::get(opCtx);
     auto* taskWithOngoingQueries = &rangeDeletionTask0ForCollA;
 
-    auto completionFuture = rds.registerTask(taskWithOngoingQueries->getTask(),
-                                             taskWithOngoingQueries->getOngoingQueriesFuture());
+    auto completionFuture = rds->registerTask(taskWithOngoingQueries->getTask(),
+                                              taskWithOngoingQueries->getOngoingQueriesFuture());
     // The task can't be processed (hence completed) before ongoing queries drain
     ASSERT(!completionFuture.isReady());
-    ASSERT_EQ(1, rds.getNumRangeDeletionTasksForCollection(uuidCollA));
+    ASSERT_EQ(1, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
 
     // Pretend ongoing queries have drained and check task is processed
     taskWithOngoingQueries->drainOngoingQueries();
     completionFuture.get(opCtx);
-    ASSERT_EQ(0, rds.getNumRangeDeletionTasksForCollection(uuidCollA));
+    ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
 }
 
 TEST_F(RangeDeleterServiceTest, RegisterDuplicateTaskForSameRangeReturnsOriginalFuture) {
-    RangeDeleterService rds;
+    auto rds = RangeDeleterService::get(opCtx);
     auto* taskWithOngoingQueries = &rangeDeletionTask0ForCollA;
 
-    auto originalTaskCompletionFuture = rds.registerTask(
+    auto originalTaskCompletionFuture = rds->registerTask(
         taskWithOngoingQueries->getTask(), taskWithOngoingQueries->getOngoingQueriesFuture());
 
     // Trying registering a duplicate task must return a future without throwing errors
     auto duplicateTaskCompletionFuture =
-        rds.registerTask(taskWithOngoingQueries->getTask(), SemiFuture<void>::makeReady());
+        rds->registerTask(taskWithOngoingQueries->getTask(), SemiFuture<void>::makeReady());
 
     // Check that the state of the original task is not affected
     ASSERT(!originalTaskCompletionFuture.isReady());
 
     // Check that no new task has been registered
-    ASSERT_EQ(1, rds.getNumRangeDeletionTasksForCollection(uuidCollA));
+    ASSERT_EQ(1, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
 
     // Check that - upon range deletion completion - both original and "duplicate" futures are ready
     taskWithOngoingQueries->drainOngoingQueries();
     originalTaskCompletionFuture.get(opCtx);
     ASSERT(duplicateTaskCompletionFuture.isReady());
-    ASSERT_EQ(0, rds.getNumRangeDeletionTasksForCollection(uuidCollA));
+    ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
 }
 
 TEST_F(RangeDeleterServiceTest, RegisterAndProcessMoreTasksForSameCollection) {
-    RangeDeleterService rds;
+    auto rds = RangeDeleterService::get(opCtx);
     auto* task0WithOngoingQueries = &rangeDeletionTask0ForCollA;
     auto* task1WithOngoingQueries = &rangeDeletionTask1ForCollA;
 
     // Register 2 tasks for the same collection
-    auto completionFuture0 = rds.registerTask(task0WithOngoingQueries->getTask(),
-                                              task0WithOngoingQueries->getOngoingQueriesFuture());
-    auto completionFuture1 = rds.registerTask(task1WithOngoingQueries->getTask(),
-                                              task1WithOngoingQueries->getOngoingQueriesFuture());
+    auto completionFuture0 = rds->registerTask(task0WithOngoingQueries->getTask(),
+                                               task0WithOngoingQueries->getOngoingQueriesFuture());
+    auto completionFuture1 = rds->registerTask(task1WithOngoingQueries->getTask(),
+                                               task1WithOngoingQueries->getOngoingQueriesFuture());
 
     // The tasks can't be processed (hence completed) before ongoing queries drain
     ASSERT(!completionFuture0.isReady());
     ASSERT(!completionFuture1.isReady());
-    ASSERT_EQ(2, rds.getNumRangeDeletionTasksForCollection(uuidCollA));
+    ASSERT_EQ(2, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
 
     // Pretend ongoing queries have drained for task 1 and check it gets processed
     task1WithOngoingQueries->drainOngoingQueries();
     completionFuture1.get(opCtx);
-    ASSERT_EQ(1, rds.getNumRangeDeletionTasksForCollection(uuidCollA));
+    ASSERT_EQ(1, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
 
     // Pretend ongoing queries have drained for task 0 and check it gets processed
     task0WithOngoingQueries->drainOngoingQueries();
     completionFuture0.get(opCtx);
-    ASSERT_EQ(0, rds.getNumRangeDeletionTasksForCollection(uuidCollA));
+    ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
 }
 
 TEST_F(RangeDeleterServiceTest, RegisterAndProcessTasksForDifferentCollections) {
-    RangeDeleterService rds;
+    auto rds = RangeDeleterService::get(opCtx);
     auto* taskWithOngoingQueriesCollA = &rangeDeletionTask0ForCollA;
     auto* taskWithOngoingQueriesCollB = &rangeDeletionTask0ForCollB;
 
     // Register 1 tasks for `collA` and 1 task for `collB`
     auto completionFutureCollA =
-        rds.registerTask(taskWithOngoingQueriesCollA->getTask(),
-                         taskWithOngoingQueriesCollA->getOngoingQueriesFuture());
+        rds->registerTask(taskWithOngoingQueriesCollA->getTask(),
+                          taskWithOngoingQueriesCollA->getOngoingQueriesFuture());
     auto completionFutureCollB =
-        rds.registerTask(taskWithOngoingQueriesCollB->getTask(),
-                         taskWithOngoingQueriesCollB->getOngoingQueriesFuture());
+        rds->registerTask(taskWithOngoingQueriesCollB->getTask(),
+                          taskWithOngoingQueriesCollB->getOngoingQueriesFuture());
 
     // The tasks can't be processed (hence completed) before ongoing queries drain
     ASSERT(!completionFutureCollA.isReady());
     ASSERT(!completionFutureCollB.isReady());
-    ASSERT_EQ(1, rds.getNumRangeDeletionTasksForCollection(uuidCollA));
-    ASSERT_EQ(1, rds.getNumRangeDeletionTasksForCollection(uuidCollB));
+    ASSERT_EQ(1, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+    ASSERT_EQ(1, rds->getNumRangeDeletionTasksForCollection(uuidCollB));
 
     // Pretend ongoing queries have drained for task on coll B and check that:
     // - Task for `collB` gets processed
     // - Task for `collA` is not affected
     taskWithOngoingQueriesCollB->drainOngoingQueries();
     completionFutureCollB.get(opCtx);
-    ASSERT_EQ(0, rds.getNumRangeDeletionTasksForCollection(uuidCollB));
-    ASSERT_EQ(1, rds.getNumRangeDeletionTasksForCollection(uuidCollA));
+    ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollB));
+    ASSERT_EQ(1, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
 
     // Pretend ongoing queries have drained for task on coll A and check it gets processed
     taskWithOngoingQueriesCollA->drainOngoingQueries();
     completionFutureCollA.get(opCtx);
-    ASSERT_EQ(0, rds.getNumRangeDeletionTasksForCollection(uuidCollA));
+    ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
 }
 
 TEST_F(RangeDeleterServiceTest, DelayForSecondaryQueriesIsHonored) {
@@ -200,12 +205,12 @@ TEST_F(RangeDeleterServiceTest, DelayForSecondaryQueriesIsHonored) {
     // Set delay for waiting secondary queries to 2 seconds
     orphanCleanupDelaySecs.store(2);
 
-    RangeDeleterService rds;
+    auto rds = RangeDeleterService::get(opCtx);
     auto taskWithOngoingQueries = createRangeDeletionTaskForTesting(
         uuidCollA, BSON("a" << 0), BSON("a" << 10), CleanWhenEnum::kDelayed);
 
-    auto completionFuture = rds.registerTask(taskWithOngoingQueries.getTask(),
-                                             taskWithOngoingQueries.getOngoingQueriesFuture());
+    auto completionFuture = rds->registerTask(taskWithOngoingQueries.getTask(),
+                                              taskWithOngoingQueries.getOngoingQueriesFuture());
 
     // Check that the task lasts at least 2 seconds from the moment ongoing queries drain
     auto start = Date_t::now();
@@ -215,6 +220,80 @@ TEST_F(RangeDeleterServiceTest, DelayForSecondaryQueriesIsHonored) {
 
     auto elapsed = end.toDurationSinceEpoch() - start.toDurationSinceEpoch();
     ASSERT(elapsed >= Milliseconds(2000));
+}
+
+TEST_F(RangeDeleterServiceTest, TaskWaitingForOngoingQueriesInvalidatedOnStepDown) {
+    auto rds = RangeDeleterService::get(opCtx);
+
+    auto taskWithOngoingQueries = createRangeDeletionTaskForTesting(
+        uuidCollA, BSON("a" << 0), BSON("a" << 10), CleanWhenEnum::kDelayed);
+
+    auto completionFuture = rds->registerTask(taskWithOngoingQueries.getTask(),
+                                              taskWithOngoingQueries.getOngoingQueriesFuture());
+
+    // Manually trigger disabling of the service
+    rds->onStepDown();
+    ON_BLOCK_EXIT([&] {
+        rds->onStepUpComplete(opCtx, 0L);  // Re-enable the service
+    });
+
+    try {
+        completionFuture.get(opCtx);
+    } catch (const ExceptionForCat<ErrorCategory::CancellationError>&) {
+        // Expect a cancellation error when the service gets disabled
+    }
+}
+
+TEST_F(RangeDeleterServiceTest, ScheduledTaskInvalidatedOnStepDown) {
+    auto rds = RangeDeleterService::get(opCtx);
+
+    auto taskWithOngoingQueries = createRangeDeletionTaskForTesting(
+        uuidCollA, BSON("a" << 0), BSON("a" << 10), CleanWhenEnum::kDelayed);
+    // Mark ongoing queries as completed
+    taskWithOngoingQueries.drainOngoingQueries();
+
+    auto completionFuture = rds->registerTask(taskWithOngoingQueries.getTask(),
+                                              taskWithOngoingQueries.getOngoingQueriesFuture());
+
+    // Manually trigger disabling of the service
+    rds->onStepDown();
+    ON_BLOCK_EXIT([&] {
+        rds->onStepUpComplete(opCtx, 0L);  // Re-enable the service for clean teardown
+    });
+
+    try {
+        completionFuture.get(opCtx);
+    } catch (const ExceptionForCat<ErrorCategory::CancellationError>&) {
+        // Expect a cancellation error when the service gets disabled
+    }
+}
+
+TEST_F(RangeDeleterServiceTest, NoActionPossibleIfServiceIsDown) {
+    auto rds = RangeDeleterService::get(opCtx);
+
+    // Manually trigger disabling of the service
+    rds->onStepDown();
+    ON_BLOCK_EXIT([&] {
+        rds->onStepUpComplete(opCtx, 0L);  // Re-enable the service for clean teardown
+    });
+
+    auto taskWithOngoingQueries = createRangeDeletionTaskForTesting(
+        uuidCollA, BSON("a" << 0), BSON("a" << 10), CleanWhenEnum::kDelayed);
+
+    ASSERT_THROWS_CODE(rds->registerTask(taskWithOngoingQueries.getTask(),
+                                         taskWithOngoingQueries.getOngoingQueriesFuture()),
+                       DBException,
+                       ErrorCodes::NotYetInitialized);
+
+    ASSERT_THROWS_CODE(rds->deregisterTask(taskWithOngoingQueries.getTask().getCollectionUuid(),
+                                           taskWithOngoingQueries.getTask().getRange()),
+                       DBException,
+                       ErrorCodes::NotYetInitialized);
+
+    ASSERT_THROWS_CODE(rds->getNumRangeDeletionTasksForCollection(
+                           taskWithOngoingQueries.getTask().getCollectionUuid()),
+                       DBException,
+                       ErrorCodes::NotYetInitialized);
 }
 
 }  // namespace mongo
