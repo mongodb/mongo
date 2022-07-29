@@ -412,21 +412,27 @@ makeRecursiveBranchForGenericIndexScan(const CollectionPtr& collection,
                                        PlanNodeId planNodeId) {
     // The IndexScanStage in this branch will always produce a KeyString. As such, we use
     // 'indexKeySlot' if is defined and generate a new slot otherwise.
-    sbe::value::SlotId resultSlot;
-    if (indexKeySlot) {
-        resultSlot = *indexKeySlot;
-    } else {
-        resultSlot = slotIdGenerator->generate();
-    }
+    auto resultSlot = indexKeySlot ? *indexKeySlot : slotIdGenerator->generate();
     auto recordIdSlot = slotIdGenerator->generate();
     auto seekKeySlot = slotIdGenerator->generate();
-    auto lowKeySlot = slotIdGenerator->generate();
 
     // Build a standard index scan nested loop join with the outer branch producing a low key
     // to be fed into the index scan. The low key is taken from the 'seekKeySlot' which would
     // contain a value from the stack spool. See below for details.
+    auto stage = sbe::makeS<sbe::IndexScanStage>(collection->uuid(),
+                                                 indexName,
+                                                 params.direction == 1,
+                                                 resultSlot,
+                                                 recordIdSlot,
+                                                 snapshotIdSlot,
+                                                 indexKeysToInclude,
+                                                 std::move(savedIndexKeySlots),
+                                                 makeVariable(seekKeySlot) /* seekKeyLow */,
+                                                 nullptr /* seekKeyHigh */,
+                                                 yieldPolicy,
+                                                 planNodeId);
+
     sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
-    projects.emplace(lowKeySlot, makeVariable(seekKeySlot));
     if (indexIdSlot) {
         // Construct a copy of 'indexName' to project for use in the index consistency check.
         projects.emplace(*indexIdSlot, makeConstant(indexName));
@@ -439,49 +445,8 @@ makeRecursiveBranchForGenericIndexScan(const CollectionPtr& collection,
         projects.emplace(*indexKeyPatternSlot, makeConstant(bsonObjTag, bsonObjVal));
     }
 
-    auto project = sbe::makeS<sbe::ProjectStage>(
-        sbe::makeS<sbe::LimitSkipStage>(
-            sbe::makeS<sbe::CoScanStage>(planNodeId), 1, boost::none, planNodeId),
-        std::move(projects),
-        planNodeId);
-
-    auto ixscan = sbe::makeS<sbe::IndexScanStage>(collection->uuid(),
-                                                  indexName,
-                                                  params.direction == 1,
-                                                  resultSlot,
-                                                  recordIdSlot,
-                                                  snapshotIdSlot,
-                                                  indexKeysToInclude,
-                                                  std::move(savedIndexKeySlots),
-                                                  makeVariable(lowKeySlot),
-                                                  nullptr /* seekKeyHigh */,
-                                                  yieldPolicy,
-                                                  planNodeId);
-
-    // Get the low key from the outer side and feed it to the inner side (ixscan).
-    sbe::value::SlotVector outerSv = sbe::makeSV();
-    if (indexIdSlot) {
-        outerSv.push_back(*indexIdSlot);
-    }
-
-    if (indexKeyPatternSlot) {
-        outerSv.push_back(*indexKeyPatternSlot);
-    }
-
-    auto nlj = sbe::makeS<sbe::LoopJoinStage>(std::move(project),
-                                              std::move(ixscan),
-                                              std::move(outerSv),
-                                              sbe::makeSV(lowKeySlot),
-                                              nullptr,
-                                              planNodeId);
-
-    sbe::value::SlotVector correlatedSv = sbe::makeSV(seekKeySlot);
-    if (indexIdSlot) {
-        correlatedSv.push_back(*indexIdSlot);
-    }
-
-    if (indexKeyPatternSlot) {
-        correlatedSv.push_back(*indexKeyPatternSlot);
+    if (!projects.empty()) {
+        stage = sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projects), planNodeId);
     }
 
     auto spoolValsSV = sbe::makeSV(seekKeySlot);
@@ -493,8 +458,10 @@ makeRecursiveBranchForGenericIndexScan(const CollectionPtr& collection,
         spoolValsSV.push_back(*indexKeyPatternSlot);
     }
 
-    // Inject another nested loop join with the outer branch being a stack spool, and the inner an
-    // index scan nljoin which just constructed above. The stack spool is populated from the values
+    auto correlatedSv = spoolValsSV;
+
+    // Inject a nested loop join with the outer branch being a stack spool, and the inner branch
+    // being the index scan subtree ('stage'). The stack spool is populated from the values
     // generated by the index scan above, and passed through the check bounds stage, which would
     // produce either a valid recordId to be consumed by the stage sitting above the index scan
     // sub-tree, or a seek key to restart the index scan from. The spool will only store the seek
@@ -503,7 +470,7 @@ makeRecursiveBranchForGenericIndexScan(const CollectionPtr& collection,
     return {checkBoundsSlot,
             sbe::makeS<sbe::LoopJoinStage>(sbe::makeS<sbe::SpoolConsumerStage<true>>(
                                                spoolId, std::move(spoolValsSV), planNodeId),
-                                           sbe::makeS<sbe::CheckBoundsStage>(std::move(nlj),
+                                           sbe::makeS<sbe::CheckBoundsStage>(std::move(stage),
                                                                              std::move(params),
                                                                              resultSlot,
                                                                              recordIdSlot,
@@ -534,17 +501,11 @@ makeRecursiveBranchForGenericIndexScan(const CollectionPtr& collection,
  *                         sspool [seekKeySlot, indexIdSlot, indexKeyPatternSlot]
  *                     right
  *                         chkbounds resultSlot recordIdSlot checkBoundsSlot
- *                         nlj [indexIdSlot, indexKeyPatternSlot] [lowKeySlot]
- *                             left
- *                                 project [indexIdSlot = <indexName>,
- *                                 indexKeyPatternSlot = <index key pattern>,
- *                                 lowKeySlot = seekKeySlot]
- *                                 limit 1
- *                                 coscan
- *                             right
- *                                 ixseek lowKeySlot resultSlot recordIdSlot
- *                                        snapshotIdSlot savedIndexKeySlots []
- *                                        @coll @index
+ *                         project [indexIdSlot = <indexName>,
+ *                                  indexKeyPatternSlot = <index key pattern>]
+ *                         ixseek seekKeySlot resultSlot recordIdSlot
+ *                                snapshotIdSlot savedIndexKeySlots []
+ *                                @coll @index
  *
  *   - The anchor union branch is the starting point of the recursive subtree. It pushes the
  *     starting index into the lspool stage. The lspool has a filter predicate to ensure that
@@ -556,8 +517,7 @@ makeRecursiveBranchForGenericIndexScan(const CollectionPtr& collection,
  *        1. The outer branch reads next seek key from sspool.
  *               * If the spool is empty, we're done with the scan.
  *        2. The seek key is passed to the inner branch.
- *        3. The inner branch execution starts with the projection of the seek key, which is
- *           fed into the ixscan as a 'lowKeySlot'.
+ *        3. The inner branch execution starts with the ixscan.
  *        4. Two slots produced by the ixscan, 'resultSlot' and 'recordIdSlot', are passed to
  *            the chkbounds stage. Note that 'resultSlot' would contain the index key.
  *        5. The chkbounds stage can produce one of the following values:
