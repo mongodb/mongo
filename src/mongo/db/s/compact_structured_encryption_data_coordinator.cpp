@@ -211,11 +211,21 @@ ExecutorFuture<void> CompactStructuredEncryptionDataCoordinator::_runImpl(
                                 _doc.setSkipCompact(_skipCompact);
                                 _doc.setEcocRenameUuid(_ecocRenameUuid);
                             }))
-        .then(_executePhase(
-            Phase::kCompactStructuredEncryptionData,
-            [this, anchor = shared_from_this()]() { _response = doCompactOperation(_doc); }))
-        .then(_executePhase(Phase::kDropTempCollection,
-                            [this, anchor = shared_from_this()] { doDropOperation(_doc); }));
+        .then(_executePhase(Phase::kCompactStructuredEncryptionData,
+                            [this, anchor = shared_from_this()]() {
+                                _response = doCompactOperation(_doc);
+                                if (!_isPre61Compatible()) {
+                                    stdx::lock_guard lg(_docMutex);
+                                    _doc.setResponse(_response);
+                                }
+                            }))
+        .then(_executePhase(Phase::kDropTempCollection, [this, anchor = shared_from_this()] {
+            if (!_isPre61Compatible()) {
+                invariant(_doc.getResponse());
+                _response = *_doc.getResponse();
+            }
+            doDropOperation(_doc);
+        }));
 }
 
 }  // namespace mongo

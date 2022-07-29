@@ -95,6 +95,8 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
         case DDLCoordinatorTypeEnum::kReshardCollection:
             return std::make_shared<ReshardCollectionCoordinator>(service, std::move(initialState));
             break;
+        case DDLCoordinatorTypeEnum::kCompactStructuredEncryptionDataPre61Compatible:
+            // TODO SERVER-68373 remove once 7.0 becomes last LTS
         case DDLCoordinatorTypeEnum::kCompactStructuredEncryptionData:
             return std::make_shared<CompactStructuredEncryptionDataCoordinator>(
                 service, std::move(initialState));

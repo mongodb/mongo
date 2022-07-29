@@ -73,6 +73,12 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept final;
 
+    // TODO SERVER-68373 remove once 7.0 becomes last LTS
+    bool _isPre61Compatible() const {
+        return operationType() ==
+            DDLCoordinatorTypeEnum::kCompactStructuredEncryptionDataPre61Compatible;
+    }
+
 private:
     boost::optional<CompactStructuredEncryptionDataCommandReply> _response;
     bool _skipCompact{false};

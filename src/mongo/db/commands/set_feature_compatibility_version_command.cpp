@@ -359,6 +359,16 @@ public:
                         ->waitForCoordinatorsOfGivenTypeToComplete(
                             opCtx, DDLCoordinatorTypeEnum::kCollMod);
                 }
+
+                // TODO SERVER-68373 remove once 7.0 becomes last LTS
+                if (actualVersion > requestedVersion) {
+                    // Drain the QE compact coordinator because it persists state that is
+                    // not backwards compatible with earlier versions.
+                    ShardingDDLCoordinatorService::getService(opCtx)
+                        ->waitForCoordinatorsOfGivenTypeToComplete(
+                            opCtx, DDLCoordinatorTypeEnum::kCompactStructuredEncryptionData);
+                }
+
                 // If we are only running phase-1, then we are done
                 return true;
             }

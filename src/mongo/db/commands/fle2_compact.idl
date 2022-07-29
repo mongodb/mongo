@@ -82,5 +82,5 @@ commands:
         reply_type: CompactStructuredEncryptionDataCommandReply
         fields:
             compactionTokens:
-                description: "Map of field path to EOCToken"
+                description: "Map of field path to ECOCToken"
                 type: object

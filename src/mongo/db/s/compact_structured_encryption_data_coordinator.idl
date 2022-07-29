@@ -82,3 +82,7 @@ structs:
             compactionTokens:
                 description: "Compaction tokens for the compact operation"
                 type: object_owned
+            response:
+                description: "Response to the compactStructuredEncryptedData command"
+                type: CompactStructuredEncryptionDataCommandReply
+                optional: true

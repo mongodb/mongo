@@ -52,9 +52,11 @@ enums:
             kSetAllowMigrations: "setAllowMigrations"
             kCollMod: "collMod_V3"
             # TODO SERVER-68008: Remove once 7.0 becomes last LTS
-            kCollModPre61Compatible: "collMod_V2" 
+            kCollModPre61Compatible: "collMod_V2"
             kReshardCollection: "reshardCollection"
-            kCompactStructuredEncryptionData: "compactStructuredEncryptionData"
+            kCompactStructuredEncryptionData: "compactStructuredEncryptionData_V2"
+            # TODO SERVER-68373 remove once 7.0 becomes last LTS
+            kCompactStructuredEncryptionDataPre61Compatible: "compactStructuredEncryptionData"
 
 types:
     ForwardableOperationMetadata:
@@ -92,7 +94,7 @@ structs:
                 type: LogicalSessionId
             txnNumber:
                 type: TxnNumber
-    
+
     ShardingDDLCoordinatorMetadata:
         description: "Commong metadata for all sharding DDL coordinator."
         generate_comparison_operators: false
