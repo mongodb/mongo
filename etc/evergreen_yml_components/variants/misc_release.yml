@@ -101,7 +101,6 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .txns
   - name: slow1_gen
-  - name: snmp
   - name: .stitch
   - name: .crypt
   - name: test_packages
@@ -212,7 +211,6 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .txns !.csrs
   - name: slow1_gen
-  - name: snmp
   - name: .stitch
   - name: .crypt
   - name: .publish_crypt
@@ -374,7 +372,6 @@ buildvariants:
   - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns
   - name: .sharding .common
-  - name: snmp
   - name: .stitch
   - name: .crypt
     distros:
@@ -496,7 +493,6 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth_gen
-  - name: snmp
   - name: .stitch
   - name: .crypt
   - name: .publish_crypt
@@ -606,7 +602,6 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth_gen
-  - name: snmp
   - name: .stitch
   - name: .crypt
   - name: .publish_crypt
@@ -855,7 +850,6 @@ buildvariants:
   - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns
   - name: .sharding .common
-  - name: snmp
   - name: .stitch
   - name: .crypt
     distros:
@@ -971,7 +965,6 @@ buildvariants:
   - name: search_ssl
   - name: sharding_auth_audit_gen
   - name: sharding_auth_gen
-  - name: snmp
   - name: .stitch
   - name: .crypt
     distros:
@@ -1074,7 +1067,6 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth_gen
-  - name: snmp
   - name: .stitch
   - name: .crypt
   - name: .publish_crypt
@@ -1122,7 +1114,6 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth_gen
-  - name: snmp
   - name: .stitch
   - name: .crypt
   - name: .publish_crypt
@@ -1302,7 +1293,6 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth_gen
-  - name: snmp
   - name: .watchdog
   - name: test_packages
     distros:
@@ -1508,7 +1498,6 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: sharding_auth_gen
-  - name: snmp
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -1679,7 +1668,7 @@ buildvariants:
     exe: ".exe"
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi archive-mh archive-mh-debug
     content_type: application/zip
-    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include c:/snmp/include" LIBPATH="c:/sasl/lib c:/snmp/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") --win-version-min=win10
+    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include" LIBPATH="c:/sasl/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") --win-version-min=win10
     num_scons_link_jobs_available: 0.25
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip

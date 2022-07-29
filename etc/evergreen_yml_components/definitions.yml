@@ -1481,13 +1481,6 @@ functions:
       args:
       - "./src/evergreen/packager.py_run.sh"
 
-  "do snmp setup":
-    command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/do_snmp_setup.sh"
-
   "do watchdog setup":
     command: subprocess.exec
     params:
@@ -5827,17 +5820,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-
-- <<: *task_template
-  name: snmp
-  tags: []
-  commands:
-  - *f_expansions_write
-  - func: "do setup"
-  - func: "do snmp setup"
-  - func: "run tests"
-    vars:
-      snmp_config_path: SNMPCONFPATH=snmpconf
 
 - <<: *gen_task_template
   name: ssl_gen

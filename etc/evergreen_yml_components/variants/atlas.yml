@@ -65,7 +65,6 @@ buildvariants:
   - name: search_ssl
   - name: sharding_auth_audit_gen
   - name: sharding_auth_gen
-  - name: snmp
   - name: .stitch
   - name: .crypt
   - name: .publish_crypt

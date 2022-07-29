@@ -95,7 +95,6 @@ buildvariants:
   - name: session_jscore_passthrough
   - name: .sharding .jscore !.wo_snapshot
   - name: .sharding .common !.csrs
-  - name: snmp
   - name: .watchdog
   - name: .stitch
   - name: .serverless
@@ -164,7 +163,6 @@ buildvariants:
   - name: session_jscore_passthrough
   - name: .sharding .jscore !.wo_snapshot
   - name: .sharding .common !.csrs
-  - name: snmp
   - name: .stitch
   - name: .updatefuzzer
   - name: .serverless

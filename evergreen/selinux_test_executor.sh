@@ -43,7 +43,6 @@ sudo --non-interactive bash -c '
 
     rm -rf /etc/sysconfig/mongod /etc/mongod
 
-    setsebool mongod_can_connect_snmp off
     setsebool mongod_can_connect_ldap off
     setsebool mongod_can_use_kerberos off
 '
