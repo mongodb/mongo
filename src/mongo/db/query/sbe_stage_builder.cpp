@@ -2200,20 +2200,12 @@ std::tuple<sbe::value::SlotVector, EvalStage, std::unique_ptr<sbe::EExpression>>
                                                                       nodeId,
                                                                       slotIdGenerator);
 
+    // The group-by field may end up being 'Nothing' and in that case _id: null will be
+    // returned. Calling 'makeFillEmptyNull' for the group-by field takes care of that.
+    auto fillEmptyNullExpr = makeFillEmptyNull(groupByEvalExpr.extractExpr());
     sbe::value::SlotId slot;
-    if (auto isConstIdExpr = dynamic_cast<ExpressionConstant*>(idExpr.get()) != nullptr;
-        isConstIdExpr) {
-        std::tie(slot, retEvalStage) = projectEvalExpr(
-            std::move(groupByEvalExpr), std::move(groupByEvalStage), nodeId, slotIdGenerator);
-    } else {
-        // The group-by field may end up being 'Nothing' and in that case _id: null will be
-        // returned. Calling 'makeFillEmptyNull' for the group-by field takes care of that.
-        std::tie(slot, retEvalStage) =
-            projectEvalExpr(makeFillEmptyNull(groupByEvalExpr.extractExpr()),
-                            std::move(groupByEvalStage),
-                            nodeId,
-                            slotIdGenerator);
-    }
+    std::tie(slot, retEvalStage) = projectEvalExpr(
+        std::move(fillEmptyNullExpr), std::move(groupByEvalStage), nodeId, slotIdGenerator);
 
     return {sbe::value::SlotVector{slot}, std::move(retEvalStage), nullptr};
 }
