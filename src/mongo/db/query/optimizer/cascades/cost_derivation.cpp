@@ -156,7 +156,7 @@ public:
     CostAndCEInternal operator()(const ABT& /*n*/, const FilterNode& node) {
         CostAndCEInternal childResult = deriveChild(node.getChild(), 0);
         double filterCost = childResult._cost;
-        if (!node.getFilter().is<Constant>() && !node.getFilter().is<Variable>()) {
+        if (!isTrivialExpr<EvalFilter>(node.getFilter())) {
             // Non-trivial filter.
             filterCost += kStartupCost + kFilterIncrementalCost * childResult._ce;
         }
@@ -166,7 +166,7 @@ public:
     CostAndCEInternal operator()(const ABT& /*n*/, const EvaluationNode& node) {
         CostAndCEInternal childResult = deriveChild(node.getChild(), 0);
         double evalCost = childResult._cost;
-        if (!node.getProjection().is<Constant>() && !node.getProjection().is<Variable>()) {
+        if (!isTrivialExpr<EvalPath>(node.getProjection())) {
             // Non-trivial projection.
             evalCost += kStartupCost + kEvalIncrementalCost * childResult._ce;
         }
@@ -358,6 +358,18 @@ private:
           _cardinalityEstimate(getAdjustedCE(ce, _physProps)),
           _childProps(childProps),
           _nodeCEMap(nodeCEMap) {}
+
+    template <class T>
+    static bool isTrivialExpr(const ABT& n) {
+        if (n.is<Constant>() || n.is<Variable>()) {
+            return true;
+        }
+        if (const auto* ptr = n.cast<T>(); ptr != nullptr &&
+            ptr->getPath().template is<PathIdentity>() && isTrivialExpr<T>(ptr->getInput())) {
+            return true;
+        }
+        return false;
+    }
 
     static CostAndCEInternal deriveInternal(const Memo& memo,
                                             const PhysProps& physProps,

@@ -110,7 +110,7 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
 
     // Plan output with properties.
     ASSERT_EXPLAIN_PROPS_V2(
-        "Properties [cost: 1.02, localCost: 0, adjustedCE: 10]\n"
+        "Properties [cost: 0.620002, localCost: 0, adjustedCE: 10]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 10\n"
@@ -134,7 +134,7 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
         "|   |       p2\n"
         "|   RefBlock: \n"
         "|       Variable [p2]\n"
-        "Properties [cost: 1.02, localCost: 0.020001, adjustedCE: 10]\n"
+        "Properties [cost: 0.620002, localCost: 0.020001, adjustedCE: 10]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 10\n"
@@ -163,7 +163,7 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
         "|   PathGet [a]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [1]\n"
-        "Properties [cost: 1, localCost: 0.200001, adjustedCE: 100]\n"
+        "Properties [cost: 0.600001, localCost: 0, adjustedCE: 100]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 100\n"
@@ -190,7 +190,7 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
         "|           EvalPath []\n"
         "|           |   Variable [p1]\n"
         "|           PathIdentity []\n"
-        "Properties [cost: 0.800002, localCost: 0.200001, adjustedCE: 100]\n"
+        "Properties [cost: 0.600001, localCost: 0, adjustedCE: 100]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 100\n"
@@ -2627,6 +2627,10 @@ TEST(PhysRewriter, CompoundIndex4Negative) {
     using namespace properties;
     PrefixId prefixId;
 
+    PartialSchemaSelHints hints;
+    hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())}, 0.05);
+    hints.emplace(PartialSchemaKey{"root", make<PathGet>("b", make<PathIdentity>())}, 0.1);
+
     ABT scanNode = make<ScanNode>("root", "c1");
 
     // Create the following expression: {$and: [{a: {$eq: 1}}, {b: {$eq: 2}}]}
@@ -2661,6 +2665,7 @@ TEST(PhysRewriter, CompoundIndex4Negative) {
          OptPhaseManager::OptPhase::MemoExplorationPhase,
          OptPhaseManager::OptPhase::MemoImplementationPhase},
         prefixId,
+        false /*requireRID*/,
         {{{"c1",
            ScanDefinition{
                {},
@@ -2672,6 +2677,8 @@ TEST(PhysRewriter, CompoundIndex4Negative) {
                  IndexDefinition{{{makeNonMultikeyIndexPath("b"), CollationOp::Ascending},
                                   {makeNonMultikeyIndexPath("d"), CollationOp::Ascending}},
                                  false /*isMultiKey*/}}}}}}},
+        std::make_unique<HintedCE>(std::move(hints)),
+        std::make_unique<DefaultCosting>(),
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -2682,43 +2689,17 @@ TEST(PhysRewriter, CompoundIndex4Negative) {
     // Demonstrate that we do not get a merge join when the lookup keys on both intersected indexes
     // do not cover all field indexes. In this case there is no guarantee that the RIDs of all
     // matching keys will be sorted, and therefore they cannot be merge-joined.
-    ASSERT_EXPLAIN_V2(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       root\n"
-        "|   RefBlock: \n"
-        "|       Variable [root]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
-        "|   |   Const [true]\n"
-        "|   Filter []\n"
-        "|   |   EvalFilter []\n"
-        "|   |   |   Variable [pa]\n"
-        "|   |   PathCompare [Eq]\n"
-        "|   |   Const [1]\n"
-        "|   Evaluation []\n"
-        "|   |   BindBlock:\n"
-        "|   |       [pa]\n"
-        "|   |           EvalPath []\n"
-        "|   |           |   Variable [evalTemp_2]\n"
-        "|   |           PathIdentity []\n"
-        "|   LimitSkip []\n"
-        "|   |   limitSkip:\n"
-        "|   |       limit: 1\n"
-        "|   |       skip: 0\n"
-        "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': evalTemp_2}, c1]\n"
-        "|   |   BindBlock:\n"
-        "|   |       [evalTemp_2]\n"
-        "|   |           Source []\n"
-        "|   |       [root]\n"
-        "|   |           Source []\n"
-        "|   RefBlock: \n"
-        "|       Variable [rid_0]\n"
-        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index2, interval: {[Const "
-        "[2], Const [2]], [Const [minKey], Const [maxKey]]}]\n"
-        "    BindBlock:\n"
-        "        [rid_0]\n"
-        "            Source []\n",
-        optimized);
+    // Also demonstrate we pick index1 with the more selective predicate.
+
+    const BSONObj& explainRoot = ExplainGenerator::explainBSONObj(optimized);
+    ASSERT_BSON_PATH("\"BinaryJoin\"", explainRoot, "child.nodeType");
+    ASSERT_BSON_PATH("\"Filter\"", explainRoot, "child.rightChild.nodeType");
+    ASSERT_BSON_PATH("2", explainRoot, "child.rightChild.filter.path.value.value");
+    ASSERT_BSON_PATH("\"Seek\"", explainRoot, "child.rightChild.child.child.child.nodeType");
+
+    ASSERT_BSON_PATH("\"IndexScan\"", explainRoot, "child.leftChild.nodeType");
+    ASSERT_BSON_PATH("1", explainRoot, "child.leftChild.interval.0.lowBound.bound.value");
+    ASSERT_BSON_PATH("1", explainRoot, "child.leftChild.interval.0.highBound.bound.value");
 }
 
 TEST(PhysRewriter, IndexBoundsIntersect) {
@@ -2769,38 +2750,35 @@ TEST(PhysRewriter, IndexBoundsIntersect) {
     ASSERT_TRUE(phaseManager.optimize(optimized));
     ASSERT_BETWEEN(30, 40, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
-    // Demonstrate that the predicates >70 and <90 are NOT combined into the same interval (70, 90).
-    ASSERT_EXPLAIN_V2(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   RefBlock: \n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
-        "|   |   Const [true]\n"
-        "|   Filter []\n"
-        "|   |   EvalFilter []\n"
-        "|   |   |   Variable [evalTemp_15]\n"
-        "|   |   PathTraverse [1]\n"
-        "|   |   PathCompare [Gt]\n"
-        "|   |   Const [70]\n"
-        "|   LimitSkip []\n"
-        "|   |   limitSkip:\n"
-        "|   |       limit: 1\n"
-        "|   |       skip: 0\n"
-        "|   Seek [ridProjection: rid_0, {'a': evalTemp_15}, c1]\n"
-        "|   |   BindBlock:\n"
-        "|   |       [evalTemp_15]\n"
-        "|   |           Source []\n"
-        "|   RefBlock: \n"
-        "|       Variable [rid_0]\n"
-        "Unique []\n"
-        "|   projections: \n"
-        "|       rid_0\n"
-        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const "
-        "[1], Const [1]], [Const [minKey], Const [90])}]\n"
-        "    BindBlock:\n"
-        "        [rid_0]\n"
-        "            Source []\n",
-        optimized);
+    // Demonstrate that the predicates >70 and <90 are NOT combined into the same interval (70, 90)
+    // since the paths are multiKey. With the heuristic estimate we may get either interval in the
+    // index, and the other one as a residual filter.
+
+    const BSONObj& explainRoot = ExplainGenerator::explainBSONObj(optimized);
+    ASSERT_BSON_PATH("\"BinaryJoin\"", explainRoot, "child.nodeType");
+
+    ASSERT_BSON_PATH("\"Filter\"", explainRoot, "child.rightChild.nodeType");
+    const std::string filterVal = dotted_path_support::extractElementAtPath(
+                                      explainRoot, "child.rightChild.filter.path.input.value.value")
+                                      .toString(false /*includeFieldName*/);
+
+    ASSERT_BSON_PATH("\"Seek\"", explainRoot, "child.rightChild.child.child.nodeType");
+    ASSERT_BSON_PATH("\"Unique\"", explainRoot, "child.leftChild.nodeType");
+
+    const BSONObj& explainIndexScan =
+        dotted_path_support::extractElementAtPath(explainRoot, "child.leftChild.child").Obj();
+    ASSERT_BSON_PATH("\"IndexScan\"", explainIndexScan, "nodeType");
+    ASSERT_BSON_PATH("1", explainIndexScan, "interval.0.lowBound.bound.value");
+    ASSERT_BSON_PATH("1", explainIndexScan, "interval.0.highBound.bound.value");
+
+    const std::string lowBound = dotted_path_support::extractElementAtPath(
+                                     explainIndexScan, "interval.1.lowBound.bound.value")
+                                     .toString(false /*includeFieldName*/);
+    const std::string highBound = dotted_path_support::extractElementAtPath(
+                                      explainIndexScan, "interval.1.highBound.bound.value")
+                                      .toString(false /*includeFieldName*/);
+    ASSERT_TRUE((filterVal == "70" && lowBound == "MinKey" && highBound == "90") ||
+                (filterVal == "90" && lowBound == "70" && highBound == "MaxKey"));
 }
 
 TEST(PhysRewriter, IndexBoundsIntersect1) {
@@ -2948,18 +2926,6 @@ TEST(PhysRewriter, IndexBoundsIntersect2) {
 TEST(PhysRewriter, IndexBoundsIntersect3) {
     using namespace properties;
     PrefixId prefixId;
-
-    PartialSchemaSelHints hints;
-    hints.emplace(
-        PartialSchemaKey{
-            "root",
-            make<PathGet>(
-                "a",
-                make<PathTraverse>(
-                    make<PathGet>(
-                        "b", make<PathTraverse>(make<PathIdentity>(), PathTraverse::kSingleLevel)),
-                    PathTraverse::kSingleLevel))},
-        kDefaultSelectivity);
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
