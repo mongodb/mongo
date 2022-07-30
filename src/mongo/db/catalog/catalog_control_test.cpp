@@ -75,8 +75,8 @@ TEST_F(CatalogControlTest, CloseAndOpenCatalog) {
     ServiceContext::UniqueOperationContext opCtx = cc().makeOperationContext();
     Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
 
-    auto map = catalog::closeCatalog(opCtx.get());
-    ASSERT_EQUALS(0U, map.size());
+    auto previousState = catalog::closeCatalog(opCtx.get());
+    ASSERT_EQUALS(0U, previousState.minVisibleTimestampMap.size());
     catalog::openCatalog(opCtx.get(), {}, Timestamp());
 }
 

@@ -258,6 +258,14 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    bool getRequiresTimeseriesExtendedRangeSupport() const {
+        MONGO_UNREACHABLE;
+    }
+
+    void setRequiresTimeseriesExtendedRangeSupport(OperationContext* opCtx) const {
+        MONGO_UNREACHABLE;
+    }
+
     bool isClustered() const {
         return false;
     }

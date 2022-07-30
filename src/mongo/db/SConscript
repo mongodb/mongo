@@ -1564,6 +1564,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/repl/repl_settings',
         '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_extended_range',
         'dbdirectclient',
         'dbhelpers',
         'index_builds_coordinator_interface',

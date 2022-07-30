@@ -562,6 +562,22 @@ public:
     virtual bool doesTimeseriesBucketsDocContainMixedSchemaData(
         const BSONObj& bucketsDoc) const = 0;
 
+    /**
+     * Returns true if the time-series collection may have dates outside the standard range (roughly
+     * 1970-2038). The value may be updated in the background by another thread between calls, even
+     * if the caller holds a lock on the collection. The value may only transition from false to
+     * true.
+     */
+    virtual bool getRequiresTimeseriesExtendedRangeSupport() const = 0;
+
+    /**
+     * Sets the in-memory flag for this collection. This value can be retrieved by
+     * 'getRequiresTimeseriesExtendedRangeSupport'.
+     *
+     * Throws if this is not a time-series collection.
+     */
+    virtual void setRequiresTimeseriesExtendedRangeSupport(OperationContext* opCtx) const = 0;
+
     /*
      * Returns true if this collection is clustered. That is, its RecordIds store the value of the
      * cluster key. If the collection is clustered on _id, there is no separate _id index.

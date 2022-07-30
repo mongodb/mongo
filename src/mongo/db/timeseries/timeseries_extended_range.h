@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,44 +27,39 @@
  *    it in the license file.
  */
 
-#include <map>
+#pragma once
 
-#include "mongo/db/operation_context.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 
-namespace mongo {
-namespace catalog {
-
-using MinVisibleTimestamp = Timestamp;
-using MinVisibleTimestampMap = std::map<UUID, MinVisibleTimestamp>;
-using RequiresTimestampExtendedRangeSupportMap = std::map<UUID, bool>;
-struct PreviousCatalogState {
-    MinVisibleTimestampMap minVisibleTimestampMap;
-    RequiresTimestampExtendedRangeSupportMap requiresTimestampExtendedRangeSupportMap;
-};
+namespace mongo::timeseries {
 
 /**
- * Closes the catalog, destroying all associated in-memory data structures for all databases. After
- * a call to this function, it is illegal to access the catalog before calling openCatalog().
- *
- * Must be called with the global lock acquired in exclusive mode.
+ * Determines whether the given 'date' is outside the standard supported range and requires extended
+ * range support. Standard range dates can be expressed as a number of seconds since the Unix epoch
+ * in 31 unsigned bits.
  */
-PreviousCatalogState closeCatalog(OperationContext* opCtx);
+bool dateOutsideStandardRange(Date_t date);
 
 /**
- * Restores the catalog and all in-memory state after a call to closeCatalog().
- *
- * Must be called with the global lock acquired in exclusive mode.
+ * Determines whether any of the given measurements have timeField values that lie outside the
+ * standard range.
  */
-void openCatalog(OperationContext* opCtx,
-                 const PreviousCatalogState& catalogState,
-                 Timestamp stableTimestamp);
+bool measurementsHaveDateOutsideStandardRange(const TimeseriesOptions& options,
+                                              const std::vector<BSONObj>& measurements);
 
 /**
- * Restores the catalog and all in-memory state after a call to
- * closeCatalog -> reinitializeStorageEngine -> startupRecovery.
- *
- * Must be called with the global lock acquired in exclusive mode.
+ * Uses a heuristic to determine whether a given time-series collection may contain measurements
+ * with dates that fall outside the standard range.
  */
-void openCatalogAfterStorageChange(OperationContext* opCtx);
-}  // namespace catalog
-}  // namespace mongo
+bool collectionMayRequireExtendedRangeSupport(OperationContext* opCtx,
+                                              const CollectionPtr& collection);
+
+/**
+ * Determines whether a time-series collection has an index primarily ordered by a time field. This
+ * excludes the clustered index, and is testing specifically if an index's key pattern's first field
+ * is either control.min.<timeField> or control.max.<timeField>.
+ */
+bool collectionHasTimeIndex(OperationContext* opCtx, const Collection& collection);
+}  // namespace mongo::timeseries
