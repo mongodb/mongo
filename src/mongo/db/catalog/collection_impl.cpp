@@ -40,6 +40,7 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/db/auth/security_token.h"
+#include "mongo/db/catalog/catalog_stats.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -80,6 +81,7 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/ttl_collection_cache.h"
@@ -1615,6 +1617,29 @@ bool CollectionImpl::doesTimeseriesBucketsDocContainMixedSchemaData(
     const BSONObj maxObj = controlObj.getObjectField(timeseries::kBucketControlMaxFieldName);
 
     return doesMinMaxHaveMixedSchemaData(minObj, maxObj);
+}
+
+bool CollectionImpl::getRequiresTimeseriesExtendedRangeSupport() const {
+    return _shared->_requiresTimeseriesExtendedRangeSupport.load();
+}
+
+void CollectionImpl::setRequiresTimeseriesExtendedRangeSupport(OperationContext* opCtx) const {
+    uassert(6679401, "This is not a time-series collection", _metadata->options.timeseries);
+
+    bool expected = false;
+    bool set = _shared->_requiresTimeseriesExtendedRangeSupport.compareAndSwap(&expected, true);
+    if (set) {
+        catalog_stats::requiresTimeseriesExtendedRangeSupport.fetchAndAdd(1);
+        if (!timeseries::collectionHasTimeIndex(opCtx, *this)) {
+            LOGV2_WARNING(
+                6679402,
+                "Time-series collection contains dates outside the standard range. Some query "
+                "optimizations may be disabled. Please consider building an index on timeField to "
+                "re-enable them.",
+                "nss"_attr = ns().getTimeseriesViewNamespace(),
+                "timeField"_attr = _metadata->options.timeseries->getTimeField());
+        }
+    }
 }
 
 bool CollectionImpl::isClustered() const {

@@ -71,6 +71,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/timeseries/bucket_catalog.h"
+#include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/transaction_participant.h"
 #include "mongo/db/transaction_participant_gen.h"
 #include "mongo/db/views/durable_view_catalog.h"
@@ -632,6 +633,27 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                         validator->cacheExternalKey(externalKey);
                     }
                 });
+        }
+    } else if (nss.isTimeseriesBucketsCollection()) {
+        // Check if the bucket _id is sourced from a date outside the standard range. If our writes
+        // end up erroring out or getting rolled back, then this flag will stay set. This is okay
+        // though, as it only disables some query optimizations and won't result in any correctness
+        // issues if the flag is set when it doesn't need to be (as opposed to NOT being set when it
+        // DOES need to be -- that will cause correctness issues). Additionally, if the user tried
+        // to insert measurements with dates outside the standard range, chances are they will do so
+        // again, and we will have only set the flag a little early.
+        invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
+        auto bucketsColl =
+            CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, nss);
+        tassert(6905201, "Could not find collection for write", bucketsColl);
+        auto timeSeriesOptions = bucketsColl->getTimeseriesOptions();
+        if (timeSeriesOptions.has_value()) {
+            if (auto currentSetting = bucketsColl->getRequiresTimeseriesExtendedRangeSupport();
+                !currentSetting &&
+                timeseries::bucketsHaveDateOutsideStandardRange(
+                    timeSeriesOptions.value(), first, last)) {
+                bucketsColl->setRequiresTimeseriesExtendedRangeSupport(opCtx);
+            }
         }
     }
 }

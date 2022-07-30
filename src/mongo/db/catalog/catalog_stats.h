@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,44 +27,12 @@
  *    it in the license file.
  */
 
-#include <map>
+#pragma once
 
-#include "mongo/db/operation_context.h"
+#include "mongo/platform/atomic_word.h"
 
-namespace mongo {
-namespace catalog {
+namespace mongo::catalog_stats {
 
-using MinVisibleTimestamp = Timestamp;
-using MinVisibleTimestampMap = std::map<UUID, MinVisibleTimestamp>;
-using RequiresTimestampExtendedRangeSupportMap = std::map<UUID, bool>;
-struct PreviousCatalogState {
-    MinVisibleTimestampMap minVisibleTimestampMap;
-    RequiresTimestampExtendedRangeSupportMap requiresTimestampExtendedRangeSupportMap;
-};
+extern AtomicWord<int> requiresTimeseriesExtendedRangeSupport;
 
-/**
- * Closes the catalog, destroying all associated in-memory data structures for all databases. After
- * a call to this function, it is illegal to access the catalog before calling openCatalog().
- *
- * Must be called with the global lock acquired in exclusive mode.
- */
-PreviousCatalogState closeCatalog(OperationContext* opCtx);
-
-/**
- * Restores the catalog and all in-memory state after a call to closeCatalog().
- *
- * Must be called with the global lock acquired in exclusive mode.
- */
-void openCatalog(OperationContext* opCtx,
-                 const PreviousCatalogState& catalogState,
-                 Timestamp stableTimestamp);
-
-/**
- * Restores the catalog and all in-memory state after a call to
- * closeCatalog -> reinitializeStorageEngine -> startupRecovery.
- *
- * Must be called with the global lock acquired in exclusive mode.
- */
-void openCatalogAfterStorageChange(OperationContext* opCtx);
-}  // namespace catalog
-}  // namespace mongo
+}  // namespace mongo::catalog_stats
