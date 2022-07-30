@@ -101,11 +101,24 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='timeseries_extended_range',
+    source=[
+        'timeseries_extended_range.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/index_catalog',
+        'timeseries_options',
+    ],
+)
+
 env.CppUnitTest(
     target='db_timeseries_test',
     source=[
         'bucket_catalog_test.cpp',
         'minmax_test.cpp',
+        'timeseries_extended_range_test.cpp',
         'timeseries_index_schema_conversion_functions_test.cpp',
         'timeseries_update_delete_util_test.cpp',
         'timeseries_options_test.cpp'
@@ -113,6 +126,8 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
         'bucket_catalog',
+        'bucket_compression',
+        'timeseries_extended_range',
         'timeseries_index_schema_conversion_functions',
         'timeseries_options',
         'timeseries_update_delete_util',

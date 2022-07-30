@@ -29,7 +29,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/catalog/catalog_stats.h"
 
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -38,7 +38,10 @@
 #include "mongo/db/views/view_catalog.h"
 #include "mongo/logv2/log.h"
 
-namespace mongo {
+namespace mongo::catalog_stats {
+
+// Number of time-series collections requiring extended range support
+AtomicWord<int> requiresTimeseriesExtendedRangeSupport;
 
 namespace {
 class CatalogStatsSSS : public ServerStatusSection {
@@ -58,6 +61,7 @@ public:
         int timeseries = 0;
         int internalCollections = 0;
         int internalViews = 0;
+        int timeseriesExtendedRange = 0;
 
         void toBson(BSONObjBuilder* builder) const {
             builder->append("collections", collections);
@@ -66,6 +70,9 @@ public:
             builder->append("views", views);
             builder->append("internalCollections", internalCollections);
             builder->append("internalViews", internalViews);
+            if (timeseriesExtendedRange > 0) {
+                builder->append("timeseriesExtendedRange", timeseriesExtendedRange);
+            }
         }
     };
 
@@ -78,6 +85,7 @@ public:
         stats.collections = catalogStats.userCollections;
         stats.capped = catalogStats.userCapped;
         stats.internalCollections = catalogStats.internal;
+        stats.timeseriesExtendedRange = requiresTimeseriesExtendedRangeSupport.load();
 
         const auto viewCatalogDbNames = catalog->getViewCatalogDbNames();
         for (const auto& dbName : viewCatalogDbNames) {
@@ -107,4 +115,4 @@ public:
 
 } catalogStatsSSS;
 }  // namespace
-}  // namespace mongo
+}  // namespace mongo::catalog_stats

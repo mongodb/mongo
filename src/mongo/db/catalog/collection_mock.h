@@ -243,6 +243,14 @@ public:
         std::abort();
     }
 
+    bool getRequiresTimeseriesExtendedRangeSupport() const {
+        MONGO_UNREACHABLE;
+    }
+
+    void setRequiresTimeseriesExtendedRangeSupport(OperationContext* opCtx) const {
+        MONGO_UNREACHABLE;
+    }
+
     bool isClustered() const {
         std::abort();
     }
