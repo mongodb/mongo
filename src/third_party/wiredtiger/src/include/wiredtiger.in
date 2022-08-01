@@ -4847,7 +4847,7 @@ struct __wt_file_handle {
 	 *    which is subsequently passed to WT_FILE_HANDLE::unmap.
 	 */
 	int (*fh_map)(WT_FILE_HANDLE *file_handle, WT_SESSION *session,
-	    void *mapped_regionp, size_t *lengthp, void *mapped_cookiep);
+	    void **mapped_regionp, size_t *lengthp, void **mapped_cookiep);
 
 	/*!
 	 * Unmap part of a memory mapped file, based on the POSIX 1003.1
