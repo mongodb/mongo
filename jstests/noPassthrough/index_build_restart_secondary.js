@@ -48,46 +48,94 @@ assert.commandWorked(bulk.execute({j: true}));
 // Make sure the documents make it to the secondary.
 replTest.awaitReplication();
 
-// Pause the index build on the primary after replicating the startIndexBuild oplog entry.
-IndexBuildTest.pauseIndexBuilds(primaryDB);
-IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {i: 1});
-IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {x: 1});
-IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {y: 1});
+if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
+    // Pause the index build on the primary after replicating the startIndexBuild oplog entry.
+    IndexBuildTest.pauseIndexBuilds(primaryDB);
+    IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {i: 1});
+    IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {x: 1});
+    IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {y: 1});
 
-// Wait for build to start on the secondary.
-jsTestLog("Waiting for all index builds to start on the secondary");
-IndexBuildTest.waitForIndexBuildToStart(secondaryDB, coll.getName(), "i_1");
-IndexBuildTest.waitForIndexBuildToStart(secondaryDB, coll.getName(), "x_1");
-IndexBuildTest.waitForIndexBuildToStart(secondaryDB, coll.getName(), "y_1");
+    // Wait for build to start on the secondary.
+    jsTestLog("waiting for all index builds to start on secondary");
+    IndexBuildTest.waitForIndexBuildToStart(secondaryDB, coll.getName(), "i_1");
+    IndexBuildTest.waitForIndexBuildToStart(secondaryDB, coll.getName(), "x_1");
+    IndexBuildTest.waitForIndexBuildToStart(secondaryDB, coll.getName(), "y_1");
+} else {
+    assert.commandWorked(secondaryDB.adminCommand(
+        {configureFailPoint: 'leaveIndexBuildUnfinishedForShutdown', mode: 'alwaysOn'}));
 
-replTest.stop(secondary);
-replTest.start(secondary,
-               {
-                   setParameter: {
-                       "failpoint.hangAfterSettingUpIndexBuildUnlocked": tojson({mode: "alwaysOn"}),
-                   }
-               },
-               true /* restart */);
+    try {
+        coll.createIndex({i: 1});
+        coll.createIndex({x: 1});
+        coll.createIndex({y: 1});
+        primaryDB.getLastError(2);
+        assert.eq(4, coll.getIndexes().length);
 
-// Verify that we do not wait for the index build to complete on startup.
-assert.soonNoExcept(() => {
-    IndexBuildTest.assertIndexes(secondaryDB.getCollection(collectionName),
-                                 4,
-                                 ["_id_"],
-                                 ["i_1", "x_1", "y_1"],
-                                 {includeBuildUUIDS: true});
-    return true;
-});
+        // Make sure all writes are durable on the secondary so that we can restart it knowing that
+        // the index build will be found on startup.
+        // Waiting for durable is important for both (A) the record that we started the index build
+        // so it is rebuild on restart, and (B) the update to minvalid to show that we've already
+        // applied the oplog entry so it isn't replayed. If (A) is present without (B), then there
+        // are two ways that the index can be rebuilt on startup and this test is only for the one
+        // triggered by (A).
+        secondaryDB.adminCommand({fsync: 1});
+    } finally {
+        assert.commandWorked(secondaryDB.adminCommand(
+            {configureFailPoint: 'leaveIndexBuildUnfinishedForShutdown', mode: 'off'}));
+    }
+}
 
-assert.commandWorked(secondary.adminCommand(
-    {configureFailPoint: 'hangAfterSettingUpIndexBuildUnlocked', mode: 'off'}));
+MongoRunner.stopMongod(secondary);
 
-// Let index build complete on primary, which replicates a commitIndexBuild to the secondary.
-IndexBuildTest.resumeIndexBuilds(primaryDB);
+if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
+    replTest.start(
+        secondary,
+        {
+            setParameter:
+                {"failpoint.hangAfterSettingUpIndexBuildUnlocked": tojson({mode: "alwaysOn"})}
+        },
+        /*restart=*/true,
+        /*wait=*/true);
+} else {
+    replTest.start(secondary,
+                   {},
+                   /*restart=*/true,
+                   /*wait=*/true);
+}
+
+// Make sure secondary comes back.
+try {
+    assert.soon(function() {
+        try {
+            secondaryDB.isMaster();  // trigger a reconnect if needed
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }, "secondary didn't restart", 30000, 1000);
+
+    if (IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
+        // Verify that we do not wait for the index build to complete on startup.
+        assert.eq(100, secondaryDB.getCollection(collectionName).find({}).itcount());
+
+        // Verify that only the _id index is ready.
+        checkLog.containsJson(secondary, 4585201);
+        IndexBuildTest.assertIndexes(secondaryDB.getCollection(collectionName),
+                                     4,
+                                     ["_id_"],
+                                     ["i_1", "x_1", "y_1"],
+                                     {includeBuildUUIDS: true});
+    }
+} finally {
+    assert.commandWorked(secondary.adminCommand(
+        {configureFailPoint: 'hangAfterSettingUpIndexBuildUnlocked', mode: 'off'}));
+
+    // Let index build complete on primary, which replicates a commitIndexBuild to the secondary.
+    IndexBuildTest.resumeIndexBuilds(primaryDB);
+}
 
 assert.soonNoExcept(function() {
-    return 4 === secondaryDB.getCollection(collectionName).getIndexes().length;
-}, "Index build did not complete after restart");
-
+    return 4 == secondaryDB.getCollection(collectionName).getIndexes().length;
+}, "Index build not resumed after restart", 30000, 50);
 replTest.stopSet();
 }());
