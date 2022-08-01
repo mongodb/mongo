@@ -1,7 +1,11 @@
 // Confirm that implicitly created profile collections are successful and do not trigger assertions.
 // In order to implicitly create a profile collection with a read, we must set up the server with
 // some data to read without the profiler being active.
-// @tags: [requires_persistence]
+// @tags: [
+//     # 'assert' log component is not available in 5.0.
+//     requires_fcv_60,
+//     requires_persistence,
+// ]
 (function() {
 "use strict";
 let rst = new ReplSetTest({nodes: {n0: {profile: "0"}}});
