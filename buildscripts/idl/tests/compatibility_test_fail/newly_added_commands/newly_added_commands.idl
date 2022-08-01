@@ -53,7 +53,7 @@ structs:
         fields:
             newStructFieldTypeContainsAny:
                 type: bsonSerializationTypeAny
-                unstable: false
+                stability: stable
 
 commands:
     newCommandParameterNoUnstableField:
@@ -99,7 +99,7 @@ commands:
         fields:
             flag1:
                 type: bsonSerializationTypeAny
-                unstable: false
+                stability: stable
         reply_type: OkReply
 
     newCommandReplyBsonSerializationTypeAny:

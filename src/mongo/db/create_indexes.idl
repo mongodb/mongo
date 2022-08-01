@@ -43,29 +43,29 @@ structs:
                 description: 'Index count before create'
                 type: int
                 optional: true
-                unstable: false
+                stability: stable
             numIndexesAfter:
                 description: 'Index count after create'
                 type: int
                 optional: true
-                unstable: false
+                stability: stable
             createdCollectionAutomatically:
                 description: >-
                     Whether or not this createIndexes command resulted
                     in a newly created collection.
                 type: bool
                 optional: true
-                unstable: false
+                stability: stable
             commitQuorum:
                 description: 'Commit Quorum options used'
                 type: CommitQuorum
                 optional: true
-                unstable: false
+                stability: stable
             note:
                 description: 'Optional warning/error related to createIndex'
                 type: string
                 optional: true
-                unstable: false
+                stability: stable
 
     # A built index appears with these fields, which must be the same as ListIndexesReplyItem's
     # fields in list_indexes.idl.
@@ -77,117 +77,117 @@ structs:
                 description: 'Index spec version'
                 type: safeInt
                 optional: true
-                unstable: false
+                stability: stable
             key:
                 description: 'Key to index on'
                 type: object_owned
-                unstable: false
+                stability: stable
             name:
                 description: 'Descriptive name for the index'
                 type: string
-                unstable: false
+                stability: stable
             ns:
                 # MongoDB 4.2 and older generate this field, see SERVER-41696.
                 type: string
                 ignore: true
-                unstable: false
+                stability: stable
             background:
                 type: safeBool
                 optional: true
-                unstable: true
+                stability: unstable
             unique:
                 type: safeBool
                 optional: true
-                unstable: false
+                stability: stable
             hidden:
                 type: safeBool
                 optional: true
-                unstable: false
+                stability: stable
             partialFilterExpression:
                 type: object_owned
                 optional: true
-                unstable: false
+                stability: stable
             sparse:
                 type: safeBool
                 optional: true
-                unstable: true
+                stability: unstable
             expireAfterSeconds:
                 type: safeInt
                 optional: true
-                unstable: false
+                stability: stable
             storageEngine:
                 type: object_owned
                 optional: true
-                unstable: true
+                stability: unstable
             weights:
                 type:
                     variant: [string, object_owned]
                 optional: true
-                unstable: false
+                stability: stable
             default_language:
                 type: string
                 optional: true
-                unstable: false
+                stability: stable
             language_override:
                 type: string
                 optional: true
-                unstable: false
+                stability: stable
             textIndexVersion:
                 type: safeInt
                 optional: true
-                unstable: false
+                stability: stable
             2dsphereIndexVersion:
                 type: safeInt
                 optional: true
-                unstable: false
+                stability: stable
             bits:
                 type: safeInt
                 optional: true
-                unstable: false
+                stability: stable
             min:
                 type: safeDouble
                 optional: true
-                unstable: false
+                stability: stable
             max:
                 type: safeDouble
                 optional: true
-                unstable: false
+                stability: stable
             bucketSize:
                 type: safeDouble
                 optional: true
-                unstable: true
+                stability: unstable
             collation:
                 type: object_owned
                 optional: true
-                unstable: false
+                stability: stable
             wildcardProjection:
                 type: object_owned
                 optional: true
-                unstable: false
+                stability: stable
             columnstoreProjection:
                 type: object_owned
                 optional: true
-                unstable: true
+                stability: unstable
             coarsestIndexedLevel:
                 type: safeInt
                 optional: true
-                unstable: false
+                stability: stable
             finestIndexedLevel:
                 type: safeInt
                 optional: true
-                unstable: false
+                stability: stable
             dropDups:
                 type: safeBool
                 optional: true
-                unstable: true
+                stability: unstable
             clustered:
                 type: safeBool
                 optional: true
-                unstable: false
+                stability: stable
             prepareUnique:
                 type: safeBool
                 optional: true
-                unstable: true
+                stability: unstable
 commands:
     createIndexes:
         description: "Command for creating indexes on a collection"
@@ -207,17 +207,17 @@ commands:
                 description: 'Index schema version'
                 type: safeInt
                 default: 2
-                unstable: false
+                stability: stable
             indexes:
                 description: 'Indexes to be created'
                 # array<NewIndexSpec> but respect ignoreUnknownIndexOptions
                 type: array<object>
-                unstable: false
+                stability: stable
             ignoreUnknownIndexOptions:
                 description: 'Ignore unknown options in index spec'
                 type: safeBool
                 default: false
-                unstable: true
+                stability: unstable
             commitQuorum:
                 description: "Dictates which or how many replica set members must be ready to commit
                               the index build before the primary will proceed to commit the index.
@@ -225,16 +225,16 @@ commands:
                               commit and can quickly apply the commit on a finished index build"
                 type: CommitQuorum
                 optional: true
-                unstable: false
+                stability: stable
             isTimeseriesNamespace:
                 description: "This flag is set to true when the command was originally sent to
                               mongos on the time-series view, but got rewritten to target
                               time-series buckets namespace before being sent to shards."
                 type: bool
                 optional: true
-                unstable: false
+                stability: internal
             collectionUUID:
                 type: uuid
                 description: "The expected UUID of the collection."
                 optional: true
-                unstable: true
+                stability: unstable

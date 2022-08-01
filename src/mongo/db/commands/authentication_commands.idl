@@ -40,11 +40,11 @@ structs:
             dbname:
                 description: "Name of the database the user is authenticating to"
                 type: "string"
-                unstable: false
+                stability: stable
             user:
                 description: "Username"
                 type: "string"
-                unstable: false
+                stability: stable
 
 commands:
     authenticate:
@@ -61,12 +61,12 @@ commands:
             mechanism:
                 description: "Mechanism used for authentication. Should be 'MONGODB-X509'."
                 type: string
-                unstable: false
+                stability: stable
             user:
                 description: "The user attempting to authenticate"
                 type: string
                 optional: true
-                unstable: false
+                stability: stable
 
     logout:
         description: "Deauthenticate from the current database"

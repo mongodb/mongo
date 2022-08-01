@@ -207,7 +207,7 @@ class Field(common.SourceLocation):
         self.chained = False  # type: bool
         self.comparison_order = -1  # type: int
         self.non_const_getter = False  # type: bool
-        self.unstable = None  # type: Optional[bool]
+        self.stability = None  # type: Optional[str]
         self.default = None  # type: str
         self.type = None  # type: Type
         self.always_serialize = False  # type: bool

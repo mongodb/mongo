@@ -42,7 +42,7 @@ structs:
       expireAfterSeconds:
         description: "The number of seconds after which a pre-image is eligible for
                       deletion. A string value 'off' enables the default expiration policy."
-        unstable: false
+        stability: stable
         type:
           variant: [string, safeInt64]
         default: "\"off\""
@@ -54,5 +54,5 @@ structs:
     fields:
       preAndPostImages:
         type: PreAndPostImagesOptions
-        unstable: false
+        stability: stable
         default: true

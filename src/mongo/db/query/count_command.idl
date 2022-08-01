@@ -78,55 +78,55 @@ commands:
                 view."
                 type: object
                 default: BSONObj()
-                unstable: false
+                stability: stable
             limit:
                 description: "The maximum number of matching documents to count."
                 type: countLimit
                 optional: true
-                unstable: false
+                stability: stable
             skip:
                 description: "The number of matching documents to skip before counting subsequent
                     results."
                 type: safeInt64
                 optional: true
                 validator: { gte: 0 }
-                unstable: false
+                stability: stable
             hint:
                 description: "The index name to use or the index specification document."
                 type: indexHint
                 default: BSONObj()
-                unstable: false
+                stability: stable
             collation:
                 description: "The collation to use in the count command."
                 type: object
                 optional: true
-                unstable: false
+                stability: stable
             fields:
                 description: "A BSONObj added by the shell. Left in for backwards compatibility."
                 type: object
                 ignore: true
-                unstable: true
+                stability: unstable
             readConcern:
                 description: "A BSONObj read concern."
                 type: object
                 optional: true
-                unstable: false
+                stability: stable
             maxTimeMS:
                 type: maxTimeMS
                 optional: true
-                unstable: false
+                stability: stable
             $queryOptions:
                 description: "Unwrapped read preference."
                 cpp_name: queryOptions
                 type: object
                 optional: true
-                unstable: false
+                stability: stable
             encryptionInformation:
                 description: "Encryption Information schema and other tokens for CRUD commands"
                 type: EncryptionInformation
                 optional: true
-                unstable: true
+                stability: unstable
             mirrored:
                 description: "Indicates whether the operation is a mirrored read"
                 type: optionalBool
-                unstable: true
+                stability: unstable

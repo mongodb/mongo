@@ -44,22 +44,22 @@ structs:
               cpp_name: localNow
               type: date
               description: A value of the $$NOW variable.
-              unstable: false
+              stability: stable
           clusterTime:
               cpp_name: clusterTime
               type: timestamp
               description: A value of the $$CLUSTER_TIME variable.
-              unstable: false
+              stability: stable
           jsScope:
               cpp_name: jsScope
               type: object
               optional: true
               description: Optional scope variables accessible from internal javacsript expressions.
-              unstable: false
+              stability: stable
           isMapReduce:
               cpp_name: isMapReduce
               type: bool
               optional: true
-              unstable: false
+              stability: stable
               description: When specified, signals that the aggregation pipeline originated from a
                            mapReduce command.

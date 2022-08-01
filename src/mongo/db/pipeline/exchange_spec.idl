@@ -50,25 +50,25 @@ structs:
       policy:
         type: ExchangePolicy
         description: A string indicating a policy of how documents are distributed to consumers.
-        unstable: false
+        stability: stable
       consumers:
         type: int
         description: Number of consumers.
-        unstable: false
+        stability: stable
       orderPreserving:
         type: bool
         default: false
         description: A flag indicating documents are merged while preserving the order.
-        unstable: false
+        stability: stable
       bufferSize:
         type: int
         default: 16777216
         description: The size of exchange buffers.
-        unstable: false
+        stability: stable
       key:
         type: object
         default: "BSONObj()"
-        unstable: false
+        stability: stable
         description: A key used for document distribution to consumers. The same description as
                      sorting/sharding. If the document entering the exchange does not have every
                      field listed here, or if any prefix of any path is multikey (i.e. an array is
@@ -78,10 +78,10 @@ structs:
         type: array<object>
         optional: true
         description: Range/hash split points.
-        unstable: false
+        stability: stable
       consumerIds:
         type: array<int>
         optional: true
         description: Mapping from a range index to a consumer id.
-        unstable: false
+        stability: stable
 

@@ -55,28 +55,28 @@ structs:
             queryType:
                 description: "Type of supported queries"
                 type: QueryType
-                unstable: true
+                stability: unstable
             contention:
                 description: "Contention factor for field, 0 means it has extremely high set number of distinct values"
                 type: exactInt64
                 default: 4
-                unstable: true
+                stability: unstable
                 validator: { gte: 0 }
             min:
                 description: "Defines the lower bound for field values. Only applicable for queryType range"
                 type: Value
                 optional: true
-                unstable: true
+                stability: unstable
             max:
                 description: "Defines the upper bound for field values. Only applicable for queryType range"
                 type: Value
                 optional: true
-                unstable: true
+                stability: unstable
             sparsity:
                 description: "Lower value - higher storage overhead, faster query."
                 type: int
                 optional: true
-                unstable: true
+                stability: unstable
                 validator: { gte: 0, lte: 3 }
 
     EncryptedField:
@@ -86,23 +86,23 @@ structs:
             keyId:
                 description: "UUID of key in key vault to use for encryption"
                 type: uuid
-                unstable: true
+                stability: unstable
             path:
                 description: "Path to field to encrypt"
                 type: string
-                unstable: true
+                stability: unstable
             bsonType:
                 description: "BSON type of field to encrypt"
                 type: string
                 validator: { callback: "isValidBSONTypeName" }
                 optional: true
-                unstable: true
+                stability: unstable
             queries:
                 description: "List of supported query types"
                 type:
                     variant: [QueryTypeConfig, array<QueryTypeConfig>]
                 optional: true
-                unstable: true
+                stability: unstable
 
     EncryptedFieldConfig:
         description: "Information about encrypted fields and state collections"
@@ -112,18 +112,18 @@ structs:
                 description: "Encrypted State Collection name, defaults to <collection>.esc"
                 type: string
                 optional: true
-                unstable: true
+                stability: unstable
             eccCollection:
                 description: "Encrypted Cache Collection name, defaults to <collection>.ecc"
                 type: string
                 optional: true
-                unstable: true
+                stability: unstable
             ecocCollection:
                 description: "Encrypted Compaction Collection name, defaults to <collection>.ecoc"
                 type: string
                 optional: true
-                unstable: true
+                stability: unstable
             fields:
                 description: "Array of encrypted fields"
                 type: array<EncryptedField>
-                unstable: true
+                stability: unstable

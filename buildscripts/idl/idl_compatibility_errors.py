@@ -118,9 +118,9 @@ ERROR_ID_REPLY_FIELD_SERIALIZER_NOT_EQUAL = "ID0073"
 ERROR_ID_COMMAND_DESERIALIZER_NOT_EQUAL = "ID0074"
 ERROR_ID_COMMAND_PARAMETER_DESERIALIZER_NOT_EQUAL = "ID0075"
 ERROR_ID_REPLY_FIELD_DESERIALIZER_NOT_EQUAL = "ID0076"
-ERROR_ID_NEW_REPLY_FIELD_REQUIRES_UNSTABLE = "ID0077"
-ERROR_ID_NEW_PARAMETER_REQUIRES_UNSTABLE = "ID0078"
-ERROR_ID_NEW_COMMAND_TYPE_FIELD_REQUIRES_UNSTABLE = "ID0079"
+ERROR_ID_NEW_REPLY_FIELD_REQUIRES_STABILITY = "ID0077"
+ERROR_ID_NEW_PARAMETER_REQUIRES_STABILITY = "ID0078"
+ERROR_ID_NEW_COMMAND_TYPE_FIELD_REQUIRES_STABILITY = "ID0079"
 ERROR_ID_NEW_REPLY_CHAINED_TYPE_NOT_SUBSET = "ID0080"
 ERROR_ID_NEW_COMMAND_PARAMETER_CHAINED_TYPE_NOT_SUPERSET = "ID0081"
 ERROR_ID_NEW_COMMAND_CHAINED_TYPE_NOT_SUPERSET = "ID0082"
@@ -1101,29 +1101,29 @@ class IDLCompatibilityContext(object):
                         ("The generic reply field '%s' was removed from the new definition of the "
                          "generic_argument.idl file") % (field_name), file)
 
-    def add_new_reply_field_requires_unstable_error(self, command_name: str, field_name: str,
-                                                    file: str) -> None:
-        """Add an error that a new reply field requires the 'unstable' field."""
+    def add_new_reply_field_requires_stability_error(self, command_name: str, field_name: str,
+                                                     file: str) -> None:
+        """Add an error that a new reply field requires the 'stability' field."""
         self._add_error(
-            ERROR_ID_NEW_REPLY_FIELD_REQUIRES_UNSTABLE, command_name,
+            ERROR_ID_NEW_REPLY_FIELD_REQUIRES_STABILITY, command_name,
             ("The new definition of '%s' has reply field '%s' that requires specifying a value "
-             "for the 'unstable' field") % (command_name, field_name), file)
+             "for the 'stability' field") % (command_name, field_name), file)
 
-    def add_new_param_or_command_type_field_requires_unstable_error(
+    def add_new_param_or_command_type_field_requires_stability_error(
             self, command_name: str, field_name: str, file: str,
             is_command_parameter: bool) -> None:
         # pylint: disable=invalid-name
-        """Add an error that a new param or command type field requires the 'unstable' field."""
+        """Add an error that a new param or command type field requires the 'stability' field."""
         if is_command_parameter:
             self._add_error(
-                ERROR_ID_NEW_PARAMETER_REQUIRES_UNSTABLE, command_name,
+                ERROR_ID_NEW_PARAMETER_REQUIRES_STABILITY, command_name,
                 ("The new definition of '%s' has parameter '%s' that requires specifying a value "
-                 "for the 'unstable' field") % (command_name, field_name), file)
+                 "for the 'stability' field") % (command_name, field_name), file)
         else:
             self._add_error(
-                ERROR_ID_NEW_COMMAND_TYPE_FIELD_REQUIRES_UNSTABLE, command_name,
+                ERROR_ID_NEW_COMMAND_TYPE_FIELD_REQUIRES_STABILITY, command_name,
                 ("The new definition of '%s' has command type field '%s' that requires specifying "
-                 "a value for the 'unstable' field") % (command_name, field_name), file)
+                 "a value for the 'stability' field") % (command_name, field_name), file)
 
     def add_unstable_reply_field_changed_to_stable_error(self, command_name: str, field_name: str,
                                                          file: str) -> None:

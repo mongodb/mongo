@@ -52,19 +52,19 @@ structs:
                 description: 'Index spec version'
                 type: safeInt
                 default: 2
-                unstable: false
+                stability: stable
             key:
                 description: 'Key to index on'
                 type: object_owned
-                unstable: false
+                stability: stable
             name:
                 description: 'Descriptive name for the index'
                 type: string
                 optional: true
-                unstable: false
+                stability: stable
             unique:
                 type: safeBool
-                unstable: false
+                stability: stable
 
     ClusteredCollectionInfo:
         description: "Information on how a collection is clustered. For internal use only"

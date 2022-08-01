@@ -112,7 +112,7 @@ ERROR_ID_NON_CONST_GETTER_IN_IMMUTABLE_STRUCT = "ID0069"
 ERROR_ID_FEATURE_FLAG_DEFAULT_TRUE_MISSING_VERSION = "ID0070"
 ERROR_ID_FEATURE_FLAG_DEFAULT_FALSE_HAS_VERSION = "ID0071"
 ERROR_ID_INVALID_REPLY_TYPE = "ID0072"
-ERROR_ID_UNSTABLE_NO_API_VERSION = "ID0073"
+ERROR_ID_STABILITY_NO_API_VERSION = "ID0073"
 ERROR_ID_MISSING_REPLY_TYPE = "ID0074"
 ERROR_ID_USELESS_VARIANT = "ID0076"
 ERROR_ID_ILLEGAL_FIELD_ALWAYS_SERIALIZE_NOT_OPTIONAL = "ID0077"
@@ -128,6 +128,8 @@ ERROR_ID_DUPLICATE_ACCESS_CHECK = "ID0087"
 ERROR_ID_DUPLICATE_PRIVILEGE = "ID0088"
 ERROR_ID_EMPTY_ACCESS_CHECK = "ID0089"
 ERROR_ID_MISSING_ACCESS_CHECK = "ID0090"
+ERROR_ID_STABILITY_UNKNOWN_VALUE = "ID0091"
+ERROR_ID_DUPLICATE_UNSTABLE_STABILITY = "ID0092"
 
 
 class IDLError(Exception):
@@ -882,13 +884,13 @@ class ParserContext(object):
             location, ERROR_ID_INVALID_REPLY_TYPE,
             ("Command '%s' has invalid reply_type '%s'" % (command_name, reply_type_name)))
 
-    def add_unstable_no_api_version(self, location, command_name):
+    def add_stability_no_api_version(self, location, command_name):
         # type: (common.SourceLocation, str) -> None
-        """Add an error about a command with 'unstable' but no 'api_version'."""
+        """Add an error about a command with 'stability' but no 'api_version'."""
         # pylint: disable=invalid-name
         self._add_error(
-            location, ERROR_ID_UNSTABLE_NO_API_VERSION,
-            ("Command '%s' specifies 'unstable' but has no 'api_version'" % (command_name, )))
+            location, ERROR_ID_STABILITY_NO_API_VERSION,
+            ("Command '%s' specifies 'stability' but has no 'api_version'" % (command_name, )))
 
     def add_missing_reply_type(self, location, command_name):
         # type: (common.SourceLocation, str) -> None
@@ -966,6 +968,23 @@ class ParserContext(object):
         # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_MISSING_ACCESS_CHECK,
                         'Command "%s" has api_version != "" but is missing access_check.' % (name))
+
+    def add_stability_unknown_value(self, location):
+        # type: (common.SourceLocation) -> None
+        """Add an error about a field with unknown value set to 'stability' option."""
+        # pylint: disable=invalid-name
+        self._add_error(
+            location, ERROR_ID_STABILITY_UNKNOWN_VALUE,
+            "Field option 'stability' has unknown value, should be one of 'stable', 'unstable' or 'internal.'"
+        )
+
+    def add_duplicate_unstable_stability(self, location):
+        # type: (common.SourceLocation) -> None
+        """Add an error about a field specifying both 'unstable' and 'stability'."""
+        # pylint: disable=invalid-name
+        self._add_error(location, ERROR_ID_DUPLICATE_UNSTABLE_STABILITY, (
+            "Field specifies both 'unstable' and 'stability' options, should use 'stability: [stable|unstable|internal]' instead and remove the deprecated 'unstable' option."
+        ))
 
 
 def _assert_unique_error_messages():

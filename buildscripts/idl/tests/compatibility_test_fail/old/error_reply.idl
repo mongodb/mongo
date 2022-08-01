@@ -41,7 +41,7 @@ structs:
         fields:
             errorLabels:
                 type: StructType
-                unstable: false
+                stability: stable
     
     StructType:
         description: "This struct contains a field that is non-optional in the old
@@ -49,4 +49,4 @@ structs:
         fields:
             structField:
                 type: string
-                unstable: false
+                stability: stable

@@ -39,7 +39,7 @@ structs:
         fields:
             stableNewField:
                 type: string
-                unstable: true
+                stability: unstable
 
 commands:
     importCommand:

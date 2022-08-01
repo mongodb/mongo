@@ -59,6 +59,6 @@ structs:
                 description: "The index options for the specified storage engines."
                 type: object_owned
                 optional: true
-                unstable: false
+                stability: stable
                 validator:
                     callback: collection_options_validation::validateStorageEngineOptions

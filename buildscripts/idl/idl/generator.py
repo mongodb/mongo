@@ -217,7 +217,7 @@ class _FastFieldUsageChecker(_FieldUsageCheckerBase):
         self._writer.write_line('usedFields.set(%s);' % (_gen_field_usage_constant(field)))
         self._writer.write_empty_line()
 
-        if field.unstable:
+        if field.stability == 'unstable':
             self._writer.write_line(
                 'ctxt.throwAPIStrictErrorIfApplicable(%s);' % (bson_element_variable))
             self._writer.write_empty_line()

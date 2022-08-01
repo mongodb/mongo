@@ -98,7 +98,7 @@ structs:
         fields:
             stableNewField:
                 type: string
-                unstable: false
+                stability: stable
 
     UnstableNewFieldReplyIgnoreList:
         description: "This reply contains a field that is stable in the old command and is
@@ -106,7 +106,7 @@ structs:
         fields:
             unstableNewFieldIgnoreList:
                 type: string
-                unstable: true
+                stability: unstable
 
     NewReplyTypeEnumOrStructIgnoreList:
         description: "the type is a non-enum or struct type in the old command, and an enum or struct
@@ -114,7 +114,7 @@ structs:
         fields:
             newReplyTypeEnumOrStructIgnoreList:
                 type: StructType
-                unstable: true
+                stability: unstable
 
     RequiredNewFieldReply:
         description: "This reply contains a field that is optional in the old command but is
@@ -122,7 +122,7 @@ structs:
         fields:
             requiredNewField:
                 type: string
-                unstable: false
+                stability: stable
 
     OptionalNewField:
         description: "This struct contains a field that is required in the old command but is
@@ -131,14 +131,14 @@ structs:
             optionalNewField:
                 type: string
                 optional: true
-                unstable: false
+                stability: stable
 
     AddedNewFieldReply:
         description: "This reply contains a field that is added in the new command."
         fields:
             addedNewField:
                 type: string
-                unstable: false
+                stability: stable
 
     UnstableOldFieldReply:
         description: "This reply contains a field that is unstable in the old command and is
@@ -146,7 +146,7 @@ structs:
         fields:
             unstableOldField:
                 type: string
-                unstable: true
+                stability: unstable
                 optional: true
 
     UnstableOptionalNewFieldReplyIgnoreList:
@@ -155,7 +155,7 @@ structs:
         fields:
             unstableOptionalNewFieldIgnoreList:
                 type: string
-                unstable: true
+                stability: unstable
                 optional: true
 
     EnumSubsetReply:
@@ -164,7 +164,7 @@ structs:
         fields:
             replyField:
                 type: NewReplyFieldEnumSubset
-                unstable: false
+                stability: stable
 
     BsonSubsetReply:
         description: "This reply contains a field type where the new bson_serialization_type
@@ -172,7 +172,7 @@ structs:
         fields:
             bsonSubsetReplyField:
                 type: intStringToInt
-                unstable: false
+                stability: stable
 
     BsonSubsetReplyTwo:
         description: "This reply contains a field type where the new bson_serialization_type
@@ -180,7 +180,7 @@ structs:
         fields:
             bsonSubsetReplyFieldTwo:
                 type: intStringBoolToIntString
-                unstable: false
+                stability: stable
 
     StructFieldTypeRecursiveReplyIgnoreList:
         description: "This reply contains a field whose new type is a struct that is not
@@ -188,7 +188,7 @@ structs:
         fields:
             structReplyField:
                 type: UnstableNewFieldReplyIgnoreList
-                unstable: true
+                stability: unstable
 
     StructFieldTypeRecursiveReplyOne:
         description: "This reply contains a field whose new type is a struct that is
@@ -196,7 +196,7 @@ structs:
         fields:
             structReplyField:
                 type: StableNewFieldReply
-                unstable: false
+                stability: stable
 
     StructFieldTypeRecursiveReplyTwo:
         description: "This reply contains a field whose new type is a struct that is
@@ -204,7 +204,7 @@ structs:
         fields:
             structReplyField:
                 type: StructType
-                unstable: false
+                stability: stable
 
     StructType:
         description: "This struct contains a field whose new type is compatible with the
@@ -212,7 +212,7 @@ structs:
         fields:
             fieldOne:
                 type: BsonSubsetReply
-                unstable: false
+                stability: stable
 
     OldVariantTypeReply:
         description: "This reply contains an old field that has a variant type while the new field
@@ -220,7 +220,7 @@ structs:
         fields:
             oldVariantTypeReplyField:
                 type: int
-                unstable: false
+                stability: stable
 
     NewVariantNotSubsetReplyIgnoreList:
         description: "This reply contains a field whose new variant types are not a subset
@@ -229,14 +229,14 @@ structs:
             variantNotSubsetReplyFieldIgnoreList:
                 type:
                     variant: [int, string]
-                unstable: true
+                stability: unstable
 
     NewVariantSubsetReply:
         description: "This reply contains a field whose new variant types are a subset
                       of the old variant types"
         fields:
             variantSubsetReplyField:
-                unstable: false
+                stability: stable
                 type:
                     variant: [int, string, array<string>]
 
@@ -245,7 +245,7 @@ structs:
                       of the old variant types"
         fields:
             variantSubsetReplyFieldTwo:
-                unstable: false
+                stability: stable
                 type:
                     variant: [int, string, array<string>]
 
@@ -254,7 +254,7 @@ structs:
                       with the old variant type"
         fields:
             variantRecursiveReplyField:
-                unstable: false
+                stability: stable
                 type:
                     variant: [int, intStringBoolToIntString,
                               array<intStringBoolToIntString>, array<string>]
@@ -264,7 +264,7 @@ structs:
                       struct type while the old one does"
         fields:
             variantStructReplyField:
-                unstable: false
+                stability: stable
                 type:
                     variant: [int, string, array<string>]
 
@@ -273,7 +273,7 @@ structs:
                       compatible with the old variant struct type"
         fields:
             variantStructRecursiveReplyField:
-                unstable: false
+                stability: stable
                 type:
                     variant: [int, StructFieldTypeRecursiveReplyTwo,
                               array<StructFieldTypeRecursiveReplyTwo>, array<string>]
@@ -283,7 +283,7 @@ structs:
                       different from the old variant struct type"
         fields:
             variantStructRecursiveReplyFieldIgnoreList:
-                unstable: true
+                stability: unstable
                 type:
                     variant: [int, StructFieldTypeRecursiveReplyTwo]
 
@@ -292,7 +292,7 @@ structs:
                       type, but the field is in the ignore list"
         fields:
             nonVariantToVariantReplyFieldIgnoreList:
-                unstable: true
+                stability: unstable
                 type:
                     variant: [int, StructFieldTypeRecursiveReplyOne]
 
@@ -302,7 +302,7 @@ structs:
         fields:
             nonEnumToEnumReplyIgnoreList:
                 type: EnumSubsetReply
-                unstable: true
+                stability: unstable
 
     CommandParamStructRecursiveOne:
         description: "This command parameter struct type contains a stable and optional
@@ -311,7 +311,7 @@ structs:
             unstableToStableOptionalField:
                 type: string
                 optional: true
-                unstable: false
+                stability: stable
 
     CommandParamStructRecursiveTwo:
         description: "This command parameter struct type contains a field whose new type is
@@ -319,7 +319,7 @@ structs:
         fields:
             supersetField:
                 type: intToIntString
-                unstable: false
+                stability: stable
 
     OldValidatorStruct:
         description: "This struct contains a field where the old version contains a validator while
@@ -327,14 +327,14 @@ structs:
         fields:
             oldValidatorField:
                 type: int
-                unstable: false
+                stability: stable
 
     ValidatorsEqualStruct:
         description: "This struct contains a field where the new and old validator are exactly equal"
         fields:
             validatorsEqualField:
                 type: double
-                unstable: false
+                stability: stable
                 validator:
                     lt: 0.0
                     gt: -1.1
@@ -352,7 +352,7 @@ structs:
             addedOptionalTypeField:
                 type: string
                 optional: true
-                unstable: false
+                stability: stable
 
     StableOptionalTypeFieldStruct:
         description: "This struct contains a field that is stable and optional in the new version
@@ -361,7 +361,7 @@ structs:
             stableOptionalTypeField:
                 type: string
                 optional: true
-                unstable: false
+                stability: stable
 
     StableWithDefaultTypeFieldStruct:
         description: "This struct contains a field that is stable and required with a default value
@@ -370,10 +370,14 @@ structs:
             stableWithDefaultTypeField:
                 type: string
                 default: ""
-                unstable: false
+                stability: stable
 
     RemovedUnstableTypeFieldStruct:
         description: "This struct contains a field that is unstable in the old version and
+                      is removed in the new version"
+
+    RemovedInternalTypeFieldStruct:
+        description: "This struct contains a field that is internal in the old version and
                       is removed in the new version"
 
     AddedUnstableTypeFieldStruct:
@@ -381,7 +385,14 @@ structs:
         fields:
             addedUnstableTypeField:
                 type: string
-                unstable: true
+                stability: unstable
+
+    AddedInternalTypeFieldStruct:
+        description: "This struct contains a field that is added and internal in the new version"
+        fields:
+            addedInternalTypeField:
+                type: string
+                stability: internal
 
     KeptUnstableTypeFieldStruct:
         description: "This struct contains a field that is unstable in the new version and also
@@ -389,7 +400,15 @@ structs:
         fields:
             keptUnstableTypeField:
                 type: string
-                unstable: true
+                stability: unstable
+
+    KeptInternalTypeFieldStruct:
+        description: "This struct contains a field that is internal in the new version and also
+                      exists in the old version"
+        fields:
+            keptInternalTypeField:
+                type: string
+                stability: internal
 
     StructCommandParameterTypeRecursive:
         description: "This param struct type contains a field that is compatible between the
@@ -397,14 +416,14 @@ structs:
         fields:
             structCommandParameterTypeRecursiveField:
                 type: intStringToIntStringBool
-                unstable: false
+                stability: stable
 
     VariantSupersetStruct:
         description: "This struct contains a field where the new variant types are a superset
                       of the old variant types"
         fields:
             variantSupersetField:
-                unstable: false
+                stability: stable
                 type:
                     variant: [int, bool, string, array<string>]
 
@@ -413,7 +432,7 @@ structs:
                       of the old variant types"
         fields:
             variantSupersetFieldTwo:
-                unstable: false
+                stability: stable
                 type:
                     variant: [int, bool, string, double, array<string>]
 
@@ -422,7 +441,7 @@ structs:
                       old one is not"
         fields:
             variantField:
-                unstable: false
+                stability: stable
                 type:
                     variant: [int, bool, array<string>]
 
@@ -431,7 +450,7 @@ structs:
                       compatible with the old variant types"
         fields:
             variantRecursiveField:
-                unstable: false
+                stability: stable
                 type:
                     variant: [int, intStringToIntStringBool,
                               array<intStringToIntStringBool>, array<string>]
@@ -441,7 +460,7 @@ structs:
                       while the old one does not"
         fields:
             variantStructSupersetField:
-                unstable: false
+                stability: stable
                 type:
                     variant: [int, string, NewCommandParameterStruct,
                               array<NewCommandParameterStruct>, array<string>]
@@ -451,7 +470,7 @@ structs:
                       variant struct are compatible"
         fields:
             variantStructRecursiveField:
-                unstable: false
+                stability: stable
                 type:
                     variant: [int, string, StructCommandParameterTypeRecursive,
                               array<StructCommandParameterTypeRecursive>, array<string>]
@@ -461,7 +480,7 @@ structs:
         fields:
             anyTypeField:
                 type: bsonSerializationTypeAnyAllowed
-                unstable: false
+                stability: stable
 
     NewlyAddedBsonSerializationTypeAnyReply:
         description: "This reply contains a newly added field whose type has a bson_serialization_type
@@ -469,13 +488,22 @@ structs:
         fields:
             newlyAddedBsonSerializationTypeAnyReplyField:
                 type: bsonSerializationTypeAnyAllowed
-                unstable: false
+                stability: stable
 
     OldUnstableTypeChangesReply:
         description: "This reply contains a field that is unstable in the old version and has type changes"
         fields:
             oldUnstableTypeChangesReplyField:
-                unstable: true
+                stability: unstable
+                type: intStringToIntStringBool
+                validator:
+                    lt: 0
+
+    OldInternalTypeChangesReply:
+        description: "This reply contains a field that is internal in the old version and has type changes"
+        fields:
+            oldInternalTypeChangesReplyField:
+                stability: internal
                 type: intStringToIntStringBool
                 validator:
                     lt: 0
@@ -485,7 +513,7 @@ structs:
                       but is also in the ignore list"
         fields:
             newUnstableTypeChangesReplyFieldIgnoreList:
-                unstable: true
+                stability: unstable
                 type: intStringToIntStringBool
                 validator:
                     lt: 0
@@ -497,7 +525,7 @@ structs:
             newlyAddedBsonSerializationTypeAnyStructField:
                 type: bsonSerializationTypeAnyAllowed
                 optional: true
-                unstable: false
+                stability: stable
 
     OldUnstableTypeChangesStruct:
         description: "This struct contains a field that is unstable in the old version and has type changes"
@@ -505,7 +533,7 @@ structs:
             oldUnstableTypeChangesField:
                 type: intStringBoolToIntString
                 optional: true
-                unstable: false
+                stability: stable
                 validator:
                     lt: 0
 
@@ -515,7 +543,7 @@ structs:
         fields:
             newUnstableTypeChangesFieldIgnoreList:
                 type: intStringBoolToIntString
-                unstable: true
+                stability: unstable
                 validator:
                     lt: 0
 
@@ -524,7 +552,7 @@ structs:
                       bson serialization types is 'any' and is explicitly allowed"
         fields:
             anyTypeField:
-                unstable: false
+                stability: stable
                 type:
                     variant: [bsonSerializationTypeAnyAllowed, StructFieldTypeRecursiveReplyTwo,
                               array<bsonSerializationTypeAnyAllowed>,
@@ -535,22 +563,22 @@ structs:
         fields:
             ArrayCommandParameter:
                 type: array<string>
-                unstable: false
+                stability: stable
 
     MissingUnstableFieldNewFieldStruct:
-        description: "This struct contains a field that missing the 'unstable' field in the new
+        description: "This struct contains a field that missing the 'stability' field in the new
                       command."
         fields:
             missingUnstableFieldNewField:
                 type: string
 
     MissingUnstableFieldOldFieldStruct:
-        description: "This struct contains a field that missing the 'unstable' field in the old
+        description: "This struct contains a field that missing the 'stability' field in the old
                       command."
         fields:
             missingUnstableFieldNewField:
                 type: string
-                unstable: false
+                stability: stable
 
     CompatibleChainedStructReply:
         description: "This reply contains an compatible chained struct"
@@ -567,61 +595,61 @@ structs:
         fields:
             ok1:
                 type: bool
-                unstable: false
+                stability: stable
                 optional: true
             ok2:
                 type: optionalBool
-                unstable: false
+                stability: stable
 
     OptionalBoolEquivalenceStruct:
         description: "First two fields get the types swapped."
         fields:
             ok1:
                 type: optionalBool
-                unstable: false
+                stability: stable
             ok2:
                 type: bool
-                unstable: false
+                stability: stable
                 optional: true
             ok3:
                 type: optionalBool
-                unstable: false
+                stability: stable
 
     OptionalBoolToBoolStruct:
         description: "optionalBool field replaced by bool"
         fields:
             ok:
                 type: bool
-                unstable: false
+                stability: stable
 
     BoolToOptionalBoolStruct:
         description: "bool field replaced by optionalBool"
         fields:
             ok:
                 type: optionalBool
-                unstable: false
+                stability: stable
 
     ReplyWithNewArrayTypeField:
         description: "new field is of ArrayType"
         fields:
             ok:
                 type: bool
-                unstable: false
+                stability: stable
             newArrayTypeField:
                 type: array<int>
                 optional: true
-                unstable: false
+                stability: stable
 
     ReplyWithNewNestedArrayTypeField:
         description: "new field is a struct with a field of ArrayType"
         fields:
             ok:
                 type: bool
-                unstable: false
+                stability: stable
             newStructWithArrayTypeField:
                 type: ArrayTypeStruct
                 optional: true
-                unstable: false
+                stability: stable
 
 commands:
     testCommand:
@@ -672,7 +700,7 @@ commands:
             newParameter:
                 type: string
                 optional: true
-                unstable: false
+                stability: stable
 
     addedCommandParameterStable:
         description: "new command has an optional stable parameter that is unstable
@@ -687,7 +715,7 @@ commands:
             newOptionalStableParam:
                 type: string
                 optional: true
-                unstable: false
+                stability: stable
 
     addedCommandParameterStableWithDefault:
         description: "new command has a required stable parameter with a default value
@@ -702,7 +730,7 @@ commands:
             newStableParamWithDefault:
                 type: string
                 default: ""
-                unstable: false
+                stability: stable
 
     commandParameterUnstableIgnoreList:
         description: "new unstable command parameter is stable in the corresponding old
@@ -716,7 +744,7 @@ commands:
         fields:
             newUnstableParameterIgnoreList:
                 type: string
-                unstable: true
+                stability: unstable
 
     removeCommandParameterUnstable:
         description: "new command removes parameter that is unstable
@@ -741,7 +769,7 @@ commands:
             newOptionalParam:
                 type: string
                 optional: true
-                unstable: false
+                stability: stable
 
     addedUnstableCommandParameter:
         description: "new command has a new unstable parameter that did not
@@ -755,7 +783,7 @@ commands:
         fields:
             newUnstableParam:
                 type: string
-                unstable: true
+                stability: unstable
 
     keptUnstableCommandParameter:
         description: "new command has an unstable parameter that also
@@ -769,7 +797,7 @@ commands:
         fields:
             unstableParam:
                 type: string
-                unstable: true
+                stability: unstable
 
     newCommandParameterType:
         description: "new command passes because its command parameter type is compatible with
@@ -783,7 +811,7 @@ commands:
         fields:
             compatibleParameter:
                 type: string
-                unstable: false
+                stability: stable
 
     newCommandParameterTypeEnumSuperset:
         description: "new command passes because its command parameter type is an enum that is
@@ -797,7 +825,7 @@ commands:
         fields:
             parameterEnumSuperset:
                 type: EnumSuperset
-                unstable: false
+                stability: stable
 
     newCommandParameterTypeStruct:
         description: "new command passes because its command parameter type is a struct and the
@@ -811,7 +839,7 @@ commands:
         fields:
             parameterStruct:
                 type: NewCommandParameterStruct
-                unstable: false
+                stability: stable
 
     newCommandParameterTypeBsonSuperset:
         description: "new command passes because its parameter type has a bson_serialization_type
@@ -826,7 +854,7 @@ commands:
         fields:
             bsonSupersetParam:
                 type: intToIntString
-                unstable: false
+                stability: stable
 
     newCommandParameterTypeStructRecursiveOne:
         description: "new command passes because its parameter type is a struct that is
@@ -840,7 +868,7 @@ commands:
         fields:
             unstableToStableOptionalStructParameter:
                 type: CommandParamStructRecursiveOne
-                unstable: false
+                stability: stable
 
     newCommandParameterTypeStructRecursiveTwo:
         description: "new command passes because its parameter type is a struct that is
@@ -854,7 +882,7 @@ commands:
         fields:
             supersetStructParameter:
                 type: CommandParamStructRecursiveTwo
-                unstable: false
+                stability: stable
 
     newlyAddedParamBsonAnyAllowList:
         description: "command passes when its parameter is newly added and has bson type 'any'
@@ -869,7 +897,7 @@ commands:
             newlyAddedBsonAnyAllowListParam:
                 type: bsonSerializationTypeAnyAllowed
                 optional: true
-                unstable: false
+                stability: stable
 
     oldUnstableParamTypeChanges:
         description: "command passes when it has an old unstable param with incompatible type changes"
@@ -883,7 +911,23 @@ commands:
             oldUnstableTypeChangesParam:
                 type: intStringBoolToIntString
                 optional: true
-                unstable: false
+                stability: stable
+                validator:
+                    lt: 0
+
+    oldInternalParamTypeChanges:
+        description: "command passes when it has an old internal param with incompatible type changes"
+        command_name: oldInternalParamTypeChanges
+        namespace: ignored
+        cpp_name: oldInternalParamTypeChanges
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        fields:
+            oldInternalTypeChangesParam:
+                type: intStringBoolToIntString
+                optional: true
+                stability: internal
                 validator:
                     lt: 0
 
@@ -899,7 +943,7 @@ commands:
         fields:
             newUnstableTypeChangesParamIgnoreList:
                 type: intStringBoolToIntString
-                unstable: true
+                stability: unstable
                 validator:
                     lt: 0
 
@@ -947,7 +991,7 @@ commands:
         fields:
             newParam:
                 type: int
-                unstable: false
+                stability: stable
 
     commandParameterValidatorsEqual:
         description: "new command passes because it contains a parameter that contains a validator
@@ -961,7 +1005,7 @@ commands:
         fields:
             newParam:
                 type: double
-                unstable: false
+                stability: stable
                 validator:
                     lt: 0.0
                     gt: -1.1
@@ -1267,6 +1311,17 @@ commands:
         api_version: "1"
         reply_type: OkReply
 
+    removeTypeFieldInternal:
+        description: "new command removes type field that is internal
+                      in the corresponding old command and still passes"
+        command_name: removeTypeFieldInternal
+        namespace: type
+        type: RemovedInternalTypeFieldStruct
+        cpp_name: removeTypeFieldInternal
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
     addedUnstableTypeField:
         description: "new command has a new unstable type field that does not
                       exist in the corresponding old command and still passes"
@@ -1278,6 +1333,17 @@ commands:
         api_version: "1"
         reply_type: OkReply
 
+    addedInternalTypeField:
+        description: "new command has a new internal type field that does not
+                      exist in the corresponding old command and still passes"
+        command_name: addedInternalTypeField
+        namespace: type
+        type: AddedInternalTypeFieldStruct
+        cpp_name: addedInternalTypeField
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
     keptUnstableTypeField:
         description: "new command has an unstable type field that also
                       exists in the corresponding old command and still passes"
@@ -1285,6 +1351,17 @@ commands:
         namespace: type
         type: KeptUnstableTypeFieldStruct
         cpp_name: keptUnstableTypeField
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+
+    keptInternalTypeField:
+        description: "new command has an internal type field that also
+                      exists in the corresponding old command and still passes"
+        command_name: keptInternalTypeField
+        namespace: type
+        type: KeptInternalTypeFieldStruct
+        cpp_name: keptInternalTypeField
         strict: true
         api_version: "1"
         reply_type: OkReply
@@ -1408,6 +1485,15 @@ commands:
         api_version: "1"
         reply_type: OldUnstableTypeChangesReply
 
+    oldInternalReplyFieldTypeChanges:
+        description: "command passes when it has an old internal reply field with incompatible type changes"
+        command_name: oldInternalReplyFieldTypeChanges
+        namespace: ignored
+        cpp_name: oldInternalReplyFieldTypeChanges
+        strict: true
+        api_version: "1"
+        reply_type: OldInternalTypeChangesReply
+
     newUnstableReplyFieldTypeChangesIgnoreList:
         description: "command has an old stable reply field with incompatible type changes but it is also
                       in the ignore list"
@@ -1431,7 +1517,7 @@ commands:
         fields:
             anyTypeParam:
                 type: bsonSerializationTypeAnyAllowed
-                unstable: false
+                stability: stable
 
     commandAllowedAnyTypesWithVariant:
         description: "command that has reply variant types with
@@ -1454,7 +1540,7 @@ commands:
         reply_type: OkReply
         fields:
             variantSupersetParam:
-                unstable: false
+                stability: stable
                 type:
                     variant: [int, bool, string, array<string>]
 
@@ -1469,7 +1555,7 @@ commands:
         reply_type: OkReply
         fields:
             variantSupersetParam:
-                unstable: false
+                stability: stable
                 type:
                     variant: [int, string, bool, double, array<string>]
 
@@ -1484,7 +1570,7 @@ commands:
         reply_type: OkReply
         fields:
             variantParam:
-                unstable: false
+                stability: stable
                 type:
                     variant: [int, string, array<string>]
 
@@ -1499,7 +1585,7 @@ commands:
         reply_type: OkReply
         fields:
             variantRecursiveParam:
-                unstable: false
+                stability: stable
                 type:
                     variant: [int, intStringToIntStringBool,
                               array<intStringToIntStringBool>, array<string>]
@@ -1515,7 +1601,7 @@ commands:
         reply_type: OkReply
         fields:
             variantStructSupersetParam:
-                unstable: false
+                stability: stable
                 type:
                     variant: [int, string, NewCommandParameterStruct,
                               array<NewCommandParameterStruct>, array<string>]
@@ -1532,7 +1618,7 @@ commands:
         reply_type: OkReply
         fields:
             variantStructRecursiveParam:
-                unstable: false
+                stability: stable
                 type:
                     variant: [int, string, StructCommandParameterTypeRecursive,
                               array<StructCommandParameterTypeRecursive>, array<string>]
@@ -1679,7 +1765,7 @@ commands:
         fields:
             parameterStruct:
                 type: array<ArrayTypeStruct>
-                unstable: false
+                stability: stable
         reply_type: ArrayTypeStruct
 
     complexActionTypesSubset:
@@ -1799,7 +1885,7 @@ commands:
 
     newReplyFieldMissingUnstableField:
         description: "new command passes because it does not have an api_version even though it
-                      contains a reply field that is missing the 'unstable' field"
+                      contains a reply field that is missing the 'stability' field"
         command_name: newReplyFieldMissingUnstableField
         namespace: ignored
         cpp_name: newReplyFieldMissingUnstableField
@@ -1809,7 +1895,7 @@ commands:
 
     oldReplyFieldMissingUnstableField:
         description: "old command passes even though it contains a reply field that is missing the
-                      'unstable' field"
+                      'stability' field"
         command_name: oldReplyFieldMissingUnstableField
         namespace: ignored
         cpp_name: oldReplyFieldMissingUnstableField
@@ -1819,7 +1905,7 @@ commands:
 
     newCommandTypeFieldMissingUnstableField:
         description: "new command passes because it does not have an api_version even though it
-                      contains a command type field that is missing the 'unstable' field"
+                      contains a command type field that is missing the 'stability' field"
         command_name: newCommandTypeFieldMissingUnstableField
         namespace: type
         cpp_name: newCommandTypeFieldMissingUnstableField
@@ -1830,7 +1916,7 @@ commands:
 
     oldCommandTypeFieldMissingUnstableField:
         description: "old command passes even though it
-                      contains a command type field that is missing the 'unstable' field"
+                      contains a command type field that is missing the 'stability' field"
         command_name: oldCommandTypeFieldMissingUnstableField
         namespace: type
         cpp_name: oldCommandTypeFieldMissingUnstableField
@@ -1841,7 +1927,7 @@ commands:
 
     newParameterMissingUnstableField:
         description: "new command passes because it does not have an api_version even though it
-                      contains a parameter that is missing the 'unstable' field"
+                      contains a parameter that is missing the 'stability' field"
         command_name: newParameterMissingUnstableField
         namespace: ignored
         cpp_name: newParameterMissingUnstableField
@@ -1854,7 +1940,7 @@ commands:
 
     oldParameterMissingUnstableField:
         description: "old command passes even though it
-                      contains a parameter that is missing the 'unstable' field"
+                      contains a parameter that is missing the 'stability' field"
         command_name: oldParameterMissingUnstableField
         namespace: ignored
         cpp_name: oldParameterMissingUnstableField
@@ -1863,7 +1949,7 @@ commands:
         fields:
             missingUnstableFieldOldParameter:
                 type: int
-                unstable: false
+                stability: stable
         reply_type: OkReply
 
     chainedStructCompatible:
@@ -1921,7 +2007,7 @@ commands:
         fields:
             flag:
                 type: optionalBool
-                unstable: false
+                stability: stable
 
     newReplyOptionalBool:
         description: "new command can add reply fields of type optionalBoolean"
@@ -1951,14 +2037,14 @@ commands:
         api_version: "1"
         fields:
             flag1:
-                unstable: false
+                stability: stable
                 type: optionalBool
             flag2:
-                unstable: false
+                stability: stable
                 type: bool
                 optional: true
             flag3:
-                unstable: false
+                stability: stable
                 type: optionalBool
         reply_type: OkReply
 
@@ -1990,7 +2076,7 @@ commands:
         api_version: "1"
         fields:
             flag:
-                unstable: false
+                stability: stable
                 type: optionalBool
         reply_type: OkReply
 
@@ -2025,7 +2111,7 @@ commands:
             newArrayTypeParameter:
                 type: array<int>
                 optional: true
-                unstable: false
+                stability: stable
         reply_type: ReplyWithNewArrayTypeField
 
     commandWithNewNestedArrayTypeParameterAndNestedArrayTypeReply:
@@ -2040,5 +2126,5 @@ commands:
             newNestedArrayTypeParameter:
                 type: ArrayTypeStruct
                 optional: true
-                unstable: false
+                stability: stable
         reply_type: ReplyWithNewNestedArrayTypeField

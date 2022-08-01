@@ -43,10 +43,10 @@ structs:
                 description: "An id maintained in memory by the server. It is reinitialized by the
                              server using the standard ObjectId logic each time this server process
                              starts."
-                unstable: false
+                stability: stable
             counter:
                 type: long
                 description: "State change counter, maintained in memory by the server. It begins
                              at 0 when the server starts, and it is incremented whenever there is a
                              significant topology change."
-                unstable: false
+                stability: stable

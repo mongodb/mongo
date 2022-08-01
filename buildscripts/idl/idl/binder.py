@@ -1005,7 +1005,9 @@ def _bind_field(ctxt, parsed_spec, field):
     ast_field.constructed = field.constructed
     ast_field.comparison_order = field.comparison_order
     ast_field.non_const_getter = field.non_const_getter
-    ast_field.unstable = field.unstable
+    # Ignore the 'unstable' field since it's deprecated by the 'stability' field and only there at parsing level
+    # to provide compatibility support.
+    ast_field.stability = field.stability
     ast_field.always_serialize = field.always_serialize
 
     ast_field.cpp_name = field.name

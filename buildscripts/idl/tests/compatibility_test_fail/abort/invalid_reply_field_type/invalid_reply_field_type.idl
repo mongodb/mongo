@@ -38,7 +38,7 @@ structs:
         fields:
             invalidReplyField:
                 type: None
-                unstable: false
+                stability: stable
 commands:
     replyFieldTypeInvalid:
         description: "This command aborts because its reply field type is invalid"

@@ -36,4 +36,4 @@ structs:
         fields:
             unstableNewField:
                 type: string
-                unstable: true
+                stability: unstable

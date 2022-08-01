@@ -44,4 +44,4 @@ structs:
                 description: 'Determines whether point-in-time pre- and post-images are available for change streams.'
                 type: bool
                 optional: false
-                unstable: false
+                stability: stable

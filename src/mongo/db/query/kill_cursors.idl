@@ -51,20 +51,20 @@ structs:
             cursorsKilled:
                 description: 'Cursors successfully killed'
                 type: array<cursorId>
-                unstable: false
+                stability: stable
             cursorsNotFound:
                 description: 'Cursors not found'
                 type: array<cursorId>
-                unstable: false
+                stability: stable
             cursorsAlive:
                 description: 'Cursors still alive'
                 type: array<cursorId>
-                unstable: false
+                stability: stable
             cursorsUnknown:
                 # This is a legacy field and always returns an empty array.
                 description: 'Unknown cursors'
                 type: array<cursorId>
-                unstable: false
+                stability: stable
 
 commands:
     killCursors:
@@ -93,4 +93,4 @@ commands:
                 type: array<cursorId>
                 cpp_name: cursorIds
                 optional: false
-                unstable: false
+                stability: stable

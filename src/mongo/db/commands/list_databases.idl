@@ -40,34 +40,34 @@ structs:
         fields:
             name:
                 type: string
-                unstable: false
+                stability: stable
             sizeOnDisk:
                 type: long
                 optional: true
-                unstable: false
+                stability: stable
             empty:
                 type: bool
                 optional: true
-                unstable: false
+                stability: stable
             shards:
                 type: object_owned
                 optional: true
-                unstable: false
+                stability: stable
 
     ListDatabasesReply:
         description: "The listDatabases command's reply."
         fields:
             databases:
                 type: array<ListDatabasesReplyItem>
-                unstable: false
+                stability: stable
             totalSize:
                 type: long
                 optional: true
-                unstable: false
+                stability: stable
             totalSizeMb:
                 type: long
                 optional: true
-                unstable: false
+                stability: stable
 
 commands:
     listDatabases:
@@ -88,15 +88,15 @@ commands:
                 description: "Return just the database name without metadata"
                 type: safeBool
                 default: false
-                unstable: false
+                stability: stable
             authorizedDatabases:
                 description: "Only return those databases for which the user is authorized"
                 type: bool
                 optional: true
-                unstable: false
+                stability: stable
             filter:
                 description: "Filter description to limit results"
                 type: object
                 optional: true
-                unstable: false
+                stability: stable
         reply_type: ListDatabasesReply

@@ -46,10 +46,10 @@ structs:
                 # Currently ignored
                 type: safeInt
                 default: 0
-                unstable: false
+                stability: stable
             maxWireVersion:
                 type: safeInt
-                unstable: false
+                stability: stable
 
     HelloLastWrite:
         description: "Most recent op/write times for this node"
@@ -58,19 +58,19 @@ structs:
             opTime:
                 type: optime
                 optional: true
-                unstable: false
+                stability: stable
             lastWriteDate:
                 type: date
                 optional: true
-                unstable: false
+                stability: stable
             majorityOpTime:
                 type: optime
                 optional: true
-                unstable: false
+                stability: stable
             majorityWriteDate:
                 type: date
                 optional: true
-                unstable: false
+                stability: stable
 
     HelloCommandReply:
         description: "Reply to 'hello' command"
@@ -79,180 +79,180 @@ structs:
             helloOk:
                 type: bool
                 default: true
-                unstable: false
+                stability: stable
             clientSupportsHello:
                 type: bool
                 optional: true
-                unstable: false
+                stability: stable
             configsvr:
                 type: safeInt
                 optional: true
-                unstable: false
+                stability: stable
             maxBsonObjectSize:
                 type: safeInt64
                 optional: true
-                unstable: false
+                stability: stable
             maxMessageSizeBytes:
                 type: safeInt64
                 optional: true
-                unstable: false
+                stability: stable
             maxWriteBatchSize:
                 type: safeInt64
                 optional: true
-                unstable: false
+                stability: stable
             localTime:
                 type: date
                 optional: true
-                unstable: false
+                stability: stable
             logicalSessionTimeoutMinutes:
                 type: safeInt
                 optional: true
-                unstable: false
+                stability: stable
             connectionId:
                 type: safeInt64
                 optional: true
-                unstable: false
+                stability: stable
             minWireVersion:
                 type: safeInt
                 optional: true
-                unstable: false
+                stability: stable
             maxWireVersion:
                 type: safeInt
                 optional: true
-                unstable: false
+                stability: stable
             readOnly:
                 type: bool
                 optional: true
-                unstable: false
+                stability: stable
             compression:
                 type: array<string>
                 optional: true
-                unstable: false
+                stability: stable
             automationServiceDescriptor:
                 type: string
                 optional: true
-                unstable: false
+                stability: stable
             saslSupportedMechs:
                 type: array<string>
                 optional: true
-                unstable: false
+                stability: stable
             speculativeAuthenticate:
                 type: object
                 optional: true
-                unstable: false
+                stability: stable
             msg:
                 type: string
                 optional: true
-                unstable: false
+                stability: stable
             serviceId:
                 type: objectid
                 optional: true
-                unstable: false
+                stability: stable
             ##
             ## ReplicationInfo
             ##
             topologyVersion:
                 type: TopologyVersion
-                unstable: false
+                stability: stable
             ismaster:
                 # Replies will contain 'ismaster' OR 'isWritablePrimary', not both
                 type: bool
                 optional: true
-                unstable: false
+                stability: stable
             isWritablePrimary:
                 type: bool
                 optional: true
-                unstable: false
+                stability: stable
             ##
             ## Using ReplSets
             ##
             hosts:
                 type: array<string>
                 optional: true
-                unstable: false
+                stability: stable
             passives:
                 type: array<string>
                 optional: true
-                unstable: false
+                stability: stable
             arbiters:
                 type: array<string>
                 optional: true
-                unstable: false
+                stability: stable
             setName:
                 type: string
                 optional: true
-                unstable: false
+                stability: stable
             primary:
                 type: string
                 optional: true
-                unstable: false
+                stability: stable
             secondary:
                 type: bool
                 optional: true
-                unstable: false
+                stability: stable
             info:
                 type: string
                 optional: true
-                unstable: false
+                stability: stable
             isreplicaset:
                 type: bool
                 optional: true
-                unstable: false
+                stability: stable
             setVersion:
                 type: safeInt
                 optional: true
-                unstable: false
+                stability: stable
             arbiterOnly:
                 type: bool
                 optional: true
-                unstable: false
+                stability: stable
             passive:
                 type: bool
                 optional: true
-                unstable: false
+                stability: stable
             hidden:
                 type: bool
                 optional: true
-                unstable: false
+                stability: stable
             buildIndexes:
                 type: bool
                 optional: true
-                unstable: false
+                stability: stable
             slaveDelay:
                 # Reply will contain either slaveDelay or secondaryDelaySecs, but not both.
                 type: safeInt64
                 optional: true
-                unstable: false
+                stability: stable
             secondaryDelaySecs:
                 type: safeInt64
                 optional: true
-                unstable: false
+                stability: stable
             tags:
                 type: object
                 optional: true
-                unstable: false
+                stability: stable
             me:
                 type: string
                 optional: true
-                unstable: false
+                stability: stable
             electionId:
                 type: objectid
                 optional: true
-                unstable: false
+                stability: stable
             lastWrite:
                 type: HelloLastWrite
                 optional: true
-                unstable: false
+                stability: stable
             isImplicitDefaultMajorityWC:
                 # Only populated on shard server.
                 type: bool
                 optional: true
-                unstable: false
+                stability: stable
             cwwc:
                 # Only populated on shard server.
                 type: WriteConcern
                 optional: true
-                unstable: false
+                stability: stable
 
 commands:
     hello:
@@ -271,50 +271,50 @@ commands:
             forShell:
                 type: safeBool
                 default: false
-                unstable: false
+                stability: stable
             hostInfo:
                 type: string
                 default: false
-                unstable: false
+                stability: stable
             hangUpOnStepDown:
                 type: safeBool
                 default: true
-                unstable: false
+                stability: stable
             internalClient:
                 type: HelloInternalClientField
                 optional: true
-                unstable: false
+                stability: stable
             client:
                 type: ClientMetadata
                 optional: true
-                unstable: false
+                stability: stable
             topologyVersion:
                 type: TopologyVersion
                 optional: true
-                unstable: false
+                stability: stable
             maxAwaitTimeMS:
                 type: safeInt64
                 optional: true
                 validator: { gte: 0 }
-                unstable: false
+                stability: stable
             helloOk:
                 type: safeBool
                 optional: true
-                unstable: false
+                stability: stable
             compression:
                 type: array<string>
                 optional: true
-                unstable: false
+                stability: stable
             saslSupportedMechs:
                 type: 
                     variant: [string, object_owned]
                 optional: true
-                unstable: false
+                stability: stable
             speculativeAuthenticate:
                 type: object
                 optional: true
-                unstable: false
+                stability: stable
             loadBalanced:
                 type: bool
                 optional: true
-                unstable: false
+                stability: stable

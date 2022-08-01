@@ -69,36 +69,36 @@ structs:
                 type: writeConcernW
                 cpp_name: writeConcernW
                 optional: true
-                unstable: false
+                stability: stable
             j:
                 type: safeBool
                 optional: true
-                unstable: false
+                stability: stable
             wtimeout:
                 type: writeConcernWTimeout
                 default: 0
-                unstable: false
+                stability: stable
             fsync:
                 type: safeBool
                 optional: true
-                unstable: false
+                stability: stable
             # Fields with names wElectionId, wOpTime, and getLastError are accepted in the WriteConcern document for
             # backwards-compatibility reasons, but their values are entirely ignored.
             wElectionId:
                 type: any
                 ignore: true
-                unstable: false
+                stability: stable
             wOpTime:
                 type: any
                 ignore: true
-                unstable: false
+                stability: stable
             getLastError:
                 type: any
                 ignore: true
-                unstable: false
+                stability: stable
             provenance:
                 description: "The source for this provenance"
                 cpp_name: source
                 type: ReadWriteConcernProvenanceSource
                 optional: true
-                unstable: false
+                stability: stable

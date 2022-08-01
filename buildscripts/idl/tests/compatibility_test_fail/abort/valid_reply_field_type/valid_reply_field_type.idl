@@ -38,7 +38,7 @@ structs:
         fields:
             invalidReplyField:
                 type: string
-                unstable: false
+                stability: stable
 
 commands:
     replyFieldTypeInvalid:

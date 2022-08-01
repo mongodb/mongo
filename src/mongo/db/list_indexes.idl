@@ -51,121 +51,121 @@ structs:
             v:
                 type: safeInt
                 optional: true
-                unstable: false
+                stability: stable
             key:
                 type: object_owned
                 optional: true
-                unstable: false
+                stability: stable
             name:
                 type: string
                 optional: true
-                unstable: false
+                stability: stable
             ns:
                 # MongoDB 4.2 and older generate this field, see SERVER-41696.
                 type: string
                 ignore: true
-                unstable: false
+                stability: stable
             background:
                 type: safeBool
                 optional: true
-                unstable: false
+                stability: stable
             unique:
                 type: safeBool
                 optional: true
-                unstable: false
+                stability: stable
             hidden:
                 type: safeBool
                 optional: true
-                unstable: false
+                stability: stable
             partialFilterExpression:
                 type: object_owned
                 optional: true
-                unstable: false
+                stability: stable
             sparse:
                 type: safeBool
                 optional: true
-                unstable: false
+                stability: stable
             expireAfterSeconds:
                 type: safeInt
                 optional: true
-                unstable: false
+                stability: stable
             storageEngine:
                 type: object_owned
                 optional: true
-                unstable: false
+                stability: stable
             weights:
                 type:
                     variant: [string, object_owned]
                 optional: true
-                unstable: false
+                stability: stable
             default_language:
                 type: string
                 optional: true
-                unstable: false
+                stability: stable
             language_override:
                 type: string
                 optional: true
-                unstable: false
+                stability: stable
             textIndexVersion:
                 type: safeInt
                 optional: true
-                unstable: false
+                stability: stable
             2dsphereIndexVersion:
                 type: safeInt
                 optional: true
-                unstable: false
+                stability: stable
             bits:
                 type: safeInt
                 optional: true
-                unstable: false
+                stability: stable
             min:
                 type: safeDouble
                 optional: true
-                unstable: false
+                stability: stable
             max:
                 type: safeDouble
                 optional: true
-                unstable: false
+                stability: stable
             bucketSize:
                 type: safeDouble
                 optional: true
-                unstable: false
+                stability: stable
             collation:
                 type: object_owned
                 optional: true
-                unstable: false
+                stability: stable
             wildcardProjection:
                 type: object_owned
                 optional: true
-                unstable: false
+                stability: stable
             columnstoreProjection:
                 type: object_owned
                 optional: true
-                unstable: true
+                stability: unstable
             coarsestIndexedLevel:
                 type: safeInt
                 optional: true
-                unstable: false
+                stability: stable
             finestIndexedLevel:
                 type: safeInt
                 optional: true
-                unstable: false
+                stability: stable
             dropDups:
                 type: safeBool
                 optional: true
-                unstable: false
+                stability: stable
             originalSpec:
                 type: object_owned
                 optional: true
-                unstable: true
+                stability: unstable
             clustered:
                 type: safeBool
                 optional: true
-                unstable: false
+                stability: stable
             prepareUnique:
                 type: safeBool
                 optional: true
-                unstable: true
+                stability: unstable
             #
             # Depending on the values of includeIndexBuildInfo and includeBuildUUIDs, indexes may
             # appear with a combination of these three fields. Specifically, if includeIndexBuildInfo
@@ -178,43 +178,43 @@ structs:
                 description: "Contains information about the build. Included if includeIndexBuildInfo is set and the index is currently building."
                 type: object_owned
                 optional: true
-                unstable: true
+                stability: unstable
             buildUUID:
                 description: "The UUID of a two-phase index build. Included if includeBuildUUIDs is set and the index is currently building."
                 type: uuid
                 optional: true
-                unstable: false
+                stability: stable
             spec:
                 description: "Contains the index spec. If includeIndexBuildInfo is set, always included. If includeBuildUUIDs is set, included if the index is currently building."
                 type: NewIndexSpec
                 optional: true
-                unstable: false
+                stability: stable
 
     ListIndexesReplyCursor:
         description: "Cursor object"
         fields:
             id:
                 type: long
-                unstable: false
+                stability: stable
             ns:
                 type: namespacestring
-                unstable: false
+                stability: stable
             firstBatch:
                 type: array<ListIndexesReplyItem>
-                unstable: false
+                stability: stable
 
     ListIndexesReply:
         description: "The listIndexes command's reply."
         fields:
             cursor:
                 type: ListIndexesReplyCursor
-                unstable: false
+                stability: stable
             # Included so mongos can parse shards' listIndexes replies.
             ok:
                 type: safeDouble
                 validator: { gte: 0.0, lte: 1.0 }
                 optional: true
-                unstable: false
+                stability: stable
 
 commands:
     listIndexes:
@@ -237,21 +237,21 @@ commands:
             cursor:
                 type: SimpleCursorOptions
                 optional: true
-                unstable: false
+                stability: stable
             includeBuildUUIDs:
                 type: safeBool
                 optional: true
-                unstable: true
+                stability: unstable
             includeIndexBuildInfo:
                 description: "If true, the reply will include information about the build status for each index."
                 type: safeBool
                 optional: true
-                unstable: true
+                stability: unstable
             isTimeseriesNamespace:
                 description: "This flag is set to true when the command was originally sent to
                               mongos on the time-series view, but got rewritten to target
                               time-series buckets namespace before being sent to shards."
                 type: bool
                 optional: true
-                unstable: false
+                stability: internal
         reply_type: ListIndexesReply

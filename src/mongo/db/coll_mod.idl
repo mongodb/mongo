@@ -46,31 +46,31 @@ structs:
             name:
                 optional: true
                 type: string
-                unstable: false
+                stability: stable
             keyPattern:
                 optional: true
                 type: object
-                unstable: false
+                stability: stable
             expireAfterSeconds:
                 optional: true
                 type: safeInt
-                unstable: false
+                stability: stable
             hidden:
                 optional: true
                 type: safeBool
-                unstable: false
+                stability: stable
             unique:
                 optional: true
                 type: safeBool
-                unstable: true
+                stability: unstable
             prepareUnique:
                 optional: true
                 type: safeBool
-                unstable: true
+                stability: unstable
             forceNonUnique:
                 optional: true
                 type: safeBool
-                unstable: true
+                stability: unstable
 
     CollModReply:
         description: "The collMod command's reply."
@@ -80,35 +80,35 @@ structs:
             expireAfterSeconds_old:
                 optional: true
                 type: safeInt
-                unstable: false
+                stability: stable
             expireAfterSeconds_new:
                 optional: true
                 type: safeInt
-                unstable: false
+                stability: stable
             hidden_old:
                 optional: true
                 type: safeBool
-                unstable: false
+                stability: stable
             hidden_new:
                 optional: true
                 type: safeBool
-                unstable: false
+                stability: stable
             unique_new:
                 optional: true
                 type: safeBool
-                unstable: true
+                stability: unstable
             prepareUnique_old:
                 optional: true
                 type: safeBool
-                unstable: true
+                stability: unstable
             prepareUnique_new:
                 optional: true
                 type: safeBool
-                unstable: true
+                stability: unstable
             forceNonUnique_new:
                 optional: true
                 type: safeBool
-                unstable: true
+                stability: unstable
 
     CollModRequest:
         description: "The collMod command's request."
@@ -118,32 +118,32 @@ structs:
                 description: "Index to be modified."
                 optional: true
                 type: CollModIndex
-                unstable: false
+                stability: stable
             validator:
                 description: "Specify validation rules or expressions for the collection."
                 type: object
                 optional: true
-                unstable: false
+                stability: stable
             validationLevel:
                 description: "Determines how strictly to apply the validation rules to existing
                               documents during an update.
                               Can be one of following values: 'off', 'strict' or 'moderate'."
                 type: ValidationLevel
                 optional: true
-                unstable: false
+                stability: stable
             validationAction:
                 description: "Determines whether to error on invalid documents or just warn about
                               the violations but allow invalid documents to be inserted.
                               Can be either 'warn' or 'error'."
                 type: ValidationAction
                 optional: true
-                unstable: false
+                stability: stable
             viewOn:
                 description: "The name of the source collection or view that
                               'namespace' is based off of."
                 type: string
                 optional: true
-                unstable: false
+                stability: stable
                 validator:
                     callback: create_command_validation::validateViewOnNotEmpty
             pipeline:
@@ -152,30 +152,30 @@ structs:
                               view."
                 type: array<object>
                 optional: true
-                unstable: false
+                stability: stable
             recordPreImages:
                 description: "Sets whether updates/deletes should store the pre-image of the
                               document in the oplog"
                 optional: true
                 type: safeBool
-                unstable: true
+                stability: unstable
             changeStreamPreAndPostImages:
                 description: "The options for point-in-time pre- and post-images in change streams opened on this collection."
                 type: ChangeStreamPreAndPostImagesOptions
                 optional: true
-                unstable: true
+                stability: unstable
             expireAfterSeconds:
                 description: "The number of seconds after which old data should be deleted. This can
                               be disabled by passing in 'off' as a value"
                 optional: true
-                unstable: false
+                stability: stable
                 type:
                     variant: [string, safeInt64]
             timeseries:
                 description: "Adjusts parameters for timeseries collections"
                 optional: true
                 type: CollModTimeseries
-                unstable: false
+                stability: stable
             # TODO (SERVER-61685): `isTimeseriesNamespace` is not needed for the collMod command but kept
             # for backward compatibility. Remove this flag after 6.0 branching.
             isTimeseriesNamespace:
@@ -184,19 +184,19 @@ structs:
                               time-series buckets namespace before being sent to shards."
                 optional: true
                 type: bool
-                unstable: false
+                stability: internal
             dryRun:
                 description: "Runs the requested modification without modifying any database state.
                               This can be used to determine in advance if a particular collMod
                               request can be completed without errors."
                 optional: true
                 type: safeBool
-                unstable: true
+                stability: unstable
             collectionUUID:
                 description: "The expected UUID of the collection."
                 type: uuid
                 optional: true
-                unstable: true
+                stability: unstable
             cappedSize:
                 description: "Update the maximum size in bytes for the capped collection."
                 type: safeInt64
@@ -204,14 +204,14 @@ structs:
                 validator:
                     gte: 1
                     lte: 1125899906842624  # 1 PB
-                unstable: false
+                stability: stable
             cappedMax:
                 description: "Update the maximum number of documents allowed in the capped collection."
                 type: safeInt64
                 optional: true
                 validator:
                     lt: 2147483648  # 2^31
-                unstable: false
+                stability: stable
 
 commands:
     collMod:

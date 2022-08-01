@@ -70,7 +70,7 @@ structs:
             shard:
                 description: "id of the shard to passthrough to"
                 type: string
-                unstable: true
+                stability: unstable
 
 commands:
     aggregate:
@@ -165,110 +165,110 @@ commands:
             pipeline:
                 description: "An unparsed version of the pipeline."
                 type: pipeline
-                unstable: false
+                stability: stable
             explain:
                 description: "Specifies to return the information on the processing of the pipeline."
                 type: explainVerbosity
                 optional: true
-                unstable: true
+                stability: unstable
             allowDiskUse:
                 description: "Enables writing to temporary files."
                 type: optionalBool
-                unstable: false
+                stability: stable
             cursor:
                 description: "To indicate a cursor with a non-default batch size."
                 type: aggregateCursor
                 default: SimpleCursorOptions()
-                unstable: false
+                stability: stable
             maxTimeMS:
                 description: "Specifies a time limit in milliseconds for processing operations on a cursor. If you do not specify a value for maxTimeMS, operations will not time out."
                 type: safeInt64
                 validator: { gte: 0 }
                 optional: true
-                unstable: false
+                stability: stable
             bypassDocumentValidation:
                 description: "True if this should bypass the document validation."
                 type: safeBool
                 optional: true
-                unstable: false
+                stability: stable
             readConcern:
                 description: "Specifies the read concern."
                 type: object_owned
                 optional: true
-                unstable: false
+                stability: stable
             collation:
                 description: "Specifies the collation to use for the operation."
                 type: object_owned
                 optional: true
-                unstable: false
+                stability: stable
             hint:
                 description: "The index name to use or the index specification document."
                 type: indexHint
                 optional: true
-                unstable: false
+                stability: stable
             writeConcern:
                 description: "A document that expresses the write concern to use with the $out or $merge stage."
                 type: WriteConcern
                 optional: true
-                unstable: false
+                stability: stable
             let:
                 description: "A document containing user-specified let parameter constants; i.e. values that do not change once computed."
                 type: object_owned
                 optional: true
-                unstable: false
+                stability: stable
             needsMerge:
                 description: "True if this request represents the shards part of a split pipeline, and should produce mergeable output."
                 type: optionalBool
-                unstable: false
+                stability: internal
             fromMongos:
                 description: "True if this request originated from a mongoS."
                 type: optionalBool
-                unstable: false
+                stability: internal
             $queryOptions:
                 description: "The unwrapped readPreference object, if one was given to us by the mongos command processor. This object will be empty when no readPreference is specified or if the request does not originate from mongos."
                 cpp_name: unwrappedReadPref
                 type: object_owned
                 optional: true
-                unstable: true
+                stability: unstable
             $_requestReshardingResumeToken:
                 description: "True if this requests resharding resume token."
                 cpp_name: requestReshardingResumeToken
                 type: optionalBool
-                unstable: true
+                stability: unstable
             exchange:
                 description: "An optional exchange specification for this request. If set it means that the request represents a producer running as a part of the exchange machinery. This is an internal option; we do not expect it to be set on requests from users or drivers."
                 type: ExchangeSpec
                 optional: true
-                unstable: false
+                stability: stable
             runtimeConstants:
                 description: "A legacy way to specify constant variables available during execution. 'let' is now preferred."
                 type: LegacyRuntimeConstants
                 cpp_name: legacyRuntimeConstants
                 optional: true
-                unstable: true
+                stability: unstable
             isMapReduceCommand:
                 description: "True if an aggregation was invoked by the MapReduce command."
                 type: optionalBool
-                unstable: true
+                stability: unstable
             collectionUUID:
                 description: "The expected UUID of the namespace the aggregation executes on."
                 type: uuid
                 optional: true
-                unstable: true
+                stability: unstable
             $_passthroughToShard:
                 description: "An optional internal parameter for this request. If a shard key is specified, then that specific shard will be targeted."
                 type: PassthroughToShardOptions
                 cpp_name: passthroughToShard
                 optional: true
-                unstable: true
+                stability: unstable
             # TODO SERVER-65369: $_generateV2ResumeTokens can be removed after 7.0.
             $_generateV2ResumeTokens:
                 description: "Internal parameter to signal whether v2 resume tokens should be generated."
                 type: optionalBool
                 cpp_name: generateV2ResumeTokens
-                unstable: false
+                stability: stable
             encryptionInformation:
                 description: "Encryption Information schema and other tokens for CRUD commands"
                 type: EncryptionInformation
                 optional: true
-                unstable: true
+                stability: unstable

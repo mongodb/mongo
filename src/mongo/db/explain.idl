@@ -49,6 +49,6 @@ commands:
                 description: "The verbosity for explain command."
                 type: Verbosity
                 default : kExecAllPlans
-                unstable: false
+                stability: stable
         # Dummy reply type as we won't use it to parse explain reply.
         reply_type: OkReply

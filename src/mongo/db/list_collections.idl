@@ -44,12 +44,12 @@ structs:
                 type: bool
                 description: "If true, the data store is read only."
                 optional: true
-                unstable: false
+                stability: stable
             uuid:
                 type: uuid
                 description: "Unique, immutable collection ID."
                 optional: true
-                unstable: false
+                stability: stable
 
     ListCollectionsReplyItem:
         description: "Individual result"
@@ -57,46 +57,46 @@ structs:
             name:
                 type: string
                 description: "Name of the collection."
-                unstable: false
+                stability: stable
             type:
                 type: string
                 description: "Type of data store."
-                unstable: false
+                stability: stable
             options:
                 type: object_owned
                 description: "Collection options."
                 optional: true
-                unstable: false
+                stability: stable
             info:
                 type: ListCollectionsReplyInfo
                 description: "Information about the collection."
                 optional: true
-                unstable: false
+                stability: stable
             idIndex:
                 type: object_owned
                 description: "Provides information on the _id index for the collection."
                 optional: true
-                unstable: false
+                stability: stable
 
     ListCollectionsReplyCursor:
         description: "Cursor object"
         fields:
             id: 
                 type: long
-                unstable: false
+                stability: stable
             ns: 
                 type: namespacestring
-                unstable: false
+                stability: stable
             firstBatch: 
                 type: array<ListCollectionsReplyItem>
-                unstable: false
+                stability: stable
 
     ListCollectionsReply:
         description: "The listCollection command's reply."
         fields:
             cursor:
                 type: ListCollectionsReplyCursor
-                unstable: false
+                stability: stable
 
 commands:
     listCollections:
@@ -119,21 +119,21 @@ commands:
             cursor:
                 type: SimpleCursorOptions
                 optional: true
-                unstable: false
+                stability: stable
             filter:
                 type: object
                 optional: true
-                unstable: false
+                stability: stable
             nameOnly:
                 type: bool
                 default: false
-                unstable: false
+                stability: stable
             authorizedCollections:
                 type: bool
                 default: false
-                unstable: false
+                stability: stable
             includePendingDrops:
                 type: safeBool
-                unstable: true
+                stability: unstable
                 optional: true
         reply_type: ListCollectionsReply

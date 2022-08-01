@@ -43,12 +43,12 @@ structs:
                              (mongod only)
                 type: int
                 optional: true
-                unstable: false
+                stability: stable
             msg:
                 description: Optional message (mongod only)
                 type: string
                 optional: true
-                unstable: false
+                stability: stable
 
     DropIndexesRequest:
         description: dropIndexes command request
@@ -62,19 +62,19 @@ structs:
                         - string
                         - array<string>
                         - object
-                unstable: false
+                stability: stable
             isTimeseriesNamespace:
                 description: "This flag is set to true when the command was originally sent to
                               mongos on the time-series view, but got rewritten to target
                               time-series buckets namespace before being sent to shards."
                 type: bool
                 optional: true
-                unstable: false
+                stability: internal
             collectionUUID:
                 type: uuid
                 description: "The expected UUID of the collection."
                 optional: true
-                unstable: true
+                stability: unstable
 
 commands:
     dropIndexes:

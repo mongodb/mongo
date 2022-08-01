@@ -77,12 +77,12 @@ structs:
         description: "Used for internal sessions only."
         type: TxnNumber
         optional: true
-        unstable: false
+        stability: stable
       txnUUID:
         description: "Used for internal sessions only."
         type: uuid
         optional: true
-        unstable: false
+        stability: stable
 
   LogicalSessionIdToClient:
     description: "A struct representing a LogicalSessionId to external clients"
@@ -115,21 +115,21 @@ structs:
     fields:
       id:
         type: uuid
-        unstable: false
+        stability: stable
       uid:
         type: sha256Block
         optional: true
-        unstable: false
+        stability: stable
       txnNumber:
         description: "Used for internal sessions only."
         type: TxnNumber
         optional: true
-        unstable: false
+        stability: stable
       txnUUID:
         description: "Used for internal sessions only."
         type: uuid
         optional: true
-        unstable: false
+        stability: stable
 
   OperationSessionInfo:
     description: "Parser for serializing session transaction metadata"
