@@ -212,6 +212,12 @@ __compact_page_skip(
         }
     }
     __wt_spin_unlock(session, &block->live_lock);
+
+    ++block->compact_pages_reviewed;
+    if (*skipp)
+        ++block->compact_pages_skipped;
+    else
+        ++block->compact_pages_rewritten;
 }
 
 /*
@@ -234,12 +240,6 @@ __wt_block_compact_page_skip(
       session, block, addr, addr_size, &objectid, &offset, &size, &checksum));
 
     __compact_page_skip(session, block, offset, size, skipp);
-
-    ++block->compact_pages_reviewed;
-    if (*skipp)
-        ++block->compact_pages_skipped;
-    else
-        ++block->compact_pages_rewritten;
 
     return (0);
 }
