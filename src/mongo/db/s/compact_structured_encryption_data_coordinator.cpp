@@ -48,6 +48,8 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(fleCompactHangAfterDropTempCollection);
+
 const auto kMajorityWriteConcern = BSON("writeConcern" << BSON("w"
                                                                << "majority"));
 /**
@@ -175,10 +177,21 @@ void doDropOperation(const CompactStructuredEncryptionDataState& state) {
             "Cannot drop temporary encrypted compaction collection due to missing collection UUID",
             state.getEcocRenameUuid().has_value());
 
+    auto opCtx = cc().makeOperationContext();
+    auto catalog = CollectionCatalog::get(opCtx.get());
     auto ecocNss = state.getEcocRenameNss();
+    auto ecocUuid = catalog->lookupUUIDByNSS(opCtx.get(), ecocNss);
+
+    if (!ecocUuid) {
+        LOGV2_DEBUG(
+            6790901,
+            1,
+            "Skipping drop operation as temporary encrypted compaction collection does not exist");
+        return;
+    }
+
     Drop cmd(ecocNss);
     cmd.setCollectionUUID(state.getEcocRenameUuid().value());
-    auto opCtx = cc().makeOperationContext();
     doRunCommand(opCtx.get(), ecocNss.db(), cmd);
 }
 
@@ -225,6 +238,10 @@ ExecutorFuture<void> CompactStructuredEncryptionDataCoordinator::_runImpl(
                 _response = *_doc.getResponse();
             }
             doDropOperation(_doc);
+            if (MONGO_unlikely(fleCompactHangAfterDropTempCollection.shouldFail())) {
+                LOGV2(6790902, "Hanging due to fleCompactHangAfterDropTempCollection fail point");
+                fleCompactHangAfterDropTempCollection.pauseWhileSet();
+            }
         }));
 }
 
