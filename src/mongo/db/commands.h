@@ -133,6 +133,10 @@ struct CommandHelpers {
 
     // The type of the first field in 'cmdObj' must be mongo::String or Symbol.
     // The first field is interpreted as a collection name.
+    static NamespaceString parseNsCollectionRequired(const DatabaseName& dbName,
+                                                     const BSONObj& cmdObj);
+    // TODO SERVER-68421: Remove this method once all call sites have been updated to pass
+    // DatabaseName.
     static NamespaceString parseNsCollectionRequired(StringData dbname, const BSONObj& cmdObj);
 
     static NamespaceStringOrUUID parseNsOrUUID(StringData dbname, const BSONObj& cmdObj);
