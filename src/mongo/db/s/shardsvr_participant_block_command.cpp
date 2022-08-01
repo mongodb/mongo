@@ -78,13 +78,27 @@ public:
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             auto service = RecoverableCriticalSectionService::get(opCtx);
-            const auto reason = BSON("command"
-                                     << "ShardSvrParticipantBlockCommand"
-                                     << "ns" << ns().toString());
-            service->acquireRecoverableCriticalSectionBlockWrites(
-                opCtx, ns(), reason, ShardingCatalogClient::kLocalWriteConcern);
-            service->promoteRecoverableCriticalSectionToBlockAlsoReads(
-                opCtx, ns(), reason, ShardingCatalogClient::kLocalWriteConcern);
+            const auto reason =
+                request().getReason().get_value_or(BSON("command"
+                                                        << "ShardSvrParticipantBlockCommand"
+                                                        << "ns" << ns().toString()));
+            auto blockType = request().getBlockType().get_value_or(
+                CriticalSectionBlockTypeEnum::kReadsAndWrites);
+            switch (blockType) {
+                case CriticalSectionBlockTypeEnum::kUnblock:
+                    service->releaseRecoverableCriticalSection(
+                        opCtx, ns(), reason, ShardingCatalogClient::kLocalWriteConcern);
+                    break;
+                case CriticalSectionBlockTypeEnum::kWrites:
+                    service->acquireRecoverableCriticalSectionBlockWrites(
+                        opCtx, ns(), reason, ShardingCatalogClient::kLocalWriteConcern);
+                    break;
+                default:
+                    service->acquireRecoverableCriticalSectionBlockWrites(
+                        opCtx, ns(), reason, ShardingCatalogClient::kLocalWriteConcern);
+                    service->promoteRecoverableCriticalSectionToBlockAlsoReads(
+                        opCtx, ns(), reason, ShardingCatalogClient::kLocalWriteConcern);
+            }
         }
 
     private:
