@@ -69,6 +69,7 @@ main(int argc, char *argv[])
     g.nworkers = 1;
     g.evict_reposition_timing_stress = false;
     g.sweep_stress = g.use_timestamps = false;
+    g.failpoint_eviction_fail_after_reconciliation = false;
     g.failpoint_hs_delete_key_from_ts = false;
     g.hs_checkpoint_timing_stress = g.reserved_txnid_timing_stress = false;
     g.checkpoint_slow_timing_stress = false;
@@ -133,6 +134,9 @@ main(int argc, char *argv[])
                 break;
             case '6':
                 g.evict_reposition_timing_stress = true;
+                break;
+            case '7':
+                g.failpoint_eviction_fail_after_reconciliation = true;
                 break;
             default:
                 return (usage());
@@ -299,12 +303,16 @@ wt_connect(const char *config_open)
       progname, fast_eviction ? 5 : 20, fast_eviction ? 1 : 5, g.debug_mode ? DEBUG_MODE_CFG : "",
       config_open == NULL ? "" : ",", config_open == NULL ? "" : config_open));
 
-    if (g.evict_reposition_timing_stress || g.sweep_stress || g.failpoint_hs_delete_key_from_ts ||
+    if (g.evict_reposition_timing_stress || g.sweep_stress ||
+      g.failpoint_eviction_fail_after_reconciliation || g.failpoint_hs_delete_key_from_ts ||
       g.hs_checkpoint_timing_stress || g.reserved_txnid_timing_stress ||
       g.checkpoint_slow_timing_stress) {
-        testutil_check(__wt_snprintf(buf, sizeof(buf), ",timing_stress_for_test=[%s%s%s%s%s%s]",
+        testutil_check(__wt_snprintf(buf, sizeof(buf), ",timing_stress_for_test=[%s%s%s%s%s%s%s]",
           g.checkpoint_slow_timing_stress ? "checkpoint_slow" : "",
           g.evict_reposition_timing_stress ? "evict_reposition" : "",
+          g.failpoint_eviction_fail_after_reconciliation ?
+            "failpoint_eviction_fail_after_reconciliation" :
+            "",
           g.failpoint_hs_delete_key_from_ts ? "failpoint_history_store_delete_key_from_ts" : "",
           g.hs_checkpoint_timing_stress ? "history_store_checkpoint_delay" : "",
           g.reserved_txnid_timing_stress ? "checkpoint_reserved_txnid_delay" : "",
@@ -620,6 +628,8 @@ usage(void)
       "\t\t3: hs_checkpoint_timing_stress\n"
       "\t\t4: reserved_txnid_timing_stress\n"
       "\t\t5: checkpoint_slow_timing_stress\n"
+      "\t\t6: evict_reposition_timing_stress\n"
+      "\t\t7: failpoint_eviction_fail_after_reconciliation\n"
       "\t-T specify a table configuration\n"
       "\t-t set a file type ( col | mix | row | lsm )\n"
       "\t-v verify only\n"

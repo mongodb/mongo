@@ -452,6 +452,9 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
                 continue;
 
             if (F_ISSET(upd, WT_UPDATE_TO_DELETE_FROM_HS)) {
+                WT_ASSERT_ALWAYS(session, F_ISSET(upd, WT_UPDATE_HS | WT_UPDATE_RESTORED_FROM_HS),
+                  "Attempting to remove an update from the history store in WiredTiger, but the "
+                  "update was missing.");
                 if (upd->type == WT_UPDATE_TOMBSTONE)
                     delete_tombstone = upd;
                 else {
