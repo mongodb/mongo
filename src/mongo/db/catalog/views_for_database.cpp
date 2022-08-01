@@ -30,6 +30,8 @@
 
 #include "views_for_database.h"
 
+#include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -55,7 +57,7 @@ void ViewsForDatabase::requireValidCatalog() const {
 }
 
 std::shared_ptr<const ViewDefinition> ViewsForDatabase::lookup(const NamespaceString& ns) const {
-    ViewMap::const_iterator it = viewMap.find(ns.ns());
+    ViewMap::const_iterator it = viewMap.find(ns);
     if (it != viewMap.end()) {
         return it->second;
     }
@@ -64,7 +66,9 @@ std::shared_ptr<const ViewDefinition> ViewsForDatabase::lookup(const NamespaceSt
 
 Status ViewsForDatabase::reload(OperationContext* opCtx) {
     try {
-        durable->iterate(opCtx, [&](const BSONObj& view) { return _insert(opCtx, view); });
+        durable->iterate(opCtx, [&](const BSONObj& view) {
+            return _insert(opCtx, view, durable->getName().tenantId());
+        });
     } catch (const DBException& ex) {
         auto status = ex.toStatus();
         LOGV2(22547,
@@ -78,8 +82,10 @@ Status ViewsForDatabase::reload(OperationContext* opCtx) {
 }
 
 
-Status ViewsForDatabase::insert(OperationContext* opCtx, const BSONObj& view) {
-    auto status = _insert(opCtx, view);
+Status ViewsForDatabase::insert(OperationContext* opCtx,
+                                const BSONObj& view,
+                                const boost::optional<TenantId>& tenantId) {
+    auto status = _insert(opCtx, view, tenantId);
     if (!status.isOK()) {
         LOGV2(5387000,
               "Could not insert view",
@@ -91,14 +97,25 @@ Status ViewsForDatabase::insert(OperationContext* opCtx, const BSONObj& view) {
     return Status::OK();
 };
 
-Status ViewsForDatabase::_insert(OperationContext* opCtx, const BSONObj& view) {
+Status ViewsForDatabase::_insert(OperationContext* opCtx,
+                                 const BSONObj& view,
+                                 const boost::optional<TenantId>& tenantId) {
     BSONObj collationSpec = view.hasField("collation") ? view["collation"].Obj() : BSONObj();
     auto collator = parseCollator(opCtx, collationSpec);
     if (!collator.isOK()) {
         return collator.getStatus();
     }
 
-    NamespaceString viewName(view["_id"].str());
+    NamespaceString viewName;
+    // TODO SERVER-65457 Use deserialize function on NamespaceString to reconstruct NamespaceString
+    // correctly.
+    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility) ||
+        !gMultitenancySupport) {
+        viewName = NamespaceString(tenantId, view["_id"].str());
+    } else {
+        viewName =
+            NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(view["_id"].str());
+    }
 
     auto pipeline = view["pipeline"].Obj();
     for (auto&& stage : pipeline) {
@@ -137,7 +154,7 @@ Status ViewsForDatabase::_insert(OperationContext* opCtx, const BSONObj& view) {
         stats.internal += 1;
     }
 
-    viewMap[viewName.ns()] = std::move(viewDef);
+    viewMap[viewName] = std::move(viewDef);
     return Status::OK();
 }
 

@@ -46,7 +46,7 @@ namespace mongo {
  */
 class ViewsForDatabase {
 public:
-    using ViewMap = StringMap<std::shared_ptr<ViewDefinition>>;
+    using ViewMap = stdx::unordered_map<NamespaceString, std::shared_ptr<ViewDefinition>>;
     using PipelineValidatorFn = std::function<StatusWith<stdx::unordered_set<NamespaceString>>(
         OperationContext*, const ViewDefinition&)>;
 
@@ -95,7 +95,9 @@ public:
     /**
      * Inserts the view into the view map.
      */
-    Status insert(OperationContext* opCtx, const BSONObj& view);
+    Status insert(OperationContext* opCtx,
+                  const BSONObj& view,
+                  const boost::optional<TenantId>& tenantId);
 
     /**
      * Returns Status::OK if each view namespace in 'refs' has the same default collation as
@@ -118,7 +120,9 @@ public:
                            bool needsValidation);
 
 private:
-    Status _insert(OperationContext* opCtx, const BSONObj& view);
+    Status _insert(OperationContext* opCtx,
+                   const BSONObj& view,
+                   const boost::optional<TenantId>& tenantId);
 };
 
 }  // namespace mongo

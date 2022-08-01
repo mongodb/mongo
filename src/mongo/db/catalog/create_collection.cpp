@@ -162,7 +162,7 @@ Status _createView(OperationContext* opCtx,
         // Operations all lock system.views in the end to prevent deadlock.
         Lock::CollectionLock systemViewsLock(
             opCtx,
-            NamespaceString(nss.db(), NamespaceString::kSystemDotViewsCollectionName),
+            NamespaceString(nss.dbName(), NamespaceString::kSystemDotViewsCollectionName),
             MODE_X);
 
         auto db = autoDb.ensureDbExists(opCtx);

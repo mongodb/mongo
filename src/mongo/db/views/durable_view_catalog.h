@@ -88,7 +88,7 @@ public:
                         const NamespaceString& name,
                         const BSONObj& view) = 0;
     virtual void remove(OperationContext* opCtx, const NamespaceString& name) = 0;
-    virtual const std::string& getName() const = 0;
+    virtual const DatabaseName& getName() const = 0;
     virtual ~DurableViewCatalog() = default;
 };
 
@@ -106,7 +106,7 @@ public:
 
     void upsert(OperationContext* opCtx, const NamespaceString& name, const BSONObj& view);
     void remove(OperationContext* opCtx, const NamespaceString& name);
-    const std::string& getName() const;
+    const DatabaseName& getName() const;
 
 private:
     void _iterate(OperationContext* opCtx,

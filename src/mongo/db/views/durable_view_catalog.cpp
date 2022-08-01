@@ -43,8 +43,10 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/logv2/log.h"
@@ -72,9 +74,19 @@ void validateViewDefinitionBSON(OperationContext* opCtx,
             name == "timeseries";
     }
 
-    const auto viewName = viewDefinition["_id"].str();
-    const auto viewNameIsValid = NamespaceString::validCollectionComponent(viewName) &&
-        NamespaceString::validDBName(nsToDatabaseSubstring(viewName));
+    NamespaceString viewName;
+    // TODO SERVER-65457 Use deserialize function on NamespaceString to reconstruct NamespaceString
+    // correctly.
+    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility) ||
+        !gMultitenancySupport) {
+        viewName = NamespaceString(dbName.tenantId(), viewDefinition["_id"].str());
+    } else {
+        viewName = NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(
+            viewDefinition["_id"].str());
+    }
+
+    const auto viewNameIsValid = NamespaceString::validCollectionComponent(viewName.ns()) &&
+        NamespaceString::validDBName(viewName.dbName());
     valid &= viewNameIsValid;
 
     // Only perform validation via NamespaceString if the collection name has been determined to
@@ -112,7 +124,7 @@ void validateViewDefinitionBSON(OperationContext* opCtx,
 void DurableViewCatalog::onExternalChange(OperationContext* opCtx, const NamespaceString& name) {
     dassert(opCtx->lockState()->isDbLockedForMode(name.dbName(), MODE_IX));
     dassert(opCtx->lockState()->isCollectionLockedForMode(
-        NamespaceString(name.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
+        NamespaceString(name.dbName(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
     // On an external change, an invalid view definition can be detected when the view catalog
     // is reloaded. This will prevent any further usage of the views for this database until the
@@ -131,8 +143,18 @@ Status DurableViewCatalog::onExternalInsert(OperationContext* opCtx,
     }
 
     auto catalog = CollectionCatalog::get(opCtx);
-    NamespaceString viewName(doc.getStringField("_id"));
-    NamespaceString viewOn(name.db(), doc.getStringField("viewOn"));
+
+    NamespaceString viewName;
+    // TODO SERVER-65457 Use deserialize function on NamespaceString to reconstruct NamespaceString
+    // correctly.
+    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility) ||
+        !gMultitenancySupport) {
+        viewName = NamespaceString(name.tenantId(), doc.getStringField("_id"));
+    } else {
+        viewName = NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(
+            doc.getStringField("_id"));
+    }
+    NamespaceString viewOn(name.dbName(), doc.getStringField("viewOn"));
     BSONArray pipeline(doc.getObjectField("pipeline"));
     BSONObj collation(doc.getObjectField("collation"));
 
@@ -149,7 +171,7 @@ void DurableViewCatalog::onSystemViewsCollectionDrop(OperationContext* opCtx,
                                                      const NamespaceString& name) {
     dassert(opCtx->lockState()->isDbLockedForMode(name.dbName(), MODE_IX));
     dassert(opCtx->lockState()->isCollectionLockedForMode(
-        NamespaceString(name.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
+        NamespaceString(name.dbName(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
     dassert(name.coll() == NamespaceString::kSystemDotViewsCollectionName);
 
     auto catalog = CollectionCatalog::get(opCtx);
@@ -175,8 +197,8 @@ void DurableViewCatalog::onSystemViewsCollectionDrop(OperationContext* opCtx,
 
 // DurableViewCatalogImpl
 
-const std::string& DurableViewCatalogImpl::getName() const {
-    return _db->name().toString();
+const DatabaseName& DurableViewCatalogImpl::getName() const {
+    return _db->name();
 }
 
 void DurableViewCatalogImpl::iterate(OperationContext* opCtx, Callback callback) {
@@ -238,7 +260,16 @@ void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, systemViewsNs);
     invariant(systemViews);
 
-    RecordId id = Helpers::findOne(opCtx, systemViews, BSON("_id" << name.ns()));
+    std::string nssOnDisk;
+    // TODO SERVER-65457 Move this check into a function on NamespaceString.
+    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility) ||
+        !gMultitenancySupport) {
+        nssOnDisk = name.toString();
+    } else {
+        nssOnDisk = name.toStringWithTenantId();
+    }
+
+    RecordId id = Helpers::findOne(opCtx, systemViews, BSON("_id" << nssOnDisk));
 
     Snapshotted<BSONObj> oldView;
     if (!id.isValid() || !systemViews->findDoc(opCtx, id, &oldView)) {
@@ -252,7 +283,7 @@ void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
     } else {
         CollectionUpdateArgs args;
         args.update = view;
-        args.criteria = BSON("_id" << name.ns());
+        args.criteria = BSON("_id" << nssOnDisk);
 
         const bool assumeIndexesAreAffected = true;
         systemViews->updateDocument(
@@ -270,7 +301,18 @@ void DurableViewCatalogImpl::remove(OperationContext* opCtx, const NamespaceStri
 
     if (!systemViews)
         return;
-    RecordId id = Helpers::findOne(opCtx, systemViews, BSON("_id" << name.ns()));
+
+
+    std::string nssOnDisk;
+    // TODO SERVER-65457 Move this check into a function on NamespaceString.
+    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility) ||
+        !gMultitenancySupport) {
+        nssOnDisk = name.toString();
+    } else {
+        nssOnDisk = name.toStringWithTenantId();
+    }
+
+    RecordId id = Helpers::findOne(opCtx, systemViews, BSON("_id" << nssOnDisk));
     if (!id.isValid())
         return;
 

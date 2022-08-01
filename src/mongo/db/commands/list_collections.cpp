@@ -268,6 +268,10 @@ public:
         return AllowedOnSecondary::kOptIn;
     }
 
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
     bool maintenanceOk() const final {
         return false;
     }

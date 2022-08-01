@@ -35,6 +35,8 @@
 #include "mongo/db/catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot_helper.h"
@@ -478,7 +480,8 @@ Status CollectionCatalog::createView(OperationContext* opCtx,
     invariant(insertViewMode == ViewUpsertMode::kAlreadyDurableView ||
               opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
     invariant(opCtx->lockState()->isCollectionLockedForMode(
-        NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
+        NamespaceString(viewName.dbName(), NamespaceString::kSystemDotViewsCollectionName),
+        MODE_X));
 
     invariant(_viewsForDatabase.contains(viewName.dbName()));
     const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.dbName());
@@ -528,7 +531,8 @@ Status CollectionCatalog::modifyView(
     const ViewsForDatabase::PipelineValidatorFn& pipelineValidator) const {
     invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_X));
     invariant(opCtx->lockState()->isCollectionLockedForMode(
-        NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
+        NamespaceString(viewName.dbName(), NamespaceString::kSystemDotViewsCollectionName),
+        MODE_X));
     invariant(_viewsForDatabase.contains(viewName.dbName()));
     const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.dbName());
 
@@ -565,7 +569,8 @@ Status CollectionCatalog::modifyView(
 Status CollectionCatalog::dropView(OperationContext* opCtx, const NamespaceString& viewName) const {
     invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
     invariant(opCtx->lockState()->isCollectionLockedForMode(
-        NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
+        NamespaceString(viewName.dbName(), NamespaceString::kSystemDotViewsCollectionName),
+        MODE_X));
     invariant(_viewsForDatabase.contains(viewName.dbName()));
     const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.dbName());
     viewsForDb.requireValidCatalog();
@@ -584,7 +589,7 @@ Status CollectionCatalog::dropView(OperationContext* opCtx, const NamespaceStrin
 
         writable.durable->remove(opCtx, viewName);
         writable.viewGraph.remove(viewName);
-        writable.viewMap.erase(viewName.ns());
+        writable.viewMap.erase(viewName);
         writable.stats = {};
 
         // Reload the view catalog with the changes applied.
@@ -592,7 +597,8 @@ Status CollectionCatalog::dropView(OperationContext* opCtx, const NamespaceStrin
         if (result.isOK()) {
             auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
             uncommittedCatalogUpdates.removeView(viewName);
-            uncommittedCatalogUpdates.replaceViewsForDatabase(viewName.db(), std::move(writable));
+            uncommittedCatalogUpdates.replaceViewsForDatabase(viewName.dbName(),
+                                                              std::move(writable));
 
             PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx,
                                                                     uncommittedCatalogUpdates);
@@ -1219,7 +1225,7 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(OperationCon
 void CollectionCatalog::registerUncommittedView(OperationContext* opCtx,
                                                 const NamespaceString& nss) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(
-        NamespaceString(nss.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
+        NamespaceString(nss.dbName(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
     // Since writing to system.views requires an X lock, we only need to cross-check collection
     // namespaces here.
@@ -1426,14 +1432,21 @@ Status CollectionCatalog::_createOrUpdateView(
     invariant(insertViewMode == ViewUpsertMode::kAlreadyDurableView ||
               opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
     invariant(opCtx->lockState()->isCollectionLockedForMode(
-        NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
+        NamespaceString(viewName.dbName(), NamespaceString::kSystemDotViewsCollectionName),
+        MODE_X));
 
     viewsForDb.requireValidCatalog();
 
     // Build the BSON definition for this view to be saved in the durable view catalog and/or to
     // insert in the viewMap. If the collation is empty, omit it from the definition altogether.
     BSONObjBuilder viewDefBuilder;
-    viewDefBuilder.append("_id", viewName.ns());
+    // TODO SERVER-65457 Use serialize function on NamespaceString to create the string to write.
+    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility) ||
+        !gMultitenancySupport) {
+        viewDefBuilder.append("_id", viewName.toString());
+    } else {
+        viewDefBuilder.append("_id", viewName.toStringWithTenantId());
+    }
     viewDefBuilder.append("viewOn", viewOn.coll());
     viewDefBuilder.append("pipeline", pipeline);
     if (collator) {
@@ -1464,7 +1477,7 @@ Status CollectionCatalog::_createOrUpdateView(
         switch (insertViewMode) {
             case ViewUpsertMode::kCreateView:
             case ViewUpsertMode::kAlreadyDurableView:
-                return viewsForDb.insert(opCtx, viewDef);
+                return viewsForDb.insert(opCtx, viewDef, viewName.tenantId());
             case ViewUpsertMode::kUpdateView:
                 viewsForDb.viewMap.clear();
                 viewsForDb.viewGraphNeedsRefresh = true;

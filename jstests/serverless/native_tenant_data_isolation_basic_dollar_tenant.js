@@ -3,6 +3,8 @@
 (function() {
 "use strict";
 
+load('jstests/aggregation/extras/utils.js');  // For arrayEq()
+
 const mongod = MongoRunner.runMongod(
     {auth: '', setParameter: {multitenancySupport: true, featureFlagMongoStore: true}});
 const adminDb = mongod.getDB('admin');
@@ -18,13 +20,23 @@ assert(adminDb.auth('admin', 'pwd'));
     const testDb = mongod.getDB('myDb0');
     const testColl = testDb.getCollection('myColl0');
 
-    // Create a collection for the tenant kTenant.
+    // Create a collection for the tenant kTenant, and then create a view on the collection.
     assert.commandWorked(
         testColl.getDB().createCollection(testColl.getName(), {'$tenant': kTenant}));
+    assert.commandWorked(testDb.runCommand(
+        {"create": "view1", "viewOn": "myColl0", pipeline: [], '$tenant': kTenant}));
+
     const colls = assert.commandWorked(
         testDb.runCommand({listCollections: 1, nameOnly: true, '$tenant': kTenant}));
-    assert.eq(1, colls.cursor.firstBatch.length, tojson(colls.cursor.firstBatch));
-    // This collection should not be accessed with a different tenant.
+    assert.eq(3, colls.cursor.firstBatch.length, tojson(colls.cursor.firstBatch));
+    const expectedColls = [
+        {"name": "myColl0", "type": "collection"},
+        {"name": "system.views", "type": "collection"},
+        {"name": "view1", "type": "view"}
+    ];
+    assert(arrayEq(expectedColls, colls.cursor.firstBatch), tojson(colls.cursor.firstBatch));
+
+    // These collections should not be accessed with a different tenant.
     const collsWithDiffTenant = assert.commandWorked(
         testDb.runCommand({listCollections: 1, nameOnly: true, '$tenant': ObjectId()}));
     assert.eq(0, collsWithDiffTenant.cursor.firstBatch.length);

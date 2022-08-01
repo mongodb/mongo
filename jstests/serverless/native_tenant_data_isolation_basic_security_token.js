@@ -3,6 +3,8 @@
 (function() {
 "use strict";
 
+load('jstests/aggregation/extras/utils.js');  // For arrayEq()
+
 const mongod = MongoRunner.runMongod(
     {auth: '', setParameter: {multitenancySupport: true, featureFlagMongoStore: true}});
 const adminDb = mongod.getDB('admin');
@@ -39,11 +41,23 @@ assert(adminDb.auth('admin', 'pwd'));
         tokenDB.runCommand({findAndModify: "myColl0", query: {a: 11}, update: {$inc: {a: 10}}}));
     assert.eq({_id: 0, a: 11, b: 1}, fad2.value);
 
+    // Create a view on the collection.
+    assert.commandWorked(
+        tokenDB.runCommand({"create": "view1", "viewOn": "myColl0", pipeline: []}));
+
+    const colls = assert.commandWorked(tokenDB.runCommand({listCollections: 1, nameOnly: true}));
+    assert.eq(3, colls.cursor.firstBatch.length, tojson(colls.cursor.firstBatch));
+    const expectedColls = [
+        {"name": "myColl0", "type": "collection"},
+        {"name": "system.views", "type": "collection"},
+        {"name": "view1", "type": "view"}
+    ];
+    assert(arrayEq(expectedColls, colls.cursor.firstBatch), tojson(colls.cursor.firstBatch));
+
     // Create a user for a different tenant, and set the security token on the connection. Then,
     // check that this tenant cannot access the other tenant's collection. We reuse the same
     // connection, but swap the token out.
     const kOtherTenant = ObjectId();
-    // const tokenConn2 = new Mongo(mongod.host);
 
     assert.commandWorked(mongod.getDB('$external').runCommand({
         createUser: "readWriteUserTenant2",
