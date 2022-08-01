@@ -360,7 +360,7 @@ function InternalTransactionChunkMigrationTest(storeFindAndModifyImagesInSideCol
         testCase.setUpFunc();
 
         const lsid = getTransactionSessionId(txnType, testCase);
-        runTxnRetryOnLockTimeoutError(() => {
+        runTxnRetryOnTransientError(() => {
             const txnNumber = getNextTxnNumber(txnType, testCase);
 
             for (let i = 0; i < testCase.commands.length; i++) {
@@ -401,7 +401,7 @@ function InternalTransactionChunkMigrationTest(storeFindAndModifyImagesInSideCol
         const lsid = getTransactionSessionId(txnType, testCase);
         // Give the session a different txnUUID to simulate a retry from a different mongos.
         lsid.txnUUID = UUID();
-        runTxnRetryOnLockTimeoutError(() => {
+        runTxnRetryOnTransientError(() => {
             const txnNumber = getNextTxnNumber(txnType, testCase);
 
             for (let i = 0; i < testCase.commands.length; i++) {
