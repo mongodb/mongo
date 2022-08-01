@@ -426,7 +426,7 @@ static int
 __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
 {
     WT_REF *child;
-    bool visible;
+    bool active;
 
     /*
      * There may be cursors in the tree walking the list of child pages. The parent is locked, so
@@ -488,24 +488,9 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
                               */
             if (!__wt_atomic_casv8(&child->state, WT_REF_DELETED, WT_REF_LOCKED))
                 return (__wt_set_return(session, EBUSY));
-            /*
-             * We can evict any truncation that's committed. However, restrictions in reconciliation
-             * mean that it needs to be visible to us when we get there. And unfortunately we are
-             * upstream of the point where eviction threads get snapshots. So, use the following
-             * logic:
-             *     1. If we already have a snapshot, use it to check visibility.
-             *     2. If we do not but we're an eviction thread, check if the operation is resolved.
-             *        We will get a snapshot shortly and any committed operation will be visible.
-             *     3. Otherwise, check if it is globally visible.
-             */
-            if (F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT))
-                visible = __wt_page_del_visible(session, child->ft_info.del, false);
-            else if (F_ISSET(session, WT_SESSION_EVICTION))
-                visible = __wt_page_del_committed(child->ft_info.del);
-            else
-                visible = __wt_page_del_visible(session, child->ft_info.del, true);
+            active = __wt_page_del_active(session, child, true);
             child->state = WT_REF_DELETED;
-            if (!visible)
+            if (active)
                 return (__wt_set_return(session, EBUSY));
             break;
         default:
