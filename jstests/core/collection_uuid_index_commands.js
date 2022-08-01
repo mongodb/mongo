@@ -4,6 +4,7 @@
  * @tags: [
  *   requires_fcv_60,
  *   tenant_migration_incompatible,
+ *   requires_non_retryable_commands,
  * ]
  */
 (function() {
@@ -20,12 +21,6 @@ const validateErrorResponse = function(
         // In sharded cluster scenario, the inner raw shards reply should contain the error info,
         // along with the outer reply obj.
         for (let [_, shardReply] of Object.entries(res.raw)) {
-            if (shardReply.code === ErrorCodes.HostUnreachable) {
-                // We can hit this error on some suites that kills the primary node on shards.
-                // Skipping is safe as this is rare and most probably happens on one shard.
-                continue;
-            }
-
             assert.eq(shardReply.code, ErrorCodes.CollectionUUIDMismatch);
             assert.eq(shardReply.db, db);
             assert.eq(shardReply.collectionUUID, collectionUUID);
