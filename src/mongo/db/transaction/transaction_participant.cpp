@@ -33,7 +33,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/transaction_participant.h"
+#include "mongo/db/transaction/transaction_participant.h"
 
 #include <fmt/format.h>
 
@@ -61,15 +61,15 @@
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/s/sharding_write_router.h"
 #include "mongo/db/server_recovery.h"
-#include "mongo/db/server_transactions_metrics.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/storage/flow_control.h"
-#include "mongo/db/transaction_history_iterator.h"
-#include "mongo/db/transaction_participant_gen.h"
+#include "mongo/db/transaction/retryable_writes_stats.h"
+#include "mongo/db/transaction/server_transactions_metrics.h"
+#include "mongo/db/transaction/transaction_history_iterator.h"
+#include "mongo/db/transaction/transaction_participant_gen.h"
 #include "mongo/db/txn_retry_counter_too_old_info.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"

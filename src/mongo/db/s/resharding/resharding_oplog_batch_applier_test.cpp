@@ -50,7 +50,7 @@
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/transaction_participant.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"

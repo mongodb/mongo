@@ -37,7 +37,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/remove_tags_gen.h"
 #include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/transaction_participant.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/grid.h"

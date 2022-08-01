@@ -41,7 +41,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/transaction_participant.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/logv2/log.h"
 

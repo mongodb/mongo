@@ -28,7 +28,7 @@
  */
 
 #include "mongo/db/cluster_transaction_api.h"
-#include "mongo/db/transaction_participant_resource_yielder.h"
+#include "mongo/db/transaction/transaction_participant_resource_yielder.h"
 #include "mongo/s/commands/internal_transactions_test_command.h"
 
 namespace mongo {

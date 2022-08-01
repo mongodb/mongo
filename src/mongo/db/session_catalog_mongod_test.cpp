@@ -33,8 +33,8 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/session_txn_record_gen.h"
 #include "mongo/db/sessions_collection_mock.h"
+#include "mongo/db/transaction/session_txn_record_gen.h"
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {

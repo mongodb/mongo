@@ -37,7 +37,7 @@
 #include "mongo/db/s/transaction_coordinator_document_gen.h"
 #include "mongo/db/s/transaction_coordinator_params_gen.h"
 #include "mongo/db/storage/flow_control.h"
-#include "mongo/db/transaction_participant_gen.h"
+#include "mongo/db/transaction/transaction_participant_gen.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"

@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/db/transaction_participant_resource_yielder.h"
+#include "mongo/db/transaction/transaction_participant_resource_yielder.h"
 
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/transaction_participant.h"
+#include "mongo/db/transaction/transaction_participant.h"
 
 namespace mongo {
 

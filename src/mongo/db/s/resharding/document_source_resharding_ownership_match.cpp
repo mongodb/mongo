@@ -33,7 +33,7 @@
 #include "mongo/db/s/resharding/document_source_resharding_ownership_match.h"
 
 #include "mongo/db/s/resharding/resharding_util.h"
-#include "mongo/db/transaction_history_iterator.h"
+#include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/resharding/common_types_gen.h"

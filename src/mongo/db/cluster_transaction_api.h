@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/transaction_api.h"
+#include "mongo/db/transaction/transaction_api.h"
 #include "mongo/s/service_entry_point_mongos.h"
 
 namespace mongo::txn_api::details {

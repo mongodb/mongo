@@ -59,7 +59,7 @@
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/timeseries/timeseries_options.h"
-#include "mongo/db/transaction_api.h"
+#include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/task_executor.h"

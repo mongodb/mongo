@@ -35,7 +35,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/transactions_stats_gen.h"
+#include "mongo/db/transaction/transactions_stats_gen.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
 

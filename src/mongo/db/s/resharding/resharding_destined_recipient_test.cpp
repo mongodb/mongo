@@ -41,7 +41,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_write_router.h"
 #include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/transaction_participant.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache_loader_mock.h"

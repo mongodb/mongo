@@ -44,7 +44,7 @@
 #include "mongo/db/s/resharding/resharding_oplog_session_application.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/transaction_participant.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 

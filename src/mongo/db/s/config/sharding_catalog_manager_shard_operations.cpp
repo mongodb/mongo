@@ -65,7 +65,7 @@
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/s/user_writes_critical_section_document_gen.h"
 #include "mongo/db/s/user_writes_recoverable_critical_section_service.h"
-#include "mongo/db/transaction_api.h"
+#include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/task_executor.h"

@@ -29,10 +29,10 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/transaction_metrics_observer.h"
+#include "mongo/db/transaction/transaction_metrics_observer.h"
 
-#include "mongo/db/server_transactions_metrics.h"
-#include "mongo/db/transaction_participant.h"
+#include "mongo/db/transaction/server_transactions_metrics.h"
+#include "mongo/db/transaction/transaction_participant.h"
 
 namespace mongo {
 

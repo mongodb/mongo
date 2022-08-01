@@ -48,7 +48,7 @@
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/stats/counters.h"
-#include "mongo/db/transaction_participant.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 

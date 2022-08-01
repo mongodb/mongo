@@ -36,7 +36,7 @@
 #include "mongo/db/logical_session_cache.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime_with.h"
-#include "mongo/db/transaction_api.h"
+#include "mongo/db/transaction/transaction_api.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_chunk.h"

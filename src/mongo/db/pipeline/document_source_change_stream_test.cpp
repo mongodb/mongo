@@ -66,7 +66,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
-#include "mongo/db/transaction_history_iterator.h"
+#include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"

@@ -50,7 +50,7 @@
 #include "mongo/db/query/fle/server_rewrite.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/transaction_api.h"
+#include "mongo/db/transaction/transaction_api.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"

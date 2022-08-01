@@ -37,7 +37,7 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/transaction_participant.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 

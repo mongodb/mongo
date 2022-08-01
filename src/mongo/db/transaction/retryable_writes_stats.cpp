@@ -27,50 +27,46 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/platform/basic.h"
 
+#include "mongo/db/transaction/retryable_writes_stats.h"
+
+#include "mongo/db/commands/server_status.h"
+#include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/transactions_stats_gen.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/db/transaction/transactions_stats_gen.h"
 
 namespace mongo {
+namespace {
+const auto retryableWritesStatsDecoration =
+    ServiceContext::declareDecoration<RetryableWritesStats>();
+}  // namespace
 
-/**
- * Container for retryable writes statistics.
- */
-class RetryableWritesStats {
-    RetryableWritesStats(const RetryableWritesStats&) = delete;
-    RetryableWritesStats& operator=(const RetryableWritesStats&) = delete;
+RetryableWritesStats* RetryableWritesStats::get(ServiceContext* service) {
+    return &retryableWritesStatsDecoration(service);
+}
 
-public:
-    RetryableWritesStats() = default;
+RetryableWritesStats* RetryableWritesStats::get(OperationContext* opCtx) {
+    return get(opCtx->getServiceContext());
+}
 
-    static RetryableWritesStats* get(ServiceContext* service);
-    static RetryableWritesStats* get(OperationContext* opCtx);
+void RetryableWritesStats::incrementRetriedCommandsCount() {
+    _retriedCommandsCount.fetchAndAdd(1);
+}
 
-    void incrementRetriedCommandsCount();
+void RetryableWritesStats::incrementRetriedStatementsCount() {
+    _retriedStatementsCount.fetchAndAdd(1);
+}
 
-    void incrementRetriedStatementsCount();
+void RetryableWritesStats::incrementTransactionsCollectionWriteCount() {
+    _transactionsCollectionWriteCount.fetchAndAdd(1);
+}
 
-    void incrementTransactionsCollectionWriteCount();
-
-    /**
-     * Appends the accumulated stats to a transactions stats object to be returned through
-     * serverStatus.
-     */
-    void updateStats(TransactionsStats* stats);
-
-private:
-    // The number of received commands that contained a statement that had already been executed.
-    AtomicWord<unsigned long long> _retriedCommandsCount{0};
-
-    // The number of received statements found to have been previously executed.
-    AtomicWord<unsigned long long> _retriedStatementsCount{0};
-
-    // The number of writes to the config.transactions collection. Includes writes initiated by a
-    // migration.
-    AtomicWord<unsigned long long> _transactionsCollectionWriteCount{0};
-};
+void RetryableWritesStats::updateStats(TransactionsStats* stats) {
+    stats->setRetriedCommandsCount(_retriedCommandsCount.load());
+    stats->setRetriedStatementsCount(_retriedStatementsCount.load());
+    stats->setTransactionsCollectionWriteCount(_transactionsCollectionWriteCount.load());
+}
 
 }  // namespace mongo

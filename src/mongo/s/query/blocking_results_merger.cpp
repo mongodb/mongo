@@ -31,7 +31,7 @@
 
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/transaction_participant.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/s/query/blocking_results_merger.h"
 #include "mongo/util/scopeguard.h"
 

@@ -36,7 +36,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/transaction_history_iterator.h"
+#include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/str.h"
 

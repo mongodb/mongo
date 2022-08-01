@@ -40,7 +40,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
-        '$BUILD_DIR/mongo/db/transaction',
+        '$BUILD_DIR/mongo/db/transaction/transaction',
         'common_process_interface',
     ],
     LIBDEPS_PRIVATE=[

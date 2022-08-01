@@ -43,7 +43,7 @@
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner.h"
 #include "mongo/db/s/resharding/resharding_util.h"
-#include "mongo/db/session_txn_record_gen.h"
+#include "mongo/db/transaction/session_txn_record_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/shard_id.h"
 #include "mongo/unittest/unittest.h"

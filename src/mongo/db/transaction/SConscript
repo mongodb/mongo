@@ -1,0 +1,78 @@
+# -*- mode: python -*-
+
+Import("env")
+
+env = env.Clone()
+
+env.Library(
+    target='transaction',
+    source=[
+        '$BUILD_DIR/mongo/db/session_catalog_mongod.cpp',
+        'internal_transactions_reap_service.cpp',
+        'retryable_writes_stats.cpp',
+        'server_transactions_metrics.cpp',
+        'transaction_history_iterator.cpp',
+        'transaction_metrics_observer.cpp',
+        'transaction_participant.cpp',
+        'transaction_participant_resource_yielder.cpp',
+        'internal_transactions_reap_service.idl',
+        'session_txn_record.idl',
+        'transaction_participant.idl',
+        'transactions_stats.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
+        '$BUILD_DIR/mongo/db/catalog/database_holder',
+        '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
+        '$BUILD_DIR/mongo/db/catalog_raii',
+        '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
+        '$BUILD_DIR/mongo/db/concurrency/exception_util',
+        '$BUILD_DIR/mongo/db/curop_failpoint_helpers',
+        '$BUILD_DIR/mongo/db/dbdirectclient',
+        '$BUILD_DIR/mongo/db/index/index_access_method',
+        '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
+        '$BUILD_DIR/mongo/db/index_commands_idl',
+        '$BUILD_DIR/mongo/db/internal_transactions_feature_flag',
+        '$BUILD_DIR/mongo/db/multitenancy',
+        '$BUILD_DIR/mongo/db/not_primary_error_tracker',
+        '$BUILD_DIR/mongo/db/query_exec',
+        '$BUILD_DIR/mongo/db/repl/apply_ops_command_info',
+        '$BUILD_DIR/mongo/db/repl/repl_server_parameters',
+        '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
+        '$BUILD_DIR/mongo/db/session_catalog',
+        '$BUILD_DIR/mongo/db/stats/fill_locker_info',
+        '$BUILD_DIR/mongo/db/stats/top',
+        '$BUILD_DIR/mongo/db/stats/transaction_stats',
+        '$BUILD_DIR/mongo/db/update/update_driver',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/s/sharding_router_api',
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+    ],
+)
+
+env.Library(
+    target='transaction_api',
+    source=[
+        'transaction_api.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/auth',
+        '$BUILD_DIR/mongo/db/logical_session_id',
+        '$BUILD_DIR/mongo/db/logical_session_id_helpers',
+        '$BUILD_DIR/mongo/db/operation_time_tracker',
+        '$BUILD_DIR/mongo/db/query/command_request_response',
+        '$BUILD_DIR/mongo/db/query/query_request',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/s/sharding_api_d',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/session_catalog',
+        '$BUILD_DIR/mongo/db/shared_request_handling',
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
+        '$BUILD_DIR/mongo/rpc/command_status',
+        '$BUILD_DIR/mongo/rpc/rpc',
+        '$BUILD_DIR/mongo/transport/service_entry_point',
+    ],
+)

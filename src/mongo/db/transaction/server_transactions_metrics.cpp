@@ -29,15 +29,15 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/server_transactions_metrics.h"
+#include "mongo/db/transaction/server_transactions_metrics.h"
 
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/retryable_writes_stats.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/transactions_stats_gen.h"
+#include "mongo/db/transaction/retryable_writes_stats.h"
+#include "mongo/db/transaction/transactions_stats_gen.h"
 
 namespace mongo {
 namespace {

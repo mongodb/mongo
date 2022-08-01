@@ -71,7 +71,7 @@
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/storage/control/journal_flusher.h"
 #include "mongo/db/storage/remove_saver.h"
-#include "mongo/db/transaction_participant.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"

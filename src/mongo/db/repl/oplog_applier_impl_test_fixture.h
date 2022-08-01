@@ -37,7 +37,7 @@
 #include "mongo/db/repl/oplog_applier_impl.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/session_txn_record_gen.h"
+#include "mongo/db/transaction/session_txn_record_gen.h"
 
 namespace mongo {
 

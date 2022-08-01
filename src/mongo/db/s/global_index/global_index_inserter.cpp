@@ -32,7 +32,7 @@
 #include <fmt/format.h>
 
 #include "mongo/db/s/global_index/global_index_entry_gen.h"
-#include "mongo/db/transaction_api.h"
+#include "mongo/db/transaction/transaction_api.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 

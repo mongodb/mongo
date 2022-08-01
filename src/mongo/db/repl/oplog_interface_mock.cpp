@@ -30,7 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/repl/oplog_interface_mock.h"
-#include "mongo/db/transaction_history_iterator.h"
+#include "mongo/db/transaction/transaction_history_iterator.h"
 
 namespace mongo {
 namespace repl {

@@ -87,7 +87,7 @@
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/stats/server_read_concern_metrics.h"
 #include "mongo/db/stats/top.h"
-#include "mongo/db/transaction_participant.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"

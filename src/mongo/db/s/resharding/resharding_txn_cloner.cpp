@@ -56,8 +56,8 @@
 #include "mongo/db/s/resharding/resharding_txn_cloner_progress_gen.h"
 #include "mongo/db/s/session_catalog_migration_destination.h"
 #include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/session_txn_record_gen.h"
-#include "mongo/db/transaction_participant.h"
+#include "mongo/db/transaction/session_txn_record_gen.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/scopeguard.h"
 

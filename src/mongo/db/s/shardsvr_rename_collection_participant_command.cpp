@@ -36,7 +36,7 @@
 #include "mongo/db/s/rename_collection_participant_service.h"
 #include "mongo/db/s/sharded_rename_collection_gen.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/transaction_participant.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
 
