@@ -319,10 +319,15 @@ NamespaceStringOrUUID CommandHelpers::parseNsOrUUID(StringData dbname, const BSO
 }
 
 std::string CommandHelpers::parseNsFromCommand(StringData dbname, const BSONObj& cmdObj) {
+    return parseNsFromCommand({boost::none, dbname}, cmdObj).ns();
+}
+
+NamespaceString CommandHelpers::parseNsFromCommand(const DatabaseName& dbName,
+                                                   const BSONObj& cmdObj) {
     BSONElement first = cmdObj.firstElement();
     if (first.type() != mongo::String)
-        return dbname.toString();
-    return str::stream() << dbname << '.' << cmdObj.firstElement().valueStringData();
+        return NamespaceString(dbName);
+    return NamespaceString(dbName, cmdObj.firstElement().valueStringData());
 }
 
 ResourcePattern CommandHelpers::resourcePatternForNamespace(const std::string& ns) {
