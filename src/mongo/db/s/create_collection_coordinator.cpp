@@ -412,6 +412,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 // Log the start of the event only if we're not recovering.
                 _logStartCreateCollection(opCtx);
 
+                _checkCollectionUUIDMismatch(opCtx);
+
                 // Quick check (without critical section) to see if another create collection
                 // already succeeded.
                 if (auto createCollectionResponseOpt =
@@ -421,7 +423,6 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                             _shardKeyPattern->getKeyPattern().toBSON(),
                             getCollation(opCtx, nss(), _request.getCollation()).second,
                             _request.getUnique().value_or(false))) {
-                    _checkCollectionUUIDMismatch(opCtx);
 
                     // The critical section can still be held here if the node committed the
                     // sharding of the collection but then it stepped down before it managed to
@@ -463,7 +464,6 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     }
                 }
 
-                _checkCollectionUUIDMismatch(opCtx);
                 _createPolicy(opCtx);
                 _createCollectionAndIndexes(opCtx);
 

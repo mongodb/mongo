@@ -272,6 +272,8 @@ last-continuous:
       test_file: jstests/aggregation/match_no_swap_rand.js
     - ticket: SERVER-67723
       test_file: jstests/replsets/internal_sessions_reaping_basic.js
+    - ticket: SERVER-67885
+      test_file: jstests/sharding/collection_uuid_shard_capped_collection.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -677,6 +679,8 @@ last-lts:
       test_file: jstests/aggregation/match_no_swap_rand.js
     - ticket: SERVER-67723
       test_file: jstests/replsets/internal_sessions_reaping_basic.js
+    - ticket: SERVER-67885
+      test_file: jstests/sharding/collection_uuid_shard_capped_collection.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
