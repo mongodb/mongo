@@ -129,7 +129,7 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
         // Initial try.
         const initialLsid = txnOptions.makeSessionIdFunc();
         let initialTxnNumber = 0;
-        runTxnRetryOnLockTimeoutError(() => {
+        runTxnRetryOnTransientError(() => {
             initialTxnNumber++;
             setTxnFields(cmdObj, initialLsid, initialTxnNumber);
             assert.commandWorked(mongosTestDB.runCommand(cmdObj));
@@ -175,7 +175,7 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
         const initialLsid = txnOptions.makeSessionIdFunc();
         let initialTxnNumber = 0;
         let initialRes;
-        runTxnRetryOnLockTimeoutError(() => {
+        runTxnRetryOnTransientError(() => {
             initialTxnNumber++;
             setTxnFields(cmdObj, initialLsid, initialTxnNumber);
             initialRes = assert.commandWorked(mongosTestDB.runCommand(cmdObj));
@@ -202,7 +202,7 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
         // different txnUUID) to simulate a retry from a different mongos.
         const retryLsid = Object.assign({}, initialLsid, {txnUUID: UUID()});
         let retryTxnNumber = 0;
-        runTxnRetryOnLockTimeoutError(() => {
+        runTxnRetryOnTransientError(() => {
             retryTxnNumber++;
             setTxnFields(cmdObj, retryLsid, retryTxnNumber);
             const retryRes = assert.commandWorked(mongosTestDB.runCommand(cmdObj));
@@ -271,7 +271,7 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
         const initialLsid = txnOptions.makeSessionIdFunc();
         let initialTxnNumber = 0;
         let initialRes;
-        runTxnRetryOnLockTimeoutError(() => {
+        runTxnRetryOnTransientError(() => {
             initialTxnNumber++;
             setTxnFields(cmdObjToRetry, initialLsid, initialTxnNumber);
             insertCmdObjs.forEach(cmdObj => setTxnFields(cmdObj, initialLsid, initialTxnNumber));
@@ -314,7 +314,7 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
         // different txnUUID) to simulate a retry from a different mongos.
         const retryLsid = Object.assign({}, initialLsid, {txnUUID: UUID()});
         let retryTxnNumber = 0;
-        runTxnRetryOnLockTimeoutError(() => {
+        runTxnRetryOnTransientError(() => {
             retryTxnNumber++;
             setTxnFields(cmdObjToRetry, retryLsid, retryTxnNumber);
             insertCmdObjs.forEach(cmdObj => setTxnFields(cmdObj, retryLsid, retryTxnNumber));
