@@ -283,6 +283,25 @@ TEST(BSONElement, SafeNumberDoubleNegativeBound) {
               (double)BSONElement::kSmallestSafeLongLongAsDouble);
 }
 
+TEST(BSONElement, IsNaN) {
+    ASSERT(BSON("" << std::numeric_limits<double>::quiet_NaN()).firstElement().isNaN());
+    ASSERT(BSON("" << -std::numeric_limits<double>::quiet_NaN()).firstElement().isNaN());
+    ASSERT(BSON("" << Decimal128::kPositiveNaN).firstElement().isNaN());
+    ASSERT(BSON("" << Decimal128::kNegativeNaN).firstElement().isNaN());
+
+    ASSERT_FALSE(BSON("" << std::numeric_limits<double>::infinity()).firstElement().isNaN());
+    ASSERT_FALSE(BSON("" << -std::numeric_limits<double>::infinity()).firstElement().isNaN());
+    ASSERT_FALSE(BSON("" << Decimal128::kPositiveInfinity).firstElement().isNaN());
+    ASSERT_FALSE(BSON("" << Decimal128::kNegativeInfinity).firstElement().isNaN());
+    ASSERT_FALSE(BSON("" << Decimal128{"9223372036854775808.5"}).firstElement().isNaN());
+    ASSERT_FALSE(BSON("" << Decimal128{"-9223372036854775809.99"}).firstElement().isNaN());
+    ASSERT_FALSE(BSON("" << 12345LL).firstElement().isNaN());
+    ASSERT_FALSE(BSON(""
+                      << "foo")
+                     .firstElement()
+                     .isNaN());
+}
+
 TEST(BSONElementIntegerParseTest, ParseIntegerElementToNonNegativeLongRejectsNegative) {
     BSONObj query = BSON("" << -2LL);
     ASSERT_NOT_OK(query.firstElement().parseIntegerElementToNonNegativeLong());
