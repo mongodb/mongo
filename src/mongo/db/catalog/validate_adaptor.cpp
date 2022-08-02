@@ -266,13 +266,15 @@ Status _validateTimeseriesMinMax(const BSONObj& recordBson, const CollectionPtr&
         auto field = data.getField(fieldName);
 
         if (version == 1) {
-            for (BSONElement el : field.Obj()) {
+            for (const BSONElement& el : field.Obj()) {
                 minmax.update(el.wrap(fieldName), boost::none, coll->getDefaultCollator());
             }
         } else {
             BSONColumn col{field};
-            for (BSONElement el : col) {
-                minmax.update(el.wrap(fieldName), boost::none, coll->getDefaultCollator());
+            for (const BSONElement& el : col) {
+                if (!el.eoo()) {
+                    minmax.update(el.wrap(fieldName), boost::none, coll->getDefaultCollator());
+                }
             }
         }
 

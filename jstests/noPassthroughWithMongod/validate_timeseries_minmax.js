@@ -109,6 +109,14 @@ const objectData = [
 const lotsOfData = [...Array(1010).keys()].map(
     i => ({"metadata": {"sensorId": 2, "type": "temperature"}, "timestamp": ISODate(), "temp": i}));
 
+const skipFieldData = [...Array(1010).keys()].map(function(i) {
+    if (i % 2) {
+        return {"timestamp": ISODate(), "temp": i};
+    } else {
+        return {"timestamp": ISODate()};
+    }
+});
+
 // Drops collection and creates it again with new data, checking that collection is valid before
 // faulty data is inserted.
 function setUpCollection(data) {
@@ -263,6 +271,17 @@ assert.eq(res.warnings.length, 1);
 jsTestLog(
     "Running validate on a version 2 bucket with everything correct, checking that no warnings are found.");
 setUpCollection(lotsOfData);
+coll = db.getCollection(collName);
+bucket = db.getCollection(bucketName);
+res = bucket.validate();
+assert(res.valid, tojson(res));
+assert.eq(res.nNonCompliantDocuments, 0);
+assert.eq(res.warnings.length, 0);
+
+// "Checks no errors are thrown with a valid closed bucket with skipped data fields."
+jsTestLog(
+    "Running validate on a correct version 2 bucket with skipped data fields, checking that no warnings are found.");
+setUpCollection(skipFieldData);
 coll = db.getCollection(collName);
 bucket = db.getCollection(bucketName);
 res = bucket.validate();
