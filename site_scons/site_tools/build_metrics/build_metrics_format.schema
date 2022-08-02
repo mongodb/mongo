@@ -13,6 +13,10 @@
             "description": "Size in bytes",
             "minimum": 0
         },
+        "seconds": {
+            "type": "integer",
+            "description": "Number of seconds"
+        },
         "binsize": {
             "type": "object",
             "properties": {
@@ -101,6 +105,43 @@
                         "output": { "type": "str"}
                     },
                     "action": {"type" : "str"}
+                }
+            }
+        }
+    },
+    "scons_metrics": {
+        "type": "object",
+        "properties": {
+            "memory": {
+                "type": "object",
+                "properties": {
+                    "pre_read": {"$ref": "#/$defs/bytes"},
+                    "post_read": {"$ref": "#/$defs/bytes"},
+                    "pre_build": {"$ref": "#/$defs/bytes"},
+                    "post_build": {"$ref": "#/$defs/bytes"}
+                }
+            },
+            "time": {
+                "type": "object",
+                "properties": {
+                    "total": {"type": "number"},
+                    "sconscript_exec": {"type": "number"},
+                    "scons_exec": {"type": "number"},
+                    "command_exec": {"type": "number"}
+                }
+            },
+            "counts": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "array_index": {"type": "integer"},
+                        "item_name": {"type": "str"},
+                        "pre_read": {"$ref": "#/$defs/bytes"},
+                        "post_read": {"$ref": "#/$defs/bytes"},
+                        "pre_build": {"$ref": "#/$defs/bytes"},
+                        "post_build": {"$ref": "#/$defs/bytes"}
+                    }
                 }
             }
         }

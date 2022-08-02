@@ -35,6 +35,7 @@ from .util import add_meta_data, get_build_metric_dict, CaptureAtexits
 from .memory import MemoryMonitor
 from .per_action_metrics import PerActionMetrics
 from .artifacts import CollectArtifacts
+from .scons import SConsStats
 
 _SEC_TO_NANOSEC_FACTOR = 1000000000.0
 _METRICS_COLLECTORS = []
@@ -86,7 +87,8 @@ def generate(env, **kwargs):
     _METRICS_COLLECTORS = [
         MemoryMonitor(psutil.Process().memory_info().vms),
         PerActionMetrics(),
-        CollectArtifacts(env)
+        CollectArtifacts(env),
+        SConsStats()
     ]
 
 
