@@ -113,6 +113,17 @@ public:
                             NonConformantBSON,
                             fmt::format("Use of deprecated BSON binary data subtype {}", subtype));
                         break;
+                    case BinDataType::newUUID: {
+                        constexpr uint32_t UUIDLength = 16;
+                        uint32_t l = ConstDataView(ptr).read<LittleEndian<uint32_t>>();
+                        uassert(
+                            ErrorCodes::NonConformantBSON,
+                            fmt::format("BSON UUID length should be {} bytes. Found {} instead.",
+                                        UUIDLength,
+                                        l),
+                            l == UUIDLength);
+                        break;
+                    }
                     case BinDataType::MD5Type:
                         constexpr uint32_t md5Length = 16;
                         auto md5Size = ConstDataView(ptr).read<LittleEndian<uint32_t>>();

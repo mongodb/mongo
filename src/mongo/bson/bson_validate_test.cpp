@@ -451,6 +451,29 @@ TEST(BSONValidateFast, MaxNestingDepth) {
     ASSERT_EQ(status.code(), ErrorCodes::Overflow);
 }
 
+TEST(BSONValidateExtended, UUIDLength) {
+    // Checks that an invalid UUID length (!= 16 bytes) throws a warning.
+    std::pair<Status, Status> stats{Status::OK(), Status::OK()};
+    auto fullyValidate = [&](BSONObj obj) {
+        return std::pair{validateBSON(obj.objdata(), obj.objsize(), BSONValidateMode::kExtended),
+                         validateBSON(obj.objdata(), obj.objsize(), BSONValidateMode::kFull)};
+    };
+    BSONObj x = BSON("u" << BSONBinData("de", 2, BinDataType::newUUID));
+    stats = fullyValidate(x);
+    ASSERT_EQ(stats.first.code(), ErrorCodes::NonConformantBSON);
+    ASSERT_EQ(stats.second.code(), ErrorCodes::NonConformantBSON);
+    x = BSON("u" << BSONBinData("aaaaaaaaaaaaaaaaaaaaaa", 22, BinDataType::newUUID));
+    stats = fullyValidate(x);
+    ASSERT_EQ(stats.first.code(), ErrorCodes::NonConformantBSON);
+    ASSERT_EQ(stats.second.code(), ErrorCodes::NonConformantBSON);
+
+    // Checks that a valid UUID does not throw any warnings.
+    x = BSON("u" << BSONBinData("abcdabcdabcdabcd", 16, BinDataType::newUUID));
+    stats = fullyValidate(x);
+    ASSERT_OK(stats.first);
+    ASSERT_OK(stats.second);
+}
+
 TEST(BSONValidateExtended, DeprecatedTypes) {
     BSONObj obj = BSON("a" << BSONUndefined);
     Status status = validateBSON(obj.objdata(), obj.objsize(), BSONValidateMode::kExtended);

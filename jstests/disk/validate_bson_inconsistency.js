@@ -34,8 +34,35 @@ resetDbpath(dbpath);
 
     let res = assert.commandWorked(testColl.validate());
     assert(res.valid, tojson(res));
-    // TODO: Check the warnings that the documents with duplicate field names are detected.
+    MongoRunner.stopMongod(mongod, null, {skipValidation: true});
+})();
 
+(function validateDocumentsInvalidUUIDLength() {
+    let mongod = startMongodOnExistingPath(dbpath);
+    let db = mongod.getDB(baseName);
+    const collName = collNamePrefix + count++;
+    db.createCollection(collName);
+    let coll = db[collName];
+
+    jsTestLog(
+        "Checks that warnings are triggered when validating UUIDs that are either too short or too long.");
+    coll.insert({u: HexData(4, "deadbeefdeadbeefdeadbeefdeadbeef")});
+    coll.insert({u: HexData(4, "deadbeef")});
+    coll.insert({
+        u: HexData(
+            4,
+            "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
+    });
+
+    let res = coll.validate({checkBSONConsistency: true});
+    assert(res.valid, tojson(res));
+    assert.eq(res.nNonCompliantDocuments, 2);
+    assert.eq(res.warnings.length, 1);
+
+    res = coll.validate({checkBSONConsistency: false});
+    assert(res.valid, tojson(res));
+    assert.eq(res.nNonCompliantDocuments, 2);
+    assert.eq(res.warnings.length, 1);
     MongoRunner.stopMongod(mongod, null, {skipValidation: true});
 })();
 
