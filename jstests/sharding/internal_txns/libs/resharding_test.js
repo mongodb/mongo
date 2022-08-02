@@ -28,7 +28,8 @@ function InternalTransactionReshardingTest(
         numRecipients: 1,
         reshardInPlace,
         storeFindAndModifyImagesInSideCollection,
-        oplogSize: 256
+        oplogSize: 256,
+        maxNumberOfTransactionOperationsInSingleOplogEntry: 1
     });
     reshardingTest.setup();
 
@@ -47,7 +48,6 @@ function InternalTransactionReshardingTest(
         ],
     };
 
-    const kSize10MB = 10 * 1024 * 1024;
     const kInternalTxnType = {kRetryable: 1, kNonRetryable: 2};
     const kImageType = {kPreImage: 1, kPostImage: 2};
 
@@ -249,11 +249,7 @@ function InternalTransactionReshardingTest(
             // Prior to resharding, the insert statements below will be routed to donor0.
             const numLargeDocs = 2;
             for (let i = 0; i < numLargeDocs; i++) {
-                const docToInsert = {
-                    insert10MB: i.toString() + new Array(kSize10MB).join("x"),
-                    oldShardKey: -testId,
-                    newShardKey: -testId
-                };
+                const docToInsert = {insert: i, oldShardKey: -testId, newShardKey: -testId};
                 testCase.commands.push({
                     // Use stmtId -1 to get test coverage for "applyOps" entries without a stmtId.
                     cmdObj: {insert: kCollName, documents: [docToInsert], stmtId: NumberInt(-1)},

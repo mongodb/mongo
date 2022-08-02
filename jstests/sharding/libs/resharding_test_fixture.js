@@ -34,7 +34,9 @@ var ReshardingTest = class {
         enableElections: enableElections = false,
         logComponentVerbosity: logComponentVerbosity = undefined,
         storeFindAndModifyImagesInSideCollection: storeFindAndModifyImagesInSideCollection = true,
-        oplogSize: oplogSize = undefined
+        oplogSize: oplogSize = undefined,
+        maxNumberOfTransactionOperationsInSingleOplogEntry:
+            maxNumberOfTransactionOperationsInSingleOplogEntry = undefined
     } = {}) {
         // The @private JSDoc comments cause VS Code to not display the corresponding properties and
         // methods in its autocomplete list. This makes it simpler for test authors to know what the
@@ -64,6 +66,8 @@ var ReshardingTest = class {
         /** @private */
         this._storeFindAndModifyImagesInSideCollection = storeFindAndModifyImagesInSideCollection;
         this._oplogSize = oplogSize;
+        this._maxNumberOfTransactionOperationsInSingleOplogEntry =
+            maxNumberOfTransactionOperationsInSingleOplogEntry;
 
         // Properties set by setup().
         /** @private */
@@ -163,6 +167,11 @@ var ReshardingTest = class {
             rsOptions.setParameter.logComponentVerbosity = this._logComponentVerbosity;
             configOptions.setParameter.logComponentVerbosity = this._logComponentVerbosity;
             mongosOptions.setParameter.logComponentVerbosity = this._logComponentVerbosity;
+        }
+
+        if (this._maxNumberOfTransactionOperationsInSingleOplogEntry !== undefined) {
+            rsOptions.setParameter.maxNumberOfTransactionOperationsInSingleOplogEntry =
+                this._maxNumberOfTransactionOperationsInSingleOplogEntry;
         }
 
         this._st = new ShardingTest({
