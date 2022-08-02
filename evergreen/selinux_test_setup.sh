@@ -31,8 +31,9 @@ if [ "$SEORDER" == "0" ]; then
 fi
 
 pkg="$(find "$HOME"/repo -name 'mongodb-*-server-*.x86_64.rpm' | tee /dev/stderr)"
-sudo --non-interactive rpm --install --verbose --verbose --hash --nodeps "$pkg"
-if [ "$?" -gt "1" ]; then exit 1; fi # exit code 1 is OK
+if ! sudo --non-interactive rpm --install --verbose --verbose --hash --nodeps "$pkg"; then
+  if [ "$?" -gt "1" ]; then exit 1; fi # exit code 1 is OK
+fi
 
 if [ "$SEORDER" == "1" ]; then
   apply_selinux_policy
