@@ -1225,7 +1225,7 @@ boost::optional<TimeZone> makeTimeZone(const TimeZoneDatabase* tzdb,
                           << typeName(timeZoneId.getType()),
             timeZoneId.getType() == BSONType::String);
 
-    return tzdb->getTimeZone(timeZoneId.getString());
+    return tzdb->getTimeZone(timeZoneId.getStringData());
 }
 
 }  // namespace

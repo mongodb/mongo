@@ -174,7 +174,7 @@ void TimeZoneDatabase::loadTimeZoneInfo(
     auto timezone_identifier_list =
         timelib_timezone_identifiers_list(_timeZoneDatabase.get(), &nTimeZones);
     for (int i = 0; i < nTimeZones; ++i) {
-        auto entry = timezone_identifier_list[i];
+        const auto& entry = timezone_identifier_list[i];
         int errorCode = TIMELIB_ERROR_NO_ERROR;
         auto tzInfo = timelib_parse_tzfile(entry.id, _timeZoneDatabase.get(), &errorCode);
         if (!tzInfo) {
@@ -188,7 +188,13 @@ void TimeZoneDatabase::loadTimeZoneInfo(
 
         invariant(errorCode == TIMELIB_ERROR_NO_ERROR ||
                   errorCode == TIMELIB_ERROR_EMPTY_POSIX_STRING);
-        _timeZones[entry.id] = TimeZone{tzInfo};
+
+        if (strcmp(entry.id, "UTC") == 0) {
+            _timeZones[entry.id] = TimeZone{nullptr};
+            timelib_tzinfo_dtor(tzInfo);
+        } else {
+            _timeZones[entry.id] = TimeZone{tzInfo};
+        }
     }
 }
 
@@ -1207,16 +1213,15 @@ Date_t dateAdd(Date_t date, TimeUnit unit, long long amount, const TimeZone& tim
 
     auto interval = getTimelibRelTime(unit, amount);
 
-    auto timeAfterAddition = [&]() {
-        // For time units of day or larger perform the computation in the local timezone. This
-        // keeps the values of hour, minute, second, and millisecond components from the input date
-        // the same in the result date regardless of transitions from DST to Standard Time and vice
-        // versa that may happen between the input date and the result.
-        if (timezone.isUtcZone() || timezone.isUtcOffsetZone() || interval->d || interval->m ||
-            interval->y) {
-            return timelib_add(localTime.get(), interval.get());
-        }
-
+    timelib_time* timeAfterAddition;
+    // For time units of day or larger perform the computation in the local timezone. This
+    // keeps the values of hour, minute, second, and millisecond components from the input date
+    // the same in the result date regardless of transitions from DST to Standard Time and vice
+    // versa that may happen between the input date and the result.
+    if (timezone.isUtcZone() || timezone.isUtcOffsetZone() || interval->d || interval->m ||
+        interval->y) {
+        timeAfterAddition = timelib_add(localTime.get(), interval.get());
+    } else {
         // For time units of hour or smaller and a timezone different from UTC perform the
         // computation in UTC. In this case we don't want to apply the DST correction to the return
         // date, which would happen by default if we used the timelib_add() function with local
@@ -1228,8 +1233,8 @@ Date_t dateAdd(Date_t date, TimeUnit unit, long long amount, const TimeZone& tim
         auto utcTime = createTimelibTime();
         timelib_unixtime2gmt(utcTime.get(), seconds(date));
         utcTime->us = microSec;
-        return timelib_add(utcTime.get(), interval.get());
-    }();
+        timeAfterAddition = timelib_add(utcTime.get(), interval.get());
+    }
 
     long long res;
     if (overflow::mul(timeAfterAddition->sse, 1000L, &res)) {

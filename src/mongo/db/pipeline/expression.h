@@ -900,7 +900,7 @@ protected:
                 timeZoneId.getType() == BSONType::String);
 
         invariant(getExpressionContext()->timeZoneDatabase);
-        return getExpressionContext()->timeZoneDatabase->getTimeZone(timeZoneId.getString());
+        return getExpressionContext()->timeZoneDatabase->getTimeZone(timeZoneId.getStringData());
     }
 
 private:
