@@ -210,6 +210,10 @@ if (typeof _threadInject != "undefined") {
             // Other tests will fail while the requireApiVersion server parameter is set.
             "require_api_version.js",
 
+            // This sets the 'disablePipelineOptimization' failpoint, which causes other tests
+            // running in parallel to fail if they were expecting their pipelines to be optimized.
+            "type_bracket.js",
+
             // This test updates global memory usage counters in the bucket catalog in a way that
             // may affect other time-series tests running concurrently.
             "timeseries/timeseries_idle_buckets.js",
