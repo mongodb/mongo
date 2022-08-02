@@ -70,6 +70,8 @@ def dump_update_chain(update_chain):
         if can_bson:
             try:
                 obj = bson.decode_all(val_bytes)[0]
+                if obj["_id"]['id'] and obj["_id"]["id"].subtype == 4:
+                    obj["_id"]["id"] = obj["_id"]["id"].as_uuid()
             except:
                 pass
         print('  ' + '\n  '.join(str(wt_val).split('\n')) + " " + str(obj) + " =>")
@@ -86,6 +88,9 @@ def dump_insert_list(wt_insert):
 
 def dump_skip_list(wt_insert_head):
     wt_insert = wt_insert_head['head'][0]
+    if wt_insert.address == 0:
+        print("  Null insert list.")
+        return
     idx = 0
     while True:
         if not wt_insert:
@@ -115,7 +120,7 @@ def dump_modified(leaf_page):
     if not row_leaf_update:
         print("No update list")
     else:
-        print("Update list:")
+        print("Update list (({}){}):".format(leaf_page.type.name, leaf_page.address))
         leaf_num_entries = int(leaf_page['entries'])
         for i in range(0, leaf_num_entries):
             dump_update_chain(row_leaf_update[i])
@@ -128,8 +133,8 @@ def dump_disk(leaf_page):
         print("No page loaded from disk.")
         return
     dbg('on-disk page:', dsk)
-    wt_page_header_size = 28
-    wt_block_header_size = 12
+    wt_page_header_size = 28 # defined as WT_PAGE_HEADER_SIZE in btmem.h
+    wt_block_header_size = 12 # defined as WT_BLOCK_HEADER_SIZE in block.h
     page_bytes = gdb.selected_inferior().read_memory(int(dsk.address) + wt_page_header_size + wt_block_header_size, int(dsk['mem_size'])).tobytes()
     print("Dsk:\n" + str(page_bytes))
 
@@ -138,13 +143,16 @@ def dump_handle(dhandle):
     btree = get_btree_handle(dhandle)
     root = btree['root']
     root_page = root['page'].dereference()
-    dbg('btree', get_btree_handle(user))
+    #dbg('btree', get_btree_handle(user))
     dbg('root', btree['root'])
     dbg('root page', root_page)
     rpindex = root_page['u']['intl']['__index'].dereference()
     dbg('rpindex', rpindex)
-    dbg('rp-pre-index', rpindex['index'].dereference().dereference())
-    leaf_page = rpindex['index'].dereference().dereference()['page'].dereference()
-    dbg('leaf', leaf_page)
-    dump_disk(leaf_page)
-    dump_modified(leaf_page)
+    leaf_num_entries = int(rpindex['entries'])
+    #dbg('rp-pre-index', rpindex['index'].dereference().dereference())
+    for i in range(0, leaf_num_entries):
+        leaf_page = rpindex['index'][i].dereference()['page'].dereference()
+        dbg('leaf page', i)
+        dbg('leaf', leaf_page)
+        dump_disk(leaf_page)
+        dump_modified(leaf_page)
