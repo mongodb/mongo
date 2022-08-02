@@ -346,6 +346,11 @@ public:
     /** True if element is of a numeric type. */
     bool isNumber() const;
 
+    /**
+     * True if element is a NaN double or decimal.
+     */
+    bool isNaN() const;
+
     /** Return double value for this field. MUST be NumberDouble type. */
     double _numberDouble() const {
         return ConstDataView(value()).read<LittleEndian<double>>();
@@ -868,6 +873,21 @@ inline bool BSONElement::isNumber() const {
         case NumberDecimal:
         case NumberInt:
             return true;
+        default:
+            return false;
+    }
+}
+
+inline bool BSONElement::isNaN() const {
+    switch (type()) {
+        case NumberDouble: {
+            double d = _numberDouble();
+            return std::isnan(d);
+        }
+        case NumberDecimal: {
+            Decimal128 d = _numberDecimal();
+            return d.isNaN();
+        }
         default:
             return false;
     }
