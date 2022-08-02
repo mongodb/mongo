@@ -630,7 +630,6 @@ private:
         assertSupportedPathExpression(expr);
 
         auto [tag, val] = convertFrom(Value(expr->getData()));
-        const bool isArray = tag == sbe::value::TypeTags::Array;
         ABT result = make<PathCompare>(op, make<Constant>(tag, val));
 
         switch (op) {
@@ -642,6 +641,12 @@ private:
                                      make<PathCompare>(inclusive ? Operations::Gte : Operations::Gt,
                                                        std::move(constant.get())));
                 }
+                // Handle null and missing semantics
+                // find({a: {$lt: MaxKey()}}) matches {a: null} and {b: 1}
+                if (tag == sbe::value::TypeTags::MaxKey) {
+                    maybeComposePath<PathComposeA>(result,
+                                                   make<PathDefault>(Constant::boolean(true)));
+                }
                 break;
             }
 
@@ -652,6 +657,12 @@ private:
                     maybeComposePath(result,
                                      make<PathCompare>(inclusive ? Operations::Lte : Operations::Lt,
                                                        std::move(constant.get())));
+                }
+                // Handle null and missing semantics
+                // find({a: {$gt: MinKey()}}) matches {a: null} and {b: 1}
+                if (tag == sbe::value::TypeTags::MinKey) {
+                    maybeComposePath<PathComposeA>(result,
+                                                   make<PathDefault>(Constant::boolean(true)));
                 }
                 break;
             }
@@ -673,11 +684,15 @@ private:
         // The path can be empty if we are within an $elemMatch. In this case elemMatch would
         // insert a traverse.
         if (!expr->path().empty()) {
-            if (isArray) {
-                // When the path we are comparing is a path to an array, the comparison is
-                // considered true if it evaluates to true for the array itself or for any of
-                // the array’s elements.
-
+            if (tag == sbe::value::TypeTags::Array || tag == sbe::value::TypeTags::MinKey ||
+                tag == sbe::value::TypeTags::MaxKey) {
+                // The behavior of PathTraverse when it encounters an array is to apply its subpath
+                // to every element of the array and not the array itself. When an expression is
+                // comparing a field to an array, minKey or maxKey constant, we need to ensure that
+                // these comparisons happen to every element of the array and the array itself.
+                // For example:
+                // find({a: [1]}) matches {a: [1]} and {a: [[1]]}
+                // find({a: {$gt: MinKey()}}) matches {a: []}
                 result = make<PathComposeA>(make<PathTraverse>(result, PathTraverse::kSingleLevel),
                                             result);
             } else {
