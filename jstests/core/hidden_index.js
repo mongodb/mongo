@@ -17,8 +17,8 @@ load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 load("jstests/libs/index_catalog_helpers.js");     // For IndexCatalogHelpers.findByName.
 load("jstests/libs/sbe_util.js");                  // For checkSBEEnabled.
 
-const columnstoreEnabled =
-    checkSBEEnabled(db, ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"]);
+const columnstoreEnabled = checkSBEEnabled(
+    db, ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true /* checkAllNodes */);
 
 const collName = "hidden_index";
 let coll = assertDropAndRecreateCollection(db, collName);
