@@ -155,3 +155,9 @@ structs:
                                move. This will only prevent migration from committing and new balancer
                                rounds, this flag will not be loaded by shards."
                 optional: true
+            indexVersion:
+                type: timestamp
+                description: "Current collection index version. It will tick everytime a global index 
+                                is created or dropped. If not set, then we can assume it's value is 
+                                Timestamp(0, 0)."
+                optional: true

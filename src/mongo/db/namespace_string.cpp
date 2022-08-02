@@ -173,8 +173,11 @@ const NamespaceString NamespaceString::kConfigsvrShardsNamespace(NamespaceString
 const NamespaceString NamespaceString::kConfigsvrIndexCatalogNamespace(NamespaceString::kConfigDb,
                                                                        "csrs.indexes");
 
-const NamespaceString NamespaceString::kShardsIndexCatalogNamespace(NamespaceString::kConfigDb,
-                                                                    "shard.indexes");
+const NamespaceString NamespaceString::kShardIndexCatalogNamespace(NamespaceString::kConfigDb,
+                                                                   "shard.indexes");
+
+const NamespaceString NamespaceString::kShardCollectionCatalogNamespace(NamespaceString::kConfigDb,
+                                                                        "shard.collections");
 
 NamespaceString NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(StringData ns) {
     if (!gMultitenancySupport) {

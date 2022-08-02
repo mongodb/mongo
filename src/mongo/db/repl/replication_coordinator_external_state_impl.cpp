@@ -995,7 +995,26 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
                 6280501,
                 indexStatus.withContext(str::stream()
                                         << "Failed to create index on "
-                                        << NamespaceString::kShardsIndexCatalogNamespace
+                                        << NamespaceString::kShardIndexCatalogNamespace
+                                        << " on shard's first transition to primary"));
+        }
+
+        // Create indexes in config.shard.collections if needed.
+        indexStatus = sharding_util::createShardCollectionCatalogIndexes(opCtx);
+        if (!indexStatus.isOK()) {
+            // If the node is shutting down or it lost quorum just as it was becoming primary,
+            // don't run the sharding onStepUp machinery. The onStepDown counterpart to these
+            // methods is already idempotent, so the machinery will remain in the stepped down
+            // state.
+            if (ErrorCodes::isShutdownError(indexStatus.code()) ||
+                ErrorCodes::isNotPrimaryError(indexStatus.code())) {
+                return;
+            }
+            fassertFailedWithStatus(
+                6711907,
+                indexStatus.withContext(str::stream()
+                                        << "Failed to create index on "
+                                        << NamespaceString::kShardCollectionCatalogNamespace
                                         << " on shard's first transition to primary"));
         }
     } else {  // unsharded

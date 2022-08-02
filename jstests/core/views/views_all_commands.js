@@ -94,6 +94,7 @@ let viewsCommandTests = {
     _configsvrCommitChunksMerge: {skip: isAnInternalCommand},
     _configsvrCommitChunkMigration: {skip: isAnInternalCommand},
     _configsvrCommitChunkSplit: {skip: isAnInternalCommand},
+    _configsvrCommitIndex: {skip: isAnInternalCommand},
     _configsvrCommitMovePrimary:
         {skip: isAnInternalCommand},  // Can be removed once 6.0 is last LTS
     _configsvrCommitReshardCollection: {skip: isAnInternalCommand},
@@ -106,6 +107,7 @@ let viewsCommandTests = {
         {skip: isAnInternalCommand},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
     _configsvrDropDatabase:
         {skip: isAnInternalCommand},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
+    _configsvrDropIndexCatalogEntry: {skip: isAnInternalCommand},
     _configsvrEnableSharding:
         {skip: isAnInternalCommand},  // TODO (SERVER-58843): Remove once 6.0 becomes last LTS
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: isAnInternalCommand},
@@ -153,8 +155,11 @@ let viewsCommandTests = {
     _shardsvrDropCollection: {skip: isAnInternalCommand},
     _shardsvrDropCollectionIfUUIDNotMatching: {skip: isUnrelated},
     _shardsvrDropCollectionParticipant: {skip: isAnInternalCommand},
+    _shardsvrDropIndexCatalogEntryParticipant: {skip: isAnInternalCommand},
     _shardsvrDropIndexes: {skip: isAnInternalCommand},
     _shardsvrCleanupReshardCollection: {skip: isAnInternalCommand},
+    _shardsvrRegisterIndex: {skip: isAnInternalCommand},
+    _shardsvrCommitIndexParticipant: {skip: isAnInternalCommand},
     _shardsvrCommitReshardCollection: {skip: isAnInternalCommand},
     _shardsvrCreateCollection: {skip: isAnInternalCommand},
     _shardsvrCreateCollectionParticipant: {skip: isAnInternalCommand},
@@ -184,6 +189,7 @@ let viewsCommandTests = {
     _shardsvrCollMod: {skip: isAnInternalCommand},
     _shardsvrCollModParticipant: {skip: isAnInternalCommand},
     _shardsvrParticipantBlock: {skip: isAnInternalCommand},
+    _shardsvrUnregisterIndex: {skip: isAnInternalCommand},
     _transferMods: {skip: isAnInternalCommand},
     _vectorClockPersist: {skip: isAnInternalCommand},
     abortReshardCollection: {skip: isUnrelated},

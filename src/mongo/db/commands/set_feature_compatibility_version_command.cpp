@@ -82,6 +82,7 @@
 #include "mongo/idl/cluster_server_parameter_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/exit.h"
@@ -456,6 +457,9 @@ private:
         // TODO SERVER-67392: Remove once FCV 7.0 becomes last-lts.
         if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(requestedVersion)) {
             uassertStatusOK(sharding_util::createGlobalIndexesIndexes(opCtx));
+            if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+                uassertStatusOK(sharding_util::createShardCollectionCatalogIndexes(opCtx));
+            }
         }
 
         hangWhileUpgrading.pauseWhileSet(opCtx);
@@ -569,12 +573,14 @@ private:
         }
 
         // TODO SERVER-67392: Remove when 7.0 branches-out.
+        // Coordinators that commits indexes to the csrs must be drained before this point. Older
+        // FCV's must not find cluster-wide indexes.
         if (requestedVersion == GenericFCV::kLastLTS) {
             NamespaceString indexCatalogNss;
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
                 indexCatalogNss = NamespaceString::kConfigsvrIndexCatalogNamespace;
             } else {
-                indexCatalogNss = NamespaceString::kShardsIndexCatalogNamespace;
+                indexCatalogNss = NamespaceString::kShardIndexCatalogNamespace;
             }
             LOGV2(6280502, "Droping global indexes collection", "nss"_attr = indexCatalogNss);
             DropReply dropReply;
@@ -588,6 +594,38 @@ private:
                                   << causedBy(deletionStatus.reason()),
                     deletionStatus.isOK() ||
                         deletionStatus.code() == ErrorCodes::NamespaceNotFound);
+
+            if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+                LOGV2(6711905,
+                      "Droping collection catalog collection",
+                      "nss"_attr = NamespaceString::kShardCollectionCatalogNamespace);
+                const auto dropStatus =
+                    dropCollection(opCtx,
+                                   NamespaceString::kShardCollectionCatalogNamespace,
+                                   &dropReply,
+                                   DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
+                uassert(dropStatus.code(),
+                        str::stream() << "Failed to drop "
+                                      << NamespaceString::kShardCollectionCatalogNamespace
+                                      << causedBy(dropStatus.reason()),
+                        dropStatus.isOK() || dropStatus.code() == ErrorCodes::NamespaceNotFound);
+            } else {
+                LOGV2(6711906,
+                      "Unset index version field in config.collections",
+                      "nss"_attr = CollectionType::ConfigNS);
+                DBDirectClient client(opCtx);
+                write_ops::UpdateCommandRequest update(CollectionType::ConfigNS);
+                update.setUpdates({[&]() {
+                    write_ops::UpdateOpEntry entry;
+                    entry.setQ(
+                        BSON(CollectionType::kIndexVersionFieldName << BSON("$exists" << true)));
+                    entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
+                        BSON("$unset" << BSON(CollectionType::kIndexVersionFieldName << true))));
+                    entry.setMulti(true);
+                    return entry;
+                }()});
+                client.update(update);
+            }
         }
 
         uassert(ErrorCodes::Error(549181),

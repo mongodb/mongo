@@ -234,7 +234,10 @@ public:
     static const NamespaceString kConfigsvrIndexCatalogNamespace;
 
     // Namespace used for storing the index catalog on the shards.
-    static const NamespaceString kShardsIndexCatalogNamespace;
+    static const NamespaceString kShardIndexCatalogNamespace;
+
+    // Namespace used for storing the collection catalog on the shards.
+    static const NamespaceString kShardCollectionCatalogNamespace;
 
     /**
      * Constructs an empty NamespaceString.

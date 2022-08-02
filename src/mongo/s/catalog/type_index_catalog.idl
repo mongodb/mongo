@@ -47,7 +47,7 @@ structs:
             options:
                 type: object
                 description: "Index options"
-            lastMod:
+            lastmod:
                 type: timestamp
                 description: "Index version"
             collectionUUID:

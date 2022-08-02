@@ -1,0 +1,136 @@
+# Copyright (C) 2022-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+# This file provides the neccesary commands to implement the sharded catalog index protocol. 
+#
+# The protocol to register an index works the following way:
+# 1. While the migrations are disallowed and the critical section is taken for the collection,
+#   a DDLCoordinator calls _shardsvrCommitIndexParticipant in all shards that contain data in the
+#   base collection. This will effectively write the catalog entry locally and will bump the index
+#   version in the collections collection.
+# 2. The DDLCoordinator calls _configsvrCommitIndex to commit the index entry in the config server
+#   transactionally.
+# 3. The critical sections can be freed in all shards and the migrations can be allowed again.
+#
+# To unregister an index, the process is the same, but, instead of using 
+# _shardsvrCommitIndexParticipant and _configsvrCommitIndex, we use 
+# _shardsvrDropIndexCatalogEntryParticipant and _configsvrDropIndexCatalogEntry respectively.
+#
+# Additionally in this file we have two functions to test the registering/unregistering process: 
+# _shardsvrRegisterIndex and _shardsvrUnregisterIndex, which will be used by tests while the 
+# DDLCoordinator is implemented.
+
+global:
+    cpp_namespace: "mongo"
+
+imports:
+    - "mongo/idl/basic_types.idl"
+    - "mongo/s/sharding_types.idl"
+    - "mongo/s/catalog/type_index_catalog.idl"
+
+structs:
+    UnregisterIndexCatalogRequest:
+        description: "Parameters sent to drop an index entry from the cluster catalog."
+        strict: false
+        fields:
+            collectionUUID:
+                type: uuid
+                description: "UUID of the user colection."
+            name:
+                type: string
+                description: "Index name."
+            lastmod:
+                type: timestamp
+                description: "Drop cluster time."
+
+commands:
+    _shardsvrRegisterIndex:
+        command_name: _shardsvrRegisterIndex
+        cpp_name: ShardsvrRegisterIndex
+        description: "Internal test command to register an index catalog entry in the cluster."
+        api_version: ""
+        namespace: type
+        type: namespacestring
+        strict: false
+        chained_structs:
+            IndexCatalogType: IndexCatalogType
+
+    _shardsvrCommitIndexParticipant:
+        command_name: _shardsvrCommitIndexParticipant
+        cpp_name: ShardsvrCommitIndexParticipant
+        description: "Internal command to commit an index catalog entry locally in a shard."
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        strict: false
+        chained_structs:
+            IndexCatalogType: IndexCatalogType
+
+    _configsvrCommitIndex:
+        command_name: _configsvrCommitIndex
+        cpp_name: ConfigsvrCommitIndex
+        description: "Internal command to commit an index catalog entry locally in the config server."
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        strict: false
+        chained_structs:
+            IndexCatalogType: IndexCatalogType
+
+    _shardsvrUnregisterIndex:
+        command_name: _shardsvrUnregisterIndex
+        cpp_name: ShardsvrUnregisterIndex
+        description: "Internal test command to unregister an index catalog entry in the cluster."
+        api_version: ""
+        namespace: type
+        type: namespacestring
+        strict: false
+        chained_structs:
+            UnregisterIndexCatalogRequest: UnregisterIndexCatalogRequest
+
+    _shardsvrDropIndexCatalogEntryParticipant:
+        command_name: _shardsvrDropIndexCatalogEntryParticipant
+        cpp_name: ShardsvrDropIndexCatalogEntryParticipant
+        description: "Internal command to drop an index catalog entry locally in a shard."
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        strict: false
+        chained_structs:
+            UnregisterIndexCatalogRequest: UnregisterIndexCatalogRequest
+            
+    _configsvrDropIndexCatalogEntry:
+        command_name: _configsvrDropIndexCatalogEntry
+        cpp_name: ConfigsvrDropIndexCatalogEntry
+        description: "Internal command to drop an index catalog entry locally in the config server."
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        strict: false
+        chained_structs:
+            UnregisterIndexCatalogRequest: UnregisterIndexCatalogRequest

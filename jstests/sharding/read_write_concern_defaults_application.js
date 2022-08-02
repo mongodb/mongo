@@ -92,6 +92,7 @@ let testCases = {
     _configsvrCommitChunksMerge: {skip: "internal command"},
     _configsvrCommitChunkMigration: {skip: "internal command"},
     _configsvrCommitChunkSplit: {skip: "internal command"},
+    _configsvrCommitIndex: {skip: "internal command"},
     _configsvrCommitMovePrimary: {skip: "internal command"},  // Can be removed once 6.0 is last LTS
     _configsvrCommitReshardCollection: {skip: "internal command"},
     _configsvrConfigureAutoSplit: {
@@ -103,6 +104,7 @@ let testCases = {
         {skip: "internal command"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
     _configsvrDropDatabase:
         {skip: "internal command"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
+    _configsvrDropIndexCatalogEntry: {skip: "internal command"},
     _configsvrEnableSharding:
         {skip: "internal command"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: "internal command"},
@@ -146,6 +148,8 @@ let testCases = {
     _shardsvrAbortReshardCollection: {skip: "internal command"},
     _shardsvrCleanupReshardCollection: {skip: "internal command"},
     _shardsvrCloneCatalogData: {skip: "internal command"},
+    _shardsvrRegisterIndex: {skip: "internal command"},
+    _shardsvrCommitIndexParticipant: {skip: "internal command"},
     _shardsvrCommitReshardCollection: {skip: "internal command"},
     _shardsvrCompactStructuredEncryptionData: {skip: "internal command"},
     _shardsvrCreateCollection: {skip: "internal command"},
@@ -153,6 +157,8 @@ let testCases = {
     _shardsvrDropCollection: {skip: "internal command"},
     _shardsvrDropCollectionIfUUIDNotMatching: {skip: "internal command"},
     _shardsvrDropCollectionParticipant: {skip: "internal command"},
+    _shardsvrUnregisterIndex: {skip: "internal command"},
+    _shardsvrDropIndexCatalogEntryParticipant: {skip: "internal command"},
     _shardsvrDropIndexes: {skip: "internal command"},
     _shardsvrDropDatabase: {skip: "internal command"},
     _shardsvrDropDatabaseParticipant: {skip: "internal command"},

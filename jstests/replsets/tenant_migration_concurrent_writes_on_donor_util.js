@@ -279,9 +279,11 @@ TenantMigrationConcurrentWriteUtil.testCases = {
     _configsvrCommitChunksMerge: {skip: isNotRunOnUserDatabase},
     _configsvrCommitChunkMigration: {skip: isNotRunOnUserDatabase},
     _configsvrCommitChunkSplit: {skip: isNotRunOnUserDatabase},
+    _configsvrCommitIndex: {skip: isNotRunOnUserDatabase},
     _configsvrCommitMovePrimary:
         {skip: isNotRunOnUserDatabase},  // Can be removed once 6.0 is last LTS
     _configsvrCreateDatabase: {skip: isNotRunOnUserDatabase},
+    _configsvrDropIndexCatalogEntry: {skip: isNotRunOnUserDatabase},
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: isNotRunOnUserDatabase},
     _configsvrMoveChunk: {skip: isNotRunOnUserDatabase},  // Can be removed once 6.0 is last LTS
     _configsvrMovePrimary: {skip: isNotRunOnUserDatabase},
@@ -308,14 +310,18 @@ TenantMigrationConcurrentWriteUtil.testCases = {
     _recvChunkStart: {skip: isNotRunOnUserDatabase},
     _recvChunkStatus: {skip: isNotRunOnUserDatabase},
     _shardsvrCloneCatalogData: {skip: isNotRunOnUserDatabase},
+    _shardsvrCommitIndexParticipant: {skip: isOnlySupportedOnShardedCluster},
     _shardsvrCompactStructuredEncryptionData: {skip: isOnlySupportedOnShardedCluster},
     _shardsvrCreateCollection: {skip: isOnlySupportedOnShardedCluster},
     _shardsvrCreateCollectionParticipant: {skip: isOnlySupportedOnShardedCluster},
+    _shardsvrRegisterIndex: {skip: isOnlySupportedOnShardedCluster},
+    _shardsvrDropIndexCatalogEntryParticipant: {skip: isOnlySupportedOnShardedCluster},
     _shardsvrMovePrimary: {skip: isNotRunOnUserDatabase},
     _shardsvrSetAllowMigrations: {skip: isOnlySupportedOnShardedCluster},
     _shardsvrShardCollection:
         {skip: isNotRunOnUserDatabase},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
     _shardsvrRenameCollection: {skip: isOnlySupportedOnShardedCluster},
+    _shardsvrUnregisterIndex: {skip: isOnlySupportedOnShardedCluster},
     _transferMods: {skip: isNotRunOnUserDatabase},
     abortTransaction: {
         skip: isNotWriteCommand  // aborting unprepared transaction doesn't create an abort oplog

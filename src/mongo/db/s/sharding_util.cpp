@@ -38,6 +38,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/catalog/type_collection_gen.h"
 #include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 
@@ -184,31 +185,47 @@ Status createIndexOnCollection(OperationContext* opCtx,
 
 Status createGlobalIndexesIndexes(OperationContext* opCtx) {
     bool unique = true;
+    NamespaceString indexCatalogNamespace;
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        auto result =
-            createIndexOnCollection(opCtx,
-                                    NamespaceString::kConfigsvrIndexCatalogNamespace,
-                                    BSON(IndexCatalogType::kCollectionUUIDFieldName
-                                         << 1 << IndexCatalogType::kLastModFieldName << 1),
-                                    !unique);
-        if (!result.isOK()) {
-            return result.withContext(str::stream()
-                                      << "couldn't create collectionUUID_1_lastmod_1 index on "
-                                      << NamespaceString::kConfigsvrIndexCatalogNamespace);
-        }
+        indexCatalogNamespace = NamespaceString::kConfigsvrIndexCatalogNamespace;
     } else {
-        auto result =
-            createIndexOnCollection(opCtx,
-                                    NamespaceString::kShardsIndexCatalogNamespace,
-                                    BSON(IndexCatalogType::kCollectionUUIDFieldName
-                                         << 1 << IndexCatalogType::kLastModFieldName << 1),
-                                    !unique);
-        if (!result.isOK()) {
-            return result.withContext(str::stream()
-                                      << "couldn't create collectionUUID_1_lastmod_1 index on "
-                                      << NamespaceString::kShardsIndexCatalogNamespace);
-        }
+        indexCatalogNamespace = NamespaceString::kShardIndexCatalogNamespace;
     }
+    auto result = createIndexOnCollection(opCtx,
+                                          indexCatalogNamespace,
+                                          BSON(IndexCatalogType::kCollectionUUIDFieldName
+                                               << 1 << IndexCatalogType::kLastmodFieldName << 1),
+                                          !unique);
+    if (!result.isOK()) {
+        return result.withContext(str::stream()
+                                  << "couldn't create collectionUUID_1_lastmod_1 index on "
+                                  << indexCatalogNamespace);
+    }
+    result = createIndexOnCollection(opCtx,
+                                     indexCatalogNamespace,
+                                     BSON(IndexCatalogType::kCollectionUUIDFieldName
+                                          << 1 << IndexCatalogType::kNameFieldName << 1),
+                                     unique);
+    if (!result.isOK()) {
+        return result.withContext(str::stream()
+                                  << "couldn't create collectionUUID_1_name_1 index on "
+                                  << indexCatalogNamespace);
+    }
+    return Status::OK();
+}
+
+Status createShardCollectionCatalogIndexes(OperationContext* opCtx) {
+    bool unique = true;
+    auto result = createIndexOnCollection(opCtx,
+                                          NamespaceString::kShardCollectionCatalogNamespace,
+                                          BSON(CollectionTypeBase::kUuidFieldName << 1),
+                                          !unique);
+    if (!result.isOK()) {
+        return result.withContext(str::stream()
+                                  << "couldn't create uuid_1 index on "
+                                  << NamespaceString::kShardCollectionCatalogNamespace);
+    }
+
     return Status::OK();
 }
 

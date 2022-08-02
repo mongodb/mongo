@@ -85,6 +85,7 @@ public:
     using CollectionTypeBase::kDefaultCollationFieldName;
     using CollectionTypeBase::kDefragmentationPhaseFieldName;
     using CollectionTypeBase::kDefragmentCollectionFieldName;
+    using CollectionTypeBase::kIndexVersionFieldName;
     using CollectionTypeBase::kKeyPatternFieldName;
     using CollectionTypeBase::kMaxChunkSizeBytesFieldName;
     using CollectionTypeBase::kNoAutoSplitFieldName;
@@ -169,6 +170,10 @@ public:
             CollectionTypeBase::setAllowMigrations(boost::none);
         else
             CollectionTypeBase::setAllowMigrations(false);
+    }
+
+    Timestamp getIndexVersion() const {
+        return CollectionTypeBase::getIndexVersion().get_value_or(Timestamp(0, 0));
     }
 
     // TODO SERVER-61033: remove after permitMigrations have been merge with allowMigrations.

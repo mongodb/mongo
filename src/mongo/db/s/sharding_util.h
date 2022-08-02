@@ -67,6 +67,11 @@ std::vector<AsyncRequestsSender::Response> sendCommandToShards(
 Status createGlobalIndexesIndexes(OperationContext* opCtx);
 
 /**
+ * Creates the necessary indexes for the collections collection.
+ */
+Status createShardCollectionCatalogIndexes(OperationContext* opCtx);
+
+/**
  * Helper function to create an index on a collection locally.
  */
 Status createIndexOnCollection(OperationContext* opCtx,
