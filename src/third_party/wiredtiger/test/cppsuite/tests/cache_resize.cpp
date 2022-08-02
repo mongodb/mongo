@@ -163,8 +163,7 @@ class cache_resize : public test {
         }
 
         /* Make sure the last transaction is rolled back now the work is finished. */
-        if (tc->txn.active())
-            tc->txn.rollback();
+        tc->txn.try_rollback();
     }
 
     void

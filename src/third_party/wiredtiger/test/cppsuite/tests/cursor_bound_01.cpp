@@ -584,8 +584,7 @@ class cursor_bound_01 : public test {
             testutil_check(cursor->reset(cursor.get()));
         }
         /* Rollback any transaction that could not commit before the end of the test. */
-        if (tc->txn.active())
-            tc->txn.rollback();
+        tc->txn.try_rollback();
     }
 
     void
@@ -649,8 +648,7 @@ class cursor_bound_01 : public test {
         }
 
         /* Rollback any transaction that could not commit before the end of the test. */
-        if (tc->txn.active())
-            tc->txn.rollback();
+        tc->txn.try_rollback();
     }
 
     void
@@ -734,8 +732,7 @@ class cursor_bound_01 : public test {
             normal_cursor->reset(normal_cursor.get());
         }
         /* Roll back the last transaction if still active now the work is finished. */
-        if (tc->txn.active())
-            tc->txn.commit();
+        tc->txn.try_rollback();
     }
 
     void
@@ -783,7 +780,6 @@ class cursor_bound_01 : public test {
             normal_cursor->reset(normal_cursor.get());
         }
         /* Roll back the last transaction if still active now the work is finished. */
-        if (tc->txn.active())
-            tc->txn.rollback();
+        tc->txn.try_rollback();
     }
 };

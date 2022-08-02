@@ -26,6 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include "src/common/logger.h"
 #include "src/common/random_generator.h"
 #include "src/main/test.h"
 
@@ -52,43 +53,37 @@ class hs_cleanup : public test {
         logger::log_msg(
           LOG_INFO, type_string(tc->type) + " thread {" + std::to_string(tc->id) + "} commencing.");
 
-        const char *key_tmp;
         const uint64_t MAX_ROLLBACKS = 100;
         uint32_t rollback_retries = 0;
 
-        collection &coll = tc->db.get_collection(tc->id);
-
         /* In this test each thread gets a single collection. */
         testutil_assert(tc->db.get_collection_count() == tc->thread_count);
+
+        collection &coll = tc->db.get_collection(tc->id);
         scoped_cursor cursor = tc->session.open_scoped_cursor(coll.name);
 
-        /* We don't know the keyrange we're operating over here so we can't be much smarter here. */
+        /*
+         * We don't know the key range we're operating over here so we can't be much smarter here.
+         */
         while (tc->running()) {
             tc->sleep();
 
-            auto ret = cursor->next(cursor.get());
-            if (ret != 0) {
-                if (ret == WT_NOTFOUND) {
-                    testutil_check(cursor->reset(cursor.get()));
-                    continue;
-                }
-                if (ret == WT_ROLLBACK) {
-                    /*
-                     * As a result of the logic in this test its possible that the previous next
-                     * call can happen outside the context of a transaction. Assert that we are in
-                     * one if we got a rollback.
-                     */
-                    testutil_check(tc->txn.can_rollback());
-                    tc->txn.rollback();
-                    continue;
-                }
-                testutil_die(ret, "Unexpected error returned from cursor->next()");
-            }
-
-            testutil_check(cursor->get_key(cursor.get(), &key_tmp));
-
             /* Start a transaction if possible. */
             tc->txn.try_begin();
+
+            auto ret = cursor->next(cursor.get());
+            if (ret != 0) {
+                if (ret == WT_NOTFOUND)
+                    testutil_check(cursor->reset(cursor.get()));
+                else if (ret == WT_ROLLBACK)
+                    tc->txn.rollback();
+                else
+                    testutil_die(ret, "Unexpected error returned from cursor->next()");
+                continue;
+            }
+
+            const char *key_tmp;
+            testutil_check(cursor->get_key(cursor.get(), &key_tmp));
 
             /*
              * The retrieved key needs to be passed inside the update function. However, the update
@@ -111,7 +106,6 @@ class hs_cleanup : public test {
             testutil_assert(rollback_retries < MAX_ROLLBACKS);
         }
         /* Ensure our last transaction is resolved. */
-        if (tc->txn.active())
-            tc->txn.rollback();
+        tc->txn.try_rollback();
     }
 };

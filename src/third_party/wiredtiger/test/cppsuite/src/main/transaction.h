@@ -66,11 +66,6 @@ class transaction {
      * the transaction.
      */
     bool can_commit();
-    /*
-     * Returns true if a transaction can be rolled back as determined by the op count and the state
-     * of the transaction.
-     */
-    bool can_rollback();
     /* Get the number of operations this transaction needs before it can commit */
     int64_t get_target_op_count() const;
 

@@ -23,9 +23,9 @@ metrics_monitor=
     stat_cache_size=
     (
         # FIXME-WT-9339
-        # one day maybe we'll stop blowing out the cache.
+        # Re-enable the runtime check once we manage cache better.
         max=200,
-        runtime=true,
+        runtime=false,
     ),
     stat_db_size=
     (
