@@ -176,15 +176,6 @@ structs:
                 optional: true
                 type: CollModTimeseries
                 stability: stable
-            # TODO (SERVER-61685): `isTimeseriesNamespace` is not needed for the collMod command but kept
-            # for backward compatibility. Remove this flag after 6.0 branching.
-            isTimeseriesNamespace:
-                description: "This flag is set to true when the command was originally sent to
-                              mongos on the time-series view, but got rewritten to target
-                              time-series buckets namespace before being sent to shards."
-                optional: true
-                type: bool
-                stability: internal
             dryRun:
                 description: "Runs the requested modification without modifying any database state.
                               This can be used to determine in advance if a particular collMod
