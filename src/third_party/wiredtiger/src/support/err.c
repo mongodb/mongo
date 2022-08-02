@@ -503,7 +503,13 @@ __wt_panic_func(WT_SESSION_IMPL *session, int error, const char *func, int line,
     WT_CONNECTION_IMPL *conn;
     va_list ap;
 
-    conn = S2C(session);
+    /*
+     * !!!
+     * This function MUST handle a NULL WT_SESSION_IMPL handle.
+     *
+     * We will pedantically check the session and connection handles any time we use them.
+     */
+    conn = session != NULL ? S2C(session) : NULL;
 
     /*
      * Ignore error returns from underlying event handlers, we already have an error value to
@@ -511,17 +517,12 @@ __wt_panic_func(WT_SESSION_IMPL *session, int error, const char *func, int line,
      */
     va_start(ap, fmt);
     WT_IGNORE_RET(
-      __eventv(session, session ? FLD_ISSET(conn->json_output, WT_JSON_OUTPUT_ERROR) : false, error,
-        func, line, category, WT_VERBOSE_ERROR, fmt, ap));
+      __eventv(session, conn != NULL ? FLD_ISSET(conn->json_output, WT_JSON_OUTPUT_ERROR) : false,
+        error, func, line, category, WT_VERBOSE_ERROR, fmt, ap));
     va_end(ap);
 
-    /*
-     * !!!
-     * This function MUST handle a NULL WT_SESSION_IMPL handle.
-     *
-     * If the connection has already panicked, just return the error.
-     */
-    if (session != NULL && F_ISSET(conn, WT_CONN_PANIC))
+    /* If the connection has already panicked, just return the error. */
+    if (conn != NULL && F_ISSET(conn, WT_CONN_PANIC))
         return (WT_PANIC);
 
     /*
@@ -531,8 +532,9 @@ __wt_panic_func(WT_SESSION_IMPL *session, int error, const char *func, int line,
      * I'm not confident of underlying support for a NULL.
      */
     va_start(ap, fmt);
-    WT_IGNORE_RET(__eventv(session, FLD_ISSET(conn->json_output, WT_JSON_OUTPUT_ERROR), WT_PANIC,
-      func, line, category, WT_VERBOSE_ERROR, "the process must exit and restart", ap));
+    WT_IGNORE_RET(
+      __eventv(session, conn != NULL ? FLD_ISSET(conn->json_output, WT_JSON_OUTPUT_ERROR) : false,
+        WT_PANIC, func, line, category, WT_VERBOSE_ERROR, "the process must exit and restart", ap));
     va_end(ap);
 
 #if defined(HAVE_DIAGNOSTIC)
@@ -545,17 +547,14 @@ __wt_panic_func(WT_SESSION_IMPL *session, int error, const char *func, int line,
      * Hence in the diagnostic mode, the application can set the debug flag to choose between
      * dropping a core and returning an error.
      */
-    if (!F_ISSET(conn, WT_CONN_DATA_CORRUPTION) ||
-      FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_CORRUPTION_ABORT))
+    if (conn != NULL &&
+      (!F_ISSET(conn, WT_CONN_DATA_CORRUPTION) ||
+        FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_CORRUPTION_ABORT)))
         __wt_abort(session);
 #endif
-    /*
-     * !!!
-     * This function MUST handle a NULL WT_SESSION_IMPL handle.
-     *
-     * Panic the connection;
-     */
-    if (session != NULL)
+
+    /* Panic the connection. */
+    if (conn != NULL)
         F_SET(conn, WT_CONN_PANIC);
 
     /*
