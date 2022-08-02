@@ -296,4 +296,198 @@ TEST_F(RangeDeleterServiceTest, NoActionPossibleIfServiceIsDown) {
                        ErrorCodes::NotYetInitialized);
 }
 
+TEST_F(RangeDeleterServiceTest, NoOverlappingRangeDeletionsFuture) {
+    auto rds = RangeDeleterService::get(opCtx);
+
+    // No range deletion task registered
+    ChunkRange inputRange(BSON("a" << 0), BSON("a" << 10));
+    auto fut = rds->getOverlappingRangeDeletionsFuture(uuidCollA, inputRange);
+    ASSERT(fut.isReady());
+
+    // Register a range deletion task
+    auto taskWithOngoingQueries =
+        createRangeDeletionTaskForTesting(uuidCollA, BSON("a" << 0), BSON("a" << 10));
+    auto completionFuture = rds->registerTask(taskWithOngoingQueries.getTask(),
+                                              taskWithOngoingQueries.getOngoingQueriesFuture());
+
+    // Totally unrelated range
+    inputRange = ChunkRange(BSON("a" << -10), BSON("a" << -3));
+    fut = rds->getOverlappingRangeDeletionsFuture(uuidCollA, inputRange);
+    ASSERT(fut.isReady());
+
+    // Range "touching" lower bound
+    inputRange = ChunkRange(BSON("a" << -10), BSON("a" << 0));
+    fut = rds->getOverlappingRangeDeletionsFuture(uuidCollA, inputRange);
+    ASSERT(fut.isReady());
+
+    // Range "touching" upper bound
+    inputRange = ChunkRange(BSON("a" << 10), BSON("a" << 20));
+    fut = rds->getOverlappingRangeDeletionsFuture(uuidCollA, inputRange);
+    ASSERT(fut.isReady());
+}
+
+TEST_F(RangeDeleterServiceTest, OneOverlappingRangeDeletionFuture) {
+    auto rds = RangeDeleterService::get(opCtx);
+    auto taskWithOngoingQueries =
+        createRangeDeletionTaskForTesting(uuidCollA, BSON("a" << 0), BSON("a" << 10));
+
+    auto completionFuture = rds->registerTask(taskWithOngoingQueries.getTask(),
+                                              taskWithOngoingQueries.getOngoingQueriesFuture());
+
+    std::vector<SharedSemiFuture<void>> waitForRangeToBeDeletedFutures;
+
+    // Exact match
+    ChunkRange inputRange(BSON("a" << 0), BSON("a" << 10));
+    auto fut = rds->getOverlappingRangeDeletionsFuture(uuidCollA, inputRange);
+    ASSERT(!fut.isReady());
+    waitForRangeToBeDeletedFutures.push_back(fut);
+
+    // Super-range
+    inputRange = ChunkRange(BSON("a" << -10), BSON("a" << 20));
+    fut = rds->getOverlappingRangeDeletionsFuture(uuidCollA, inputRange);
+    ASSERT(!fut.isReady());
+    waitForRangeToBeDeletedFutures.push_back(fut);
+
+    // Super range touching upper bound
+    inputRange = ChunkRange(BSON("a" << -10), BSON("a" << 10));
+    fut = rds->getOverlappingRangeDeletionsFuture(uuidCollA, inputRange);
+    ASSERT(!fut.isReady());
+    waitForRangeToBeDeletedFutures.push_back(fut);
+
+    // Super range touching lower bound
+    inputRange = ChunkRange(BSON("a" << 0), BSON("a" << 20));
+    fut = rds->getOverlappingRangeDeletionsFuture(uuidCollA, inputRange);
+    ASSERT(!fut.isReady());
+    waitForRangeToBeDeletedFutures.push_back(fut);
+
+    // Sub-range
+    inputRange = ChunkRange(BSON("a" << 3), BSON("a" << 6));
+    fut = rds->getOverlappingRangeDeletionsFuture(uuidCollA, inputRange);
+    ASSERT(!fut.isReady());
+    waitForRangeToBeDeletedFutures.push_back(fut);
+
+    // Sub-range touching upper bound
+    inputRange = ChunkRange(BSON("a" << 3), BSON("a" << 10));
+    fut = rds->getOverlappingRangeDeletionsFuture(uuidCollA, inputRange);
+    ASSERT(!fut.isReady());
+    waitForRangeToBeDeletedFutures.push_back(fut);
+
+    // Sub-range touching lower bound
+    inputRange = ChunkRange(BSON("a" << 0), BSON("a" << 6));
+    fut = rds->getOverlappingRangeDeletionsFuture(uuidCollA, inputRange);
+    ASSERT(!fut.isReady());
+    waitForRangeToBeDeletedFutures.push_back(fut);
+
+    // Drain ongoing queries to start the task and check futures get marked as ready
+    taskWithOngoingQueries.drainOngoingQueries();
+    for (const auto& future : waitForRangeToBeDeletedFutures) {
+        future.get(opCtx);
+    }
+}
+
+TEST_F(RangeDeleterServiceTest, MultipleOverlappingRangeDeletionsFuture) {
+    auto rds = RangeDeleterService::get(opCtx);
+
+    // Register range deletion tasks [0, 10) - [10, 20) - [20, 30)
+    auto taskWithOngoingQueries0 =
+        createRangeDeletionTaskForTesting(uuidCollA, BSON("a" << 0), BSON("a" << 10));
+    auto completionFuture0 = rds->registerTask(taskWithOngoingQueries0.getTask(),
+                                               taskWithOngoingQueries0.getOngoingQueriesFuture());
+    auto taskWithOngoingQueries10 =
+        createRangeDeletionTaskForTesting(uuidCollA, BSON("a" << 10), BSON("a" << 20));
+    auto completionFuture10 = rds->registerTask(taskWithOngoingQueries10.getTask(),
+                                                taskWithOngoingQueries10.getOngoingQueriesFuture());
+    auto taskWithOngoingQueries30 =
+        createRangeDeletionTaskForTesting(uuidCollA, BSON("a" << 30), BSON("a" << 40));
+    auto completionFuture30 = rds->registerTask(taskWithOngoingQueries30.getTask(),
+                                                taskWithOngoingQueries30.getOngoingQueriesFuture());
+
+    // Exact match with [0, 10)
+    ChunkRange inputRange(BSON("a" << 0), BSON("a" << 10));
+    auto futureReadyWhenTask0Ready = rds->getOverlappingRangeDeletionsFuture(uuidCollA, inputRange);
+    ASSERT(!futureReadyWhenTask0Ready.isReady());
+
+    // Super-range spanning across [0, 10) and [10, 20)
+    inputRange = ChunkRange(BSON("a" << -10), BSON("a" << 20));
+    auto futureReadyWhenTasks0And10Ready =
+        rds->getOverlappingRangeDeletionsFuture(uuidCollA, inputRange);
+    ASSERT(!futureReadyWhenTasks0And10Ready.isReady());
+
+    // Super-range spanning across [0, 10), [10, 20) and [30, 40)
+    inputRange = ChunkRange(BSON("a" << -10), BSON("a" << 50));
+    auto futureReadyWhenTasks0And10And30Ready =
+        rds->getOverlappingRangeDeletionsFuture(uuidCollA, inputRange);
+    ASSERT(!futureReadyWhenTasks0And10And30Ready.isReady());
+
+    // Drain ongoing queries one task per time and check only expected futures get marked as ready
+    taskWithOngoingQueries0.drainOngoingQueries();
+    futureReadyWhenTask0Ready.get(opCtx);
+    ASSERT(!futureReadyWhenTasks0And10Ready.isReady());
+    ASSERT(!futureReadyWhenTasks0And10And30Ready.isReady());
+
+    taskWithOngoingQueries10.drainOngoingQueries();
+    futureReadyWhenTasks0And10Ready.get(opCtx);
+    ASSERT(!futureReadyWhenTasks0And10And30Ready.isReady());
+
+    taskWithOngoingQueries30.drainOngoingQueries();
+    futureReadyWhenTasks0And10And30Ready.get(opCtx);
+}
+
+TEST_F(RangeDeleterServiceTest, GetOverlappingRangeDeletionsResilientToRefineShardKey) {
+    auto rds = RangeDeleterService::get(opCtx);
+
+    // Register range deletion tasks [0, 10) - [10, 20) - [20, 30)
+    auto taskWithOngoingQueries0 =
+        createRangeDeletionTaskForTesting(uuidCollA, BSON("a" << 0), BSON("a" << 10));
+    auto completionFuture0 = rds->registerTask(taskWithOngoingQueries0.getTask(),
+                                               taskWithOngoingQueries0.getOngoingQueriesFuture());
+    auto taskWithOngoingQueries10 =
+        createRangeDeletionTaskForTesting(uuidCollA, BSON("a" << 10), BSON("a" << 20));
+    auto completionFuture10 = rds->registerTask(taskWithOngoingQueries10.getTask(),
+                                                taskWithOngoingQueries10.getOngoingQueriesFuture());
+    auto taskWithOngoingQueries30 =
+        createRangeDeletionTaskForTesting(uuidCollA, BSON("a" << 30), BSON("a" << 40));
+    auto completionFuture30 = rds->registerTask(taskWithOngoingQueries30.getTask(),
+                                                taskWithOngoingQueries30.getOngoingQueriesFuture());
+
+    // Exact match with [0, 10)
+    ChunkRange inputRange(BSON("a" << 0 << "b"
+                                   << "lol"),
+                          BSON("a" << 9 << "b"
+                                   << "lol"));
+    auto futureReadyWhenTask0Ready = rds->getOverlappingRangeDeletionsFuture(uuidCollA, inputRange);
+    ASSERT(!futureReadyWhenTask0Ready.isReady());
+
+    // Super-range spanning across [0, 10) and [10, 20)
+    inputRange = ChunkRange(BSON("a" << -10 << "b"
+                                     << "lol"),
+                            BSON("a" << 15 << "b"
+                                     << "lol"));
+    auto futureReadyWhenTasks0And10Ready =
+        rds->getOverlappingRangeDeletionsFuture(uuidCollA, inputRange);
+    ASSERT(!futureReadyWhenTasks0And10Ready.isReady());
+
+    // Super-range spanning across [0, 10), [10, 20) and [30, 40)
+    inputRange = ChunkRange(BSON("a" << -10 << "b"
+                                     << "lol"),
+                            BSON("a" << 50 << "b"
+                                     << "lol"));
+    auto futureReadyWhenTasks0And10And30Ready =
+        rds->getOverlappingRangeDeletionsFuture(uuidCollA, inputRange);
+    ASSERT(!futureReadyWhenTasks0And10And30Ready.isReady());
+
+    // Drain ongoing queries one task per time and check only expected futures get marked as ready
+    taskWithOngoingQueries0.drainOngoingQueries();
+    futureReadyWhenTask0Ready.get(opCtx);
+    ASSERT(!futureReadyWhenTasks0And10Ready.isReady());
+    ASSERT(!futureReadyWhenTasks0And10And30Ready.isReady());
+
+    taskWithOngoingQueries10.drainOngoingQueries();
+    futureReadyWhenTasks0And10Ready.get(opCtx);
+    ASSERT(!futureReadyWhenTasks0And10And30Ready.isReady());
+
+    taskWithOngoingQueries30.drainOngoingQueries();
+    futureReadyWhenTasks0And10And30Ready.get(opCtx);
+}
+
 }  // namespace mongo

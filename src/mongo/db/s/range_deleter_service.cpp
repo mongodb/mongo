@@ -172,4 +172,36 @@ int RangeDeleterService::getNumRangeDeletionTasksForCollection(const UUID& colle
     }
     return tasksSet->second.size();
 }
+
+SharedSemiFuture<void> RangeDeleterService::getOverlappingRangeDeletionsFuture(
+    const UUID& collectionUUID, const ChunkRange& range) {
+    auto lock = _acquireMutexFailIfServiceNotUp();
+
+    auto mapEntry = _rangeDeletionTasks.find(collectionUUID);
+    if (mapEntry == _rangeDeletionTasks.end() || mapEntry->second.size() == 0) {
+        // No tasks scheduled for the specified collection
+        return SemiFuture<void>::makeReady().share();
+    }
+
+    std::vector<ExecutorFuture<void>> overlappingRangeDeletionsFutures;
+
+    auto rangeDeletions = mapEntry->second;
+    const auto rangeSharedPtr = std::make_shared<ChunkRange>(range);
+    auto forwardIt = rangeDeletions.lower_bound(rangeSharedPtr);
+    if (forwardIt != rangeDeletions.begin()) {
+        forwardIt--;
+    }
+
+    while (forwardIt != rangeDeletions.end() && forwardIt->get()->overlapWith(range)) {
+        auto future = static_cast<RangeDeletion*>(forwardIt->get())->getCompletionFuture();
+        // Scheduling wait on the current executor so that it gets invalidated on step-down
+        overlappingRangeDeletionsFutures.push_back(future.thenRunOn(_executor));
+        forwardIt++;
+    }
+
+    if (overlappingRangeDeletionsFutures.size() == 0) {
+        return SemiFuture<void>::makeReady().share();
+    }
+    return whenAllSucceed(std::move(overlappingRangeDeletionsFutures)).share();
+}
 }  // namespace mongo

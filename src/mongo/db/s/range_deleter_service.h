@@ -132,6 +132,15 @@ public:
      */
     int getNumRangeDeletionTasksForCollection(const UUID& collectionUUID);
 
+    /*
+     * Returns a future marked as ready when all overlapping range deletion tasks complete.
+     *
+     * NB: in case an overlapping range deletion task is registered AFTER invoking this method,
+     * it will not be taken into account. Handling this scenario is responsibility of the caller.
+     * */
+    SharedSemiFuture<void> getOverlappingRangeDeletionsFuture(const UUID& collectionUUID,
+                                                              const ChunkRange& range);
+
     /* ReplicaSetAwareServiceShardSvr implemented methods */
     void onStepUpComplete(OperationContext* opCtx, long long term) override;
     void onStepDown() override;
