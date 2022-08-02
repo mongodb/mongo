@@ -274,6 +274,8 @@ last-continuous:
       test_file: jstests/replsets/internal_sessions_reaping_basic.js
     - ticket: SERVER-67885
       test_file: jstests/sharding/collection_uuid_shard_capped_collection.js
+    - ticket: SERVER-67492
+      test_file: jstests/sharding/move_chunk_interrupt_postimage.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -681,6 +683,8 @@ last-lts:
       test_file: jstests/replsets/internal_sessions_reaping_basic.js
     - ticket: SERVER-67885
       test_file: jstests/sharding/collection_uuid_shard_capped_collection.js
+    - ticket: SERVER-67492
+      test_file: jstests/sharding/move_chunk_interrupt_postimage.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
