@@ -412,31 +412,6 @@ void PrimaryOnlyService::onStepUp(const OpTime& stepUpOpTime) {
             }
             _rebuildInstances(newTerm);
         })
-        .onCompletion([this, newTerm](Status s) {
-            stdx::lock_guard lk(_mutex);
-            if (_state != State::kRebuilding || _term != newTerm) {
-                bool steppedDown = _state == State::kPaused;
-                bool shutDown = _state == State::kShutdown;
-                bool termAdvanced = _term > newTerm;
-                StringData stateString = _getStateString(lk);
-                invariant(steppedDown || shutDown || termAdvanced,
-                          "Unexpected _state or _term; _state is {} term is {} term was {} "_format(
-                              stateString, _term, newTerm));
-                // We've either stepped or shut down, or advanced to a
-                // new term. In either case, we rely on the stepdown/shutdown
-                // logic or the step-up of the new term to handle managing _state
-                // and do nothing.
-                return;
-            }
-            // We're in the same term, and stepdown/shutdown hasn't occured.
-            invariant(_state == State::kRebuilding);
-            if (s.isOK()) {
-                _setState(State::kRunning, lk);
-            } else {
-                _rebuildStatus = s;
-                _setState(State::kRebuildFailed, lk);
-            }
-        })
         .getAsync([](auto&&) {});  // Ignore the result Future
     lk.unlock();
 }
@@ -673,7 +648,7 @@ bool PrimaryOnlyService::_getHasExecutor() const {
     return _hasExecutor.load();
 }
 
-void PrimaryOnlyService::_rebuildInstances(long long term) {
+void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
     std::vector<BSONObj> stateDocuments;
 
     auto serviceName = getServiceName();
@@ -712,7 +687,7 @@ void PrimaryOnlyService::_rebuildInstances(long long term) {
             while (cursor->more()) {
                 stateDocuments.push_back(cursor->nextSafe().getOwned());
             }
-        } catch (DBException& e) {
+        } catch (const DBException& e) {
             LOGV2_ERROR(
                 4923601,
                 "Failed to start PrimaryOnlyService {service} because the query on {namespace} "
@@ -722,10 +697,20 @@ void PrimaryOnlyService::_rebuildInstances(long long term) {
                 logAttrs(ns),
                 "error"_attr = e);
 
-            e.addContext(str::stream() << "Failed to start PrimaryOnlyService \"" << serviceName
-                                       << "\" because the query for state documents on ns \"" << ns
-                                       << "\" failed");
-            throw;
+            Status status = e.toStatus();
+            status.addContext(str::stream()
+                              << "Failed to start PrimaryOnlyService \"" << serviceName
+                              << "\" because the query for state documents on ns \"" << ns
+                              << "\" failed");
+
+            stdx::lock_guard lk(_mutex);
+            if (_state != State::kRebuilding || _term != term) {
+                _stateChangeCV.notify_all();
+                return;
+            }
+            _setState(State::kRebuildFailed, lk);
+            _rebuildStatus = std::move(status);
+            return;
         }
     }
 
@@ -733,15 +718,20 @@ void PrimaryOnlyService::_rebuildInstances(long long term) {
         {
             stdx::lock_guard lk(_mutex);
             if (_state != State::kRebuilding || _term != term) {  // Node stepped down
+                _stateChangeCV.notify_all();
                 return;
             }
         }
         sleepmillis(100);
     }
 
+    // Must create opCtx before taking _mutex to avoid deadlock.
+    AllowOpCtxWhenServiceRebuildingBlock allowOpCtxBlock(Client::getCurrent());
+    auto opCtx = cc().makeOperationContext();
     stdx::lock_guard lk(_mutex);
     if (_state != State::kRebuilding || _term != term) {
         // Node stepped down before finishing rebuilding service from previous stepUp.
+        _stateChangeCV.notify_all();
         return;
     }
     invariant(_activeInstances.empty());
@@ -764,6 +754,7 @@ void PrimaryOnlyService::_rebuildInstances(long long term) {
         [[maybe_unused]] auto newInstance =
             _insertNewInstance(lk, std::move(instance), std::move(instanceID));
     }
+    _setState(State::kRunning, lk);
 }
 
 std::shared_ptr<PrimaryOnlyService::Instance> PrimaryOnlyService::_insertNewInstance(
