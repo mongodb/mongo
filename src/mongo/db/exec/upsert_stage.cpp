@@ -33,6 +33,7 @@
 #include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -138,12 +139,20 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
             if (!collFilter.keyBelongsToMe(newShardKey)) {
                 // An attempt to upsert a document with a shard key value that belongs on another
                 // shard must either be a retryable write or inside a transaction.
-                uassert(ErrorCodes::IllegalOperation,
+                // An upsert without a transaction number is legal if
+                // gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi is enabled because mongos
+                // will be able to start an internal transaction to handle the
+                // wouldChangeOwningShard error thrown below.
+                if (!feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
+                        serverGlobalParams.featureCompatibility)) {
+                    uassert(
+                        ErrorCodes::IllegalOperation,
                         "The upsert document could not be inserted onto the shard targeted by the "
                         "query, since its shard key belongs on a different shard. Cross-shard "
                         "upserts are only allowed when running in a transaction or with "
                         "retryWrites: true.",
                         opCtx()->getTxnNumber());
+                }
                 uasserted(WouldChangeOwningShardInfo(_params.request->getQuery(),
                                                      newDocument,
                                                      true /* upsert */,

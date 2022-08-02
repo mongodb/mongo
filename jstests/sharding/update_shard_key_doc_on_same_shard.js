@@ -29,26 +29,6 @@ enableCoordinateCommitReturnImmediatelyAfterPersistingDecision(st);
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 st.ensurePrimaryShard(kDbName, shard0);
 
-// -----------------------------------------
-// Updates to the shard key are not allowed if write is not retryable and not in a multi-stmt
-// txn
-// -----------------------------------------
-
-let docsToInsert = [{"x": 4, "a": 3}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
-shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
-
-assert.writeError(mongos.getDB(kDbName).foo.update({"x": 300}, {"x": 600}));
-assert.eq(1, mongos.getDB(kDbName).foo.find({"x": 300}).itcount());
-assert.eq(0, mongos.getDB(kDbName).foo.find({"x": 600}).itcount());
-
-assert.throws(function() {
-    mongos.getDB(kDbName).foo.findAndModify({query: {"x": 300}, update: {$set: {"x": 600}}});
-});
-assert.eq(1, mongos.getDB(kDbName).foo.find({"x": 300}).itcount());
-assert.eq(0, mongos.getDB(kDbName).foo.find({"x": 600}).itcount());
-
-mongos.getDB(kDbName).foo.drop();
-
 // ---------------------------------
 // Update shard key retryable write
 // ---------------------------------
@@ -794,7 +774,7 @@ assertCanUpdateInBulkOpWhenDocsRemainOnSameShard(st, kDbName, ns, session, sessi
 assertCanUpdateInBulkOpWhenDocsRemainOnSameShard(st, kDbName, ns, session, sessionDB, true, true);
 
 // Update two docs, updating one twice
-docsToInsert = [{"x": 4, "a": 3}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
+let docsToInsert = [{"x": 4, "a": 3}, {"x": 100}, {"x": 300, "a": 3}, {"x": 500, "a": 6}];
 shardCollectionMoveChunks(st, kDbName, ns, {"x": 1}, docsToInsert, {"x": 100}, {"x": 300});
 
 session.startTransaction();

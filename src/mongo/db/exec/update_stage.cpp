@@ -43,6 +43,7 @@
 #include "mongo/db/exec/shard_filterer_impl.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/write_stage_common.h"
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/explain.h"
@@ -718,11 +719,18 @@ void UpdateStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
 
     // If this node is a replica set primary node, an attempted update to the shard key value must
     // either be a retryable write or inside a transaction.
+    // An update without a transaction number is legal if
+    // gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi is enabled because mongos
+    // will be able to start an internal transaction to handle the wouldChangeOwningShard error
+    // thrown below.
     // If this node is a replica set secondary node, we can skip validation.
-    uassert(ErrorCodes::IllegalOperation,
-            "Must run update to shard key field in a multi-statement transaction or with "
-            "retryWrites: true.",
-            opCtx()->getTxnNumber() || !opCtx()->writesAreReplicated());
+    if (!feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        uassert(ErrorCodes::IllegalOperation,
+                "Must run update to shard key field in a multi-statement transaction or with "
+                "retryWrites: true.",
+                opCtx()->getTxnNumber());
+    }
 }
 
 
