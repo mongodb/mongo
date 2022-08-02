@@ -491,26 +491,6 @@ void BackgroundSync::_produce() {
         _replCoord->signalUpstreamUpdater();
     }
 
-    // Set the applied point if unset. This is most likely the first time we've established a sync
-    // source since stepping down or otherwise clearing the applied point. We need to set this here,
-    // before the OplogWriter gets a chance to append to the oplog.
-    {
-        auto opCtx = cc().makeOperationContext();
-
-        // Check if the producer has been stopped so that we can prevent setting the applied point
-        // after step up has already cleared it. We need to acquire the collection lock before the
-        // mutex to preserve proper lock ordering.
-        AutoGetCollection autoColl(
-            opCtx.get(),
-            NamespaceString(ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace),
-            MODE_IX);
-        stdx::lock_guard<Latch> lock(_mutex);
-
-        if (_state != ProducerState::Running) {
-            return;
-        }
-    }
-
     // "lastFetched" not used. Already set in _enqueueDocuments.
     Status fetcherReturnStatus = Status::OK();
     int syncSourceRBID = syncSourceResp.rbid;
