@@ -36,8 +36,12 @@ from wtbound import bound_base
 class test_cursor_bound05(bound_base):
     file_name = 'test_cursor_bound05'
     key_format = 'S'
+    value_format = 'S'
+    
+    # The start and end key denotes the first and last key in the table. Since 1000 is a key itself, 
+    # there are 1000 entries between the start and end key.
     start_key = 1000
-    end_key = 2000
+    end_key = 1999
 
     types = [
         ('file', dict(uri='file:', use_colgroup=False)),
@@ -50,25 +54,6 @@ class test_cursor_bound05(bound_base):
     ]
     scenarios = make_scenarios(types, config)
 
-    def create_session_and_cursor(self):
-        uri = self.uri + self.file_name
-        create_params = 'value_format=S,key_format={}'.format(self.key_format)
-        self.session.create(uri, create_params)
-
-        cursor = self.session.open_cursor(uri)
-        self.session.begin_transaction()
-        for i in range(self.start_key, self.end_key + 1):
-            cursor[self.gen_key(i)] = "value" + str(i)
-        self.session.commit_transaction()
-
-        if (self.evict):
-            evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
-            for i in range(self.start_key, self.end_key):
-                evict_cursor.set_key(self.gen_key(i))
-                evict_cursor.search()
-                evict_cursor.reset() 
-        return cursor
-
     def test_bound_special_scenario(self):
         cursor = self.create_session_and_cursor()
 
@@ -80,21 +65,21 @@ class test_cursor_bound05(bound_base):
 
         # Test bound api: Test prefix key with upper bound.
         self.set_bounds(cursor, 20, "upper", False)
-        self.cursor_traversal_bound(cursor, None, 20, True, 999)
-        self.cursor_traversal_bound(cursor, None, 20, False, 999)
+        self.cursor_traversal_bound(cursor, None, 20, True, 1000)
+        self.cursor_traversal_bound(cursor, None, 20, False, 1000)
         self.assertEqual(cursor.bound("action=clear"), 0)
 
         # Test bound api: Test prefix key works with both bounds.
         self.set_bounds(cursor, 10, "lower", True)
         self.set_bounds(cursor, 20, "upper", False)
-        self.cursor_traversal_bound(cursor, 10, 20, True, 999)
-        self.cursor_traversal_bound(cursor, 10, 20, False, 999)
+        self.cursor_traversal_bound(cursor, 10, 20, True, 1000)
+        self.cursor_traversal_bound(cursor, 10, 20, False, 1000)
         self.assertEqual(cursor.bound("action=clear"), 0)
 
         self.set_bounds(cursor, 10, "lower", True)
         self.set_bounds(cursor, 11, "upper", False)
-        self.cursor_traversal_bound(cursor, 10, 11, True, 99)
-        self.cursor_traversal_bound(cursor, 10, 11, False, 99)
+        self.cursor_traversal_bound(cursor, 10, 11, True, 100)
+        self.cursor_traversal_bound(cursor, 10, 11, False, 100)
         self.assertEqual(cursor.bound("action=clear"), 0)
 
         # Test bound api: Test early exit works with lower bound (Greater than data range).

@@ -42,7 +42,7 @@ class test_cursor_bound03(bound_base):
         ('colgroup', dict(uri='table:', use_colgroup=True))
     ]
 
-    key_format_values = [
+    key_formats = [
         ('string', dict(key_format='S')),
         ('var', dict(key_format='r')),
         ('int', dict(key_format='i')),
@@ -50,6 +50,12 @@ class test_cursor_bound03(bound_base):
         ('composite_string', dict(key_format='SSS')),
         ('composite_int_string', dict(key_format='iS')),
         ('composite_complex', dict(key_format='iSru')),
+    ]
+
+    value_formats = [
+        ('string', dict(value_format='S')),
+        # FIX-ME-WT-9589: Fix bug complex colgroups not returning records within bounds.
+        # ('complex-string', dict(value_format='SS')),
     ]
 
     config = [
@@ -68,33 +74,7 @@ class test_cursor_bound03(bound_base):
         ('next', dict(next=True)),
     ]
 
-    scenarios = make_scenarios(types, key_format_values, config, direction)
-
-    def create_session_and_cursor(self):
-        uri = self.uri + self.file_name
-        create_params = 'value_format=S,key_format={}'.format(self.key_format)
-        if self.use_colgroup:
-            create_params += self.gen_colgroup_create_param()
-        self.session.create(uri, create_params)
-        # Add in column group.
-        if self.use_colgroup:
-            create_params = 'columns=(v),'
-            suburi = 'colgroup:{0}:g0'.format(self.file_name)
-            self.session.create(suburi, create_params)
-
-        cursor = self.session.open_cursor(uri)
-        self.session.begin_transaction()
-        for i in range(self.start_key, self.end_key + 1):
-            cursor[self.gen_key(i)] = "value" + str(i)
-        self.session.commit_transaction()
-
-        if (self.evict):
-            evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
-            for i in range(self.start_key, self.end_key):
-                evict_cursor.set_key(self.gen_key(i))
-                evict_cursor.search()
-                evict_cursor.reset() 
-        return cursor
+    scenarios = make_scenarios(types, key_formats, value_formats, config, direction)
 
     def test_bound_general_scenario(self):
         cursor = self.create_session_and_cursor()
@@ -148,7 +128,7 @@ class test_cursor_bound03(bound_base):
         # Test bound api: Test upper bound clearing with only lower bounds.
         self.set_bounds(cursor, 50, "lower")
         cursor.bound("action=clear,bound=upper")
-        self.cursor_traversal_bound(cursor, None, None, self.direction, self.end_key - 50)
+        self.cursor_traversal_bound(cursor, None, None, self.direction, self.end_key - 49)
 
         cursor.bound("action=clear,bound=lower")
         self.cursor_traversal_bound(cursor, None, None)

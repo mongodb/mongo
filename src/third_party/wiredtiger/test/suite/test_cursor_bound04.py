@@ -44,7 +44,7 @@ class test_cursor_bound04(bound_base):
         ('colgroup', dict(uri='table:', use_colgroup=True))
     ]
 
-    key_format_values = [
+    key_formats = [
         ('string', dict(key_format='S')),
         ('var', dict(key_format='r')),
         ('int', dict(key_format='i')),
@@ -54,37 +54,17 @@ class test_cursor_bound04(bound_base):
         ('composite_complex', dict(key_format='iSru')),
     ]
 
+    value_formats = [
+        ('string', dict(value_format='S')),
+        # FIX-ME-WT-9589: Fix bug complex colgroups not returning records within bounds.
+        # ('complex-string', dict(value_format='SS')),
+    ]
+
     config = [
         ('evict', dict(evict=True)),
         ('no-evict', dict(evict=False))
     ]
-    scenarios = make_scenarios(types, key_format_values, config)
-
-    def create_session_and_cursor(self):
-        uri = self.uri + self.file_name
-        create_params = 'value_format=S,key_format={}'.format(self.key_format)
-        if self.use_colgroup:
-            create_params += self.gen_colgroup_create_param()
-        self.session.create(uri, create_params)
-        # Add in column group.
-        if self.use_colgroup:
-            create_params = 'columns=(v),'
-            suburi = 'colgroup:{0}:g0'.format(self.file_name)
-            self.session.create(suburi, create_params)
-
-        cursor = self.session.open_cursor(uri)
-        self.session.begin_transaction()
-        for i in range(self.start_key, self.end_key + 1):
-            cursor[self.gen_key(i)] = "value" + str(i)
-        self.session.commit_transaction()
-
-        if (self.evict):
-            evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
-            for i in range(self.start_key, self.end_key):
-                evict_cursor.set_key(self.gen_key(i))
-                evict_cursor.search()
-                evict_cursor.reset() 
-        return cursor
+    scenarios = make_scenarios(types, key_formats, value_formats, config)
 
     def test_bound_special_scenario(self):
         cursor = self.create_session_and_cursor()
@@ -181,7 +161,7 @@ class test_cursor_bound04(bound_base):
         key = cursor.get_key()
         self.assertEqual(key, self.check_key(55))
         self.assertEqual(cursor.bound("action=clear"), 0)
-        self.cursor_traversal_bound(cursor, None, None, True, self.end_key - 55 - 1)
+        self.cursor_traversal_bound(cursor, None, None, True,  self.end_key - 55)
         cursor.reset()
 
         self.set_bounds(cursor, 55, "upper")
@@ -189,7 +169,7 @@ class test_cursor_bound04(bound_base):
         key = cursor.get_key()
         self.assertEqual(key, self.check_key(self.start_key))
         self.assertEqual(cursor.bound("action=clear"), 0)
-        self.cursor_traversal_bound(cursor, None, None, True,  self.end_key - self.start_key - 1)
+        self.cursor_traversal_bound(cursor, None, None, True,  self.end_key - self.start_key)
         cursor.reset()
         cursor.close()
 
@@ -249,7 +229,7 @@ class test_cursor_bound04(bound_base):
         key = cursor.get_key()
         self.assertEqual(key, self.check_key(45))
         self.assertEqual(cursor.bound("action=clear"), 0)
-        self.cursor_traversal_bound(cursor, None, None, False,  45 - self.start_key - 1)
+        self.cursor_traversal_bound(cursor, None, None, False,  45 - self.start_key)
         cursor.reset()
 
         self.set_bounds(cursor, 45, "upper")
@@ -257,7 +237,7 @@ class test_cursor_bound04(bound_base):
         key = cursor.get_key()
         self.assertEqual(key, self.check_key(45))
         self.assertEqual(cursor.bound("action=clear"), 0)
-        self.cursor_traversal_bound(cursor, None, None, True,  self.end_key - 45 - 1)
+        self.cursor_traversal_bound(cursor, None, None, True,  self.end_key - 45)
         cursor.reset()
 
         cursor.close()

@@ -34,8 +34,11 @@ from wtbound import bound_base
 # Test column store related scenarios with the bounds API. 
 class test_cursor_bound07(bound_base):
     file_name = 'test_cursor_bound07'
+    
+    # The start and end key denotes the first and last key in the table. Since 10 is a key itself, 
+    # there are 100 entries between the start and end key.
     start_key = 10
-    end_key = 100
+    end_key = 99
     key_format = 'r'
     lower_inclusive = True
     upper_inclusive = True
@@ -70,19 +73,19 @@ class test_cursor_bound07(bound_base):
 
         cursor = self.session.open_cursor(uri)
         self.session.begin_transaction()
-        for i in range(10, 31):
+        for i in range(10, 30):
             value = "value" + str(i) if not self.records_rle else "value"
             cursor[self.gen_key(i)] = value
         self.session.commit_transaction()
 
         self.session.begin_transaction()
-        for i in range(71, 101):
+        for i in range(70, 100):
             value = "value" + str(i) if not self.records_rle else "value"
             cursor[self.gen_key(i)] = value
         self.session.commit_transaction()
         
         self.session.begin_transaction()
-        for i in range(31, 71):
+        for i in range(30, 70):
             value = "value" + str(i) if not self.deleted_rle else "value"
             cursor[self.gen_key(i)] = value
             cursor.set_key(self.gen_key(i))
@@ -119,7 +122,7 @@ class test_cursor_bound07(bound_base):
        
         # Test bound api: Test traversal with lower over deleted records.
         self.set_bounds(cursor, 50, "lower", self.lower_inclusive)
-        self.cursor_traversal_bound(cursor, 50, None, self.next, 29)
+        self.cursor_traversal_bound(cursor, 50, None, self.next, 30)
         self.assertEqual(cursor.bound("action=clear"), 0)
 
         self.set_bounds(cursor, 50, "upper", self.upper_inclusive)
@@ -128,12 +131,12 @@ class test_cursor_bound07(bound_base):
 
         # Test bound api: Test column store insert list.
         self.session.begin_transaction()
-        for i in range(51, 61):
+        for i in range(50, 60):
             cursor[self.gen_key(i)] = "value" + str(i)
         self.session.commit_transaction()
 
         self.set_bounds(cursor, 55, "upper", self.upper_inclusive)
-        self.cursor_traversal_bound(cursor, None, 55, self.next, 25)
+        self.cursor_traversal_bound(cursor, None, 55, self.next, 26)
         self.assertEqual(cursor.bound("action=clear"), 0)
 
         self.set_bounds(cursor, 55, "lower", self.lower_inclusive)
@@ -145,10 +148,9 @@ class test_cursor_bound07(bound_base):
         cursor[101] = "value_normal" + str(i)
         self.session.commit_transaction()
         
-        # FIX-ME-WT-9475: cursor_traversal_bound has a bug, therefore e-enable this check when the function is fixed.
-        # self.set_bounds(cursor, 100, "lower", False)
-        # self.cursor_traversal_bound(cursor, 100, None, self.next, 1)
-        # self.assertEqual(cursor.bound("action=clear"), 0)
+        self.set_bounds(cursor, 100, "lower", False)
+        self.cursor_traversal_bound(cursor, 100, None, self.next, 1)
+        self.assertEqual(cursor.bound("action=clear"), 0)
 
         self.set_bounds(cursor, 101, "upper", False)
         self.cursor_traversal_bound(cursor, None, 101, self.next, 60)
@@ -158,10 +160,9 @@ class test_cursor_bound07(bound_base):
         cursor[102] = "value_normal" + str(i)
         self.session.commit_transaction()
 
-        # FIX-ME-WT-9475: cursor_traversal_bound has a bug, therefore e-enable this check when the function is fixed.
-        # self.set_bounds(cursor, 100, "lower", False)
-        # self.cursor_traversal_bound(cursor, 100, None, self.next, 2)
-        # self.assertEqual(cursor.bound("action=clear"), 0)
+        self.set_bounds(cursor, 100, "lower", False)
+        self.cursor_traversal_bound(cursor, 100, None, self.next, 2)
+        self.assertEqual(cursor.bound("action=clear"), 0)
 
         self.set_bounds(cursor, 101, "upper", False)
         self.cursor_traversal_bound(cursor, None, 101, self.next, 60)
