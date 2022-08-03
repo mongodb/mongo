@@ -75,6 +75,25 @@ ShouldRestoreDocument shouldRestoreDocument(OperationContext* opCtx,
                                                    : ShouldRestoreDocument::kNo;
 }
 
+std::set<std::string> getDatabasesToRestore(OperationContext* opCtx) {
+    auto findRequest = FindCommandRequest(NamespaceString::kConfigsvrRestoreNamespace);
+
+    std::set<std::string> databasesToRestore;
+    DBDirectClient client(opCtx);
+    auto it = client.find(findRequest);
+    while (it->more()) {
+        const auto doc = it->next();
+        if (!doc.hasField("ns")) {
+            continue;
+        }
+
+        NamespaceString nss(doc.getStringField("ns"));
+        databasesToRestore.emplace(nss.db());
+    }
+
+    return databasesToRestore;
+}
+
 // Modifications to this map should add new testing in 'sharded_backup_restore.js'.
 // { config collection namespace -> ( optional nss field name, optional UUID field name ) }
 const stdx::unordered_map<NamespaceString,
@@ -148,7 +167,7 @@ public:
 
         // Keeps track of database names for collections restored. Databases with no collections
         // restored will have their entries removed in the config collections.
-        std::set<std::string> databasesRestored;
+        std::set<std::string> databasesRestored = getDatabasesToRestore(opCtx);
 
         for (const auto& collectionEntry : kCollectionEntries) {
             const NamespaceString& nss = collectionEntry.first;
@@ -201,10 +220,6 @@ public:
                             "Found document",
                             "doc"_attr = doc,
                             "shouldRestore"_attr = shouldRestore);
-
-                if (shouldRestore == ShouldRestoreDocument::kYes && docNss) {
-                    databasesRestored.insert(docNss->db().toString());
-                }
 
                 if (shouldRestore == ShouldRestoreDocument::kYes ||
                     shouldRestore == ShouldRestoreDocument::kMaybe) {
