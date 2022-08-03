@@ -32,6 +32,7 @@
 
 #include "mongo/watchdog/watchdog.h"
 
+#include <boost/align.hpp>
 #include <boost/filesystem.hpp>
 
 #ifndef _WIN32
@@ -468,115 +469,113 @@ void checkFile(OperationContext* opCtx, const boost::filesystem::path& file) {
     Date_t now = opCtx->getServiceContext()->getPreciseClockSource()->now();
     std::string nowStr = now.toString();
 
+// Apple does not support O_DIRECT, so instead we use fcntl to enable the F_NOCACHE flag later.
+#if defined(__APPLE__)
     int fd = open(file.generic_string().c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+#else
+    int fd = open(file.generic_string().c_str(), O_RDWR | O_CREAT | O_DIRECT, S_IRUSR | S_IWUSR);
+#endif
+
     if (fd == -1) {
         auto ec = lastSystemError();
-        LOGV2_FATAL_CONTINUE(
-            23424,
-            "open failed for '{file_generic_string}' with error: {errnoWithDescription_err}",
-            "file_generic_string"_attr = file.generic_string(),
-            "errnoWithDescription_err"_attr = errorMessage(ec));
+        LOGV2_FATAL_CONTINUE(23424,
+                             "open failed in checkFile",
+                             "filepath"_attr = file.generic_string(),
+                             "error"_attr = errorMessage(ec));
         fassertNoTrace(4080, !ec);
     }
 
-    size_t bytesWrittenTotal = 0;
-    while (bytesWrittenTotal < nowStr.size()) {
-        ssize_t bytesWrittenInWrite =
-            write(fd, nowStr.c_str() + bytesWrittenTotal, nowStr.size() - bytesWrittenTotal);
+#if defined(__APPLE__)
+    if (-1 == fcntl(fd, F_NOCACHE, 1)) {
+        auto ec = lastSystemError();
+        LOGV2_FATAL_CONTINUE(6319301,
+                             "fcntl failed in checkFile",
+                             "filepath"_attr = file.generic_string(),
+                             "error"_attr = errorMessage(ec));
+        fassertNoTrace(6319302, !ec);
+    }
+#endif
+
+    struct stat st;
+    if (fstat(fd, &st) < 0) {
+        auto ec = lastSystemError();
+        LOGV2(6319300, "fstat failed in checkFile", "error"_attr = errorMessage(ec));
+        // default to reasonable power of two
+        st.st_blksize = 4096;
+    }
+
+    unsigned long alignment = st.st_blksize;
+    unsigned long alignedSize = boost::alignment::align_up(nowStr.size(), alignment);
+    char* alignedBuf = static_cast<char*>(boost::alignment::aligned_alloc(alignment, alignedSize));
+    ScopeGuard cleanupBuf([alignedBuf]() { boost::alignment::aligned_free(alignedBuf); });
+
+    memset(alignedBuf, 0, alignedSize);
+    memcpy(alignedBuf, nowStr.c_str(), nowStr.size());
+
+    ssize_t bytesWrittenInWrite = -1;
+    while (bytesWrittenInWrite == -1) {
+        bytesWrittenInWrite = write(fd, alignedBuf, alignedSize);
         if (bytesWrittenInWrite == -1) {
             auto ec = lastSystemError();
-            if (ec == systemError(EINTR)) {
-                continue;
+            if (ec != systemError(EINTR)) {
+                LOGV2_FATAL_CONTINUE(23425,
+                                     "write failed in checkFile",
+                                     "filepath"_attr = file.generic_string(),
+                                     "error"_attr = errorMessage(ec));
+                fassertNoTrace(4081, !ec);
             }
-
-            LOGV2_FATAL_CONTINUE(
-                23425,
-                "write failed for '{file_generic_string}' with error: {errnoWithDescription_err}",
-                "file_generic_string"_attr = file.generic_string(),
-                "errnoWithDescription_err"_attr = errorMessage(ec));
-            fassertNoTrace(4081, !ec);
         }
-
-        // Warn if the write was incomplete
-        if (bytesWrittenTotal == 0 && static_cast<size_t>(bytesWrittenInWrite) != nowStr.size()) {
-            LOGV2_WARNING(23412,
-                          "parital write for '{file_generic_string}' expected {nowStr_size} bytes "
-                          "but wrote {bytesWrittenInWrite} bytes",
-                          "file_generic_string"_attr = file.generic_string(),
-                          "nowStr_size"_attr = nowStr.size(),
-                          "bytesWrittenInWrite"_attr = bytesWrittenInWrite);
-        }
-
-        bytesWrittenTotal += bytesWrittenInWrite;
+    }
+    if (static_cast<size_t>(bytesWrittenInWrite) != alignedSize) {
+        LOGV2_FATAL_NOTRACE(23412,
+                            "partial or EOF write in checkFile",
+                            "filepath"_attr = file.generic_string(),
+                            "alignedSize"_attr = alignedSize,
+                            "bytesWritten"_attr = bytesWrittenInWrite);
     }
 
     if (fsync(fd)) {
         auto ec = lastSystemError();
-        LOGV2_FATAL_CONTINUE(
-            23426,
-            "fsync failed for '{file_generic_string}' with error: {errnoWithDescription_err}",
-            "file_generic_string"_attr = file.generic_string(),
-            "errnoWithDescription_err"_attr = errorMessage(ec));
+        LOGV2_FATAL_CONTINUE(23426,
+                             "fsync failed in checkFile",
+                             "filepath"_attr = file.generic_string(),
+                             "error"_attr = errorMessage(ec));
         fassertNoTrace(4082, !ec);
     }
 
-    auto readBuffer = std::make_unique<char[]>(nowStr.size());
-    size_t bytesReadTotal = 0;
-    while (bytesReadTotal < nowStr.size()) {
-        ssize_t bytesReadInRead = pread(
-            fd, readBuffer.get() + bytesReadTotal, nowStr.size() - bytesReadTotal, bytesReadTotal);
+    ssize_t bytesReadInRead = -1;
+    while (bytesReadInRead == -1) {
+        bytesReadInRead = pread(fd, alignedBuf, alignedSize, 0);
         if (bytesReadInRead == -1) {
             auto ec = lastSystemError();
-            if (ec == systemError(EINTR)) {
-                continue;
+            if (ec != systemError(EINTR)) {
+                LOGV2_FATAL_CONTINUE(23427,
+                                     "read failed in checkFile",
+                                     "filepath"_attr = file.generic_string(),
+                                     "error"_attr = errorMessage(ec));
+                fassertNoTrace(4083, !ec);
             }
-
-            LOGV2_FATAL_CONTINUE(
-                23427,
-                "read failed for '{file_generic_string}' with error: {errnoWithDescription_err}",
-                "file_generic_string"_attr = file.generic_string(),
-                "errnoWithDescription_err"_attr = errorMessage(ec));
-            fassertNoTrace(4083, !ec);
-        } else if (bytesReadInRead == 0) {
-            LOGV2_FATAL_NOTRACE(
-                50719,
-                "read failed for '{file_generic_string}' with unexpected end of file",
-                "file_generic_string"_attr = file.generic_string());
         }
-
-        // Warn if the read was incomplete
-        if (bytesReadTotal == 0 && static_cast<size_t>(bytesReadInRead) != nowStr.size()) {
-            LOGV2_WARNING(23413,
-                          "partial read for '{file_generic_string}' expected {nowStr_size} bytes "
-                          "but read {bytesReadInRead} bytes",
-                          "file_generic_string"_attr = file.generic_string(),
-                          "nowStr_size"_attr = nowStr.size(),
-                          "bytesReadInRead"_attr = bytesReadInRead);
-        }
-
-        bytesReadTotal += bytesReadInRead;
+    }
+    if (static_cast<size_t>(bytesReadInRead) != alignedSize) {
+        LOGV2_FATAL_NOTRACE(23413,
+                            "partial or EOF read in checkFile",
+                            "filepath"_attr = file.generic_string(),
+                            "alignedSize"_attr = alignedSize,
+                            "bytesRead"_attr = bytesReadInRead);
     }
 
-    if (memcmp(nowStr.c_str(), readBuffer.get(), nowStr.size()) != 0) {
+    if (memcmp(nowStr.c_str(), alignedBuf, nowStr.size()) != 0) {
         LOGV2_FATAL_NOTRACE(
-            50718,
-            "Read wrong string from file '{file_generic_string}' expected {nowStr_size} "
-            "bytes (in hex) '{toHexLower_nowStr_c_str_nowStr_size}' but read bytes "
-            "'{toHexLower_readBuffer_get_bytesReadTotal}'",
-            "file_generic_string"_attr = file.generic_string(),
-            "nowStr_size"_attr = nowStr.size(),
-            "toHexLower_nowStr_c_str_nowStr_size"_attr = hexblob::encodeLower(nowStr),
-            "toHexLower_readBuffer_get_bytesReadTotal"_attr =
-                hexblob::encodeLower(readBuffer.get(), bytesReadTotal));
+            50718, "Read wrong string in checkFile", "filepath"_attr = file.generic_string());
     }
 
     if (close(fd)) {
         auto ec = lastSystemError();
-        LOGV2_FATAL_CONTINUE(
-            23430,
-            "close failed for '{file_generic_string}' with error: {errnoWithDescription_err}",
-            "file_generic_string"_attr = file.generic_string(),
-            "errnoWithDescription_err"_attr = errorMessage(ec));
+        LOGV2_FATAL_CONTINUE(23430,
+                             "close failed in checkFile",
+                             "filepath"_attr = file.generic_string(),
+                             "error"_attr = errorMessage(ec));
         fassertNoTrace(4084, !ec);
     }
 }
