@@ -51,6 +51,19 @@
 #include "mongo/util/synchronized_value.h"
 
 namespace mongo {
+
+/**
+ * Used to check if the parameter type has the getClusterServerParameter method, which proves
+ * that ClusterServerParameter is inline chained to it.
+ */
+template <typename T>
+using HasClusterServerParameter = decltype(std::declval<T>().getClusterServerParameter());
+template <typename T>
+constexpr bool hasClusterServerParameter = stdx::is_detected_v<HasClusterServerParameter, T>;
+
+template <typename U>
+using TenantIdMap = std::map<boost::optional<TenantId>, U>;
+
 namespace idl_server_parameter_detail {
 
 template <typename T>
@@ -127,18 +140,23 @@ struct storage_wrapper;
 
 template <typename U>
 struct storage_wrapper<AtomicWord<U>> {
+    static constexpr bool isTenantAware = false;
+
     using type = U;
     storage_wrapper(AtomicWord<U>& storage) : _storage(storage), _defaultValue(storage.load()) {}
 
-    void store(const U& value) {
+    void store(const U& value, const boost::optional<TenantId>& id) {
+        invariant(!id.is_initialized());
         _storage.store(value);
     }
 
-    U load() const {
+    U load(const boost::optional<TenantId>& id) const {
+        invariant(!id.is_initialized());
         return _storage.load();
     }
 
-    void reset() {
+    void reset(const boost::optional<TenantId>& id) {
+        invariant(!id.is_initialized());
         _storage.store(_defaultValue);
     }
 
@@ -158,19 +176,24 @@ private:
 // Covers AtomicDouble
 template <typename U, typename P>
 struct storage_wrapper<AtomicProxy<U, P>> {
+    static constexpr bool isTenantAware = false;
+
     using type = U;
     storage_wrapper(AtomicProxy<U, P>& storage)
         : _storage(storage), _defaultValue(storage.load()) {}
 
-    void store(const U& value) {
+    void store(const U& value, const boost::optional<TenantId>& id) {
+        invariant(!id.is_initialized());
         _storage.store(value);
     }
 
-    U load() const {
+    U load(const boost::optional<TenantId>& id) const {
+        invariant(!id.is_initialized());
         return _storage.load();
     }
 
-    void reset() {
+    void reset(const boost::optional<TenantId>& id) {
+        invariant(!id.is_initialized());
         _storage.store(_defaultValue);
     }
 
@@ -189,18 +212,23 @@ private:
 
 template <typename U>
 struct storage_wrapper<synchronized_value<U>> {
+    static constexpr bool isTenantAware = false;
+
     using type = U;
     storage_wrapper(synchronized_value<U>& storage) : _storage(storage), _defaultValue(*storage) {}
 
-    void store(const U& value) {
+    void store(const U& value, const boost::optional<TenantId>& id) {
+        invariant(!id.is_initialized());
         *_storage = value;
     }
 
-    U load() const {
+    U load(const boost::optional<TenantId>& id) const {
+        invariant(!id.is_initialized());
         return *_storage;
     }
 
-    void reset() {
+    void reset(const boost::optional<TenantId>& id) {
+        invariant(!id.is_initialized());
         *_storage = _defaultValue;
     }
 
@@ -217,23 +245,71 @@ private:
     U _defaultValue;
 };
 
+
+template <typename U>
+struct storage_wrapper<TenantIdMap<U>> {
+    static constexpr bool isTenantAware = true;
+
+    using type = U;
+    storage_wrapper(TenantIdMap<U>& storage) : _storage(storage) {}
+
+    void store(const U& value, const boost::optional<TenantId>& id) {
+        stdx::lock_guard<Latch> lg(_storageMutex);
+        _storage[id] = value;
+    }
+
+    U load(const boost::optional<TenantId>& id) const {
+        stdx::lock_guard<Latch> lg(_storageMutex);
+        auto it = _storage.find(id);
+        if (it != _storage.end()) {
+            return it->second;
+        } else {
+            return _defaultValue;
+        }
+    }
+
+    void reset(const boost::optional<TenantId>& id) {
+        stdx::lock_guard<Latch> lg(_storageMutex);
+        _storage.erase(id);
+    }
+
+    // Not thread-safe, will only be called once at most per ServerParameter in its initialization
+    // block.
+    void setDefault(const U& value) {
+        _defaultValue = value;
+    }
+
+private:
+    mutable Mutex _storageMutex =
+        MONGO_MAKE_LATCH("IDLServerParameterWithStorage::_tenantStorageMutex");
+    TenantIdMap<U>& _storage;
+
+    // Copy of original value to be read from during resets.
+    U _defaultValue;
+};
+
 // All other types will use a mutex to synchronize in a threadsafe manner.
 template <typename U>
 struct storage_wrapper {
+    static constexpr bool isTenantAware = false;
+
     using type = U;
     storage_wrapper(U& storage) : _storage(storage), _defaultValue(storage) {}
 
-    void store(const U& value) {
+    void store(const U& value, const boost::optional<TenantId>& id) {
+        invariant(!id.is_initialized());
         stdx::lock_guard<Latch> lg(_storageMutex);
         _storage = value;
     }
 
-    U load() const {
+    U load(const boost::optional<TenantId>& id) const {
+        invariant(!id.is_initialized());
         stdx::lock_guard<Latch> lg(_storageMutex);
         return _storage;
     }
 
-    void reset() {
+    void reset(const boost::optional<TenantId>& id) {
+        invariant(!id.is_initialized());
         stdx::lock_guard<Latch> lg(_storageMutex);
         _storage = _defaultValue;
     }
@@ -255,15 +331,6 @@ private:
 }  // namespace idl_server_parameter_detail
 
 /**
- * Used to check if the parameter type has the getClusterServerParameter method, which proves
- * that ClusterServerParameter is inline chained to it.
- */
-template <typename T>
-using HasClusterServerParameter = decltype(std::declval<T>().getClusterServerParameter());
-template <typename T>
-constexpr bool hasClusterServerParameter = stdx::is_detected_v<HasClusterServerParameter, T>;
-
-/**
  * Specialization of ServerParameter used by IDL generator.
  */
 template <ServerParameterType paramType, typename T>
@@ -275,15 +342,16 @@ private:
 public:
     using element_type = typename SW::type;
 
+    // TODO SERVER-68017 Tenant aware parameters are currently unsupported.
+    static_assert(!SW::isTenantAware);
+
+    // Compile-time assertion to ensure that IDL-defined in-memory storage for CSPs are
+    // chained to the ClusterServerParameter base type.
+    static_assert((paramType != SPT::kClusterWide) || hasClusterServerParameter<element_type>,
+                  "Cluster server parameter storage must be chained from ClusterServerParameter");
+
     IDLServerParameterWithStorage(StringData name, T& storage)
-        : ServerParameter(name, paramType), _storage(storage) {
-        constexpr bool notClusterParameter = (paramType != SPT::kClusterWide);
-        // Compile-time assertion to ensure that IDL-defined in-memory storage for CSPs are
-        // chained to the ClusterServerParameter base type.
-        static_assert(
-            notClusterParameter || hasClusterServerParameter<T>,
-            "Cluster server parameter storage must be chained from ClusterServerParameter");
-    }
+        : ServerParameter(name, paramType), _storage(storage) {}
 
     Status validateValue(const element_type& newValue) const {
         for (const auto& validator : _validators) {
@@ -303,7 +371,7 @@ public:
             return status;
         }
 
-        _storage.store(newValue);
+        _storage.store(newValue, boost::none);
 
         if (_onUpdate) {
             return _onUpdate(newValue);
@@ -316,7 +384,7 @@ public:
      * Convenience wrapper for fetching value from storage.
      */
     element_type getValue() const {
-        return _storage.load();
+        return _storage.load(boost::none);
     }
 
     /**
@@ -403,9 +471,9 @@ public:
      * Resets the current storage value in storage_wrapper with the default value.
      */
     Status reset() final {
-        _storage.reset();
+        _storage.reset(boost::none);
         if (_onUpdate) {
-            return _onUpdate(_storage.load());
+            return _onUpdate(_storage.load(boost::none));
         }
 
         return Status::OK();
@@ -437,7 +505,7 @@ public:
      * storage. All other server parameters simply return the uninitialized LogicalTime.
      */
     LogicalTime getClusterParameterTime() const final {
-        if constexpr (hasClusterServerParameter<T>) {
+        if constexpr (hasClusterServerParameter<element_type>) {
             return getValue().getClusterParameterTime();
         }
 
