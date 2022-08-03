@@ -728,3 +728,90 @@ Status exceptionToStatus() noexcept;
  * Like `MONGO_UNIMPLEMENTED`, but triggers a `tassert` instead of an `invariant`
  */
 #define MONGO_UNIMPLEMENTED_TASSERT(msgid) tasserted(msgid, "Hit a MONGO_UNIMPLEMENTED_TASSERT!")
+
+namespace mongo {
+
+/**
+ * A stack of auxilliary information to be dumped on invariant failure.
+ * These are intended to carry only very lightweight objects like short strings
+ * and numbers, to give some basic clue as to what was going on when a thread
+ * suffered an invariant failure.
+ */
+class ScopedDebugInfoStack {
+public:
+    struct Rec {
+        virtual ~Rec() = default;
+        virtual std::string toString() const = 0;
+    };
+
+    void push(const Rec* rec) {
+        _stack.push_back(rec);
+    }
+    void pop() {
+        _stack.pop_back();
+    }
+
+    std::vector<std::string> getAll() const {
+        std::vector<std::string> r;
+        r.reserve(_stack.size());
+        std::transform(_stack.begin(), _stack.end(), std::back_inserter(r), [](auto&& e) {
+            return e->toString();
+        });
+        return r;
+    }
+
+private:
+    std::vector<const Rec*> _stack;
+};
+
+/** Each thread has its own stack of scoped debug info. */
+inline ScopedDebugInfoStack& scopedDebugInfoStack() {
+    thread_local ScopedDebugInfoStack tls;
+    return tls;
+}
+
+/**
+ * An RAII type that attaches a datum to a ScopedDebugInfoStack, intended as a
+ * broad hint as to what the thread is doing. Pops that datum at scope
+ * exit. By default, attaches to the thread_local ScopedDebugInfoStack.
+ * If the thread encounters a fatal error, the thread's ScopedDebugInfoStack
+ * is logged.
+ *
+ * Example:
+ *
+ *     void doSomethingAsUser(const User& currentUser) {
+ *         ScopedDebugInfo userNameDbg("userName", currentUser.nameStringData());
+ *         ScopedDebugInfo userIdDbg("userId", currentUser.id());
+ *         somethingThatMightCrash(currentUser);
+ *     }
+ */
+template <typename T>
+class ScopedDebugInfo {
+public:
+    ScopedDebugInfo(StringData label, T v, ScopedDebugInfoStack* stack = &scopedDebugInfoStack())
+        : label(label), v(std::move(v)), stack(stack) {
+        stack->push(&rec);
+    }
+    ~ScopedDebugInfo() {
+        stack->pop();
+    }
+    ScopedDebugInfo(const ScopedDebugInfo&) noexcept = delete;
+    ScopedDebugInfo& operator=(const ScopedDebugInfo&) noexcept = delete;
+
+private:
+    struct ThisRec : ScopedDebugInfoStack::Rec {
+        explicit ThisRec(const ScopedDebugInfo* owner) : owner(owner) {}
+        std::string toString() const override {
+            using namespace fmt::literals;
+            return "{}: {}"_format(owner->label, owner->v);
+        }
+        const ScopedDebugInfo* owner;
+    };
+
+    StringData label;
+    T v;
+    ScopedDebugInfoStack* stack;
+    ThisRec rec{this};
+};
+
+}  // namespace mongo

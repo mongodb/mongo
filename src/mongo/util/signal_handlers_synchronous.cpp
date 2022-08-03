@@ -229,6 +229,19 @@ void printSignalAndBacktrace(int signalNum) {
     printStackTraceNoRecursion();
 }
 
+void dumpScopedDebugInfo(std::ostream& os) {
+    auto diagStack = scopedDebugInfoStack().getAll();
+    if (diagStack.empty())
+        return;
+    os << "ScopedDebugInfo: [";
+    StringData sep;
+    for (const auto& s : diagStack) {
+        os << sep << "(" << s << ")";
+        sep = ", "_sd;
+    }
+    os << "]\n";
+}
+
 // this will be called in certain c++ error cases, for example if there are two active
 // exceptions
 void myTerminate() {
@@ -242,6 +255,8 @@ void myTerminate() {
         mallocFreeOStream << " No exception is active";
     }
     writeMallocFreeStreamToLog();
+    dumpScopedDebugInfo(mallocFreeOStream);
+    writeMallocFreeStreamToLog();
     printStackTraceNoRecursion();
     breakpoint();
     endProcessWithSignal(SIGABRT);
@@ -249,6 +264,8 @@ void myTerminate() {
 
 extern "C" void abruptQuit(int signalNum) {
     MallocFreeOStreamGuard lk{};
+    dumpScopedDebugInfo(mallocFreeOStream);
+    writeMallocFreeStreamToLog();
     printSignalAndBacktrace(signalNum);
     breakpoint();
     endProcessWithSignal(signalNum);

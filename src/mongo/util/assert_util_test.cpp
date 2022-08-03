@@ -34,6 +34,7 @@
 #include <type_traits>
 
 #include "mongo/base/static_assert.h"
+#include "mongo/unittest/assert_that.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -500,6 +501,42 @@ DEATH_TEST(DassertTerminationTest,
     dassert(false, msg);
 }
 #endif  // defined(MONGO_CONFIG_DEBUG_BUILD)
+
+TEST(ScopedDebugInfo, Stack) {
+    using namespace unittest::match;
+    ScopedDebugInfoStack infoStack{};  // Avoiding the tls instance for now.
+    std::vector<std::string> expected;
+    ASSERT_THAT(infoStack.getAll(), Eq(expected));
+    {
+        ScopedDebugInfo greetingGuard("greeting", "hello", &infoStack);
+        expected.push_back("greeting: hello");
+        ASSERT_THAT(infoStack.getAll(), Eq(expected));
+
+        ScopedDebugInfo numberGuard("age", 123, &infoStack);
+        expected.push_back("age: 123");
+        ASSERT_THAT(infoStack.getAll(), Eq(expected));
+
+        {
+            ScopedDebugInfo innerGuard("inner", 222, &infoStack);
+            expected.push_back("inner: 222");
+            ASSERT_THAT(infoStack.getAll(), Eq(expected));
+            expected.pop_back();  // innerGuard
+        }
+        ASSERT_THAT(infoStack.getAll(), Eq(expected));
+        expected.pop_back();  // numberGuard
+        expected.pop_back();  // greetingGuard
+    }
+    ASSERT_THAT(infoStack.getAll(), Eq(expected));
+}
+
+void someRiskyBusiness() {
+    invariant(false, "ouch");
+}
+
+DEATH_TEST(ScopedDebugInfo, PrintedOnInvariant, "mission: ATestInjectedString") {
+    ScopedDebugInfo g("mission", "ATestInjectedString");
+    someRiskyBusiness();
+}
 
 }  // namespace
 }  // namespace mongo

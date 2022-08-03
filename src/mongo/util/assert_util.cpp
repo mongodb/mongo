@@ -59,8 +59,14 @@
 #define XSTR(x) STR(x)
 
 namespace mongo {
-
 namespace {
+void logScopedDebugInfo() {
+    auto diagStack = scopedDebugInfoStack().getAll();
+    if (diagStack.empty())
+        return;
+    LOGV2_FATAL_CONTINUE(4106400, "ScopedDebugInfo", "scopedDebugInfo"_attr = diagStack);
+}
+
 /**
  * Rather than call std::abort directly, assertion and invariant failures that wish to abort the
  * process should call this function, which ensures that std::abort is invoked at most once per
@@ -95,6 +101,7 @@ void DBException::traceIfNeeded(const DBException& e) {
         (e.code() == ErrorCodes::WriteConflict && traceWriteConflictExceptions.load());
     if (traceNeeded) {
         LOGV2_WARNING(23075, "DBException thrown {error}", "DBException thrown", "error"_attr = e);
+        logScopedDebugInfo();
         printStackTrace();
     }
 }
@@ -107,6 +114,7 @@ MONGO_COMPILER_NOINLINE void verifyFailed(const char* expr, const char* file, un
                 "expr"_attr = expr,
                 "file"_attr = file,
                 "line"_attr = line);
+    logScopedDebugInfo();
     printStackTrace();
     std::stringstream temp;
     temp << "assertion " << file << ":" << line;
@@ -302,6 +310,7 @@ void tassertFailed(const Status& status, SourceLocation loc) {
                 "Tripwire assertion",
                 "error"_attr = status,
                 "location"_attr = SourceLocationHolder(std::move(loc)));
+    logScopedDebugInfo();
     printStackTrace();
     breakpoint();
     error_details::throwExceptionForStatus(status);
