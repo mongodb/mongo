@@ -349,11 +349,16 @@ void BucketCatalog::EraManager::insertToRegistry(uint64_t era, ShouldClearFn&& s
     _clearRegistry[era] = std::move(shouldClear);
 }
 
+uint64_t BucketCatalog::EraManager::getClearOperationsCount() {
+    return _clearRegistry.size();
+}
+
 void BucketCatalog::EraManager::_decrementEraCountHelper(uint64_t era) {
     auto it = _countMap.find(era);
     invariant(it != _countMap.end());
     if (it->second == 1) {
         _countMap.erase(it);
+        _cleanClearRegistry();
     } else {
         --it->second;
     }
@@ -382,6 +387,23 @@ bool BucketCatalog::EraManager::hasBeenCleared(Bucket* bucket) {
     }
 
     return false;
+}
+
+void BucketCatalog::EraManager::_cleanClearRegistry() {
+    // An edge case occurs when the count map is empty. In this case, we can clean the whole clear
+    // registry.
+    if (_countMap.begin() == _countMap.end()) {
+        _clearRegistry.erase(_clearRegistry.begin(), _clearRegistry.end());
+        return;
+    }
+
+    uint64_t smallestEra = _countMap.begin()->first;
+    auto endIt = upper_bound(_clearRegistry.begin(),
+                             _clearRegistry.end(),
+                             smallestEra,
+                             [](uint64_t val, auto kv) { return val < kv.first; });
+
+    _clearRegistry.erase(_clearRegistry.begin(), endIt);
 }
 
 BucketCatalog::Bucket::Bucket(const OID& id,

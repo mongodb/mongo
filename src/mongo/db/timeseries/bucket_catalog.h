@@ -54,7 +54,7 @@ protected:
 
     using StripeNumber = std::uint8_t;
 
-    using EraCountMap = stdx::unordered_map<uint64_t, uint64_t>;
+    using EraCountMap = std::map<uint64_t, uint64_t>;
 
     using ShouldClearFn = std::function<bool(const NamespaceString&)>;
 
@@ -542,14 +542,20 @@ protected:
         void insertToRegistry(uint64_t era,
                               std::function<bool(const NamespaceString&)>&& shouldClear);
 
+        // Returns the number of clear operations currently stored in the clear registry.
+        uint64_t getClearOperationsCount();
+
         // Returns whether the Bucket has been marked as cleared by checking against the
         // clearRegistry. Advances Bucket's era up to current global era if the bucket has not been
         // cleared.
         bool hasBeenCleared(Bucket* bucket);
 
-    private:
+    protected:
         void _decrementEraCountHelper(uint64_t era);
         void _incrementEraCountHelper(uint64_t era);
+
+        // Removes clear operations from the clear registry that no longer need to be tracked.
+        void _cleanClearRegistry();
 
         // Pointer to 'BucketCatalog::_mutex'.
         Mutex* _mutex;
