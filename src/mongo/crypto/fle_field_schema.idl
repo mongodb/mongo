@@ -261,3 +261,20 @@ structs:
             description: "Encrypted value"
             type: bindata_generic
 
+    FLE2RangeSpec:
+        description: "Range specification that is encoded inside of a FLE2EncryptionPlaceholder."
+        strict: true
+        cpp_validator_func: "validateIDLFLE2RangeSpec"
+        fields:
+          min:
+            description: "The minimum value for an encrypted range query."
+            type: IDLAnyType
+          minIncluded:
+            description: "Indicates if the lower bound should be included in the range."
+            type: bool
+          max:
+            description: "The maximum value for an encrypted range query."
+            type: IDLAnyType
+          maxIncluded:
+            description: "Indicates if the upper bound should be included in the range."
+            type: bool

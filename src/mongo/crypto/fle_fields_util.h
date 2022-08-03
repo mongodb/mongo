@@ -31,10 +31,12 @@
 
 namespace mongo {
 class FLE2EncryptionPlaceholder;
+class FLE2RangeSpec;
 
 /**
  * Extra validation for the placeholder struct to verify that range placeholders have min/max
  * endpoints. Will throw a uassert if the placeholder does not pass validation.
  */
 void validateIDLFLE2EncryptionPlaceholder(const FLE2EncryptionPlaceholder* placeholder);
+void validateIDLFLE2RangeSpec(const FLE2RangeSpec* placeholder);
 }  // namespace mongo

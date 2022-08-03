@@ -37,12 +37,19 @@ namespace mongo {
 void validateIDLFLE2EncryptionPlaceholder(const FLE2EncryptionPlaceholder* placeholder) {
     if (placeholder->getAlgorithm() == Fle2AlgorithmInt::kRange) {
         auto val = placeholder->getValue().getElement();
-        uassert(6720200, "Range placeholder must be an array.", val.isABSONObj());
+        uassert(6720200, "Range placeholder value must be an object.", val.isABSONObj());
         auto obj = val.Obj();
-        uassert(6720201, "Range placeholder must be an array.", obj.couldBeArray());
-        uassert(6720202,
-                "Range placeholder must hold an array with a min and max value.",
-                obj.nFields() == 2);
+        FLE2RangeSpec::parse(IDLParserContext("v"), obj);
     }
+}
+void validateIDLFLE2RangeSpec(const FLE2RangeSpec* placeholder) {
+    auto min = placeholder->getMin().getElement();
+    auto max = placeholder->getMax().getElement();
+    uassert(6833400,
+            str::stream() << "Minimum element in a range must be numeric, not: " << min.type(),
+            min.isNumber() || min.type() == BSONType::MinKey);
+    uassert(6833401,
+            str::stream() << "Maximum element in a range must be numeric, not: " << max.type(),
+            max.isNumber() || max.type() == BSONType::MaxKey);
 }
 }  // namespace mongo
