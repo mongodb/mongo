@@ -5,7 +5,7 @@
  *  # Cannot implicitly shard accessed collections because of collection existing when none
  *  # expected.
  *  assumes_no_implicit_collection_creation_after_drop,  # common tag in collMod tests.
- *  requires_fcv_52,
+ *  requires_fcv_60,
  *  requires_non_retryable_commands, # common tag in collMod tests.
  *  # TODO(SERVER-61182): Fix WiredTigerKVEngine::alterIdentMetadata() under inMemory.
  *  requires_persistence,

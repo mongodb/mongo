@@ -6,6 +6,7 @@
  *
  * @tags: [
  *  # TODO(SERVER-61182): Fix WiredTigerKVEngine::alterIdentMetadata() under inMemory.
+ *  requires_fcv_60,
  *  requires_persistence,
  *  requires_replication,
  * ]

@@ -3,6 +3,7 @@
  * is persisted over restarts.
  *
  * @tags: [
+ *  requires_fcv_60,
  *  requires_persistence,
  *  requires_replication,
  * ]
