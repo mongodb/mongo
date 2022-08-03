@@ -1918,6 +1918,11 @@ if link_model == 'dynamic' and env.TargetOSIs(
             Failed to detect macos version: {exc}
             """) + macos_version_message)
 
+# TODO: SERVER-68475
+# temp fix for BF-25986, should be removed when better solution is found
+if env.ToolchainIs('gcc') and not link_model == "dynamic":
+    env.Append(CCFLAGS=['-gsplit-dwarf'])
+
 # libunwind configuration.
 # In which the following globals are set and normalized to bool:
 #     - use_libunwind
