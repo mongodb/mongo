@@ -1,6 +1,7 @@
 // Test validation of connection strings passed to the JavaScript "connect()" function.
 // @tags: [
 //   uses_multiple_connections,
+//   docker_incompatible,
 // ]
 // Related to SERVER-8030.
 
