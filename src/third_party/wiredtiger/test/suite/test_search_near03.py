@@ -33,6 +33,7 @@ from wtscenario import make_scenarios
 # test_search_near03.py
 # Test prefix search near format rules, only format fixed-length strings (s), variable strings (S)
 # and raw bytes array (u) is allowed.
+# FIXME-WT-9142 Remove once prefix search near is deprecated.
 class test_search_near03(wttest.WiredTigerTestCase):
     key_format_values = [
          ('s', dict(key_format='s')),

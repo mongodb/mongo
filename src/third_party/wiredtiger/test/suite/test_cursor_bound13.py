@@ -29,13 +29,14 @@
 
 import wttest
 from wtscenario import make_scenarios
+from wtbound import set_prefix_bound
 
-# test_search_near04.py
+# test_cursor_bound13.py
 # This test checks that a search_near call with the prefix key
 # configuration will correctly find a key even in cases where the key
 # range is split across multiple pages.
-# FIXME-WT-9142 Remove once prefix search near is deprecated.
-class test_search_near04(wttest.WiredTigerTestCase):
+# This test has been migrated to use cursor bounds logic.
+class test_cursor_bound13(wttest.WiredTigerTestCase):
     key_format_values = [
         ('var_string', dict(key_format='S')),
         ('byte_array', dict(key_format='u')),
@@ -106,9 +107,6 @@ class test_search_near04(wttest.WiredTigerTestCase):
         cursor3.set_key("aazab")
         self.assertEqual(cursor3.search_near(), -1)
         self.assertEqual(cursor3.get_key(), self.check_key(expected_key))
-
-        # Enable prefix search.
-        cursor3.reconfigure("prefix_search=true")
         
         # The only visible key is aaz.
         # If we try to do a search_near() with the prefixes "a" or "aa" without the changes
@@ -117,18 +115,22 @@ class test_search_near04(wttest.WiredTigerTestCase):
         # key that is on another page. However, if we specify "aaz" as a prefix, we are
         # able to find that as we are traversing on the same page.
         # All three of the prefixes "a", "aa" and "aaz" should lead us to find "aaz".
+        set_prefix_bound(self, cursor2, "a")
         cursor3.set_key("a")
         self.assertEqual(cursor3.search_near(), 1)
         self.assertEqual(cursor3.get_key(), self.check_key(expected_key))
 
+        set_prefix_bound(self, cursor2, "aa")
         cursor3.set_key("aa")
         self.assertEqual(cursor3.search_near(), 1)
         self.assertEqual(cursor3.get_key(), self.check_key(expected_key))
 
+        set_prefix_bound(self, cursor2, "aaz")
         cursor3.set_key("aaz")
         self.assertEqual(cursor3.search_near(), 1)
         self.assertEqual(cursor3.get_key(), self.check_key(expected_key))
 
+        set_prefix_bound(self, cursor2, "aaz" * key_size)
         cursor3.set_key("aaz" * key_size)
         self.assertEqual(cursor3.search_near(), 0)
         self.assertEqual(cursor3.get_key(), self.check_key(expected_key))

@@ -29,16 +29,17 @@
 
 import wiredtiger, wttest
 from wtscenario import make_scenarios
+from wtbound import set_prefix_bound
 
-# test_search_near02.py
+# test_cursor_bound12.py
 # Check the search_near API returns the correct key according to visibility rules and its
 # configuration.
-# When prefix search is disabled, the search_near API should always return the closest key (in
+# When cursor bounds aren't set, the search_near API should always return the closest key (in
 # lexicographic order) as long as one exists and is visible.
-# When prefix search is enabled, in addition to the previous rules, search_near returns a key that
-# matches the prefix being searched.
-# FIXME-WT-9142 Remove once prefix search near is deprecated.
-class test_search_near02(wttest.WiredTigerTestCase):
+# When cursor bounds are set, in addition to the previous rules, search_near returns a key that
+# is within the given bounds.
+# This test has been migrated to use cursor bound logic.
+class test_cursor_bound12(wttest.WiredTigerTestCase):
     key_format_values = [
         ('fixed_string', dict(key_format='10s')),
         ('var_string', dict(key_format='S')),
@@ -60,8 +61,8 @@ class test_search_near02(wttest.WiredTigerTestCase):
         else:
             return key
 
-    def test_search_near(self):
-        uri = 'table:test_search_near'
+    def test_cursor_bound(self):
+        uri = 'table:test_cursor_bound'
         self.session.create(uri, 'key_format={},value_format=S'.format(self.key_format))
         cursor = self.session.open_cursor(uri)
         cursor2 = self.session.open_cursor(uri, None, "debug=(release_evict=true)")
@@ -100,7 +101,7 @@ class test_search_near02(wttest.WiredTigerTestCase):
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(100))
         cursor3 = self.session.open_cursor(uri)
 
-        # Prefix search is disabled by default.
+        # Cursor bounds aren't set by default.
         # Search near should always return the only visible key.
         cursor3.set_key("aa")
         self.assertEqual(cursor3.search_near(), 1)
@@ -118,27 +119,29 @@ class test_search_near02(wttest.WiredTigerTestCase):
         self.assertEqual(cursor3.search_near(), -1)
         self.assertEqual(cursor3.get_key(), self.check_key("aaz"))
 
-        # Enable prefix search.
-        cursor3.reconfigure("prefix_search=true")
-
         # The only visible key is aaz. As long we are looking for a key that starts with either "a",
         # "aa" or "aaz", search near should return back aaz. Otherwise, search near should return
         # WT_NOTFOUND.
+        set_prefix_bound(self, cursor3, "a")
         cursor3.set_key("a")
         self.assertEqual(cursor3.search_near(), 1)
         self.assertEqual(cursor3.get_key(), self.check_key("aaz"))
 
+        set_prefix_bound(self, cursor3, "aa")
         cursor3.set_key("aa")
         self.assertEqual(cursor3.search_near(), 1)
         self.assertEqual(cursor3.get_key(), self.check_key("aaz"))
 
+        set_prefix_bound(self, cursor3, "aaz")
         cursor3.set_key("aaz")
         self.assertEqual(cursor3.search_near(), 0)
         self.assertEqual(cursor3.get_key(), self.check_key("aaz"))
 
+        set_prefix_bound(self, cursor3, "az")
         cursor3.set_key("az")
         self.assertEqual(cursor3.search_near(), wiredtiger.WT_NOTFOUND)
 
+        set_prefix_bound(self, cursor3, "b")
         cursor3.set_key("b")
         self.assertEqual(cursor3.search_near(), wiredtiger.WT_NOTFOUND)
 
@@ -153,9 +156,8 @@ class test_search_near02(wttest.WiredTigerTestCase):
         cursor3.set_key("aaz")
         self.assertEqual(cursor3.search_near(), wiredtiger.WT_NOTFOUND)
 
-        # Enable prefix search.
-        cursor3.reconfigure("prefix_search=true")
 
+        set_prefix_bound(self, cursor3, "aaz")
         cursor3.set_key("aaz")
         self.assertEqual(cursor3.search_near(), wiredtiger.WT_NOTFOUND)
 
@@ -181,30 +183,32 @@ class test_search_near02(wttest.WiredTigerTestCase):
         self.assertEqual(cursor3.search_near(), -1)
         self.assertEqual(cursor3.get_key(), self.check_key("aazab"))
 
-        # Enable prefix search.
-        cursor3.reconfigure("prefix_search=true")
-
         # Search near for a, should return the closest visible key with a matching prefix: aaa.
+        set_prefix_bound(self, cursor3, "a")
         cursor3.set_key("a")
         self.assertEqual(cursor3.search_near(), 1)
         self.assertEqual(cursor3.get_key(), self.check_key("aaa"))
 
         # Search near for aa, should return the closest visible key with a matching prefix: aaa.
+        set_prefix_bound(self, cursor3, "aa")
         cursor3.set_key("aa")
         self.assertEqual(cursor3.search_near(), 1)
         self.assertEqual(cursor3.get_key(), self.check_key("aaa"))
 
         # Search near for aaz, should return the existing visible key with a matching prefix: aaz.
+        set_prefix_bound(self, cursor3, "aaz")
         cursor3.set_key("aaz")
         self.assertEqual(cursor3.search_near(), 0)
         self.assertEqual(cursor3.get_key(), self.check_key("aaz"))
 
         # Search near for aaza, should return the closest visible key with a matching prefix: aazab.
+        set_prefix_bound(self, cursor3, "aaza")
         cursor3.set_key("aaza")
         self.assertEqual(cursor3.search_near(), 1)
         self.assertEqual(cursor3.get_key(), self.check_key("aazab"))
 
         # Search near for az, no keys match the prefix, hence search_near returns WT_NOTFOUND.
+        set_prefix_bound(self, cursor3, "az")
         cursor3.set_key("az")
         self.assertEqual(cursor3.search_near(), wiredtiger.WT_NOTFOUND)
         cursor3.close()

@@ -27,13 +27,14 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import wiredtiger, wttest
+import wiredtiger, wttest, unittest
 from wiredtiger import stat
+from wtbound import set_prefix_bound
 
-# test_search_near01.py
-# Test various prefix search near scenarios.
-# FIXME-WT-9142 Remove once prefix search near is deprecated.
-class test_search_near01(wttest.WiredTigerTestCase):
+# test_cursor_bound11.py
+# Test various cursor bound prefix search scenarios.
+# This test has been migrated to use the bounded cursor logic.
+class test_cursor_bound11(wttest.WiredTigerTestCase):
     conn_config = 'statistics=(all)'
 
     def get_stat(self, stat, local_session = None):
@@ -93,51 +94,49 @@ class test_search_near01(wttest.WiredTigerTestCase):
         cursor2.set_key('aa')
         cursor2.search_near()
 
-        skip_count = self.get_stat(stat.conn.cursor_next_skip_lt_100)
-        # This should be equal to roughly key_count * 2 as we're going to traverse the whole
-        # range forward, and then the whole range backwards.
-        self.assertGreater(skip_count, key_count * 2)
+        skip_count = self.get_stat(stat.conn.cursor_next_skip_total)
+        # This should be equal to key_count - 1 as we're going to traverse the whole
+        # range forward from "aa".
+        self.assertEqual(skip_count, key_count - 1)
 
-        cursor2.reconfigure("prefix_search=true")
+        set_prefix_bound(self, cursor2, 'aa')
         cursor2.set_key('aa')
         self.assertEqual(cursor2.search_near(), wiredtiger.WT_NOTFOUND)
 
-        prefix_skip_count = self.get_stat(stat.conn.cursor_next_skip_lt_100)
-        # We should've skipped ~26 here as we're only looking at the "aa" range.
-        self.assertGreaterEqual(prefix_skip_count - skip_count, 26)
-        skip_count = prefix_skip_count
+        bound_skip_count = self.get_stat(stat.conn.cursor_next_skip_total)
+        # We should've skipped 26 - 1 here as we're only looking at the "aa" range starting from "aa".
+        self.assertGreaterEqual(bound_skip_count - skip_count, 25)
+        skip_count = bound_skip_count
 
-        # The prefix code will have come into play at once as we walked to "aba". The prev
+        # The bounded cursor logic will have come into play at once as we walked to "aba". The prev
         # traversal will go off the end of the file and as such we don't expect it to increment
         # this statistic again.
-        self.assertEqual(self.get_stat(stat.conn.cursor_search_near_prefix_fast_paths), 1)
+        self.assertEqual(self.get_stat(stat.conn.cursor_bounds_next_early_exit), 1)
 
         # Search for a key not at the start.
+        set_prefix_bound(self, cursor2, 'bb')
         cursor2.set_key('bb')
         self.assertEqual(cursor2.search_near(), wiredtiger.WT_NOTFOUND)
 
         # Assert it to have only incremented the skipped statistic ~26 times.
-        prefix_skip_count = self.get_stat(stat.conn.cursor_next_skip_lt_100)
-        self.assertGreaterEqual(prefix_skip_count - skip_count, 26)
-        skip_count = prefix_skip_count
+        bound_skip_count = self.get_stat(stat.conn.cursor_next_skip_total)
+        self.assertGreaterEqual(bound_skip_count - skip_count, 26)
+        skip_count = bound_skip_count
 
-        # Here we should have hit the prefix fast path code twice, as we have called prefix
-        # search near twice, both of which should have early exited when going forwards.
-        self.assertEqual(self.get_stat(stat.conn.cursor_search_near_prefix_fast_paths), 2)
+        # Here we should hit the bounded cursor fast path an additional time.
+        self.assertEqual(self.get_stat(stat.conn.cursor_bounds_next_early_exit), 2)
 
         cursor2.close()
         cursor2 = session2.open_cursor(uri)
-        cursor2.set_key('bb')
+        cursor2.set_key('aa')
         cursor2.search_near()
         # Assert that we've incremented the stat key_count times, as we closed the cursor and
         # reopened it.
         #
         # This validates cursor caching logic, as if we don't clear the flag correctly this will
         # fail.
-        #
-        # It should be closer to key_count * 2 but this an approximation.
-        prefix_skip_count = self.get_stat(stat.conn.cursor_next_skip_lt_100)
-        self.assertGreaterEqual(prefix_skip_count - skip_count, key_count)
+        bound_skip_count = self.get_stat(stat.conn.cursor_next_skip_total)
+        self.assertGreaterEqual(bound_skip_count - skip_count, key_count - 1)
 
     # This test aims to simulate a unique index insertion.
     def test_unique_index_case(self):
@@ -192,29 +191,28 @@ class test_search_near01(wttest.WiredTigerTestCase):
         cursor2.set_key('cc')
         cursor2.search_near()
 
-        skip_count = self.get_stat(stat.conn.cursor_next_skip_lt_100)
+        skip_count = self.get_stat(stat.conn.cursor_next_skip_total)
         # This should be slightly greater than key_count as we're going to traverse most of the
         # range forwards.
         self.assertGreater(skip_count, key_count)
-        self.assertEqual(self.get_stat(stat.conn.cursor_search_near_prefix_fast_paths), 0)
+        self.assertEqual(self.get_stat(stat.conn.cursor_bounds_next_early_exit), 0)
 
-        cursor2.reconfigure("prefix_search=true")
+        set_prefix_bound(self, cursor2, 'cc')
         cursor2.set_key('cc')
         self.assertEqual(cursor2.search_near(), wiredtiger.WT_NOTFOUND)
-        self.assertEqual(self.get_stat(stat.conn.cursor_search_near_prefix_fast_paths), 1)
+        self.assertEqual(self.get_stat(stat.conn.cursor_bounds_next_early_exit), 1)
 
         # This still isn't visible to our older reader and as such we expect this statistic to
         # increment again.
         self.unique_insert(cursor2, 'cc', cc_id, keys)
-        self.assertEqual(self.get_stat(stat.conn.cursor_search_near_prefix_fast_paths), 2)
+        self.assertEqual(self.get_stat(stat.conn.cursor_bounds_next_early_exit), 2)
 
-    # In order for prefix key fast pathing to work we rely on some guarantees provided by row
+    # In order for cursor bound fast pathing to work we rely on some guarantees provided by row
     # search. Test some of the guarantees.
     def test_row_search(self):
         uri = 'table:test_row_search'
         self.session.create(uri, 'key_format=u,value_format=u')
         cursor = self.session.open_cursor(uri)
-        expect_count = self.get_stat(stat.conn.cursor_next_skip_lt_100)
         session2 = self.conn.open_session()
         l = "abcdefghijklmnopqrstuvwxyz"
         # Insert keys a -> z, except c
@@ -232,15 +230,13 @@ class test_search_near01(wttest.WiredTigerTestCase):
         cursor['cc'] = 'cc'
         cursor['ccc'] = 'ccc'
         self.session.commit_transaction()
-        # Search_near for 'c' and assert we skip 3 entries. Internally the row search is landing on
-        # 'c'.
+        # Search_near for 'c' and assert we skip 2 entries.
         cursor2 = session2.open_cursor(uri)
         cursor2.set_key('c')
         cursor2.search_near()
-
-        expect_count += 1
-        skip_count = self.get_stat(stat.conn.cursor_next_skip_lt_100)
-        self.assertEqual(skip_count, expect_count)
+        skip_count = self.get_stat(stat.conn.cursor_next_skip_total)
+        # We are positioning on 'c' and skipping over 'cc' and 'ccc'.
+        self.assertEqual(skip_count, 2)
         session2.commit_transaction()
 
         # Perform an insertion and removal of a key next to another key, then search for the
@@ -257,9 +253,9 @@ class test_search_near01(wttest.WiredTigerTestCase):
         cursor.set_key('dd')
         cursor.search_near()
         self.session.commit_transaction()
-        expect_count += 1
-        skip_count = self.get_stat(stat.conn.cursor_next_skip_lt_100)
-        self.assertEqual(skip_count, expect_count)
+        # We aren't skipping any entries as we position on 'dd' and walk once to 'ddd'.
+        new_skip_count = self.get_stat(stat.conn.cursor_next_skip_total)
+        self.assertEqual(new_skip_count - skip_count, 0)
 
     # Test a basic prepared scenario.
     def test_prepared(self):
@@ -271,22 +267,22 @@ class test_search_near01(wttest.WiredTigerTestCase):
         # Insert an update without timestamp
         l = "abcdefghijklmnopqrstuvwxyz"
         session2.begin_transaction()
-
-        key_count = 26*26
+        key_count = 0
 
         # Insert 'cc'
         self.session.begin_transaction()
         cursor['cc'] = 'cc'
         self.session.commit_transaction()
 
-        # Prepare keys aa -> zz
+        # Prepare keys aa -> zz but not 'cX'
         self.session.begin_transaction()
         for i in range (0, 26):
             if (i == 2):
                 continue
             for j in range (0, 26):
                 cursor[l[i] + l[j]] = l[i] + l[j]
-
+                key_count += 1
+        cursor.reset()
         self.session.prepare_transaction('prepare_timestamp=2')
 
         # Evict the whole range.
@@ -296,41 +292,43 @@ class test_search_near01(wttest.WiredTigerTestCase):
                 cursor3.search()
                 cursor3.reset()
 
-        # Search near for the "aa" part of the range.
+        # Search near for the 'c' key. We can't see this as our txn started before 'cc' was inserted.
         cursor2 = session2.open_cursor(uri)
         cursor2.set_key('c')
         self.assertEqual(cursor2.search_near(), wiredtiger.WT_NOTFOUND)
 
-        skip_count = self.get_stat(stat.conn.cursor_next_skip_lt_100, session2)
+        skip_count = self.get_stat(stat.conn.cursor_next_skip_total, session2)
         # This should be equal to roughly key_count as we're going to traverse the whole
-        # range forwards.
-        self.assertGreater(skip_count, key_count)
+        # range forwards. Not including 'a' and 'b'.
+        self.assertGreaterEqual(skip_count, key_count - 2*26)
 
-        cursor2.reconfigure("prefix_search=true")
+        set_prefix_bound(self, cursor2, 'c')
         cursor2.set_key('c')
         self.assertEqual(cursor2.search_near(), wiredtiger.WT_NOTFOUND)
 
-        prefix_skip_count = self.get_stat(stat.conn.cursor_next_skip_lt_100, session2)
-        # We expect to traverse one entry and have a buffer to account for anomalies.
-        self.assertEqual(prefix_skip_count - skip_count, 3)
-        skip_count = prefix_skip_count
+        bound_skip_count = self.get_stat(stat.conn.cursor_next_skip_total, session2)
+        # We expect to traverse one entry, 'cc'.
+        self.assertEqual(bound_skip_count - skip_count, 1)
+        skip_count = bound_skip_count
 
         # We early exit here as "cc" is not the last key. 
-        self.assertEqual(self.get_stat(stat.conn.cursor_search_near_prefix_fast_paths, session2), 1)
+        self.assertEqual(self.get_stat(stat.conn.cursor_bounds_next_early_exit, session2), 1)
 
         session2.rollback_transaction()
         session2.begin_transaction('ignore_prepare=true')
         cursor4 = session2.open_cursor(uri)
-        cursor4.reconfigure("prefix_search=true")
+        set_prefix_bound(self, cursor4, 'c')
         cursor4.set_key('c')
         self.assertEqual(cursor4.search_near(), 1)
-        prefix_skip_count = self.get_stat(stat.conn.cursor_next_skip_lt_100, session2)
-        # We expect to traverse one entry and have a buffer to account for anomalies.
-        self.assertEqual(prefix_skip_count - skip_count, 2)
-        skip_count = prefix_skip_count
+        bound_skip_count = self.get_stat(stat.conn.cursor_next_skip_total, session2)
+        # We expect to not skip any entries and return 'cc'
+        self.assertEqual(bound_skip_count - skip_count, 0)
+        self.assertEqual(cursor4.get_key(), b'cc')
+        skip_count = bound_skip_count
 
-        cursor4.reconfigure("prefix_search=false")
+        cursor4.bound("action=clear")
         cursor4.set_key('c')
         ret = cursor4.search_near()
         self.assertTrue(ret == -1 or ret == 1)
-        self.assertEqual(self.get_stat(stat.conn.cursor_next_skip_lt_100, session2) - skip_count, 2)
+        # We expect to not skip any entries and return 'cc'
+        self.assertEqual(self.get_stat(stat.conn.cursor_next_skip_total, session2) - skip_count, 0)
