@@ -9,6 +9,7 @@
  *   no_selinux,
  *   # This test contains assertions for the hostname that operations run on.
  *   tenant_migration_incompatible,
+ *   docker_incompatible,
  * ]
  */
 
