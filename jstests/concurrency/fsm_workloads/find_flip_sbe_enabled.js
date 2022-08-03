@@ -1,8 +1,8 @@
 'use strict';
 
 /**
- * Sets the internalQueryForceClassicEngine flag to true and false, and asserts that find queries
- * using the plan cache produce the correct results.
+ * Sets the internalQueryFrameworkControl flag to "forceClassicEngine" and "trySbe", and asserts
+ * that find queries using the plan cache produce the correct results.
  *
  * @tags: [
  *     # Our test infrastructure prevents tests which use the 'setParameter' command from running in
@@ -20,10 +20,10 @@ var $config = (function() {
 
     function setup(db, collName, cluster) {
         const originalParamValue =
-            db.adminCommand({getParameter: 1, internalQueryForceClassicEngine: 1});
+            db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1});
         assertAlways.commandWorked(originalParamValue);
-        assert(originalParamValue.hasOwnProperty("internalQueryForceClassicEngine"));
-        this.originalParamValue = originalParamValue.internalQueryForceClassicEngine;
+        assert(originalParamValue.hasOwnProperty("internalQueryFrameworkControl"));
+        this.originalParamValue = originalParamValue.internalQueryFrameworkControl;
         const coll = db.getCollection(getCollectionName(collName));
         for (let i = 0; i < 10; ++i) {
             assertAlways.commandWorked(
@@ -36,13 +36,13 @@ var $config = (function() {
 
     let states = (function() {
         function setForceClassicEngineOn(db, collName) {
-            assertAlways.commandWorked(
-                db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}));
+            assertAlways.commandWorked(db.adminCommand(
+                {setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
         }
 
         function setForceClassicEngineOff(db, collName) {
             assertAlways.commandWorked(
-                db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}));
+                db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
         }
 
         function runQueriesAndCheckResults(db, collName) {
@@ -126,7 +126,7 @@ var $config = (function() {
         const setParam = this.originalParamValue;
         cluster.executeOnMongodNodes(function(db) {
             assertAlways.commandWorked(
-                db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: setParam}));
+                db.adminCommand({setParameter: 1, internalQueryFrameworkControl: setParam}));
         });
     }
 

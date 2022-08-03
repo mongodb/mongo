@@ -29,6 +29,7 @@
 
 #include "mongo/db/commands/cqf/cqf_command_utils.h"
 
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/exec/add_fields_projection_executor.h"
 #include "mongo/db/exec/exclusion_projection_executor.h"
 #include "mongo/db/exec/inclusion_projection_executor.h"
@@ -632,28 +633,31 @@ bool isEligibleCommon(const RequestType& request,
         !storageGlobalParams.noTableScan.load();
 }
 
-boost::optional<bool> shouldForceBonsai() {
-    // Without the feature flag set, nothing else matters.
+boost::optional<bool> shouldForceEligibility() {
+    // Without the feature flag set, no queries are eligible for Bonsai.
     if (!serverGlobalParams.featureCompatibility.isVersionInitialized() ||
         !feature_flags::gFeatureFlagCommonQueryFramework.isEnabled(
             serverGlobalParams.featureCompatibility)) {
         return false;
     }
 
-    // The "force classic" flag takes precedence over the others.
-    if (internalQueryForceClassicEngine.load()) {
-        return false;
+    auto queryControl = ServerParameterSet::getNodeParameterSet()->get<QueryFrameworkControl>(
+        "internalQueryFrameworkControl");
+
+    switch (queryControl->_data.get()) {
+        case QueryFrameworkControlEnum::kForceClassicEngine:
+        case QueryFrameworkControlEnum::kTrySbeEngine:
+            return false;
+        case QueryFrameworkControlEnum::kTryBonsai:
+            // Return boost::none to indicate that we should not force eligibility of bonsai nor the
+            // classic engine.
+            return boost::none;
+        case QueryFrameworkControlEnum::kForceBonsai:
+            // This option is only supported with test commands enabled.
+            return getTestCommandsEnabled();
     }
 
-    if (internalQueryForceCommonQueryFramework.load()) {
-        return true;
-    }
-
-    if (!internalQueryEnableCascadesOptimizer.load()) {
-        return false;
-    }
-
-    return boost::none;
+    MONGO_UNREACHABLE;
 }
 
 }  // namespace
@@ -662,7 +666,7 @@ bool isEligibleForBonsai(const AggregateCommandRequest& request,
                          const Pipeline& pipeline,
                          OperationContext* opCtx,
                          const CollectionPtr& collection) {
-    if (auto forceBonsai = shouldForceBonsai(); forceBonsai.has_value()) {
+    if (auto forceBonsai = shouldForceEligibility(); forceBonsai.has_value()) {
         return *forceBonsai;
     }
 
@@ -693,7 +697,7 @@ bool isEligibleForBonsai(const AggregateCommandRequest& request,
 bool isEligibleForBonsai(const CanonicalQuery& cq,
                          OperationContext* opCtx,
                          const CollectionPtr& collection) {
-    if (auto forceBonsai = shouldForceBonsai(); forceBonsai.has_value()) {
+    if (auto forceBonsai = shouldForceEligibility(); forceBonsai.has_value()) {
         return *forceBonsai;
     }
 

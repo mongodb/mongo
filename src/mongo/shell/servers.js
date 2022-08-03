@@ -701,7 +701,6 @@ MongoRunner.mongodOptions = function(opts = {}) {
         opts, "enableDefaultWriteConcernUpdatesForInitiate", "5.0.0");
     _removeSetParameterIfBeforeVersion(opts, "enableReconfigRollbackCommittedWritesCheck", "5.0.0");
     _removeSetParameterIfBeforeVersion(opts, "featureFlagRetryableFindAndModify", "5.0.0");
-    _removeSetParameterIfBeforeVersion(opts, "internalQueryForceClassicEngine", "5.1.0");
     _removeSetParameterIfBeforeVersion(opts, "allowMultipleArbiters", "5.3.0");
 
     if (!opts.logFile && opts.useLogFiles) {

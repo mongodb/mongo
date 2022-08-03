@@ -42,12 +42,12 @@ function checkSBEEnabled(theDB, featureFlags = [], checkAllNodes = false) {
 
                 const getParam = conn.adminCommand({
                     getParameter: 1,
-                    internalQueryForceClassicEngine: 1,
+                    internalQueryFrameworkControl: 1,
                 });
 
-                if (!getParam.hasOwnProperty("internalQueryForceClassicEngine") ||
-                    getParam.internalQueryForceClassicEngine) {
-                    checkResult = false;
+                if (getParam.hasOwnProperty("internalQueryFrameworkControl") &&
+                    getParam.internalQueryFrameworkControl != "forceClassicEngine") {
+                    checkResult = true;
                 }
 
                 featureFlags.forEach(function(featureFlag) {
@@ -121,16 +121,16 @@ function checkBothEnginesAreRunOnCluster(theDB) {
 
                 const getParam = conn.adminCommand({
                     getParameter: 1,
-                    internalQueryForceClassicEngine: 1,
+                    internalQueryFrameworkControl: 1,
                     internalQueryEnableSlotBasedExecutionEngine: 1,
                     featureFlagSbeFull: 1,
                 });
 
-                if (getParam.hasOwnProperty("internalQueryForceClassicEngine")) {
+                if (getParam.hasOwnProperty("internalQueryFrameworkControl")) {
                     // We say SBE is fully enabled if the engine is on and either
                     // 'featureFlagSbeFull' doesn't exist on the targeted server, or it exists and
                     // is set to true.
-                    if (!getParam.internalQueryForceClassicEngine &&
+                    if (getParam.internalQueryFrameworkControl != "forceClassicEngine" &&
                         (!getParam.hasOwnProperty("featureFlagSbeFull") ||
                          getParam.featureFlagSbeFull.value)) {
                         engineMap.sbe++;

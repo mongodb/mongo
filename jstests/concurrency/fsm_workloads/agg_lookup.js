@@ -72,10 +72,9 @@ var $config = (function() {
         assertWhenOwnColl.eq(this.numDocs, res.nInserted);
         assertWhenOwnColl.eq(this.numDocs, db[collName].find().itcount());
 
-        const getParam = db.adminCommand({getParameter: 1, internalQueryForceClassicEngine: 1});
-        const isLookupPushdownEnabled =
-            getParam.hasOwnProperty("internalQueryForceClassicEngine") &&
-            !getParam.internalQueryForceClassicEngine.value;
+        const getParam = db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1});
+        const isLookupPushdownEnabled = getParam.hasOwnProperty("internalQueryFrameworkControl") &&
+            getParam.internalQueryFrameworkControl.value != "forceClassicEngine";
 
         this.allowDiskUse = true;
         // If $lookup pushdown into SBE is enabled, we select a random join algorithm to use and

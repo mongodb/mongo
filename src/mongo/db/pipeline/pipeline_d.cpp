@@ -117,12 +117,12 @@ namespace {
  * pipeline to prepare for pushdown of $group and $lookup into the inner query layer so that it
  * can be executed using SBE.
  * Group stages are extracted from the pipeline when all of the following conditions are met:
- *    - When the 'internalQueryForceClassicEngine' feature flag is 'false'.
+ *    - When the 'internalQueryFrameworkControl' is not set to "forceClassicEngine".
  *    - When the 'internalQuerySlotBasedExecutionDisableGroupPushdown' query knob is 'false'.
  *    - When the DocumentSourceGroup has 'doingMerge=false'.
  *
  * Lookup stages are extracted from the pipeline when all of the following conditions are met:
- *    - When the 'internalQueryForceClassicEngine' feature flag is 'false'.
+ *    - When the 'internalQueryFrameworkControl' is not set to "forceClassicEngine".
  *    - When the 'internalQuerySlotBasedExecutionDisableLookupPushdown' query knob is 'false'.
  *    - The $lookup uses only the 'localField'/'foreignField' syntax (no pipelines).
  *    - The foreign collection is neither sharded nor a view.
