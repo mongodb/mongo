@@ -43,11 +43,10 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-REGISTER_DOCUMENT_SOURCE_WITH_MIN_VERSION(listCatalog,
-                                          DocumentSourceListCatalog::LiteParsed::parse,
-                                          DocumentSourceListCatalog::createFromBson,
-                                          AllowedWithApiStrict::kNeverInVersion1,
-                                          multiversion::FeatureCompatibilityVersion::kVersion_6_0);
+REGISTER_DOCUMENT_SOURCE(listCatalog,
+                         DocumentSourceListCatalog::LiteParsed::parse,
+                         DocumentSourceListCatalog::createFromBson,
+                         AllowedWithApiStrict::kNeverInVersion1);
 
 const char* DocumentSourceListCatalog::getSourceName() const {
     return kStageName.rawData();

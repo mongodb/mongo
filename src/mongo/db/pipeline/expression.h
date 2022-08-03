@@ -90,16 +90,16 @@ class DocumentSource;
 /**
  * Registers a Parser so it can be called from parseExpression and friends. Use this version if your
  * expression can only be persisted to a catalog data structure in a feature compatibility version
- * >= X.
+ * that enables the featureFlag.
  *
  * As an example, if your expression looks like {"$foo": [1,2,3]}, and can only be used in a feature
- * compatibility version >= X, you would add this line:
- * REGISTER_EXPRESSION_WITH_MIN_VERSION(
+ * compatibility version that enables featureFlag, you would add this line:
+ * REGISTER_EXPRESSION_WITH_FEATURE_FLAG(
  *  foo,
  *  ExpressionFoo::parse,
  *  AllowedWithApiStrict::kNeverInVersion1,
  *  AllowedWithClientType::kAny,
- *  X);
+ *  featureFlag);
  *
  * Generally new language features should be excluded from the stable API for a stabilization period
  * to allow for incorporating feedback or fixing accidental semantics bugs.
@@ -108,21 +108,25 @@ class DocumentSource;
  * parser and enforce the 'sometimes' behavior during that invocation. No extra validation will be
  * done here.
  */
-#define REGISTER_EXPRESSION_WITH_MIN_VERSION(                                               \
-    key, parser, allowedWithApiStrict, allowedClientType, minVersion)                       \
-    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,                               \
-                              ("BeginExpressionRegistration"),                              \
-                              ("EndExpressionRegistration"))                                \
-    (InitializerContext*) {                                                                 \
-        Expression::registerExpression(                                                     \
-            "$" #key, (parser), (allowedWithApiStrict), (allowedClientType), (minVersion)); \
+#define REGISTER_EXPRESSION_WITH_FEATURE_FLAG(                                               \
+    key, parser, allowedWithApiStrict, allowedClientType, featureFlag)                       \
+    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,                                \
+                              ("BeginExpressionRegistration"),                               \
+                              ("EndExpressionRegistration"))                                 \
+    (InitializerContext*) {                                                                  \
+        if (boost::optional<FeatureFlag>(featureFlag) != boost::none &&                      \
+            !boost::optional<FeatureFlag>(featureFlag)->isEnabledAndIgnoreFCV()) {           \
+            return;                                                                          \
+        }                                                                                    \
+        Expression::registerExpression(                                                      \
+            "$" #key, (parser), (allowedWithApiStrict), (allowedClientType), (featureFlag)); \
     }
 
 /**
  * Registers a Parser only if test commands are enabled. Use this if your expression is only used
  * for testing purposes.
  */
-#define REGISTER_TEST_EXPRESSION(key, allowedWithApiStrict, allowedClientType, parser)       \
+#define REGISTER_TEST_EXPRESSION(key, parser, allowedWithApiStrict, allowedClientType)       \
     MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,                                \
                               ("BeginExpressionRegistration"),                               \
                               ("EndExpressionRegistration"))                                 \
@@ -133,10 +137,9 @@ class DocumentSource;
         Expression::registerExpression(                                                      \
             "$" #key, (parser), (allowedWithApiStrict), (allowedClientType), (boost::none)); \
     }
-
 /**
- * Like REGISTER_EXPRESSION_WITH_MIN_VERSION, except you can also specify a condition,
- * evaluated during startup, that decides whether to register the parser.
+ * You can specify a condition, evaluated during startup,
+ * that decides whether to register the parser.
  *
  * For example, you could check a feature flag, and register the parser only when it's enabled.
  *
@@ -146,17 +149,19 @@ class DocumentSource;
  *
  * This is the most general REGISTER_EXPRESSION* macro, which all others should delegate to.
  */
-#define REGISTER_EXPRESSION_CONDITIONALLY(                                                  \
-    key, parser, allowedWithApiStrict, allowedClientType, minVersion, ...)                  \
-    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,                               \
-                              ("BeginExpressionRegistration"),                              \
-                              ("EndExpressionRegistration"))                                \
-    (InitializerContext*) {                                                                 \
-        if (!(__VA_ARGS__)) {                                                               \
-            return;                                                                         \
-        }                                                                                   \
-        Expression::registerExpression(                                                     \
-            "$" #key, (parser), (allowedWithApiStrict), (allowedClientType), (minVersion)); \
+#define REGISTER_EXPRESSION_CONDITIONALLY(                                                   \
+    key, parser, allowedWithApiStrict, allowedClientType, featureFlag, ...)                  \
+    MONGO_INITIALIZER_GENERAL(addToExpressionParserMap_##key,                                \
+                              ("BeginExpressionRegistration"),                               \
+                              ("EndExpressionRegistration"))                                 \
+    (InitializerContext*) {                                                                  \
+        if (!__VA_ARGS__ ||                                                                  \
+            (boost::optional<FeatureFlag>(featureFlag) != boost::none &&                     \
+             !boost::optional<FeatureFlag>(featureFlag)->isEnabledAndIgnoreFCV())) {         \
+            return;                                                                          \
+        }                                                                                    \
+        Expression::registerExpression(                                                      \
+            "$" #key, (parser), (allowedWithApiStrict), (allowedClientType), (featureFlag)); \
     }
 
 class Expression : public RefCountable {
@@ -321,12 +326,11 @@ public:
      * DO NOT call this method directly. Instead, use the REGISTER_EXPRESSION macro defined in this
      * file.
      */
-    static void registerExpression(
-        std::string key,
-        Parser parser,
-        AllowedWithApiStrict allowedWithApiStrict,
-        AllowedWithClientType allowedWithClientType,
-        boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion);
+    static void registerExpression(std::string key,
+                                   Parser parser,
+                                   AllowedWithApiStrict allowedWithApiStrict,
+                                   AllowedWithClientType allowedWithClientType,
+                                   boost::optional<FeatureFlag> featureFlag);
 
     const auto& getChildren() const {
         return _children;

@@ -95,15 +95,16 @@ intrusive_ptr<Expression> Expression::parse(BSONObj obj,
                 // be caught as invalid arguments to the Expression parser later.
                 const auto& parserRegistration = parserFCV->second;
                 const auto& parser = parserRegistration.parser;
-                const auto& fcv = parserRegistration.fcv;
+                const auto& featureFlag = parserRegistration.featureFlag;
                 uassert(ErrorCodes::QueryFeatureNotAllowed,
                         str::stream()
                             << exprName
                             << " is not allowed in the current feature compatibility version. See "
                             << feature_compatibility_version_documentation::kCompatibilityLink
                             << " for more information.",
-                        !expCtx->maxFeatureCompatibilityVersion || !fcv ||
-                            (*fcv <= *expCtx->maxFeatureCompatibilityVersion));
+                        !expCtx->maxFeatureCompatibilityVersion || !featureFlag ||
+                            featureFlag->isEnabledOnVersion(
+                                *expCtx->maxFeatureCompatibilityVersion));
 
                 auto allowedWithApi = parserRegistration.allowedWithApi;
 
@@ -147,13 +148,12 @@ intrusive_ptr<Expression> Expression::parse(BSONObj obj,
                        : ", "s + obj.firstElementFieldNameStringData()));
 }
 
-void Expression::registerParser(
-    std::string functionName,
-    Parser parser,
-    boost::optional<multiversion::FeatureCompatibilityVersion> requiredMinVersion,
-    AllowedWithApiStrict allowedWithApi) {
+void Expression::registerParser(std::string functionName,
+                                Parser parser,
+                                boost::optional<FeatureFlag> featureFlag,
+                                AllowedWithApiStrict allowedWithApi) {
     invariant(parserMap.find(functionName) == parserMap.end());
-    ExpressionParserRegistration r{parser, requiredMinVersion, allowedWithApi};
+    ExpressionParserRegistration r{parser, featureFlag, allowedWithApi};
     operatorCountersWindowAccumulatorExpressions.addCounter(functionName);
     parserMap.emplace(std::move(functionName), std::move(r));
 }
