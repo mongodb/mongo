@@ -85,11 +85,10 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const NamespaceString nss(parseNs({boost::none, dbname}, cmdObj));
-
+        const NamespaceString nss(parseNs(dbName, cmdObj));
         const auto catalogCache = Grid::get(opCtx)->catalogCache();
 
         if (nss.coll().empty()) {

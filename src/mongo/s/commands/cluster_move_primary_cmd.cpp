@@ -91,12 +91,11 @@ public:
     }
 
     virtual bool run(OperationContext* opCtx,
-                     const std::string& dbname,
+                     const DatabaseName& dbName,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         auto request = MovePrimary::parse(IDLParserContext("MovePrimary"), cmdObj);
-
-        const string db = parseNs({boost::none, ""}, cmdObj).dbName().db();
+        const string db = parseNs(dbName, cmdObj).dbName().db();
         const StringData toShard(request.getTo());
 
         // Invalidate the routing table cache entry for this database so that we reload the

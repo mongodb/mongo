@@ -191,10 +191,10 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbName,
+             const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const NamespaceString nss(parseNs({boost::none, dbName}, cmdObj));
+        const NamespaceString nss(parseNs(dbName, cmdObj));
 
         const auto targeter = ChunkManagerTargeter(opCtx, nss);
         const auto cm = targeter.getRoutingInfo();

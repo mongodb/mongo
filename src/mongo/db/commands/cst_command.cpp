@@ -72,7 +72,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
 
@@ -87,7 +87,7 @@ public:
         }
         result.append("cst", BSONArray(pipelineCst.toBson()));
 
-        auto nss = NamespaceString{dbname, ""};
+        auto nss = NamespaceString{dbName, ""};
         auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr /*collator*/, nss);
         auto pipeline = cst_pipeline_translation::translatePipeline(pipelineCst, expCtx);
         result.append("ds", pipeline->serializeToBson());

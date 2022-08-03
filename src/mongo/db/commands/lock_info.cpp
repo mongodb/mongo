@@ -75,7 +75,7 @@ public:
     CmdLockInfo() : BasicCommand("lockInfo") {}
 
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName&,
              const BSONObj& jsobj,
              BSONObjBuilder& result) {
         auto lockToClientMap = LockManager::getLockToClientMap(opCtx->getServiceContext());

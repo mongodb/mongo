@@ -83,7 +83,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& unusedDbName,
+             const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         uassert(ErrorCodes::IllegalOperation,
@@ -96,7 +96,7 @@ public:
 
         CommandHelpers::uassertCommandRunWithMajority(getName(), opCtx->getWriteConcern());
 
-        const NamespaceString nss{parseNs({boost::none, unusedDbName}, cmdObj)};
+        const NamespaceString nss{parseNs(dbName, cmdObj)};
 
         auto currentTime = VectorClock::get(opCtx)->getTime();
         auto validAfter = currentTime.configTime().asTimestamp();

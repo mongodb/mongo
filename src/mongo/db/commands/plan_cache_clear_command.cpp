@@ -142,7 +142,7 @@ public:
     PlanCacheClearCommand() : BasicCommand("planCacheClear") {}
 
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override;
 
@@ -177,10 +177,10 @@ Status PlanCacheClearCommand::checkAuthForCommand(Client* client,
 }
 
 bool PlanCacheClearCommand::run(OperationContext* opCtx,
-                                const std::string& dbname,
+                                const DatabaseName& dbName,
                                 const BSONObj& cmdObj,
                                 BSONObjBuilder& result) {
-    const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
+    const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
 
     // This is a read lock. The query cache is owned by the collection.
     AutoGetCollectionForReadCommand ctx(opCtx, nss);

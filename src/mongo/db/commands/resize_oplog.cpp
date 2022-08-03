@@ -79,7 +79,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName&,
              const BSONObj& jsobj,
              BSONObjBuilder& result) {
         AutoGetCollection coll(opCtx, NamespaceString::kRsOplogNamespace, MODE_X);

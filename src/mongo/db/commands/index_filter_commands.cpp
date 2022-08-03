@@ -88,10 +88,10 @@ IndexFilterCommand::IndexFilterCommand(const string& name, const string& helpTex
     : BasicCommand(name), helpText(helpText) {}
 
 bool IndexFilterCommand::run(OperationContext* opCtx,
-                             const string& dbname,
+                             const DatabaseName& dbName,
                              const BSONObj& cmdObj,
                              BSONObjBuilder& result) {
-    const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
+    const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
     AutoGetCollectionForReadCommand ctx(opCtx, nss);
     uassertStatusOK(runIndexFilterCommand(opCtx, ctx.getCollection(), cmdObj, &result));
     return true;

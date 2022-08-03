@@ -83,13 +83,13 @@ public:
     }
 
     virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
+                     const DatabaseName& dbName,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
 
         auto shardResponses = scatterGatherUnversionedTargetAllShards(
             opCtx,
-            dbname,
+            dbName.toStringWithTenantId(),
             applyReadWriteConcern(
                 opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             ReadPreferenceSetting::get(opCtx),

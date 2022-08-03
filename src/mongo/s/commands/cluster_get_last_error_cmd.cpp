@@ -61,7 +61,7 @@ public:
         return false;
     }
 
-    virtual bool run(OperationContext*, const std::string&, const BSONObj&, BSONObjBuilder&) {
+    virtual bool run(OperationContext*, const DatabaseName&, const BSONObj&, BSONObjBuilder&) {
         uasserted(5739001, "getLastError command is not supported");
         return false;
     }

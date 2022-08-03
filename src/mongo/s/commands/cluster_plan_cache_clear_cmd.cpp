@@ -87,13 +87,13 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result);
 } clusterPlanCacheClearCmd;
 
 bool ClusterPlanCacheClearCmd::run(OperationContext* opCtx,
-                                   const std::string& dbName,
+                                   const DatabaseName& dbName,
                                    const BSONObj& cmdObj,
                                    BSONObjBuilder& result) {
     const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));

@@ -103,6 +103,10 @@ public:
         return false;
     }
 
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
     ReadConcernSupportResult supportsReadConcern(const BSONObj& cmdObj,
                                                  repl::ReadConcernLevel level,
                                                  bool isImplicitDefault) const override {
@@ -224,7 +228,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
@@ -232,7 +236,7 @@ public:
         // of a view, the locks need to be released.
         boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
         ctx.emplace(opCtx,
-                    CommandHelpers::parseNsOrUUID({boost::none, dbname}, cmdObj),
+                    CommandHelpers::parseNsOrUUID(dbName, cmdObj),
                     AutoGetCollectionViewMode::kViewsPermitted);
         const auto& nss = ctx->getNss();
 
@@ -257,7 +261,8 @@ public:
             uassertStatusOK(viewAggregation.getStatus());
 
             BSONObj aggResult = CommandHelpers::runCommandDirectly(
-                opCtx, OpMsgRequest::fromDBAndBody(dbname, std::move(viewAggregation.getValue())));
+                opCtx,
+                OpMsgRequest::fromDBAndBody(dbName.db(), std::move(viewAggregation.getValue())));
 
             uassertStatusOK(ViewResponseFormatter(aggResult).appendAsCountResponse(&result));
             return true;

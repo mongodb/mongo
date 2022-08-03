@@ -181,11 +181,11 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbName,
+             const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
-        const NamespaceString nss(parseNs({boost::none, dbName}, cmdObj));
+        const NamespaceString nss(parseNs(dbName, cmdObj));
 
         auto parsedDistinctCmd =
             ParsedDistinct::parse(opCtx, nss, cmdObj, ExtensionsCallbackNoop(), false);
@@ -249,7 +249,7 @@ public:
             }
 
             BSONObj aggResult = CommandHelpers::runCommandDirectly(
-                opCtx, OpMsgRequest::fromDBAndBody(dbName, std::move(resolvedAggCmd)));
+                opCtx, OpMsgRequest::fromDBAndBody(dbName.db(), std::move(resolvedAggCmd)));
 
             ViewResponseFormatter formatter(aggResult);
             auto formatStatus = formatter.appendAsDistinctResponse(&result);

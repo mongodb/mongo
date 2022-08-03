@@ -83,10 +83,10 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const NamespaceString nss(parseNs({boost::none, dbname}, cmdObj));
+        const NamespaceString nss(parseNs(dbName, cmdObj));
 
         uassert(5731501,
                 "Sharding a buckets collection is not allowed",

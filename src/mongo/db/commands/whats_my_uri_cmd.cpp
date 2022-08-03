@@ -60,7 +60,7 @@ public:
                                std::vector<Privilege>* out) const override {}  // No auth required
 
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         result << "you" << opCtx->getClient()->clientAddress(true /*includePort*/);

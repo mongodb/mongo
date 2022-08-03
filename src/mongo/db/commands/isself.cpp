@@ -61,7 +61,7 @@ public:
                                const BSONObj& cmdObj,
                                std::vector<Privilege>* out) const override {}
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         result.append("id", repl::instanceId);

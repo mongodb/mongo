@@ -68,7 +68,7 @@ Status ProfileCmdBase::checkAuthForCommand(Client* client,
 }
 
 bool ProfileCmdBase::run(OperationContext* opCtx,
-                         const std::string& dbName,
+                         const DatabaseName& dbName,
                          const BSONObj& cmdObj,
                          BSONObjBuilder& result) {
     auto request = ProfileCmdRequest::parse(IDLParserContext("profile"), cmdObj);
@@ -81,11 +81,9 @@ bool ProfileCmdBase::run(OperationContext* opCtx,
                 *sampleRate >= 0.0 && *sampleRate <= 1.0);
     }
 
-    // TODO SERVER-67459: For _applyProfilingLevel, takes the passed in "const DatabaseName& dbName"
-    // directly.
     // Delegate to _applyProfilingLevel to set the profiling level appropriately whether
     // we are on mongoD or mongoS.
-    auto oldSettings = _applyProfilingLevel(opCtx, {boost::none, dbName}, request);
+    auto oldSettings = _applyProfilingLevel(opCtx, dbName, request);
     auto oldSlowMS = serverGlobalParams.slowMS;
     auto oldSampleRate = serverGlobalParams.sampleRate;
 
@@ -124,14 +122,10 @@ bool ProfileCmdBase::run(OperationContext* opCtx,
         }
         attrs.add("from", oldState.obj());
 
-        // TODO SERVER-67459: For getDatabaseProfileSettings, takes the passed in "const
-        // DatabaseName& dbName" directly.
-
         // newSettings.level may differ from profilingLevel: profilingLevel is part of the request,
         // and if the request specifies {profile: -1, ...} then we want to show the unchanged value
         // (0, 1, or 2).
-        auto newSettings =
-            CollectionCatalog::get(opCtx)->getDatabaseProfileSettings({boost::none, dbName});
+        auto newSettings = CollectionCatalog::get(opCtx)->getDatabaseProfileSettings(dbName);
         newState.append("level"_sd, newSettings.level);
         newState.append("slowms"_sd, serverGlobalParams.slowMS);
         newState.append("sampleRate"_sd, serverGlobalParams.sampleRate);

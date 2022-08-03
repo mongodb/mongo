@@ -124,7 +124,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const string& dbname,
+             const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         BSONElement argElt = cmdObj["stageDebug"];
@@ -139,7 +139,7 @@ public:
             return false;
         }
 
-        const NamespaceString nss(dbname, collElt.String());
+        const NamespaceString nss(dbName, collElt.String());
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << nss.toString() << " is not a valid namespace",
                 nss.isValid());

@@ -60,7 +60,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string&,
+             const DatabaseName&,
              const mongo::BSONObj&,
              mongo::BSONObjBuilder& result) override {
         globalConnPool.flush();

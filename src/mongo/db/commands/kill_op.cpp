@@ -53,7 +53,7 @@ namespace mongo {
 class KillOpCommand : public KillOpCmdBase {
 public:
     bool run(OperationContext* opCtx,
-             const std::string& db,
+             const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
         long long opId = KillOpCmdBase::parseOpId(cmdObj);
@@ -62,7 +62,7 @@ public:
         result.append("info", "attempting to kill op");
         LOGV2(20482, "Going to kill op: {opId}", "Going to kill op", "opId"_attr = opId);
         KillOpCmdBase::killLocalOperation(opCtx, opId);
-        reportSuccessfulCompletion(opCtx, db, cmdObj);
+        reportSuccessfulCompletion(opCtx, dbName, cmdObj);
 
         // killOp always reports success once past the auth check.
         return true;

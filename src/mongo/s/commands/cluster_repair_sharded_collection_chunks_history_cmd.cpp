@@ -90,10 +90,10 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& unusedDbName,
+             const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const NamespaceString nss{parseNs({boost::none, unusedDbName}, cmdObj)};
+        const NamespaceString nss{parseNs(dbName, cmdObj)};
 
         BSONObjBuilder cmdBuilder(
             BSON("_configsvrRepairShardedCollectionChunksHistory" << nss.ns()));

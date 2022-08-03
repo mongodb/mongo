@@ -67,7 +67,7 @@ public:
     CmdIsMaster() : BasicCommand("isMaster", "ismaster") {}
 
     virtual bool run(OperationContext* opCtx,
-                     const std::string&,
+                     const DatabaseName&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
 

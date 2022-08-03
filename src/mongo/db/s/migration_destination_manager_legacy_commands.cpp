@@ -193,7 +193,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         bool waitForSteadyOrDone = cmdObj["waitForSteadyOrDone"].boolean();
@@ -238,7 +238,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         auto const sessionId = uassertStatusOK(MigrationSessionId::extractFromBSON(cmdObj));
@@ -292,7 +292,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string&,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         auto const mdm = MigrationDestinationManager::get(opCtx);
@@ -350,7 +350,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();

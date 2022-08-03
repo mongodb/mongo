@@ -45,7 +45,7 @@
 namespace mongo {
 
 void KillOpCmdBase::reportSuccessfulCompletion(OperationContext* opCtx,
-                                               const std::string& db,
+                                               const DatabaseName& dbName,
                                                const BSONObj& cmdObj) {
 
     logv2::DynamicAttributes attr;
@@ -69,7 +69,7 @@ void KillOpCmdBase::reportSuccessfulCompletion(OperationContext* opCtx,
         }
     }
 
-    attr.add("db", db);
+    attr.add("db", dbName.db());
     attr.add("command", cmdObj);
 
     LOGV2(558700, "Successful killOp", attr);

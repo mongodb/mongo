@@ -54,7 +54,7 @@ public:
     ClusterSetDefaultRWConcernCommand() : BasicCommand("setDefaultRWConcern") {}
 
     bool run(OperationContext* opCtx,
-             const std::string& dbName,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();

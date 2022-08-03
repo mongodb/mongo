@@ -154,7 +154,7 @@ struct DbCheckCollectionInfo {
 using DbCheckRun = std::vector<DbCheckCollectionInfo>;
 
 std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
-                                                const std::string& dbName,
+                                                const DatabaseName& dbName,
                                                 const DbCheckSingleInvocation& invocation) {
     NamespaceString nss(dbName, invocation.getColl());
     AutoGetCollectionForRead agc(opCtx, nss);
@@ -192,14 +192,14 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
 }
 
 std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
-                                            const std::string& dbName,
+                                            const DatabaseName& dbName,
                                             const DbCheckAllInvocation& invocation) {
-    uassert(
-        ErrorCodes::InvalidNamespace, "Cannot run dbCheck on local database", dbName != "local");
+    uassert(ErrorCodes::InvalidNamespace,
+            "Cannot run dbCheck on local database",
+            dbName.db() != "local");
 
-    // TODO SERVER-63353 Change to use dbName directly
-    AutoGetDb agd(opCtx, DatabaseName(boost::none, dbName), MODE_IS);
-    uassert(ErrorCodes::NamespaceNotFound, "Database " + dbName + " not found", agd.getDb());
+    AutoGetDb agd(opCtx, dbName, MODE_IS);
+    uassert(ErrorCodes::NamespaceNotFound, "Database " + dbName.db() + " not found", agd.getDb());
 
     const int64_t max = std::numeric_limits<int64_t>::max();
     const auto rate = invocation.getMaxCountPerSecond();
@@ -225,9 +225,7 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
         result->push_back(info);
         return true;
     };
-    // TODO SERVER-63353: Change dbcheck command to use DatabaseName
-    mongo::catalog::forEachCollectionFromDb(
-        opCtx, DatabaseName(boost::none, dbName), MODE_IS, perCollectionWork);
+    mongo::catalog::forEachCollectionFromDb(opCtx, dbName, MODE_IS, perCollectionWork);
 
     return result;
 }
@@ -237,7 +235,7 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
  * Factory function for producing DbCheckRun's from command objects.
  */
 std::unique_ptr<DbCheckRun> getRun(OperationContext* opCtx,
-                                   const std::string& dbName,
+                                   const DatabaseName& dbName,
                                    const BSONObj& obj) {
     BSONObjBuilder builder;
 
@@ -267,7 +265,7 @@ std::unique_ptr<DbCheckRun> getRun(OperationContext* opCtx,
  */
 class DbCheckJob : public BackgroundJob {
 public:
-    DbCheckJob(const StringData& dbName, std::unique_ptr<DbCheckRun> run)
+    DbCheckJob(const DatabaseName& dbName, std::unique_ptr<DbCheckRun> run)
         : BackgroundJob(true), _done(false), _dbName(dbName.toString()), _run(std::move(run)) {}
 
 protected:
@@ -683,12 +681,12 @@ public:
     }
 
     virtual bool run(OperationContext* opCtx,
-                     const std::string& dbname,
+                     const DatabaseName& dbName,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        auto job = getRun(opCtx, dbname, cmdObj);
+        auto job = getRun(opCtx, dbName, cmdObj);
         try {
-            (new DbCheckJob(dbname, std::move(job)))->go();
+            (new DbCheckJob(dbName, std::move(job)))->go();
         } catch (const DBException& e) {
             result.append("ok", false);
             result.append("err", e.toString());

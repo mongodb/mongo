@@ -62,7 +62,7 @@ public:
     }
 
     virtual bool run(OperationContext* opCtx,
-                     const std::string& dbname,
+                     const DatabaseName&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         result << "you" << cc().getRemote().toString();

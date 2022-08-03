@@ -69,7 +69,7 @@ public:
                                const BSONObj& cmdObj) const final;
 
     bool run(OperationContext* opCtx,
-             const std::string& dbName,
+             const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final;
 

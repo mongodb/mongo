@@ -155,7 +155,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string&,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         const MigrationSessionId migrationSessionId(
@@ -222,7 +222,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string&,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         const MigrationSessionId migrationSessionId(
@@ -336,7 +336,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string&,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         const MigrationSessionId migrationSessionId(

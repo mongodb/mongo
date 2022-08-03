@@ -63,7 +63,7 @@ public:
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) const {}  // No auth required
     virtual bool run(OperationContext* txn,
-                     const string& badns,
+                     const DatabaseName&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         double cpuFactor = 1;

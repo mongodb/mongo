@@ -101,7 +101,7 @@ public:
     }
     CmdReplSetTest() : ReplSetCommand("replSetTest") {}
     virtual bool run(OperationContext* opCtx,
-                     const string&,
+                     const DatabaseName&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         LOGV2(21573,
@@ -186,7 +186,7 @@ class CmdReplSetGetRBID : public ReplSetCommand {
 public:
     CmdReplSetGetRBID() : ReplSetCommand("replSetGetRBID") {}
     virtual bool run(OperationContext* opCtx,
-                     const string&,
+                     const DatabaseName&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
@@ -206,7 +206,7 @@ public:
     }
     CmdReplSetGetConfig() : ReplSetCommand("replSetGetConfig") {}
     virtual bool run(OperationContext* opCtx,
-                     const string&,
+                     const DatabaseName&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
@@ -338,7 +338,7 @@ public:
                "http://dochub.mongodb.org/core/replicasetcommands";
     }
     virtual bool run(OperationContext* opCtx,
-                     const string&,
+                     const DatabaseName&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         BSONObj configObj;
@@ -433,7 +433,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const string&,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         const auto replCoord = ReplicationCoordinator::get(opCtx);
@@ -501,7 +501,7 @@ public:
     }
     CmdReplSetFreeze() : ReplSetCommand("replSetFreeze") {}
     virtual bool run(OperationContext* opCtx,
-                     const string&,
+                     const DatabaseName&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
@@ -536,7 +536,7 @@ public:
     CmdReplSetStepDown() : ReplSetCommand("replSetStepDown") {}
 
     virtual bool run(OperationContext* opCtx,
-                     const string&,
+                     const DatabaseName&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         const bool force = cmdObj["force"].trueValue();
@@ -616,7 +616,7 @@ public:
     }
     CmdReplSetMaintenance() : ReplSetCommand("replSetMaintenance") {}
     virtual bool run(OperationContext* opCtx,
-                     const string&,
+                     const DatabaseName&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
@@ -642,7 +642,7 @@ public:
     }
     CmdReplSetSyncFrom() : ReplSetCommand("replSetSyncFrom") {}
     virtual bool run(OperationContext* opCtx,
-                     const string&,
+                     const DatabaseName&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
@@ -667,7 +667,7 @@ class CmdReplSetUpdatePosition : public ReplSetCommand {
 public:
     CmdReplSetUpdatePosition() : ReplSetCommand("replSetUpdatePosition") {}
     virtual bool run(OperationContext* opCtx,
-                     const string&,
+                     const DatabaseName&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         auto replCoord = repl::ReplicationCoordinator::get(opCtx->getClient()->getServiceContext());
@@ -744,7 +744,7 @@ class CmdReplSetHeartbeat : public ReplSetCommand {
 public:
     CmdReplSetHeartbeat() : ReplSetCommand("replSetHeartbeat") {}
     virtual bool run(OperationContext* opCtx,
-                     const string&,
+                     const DatabaseName&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         rsDelayHeartbeatResponse.execute(
@@ -795,7 +795,7 @@ public:
     CmdReplSetStepUp() : ReplSetCommand("replSetStepUp") {}
 
     virtual bool run(OperationContext* opCtx,
-                     const string&,
+                     const DatabaseName&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);
@@ -834,7 +834,7 @@ public:
     CmdReplSetAbortPrimaryCatchUp() : ReplSetCommand("replSetAbortPrimaryCatchUp") {}
 
     virtual bool run(OperationContext* opCtx,
-                     const string&,
+                     const DatabaseName&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) override {
         Status status = ReplicationCoordinator::get(opCtx)->checkReplEnabledForCommand(&result);

@@ -274,7 +274,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& db,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
         if (MONGO_unlikely(hangInGetLog.shouldFail())) {

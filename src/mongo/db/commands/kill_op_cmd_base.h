@@ -73,7 +73,7 @@ protected:
     static unsigned int parseOpId(const BSONObj& cmdObj);
 
     static void reportSuccessfulCompletion(OperationContext* opCtx,
-                                           const std::string& db,
+                                           const DatabaseName& dbName,
                                            const BSONObj& cmdObj);
 
     /**

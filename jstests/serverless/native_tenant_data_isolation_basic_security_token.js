@@ -67,6 +67,20 @@ const tokenConn = new Mongo(mongod.host);
         assert(arrayEq(expectedColls, colls.cursor.firstBatch), tojson(colls.cursor.firstBatch));
     }
 
+    // Test count and distinct command.
+    {
+        assert.commandWorked(tokenDB.runCommand(
+            {insert: kCollName, documents: [{_id: 1, c: 1, d: 1}, {_id: 2, c: 1, d: 2}]}));
+
+        const resCount =
+            assert.commandWorked(tokenDB.runCommand({count: kCollName, query: {c: 1}}));
+        assert.eq(2, resCount.n);
+
+        const resDitinct =
+            assert.commandWorked(tokenDB.runCommand({distinct: kCollName, key: 'd', query: {}}));
+        assert.eq([1, 2], resDitinct.values.sort());
+    }
+
     // Rename the collection.
     {
         const fromName = kDbName + '.' + kCollName;
@@ -105,6 +119,14 @@ const tokenConn = new Mongo(mongod.host);
     const fadOtherUser = assert.commandWorked(
         tokenDB2.runCommand({findAndModify: kCollName, query: {b: 1}, update: {$inc: {b: 10}}}));
     assert.eq(null, fadOtherUser.value);
+
+    const countOtherUser =
+        assert.commandWorked(tokenDB2.runCommand({count: kCollName, query: {c: 1}}));
+    assert.eq(0, countOtherUser.n);
+
+    const distinctOtherUer =
+        assert.commandWorked(tokenDB2.runCommand({distinct: kCollName, key: 'd', query: {}}));
+    assert.eq([], distinctOtherUer.values);
 
     const fromName = kDbName + '.' + kCollName;
     const toName = fromName + "_renamed";

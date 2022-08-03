@@ -100,7 +100,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName&,
              const BSONObj& jsobj,
              BSONObjBuilder& result) final {
         VersionInfoInterface::instance().appendBuildInfo(&result);

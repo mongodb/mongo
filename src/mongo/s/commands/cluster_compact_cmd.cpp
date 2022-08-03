@@ -59,7 +59,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbName,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         uasserted(ErrorCodes::CommandNotSupported, "compact not allowed through mongos");

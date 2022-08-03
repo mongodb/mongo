@@ -260,7 +260,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         // Always wait for at least majority writeConcern to ensure all writes involved in the

@@ -881,7 +881,7 @@ public:
         : CommandInvocation(command),
           _command(command),
           _request(request),
-          _dbName(_request.getValidatedTenantId(), _request.getDatabase().toString()) {}
+          _dbName(_request.getValidatedTenantId(), _request.getDatabase()) {}
 
 private:
     void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
@@ -1029,11 +1029,11 @@ void Command::generateHelpResponse(OperationContext* opCtx,
 }
 
 bool ErrmsgCommandDeprecated::run(OperationContext* opCtx,
-                                  const std::string& db,
+                                  const DatabaseName& dbName,
                                   const BSONObj& cmdObj,
                                   BSONObjBuilder& result) {
     std::string errmsg;
-    auto ok = errmsgRun(opCtx, db, cmdObj, errmsg, result);
+    auto ok = errmsgRun(opCtx, dbName.toStringWithTenantId(), cmdObj, errmsg, result);
     if (!errmsg.empty()) {
         CommandHelpers::appendSimpleCommandStatus(result, ok, errmsg);
     }

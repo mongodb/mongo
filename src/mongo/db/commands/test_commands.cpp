@@ -137,10 +137,10 @@ public:
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) const {}
     virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
+                     const DatabaseName& dbName,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        const NamespaceString fullNs = CommandHelpers::parseNsCollectionRequired(dbname, cmdObj);
+        const NamespaceString fullNs = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
         if (!fullNs.isValid()) {
             uasserted(ErrorCodes::InvalidNamespace,
                       str::stream() << "collection name " << fullNs.ns() << " is not valid");
@@ -210,10 +210,10 @@ public:
                                        std::vector<Privilege>* out) const {}
 
     virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
+                     const DatabaseName& dbName,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
-        const NamespaceString nss = CommandHelpers::parseNsCollectionRequired(dbname, cmdObj);
+        const NamespaceString nss = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
 
         uassertStatusOK(emptyCapped(opCtx, nss));
         return true;
@@ -252,7 +252,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         const Timestamp requestedPinTs = cmdObj.firstElement().timestamp();

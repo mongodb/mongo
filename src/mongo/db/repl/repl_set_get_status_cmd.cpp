@@ -46,7 +46,7 @@ public:
     CmdReplSetGetStatus() : ReplSetCommand("replSetGetStatus") {}
 
     bool run(OperationContext* opCtx,
-             const std::string&,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         if (cmdObj["forShell"].trueValue())

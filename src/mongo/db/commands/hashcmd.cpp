@@ -80,7 +80,7 @@ public:
      *>  "ok" : 1 }
      **/
     bool run(OperationContext* opCtx,
-             const string& db,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         result.appendAs(cmdObj.firstElement(), "key");

@@ -81,7 +81,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& unusedDbName,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final {
         uassert(ErrorCodes::InternalError,

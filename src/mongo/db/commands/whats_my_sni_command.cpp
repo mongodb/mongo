@@ -42,7 +42,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& ns,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         auto sniName = opCtx->getClient()->getSniNameForSession();

@@ -247,10 +247,10 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName& dbName,
              const BSONObj& jsobj,
              BSONObjBuilder& result) {
-        const NamespaceString nss(parseNs({boost::none, dbname}, jsobj));
+        const NamespaceString nss(parseNs(dbName, jsobj));
 
         md5digest d;
         md5_state_t st;
@@ -283,7 +283,7 @@ public:
         BSONObj query = BSON("files_id" << jsobj["filemd5"] << "n" << GTE << n);
         BSONObj sort = BSON("files_id" << 1 << "n" << 1);
 
-        return writeConflictRetry(opCtx, "filemd5", dbname, [&] {
+        return writeConflictRetry(opCtx, "filemd5", dbName.toString(), [&] {
             auto findCommand = std::make_unique<FindCommandRequest>(nss);
             findCommand->setFilter(query.getOwned());
             findCommand->setSort(sort.getOwned());

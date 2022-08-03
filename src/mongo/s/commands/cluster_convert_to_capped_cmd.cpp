@@ -42,7 +42,7 @@ namespace mongo {
 namespace {
 
 bool nonShardedCollectionCommandPassthrough(OperationContext* opCtx,
-                                            StringData dbName,
+                                            const DatabaseName& dbName,
                                             const NamespaceString& nss,
                                             const ChunkManager& cm,
                                             const BSONObj& cmdObj,
@@ -53,8 +53,15 @@ bool nonShardedCollectionCommandPassthrough(OperationContext* opCtx,
             str::stream() << "Can't do command: " << cmdName << " on a sharded collection",
             !cm.isSharded());
 
-    auto responses = scatterGatherVersionedTargetByRoutingTable(
-        opCtx, dbName, nss, cm, cmdObj, ReadPreferenceSetting::get(opCtx), retryPolicy, {}, {});
+    auto responses = scatterGatherVersionedTargetByRoutingTable(opCtx,
+                                                                dbName.toStringWithTenantId(),
+                                                                nss,
+                                                                cm,
+                                                                cmdObj,
+                                                                ReadPreferenceSetting::get(opCtx),
+                                                                retryPolicy,
+                                                                {},
+                                                                {});
     invariant(responses.size() == 1);
 
     const auto cmdResponse = uassertStatusOK(std::move(responses.front().swResponse));
@@ -93,10 +100,10 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbName,
+             const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const NamespaceString nss(parseNs({boost::none, dbName}, cmdObj));
+        const NamespaceString nss(parseNs(dbName, cmdObj));
         const auto cm =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
         uassert(ErrorCodes::IllegalOperation,

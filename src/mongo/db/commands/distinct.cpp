@@ -139,17 +139,21 @@ public:
         return true;
     }
 
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
     Status explain(OperationContext* opCtx,
                    const OpMsgRequest& request,
                    ExplainOptions::Verbosity verbosity,
                    rpc::ReplyBuilderInterface* result) const override {
-        std::string dbname = request.getDatabase().toString();
+        const DatabaseName dbName(request.getValidatedTenantId(), request.getDatabase());
         const BSONObj& cmdObj = request.body;
         // Acquire locks. The RAII object is optional, because in the case of a view, the locks
         // need to be released.
         boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
         ctx.emplace(opCtx,
-                    CommandHelpers::parseNsCollectionRequired(dbname, cmdObj),
+                    CommandHelpers::parseNsCollectionRequired(dbName, cmdObj),
                     AutoGetCollectionViewMode::kViewsPermitted);
         const auto nss = ctx->getNss();
 
@@ -195,7 +199,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
@@ -203,7 +207,7 @@ public:
         // of a view, the locks need to be released.
         boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
         ctx.emplace(opCtx,
-                    CommandHelpers::parseNsOrUUID({boost::none, dbname}, cmdObj),
+                    CommandHelpers::parseNsOrUUID(dbName, cmdObj),
                     AutoGetCollectionViewMode::kViewsPermitted);
         const auto& nss = ctx->getNss();
 
@@ -245,7 +249,8 @@ public:
             uassertStatusOK(viewAggregation.getStatus());
 
             BSONObj aggResult = CommandHelpers::runCommandDirectly(
-                opCtx, OpMsgRequest::fromDBAndBody(dbname, std::move(viewAggregation.getValue())));
+                opCtx,
+                OpMsgRequest::fromDBAndBody(dbName.db(), std::move(viewAggregation.getValue())));
             uassertStatusOK(ViewResponseFormatter(aggResult).appendAsDistinctResponse(&result));
             return true;
         }

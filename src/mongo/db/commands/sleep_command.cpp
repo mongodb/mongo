@@ -141,7 +141,7 @@ public:
 
     CmdSleep() : BasicCommand("sleep") {}
     bool run(OperationContext* opCtx,
-             const std::string& ns,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) {
         LOGV2(20504, "Test-only command 'sleep' invoked");

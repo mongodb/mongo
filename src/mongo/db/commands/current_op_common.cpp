@@ -46,7 +46,7 @@ static const StringDataSet kCurOpCmdParams = {kAll, kOwnOps, kTruncateOps};
 }  // namespace
 
 bool CurrentOpCommandBase::run(OperationContext* opCtx,
-                               const std::string& dbName,
+                               const DatabaseName&,
                                const BSONObj& cmdObj,
                                BSONObjBuilder& result) {
     // Convert the currentOp command spec into an equivalent aggregation command. This will be

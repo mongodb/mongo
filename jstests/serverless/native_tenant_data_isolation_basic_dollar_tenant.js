@@ -65,13 +65,35 @@ const testColl = testDb.getCollection(kCollName);
     }));
     assert.eq({_id: 0, a: 11, b: 1}, fad2.value);
     // This document should not be accessed with a different tenant.
-    const fad3 = assert.commandWorked(testDb.runCommand({
+    const fadOtherUser = assert.commandWorked(testDb.runCommand({
         findAndModify: kCollName,
         query: {b: 1},
         update: {$inc: {b: 10}},
         '$tenant': kOtherTenant
     }));
-    assert.eq(null, fad3.value);
+    assert.eq(null, fadOtherUser.value);
+}
+
+// Test count and distinct command.
+{
+    assert.commandWorked(testDb.runCommand(
+        {insert: kCollName, documents: [{c: 1, d: 1}, {c: 1, d: 2}], '$tenant': kTenant}));
+
+    // Test count command.
+    const resCount = assert.commandWorked(
+        testDb.runCommand({count: kCollName, query: {c: 1}, '$tenant': kTenant}));
+    assert.eq(2, resCount.n);
+    const resCountOtherUser = assert.commandWorked(
+        testDb.runCommand({count: kCollName, query: {c: 1}, '$tenant': kOtherTenant}));
+    assert.eq(0, resCountOtherUser.n);
+
+    // Test Distict command.
+    const resDistinct = assert.commandWorked(
+        testDb.runCommand({distinct: kCollName, key: 'd', query: {}, '$tenant': kTenant}));
+    assert.eq([1, 2], resDistinct.values.sort());
+    const resDistinctOtherUser = assert.commandWorked(
+        testDb.runCommand({distinct: kCollName, key: 'd', query: {}, '$tenant': kOtherTenant}));
+    assert.eq([], resDistinctOtherUser.values);
 }
 
 // Test renameCollection command.

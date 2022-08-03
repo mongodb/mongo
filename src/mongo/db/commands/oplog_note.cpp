@@ -118,7 +118,7 @@ public:
     }
 
     virtual bool run(OperationContext* opCtx,
-                     const string& dbname,
+                     const DatabaseName&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         hangInAppendOplogNote.pauseWhileSet();

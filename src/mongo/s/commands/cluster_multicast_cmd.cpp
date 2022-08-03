@@ -88,7 +88,7 @@ public:
                                std::vector<Privilege>* out) const override {}
 
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         IDLParserContext ctx("ClusterMulticast");

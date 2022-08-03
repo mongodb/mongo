@@ -165,7 +165,7 @@ public:
         return false;
     }
     virtual bool run(OperationContext* opCtx,
-                     const string& ns,
+                     const DatabaseName&,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         // Sort the command names before building the result BSON.

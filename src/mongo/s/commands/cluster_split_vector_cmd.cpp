@@ -69,13 +69,13 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbName,
+             const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const NamespaceString nss(parseNs({boost::none, dbName}, cmdObj));
+        const NamespaceString nss(parseNs(dbName, cmdObj));
         uassert(ErrorCodes::IllegalOperation,
                 "Performing splitVector across dbs isn't supported via mongos",
-                nss.db() == dbName);
+                nss.dbName() == dbName);
 
         const auto cm =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
@@ -95,7 +95,7 @@ public:
         auto commandResponse = uassertStatusOK(shard->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting::get(opCtx),
-            dbName,
+            dbName.toStringWithTenantId(),
             cm.dbPrimary() == ShardId::kConfigServerId ? filteredCmdObj : filteredCmdObjWithVersion,
             Shard::RetryPolicy::kIdempotent));
 

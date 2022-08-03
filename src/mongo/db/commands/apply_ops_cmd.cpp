@@ -211,7 +211,7 @@ public:
     }
 
     bool run(OperationContext* opCtx,
-             const std::string& dbname,
+             const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         validateApplyOpsCommand(cmdObj);
@@ -260,8 +260,11 @@ public:
         OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
             opCtx);
 
+        // TODO SERVER-68550: call applyOps with DatabaseName object instead of db string.
         auto applyOpsStatus = CommandHelpers::appendCommandStatusNoThrow(
-            result, repl::applyOps(opCtx, dbname, cmdObj, oplogApplicationMode, &result));
+            result,
+            repl::applyOps(
+                opCtx, dbName.toStringWithTenantId(), cmdObj, oplogApplicationMode, &result));
 
         return applyOpsStatus;
     }

@@ -1011,7 +1011,7 @@ public:
      * Runs the given command. Returns true upon success.
      */
     virtual bool run(OperationContext* opCtx,
-                     const std::string& db,
+                     const DatabaseName& dbName,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) = 0;
 
@@ -1020,8 +1020,7 @@ public:
                              const BSONObj& cmdObj,
                              rpc::ReplyBuilderInterface* replyBuilder) override {
         auto result = replyBuilder->getBodyBuilder();
-        // TODO SERVER-67459 change BasicCommand::run to take in DatabaseName
-        return run(opCtx, dbName.toStringWithTenantId(), cmdObj, result);
+        return run(opCtx, dbName, cmdObj, result);
     }
 };
 
@@ -1174,7 +1173,7 @@ private:
 class ErrmsgCommandDeprecated : public BasicCommand {
     using BasicCommand::BasicCommand;
     bool run(OperationContext* opCtx,
-             const std::string& db,
+             const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) final;
 
