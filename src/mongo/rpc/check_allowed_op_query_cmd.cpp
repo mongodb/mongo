@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -30,47 +30,48 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/rpc/check_allowed_op_query_cmd.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
+#include <fmt/format.h>
+#include <string>
 
 namespace mongo {
-namespace {
 
-class CmdGetLastError : public ErrmsgCommandDeprecated {
-public:
-    CmdGetLastError() : ErrmsgCommandDeprecated("getLastError", "getlasterror") {}
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return false;
+using namespace fmt::literals;
+
+void checkAllowedOpQueryCommand(Client& client, StringData cmd) {
+    static constexpr std::array allowed{
+        "hello"_sd,
+        "isMaster"_sd,
+        "ismaster"_sd,
+    };
+    const bool isAllowed = (std::find(allowed.begin(), allowed.end(), cmd) != allowed.end());
+
+    // The deprecated commands below are still used by some old drivers. Eventually, they should go.
+    static constexpr std::array temporarilyAllowed{
+        "_isSelf"_sd,
+        "authenticate"_sd,
+        "buildinfo"_sd,
+        "buildInfo"_sd,
+        "saslContinue"_sd,
+        "saslStart"_sd,
+    };
+    const bool isTemporarilyAllowed =
+        (std::find(temporarilyAllowed.begin(), temporarilyAllowed.end(), cmd) !=
+         temporarilyAllowed.end());
+
+    if (!isAllowed && !isTemporarilyAllowed) {
+        uasserted(
+            ErrorCodes::UnsupportedOpQueryCommand,
+            "Unsupported OP_QUERY command: {}. The client driver may require an upgrade. "
+            "For more details see https://dochub.mongodb.org/core/legacy-opcode-removal"_format(
+                cmd));
     }
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
+
+    if (isTemporarilyAllowed) {
+        globalOpCounters.gotQueryDeprecated();
     }
-    virtual void addRequiredPrivileges(const std::string& dbname,
-                                       const BSONObj& cmdObj,
-                                       std::vector<Privilege>* out) const {}  // No auth required
+}
 
-    bool requiresAuth() const override {
-        return false;
-    }
-
-    std::string help() const override {
-        return "no longer supported";
-    }
-
-    bool errmsgRun(OperationContext* opCtx,
-                   const std::string&,
-                   const BSONObj&,
-                   std::string&,
-                   BSONObjBuilder&) {
-        uasserted(5739000, "getLastError command is not supported");
-        return false;
-    }
-
-} cmdGetLastError;
-
-}  // namespace
 }  // namespace mongo

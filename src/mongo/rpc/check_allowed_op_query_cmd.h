@@ -30,32 +30,8 @@
 #pragma once
 
 #include "mongo/db/client.h"
-#include "mongo/rpc/message.h"
 
 namespace mongo {
-
-/**
- * Logs a warning message for use of a legacy opcode or getLastError command once per each unique
- * client in 60 minutes-period by default.
- * - The specific unsupported op code or command is given by 'op' parameter.
- * - Each client is identified by remote IP if client metadata is not available. If client metadata
- *   is available, a client is identified by client metadata’s application name + driver name +
- *   driver version.
- * - The log message includes the following information.
- *   - Either client IP and port if client metadata is not available,
- *   - Or client metadata if client metadata is available.
- * - The warning period is defined by 'deprecatedWireOpsWarningPeriodInSeconds' setParameter.
- *   - The default value is 3600 seconds.
- *   - If this value is 0, every legacy op code or getLastError request is logged with a warning
- *     message.
- */
-void warnUnsupportedOp(Client& client, StringData op);
-
-/**
- * Callback that gets invoked when 'deprecatedWireOpsWarningPeriodInSeconds' setting is changed.
- */
-Status onUpdateOfWireOpsWarningPeriod(const int&);
-
 /**
  * Logs a warning message and throws if 'cmd' is not an allowed 'OP_QUERY' command.
  *

@@ -53,6 +53,7 @@ protoEnv.Library(
 env.Library(
     target='rpc',
     source=[
+        'check_allowed_op_query_cmd.cpp',
         'factory.cpp',
         'legacy_reply.cpp',
         'legacy_reply_builder.cpp',
@@ -60,8 +61,6 @@ env.Library(
         'object_check.cpp',
         'object_check.idl',
         'reply_builder_interface.cpp',
-        'unsupported_wire_ops.idl',
-        'warn_unsupported_wire_ops.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

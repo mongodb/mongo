@@ -47,15 +47,6 @@ std::unique_ptr<DBClientBase> getIntegrationTestConnection() {
     return std::move(swConn.getValue());
 }
 
-long getOpCount(BSONObj serverStatus, const char* opName) {
-    return serverStatus["opcounters"][opName].Long();
-}
-
-long getUnsupportedOpCount(BSONObj serverStatus, const char* opName) {
-    auto unsupportedOpcounters = serverStatus["opcounters"]["deprecated"];
-    return unsupportedOpcounters ? unsupportedOpcounters[opName].Long() : 0;
-}
-
 Message makeUnsupportedOpUpdateMessage(StringData ns, BSONObj query, BSONObj update, int flags) {
     return makeMessage(dbUpdate, [&](BufBuilder& b) {
         const int reservedFlags = 0;
@@ -133,14 +124,23 @@ int64_t getValidCursorIdFromFindCmd(DBClientBase* conn, const char* collName) {
     return cursorId;
 }
 
-TEST(OpLegacy, UnsupportedWriteOpsCounters) {
+TEST(OpLegacy, GetLastError) {
     auto conn = getIntegrationTestConnection();
-    const std::string ns = "testOpLegacy.UnsupportedWriteOpsCounters";
 
-    // Cache the counters prior to running the unsupported requests.
-    auto serverStatusCmd = fromjson("{serverStatus: 1}");
-    BSONObj serverStatusReplyPrior;
-    ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatusReplyPrior));
+    static const auto getLastErrorCommand = fromjson(R"({"getlasterror": 1})");
+    BSONObj replyObj;
+    conn->runCommand("admin", getLastErrorCommand, replyObj);
+
+    // 'getLastError' command is no longer supported and will always fail.
+    auto status = getStatusFromCommandResult(replyObj);
+    ASSERT_NOT_OK(status) << replyObj;
+    const auto expectedCode = conn->isMongos() ? 5739001 : 5739000;
+    ASSERT_EQ(status.code(), expectedCode) << replyObj;
+}
+
+TEST(OpLegacy, UnsupportedWriteOps) {
+    auto conn = getIntegrationTestConnection();
+    const std::string ns = "testOpLegacy.UnsupportedWriteOps";
 
     // Building parts for the unsupported requests.
     const BSONObj doc1 = fromjson("{a: 1}");
@@ -149,7 +149,7 @@ TEST(OpLegacy, UnsupportedWriteOpsCounters) {
     const BSONObj query = fromjson("{a: {$lt: 42}}");
     const BSONObj update = fromjson("{$set: {b: 2}}");
 
-    // Issue the requests. They are expected to fail but should still be counted.
+    // Issue the requests. They are expected to fail.
     Message ignore;
     auto opInsert = makeUnsupportedOpInsertMessage(ns, insert, 2, 0 /*continue on error*/);
     ASSERT_THROWS(conn->call(opInsert, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
@@ -159,22 +159,6 @@ TEST(OpLegacy, UnsupportedWriteOpsCounters) {
 
     auto opDelete = makeUnsupportedOpRemoveMessage(ns, query, 0 /*limit*/);
     ASSERT_THROWS(conn->call(opDelete, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
-
-    // Check the opcounters after running the unsupported operations.
-    BSONObj serverStatusReply;
-    ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatusReply));
-
-    ASSERT_EQ(getUnsupportedOpCount(serverStatusReplyPrior, "insert") + 2,
-              getUnsupportedOpCount(serverStatusReply, "insert"));
-
-    ASSERT_EQ(getUnsupportedOpCount(serverStatusReplyPrior, "update") + 1,
-              getUnsupportedOpCount(serverStatusReply, "update"));
-
-    ASSERT_EQ(getUnsupportedOpCount(serverStatusReplyPrior, "delete") + 1,
-              getUnsupportedOpCount(serverStatusReply, "delete"));
-
-    ASSERT_EQ(getUnsupportedOpCount(serverStatusReplyPrior, "total") + 2 + 1 + 1,
-              getUnsupportedOpCount(serverStatusReply, "total"));
 }
 
 void assertFailure(const Message response, StringData expectedErr) {
@@ -189,21 +173,16 @@ void assertFailure(const Message response, StringData expectedErr) {
         << responseBody;
 }
 
-TEST(OpLegacy, UnsupportedReadOpsCounters) {
+TEST(OpLegacy, UnsupportedReadOps) {
     auto conn = getIntegrationTestConnection();
-    const std::string ns = "testOpLegacy.UnsupportedReadOpsCounters";
+    const std::string ns = "testOpLegacy.UnsupportedReadOps";
 
     BSONObj insert = fromjson(R"({
-        insert: "UnsupportedReadOpsCounters",
+        insert: "UnsupportedReadOps",
         documents: [ {a: 1},{a: 2},{a: 3},{a: 4},{a: 5},{a: 6},{a: 7} ]
     })");
     BSONObj ignoreResponse;
     ASSERT(conn->runCommand("testOpLegacy", insert, ignoreResponse));
-
-    // Cache the counters prior to running the unsupported requests.
-    auto serverStatusCmd = fromjson("{serverStatus: 1}");
-    BSONObj serverStatusReplyPrior;
-    ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatusReplyPrior));
 
     // Issue the unsupported requests. They all should fail one way or another.
     Message opQueryRequest = makeUnsupportedOpQueryMessage(ns,
@@ -216,190 +195,25 @@ TEST(OpLegacy, UnsupportedReadOpsCounters) {
     conn->call(opQueryRequest, opQueryReply);
     assertFailure(opQueryReply, "OP_QUERY is no longer supported");
 
-    const int64_t cursorId = getValidCursorIdFromFindCmd(conn.get(), "UnsupportedReadOpsCounters");
-
-    Message opGetMoreRequest =
-        makeUnsupportedOpGetMoreMessage(ns, cursorId, 2 /*nToReturn*/, 0 /*flags*/);
-    Message opGetMoreReply;
-    conn->call(opGetMoreRequest, opGetMoreReply);
-    assertFailure(opGetMoreReply, "OP_GET_MORE is no longer supported");
-
-    Message opKillCursorsRequest = makeUnsupportedOpKillCursorsMessage(cursorId);
-    Message opKillCursorsReply;
-    ASSERT_THROWS(conn->call(opKillCursorsRequest, opKillCursorsReply),
-                  ExceptionForCat<ErrorCategory::NetworkError>);
-
-    // Check the opcounters after running the unsupported operations.
-    BSONObj serverStatusReply;
-    ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatusReply));
-
-    ASSERT_EQ(getUnsupportedOpCount(serverStatusReplyPrior, "query") + 1,
-              getUnsupportedOpCount(serverStatusReply, "query"));
-
-    ASSERT_EQ(getUnsupportedOpCount(serverStatusReplyPrior, "getmore") + 1,
-              getUnsupportedOpCount(serverStatusReply, "getmore"));
-
-    ASSERT_EQ(getUnsupportedOpCount(serverStatusReplyPrior, "killcursors") + 1,
-              getUnsupportedOpCount(serverStatusReply, "killcursors"));
-
-    ASSERT_EQ(getUnsupportedOpCount(serverStatusReplyPrior, "total") + 1 + 1 + 1,
-              getUnsupportedOpCount(serverStatusReply, "total"));
-}
-
-// The dochub link for warning messages about the removed op codes.
-static constexpr auto docLink = "https://dochub.mongodb.org/core/legacy-opcode-removal";
-
-// Check whether the most recent "deprecation" entry in the log matches the given opName and
-// severity (if the 'severity' string isn't empty). Return 'false' if no deprecation entries found.
-bool wasLogged(DBClientBase* conn, const std::string& opName, const std::string& severity) {
-    BSONObj getLogResponse;
-    ASSERT(conn->runCommand("admin", fromjson("{getLog: 'global'}"), getLogResponse));
-
-    auto logEntries = getLogResponse["log"].Array();
-    for (auto it = logEntries.rbegin(); it != logEntries.rend(); ++it) {
-        auto entry = it->String();
-        if (entry.find("\"id\":5578800") != std::string::npos) {
-            ASSERT_TRUE(entry.find(docLink) != std::string::npos);
-            const bool severityMatches = severity.empty() ||
-                (entry.find(std::string("\"s\":\"") + severity + "\"") != std::string::npos);
-            const bool opNameMatches =
-                (entry.find(std::string("\"op\":\"") + opName + "\"") != std::string::npos);
-            return severityMatches && opNameMatches;
-        }
-    }
-    return false;
-}
-
-void getLastError(DBClientBase* conn) {
-    static const auto getLastErrorCommand = fromjson(R"({"getlasterror": 1})");
-    BSONObj replyObj;
-    conn->runCommand("admin", getLastErrorCommand, replyObj);
-
-    // getLastError command is no longer supported and must always fails.
-    auto status = getStatusFromCommandResult(replyObj);
-    ASSERT_NOT_OK(status) << replyObj;
-    const auto expectedCode = conn->isMongos() ? 5739001 : 5739000;
-    ASSERT_EQ(status.code(), expectedCode) << replyObj;
-}
-
-void exerciseUnsupportedOps(DBClientBase* conn, const std::string& expectedSeverity) {
-    // Build the unsupported requests and the getLog command.
-    const std::string ns = "testOpLegacy.exerciseUnsupportedOps";
-
-    // Insert some docs into the collection so even though the legacy write ops are failing we can
-    // still test getMore, killCursors and query.
-    BSONObj data = fromjson(R"({
-        insert: "exerciseUnsupportedOps",
-        documents: [ {a: 1},{a: 2},{a: 3},{a: 4},{a: 5},{a: 6},{a: 7} ]
-    })");
-    BSONObj ignoreResponse;
-    ASSERT(conn->runCommand("testOpLegacy", data, ignoreResponse));
-
-    const BSONObj doc1 = fromjson("{a: 1}");
-    const BSONObj doc2 = fromjson("{a: 2}");
-    const BSONObj insert[2] = {doc1, doc2};
-    const BSONObj query = fromjson("{a: {$lt: 42}}");
-    const BSONObj update = fromjson("{$set: {b: 2}}");
-    auto opInsert = makeUnsupportedOpInsertMessage(ns, insert, 2, 0 /*continue on error*/);
-    auto opUpdate = makeUnsupportedOpUpdateMessage(ns, query, update, 0 /*no upsert, no multi*/);
-    auto opDelete = makeUnsupportedOpRemoveMessage(ns, query, 0 /*limit*/);
-    auto opQuery = makeUnsupportedOpQueryMessage(
-        ns, query, 2 /*nToReturn*/, 0 /*nToSkip*/, nullptr /*fieldsToReturn*/, 0 /*queryOptions*/);
-    Message ignore;
-
-    // The first unsupported call after adding a suppression is still logged with elevated severity
-    // and after it the suppression kicks in. Any unsupported op can be used to start the
-    // suppression period, here we chose getLastError.
-    getLastError(conn);
-
-    ASSERT_THROWS(conn->call(opInsert, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
-    ASSERT(wasLogged(conn, "insert", expectedSeverity));
-
-    getLastError(conn);
-    ASSERT(wasLogged(conn, "getLastError", expectedSeverity));
-
-    ASSERT_THROWS(conn->call(opUpdate, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
-    ASSERT(wasLogged(conn, "update", expectedSeverity));
-
-    Message replyQuery;
-    conn->call(opQuery, replyQuery);
-    ASSERT(wasLogged(conn, "query", expectedSeverity));
-
-    int64_t cursorId = getValidCursorIdFromFindCmd(conn, "exerciseUnsupportedOps");
+    const int64_t cursorId = getValidCursorIdFromFindCmd(conn.get(), "UnsupportedReadOps");
 
     auto opGetMore = makeUnsupportedOpGetMoreMessage(ns, cursorId, 2 /*nToReturn*/, 0 /*flags*/);
-    Message replyGetMore;
-    conn->call(opGetMore, replyGetMore);
-    ASSERT(wasLogged(conn, "getmore", expectedSeverity));
+    Message opGetMoreReply;
+    conn->call(opGetMore, opGetMoreReply);
+    assertFailure(opGetMoreReply, "OP_GET_MORE is no longer supported");
 
     auto opKillCursors = makeUnsupportedOpKillCursorsMessage(cursorId);
-    ASSERT_THROWS(conn->call(opKillCursors, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
-    ASSERT(wasLogged(conn, "killcursors", expectedSeverity));
-
-    ASSERT_THROWS(conn->call(opDelete, ignore), ExceptionForCat<ErrorCategory::NetworkError>);
-    ASSERT(wasLogged(conn, "remove", expectedSeverity));
-}
-
-void setUnsupportedWireOpsWarningPeriod(DBClientBase* conn, Seconds timeout) {
-    const BSONObj warningTimeout =
-        BSON("setParameter" << 1 << "deprecatedWireOpsWarningPeriodInSeconds" << timeout.count());
-    BSONObj response;
-    ASSERT(conn->runCommand("admin", warningTimeout, response));
-}
-
-class UnsupportedWireOpsWarningPeriodScope {
-public:
-    UnsupportedWireOpsWarningPeriodScope() {
-        auto conn = getIntegrationTestConnection();
-        BSONObj currentSetting;
-        ASSERT(conn->runCommand(
-            "admin",
-            fromjson("{getParameter: 1, deprecatedWireOpsWarningPeriodInSeconds: 1}"),
-            currentSetting));
-        timeout = currentSetting["deprecatedWireOpsWarningPeriodInSeconds"].Int();
-    }
-    ~UnsupportedWireOpsWarningPeriodScope() {
-        auto conn = getIntegrationTestConnection();
-        setUnsupportedWireOpsWarningPeriod(conn.get(), Seconds{timeout});
-    }
-
-private:
-    int timeout = 3600;
-};
-
-TEST(OpLegacy, UnsupportedOpsLogging) {
-    UnsupportedWireOpsWarningPeriodScope timeoutSettingScope;
-
-    auto conn = getIntegrationTestConnection();
-
-    // This test relies on the fact that the suite is run at D2 logging level.
-    BSONObj logSettings;
-    ASSERT(conn->runCommand(
-        "admin", fromjson("{getParameter: 1, logComponentVerbosity: {command: 1}}"), logSettings));
-    ASSERT_LTE(2, logSettings["logComponentVerbosity"]["command"]["verbosity"].Int());
-
-    setUnsupportedWireOpsWarningPeriod(conn.get(), Seconds{0} /*timeout*/);
-    exerciseUnsupportedOps(conn.get(), "W" /*expectedSeverity*/);
-
-    setUnsupportedWireOpsWarningPeriod(conn.get(), Seconds{3600} /*timeout*/);
-    exerciseUnsupportedOps(conn.get(), "D2" /*expectedSeverity*/);
+    Message opKillCursorsReply;
+    ASSERT_THROWS(conn->call(opKillCursors, opKillCursorsReply),
+                  ExceptionForCat<ErrorCategory::NetworkError>);
 }
 
 TEST(OpLegacy, GenericCommandViaOpQuery) {
     auto conn = getIntegrationTestConnection();
 
-    auto serverStatusCmd = fromjson("{serverStatus: 1}");
-    BSONObj serverStatusReplyPrior;
-    ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatusReplyPrior));
-
-    // Because we cannot link the log entries to the issued commands, limit the search window for
-    // the query-related entry in the log by first running a different command (e.g. getLastError).
-    getLastError(conn.get());
-    ASSERT(wasLogged(conn.get(), "getLastError", ""));
-
     // The actual command doesn't matter, as long as it's not 'hello' or 'isMaster'.
     auto opQuery = makeUnsupportedOpQueryMessage("testOpLegacy.$cmd",
-                                                 serverStatusCmd,
+                                                 fromjson("{serverStatus: 1}"),
                                                  1 /*nToReturn*/,
                                                  0 /*nToSkip*/,
                                                  nullptr /*fieldsToReturn*/,
@@ -411,29 +225,13 @@ TEST(OpLegacy, GenericCommandViaOpQuery) {
     BSONObj obj = data.read<BSONObj>();
     auto status = getStatusFromCommandResult(obj);
     ASSERT_EQ(status.code(), ErrorCodes::UnsupportedOpQueryCommand);
-
-    // The logic around log severity for the deprecation logging is tested elsewhere. Here we check
-    // that it gets logged at all.
-    ASSERT(wasLogged(conn.get(), "query", ""));
-
-    BSONObj serverStatusReply;
-    ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatusReply));
-    ASSERT_EQ(getUnsupportedOpCount(serverStatusReplyPrior, "query") + 1,
-              getUnsupportedOpCount(serverStatusReply, "query"));
 }
 
-// 'hello' and 'isMaster' commands, issued via OP_QUERY protocol, are still fully supported.
-void testAllowedCommand(const char* command, ErrorCodes::Error code = ErrorCodes::OK) {
+// Test commands that are still allowed via OP_QUERY protocol.
+void testAllowedCommand(const char* command,
+                        bool expectToBeCounted,
+                        ErrorCodes::Error code = ErrorCodes::OK) {
     auto conn = getIntegrationTestConnection();
-
-    auto serverStatusCmd = fromjson("{serverStatus: 1}");
-    BSONObj serverStatusReplyPrior;
-    ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatusReplyPrior));
-
-    // Because we cannot link the log entries to the issued commands, limit the search window for
-    // the query-related entry in the log by first running a different command (e.g. getLastError).
-    getLastError(conn.get());
-    ASSERT(wasLogged(conn.get(), "getLastError", ""));
 
     auto opQuery = makeUnsupportedOpQueryMessage("testOpLegacy.$cmd",
                                                  fromjson(command),
@@ -441,6 +239,13 @@ void testAllowedCommand(const char* command, ErrorCodes::Error code = ErrorCodes
                                                  0 /*nToSkip*/,
                                                  nullptr /*fieldsToReturn*/,
                                                  0 /*queryOptions*/);
+
+    auto serverStatusCmd = fromjson("{serverStatus: 1}");
+    BSONObj serverStatus;
+    ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatus));
+    auto opCountersPrior = serverStatus["opcounters"]["deprecated"];
+    const auto queryCountPrior = opCountersPrior ? opCountersPrior["query"].Long() : 0;
+
     Message replyQuery;
     conn->call(opQuery, replyQuery);
     QueryResult::ConstView qr = replyQuery.singleData().view2ptr();
@@ -449,36 +254,35 @@ void testAllowedCommand(const char* command, ErrorCodes::Error code = ErrorCodes
     auto status = getStatusFromCommandResult(obj);
     ASSERT_EQ(status.code(), code);
 
-    ASSERT_FALSE(wasLogged(conn.get(), "query", ""));
+    ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatus));
+    auto opCounters = serverStatus["opcounters"]["deprecated"];
+    const auto queryCount = opCounters ? opCounters["query"].Long() : 0;
 
-    BSONObj serverStatusReply;
-    ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatusReply));
-    ASSERT_EQ(getUnsupportedOpCount(serverStatusReplyPrior, "query"),
-              getUnsupportedOpCount(serverStatusReply, "query"));
+    ASSERT_EQ(queryCountPrior + (expectToBeCounted ? 1 : 0), queryCount) << command;
 }
 
 TEST(OpLegacy, IsSelfCommandViaOpQuery) {
-    testAllowedCommand("{_isSelf: 1}");
+    testAllowedCommand("{_isSelf: 1}", true /* expectToBeCounted */);
 }
 
 TEST(OpLegacy, BuildinfoCommandViaOpQuery) {
-    testAllowedCommand("{buildinfo: 1}");
+    testAllowedCommand("{buildinfo: 1}", true /* expectToBeCounted */);
 }
 
 TEST(OpLegacy, BuildInfoCommandViaOpQuery) {
-    testAllowedCommand("{buildInfo: 1}");
+    testAllowedCommand("{buildInfo: 1}", true /* expectToBeCounted */);
 }
 
 TEST(OpLegacy, HelloCommandViaOpQuery) {
-    testAllowedCommand("{hello: 1}");
+    testAllowedCommand("{hello: 1}", false /* expectToBeCounted */);
 }
 
 TEST(OpLegacy, IsMasterCommandViaOpQuery) {
-    testAllowedCommand("{isMaster: 1}");
+    testAllowedCommand("{isMaster: 1}", false /* expectToBeCounted */);
 }
 
 TEST(OpLegacy, IsmasterCommandViaOpQuery) {
-    testAllowedCommand("{ismaster: 1}");
+    testAllowedCommand("{ismaster: 1}", false /* expectToBeCounted */);
 }
 
 TEST(OpLegacy, SaslStartCommandViaOpQuery) {
@@ -500,6 +304,7 @@ TEST(OpLegacy, SaslStartCommandViaOpQuery) {
                                }
                            }
                        })",
+                       true /* expectToBeCounted */,
                        ErrorCodes::AuthenticationFailed);
 }
 
@@ -521,6 +326,7 @@ TEST(OpLegacy, SaslContinueCommandViaOpQuery) {
                            },
                            "conversationId":1
                        })",
+                       true /* expectToBeCounted */,
                        ErrorCodes::ProtocolError);
 }
 
@@ -533,6 +339,7 @@ TEST(OpLegacy, AuthenticateCommandViaOpQuery) {
     // an invalid authentication request. The AuthenticationFailed error code means that it passes
     // request parsing.
     testAllowedCommand(R"({authenticate: 1, mechanism: "MONGODB-X509"})",
+                       true /* expectToBeCounted */,
                        ErrorCodes::AuthenticationFailed);
 }
 

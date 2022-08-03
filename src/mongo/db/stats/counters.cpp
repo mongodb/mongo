@@ -58,12 +58,7 @@ void OpCounters::_checkWrap(CacheExclusive<AtomicWord<long long>> OpCounters::*c
         _getmore->store(0);
         _command->store(0);
 
-        _insertDeprecated->store(0);
         _queryDeprecated->store(0);
-        _updateDeprecated->store(0);
-        _deleteDeprecated->store(0);
-        _getmoreDeprecated->store(0);
-        _killcursorsDeprecated->store(0);
 
         _insertOnExistingDoc->store(0);
         _updateOnMissingDoc->store(0);
@@ -83,23 +78,9 @@ BSONObj OpCounters::getObj() const {
     b.append("command", _command->loadRelaxed());
 
     auto queryDep = _queryDeprecated->loadRelaxed();
-    auto getmoreDep = _getmoreDeprecated->loadRelaxed();
-    auto killcursorsDep = _killcursorsDeprecated->loadRelaxed();
-    auto updateDep = _updateDeprecated->loadRelaxed();
-    auto deleteDep = _deleteDeprecated->loadRelaxed();
-    auto insertDep = _insertDeprecated->loadRelaxed();
-    auto totalDep = queryDep + getmoreDep + killcursorsDep + updateDep + deleteDep + insertDep;
-
-    if (totalDep > 0) {
+    if (queryDep > 0) {
         BSONObjBuilder d(b.subobjStart("deprecated"));
-
-        d.append("total", totalDep);
-        d.append("insert", insertDep);
         d.append("query", queryDep);
-        d.append("update", updateDep);
-        d.append("delete", deleteDep);
-        d.append("getmore", getmoreDep);
-        d.append("killcursors", killcursorsDep);
     }
 
     // Append counters for constraint relaxations, only if they exist.
