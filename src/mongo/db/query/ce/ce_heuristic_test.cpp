@@ -73,6 +73,7 @@ TEST(CEHeuristicTest, CEwithoutOptimization) {
 TEST(CEHeuristicTest, CEAfterMemoSubstitutionPhase_Eq) {
     std::string query = "{a : 123}";
     ASSERT_MATCH_CE_CARD(ht, query, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 0.1, 0.1);
     ASSERT_MATCH_CE_CARD(ht, query, 1.73205, 3.0);
     ASSERT_MATCH_CE_CARD(ht, query, 2.64575, 7.0);
     ASSERT_MATCH_CE_CARD(ht, query, 3.16228, 10.0);

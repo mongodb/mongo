@@ -89,6 +89,10 @@ public:
      */
     SelectivityType equalitySel(const CEType inputCard) {
         uassert(6716604, "Zero cardinality must be handled by the caller.", inputCard > 0.0);
+        if (inputCard <= 1.0) {
+            // If the input has < 1 values, it cannot be reduced any further by a condition.
+            return 1.0;
+        }
         return std::sqrt(inputCard) / inputCard;
     }
 
