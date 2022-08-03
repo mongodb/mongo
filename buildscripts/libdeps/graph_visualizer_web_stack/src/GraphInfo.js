@@ -25,11 +25,13 @@ const useStyles = makeStyles({
 const GraphInfo = ({ selectedGraph, counts, datawidth, setCounts }) => {
   React.useEffect(() => {
     let gitHash = selectedGraph;
-    fetch('/api/graphs/' + gitHash + '/analysis')
-      .then(response => response.json())
-      .then(data => {
-        setCounts(data.results);
-      });
+    if (gitHash) {
+      fetch('/api/graphs/' + gitHash + '/analysis')
+        .then(response => response.json())
+        .then(data => {
+          setCounts(data.results);
+        });
+    }
   }, [selectedGraph]);
   
   const classes = useStyles();

@@ -1,13 +1,13 @@
 import { initialState } from "./store";
 
-export const links = (state = initialState, action) => {
+export const linksTrans = (state = initialState, action) => {
   switch (action.type) {
-    case "addLink":
+    case "addLinkTrans":
       var arr = Object.assign(state);
       return [...arr, action.payload];
-    case "setLinks":
+    case "setLinksTrans":
       return action.payload;
-    case "updateSelectedLinks":
+    case "updateSelectedLinksTrans":
       var newState = Object.assign(state);
       newState[action.payload.index].selected = action.payload.value;
       return newState;
@@ -16,17 +16,17 @@ export const links = (state = initialState, action) => {
   }
 };
 
-export const addLink = (link) => ({
-  type: "addLink",
+export const addLinkTrans = (link) => ({
+  type: "addLinkTrans",
   payload: link,
 });
 
-export const setLinks = (links) => ({
-  type: "setLinks",
+export const setLinksTrans = (links) => ({
+  type: "setLinksTrans",
   payload: links,
 });
 
-export const updateSelectedLinks = (newValue) => ({
-  type: "updateSelectedLinks",
+export const updateSelectedLinksTrans = (newValue) => ({
+  type: "updateSelectedLinksTrans",
   payload: newValue,
 });

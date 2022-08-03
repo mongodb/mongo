@@ -32,6 +32,7 @@ from collections import namedtuple, OrderedDict
 
 import flask
 import networkx
+import cxxfilt
 
 from flask_cors import CORS
 from flask_session import Session
@@ -157,16 +158,12 @@ class BackendServer:
                             'name': key, 'value': value
                         } for key, value in dependents_graph.nodes(data=True)[str(node)].items()],
                         'dependers': [{
-                            'node':
-                                depender, 'symbols':
-                                    dependents_graph[str(node)][depender].get('symbols',
-                                                                              '').split(' ')
+                            'node': depender, 'symbols': dependents_graph[str(node)]
+                                                         [depender].get('symbols')
                         } for depender in dependents_graph[str(node)]],
                         'dependencies': [{
-                            'node':
-                                dependency, 'symbols':
-                                    dependents_graph[dependency][str(node)].get('symbols',
-                                                                                '').split(' ')
+                            'node': dependency, 'symbols': dependents_graph[dependency]
+                                                           [str(node)].get('symbols')
                         } for dependency in dependency_graph[str(node)]],
                     })
 
@@ -189,16 +186,17 @@ class BackendServer:
 
                 nodes = {}
                 links = {}
+                links_trans = {}
 
                 def add_node_to_graph_data(node):
                     nodes[str(node)] = {
-                        'id': str(node), 'name': Path(node).name, 'type': dependents_graph.nodes()
-                                                                          [str(node)]['bin_type']
+                        'id': str(node), 'name': Path(node).name,
+                        'type': dependents_graph.nodes()[str(node)].get('bin_type', '')
                     }
 
-                def add_link_to_graph_data(source, target):
+                def add_link_to_graph_data(source, target, data):
                     links[str(source) + str(target)] = {
-                        'source': str(source), 'target': str(target)
+                        'source': str(source), 'target': str(target), 'data': data
                     }
 
                 for node in selected_nodes:
@@ -207,7 +205,15 @@ class BackendServer:
                     for libdep in dependency_graph[str(node)]:
                         if dependents_graph[libdep][str(node)].get('direct'):
                             add_node_to_graph_data(libdep)
-                            add_link_to_graph_data(node, libdep)
+                            add_link_to_graph_data(node, libdep,
+                                                   dependents_graph[libdep][str(node)])
+
+                if "transitive_edges" in req_body.keys() and req_body["transitive_edges"] is True:
+                    for node in selected_nodes:
+                        for libdep in dependency_graph[str(node)]:
+                            if str(libdep) in nodes.keys():
+                                add_link_to_graph_data(node, libdep,
+                                                       dependents_graph[libdep][str(node)])
 
                 if "extra_nodes" in req_body.keys():
                     extra_nodes = req_body["extra_nodes"]
@@ -216,12 +222,14 @@ class BackendServer:
 
                         for libdep in dependency_graph.get_direct_nonprivate_graph()[str(node)]:
                             add_node_to_graph_data(libdep)
-                            add_link_to_graph_data(node, libdep)
+                            add_link_to_graph_data(node, libdep,
+                                                   dependents_graph[libdep][str(node)])
 
                 node_data = {
                     'graphData': {
                         'nodes': [data for node, data in nodes.items()],
                         'links': [data for link, data in links.items()],
+                        'links_trans': [data for link, data in links_trans.items()],
                     }
                 }
                 return node_data, 200
@@ -306,7 +314,27 @@ class BackendServer:
             else:
                 if git_hash in self.graph_files:
                     file_path = self.graph_files[git_hash].graph_file
-                    graph = libdeps.graph.LibdepsGraph(networkx.read_graphml(file_path))
+                    nx_graph = networkx.read_graphml(file_path)
+                    if int(self.get_graph_build_data(file_path).version) > 3:
+                        for source, target in nx_graph.edges:
+                            try:
+                                nx_graph[source][target]['symbols'] = list(
+                                    nx_graph[source][target].get('symbols').split('\n'))
+                            except AttributeError:
+                                nx_graph[source][target]['symbols'] = []
+                    else:
+                        for source, target in nx_graph.edges:
+                            try:
+                                nx_graph[source][target]['symbols'] = list(
+                                    map(cxxfilt.demangle,
+                                        nx_graph[source][target].get('symbols').split()))
+                            except AttributeError:
+                                try:
+                                    nx_graph[source][target]['symbols'] = list(
+                                        nx_graph[source][target].get('symbols').split())
+                                except AttributeError:
+                                    nx_graph[source][target]['symbols'] = []
+                    graph = libdeps.graph.LibdepsGraph(nx_graph)
                     self.loaded_graphs[git_hash] = graph
                     return graph
                 return None

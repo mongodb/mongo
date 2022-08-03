@@ -9,8 +9,10 @@ import LoadingBar from "./LoadingBar";
 import TextField from "@material-ui/core/TextField";
 
 import { setNodes, updateCheckbox, updateSelected } from "./redux/nodes";
+import { setNodeInfos } from "./redux/nodeInfo";
 import { setGraphData } from "./redux/graphData";
-import { addLinks } from "./redux/links";
+import { setLinks } from "./redux/links";
+import { setLinksTrans } from "./redux/linksTrans";
 import { setLoading } from "./redux/loading";
 import { setListSearchTerm } from "./redux/listSearchTerm";
 import { Button, Autocomplete, Grid } from "@material-ui/core";
@@ -21,57 +23,63 @@ const columns = [
   { id: "ID", dataKey: "node", label: "Node", width: 200 },
 ];
 
-const NodeList = ({ selectedGraph, nodes, searchedNodes, loading, setFindNode, setNodes, addLinks, setLoading, setListSearchTerm, updateCheckbox, updateSelected, setGraphData}) => {
+const NodeList = ({ selectedGraph, nodes, searchedNodes, loading, setFindNode, setNodeInfos, setNodes, setLinks, setLinksTrans, setLoading, setListSearchTerm, updateCheckbox, updateSelected, setGraphData, showTransitive}) => {
   const [searchPath, setSearchPath] = React.useState('');
 
   React.useEffect(() => {
     let gitHash = selectedGraph;
-    fetch('/api/graphs/' + gitHash + '/nodes')
-      .then(response => response.json())
-      .then(data => {
-        setNodes(data.nodes.map((node, index) => {
-          return {
-            id: index,
-            node: node,
-            name: node.substring(node.lastIndexOf('/') + 1),
-            check: "checkbox",
-            selected: false,
-          };
-        }));
-        addLinks(data.links);
-        setLoading(false);
-      });
-    setSearchPath(null);
-    setListSearchTerm('');
+    if (gitHash) {
+      fetch('/api/graphs/' + gitHash + '/nodes')
+        .then(response => response.json())
+        .then(data => {
+          setNodes(data.nodes.map((node, index) => {
+            return {
+              id: index,
+              node: node,
+              name: node.substring(node.lastIndexOf('/') + 1),
+              check: "checkbox",
+              selected: false,
+            };
+          }));
+          setLoading(false);
+        });
+      setSearchPath(null);
+      setListSearchTerm('');
+    }
   }, [selectedGraph]);
 
   function newGraphData() {
     let gitHash = selectedGraph;
-    let postData = {
-        "selected_nodes": nodes.filter(node => node.selected == true).map(node => node.node)
-    };
-    fetch('/api/graphs/' + gitHash + '/d3', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(postData)
-    })
-      .then(response => response.json())
-      .then(data => {
-        setGraphData(data.graphData);
-      });
-    fetch('/api/graphs/' + gitHash + '/nodes/details', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(postData)
-    })
-      .then(response => response.json())
-      .then(data => {
-        setNodeInfos(data.nodeInfos);
-      });
+    if (gitHash) {
+      let postData = {
+          "selected_nodes": nodes.filter(node => node.selected == true).map(node => node.node),
+          "transitive_edges": showTransitive
+      };
+      fetch('/api/graphs/' + gitHash + '/d3', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(postData)
+      })
+        .then(response => response.json())
+        .then(data => {
+          setGraphData(data.graphData);
+          setLinks(data.graphData.links);
+          setLinksTrans(data.graphData.links_trans);
+        });
+      fetch('/api/graphs/' + gitHash + '/nodes/details', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(postData)
+      })
+        .then(response => response.json())
+        .then(data => {
+          setNodeInfos(data.nodeInfos);
+        });
+    }
   }
 
   function nodePaths() {
@@ -102,7 +110,7 @@ const NodeList = ({ selectedGraph, nodes, searchedNodes, loading, setFindNode, s
   function handleSearchTermChange(event, newTerm) {
     if (newTerm == null) {
       setSearchPath('');
-      setListSearchTerm(newTerm);
+      setListSearchTerm('');
     } else {
       setSearchPath(newTerm);
       setListSearchTerm(newTerm);
@@ -125,7 +133,6 @@ const NodeList = ({ selectedGraph, nodes, searchedNodes, loading, setFindNode, s
             renderInput={(params) => <TextField {...params}
               label="Search by Path or Name"
               variant="outlined"
-              onClick={(event) => event.target.select()}
               />}
           />
         </Grid>
@@ -167,4 +174,4 @@ const NodeList = ({ selectedGraph, nodes, searchedNodes, loading, setFindNode, s
   );
 };
 
-export default connect(getNodes, { setFindNode, setNodes, addLinks, setLoading, setListSearchTerm, updateCheckbox, updateSelected, setGraphData })(NodeList);
+export default connect(getNodes, { setFindNode, setNodes, setNodeInfos, setLinks, setLinksTrans, setLoading, setListSearchTerm, updateCheckbox, updateSelected, setGraphData })(NodeList);

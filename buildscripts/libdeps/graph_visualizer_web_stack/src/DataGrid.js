@@ -12,6 +12,8 @@ import { getRows } from "./redux/store";
 import { updateSelected } from "./redux/nodes";
 import { setGraphData } from "./redux/graphData";
 import { setNodeInfos } from "./redux/nodeInfo";
+import { setLinks } from "./redux/links";
+import { setLinksTrans } from "./redux/linksTrans";
 
 function componentToHex(c) {
   var hex = c.toString(16);
@@ -90,10 +92,13 @@ const DataGrid = ({
   updateSelected,
   classes,
   setGraphData,
+  setLinks,
+  setLinksTrans,
   selectedGraph,
   setNodeInfos,
   selectedNodes,
   searchedNodes,
+  showTransitive
 }) => {
   const [checkBoxes, setCheckBoxes] = React.useState([]);
 
@@ -103,31 +108,36 @@ const DataGrid = ({
 
   function newGraphData() {
     let gitHash = selectedGraph;
-    let postData = {
-        "selected_nodes": nodes.filter(node => node.selected == true).map(node => node.node)
-    };
-    fetch('/api/graphs/' + gitHash + '/d3', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(postData)
-    })
-      .then(response => response.json())
-      .then(data => {
-        setGraphData(data.graphData);
-      });
-    fetch('/api/graphs/' + gitHash + '/nodes/details', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(postData)
-    })
-      .then(response => response.json())
-      .then(data => {
-        setNodeInfos(data.nodeInfos);
-      });
+    if (gitHash) {
+      let postData = {
+          "selected_nodes": nodes.filter(node => node.selected == true).map(node => node.node),
+          "transitive_edges": showTransitive
+      };
+      fetch('/api/graphs/' + gitHash + '/d3', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(postData)
+      })
+        .then(response => response.json())
+        .then(data => {
+          setGraphData(data.graphData);
+          setLinks(data.graphData.links);
+          setLinksTrans(data.graphData.links_trans);
+        });
+      fetch('/api/graphs/' + gitHash + '/nodes/details', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(postData)
+      })
+        .then(response => response.json())
+        .then(data => {
+          setNodeInfos(data.nodeInfos);
+        });
+    }
   }
 
   const getRowClassName = ({ index }) => {
@@ -249,6 +259,6 @@ const DataGrid = ({
   );
 };
 
-export default connect(getRows, { updateSelected, setGraphData, setNodeInfos })(
+export default connect(getRows, { updateSelected, setGraphData, setNodeInfos, setLinks, setLinksTrans })(
   withStyles(styles)(DataGrid)
 );

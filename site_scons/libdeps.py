@@ -63,6 +63,7 @@ import textwrap
 import hashlib
 import json
 import fileinput
+import subprocess
 
 try:
     import networkx
@@ -1265,7 +1266,9 @@ def generate_graph(env, target, source):
 
     libdeps_graph = env.GetLibdepsGraph()
 
+    demangled_symbols = {}
     for symbol_deps_file in source:
+
         with open(str(symbol_deps_file)) as f:
             symbols = {}
             try:
@@ -1279,16 +1282,26 @@ def generate_graph(env, target, source):
             except json.JSONDecodeError:
                 env.FatalError(f"Failed processing json file: {str(symbol_deps_file)}")
 
-            for libdep in symbols:
-                from_node = os.path.abspath(str(symbol_deps_file)[:-len(env['SYMBOLDEPSSUFFIX'])])
-                to_node = os.path.abspath(libdep).strip()
-                libdeps_graph.add_edges_from([(
-                    from_node,
-                    to_node,
-                    {EdgeProps.symbols.name: " ".join(symbols[libdep])},
-                )])
-                node = env.File(str(symbol_deps_file)[:-len(env['SYMBOLDEPSSUFFIX'])])
-                add_node_from(env, node)
+            demangled_symbols[str(symbol_deps_file)] = symbols
+
+    p1 = subprocess.Popen(['c++filt', '-n'], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                          stderr=subprocess.STDOUT)
+    stdout, stderr = p1.communicate(json.dumps(demangled_symbols).encode('utf-8'))
+    demangled_symbols = json.loads(stdout.decode("utf-8"))
+
+    for deps_file in demangled_symbols:
+
+        for libdep in demangled_symbols[deps_file]:
+
+            from_node = os.path.abspath(str(deps_file)[:-len(env['SYMBOLDEPSSUFFIX'])])
+            to_node = os.path.abspath(libdep).strip()
+            libdeps_graph.add_edges_from([(
+                from_node,
+                to_node,
+                {EdgeProps.symbols.name: "\n".join(demangled_symbols[deps_file][libdep])},
+            )])
+            node = env.File(str(deps_file)[:-len(env['SYMBOLDEPSSUFFIX'])])
+            add_node_from(env, node)
 
     libdeps_graph_file = f"{env.Dir('$BUILD_DIR').path}/libdeps/libdeps.graphml"
     networkx.write_graphml(libdeps_graph, libdeps_graph_file, named_key_ids=True)
@@ -1364,7 +1377,7 @@ def setup_environment(env, emitting_shared=False, debug='off', linting='on'):
 
         env['LIBDEPS_SYMBOL_DEP_FILES'] = symbol_deps
         env['LIBDEPS_GRAPH_FILE'] = env.File("${BUILD_DIR}/libdeps/libdeps.graphml")
-        env['LIBDEPS_GRAPH_SCHEMA_VERSION'] = 3
+        env['LIBDEPS_GRAPH_SCHEMA_VERSION'] = 4
         env["SYMBOLDEPSSUFFIX"] = '.symbol_deps'
 
         libdeps_graph = LibdepsGraph()
