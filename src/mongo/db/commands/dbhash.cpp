@@ -134,7 +134,11 @@ public:
             }
         }
 
-        const std::string ns = parseNs(dbname, cmdObj);
+        // TODO SERVER-67827: Pass dbName obj directly.
+        const DatabaseName dbName(boost::none, dbname);
+        // For empty databasename on first command field, the following code depends on the "."
+        // on ns to find the invalid empty db name instead of checking empty db name directly.
+        const std::string ns = parseNs(dbName, cmdObj).ns();
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid db name: " << ns,
                 NamespaceString::validDBName(ns, NamespaceString::DollarInDbNameBehavior::Allow));
@@ -222,7 +226,7 @@ public:
             shouldNotConflictBlock.emplace(opCtx->lockState());
         }
 
-        // TODO SERVER-67459 Pass dbName obj directly
+        // TODO SERVER-67827: Pass dbName obj directly.
         AutoGetDb autoDb(opCtx, DatabaseName(boost::none, ns), lockMode);
         Database* db = autoDb.getDb();
 
@@ -236,9 +240,8 @@ public:
         std::set<std::string> cappedCollectionSet;
 
         bool noError = true;
-        const DatabaseName tenantDbName(boost::none, dbname);
         catalog::forEachCollectionFromDb(
-            opCtx, tenantDbName, MODE_IS, [&](const CollectionPtr& collection) {
+            opCtx, dbName, MODE_IS, [&](const CollectionPtr& collection) {
                 auto collNss = collection->ns();
 
                 if (collNss.size() - 1 <= dbname.size()) {

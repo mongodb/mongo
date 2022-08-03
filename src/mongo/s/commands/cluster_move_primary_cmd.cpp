@@ -74,19 +74,20 @@ public:
                                        const std::string& dbname,
                                        const BSONObj& cmdObj) const {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forDatabaseName(parseNs(dbname, cmdObj)), ActionType::moveChunk)) {
+                ResourcePattern::forDatabaseName(parseNs({boost::none, dbname}, cmdObj).db()),
+                ActionType::moveChunk)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
 
         return Status::OK();
     }
 
-    virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+    NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj) const override {
         const auto nsElt = cmdObj.firstElement();
         uassert(ErrorCodes::InvalidNamespace,
                 "'movePrimary' must be of type String",
                 nsElt.type() == BSONType::String);
-        return nsElt.str();
+        return NamespaceString(dbName.tenantId(), nsElt.str());
     }
 
     virtual bool run(OperationContext* opCtx,
@@ -95,7 +96,7 @@ public:
                      BSONObjBuilder& result) {
         auto request = MovePrimary::parse(IDLParserContext("MovePrimary"), cmdObj);
 
-        const string db = parseNs("", cmdObj);
+        const string db = parseNs({boost::none, ""}, cmdObj).dbName().db();
         const StringData toShard(request.getTo());
 
         // Invalidate the routing table cache entry for this database so that we reload the

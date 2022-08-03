@@ -174,8 +174,8 @@ public:
         return false;
     }
 
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsCollectionRequired(dbname, cmdObj).ns();
+    NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj) const override {
+        return CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -194,7 +194,7 @@ public:
              const std::string& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const NamespaceString nss(parseNs(dbName, cmdObj));
+        const NamespaceString nss(parseNs({boost::none, dbName}, cmdObj));
 
         const auto targeter = ChunkManagerTargeter(opCtx, nss);
         const auto cm = targeter.getRoutingInfo();

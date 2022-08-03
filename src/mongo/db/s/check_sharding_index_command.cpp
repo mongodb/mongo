@@ -66,8 +66,8 @@ public:
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
 
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsFullyQualified(cmdObj);
+    NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj) const override {
+        return NamespaceString(dbName.tenantId(), CommandHelpers::parseNsFullyQualified(cmdObj));
     }
 
     bool errmsgRun(OperationContext* opCtx,
@@ -75,7 +75,7 @@ public:
                    const BSONObj& jsobj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
-        const NamespaceString nss = NamespaceString(parseNs(dbname, jsobj));
+        const NamespaceString nss(parseNs({boost::none, dbname}, jsobj));
 
         BSONObj keyPattern = jsobj.getObjectField("keyPattern");
         if (keyPattern.isEmpty()) {

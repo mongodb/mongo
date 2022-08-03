@@ -225,7 +225,8 @@ public:
         return true;
     }
 
-    virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
+    virtual NamespaceString parseNs(const DatabaseName& dbName,
+                                    const BSONObj& cmdObj) const override {
         std::string collectionName;
         if (const auto rootElt = cmdObj["root"]) {
             uassert(ErrorCodes::InvalidNamespace,
@@ -236,7 +237,7 @@ public:
         if (collectionName.empty())
             collectionName = "fs";
         collectionName += ".chunks";
-        return NamespaceString(dbname, collectionName).ns();
+        return NamespaceString(dbName, collectionName);
     }
 
     virtual void addRequiredPrivileges(const std::string& dbname,
@@ -249,7 +250,7 @@ public:
              const std::string& dbname,
              const BSONObj& jsobj,
              BSONObjBuilder& result) {
-        const NamespaceString nss(parseNs(dbname, jsobj));
+        const NamespaceString nss(parseNs({boost::none, dbname}, jsobj));
 
         md5digest d;
         md5_state_t st;

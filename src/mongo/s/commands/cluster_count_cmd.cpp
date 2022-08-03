@@ -93,7 +93,7 @@ public:
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
-        const NamespaceString nss(parseNs(dbname, cmdObj));
+        const NamespaceString nss(parseNs({boost::none, dbname}, cmdObj));
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
                 nss.isValid());
@@ -195,7 +195,6 @@ public:
                    const OpMsgRequest& request,
                    ExplainOptions::Verbosity verbosity,
                    rpc::ReplyBuilderInterface* result) const override {
-        std::string dbname = request.getDatabase().toString();
         const BSONObj& cmdObj = request.body;
 
         CountCommandRequest countRequest(NamespaceStringOrUUID(NamespaceString{}));
@@ -205,7 +204,7 @@ public:
             return exceptionToStatus();
         }
 
-        const NamespaceString nss(parseNs(dbname, cmdObj));
+        const NamespaceString nss(parseNs(request.getDatabase(), cmdObj));
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
                 nss.isValid());

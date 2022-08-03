@@ -78,12 +78,12 @@ public:
         return Status::OK();
     }
 
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
+    NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj) const override {
         const auto nsElt = cmdObj.firstElement();
         uassert(ErrorCodes::InvalidNamespace,
                 "'movePrimary' must be of type String",
                 nsElt.type() == BSONType::String);
-        return nsElt.str();
+        return NamespaceString(dbName.tenantId(), nsElt.str());
     }
 
     bool run(OperationContext* opCtx,
@@ -94,18 +94,18 @@ public:
 
         const auto movePrimaryRequest =
             ShardMovePrimary::parse(IDLParserContext("_shardsvrMovePrimary"), cmdObj);
-        const auto dbname = parseNs("", cmdObj);
+        const auto dbName = parseNs({boost::none, ""}, cmdObj).dbName();
 
-        const NamespaceString dbNss(dbname);
+        const NamespaceString dbNss(dbName);
         const auto toShard = movePrimaryRequest.getTo();
 
         uassert(
             ErrorCodes::InvalidNamespace,
-            str::stream() << "invalid db name specified: " << dbname,
-            NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
+            str::stream() << "invalid db name specified: " << dbName.db(),
+            NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow));
 
         uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "Can't move primary for " << dbname << " database",
+                str::stream() << "Can't move primary for " << dbName.db() << " database",
                 !dbNss.isOnInternalDb());
 
         uassert(ErrorCodes::InvalidOptions,

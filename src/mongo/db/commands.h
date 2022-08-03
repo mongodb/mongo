@@ -852,12 +852,13 @@ private:
 public:
     using Command::Command;
 
-    virtual std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const {
-        return CommandHelpers::parseNsFromCommand(dbname, cmdObj);
+    virtual NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj) const {
+        return CommandHelpers::parseNsFromCommand(dbName, cmdObj);
     }
 
     ResourcePattern parseResourcePattern(const std::string& dbname, const BSONObj& cmdObj) const {
-        return CommandHelpers::resourcePatternForNamespace(parseNs(dbname, cmdObj));
+        return CommandHelpers::resourcePatternForNamespace(
+            parseNs({boost::none, dbname}, cmdObj).ns());
     }
 
     //

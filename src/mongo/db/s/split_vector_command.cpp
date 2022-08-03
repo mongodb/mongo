@@ -73,15 +73,15 @@ public:
                                const std::string& dbname,
                                const BSONObj& cmdObj) const override {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
+                ResourcePattern::forExactNamespace(parseNs({boost::none, dbname}, cmdObj)),
                 ActionType::splitVector)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         return Status::OK();
     }
 
-    std::string parseNs(const string& dbname, const BSONObj& cmdObj) const override {
-        return CommandHelpers::CommandHelpers::parseNsFullyQualified(cmdObj);
+    NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj) const override {
+        return NamespaceString(dbName.tenantId(), CommandHelpers::parseNsFullyQualified(cmdObj));
     }
 
     bool errmsgRun(OperationContext* opCtx,
@@ -90,7 +90,7 @@ public:
                    string& errmsg,
                    BSONObjBuilder& result) override {
 
-        const NamespaceString nss = NamespaceString(parseNs(dbname, jsobj));
+        const NamespaceString nss(parseNs({boost::none, dbname}, jsobj));
         BSONObj keyPattern = jsobj.getObjectField("keyPattern");
 
         if (keyPattern.isEmpty()) {

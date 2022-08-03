@@ -909,7 +909,7 @@ private:
     }
 
     NamespaceString ns() const override {
-        return NamespaceString(_dbName.tenantId(), _command->parseNs(_dbName.toString(), cmdObj()));
+        return _command->parseNs(_dbName, cmdObj());
     }
 
     bool supportsWriteConcern() const override {

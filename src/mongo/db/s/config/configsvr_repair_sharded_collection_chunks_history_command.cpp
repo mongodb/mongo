@@ -68,8 +68,8 @@ public:
         return true;
     }
 
-    std::string parseNs(const std::string& unusedDbName, const BSONObj& cmdObj) const override {
-        return CommandHelpers::parseNsFullyQualified(cmdObj);
+    NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj) const override {
+        return NamespaceString(dbName.tenantId(), CommandHelpers::parseNsFullyQualified(cmdObj));
     }
 
     Status checkAuthForCommand(Client* client,
@@ -96,7 +96,7 @@ public:
 
         CommandHelpers::uassertCommandRunWithMajority(getName(), opCtx->getWriteConcern());
 
-        const NamespaceString nss{parseNs(unusedDbName, cmdObj)};
+        const NamespaceString nss{parseNs({boost::none, unusedDbName}, cmdObj)};
 
         auto currentTime = VectorClock::get(opCtx)->getTime();
         auto validAfter = currentTime.configTime().asTimestamp();

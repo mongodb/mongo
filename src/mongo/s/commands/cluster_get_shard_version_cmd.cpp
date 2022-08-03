@@ -68,7 +68,7 @@ public:
                                const std::string& dbname,
                                const BSONObj& cmdObj) const override {
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(NamespaceString(parseNs(dbname, cmdObj))),
+                ResourcePattern::forExactNamespace(parseNs({boost::none, dbname}, cmdObj)),
                 ActionType::getShardVersion)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
@@ -76,20 +76,19 @@ public:
         return Status::OK();
     }
 
-    std::string parseNs(const std::string& dbname, const BSONObj& cmdObj) const override {
+    NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj) const override {
         BSONElement first = cmdObj.firstElement();
         uassert(ErrorCodes::BadValue,
                 str::stream() << "namespace has invalid type " << typeName(first.type()),
                 first.canonicalType() == canonicalizeBSONType(mongo::String));
-        const NamespaceString nss(first.valueStringData());
-        return nss.ns();
+        return NamespaceString(dbName.tenantId(), first.valueStringData());
     }
 
     bool run(OperationContext* opCtx,
              const std::string& dbname,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const NamespaceString nss(parseNs(dbname, cmdObj));
+        const NamespaceString nss(parseNs({boost::none, dbname}, cmdObj));
 
         const auto catalogCache = Grid::get(opCtx)->catalogCache();
 
