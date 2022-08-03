@@ -6,6 +6,7 @@
  *   assumes_read_concern_unchanged,
  *   assumes_read_preference_unchanged,
  *   requires_capped,
+ *   docker_incompatible,
  * ]
  */
 
