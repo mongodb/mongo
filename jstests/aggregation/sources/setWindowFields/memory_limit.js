@@ -61,10 +61,6 @@ assert.commandWorked(coll.runCommand({
     allowDiskUse: false
 }));
 
-setParameterOnAllHosts(nonConfigNodes,
-                       "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
-                       (perDocSize * docsPerPartition) + 1024);
-
 // Test that the query fails with a window function that stores documents.
 assert.commandFailedWithCode(coll.runCommand({
     aggregate: coll.getName(),
@@ -78,7 +74,7 @@ assert.commandFailedWithCode(coll.runCommand({
     cursor: {},
     allowDiskUse: false
 }),
-                             [5643011, 5414201]);
+                             5414201);
 // Reset limit for other tests.
 setParameterOnAllHosts(
     nonConfigNodes, "internalDocumentSourceSetWindowFieldsMaxMemoryBytes", 100 * 1024 * 1024);
