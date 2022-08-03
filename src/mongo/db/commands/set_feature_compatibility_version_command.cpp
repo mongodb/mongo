@@ -76,6 +76,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/serverless/shard_split_donor_service.h"
 #include "mongo/db/session_catalog.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/transaction/session_txn_record_gen.h"
 #include "mongo/db/vector_clock.h"
@@ -465,43 +466,52 @@ private:
         hangWhileUpgrading.pauseWhileSet(opCtx);
     }
 
-    void _runDowngrade(OperationContext* opCtx,
-                       const SetFeatureCompatibilityVersion& request,
-                       boost::optional<Timestamp> changeTimestamp) {
-        const auto requestedVersion = request.getCommandParameter();
-
-        // TODO  SERVER-65332 remove logic bound to this future object When kLastLTS is 6.0
-        boost::optional<SharedSemiFuture<void>> chunkResizeAsyncTask;
+    // This helper function is for any actions that should be done before taking the FCV full
+    // transition lock in S mode.
+    void _prepareForDowngrade(OperationContext* opCtx) {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            // Tell the shards to enter phase-1 of setFCV
-            auto requestPhase1 = request;
-            requestPhase1.setFromConfigServer(true);
-            requestPhase1.setPhase(SetFCVPhaseEnum::kStart);
-            requestPhase1.setChangeTimestamp(changeTimestamp);
-            uassertStatusOK(
-                ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
-                    opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase1.toBSON({}))));
-
-            chunkResizeAsyncTask =
-                Balancer::get(opCtx)->applyLegacyChunkSizeConstraintsOnClusterData(opCtx);
+            return;
+        } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+            return;
+        } else {
+            _cancelServerlessMigrations(opCtx);
         }
+    }
 
-        _cancelServerlessMigrations(opCtx);
+    // Tell the shards to enter phase-1 or phase-2 of setFCV.
+    void _sendSetFCVRequestToShards(OperationContext* opCtx,
+                                    const SetFeatureCompatibilityVersion& request,
+                                    boost::optional<Timestamp> changeTimestamp,
+                                    enum mongo::SetFCVPhaseEnum phase) {
+        auto requestPhase = request;
+        requestPhase.setFromConfigServer(true);
+        requestPhase.setPhase(phase);
+        requestPhase.setChangeTimestamp(changeTimestamp);
+        uassertStatusOK(ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
+            opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase.toBSON({}))));
+    }
 
-        {
-            // Take the FCV full transition lock in S mode to create a barrier for operations taking
-            // the global IX or X locks, which implicitly take the FCV full transition lock in IX
-            // mode (aside from those which explicitly opt out). This ensures that either:
-            //   - The global IX/X locked operation will start after the FCV change, see the
-            //     downgrading to the last-lts or last-continuous FCV and act accordingly.
-            //   - The global IX/X locked operation began prior to the FCV change, is acting on that
-            //     assumption and will finish before downgrade procedures begin right after this.
-            Lock::ResourceLock lk(
-                opCtx, opCtx->lockState(), resourceIdFeatureCompatibilityVersion, MODE_S);
+    // This helper function is for any uasserts for users to clean up user collections. Uasserts for
+    // users to change settings or wait for settings to change should also happen here. These
+    // uasserts happen before the internal server downgrade cleanup. The code in this helper
+    // function is required to be idempotent in case the node crashes or downgrade fails in a way
+    // that the user has to run setFCV again. The code added/modified in this helper function should
+    // not leave the server in an inconsistent state if the actions in this function failed part way
+    // through.
+    void _uassertUserDataAndSettingsReadyForDowngrade(
+        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            return;
+        } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
+                   serverGlobalParams.clusterRole == ClusterRole::None) {
+            _userCollectionsUasserts(opCtx, requestedVersion);
         }
+    }
 
-        if (serverGlobalParams.featureCompatibility
-                .isFCVDowngradingOrAlreadyDowngradedFromLatest()) {
+    void _userCollectionsUasserts(
+        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        if (!feature_flags::gTimeseriesScalabilityImprovements.isEnabledOnVersion(
+                requestedVersion)) {
             for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
                 Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
                 catalog::forEachCollectionFromDb(
@@ -547,31 +557,31 @@ private:
                     });
             }
         }
+    }
 
-        {
+    // This helper function is for any internal server downgrade cleanup, such as dropping
+    // collections or aborting. This cleanup will happen after user collection downgrade
+    // cleanup. The code in this helper function is required to be idempotent in case the node
+    // crashes or downgrade fails in a way that the user has to run setFCV again. It also cannot
+    // fail for a non-retryable reason since at this point user data has already been cleaned up.
+    void _internalServerDowngradeCleanup(
+        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            _dropInternalGlobalIndexesCollection(opCtx, requestedVersion);
 
-            LOGV2(5876100, "Starting removal of internal sessions from config.transactions.");
-
-            // Due to the possibility that the shell or drivers have implicit sessions enabled, we
-            // cannot write to the config.transactions collection while we're in a session. So we
-            // construct a temporary client to as a work around.
-            auto newClient = opCtx->getServiceContext()->makeClient("InternalSessionsCleanup");
-
-            {
-                stdx::lock_guard<Client> lk(*newClient.get());
-                newClient->setSystemOperationKillableByStepdown(lk);
-            }
-
-            AlternativeClientRegion acr(newClient);
-            auto newOpCtxPtr = cc().makeOperationContext();
-            auto newOpCtx = newOpCtxPtr.get();
-
-            // Ensure that we can interrupt clean up during stepup or stepdown.
-            newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-
-            LOGV2(5876101, "Completed removal of internal sessions from config.transactions.");
+            // Always abort the reshardCollection regardless of version to ensure that it will
+            // run on a consistent version from start to finish. This will ensure that it will
+            // be able to apply the oplog entries correctly.
+            abortAllReshardCollection(opCtx);
+        } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+            _dropInternalGlobalIndexesCollection(opCtx, requestedVersion);
+        } else {
+            return;
         }
+    }
 
+    void _dropInternalGlobalIndexesCollection(
+        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
         // TODO SERVER-67392: Remove when 7.0 branches-out.
         // Coordinators that commits indexes to the csrs must be drained before this point. Older
         // FCV's must not find cluster-wide indexes.
@@ -627,34 +637,78 @@ private:
                 client.update(update);
             }
         }
+    }
+
+    void _runDowngrade(OperationContext* opCtx,
+                       const SetFeatureCompatibilityVersion& request,
+                       boost::optional<Timestamp> changeTimestamp) {
+        const auto requestedVersion = request.getCommandParameter();
+        // TODO  SERVER-65332 remove logic bound to this future object When kLastLTS is 6.0
+        boost::optional<SharedSemiFuture<void>> chunkResizeAsyncTask;
+
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            // Tell the shards to enter phase-1 of setFCV
+            _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kStart);
+        }
+
+        // Any actions that should be done before taking the FCV full transition lock in S mode
+        // should go in this function.
+        _prepareForDowngrade(opCtx);
+
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            chunkResizeAsyncTask =
+                Balancer::get(opCtx)->applyLegacyChunkSizeConstraintsOnClusterData(opCtx);
+        }
+
+        {
+            // Take the FCV full transition lock in S mode to create a barrier for operations taking
+            // the global IX or X locks, which implicitly take the FCV full transition lock in IX
+            // mode (aside from those which explicitly opt out). This ensures that either:
+            //   - The global IX/X locked operation will start after the FCV change, see the
+            //     upgrading to the latest FCV and act accordingly.
+            //   - The global IX/X locked operation began prior to the FCV change, is acting on that
+            //     assumption and will finish before upgrade procedures begin right after this.
+            Lock::ResourceLock lk(
+                opCtx, opCtx->lockState(), resourceIdFeatureCompatibilityVersion, MODE_S);
+        }
 
         uassert(ErrorCodes::Error(549181),
                 "Failing downgrade due to 'failDowngrading' failpoint set",
                 !failDowngrading.shouldFail());
 
+        // This helper function is for any uasserts for users to clean up user collections. Uasserts
+        // for users to change settings or wait for settings to change should also happen here.
+        // These uasserts happen before the internal server downgrade cleanup. The code in this
+        // helper function is required to be idempotent in case the node crashes or downgrade fails
+        // in a way that the user has to run setFCV again. The code added/modified in this helper
+        // function should not leave the server in an inconsistent state if the actions in this
+        // function failed part way through.
+        _uassertUserDataAndSettingsReadyForDowngrade(opCtx, requestedVersion);
+
+        // This helper function is for any internal server downgrade cleanup, such as dropping
+        // collections or aborting. These cleanup will happen after user collection downgrade
+        // cleanup. The code in this helper function is required to be idempotent in case the node
+        // crashes or downgrade fails in a way that the user has to run setFCV again. It also cannot
+        // fail for a non-retryable reason since at this point user data has already been cleaned
+        // up.
+        _internalServerDowngradeCleanup(opCtx, requestedVersion);
+
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            // Always abort the reshardCollection regardless of version to ensure that it will run
-            // on a consistent version from start to finish. This will ensure that it will be able
-            // to apply the oplog entries correctly.
-            abortAllReshardCollection(opCtx);
-
             // Tell the shards to enter phase-2 of setFCV (fully downgraded)
-            auto requestPhase2 = request;
-            requestPhase2.setFromConfigServer(true);
-            requestPhase2.setPhase(SetFCVPhaseEnum::kComplete);
-            requestPhase2.setChangeTimestamp(changeTimestamp);
-            uassertStatusOK(
-                ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
-                    opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
-        }
+            _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kComplete);
 
-        if (chunkResizeAsyncTask.has_value()) {
+            // chunkResizeAsyncTask is only used by config servers as part of internal server
+            // downgrade cleanup. Waiting for the task to complete is put at the end of
+            // _runDowngrade instead of inside _internalServerDowngradeCleanup because the task
+            // might take a long time to complete.
+            invariant(chunkResizeAsyncTask.has_value());
             LOGV2(6417108, "Waiting for cluster chunks resize process to complete.");
             uassertStatusOKWithContext(
                 chunkResizeAsyncTask->getNoThrow(opCtx),
                 "Failed to enforce chunk size constraint during FCV downgrade");
             LOGV2(6417109, "Cluster chunks resize process completed.");
         }
+
         hangWhileDowngrading.pauseWhileSet(opCtx);
 
         if (request.getDowngradeOnDiskChanges()) {

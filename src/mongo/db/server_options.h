@@ -201,17 +201,6 @@ struct ServerGlobalParams {
                 version != multiversion::GenericFCV::kLastLTS;
         }
 
-        bool isFCVDowngradingOrAlreadyDowngradedFromLatest() const {
-            auto currentVersion = getVersion();
-
-            // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
-            return currentVersion == multiversion::GenericFCV::kDowngradingFromLatestToLastLTS ||
-                currentVersion == multiversion::GenericFCV::kLastLTS ||
-                currentVersion ==
-                multiversion::GenericFCV::kDowngradingFromLatestToLastContinuous ||
-                currentVersion == multiversion::GenericFCV::kLastContinuous;
-        }
-
         void reset() {
             _version.store(FCV::kUnsetDefaultLastLTSBehavior);
         }
