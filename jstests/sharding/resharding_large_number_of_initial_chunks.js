@@ -33,7 +33,7 @@ const mongos = st.s;
 assert.commandWorked(mongos.adminCommand({enableSharding: kDbName}));
 assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
 
-let nZones = 10000;
+let nZones = 175000;
 let zones = [];
 let shard0Zones = [];
 let shard1Zones = [];
@@ -65,5 +65,14 @@ assert.commandWorked(mongos.adminCommand({reshardCollection: ns, key: {newKey: 1
 assert.eq(mongos.getDB("config").tags.find({ns: ns}).itcount(), nZones);
 assert.eq(findChunksUtil.countChunksForNs(mongos.getDB("config"), ns), nZones + 2);
 
+// check_orphans_are_deleted.js is skipped because it takes 1 minute to run on an optimized build
+// and this test doesn't insert any data for there to be unowned documents anyway.
+TestData.skipCheckOrphans = true;
+// check_uuids_consistent_across_cluster.js is skipped because it takes nearly 1 minute to run on an
+// optimized build.
+TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
+// check_routing_table_consistency.js is skipped because its $group + $lookup aggregation over the
+// config.chunks documents exceeds 100MB and fails.
+TestData.skipCheckRoutingTableConsistency = true;
 st.stop();
 })();
