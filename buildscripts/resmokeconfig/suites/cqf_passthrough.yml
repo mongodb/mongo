@@ -5,14 +5,9 @@ selector:
   - jstests/aggregation/**/*.js
   - jstests/core/**/*.js
   exclude_files:
-  # TODO SERVER-67369 enable once full type bracketing is supported.
-  - jstests/core/array_comparison_correctness.js
-  - jstests/core/arrayfind10.js
-  - jstests/core/arrayfind3.js
-  - jstests/core/date2.js
-  - jstests/core/expressions_matching_whole_array.js
+  # TODO SERVER-68364
   - jstests/core/index_decimal.js
-  - jstests/core/min_max_key.js
+  # TODO SERVER-67818
   - jstests/core/nan.js
   # TODO SERVER-67506
   - jstests/core/arrayfind5.js
