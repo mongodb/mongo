@@ -43,8 +43,7 @@ class test_cursor_bound06(bound_base):
 
     key_formats = [
         ('string', dict(key_format='S')),
-        # FIXME-WT-9487: Uncomment once column store search is implemented.
-        # ('var', dict(key_format='r')),
+        ('var', dict(key_format='r')),
         ('int', dict(key_format='i')),
         ('bytes', dict(key_format='u')),
         ('composite_string', dict(key_format='SSS')),
