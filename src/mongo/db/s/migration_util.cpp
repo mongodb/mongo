@@ -555,51 +555,6 @@ void resubmitRangeDeletionsOnStepUp(ServiceContext* serviceContext) {
         .getAsync([](auto) {});
 }
 
-template <typename Callable>
-void forEachOrphanRange(OperationContext* opCtx, const NamespaceString& nss, Callable&& handler) {
-    AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-
-    const auto csr = CollectionShardingRuntime::get(opCtx, nss);
-    const auto metadata = csr->getCurrentMetadataIfKnown();
-    const auto emptyChunkMap =
-        RangeMap{SimpleBSONObjComparator::kInstance.makeBSONObjIndexedMap<BSONObj>()};
-
-    if (!metadata) {
-        LOGV2(474680,
-              "Upgrade: Skipping orphaned range enumeration because the collection's sharding "
-              "state is not known",
-              "namespace"_attr = nss);
-        return;
-    }
-
-    if (!metadata->isSharded()) {
-        LOGV2(22029,
-              "Upgrade: Skipping orphaned range enumeration because the collection is not sharded",
-              "namespace"_attr = nss);
-        return;
-    }
-
-    auto startingKey = metadata->getMinKey();
-
-    while (true) {
-        auto range = metadata->getNextOrphanRange(emptyChunkMap, startingKey);
-        if (!range) {
-            LOGV2_DEBUG(22030,
-                        2,
-                        "Upgrade: Completed orphanged range enumeration; no orphaned ranges "
-                        "remain",
-                        "namespace"_attr = nss.toString(),
-                        "startingKey"_attr = redact(startingKey));
-
-            return;
-        }
-
-        handler(*range);
-
-        startingKey = range->getMax();
-    }
-}
-
 void persistMigrationCoordinatorLocally(OperationContext* opCtx,
                                         const MigrationCoordinatorDocument& migrationDoc) {
     PersistentTaskStore<MigrationCoordinatorDocument> store(
