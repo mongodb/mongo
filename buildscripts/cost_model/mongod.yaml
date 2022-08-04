@@ -5,6 +5,5 @@ storage:
     enabled: false
 setParameter:
   featureFlagCommonQueryFramework: true
-  internalQueryEnableCascadesOptimizer: true
-  internalQueryForceClassicEngine: false
+  internalQueryFrameworkControl: "tryBonsai"
   internalMeasureQueryExecutionTimeInMicroseconds: true

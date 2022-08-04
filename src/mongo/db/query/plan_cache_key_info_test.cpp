@@ -422,8 +422,9 @@ TEST(PlanCacheKeyInfoTest, DifferentQueryEngines) {
 
     // Helper to construct a plan cache key given the 'forceClassicEngine' flag.
     auto constructPlanCacheKey = [&](bool forceClassicEngine) {
-        RAIIServerParameterControllerForTest controller{"internalQueryForceClassicEngine",
-                                                        forceClassicEngine};
+        RAIIServerParameterControllerForTest controller{"internalQueryFrameworkControl",
+                                                        forceClassicEngine ? "forceClassicEngine"
+                                                                           : "trySbeEngine"};
         const auto queryStr = "{a: 0}";
         unique_ptr<CanonicalQuery> cq(canonicalize(queryStr));
         return makeKey(*cq, indexCores);

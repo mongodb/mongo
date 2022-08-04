@@ -70,7 +70,7 @@ explainPlan =
     assert.commandWorked(lessThanSevenView.explain("executionStats").count({x: {$gte: 5}}));
 assert.eq(explainPlan.stages[0].$cursor.queryPlanner.namespace, "views_count.coll");
 assert(explainPlan.stages[0].$cursor.hasOwnProperty("executionStats"));
-assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned, 2);
+assert.eq(explainPlan.stages[0].$cursor.executionStats.nReturned, 2, tojson(explainPlan));
 assert(!explainPlan.stages[0].$cursor.executionStats.hasOwnProperty("allPlansExecution"));
 
 explainPlan =

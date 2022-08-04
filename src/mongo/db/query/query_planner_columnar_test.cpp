@@ -85,7 +85,8 @@ protected:
 
 private:
     // SBE must be enabled in order to test columnar indexes.
-    RAIIServerParameterControllerForTest _controllerSBE{"internalQueryForceClassicEngine", false};
+    RAIIServerParameterControllerForTest _controllerSBE{"internalQueryFrameworkControl",
+                                                        "trySbeEngine"};
 };
 
 TEST_F(QueryPlannerColumnarTest, InclusionProjectionUsesColumnStoreIndex) {

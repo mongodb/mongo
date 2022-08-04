@@ -172,8 +172,9 @@ TEST(CanonicalQueryEncoderTest, ComputeKey) {
 
     // The computed key depends on which execution engine is enabled. As such, we disable SBE for
     // this test so that the test doesn't break should the default value of
-    // 'internalQueryForceClassicEngine' change in the future.
-    RAIIServerParameterControllerForTest controllerSBE("internalQueryForceClassicEngine", true);
+    // 'internalQueryFrameworkControl' change in the future.
+    RAIIServerParameterControllerForTest controllerSBE("internalQueryFrameworkControl",
+                                                       "forceClassicEngine");
 
     // No sorts
     testComputeKey("{}", "{}", "{}", "an@f");
@@ -247,8 +248,9 @@ TEST(CanonicalQueryEncoderTest, ComputeKey) {
 TEST(CanonicalQueryEncoderTest, EncodeNotEqualNullPredicates) {
     // The computed key depends on which execution engine is enabled. As such, we disable SBE for
     // this test so that the test doesn't break should the default value of
-    // 'internalQueryForceClassicEngine' change in the future.
-    RAIIServerParameterControllerForTest controllerSBE("internalQueryForceClassicEngine", true);
+    // 'internalQueryFrameworkControl' change in the future.
+    RAIIServerParameterControllerForTest controllerSBE("internalQueryFrameworkControl",
+                                                       "forceClassicEngine");
 
     // With '$eq', '$gte', and '$lte' negation comparison to 'null'.
     testComputeKey("{a: {$not: {$eq: null}}}", "{}", "{_id: 0, a: 1}", "ntnot_eq_null[eqa]|a@f");
@@ -268,8 +270,9 @@ TEST(CanonicalQueryEncoderTest, EncodeNotEqualNullPredicates) {
 TEST(CanonicalQueryEncoderTest, ComputeKeyEscaped) {
     // The computed key depends on which execution engine is enabled. As such, we disable SBE for
     // this test so that the test doesn't break should the default value of
-    // 'internalQueryForceClassicEngine' change in the future.
-    RAIIServerParameterControllerForTest controllerSBE("internalQueryForceClassicEngine", true);
+    // 'internalQueryFrameworkControl' change in the future.
+    RAIIServerParameterControllerForTest controllerSBE("internalQueryFrameworkControl",
+                                                       "forceClassicEngine");
     // Field name in query.
     testComputeKey("{'a,[]~|-<>': 1}", "{}", "{}", "eqa\\,\\[\\]\\~\\|\\-<>@f");
 
@@ -304,8 +307,9 @@ TEST(CanonicalQueryEncoderTest, ComputeKeyGeoWithin) {
 TEST(CanonicalQueryEncoderTest, ComputeKeyGeoNear) {
     // The computed key depends on which execution engine is enabled. As such, we disable SBE for
     // this test so that the test doesn't break should the default value of
-    // 'internalQueryForceClassicEngine' change in the future.
-    RAIIServerParameterControllerForTest controllerSBE("internalQueryForceClassicEngine", true);
+    // 'internalQueryFrameworkControl' change in the future.
+    RAIIServerParameterControllerForTest controllerSBE("internalQueryFrameworkControl",
+                                                       "forceClassicEngine");
 
     testComputeKey("{a: {$near: [0,0], $maxDistance:0.3 }}", "{}", "{}", "gnanrfl@f");
     testComputeKey("{a: {$nearSphere: [0,0], $maxDistance: 0.31 }}", "{}", "{}", "gnanssp@f");
@@ -320,7 +324,8 @@ TEST(CanonicalQueryEncoderTest, ComputeKeyGeoNear) {
 TEST(CanonicalQueryEncoderTest, ComputeKeyRegexDependsOnFlags) {
     // The computed key depends on which execution engine is enabled. As such, we enable SBE for
     // this test in order to ensure that we have coverage for both SBE and the classic engine.
-    RAIIServerParameterControllerForTest controllerSBE("internalQueryForceClassicEngine", false);
+    RAIIServerParameterControllerForTest controllerSBE("internalQueryFrameworkControl",
+                                                       "trySbeEngine");
     testComputeKey("{a: {$regex: \"sometext\"}}", "{}", "{}", "rea@t");
     testComputeKey("{a: {$regex: \"sometext\", $options: \"\"}}", "{}", "{}", "rea@t");
 
@@ -353,8 +358,9 @@ TEST(CanonicalQueryEncoderTest, ComputeKeyRegexDependsOnFlags) {
 TEST(CanonicalQueryEncoderTest, ComputeKeyMatchInDependsOnPresenceOfRegexAndFlags) {
     // The computed key depends on which execution engine is enabled. As such, we disable SBE for
     // this test so that the test doesn't break should the default value of
-    // 'internalQueryForceClassicEngine' change in the future.
-    RAIIServerParameterControllerForTest controllerSBE("internalQueryForceClassicEngine", true);
+    // 'internalQueryFrameworkControl' change in the future.
+    RAIIServerParameterControllerForTest controllerSBE("internalQueryFrameworkControl",
+                                                       "forceClassicEngine");
 
     // Test that an $in containing a single regex is unwrapped to $regex.
     testComputeKey("{a: {$in: [/foo/]}}", "{}", "{}", "rea@f");
@@ -403,8 +409,9 @@ TEST(CanonicalQueryEncoderTest, ComputeKeyMatchInDependsOnPresenceOfRegexAndFlag
 TEST(CanonicalQueryEncoderTest, CheckCollationIsEncoded) {
     // The computed key depends on which execution engine is enabled. As such, we disable SBE for
     // this test so that the test doesn't break should the default value of
-    // 'internalQueryForceClassicEngine' change in the future.
-    RAIIServerParameterControllerForTest controllerSBE("internalQueryForceClassicEngine", true);
+    // 'internalQueryFrameworkControl' change in the future.
+    RAIIServerParameterControllerForTest controllerSBE("internalQueryFrameworkControl",
+                                                       "forceClassicEngine");
 
     unique_ptr<CanonicalQuery> cq(canonicalize(
         fromjson("{a: 1, b: 1}"), {}, {}, fromjson("{locale: 'mock_reverse_string'}")));
@@ -416,7 +423,8 @@ TEST(CanonicalQueryEncoderTest, ComputeKeySBE) {
     // Generated cache keys should be treated as opaque to the user.
 
     // SBE must be enabled in order to generate SBE plan cache keys.
-    RAIIServerParameterControllerForTest controllerSBE("internalQueryForceClassicEngine", false);
+    RAIIServerParameterControllerForTest controllerSBE("internalQueryFrameworkControl",
+                                                       "trySbeEngine");
 
     RAIIServerParameterControllerForTest controllerSBEPlanCache("featureFlagSbeFull", true);
 
@@ -534,7 +542,8 @@ TEST(CanonicalQueryEncoderTest, ComputeKeySBE) {
 
 TEST(CanonicalQueryEncoderTest, ComputeKeySBEWithPipeline) {
     // SBE must be enabled in order to generate SBE plan cache keys.
-    RAIIServerParameterControllerForTest controllerSBE("internalQueryForceClassicEngine", false);
+    RAIIServerParameterControllerForTest controllerSBE("internalQueryFrameworkControl",
+                                                       "trySbeEngine");
 
     RAIIServerParameterControllerForTest controllerSBEPlanCache("featureFlagSbeFull", true);
 
@@ -595,7 +604,8 @@ TEST(CanonicalQueryEncoderTest, ComputeKeySBEWithPipeline) {
 
 TEST(CanonicalQueryEncoderTest, ComputeKeySBEWithReadConcern) {
     // SBE must be enabled in order to generate SBE plan cache keys.
-    RAIIServerParameterControllerForTest controllerSBE("internalQueryForceClassicEngine", false);
+    RAIIServerParameterControllerForTest controllerSBE("internalQueryFrameworkControl",
+                                                       "trySbeEngine");
     RAIIServerParameterControllerForTest controllerSBEPlanCache("featureFlagSbeFull", true);
 
     const auto sbeEncodingWithoutReadConcernAvailable =

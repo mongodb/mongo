@@ -103,7 +103,8 @@ function compareQueryEngineCounters(expectedCounters) {
 }
 
 // Start with SBE off.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
 
 // Run a find command.
 let expectedCounters = generateExpectedCounters(engine.find.classic);
@@ -138,7 +139,8 @@ compareQueryEngineCounters(expectedCounters);
 verifyProfiler(queryComment, engine.find.classic);
 
 // Turn SBE on.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
 
 // Run a find command.
 expectedCounters = generateExpectedCounters(engine.find.sbe);

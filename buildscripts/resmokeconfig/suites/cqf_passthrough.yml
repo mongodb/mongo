@@ -102,4 +102,4 @@ executor:
       set_parameters:
         enableTestCommands: 1
         featureFlagCommonQueryFramework: true
-        internalQueryEnableCascadesOptimizer: true
+        internalQueryFrameworkControl: "tryBonsai"

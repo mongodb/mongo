@@ -215,7 +215,8 @@ const groupStage = {
 
     // When using classic engine, the plan cache key of $match vs. $match + $lookup should be the
     // same.
-    assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
 
     coll.getPlanCache().clear();
     matchEntry = testLoweredPipeline(
@@ -227,7 +228,7 @@ const groupStage = {
     assert.eq(matchEntry.planCacheKey, lookupEntry.planCacheKey, {matchEntry, lookupEntry});
 
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}));
+        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
 })();
 
 MongoRunner.stopMongod(conn);

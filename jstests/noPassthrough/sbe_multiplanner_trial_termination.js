@@ -63,7 +63,8 @@ assert.commandWorked(db.adminCommand({setParameter: 1, [worksKnob]: trialLengthF
 // Force the classic engine and run an "allPlansExecution" verbosity explain. Confirm that the trial
 // period terminates based on the the "collection fraction" as opposed to
 // 'internalQueryPlanEvaluationWorks'.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
 let allPlans = getAllPlansExecution("1");
 for (let plan of allPlans) {
     assert(plan.hasOwnProperty("executionStages"), plan);
@@ -101,7 +102,8 @@ assert.gt(getParamRes[worksKnobSbe], numDocs);
 // default value of SBE's works knob exceeds the size of the collection, we expect the number of
 // reads to exceed the collection size as well. By construction of the test, this also means that
 // the trial period length exceeds both 'trialLengthFromCollFrac' and 'trialLengthFromWorksKnob'.
-assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}));
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
 allPlans = getAllPlansExecution("2");
 verifySbeNumReads(allPlans, numDocs, assert.gt);
 
