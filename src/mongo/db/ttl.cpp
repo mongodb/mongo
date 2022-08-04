@@ -231,10 +231,11 @@ private:
         }
 
         BSONElement secondsExpireElt = idx[secondsExpireField];
-        if (!secondsExpireElt.isNumber()) {
-            error() << "ttl indexes require the " << secondsExpireField << " field to be "
-                    << "numeric but received a type of " << typeName(secondsExpireElt.type())
-                    << ", skipping ttl job for: " << idx;
+        if (!secondsExpireElt.isNumber() || secondsExpireElt.isNaN()) {
+            error() << "TTL indexes require the expireAfterSeconds field to be to be numeric and "
+                       "not a NaN, skipping TTL job. ns: "
+                    << collectionNSS << "; field: " << secondsExpireField
+                    << "; type: " << typeName(secondsExpireElt.type()) << "; index: " << idx;
             return;
         }
 
