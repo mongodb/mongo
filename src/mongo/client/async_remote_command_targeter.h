@@ -33,6 +33,7 @@
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/executor/remote_command_targeter.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/future.h"
 #include <memory>
 
 namespace mongo {
@@ -48,8 +49,10 @@ public:
         return _targeter->findHosts(_readPref, t);
     }
 
-    void onRemoteCommandError(HostAndPort remoteHost, Status remoteCommandStatus) override final {
+    SemiFuture<void> onRemoteCommandError(HostAndPort remoteHost,
+                                          Status remoteCommandStatus) override final {
         _targeter->updateHostWithStatus(remoteHost, remoteCommandStatus);
+        return SemiFuture<void>::makeReady();
     }
 
 private:

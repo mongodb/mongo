@@ -88,7 +88,8 @@ TEST_F(AsyncRemoteCommandTargeterTest, OnRemoteErrorUpdatesTopology) {
     ReadPreferenceSetting readPref;
     AsyncRemoteCommandTargeter targeter = AsyncRemoteCommandTargeter(readPref, getTargeter());
 
-    targeter.onRemoteCommandError(kHosts[0], Status(ErrorCodes::NotPrimaryNoSecondaryOk, "mock"));
+    [[maybe_unused]] auto commandErrorResponse = targeter.onRemoteCommandError(
+        kHosts[0], Status(ErrorCodes::NotPrimaryNoSecondaryOk, "mock"));
 
     auto markedDownHosts = getTargeterMock()->getAndClearMarkedDownHosts();
     auto markedDownHost = *markedDownHosts.begin();
@@ -106,7 +107,8 @@ TEST_F(AsyncRemoteCommandTargeterTest, OnRemoteErrorUpdatesTopologyAndResolver) 
     AsyncRemoteCommandTargeter targeter = AsyncRemoteCommandTargeter(readPref, getTargeter());
 
     // Mark down a host and ensure that it has been noted as marked down.
-    targeter.onRemoteCommandError(kHosts[0], Status(ErrorCodes::NotPrimaryNoSecondaryOk, "mock"));
+    [[maybe_unused]] auto commandErrorResponse = targeter.onRemoteCommandError(
+        kHosts[0], Status(ErrorCodes::NotPrimaryNoSecondaryOk, "mock"));
     auto markedDownHosts = getTargeterMock()->getAndClearMarkedDownHosts();
     auto markedDownHost = *markedDownHosts.begin();
 

@@ -29,79 +29,67 @@
 
 #pragma once
 
-#include "mongo/base/status.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/server_options.h"
+#include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/service_context.h"
+#include "mongo/executor/remote_command_targeter.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/shard_id.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/cancellation.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/future.h"
-#include "mongo/util/net/hostandport.h"
+#include "mongo/util/out_of_line_executor.h"
+#include <memory>
 #include <vector>
 
+
 namespace mongo {
-namespace executor {
 namespace remote_command_runner {
 
-class RemoteCommandHostTargeter {
+class RemoteCommandShardIdTargeter
+    : public executor::remote_command_runner::RemoteCommandHostTargeter {
 public:
-    RemoteCommandHostTargeter() = default;
-
-    virtual ~RemoteCommandHostTargeter() = default;
-
-    /*
-     * Returns a collection of possible Hosts on which the command may run based on the specific
-     * settings (ReadPreference, etc.) of the targeter.
-     */
-    virtual SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) = 0;
-
-    /*
-     * Informs the RemoteHostTargeter that an error happened when trying to run a command on a
-     * HostAndPort. Allows the targeter to update its view of the cluster's topology if network
-     * or shutdown errors are recieved.
-     */
-    virtual SemiFuture<void> onRemoteCommandError(HostAndPort h, Status s) = 0;
-};
-
-class RemoteCommandLocalHostTargeter : public RemoteCommandHostTargeter {
-public:
-    RemoteCommandLocalHostTargeter() = default;
+    RemoteCommandShardIdTargeter(ShardId shardId,
+                                 OperationContext* opCtx,
+                                 ReadPreferenceSetting readPref,
+                                 ExecutorPtr executor)
+        : _shardId(shardId), _opCtx(opCtx), _readPref(readPref), _executor(executor){};
 
     SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) override final {
-        HostAndPort h = HostAndPort("localhost", serverGlobalParams.port);
-        std::vector<HostAndPort> hostList{h};
-
-        return SemiFuture<std::vector<HostAndPort>>::makeReady(hostList);
+        return getShard()
+            .thenRunOn(_executor)
+            .then([this, t](std::shared_ptr<Shard> shard) {
+                _shardFromLastResolve = shard;
+                return shard->getTargeter()->findHosts(_readPref, t);
+            })
+            .semi();
     }
 
+    /**
+     * Update underlying shard targeter's view of topology on error.
+     */
     SemiFuture<void> onRemoteCommandError(HostAndPort h, Status s) override final {
+        invariant(_shardFromLastResolve,
+                  "Cannot propagate a remote command error to a ShardTargeter before calling "
+                  "resolve and obtaining a shard.");
+        _shardFromLastResolve->updateReplSetMonitor(h, s);
         return SemiFuture<void>::makeReady();
     }
-};
 
-/**
- * Basic RemoteCommandHostTargeter that wraps a single HostAndPort. Use when you need to make a call
- * to the doRequest function but already know what HostAndPort to target.
- */
-class RemoteCommandFixedTargeter : public RemoteCommandHostTargeter {
-public:
-    RemoteCommandFixedTargeter(HostAndPort host) : _host(host){};
-
-    SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) override final {
-        std::vector<HostAndPort> hostList{_host};
-
-        return SemiFuture<std::vector<HostAndPort>>::makeReady(hostList);
-    }
-
-    SemiFuture<void> onRemoteCommandError(HostAndPort h, Status s) override final {
-        return SemiFuture<void>::makeReady();
+    SemiFuture<std::shared_ptr<Shard>> getShard() {
+        return Grid::get(_opCtx)->shardRegistry()->getShard(_executor, _shardId);
     }
 
 private:
-    HostAndPort _host;
+    ShardId _shardId;
+    OperationContext* _opCtx;
+    ReadPreferenceSetting _readPref;
+    ExecutorPtr _executor;
+    std::shared_ptr<Shard> _shardFromLastResolve;
 };
 
 }  // namespace remote_command_runner
-}  // namespace executor
 }  // namespace mongo

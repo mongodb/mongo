@@ -607,6 +607,7 @@ env.CppUnitTest(
         'mongos_core_options_stub.cpp',
         'mock_ns_targeter.cpp',
         'mongos_topology_coordinator_test.cpp',
+        'remote_command_shard_targeter_test.cpp',
         'request_types/add_shard_request_test.cpp',
         'request_types/add_shard_to_zone_request_test.cpp',
         'request_types/balance_chunk_request_test.cpp',
