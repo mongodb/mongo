@@ -61,6 +61,9 @@ void writeDecisionPersistedState(OperationContext* opCtx,
                                  OID newCollectionEpoch,
                                  Timestamp newCollectionTimestamp);
 
+void updateTagsDocsForTempNss(OperationContext* opCtx,
+                              const ReshardingCoordinatorDocument& coordinatorDoc);
+
 void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
                                           ReshardingMetrics* metrics,
                                           const ReshardingCoordinatorDocument& coordinatorDoc);
@@ -417,11 +420,10 @@ private:
      * Does the following writes:
      * 1. Updates the config.collections entry for the new sharded collection
      * 2. Updates config.chunks entries for the new sharded collection
-     * 3. Updates config.tags for the new sharded collection
      *
      * Transitions to 'kCommitting'.
      */
-    Future<void> _commit(const ReshardingCoordinatorDocument& updatedDoc);
+    void _commit(const ReshardingCoordinatorDocument& updatedDoc);
 
     /**
      * Waits on _reshardingCoordinatorObserver to notify that:

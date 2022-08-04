@@ -630,6 +630,8 @@ protected:
                                     _finalEpoch,
                                     _finalTimestamp);
 
+        updateTagsDocsForTempNss(operationContext(), expectedCoordinatorDoc);
+
         // Check that config.reshardingOperations and config.collections entries are updated
         // correctly
         assertStateAndCatalogEntriesMatchExpected(opCtx, expectedCoordinatorDoc, _finalEpoch);
