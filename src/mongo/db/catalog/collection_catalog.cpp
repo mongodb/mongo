@@ -144,8 +144,10 @@ public:
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kDroppedCollection: {
                     writeJobs.push_back(
-                        [opCtx = _opCtx, uuid = *entry.uuid()](CollectionCatalog& catalog) {
-                            catalog.deregisterCollection(opCtx, uuid);
+                        [opCtx = _opCtx,
+                         uuid = *entry.uuid(),
+                         isDropPending = *entry.isDropPending](CollectionCatalog& catalog) {
+                            catalog.deregisterCollection(opCtx, uuid, isDropPending);
                         });
                     break;
                 }
@@ -197,6 +199,15 @@ public:
                         auto viewRid = ResourceId(RESOURCE_COLLECTION, viewName);
                         catalog.removeResource(viewRid, viewName);
                     });
+                    break;
+                }
+                case UncommittedCatalogUpdates::Entry::Action::kDroppedIndex: {
+                    writeJobs.push_back(
+                        [opCtx = _opCtx,
+                         indexEntry = entry.indexEntry,
+                         isDropPending = *entry.isDropPending](CollectionCatalog& catalog) {
+                            catalog.deregisterIndex(opCtx, std::move(indexEntry), isDropPending);
+                        });
                     break;
                 }
             };
@@ -670,11 +681,22 @@ void CollectionCatalog::onCollectionRename(OperationContext* opCtx,
     uncommittedCatalogUpdates.renameCollection(coll, fromCollection);
 }
 
-void CollectionCatalog::dropCollection(OperationContext* opCtx, Collection* coll) const {
+void CollectionCatalog::dropIndex(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  std::shared_ptr<IndexCatalogEntry> indexEntry,
+                                  bool isDropPending) const {
+    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
+    uncommittedCatalogUpdates.dropIndex(nss, std::move(indexEntry), isDropPending);
+    PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
+}
+
+void CollectionCatalog::dropCollection(OperationContext* opCtx,
+                                       Collection* coll,
+                                       bool isDropPending) const {
     invariant(coll);
 
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    uncommittedCatalogUpdates.dropCollection(coll);
+    uncommittedCatalogUpdates.dropCollection(coll, isDropPending);
 
     // Requesting a writable collection normally ensures we have registered PublishCatalogUpdates
     // with the recovery unit. However, when the writable Collection was requested in Inplace mode
@@ -1183,7 +1205,8 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
 }
 
 std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(OperationContext* opCtx,
-                                                                    const UUID& uuid) {
+                                                                    const UUID& uuid,
+                                                                    bool isDropPending) {
     invariant(_catalog.find(uuid) != _catalog.end());
 
     auto coll = std::move(_catalog[uuid]);
@@ -1195,6 +1218,15 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(OperationCon
     // Make sure collection object exists.
     invariant(_collections.find(ns) != _collections.end());
     invariant(_orderedCollections.find(dbIdPair) != _orderedCollections.end());
+
+    if (isDropPending) {
+        auto ident = coll->getSharedIdent()->getIdent();
+        LOGV2_DEBUG(6825300, 1, "Registering drop pending collection ident", "ident"_attr = ident);
+
+        auto it = _dropPendingCollection.find(ident);
+        invariant(it == _dropPendingCollection.end());
+        _dropPendingCollection[ident] = coll;
+    }
 
     _orderedCollections.erase(dbIdPair);
     _collections.erase(ns);
@@ -1286,6 +1318,8 @@ void CollectionCatalog::deregisterAllCollectionsAndViews() {
     _orderedCollections.clear();
     _catalog.clear();
     _viewsForDatabase.clear();
+    _dropPendingCollection.clear();
+    _dropPendingIndex.clear();
     _stats = {};
 
     _resourceInformation.clear();
@@ -1307,6 +1341,48 @@ void CollectionCatalog::clearViews(OperationContext* opCtx, const DatabaseName& 
     CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
         catalog._replaceViewsForDatabase(dbName, std::move(viewsForDb));
     });
+}
+
+void CollectionCatalog::deregisterIndex(OperationContext* opCtx,
+                                        std::shared_ptr<IndexCatalogEntry> indexEntry,
+                                        bool isDropPending) {
+    if (!isDropPending) {
+        // No-op.
+        return;
+    }
+
+    // Unfinished index builds return a nullptr for getSharedIdent(). Use getIdent() instead.
+    std::string ident = indexEntry->getIdent();
+
+    auto it = _dropPendingIndex.find(ident);
+    invariant(it == _dropPendingIndex.end());
+
+    LOGV2_DEBUG(6825301, 1, "Registering drop pending index entry ident", "ident"_attr = ident);
+    _dropPendingIndex[ident] = indexEntry;
+}
+
+void CollectionCatalog::notifyIdentDropped(const std::string& ident) {
+    // It's possible that the ident doesn't exist in either map when the collection catalog is
+    // re-opened, the _dropPendingIdent map is cleared. During rollback-to-stable we re-open the
+    // collection catalog. The TimestampMonitor is a background thread that continues to run during
+    // rollback-to-stable and maintains its own drop pending ident information. It generates a set
+    // of drop pending idents outside of the global lock. However, during rollback-to-stable, we
+    // clear the TimestampMonitors drop pending state. But it's possible that the TimestampMonitor
+    // already generated a set of idents to drop for its next iteration, which would call into this
+    // function, for idents we've already cleared from the collection catalogs in-memory state.
+    LOGV2_DEBUG(6825302, 1, "Deregistering drop pending ident", "ident"_attr = ident);
+
+    auto collIt = _dropPendingCollection.find(ident);
+    if (collIt != _dropPendingCollection.end()) {
+        _dropPendingCollection.erase(collIt);
+        return;
+    }
+
+    auto indexIt = _dropPendingIndex.find(ident);
+    if (indexIt != _dropPendingIndex.end()) {
+        _dropPendingIndex.erase(indexIt);
+        return;
+    }
 }
 
 CollectionCatalog::iterator CollectionCatalog::begin(OperationContext* opCtx,

@@ -150,6 +150,8 @@ public:
 
     std::shared_ptr<const IndexCatalogEntry> getEntryShared(const IndexDescriptor*) const override;
 
+    std::shared_ptr<IndexCatalogEntry> getEntryShared(const IndexDescriptor*) override;
+
     std::vector<std::shared_ptr<const IndexCatalogEntry>> getAllReadyEntriesShared() const override;
 
     using IndexIterator = IndexCatalog::IndexIterator;
@@ -342,7 +344,7 @@ private:
     void _deleteIndexFromDisk(OperationContext* opCtx,
                               Collection* collection,
                               const std::string& indexName,
-                              std::shared_ptr<Ident> ident);
+                              std::shared_ptr<IndexCatalogEntry> entry);
 
     /**
      * Applies a set of transformations to the user-provided index object 'spec' to make it

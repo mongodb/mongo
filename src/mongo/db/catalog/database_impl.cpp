@@ -674,7 +674,8 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
             HistoricalIdentTracker::get(opCtx).recordDrop(ident, nss, uuid, commitTime.value());
         });
 
-    CollectionCatalog::get(opCtx)->dropCollection(opCtx, collection);
+    CollectionCatalog::get(opCtx)->dropCollection(
+        opCtx, collection, opCtx->getServiceContext()->getStorageEngine()->supportsPendingDrops());
 
 
     return Status::OK();

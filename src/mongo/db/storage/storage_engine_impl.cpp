@@ -886,8 +886,10 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
 
             audit::logDropIndex(opCtx->getClient(), ice->descriptor()->indexName(), coll->ns());
 
-            catalog::removeIndex(
-                opCtx, ice->descriptor()->indexName(), coll, ice->getSharedIdent());
+            catalog::removeIndex(opCtx,
+                                 ice->descriptor()->indexName(),
+                                 coll,
+                                 coll->getIndexCatalog()->getEntryShared(ice->descriptor()));
         }
 
         audit::logDropCollection(opCtx->getClient(), coll->ns());
@@ -898,7 +900,8 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
             firstError = result;
         }
 
-        CollectionCatalog::get(opCtx)->dropCollection(opCtx, coll);
+        CollectionCatalog::get(opCtx)->dropCollection(
+            opCtx, coll, opCtx->getServiceContext()->getStorageEngine()->supportsPendingDrops());
     }
 
     untimestampedDropWuow.commit();
@@ -973,7 +976,7 @@ Status StorageEngineImpl::repairRecordStore(OperationContext* opCtx,
     // After repairing, re-initialize the collection with a valid RecordStore.
     CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
         auto uuid = catalog.lookupUUIDByNSS(opCtx, nss).value();
-        catalog.deregisterCollection(opCtx, uuid);
+        catalog.deregisterCollection(opCtx, uuid, /*isDropPending=*/false);
     });
 
     // When repairing a record store, keep the existing behavior of not installing a minimum visible

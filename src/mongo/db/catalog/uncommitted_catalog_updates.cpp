@@ -122,7 +122,7 @@ void UncommittedCatalogUpdates::_createCollection(OperationContext* opCtx,
 
             opCtx->recoveryUnit()->onRollback([opCtx, uuid]() {
                 CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-                    catalog.deregisterCollection(opCtx, uuid);
+                    catalog.deregisterCollection(opCtx, uuid, /*isDropPending=*/false);
                 });
             });
         });
@@ -149,15 +149,38 @@ void UncommittedCatalogUpdates::renameCollection(const Collection* collection,
     _entries.push_back({Entry::Action::kRenamedCollection, nullptr, from, boost::none, it->nss});
 }
 
-void UncommittedCatalogUpdates::dropCollection(const Collection* collection) {
+void UncommittedCatalogUpdates::dropIndex(const NamespaceString& nss,
+                                          std::shared_ptr<IndexCatalogEntry> indexEntry,
+                                          bool isDropPending) {
+    auto it = std::find_if(_entries.rbegin(), _entries.rend(), [indexEntry](auto&& entry) {
+        return indexEntry == entry.indexEntry;
+    });
+    invariant(it == _entries.rend());
+
+    Entry entry;
+    entry.action = Entry::Action::kDroppedIndex;
+
+    // The index entry will use the namespace of the collection it belongs to.
+    entry.nss = nss;
+
+    entry.indexEntry = std::move(indexEntry);
+    entry.isDropPending = isDropPending;
+    _entries.push_back(std::move(entry));
+}
+
+void UncommittedCatalogUpdates::dropCollection(const Collection* collection, bool isDropPending) {
     auto it =
         std::find_if(_entries.rbegin(), _entries.rend(), [uuid = collection->uuid()](auto&& entry) {
             return entry.uuid() == uuid;
         });
     if (it == _entries.rend()) {
         // An entry with this uuid was not found so add a new entry.
-        _entries.push_back(
-            {Entry::Action::kDroppedCollection, nullptr, collection->ns(), collection->uuid()});
+        Entry entry;
+        entry.action = Entry::Action::kDroppedCollection;
+        entry.nss = collection->ns();
+        entry.externalUUID = collection->uuid();
+        entry.isDropPending = isDropPending;
+        _entries.push_back(std::move(entry));
         return;
     }
 
@@ -180,6 +203,7 @@ void UncommittedCatalogUpdates::dropCollection(const Collection* collection) {
     it->action = Entry::Action::kDroppedCollection;
     it->externalUUID = it->collection->uuid();
     it->collection = nullptr;
+    it->isDropPending = isDropPending;
 }
 
 void UncommittedCatalogUpdates::replaceViewsForDatabase(const DatabaseName& dbName,

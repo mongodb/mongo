@@ -1337,17 +1337,13 @@ Status IndexCatalogImpl::dropIndexEntry(OperationContext* opCtx,
     }();
 
     invariant(released.get() == entry);
-    opCtx->recoveryUnit()->registerChange(
-        std::make_unique<IndexRemoveChange>(opCtx,
-                                            collection->ns(),
-                                            collection->uuid(),
-                                            std::move(released),
-                                            collection->getSharedDecorations()));
+    opCtx->recoveryUnit()->registerChange(std::make_unique<IndexRemoveChange>(
+        opCtx, collection->ns(), collection->uuid(), released, collection->getSharedDecorations()));
 
     CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, collection);
     CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
         .unregisterIndex(indexName);
-    _deleteIndexFromDisk(opCtx, collection, indexName, entry->getSharedIdent());
+    _deleteIndexFromDisk(opCtx, collection, indexName, released);
 
     return Status::OK();
 }
@@ -1361,13 +1357,20 @@ void IndexCatalogImpl::deleteIndexFromDisk(OperationContext* opCtx,
 void IndexCatalogImpl::_deleteIndexFromDisk(OperationContext* opCtx,
                                             Collection* collection,
                                             const string& indexName,
-                                            std::shared_ptr<Ident> ident) {
+                                            std::shared_ptr<IndexCatalogEntry> entry) {
     invariant(!findIndexByName(opCtx,
                                indexName,
                                IndexCatalog::InclusionPolicy::kReady |
                                    IndexCatalog::InclusionPolicy::kUnfinished |
                                    IndexCatalog::InclusionPolicy::kFrozen));
-    catalog::removeIndex(opCtx, indexName, collection, std::move(ident));
+
+    catalog::DataRemoval dataRemoval = catalog::DataRemoval::kTwoPhase;
+    if (!entry || (entry && !entry->getSharedIdent())) {
+        // getSharedIdent() returns a nullptr for unfinished index builds. These indexes can be
+        // removed immediately as they weren't ready for use yet.
+        dataRemoval = catalog::DataRemoval::kImmediate;
+    }
+    catalog::removeIndex(opCtx, indexName, collection, std::move(entry), dataRemoval);
 }
 
 void IndexCatalogImpl::setMultikeyPaths(OperationContext* const opCtx,
@@ -1481,6 +1484,11 @@ const IndexCatalogEntry* IndexCatalogImpl::getEntry(const IndexDescriptor* desc)
 
 std::shared_ptr<const IndexCatalogEntry> IndexCatalogImpl::getEntryShared(
     const IndexDescriptor* indexDescriptor) const {
+    return indexDescriptor->getEntry()->shared_from_this();
+}
+
+std::shared_ptr<IndexCatalogEntry> IndexCatalogImpl::getEntryShared(
+    const IndexDescriptor* indexDescriptor) {
     return indexDescriptor->getEntry()->shared_from_this();
 }
 

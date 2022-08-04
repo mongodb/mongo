@@ -61,6 +61,9 @@ public:
             kAddViewResource,
             // Remove a view resource
             kRemoveViewResource,
+            // Dropped index instance
+            kDroppedIndex
+
         };
 
         boost::optional<UUID> uuid() const {
@@ -94,6 +97,14 @@ public:
         // New set of view information for a database.
         // Set for action kReplacedViewsForDatabase, boost::none otherwise.
         boost::optional<ViewsForDatabase> viewsForDb;
+
+        // Storage for the actual index entry.
+        // Set for action kDroppedIndex and nullptr otherwise.
+        std::shared_ptr<IndexCatalogEntry> indexEntry;
+
+        // Whether the collection or index entry is drop pending.
+        // Set for actions kDroppedCollection and kDroppedIndex, boost::none otherwise.
+        boost::optional<bool> isDropPending;
     };
 
     struct CollectionLookupResult {
@@ -165,9 +176,16 @@ public:
     void renameCollection(const Collection* collection, const NamespaceString& from);
 
     /**
+     * Manages an uncommitted index entry drop.
+     */
+    void dropIndex(const NamespaceString& nss,
+                   std::shared_ptr<IndexCatalogEntry> indexEntry,
+                   bool isDropPending);
+
+    /**
      * Manage an uncommitted collection drop.
      */
-    void dropCollection(const Collection* collection);
+    void dropCollection(const Collection* collection, bool isDropPending);
 
     /**
      * Replace the ViewsForDatabase instance assocated with database `dbName` with `vfdb`. This is

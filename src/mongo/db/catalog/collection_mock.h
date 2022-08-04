@@ -94,7 +94,7 @@ public:
         MONGO_UNREACHABLE;
     }
     std::shared_ptr<Ident> getSharedIdent() const {
-        MONGO_UNREACHABLE;
+        return std::make_shared<Ident>(_nss.toString());
     }
 
     BSONObj getValidatorDoc() const {

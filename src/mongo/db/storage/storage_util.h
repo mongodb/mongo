@@ -57,15 +57,16 @@ enum class DataRemoval {
  * used for incomplete indexes, where the index build is the only accessor and the data will not be
  * needed for earlier points in time.
  *
- * Uses 'ident' shared_ptr to ensure that the second phase of drop (data table drop) will not
- * execute until no users of the index (shared owners) remain. 'ident' is allowed to be a nullptr,
- * in which case the caller guarantees that there are no remaining users of the index. This handles
- * situations wherein there is no in-memory state available for an index, such as during repair.
+ * Uses IndexCatalogEntry::getSharedIdent() shared_ptr to ensure that the second phase of drop (data
+ * table drop) will not execute until no users of the index (shared owners) remain.
+ * IndexCatalogEntry::getSharedIdent() is allowed to be a nullptr, in which case the caller
+ * guarantees that there are no remaining users of the index. This handles situations wherein there
+ * is no in-memory state available for an index, such as during repair.
  */
 void removeIndex(OperationContext* opCtx,
                  StringData indexName,
                  Collection* collection,
-                 std::shared_ptr<Ident> ident,
+                 std::shared_ptr<IndexCatalogEntry> entry,
                  DataRemoval dataRemoval = DataRemoval::kTwoPhase);
 
 /**
