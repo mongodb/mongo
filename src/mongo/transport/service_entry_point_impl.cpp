@@ -40,6 +40,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/restriction_environment.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -254,7 +255,10 @@ public:
 };
 
 ServiceEntryPointImpl::ServiceEntryPointImpl(ServiceContext* svcCtx)
-    : _svcCtx(svcCtx), _maxSessions(getSupportedMax()), _sessions{std::make_unique<Sessions>()} {}
+    : _svcCtx(svcCtx),
+      _maxSessions(getSupportedMax()),
+      _rejectedSessions(0),
+      _sessions{std::make_unique<Sessions>()} {}
 
 ServiceEntryPointImpl::~ServiceEntryPointImpl() = default;
 
@@ -295,6 +299,9 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
     {
         auto sync = _sessions->sync();
         if (sync.size() >= _maxSessions && !isPrivilegedSession) {
+            // Since startSession() is guaranteed to be accessed only by a single listener thread,
+            // an atomic increment is not necessary here.
+            _rejectedSessions++;
             if (!quiet()) {
                 LOGV2(22942,
                       "Connection refused because there are too many open connections",
@@ -422,6 +429,10 @@ void ServiceEntryPointImpl::appendStats(BSONObjBuilder* bob) const {
     appendInt("current", sessionCount);
     appendInt("available", _maxSessions - sessionCount);
     appendInt("totalCreated", sessionsCreated);
+
+    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV()) {
+        appendInt("rejected", _rejectedSessions);
+    }
 
     invariant(_svcCtx);
     appendInt("active", _svcCtx->getActiveClientOperations());

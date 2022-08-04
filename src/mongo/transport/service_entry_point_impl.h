@@ -87,6 +87,7 @@ private:
     ServiceContext* const _svcCtx;
 
     const size_t _maxSessions;
+    size_t _rejectedSessions;
 
     std::unique_ptr<Sessions> _sessions;
 };

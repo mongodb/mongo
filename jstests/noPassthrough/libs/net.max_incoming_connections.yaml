@@ -1,0 +1,3 @@
+# Used in rejected_connections_server_status.js to limit the number of inbound connections.
+net:
+    maxIncomingConnections: 5
