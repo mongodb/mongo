@@ -64,6 +64,9 @@ using std::string;
 Status filterMatches(const BSONObj& testFilter,
                      const MatchExpression* trueFilter,
                      std::unique_ptr<CollatorInterface> collator) {
+    if (!trueFilter) {
+        return {ErrorCodes::Error{6298503}, "actual (true) filter was null"};
+    }
     std::unique_ptr<MatchExpression> trueFilterClone(trueFilter->shallowClone());
     MatchExpression::sortTree(trueFilterClone.get());
 
@@ -150,6 +153,22 @@ Status columnIxScanFiltersByPathMatch(
                                   << ", expected filters: " << expectedFiltersByPath
                                   << "stage. Please specify an object."};
         }
+    }
+    return Status::OK();
+}
+
+Status indexNamesMatch(BSONElement expectedIndexName, std::string actualIndexName) {
+    if (expectedIndexName.type() != BSONType::String) {
+        return {ErrorCodes::Error{5619234},
+                str::stream() << "Provided JSON gave a 'ixscan' with a 'name', but the name "
+                                 "was not an string: "
+                              << expectedIndexName};
+    }
+    if (expectedIndexName.valueStringData() != actualIndexName) {
+        return {ErrorCodes::Error{5619235},
+                str::stream() << "Provided JSON gave a 'column_scan' with an 'indexName' which did "
+                                 "not match. Expected: "
+                              << expectedIndexName << " Found: " << actualIndexName};
     }
     return Status::OK();
 }
@@ -521,20 +540,11 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
             }
         }
 
-        BSONElement name = ixscanObj["name"];
+        auto name = ixscanObj["name"];
         if (!name.eoo()) {
-            if (name.type() != BSONType::String) {
-                return {ErrorCodes::Error{5619234},
-                        str::stream()
-                            << "Provided JSON gave a 'ixscan' with a 'name', but the name "
-                               "was not an string: "
-                            << name};
-            }
-            if (name.valueStringData() != ixn->index.identifier.catalogName) {
-                return {ErrorCodes::Error{5619235},
-                        str::stream() << "Provided JSON gave a 'ixscan' with a 'name' which did "
-                                         "not match. Expected: "
-                                      << name << " Found: " << ixn->index.identifier.catalogName};
+            if (auto nameStatus = indexNamesMatch(name, ixn->index.identifier.catalogName);
+                !nameStatus.isOK()) {
+                return nameStatus;
             }
         }
 
@@ -1300,6 +1310,14 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                     "'column_scan' object in the expected JSON"};
         }
         auto obj = expectedElem.Obj();
+
+        if (auto indexName = obj["indexName"]) {
+            if (auto nameStatus =
+                    indexNamesMatch(indexName, actualColumnIxScanNode->indexEntry.catalogName);
+                !nameStatus.isOK()) {
+                return nameStatus;
+            }
+        }
 
         if (auto outputFields = obj["outputFields"]) {
             if (auto outputStatus =

@@ -44,12 +44,14 @@
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_text.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_enumerator.h"
@@ -61,6 +63,7 @@
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/util/set_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util_core.h"
 
@@ -140,9 +143,28 @@ Status tagOrChildAccordingToCache(PlanCacheIndexTree* compositeCacheData,
 }
 
 /**
- * Returns whether the hintedIndex matches the cluster key. When hinting by index name,
- * 'hintObj' takes the shape of {$hint: <indexName>}. When hinting by key pattern,
- * 'hintObj' represents the actual key pattern (eg: {_id: 1}).
+ * Returns whether the hint matches the given index. When hinting by index name, 'hintObj' takes the
+ * shape of {$hint: <indexName>}. When hinting by key pattern, 'hintObj' represents the actual key
+ * pattern (eg: {_id: 1}).
+ */
+bool hintMatchesNameOrPattern(const BSONObj& hintObj,
+                              StringData indexName,
+                              BSONObj indexKeyPattern) {
+
+    BSONElement firstHintElt = hintObj.firstElement();
+    if (firstHintElt.fieldNameStringData() == "$hint"_sd &&
+        firstHintElt.type() == BSONType::String) {
+        // An index name is provided by the hint.
+        return indexName == firstHintElt.valueStringData();
+        ;
+    }
+
+    // An index spec is provided by the hint.
+    return hintObj.woCompare(indexKeyPattern) == 0;
+}
+
+/**
+ * Returns whether the hintedIndex matches the cluster key.
  */
 bool hintMatchesClusterKey(const boost::optional<ClusteredCollectionInfo>& clusteredInfo,
                            const BSONObj& hintObj) {
@@ -153,23 +175,24 @@ bool hintMatchesClusterKey(const boost::optional<ClusteredCollectionInfo>& clust
 
     auto clusteredIndexSpec = clusteredInfo->getIndexSpec();
 
-    BSONElement firstHintElt = hintObj.firstElement();
-    if (firstHintElt.fieldNameStringData() == "$hint"_sd &&
-        firstHintElt.type() == BSONType::String) {
-        // An index name is provided by the hint.
+    // The clusteredIndex's name should always be filled in with a default value when not
+    // specified upon creation.
+    tassert(6012100,
+            "clusteredIndex's 'ne' field should be filled in by default after creation",
+            clusteredIndexSpec.getName());
+    return hintMatchesNameOrPattern(
+        hintObj, clusteredIndexSpec.getName().value(), clusteredIndexSpec.getKey());
+}
 
-        // The clusteredIndex's name should always be filled in with a default value when not
-        // specified upon creation.
-        tassert(6012100,
-                "clusteredIndex's 'name' field should be filled in by default after creation",
-                clusteredIndexSpec.getName());
-
-        auto hintName = firstHintElt.valueStringData();
-        return hintName == clusteredIndexSpec.getName().value();
-    }
-
-    // An index spec is provided by the hint.
-    return hintObj.woCompare(clusteredIndexSpec.getKey()) == 0;
+/**
+ * Returns whether the hintedIndex matches the columnstore index.
+ */
+bool hintMatchesColumnStoreIndex(const BSONObj& hintObj, const ColumnIndexEntry& columnStoreIndex) {
+    // TODO SERVER-68400: Should be possible to have some other keypattern.
+    return hintMatchesNameOrPattern(hintObj,
+                                    columnStoreIndex.catalogName,
+                                    BSON("$**"
+                                         << "columnstore"));
 }
 
 /**
@@ -200,22 +223,101 @@ std::pair<DepsTracker, DepsTracker> computeDeps(const QueryPlannerParams& params
     return {std::move(filterDeps), std::move(outputDeps)};
 }
 
-void tryToAddColumnScan(const QueryPlannerParams& params,
-                        const CanonicalQuery& query,
-                        std::vector<std::unique_ptr<QuerySolution>>& out) {
-    if (params.columnarIndexes.empty()) {
-        return;
+Status columnScanIsPossibleStatus(const CanonicalQuery& query, const QueryPlannerParams& params) {
+    if (params.columnStoreIndexes.empty()) {
+        return {ErrorCodes::InvalidOptions, "No columnstore indexes available"};
     }
-    invariant(params.columnarIndexes.size() == 1);
+    if (!query.isSbeCompatible()) {
+        return {ErrorCodes::NotImplemented,
+                "A columnstore index can only be used with queries in the SBE engine. The given "
+                "query is not eligible for this engine (yet)"};
+    }
+    if (query.getForceClassicEngine()) {
+        return {ErrorCodes::InvalidOptions,
+                "A columnstore index can only be used with queries in the SBE engine, but the "
+                "query specified to force the classic engine"};
+    }
+    return Status::OK();
+}
+
+bool columnScanIsPossible(const CanonicalQuery& query, const QueryPlannerParams& params) {
+    return columnScanIsPossibleStatus(query, params).isOK();
+}
+
+std::unique_ptr<QuerySolution> makeColumnScanPlan(
+    const CanonicalQuery& query,
+    const QueryPlannerParams& params,
+    const ColumnIndexEntry& columnStoreIndex,
+    DepsTracker filterDeps,
+    DepsTracker outputDeps,
+    StringMap<std::unique_ptr<MatchExpression>> filterSplitByColumn,
+    std::unique_ptr<MatchExpression> residualPredicate) {
+    dassert(columnScanIsPossible(query, params));
+
+    // TODO SERVER-67140: Check if the columnar index actually provides the fields we need.
+    return QueryPlannerAnalysis::analyzeDataAccess(
+        query,
+        params,
+        std::make_unique<ColumnIndexScanNode>(columnStoreIndex,
+                                              std::move(outputDeps.fields),
+                                              std::move(filterDeps.fields),
+                                              std::move(filterSplitByColumn),
+                                              std::move(residualPredicate)));
+}
+
+/**
+ * A helper function which applies a heuristic to determine if a COLUMN_SCAN plan would examine few
+ * enough fields to be considered faster than a COLLSCAN.
+ */
+Status checkFieldLimits(const OrderedPathSet& filterDeps,
+                        const OrderedPathSet& outputDeps,
+                        const StringMap<std::unique_ptr<MatchExpression>>& filterSplitByColumn) {
+
+    const int nReferencedFields =
+        static_cast<int>(set_util::setUnion(filterDeps, outputDeps).size());
+    const int maxNumFields = filterSplitByColumn.size() > 0
+        ? internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan.load()
+        : internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan.load();
+    if (nReferencedFields > maxNumFields) {
+        return Status{ErrorCodes::Error{6430508},
+                      str::stream() << "referenced too many fields. nReferenced="
+                                    << nReferencedFields << ", limit=" << maxNumFields};
+    }
+    return Status::OK();
+}
+/**
+ * Attempts to build a plan using a columnstore index. Returns a non-OK status if it can't build
+ * one
+ * - with the code and message indicating the problem - or a QuerySolution if it can.
+ */
+StatusWith<std::unique_ptr<QuerySolution>> tryToBuildColumnScan(
+    const QueryPlannerParams& params,
+    const CanonicalQuery& query,
+    const boost::optional<ColumnIndexEntry>& hintedIndex = boost::none) {
+    if (auto status = columnScanIsPossibleStatus(query, params); !status.isOK()) {
+        return status;
+    }
+
+    invariant(params.columnStoreIndexes.size() >= 1);
+    const auto& columnStoreIndex = hintedIndex.value_or(params.columnStoreIndexes.front());
+    if (!hintedIndex && params.columnStoreIndexes.size() > 1) {
+        // TODO SERVER-67140 only warnn if there is more than one index that is actually eligible
+        // for use.
+        LOGV2_DEBUG(6298500,
+                    2,
+                    "Multiple column store indexes present. Selecting the first "
+                    "one arbitrarily",
+                    "indexName"_attr = columnStoreIndex.catalogName);
+    }
 
     auto [filterDeps, outputDeps] = computeDeps(params, query);
     if (filterDeps.needWholeDocument || outputDeps.needWholeDocument) {
         // We only want to use the columnar index if we can avoid fetching the whole document.
-        return;
-    }
-    if (!query.isSbeCompatible() || query.getForceClassicEngine()) {
-        // We only support column scans in SBE.
-        return;
+        // TODO SERVER-66284 Would like to enable a plan when hinted, even if we need the whole
+        // document. Something like COLUMN_SCAN -> FETCH.
+        return {ErrorCodes::Error{6298501},
+                "cannot use columnstore index because the query requires seeing the entire "
+                "document"};
     }
 
     // TODO SERVER-67140: Check if the columnar index actually provides the fields we need.
@@ -227,31 +329,21 @@ void tryToAddColumnScan(const QueryPlannerParams& params,
     } else {
         residualPredicate = query.root()->shallowClone();
     }
-    const bool canPushFilters = filterSplitByColumn.size() > 0;
+    auto fieldLimitStatus =
+        checkFieldLimits(filterDeps.fields, outputDeps.fields, filterSplitByColumn);
 
-    auto columnScan = std::make_unique<ColumnIndexScanNode>(params.columnarIndexes.front(),
-                                                            std::move(outputDeps.fields),
-                                                            std::move(filterDeps.fields),
-                                                            std::move(filterSplitByColumn),
-                                                            std::move(residualPredicate));
-
-    const int nReferencedFields = static_cast<int>(columnScan->allFields.size());
-    const int maxNumFields = canPushFilters
-        ? internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan.load()
-        : internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan.load();
-    if (nReferencedFields > maxNumFields) {
-        LOGV2_DEBUG(6430508,
-                    5,
-                    "Opting out of column scan plan due to too many referenced fields",
-                    "nReferencedFields"_attr = nReferencedFields,
-                    "maxNumFields"_attr = maxNumFields,
-                    "canPushFilters"_attr = canPushFilters);
-        return;
+    if (fieldLimitStatus.isOK() || hintedIndex) {
+        // We have a hint, or few enough dependencies that we suspect a column scan is still
+        // better than a collection scan. Build it and return it.
+        return makeColumnScanPlan(query,
+                                  params,
+                                  columnStoreIndex,
+                                  std::move(filterDeps),
+                                  std::move(outputDeps),
+                                  std::move(filterSplitByColumn),
+                                  std::move(residualPredicate));
     }
-
-    // We have few enough dependencies that we suspect a column scan is still better than a
-    // collection scan. Add that solution.
-    out.push_back(QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(columnScan)));
+    return Status{ErrorCodes::Error{6298502}, "columnstore index is not applicable for this query"};
 }
 }  // namespace
 
@@ -259,7 +351,6 @@ using std::numeric_limits;
 using std::unique_ptr;
 
 namespace dps = ::mongo::dotted_path_support;
-
 // Copied verbatim from db/index.h
 static bool isIdIndex(const BSONObj& pattern) {
     BSONObjIterator i(pattern);
@@ -741,6 +832,94 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
     return {std::move(soln)};
 }
 
+/**
+ * For some reason this type is hard to construct inline and keep the compiler happy. Convenience
+ * helper to do so since we do it a couple times.
+ */
+StatusWith<std::vector<std::unique_ptr<QuerySolution>>> singleSolution(
+    std::unique_ptr<QuerySolution> soln) {
+    std::vector<std::unique_ptr<QuerySolution>> out;
+    out.push_back(std::move(soln));
+    return {std::move(out)};
+}
+
+bool canTableScan(const QueryPlannerParams& params) {
+    return !(params.options & QueryPlannerParams::NO_TABLE_SCAN);
+}
+
+StatusWith<std::vector<std::unique_ptr<QuerySolution>>> attemptCollectionScan(
+    const CanonicalQuery& query, bool isTailable, const QueryPlannerParams& params) {
+    if (!canTableScan(params)) {
+        return Status(ErrorCodes::NoQueryExecutionPlans,
+                      "not allowed to output a collection scan because 'notablescan' is enabled");
+    }
+    if (auto soln = buildCollscanSoln(query, isTailable, params)) {
+        return singleSolution(std::move(soln));
+    }
+    return Status(ErrorCodes::NoQueryExecutionPlans, "Failed to build collection scan soln");
+}
+
+StatusWith<std::vector<std::unique_ptr<QuerySolution>>> handleNaturalHint(
+    const CanonicalQuery& query,
+    const QueryPlannerParams& params,
+    BSONElement naturalHint,
+    bool isTailable) {
+    // The hint can be {$natural: +/-1}. If this happens, output a collscan. We expect any
+    // $natural sort to have been normalized to a $natural hint upstream. Additionally, if
+    // the hint matches the collection's cluster key, we also output a collscan utilizing
+    // the cluster key.
+
+    // Perform validation specific to $natural.
+    LOGV2_DEBUG(20969, 5, "Forcing a table scan due to hinted $natural");
+    if (!query.getFindCommandRequest().getMin().isEmpty() ||
+        !query.getFindCommandRequest().getMax().isEmpty()) {
+        return Status(ErrorCodes::NoQueryExecutionPlans,
+                      "min and max are incompatible with $natural");
+    }
+    auto result = attemptCollectionScan(query, isTailable, params);
+    if (result.isOK()) {
+        return result;
+    }
+    return result.getStatus().withContext("could not force a collection scan with a $natural hint");
+}
+
+StatusWith<std::vector<std::unique_ptr<QuerySolution>>> handleClusteredScanHint(
+    const CanonicalQuery& query, const QueryPlannerParams& params, bool isTailable) {
+    // Perform validation specific to hinting on a cluster key.
+    BSONObj minObj = query.getFindCommandRequest().getMin();
+    BSONObj maxObj = query.getFindCommandRequest().getMax();
+
+    const auto clusterKey = params.clusteredInfo->getIndexSpec().getKey();
+
+    // Check if the query collator is compatible with the collection collator for the
+    // provided min and max values.
+    if ((!minObj.isEmpty() &&
+         !indexCompatibleMaxMin(
+             minObj, query.getCollator(), params.clusteredCollectionCollator, clusterKey)) ||
+        (!maxObj.isEmpty() &&
+         !indexCompatibleMaxMin(
+             maxObj, query.getCollator(), params.clusteredCollectionCollator, clusterKey))) {
+        return Status(ErrorCodes::Error(6137400),
+                      "The clustered index is not compatible with the values provided "
+                      "for min/max due to the query collation");
+    }
+
+    auto wellSorted = [&minObj, &maxObj, collator = query.getCollator()]() {
+        if (collator) {
+            auto min = stripFieldNamesAndApplyCollation(minObj, collator);
+            auto max = stripFieldNamesAndApplyCollation(maxObj, collator);
+            return min.woCompare(max) < 0;
+        } else {
+            return minObj.woCompare(maxObj) < 0;
+        }
+    };
+    if (!minObj.isEmpty() && !maxObj.isEmpty() && !wellSorted()) {
+        return Status(ErrorCodes::Error(6137401), "max() must be greater than min()");
+    }
+    return attemptCollectionScan(query, isTailable, params);
+}
+
+
 StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     const CanonicalQuery& query, const QueryPlannerParams& params) {
     // It's a little silly to ask for a count and for owned data. This could indicate a bug
@@ -764,104 +943,48 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                     "index"_attr = params.indices[i].toString());
     }
 
-    const bool canTableScan = !(params.options & QueryPlannerParams::NO_TABLE_SCAN);
     const bool isTailable = query.getFindCommandRequest().getTailable();
 
     // If the query requests a tailable cursor, the only solution is a collscan + filter with
     // tailable set on the collscan.
     if (isTailable) {
-        if (!canTableScan) {
-            return Status(
-                ErrorCodes::NoQueryExecutionPlans,
-                "Running with 'notablescan', so tailable cursors (which always do a table "
-                "scan) are not allowed");
+        auto collScanResult = attemptCollectionScan(query, isTailable, params);
+        if (collScanResult.isOK()) {
+            return collScanResult;
         }
-        auto soln = buildCollscanSoln(query, isTailable, params);
-        if (!soln) {
-            return Status(ErrorCodes::NoQueryExecutionPlans,
-                          "Failed to build collection scan soln");
-        }
-        std::vector<std::unique_ptr<QuerySolution>> out;
-        out.push_back(std::move(soln));
-        return {std::move(out)};
+        return collScanResult.getStatus().withContext(
+            "query is tailable so must do a collection scan");
     }
 
-    if (!query.getFindCommandRequest().getHint().isEmpty()) {
-        const BSONObj& hintObj = query.getFindCommandRequest().getHint();
-        const auto naturalHint = hintObj[query_request_helper::kNaturalSortField];
-        if (naturalHint || hintMatchesClusterKey(params.clusteredInfo, hintObj)) {
-            // The hint can be {$natural: +/-1}. If this happens, output a collscan. We expect
-            // any $natural sort to have been normalized to a $natural hint upstream.
-            // Additionally, if the hint matches the collection's cluster key, we also output a
-            // collscan utilizing the cluster key.
-
-            if (naturalHint) {
-                // Perform validation specific to $natural.
-                LOGV2_DEBUG(20969, 5, "Forcing a table scan due to hinted $natural");
-                if (!canTableScan) {
-                    return Status(ErrorCodes::NoQueryExecutionPlans,
-                                  "hint $natural is not allowed, because 'notablescan' is enabled");
-                }
-                if (!query.getFindCommandRequest().getMin().isEmpty() ||
-                    !query.getFindCommandRequest().getMax().isEmpty()) {
-                    return Status(ErrorCodes::NoQueryExecutionPlans,
-                                  "min and max are incompatible with $natural");
-                }
-            } else {
-                // Perform validation specific to hinting on a cluster key.
-                BSONObj minObj = query.getFindCommandRequest().getMin();
-                BSONObj maxObj = query.getFindCommandRequest().getMax();
-
-                const auto clusterKey = params.clusteredInfo->getIndexSpec().getKey();
-
-                // Check if the query collator is compatible with the collection collator for
-                // the provided min and max values.
-                if ((!minObj.isEmpty() &&
-                     !indexCompatibleMaxMin(minObj,
-                                            query.getCollator(),
-                                            params.clusteredCollectionCollator,
-                                            clusterKey)) ||
-                    (!maxObj.isEmpty() &&
-                     !indexCompatibleMaxMin(maxObj,
-                                            query.getCollator(),
-                                            params.clusteredCollectionCollator,
-                                            clusterKey))) {
-                    return Status(ErrorCodes::Error(6137400),
-                                  "The clustered index is not compatible with the values provided "
-                                  "for min/max due to the query collation");
-                }
-
-                auto wellSorted = [&minObj, &maxObj, collator = query.getCollator()]() {
-                    if (collator) {
-                        auto min = stripFieldNamesAndApplyCollation(minObj, collator);
-                        auto max = stripFieldNamesAndApplyCollation(maxObj, collator);
-                        return min.woCompare(max) < 0;
-                    } else {
-                        return minObj.woCompare(maxObj) < 0;
-                    }
-                };
-                if (!minObj.isEmpty() && !maxObj.isEmpty() && !wellSorted()) {
-                    return Status(ErrorCodes::Error(6137401), "max() must be greater than min()");
-                }
-            }
-
-            auto soln = buildCollscanSoln(query, isTailable, params);
-            if (!soln) {
-                return Status(ErrorCodes::NoQueryExecutionPlans,
-                              "Failed to build collection scan soln");
-            }
-            std::vector<std::unique_ptr<QuerySolution>> out;
-            out.push_back(std::move(soln));
-            return {std::move(out)};
-        }
-    }
-
-    // Hints require us to only consider the hinted index. If index filters in the query
-    // settings were used to override the allowed indices for planning, we should not use the
-    // hinted index requested in the query.
-    BSONObj hintedIndex;
+    // Hints require us to only consider the hinted index. If index filters in the query settings
+    // were used to override the allowed indices for planning, we should not use the hinted index
+    // requested in the query.
+    boost::optional<BSONObj> hintedIndexBson;
     if (!params.indexFiltersApplied) {
-        hintedIndex = query.getFindCommandRequest().getHint();
+        if (auto hintObj = query.getFindCommandRequest().getHint(); !hintObj.isEmpty()) {
+            hintedIndexBson = hintObj;
+        }
+    }
+
+    if (hintedIndexBson) {
+        // If we have a hint, check if it matches any "special" index before proceeding.
+        const auto& hintObj = *hintedIndexBson;
+        if (const auto naturalHint = hintObj[query_request_helper::kNaturalSortField]) {
+            return handleNaturalHint(query, params, naturalHint, isTailable);
+        } else if (hintMatchesClusterKey(params.clusteredInfo, hintObj)) {
+            return handleClusteredScanHint(query, params, isTailable);
+        } else {
+            for (auto&& columnIndex : params.columnStoreIndexes) {
+                if (hintMatchesColumnStoreIndex(hintObj, columnIndex)) {
+                    // Hint matches - either build the plan or fail.
+                    auto statusWithSoln = tryToBuildColumnScan(params, query, columnIndex);
+                    if (!statusWithSoln.isOK()) {
+                        return statusWithSoln.getStatus();
+                    }
+                    return singleSolution(std::move(statusWithSoln.getValue()));
+                }
+            }
+        }
     }
 
     // Either the list of indices passed in by the caller, or the list of indices filtered
@@ -871,10 +994,10 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
     // Will hold a copy of the index entry chosen by the hint.
     boost::optional<IndexEntry> hintedIndexEntry;
-    if (hintedIndex.isEmpty()) {
+    if (!hintedIndexBson) {
         fullIndexList = params.indices;
     } else {
-        fullIndexList = QueryPlannerIXSelect::findIndexesByHint(hintedIndex, params.indices);
+        fullIndexList = QueryPlannerIXSelect::findIndexesByHint(*hintedIndexBson, params.indices);
 
         if (fullIndexList.empty()) {
             return Status(ErrorCodes::BadValue,
@@ -964,9 +1087,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
             return Status(ErrorCodes::NoQueryExecutionPlans,
                           "Sort and covering analysis failed while planning hint/min/max query");
         }
-        std::vector<std::unique_ptr<QuerySolution>> out;
-        out.push_back(std::move(soln));
-        return {std::move(out)};
+        return singleSolution(std::move(soln));
     }
 
     for (size_t i = 0; i < relevantIndices.size(); ++i) {
@@ -1148,7 +1269,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     // desired behavior when an index is hinted that is not relevant to the query. In the case
     // that
     // $** index is hinted, we do not want this behavior.
-    if (!hintedIndex.isEmpty() && relevantIndices.size() == 1) {
+    if (hintedIndexBson && relevantIndices.size() == 1) {
         if (out.size() > 0) {
             return {std::move(out)};
         }
@@ -1159,15 +1280,12 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
         }
 
         // Return hinted index solution if found.
-        auto soln = buildWholeIXSoln(relevantIndices.front(), query, params);
-        if (!soln) {
-            return Status(ErrorCodes::NoQueryExecutionPlans,
-                          "Failed to build whole-index solution for $hint");
+        if (auto soln = buildWholeIXSoln(relevantIndices.front(), query, params)) {
+            LOGV2_DEBUG(20980, 5, "Planner: outputting soln that uses hinted index as scan");
+            return singleSolution(std::move(soln));
         }
-        LOGV2_DEBUG(20980, 5, "Planner: outputting soln that uses hinted index as scan");
-        std::vector<std::unique_ptr<QuerySolution>> out;
-        out.push_back(std::move(soln));
-        return {std::move(out)};
+        return Status(ErrorCodes::NoQueryExecutionPlans,
+                      "Failed to build whole-index solution for $hint");
     }
 
     // If a sort order is requested, there may be an index that provides it, even if that
@@ -1300,7 +1418,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     if (params.options & QueryPlannerParams::GENERATE_COVERED_IXSCANS && out.size() == 0 &&
         query.getQueryObj().isEmpty() && projection && !projection->requiresDocument()) {
 
-        const auto* indicesToConsider = hintedIndex.isEmpty() ? &fullIndexList : &relevantIndices;
+        const auto* indicesToConsider = hintedIndexBson ? &relevantIndices : &fullIndexList;
         for (auto&& index : *indicesToConsider) {
             if (index.type != INDEX_BTREE || index.multikey || index.sparse || index.filterExpr ||
                 !CollatorInterface::collatorsMatch(index.collator, query.getCollator())) {
@@ -1330,7 +1448,9 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     // Check whether we're eligible to use the columnar index, assuming no other indexes can be
     // used.
     if (out.empty()) {
-        tryToAddColumnScan(params, query, out);
+        if (auto statusWithSoln = tryToBuildColumnScan(params, query); statusWithSoln.isOK()) {
+            out.emplace_back(std::move(statusWithSoln.getValue()));
+        }
     }
 
     // The caller can explicitly ask for a collscan.
@@ -1338,7 +1458,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
 
     // No indexed plans?  We must provide a collscan if possible or else we can't run the query.
     bool collScanRequired = 0 == out.size();
-    if (collScanRequired && !canTableScan) {
+    if (collScanRequired && !canTableScan(params)) {
         return Status(ErrorCodes::NoQueryExecutionPlans,
                       "No indexed plans available, and running with 'notablescan'");
     }
@@ -1347,7 +1467,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     // Also, if a hint is specified it indicates that we MUST use it.
     bool possibleToCollscan =
         !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR) &&
-        !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT) && hintedIndex.isEmpty();
+        !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT) && !hintedIndexBson;
     if (collScanRequired && !possibleToCollscan) {
         return Status(ErrorCodes::NoQueryExecutionPlans, "No query solutions");
     }

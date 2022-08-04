@@ -558,6 +558,10 @@ struct ColumnIndexScanNode : public QuerySolutionNode {
     // 'postAssemblyFilter'.
     OrderedPathSet matchFields;
 
+    // A cached copy of the union of the above two field sets which we expect to be frequently asked
+    // for.
+    OrderedPathSet allFields;
+
     // A column scan can apply a filter to the columns directly while scanning, or to a document
     // assembled from the scanned columns.
 
@@ -568,10 +572,6 @@ struct ColumnIndexScanNode : public QuerySolutionNode {
     // An optional filter to apply after assembling a document from all scanned columns. For
     // example: {$or: [{a: 2}, {b: 2}]}.
     std::unique_ptr<MatchExpression> postAssemblyFilter;
-
-    // A cached copy of the union of the above two field sets which we expect to be frequently asked
-    // for.
-    OrderedPathSet allFields;
 };
 
 /**

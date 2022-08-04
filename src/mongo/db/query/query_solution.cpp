@@ -51,6 +51,7 @@
 #include "mongo/db/query/planner_wildcard_helpers.h"
 #include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/query/util/set_util.h"
 
 namespace mongo {
 
@@ -1104,6 +1105,7 @@ ColumnIndexScanNode::ColumnIndexScanNode(ColumnIndexEntry indexEntry,
     : indexEntry(std::move(indexEntry)),
       outputFields(std::move(outputFieldsIn)),
       matchFields(std::move(matchFieldsIn)),
+      allFields(set_util::setUnion(outputFields, matchFields)),
       filtersByPath(std::move(filtersByPath)),
       postAssemblyFilter(std::move(postAssemblyFilter)) {
     allFields = outputFields;

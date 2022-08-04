@@ -44,8 +44,8 @@ try {
     err = assert.throws(function() {
         t.find({a: 1}).hint({$natural: 1}).toArray();
     });
-    assert.includes(err.toString(),
-                    "hint $natural is not allowed, because 'notablescan' is enabled");
+    assert.includes(err.toString(), "$natural");
+    assert.includes(err.toString(), "notablescan");
 
     t.createIndex({a: 1});
     assert.eq(0, t.find({a: 1, b: 1}).itcount());

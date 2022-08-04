@@ -325,7 +325,7 @@ void fillOutPlannerParams(OperationContext* opCtx,
                         canonicalQuery,
                         collection,
                         plannerParams->indices,
-                        plannerParams->columnarIndexes);
+                        plannerParams->columnStoreIndexes);
 
     // If query supports index filters, filter params.indices by indices in query settings.
     // Ignore index filters when it is possible to use the id-hack.

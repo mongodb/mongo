@@ -25,9 +25,8 @@ try {
     err = assert.throws(function() {
         t.find({a: 1}).tailable(true).next();
     });
-    assert.includes(
-        err.toString(),
-        "Running with 'notablescan', so tailable cursors (which always do a table scan) are not allowed");
+    assert.includes(err.toString(), "tailable");
+    assert.includes(err.toString(), "notablescan");
 
 } finally {
     // We assume notablescan was false before this test started and restore that
