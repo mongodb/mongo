@@ -222,6 +222,8 @@ __compact_walk_internal(WT_SESSION_IMPL *session, WT_REF *parent)
     WT_REF *ref;
     bool overall_progress, skipp;
 
+    WT_ASSERT(session, F_ISSET(parent, WT_REF_FLAG_INTERNAL));
+
     ref = NULL; /* [-Wconditional-uninitialized] */
 
     /*
@@ -361,7 +363,15 @@ __wt_compact(WT_SESSION_IMPL *session)
         if (ref == NULL)
             break;
 
-        WT_WITH_PAGE_INDEX(session, ret = __compact_walk_internal(session, ref));
+        /*
+         * The compact walk only flags internal pages for review, but there is a rare case where an
+         * WT_REF in the WT_REF_DISK state pointing to an internal page, can transition to a leaf
+         * page when it is being read in. Handle that here, by re-checking the page type now that
+         * the page is in memory.
+         */
+        if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))
+            WT_WITH_PAGE_INDEX(session, ret = __compact_walk_internal(session, ref));
+
         WT_ERR(ret);
     }
 
