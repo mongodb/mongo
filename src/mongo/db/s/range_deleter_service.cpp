@@ -91,19 +91,6 @@ void RangeDeleterService::onStepDown() {
     _state.store(kDown);
 }
 
-BSONObj RangeDeleterService::dumpState() {
-    auto lock = _acquireMutexUnconditionally();
-
-    BSONObjBuilder builder;
-    for (const auto& [collUUID, chunkRanges] : _rangeDeletionTasks) {
-        BSONArrayBuilder subBuilder(builder.subarrayStart(collUUID.toString()));
-        for (const auto& chunkRange : chunkRanges) {
-            subBuilder.append(chunkRange->toBSON());
-        }
-    }
-    return builder.obj();
-}
-
 SharedSemiFuture<void> RangeDeleterService::registerTask(
     const RangeDeletionTask& rdt, SemiFuture<void>&& waitForActiveQueriesToComplete) {
 

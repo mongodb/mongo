@@ -145,12 +145,6 @@ public:
     void onStepUpComplete(OperationContext* opCtx, long long term) override;
     void onStepDown() override;
 
-    /*
-     * Returns the RangeDeleterService state with the following schema:
-     *     {collectionUUIDA: [{min: x, max: y}, {min: w, max: z}....], collectionUUIDB: ......}
-     */
-    BSONObj dumpState();
-
 private:
     /* Asynchronously register range deletions on the service. To be called on on step-up */
     void _recoverRangeDeletionsOnStepUp();
