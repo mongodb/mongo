@@ -323,7 +323,7 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildColumnScan(
     // TODO SERVER-67140: Check if the columnar index actually provides the fields we need.
     std::unique_ptr<MatchExpression> residualPredicate;
     StringMap<std::unique_ptr<MatchExpression>> filterSplitByColumn;
-    if (params.options & QueryPlannerParams::GENERATE_PER_COLUMN_FILTERS) {
+    if (params.options) {
         std::tie(filterSplitByColumn, residualPredicate) =
             expression::splitMatchExpressionForColumns(query.root());
     } else {
