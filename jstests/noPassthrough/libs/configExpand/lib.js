@@ -188,7 +188,7 @@ function configExpandFailure(config, test = null, opts = {}) {
         port: allocatePort(),
     },
                                   opts);
-    let args = [MongoRunner.mongodPath];
+    let args = [MongoRunner.getMongodPath()];
     for (let k in options) {
         args.push('--' + k);
         if (options[k] != '') {

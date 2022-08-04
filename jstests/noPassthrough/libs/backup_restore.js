@@ -109,7 +109,8 @@ var BackupRestoreTest = function(options) {
 
         // Returns the pid of the started mongo shell so the CRUD test client can be terminated
         // without waiting for its execution to finish.
-        return startMongoProgramNoConnect(MongoRunner.mongoShellPath,
+        let shellPath = MongoRunner.getMongoShellPath();
+        return startMongoProgramNoConnect(shellPath,
                                           '--eval',
                                           '(' + crudClientCmds + ')("' + dbName + '", "' +
                                               collectionName + '", ' + numNodes + ')',
@@ -123,8 +124,9 @@ var BackupRestoreTest = function(options) {
         // Launch FSM client
         const suite = 'concurrency_replication_for_backup_restore';
         const resmokeCmd = 'python buildscripts/resmoke.py run --shuffle --continueOnFailure' +
-            ' --repeat=99999 --internalParam=is_inner_level --mongo=' + MongoRunner.mongoShellPath +
-            ' --shellConnString=mongodb://' + host + ' --suites=' + suite;
+            ' --repeat=99999 --internalParam=is_inner_level --mongo=' +
+            MongoRunner.getMongoShellPath() + ' --shellConnString=mongodb://' + host +
+            ' --suites=' + suite;
 
         // Returns the pid of the FSM test client so it can be terminated without waiting for its
         // execution to finish.

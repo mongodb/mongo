@@ -42,7 +42,7 @@ assert(session.getOptions().shouldRetryWrites(),
 session.endSession();
 
 function runMongoShellWithRetryWritesEnabled(func) {
-    const args = [MongoRunner.mongoShellPath];
+    const args = [MongoRunner.getMongoShellPath()];
     args.push("--port", conn.port);
     args.push("--retryWrites");
 

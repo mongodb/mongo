@@ -72,15 +72,42 @@ var createMongoArgs = function(binaryName, args) {
     return fullArgs;
 };
 
+// A path.join-like thing for paths that must work
+// on Windows (\-separated) and *nix (/-separated).
+function pathJoin(...parts) {
+    const separator = _isWindows() ? '\\' : '/';
+    return parts.join(separator);
+}
+
 MongoRunner = function() {};
 
 MongoRunner.dataDir = "/data/db";
 MongoRunner.dataPath = "/data/db/";
 
-MongoRunner.mongodPath = "mongod";
-MongoRunner.mongosPath = "mongos";
-MongoRunner.mongoqPath = "mongoqd";
-MongoRunner.mongoShellPath = "mongo";
+function getMongoSuffixPath(binary_name) {
+    let installDir = _getEnv("INSTALL_DIR");
+    if (installDir && !jsTestOptions().inEvergreen) {
+        return pathJoin(installDir, binary_name);
+    }
+    return binary_name;
+}
+
+MongoRunner.getMongodPath = function() {
+    return getMongoSuffixPath("mongod");
+};
+
+MongoRunner.getMongosPath = function() {
+    return getMongoSuffixPath("mongos");
+};
+
+MongoRunner.getMongoqPath = function() {
+    return getMongoSuffixPath("mongoqd");
+};
+
+MongoRunner.getMongoShellPath = function() {
+    let shellPath = getMongoSuffixPath("mongo");
+    return shellPath;
+};
 
 MongoRunner.VersionSub = function(pattern, version) {
     this.pattern = pattern;
@@ -97,13 +124,6 @@ function getPids() {
     }
     pids = pids.concat(MongoRunner.runningChildPids());
     return pids;
-}
-
-// A path.join-like thing for paths that must work
-// on Windows (\-separated) and *nix (/-separated).
-function pathJoin(...parts) {
-    const separator = _isWindows() ? '\\' : '/';
-    return parts.join(separator);
 }
 
 // Internal state to determine if the hang analyzer should be enabled or not.
@@ -977,7 +997,7 @@ MongoRunner.runMongod = function(opts) {
             }
         }
 
-        var mongodProgram = MongoRunner.mongodPath;
+        var mongodProgram = MongoRunner.getMongodPath();
         opts = MongoRunner.arrOptions(mongodProgram, opts);
     }
 
@@ -1015,7 +1035,7 @@ MongoRunner.runMongos = function(opts) {
         runId = opts.runId;
         waitForConnect = opts.waitForConnect;
         env = opts.env;
-        var mongosProgram = MongoRunner.mongosPath;
+        var mongosProgram = MongoRunner.getMongosPath();
         opts = MongoRunner.arrOptions(mongosProgram, opts);
     }
 
@@ -1052,7 +1072,7 @@ MongoRunner.runMongoq = function(opts) {
         runId = opts.runId;
         waitForConnect = opts.waitForConnect;
         env = opts.env;
-        var mongoqProgram = MongoRunner.mongoqPath;
+        var mongoqProgram = MongoRunner.getMongoqPath();
         opts = MongoRunner.arrOptions(mongoqProgram, opts);
     }
 

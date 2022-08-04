@@ -111,7 +111,7 @@ uncheckedParallelShellPidsString = function() {
 };
 
 startParallelShell = function(jsCode, port, noConnect, ...optionArgs) {
-    var shellPath = MongoRunner.mongoShellPath;
+    var shellPath = MongoRunner.getMongoShellPath();
     var args = [shellPath];
 
     if (typeof db == "object") {
