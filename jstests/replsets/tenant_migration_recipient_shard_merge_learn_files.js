@@ -24,12 +24,6 @@ const tenantMigrationTest =
 
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
-if (!TenantMigrationUtil.isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
-    tenantMigrationTest.stop();
-    jsTestLog("Skipping Shard Merge-specific test");
-    return;
-}
-
 jsTestLog(
     "Test that recipient state is correctly set to 'learned filenames' after creating the backup cursor");
 const tenantId = "testTenantId";
@@ -50,6 +44,7 @@ const migrationUuid = UUID();
 const kDummyTenantId = "nonExistentTenantId";
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationUuid),
+    // TODO (SERVER-63454): Remove kDummyTenantId.
     tenantId: kDummyTenantId,
     readPreference: {mode: 'primary'}
 };
@@ -63,7 +58,7 @@ waitInFailPoint.wait();
 tenantMigrationTest.assertRecipientNodesInExpectedState(
     tenantMigrationTest.getRecipientRst().nodes,
     migrationUuid,
-    kDummyTenantId,
+    tenantId,
     TenantMigrationTest.RecipientState.kLearnedFilenames,
     TenantMigrationTest.RecipientAccessState.kReject);
 

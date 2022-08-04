@@ -42,12 +42,12 @@ const Status kNonRetryableTenantMigrationStatus(
 
 class TenantMigrationConflictInfoBase : public ErrorExtraInfo {
 public:
-    TenantMigrationConflictInfoBase(const std::string tenantId,
+    TenantMigrationConflictInfoBase(UUID migrationId,
                                     std::shared_ptr<TenantMigrationAccessBlocker> mtab = nullptr)
-        : _tenantId(std::move(tenantId)), _mtab(std::move(mtab)){};
+        : _migrationId(std::move(migrationId)), _mtab(std::move(mtab)){};
 
-    const auto& getTenantId() const {
-        return _tenantId;
+    const auto& getMigrationId() const {
+        return _migrationId;
     }
 
     const auto& getTenantMigrationAccessBlocker() const {
@@ -58,17 +58,17 @@ public:
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj&);
 
 private:
-    std::string _tenantId;
-    std::shared_ptr<TenantMigrationAccessBlocker> _mtab;
+    const UUID _migrationId;
+    const std::shared_ptr<TenantMigrationAccessBlocker> _mtab;
 };
 
 class TenantMigrationConflictInfo final : public TenantMigrationConflictInfoBase {
 public:
     static constexpr auto code = ErrorCodes::TenantMigrationConflict;
 
-    TenantMigrationConflictInfo(const std::string tenantId,
+    TenantMigrationConflictInfo(UUID migrationId,
                                 std::shared_ptr<TenantMigrationAccessBlocker> mtab = nullptr)
-        : TenantMigrationConflictInfoBase(std::move(tenantId), std::move(mtab)) {}
+        : TenantMigrationConflictInfoBase(std::move(migrationId), std::move(mtab)) {}
 };
 
 class NonRetryableTenantMigrationConflictInfo final : public TenantMigrationConflictInfoBase {
@@ -76,8 +76,8 @@ public:
     static constexpr auto code = ErrorCodes::NonRetryableTenantMigrationConflict;
 
     NonRetryableTenantMigrationConflictInfo(
-        const std::string tenantId, std::shared_ptr<TenantMigrationAccessBlocker> mtab = nullptr)
-        : TenantMigrationConflictInfoBase(std::move(tenantId), std::move(mtab)) {}
+        UUID migrationId, std::shared_ptr<TenantMigrationAccessBlocker> mtab = nullptr)
+        : TenantMigrationConflictInfoBase(std::move(migrationId), std::move(mtab)) {}
 };
 
 using TenantMigrationCommittedException = ExceptionFor<ErrorCodes::TenantMigrationCommitted>;

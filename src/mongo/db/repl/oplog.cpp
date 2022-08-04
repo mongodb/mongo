@@ -427,7 +427,7 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
     }
     // If this oplog entry is from a tenant migration, include the tenant migration
     // UUID.
-    const auto& recipientInfo = tenantMigrationRecipientInfo(opCtx);
+    const auto& recipientInfo = tenantMigrationInfo(opCtx);
     if (recipientInfo) {
         oplogEntry->setFromTenantMigration(recipientInfo->uuid);
     }
@@ -494,7 +494,7 @@ std::vector<OpTime> logInsertOps(
     oplogEntryTemplate->setOpType(repl::OpTypeEnum::kInsert);
     // If this oplog entry is from a tenant migration, include the tenant migration
     // UUID.
-    const auto& recipientInfo = tenantMigrationRecipientInfo(opCtx);
+    const auto& recipientInfo = tenantMigrationInfo(opCtx);
     if (recipientInfo) {
         oplogEntryTemplate->setFromTenantMigration(recipientInfo->uuid);
     }
@@ -823,6 +823,11 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           const auto& ui = entry.getUuid();
           const auto& cmd = entry.getObject();
           const NamespaceString nss(extractNs(entry.getNss().db(), cmd));
+
+          const auto& migrationId = entry.getFromTenantMigration();
+          if (migrationId) {
+              tenantMigrationInfo(opCtx) = boost::optional<TenantMigrationInfo>(migrationId);
+          }
 
           // Mode SECONDARY steady state replication should not allow create collection to rename an
           // existing collection out of the way. This leaves a collection orphaned and is a bug.
@@ -1283,7 +1288,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 // inserts on primary as part of a tenant migration.
                 uassert(ErrorCodes::OperationFailed,
                         "Cannot apply an array insert with applyOps",
-                        !opCtx->writesAreReplicated() || tenantMigrationRecipientInfo(opCtx));
+                        !opCtx->writesAreReplicated() || tenantMigrationInfo(opCtx));
 
                 std::vector<InsertStatement> insertObjs;
                 const auto insertOps = opOrGroupedInserts.getGroupedInserts();

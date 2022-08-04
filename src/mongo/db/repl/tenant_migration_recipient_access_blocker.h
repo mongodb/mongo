@@ -66,18 +66,14 @@ namespace mongo {
  * recipientSyncData command with a returnAfterReachingTimestamp after the consistent point, the
  * `rejectBeforeTimestamp` will be advanced to the given returnAfterReachingTimestamp.
  *
- * Blocker excludes all operations with 'tenantMigrationRecipientInfo' decoration set, as they are
+ * Blocker excludes all operations with 'tenantMigrationInfo' decoration set, as they are
  * internal.
  */
 class TenantMigrationRecipientAccessBlocker
     : public std::enable_shared_from_this<TenantMigrationRecipientAccessBlocker>,
       public TenantMigrationAccessBlocker {
 public:
-    TenantMigrationRecipientAccessBlocker(ServiceContext* serviceContext,
-                                          UUID migrationId,
-                                          std::string tenantId,
-                                          MigrationProtocolEnum protocol,
-                                          std::string donorConnString);
+    TenantMigrationRecipientAccessBlocker(ServiceContext* serviceContext, const UUID& migrationId);
 
     //
     // Called by all writes and reads against the database.
@@ -107,10 +103,6 @@ public:
     void onMajorityCommitPointUpdate(repl::OpTime opTime) final;
 
     void appendInfoForServerStatus(BSONObjBuilder* builder) const final;
-
-    UUID getMigrationId() const;
-
-    BSONObj getDebugInfo() const final;
 
     void recordTenantMigrationError(Status status) final{};
 
@@ -150,10 +142,6 @@ private:
     };
 
     ServiceContext* _serviceContext;
-    const UUID _migrationId;
-    const std::string _tenantId;
-    const MigrationProtocolEnum _protocol;
-    const std::string _donorConnString;
 
     // Protects the state below.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationRecipientAccessBlocker::_mutex");

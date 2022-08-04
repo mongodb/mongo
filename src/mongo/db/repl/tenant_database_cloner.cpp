@@ -190,8 +190,8 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listExistingCollectionsStag
     }
     auto opCtx = cc().makeOperationContext();
     DBDirectClient client(opCtx.get());
-    tenantMigrationRecipientInfo(opCtx.get()) =
-        boost::make_optional<TenantMigrationRecipientInfo>(getSharedData()->getMigrationId());
+    tenantMigrationInfo(opCtx.get()) =
+        boost::make_optional<TenantMigrationInfo>(getSharedData()->getMigrationId());
 
     long long sizeOfCurrCollOnDisk = 0;
     long long approxTotalDBSizeOnDisk = 0;

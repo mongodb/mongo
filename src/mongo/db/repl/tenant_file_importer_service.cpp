@@ -63,9 +63,7 @@ const auto _TenantFileImporterService =
 const ReplicaSetAwareServiceRegistry::Registerer<TenantFileImporterService>
     _TenantFileImporterServiceRegisterer("TenantFileImporterService");
 
-void importCopiedFiles(OperationContext* opCtx,
-                       UUID& migrationId,
-                       const StringData& donorConnectionString) {
+void importCopiedFiles(OperationContext* opCtx, UUID& migrationId) {
     auto tempWTDirectory = fileClonerTempDir(migrationId);
     uassert(6113315,
             str::stream() << "Missing file cloner's temporary dbpath directory: "
@@ -90,11 +88,8 @@ void importCopiedFiles(OperationContext* opCtx,
         }
 
         LOGV2_DEBUG(6114100, 1, "Create recipient access blocker", "tenantId"_attr = tenantId);
-        addTenantMigrationRecipientAccessBlocker(opCtx->getServiceContext(),
-                                                 *tenantId,
-                                                 migrationId,
-                                                 MigrationProtocolEnum::kShardMerge,
-                                                 donorConnectionString);
+        addTenantMigrationRecipientAccessBlocker(
+            opCtx->getServiceContext(), *tenantId, migrationId);
     }
 
     wiredTigerImportFromBackupCursor(opCtx, metadatas, tempWTDirectory.string());
@@ -206,7 +201,6 @@ void TenantFileImporterService::interruptAll() {
 void TenantFileImporterService::_handleEvents(OperationContext* opCtx) {
     using eventType = ImporterEvent::Type;
 
-    std::string donorConnectionString;
     boost::optional<UUID> migrationId;
 
     std::shared_ptr<Queue> eventQueueRef;
@@ -214,7 +208,6 @@ void TenantFileImporterService::_handleEvents(OperationContext* opCtx) {
         stdx::lock_guard lk(_mutex);
         invariant(_eventQueue);
         eventQueueRef = _eventQueue;
-        donorConnectionString = _donorConnectionString;
         migrationId = _migrationId;
     }
 
@@ -239,7 +232,7 @@ void TenantFileImporterService::_handleEvents(OperationContext* opCtx) {
                 cloneFile(opCtx, event.metadataDoc);
                 continue;
             case eventType::kLearnedAllFilenames:
-                importCopiedFiles(opCtx, event.migrationId, donorConnectionString);
+                importCopiedFiles(opCtx, event.migrationId);
                 _voteImportedFiles(opCtx);
                 break;
         }

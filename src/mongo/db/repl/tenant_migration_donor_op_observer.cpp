@@ -31,8 +31,12 @@
 
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
+#include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/tenant_migration_donor_op_observer.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
+#include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
 namespace mongo {
 namespace repl {
@@ -42,12 +46,6 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(donorOpObserverFailAfterOnInsert);
 MONGO_FAIL_POINT_DEFINE(donorOpObserverFailAfterOnUpdate);
 
-const auto tenantIdToDeleteDecoration =
-    OperationContext::declareDecoration<boost::optional<std::string>>();
-
-const auto migrationIdToDeleteDecoration =
-    OperationContext::declareDecoration<boost::optional<UUID>>();
-
 /**
  * Initializes the TenantMigrationDonorAccessBlocker for the tenant migration denoted by the given
  * state doc.
@@ -56,14 +54,10 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
                                        const TenantMigrationDonorDocument& donorStateDoc) {
     invariant(donorStateDoc.getState() == TenantMigrationDonorStateEnum::kAbortingIndexBuilds);
 
+    auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(opCtx->getServiceContext(),
+                                                                    donorStateDoc.getId());
     if (donorStateDoc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations) ==
         MigrationProtocolEnum::kMultitenantMigrations) {
-        auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
-            opCtx->getServiceContext(),
-            donorStateDoc.getId(),
-            donorStateDoc.getTenantId().toString(),
-            MigrationProtocolEnum::kMultitenantMigrations,
-            donorStateDoc.getRecipientConnectionString().toString());
 
         TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
             .add(donorStateDoc.getTenantId(), mtab);
@@ -81,12 +75,6 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
         tassert(6448702,
                 "Bad protocol",
                 donorStateDoc.getProtocol() == MigrationProtocolEnum::kShardMerge);
-        auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
-            opCtx->getServiceContext(),
-            donorStateDoc.getId(),
-            donorStateDoc.getTenantId().toString(),
-            MigrationProtocolEnum::kShardMerge,
-            donorStateDoc.getRecipientConnectionString().toString());
 
         TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
             .addShardMergeDonorAccessBlocker(mtab);
@@ -312,21 +300,24 @@ void TenantMigrationDonorOpObserver::aboutToDelete(OperationContext* opCtx,
         // TenantMigrationDonorAccessBlocker as soon as its donor state doc is marked as garbage
         // collectable. So onDelete should skip removing the TenantMigrationDonorAccessBlocker for
         // aborted migrations.
-        if (donorStateDoc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations) ==
-            MigrationProtocolEnum::kMultitenantMigrations) {
-            tenantIdToDeleteDecoration(opCtx) =
-                donorStateDoc.getState() == TenantMigrationDonorStateEnum::kAborted
-                ? boost::none
-                : boost::make_optional(donorStateDoc.getTenantId().toString());
-        } else {
+        auto constructTenantMigrationInfo = [&]() -> boost::optional<TenantMigrationInfo> {
+            if (donorStateDoc.getProtocol().value_or(
+                    MigrationProtocolEnum::kMultitenantMigrations) ==
+                MigrationProtocolEnum::kMultitenantMigrations) {
+                return boost::make_optional(TenantMigrationInfo(
+                    donorStateDoc.getId(), donorStateDoc.getTenantId().toString()));
+            }
+
             tassert(6448700,
                     "Bad protocol",
                     donorStateDoc.getProtocol() == MigrationProtocolEnum::kShardMerge);
-            migrationIdToDeleteDecoration(opCtx) =
-                donorStateDoc.getState() == TenantMigrationDonorStateEnum::kAborted
-                ? boost::none
-                : boost::make_optional(donorStateDoc.getId());
-        }
+            return boost::make_optional(TenantMigrationInfo(donorStateDoc.getId()));
+        };
+
+        tenantMigrationInfo(opCtx) =
+            donorStateDoc.getState() == TenantMigrationDonorStateEnum::kAborted
+            ? boost::none
+            : constructTenantMigrationInfo();
     }
 }
 
@@ -337,19 +328,28 @@ void TenantMigrationDonorOpObserver::onDelete(OperationContext* opCtx,
                                               const OplogDeleteEntryArgs& args) {
     if (nss == NamespaceString::kTenantMigrationDonorsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
-        if (tenantIdToDeleteDecoration(opCtx)) {
-            opCtx->recoveryUnit()->onCommit([opCtx](boost::optional<Timestamp>) {
-                TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                    .remove(tenantIdToDeleteDecoration(opCtx).value(),
-                            TenantMigrationAccessBlocker::BlockerType::kDonor);
-            });
+        auto tmi = tenantMigrationInfo(opCtx);
+        if (!tmi) {
+            return;
         }
 
-        if (migrationIdToDeleteDecoration(opCtx)) {
-            opCtx->recoveryUnit()->onCommit([opCtx](boost::optional<Timestamp>) {
+        if (tmi->tenantId) {
+            auto tenantId = tmi->tenantId.get();
+            LOGV2_INFO(6461600,
+                       "Removing expired 'multitenant migration' migration",
+                       "tenantId"_attr = tenantId);
+            opCtx->recoveryUnit()->onCommit([opCtx, tenantId](boost::optional<Timestamp>) {
                 TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                    .removeShardMergeDonorAccessBlocker(
-                        migrationIdToDeleteDecoration(opCtx).value());
+                    .remove(tenantId, TenantMigrationAccessBlocker::BlockerType::kDonor);
+            });
+        } else {
+            auto migrationId = tmi->uuid;
+            LOGV2_INFO(6461601,
+                       "Removing expired 'shard merge' migration",
+                       "migrationId"_attr = migrationId);
+            opCtx->recoveryUnit()->onCommit([opCtx, migrationId](boost::optional<Timestamp>) {
+                TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                    .removeShardMergeDonorAccessBlocker(migrationId);
             });
         }
     }

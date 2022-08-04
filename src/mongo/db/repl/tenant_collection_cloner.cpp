@@ -341,11 +341,11 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::createCollectionStage() {
         DBDirectClient client(opCtx.get());
 
         // Set the recipient info on the opCtx to bypass the access blocker for local reads.
-        tenantMigrationRecipientInfo(opCtx.get()) =
-            boost::make_optional<TenantMigrationRecipientInfo>(getSharedData()->getMigrationId());
+        tenantMigrationInfo(opCtx.get()) =
+            boost::make_optional<TenantMigrationInfo>(getSharedData()->getMigrationId());
         // Reset the recipient info after local reads so oplog entries for future writes
         // (createCollection/createIndex) don't get stamped with the fromTenantMigration field.
-        ON_BLOCK_EXIT([&opCtx] { tenantMigrationRecipientInfo(opCtx.get()) = boost::none; });
+        ON_BLOCK_EXIT([&opCtx] { tenantMigrationInfo(opCtx.get()) = boost::none; });
 
         FindCommandRequest findCmd{*_existingNss};
         findCmd.setSort(BSON("_id" << -1));
@@ -585,8 +585,8 @@ void TenantCollectionCloner::insertDocumentsCallback(
 
     // Set the recipient info on the opCtx to skip checking user permissions in
     // 'write_ops_exec::performInserts()'.
-    tenantMigrationRecipientInfo(cbd.opCtx) =
-        boost::make_optional<TenantMigrationRecipientInfo>(getSharedData()->getMigrationId());
+    tenantMigrationInfo(cbd.opCtx) =
+        boost::make_optional<TenantMigrationInfo>(getSharedData()->getMigrationId());
 
     // write_ops_exec::PerformInserts() will handle limiting the batch size
     // that gets inserted in a single WUOW.

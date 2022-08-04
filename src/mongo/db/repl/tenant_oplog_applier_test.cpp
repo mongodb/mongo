@@ -89,7 +89,7 @@ public:
         } else {
             oplogEntry.setOpTime(getNextOpTime(opCtx));
         }
-        const auto& recipientInfo = tenantMigrationRecipientInfo(opCtx);
+        const auto& recipientInfo = tenantMigrationInfo(opCtx);
         if (recipientInfo) {
             oplogEntry.setFromTenantMigration(recipientInfo->uuid);
         }

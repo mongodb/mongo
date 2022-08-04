@@ -180,15 +180,7 @@ class TenantMigrationDonorAccessBlocker
     : public std::enable_shared_from_this<TenantMigrationDonorAccessBlocker>,
       public TenantMigrationAccessBlocker {
 public:
-    TenantMigrationDonorAccessBlocker(ServiceContext* serviceContext,
-                                      UUID migrationId,
-                                      std::string tenantId,
-                                      MigrationProtocolEnum protocol,
-                                      std::string recipientConnString);
-
-    const UUID& getMigrationId() const {
-        return _migrationId;
-    }
+    TenantMigrationDonorAccessBlocker(ServiceContext* serviceContext, const UUID& migrationId);
 
     //
     // Called by all writes and reads against the database.
@@ -219,8 +211,6 @@ public:
     void onMajorityCommitPointUpdate(repl::OpTime opTime) final;
 
     void appendInfoForServerStatus(BSONObjBuilder* builder) const final;
-
-    BSONObj getDebugInfo() const final;
 
     void recordTenantMigrationError(Status status) final;
 
@@ -326,10 +316,6 @@ private:
     void _onMajorityCommitAbortOpTime(stdx::unique_lock<Latch>& lk);
 
     ServiceContext* _serviceContext;
-    const UUID _migrationId;
-    const std::string _tenantId;
-    const MigrationProtocolEnum _protocol;
-    const std::string _recipientConnString;
 
     // Protects the state below.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationDonorAccessBlocker::_mutex");

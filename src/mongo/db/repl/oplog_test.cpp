@@ -356,8 +356,7 @@ TEST_F(OplogTest, ConcurrentLogOpRevertLastOplogEntry) {
 TEST_F(OplogTest, MigrationIdAddedToOplog) {
     auto opCtx = cc().makeOperationContext();
     auto migrationUuid = UUID::gen();
-    tenantMigrationRecipientInfo(opCtx.get()) =
-        boost::make_optional<TenantMigrationRecipientInfo>(migrationUuid);
+    tenantMigrationInfo(opCtx.get()) = boost::make_optional<TenantMigrationInfo>(migrationUuid);
 
     const NamespaceString nss("test.coll");
     auto msgObj = BSON("msg"

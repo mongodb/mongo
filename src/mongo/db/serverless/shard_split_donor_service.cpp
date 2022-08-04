@@ -88,16 +88,10 @@ void insertTenantAccessBlocker(WithLock lk,
                                ShardSplitDonorDocument donorStateDoc) {
     auto optionalTenants = donorStateDoc.getTenantIds();
     invariant(optionalTenants);
-    auto recipientConnectionString = donorStateDoc.getRecipientConnectionString();
-    invariant(recipientConnectionString);
 
     for (const auto& tenantId : optionalTenants.value()) {
-        auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
-            opCtx->getServiceContext(),
-            donorStateDoc.getId(),
-            tenantId.toString(),
-            MigrationProtocolEnum::kMultitenantMigrations,
-            recipientConnectionString->toString());
+        auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(opCtx->getServiceContext(),
+                                                                        donorStateDoc.getId());
 
         TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext()).add(tenantId, mtab);
 

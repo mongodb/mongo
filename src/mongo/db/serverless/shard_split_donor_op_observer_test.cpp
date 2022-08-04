@@ -130,17 +130,12 @@ protected:
     std::vector<std::shared_ptr<TenantMigrationDonorAccessBlocker>>
     createBlockersAndStartBlockingWrites(const std::vector<std::string>& tenants,
                                          OperationContext* opCtx,
-                                         const std::string& connectionStr,
                                          bool isSecondary = false) {
         auto uuid = UUID::gen();
         std::vector<std::shared_ptr<TenantMigrationDonorAccessBlocker>> blockers;
         for (const auto& tenant : tenants) {
             auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
-                _opCtx->getServiceContext(),
-                uuid,
-                tenant,
-                MigrationProtocolEnum::kMultitenantMigrations,
-                _connectionStr);
+                _opCtx->getServiceContext(), uuid);
 
             blockers.push_back(mtab);
             if (!isSecondary) {
@@ -167,7 +162,6 @@ protected:
         MockReplicaSet("recipientSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
     const NamespaceString _nss = NamespaceString::kShardSplitDonorsNamespace;
     std::vector<std::string> _tenantIds = {"tenant1", "tenantAB"};
-    std::string _connectionStr = _replSet.getConnectionString();
     UUID _uuid = UUID::gen();
     std::string _recipientTagName{"$recipientNode"};
     std::string _recipientSetName{_replSet.getURI().getSetName()};
@@ -285,7 +279,7 @@ TEST_F(ShardSplitDonorOpObserverTest, UpdateBlockingDocumentPrimary) {
     test::shard_split::reconfigToAddRecipientNodes(
         getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientReplSet.getHosts());
 
-    createBlockersAndStartBlockingWrites(_tenantIds, _opCtx.get(), _connectionStr);
+    createBlockersAndStartBlockingWrites(_tenantIds, _opCtx.get());
 
     auto stateDocument = defaultStateDocument();
     stateDocument.setState(ShardSplitDonorStateEnum::kBlocking);
@@ -311,7 +305,7 @@ TEST_F(ShardSplitDonorOpObserverTest, UpdateBlockingDocumentSecondary) {
 
     // This indicates the instance is secondary for the OpObserver.
     repl::UnreplicatedWritesBlock setSecondary(_opCtx.get());
-    createBlockersAndStartBlockingWrites(_tenantIds, _opCtx.get(), _connectionStr, true);
+    createBlockersAndStartBlockingWrites(_tenantIds, _opCtx.get(), true);
 
     auto stateDocument = defaultStateDocument();
     stateDocument.setState(ShardSplitDonorStateEnum::kBlocking);
@@ -366,7 +360,7 @@ TEST_F(ShardSplitDonorOpObserverTest, TransitionToCommit) {
     stateDocument.setBlockTimestamp(Timestamp(1, 2));
     stateDocument.setCommitOrAbortOpTime(commitOpTime);
 
-    auto blockers = createBlockersAndStartBlockingWrites(_tenantIds, _opCtx.get(), _connectionStr);
+    auto blockers = createBlockersAndStartBlockingWrites(_tenantIds, _opCtx.get());
     startBlockingReadsAfter(blockers, Timestamp(1));
 
     auto mtabVerifier = [opCtx = _opCtx.get()](std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
@@ -398,7 +392,7 @@ TEST_F(ShardSplitDonorOpObserverTest, TransitionToAbort) {
     stateDocument.setCommitOrAbortOpTime(abortOpTime);
     stateDocument.setAbortReason(bob.obj());
 
-    auto blockers = createBlockersAndStartBlockingWrites(_tenantIds, _opCtx.get(), _connectionStr);
+    auto blockers = createBlockersAndStartBlockingWrites(_tenantIds, _opCtx.get());
     startBlockingReadsAfter(blockers, Timestamp(1));
 
     auto mtabVerifier = [opCtx = _opCtx.get()](std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
@@ -430,7 +424,7 @@ TEST_F(ShardSplitDonorOpObserverTest, SetExpireAtForAbortedRemoveBlockers) {
     stateDocument.setAbortReason(bob.obj());
     stateDocument.setExpireAt(mongo::Date_t::fromMillisSinceEpoch(1000));
 
-    auto blockers = createBlockersAndStartBlockingWrites(_tenantIds, _opCtx.get(), _connectionStr);
+    auto blockers = createBlockersAndStartBlockingWrites(_tenantIds, _opCtx.get());
     startBlockingReadsAfter(blockers, Timestamp(1));
     for (auto& blocker : blockers) {
         blocker->setAbortOpTime(_opCtx.get(), *stateDocument.getCommitOrAbortOpTime());
@@ -459,7 +453,7 @@ TEST_F(ShardSplitDonorOpObserverTest, DeleteAbortedDocumentDoesNotRemoveBlockers
     stateDocument.setAbortReason(bob.obj());
     stateDocument.setExpireAt(mongo::Date_t::fromMillisSinceEpoch(1000));
 
-    auto blockers = createBlockersAndStartBlockingWrites(_tenantIds, _opCtx.get(), _connectionStr);
+    auto blockers = createBlockersAndStartBlockingWrites(_tenantIds, _opCtx.get());
     startBlockingReadsAfter(blockers, Timestamp(1));
     for (auto& blocker : blockers) {
         blocker->setAbortOpTime(_opCtx.get(), *stateDocument.getCommitOrAbortOpTime());
@@ -500,7 +494,7 @@ TEST_F(ShardSplitDonorOpObserverTest, DeleteCommittedDocumentRemovesBlockers) {
     stateDocument.setCommitOrAbortOpTime(commitOpTime);
     stateDocument.setExpireAt(mongo::Date_t::fromMillisSinceEpoch(1000));
 
-    auto blockers = createBlockersAndStartBlockingWrites(_tenantIds, _opCtx.get(), _connectionStr);
+    auto blockers = createBlockersAndStartBlockingWrites(_tenantIds, _opCtx.get());
     startBlockingReadsAfter(blockers, Timestamp(1));
     for (auto& blocker : blockers) {
         blocker->setCommitOpTime(_opCtx.get(), *stateDocument.getCommitOrAbortOpTime());

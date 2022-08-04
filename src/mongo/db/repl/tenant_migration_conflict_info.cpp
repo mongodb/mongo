@@ -40,16 +40,17 @@ namespace {
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(TenantMigrationConflictInfo);
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(NonRetryableTenantMigrationConflictInfo);
 
-constexpr StringData kTenantIdFieldName = "tenantId"_sd;
+constexpr StringData kMigrationIdFieldName = "migrationId"_sd;
 
 }  // namespace
 
 void TenantMigrationConflictInfoBase::serialize(BSONObjBuilder* bob) const {
-    bob->append(kTenantIdFieldName, _tenantId);
+    _migrationId.appendToBuilder(bob, kMigrationIdFieldName);
 }
 
 std::shared_ptr<const ErrorExtraInfo> TenantMigrationConflictInfoBase::parse(const BSONObj& obj) {
-    return std::make_shared<TenantMigrationConflictInfoBase>(obj[kTenantIdFieldName].String());
+    auto uuid = uassertStatusOK(UUID::parse(obj[kMigrationIdFieldName]));
+    return std::make_shared<TenantMigrationConflictInfoBase>(std::move(uuid));
 }
 
 }  // namespace mongo

@@ -203,7 +203,7 @@ OpTimeBundle replLogUpdate(OperationContext* opCtx,
     OpTimeBundle opTimes;
     // We never want to store pre- or post- images when we're migrating oplog entries from another
     // replica set.
-    const auto& migrationRecipientInfo = repl::tenantMigrationRecipientInfo(opCtx);
+    const auto& migrationRecipientInfo = repl::tenantMigrationInfo(opCtx);
     const auto storePreImageInOplogForRetryableWrite =
         (args.updateArgs->storeDocOption == CollectionUpdateArgs::StoreDocOption::PreImage &&
          opCtx->getTxnNumber() && !oplogEntry->getNeedsRetryImage());
@@ -284,7 +284,7 @@ OpTimeBundle replLogDelete(OperationContext* opCtx,
     OpTimeBundle opTimes;
     // We never want to store pre-images when we're migrating oplog entries from another
     // replica set.
-    const auto& migrationRecipientInfo = repl::tenantMigrationRecipientInfo(opCtx);
+    const auto& migrationRecipientInfo = repl::tenantMigrationInfo(opCtx);
     if (deletedDoc && !migrationRecipientInfo) {
         MutableOplogEntry noopEntry = *oplogEntry;
         noopEntry.setOpType(repl::OpTypeEnum::kNoop);
@@ -1596,7 +1596,7 @@ getApplyOpsOplogSlotAndOperationAssignmentForTransaction(
     };
 
     auto isMigratingTenant = [&opCtx]() {
-        return static_cast<bool>(repl::tenantMigrationRecipientInfo(opCtx));
+        return static_cast<bool>(repl::tenantMigrationInfo(opCtx));
     };
 
     // We never want to store pre-images or post-images when we're migrating oplog entries from
@@ -1872,7 +1872,7 @@ int logOplogEntries(
 
     // We never want to store pre-images or post-images when we're migrating oplog entries from
     // another replica set.
-    const auto& migrationRecipientInfo = repl::tenantMigrationRecipientInfo(opCtx);
+    const auto& migrationRecipientInfo = repl::tenantMigrationInfo(opCtx);
 
     auto logPrePostImageNoopEntry = [&](const repl::ReplOperation& statement,
                                         const BSONObj& imageDoc) {

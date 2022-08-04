@@ -258,8 +258,8 @@ var TenantMigrationUtil = (function() {
     }
 
     /**
-     * Returns the TenantMigrationAccessBlocker serverStatus output for the migration or shard merge
-     * for the given node.
+     * Returns the TenantMigrationAccessBlocker serverStatus output for the multi-tenant migration
+     * or shard merge for the given node.
      */
     function getTenantMigrationAccessBlocker({donorNode, recipientNode, tenantId}) {
         if (donorNode && recipientNode) {
@@ -292,6 +292,26 @@ var TenantMigrationUtil = (function() {
         }
 
         return tenantMigrationAccessBlocker;
+    }
+
+    /**
+     * Returns all TenantMigrationAccessBlocker serverStatus output for the multi-tenant migration
+     * or shard merge associated with the provided tenantId for the given nodes, filtering out any
+     * empty entries.
+     */
+    function getTenantMigrationAccessBlockers({donorNodes = [], recipientNodes = [], tenantId}) {
+        const recipientAccessBlockers = recipientNodes.reduce((acc, node) => {
+            const accessBlocker = getTenantMigrationAccessBlocker({recipientNode: node, tenantId});
+            return accessBlocker && accessBlocker.recipient ? acc.concat(accessBlocker.recipient)
+                                                            : acc;
+        }, []);
+
+        const donorAccessBlockers = donorNodes.reduce((acc, node) => {
+            const accessBlocker = getTenantMigrationAccessBlocker({donorNode: node, tenantId});
+            return accessBlocker && accessBlocker.donor ? acc.concat(accessBlocker.donor) : acc;
+        }, []);
+
+        return {recipientAccessBlockers, donorAccessBlockers};
     }
 
     /**
@@ -537,6 +557,7 @@ var TenantMigrationUtil = (function() {
         makeX509OptionsForTest,
         isMigrationCompleted,
         getTenantMigrationAccessBlocker,
+        getTenantMigrationAccessBlockers,
         getNumBlockedReads,
         getNumBlockedWrites,
         isNamespaceForTenant,

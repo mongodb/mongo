@@ -148,14 +148,9 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
     invariant(donorStateDoc.getRecipientConnectionString());
 
     auto tenantIds = *donorStateDoc.getTenantIds();
-    auto recipientConnectionString = *donorStateDoc.getRecipientConnectionString();
     for (const auto& tenantId : tenantIds) {
-        auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
-            opCtx->getServiceContext(),
-            donorStateDoc.getId(),
-            tenantId.toString(),
-            MigrationProtocolEnum::kMultitenantMigrations,
-            recipientConnectionString.toString());
+        auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(opCtx->getServiceContext(),
+                                                                        donorStateDoc.getId());
 
         TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext()).add(tenantId, mtab);
     }

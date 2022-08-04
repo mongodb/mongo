@@ -136,8 +136,8 @@ BaseCloner::AfterStageBehavior TenantAllDatabaseCloner::listDatabasesStage() {
 BaseCloner::AfterStageBehavior TenantAllDatabaseCloner::listExistingDatabasesStage() {
     auto opCtx = cc().makeOperationContext();
     DBDirectClient client(opCtx.get());
-    tenantMigrationRecipientInfo(opCtx.get()) =
-        boost::make_optional<TenantMigrationRecipientInfo>(getSharedData()->getMigrationId());
+    tenantMigrationInfo(opCtx.get()) =
+        boost::make_optional<TenantMigrationInfo>(getSharedData()->getMigrationId());
 
     const BSONObj filter = ClonerUtils::makeTenantDatabaseFilter(_tenantId);
     auto databasesArray = client.getDatabaseInfos(filter, true /* nameOnly */);

@@ -4721,12 +4721,7 @@ TEST_F(OpObserverTest, OnInsertChecksIfTenantMigrationIsBlockingWrites) {
     const auto uuid = UUID::gen();
 
     // Add a tenant migration access blocker on donor for blocking writes.
-    auto donorMtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
-        getServiceContext(),
-        uuid,
-        kTenantId,
-        MigrationProtocolEnum::kMultitenantMigrations,
-        "fakeConnString");
+    auto donorMtab = std::make_shared<TenantMigrationDonorAccessBlocker>(getServiceContext(), uuid);
     TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, donorMtab);
     donorMtab->startBlockingWrites();
 
@@ -4751,12 +4746,7 @@ TEST_F(OpObserverTransactionTest,
     const auto uuid = UUID::gen();
 
     // Add a tenant migration access blocker on donor for blocking writes.
-    auto donorMtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
-        getServiceContext(),
-        uuid,
-        kTenantId,
-        MigrationProtocolEnum::kMultitenantMigrations,
-        "fakeConnString");
+    auto donorMtab = std::make_shared<TenantMigrationDonorAccessBlocker>(getServiceContext(), uuid);
     TenantMigrationAccessBlockerRegistry::get(getServiceContext()).add(kTenantId, donorMtab);
 
     const NamespaceString nss(boost::none, "tenantId_db", "testColl");

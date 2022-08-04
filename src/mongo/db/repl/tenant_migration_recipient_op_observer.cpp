@@ -32,8 +32,10 @@
 
 #include <fmt/format.h>
 
+#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/repl/tenant_file_importer_service.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
+#include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/tenant_migration_recipient_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/tenant_migration_shard_merge_util.h"
@@ -43,44 +45,10 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
-
 namespace mongo {
 namespace repl {
 using namespace fmt;
 namespace {
-
-// For "multitenant migration" migrations.
-const auto tenantIdToDeleteDecoration =
-    OperationContext::declareDecoration<boost::optional<std::string>>();
-// For "shard merge" migrations.
-const auto migrationIdToDeleteDecoration =
-    OperationContext::declareDecoration<boost::optional<UUID>>();
-
-/**
- * Initializes the TenantMigrationRecipientAccessBlocker for the tenant migration denoted by the
- * given state doc.
- *
- * TODO (SERVER-64616): Skip for protocol kShardMerge.
- */
-void createAccessBlockerIfNeeded(OperationContext* opCtx,
-                                 const TenantMigrationRecipientDocument& recipientStateDoc) {
-    if (tenant_migration_access_blocker::getTenantMigrationRecipientAccessBlocker(
-            opCtx->getServiceContext(), recipientStateDoc.getTenantId())) {
-        // The migration failed part-way on the recipient with a retryable error, and got retried
-        // internally.
-        return;
-    }
-
-    auto mtab = std::make_shared<TenantMigrationRecipientAccessBlocker>(
-        opCtx->getServiceContext(),
-        recipientStateDoc.getId(),
-        recipientStateDoc.getTenantId().toString(),
-        recipientStateDoc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations),
-        recipientStateDoc.getDonorConnectionString().toString());
-
-    TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-        .add(recipientStateDoc.getTenantId(), mtab);
-}
 
 /**
  * Transitions the TenantMigrationRecipientAccessBlocker to the rejectBefore state.
@@ -111,35 +79,49 @@ void TenantMigrationRecipientOpObserver::onCreateCollection(OperationContext* op
                                                             const BSONObj& idIndex,
                                                             const OplogSlot& createOpTime,
                                                             bool fromMigrate) {
-    if (!shard_merge_utils::isDonatedFilesCollection(collectionName))
-        return;
+    if (shard_merge_utils::isDonatedFilesCollection(collectionName)) {
+        auto collString = collectionName.coll().toString();
+        auto migrationUUID =
+            uassertStatusOK(UUID::parse(collString.substr(collString.find('.') + 1)));
+        auto fileClonerTempDirPath = shard_merge_utils::fileClonerTempDir(migrationUUID);
 
-    auto collString = collectionName.coll().toString();
-    auto migrationUUID = uassertStatusOK(UUID::parse(collString.substr(collString.find('.') + 1)));
-    auto fileClonerTempDirPath = shard_merge_utils::fileClonerTempDir(migrationUUID);
+        // This is possible when a secondary restarts or rollback and the donated files collection
+        // is created as part of oplog replay.
+        if (boost::filesystem::exists(fileClonerTempDirPath)) {
+            LOGV2_DEBUG(6113316,
+                        1,
+                        "File cloner temp directory already exists",
+                        "directory"_attr = fileClonerTempDirPath.generic_string());
 
-    // This is possible when a secondary restarts or rollback and the donated files collection
-    // is created as part of oplog replay.
-    if (boost::filesystem::exists(fileClonerTempDirPath)) {
-        LOGV2_DEBUG(6113316,
-                    1,
-                    "File cloner temp directory already exists",
-                    "directory"_attr = fileClonerTempDirPath.generic_string());
+            // Ignoring the errors because if this step fails, then the following step
+            // create_directory() will fail and that will throw an exception.
+            boost::system::error_code ec;
+            boost::filesystem::remove_all(fileClonerTempDirPath, ec);
+        }
 
-        // Ignoring the errors because if this step fails, then the following step
-        // create_directory() will fail and that will throw an exception.
-        boost::system::error_code ec;
-        boost::filesystem::remove_all(fileClonerTempDirPath, ec);
-    }
+        try {
+            boost::filesystem::create_directory(fileClonerTempDirPath);
+        } catch (std::exception& e) {
+            LOGV2_ERROR(6113317,
+                        "Error creating file cloner temp directory",
+                        "directory"_attr = fileClonerTempDirPath.generic_string(),
+                        "error"_attr = e.what());
+            throw;
+        }
+    } else if (!collectionName.isOnInternalDb()) {
+        const auto& recipientInfo = tenantMigrationInfo(opCtx);
+        if (!recipientInfo)
+            return;
 
-    try {
-        boost::filesystem::create_directory(fileClonerTempDirPath);
-    } catch (std::exception& e) {
-        LOGV2_ERROR(6113317,
-                    "Error creating file cloner temp directory",
-                    "directory"_attr = fileClonerTempDirPath.generic_string(),
-                    "error"_attr = e.what());
-        throw;
+        auto tenantId = tenant_migration_access_blocker::parseTenantIdFromDB(collectionName.db());
+
+        tassert(
+            6461602,
+            "Unable to determine tenant id from provided database name"_format(collectionName.db()),
+            tenantId);
+
+        tenant_migration_access_blocker::addTenantMigrationRecipientAccessBlocker(
+            opCtx->getServiceContext(), tenantId.get(), recipientInfo->uuid);
     }
 }
 
@@ -203,7 +185,12 @@ void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
                 case TenantMigrationRecipientStateEnum::kUninitialized:
                     break;
                 case TenantMigrationRecipientStateEnum::kStarted:
-                    createAccessBlockerIfNeeded(opCtx, recipientStateDoc);
+                    if (protocol == MigrationProtocolEnum::kMultitenantMigrations) {
+                        tenant_migration_access_blocker::addTenantMigrationRecipientAccessBlocker(
+                            opCtx->getServiceContext(),
+                            recipientStateDoc.getTenantId().toString(),
+                            recipientStateDoc.getId());
+                    }
                     break;
                 case TenantMigrationRecipientStateEnum::kLearnedFilenames:
                     break;
@@ -265,15 +252,20 @@ void TenantMigrationRecipientOpObserver::aboutToDelete(OperationContext* opCtx,
         // kDone in order to avoid creating an unnecessary TenantMigrationRecipientAccessBlocker.
         // In this case, the TenantMigrationRecipientAccessBlocker will not exist for a given
         // tenant.
-        if (recipientStateDoc.getProtocol() == MigrationProtocolEnum::kMultitenantMigrations) {
-            auto mtab = tenant_migration_access_blocker::getTenantMigrationRecipientAccessBlocker(
-                opCtx->getServiceContext(), recipientStateDoc.getTenantId());
-            tenantIdToDeleteDecoration(opCtx) = mtab
-                ? boost::make_optional(recipientStateDoc.getTenantId().toString())
-                : boost::none;
-        } else {
-            migrationIdToDeleteDecoration(opCtx) = recipientStateDoc.getId();
-        }
+        auto getTenantId = [&]() -> boost::optional<std::string> {
+            if (recipientStateDoc.getProtocol() == MigrationProtocolEnum::kMultitenantMigrations) {
+                auto mtab =
+                    tenant_migration_access_blocker::getTenantMigrationRecipientAccessBlocker(
+                        opCtx->getServiceContext(), recipientStateDoc.getTenantId());
+                return mtab ? boost::make_optional(recipientStateDoc.getTenantId().toString())
+                            : boost::none;
+            }
+
+            return boost::none;
+        };
+
+        tenantMigrationInfo(opCtx) =
+            boost::make_optional(TenantMigrationInfo(recipientStateDoc.getId(), getTenantId()));
     }
 }
 
@@ -284,8 +276,13 @@ void TenantMigrationRecipientOpObserver::onDelete(OperationContext* opCtx,
                                                   const OplogDeleteEntryArgs& args) {
     if (nss == NamespaceString::kTenantMigrationRecipientsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
-        if (tenantIdToDeleteDecoration(opCtx)) {
-            auto tenantId = tenantIdToDeleteDecoration(opCtx).value();
+        auto tmi = tenantMigrationInfo(opCtx);
+        if (!tmi) {
+            return;
+        }
+
+        if (tmi->tenantId) {
+            auto tenantId = tmi->tenantId.get();
             LOGV2_INFO(8423337,
                        "Removing expired 'multitenant migration' migration",
                        "tenantId"_attr = tenantId);
@@ -293,10 +290,8 @@ void TenantMigrationRecipientOpObserver::onDelete(OperationContext* opCtx,
                 TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                     .remove(tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
             });
-        }
-
-        if (migrationIdToDeleteDecoration(opCtx)) {
-            auto migrationId = migrationIdToDeleteDecoration(opCtx).value();
+        } else {
+            auto migrationId = tmi->uuid;
             LOGV2_INFO(6114101,
                        "Removing expired 'shard merge' migration",
                        "migrationId"_attr = migrationId);

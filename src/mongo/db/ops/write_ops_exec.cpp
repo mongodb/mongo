@@ -322,7 +322,7 @@ bool handleError(OperationContext* opCtx,
             auto migrationConflictInfo = ex.toStatus().extraInfo<TenantMigrationConflictInfo>();
             uassertStatusOK(
                 Status(NonRetryableTenantMigrationConflictInfo(
-                           migrationConflictInfo->getTenantId(),
+                           migrationConflictInfo->getMigrationId(),
                            migrationConflictInfo->getTenantMigrationAccessBlocker()),
                        "Multi update must block until this tenant migration commits or aborts"));
         }
@@ -664,7 +664,7 @@ WriteResult performInserts(OperationContext* opCtx,
 
     // If we are performing inserts from tenant migrations, skip checking if the user is allowed to
     // write to the namespace.
-    if (!repl::tenantMigrationRecipientInfo(opCtx)) {
+    if (!repl::tenantMigrationInfo(opCtx)) {
         uassertStatusOK(userAllowedWriteNS(opCtx, wholeOp.getNamespace()));
     }
 
@@ -1430,7 +1430,7 @@ Status performAtomicTimeseriesWrites(
             doc_diff::applyDiff(original.value(),
                                 update.getU().getDiff(),
                                 &CollectionQueryInfo::get(*coll).getIndexKeys(opCtx),
-                                static_cast<bool>(repl::tenantMigrationRecipientInfo(opCtx)));
+                                static_cast<bool>(repl::tenantMigrationInfo(opCtx)));
 
         CollectionUpdateArgs args;
         if (const auto& stmtIds = op.getStmtIds()) {

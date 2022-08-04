@@ -86,7 +86,9 @@ std::shared_ptr<TenantMigrationRecipientAccessBlocker> getTenantMigrationRecipie
             .getTenantMigrationAccessBlockerForTenantId(tenantId, MtabType::kRecipient));
 }
 
-void startRejectingReadsBefore(OperationContext* opCtx, UUID migrationId, mongo::Timestamp ts) {
+void startRejectingReadsBefore(OperationContext* opCtx,
+                               const UUID& migrationId,
+                               mongo::Timestamp ts) {
     auto callback = [&](std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
         auto recipientMtab = checked_pointer_cast<TenantMigrationRecipientAccessBlocker>(mtab);
         recipientMtab->startRejectingReadsBefore(ts);
@@ -97,20 +99,14 @@ void startRejectingReadsBefore(OperationContext* opCtx, UUID migrationId, mongo:
 }
 
 void addTenantMigrationRecipientAccessBlocker(ServiceContext* serviceContext,
-                                              StringData tenantId,
-                                              UUID migrationId,
-                                              MigrationProtocolEnum protocol,
-                                              StringData donorConnectionString) {
+                                              const StringData& tenantId,
+                                              const UUID& migrationId) {
     if (getTenantMigrationRecipientAccessBlocker(serviceContext, tenantId)) {
         return;
     }
 
     auto mtab =
-        std::make_shared<TenantMigrationRecipientAccessBlocker>(serviceContext,
-                                                                migrationId,
-                                                                tenantId.toString(),
-                                                                protocol,
-                                                                donorConnectionString.toString());
+        std::make_shared<TenantMigrationRecipientAccessBlocker>(serviceContext, migrationId);
 
     TenantMigrationAccessBlockerRegistry::get(serviceContext).add(tenantId, mtab);
 }
@@ -352,12 +348,8 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
         }
 
         auto protocol = doc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations);
-        auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
-            opCtx->getServiceContext(),
-            doc.getId(),
-            doc.getTenantId().toString(),
-            protocol,
-            doc.getRecipientConnectionString().toString());
+        auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(opCtx->getServiceContext(),
+                                                                        doc.getId());
 
         auto& registry = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext());
         if (protocol == MigrationProtocolEnum::kMultitenantMigrations) {
@@ -409,11 +401,7 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
         }
 
         auto mtab = std::make_shared<TenantMigrationRecipientAccessBlocker>(
-            opCtx->getServiceContext(),
-            doc.getId(),
-            doc.getTenantId().toString(),
-            doc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations),
-            doc.getDonorConnectionString().toString());
+            opCtx->getServiceContext(), doc.getId());
 
         TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
             .add(doc.getTenantId(), mtab);
@@ -451,13 +439,8 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
         auto optionalTenants = doc.getTenantIds();
         invariant(optionalTenants);
         for (const auto& tenantId : optionalTenants.value()) {
-            invariant(doc.getRecipientConnectionString());
             auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
-                opCtx->getServiceContext(),
-                doc.getId(),
-                tenantId.toString(),
-                MigrationProtocolEnum::kMultitenantMigrations,
-                doc.getRecipientConnectionString()->toString());
+                opCtx->getServiceContext(), doc.getId());
             TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                 .add(tenantId.toString(), mtab);
 

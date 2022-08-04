@@ -95,6 +95,18 @@ function TenantMigrationTest({
         jsTestLog(`Inserted with w: majority, opTime ${tojson(res.operationTime)}`);
     };
 
+    /**
+     * Inserts documents into the specified collection on the recipient primary.
+     */
+    this.insertRecipientDB = function(dbName, collName, data = loadDummyData()) {
+        jsTestLog(`Inserting data into collection ${collName} of DB ${dbName} on the recipient`);
+        const primary = recipientRst.getPrimary();
+        const db = primary.getDB(dbName);
+        const res = assert.commandWorked(
+            db.runCommand({insert: collName, documents: data, writeConcern: {w: 'majority'}}));
+        jsTestLog(`Inserted with w: majority, opTime ${tojson(res.operationTime)}`);
+    };
+
     // Shard Merge installs TenantRecipientAccessBlockers only for tenants with data, so most tests
     // require some data.
     if (insertDataForTenant !== undefined) {

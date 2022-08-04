@@ -38,6 +38,7 @@ const migrationUuid = UUID();
 const kDummyTenantId = "nonExistentTenantId";
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationUuid),
+    // TODO (SERVER-63454): Remove kDummyTenantId.
     tenantId: kDummyTenantId,
     readPreference: {mode: 'primary'}
 };

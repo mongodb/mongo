@@ -539,8 +539,7 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
     std::vector<TenantNoOpEntry>::const_iterator begin,
     std::vector<TenantNoOpEntry>::const_iterator end) {
     auto opCtx = cc().makeOperationContext();
-    tenantMigrationRecipientInfo(opCtx.get()) =
-        boost::make_optional<TenantMigrationRecipientInfo>(_migrationUuid);
+    tenantMigrationInfo(opCtx.get()) = boost::make_optional<TenantMigrationInfo>(_migrationUuid);
 
     // Since the client object persists across each noop write call and the same writer thread could
     // be reused to write noop entries with older optime, we need to clear the lastOp associated
@@ -874,8 +873,7 @@ void TenantOplogApplier::_writeNoOpsForRange(OpObserver* opObserver,
                                              std::vector<TenantNoOpEntry>::const_iterator begin,
                                              std::vector<TenantNoOpEntry>::const_iterator end) {
     auto opCtx = cc().makeOperationContext();
-    tenantMigrationRecipientInfo(opCtx.get()) =
-        boost::make_optional<TenantMigrationRecipientInfo>(_migrationUuid);
+    tenantMigrationInfo(opCtx.get()) = boost::make_optional<TenantMigrationInfo>(_migrationUuid);
 
     // Since the client object persists across each noop write call and the same writer thread could
     // be reused to write noop entries with older optime, we need to clear the lastOp associated
@@ -1055,8 +1053,7 @@ Status TenantOplogApplier::_applyOplogEntryOrGroupedInserts(
 Status TenantOplogApplier::_applyOplogBatchPerWorker(std::vector<const OplogEntry*>* ops) {
     auto opCtx = cc().makeOperationContext();
     opCtx->setEnforceConstraints(false);
-    tenantMigrationRecipientInfo(opCtx.get()) =
-        boost::make_optional<TenantMigrationRecipientInfo>(_migrationUuid);
+    tenantMigrationInfo(opCtx.get()) = boost::make_optional<TenantMigrationInfo>(_migrationUuid);
 
     // Set this to satisfy low-level locking invariants.
     opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);

@@ -1298,11 +1298,10 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
     auto uniqueOpCtx = cc().makeOperationContext();
     auto opCtx = uniqueOpCtx.get();
 
-    // If the tenantMigrationRecipientInfo is set on the opCtx, we will set the
+    // If the tenantMigrationInfo is set on the opCtx, we will set the
     // 'fromTenantMigration' field when writing oplog entries. That field is used to help recipient
     // secondaries determine if a no-op entry is related to a transaction entry.
-    tenantMigrationRecipientInfo(opCtx) =
-        boost::make_optional<TenantMigrationRecipientInfo>(getMigrationUUID());
+    tenantMigrationInfo(opCtx) = boost::make_optional<TenantMigrationInfo>(getMigrationUUID());
     opCtx->setLogicalSessionId(sessionId);
     opCtx->setTxnNumber(txnNumber);
     opCtx->setInMultiDocumentTransaction();

@@ -76,11 +76,6 @@ void TenantMigrationAccessBlockerRegistry::add(StringData tenantId,
                                                std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
     stdx::lock_guard<Latch> lg(_mutex);
     auto mtabType = mtab->getType();
-    tassert(8423351,
-            "add called with new-style blocker, use addShardMergeDonorAccessBlocker instead",
-            mtabType != MtabType::kDonor ||
-                mtab->getProtocol() != MigrationProtocolEnum::kShardMerge);
-
     tassert(
         8423350,
         "Adding multitenant migration donor blocker when this node has a shard merge donor blocker",
@@ -88,12 +83,13 @@ void TenantMigrationAccessBlockerRegistry::add(StringData tenantId,
 
     auto it = _tenantMigrationAccessBlockers.find(tenantId);
     if (it != _tenantMigrationAccessBlockers.end()) {
-        if (it->second.getAccessBlocker(mtabType)) {
+        auto existingMtab = it->second.getAccessBlocker(mtabType);
+        if (existingMtab) {
             tasserted(ErrorCodes::ConflictingOperationInProgress,
                       str::stream() << "This node is already a "
-                                    << MigrationProtocol_serializer(mtab->getProtocol()) << " "
                                     << (mtabType == MtabType::kDonor ? "donor" : "recipient")
-                                    << " for tenantId \"" << tenantId << "\"");
+                                    << " for tenantId \"" << tenantId << "\" with migrationId \""
+                                    << existingMtab->getMigrationId().toString() << "\"");
         }
         // The migration protocol guarantees that the original donor node must be garbage collected
         // before it can be chosen as a recipient under the same tenant. Therefore, we only expect
@@ -112,19 +108,24 @@ void TenantMigrationAccessBlockerRegistry::addShardMergeDonorAccessBlocker(
     std::shared_ptr<TenantMigrationDonorAccessBlocker> mtab) {
     LOGV2_DEBUG(6114102, 1, "Adding shard merge donor access blocker");
     stdx::lock_guard<Latch> lg(_mutex);
-    tassert(8423342,
-            "addShardMergeDonorAccessBlocker called with old-style multitenant migrations blocker",
-            mtab->getProtocol() == MigrationProtocolEnum::kShardMerge);
     tassert(ErrorCodes::ConflictingOperationInProgress,
-            str::stream() << "This node is already a shard merge donor",
+            str::stream() << "This node is already a shard merge donor with migrationId "
+                          << _donorAccessBlocker->getMigrationId().toString(),
             !_donorAccessBlocker);
+
+    const auto& foundAccessBlocker = std::find_if(
+        _tenantMigrationAccessBlockers.begin(),
+        _tenantMigrationAccessBlockers.end(),
+        [](const auto& pair) { return pair.second.getAccessBlocker(MtabType::kDonor).get(); });
     tassert(6114105,
-            "Adding shard merge donor blocker when this node has other donor blockers",
-            std::find_if(_tenantMigrationAccessBlockers.begin(),
-                         _tenantMigrationAccessBlockers.end(),
-                         [](const auto& pair) {
-                             return pair.second.getAccessBlocker(MtabType::kDonor).get();
-                         }) == _tenantMigrationAccessBlockers.end());
+            str::stream() << "Adding shard merge donor blocker when this node has another donor "
+                             "blocker with migrationId \""
+                          << foundAccessBlocker->second.getAccessBlocker(MtabType::kDonor)
+                                 ->getMigrationId()
+                                 .toString()
+                          << "\"",
+            foundAccessBlocker == _tenantMigrationAccessBlockers.end());
+
     _donorAccessBlocker = mtab;
 }
 

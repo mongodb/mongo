@@ -33,8 +33,7 @@
 
 namespace mongo {
 namespace repl {
-const OperationContext::Decoration<boost::optional<TenantMigrationRecipientInfo>>
-    tenantMigrationRecipientInfo =
-        OperationContext::declareDecoration<boost::optional<TenantMigrationRecipientInfo>>();
+const OperationContext::Decoration<boost::optional<TenantMigrationInfo>> tenantMigrationInfo =
+    OperationContext::declareDecoration<boost::optional<TenantMigrationInfo>>();
 }  // namespace repl
 }  // namespace mongo
