@@ -57,8 +57,4 @@ feature_flags:
         description: "Enable use of the new async remote command invocation API"
         cpp_varname: gFeatureFlagAsyncRemoteCmd
         default: false
-    featureFlagAdditionalParticipants:
-        description: "Adding additional participants for existing transactions"
-        cpp_varname: gfeatureFlagAdditionalParticipants
-        default: false
 
