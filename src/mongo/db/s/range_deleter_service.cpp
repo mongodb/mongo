@@ -28,6 +28,8 @@
  */
 
 #include "mongo/db/s/range_deleter_service.h"
+#include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/s/range_deleter_service_op_observer.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingRangeDeleter
@@ -57,6 +59,11 @@ void RangeDeleterService::onStepUpComplete(OperationContext* opCtx, long long te
 
         // Reset potential in-memory state referring a previous term
         _rangeDeletionTasks.clear();
+    } else {
+        // Initializing the op observer, only executed once at the first step-up
+        auto opObserverRegistry =
+            checked_cast<OpObserverRegistry*>(opCtx->getServiceContext()->getOpObserver());
+        opObserverRegistry->addObserver(std::make_unique<RangeDeleterServiceOpObserver>());
     }
 
     const std::string kExecName("RangeDeleterServiceExecutor");
