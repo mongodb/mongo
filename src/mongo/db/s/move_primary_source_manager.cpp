@@ -329,23 +329,26 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
 Status MovePrimarySourceManager::_commitOnConfig(OperationContext* opCtx) {
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
-    auto findResponse = uassertStatusOK(
-        configShard->exhaustiveFindOnConfig(opCtx,
-                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                            repl::ReadConcernLevel::kMajorityReadConcern,
-                                            NamespaceString::kConfigDatabasesNamespace,
-                                            BSON(DatabaseType::kNameFieldName << _dbname),
-                                            BSON(DatabaseType::kNameFieldName << -1),
-                                            1));
+    auto getDatabaseEntry = [&]() {
+        auto findResponse = uassertStatusOK(
+            configShard->exhaustiveFindOnConfig(opCtx,
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                repl::ReadConcernLevel::kMajorityReadConcern,
+                                                NamespaceString::kConfigDatabasesNamespace,
+                                                BSON(DatabaseType::kNameFieldName << _dbname),
+                                                BSON(DatabaseType::kNameFieldName << -1),
+                                                1));
 
-    const auto databasesVector = std::move(findResponse.docs);
-    uassert(ErrorCodes::IncompatibleShardingMetadata,
-            str::stream() << "Tried to find max database version for database '" << _dbname
-                          << "', but found no databases",
-            !databasesVector.empty());
+        const auto databasesVector = std::move(findResponse.docs);
+        uassert(ErrorCodes::IncompatibleShardingMetadata,
+                str::stream() << "Tried to find max database version for database '" << _dbname
+                              << "', but found no databases",
+                !databasesVector.empty());
 
-    const auto dbType =
-        DatabaseType::parse(IDLParserContext("DatabaseType"), databasesVector.front());
+        return DatabaseType::parse(IDLParserContext("DatabaseType"), databasesVector.front());
+    };
+
+    const auto dbType = getDatabaseEntry();
 
     if (dbType.getPrimary() == _toShard) {
         return Status::OK();
@@ -358,9 +361,17 @@ Status MovePrimarySourceManager::_commitOnConfig(OperationContext* opCtx) {
 
     newDbType.setVersion(currentDatabaseVersion.makeUpdated());
 
-    auto const updateQuery =
-        BSON(DatabaseType::kNameFieldName << _dbname << DatabaseType::kVersionFieldName
-                                          << currentDatabaseVersion.toBSON());
+    auto const updateQuery = [&] {
+        BSONObjBuilder queryBuilder;
+        queryBuilder.append(DatabaseType::kNameFieldName, _dbname);
+        // Include the version in the update filter to be resilient to potential network retries and
+        // delayed messages.
+        for (auto [fieldName, elem] : currentDatabaseVersion.toBSON()) {
+            auto dottedFieldName = DatabaseType::kVersionFieldName + "." + fieldName;
+            queryBuilder.appendAs(elem, dottedFieldName);
+        }
+        return queryBuilder.obj();
+    }();
 
     auto updateStatus = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
         opCtx,
@@ -378,6 +389,14 @@ Status MovePrimarySourceManager::_commitOnConfig(OperationContext* opCtx) {
               "error"_attr = redact(updateStatus.getStatus()));
         return updateStatus.getStatus();
     }
+
+    const auto updatedDbType = getDatabaseEntry();
+    tassert(6851100,
+            "Error committing movePrimary: database version went backwards",
+            updatedDbType.getVersion() > currentDatabaseVersion);
+    uassert(6851101,
+            "Error committing movePrimary: update of `config.databases` failed",
+            updatedDbType.getPrimary() != _fromShard);
 
     return Status::OK();
 }
