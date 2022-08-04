@@ -485,4 +485,45 @@ TEST_F(RangeDeleterServiceTest, GetOverlappingRangeDeletionsResilientToRefineSha
     futureReadyWhenTasks0And10And30Ready.get(opCtx);
 }
 
+TEST_F(RangeDeleterServiceTest, DumpState) {
+    auto rds = RangeDeleterService::get(opCtx);
+    auto* task0WithOngoingQueriesCollA = &rangeDeletionTask0ForCollA;
+    auto* task1WithOngoingQueriesCollA = &rangeDeletionTask1ForCollA;
+    auto* taskWithOngoingQueriesCollB = &rangeDeletionTask0ForCollB;
+
+    // Register 2 tasks for `collA` and 1 task for `collB`
+    auto completionFuture0CollA =
+        rds->registerTask(task0WithOngoingQueriesCollA->getTask(),
+                          task0WithOngoingQueriesCollA->getOngoingQueriesFuture());
+    auto completionFuture1CollA =
+        rds->registerTask(task1WithOngoingQueriesCollA->getTask(),
+                          task1WithOngoingQueriesCollA->getOngoingQueriesFuture());
+    auto completionFutureCollB =
+        rds->registerTask(taskWithOngoingQueriesCollB->getTask(),
+                          taskWithOngoingQueriesCollB->getOngoingQueriesFuture());
+
+    // The tasks can't be processed (hence completed) before ongoing queries drain
+    ASSERT(!completionFuture0CollA.isReady());
+    ASSERT(!completionFuture1CollA.isReady());
+    ASSERT(!completionFutureCollB.isReady());
+    ASSERT_EQ(2, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+    ASSERT_EQ(1, rds->getNumRangeDeletionTasksForCollection(uuidCollB));
+
+    // Build expected state and compare it with the returned one from
+    // RangeDeleterService::dumpState()
+    BSONArrayBuilder builderArrCollA;
+    builderArrCollA.append(task0WithOngoingQueriesCollA->getTask().getRange().toBSON());
+    builderArrCollA.append(task1WithOngoingQueriesCollA->getTask().getRange().toBSON());
+
+    BSONArrayBuilder builderArrCollB;
+    builderArrCollB.append(taskWithOngoingQueriesCollB->getTask().getRange().toBSON());
+
+    BSONObj expectedState =
+        BSON(uuidCollA.toString() << builderArrCollA.arr() << uuidCollB.toString()
+                                  << builderArrCollB.arr());
+
+    BSONObj state = rds->dumpState();
+    ASSERT_EQ(state.woCompare(expectedState), 0);
+}
+
 }  // namespace mongo
