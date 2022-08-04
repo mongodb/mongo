@@ -57,6 +57,14 @@ __rec_child_deleted(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *ref,
     }
 
     /*
+     * We should never get this far with an uncommitted deletion: in a checkpoint an uncommitted
+     * deletion should not be visible, and while an uncommitted deletion might be visible to an
+     * application thread doing eviction, the check for whether an internal page is evictable should
+     * only allow committed deletions.
+     */
+    WT_ASSERT_ALWAYS(session, page_del->committed, "Uncommitted deletions cannot be written out");
+
+    /*
      * A visible entry can be in a prepared state and checkpoints skip in-progress prepared changes.
      * We can't race here, the entry won't be visible to the checkpoint, or will be in a prepared
      * state, one or the other.

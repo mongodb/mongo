@@ -426,7 +426,7 @@ static int
 __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
 {
     WT_REF *child;
-    bool active;
+    bool visible;
 
     /*
      * There may be cursors in the tree walking the list of child pages. The parent is locked, so
@@ -488,9 +488,29 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
                               */
             if (!__wt_atomic_casv8(&child->state, WT_REF_DELETED, WT_REF_LOCKED))
                 return (__wt_set_return(session, EBUSY));
-            active = __wt_page_del_active(session, child, true);
+            /*
+             * We can evict any truncation that's committed. However, restrictions in reconciliation
+             * mean that it needs to be visible to us when we get there. And unfortunately we are
+             * upstream of the point where eviction threads get snapshots. Plus, application threads
+             * doing eviction can see their own uncommitted truncations. So, use the following
+             * logic:
+             *     1. First check if the operation is committed. If not, it's not visible for these
+             *        purposes.
+             *     2. If we already have a snapshot, use it to check visibility.
+             *     3. If we do not but we're an eviction thread, go ahead. We will get a snapshot
+             *        shortly and any committed operation will be visible in it.
+             *     4. Otherwise, check if the operation is globally visible.
+             */
+            if (!__wt_page_del_committed(child->ft_info.del))
+                visible = false;
+            else if (F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT))
+                visible = __wt_page_del_visible(session, child->ft_info.del, false);
+            else if (F_ISSET(session, WT_SESSION_EVICTION))
+                visible = true;
+            else
+                visible = __wt_page_del_visible(session, child->ft_info.del, true);
             child->state = WT_REF_DELETED;
-            if (active)
+            if (!visible)
                 return (__wt_set_return(session, EBUSY));
             break;
         default:
