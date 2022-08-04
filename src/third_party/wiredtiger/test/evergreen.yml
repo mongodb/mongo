@@ -436,7 +436,11 @@ functions:
         set -o errexit
         set -o verbose
         cd cmake_build
-        ${test_env_vars|} ${python_binary|python3} ../test/suite/run.py ${unit_test_args|-v 2} ${smp_command|} 2>&1
+        if [ ${check_coverage|false} = true ]; then
+            ${test_env_vars|} ${python_binary|python3} ../test/suite/run.py ${unit_test_args|-v 2} ${smp_command|} 2>&1 || echo "Ignoring failed test as we are checking test coverage"
+        else
+            ${test_env_vars|} ${python_binary|python3} ../test/suite/run.py ${unit_test_args|-v 2} ${smp_command|} 2>&1
+        fi
   "format test":
     command: shell.exec
     params:
@@ -2270,53 +2274,21 @@ tasks:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
+          HAVE_UNITTEST: -DHAVE_UNITTEST=1
           <<: *configure_flags_with_builtins
           CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v3_gcc.cmake
           CMAKE_BUILD_TYPE: -DCMAKE_BUILD_TYPE=Coverage
-      - func: "make check all"
       - func: "unit test"
         vars:
-          unit_test_args: -v 2 --long
-      - func: "format test"
-        vars:
-          config: ../../../test/format/CONFIG.coverage
-          extra_args: file_type=row compression=snappy logging=1 logging_compression=snappy logging_prealloc=1
-      - func: "format test"
-        vars:
-          config: ../../../test/format/CONFIG.coverage
-          extra_args: file_type=row alter=1 backups=1 compaction=1 data_extend=1 prepare=1 salvage=1 statistics=1 statistics_server=1 verify=1
-      - func: "format test"
-        vars:
-          config: ../../../test/format/CONFIG.coverage
-          extra_args: file_type=row firstfit=1 internal_key_truncation=1
-      - func: "format test"
-        vars:
-          config: ../../../test/format/CONFIG.coverage
-          extra_args: file_type=row checkpoints=0 in_memory=1 reverse=1 truncate=1
-      - func: "format test"
-        vars:
-          config: ../../../test/format/CONFIG.coverage
-          extra_args: file_type=row compression=zlib huffman_value=1
-      - func: "format test"
-        vars:
-          config: ../../../test/format/CONFIG.coverage
-          extra_args: file_type=row data_source=lsm bloom=1
-      - func: "format test"
-        vars:
-          config: ../../../test/format/CONFIG.coverage
-          extra_args: file_type=row compression=lz4 prefix_compression=1 leaf_page_max=9 internal_page_max=9 key_min=256 value_min=256
-      - func: "format test"
-        vars:
-          config: ../../../test/format/CONFIG.coverage
-          extra_args: file_type=var compression=snappy checksum=uncompressed dictionary=1 repeat_data_pct=10
-      - func: "format test"
-        vars:
-          config: ../../../test/format/CONFIG.coverage
-          extra_args: file_type=var leaf_page_max=9 internal_page_max=9 value_min=256
-      - func: "format test"
-        vars:
-          config: ../../../test/format/CONFIG.coverage
-          extra_args: file_type=fix
+          unit_test_args: -v 2
+          check_coverage: true
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/cmake_build"
+          script: |
+            set -o errexit
+            set -o verbose
+            ${test_env_vars|} test/unittest/unittests
       - command: shell.exec
         params:
           shell: bash
@@ -2326,7 +2298,7 @@ tasks:
             set -o verbose
             virtualenv -p python3 venv
             source venv/bin/activate
-            pip3 install gcovr
+            pip3 install lxml==4.8.0 Pygments==2.11.2 Jinja2==3.0.3 gcovr==5.0
             mkdir -p ../coverage_report
             GCOV=/opt/mongodbtoolchain/v3/bin/gcov gcovr -r .. -f ../src -e '.*/bt_(debug|dump|misc|salvage|vrfy).*' -e '.*/(log|progress|verify_build|strerror|env_msg|err_file|cur_config|os_abort)\..*' -e '.*_stat\..*' -e 'bench' -e 'examples' -e 'test' -e 'ext' -e 'dist' -e 'tools' -j 4 --html-details --html-self-contained -o ../coverage_report/2_coverage_report.html
       - command: s3.put
