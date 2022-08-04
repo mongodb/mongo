@@ -6,8 +6,19 @@ cd src
 set -o errexit
 set -o verbose
 
-curl -L https://github.com/mongodb/mongo-task-generator/releases/download/v0.4.7/mongo-task-generator --output mongo-task-generator
+curl -L https://github.com/mongodb/mongo-task-generator/releases/download/v0.5.0/mongo-task-generator --output mongo-task-generator
 chmod +x mongo-task-generator
+
+## Comment above and uncomment below to test unreleased mongo-task-generator changes pushed to <branch-name>
+#curl https://sh.rustup.rs -sSf | sh -s -- -y
+#source "$HOME/.cargo/env"
+#git clone git@github.com:mongodb/mongo-task-generator.git unreleased-mongo-task-generator
+#pushd unreleased-mongo-task-generator
+#git checkout <branch-name>
+#cargo build
+#generator_path="$(pwd)/target/debug/mongo-task-generator"
+#popd
+#cp "$generator_path" mongo-task-generator
 
 activate_venv
 PATH=$PATH:$HOME:/ ./mongo-task-generator \
