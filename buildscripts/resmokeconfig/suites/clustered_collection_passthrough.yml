@@ -93,6 +93,6 @@ executor:
       set_parameters:
         enableTestCommands: 1
         # SBE is not compatible with clustered collections
-        internalQueryFrameworkControl: "forceClassicEngine"
+        internalQueryForceClassicEngine: 1
         failpoint.clusterAllCollectionsByDefault: "{mode: 'alwaysOn'}"
     num_nodes: 2

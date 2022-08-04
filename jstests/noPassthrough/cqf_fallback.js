@@ -16,9 +16,9 @@ let coll = db[jsTestName()];
 coll.drop();
 
 // This test relies on the bonsai optimizer being enabled.
-if (assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}))
-        .internalQueryFrameworkControl == "forceClassicEngine") {
-    jsTestLog("Skipping test due to forceClassicEngine");
+if (assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryForceClassicEngine: 1}))
+        .internalQueryForceClassicEngine == true) {
+    jsTestLog("Skipping test due to internalQueryForceClassicEngine");
     MongoRunner.stopMongod(conn);
     return;
 }
@@ -26,7 +26,7 @@ if (assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryFramewor
 function assertUsesFallback(cmd, testOnly) {
     // An unsupported stage should not use the new optimizer.
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
+        db.adminCommand({setParameter: 1, internalQueryForceCommonQueryFramework: false}));
     const defaultExplain = assert.commandWorked(db.runCommand({explain: cmd}));
     assert(!usedBonsaiOptimizer(defaultExplain), tojson(defaultExplain));
 
@@ -37,7 +37,7 @@ function assertUsesFallback(cmd, testOnly) {
     // Force the bonsai optimizer and expect the query to either fail if unsupported, or pass if
     // marked as "test only".
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceBonsai"}));
+        db.adminCommand({setParameter: 1, internalQueryForceCommonQueryFramework: true}));
     if (testOnly) {
         const explain = assert.commandWorked(db.runCommand({explain: cmd}));
         assert(usedBonsaiOptimizer(explain), tojson(explain));
@@ -45,14 +45,14 @@ function assertUsesFallback(cmd, testOnly) {
         assert.commandFailedWithCode(db.runCommand(cmd), ErrorCodes.InternalErrorNotSupported);
     }
 
-    // Forcing the classic engine should not use Bonsai.
+    // Forcing the classic engine should override the CQF flag.
     {
-        assert.commandWorked(db.adminCommand(
-            {setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+        assert.commandWorked(
+            db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}));
         const explain = assert.commandWorked(db.runCommand({explain: cmd}));
         assert(!usedBonsaiOptimizer(explain), tojson(explain));
         assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
+            db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}));
     }
 }
 
@@ -162,7 +162,7 @@ assertUsesFallback({find: "view", filter: {a: {$mod: [4, 0]}}}, false);
 
 // Supported expression on top of the view.
 assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceBonsai"}));
+    db.adminCommand({setParameter: 1, internalQueryForceCommonQueryFramework: true}));
 assert.commandWorked(db.runCommand({find: "view", filter: {b: 4}}));
 
 // Test-only expression on top of a view.
@@ -199,9 +199,9 @@ assert(!usedBonsaiOptimizer(explain), tojson(explain));
 explain = coll.explain().aggregate([{$match: supportedExpression}]);
 assert(!usedBonsaiOptimizer(explain), tojson(explain));
 
-// Setting the force Bonsai flag has no effect.
+// Setting the force CQF flag has no effect.
 assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceBonsai"}));
+    db.adminCommand({setParameter: 1, internalQueryForceCommonQueryFramework: true}));
 explain = coll.explain().find(supportedExpression).finish();
 assert(!usedBonsaiOptimizer(explain), tojson(explain));
 

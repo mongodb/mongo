@@ -1563,7 +1563,7 @@ buildvariants:
     burn_in_tag_buildvariants: enterprise-rhel-80-64-bit-inmem enterprise-rhel-80-64-bit-multiversion
     num_scons_link_jobs_available: 0.99
     test_flags: >-
-      --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
+      --mongodSetParameters="{internalQueryForceClassicEngine: true}"
   tasks:
   - name: .aggfuzzer !.sbe_only
   - name: .aggregation !.sbe_only
@@ -2303,7 +2303,7 @@ buildvariants:
       ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=address --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: >-
-      --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
+      --mongodSetParameters="{internalQueryForceClassicEngine: true}"
       --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -2459,7 +2459,7 @@ buildvariants:
     san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
     compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --sanitize=undefined --ssl --ocsp-stapling=off --enable-free-mon=on -j$(grep -c ^processor /proc/cpuinfo)
     test_flags: >-
-      --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
+      --mongodSetParameters="{internalQueryForceClassicEngine: true}"
       --excludeWithAnyTags=requires_ocsp_stapling
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -3020,7 +3020,7 @@ buildvariants:
     target_resmoke_time: 30
     max_sub_suites: 3
     test_flags: >-
-      --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
+      --mongodSetParameters="{internalQueryForceClassicEngine: true}"
       --excludeWithAnyTags=resource_intensive
 
 - <<: *enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template

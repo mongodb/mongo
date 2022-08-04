@@ -60,7 +60,7 @@ let assertResultsMatchWithAndWithoutPushdown = function(
     assertGroupPushdown(coll, pipeline, expectedResults, expectedGroupCountInExplain);
 
     // Turn sbe off.
-    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"});
+    db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true});
 
     // Sanity check the results when no pushdown happens.
     let resultNoGroupPushdown = coll.aggregate(pipeline).toArray();
@@ -68,17 +68,17 @@ let assertResultsMatchWithAndWithoutPushdown = function(
 
     // Turn sbe on which will allow $group stages that contain supported accumulators to be pushed
     // down under certain conditions.
-    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"});
+    db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false});
 
     let resultWithGroupPushdown = coll.aggregate(pipeline).toArray();
     assert.sameMembers(resultNoGroupPushdown, resultWithGroupPushdown);
 };
 
 let assertShardedGroupResultsMatch = function(coll, pipeline, expectedGroupCountInExplain = 1) {
-    const originalFrameworkControl =
+    const originalSBEEngineStatus =
         assert
-            .commandWorked(db.adminCommand(
-                {setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}))
+            .commandWorked(
+                db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}))
             .was;
 
     const cmd = {
@@ -91,7 +91,7 @@ let assertShardedGroupResultsMatch = function(coll, pipeline, expectedGroupCount
 
     const classicalRes = coll.runCommand(cmd).cursor.firstBatch;
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
+        db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}));
     const explainCmd = {
         aggregate: coll.getName(),
         pipeline: pipeline,
@@ -107,7 +107,7 @@ let assertShardedGroupResultsMatch = function(coll, pipeline, expectedGroupCount
     assert.sameMembers(sbeRes, classicalRes);
 
     assert.commandWorked(db.adminCommand(
-        {setParameter: 1, internalQueryFrameworkControl: originalFrameworkControl}));
+        {setParameter: 1, internalQueryForceClassicEngine: originalSBEEngineStatus}));
 };
 
 // Try a pipeline with no group stage.

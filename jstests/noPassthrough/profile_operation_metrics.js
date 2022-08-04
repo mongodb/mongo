@@ -21,10 +21,10 @@ const isDebugBuild = (db) => {
     return db.adminCommand('buildInfo').debug;
 };
 const isGroupPushdownEnabled = (db) => {
-    const internalQueryFrameworkControl =
-        assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1}))
-            .internalQueryFrameworkControl;
-    return internalQueryFrameworkControl != "forceClassicEngine";
+    const internalQueryForceClassicEngine =
+        assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryForceClassicEngine: 1}))
+            .internalQueryForceClassicEngine;
+    return !internalQueryForceClassicEngine;
 };
 
 const assertMetricsExist = (profilerEntry) => {

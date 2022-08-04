@@ -914,9 +914,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     }
 
     if (MONGO_unlikely(createColumnIndex)) {
-        invariant(ServerParameterSet::getNodeParameterSet()
-                          ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
-                          ->_data.get() != QueryFrameworkControlEnum::kForceClassicEngine,
+        invariant(!internalQueryForceClassicEngine.load(),
                   "Column Store Indexes failpoint in use without enabling SBE engine");
         uassertStatusOK(collection->getIndexCatalog()->createIndexOnEmptyCollection(
             opCtx, collection, kColumnStoreSpec));

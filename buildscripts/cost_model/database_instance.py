@@ -77,10 +77,7 @@ class DatabaseInstance:
     def enable_sbe(self, state: bool) -> None:
         """Enable new query execution engine. Throw pymongo.errors.OperationFailure in case of failure."""
         # self.client.admin.command({'setParameter': 1, 'internalQueryEnableSlotBasedExecutionEngine': state})
-        self.client.admin.command({
-            'setParameter': 1,
-            'internalQueryFrameworkControl': 'trySbeEngine' if state else 'forceClassicEngine'
-        })
+        self.client.admin.command({'setParameter': 1, 'internalQueryForceClassicEngine': not state})
 
     def enable_cascades(self, state: bool) -> None:
         """Enable new query optimizer. Requires featureFlagCommonQueryFramework set to True."""

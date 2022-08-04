@@ -191,9 +191,7 @@ Status CanonicalQuery::init(OperationContext* opCtx,
     _findCommand = std::move(findCommand);
 
     _canHaveNoopMatchNodes = canHaveNoopMatchNodes;
-    _forceClassicEngine = ServerParameterSet::getNodeParameterSet()
-                              ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
-                              ->_data.get() == QueryFrameworkControlEnum::kForceClassicEngine;
+    _forceClassicEngine = internalQueryForceClassicEngine.load();
 
     auto validStatus = isValid(root.get(), *_findCommand);
     if (!validStatus.isOK()) {

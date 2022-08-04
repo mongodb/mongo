@@ -75,8 +75,7 @@ const planCacheSizeAfterSbeStep = getPlanCacheSize();
 assert.lt(initialPlanCacheSize, planCacheSizeAfterSbeStep);
 
 // Force classic plan cache.
-assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"}));
+assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}));
 
 // Create a new collection for classic queries so we can easily assess its plan cache.
 const classicColl = createTestCollection("classic");

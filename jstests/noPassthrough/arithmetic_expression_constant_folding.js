@@ -92,13 +92,13 @@ function runRandomizedPropertyTest({op, min, max}) {
 // TODO: SERVER-67282 Randomized property testing should work after SBE is updated to match classic
 // engine, so remove this setParameter. When this knob is removed from this test, move this test
 // into jstests/aggregation/expressions/arithmetic_constant_folding.js.
-testDB.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceClassicEngine"});
+testDB.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true});
 for (let i = 0; i < 5; i++) {
     runRandomizedPropertyTest({op: "$add", min: -314159255, max: 314159255});
     runRandomizedPropertyTest({op: "$multiply", min: -31415, max: 31415});
 }
 // TODO: SERVER-67282 Randomized property testing should work after SBE is updated to match classic
 // engine, so remove this setParameter.
-testDB.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"});
+testDB.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false});
 MongoRunner.stopMongod(conn);
 })();

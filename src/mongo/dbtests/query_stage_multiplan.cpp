@@ -551,8 +551,7 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
 //
 // This is a regression test for SERVER-20111.
 TEST_F(QueryStageMultiPlanTest, MPSSummaryStats) {
-    RAIIServerParameterControllerForTest controller("internalQueryFrameworkControl",
-                                                    "forceClassicEngine");
+    RAIIServerParameterControllerForTest controller("internalQueryForceClassicEngine", true);
 
     const int N = 5000;
     for (int i = 0; i < N; ++i) {

@@ -60,7 +60,6 @@ const expectedParamDefaults = {
     internalQuerySlotBasedExecutionDisableLookupPushdown: false,
     internalQuerySlotBasedExecutionDisableGroupPushdown: false,
     allowDiskUseByDefault: true,
-    internalQueryFrameworkControl: "tryBonsai",
 };
 
 function assertDefaultParameterValues() {
@@ -217,6 +216,9 @@ assertSetParameterSucceeds("internalQuerySlotBasedExecutionMaxStaticIndexScanInt
 assertSetParameterFails("internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals", 0);
 assertSetParameterFails("internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals", -1);
 
+assertSetParameterSucceeds("internalQueryForceClassicEngine", true);
+assertSetParameterSucceeds("internalQueryForceClassicEngine", false);
+
 assertSetParameterSucceeds("internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin", 1);
 assertSetParameterFails("internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin", 0);
 assertSetParameterFails("internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin", -1);
@@ -251,13 +253,6 @@ assertSetParameterSucceeds("allowDiskUseByDefault", true);
 
 assertSetParameterSucceeds("internalQueryFLERewriteMemoryLimit", 14 * 1024 * 1024);
 assertSetParameterFails("internalQueryFLERewriteMemoryLimit", 0);
-
-assertSetParameterSucceeds("internalQueryFrameworkControl", "forceClassicEngine");
-assertSetParameterSucceeds("internalQueryFrameworkControl", "trySbeEngine");
-assertSetParameterSucceeds("internalQueryFrameworkControl", "tryBonsai");
-assertSetParameterSucceeds("internalQueryFrameworkControl", "forceBonsai");
-assertSetParameterFails("internalQueryFrameworkControl", "tryCascades");
-assertSetParameterFails("internalQueryFrameworkControl", 1);
 
 MongoRunner.stopMongod(conn);
 })();
