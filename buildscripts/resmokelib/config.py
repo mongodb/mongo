@@ -50,7 +50,7 @@ DEFAULTS = {
     "archive_limit_tests": 10,
     "base_port": 20000,
     "backup_on_restart_dir": None,
-    "buildlogger_url": "https://logkeeper.mongodb.org",
+    "buildlogger_url": "https://logkeeper2.build.10gen.cc",
     "continue_on_failure": False,
     "dbpath_prefix": None,
     "dbtest_executable": None,

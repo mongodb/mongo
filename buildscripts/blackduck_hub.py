@@ -70,7 +70,7 @@ BUILD_LOGGER_APPEND_GLOBAL_LOGS_ENDPOINT = "/build/%(build_id)s"
 BUILD_LOGGER_CREATE_TEST_ENDPOINT = "/build/%(build_id)s/test"
 BUILD_LOGGER_APPEND_TEST_LOGS_ENDPOINT = "/build/%(build_id)s/test/%(test_id)s"
 
-BUILD_LOGGER_DEFAULT_URL = "https://logkeeper.mongodb.org"
+BUILD_LOGGER_DEFAULT_URL = "https://logkeeper2.build.10gen.cc"
 BUILD_LOGGER_TIMEOUT_SECS = 65
 
 LOCAL_REPORTS_DIR = "bd_reports"
