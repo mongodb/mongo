@@ -151,10 +151,9 @@ public:
     /**
      * Get extra system stats
      */
-    void appendSystemDetails(BSONObjBuilder& details) const {
-        details.append(StringData("extra"), sysInfo()._extraStats.copy());
+    static const BSONObj getSystemDetails() {
+        return sysInfo()._extraStats.copy();
     }
-
     /**
      * Append platform-specific data to obj
      */

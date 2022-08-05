@@ -171,9 +171,7 @@ HostInfoReply HostInfoCmd::Invocation::typedRun(OperationContext*) {
     reply.setOs(std::move(os));
 
     // OS-specific information.
-    BSONObjBuilder extra;
-    p.appendSystemDetails(extra);
-    reply.setExtra(extra.obj());
+    reply.setExtra(p.getSystemDetails());
 
     return reply;
 }
