@@ -18,6 +18,15 @@
 (function() {
 "use strict";
 
+const isCodeCoverageEnabled = buildInfo().buildEnvironment.ccflags.includes('-ftest-coverage');
+const isSanitizerEnabled = buildInfo().buildEnvironment.ccflags.includes('-fsanitize');
+const slowTestVariant = isCodeCoverageEnabled || isSanitizerEnabled;
+
+if (slowTestVariant) {
+    jsTestLog("Skipping test on slow test variant");
+    return;
+}
+
 load("jstests/core/txns/libs/prepare_helpers.js");
 load("jstests/libs/parallel_shell_helpers.js");
 load('jstests/libs/test_background_ops.js');
