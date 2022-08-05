@@ -1043,7 +1043,7 @@ BSONObj toBSON(BSONType type, ConstDataRange cdr) {
 
     uassert(ErrorCodes::BadValue,
             "invalid decryption value",
-            docLength < std::numeric_limits<int32_t>::max());
+            docLength < static_cast<size_t>(std::numeric_limits<int32_t>::max()));
 
     builder.appendNum(static_cast<uint32_t>(docLength));
     builder.appendChar(static_cast<uint8_t>(type));
