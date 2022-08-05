@@ -30,47 +30,29 @@
 #pragma once
 
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/ce/array_histogram.h"
+#include "mongo/db/query/ce/collection_statistics.h"
+#include "mongo/stdx/thread.h"
 
-namespace mongo::ce {
+namespace mongo {
 
-using Histograms = std::map<std::string, std::shared_ptr<ArrayHistogram>>;
+using namespace mongo::ce;
 
-class CollectionStatistics {
+class StatsCacheLoader {
 public:
     /**
-     * Returns whether collection statistics for a collection with namespace 'nss' are available.
-     */
-    static bool hasCollectionStatistics(const NamespaceString& nss);
-
-    /**
-     * Retrieves the collection statistics for a collection with namespace 'nss'.
+     * Non-blocking call, which returns CollectionStatistics from the the persistent metadata store.
      *
-     * Note: Must check hasCollectionStatistics(nss) first, as this will throw if statistics are
-     * unavailable for 'nss'.
+     * If for some reason the asynchronous fetch operation cannot be dispatched (for example on
+     * shutdown), throws a DBException.
      */
-    static const CollectionStatistics& getCollectionStatistics(const NamespaceString& nss);
+    // TODO: SERVER-68459 implement statsCacheLoader
+    SemiFuture<CollectionStatistics> getStats(const NamespaceString& nss);
 
-    CollectionStatistics(double cardinality);
-
-    /**
-     * Returns the cardinality of the given collection.
-     */
-    double getCardinality() const;
-
-    /**
-     * Adds a histogram along the given path.
-     */
-    void addHistogram(const std::string& path, std::unique_ptr<ArrayHistogram> histogram);
-
-    /**
-     * Returns the histogram for the given field path, or nullptr if none exists.
-     */
-    const ArrayHistogram* getHistogram(const std::string& path) const;
+    void setStatsReturnValueForTest(StatusWith<CollectionStatistics> swStats);
+    static const Status kInternalErrorStatus;
 
 private:
-    double _cardinality;
-    Histograms _histograms;
+    StatusWith<CollectionStatistics> _swStatsReturnValueForTest{kInternalErrorStatus};
 };
 
-}  // namespace mongo::ce
+}  // namespace mongo

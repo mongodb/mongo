@@ -13,6 +13,8 @@ env.Library(
         'collection_statistics.cpp',
         'histogram_estimation.cpp',
         'scalar_histogram.cpp',
+        'stats_cache.cpp',
+        'stats_cache_loader.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_abt',
@@ -52,5 +54,18 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'ce_test_utils',
+    ],
+)
+
+env.CppUnitTest(
+    target="stats_cache_test",
+    source=[
+        "stats_cache_test.cpp",
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context',
+        'ce_test_utils',
+        'query_ce',
     ],
 )

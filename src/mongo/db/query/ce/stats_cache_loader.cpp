@@ -27,50 +27,24 @@
  *    it in the license file.
  */
 
-#pragma once
 
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/query/ce/array_histogram.h"
+#include "mongo/platform/basic.h"
 
-namespace mongo::ce {
+#include "mongo/db/query/ce/stats_cache_loader.h"
 
-using Histograms = std::map<std::string, std::shared_ptr<ArrayHistogram>>;
+#include "mongo/db/query/ce/collection_statistics.h"
+#include "mongo/stdx/thread.h"
 
-class CollectionStatistics {
-public:
-    /**
-     * Returns whether collection statistics for a collection with namespace 'nss' are available.
-     */
-    static bool hasCollectionStatistics(const NamespaceString& nss);
+namespace mongo {
 
-    /**
-     * Retrieves the collection statistics for a collection with namespace 'nss'.
-     *
-     * Note: Must check hasCollectionStatistics(nss) first, as this will throw if statistics are
-     * unavailable for 'nss'.
-     */
-    static const CollectionStatistics& getCollectionStatistics(const NamespaceString& nss);
+const Status StatsCacheLoader::kInternalErrorStatus = {
+    ErrorCodes::InternalError, "Stats cache loader received unexpected request"};
 
-    CollectionStatistics(double cardinality);
+SemiFuture<CollectionStatistics> StatsCacheLoader::getStats(const NamespaceString& nss) {
+    return makeReadyFutureWith([this] { return _swStatsReturnValueForTest; }).semi();
+}
 
-    /**
-     * Returns the cardinality of the given collection.
-     */
-    double getCardinality() const;
-
-    /**
-     * Adds a histogram along the given path.
-     */
-    void addHistogram(const std::string& path, std::unique_ptr<ArrayHistogram> histogram);
-
-    /**
-     * Returns the histogram for the given field path, or nullptr if none exists.
-     */
-    const ArrayHistogram* getHistogram(const std::string& path) const;
-
-private:
-    double _cardinality;
-    Histograms _histograms;
-};
-
-}  // namespace mongo::ce
+void StatsCacheLoader::setStatsReturnValueForTest(StatusWith<CollectionStatistics> swStats) {
+    _swStatsReturnValueForTest = std::move(swStats);
+}
+}  // namespace mongo
