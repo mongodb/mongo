@@ -679,8 +679,18 @@ class WtUpdateToBsonPrinter(object):
 
     def children(self):
         """children."""
+        if self.val['type'] != 3:
+            # Type 3 is a "normal" update. Notably type 4 is a deletion and type 1 represents a
+            # delta relative to the previous committed version in the update chain. Only attempt
+            # to parse type 3 as bson.
+            return
+
         memory = gdb.selected_inferior().read_memory(self.ptr, self.size).tobytes()
-        bsonobj = next(bson.decode_iter(memory))  # pylint: disable=stop-iteration-return
+        bsonobj = None
+        try:
+            bsonobj = next(bson.decode_iter(memory))  # pylint: disable=stop-iteration-return
+        except bson.errors.InvalidBSON:
+            return
 
         for key, value in list(bsonobj.items()):
             yield 'key', key

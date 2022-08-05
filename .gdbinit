@@ -9,3 +9,6 @@ source buildscripts/gdb/mongo_printers.py
 
 # Load the mongodb lock analysis
 source buildscripts/gdb/mongo_lock.py
+
+# Load methods for printing in-memory contents of WT tables.
+source buildscripts/gdb/wt_dump_table.py
