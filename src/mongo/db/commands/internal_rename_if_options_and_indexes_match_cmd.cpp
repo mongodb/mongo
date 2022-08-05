@@ -87,11 +87,12 @@ public:
             // - Serialize with sharded DDLs, ensuring no concurrent modifications of the
             // collections.
             // - Check safely if the target collection is sharded or not.
+            static constexpr StringData lockReason{"internalRenameCollection"_sd};
             auto distLockManager = DistLockManager::get(opCtx);
             auto fromLocalDistlock = distLockManager->lockDirectLocally(
-                opCtx, fromNss.ns(), DistLockManager::kDefaultLockTimeout);
+                opCtx, fromNss.ns(), lockReason, DistLockManager::kDefaultLockTimeout);
             auto toLocalDistLock = distLockManager->lockDirectLocally(
-                opCtx, toNss.ns(), DistLockManager::kDefaultLockTimeout);
+                opCtx, toNss.ns(), lockReason, DistLockManager::kDefaultLockTimeout);
 
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << "cannot rename to sharded collection '" << toNss << "'",

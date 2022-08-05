@@ -46,7 +46,10 @@ Status BalancerDistLocks::acquireFor(OperationContext* opCtx, const NamespaceStr
         boost::optional<DistLockManager::ScopedLock> scopedLock;
         try {
             scopedLock.emplace(DistLockManager::get(opCtx)->lockDirectLocally(
-                opCtx, nss.ns(), DistLockManager::kSingleLockAttemptTimeout));
+                opCtx,
+                nss.ns(),
+                "moveRange" /* reason */,
+                DistLockManager::kSingleLockAttemptTimeout));
 
             const std::string whyMessage(str::stream()
                                          << "Migrating chunk(s) in collection " << nss.ns());

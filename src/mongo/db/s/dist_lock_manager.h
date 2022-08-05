@@ -71,7 +71,7 @@ public:
         ScopedLock& operator=(const ScopedLock&) = delete;
 
     public:
-        ScopedLock(StringData lockName, DistLockManager* distLockManager);
+        ScopedLock(StringData lockName, StringData reason, DistLockManager* distLockManager);
         ~ScopedLock();
 
         ScopedLock(ScopedLock&& other);
@@ -79,9 +79,13 @@ public:
         StringData getNs() {
             return _ns;
         }
+        StringData getReason() {
+            return _reason;
+        }
 
     private:
         std::string _ns;
+        std::string _reason;
         DistLockManager* _lockManager;
     };
 
@@ -158,7 +162,10 @@ public:
     /**
      * Ensures that two dist lock within the same process will serialise with each other.
      */
-    ScopedLock lockDirectLocally(OperationContext* opCtx, StringData ns, Milliseconds waitFor);
+    ScopedLock lockDirectLocally(OperationContext* opCtx,
+                                 StringData ns,
+                                 StringData reason,
+                                 Milliseconds waitFor);
 
     /**
      * Same behavior as lock(...) above, except doesn't return a scoped object, so it is the
@@ -204,9 +211,12 @@ protected:
     const OID _lockSessionID;
 
     struct NSLock {
+        NSLock(StringData reason) : reason(reason.toString()) {}
+
         stdx::condition_variable cvLocked;
         int numWaiting = 1;
         bool isInProgress = true;
+        std::string reason;
     };
 
     Mutex _mutex = MONGO_MAKE_LATCH("NamespaceSerializer::_mutex");

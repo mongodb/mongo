@@ -215,7 +215,8 @@ ExecutorFuture<void> ShardingDDLCoordinator::_acquireLockAsync(
                    return DistLockManager::kDefaultLockTimeout;
                }();
 
-               auto distLock = distLockManager->lockDirectLocally(opCtx, resource, lockTimeOut);
+               auto distLock =
+                   distLockManager->lockDirectLocally(opCtx, resource, coorName, lockTimeOut);
 
                uassertStatusOK(distLockManager->lockDirect(opCtx, resource, coorName, lockTimeOut));
                _scopedLocks.emplace(std::move(distLock));

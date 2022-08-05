@@ -156,8 +156,11 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
         return DistLockManager::kDefaultLockTimeout;
     }();
 
+    static constexpr StringData lockReason{"dropIndexes"_sd};
+
     auto distLockManager = DistLockManager::get(opCtx);
-    auto dbLocalLock = distLockManager->lockDirectLocally(opCtx, ns().db(), lockTimeout);
+    auto dbLocalLock =
+        distLockManager->lockDirectLocally(opCtx, ns().db(), lockReason, lockTimeout);
 
     // Check under the dbLock if this is still the primary shard for the database
     catalog_helper::assertIsPrimaryShardForDb(opCtx, ns().db());
@@ -175,7 +178,8 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
         resolvedNs = ns().makeTimeseriesBucketsNamespace();
     }
 
-    auto nsLocalLock = distLockManager->lockDirectLocally(opCtx, resolvedNs.ns(), lockTimeout);
+    auto nsLocalLock =
+        distLockManager->lockDirectLocally(opCtx, resolvedNs.ns(), lockReason, lockTimeout);
 
     StaleConfigRetryState retryState;
     return shardVersionRetry(

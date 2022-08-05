@@ -28,11 +28,10 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/dist_lock_manager.h"
 
 #include "mongo/db/operation_context.h"
+#include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -101,16 +100,16 @@ void DistLockManager::create(ServiceContext* service,
 
 StatusWith<DistLockManager::ScopedDistLock> DistLockManager::lock(OperationContext* opCtx,
                                                                   StringData name,
-                                                                  StringData whyMessage,
+                                                                  StringData reason,
                                                                   Milliseconds waitFor) {
     boost::optional<ScopedLock> scopedLock;
     try {
-        scopedLock.emplace(lockDirectLocally(opCtx, name, waitFor));
+        scopedLock.emplace(lockDirectLocally(opCtx, name, reason, waitFor));
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
 
-    auto status = lockDirect(opCtx, name, whyMessage, waitFor);
+    auto status = lockDirect(opCtx, name, reason, waitFor);
     if (!status.isOK()) {
         return status;
     }
@@ -120,33 +119,43 @@ StatusWith<DistLockManager::ScopedDistLock> DistLockManager::lock(OperationConte
 
 DistLockManager::ScopedLock DistLockManager::lockDirectLocally(OperationContext* opCtx,
                                                                StringData ns,
+                                                               StringData reason,
                                                                Milliseconds waitFor) {
     stdx::unique_lock<Latch> lock(_mutex);
     auto iter = _inProgressMap.find(ns);
 
     if (iter == _inProgressMap.end()) {
-        _inProgressMap.try_emplace(ns, std::make_shared<NSLock>());
+        _inProgressMap.try_emplace(ns, std::make_shared<NSLock>(reason));
     } else {
         auto nsLock = iter->second;
         nsLock->numWaiting++;
         ScopeGuard guard([&] { nsLock->numWaiting--; });
         if (!opCtx->waitForConditionOrInterruptFor(
                 nsLock->cvLocked, lock, waitFor, [nsLock]() { return !nsLock->isInProgress; })) {
-            uasserted(ErrorCodes::LockBusy,
-                      str::stream() << "Failed to acquire dist lock " << ns << " locally");
+            using namespace fmt::literals;
+            uasserted(
+                ErrorCodes::LockBusy,
+                "Failed to acquire DDL lock for namespace '{}' after {} that is currently locked with reason '{}'"_format(
+                    ns, waitFor.toString(), reason));
         }
         guard.dismiss();
+        nsLock->reason = reason.toString();
         nsLock->isInProgress = true;
     }
 
-    return ScopedLock(ns, this);
+    LOGV2(6855301, "Acquired DDL lock", "resource"_attr = ns, "reason"_attr = reason);
+    return ScopedLock(ns, reason, this);
 }
 
-DistLockManager::ScopedLock::ScopedLock(StringData ns, DistLockManager* distLockManager)
-    : _ns(ns.toString()), _lockManager(distLockManager) {}
+DistLockManager::ScopedLock::ScopedLock(StringData ns,
+                                        StringData reason,
+                                        DistLockManager* distLockManager)
+    : _ns(ns.toString()), _reason(reason.toString()), _lockManager(distLockManager) {}
 
 DistLockManager::ScopedLock::ScopedLock(ScopedLock&& other)
-    : _ns(std::move(other._ns)), _lockManager(other._lockManager) {
+    : _ns(std::move(other._ns)),
+      _reason(std::move(other._reason)),
+      _lockManager(other._lockManager) {
     other._lockManager = nullptr;
 }
 
@@ -156,12 +165,14 @@ DistLockManager::ScopedLock::~ScopedLock() {
         auto iter = _lockManager->_inProgressMap.find(_ns);
 
         iter->second->numWaiting--;
+        iter->second->reason.clear();
         iter->second->isInProgress = false;
         iter->second->cvLocked.notify_one();
 
         if (iter->second->numWaiting == 0) {
             _lockManager->_inProgressMap.erase(_ns);
         }
+        LOGV2(6855302, "Released DDL lock", "resource"_attr = _ns, "reason"_attr = _reason);
     }
 }
 
