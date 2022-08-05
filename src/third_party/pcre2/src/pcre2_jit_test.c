@@ -108,7 +108,7 @@ int main(void)
 	pcre2_config_32(PCRE2_CONFIG_JIT, &jit);
 #endif
 	if (!jit) {
-		printf("JIT must be enabled to run pcre_jit_test\n");
+		printf("JIT must be enabled to run pcre2_jit_test\n");
 		return 1;
 	}
 	return regression_tests()
@@ -291,6 +291,7 @@ static struct regression_test_case regression_test_cases[] = {
 	{ MU, A, 0, 0, "(a(?:bc|cb|b|c)+?|ss)+e", "accssabccbcacbccbbXaccssabccbcacbccbbe" },
 	{ MU, A, 0, 0, "(a(?:bc|cb|b|c)+|ss)+?e", "accssabccbcacbccbbXaccssabccbcacbccbbe" },
 	{ MU, A, 0, 0, "(?:(b(c)+?)+)?\?(?:(bc)+|(cb)+)+(?:m)+", "bccbcccbcbccbcbPbccbcccbcbccbcbmmn" },
+	{ MU, A, 0, 0, "(aa|bb){8,1000}", "abaabbaabbaabbaab_aabbaabbaabbaabbaabbaabb_" },
 
 	/* Greedy and non-greedy * operators */
 	{ CMU, A, 0, 0, "(?:AA)*AB", "aaaaaaamaaaaaaab" },
@@ -412,6 +413,9 @@ static struct regression_test_case regression_test_cases[] = {
 	{ MUP, A, 0, 0 | F_PROPERTY, "[\\P{L&}]{2}[^\xc2\x85-\xc2\x89\\p{Ll}\\p{Lu}]{2}", "\xc3\xa9\xe6\x92\xad.a\xe6\x92\xad|\xc2\x8a#" },
 	{ PCRE2_UCP, 0, 0, 0 | F_PROPERTY, "[a-b\\s]{2,5}[^a]", "AB  baaa" },
 	{ MUP, 0, 0, 0 | F_NOMATCH, "[^\\p{Hangul}\\p{Z}]", " " },
+	{ MUP, 0, 0, 0, "[\\p{Lu}\\P{Latin}]+", "c\xEA\xA4\xAE,A,b" },
+	{ MUP, 0, 0, 0, "[\\x{a92e}\\p{Lu}\\P{Latin}]+", "c\xEA\xA4\xAE,A,b" },
+	{ CMUP, 0, 0, 0, "[^S]\\B", "\xe2\x80\x8a" },
 
 	/* Possible empty brackets. */
 	{ MU, A, 0, 0, "(?:|ab||bc|a)+d", "abcxabcabd" },
@@ -747,6 +751,7 @@ static struct regression_test_case regression_test_cases[] = {
 	{ MU, A, 0, 0, "((?(R)a|(?1)){1,3}?)M", "aaaM" },
 	{ MU, A, 0, 0, "((.)(?:.|\\2(?1))){0}#(?1)#", "#aabbccdde# #aabbccddee#" },
 	{ MU, A, 0, 0, "((.)(?:\\2|\\2{4}b)){0}#(?:(?1))+#", "#aaaab# #aaaaab#" },
+	{ MU, A, 0, 0 | F_NOMATCH, "(?1)$((.|\\2xx){1,2})", "abc" },
 
 	/* 16 bit specific tests. */
 	{ CM, A, 0, 0 | F_FORCECONV, "\xc3\xa1", "\xc3\x81\xc3\xa1" },
@@ -1199,8 +1204,8 @@ static int regression_tests(void)
 #endif
 
 	/* This test compares the behaviour of interpreter and JIT. Although disabling
-	utf or ucp may make tests fail, if the pcre_exec result is the SAME, it is
-	still considered successful from pcre_jit_test point of view. */
+	utf or ucp may make tests fail, if the pcre2_match result is the SAME, it is
+	still considered successful from pcre2_jit_test point of view. */
 
 #if defined SUPPORT_PCRE2_8
 	pcre2_config_8(PCRE2_CONFIG_JITTARGET, &cpu_info);

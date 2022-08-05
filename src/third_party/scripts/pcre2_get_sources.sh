@@ -6,7 +6,20 @@
 # To get the sources for PCRE2, run this script as follows:
 # 1. Run on Linux or Darwin
 # 2. Run on Windows
+
+# Windows debugging
+# If you see an error like
+# CMake Error at CMakeLists.txt:103 (PROJECT):
+#   Failed to run MSBuild command:
 #
+#     MSBuild.exe
+#
+#   to get the value of VCTargetsPath:
+#
+#     The system cannot find the file specified
+#
+# You are missing the path to MSBuild and you need to add something like this to the command line
+# export PATH=$PATH:"/cygdrive/c/Program Files/Microsoft Visual Studio/2022/Community/Msbuild/Current/Bin"
 set -euo pipefail
 IFS=$'\n\t'
 
@@ -16,18 +29,21 @@ if [ "$#" -ne 0 ]; then
 fi
 
 NAME=pcre2
-SUFFIX=10.39
-GIT_SSH=git@github.com:PhilipHazel/pcre2.git
+SUFFIX=10.40
+GIT_SSH=git@github.com:PCRE2Project/pcre2.git
 THIRD_PARTY_DIR=$(git rev-parse --show-toplevel)/src/third_party
 DEST_DIR=$THIRD_PARTY_DIR/$NAME
-TEMP_DIR=$(mktemp -d /tmp/import-pcre2.XXXXXX)
 
 UNAME=$(uname | tr A-Z a-z)
 
 if [[ $UNAME == "cygwin"* ]]; then
+    # On windows absolute paths work weirdly
+    TEMP_DIR=$(mktemp -d ./import-pcre2.XXXXXX)
     TARGET_UNAME=windows
 else
+    TEMP_DIR=$(mktemp -d /tmp/import-pcre2.XXXXXX)
     TARGET_UNAME=posix
+
 fi
 
 echo TARGET_UNAME: $TARGET_UNAME
@@ -83,6 +99,12 @@ fi
 
 # Copy over config.h
 mkdir $DEST_DIR/build_$TARGET_UNAME || true
-cp $TEMP_DIR/src/config.h $DEST_DIR/build_$TARGET_UNAME
+
+if [ $TARGET_UNAME != "windows" ]; then
+    cp $TEMP_DIR/src/config.h $DEST_DIR/build_$TARGET_UNAME
+else
+    cp config.h $DEST_DIR/build_$TARGET_UNAME
+fi
+
 echo Deleting $TEMP_DIR
 rm -rf $TEMP_DIR

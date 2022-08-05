@@ -368,6 +368,8 @@ int rc, so, eo;
 int options = 0;
 pcre2_match_data *md = (pcre2_match_data *)preg->re_match_data;
 
+if (string == NULL) return REG_INVARG;
+
 if ((eflags & REG_NOTBOL) != 0) options |= PCRE2_NOTBOL;
 if ((eflags & REG_NOTEOL) != 0) options |= PCRE2_NOTEOL;
 if ((eflags & REG_NOTEMPTY) != 0) options |= PCRE2_NOTEMPTY;

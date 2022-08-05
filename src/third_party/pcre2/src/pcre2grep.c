@@ -208,14 +208,6 @@ point. */
 /* Jeffrey Friedl has some debugging requirements that are not part of the
 regular code. */
 
-#ifdef JFRIEDL_DEBUG
-static int S_arg = -1;
-static unsigned int jfriedl_XR = 0; /* repeat regex attempt this many times */
-static unsigned int jfriedl_XT = 0; /* replicate text this many times */
-static const char *jfriedl_prefix = "";
-static const char *jfriedl_postfix = "";
-#endif
-
 static const char *colour_string = "1;31";
 static const char *colour_option = NULL;
 static const char *dee_option = NULL;
@@ -481,9 +473,6 @@ static option_item optionlist[] = {
   { OP_PATLIST,    N_INCLUDE_DIR,&include_dir_patdata, "include-dir=pattern","include matching directories when recursing" },
   { OP_FILELIST,   N_EXCLUDE_FROM,&exclude_from_data, "exclude-from=path", "read exclude list from file" },
   { OP_FILELIST,   N_INCLUDE_FROM,&include_from_data, "include-from=path", "read include list from file" },
-#ifdef JFRIEDL_DEBUG
-  { OP_OP_NUMBER, 'S',      &S_arg,            "jeffS",         "replace matched (sub)string with X" },
-#endif
   { OP_NODATA,    's',      NULL,              "no-messages",   "suppress error messages" },
   { OP_NODATA,    't',      NULL,              "total-count",   "print total count of matching lines" },
   { OP_NODATA,    'u',      NULL,              "utf",           "use UTF mode" },
@@ -1816,7 +1805,7 @@ to find all possible matches.
 Arguments:
   matchptr     the start of the subject
   length       the length of the subject to match
-  options      options for pcre_exec
+  options      options for pcre2_match
   startoffset  where to start matching
   mrc          address of where to put the result of pcre2_match()
 
@@ -2538,6 +2527,7 @@ BOOL endhyphenpending = FALSE;
 BOOL lines_printed = FALSE;
 BOOL input_line_buffered = line_buffered;
 FILE *in = NULL;                    /* Ensure initialized */
+long stream_start = -1;             /* Only non-negative if relevant */
 
 /* Do the first read into the start of the buffer and set up the pointer to end
 of what we have. In the case of libz, a non-zipped .gz file will be read as a
@@ -2547,7 +2537,15 @@ fail. */
 if (frtype != FR_LIBZ && frtype != FR_LIBBZ2)
   {
   in = (FILE *)handle;
-  if (is_file_tty(in)) input_line_buffered = TRUE;
+  if (feof(in))
+    return 1;
+  if (is_file_tty(in))
+    input_line_buffered = TRUE;
+  else
+    {
+    if (count_limit >= 0  && filename == stdin_name)
+      stream_start = ftell(in);
+    }
   }
 else input_line_buffered = FALSE;
 
@@ -2594,8 +2592,8 @@ while (ptr < endptr)
 
   if (count_limit >= 0 && count_matched_lines >= count_limit)
     {
-    if (frtype == FR_PLAIN && filename == stdin_name && !is_file_tty(handle))
-      (void)fseek(handle, (long int)filepos, SEEK_SET);
+    if (stream_start >= 0)
+      (void)fseek(handle, stream_start + (long int)filepos, SEEK_SET);
     rc = (count_limit == 0)? 1 : 0;
     break;
     }
@@ -2670,56 +2668,6 @@ while (ptr < endptr)
       return 2;
       }
     }
-
-  /* Extra processing for Jeffrey Friedl's debugging. */
-
-#ifdef JFRIEDL_DEBUG
-  if (jfriedl_XT || jfriedl_XR)
-  {
-#     include <sys/time.h>
-#     include <time.h>
-      struct timeval start_time, end_time;
-      struct timezone dummy;
-      int i;
-
-      if (jfriedl_XT)
-      {
-          unsigned long newlen = length * jfriedl_XT + strlen(jfriedl_prefix) + strlen(jfriedl_postfix);
-          const char *orig = ptr;
-          ptr = malloc(newlen + 1);
-          if (!ptr) {
-                  printf("out of memory");
-                  pcre2grep_exit(2);
-          }
-          endptr = ptr;
-          strcpy(endptr, jfriedl_prefix); endptr += strlen(jfriedl_prefix);
-          for (i = 0; i < jfriedl_XT; i++) {
-                  strncpy(endptr, orig,  length);
-                  endptr += length;
-          }
-          strcpy(endptr, jfriedl_postfix); endptr += strlen(jfriedl_postfix);
-          length = newlen;
-      }
-
-      if (gettimeofday(&start_time, &dummy) != 0)
-              perror("bad gettimeofday");
-
-
-      for (i = 0; i < jfriedl_XR; i++)
-          match = (pcre_exec(patterns->compiled, patterns->hint, ptr, length, 0,
-              PCRE2_NOTEMPTY, offsets, offset_size) >= 0);
-
-      if (gettimeofday(&end_time, &dummy) != 0)
-              perror("bad gettimeofday");
-
-      double delta = ((end_time.tv_sec + (end_time.tv_usec / 1000000.0))
-                      -
-                      (start_time.tv_sec + (start_time.tv_usec / 1000000.0)));
-
-      printf("%s TIMER[%.4f]\n", match ? "MATCH" : "FAIL", delta);
-      return 0;
-  }
-#endif
 
   /* We come back here after a match when only_matching_count is non-zero, in
   order to find any further matches in the same line. This applies to
@@ -2974,22 +2922,6 @@ while (ptr < endptr)
 
       if (printname != NULL) fprintf(stdout, "%s:", printname);
       if (number) fprintf(stdout, "%lu:", linenumber);
-
-      /* This extra option, for Jeffrey Friedl's debugging requirements,
-      replaces the matched string, or a specific captured string if it exists,
-      with X. When this happens, colouring is ignored. */
-
-#ifdef JFRIEDL_DEBUG
-      if (S_arg >= 0 && S_arg < mrc)
-        {
-        int first = S_arg * 2;
-        int last  = first + 1;
-        FWRITE_IGNORE(ptr, 1, offsets[first], stdout);
-        fprintf(stdout, "X");
-        FWRITE_IGNORE(ptr + offsets[last], 1, linelength - offsets[last], stdout);
-        }
-      else
-#endif
 
       /* In multiline mode, or if colouring, we have to split the line(s) up
       and search for further matches, but not of course if the line is a
@@ -3266,6 +3198,7 @@ FILE *zos_test_file;
 
 if (strcmp(pathname, "-") == 0)
   {
+  if (count_limit >= 0) setbuf(stdin, NULL);
   return pcre2grep(stdin, FR_PLAIN, stdin_name,
     (filenames > FN_DEFAULT || (filenames == FN_DEFAULT && !only_one_at_top))?
       stdin_name : NULL);
@@ -3964,29 +3897,6 @@ for (i = 1; i < argc; i++)
       }
     }
 
-  /* Jeffrey Friedl's debugging harness uses these additional options which
-  are not in the right form for putting in the option table because they use
-  only one hyphen, yet are more than one character long. By putting them
-  separately here, they will not get displayed as part of the help() output,
-  but I don't think Jeffrey will care about that. */
-
-#ifdef JFRIEDL_DEBUG
-  else if (strcmp(argv[i], "-pre") == 0) {
-          jfriedl_prefix = argv[++i];
-          continue;
-  } else if (strcmp(argv[i], "-post") == 0) {
-          jfriedl_postfix = argv[++i];
-          continue;
-  } else if (strcmp(argv[i], "-XT") == 0) {
-          sscanf(argv[++i], "%d", &jfriedl_XT);
-          continue;
-  } else if (strcmp(argv[i], "-XR") == 0) {
-          sscanf(argv[++i], "%d", &jfriedl_XR);
-          continue;
-  }
-#endif
-
-
   /* One-char options; many that have no data may be in a single argument; we
   continue till we hit the last one or one that needs data. */
 
@@ -4049,7 +3959,7 @@ for (i = 1; i < argc; i++)
   /* If the option type is OP_OP_STRING or OP_OP_NUMBER(S), it's an option that
   either has a value or defaults to something. It cannot have data in a
   separate item. At the moment, the only such options are "colo(u)r",
-  "only-matching", and Jeffrey Friedl's special -S debugging option. */
+  and "only-matching". */
 
   if (*option_data == 0 &&
       (op->type == OP_OP_STRING || op->type == OP_OP_NUMBER ||
@@ -4065,12 +3975,6 @@ for (i = 1; i < argc; i++)
       only_matching_last = add_number(0, only_matching_last);
       if (only_matching == NULL) only_matching = only_matching_last;
       break;
-
-#ifdef JFRIEDL_DEBUG
-      case 'S':
-      S_arg = 0;
-      break;
-#endif
       }
     continue;
     }
@@ -4351,19 +4255,6 @@ if (DEE_option != NULL)
 
 /* Check the values for Jeffrey Friedl's debugging options. */
 
-#ifdef JFRIEDL_DEBUG
-if (S_arg > 9)
-  {
-  fprintf(stderr, "pcre2grep: bad value for -S option\n");
-  return 2;
-  }
-if (jfriedl_XT != 0 || jfriedl_XR != 0)
-  {
-  if (jfriedl_XT == 0) jfriedl_XT = 1;
-  if (jfriedl_XR == 0) jfriedl_XR = 1;
-  }
-#endif
-
 /* If use_jit is set, check whether JIT is available. If not, do not try
 to use JIT. */
 
@@ -4473,6 +4364,11 @@ no file arguments, search stdin, and then exit. */
 
 if (file_lists == NULL && i >= argc)
   {
+  /* Using a buffered stdin, that then is seek is not portable,
+     so attempt to remove the buffer, to workaround reported issues
+     affecting several BSD and AIX */
+  if (count_limit >= 0)
+    setbuf(stdin, NULL);
   rc = pcre2grep(stdin, FR_PLAIN, stdin_name,
     (filenames > FN_DEFAULT)? stdin_name : NULL);
   goto EXIT;
