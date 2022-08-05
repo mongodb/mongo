@@ -2504,4 +2504,31 @@ ConstDataRange binDataToCDR(BSONElement element) {
     const char* data = element.binData(len);
     return ConstDataRange(data, data + len);
 }
+
+bool hasQueryType(const EncryptedFieldConfig& config, QueryTypeEnum queryType) {
+
+    for (const auto& field : config.getFields()) {
+
+        if (field.getQueries().has_value()) {
+            auto queriesVariant = field.getQueries().get();
+
+            bool hasQuery = stdx::visit(
+                OverloadedVisitor{
+                    [&](QueryTypeConfig query) { return (query.getQueryType() == queryType); },
+                    [&](std::vector<QueryTypeConfig> queries) {
+                        return std::any_of(
+                            queries.cbegin(), queries.cend(), [&](const QueryTypeConfig& qtc) {
+                                return qtc.getQueryType() == queryType;
+                            });
+                    }},
+                queriesVariant);
+            if (hasQuery) {
+                return hasQuery;
+            }
+        }
+    }
+
+    return false;
+}
+
 }  // namespace mongo

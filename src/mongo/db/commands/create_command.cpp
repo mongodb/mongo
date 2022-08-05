@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/crypto/fle_crypto.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/index_key_validate.h"
@@ -198,6 +199,14 @@ public:
                         "Encrypted collections are not supported on standalone",
                         repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() ==
                             repl::ReplicationCoordinator::Mode::modeReplSet);
+
+                if (hasQueryType(cmd.getEncryptedFields().get(), QueryTypeEnum::Range)) {
+                    uassert(
+                        6775220,
+                        "Queryable Encryption Range support is only supported when FCV supports "
+                        "6.1",
+                        gFeatureFlagFLE2Range.isEnabled(serverGlobalParams.featureCompatibility));
+                }
             }
 
             if (auto timeseries = cmd.getTimeseries()) {

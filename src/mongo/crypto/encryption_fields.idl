@@ -27,10 +27,24 @@
 
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/exec/document_value/value.h"
 
 imports:
     - "mongo/idl/basic_types.idl"
-    - "mongo/db/pipeline/value.idl"
+
+types:
+  encrypted_numeric:
+    bson_serialization_type:
+    - date
+    - decimal
+    - double
+    - int
+    - long
+    description: A value with any encrypted range numeric BSON type.
+    cpp_type: Value
+    serializer: Value::serializeForIDL
+    deserializer: Value::deserializeForIDL
 
 enums:
     QueryType:
@@ -58,23 +72,23 @@ structs:
                 stability: unstable
             contention:
                 description: "Contention factor for field, 0 means it has extremely high set number of distinct values"
-                type: exactInt64
+                type: safeInt
                 default: 4
                 stability: unstable
                 validator: { gte: 0 }
             min:
                 description: "Defines the lower bound for field values. Only applicable for queryType range"
-                type: Value
+                type: encrypted_numeric
                 optional: true
                 stability: unstable
             max:
                 description: "Defines the upper bound for field values. Only applicable for queryType range"
-                type: Value
+                type: encrypted_numeric
                 optional: true
                 stability: unstable
             sparsity:
                 description: "Lower value - higher storage overhead, faster query."
-                type: int
+                type: exactInt64
                 optional: true
                 stability: unstable
                 validator: { gte: 0, lte: 3 }

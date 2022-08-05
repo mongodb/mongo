@@ -32,6 +32,7 @@
 
 #include <fmt/format.h>
 
+#include "mongo/crypto/fle_crypto.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
@@ -554,6 +555,24 @@ private:
                     },
                     [&](const CollectionPtr& collection) {
                         return collection->getTimeseriesOptions() != boost::none;
+                    });
+            }
+
+            // Block downgrade for collections with encrypted fields
+            // TODO SERVER-67760: Remove once FCV 7.0 becomes last-lts.
+            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+                Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+                catalog::forEachCollectionFromDb(
+                    opCtx, dbName, MODE_X, [&](const CollectionPtr& collection) {
+                        auto& efc = collection->getCollectionOptions().encryptedFieldConfig;
+
+                        uassert(
+                            ErrorCodes::CannotDowngrade,
+                            str::stream()
+                                << "Cannot downgrade the cluster as collection " << collection->ns()
+                                << " has 'encryptedFields' with range indexes",
+                            !(efc.has_value() && hasQueryType(efc.get(), QueryTypeEnum::Range)));
+                        return true;
                     });
             }
         }

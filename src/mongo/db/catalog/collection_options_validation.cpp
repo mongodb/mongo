@@ -28,6 +28,8 @@
  */
 
 #include "mongo/db/catalog/collection_options_validation.h"
+
+#include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/encryption_fields_util.h"
 
 namespace mongo::collection_options_validation {
@@ -85,24 +87,112 @@ EncryptedFieldConfig processAndValidateEncryptedFields(EncryptedFieldConfig conf
             auto queriesVariant = field.getQueries().value();
 
             auto queries = stdx::get_if<std::vector<mongo::QueryTypeConfig>>(&queriesVariant);
+            mongo::QueryTypeConfig query;
+
+            // TODO SERVER-67421 - remove restriction that only one query type can be specified per
+            // field
             if (queries) {
-                // If the user specified multiple queries, verify they are unique
-                // TODO - once other index types are added we will need to enhance this check
-                uassert(6338404,
-                        "Only 1 equality queryType can be specified per field",
-                        queries->size() == 1);
+                uassert(
+                    6338404, "Only one queryType can be specified per field", queries->size() == 1);
+                query = queries->at(0);
+
+            } else {
+                query = *stdx::get_if<mongo::QueryTypeConfig>(&queriesVariant);
             }
 
             uassert(6412601,
-                    "Bson type needs to be specified for equality indexed field",
+                    "Bson type needs to be specified for an indexed field",
                     field.getBsonType().has_value());
 
-            BSONType type = typeFromName(field.getBsonType().value());
+            switch (query.getQueryType()) {
+                case QueryTypeEnum::Equality: {
+                    BSONType type = typeFromName(field.getBsonType().value());
 
-            uassert(6338405,
-                    str::stream() << "Type '" << typeName(type)
-                                  << "' is not a supported equality indexed type",
-                    isFLE2EqualityIndexedSupportedType(type));
+                    uassert(6338405,
+                            str::stream() << "Type '" << typeName(type)
+                                          << "' is not a supported equality indexed type",
+                            isFLE2EqualityIndexedSupportedType(type));
+
+                    uassert(6775205,
+                            "The field 'sparsity' is not allowed for equality index but is present",
+                            !query.getSparsity().has_value());
+                    uassert(6775206,
+                            "The field 'min' is not allowed for equality index but is present",
+                            !query.getMin().has_value());
+                    uassert(6775207,
+                            "The field 'max' is not allowed for equality index but is present",
+                            !query.getMax().has_value());
+                    break;
+                }
+                case QueryTypeEnum::Range: {
+                    BSONType type = typeFromName(field.getBsonType().value());
+
+                    uassert(6775201,
+                            str::stream() << "Type '" << typeName(type)
+                                          << "' is not a supported range indexed type",
+                            isFLE2RangeIndexedSupportedType(type));
+
+                    uassert(6775202,
+                            "The field 'sparsity' is missing but required for range index",
+                            query.getSparsity().has_value());
+                    uassert(6775203,
+                            "The field 'min' is missing but required for range index",
+                            query.getMin().has_value());
+                    uassert(6775204,
+                            "The field 'max' is missing but required for range index",
+                            query.getMax().has_value());
+
+                    uassert(6775214,
+                            "The field 'sparsity' must be between 0 and 3",
+                            query.getSparsity().value() >= 1 && query.getSparsity().value() <= 3);
+
+                    // Check type compatibility
+                    switch (type) {
+                        case NumberInt: {
+                            int min = query.getMin()->coerceToInt();
+                            int max = query.getMax()->coerceToInt();
+
+                            uassert(6775208, "Min must be less than max", min < max);
+                            break;
+                        }
+                        case NumberLong: {
+                            long min = query.getMin()->coerceToLong();
+                            long max = query.getMax()->coerceToLong();
+                            uassert(6775209, "Min must be less than max", min < max);
+                            break;
+                        }
+                        case NumberDouble: {
+                            double min = query.getMin()->coerceToDouble();
+                            double max = query.getMax()->coerceToDouble();
+                            uassert(6775210, "Min must be less than max", min < max);
+                            break;
+                        }
+                        case NumberDecimal: {
+                            Decimal128 min = query.getMin()->coerceToDecimal();
+                            Decimal128 max = query.getMax()->coerceToDecimal();
+                            uassert(6775211, "Min must be less than max", min < max);
+                            break;
+                        }
+                        case Date: {
+                            uassert(6775212,
+                                    "Min and max must be a date type when bsonType is date",
+                                    query.getMin()->getType() == Date &&
+                                        query.getMax()->getType() == Date);
+
+                            Date_t min = query.getMin()->getDate();
+                            Date_t max = query.getMax()->getDate();
+                            uassert(6775213, "Min must be less than max", min < max);
+                            break;
+                        }
+                        default:
+                            MONGO_COMPILER_UNREACHABLE;
+                    }
+
+                    break;
+                }
+                default:
+                    MONGO_COMPILER_UNREACHABLE;
+            }
         } else {
             if (field.getBsonType().has_value()) {
                 BSONType type = typeFromName(field.getBsonType().value());

@@ -1211,4 +1211,7 @@ std::vector<uint8_t> toEncryptedVector(EncryptedBinDataType dt, const PrfBlock& 
 BSONBinData toBSONBinData(const std::vector<uint8_t>& buf);
 
 std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedBinData(const Value& value);
+
+bool hasQueryType(const EncryptedFieldConfig& config, QueryTypeEnum queryType);
+
 }  // namespace mongo
