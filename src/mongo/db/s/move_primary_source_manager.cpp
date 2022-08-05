@@ -332,42 +332,56 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
 Status MovePrimarySourceManager::_commitOnConfig(OperationContext* opCtx) {
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
-    auto findResponse = uassertStatusOK(
-        configShard->exhaustiveFindOnConfig(opCtx,
-                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                            repl::ReadConcernLevel::kMajorityReadConcern,
-                                            DatabaseType::ConfigNS,
-                                            BSON(DatabaseType::name << _dbname),
-                                            BSON(DatabaseType::name << -1),
-                                            1));
+    auto getDatabaseEntry = [&]() {
+        auto findResponse = uassertStatusOK(
+            configShard->exhaustiveFindOnConfig(opCtx,
+                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                                repl::ReadConcernLevel::kMajorityReadConcern,
+                                                DatabaseType::ConfigNS,
+                                                BSON(DatabaseType::name << _dbname),
+                                                BSON(DatabaseType::name << -1),
+                                                1));
 
-    const auto databasesVector = std::move(findResponse.docs);
-    uassert(ErrorCodes::IncompatibleShardingMetadata,
-            str::stream() << "Tried to find max database version for database '" << _dbname
-                          << "', but found no databases",
-            !databasesVector.empty());
+        const auto databasesVector = std::move(findResponse.docs);
+        uassert(ErrorCodes::IncompatibleShardingMetadata,
+                str::stream() << "Tried to find max database version for database '" << _dbname
+                              << "', but found no databases",
+                !databasesVector.empty());
 
-    const auto dbType = uassertStatusOK(DatabaseType::fromBSON(databasesVector.front()));
+        return uassertStatusOK(DatabaseType::fromBSON(databasesVector.front()));
+    };
 
-    if (dbType.getPrimary() == _toShard) {
+    const auto originalDbType = getDatabaseEntry();
+
+    if (originalDbType.getPrimary() == _toShard) {
         return Status::OK();
     }
 
-    auto newDbType = dbType;
-    newDbType.setPrimary(_toShard);
+    auto const newDbVersion = [&]() {
+        auto version = originalDbType.getVersion();
+        return version.makeUpdated();
+    }();
 
-    auto const currentDatabaseVersion = dbType.getVersion();
+    auto getDottedVersionField = [](const StringData& fieldName) {
+        return DatabaseType::version.name() + "." + fieldName;
+    };
 
-    newDbType.setVersion(currentDatabaseVersion.makeUpdated());
-
-    auto updateQueryBuilder = BSONObjBuilder(BSON(DatabaseType::name << _dbname));
-    updateQueryBuilder.append(DatabaseType::version.name(), currentDatabaseVersion.toBSON());
+    // Include the version in the update filter to be resilient to potential network retries
+    auto const updateQuery =
+        BSON(DatabaseType::name << _dbname << getDottedVersionField(DatabaseVersion::kUuidFieldName)
+                                << newDbVersion.getUuid()
+                                << getDottedVersionField(DatabaseVersion::kLastModFieldName)
+                                << originalDbType.getVersion().getLastMod());
+    auto const update =
+        BSON("$set" << BSON(DatabaseType::primary
+                            << _toShard << getDottedVersionField(DatabaseVersion::kLastModFieldName)
+                            << newDbVersion.getLastMod()));
 
     auto updateStatus = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
         opCtx,
         DatabaseType::ConfigNS,
-        updateQueryBuilder.obj(),
-        newDbType.toBSON(),
+        updateQuery,
+        update,
         false,
         ShardingCatalogClient::kMajorityWriteConcern);
 
@@ -379,6 +393,15 @@ Status MovePrimarySourceManager::_commitOnConfig(OperationContext* opCtx) {
               "error"_attr = redact(updateStatus.getStatus()));
         return updateStatus.getStatus();
     }
+
+    const auto updatedDbType = getDatabaseEntry();
+    tassert(6851100,
+            "Error committing movePrimary: database version went backwards",
+            updatedDbType.getVersion().getUuid() != originalDbType.getVersion().getUuid() ||
+                updatedDbType.getVersion().getLastMod() > originalDbType.getVersion().getLastMod());
+    uassert(6851101,
+            "Error committing movePrimary: update of `config.databases` failed",
+            updatedDbType.getPrimary() != _fromShard);
 
     return Status::OK();
 }
