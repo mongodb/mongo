@@ -159,7 +159,7 @@ public:
                                   "Failed to get last stable recovery timestamp due to {error}",
                                   "error"_attr = "lock acquire timeout"_sd);
                 }
-            } catch (const ExceptionForCat<ErrorCategory::Interruption>& ex) {
+            } catch (const ExceptionForCat<ErrorCategory::CancellationError>& ex) {
                 LOGV2_WARNING(6100701,
                               "Failed to get last stable recovery timestamp due to {error}",
                               "error"_attr = redact(ex));

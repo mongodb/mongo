@@ -151,17 +151,22 @@ void ReplClientInfo::setLastOpToSystemLastOpTime(OperationContext* opCtx) {
     }
 }
 
-void ReplClientInfo::setLastOpToSystemLastOpTimeIgnoringInterrupt(OperationContext* opCtx) {
+void ReplClientInfo::setLastOpToSystemLastOpTimeIgnoringCtxCancelled(OperationContext* opCtx) {
     try {
         repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
-    } catch (const ExceptionForCat<ErrorCategory::Interruption>& e) {
-        // In most cases, it is safe to ignore interruption errors because we cannot use the same
-        // OperationContext to wait for writeConcern anyways.
-        LOGV2_DEBUG(21281,
-                    2,
-                    "Ignoring set last op interruption error: {error}",
-                    "Ignoring set last op interruption error",
-                    "error"_attr = e.toStatus());
+    } catch (DBException& e) {
+        if (opCtx && opCtx->getKillStatus() != ErrorCodes::OK) {
+            // In most cases, it is safe to ignore context cancellation errors because we cannot use
+            // the same OperationContext to wait for writeConcern anyways.
+            LOGV2_DEBUG(21281,
+                        2,
+                        "Ignoring set last op error: {error}",
+                        "Ignoring set last op error",
+                        "error"_attr = e.toStatus());
+            return;
+        }
+        // Context was not cancelled, throw error up to caller.
+        throw;
     }
 }
 

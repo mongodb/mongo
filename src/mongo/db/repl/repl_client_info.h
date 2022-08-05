@@ -108,9 +108,9 @@ public:
     void setLastOpToSystemLastOpTime(OperationContext* opCtx);
 
     /**
-     * Same as setLastOpToSystemLastOpTime but ignores interruption errors.
+     * Same as setLastOpToSystemLastOpTime but ignores context cancellation errors.
      */
-    void setLastOpToSystemLastOpTimeIgnoringInterrupt(OperationContext* opCtx);
+    void setLastOpToSystemLastOpTimeIgnoringCtxCancelled(OperationContext* opCtx);
 
 private:
     static const long long kUninitializedTerm = -1;

@@ -243,9 +243,9 @@ StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
                         "totalBytes"_attr = totalBytes);
             try {
                 _oplogBuffer->waitForDataUntil(batchDeadline, opCtx);
-            } catch (const ExceptionForCat<ErrorCategory::Interruption>& e) {
+            } catch (const ExceptionForCat<ErrorCategory::CancellationError>& e) {
                 LOGV2(6572300,
-                      "Interrupted in oplog batching; returning current partial batch.",
+                      "Cancelled in oplog batching; returning current partial batch.",
                       "error"_attr = e);
             }
         }
@@ -325,10 +325,10 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
             for (const auto& oplogEntry : oplogEntries) {
                 ops.emplace_back(oplogEntry);
             }
-        } catch (const ExceptionForCat<ErrorCategory::Interruption>& e) {
+        } catch (const ExceptionForCat<ErrorCategory::CancellationError>& e) {
             LOGV2_DEBUG(6133400,
                         1,
-                        "Interrupted getting the global lock in Repl Batcher",
+                        "Cancelled getting the global lock in Repl Batcher",
                         "error"_attr = e.toStatus());
             invariant(ops.empty());
         }
