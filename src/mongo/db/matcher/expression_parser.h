@@ -55,6 +55,7 @@ enum class PathAcceptingKeyword {
     BITS_ANY_CLEAR,
     BITS_ANY_SET,
     ELEM_MATCH,
+    ENCRYPTED_BETWEEN,
     EQUALITY,
     EXISTS,
     GEO_INTERSECTS,

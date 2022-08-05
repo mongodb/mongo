@@ -42,6 +42,7 @@
 
 namespace mongo {
 
+
 TEST(MatchExpressionParserTest, SimpleEQ1) {
     BSONObj query = BSON("x" << 2);
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
@@ -809,4 +810,81 @@ TEST(InternalSchemaBinDataEncryptedTypeExpressionTest, NonBinDataValueDoesNotMat
     BSONObj notMatch = BSON("a" << BSONArray());
     ASSERT_FALSE(expr->matchesBSON(notMatch));
 }
+
+TEST(EncryptedBetweenMatchExpressionTest, EncryptedBetweenExpectedBehaviorRHSNumeric) {
+    BSONObj query = BSON("a" << BSON("$encryptedBetween" << 5));
+    BSONObj inner = BSON("$encryptedBetween" << 5);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_TRUE(result.isOK());
+
+    ASSERT_EQ(result.getValue()->matchType(), MatchExpression::ENCRYPTED_BETWEEN);
+    auto ptr = result.getValue().get();
+    auto expr = static_cast<EncryptedBetweenMatchExpression*>(ptr);
+    ASSERT_BSONOBJ_EQ(expr->getSerializedRightHandSide(), inner);
+}
+
+TEST(EncryptedBetweenMatchExpressionTest, EncryptedBetweenExpectedBehaviorRHSDate) {
+    auto date = Date_t::now();
+    BSONObj query = BSON("a" << BSON("$encryptedBetween" << date));
+    BSONObj inner = BSON("$encryptedBetween" << date);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_TRUE(result.isOK());
+
+    ASSERT_EQ(result.getValue()->matchType(), MatchExpression::ENCRYPTED_BETWEEN);
+    auto ptr = result.getValue().get();
+    auto expr = static_cast<EncryptedBetweenMatchExpression*>(ptr);
+    ASSERT_BSONOBJ_EQ(expr->getSerializedRightHandSide(), inner);
+}
+
+TEST(EncryptedBetweenMatchExpressionTest, EncryptedBetweenExpectedBehaviorInsideAnd) {
+    BSONObj query = fromjson("{$and: [{x: 1}, {a: {$encryptedBetween: 5}}]}");
+    BSONObj inner = BSON("$encryptedBetween" << 5);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_TRUE(result.isOK());
+
+    ASSERT_EQ(result.getValue()->matchType(), MatchExpression::AND);
+    ASSERT_EQ(result.getValue()->getChild(0)->matchType(), MatchExpression::EQ);
+
+    auto ptr = result.getValue().get();
+    auto encryptedBetweenChild = ptr->getChild(1);
+    ASSERT_EQ(encryptedBetweenChild->matchType(), MatchExpression::ENCRYPTED_BETWEEN);
+
+    auto expr = static_cast<EncryptedBetweenMatchExpression*>(encryptedBetweenChild);
+    ASSERT_BSONOBJ_EQ(expr->getSerializedRightHandSide(), inner);
+}
+
+TEST(EncryptedBetweenMatchExpressionTest, EncryptedBetweenExpectedBehaviorInsideNot) {
+    BSONObj query = fromjson("{a: {$not: {$encryptedBetween: 5}}}");
+    BSONObj inner = BSON("$encryptedBetween" << 5);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_TRUE(result.isOK());
+
+    ASSERT_EQ(result.getValue()->matchType(), MatchExpression::NOT);
+    ASSERT_EQ(result.getValue()->getChild(0)->matchType(), MatchExpression::AND);
+
+    auto ptr = result.getValue().get();
+    auto encryptedBetweenChild = ptr->getChild(0)->getChild(0);
+    ASSERT_EQ(encryptedBetweenChild->matchType(), MatchExpression::ENCRYPTED_BETWEEN);
+    auto expr = static_cast<EncryptedBetweenMatchExpression*>(encryptedBetweenChild);
+    ASSERT_BSONOBJ_EQ(expr->getSerializedRightHandSide(), inner);
+}
+
+TEST(EncryptedBetweenMatchExpressionTest, EncryptedBetweenExpectedBehaviorDottedPath) {
+    BSONObj query = fromjson("{'a.b': {$encryptedBetween: 5}}");
+    BSONObj inner = BSON("$encryptedBetween" << 5);
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_TRUE(result.isOK());
+    ASSERT_EQ(result.getValue()->path(), "a.b");
+
+    ASSERT_EQ(result.getValue()->matchType(), MatchExpression::ENCRYPTED_BETWEEN);
+    auto ptr = result.getValue().get();
+    auto expr = static_cast<EncryptedBetweenMatchExpression*>(ptr);
+    ASSERT_BSONOBJ_EQ(expr->getSerializedRightHandSide(), inner);
+}
+
 }  // namespace mongo
