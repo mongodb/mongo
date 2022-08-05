@@ -41,40 +41,24 @@ namespace sbe {
 /**
  * A stage that scans provided columnar index.
  *
- * Currently the stage produces an object into the 'reconstructedRecordSlot' such that accessing any
- * of the given paths in it would be equivalent to accessing the paths in the corresponding object
- * from the associated row store. In the future the stage will be extended to produce separate
- * outputs for each path without materializing this intermediate object unless requested by the
- * client.
+ * Currently the stage produces an object into the 'recordSlot' such that accessing any of the given
+ * paths in it would be equivalent to accessing the paths in the corresponding object from the
+ * associated row store. In the future the stage will be extended to produce separate outputs for
+ * each path without materializing this intermediate object unless requested by the client.
  *
  * Debug string representation:
  *
- *  COLUMN_SCAN reconstructedRecordSlot|none recordIdSlot|none [path_1, ..., path_n]
- *              [filter_path_1: filterSlot_1, filterExpr_1; ...]? [roStoreSlot, rowStoreExpr]?
- *              collectionUuid indexName
+ *  COLUMN_SCAN recordSlot|none recordIdSlot|none [path_1, ..., path_n] collectionUuid indexName
  */
 class ColumnScanStage final : public PlanStage {
 public:
-    struct PathFilter {
-        size_t pathIndex;  // index into the paths array the stage will be using
-        std::unique_ptr<EExpression> filterExpr;
-        value::SlotId inputSlotId;
-
-        PathFilter(size_t pathIndex,
-                   std::unique_ptr<EExpression> filterExpr,
-                   value::SlotId inputSlotId)
-            : pathIndex(pathIndex), filterExpr(std::move(filterExpr)), inputSlotId(inputSlotId) {}
-    };
-
     ColumnScanStage(UUID collectionUuid,
                     StringData columnIndexName,
                     std::vector<std::string> paths,
-                    std::vector<bool> includeInOutput,
                     boost::optional<value::SlotId> recordIdSlot,
                     boost::optional<value::SlotId> reconstructedRecordSlot,
                     value::SlotId rowStoreSlot,
                     std::unique_ptr<EExpression> rowStoreExpr,
-                    std::vector<PathFilter> filteredPaths,
                     PlanYieldPolicy* yieldPolicy,
                     PlanNodeId planNodeId,
                     bool participateInTrialRunTracking = true);
@@ -170,9 +154,6 @@ private:
         boost::optional<FullCellView>& lastCell() {
             return _lastCell;
         }
-        const boost::optional<FullCellView>& lastCell() const {
-            return _lastCell;
-        }
 
         size_t numNexts() const {
             return _stats.numNexts;
@@ -203,21 +184,6 @@ private:
 
     void readParentsIntoObj(StringData path, value::Object* out, StringDataSet* pathsReadSetOut);
 
-    bool checkFilter(CellView cell, size_t filterIndex, const PathValue& path);
-
-    // Finds the smallest record ID such that:
-    // 1) it is greater or equal to the record ID of all filtered columns cursors prior to the call;
-    // 2) the record with this ID passes the filters of all filtered columns.
-    // Ensures that the cursors are set to this record ID unless it's missing in the column (which
-    // is only possible for the non-filtered columns).
-    RecordId findNextRecordIdForFilteredColumns();
-
-    // Finds the lowest record ID across all cursors. Doesn't move any of the cursors.
-    RecordId findMinRecordId() const;
-
-    // Move cursors to the next record to be processed.
-    RecordId advanceCursors();
-
     // The columnar index this stage is scanning and the associated row store collection.
     const UUID _collUuid;
     const std::string _columnIndexName;
@@ -226,16 +192,13 @@ private:
     boost::optional<uint64_t> _catalogEpoch;     // and are not changed afterwards.
     std::weak_ptr<const IndexCatalogEntry> _weakIndexCatalogEntry;
 
-    // Paths to be read from the index. '_includeInOutput' defines which of the fields should be
-    // included into the reconstructed record and the order of paths in '_paths' defines the
-    // orderding of the fields. The two vectors should have the same size. NB: No paths is possible
-    // when no filters are used and only constant computed columns are projected. In this case only
-    // the dense record ID column will be read.
+    // Paths to be read from the index.
     const std::vector<std::string> _paths;
-    const std::vector<bool> _includeInOutput;
 
     // The record id in the row store that is used to connect the per-path entries in the columnar
-    // index and to retrieve the full record from the row store, if necessary.
+    // index and to retrieve the full record from the row store, if necessary. Because we put into
+    // the slot the address of record id, we must guarantee that its lifetime is as long as the
+    // stage's.
     RecordId _recordId;
     const boost::optional<value::SlotId> _recordIdSlot;
 
@@ -255,32 +218,17 @@ private:
     const value::SlotId _rowStoreSlot;
     const std::unique_ptr<EExpression> _rowStoreExpr;
 
-    // Per path filters. The slots must be allocated by the client but downstream stages must not
-    // read from them. Multiple filters form a conjunction where each branch of the AND only passes
-    // when a value exists. Empty '_filteredPaths' means there are no filters.
-    const std::vector<PathFilter> _filteredPaths;
-    ColumnCursor& cursorForFilteredPath(const PathFilter& fp) {
-        return _columnCursors[fp.pathIndex];
-    }
-    size_t _nextUnmatched = 0;  // used when searching for the next matching record
-
     std::unique_ptr<value::OwnedValueAccessor> _reconstructedRecordAccessor;
     std::unique_ptr<value::OwnedValueAccessor> _recordIdAccessor;
     std::unique_ptr<value::OwnedValueAccessor> _rowStoreAccessor;
-    std::vector<value::OwnedValueAccessor> _filterInputAccessors;
-    value::SlotAccessorMap _filterInputAccessorsMap;
 
     vm::ByteCode _bytecode;
     std::unique_ptr<vm::CodeFragment> _rowStoreExprCode;
-    std::vector<std::unique_ptr<vm::CodeFragment>> _filterExprsCode;
 
-    // Cursors to simultaneously read from the sections of the index for each path.
+    // Cursors to simultaneously read from the sections of the index for each path (and, possibly,
+    // auxiliary sections) and from the row store.
     std::vector<ColumnCursor> _columnCursors;
     StringMap<std::unique_ptr<ColumnCursor>> _parentPathCursors;
-    // Dense column contains record ids for all records. It is necessary to support projection
-    // semantics for missing values on paths.
-    std::unique_ptr<ColumnCursor> _denseColumnCursor;
-    // Cursor into the associated row store.
     std::unique_ptr<SeekableRecordCursor> _rowStoreCursor;
 
     bool _open{false};

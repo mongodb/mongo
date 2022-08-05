@@ -52,12 +52,10 @@ TranslatedCell translateCell(PathView path, const SplitCellView& splitCellView) 
 ColumnScanStage::ColumnScanStage(UUID collectionUuid,
                                  StringData columnIndexName,
                                  std::vector<std::string> paths,
-                                 std::vector<bool> includeInOutput,
                                  boost::optional<value::SlotId> recordIdSlot,
                                  boost::optional<value::SlotId> reconstuctedRecordSlot,
                                  value::SlotId rowStoreSlot,
                                  std::unique_ptr<EExpression> rowStoreExpr,
-                                 std::vector<PathFilter> filteredPaths,
                                  PlanYieldPolicy* yieldPolicy,
                                  PlanNodeId nodeId,
                                  bool participateInTrialRunTracking)
@@ -65,39 +63,26 @@ ColumnScanStage::ColumnScanStage(UUID collectionUuid,
       _collUuid(collectionUuid),
       _columnIndexName(columnIndexName),
       _paths(std::move(paths)),
-      _includeInOutput(std::move(includeInOutput)),
       _recordIdSlot(recordIdSlot),
       _reconstructedRecordSlot(reconstuctedRecordSlot),
       _rowStoreSlot(rowStoreSlot),
-      _rowStoreExpr(std::move(rowStoreExpr)),
-      _filteredPaths(std::move(filteredPaths)) {
-    invariant(_filteredPaths.size() <= _paths.size(),
-              "Filtered paths should be a subset of all paths");
-    invariant(_paths.size() == _includeInOutput.size());
-}
+      _rowStoreExpr(std::move(rowStoreExpr)) {}
 
 std::unique_ptr<PlanStage> ColumnScanStage::clone() const {
-    std::vector<PathFilter> filteredPaths;
-    for (const auto& fp : _filteredPaths) {
-        filteredPaths.emplace_back(fp.pathIndex, fp.filterExpr->clone(), fp.inputSlotId);
-    }
+    std::vector<std::unique_ptr<EExpression>> pathExprs;
     return std::make_unique<ColumnScanStage>(_collUuid,
                                              _columnIndexName,
                                              _paths,
-                                             _includeInOutput,
                                              _recordIdSlot,
                                              _reconstructedRecordSlot,
                                              _rowStoreSlot,
                                              _rowStoreExpr ? _rowStoreExpr->clone() : nullptr,
-                                             std::move(filteredPaths),
                                              _yieldPolicy,
                                              _commonStats.nodeId,
                                              _participateInTrialRunTracking);
 }
 
 void ColumnScanStage::prepare(CompileCtx& ctx) {
-    ctx.root = this;
-
     if (_reconstructedRecordSlot) {
         _reconstructedRecordAccessor = std::make_unique<value::OwnedValueAccessor>();
     }
@@ -107,17 +92,8 @@ void ColumnScanStage::prepare(CompileCtx& ctx) {
 
     _rowStoreAccessor = std::make_unique<value::OwnedValueAccessor>();
     if (_rowStoreExpr) {
+        ctx.root = this;
         _rowStoreExprCode = _rowStoreExpr->compile(ctx);
-    }
-
-    _filterInputAccessors.resize(_filteredPaths.size());
-    for (size_t idx = 0; idx < _filterInputAccessors.size(); ++idx) {
-        auto slot = _filteredPaths[idx].inputSlotId;
-        auto [it, inserted] = _filterInputAccessorsMap.emplace(slot, &_filterInputAccessors[idx]);
-        uassert(6610212, str::stream() << "duplicate slot: " << slot, inserted);
-    }
-    for (auto& filteredPath : _filteredPaths) {
-        _filterExprsCode.emplace_back(filteredPath.filterExpr->compile(ctx));
     }
 
     tassert(6610200, "'_coll' should not be initialized prior to 'acquireCollection()'", !_coll);
@@ -144,23 +120,12 @@ value::SlotAccessor* ColumnScanStage::getAccessor(CompileCtx& ctx, value::SlotId
     if (_rowStoreSlot == slot) {
         return _rowStoreAccessor.get();
     }
-
-    if (auto it = _filterInputAccessorsMap.find(slot); it != _filterInputAccessorsMap.end()) {
-        return it->second;
-    }
-
     return ctx.getAccessor(slot);
 }
 
 void ColumnScanStage::doSaveState(bool relinquishCursor) {
-    if (_denseColumnCursor) {
-        _denseColumnCursor->makeOwned();
-        _denseColumnCursor->cursor().save();
-    }
-
     for (auto& cursor : _columnCursors) {
         cursor.makeOwned();
-        cursor.cursor().save();
     }
 
     if (_rowStoreCursor && relinquishCursor) {
@@ -171,6 +136,9 @@ void ColumnScanStage::doSaveState(bool relinquishCursor) {
         _rowStoreCursor->setSaveStorageCursorOnDetachFromOperationContext(!relinquishCursor);
     }
 
+    for (auto& cursor : _columnCursors) {
+        cursor.cursor().save();
+    }
     for (auto& [path, cursor] : _parentPathCursors) {
         cursor->cursor().saveUnpositioned();
     }
@@ -202,9 +170,6 @@ void ColumnScanStage::doRestoreState(bool relinquishCursor) {
         }
     }
 
-    if (_denseColumnCursor) {
-        _denseColumnCursor->cursor().restore();
-    }
     for (auto& cursor : _columnCursors) {
         cursor.cursor().restore();
     }
@@ -217,9 +182,6 @@ void ColumnScanStage::doDetachFromOperationContext() {
     if (_rowStoreCursor) {
         _rowStoreCursor->detachFromOperationContext();
     }
-    if (_denseColumnCursor) {
-        _denseColumnCursor->cursor().detachFromOperationContext();
-    }
     for (auto& cursor : _columnCursors) {
         cursor.cursor().detachFromOperationContext();
     }
@@ -231,9 +193,6 @@ void ColumnScanStage::doDetachFromOperationContext() {
 void ColumnScanStage::doAttachToOperationContext(OperationContext* opCtx) {
     if (_rowStoreCursor) {
         _rowStoreCursor->reattachToOperationContext(opCtx);
-    }
-    if (_denseColumnCursor) {
-        _denseColumnCursor->cursor().reattachToOperationContext(opCtx);
     }
     for (auto& cursor : _columnCursors) {
         cursor.cursor().reattachToOperationContext(opCtx);
@@ -288,30 +247,24 @@ void ColumnScanStage::open(bool reOpen) {
 
         auto iam = static_cast<ColumnStoreAccessMethod*>(entry->accessMethod());
 
-        // The dense _recordId column is only needed if there are no filters (TODO SERVER-68377:
-        // eventually we can avoid including this column for the cases where a known dense column
-        // such as _id is being read anyway).
-        if (_filteredPaths.empty()) {
-            _denseColumnCursor = std::make_unique<ColumnCursor>(
-                iam->storage()->newCursor(_opCtx, ColumnStore::kRowIdPath),
-                _specificStats.cursorStats.emplace_back(ColumnStore::kRowIdPath.toString(),
-                                                        false /*includeInOutput*/));
-        }
-        for (size_t i = 0; i < _paths.size(); i++) {
-            _columnCursors.emplace_back(
-                iam->storage()->newCursor(_opCtx, _paths[i]),
-                _specificStats.cursorStats.emplace_back(_paths[i], _includeInOutput[i]));
+        // Eventually we can not include this column for the cases where a known dense column (_id)
+        // is being read anyway.
+
+        // Add a stats struct that will be shared by overall ColumnScanStats and individual
+        // cursor.
+        _columnCursors.emplace_back(
+            iam->storage()->newCursor(_opCtx, ColumnStore::kRowIdPath),
+            _specificStats.cursorStats.emplace_back(ColumnStore::kRowIdPath.toString(), false));
+
+        for (auto&& path : _paths) {
+            _columnCursors.emplace_back(iam->storage()->newCursor(_opCtx, path),
+                                        _specificStats.cursorStats.emplace_back(path, true));
         }
     }
 
-    // Set the cursors.
-    if (_denseColumnCursor) {
-        _denseColumnCursor->seekAtOrPast(RecordId());
-    }
     for (auto& columnCursor : _columnCursors) {
         columnCursor.seekAtOrPast(RecordId());
     }
-    _recordId = _filteredPaths.empty() ? findMinRecordId() : findNextRecordIdForFilteredColumns();
 
     _open = true;
 }
@@ -370,152 +323,6 @@ void ColumnScanStage::readParentsIntoObj(StringData path,
     }
 }
 
-// The result of the filter predicate will be the same regardless of sparseness or sub objects,
-// therefore we don't look at the parents and don't consult the row store.
-//
-// (TODO SERVER-68285) Currently, the per-path predicates expect an object to run on, so we create
-// one. This is very inefficient (profiles show considerable time spent under Object::push_back) and
-// should be replaced with predicates that run directly on values. The fact that the implementation
-// of the filter depends on the implementation of the expressions passed to the stage indicates a
-// tight coupling. Unfortunately, this dependency can only be discovered at runtime.
-bool ColumnScanStage::checkFilter(CellView cell, size_t filterIndex, const PathValue& path) {
-    auto [tag, val] = value::makeNewObject();
-    value::ValueGuard materializedObjGuard(tag, val);
-    auto& obj = *value::bitcastTo<value::Object*>(val);
-
-    auto splitCellView = SplitCellView::parse(cell);
-    auto translatedCell = translateCell(path, splitCellView);
-    addCellToObject(translatedCell, obj);
-
-    _filterInputAccessors[filterIndex].reset(true /*owned*/, tag, val);
-    materializedObjGuard.reset();
-    return _bytecode.runPredicate(_filterExprsCode[filterIndex].get());
-}
-
-RecordId ColumnScanStage::findNextRecordIdForFilteredColumns() {
-    invariant(!_filteredPaths.empty());
-
-    // Initialize 'targetRecordId' from the filtered cursor we are currently iterating.
-    RecordId targetRecordId;
-    {
-        auto& cursor = cursorForFilteredPath(_filteredPaths[_nextUnmatched]);
-        if (!cursor.lastCell()) {
-            return RecordId();  // Have exhausted one of the columns.
-        }
-        targetRecordId = cursor.lastCell()->rid;
-    }
-
-    size_t matchedSinceAdvance = 0;
-    // The loop will terminate because when 'matchedSinceAdvance' is reset the 'targetRecordId' is
-    // guaranteed to advance. It will do no more than N 'next()' calls across all cursors, where N
-    // is the number of records (might do fewer, if for some columns there are missing values). The
-    // number of seeks and filter checks depends on the selectivity of the filters.
-    while (matchedSinceAdvance < _filteredPaths.size()) {
-        auto& cursor = cursorForFilteredPath(_filteredPaths[_nextUnmatched]);
-
-        // Avoid seeking into the column that we started with.
-        auto& result = cursor.lastCell();
-        if (result && result->rid < targetRecordId) {
-            result = cursor.seekAtOrPast(targetRecordId);
-        }
-        if (!result) {
-            return RecordId();
-        }
-
-        if (result->rid > targetRecordId) {
-            // The column skipped ahead - have to restart at this new record ID.
-            matchedSinceAdvance = 0;
-            targetRecordId = result->rid;
-        }
-
-        if (!checkFilter(result->value, _nextUnmatched, cursor.path())) {
-            // Advance the column until find a match and restart at this new record ID.
-            do {
-                result = cursor.next();
-                if (!result) {
-                    return RecordId();
-                }
-            } while (!checkFilter(result->value, _nextUnmatched, cursor.path()));
-            matchedSinceAdvance = 0;
-            invariant(result->rid > targetRecordId);
-            targetRecordId = result->rid;
-        }
-        ++matchedSinceAdvance;
-        _nextUnmatched = (_nextUnmatched + 1) % _filteredPaths.size();
-    }
-    invariant(!targetRecordId.isNull());
-
-    // Ensure that _all_ cursors have caugth up with the filtered record ID. Some of the cursors
-    // might skip ahead, which would mean the column is missing a value for this 'recordId'.
-    for (auto& cursor : _columnCursors) {
-        const auto& result = cursor.lastCell();
-        if (result && result->rid < targetRecordId) {
-            cursor.seekAtOrPast(targetRecordId);
-        }
-    }
-
-    return targetRecordId;
-}
-
-RecordId ColumnScanStage::findMinRecordId() const {
-    if (_denseColumnCursor) {
-        // The cursor of the dense column cannot be ahead of any other, so it's always at the
-        // minimum.
-        auto& result = _denseColumnCursor->lastCell();
-        if (!result) {
-            return RecordId();
-        }
-        return result->rid;
-    }
-
-    auto recordId = RecordId();
-    for (const auto& cursor : _columnCursors) {
-        const auto& result = cursor.lastCell();
-        if (result && (recordId.isNull() || result->rid < recordId)) {
-            recordId = result->rid;
-        }
-    }
-    return recordId;
-}
-
-RecordId ColumnScanStage::advanceCursors() {
-    if (!_filteredPaths.empty()) {
-        // Nudge forward the "active" filtered cursor. The remaining ones will be synchronized by
-        // 'findNextRecordIdForFilteredColumns()'.
-        cursorForFilteredPath(_filteredPaths[_nextUnmatched]).next();
-        return findNextRecordIdForFilteredColumns();
-    }
-
-    // In absence of filters all cursors iterate forward on their own. Some of the cursors might be
-    // ahead of the current '_recordId' because there are gaps in their columns - don't move them
-    // but only those that are at '_recordId' and therefore their values have been consumed. While
-    // at it, compute the new min record ID.
-    auto nextRecordId = RecordId();
-    if (_denseColumnCursor) {
-        invariant(_denseColumnCursor->lastCell()->rid == _recordId,
-                  "Dense cursor should always be at the current minimum record ID");
-        auto cell = _denseColumnCursor->next();
-        if (!cell) {
-            return RecordId();
-        }
-        nextRecordId = cell->rid;
-    }
-    for (auto& cursor : _columnCursors) {
-        auto& cell = cursor.lastCell();
-        if (!cell) {
-            continue;  // this column has been exhausted
-        }
-        if (cell->rid == _recordId) {
-            cell = cursor.next();
-        }
-        if (cell && (nextRecordId.isNull() || cell->rid < nextRecordId)) {
-            invariant(!_denseColumnCursor, "Dense cursor should have the next lowest record ID");
-            nextRecordId = cell->rid;
-        }
-    }
-    return nextRecordId;
-}
-
 PlanState ColumnScanStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
@@ -525,32 +332,35 @@ PlanState ColumnScanStage::getNext() {
 
     checkForInterrupt(_opCtx);
 
+    // Find minimum record ID of all column cursors.
+    _recordId = RecordId();
+    for (auto& cursor : _columnCursors) {
+        auto& result = cursor.lastCell();
+        if (result && (_recordId.isNull() || result->rid < _recordId)) {
+            _recordId = result->rid;
+        }
+    }
+
     if (_recordId.isNull()) {
         return trackPlanState(PlanState::IS_EOF);
     }
-
-    bool useRowStore = false;
 
     auto [outTag, outVal] = value::makeNewObject();
     auto& outObj = *value::bitcastTo<value::Object*>(outVal);
     value::ValueGuard materializedObjGuard(outTag, outVal);
 
     StringDataSet pathsRead;
+    bool useRowStore = false;
     for (size_t i = 0; i < _columnCursors.size(); ++i) {
-        if (!_includeInOutput[i]) {
-            continue;
-        }
-        auto& cursor = _columnCursors[i];
-        auto& lastCell = cursor.lastCell();
+        auto& lastCell = _columnCursors[i].lastCell();
+        const auto& path = _columnCursors[i].path();
 
         boost::optional<SplitCellView> splitCellView;
         if (lastCell && lastCell->rid == _recordId) {
             splitCellView = SplitCellView::parse(lastCell->value);
         }
 
-        const auto& path = cursor.path();
-
-        if (!useRowStore) {
+        if (_columnCursors[i].includeInOutput() && !useRowStore) {
             if (splitCellView &&
                 (splitCellView->hasSubPaths || splitCellView->hasDuplicateFields)) {
                 useRowStore = true;
@@ -565,6 +375,10 @@ PlanState ColumnScanStage::getNext() {
                     pathsRead.insert(path);
                 }
             }
+        }
+
+        if (splitCellView) {
+            _columnCursors[i].next();
         }
     }
 
@@ -609,8 +423,6 @@ PlanState ColumnScanStage::getNext() {
         _tracker = nullptr;
         uasserted(ErrorCodes::QueryTrialRunCompleted, "Trial run early exit in scan");
     }
-
-    _recordId = advanceCursors();
     return trackPlanState(PlanState::ADVANCED);
 }
 
@@ -694,31 +506,6 @@ std::vector<DebugPrinter::Block> ColumnScanStage::debugPrint() const {
         ret.emplace_back(str::stream() << "\"" << _paths[idx] << "\"");
     }
     ret.emplace_back(DebugPrinter::Block("`]"));
-
-    // Print out per-path filters (if any).
-    if (!_filteredPaths.empty()) {
-        ret.emplace_back(DebugPrinter::Block("[`"));
-        for (size_t idx = 0; idx < _filteredPaths.size(); ++idx) {
-            if (idx) {
-                ret.emplace_back(DebugPrinter::Block("`;"));
-            }
-
-            ret.emplace_back(str::stream()
-                             << "\"" << _paths[_filteredPaths[idx].pathIndex] << "\": ");
-            DebugPrinter::addIdentifier(ret, _filteredPaths[idx].inputSlotId);
-            ret.emplace_back(DebugPrinter::Block("`,"));
-            DebugPrinter::addBlocks(ret, _filteredPaths[idx].filterExpr->debugPrint());
-        }
-        ret.emplace_back(DebugPrinter::Block("`]"));
-    }
-
-    if (_rowStoreExpr) {
-        ret.emplace_back(DebugPrinter::Block("[`"));
-        DebugPrinter::addIdentifier(ret, _rowStoreSlot);
-        ret.emplace_back(DebugPrinter::Block("`,"));
-        DebugPrinter::addBlocks(ret, _rowStoreExpr->debugPrint());
-        ret.emplace_back(DebugPrinter::Block("`]"));
-    }
 
     ret.emplace_back("@\"`");
     DebugPrinter::addIdentifier(ret, _collUuid.toString());

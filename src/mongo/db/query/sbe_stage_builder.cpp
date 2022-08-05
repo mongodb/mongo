@@ -726,6 +726,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             "'postAssemblyFilter' to be used instead.",
             !csn->filter);
 
+    tassert(6610251, "Expected no filters by path", csn->filtersByPath.empty());
+
     PlanStageSlots outputs;
 
     auto reconstructedRecordSlot = _slotIdGenerator.generate();
@@ -766,63 +768,16 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto abt = builder.generateABT();
     auto rowStoreExpr = abt ? abtToExpr(*abt, slotMap) : emptyExpr->clone();
 
-    // Get all the paths but make sure "_id" comes first (the order of paths given to the
-    // column_scan stage defines the order of fields in the reconstructed record).
-    std::vector<std::string> paths;
-    paths.reserve(csn->allFields.size());
-    if (csn->allFields.find("_id") != csn->allFields.end()) {
-        paths.push_back("_id");
-    }
-    for (const auto& path : csn->allFields) {
-        if (path != "_id") {
-            paths.push_back(path);
-        }
-    }
-
-    // Identify the filtered columns, if any, and create slots/expressions for them.
-    std::vector<sbe::ColumnScanStage::PathFilter> filteredPaths;
-    filteredPaths.reserve(csn->filtersByPath.size());
-    for (size_t i = 0; i < paths.size(); i++) {
-        auto itFilter = csn->filtersByPath.find(paths[i]);
-        if (itFilter != csn->filtersByPath.end()) {
-            auto filterInputSlot = _slotIdGenerator.generate();
-
-            // TODO SERVER-68285: use native SBE expression instead of the classic matcher.
-            auto expr = makeFunction("applyClassicMatcher",
-                                     makeConstant(sbe::value::TypeTags::classicMatchExpresion,
-                                                  sbe::value::bitcastFrom<const MatchExpression*>(
-                                                      itFilter->second->shallowClone().release())),
-                                     makeVariable(filterInputSlot));
-
-            filteredPaths.emplace_back(i, std::move(expr), filterInputSlot);
-        }
-    }
-
-    // Tag which of the paths should be included into the output.
-    DepsTracker residual;
-    if (csn->postAssemblyFilter) {
-        csn->postAssemblyFilter->addDependencies(&residual);
-    }
-    std::vector<bool> includeInOutput(paths.size(), false);
-    for (size_t i = 0; i < paths.size(); i++) {
-        if (csn->outputFields.find(paths[i]) != csn->outputFields.end() ||
-            residual.fields.find(paths[i]) != residual.fields.end()) {
-            includeInOutput[i] = true;
-        }
-    }
-
-    std::unique_ptr<sbe::PlanStage> stage =
-        std::make_unique<sbe::ColumnScanStage>(getCurrentCollection(reqs)->uuid(),
-                                               csn->indexEntry.catalogName,
-                                               std::move(paths),
-                                               std::move(includeInOutput),
-                                               ridSlot,
-                                               reconstructedRecordSlot,
-                                               rowStoreSlot,
-                                               std::move(rowStoreExpr),
-                                               std::move(filteredPaths),
-                                               _yieldPolicy,
-                                               csn->nodeId());
+    std::unique_ptr<sbe::PlanStage> stage = std::make_unique<sbe::ColumnScanStage>(
+        getCurrentCollection(reqs)->uuid(),
+        csn->indexEntry.catalogName,
+        std::vector<std::string>{csn->allFields.begin(), csn->allFields.end()},
+        ridSlot,
+        reconstructedRecordSlot,
+        rowStoreSlot,
+        std::move(rowStoreExpr),
+        _yieldPolicy,
+        csn->nodeId());
 
     // Generate post assembly filter.
     if (csn->postAssemblyFilter) {
@@ -838,7 +793,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                csn->nodeId());
         stage = std::move(outputStage.stage);
     }
-
     return {std::move(stage), std::move(outputs)};
 }
 
