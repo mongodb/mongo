@@ -59,7 +59,7 @@ def _update_builder(env, builder):
     if env.TargetOSIs("darwin"):
         base_action.list.extend([
             SCons.Action.Action(
-                "$DSYMUTIL -num-threads 1 $TARGET -o ${TARGET}.dSYM",
+                "$DSYMUTIL -num-threads 1 $TARGET -o ${TARGET}$SEPDBG_SUFFIX",
                 "$DSYMUTILCOMSTR",
             ),
             SCons.Action.Action(
@@ -70,11 +70,11 @@ def _update_builder(env, builder):
     elif env.TargetOSIs("posix"):
         base_action.list.extend([
             SCons.Action.Action(
-                "$OBJCOPY --only-keep-debug $TARGET ${TARGET}.debug",
+                "$OBJCOPY --only-keep-debug $TARGET ${TARGET}$SEPDBG_SUFFIX",
                 "$OBJCOPY_ONLY_KEEP_DEBUG_COMSTR",
             ),
             SCons.Action.Action(
-                "$OBJCOPY --strip-debug --add-gnu-debuglink ${TARGET}.debug ${TARGET}",
+                "$OBJCOPY --strip-debug --add-gnu-debuglink ${TARGET}$SEPDBG_SUFFIX ${TARGET}",
                 "$DEBUGSTRIPCOMSTR",
             ),
         ])
@@ -118,7 +118,7 @@ def _update_builder(env, builder):
             debug_files.extend([plist_file, dwarf_file])
 
         elif env.TargetOSIs("posix"):
-            debug_file = env.File(str(target[0]) + ".debug")
+            debug_file = env.File(f"{target[0]}$SEPDBG_SUFFIX")
             debug_files.append(debug_file)
         elif env.TargetOSIs("windows"):
             debug_file = env.File(env.subst("${PDB}", target=target))
@@ -154,6 +154,8 @@ def generate(env):
 
     if env.TargetOSIs("darwin"):
 
+        env['SEPDBG_SUFFIX'] = '.dSYM'
+
         if env.get("DSYMUTIL", None) is None:
             env["DSYMUTIL"] = env.WhereIs("dsymutil")
 
@@ -167,15 +169,16 @@ def generate(env):
             )
 
     elif env.TargetOSIs("posix"):
+        env['SEPDBG_SUFFIX'] = env.get('SEPDBG_SUFFIX', '.debug')
         if env.get("OBJCOPY", None) is None:
             env["OBJCOPY"] = env.Whereis("objcopy")
 
         if not env.Verbose():
             env.Append(
                 OBJCOPY_ONLY_KEEP_DEBUG_COMSTR=
-                "Generating debug info for $TARGET into ${TARGET}.dSYM",
+                "Generating debug info for $TARGET into ${TARGET}${SEPDBG_SUFFIX}",
                 DEBUGSTRIPCOMSTR=
-                "Stripping debug info from ${TARGET} and adding .gnu.debuglink to ${TARGET}.debug",
+                "Stripping debug info from ${TARGET} and adding .gnu.debuglink to ${TARGET}${SEPDBG_SUFFIX}",
             )
 
     for builder in ["Program", "SharedLibrary", "LoadableModule"]:

@@ -525,7 +525,7 @@ env.Library(
 env.CppUnitTest(
     target='db_pipeline_test',
     source=[
-        'abt/pipeline_test.cpp',
+        'abt/abt_pipeline_test.cpp',
         'accumulator_js_test.cpp' if get_option('js-engine') != 'none' else [],
         'accumulator_test.cpp',
         'aggregation_request_test.cpp',

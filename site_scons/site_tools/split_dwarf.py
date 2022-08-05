@@ -20,6 +20,8 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+import os
+
 import SCons
 
 _splitDwarfFlag = "-gsplit-dwarf"
@@ -41,35 +43,79 @@ def _dwo_emitter(target, source, env):
         base, ext = SCons.Util.splitext(str(t))
         if not any(ext == env[osuffix] for osuffix in ["OBJSUFFIX", "SHOBJSUFFIX"]):
             continue
-        # TODO: Move 'dwo' into DWOSUFFIX so it can be customized? For
-        # now, GCC doesn't let you control the output filename, so it
-        # doesn't matter.
-        dwotarget = (t.builder.target_factory or env.File)(base + ".dwo")
+        dwotarget = (t.builder.target_factory or env.File)(base + env['DWOSUFFIX'])
         new_targets.append(dwotarget)
     targets = target + new_targets
     return (targets, source)
 
 
+def _dwp_emitter(target, source, env):
+    if "conftest" not in str(target[0]) and env.get('SPLIT_DWARF_DWP_FILES'):
+
+        # Check if the information regarding where the dwo files is located are stored in
+        # the binary or a separate debug file.
+        if len(target) > 1 and os.path.splitext(str(target[1]))[1] == env.get('SEPDBG_SUFFIX'):
+            target_file = target[1]
+        else:
+            target_file = target[0]
+
+        dwp_file = env.DWP(
+            target=env.File(os.path.splitext(target_file.name)[0] + env['DWPSUFFIX']),
+            source=target_file,
+        )
+        env.NoCache(dwp_file)
+
+        if hasattr(env, "AutoInstall") and env.get("AIB_COMPONENT"):
+            env.AutoInstall(
+                "$PREFIX_BINDIR",
+                dwp_file,
+                AIB_COMPONENT=env.get("AIB_COMPONENT"),
+                AIB_ROLE="debug",
+                AIB_EXTRA_COMPONENTS=env.get("AIB_EXTRA_COMPONENTS", []),
+            )
+
+    return target, source
+
+
+def options(opts):
+    opts.AddVariables(
+        ('DWP', "Path to dwp binary."),
+        ("SPLIT_DWARF_DWP_FILES", "Set to enable DWP file creation from split dwarf."),
+    )
+
+
 def generate(env):
-    suffixes = []
-    if _splitDwarfFlag in env["CCFLAGS"]:
-        suffixes = _CSuffixes + _CXXSuffixes
-    else:
-        if _splitDwarfFlag in env["CFLAGS"]:
-            suffixes.extend(_CSuffixes)
-        if _splitDwarfFlag in env["CXXFLAGS"]:
-            suffixes.extend(_CXXSuffixes)
+
+    # these suffixes are not adjustable to the underlying tools (gcc)
+    # but we leave them adjustable in scons in case this changes in certain circumstances
+    env['DWOSUFFIX'] = env.get('DWOSUFFIX', '.dwo')
+    env['DWPSUFFIX'] = env.get('DWPSUFFIX', '.dwp')
+
+    env.Append(CCFLAGS=[_splitDwarfFlag])
 
     for object_builder in SCons.Tool.createObjBuilders(env):
         emitterdict = object_builder.builder.emitter
         for suffix in emitterdict.keys():
-            if not suffix in suffixes:
+            if not suffix in _CSuffixes + _CXXSuffixes:
                 continue
             base = emitterdict[suffix]
             emitterdict[suffix] = SCons.Builder.ListEmitter([
                 base,
                 _dwo_emitter,
             ])
+
+    for builder in ["Program"]:
+        builder = env["BUILDERS"][builder]
+        base_emitter = builder.emitter
+        new_emitter = SCons.Builder.ListEmitter([base_emitter, _dwp_emitter])
+        builder.emitter = new_emitter
+
+    env['DWP'] = env.get('DWP', 'dwp')
+    env['BUILDERS']['DWP'] = SCons.Builder.Builder(
+        action=SCons.Action.Action(
+            "$DWP -e $SOURCE -o $TARGET",
+            "Building dwp file from $SOURCE" if not env.Verbose() else "",
+        ))
 
 
 def exists(env):

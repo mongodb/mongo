@@ -24,6 +24,8 @@ import os
 
 import SCons
 
+from SCons.Node.Alias import default_ans
+
 import auto_install_binaries
 
 _proof_scanner_cache_key = "proof_scanner_cache"
@@ -104,12 +106,12 @@ def generate_test_execution_aliases(env, test):
         if target_name == source_name:
             continue
 
-        alias = env.Alias(f'+{source_name}', verbose_source_command)
-        if len(alias[0].children()) > 1:
+        if default_ans.lookup(f'+{source_name}') is not None:
             raise SCons.Errors.BuildError(
-                alias[0].children()[0],
-                f"Multiple unit test programs contain a source file named '{source_name}' which would result in an ambiguous test execution alias. Unit test source filenames are required to be globally unique."
+                str(verbose_source_command[0]),
+                f"There exists multiple unittests with a source file named {source_name}: {source.abspath} and {env.Alias(f'+{source_name}')[0].children()[1].abspath}"
             )
+        env.Alias(f'+{source_name}', [verbose_source_command, source])
 
     proof_generator_command = test_env.Command(
         target=[

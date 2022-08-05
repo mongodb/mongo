@@ -803,6 +803,16 @@ except ValueError as e:
     Exit(1)
 
 
+def to_boolean(s):
+    if isinstance(s, bool):
+        return s
+    elif s.lower() in ('1', "on", "true", "yes"):
+        return True
+    elif s.lower() in ('0', "off", "false", "no"):
+        return False
+    raise ValueError(f'Invalid value {s}, must be a boolean-like string')
+
+
 # Setup the command-line variables
 def variable_shlex_converter(val):
     # If the argument is something other than a string, propagate
@@ -834,6 +844,16 @@ def variable_arch_converter(val):
 
     # Return whatever val is passed in - hopefully it's legit
     return val
+
+
+def split_dwarf_converter(val):
+    try:
+        return to_boolean(val)
+    except ValueError as exc:
+        if val.lower() != "auto":
+            raise ValueError(
+                f'Invalid SPLIT_DWARF value {s}, must be a boolean-like string or "auto"') from exc
+    return "auto"
 
 
 # The Scons 'default' tool enables a lot of tools that we don't actually need to enable.
@@ -1312,6 +1332,11 @@ env_vars.Add(
 )
 
 env_vars.Add(
+    'SPLIT_DWARF',
+    help='Set the boolean (auto, on/off true/false 1/0) to enable gsplit-dwarf (non-Windows).',
+    converter=split_dwarf_converter, default="auto")
+
+env_vars.Add(
     'TAPI',
     help="Configures the path to the 'tapi' (an Xcode) utility",
 )
@@ -1367,6 +1392,12 @@ env_vars.AddVariables(
     ("BUILD_METRICS_EVG_TASK_ID", "Evergreen task ID to add to build metrics data."),
     ("BUILD_METRICS_EVG_BUILD_VARIANT", "Evergreen build variant to add to build metrics data."),
 )
+for tool in ['build_metrics', 'split_dwarf']:
+    try:
+        Tool(tool).options(env_vars)
+    except ImportError as exc:
+        print(f"Failed import while loading options for tool: {tool}\n{exc}")
+        pass
 
 # -- Validate user provided options --
 
@@ -1591,17 +1622,6 @@ def conf_error(env, msg, *args):
 
 env.AddMethod(fatal_error, 'FatalError')
 env.AddMethod(conf_error, 'ConfError')
-
-
-def to_boolean(s):
-    if isinstance(s, bool):
-        return s
-    elif s.lower() in ('1', "on", "true", "yes"):
-        return True
-    elif s.lower() in ('0', "off", "false", "no"):
-        return False
-    raise ValueError(f'Invalid value {s}, must be a boolean-like string')
-
 
 # Normalize the VERBOSE Option, and make its value available as a
 # function.
@@ -1924,11 +1944,6 @@ if link_model == 'dynamic' and env.TargetOSIs(
             textwrap.dedent(f"""\
             Failed to detect macos version: {exc}
             """) + macos_version_message)
-
-# TODO: SERVER-68475
-# temp fix for BF-25986, should be removed when better solution is found
-if env.ToolchainIs('gcc') and not link_model == "dynamic":
-    env.Append(CCFLAGS=['-gsplit-dwarf'])
 
 # libunwind configuration.
 # In which the following globals are set and normalized to bool:
@@ -5458,6 +5473,14 @@ if get_option('separate-debug') == "on" or env.TargetOSIs("windows"):
         )
     separate_debug(env)
 
+# TODO: SERVER-68475
+# temp fix for BF-25986, should be removed when better solution is found
+if env['SPLIT_DWARF'] == "auto":
+    env['SPLIT_DWARF'] = env.ToolchainIs('gcc') and not link_model == "dynamic"
+
+if env['SPLIT_DWARF']:
+    env.Tool('split_dwarf')
+
 env["AUTO_ARCHIVE_TARBALL_SUFFIX"] = "tgz"
 
 env["AIB_META_COMPONENT"] = "all"
@@ -5669,12 +5692,6 @@ elif env['PLATFORM'] == 'darwin':
     )
 
 env.Default(env.Alias("install-default"))
-
-# If the flags in the environment are configured for -gsplit-dwarf,
-# inject the necessary emitter.
-split_dwarf = Tool('split_dwarf')
-if split_dwarf.exists(env):
-    split_dwarf(env)
 
 # Load the compilation_db tool. We want to do this after configure so we don't end up with
 # compilation database entries for the configure tests, which is weird.
