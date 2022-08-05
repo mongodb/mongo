@@ -218,28 +218,6 @@ TEST_F(RangeDeleterServiceTest, DelayForSecondaryQueriesIsHonored) {
     ASSERT(elapsed >= Milliseconds(2000));
 }
 
-TEST_F(RangeDeleterServiceTest, TaskWaitingForOngoingQueriesInvalidatedOnStepDown) {
-    auto rds = RangeDeleterService::get(opCtx);
-
-    auto taskWithOngoingQueries = createRangeDeletionTaskWithOngoingQueries(
-        uuidCollA, BSON("a" << 0), BSON("a" << 10), CleanWhenEnum::kDelayed);
-
-    auto completionFuture = rds->registerTask(taskWithOngoingQueries.getTask(),
-                                              taskWithOngoingQueries.getOngoingQueriesFuture());
-
-    // Manually trigger disabling of the service
-    rds->onStepDown();
-    ON_BLOCK_EXIT([&] {
-        rds->onStepUpComplete(opCtx, 0L);  // Re-enable the service
-    });
-
-    try {
-        completionFuture.get(opCtx);
-    } catch (const ExceptionForCat<ErrorCategory::CancellationError>&) {
-        // Expect a cancellation error when the service gets disabled
-    }
-}
-
 TEST_F(RangeDeleterServiceTest, ScheduledTaskInvalidatedOnStepDown) {
     auto rds = RangeDeleterService::get(opCtx);
 
