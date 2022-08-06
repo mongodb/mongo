@@ -32,6 +32,7 @@
 #include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
+#include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/utils/interval_utils.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -1011,9 +1012,23 @@ CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
                                            const ProjectionName& scanProjectionName,
                                            const PartialSchemaRequirements& reqMap,
                                            const ScanDefinition& scanDef,
+                                           const bool fastNullHandling,
                                            bool& hasEmptyInterval) {
     CandidateIndexMap result;
     hasEmptyInterval = false;
+
+    // Contains one instance for each unmatched key.
+    PartialSchemaKeySet unsatisfiedKeysInitial;
+    for (const auto& [key, req] : reqMap) {
+        unsatisfiedKeysInitial.insert(key);
+
+        if (!fastNullHandling && req.hasBoundProjectionName() &&
+            checkMaybeHasNull(req.getIntervals())) {
+            // We cannot use indexes to return values for fields if we have an interval with null
+            // bounds.
+            return {};
+        }
+    }
 
     for (const auto& [indexDefName, indexDef] : scanDef.getIndexDefs()) {
         FieldProjectionMap indexProjectionMap;
@@ -1023,12 +1038,7 @@ CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
         ResidualKeyMap residualKeyMap;
         opt::unordered_set<size_t> fieldsToCollate;
         size_t intervalPrefixSize = 0;
-
-        // Contains one instance for each unmatched key.
-        PartialSchemaKeySet unsatisfiedKeys;
-        for (const auto& [key, req] : reqMap) {
-            unsatisfiedKeys.insert(key);
-        }
+        PartialSchemaKeySet unsatisfiedKeys = unsatisfiedKeysInitial;
 
         // True if the paths from partial schema requirements form a strict prefix of the index
         // collation.
@@ -1163,6 +1173,60 @@ CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
     return result;
 }
 
+/**
+ * Transport that checks if we have a primitive interval which may contain null.
+ */
+class PartialSchemaReqMayContainNullTransport {
+public:
+    bool transport(const IntervalReqExpr::Atom& node) {
+        const auto& interval = node.getExpr();
+
+        if (const auto& lowBound = interval.getLowBound();
+            foldFn(make<BinaryOp>(lowBound.isInclusive() ? Operations::Gt : Operations::Gte,
+                                  lowBound.getBound(),
+                                  Constant::null())) == Constant::boolean(true)) {
+            // Lower bound is strictly larger than null, or equal to null but not inclusive.
+            return false;
+        }
+        if (const auto& highBound = interval.getHighBound();
+            foldFn(make<BinaryOp>(highBound.isInclusive() ? Operations::Lt : Operations::Lte,
+                                  highBound.getBound(),
+                                  Constant::null())) == Constant::boolean(true)) {
+            // Upper bound is strictly smaller than null, or equal to null but not inclusive.
+            return false;
+        }
+
+        return true;
+    }
+
+    bool transport(const IntervalReqExpr::Conjunction& node, std::vector<bool> childResults) {
+        return std::all_of(
+            childResults.cbegin(), childResults.cend(), [](const bool v) { return v; });
+    }
+
+    bool transport(const IntervalReqExpr::Disjunction& node, std::vector<bool> childResults) {
+        return std::any_of(
+            childResults.cbegin(), childResults.cend(), [](const bool v) { return v; });
+    }
+
+    bool check(const IntervalReqExpr::Node& intervals) {
+        return algebra::transport<false>(intervals, *this);
+    }
+
+private:
+    ABT foldFn(ABT expr) {
+        // Performs constant folding.
+        VariableEnvironment env = VariableEnvironment::build(expr);
+        ConstEval instance(env);
+        instance.optimize(expr);
+        return expr;
+    };
+};
+
+bool checkMaybeHasNull(const IntervalReqExpr::Node& intervals) {
+    return PartialSchemaReqMayContainNullTransport{}.check(intervals);
+}
+
 class PartialSchemaReqLowerTransport {
 public:
     PartialSchemaReqLowerTransport(const bool hasBoundProjName)
@@ -1176,9 +1240,6 @@ public:
         if (interval.isEquality()) {
             if (auto constPtr = lowBound.getBound().cast<Constant>()) {
                 if (constPtr->isNull()) {
-                    uassert(6624163,
-                            "Cannot lower null index bound with bound projection",
-                            !_hasBoundProjName);
                     return make<PathComposeA>(make<PathDefault>(Constant::boolean(true)),
                                               make<PathCompare>(Operations::Eq, Constant::null()));
                 }

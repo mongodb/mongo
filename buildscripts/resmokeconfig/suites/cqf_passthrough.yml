@@ -23,8 +23,8 @@ selector:
   - jstests/core/show_record_id.js
   # TODO SERVER-68512
   - jstests/core/collation_with_reverse_index.js
-  # TODO SERVER-67548 Fix equality to null with indexes.
-  - jstests/core/cover_null_queries.js
+  # TODO SERVER-23229 on classic which is fixed by SERVER-67548 in CQF.
+  - jstests/aggregation/bugs/groupMissing.js
   - jstests/core/null_query_semantics.js
   # TODO SERVER-62407 translate to ABT directly from find.
   - jstests/core/currentop_cursors.js

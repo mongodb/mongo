@@ -69,6 +69,10 @@ coll.drop();
  * Test a descending index with range predicates, ensuring that the index plan is chosen.
  */
 assert.commandWorked(coll.insertOne({a: 1, b: 1}));
+for (let i = 0; i < 100; i++) {
+    assert.commandWorked(coll.insert({a: i + 2, b: i + 2}));
+}
+
 assert.commandWorked(coll.createIndex({a: -1, b: -1}));
 
 query = [{a: 1}, {_id: 0, a: 1, b: 1}];
@@ -77,5 +81,6 @@ res = coll.find(...query).toArray();
 assert.eq(res.length, 1);
 
 explain = coll.explain("executionStats").find(...query).finish();
-assert.eq("IndexScan", explain.queryPlanner.winningPlan.optimizerPlan.child.child.nodeType);
+assert.eq("IndexScan",
+          explain.queryPlanner.winningPlan.optimizerPlan.child.child.leftChild.nodeType);
 }());

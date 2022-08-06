@@ -1005,9 +1005,9 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const IndexScanNode& n, co
 
     auto lowerBoundExpr = convertBoundsToExpr(true /*isLower*/, indexDef, interval);
     auto upperBoundExpr = convertBoundsToExpr(false /*isLower*/, indexDef, interval);
-    const bool hasLowerBound = lowerBoundExpr != nullptr;
-    const bool hasUpperBound = upperBoundExpr != nullptr;
-    uassert(6624234, "Invalid bounds combination", hasLowerBound || !hasUpperBound);
+    uassert(6624234,
+            "Invalid bounds combination",
+            lowerBoundExpr != nullptr || upperBoundExpr == nullptr);
 
     const PlanNodeId planNodeId = _nodeToGroupPropsMap.at(&n)._planNodeId;
 

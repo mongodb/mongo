@@ -58,7 +58,11 @@ public:
      */
     using RewriteSet = opt::unordered_map<LogicalRewriteType, double>;
 
-    LogicalRewriter(Memo& memo, PrefixId& prefixId, RewriteSet rewriteSet, bool useHeuristicCE);
+    LogicalRewriter(Memo& memo,
+                    PrefixId& prefixId,
+                    RewriteSet rewriteSet,
+                    const QueryHints& hints,
+                    bool useHeuristicCE);
 
     LogicalRewriter() = delete;
     LogicalRewriter(const LogicalRewriter& other) = delete;
@@ -117,6 +121,7 @@ private:
     // We don't own those:
     Memo& _memo;
     PrefixId& _prefixId;
+    const QueryHints& _hints;
 
     RewriteFnMap _rewriteMap;
 

@@ -235,6 +235,7 @@ static QueryHints getHintsFromQueryKnobs() {
         internalCascadesOptimizerDisableGroupByAndUnionRIDIntersect.load();
     hints._keepRejectedPlans = internalCascadesOptimizerKeepRejectedPlans.load();
     hints._disableBranchAndBound = internalCascadesOptimizerDisableBranchAndBound.load();
+    hints._fastIndexNullHandling = internalCascadesOptimizerFastIndexNullHandling.load();
 
     return hints;
 }

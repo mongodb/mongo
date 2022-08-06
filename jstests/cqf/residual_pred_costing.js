@@ -24,12 +24,22 @@ assert.commandWorked(t.createIndex({a: 1, b: 1, c: 1, d: 1}));
 assert.commandWorked(t.createIndex({a: 1, b: 1, d: 1}));
 assert.commandWorked(t.createIndex({a: 1, d: 1}));
 
-let res = t.explain("executionStats")
-              .aggregate([{$match: {a: {$eq: 0}, b: {$eq: 0}, c: {$eq: 0}}}, {$sort: {d: 1}}]);
-assert.eq(nDocs * 0.1, res.executionStats.nReturned);
+try {
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalCascadesOptimizerFastIndexNullHandling: true}));
 
-// Demonstrate we can pick the indexing covering most fields.
-const indexNode = res.queryPlanner.winningPlan.optimizerPlan.child.leftChild;
-assert.eq("IndexScan", indexNode.nodeType);
-assert.eq("a_1_b_1_c_1_d_1", indexNode.indexDefName);
+    const res = t.explain("executionStats").aggregate([
+        {$match: {a: {$eq: 0}, b: {$eq: 0}, c: {$eq: 0}}},
+        {$sort: {d: 1}}
+    ]);
+    assert.eq(nDocs * 0.1, res.executionStats.nReturned);
+
+    // Demonstrate we can pick the indexing covering most fields.
+    const indexNode = res.queryPlanner.winningPlan.optimizerPlan.child.leftChild;
+    assert.eq("IndexScan", indexNode.nodeType);
+    assert.eq("a_1_b_1_c_1_d_1", indexNode.indexDefName);
+} finally {
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalCascadesOptimizerFastIndexNullHandling: false}));
+}
 }());

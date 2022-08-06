@@ -79,11 +79,13 @@ LogicalRewriter::RewriteSet LogicalRewriter::_substitutionSet = {
 LogicalRewriter::LogicalRewriter(Memo& memo,
                                  PrefixId& prefixId,
                                  const RewriteSet rewriteSet,
+                                 const QueryHints& hints,
                                  const bool useHeuristicCE)
     : _activeRewriteSet(std::move(rewriteSet)),
       _groupsPending(),
       _memo(memo),
       _prefixId(prefixId),
+      _hints(hints),
       _useHeuristicCE(useHeuristicCE) {
     initializeRewrites();
 
@@ -180,6 +182,10 @@ public:
 
     PrefixId& getPrefixId() const {
         return _rewriter._prefixId;
+    }
+
+    const QueryHints& getHints() const {
+        return _rewriter._hints;
     }
 
     auto& getIndexFieldPrefixMap() const {
@@ -567,8 +573,12 @@ static boost::optional<ABT> mergeSargableNodes(
 
     const ScanDefinition& scanDef =
         ctx.getMetadata()._scanDefs.at(indexingAvailability.getScanDefName());
-    auto candidateIndexMap = computeCandidateIndexMap(
-        ctx.getPrefixId(), scanProjName, mergedReqs, scanDef, hasEmptyInterval);
+    auto candidateIndexMap = computeCandidateIndexMap(ctx.getPrefixId(),
+                                                      scanProjName,
+                                                      mergedReqs,
+                                                      scanDef,
+                                                      ctx.getHints()._fastIndexNullHandling,
+                                                      hasEmptyInterval);
     if (hasEmptyInterval) {
         return createEmptyValueScanNode(ctx);
     }
@@ -700,8 +710,12 @@ static void convertFilterToSargableNode(ABT::reference_type node,
         return;
     }
 
-    auto candidateIndexMap = computeCandidateIndexMap(
-        ctx.getPrefixId(), scanProjName, conversion->_reqMap, scanDef, hasEmptyInterval);
+    auto candidateIndexMap = computeCandidateIndexMap(ctx.getPrefixId(),
+                                                      scanProjName,
+                                                      conversion->_reqMap,
+                                                      scanDef,
+                                                      ctx.getHints()._fastIndexNullHandling,
+                                                      hasEmptyInterval);
 
     if (hasEmptyInterval) {
         addEmptyValueScanNode(ctx);
@@ -880,8 +894,12 @@ struct SubstituteConvert<EvaluationNode> {
         }
 
         bool hasEmptyInterval = false;
-        auto candidateIndexMap = computeCandidateIndexMap(
-            ctx.getPrefixId(), scanProjName, conversion->_reqMap, scanDef, hasEmptyInterval);
+        auto candidateIndexMap = computeCandidateIndexMap(ctx.getPrefixId(),
+                                                          scanProjName,
+                                                          conversion->_reqMap,
+                                                          scanDef,
+                                                          ctx.getHints()._fastIndexNullHandling,
+                                                          hasEmptyInterval);
 
         if (hasEmptyInterval) {
             addEmptyValueScanNode(ctx);
@@ -957,6 +975,30 @@ struct ExploreConvert<SargableNode> {
         const bool indexFieldMapHasScanDef = indexFieldPrefixMapIt != indexFieldPrefixMap.cend();
 
         const auto& reqMap = sargableNode.getReqMap();
+
+        const bool fastIndexNullHandling = ctx.getHints()._fastIndexNullHandling;
+        std::vector<bool> isFullyOpen;
+        std::vector<bool> maybeHasNullAndBinds;
+        {
+            // Pre-compute if a requirement's interval is fully open.
+            isFullyOpen.reserve(reqMap.size());
+            for (const auto& [key, req] : reqMap) {
+                isFullyOpen.push_back(isIntervalReqFullyOpenDNF(req.getIntervals()));
+            }
+
+            if (!fastIndexNullHandling && !isIndex) {
+                // Pre-compute if needed if a requirement's interval may contain nulls, and also has
+                // an output binding.
+                maybeHasNullAndBinds.reserve(reqMap.size());
+                for (const auto& [key, req] : reqMap) {
+                    maybeHasNullAndBinds.push_back(req.hasBoundProjectionName() &&
+                                                   checkMaybeHasNull(req.getIntervals()));
+                }
+            }
+        }
+
+        // We iterate over the possible ways to split N predicates into 2^N subsets, one goes to the
+        // left, and the other to the right side.
         const size_t reqSize = reqMap.size();
         const size_t highMask = isIndex ? (1ull << (reqSize - 1)) : (1ull << reqSize);
         for (size_t mask = 1; mask < highMask; mask++) {
@@ -968,21 +1010,43 @@ struct ExploreConvert<SargableNode> {
 
             size_t index = 0;
             for (const auto& [key, req] : reqMap) {
-                const bool fullyOpenInterval = isIntervalReqFullyOpenDNF(req.getIntervals());
+                const bool fullyOpenInterval = isFullyOpen.at(index);
 
                 if (((1ull << index) & mask) != 0) {
-                    leftReqs.emplace(key, req);
-
-                    if (!fullyOpenInterval) {
-                        hasLeftIntervals = true;
+                    bool addedToLeft = false;
+                    if (fastIndexNullHandling || isIndex) {
+                        leftReqs.emplace(key, req);
+                        addedToLeft = true;
+                    } else if (maybeHasNullAndBinds.at(index)) {
+                        // We cannot return index values if our interval can possibly contain Null.
+                        // Instead, we remove the output binding for the left side, and return the
+                        // value from the right (seek) side.
+                        if (!fullyOpenInterval) {
+                            leftReqs.emplace(key, PartialSchemaRequirement{"", req.getIntervals()});
+                            addedToLeft = true;
+                        }
+                        rightReqs.emplace(
+                            key,
+                            PartialSchemaRequirement{req.getBoundProjectionName(),
+                                                     IntervalReqExpr::makeSingularDNF()});
+                    } else {
+                        leftReqs.emplace(key, req);
+                        addedToLeft = true;
                     }
-                    if (indexFieldMapHasScanDef) {
-                        if (auto pathPtr = key._path.cast<PathGet>(); pathPtr != nullptr &&
-                            indexFieldPrefixMapIt->second.count(pathPtr->name()) == 0) {
-                            // We have found a left requirement which cannot be covered with an
-                            // index.
-                            hasFieldCoverage = false;
-                            break;
+
+                    if (addedToLeft) {
+                        if (!fullyOpenInterval) {
+                            hasLeftIntervals = true;
+                        }
+
+                        if (indexFieldMapHasScanDef) {
+                            if (auto pathPtr = key._path.cast<PathGet>(); pathPtr != nullptr &&
+                                indexFieldPrefixMapIt->second.count(pathPtr->name()) == 0) {
+                                // We have found a left requirement which cannot be covered with an
+                                // index.
+                                hasFieldCoverage = false;
+                                break;
+                            }
                         }
                     }
                 } else {
@@ -995,6 +1059,12 @@ struct ExploreConvert<SargableNode> {
                 index++;
             }
 
+            if (leftReqs.empty()) {
+                // Can happen if we have intervals containing null.
+                invariant(!fastIndexNullHandling && !isIndex);
+                continue;
+            }
+
             if (isIndex && (!hasLeftIntervals || !hasRightIntervals)) {
                 // Reject. Must have at least one proper interval on either side.
                 continue;
@@ -1005,16 +1075,24 @@ struct ExploreConvert<SargableNode> {
             }
 
             bool hasEmptyLeftInterval = false;
-            auto leftCandidateIndexMap = computeCandidateIndexMap(
-                ctx.getPrefixId(), scanProjectionName, leftReqs, scanDef, hasEmptyLeftInterval);
+            auto leftCandidateIndexMap = computeCandidateIndexMap(ctx.getPrefixId(),
+                                                                  scanProjectionName,
+                                                                  leftReqs,
+                                                                  scanDef,
+                                                                  fastIndexNullHandling,
+                                                                  hasEmptyLeftInterval);
             if (isIndex && leftCandidateIndexMap.empty()) {
                 // Reject rewrite.
                 continue;
             }
 
             bool hasEmptyRightInterval = false;
-            auto rightCandidateIndexMap = computeCandidateIndexMap(
-                ctx.getPrefixId(), scanProjectionName, rightReqs, scanDef, hasEmptyRightInterval);
+            auto rightCandidateIndexMap = computeCandidateIndexMap(ctx.getPrefixId(),
+                                                                   scanProjectionName,
+                                                                   rightReqs,
+                                                                   scanDef,
+                                                                   fastIndexNullHandling,
+                                                                   hasEmptyRightInterval);
             if (isIndex && rightCandidateIndexMap.empty()) {
                 // With empty candidate map, reject only if we cannot implement as Seek.
                 continue;

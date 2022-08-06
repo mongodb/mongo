@@ -347,6 +347,7 @@ public:
         // via a physical scan even in the absence of indexes.
 
         const IndexingRequirement& requirements = getPropertyConst<IndexingRequirement>(_physProps);
+        const CandidateIndexMap& candidateIndexMap = node.getCandidateIndexMap();
         const IndexReqTarget indexReqTarget = requirements.getIndexReqTarget();
         switch (indexReqTarget) {
             case IndexReqTarget::Complete:
@@ -356,6 +357,11 @@ public:
                 break;
 
             case IndexReqTarget::Index:
+                if (candidateIndexMap.empty()) {
+                    return;
+                }
+                [[fallthrough]];
+
             case IndexReqTarget::Seek:
                 if (_hints._disableIndexes == DisableIndexOptions::DisableAll) {
                     return;
@@ -438,7 +444,7 @@ public:
 
             // Consider all candidate indexes, and check if they satisfy the collation and
             // distribution requirements.
-            for (const auto& [indexDefName, candidateIndexEntry] : node.getCandidateIndexMap()) {
+            for (const auto& [indexDefName, candidateIndexEntry] : candidateIndexMap) {
                 const auto& indexDef = scanDef.getIndexDefs().at(indexDefName);
                 if (!indexDef.getPartialReqMap().empty() &&
                     (_hints._disableIndexes == DisableIndexOptions::DisablePartialOnly ||

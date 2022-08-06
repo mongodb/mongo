@@ -28,47 +28,51 @@ coll.insertMany([
 ]);
 
 const nDocs = 20;
+try {
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalCascadesOptimizerFastIndexNullHandling: true}));
 
-var pln0 = [{'$project': {_id: 0, f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}}];
+    {
+        // Covered plan. Also an index scan on all fields is cheaper than a collection scan.
+        const res = coll.explain("executionStats").aggregate([
+            {'$project': {_id: 0, f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}}
+        ]);
+        assert.eq(nDocs, res.executionStats.nReturned);
+        assert.eq("IndexScan", res.queryPlanner.winningPlan.optimizerPlan.child.child.nodeType);
+    }
 
-var pln1 = [{'$sort': {f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}}];
+    {
+        // We need to fetch since we do not restrict the set of output fields.
+        const res = coll.explain("executionStats").aggregate([
+            {'$sort': {f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}}
+        ]);
+        assert.eq(nDocs, res.executionStats.nReturned);
+        assert.eq("Seek",
+                  res.queryPlanner.winningPlan.optimizerPlan.child.rightChild.child.nodeType);
+        assert.eq("IndexScan", res.queryPlanner.winningPlan.optimizerPlan.child.leftChild.nodeType);
+    }
 
-var pln2 = [
-    {'$project': {_id: 0, f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}},
-    {'$sort': {f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}}
-];
+    {
+        // Covered plan.
+        const res = coll.explain("executionStats").aggregate([
+            {'$project': {_id: 0, f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}},
+            {'$sort': {f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}}
+        ]);
+        assert.eq(nDocs, res.executionStats.nReturned);
+        assert.eq("IndexScan", res.queryPlanner.winningPlan.optimizerPlan.child.child.nodeType);
+    }
 
-var pln3 = [
-    {'$sort': {f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}},
-    {'$project': {_id: 0, f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}}
-];
-
-{
-    // Covered plan. Still chooses collection scan because there is no field size/count statistics.
-    // Also an index scan on all fields is not cheaper than a collection scan.
-    let res = coll.explain("executionStats").aggregate(pln0);
-    assert.eq(nDocs, res.executionStats.nReturned);
-    assert.eq("IndexScan", res.queryPlanner.winningPlan.optimizerPlan.child.child.nodeType);
-}
-
-{
-    // Covered plan.
-    let res = coll.explain("executionStats").aggregate(pln1);
-    assert.eq(nDocs, res.executionStats.nReturned);
-    assert.eq("IndexScan", res.queryPlanner.winningPlan.optimizerPlan.child.leftChild.nodeType);
-}
-
-{
-    // Covered plan.
-    let res = coll.explain("executionStats").aggregate(pln2);
-    assert.eq(nDocs, res.executionStats.nReturned);
-    assert.eq("IndexScan", res.queryPlanner.winningPlan.optimizerPlan.child.child.nodeType);
-}
-
-{
-    // Covered plan.
-    let res = coll.explain("executionStats").aggregate(pln3);
-    assert.eq(nDocs, res.executionStats.nReturned);
-    assert.eq("IndexScan", res.queryPlanner.winningPlan.optimizerPlan.child.child.nodeType);
+    {
+        // Covered plan.
+        const res = coll.explain("executionStats").aggregate([
+            {'$sort': {f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}},
+            {'$project': {_id: 0, f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}}
+        ]);
+        assert.eq(nDocs, res.executionStats.nReturned);
+        assert.eq("IndexScan", res.queryPlanner.winningPlan.optimizerPlan.child.child.nodeType);
+    }
+} finally {
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalCascadesOptimizerFastIndexNullHandling: false}));
 }
 }());

@@ -144,11 +144,9 @@ bool OptPhaseManager::runMemoLogicalRewrite(const OptPhase phase,
     }
 
     _memo.clear();
-    logicalRewriter = std::make_unique<LogicalRewriter>(
-        _memo,
-        _prefixId,
-        rewriteSet,
-        phase == OptPhase::MemoSubstitutionPhase /* useHeuristicCE */);
+    const bool useHeuristicCE = phase == OptPhase::MemoSubstitutionPhase;
+    logicalRewriter =
+        std::make_unique<LogicalRewriter>(_memo, _prefixId, rewriteSet, _hints, useHeuristicCE);
     rootGroupId = logicalRewriter->addRootNode(input);
 
     if (runStandalone) {

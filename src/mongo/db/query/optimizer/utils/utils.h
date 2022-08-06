@@ -222,7 +222,14 @@ CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
                                            const ProjectionName& scanProjectionName,
                                            const PartialSchemaRequirements& reqMap,
                                            const ScanDefinition& scanDef,
+                                           bool fastNullHandling,
                                            bool& hasEmptyInterval);
+
+/**
+ * Checks if we have an interval tree which has at least one atomic interval which may include Null
+ * as an endpoint.
+ */
+bool checkMaybeHasNull(const IntervalReqExpr::Node& intervals);
 
 /**
  * Used to lower a Sargable node to a subtree consisting of functionally equivalent Filter and Eval
