@@ -304,13 +304,14 @@ NamespaceString CommandHelpers::parseNsCollectionRequired(const DatabaseName& db
     return nss;
 }
 
-NamespaceStringOrUUID CommandHelpers::parseNsOrUUID(StringData dbname, const BSONObj& cmdObj) {
+NamespaceStringOrUUID CommandHelpers::parseNsOrUUID(const DatabaseName& dbName,
+                                                    const BSONObj& cmdObj) {
     BSONElement first = cmdObj.firstElement();
     if (first.type() == BinData && first.binDataType() == BinDataType::newUUID) {
-        return {dbname.toString(), uassertStatusOK(UUID::parse(first))};
+        return {dbName, uassertStatusOK(UUID::parse(first))};
     } else {
         // Ensure collection identifier is not a Command
-        const NamespaceString nss(parseNsCollectionRequired(dbname, cmdObj));
+        const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid collection name specified '" << nss.ns(),
                 !(nss.ns().find('$') != std::string::npos && nss.ns() != "local.oplog.$main"));

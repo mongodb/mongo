@@ -277,7 +277,7 @@ public:
             uassertStatusOK(auth::checkAuthForFind(
                 authSession,
                 CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(
-                    opCtx, CommandHelpers::parseNsOrUUID(_dbName, _request.body)),
+                    opCtx, CommandHelpers::parseNsOrUUID({boost::none, _dbName}, _request.body)),
                 hasTerm));
         }
 
@@ -462,7 +462,7 @@ public:
             // request into an aggregation command.
             boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
             ctx.emplace(opCtx,
-                        CommandHelpers::parseNsOrUUID(_dbName, _request.body),
+                        CommandHelpers::parseNsOrUUID({boost::none, _dbName}, _request.body),
                         AutoGetCollectionViewMode::kViewsPermitted);
             const auto& nss = ctx->getNss();
 

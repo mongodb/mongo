@@ -139,7 +139,7 @@ struct CommandHelpers {
     // DatabaseName.
     static NamespaceString parseNsCollectionRequired(StringData dbname, const BSONObj& cmdObj);
 
-    static NamespaceStringOrUUID parseNsOrUUID(StringData dbname, const BSONObj& cmdObj);
+    static NamespaceStringOrUUID parseNsOrUUID(const DatabaseName& dbName, const BSONObj& cmdObj);
 
     /**
      * Return the namespace for the command. If the first field in 'cmdObj' is of type

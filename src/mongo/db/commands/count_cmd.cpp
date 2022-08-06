@@ -134,10 +134,11 @@ public:
         }
 
         const auto hasTerm = false;
-        return auth::checkAuthForFind(authSession,
-                                      CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(
-                                          opCtx, CommandHelpers::parseNsOrUUID(dbname, cmdObj)),
-                                      hasTerm);
+        return auth::checkAuthForFind(
+            authSession,
+            CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(
+                opCtx, CommandHelpers::parseNsOrUUID({boost::none, dbname}, cmdObj)),
+            hasTerm);
     }
 
     Status explain(OperationContext* opCtx,
@@ -231,7 +232,7 @@ public:
         // of a view, the locks need to be released.
         boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
         ctx.emplace(opCtx,
-                    CommandHelpers::parseNsOrUUID(dbname, cmdObj),
+                    CommandHelpers::parseNsOrUUID({boost::none, dbname}, cmdObj),
                     AutoGetCollectionViewMode::kViewsPermitted);
         const auto& nss = ctx->getNss();
 
