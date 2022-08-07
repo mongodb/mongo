@@ -1549,7 +1549,6 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::getRecordStore(OperationContext
     params.overwrite = options.clusteredIndex ? false : true;
     params.isEphemeral = _ephemeral;
     params.isLogged = isLogged;
-    params.cappedCallback = nullptr;
     params.sizeStorer = _sizeStorer.get();
     params.tracksSizeAdjustments = true;
     params.forceUpdateWithFullDocument = options.timeseries != boost::none;
@@ -1745,7 +1744,6 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
     params.overwrite = true;
     params.isEphemeral = _ephemeral;
     params.isLogged = isLogged;
-    params.cappedCallback = nullptr;
     // Temporary collections do not need to persist size information to the size storer.
     params.sizeStorer = nullptr;
     // Temporary collections do not need to reconcile collection size/counts.

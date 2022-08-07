@@ -2054,7 +2054,7 @@ void establishOplogCollectionForLogging(OperationContext* opCtx, const Collectio
 void signalOplogWaiters() {
     const auto& oplog = LocalOplogInfo::get(getGlobalServiceContext())->getCollection();
     if (oplog) {
-        oplog->getCappedCallback()->notifyCappedWaitersIfNeeded();
+        oplog->getRecordStore()->getCappedInsertNotifier()->notifyAll();
     }
 }
 

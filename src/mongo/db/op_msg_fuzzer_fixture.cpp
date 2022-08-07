@@ -33,9 +33,7 @@
 
 #include "mongo/db/auth/authorization_session_for_test.h"
 #include "mongo/db/auth/authz_manager_external_state_local.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_impl.h"
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/database_holder_impl.h"
 #include "mongo/db/client.h"
 #include "mongo/db/index/index_access_method.h"

@@ -260,11 +260,9 @@ private:
 EphemeralForTestRecordStore::EphemeralForTestRecordStore(StringData ns,
                                                          StringData identName,
                                                          std::shared_ptr<void>* dataInOut,
-                                                         bool isCapped,
-                                                         CappedCallback* cappedCallback)
-    : RecordStore(ns, identName),
+                                                         bool isCapped)
+    : RecordStore(ns, identName, isCapped),
       _isCapped(isCapped),
-      _cappedCallback(cappedCallback),
       _data(*dataInOut ? static_cast<Data*>(dataInOut->get())
                        : new Data(ns, NamespaceString::oplog(ns))) {
     if (!*dataInOut) {
@@ -488,9 +486,11 @@ Status EphemeralForTestRecordStore::doTruncate(OperationContext* opCtx) {
     return Status::OK();
 }
 
-void EphemeralForTestRecordStore::doCappedTruncateAfter(OperationContext* opCtx,
-                                                        const RecordId& end,
-                                                        bool inclusive) {
+void EphemeralForTestRecordStore::doCappedTruncateAfter(
+    OperationContext* opCtx,
+    const RecordId& end,
+    bool inclusive,
+    const AboutToDeleteRecordCallback& aboutToDelete) {
     stdx::lock_guard<stdx::recursive_mutex> lock(_data->recordsMutex);
     Records::iterator it =
         inclusive ? _data->records.lower_bound(end) : _data->records.upper_bound(end);
@@ -498,8 +498,8 @@ void EphemeralForTestRecordStore::doCappedTruncateAfter(OperationContext* opCtx,
         auto& id = it->first;
         EphemeralForTestRecord record = it->second;
 
-        if (_cappedCallback) {
-            uassertStatusOK(_cappedCallback->aboutToDeleteCapped(opCtx, id, record.toRecordData()));
+        if (aboutToDelete) {
+            aboutToDelete(opCtx, id, record.toRecordData());
         }
 
         opCtx->recoveryUnit()->registerChange(

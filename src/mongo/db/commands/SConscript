@@ -431,7 +431,7 @@ env.Library(
 )
 
 env.Library(
-    target="shell_protocol",
+    target="test_commands",
     source=[
         "test_commands.cpp",
         "whats_my_uri_cmd.cpp",
@@ -610,10 +610,10 @@ env.Library(
         'set_feature_compatibility_version_idl',
         'set_index_commit_quorum_idl',
         'set_user_write_block_mode_idl',
-        'shell_protocol',
         'shutdown_idl',
         'standalone',
         'tenant_migration_cmds_request',
+        'test_commands',
         'test_commands_enabled',
         'txn_cmd_request',
     ],

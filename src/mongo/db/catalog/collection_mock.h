@@ -314,17 +314,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    CappedCallback* getCappedCallback() {
-        MONGO_UNREACHABLE;
-    }
-    const CappedCallback* getCappedCallback() const {
-        MONGO_UNREACHABLE;
-    }
-
-    std::shared_ptr<CappedInsertNotifier> getCappedInsertNotifier() const {
-        MONGO_UNREACHABLE;
-    }
-
     long long numRecords(OperationContext* opCtx) const {
         MONGO_UNREACHABLE;
     }
@@ -501,6 +490,14 @@ public:
 
     void replaceMetadata(OperationContext* opCtx,
                          std::shared_ptr<BSONCollectionCatalogEntry::MetaData> md) {
+        MONGO_UNREACHABLE;
+    }
+
+    bool needsCappedLock() const {
+        MONGO_UNREACHABLE;
+    }
+
+    bool isCappedAndNeedsDelete(OperationContext* opCtx) const {
         MONGO_UNREACHABLE;
     }
 

@@ -112,7 +112,6 @@ TEST(WiredTigerRecordStoreTest, SizeStorer1) {
         params.overwrite = true;
         params.isEphemeral = false;
         params.isLogged = false;
-        params.cappedCallback = nullptr;
         params.sizeStorer = &ss;
         params.tracksSizeAdjustments = true;
         params.forceUpdateWithFullDocument = false;

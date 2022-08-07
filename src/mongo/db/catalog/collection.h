@@ -50,25 +50,16 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
-#include "mongo/db/storage/capped_callback.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/yieldable.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
 
-class CappedCallback;
 class CollectionPtr;
-class IndexCatalog;
-class IndexCatalogEntry;
-class MatchExpression;
-class OpDebug;
-class OperationContext;
-class RecordCursor;
 
 /**
  * Holds information update an update operation.
@@ -99,59 +90,6 @@ struct CollectionUpdateArgs {
 
     // Set if OpTimes were reserved for the update ahead of time.
     std::vector<OplogSlot> oplogSlots;
-};
-
-/**
- * Queries with the awaitData option use this notifier object to wait for more data to be
- * inserted into the capped collection.
- */
-class CappedInsertNotifier {
-public:
-    /**
-     * Wakes up all threads waiting.
-     */
-    void notifyAll() const;
-
-    /**
-     * Waits until 'deadline', or until notifyAll() is called to indicate that new
-     * data is available in the capped collection.
-     *
-     * NOTE: Waiting threads can be signaled by calling kill or notify* methods.
-     */
-    void waitUntil(uint64_t prevVersion, Date_t deadline) const;
-
-    /**
-     * Returns the version for use as an additional wake condition when used above.
-     */
-    uint64_t getVersion() const {
-        return _version;
-    }
-
-    /**
-     * Cancels the notifier if the collection is dropped/invalidated, and wakes all waiting.
-     */
-    void kill();
-
-    /**
-     * Returns true if no new insert notification will occur.
-     */
-    bool isDead();
-
-private:
-    // Signalled when a successful insert is made into a capped collection.
-    mutable stdx::condition_variable _notifier;
-
-    // Mutex used with '_notifier'. Protects access to '_version'.
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("CappedInsertNotifier::_mutex");
-
-    // A counter, incremented on insertion of new data into the capped collection.
-    //
-    // The condition which '_cappedNewDataNotifier' is being notified of is an increment of this
-    // counter. Access to this counter is synchronized with '_mutex'.
-    mutable uint64_t _version = 0;
-
-    // True once the notifier is dead.
-    bool _dead = false;
 };
 
 /**
@@ -486,19 +424,6 @@ public:
     virtual Status truncate(OperationContext* opCtx) = 0;
 
     /**
-     * Truncate documents newer than the document at 'end' from the capped
-     * collection.  The collection cannot be completely emptied using this
-     * function.  An assertion will be thrown if that is attempted.
-     * @param inclusive - Truncate 'end' as well iff true
-     *
-     * The caller should hold a collection X lock and ensure there are no index builds in progress
-     * on the collection.
-     */
-    virtual void cappedTruncateAfter(OperationContext* opCtx,
-                                     const RecordId& end,
-                                     bool inclusive) const = 0;
-
-    /**
      * Returns a non-ok Status if validator is not legal for this collection.
      */
     virtual Validator parseValidator(OperationContext* opCtx,
@@ -730,6 +655,26 @@ public:
     virtual void replaceMetadata(OperationContext* opCtx,
                                  std::shared_ptr<BSONCollectionCatalogEntry::MetaData> md) = 0;
 
+    /**
+     * Specifies whether writes to this collection should X-lock the metadata resource. It is only
+     * set for replicated, non-clustered capped collections. Such collections require writes to be
+     * serialized on the secondary in order to guarantee insertion order (SERVER-21483). This
+     * exclusive access to the metadata resource prevents the primary from executing with more
+     * concurrency than secondaries - thus helping secondaries keep up, and protects the
+     * 'cappedFirstRecord' value for the collection. See SERVER-21646.
+     *
+     * On the other hand, capped clustered collections with a monotonically increasing cluster key
+     * natively guarantee preservation of the insertion order, and don't need serialisation, so we
+     * allow concurrent inserts for clustered capped collections.
+     */
+    virtual bool needsCappedLock() const = 0;
+
+    /**
+     * Checks whether the collection is capped and if the current data size or number of records
+     * exceeds cappedMaxSize or cappedMaxDocs respectively.
+     */
+    virtual bool isCappedAndNeedsDelete(OperationContext* opCtx) const = 0;
+
     //
     // Stats
     //
@@ -738,28 +683,12 @@ public:
     virtual long long getCappedMaxDocs() const = 0;
     virtual long long getCappedMaxSize() const = 0;
 
-    /**
-     * Returns a pointer to a capped callback object.
-     * The storage engine interacts with capped collections through a CappedCallback interface.
-     */
-    virtual CappedCallback* getCappedCallback() = 0;
-    virtual const CappedCallback* getCappedCallback() const = 0;
-
-    /**
-     * Get a pointer to a capped insert notifier object. The caller can wait on this object
-     * until it is notified of a new insert into the capped collection.
-     *
-     * It is invalid to call this method unless the collection is capped.
-     */
-    virtual std::shared_ptr<CappedInsertNotifier> getCappedInsertNotifier() const = 0;
-
     virtual long long numRecords(OperationContext* opCtx) const = 0;
 
     /**
      * Return uncompressed collection data size in bytes
      */
     virtual long long dataSize(OperationContext* opCtx) const = 0;
-
 
     /**
      * Returns true if the collection does not contain any records.
@@ -945,4 +874,5 @@ inline ValidationActionEnum validationActionOrDefault(
 inline ValidationLevelEnum validationLevelOrDefault(boost::optional<ValidationLevelEnum> level) {
     return level.value_or(ValidationLevelEnum::strict);
 }
+
 }  // namespace mongo

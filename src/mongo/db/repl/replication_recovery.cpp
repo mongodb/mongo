@@ -878,7 +878,8 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
                                                        truncateAfterOplogEntryTs);
         }
     }
-    oplogCollection->cappedTruncateAfter(opCtx, truncateAfterRecordId, /*inclusive*/ false);
+    oplogCollection->getRecordStore()->cappedTruncateAfter(
+        opCtx, truncateAfterRecordId, false /*inclusive*/, nullptr /* aboutToDelete callback */);
 
     LOGV2(21554,
           "Replication recovery oplog truncation finished in: {durationMillis}ms",

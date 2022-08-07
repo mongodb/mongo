@@ -27,11 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/db/catalog/capped_collection_maintenance.h"
 #include "mongo/db/storage/record_store_test_harness.h"
-
-#include "mongo/db/storage/record_store.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -175,7 +172,10 @@ TEST(RecordStoreTestHarness, SeekNearOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        rs->cappedTruncateAfter(opCtx.get(), RecordId(2, 2), false);  // no-op
+        rs->cappedTruncateAfter(opCtx.get(),
+                                RecordId(2, 2),
+                                false /* inclusive */,
+                                nullptr /* aboutToDelete callback */);  // no-op
     }
 
     {
@@ -188,7 +188,10 @@ TEST(RecordStoreTestHarness, SeekNearOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        rs->cappedTruncateAfter(opCtx.get(), RecordId(1, 2), false);  // deletes 2,2
+        rs->cappedTruncateAfter(opCtx.get(),
+                                RecordId(1, 2),
+                                false /* inclusive */,
+                                nullptr /* aboutToDelete callback */);  // deletes 2,2
     }
 
     {
@@ -201,7 +204,10 @@ TEST(RecordStoreTestHarness, SeekNearOplog) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        rs->cappedTruncateAfter(opCtx.get(), RecordId(1, 2), true);  // deletes 1,2
+        rs->cappedTruncateAfter(opCtx.get(),
+                                RecordId(1, 2),
+                                true /* inclusive */,
+                                nullptr /* aboutToDelete callback */);  // deletes 1,2
     }
 
     {
@@ -423,7 +429,8 @@ TEST(RecordStoreTestHarness, OplogOrder) {
     {
         auto client2 = harnessHelper->serviceContext()->makeClient("c2");
         auto opCtx = harnessHelper->newOperationContext(client2.get());
-        rs->cappedTruncateAfter(opCtx.get(), id1, /*inclusive*/ false);
+        rs->cappedTruncateAfter(
+            opCtx.get(), id1, false /* inclusive */, nullptr /* aboutToDelete callback */);
     }
 
     rs->waitForAllEarlierOplogWritesToBeVisible(harnessHelper->newOperationContext().get());

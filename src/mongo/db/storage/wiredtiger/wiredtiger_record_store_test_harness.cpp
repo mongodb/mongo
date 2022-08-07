@@ -95,7 +95,6 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     params.overwrite = collOptions.clusteredIndex ? false : true;
     params.isEphemeral = false;
     params.isLogged = WiredTigerUtil::useTableLogging(nss);
-    params.cappedCallback = nullptr;
     params.sizeStorer = nullptr;
     params.tracksSizeAdjustments = true;
     params.forceUpdateWithFullDocument = collOptions.timeseries != boost::none;
@@ -151,7 +150,6 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStoreNoInit(
     params.isLogged = true;
     // Large enough not to exceed capped limits.
     params.oplogMaxSize = 1024 * 1024 * 1024;
-    params.cappedCallback = nullptr;
     params.sizeStorer = nullptr;
     params.tracksSizeAdjustments = true;
     params.forceUpdateWithFullDocument = false;

@@ -87,7 +87,7 @@ std::shared_ptr<CappedInsertNotifier> getCappedInsertNotifier(OperationContext* 
     auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, nss);
     invariant(collection);
 
-    return collection->getCappedInsertNotifier();
+    return collection->getRecordStore()->getCappedInsertNotifier();
 }
 
 void waitForInserts(OperationContext* opCtx,

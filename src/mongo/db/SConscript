@@ -2388,7 +2388,7 @@ env.Library(
         'catalog/collection',
         'catalog/health_log',
         'commands/mongod',
-        'commands/shell_protocol',
+        'commands/test_commands',
         'concurrency/flow_control_ticketholder',
         'concurrency/lock_manager',
         'fle_crud_mongod',

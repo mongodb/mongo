@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
 #include <sstream>
 #include <string>
 #include <time.h>
@@ -600,7 +597,10 @@ TEST(WiredTigerRecordStoreTest, OplogStones_CappedTruncateAfter) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-        rs->cappedTruncateAfter(opCtx.get(), RecordId(1, 8), true);
+        rs->cappedTruncateAfter(opCtx.get(),
+                                RecordId(1, 8),
+                                true /* inclusive */,
+                                nullptr /* aboutToDelete callback */);
 
         ASSERT_EQ(7, rs->numRecords(opCtx.get()));
         ASSERT_EQ(2350, rs->dataSize(opCtx.get()));
@@ -614,7 +614,10 @@ TEST(WiredTigerRecordStoreTest, OplogStones_CappedTruncateAfter) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-        rs->cappedTruncateAfter(opCtx.get(), RecordId(1, 6), true);
+        rs->cappedTruncateAfter(opCtx.get(),
+                                RecordId(1, 6),
+                                true /* inclusive */,
+                                nullptr /* aboutToDelete callback */);
 
         ASSERT_EQ(5, rs->numRecords(opCtx.get()));
         ASSERT_EQ(1950, rs->dataSize(opCtx.get()));
@@ -628,7 +631,10 @@ TEST(WiredTigerRecordStoreTest, OplogStones_CappedTruncateAfter) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-        rs->cappedTruncateAfter(opCtx.get(), RecordId(1, 3), false);
+        rs->cappedTruncateAfter(opCtx.get(),
+                                RecordId(1, 3),
+                                false /* inclusive */,
+                                nullptr /* aboutToDelete callback */);
 
         ASSERT_EQ(3, rs->numRecords(opCtx.get()));
         ASSERT_EQ(1400, rs->dataSize(opCtx.get()));
@@ -642,7 +648,10 @@ TEST(WiredTigerRecordStoreTest, OplogStones_CappedTruncateAfter) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-        rs->cappedTruncateAfter(opCtx.get(), RecordId(1, 2), false);
+        rs->cappedTruncateAfter(opCtx.get(),
+                                RecordId(1, 2),
+                                false /* inclusive */,
+                                nullptr /* aboutToDelete callback */);
 
         ASSERT_EQ(2, rs->numRecords(opCtx.get()));
         ASSERT_EQ(1200, rs->dataSize(opCtx.get()));
@@ -656,7 +665,10 @@ TEST(WiredTigerRecordStoreTest, OplogStones_CappedTruncateAfter) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-        rs->cappedTruncateAfter(opCtx.get(), RecordId(1, 1), false);
+        rs->cappedTruncateAfter(opCtx.get(),
+                                RecordId(1, 1),
+                                false /* inclusive */,
+                                nullptr /* aboutToDelete callback */);
 
         ASSERT_EQ(1, rs->numRecords(opCtx.get()));
         ASSERT_EQ(400, rs->dataSize(opCtx.get()));
@@ -1110,7 +1122,6 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     params.overwrite = false;
     params.isEphemeral = false;
     params.isLogged = WiredTigerUtil::useTableLogging(nss);
-    params.cappedCallback = nullptr;
     params.sizeStorer = nullptr;
     params.tracksSizeAdjustments = true;
     params.forceUpdateWithFullDocument = false;

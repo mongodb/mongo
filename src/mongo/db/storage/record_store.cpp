@@ -42,6 +42,11 @@ void validateWriteAllowed(OperationContext* opCtx) {
 }
 }  // namespace
 
+RecordStore::RecordStore(StringData ns, StringData identName, bool isCapped)
+    : Ident(identName.toString()),
+      _ns(ns.toString()),
+      _cappedInsertNotifier(isCapped ? std::make_shared<CappedInsertNotifier>() : nullptr) {}
+
 void RecordStore::deleteRecord(OperationContext* opCtx, const RecordId& dl) {
     validateWriteAllowed(opCtx);
     doDeleteRecord(opCtx, dl);
@@ -78,9 +83,19 @@ Status RecordStore::truncate(OperationContext* opCtx) {
 
 void RecordStore::cappedTruncateAfter(OperationContext* opCtx,
                                       const RecordId& end,
-                                      bool inclusive) {
+                                      bool inclusive,
+                                      const AboutToDeleteRecordCallback& aboutToDelete) {
     validateWriteAllowed(opCtx);
-    doCappedTruncateAfter(opCtx, end, inclusive);
+    doCappedTruncateAfter(opCtx, end, inclusive, std::move(aboutToDelete));
+}
+
+bool RecordStore::haveCappedWaiters() const {
+    return _cappedInsertNotifier && _cappedInsertNotifier.use_count() > 1;
+}
+
+void RecordStore::notifyCappedWaitersIfNeeded() {
+    if (haveCappedWaiters())
+        _cappedInsertNotifier->notifyAll();
 }
 
 Status RecordStore::compact(OperationContext* opCtx) {
@@ -112,6 +127,32 @@ void RecordStore::waitForAllEarlierOplogWritesToBeVisible(OperationContext* opCt
               !opCtx->lockState()->uninterruptibleLocksRequested());
 
     waitForAllEarlierOplogWritesToBeVisibleImpl(opCtx);
+}
+
+void CappedInsertNotifier::notifyAll() const {
+    stdx::lock_guard<Latch> lk(_mutex);
+    ++_version;
+    _notifier.notify_all();
+}
+
+void CappedInsertNotifier::waitUntil(uint64_t prevVersion, Date_t deadline) const {
+    stdx::unique_lock<Latch> lk(_mutex);
+    while (!_dead && prevVersion == _version) {
+        if (stdx::cv_status::timeout == _notifier.wait_until(lk, deadline.toSystemTimePoint())) {
+            return;
+        }
+    }
+}
+
+void CappedInsertNotifier::kill() {
+    stdx::lock_guard<Latch> lk(_mutex);
+    _dead = true;
+    _notifier.notify_all();
+}
+
+bool CappedInsertNotifier::isDead() {
+    stdx::lock_guard<Latch> lk(_mutex);
+    return _dead;
 }
 
 }  // namespace mongo

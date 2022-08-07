@@ -39,36 +39,6 @@
 
 namespace mongo {
 
-//
-// CappedInsertNotifier
-//
-
-void CappedInsertNotifier::notifyAll() const {
-    stdx::lock_guard<Latch> lk(_mutex);
-    ++_version;
-    _notifier.notify_all();
-}
-
-void CappedInsertNotifier::waitUntil(uint64_t prevVersion, Date_t deadline) const {
-    stdx::unique_lock<Latch> lk(_mutex);
-    while (!_dead && prevVersion == _version) {
-        if (stdx::cv_status::timeout == _notifier.wait_until(lk, deadline.toSystemTimePoint())) {
-            return;
-        }
-    }
-}
-
-void CappedInsertNotifier::kill() {
-    stdx::lock_guard<Latch> lk(_mutex);
-    _dead = true;
-    _notifier.notify_all();
-}
-
-bool CappedInsertNotifier::isDead() {
-    stdx::lock_guard<Latch> lk(_mutex);
-    return _dead;
-}
-
 CollectionPtr CollectionPtr::null;
 
 CollectionPtr::CollectionPtr() : _collection(nullptr), _opCtx(nullptr) {}

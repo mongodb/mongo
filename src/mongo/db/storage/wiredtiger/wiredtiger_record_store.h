@@ -34,7 +34,6 @@
 #include <string>
 #include <wiredtiger.h>
 
-#include "mongo/db/storage/capped_callback.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
@@ -112,7 +111,6 @@ public:
         bool isEphemeral;
         bool isLogged;
         boost::optional<int64_t> oplogMaxSize;
-        CappedCallback* cappedCallback;
         WiredTigerSizeStorer* sizeStorer;
         bool tracksSizeAdjustments;
         bool forceUpdateWithFullDocument;
@@ -200,7 +198,10 @@ public:
                                       BSONObjBuilder* result,
                                       double scale) const;
 
-    void doCappedTruncateAfter(OperationContext* opCtx, const RecordId& end, bool inclusive) final;
+    void doCappedTruncateAfter(OperationContext* opCtx,
+                               const RecordId& end,
+                               bool inclusive,
+                               const AboutToDeleteRecordCallback& aboutToDelete) final;
 
     virtual void updateStatsAfterRepair(OperationContext* opCtx,
                                         long long numRecords,
@@ -208,11 +209,6 @@ public:
 
 
     Status updateOplogSize(long long newOplogSize) final;
-
-    void setCappedCallback(CappedCallback* cb) {
-        stdx::lock_guard<Latch> lk(_cappedCallbackMutex);
-        _cappedCallback = cb;
-    }
 
     const std::string& getURI() const {
         return _uri;
@@ -245,8 +241,6 @@ public:
 
     bool isOpHidden_forTest(const RecordId& id) const;
 
-    bool inShutdown() const;
-
     bool yieldAndAwaitOplogDeletionRequest(OperationContext* opCtx) override;
 
     void reclaimOplog(OperationContext* opCtx) override;
@@ -260,10 +254,6 @@ public:
      * truncate oplog entries in front of this time.
      */
     void reclaimOplog(OperationContext* opCtx, Timestamp recoveryTimestamp);
-
-    bool haveCappedWaiters();
-
-    void notifyCappedWaitersIfNeeded();
 
     class OplogStones;
 
@@ -349,12 +339,6 @@ private:
     const bool _forceUpdateWithFullDocument;
     boost::optional<int64_t> _oplogMaxSize;
     RecordId _oplogFirstRecord;
-
-    // Guards _cappedCallback and _shuttingDown.
-    mutable Mutex _cappedCallbackMutex =
-        MONGO_MAKE_LATCH("WiredTigerRecordStore::_cappedCallbackMutex");
-    CappedCallback* _cappedCallback;
-    bool _shuttingDown;
 
     // Protects initialization of the _nextIdNum.
     mutable Mutex _initNextIdMutex = MONGO_MAKE_LATCH("WiredTigerRecordStore::_initNextIdMutex");

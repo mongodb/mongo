@@ -80,7 +80,7 @@ TEST_F(CollectionTest, CappedNotifierKillAndIsDead) {
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
     const CollectionPtr& col = acfr.getCollection();
-    auto notifier = col->getCappedInsertNotifier();
+    auto notifier = col->getRecordStore()->getCappedInsertNotifier();
     ASSERT_FALSE(notifier->isDead());
     notifier->kill();
     ASSERT(notifier->isDead());
@@ -92,7 +92,7 @@ TEST_F(CollectionTest, CappedNotifierTimeouts) {
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
     const CollectionPtr& col = acfr.getCollection();
-    auto notifier = col->getCappedInsertNotifier();
+    auto notifier = col->getRecordStore()->getCappedInsertNotifier();
     ASSERT_EQ(notifier->getVersion(), 0u);
 
     auto before = Date_t::now();
@@ -108,7 +108,7 @@ TEST_F(CollectionTest, CappedNotifierWaitAfterNotifyIsImmediate) {
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
     const CollectionPtr& col = acfr.getCollection();
-    auto notifier = col->getCappedInsertNotifier();
+    auto notifier = col->getRecordStore()->getCappedInsertNotifier();
 
     auto prevVersion = notifier->getVersion();
     notifier->notifyAll();
@@ -127,7 +127,7 @@ TEST_F(CollectionTest, CappedNotifierWaitUntilAsynchronousNotifyAll) {
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
     const CollectionPtr& col = acfr.getCollection();
-    auto notifier = col->getCappedInsertNotifier();
+    auto notifier = col->getRecordStore()->getCappedInsertNotifier();
     auto prevVersion = notifier->getVersion();
     auto thisVersion = prevVersion + 1;
 
@@ -152,7 +152,7 @@ TEST_F(CollectionTest, CappedNotifierWaitUntilAsynchronousKill) {
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
     const CollectionPtr& col = acfr.getCollection();
-    auto notifier = col->getCappedInsertNotifier();
+    auto notifier = col->getRecordStore()->getCappedInsertNotifier();
     auto prevVersion = notifier->getVersion();
 
     auto before = Date_t::now();
@@ -176,12 +176,12 @@ TEST_F(CollectionTest, HaveCappedWaiters) {
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
     const CollectionPtr& col = acfr.getCollection();
-    ASSERT_FALSE(col->getCappedCallback()->haveCappedWaiters());
+    ASSERT(!col->getRecordStore()->haveCappedWaiters());
     {
-        auto notifier = col->getCappedInsertNotifier();
-        ASSERT(col->getCappedCallback()->haveCappedWaiters());
+        auto notifier = col->getRecordStore()->getCappedInsertNotifier();
+        ASSERT(col->getRecordStore()->haveCappedWaiters());
     }
-    ASSERT_FALSE(col->getCappedCallback()->haveCappedWaiters());
+    ASSERT(!col->getRecordStore()->haveCappedWaiters());
 }
 
 TEST_F(CollectionTest, NotifyCappedWaitersIfNeeded) {
@@ -190,11 +190,11 @@ TEST_F(CollectionTest, NotifyCappedWaitersIfNeeded) {
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
     const CollectionPtr& col = acfr.getCollection();
-    col->getCappedCallback()->notifyCappedWaitersIfNeeded();
+    col->getRecordStore()->notifyCappedWaitersIfNeeded();
     {
-        auto notifier = col->getCappedInsertNotifier();
+        auto notifier = col->getRecordStore()->getCappedInsertNotifier();
         ASSERT_EQ(notifier->getVersion(), 0u);
-        col->getCappedCallback()->notifyCappedWaitersIfNeeded();
+        col->getRecordStore()->notifyCappedWaitersIfNeeded();
         ASSERT_EQ(notifier->getVersion(), 1u);
     }
 }
@@ -205,16 +205,16 @@ TEST_F(CollectionTest, AsynchronouslyNotifyCappedWaitersIfNeeded) {
 
     AutoGetCollectionForRead acfr(operationContext(), nss);
     const CollectionPtr& col = acfr.getCollection();
-    auto notifier = col->getCappedInsertNotifier();
+    auto notifier = col->getRecordStore()->getCappedInsertNotifier();
     auto prevVersion = notifier->getVersion();
     auto thisVersion = prevVersion + 1;
 
     auto before = Date_t::now();
     notifier->waitUntil(prevVersion, before + Milliseconds(25));
-    stdx::thread thread([before, prevVersion, &col] {
+    stdx::thread thread([before, prevVersion, notifier] {
         auto after = Date_t::now();
         ASSERT_GTE(after - before, Milliseconds(25));
-        col->getCappedCallback()->notifyCappedWaitersIfNeeded();
+        notifier->notifyAll();
     });
     notifier->waitUntil(prevVersion, before + Seconds(25));
     auto after = Date_t::now();

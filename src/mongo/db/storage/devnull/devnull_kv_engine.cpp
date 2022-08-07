@@ -65,7 +65,7 @@ public:
                        StringData identName,
                        const CollectionOptions& options,
                        KeyFormat keyFormat)
-        : RecordStore(ns, identName), _options(options), _keyFormat(keyFormat) {
+        : RecordStore(ns, identName, options.capped), _options(options), _keyFormat(keyFormat) {
         _numInserts = 0;
         _dummy = BSON("_id" << 1);
     }
@@ -73,8 +73,6 @@ public:
     virtual const char* name() const {
         return "devnull";
     }
-
-    virtual void setCappedCallback(CappedCallback*) {}
 
     virtual long long dataSize(OperationContext* opCtx) const {
         return 0;
@@ -148,7 +146,8 @@ public:
 
     void doCappedTruncateAfter(OperationContext* opCtx,
                                const RecordId& end,
-                               bool inclusive) override {}
+                               bool inclusive,
+                               const AboutToDeleteRecordCallback& aboutToDelete) override {}
 
     virtual void appendNumericCustomStats(OperationContext* opCtx,
                                           BSONObjBuilder* result,

@@ -44,9 +44,6 @@
 
 namespace mongo {
 
-class CollectionCatalog;
-class Database;
-
 class CollectionCatalog {
     friend class iterator;
 

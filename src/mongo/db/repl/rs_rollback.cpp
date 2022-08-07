@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/catalog/capped_collection_maintenance.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -1195,134 +1196,18 @@ void rollbackRenameCollection(OperationContext* opCtx, UUID uuid, RenameCollecti
                 "renameTo"_attr = info.renameTo);
 }
 
-Status _syncRollback(OperationContext* opCtx,
-                     const OplogInterface& localOplog,
-                     const RollbackSource& rollbackSource,
-                     const IndexBuilds& stoppedIndexBuilds,
-                     int requiredRBID,
-                     ReplicationCoordinator* replCoord,
-                     ReplicationProcess* replicationProcess) {
-    invariant(!opCtx->lockState()->isLocked());
-
-    FixUpInfo how;
-    how.localTopOfOplog = replCoord->getMyLastAppliedOpTime();
-    LOGV2(21681,
-          "Starting rollback. Sync source: {syncSource}",
-          "Starting rollback",
-          "syncSource"_attr = rollbackSource.getSource());
-    how.rbid = rollbackSource.getRollbackId();
-    uassert(
-        40506, "Upstream node rolled back. Need to retry our rollback.", how.rbid == requiredRBID);
-
-    // Find the UUID of the transactions collection. An OperationContext is required because the
-    // UUID is not known at compile time, so the SessionCatalog needs to load the collection.
-    how.transactionTableUUID = MongoDSessionCatalog::getTransactionTableUUID(opCtx);
-
-    // Populate the initial list of index builds to restart with the builds that were stopped due to
-    // rollback. They may need to be restarted if no associated oplog entries are rolled-back, or
-    // they may be made redundant by a rolled-back startIndexBuild oplog entry.
-    how.indexBuildsToRestart.insert(stoppedIndexBuilds.begin(), stoppedIndexBuilds.end());
-
-    LOGV2(21682, "Finding the Common Point");
-    try {
-
-        auto processOperationForFixUp = [&how, &opCtx, &localOplog](const BSONObj& operation) {
-            return updateFixUpInfoFromLocalOplogEntry(opCtx, localOplog, how, operation, false);
-        };
-
-        // Calls syncRollBackLocalOperations to run updateFixUpInfoFromLocalOplogEntry
-        // on each oplog entry up until the common point.
-        auto res = syncRollBackLocalOperations(
-            localOplog, rollbackSource.getOplog(), processOperationForFixUp);
-        if (!res.isOK()) {
-            const auto status = res.getStatus();
-            switch (status.code()) {
-                case ErrorCodes::OplogStartMissing:
-                case ErrorCodes::UnrecoverableRollbackError:
-                    return status;
-                default:
-                    throw RSFatalException(status.toString());
-            }
-        }
-
-        how.commonPoint = res.getValue().getOpTime();
-        how.commonPointOurDiskloc = res.getValue().getRecordId();
-        how.removeRedundantOperations();
-    } catch (const RSFatalException& e) {
-        return Status(ErrorCodes::UnrecoverableRollbackError,
-                      str::stream()
-                          << "need to rollback, but unable to determine common point between"
-                             " local and remote oplog: "
-                          << e.what());
-    }
-
-    OpTime commonPointOpTime = how.commonPoint;
-    OpTime lastCommittedOpTime = replCoord->getLastCommittedOpTime();
-    OpTime committedSnapshot = replCoord->getCurrentCommittedSnapshotOpTime();
-
-    LOGV2(21683,
-          "Rollback common point is {commonPoint}",
-          "Rollback common point",
-          "commonPoint"_attr = commonPointOpTime);
-
-    // This failpoint is used for testing the invariant below.
-    if (MONGO_unlikely(rollbackViaRefetchHangCommonPointBeforeReplCommitPoint.shouldFail()) &&
-        (commonPointOpTime.getTimestamp() < lastCommittedOpTime.getTimestamp())) {
-        LOGV2(6009600,
-              "Hanging due to rollbackViaRefetchHangCommonPointBeforeReplCommitPoint failpoint");
-        rollbackViaRefetchHangCommonPointBeforeReplCommitPoint.pauseWhileSet(opCtx);
-    }
-
-    // Rollback common point should be >= the replication commit point.
-    invariant(commonPointOpTime.getTimestamp() >= lastCommittedOpTime.getTimestamp());
-    invariant(commonPointOpTime >= lastCommittedOpTime);
-
-    // Rollback common point should be >= the committed snapshot optime.
-    invariant(commonPointOpTime.getTimestamp() >= committedSnapshot.getTimestamp());
-    invariant(commonPointOpTime >= committedSnapshot);
-
-    try {
-        // It is always safe to increment the rollback ID first, even if we fail to complete
-        // the rollback.
-        auto status = replicationProcess->incrementRollbackID(opCtx);
-        fassert(40497, status);
-
-        syncFixUp(opCtx, how, rollbackSource, replCoord, replicationProcess);
-
-        if (MONGO_unlikely(rollbackExitEarlyAfterCollectionDrop.shouldFail())) {
-            LOGV2(21684,
-                  "rollbackExitEarlyAfterCollectionDrop fail point enabled. Returning early "
-                  "until fail point is disabled");
-            return Status(ErrorCodes::NamespaceNotFound,
-                          str::stream() << "Failing rollback because "
-                                           "rollbackExitEarlyAfterCollectionDrop fail point "
-                                           "enabled.");
-        }
-    } catch (const RSFatalException& e) {
-        return Status(ErrorCodes::UnrecoverableRollbackError, e.what());
-    }
-
-    if (MONGO_unlikely(rollbackHangBeforeFinish.shouldFail())) {
-        // This log output is used in js tests so please leave it.
-        LOGV2(21685,
-              "rollback - rollbackHangBeforeFinish fail point "
-              "enabled. Blocking until fail point is disabled.");
-        while (MONGO_unlikely(rollbackHangBeforeFinish.shouldFail())) {
-            invariant(!globalInShutdownDeprecated());  // It is an error to shutdown while enabled.
-            mongo::sleepsecs(1);
-        }
-    }
-
-    return Status::OK();
-}
-
-}  // namespace
-
-void rollback_internal::syncFixUp(OperationContext* opCtx,
-                                  const FixUpInfo& fixUpInfo,
-                                  const RollbackSource& rollbackSource,
-                                  ReplicationCoordinator* replCoord,
-                                  ReplicationProcess* replicationProcess) {
+/**
+ * This function uses the FixUpInfo struct to undo all of the operations that occurred after the
+ * common point on the rolling back node, checking the rollback ID and updating minValid as
+ * necessary. This includes refetching, updating, and deleting individual documents, resyncing
+ * collection data and metadata, and dropping and creating collections and indexes. Truncates the
+ * oplog and triggers necessary in-memory refreshes before returning.
+ */
+void syncFixUp(OperationContext* opCtx,
+               const FixUpInfo& fixUpInfo,
+               const RollbackSource& rollbackSource,
+               ReplicationCoordinator* replCoord,
+               ReplicationProcess* replicationProcess) {
     unsigned long long totalSize = 0;
 
     // UUID -> doc id -> doc
@@ -1811,10 +1696,8 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                                             "cappedTruncateAfter",
                                             collection->ns().ns(),
                                             [&] {
-                                                WriteUnitOfWork wunit(opCtx);
-                                                collection.getWritableCollection(opCtx)
-                                                    ->cappedTruncateAfter(opCtx, loc, true);
-                                                wunit.commit();
+                                                collection_internal::cappedTruncateAfter(
+                                                    opCtx, collection.get(), loc, true);
                                             });
                                     } catch (const DBException& e) {
                                         if (e.code() == 13415) {
@@ -1962,8 +1845,18 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
                 Status(ErrorCodes::UnrecoverableRollbackError,
                        str::stream() << "Can't find " << NamespaceString::kRsOplogNamespace.ns()));
         }
+
+        // The oplog collection doesn't have indexes and therefore can take full advantage of the
+        // truncation mechanism that the underlying storage engine offers. Because of this, here we
+        // invoke the record store's truncation logic directly without specifying a per-document
+        // callback.
+        //
         // TODO: fatal error if this throws?
-        oplogCollection->cappedTruncateAfter(opCtx, fixUpInfo.commonPointOurDiskloc, false);
+        oplogCollection->getRecordStore()->cappedTruncateAfter(
+            opCtx,
+            fixUpInfo.commonPointOurDiskloc,
+            false /* inclusive */,
+            nullptr /* aboutToDelete callback */);
     }
 
     if (!serverGlobalParams.enableMajorityReadConcern) {
@@ -2019,6 +1912,129 @@ void rollback_internal::syncFixUp(OperationContext* opCtx,
     // 'minValid'.
     replCoord->resetLastOpTimesFromOplog(opCtx);
 }
+
+Status _syncRollback(OperationContext* opCtx,
+                     const OplogInterface& localOplog,
+                     const RollbackSource& rollbackSource,
+                     const IndexBuilds& stoppedIndexBuilds,
+                     int requiredRBID,
+                     ReplicationCoordinator* replCoord,
+                     ReplicationProcess* replicationProcess) {
+    invariant(!opCtx->lockState()->isLocked());
+
+    FixUpInfo how;
+    how.localTopOfOplog = replCoord->getMyLastAppliedOpTime();
+    LOGV2(21681,
+          "Starting rollback. Sync source: {syncSource}",
+          "Starting rollback",
+          "syncSource"_attr = rollbackSource.getSource());
+    how.rbid = rollbackSource.getRollbackId();
+    uassert(
+        40506, "Upstream node rolled back. Need to retry our rollback.", how.rbid == requiredRBID);
+
+    // Find the UUID of the transactions collection. An OperationContext is required because the
+    // UUID is not known at compile time, so the SessionCatalog needs to load the collection.
+    how.transactionTableUUID = MongoDSessionCatalog::getTransactionTableUUID(opCtx);
+
+    // Populate the initial list of index builds to restart with the builds that were stopped due to
+    // rollback. They may need to be restarted if no associated oplog entries are rolled-back, or
+    // they may be made redundant by a rolled-back startIndexBuild oplog entry.
+    how.indexBuildsToRestart.insert(stoppedIndexBuilds.begin(), stoppedIndexBuilds.end());
+
+    LOGV2(21682, "Finding the Common Point");
+    try {
+
+        auto processOperationForFixUp = [&how, &opCtx, &localOplog](const BSONObj& operation) {
+            return updateFixUpInfoFromLocalOplogEntry(opCtx, localOplog, how, operation, false);
+        };
+
+        // Calls syncRollBackLocalOperations to run updateFixUpInfoFromLocalOplogEntry
+        // on each oplog entry up until the common point.
+        auto res = syncRollBackLocalOperations(
+            localOplog, rollbackSource.getOplog(), processOperationForFixUp);
+        if (!res.isOK()) {
+            const auto status = res.getStatus();
+            switch (status.code()) {
+                case ErrorCodes::OplogStartMissing:
+                case ErrorCodes::UnrecoverableRollbackError:
+                    return status;
+                default:
+                    throw RSFatalException(status.toString());
+            }
+        }
+
+        how.commonPoint = res.getValue().getOpTime();
+        how.commonPointOurDiskloc = res.getValue().getRecordId();
+        how.removeRedundantOperations();
+    } catch (const RSFatalException& e) {
+        return Status(ErrorCodes::UnrecoverableRollbackError,
+                      str::stream()
+                          << "need to rollback, but unable to determine common point between"
+                             " local and remote oplog: "
+                          << e.what());
+    }
+
+    OpTime commonPointOpTime = how.commonPoint;
+    OpTime lastCommittedOpTime = replCoord->getLastCommittedOpTime();
+    OpTime committedSnapshot = replCoord->getCurrentCommittedSnapshotOpTime();
+
+    LOGV2(21683,
+          "Rollback common point is {commonPoint}",
+          "Rollback common point",
+          "commonPoint"_attr = commonPointOpTime);
+
+    // This failpoint is used for testing the invariant below.
+    if (MONGO_unlikely(rollbackViaRefetchHangCommonPointBeforeReplCommitPoint.shouldFail()) &&
+        (commonPointOpTime.getTimestamp() < lastCommittedOpTime.getTimestamp())) {
+        LOGV2(6009600,
+              "Hanging due to rollbackViaRefetchHangCommonPointBeforeReplCommitPoint failpoint");
+        rollbackViaRefetchHangCommonPointBeforeReplCommitPoint.pauseWhileSet(opCtx);
+    }
+
+    // Rollback common point should be >= the replication commit point.
+    invariant(commonPointOpTime.getTimestamp() >= lastCommittedOpTime.getTimestamp());
+    invariant(commonPointOpTime >= lastCommittedOpTime);
+
+    // Rollback common point should be >= the committed snapshot optime.
+    invariant(commonPointOpTime.getTimestamp() >= committedSnapshot.getTimestamp());
+    invariant(commonPointOpTime >= committedSnapshot);
+
+    try {
+        // It is always safe to increment the rollback ID first, even if we fail to complete
+        // the rollback.
+        auto status = replicationProcess->incrementRollbackID(opCtx);
+        fassert(40497, status);
+
+        syncFixUp(opCtx, how, rollbackSource, replCoord, replicationProcess);
+
+        if (MONGO_unlikely(rollbackExitEarlyAfterCollectionDrop.shouldFail())) {
+            LOGV2(21684,
+                  "rollbackExitEarlyAfterCollectionDrop fail point enabled. Returning early "
+                  "until fail point is disabled");
+            return Status(ErrorCodes::NamespaceNotFound,
+                          str::stream() << "Failing rollback because "
+                                           "rollbackExitEarlyAfterCollectionDrop fail point "
+                                           "enabled.");
+        }
+    } catch (const RSFatalException& e) {
+        return Status(ErrorCodes::UnrecoverableRollbackError, e.what());
+    }
+
+    if (MONGO_unlikely(rollbackHangBeforeFinish.shouldFail())) {
+        // This log output is used in js tests so please leave it.
+        LOGV2(21685,
+              "rollback - rollbackHangBeforeFinish fail point "
+              "enabled. Blocking until fail point is disabled.");
+        while (MONGO_unlikely(rollbackHangBeforeFinish.shouldFail())) {
+            invariant(!globalInShutdownDeprecated());  // It is an error to shutdown while enabled.
+            mongo::sleepsecs(1);
+        }
+    }
+
+    return Status::OK();
+}
+
+}  // namespace
 
 Status syncRollback(OperationContext* opCtx,
                     const OplogInterface& localOplog,

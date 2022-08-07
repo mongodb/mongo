@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,38 +29,35 @@
 
 #pragma once
 
-#include "mongo/db/record_id.h"
+#include "mongo/db/catalog/collection.h"
 
 namespace mongo {
-
-class OperationContext;
-class RecordData;
+namespace collection_internal {
 
 /**
- * When a capped collection is modified (delete/insert/etc) then certain notifications need to
- * be made, which this (pure virtual) interface exposes.
+ * If the collection is capped and the current data size or number of records exceeds cappedMaxSize
+ * or cappedMaxDocs respectively, this method will block and delete as many documents as necessary
+ * in order to bring it back to under that confuguration.
+ *
+ * Generates oplog entries for the deleted records in FCV >= 5.0.
  */
-class CappedCallback {
-public:
-    virtual ~CappedCallback() {}
+void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
+                                             const CollectionPtr& collection,
+                                             const RecordId& justInserted);
 
-    /**
-     * This will be called right before loc is deleted when wrapping.
-     * If data is unowned, it is only valid inside of this call. If implementations wish to
-     * stash a pointer, they must copy it.
-     */
-    virtual Status aboutToDeleteCapped(OperationContext* opCtx,
-                                       const RecordId& loc,
-                                       RecordData data) = 0;
+/**
+ * This function starts its own WUOW to truncate documents newer than the document at 'end' from the
+ * capped collection.
+ *
+ * @param inclusive - Truncate 'end' as well iff true
+ *
+ * The caller should hold a collection X lock and ensure there are no index builds in progress on
+ * the collection.
+ */
+void cappedTruncateAfter(OperationContext* opCtx,
+                         const CollectionPtr& collection,
+                         const RecordId& end,
+                         bool inclusive);
 
-    /**
-     * Returns true if there may be waiters.
-     */
-    virtual bool haveCappedWaiters() const = 0;
-
-    /**
-     * Used to notify any waiters when new documents may be visible in the capped collection.
-     */
-    virtual void notifyCappedWaitersIfNeeded() const = 0;
-};
+}  // namespace collection_internal
 }  // namespace mongo

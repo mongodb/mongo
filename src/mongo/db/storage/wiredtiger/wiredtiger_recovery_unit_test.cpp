@@ -108,7 +108,6 @@ public:
         params.overwrite = true;
         params.isEphemeral = false;
         params.isLogged = WiredTigerUtil::useTableLogging(nss);
-        params.cappedCallback = nullptr;
         params.sizeStorer = nullptr;
         params.tracksSizeAdjustments = true;
         params.forceUpdateWithFullDocument = false;

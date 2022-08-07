@@ -27,14 +27,12 @@
  *    it in the license file.
  */
 
+#include "mongo/db/commands/test_commands.h"
 
 #include <string>
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/commands/test_commands.h"
-
 #include "mongo/base/init.h"
+#include "mongo/db/catalog/capped_collection_maintenance.h"
 #include "mongo/db/catalog/capped_utils.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/client.h"
@@ -50,7 +48,6 @@
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 
 namespace mongo {
 
@@ -190,8 +187,7 @@ public:
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(
             collection->uuid());
 
-        collection->cappedTruncateAfter(opCtx, end, inc);
-
+        collection_internal::cappedTruncateAfter(opCtx, *collection, end, inc);
         return true;
     }
 };

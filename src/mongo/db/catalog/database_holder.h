@@ -33,16 +33,11 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/database_name.h"
 #include "mongo/s/catalog/type_database_gen.h"
-#include "mongo/s/database_version.h"
-#include "mongo/s/shard_id.h"
 
 namespace mongo {
-
-class OperationContext;
 
 /**
  * Registry of opened databases.

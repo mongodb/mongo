@@ -33,7 +33,6 @@
 #include <map>
 
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/storage/capped_callback.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -51,8 +50,7 @@ public:
     explicit EphemeralForTestRecordStore(StringData ns,
                                          StringData identName,
                                          std::shared_ptr<void>* dataInOut,
-                                         bool isCapped = false,
-                                         CappedCallback* cappedCallback = nullptr);
+                                         bool isCapped = false);
 
     virtual const char* name() const;
 
@@ -92,7 +90,8 @@ public:
 
     void doCappedTruncateAfter(OperationContext* opCtx,
                                const RecordId& end,
-                               bool inclusive) override;
+                               bool inclusive,
+                               const AboutToDeleteRecordCallback& aboutToDelete) override;
 
     virtual void appendNumericCustomStats(OperationContext* opCtx,
                                           BSONObjBuilder* result,
@@ -146,9 +145,6 @@ public:
     bool isCapped() const {
         return _isCapped;
     }
-    void setCappedCallback(CappedCallback* cb) {
-        _cappedCallback = cb;
-    }
 
 private:
     class RemoveChange;
@@ -163,7 +159,6 @@ private:
     void deleteRecord(WithLock lk, OperationContext* opCtx, const RecordId& dl);
 
     const bool _isCapped;
-    CappedCallback* _cappedCallback;
 
     // This is the "persistent" data.
     struct Data {

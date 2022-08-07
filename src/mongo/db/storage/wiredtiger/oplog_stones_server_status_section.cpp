@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
@@ -39,8 +35,9 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 
-
 namespace mongo {
+namespace {
+
 class OplogStonesServerStatusSection : public ServerStatusSection {
 public:
     OplogStonesServerStatusSection() : ServerStatusSection("oplogTruncation") {}
@@ -70,4 +67,6 @@ public:
     }
 
 } oplogStonesStats;
+
+}  // namespace
 }  // namespace mongo

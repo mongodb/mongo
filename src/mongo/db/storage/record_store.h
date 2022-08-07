@@ -30,6 +30,7 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <functional>
 
 #include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/db/exec/collection_scan_common.h"
@@ -38,10 +39,10 @@
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/record_data.h"
+#include "mongo/stdx/condition_variable.h"
 
 namespace mongo {
 
-class CappedCallback;
 class Collection;
 class CollectionPtr;
 class MAdvise;
@@ -214,6 +215,59 @@ public:
 };
 
 /**
+ * Queries with the awaitData option use this notifier object to wait for more data to be
+ * inserted into the capped collection.
+ */
+class CappedInsertNotifier {
+public:
+    /**
+     * Wakes up all threads waiting.
+     */
+    void notifyAll() const;
+
+    /**
+     * Waits until 'deadline', or until notifyAll() is called to indicate that new
+     * data is available in the capped collection.
+     *
+     * NOTE: Waiting threads can be signaled by calling kill or notify* methods.
+     */
+    void waitUntil(uint64_t prevVersion, Date_t deadline) const;
+
+    /**
+     * Returns the version for use as an additional wake condition when used above.
+     */
+    uint64_t getVersion() const {
+        return _version;
+    }
+
+    /**
+     * Cancels the notifier if the collection is dropped/invalidated, and wakes all waiting.
+     */
+    void kill();
+
+    /**
+     * Returns true if no new insert notification will occur.
+     */
+    bool isDead();
+
+private:
+    // Signalled when a successful insert is made into a capped collection.
+    mutable stdx::condition_variable _notifier;
+
+    // Mutex used with '_notifier'. Protects access to '_version'.
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("CappedInsertNotifier::_mutex");
+
+    // A counter, incremented on insertion of new data into the capped collection.
+    //
+    // The condition which '_cappedNewDataNotifier' is being notified of is an increment of this
+    // counter. Access to this counter is synchronized with '_mutex'.
+    mutable uint64_t _version = 0;
+
+    // True once the notifier is dead.
+    bool _dead = false;
+};
+
+/**
  * An abstraction used for storing documents in a collection or entries in an index.
  *
  * In storage engines implementing the KVEngine, record stores are also used for implementing
@@ -231,9 +285,7 @@ class RecordStore : public Ident {
     RecordStore& operator=(const RecordStore&) = delete;
 
 public:
-    RecordStore(StringData ns, StringData identName)
-        : Ident(identName.toString()), _ns(ns.toString()) {}
-
+    RecordStore(StringData ns, StringData identName, bool isCapped);
     virtual ~RecordStore() {}
 
     // META
@@ -282,9 +334,29 @@ public:
         return false;
     }
 
-    virtual void setCappedCallback(CappedCallback*) {
-        MONGO_UNREACHABLE;
+    /**
+     * Get a pointer to a capped insert notifier object. The caller can wait on this object
+     * until it is notified of a new insert into the capped collection.
+     *
+     * It is invalid to call this method unless the owning collection is capped.
+     */
+    std::shared_ptr<CappedInsertNotifier> getCappedInsertNotifier() const {
+        return _cappedInsertNotifier;
     }
+
+    /**
+     * Uses the reference counter of the capped insert notifier shared pointer to decide whether
+     * anyone is waiting in order to optimise notifications on a potentially hot path. It is
+     * acceptable for this function to return 'true' even if there are no more waiters, but the
+     * inverse is not allowed.
+     */
+    bool haveCappedWaiters() const;
+
+    /**
+     * If the record store is capped and there are listeners waiting for notifications for capped
+     * inserts, notifies them.
+     */
+    void notifyCappedWaitersIfNeeded();
 
     /**
      * @param extraInfo - optional more debug info
@@ -449,7 +521,6 @@ public:
 
     // higher level
 
-
     /**
      * removes all Records
      */
@@ -461,7 +532,12 @@ public:
      * function.  An assertion will be thrown if that is attempted.
      * @param inclusive - Truncate 'end' as well iff true
      */
-    void cappedTruncateAfter(OperationContext* opCtx, const RecordId& end, bool inclusive);
+    using AboutToDeleteRecordCallback =
+        std::function<void(OperationContext* opCtx, const RecordId& loc, RecordData data)>;
+    void cappedTruncateAfter(OperationContext* opCtx,
+                             const RecordId& end,
+                             bool inclusive,
+                             const AboutToDeleteRecordCallback& aboutToDelete);
 
     /**
      * does this RecordStore support the compact operation?
@@ -631,7 +707,8 @@ protected:
     virtual Status doTruncate(OperationContext* opCtx) = 0;
     virtual void doCappedTruncateAfter(OperationContext* opCtx,
                                        const RecordId& end,
-                                       bool inclusive) = 0;
+                                       bool inclusive,
+                                       const AboutToDeleteRecordCallback& aboutToDelete) = 0;
     virtual Status doCompact(OperationContext* opCtx) {
         MONGO_UNREACHABLE;
     }
@@ -645,6 +722,8 @@ protected:
     virtual void waitForAllEarlierOplogWritesToBeVisibleImpl(OperationContext* opCtx) const = 0;
 
     std::string _ns;
+
+    std::shared_ptr<CappedInsertNotifier> _cappedInsertNotifier;
 };
 
 }  // namespace mongo
