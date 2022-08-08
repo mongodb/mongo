@@ -44,11 +44,14 @@ const failPointData = {
     nss: testNss
 };
 
+const finishFailPoint = "initialSyncHangBeforeFinish";
+
 jsTestLog("Restarting last node for initial sync");
 let startupParams = {};
 startupParams["logComponentVerbosity"] = tojson({replication: 3});
 startupParams["initialSyncSourceReadPreference"] = "secondaryPreferred";
 startupParams["failpoint." + clonerFailPoint] = tojson({mode: "alwaysOn", data: failPointData});
+startupParams["failpoint." + finishFailPoint] = tojson({mode: "alwaysOn"});
 initSyncNode = rst.restart(initSyncNode, {startClean: true, setParameter: startupParams});
 
 jsTestLog("Waiting for initial syncing node to hit failpoint");
@@ -98,12 +101,13 @@ assert.commandWorked(initSyncNode.adminCommand({configureFailPoint: clonerFailPo
 jsTestLog("Waiting for initial sync node to reach correct stopTimestamp");
 assert.soonNoExcept(function() {
     const nodeStatus = assert.commandWorked(initSyncNode.adminCommand({replSetGetStatus: 1}));
-    assert(nodeStatus, () => tojson(nodeStatus));
-    assert(nodeStatus.initialSyncStatus, () => tojson(nodeStatus));
+    assert(nodeStatus, () => "[1] status does not exist: " + tojson(nodeStatus));
+    assert(nodeStatus.initialSyncStatus, () => "[2] no initialSyncStatus: " + tojson(nodeStatus));
     // Is actually the 'stopTimestamp'.
-    assert(nodeStatus.initialSyncStatus.initialSyncOplogEnd, () => tojson(nodeStatus));
+    assert(nodeStatus.initialSyncStatus.initialSyncOplogEnd,
+           () => "[3] no stopTimestamp: " + tojson(nodeStatus));
     const currentStopTs = nodeStatus.initialSyncStatus.initialSyncOplogEnd;
-    assert.eq(currentStopTs, targetStopTs, () => tojson(nodeStatus));
+    assert.eq(currentStopTs, targetStopTs, () => "[4] wrong stopTimestamp: " + tojson(nodeStatus));
 
     const comparison = bsonWoCompare(currentStopTs, targetStopTs);
 
@@ -113,9 +117,14 @@ assert.soonNoExcept(function() {
     }
 
     // We should never not exceed that timestamp.
-    assert.lte(currentStopTs, targetStopTs, () => tojson(nodeStatus));
+    assert.lte(
+        currentStopTs, targetStopTs, () => "[5] exceeded stopTimestamp: " + tojson(nodeStatus));
     return false;
 });
+
+// The above checks required that the node stays in initial sync, but that failpoint can
+// be turned off now.
+assert.commandWorked(initSyncNode.adminCommand({configureFailPoint: finishFailPoint, mode: 'off'}));
 
 // Now that the stopTimestamp is far enough to include the drop, we also need to allow
 // the fetcher to actually replicate those entries.
