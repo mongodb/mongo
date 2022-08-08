@@ -117,6 +117,8 @@ TEST_F(SessionCatalogMigrationSourceTest, NoSessionsToTransferShouldNotHaveOplog
     SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
     ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
     ASSERT_FALSE(migrationSource.hasMoreOplog());
+    ASSERT_TRUE(migrationSource.inCatchupPhase());
+    ASSERT_EQ(0, migrationSource.untransferredCatchUpDataSize());
 }
 
 TEST_F(SessionCatalogMigrationSourceTest, OneSessionWithTwoWrites) {
@@ -1170,6 +1172,105 @@ TEST_F(SessionCatalogMigrationSourceTest, TwoSessionWithTwoWritesContainingWrite
     }
 
     ASSERT_FALSE(migrationSource.hasMoreOplog());
+}
+
+TEST_F(SessionCatalogMigrationSourceTest, UntransferredDataSizeWithCommittedWrites) {
+    DBDirectClient client(opCtx());
+    client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns());
+    // Enter an oplog entry before creating SessionCatalogMigrationSource to set config.transactions
+    // average object size to the size of this entry.
+    auto entry = makeOplogEntry(
+        repl::OpTime(Timestamp(52, 345), 2),  // optime
+        repl::OpTypeEnum::kInsert,            // op type
+        BSON("x" << 0),                       // o
+        boost::none,                          // o2
+        Date_t::now(),                        // wall clock time
+        0,                                    // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+    insertOplogEntry(entry);
+
+    SessionTxnRecord sessionRecord;
+    sessionRecord.setSessionId(makeLogicalSessionIdForTest());
+    sessionRecord.setTxnNum(1);
+    sessionRecord.setLastWriteOpTime(entry.getOpTime());
+    sessionRecord.setLastWriteDate(entry.getWallClockTime());
+
+    client.insert(NamespaceString::kSessionTransactionsTableNamespace.ns(), sessionRecord.toBSON());
+
+    // Check for the initial state of the SessionCatalogMigrationSource, and drain the majority
+    // committed session writes.
+    SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
+    ASSERT_TRUE(migrationSource.hasMoreOplog());
+    ASSERT_FALSE(migrationSource.inCatchupPhase());
+    migrationSource.fetchNextOplog(opCtx());
+    migrationSource.getLastFetchedOplog();
+    ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+    ASSERT_FALSE(migrationSource.hasMoreOplog());
+
+    // Test inCatchupPhase() and untransferredCatchUpDataSize() with new writes.
+    auto entry2 = makeOplogEntry(
+        repl::OpTime(Timestamp(53, 345), 2),  // optime
+        repl::OpTypeEnum::kInsert,            // op type
+        BSON("x" << 1),                       // o
+        boost::none,                          // o2
+        Date_t::now(),                        // wall clock time
+        0,                                    // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+    insertOplogEntry(entry2);
+    migrationSource.notifyNewWriteOpTime(
+        entry2.getOpTime(), SessionCatalogMigrationSource::EntryAtOpTimeType::kRetryableWrite);
+
+    ASSERT_TRUE(migrationSource.hasMoreOplog());
+    ASSERT_TRUE(migrationSource.inCatchupPhase());
+    ASSERT_EQ(migrationSource.untransferredCatchUpDataSize(), sessionRecord.toBSON().objsize());
+
+    auto entry3 = makeOplogEntry(
+        repl::OpTime(Timestamp(54, 345), 2),  // optime
+        repl::OpTypeEnum::kInsert,            // op type
+        BSON("x" << 1),                       // o
+        boost::none,                          // o2
+        Date_t::now(),                        // wall clock time
+        0,                                    // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+    insertOplogEntry(entry3);
+    migrationSource.notifyNewWriteOpTime(
+        entry3.getOpTime(), SessionCatalogMigrationSource::EntryAtOpTimeType::kRetryableWrite);
+
+    ASSERT_TRUE(migrationSource.hasMoreOplog());
+    ASSERT_TRUE(migrationSource.inCatchupPhase());
+    ASSERT_EQ(migrationSource.untransferredCatchUpDataSize(), 2 * sessionRecord.toBSON().objsize());
+
+    // Drain new writes and check untransferred data size.
+    ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
+    ASSERT_TRUE(migrationSource.fetchNextOplog(opCtx()));
+    ASSERT_FALSE(migrationSource.fetchNextOplog(opCtx()));
+
+    ASSERT_FALSE(migrationSource.hasMoreOplog());
+    ASSERT_TRUE(migrationSource.inCatchupPhase());
+    ASSERT_EQ(0, migrationSource.untransferredCatchUpDataSize());
+}
+
+TEST_F(SessionCatalogMigrationSourceTest, UntransferredDataSizeWithNoCommittedWrites) {
+    SessionCatalogMigrationSource migrationSource(opCtx(), kNs, kChunkRange, kShardKey);
+
+    auto entry = makeOplogEntry(
+        repl::OpTime(Timestamp(52, 345), 2),  // optime
+        repl::OpTypeEnum::kInsert,            // op type
+        BSON("x" << 0),                       // o
+        boost::none,                          // o2
+        Date_t::now(),                        // wall clock time
+        0,                                    // statement ids
+        repl::OpTime(Timestamp(0, 0), 0));    // optime of previous write within same transaction
+    insertOplogEntry(entry);
+    migrationSource.notifyNewWriteOpTime(
+        entry.getOpTime(), SessionCatalogMigrationSource::EntryAtOpTimeType::kRetryableWrite);
+
+    ASSERT_TRUE(migrationSource.hasMoreOplog());
+    ASSERT_TRUE(migrationSource.inCatchupPhase());
+    // Average object size is default since the config.transactions collection does not exist.
+    const int64_t defaultSessionDocSize =
+        sizeof(LogicalSessionId) + sizeof(TxnNumber) + sizeof(Timestamp) + 16;
+    ASSERT_EQ(migrationSource.untransferredCatchUpDataSize(), defaultSessionDocSize);
 }
 
 }  // namespace

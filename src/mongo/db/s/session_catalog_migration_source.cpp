@@ -228,6 +228,14 @@ SessionCatalogMigrationSource::SessionCatalogMigrationSource(OperationContext* o
     WriteConcernOptions majority(
         WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, 0);
     uassertStatusOK(waitForWriteConcern(opCtx, opTimeToWait, majority, &result));
+
+    AutoGetCollection autoColl(opCtx, NamespaceString::kSessionTransactionsTableNamespace, MODE_IS);
+    Collection* const collection = autoColl.getCollection();
+    // Session docs contain at least LSID, TxnNumber, Timestamp, and some BSON overhead.
+    const int64_t defaultSessionDocSize =
+        sizeof(LogicalSessionId) + sizeof(TxnNumber) + sizeof(Timestamp) + 16;
+    _averageSessionDocSize =
+        collection ? collection->averageObjectSize(opCtx) : defaultSessionDocSize;
 }
 
 bool SessionCatalogMigrationSource::hasMoreOplog() {
@@ -237,6 +245,15 @@ bool SessionCatalogMigrationSource::hasMoreOplog() {
 
     stdx::lock_guard<Latch> lk(_newOplogMutex);
     return _hasNewWrites(lk);
+}
+
+bool SessionCatalogMigrationSource::inCatchupPhase() {
+    return !_hasMoreOplogFromSessionCatalog();
+}
+
+int64_t SessionCatalogMigrationSource::untransferredCatchUpDataSize() {
+    invariant(inCatchupPhase());
+    return _newWriteOpTimeList.size() * _averageSessionDocSize;
 }
 
 void SessionCatalogMigrationSource::onCommitCloneStarted() {
