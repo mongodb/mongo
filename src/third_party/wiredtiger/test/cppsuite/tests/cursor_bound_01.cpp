@@ -28,6 +28,7 @@
 
 #include "src/common/constants.h"
 #include "src/common/random_generator.h"
+#include "src/bound/bound.h"
 #include "src/main/test.h"
 
 using namespace test_harness;
@@ -47,65 +48,10 @@ using namespace test_harness;
  */
 class cursor_bound_01 : public test {
     /* Class helper to represent the lower and uppers bounds for the range cursor. */
-    class bound {
-        public:
-        bound()
-        {
-            clear();
-        };
-
-        bound(uint64_t key_size_max, bool lower_bound) : _lower_bound(lower_bound)
-        {
-            auto key_size =
-              random_generator::instance().generate_integer(static_cast<uint64_t>(1), key_size_max);
-            _key = random_generator::instance().generate_random_string(
-              key_size, characters_type::ALPHABET);
-            _inclusive = random_generator::instance().generate_integer(0, 1);
-        }
-
-        bound(uint64_t key_size_max, bool lower_bound, char start)
-            : bound(key_size_max, lower_bound)
-        {
-            _key[0] = start;
-        }
-
-        std::string
-        get_config() const
-        {
-            return "bound=" + std::string(_lower_bound ? "lower" : "upper") +
-              ",inclusive=" + std::string(_inclusive ? "true" : "false");
-        }
-
-        const std::string &
-        get_key() const
-        {
-            return _key;
-        }
-
-        bool
-        get_inclusive() const
-        {
-            return _inclusive;
-        }
-
-        void
-        clear()
-        {
-            _key.clear();
-            _inclusive = false;
-            _lower_bound = false;
-        }
-
-        private:
-        std::string _key;
-        bool _inclusive;
-        bool _lower_bound;
-    };
-
     private:
     bool _reverse_collator_enabled = false;
     const uint64_t MAX_ROLLBACKS = 100;
-    enum bounds { NO_BOUNDS, LOWER_BOUND_SET, UPPER_BOUND_SET, ALL_BOUNDS_SET };
+    enum class bound_action { NO_BOUNDS, LOWER_BOUND_SET, UPPER_BOUND_SET, ALL_BOUNDS_SET };
 
     public:
     cursor_bound_01(const test_args &args) : test(args)
@@ -258,19 +204,20 @@ class cursor_bound_01 : public test {
         bound lower_bound, upper_bound;
 
         testutil_check(range_cursor->reset(range_cursor.get()));
-        auto bound_choice = random_generator::instance().generate_integer(0, 3);
-        if (bound_choice == NO_BOUNDS)
+        bound_action action =
+          static_cast<bound_action>(random_generator::instance().generate_integer(0, 3));
+        if (action == bound_action::NO_BOUNDS)
             testutil_check(range_cursor->bound(range_cursor.get(), "action=clear"));
 
-        if (bound_choice == LOWER_BOUND_SET || bound_choice == ALL_BOUNDS_SET) {
+        if (action == bound_action::LOWER_BOUND_SET || action == bound_action::ALL_BOUNDS_SET) {
             lower_bound = bound(tc->key_size, true);
             range_cursor->set_key(range_cursor.get(), lower_bound.get_key().c_str());
             testutil_check(
               range_cursor->bound(range_cursor.get(), lower_bound.get_config().c_str()));
         }
 
-        if (bound_choice == UPPER_BOUND_SET || bound_choice == ALL_BOUNDS_SET) {
-            if (bound_choice == ALL_BOUNDS_SET) {
+        if (action == bound_action::UPPER_BOUND_SET || action == bound_action::ALL_BOUNDS_SET) {
+            if (action == bound_action::ALL_BOUNDS_SET) {
                 /* Ensure that the lower and upper bounds are never overlapping. */
                 if (_reverse_collator_enabled)
                     upper_bound = bound(tc->key_size, false, lower_bound.get_key()[0] - 1);
@@ -283,7 +230,7 @@ class cursor_bound_01 : public test {
               range_cursor->bound(range_cursor.get(), upper_bound.get_config().c_str()));
         }
 
-        if (bound_choice == ALL_BOUNDS_SET)
+        if (action == bound_action::ALL_BOUNDS_SET)
             testutil_assert(
               custom_lexicographical_compare(lower_bound.get_key(), upper_bound.get_key(), false));
 
