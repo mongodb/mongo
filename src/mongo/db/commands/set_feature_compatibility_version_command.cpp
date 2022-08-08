@@ -376,6 +376,55 @@ public:
     }
 
 private:
+    // This helper function is for any actions that should be done before taking the FCV full
+    // transition lock in S mode. It is required that the code in this helper function is idempotent
+    // and could be done after _runDowngrade even if it failed at any point in the middle of
+    // _userCollectionsDowngradeCleanup or _internalServerDowngradeCleanup.
+    void _prepareForUpgrade(OperationContext* opCtx) {
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            return;
+        } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+            return;
+        } else {
+            _cancelServerlessMigrations(opCtx);
+        }
+    }
+
+    // This helper function is for any user collections uasserts, creations, or deletions that need
+    // to happen during the upgrade. It is required that the code in this helper function is
+    // idempotent and could be done after _runDowngrade even if it failed at any point in the middle
+    // of _userCollectionsDowngradeCleanup or _internalServerDowngradeCleanup.
+    void _userCollectionsUpgradeUassertsAndUpdates() {
+        return;
+    }
+
+    // This helper function is for updating metadata to make sure the new features in the
+    // upgraded version work for sharded and non-sharded clusters. It is required that the code
+    // in this helper function is idempotent and could be done after _runDowngrade even if it
+    // failed at any point in the middle of _userCollectionsDowngradeCleanup or
+    // _internalServerDowngradeCleanup.
+    void _completeUpgrade(OperationContext* opCtx,
+                          const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            _createGlobalIndexesIndexes(opCtx, requestedVersion);
+        } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+            _createGlobalIndexesIndexes(opCtx, requestedVersion);
+        } else {
+            return;
+        }
+    }
+
+    void _createGlobalIndexesIndexes(
+        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        // TODO SERVER-67392: Remove once FCV 7.0 becomes last-lts.
+        if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(requestedVersion)) {
+            uassertStatusOK(sharding_util::createGlobalIndexesIndexes(opCtx));
+            if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+                uassertStatusOK(sharding_util::createShardCollectionCatalogIndexes(opCtx));
+            }
+        }
+    }
+
     void _runUpgrade(OperationContext* opCtx,
                      const SetFeatureCompatibilityVersion& request,
                      boost::optional<Timestamp> changeTimestamp) {
@@ -383,16 +432,14 @@ private:
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             // Tell the shards to enter phase-1 of setFCV
-            auto requestPhase1 = request;
-            requestPhase1.setFromConfigServer(true);
-            requestPhase1.setPhase(SetFCVPhaseEnum::kStart);
-            requestPhase1.setChangeTimestamp(changeTimestamp);
-            uassertStatusOK(
-                ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
-                    opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase1.toBSON({}))));
+            _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kStart);
         }
 
-        _cancelServerlessMigrations(opCtx);
+        // This helper function is for any actions that should be done before taking the FCV full
+        // transition lock in S mode. It is required that the code in this helper function is
+        // idempotent and could be done after _runDowngrade even if it failed at any point in the
+        // middle of _userCollectionsDowngradeCleanup or _internalServerDowngradeCleanup.
+        _prepareForUpgrade(opCtx);
 
         {
             // Take the FCV full transition lock in S mode to create a barrier for operations taking
@@ -406,6 +453,15 @@ private:
                 opCtx, opCtx->lockState(), resourceIdFeatureCompatibilityVersion, MODE_S);
         }
 
+        // This helper function is for any user collections uasserts, creations, or deletions that
+        // need to happen during the upgrade. It is required that the code in this helper function
+        // is idempotent and could be done after _runDowngrade even if it failed at any point in the
+        // middle of _userCollectionsDowngradeCleanup or _internalServerDowngradeCleanup.
+        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
+            serverGlobalParams.clusterRole == ClusterRole::None) {
+            _userCollectionsUpgradeUassertsAndUpdates();
+        }
+
         uassert(ErrorCodes::Error(549180),
                 "Failing upgrade due to 'failUpgrading' failpoint set",
                 !failUpgrading.shouldFail());
@@ -417,22 +473,15 @@ private:
             abortAllReshardCollection(opCtx);
 
             // Tell the shards to enter phase-2 of setFCV (fully upgraded)
-            auto requestPhase2 = request;
-            requestPhase2.setFromConfigServer(true);
-            requestPhase2.setPhase(SetFCVPhaseEnum::kComplete);
-            requestPhase2.setChangeTimestamp(changeTimestamp);
-            uassertStatusOK(
-                ShardingCatalogManager::get(opCtx)->setFeatureCompatibilityVersionOnShards(
-                    opCtx, CommandHelpers::appendMajorityWriteConcern(requestPhase2.toBSON({}))));
+            _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kComplete);
         }
 
-        // TODO SERVER-67392: Remove once FCV 7.0 becomes last-lts.
-        if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(requestedVersion)) {
-            uassertStatusOK(sharding_util::createGlobalIndexesIndexes(opCtx));
-            if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-                uassertStatusOK(sharding_util::createShardCollectionCatalogIndexes(opCtx));
-            }
-        }
+        // This helper function is for updating metadata to make sure the new features in the
+        // upgraded version work for sharded and non-sharded clusters. It is required that the code
+        // in this helper function is idempotent and could be done after _runDowngrade even if it
+        // failed at any point in the middle of _userCollectionsDowngradeCleanup or
+        // _internalServerDowngradeCleanup.
+        _completeUpgrade(opCtx, requestedVersion);
 
         hangWhileUpgrading.pauseWhileSet(opCtx);
     }
@@ -469,6 +518,10 @@ private:
     // that the user has to run setFCV again. The code added/modified in this helper function should
     // not leave the server in an inconsistent state if the actions in this function failed part way
     // through.
+    // This helper function can only fail with some transient error that can be retried (like
+    // InterruptedDueToReplStateChange) or ErrorCode::CannotDowngrade. The uasserts added to this
+    // helper function can only have the CannotDowngrade error code indicating that the user must
+    // manually clean up some user data in order to retry the FCV downgrade.
     void _uassertUserDataAndSettingsReadyForDowngrade(
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
@@ -553,6 +606,13 @@ private:
     // cleanup. The code in this helper function is required to be idempotent in case the node
     // crashes or downgrade fails in a way that the user has to run setFCV again. It also cannot
     // fail for a non-retryable reason since at this point user data has already been cleaned up.
+    // This helper function can only fail with some transient error that can be retried (like
+    // InterruptedDueToReplStateChange), ManualInterventionRequired, or fasserts. For any
+    // non-retryable error in this helper function, it should error either with an uassert with
+    // ManualInterventionRequired as the error code (indicating a server bug but that all the data
+    // is consistent on disk and for reads/writes) or with an fassert (indicating a server bug and
+    // that the data is corrupted). ManualInterventionRequired and fasserts are errors that are not
+    // expected to occur in practice, but if they did, they would turn into a Support case.
     void _internalServerDowngradeCleanup(
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
@@ -672,14 +732,26 @@ private:
         // in a way that the user has to run setFCV again. The code added/modified in this helper
         // function should not leave the server in an inconsistent state if the actions in this
         // function failed part way through.
+        // This helper function can only fail with some transient error that can be retried (like
+        // InterruptedDueToReplStateChange) or ErrorCode::CannotDowngrade. The uasserts added to
+        // this helper function can only have the CannotDowngrade error code indicating that the
+        // user must manually clean up some user data in order to retry the FCV downgrade.
         _uassertUserDataAndSettingsReadyForDowngrade(opCtx, requestedVersion);
 
         // This helper function is for any internal server downgrade cleanup, such as dropping
-        // collections or aborting. These cleanup will happen after user collection downgrade
+        // collections or aborting. This cleanup will happen after user collection downgrade
         // cleanup. The code in this helper function is required to be idempotent in case the node
         // crashes or downgrade fails in a way that the user has to run setFCV again. It also cannot
         // fail for a non-retryable reason since at this point user data has already been cleaned
         // up.
+        // This helper function can only fail with some transient error that can be retried
+        // (like InterruptedDueToReplStateChange), ManualInterventionRequired, or fasserts. For any
+        // non-retryable error in this helper function, it should error either with an uassert with
+        // ManualInterventionRequired as the error code (indicating a server bug but that all the
+        // data is consistent on disk and for reads/writes) or with an fassert (indicating a server
+        // bug and that the data is corrupted). ManualInterventionRequired and fasserts are errors
+        // that are not expected to occur in practice, but if they did, they would turn into a
+        // Support case.
         _internalServerDowngradeCleanup(opCtx, requestedVersion);
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
