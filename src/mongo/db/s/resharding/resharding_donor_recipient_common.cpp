@@ -140,6 +140,13 @@ void processReshardingFieldsForDonorCollection(OperationContext* opCtx,
         return;
     }
 
+    // We clear the routing information for the temporary resharding namespace to ensure this donor
+    // shard primary will refresh from the config server and see the chunk distribution for the new
+    // resharding operation.
+    auto* catalogCache = Grid::get(opCtx)->catalogCache();
+    catalogCache->invalidateCollectionEntry_LINEARIZABLE(
+        reshardingFields.getDonorFields()->getTempReshardingNss());
+
     auto donorDoc = constructDonorDocumentFromReshardingFields(nss, metadata, reshardingFields);
     createReshardingStateMachine<ReshardingDonorService,
                                  DonorStateMachine,
@@ -338,7 +345,16 @@ void clearFilteringMetadata(OperationContext* opCtx, bool scheduleAsyncRefresh) 
 void clearFilteringMetadata(OperationContext* opCtx,
                             stdx::unordered_set<NamespaceString> namespacesToRefresh,
                             bool scheduleAsyncRefresh) {
+    auto* catalogCache = Grid::get(opCtx)->catalogCache();
+
     for (const auto& nss : namespacesToRefresh) {
+        if (nss.isTemporaryReshardingCollection()) {
+            // We clear the routing information for the temporary resharding namespace to ensure all
+            // new donor shard primaries will refresh from the config server and see the chunk
+            // distribution for the ongoing resharding operation.
+            catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
+        }
+
         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
         CollectionShardingRuntime::get(opCtx, nss)->clearFilteringMetadata(opCtx);
 

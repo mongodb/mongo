@@ -292,6 +292,11 @@ var ReshardingTest = class {
         return sourceCollection;
     }
 
+    get tempNs() {
+        assert.neq(undefined, this._tempNs, "createShardedCollection must be called first");
+        return this._tempNs;
+    }
+
     /**
      * Reshards an existing collection using the specified new shard key and new chunk ranges.
      *
