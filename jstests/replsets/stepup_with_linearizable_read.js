@@ -31,12 +31,12 @@ var sendLinearizableReadOnFailpoint = function() {
 
         jsTestLog('Sending in linearizable read in secondary thread');
 
-        // In lock free reads this will timeout as we cannot perform the necessary write after the
-        // read. Without lock free reads we timeout because we can't acquire the RSTL.
+        // In lock free reads this will error with NotWritablePrimary. Without lock free reads we
+        // timeout because we can't acquire the RSTL.
         assert.commandFailedWithCode(
             coll.runCommand(
                 {'find': 'foo', readConcern: {level: "linearizable"}, maxTimeMS: 10000}),
-            ErrorCodes.MaxTimeMSExpired);
+            [ErrorCodes.NotWritablePrimary, ErrorCodes.MaxTimeMSExpired]);
     } finally {
         // Turn off fail point so we can cleanup.
         assert.commandWorked(db.getMongo().adminCommand(
