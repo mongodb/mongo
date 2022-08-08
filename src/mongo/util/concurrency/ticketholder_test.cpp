@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include <condition_variable>
+#include <mutex>
 
 #include "mongo/platform/basic.h"
 
@@ -70,6 +72,7 @@ void basicTimeout(OperationContext* opCtx) {
     ASSERT_EQ(holder->outof(), 1);
 
     AdmissionContext admCtx;
+    admCtx.setPriority(AdmissionContext::AcquisitionPriority::kNormal);
     {
         auto ticket = holder->waitForTicket(opCtx, &admCtx, mode);
         ASSERT_EQ(holder->used(), 1);
@@ -138,12 +141,15 @@ TEST_F(TicketHolderTest, BasicTimeoutFifo) {
 TEST_F(TicketHolderTest, BasicTimeoutSemaphore) {
     basicTimeout<SemaphoreTicketHolder>(_opCtx.get());
 }
+TEST_F(TicketHolderTest, BasicTimeoutPriority) {
+    basicTimeout<PriorityTicketHolder>(_opCtx.get());
+}
 
 class Stats {
 public:
     Stats(TicketHolder* holder) : _holder(holder){};
 
-    long long operator[](StringData field) {
+    long long operator[](StringData field) const {
         BSONObjBuilder bob;
         _holder->appendStats(bob);
         auto stats = bob.obj();
@@ -276,6 +282,190 @@ TEST_F(TicketHolderTest, FifoCanceled) {
     ASSERT_EQ(stats["processing"], 0);
     ASSERT_EQ(stats["totalTimeProcessingMicros"], 100);
     ASSERT_EQ(stats["canceled"], 1);
+}
+
+TEST_F(TicketHolderTest, PriorityTwoQueuedOperations) {
+    ServiceContext serviceContext;
+    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+    PriorityTicketHolder holder(1, &serviceContext);
+    Stats stats(&holder);
+
+    {
+        // Allocate the only available ticket. Priority is irrelevant when there are tickets
+        // available.
+        AdmissionContext admCtx;
+        admCtx.setPriority(AdmissionContext::AcquisitionPriority::kLow);
+        boost::optional<Ticket> ticket =
+            holder.waitForTicket(_opCtx.get(), &admCtx, TicketHolder::WaitMode::kInterruptible);
+        ASSERT(ticket);
+
+        // Create a client corresponding to a low priority operation that will queue.
+        boost::optional<Ticket> ticketLowPriority;
+        auto clientLowPriority = this->getServiceContext()->makeClient("clientLowPriority");
+        auto opCtxLowPriority = clientLowPriority->makeOperationContext();
+        // Each ticket is assigned with a pointer to an AdmissionContext. The AdmissionContext must
+        // survive the lifetime of the ticket.
+        AdmissionContext admCtxLowPriority;
+        admCtxLowPriority.setPriority(AdmissionContext::AcquisitionPriority::kLow);
+
+        stdx::thread lowPriorityThread([&]() {
+            ticketLowPriority = holder.waitForTicket(opCtxLowPriority.get(),
+                                                     &admCtxLowPriority,
+                                                     TicketHolder::WaitMode::kUninterruptible);
+        });
+
+        // Create a client corresponding to a normal priority operation that will queue.
+        boost::optional<Ticket> ticketNormalPriority;
+        auto clientNormalPriority = this->getServiceContext()->makeClient("clientNormalPriority");
+        auto opCtxNormalPriority = clientNormalPriority->makeOperationContext();
+        // Each ticket is assigned with a pointer to an AdmissionContext. The AdmissionContext must
+        // survive the lifetime of the ticket.
+        AdmissionContext admCtxNormalPriority;
+        admCtxNormalPriority.setPriority(AdmissionContext::AcquisitionPriority::kNormal);
+
+        stdx::thread normalPriorityThread([&]() {
+            ticketNormalPriority = holder.waitForTicket(opCtxNormalPriority.get(),
+                                                        &admCtxNormalPriority,
+                                                        TicketHolder::WaitMode::kUninterruptible);
+        });
+
+        // Wait for the threads to to queue for a ticket.
+        while (holder.queued() < 2) {
+        }
+
+        // Waiting for a condition variable in MongoDB is not an atomic operation for the underlying
+        // mutex (release + wait the CV is not an atomic operation). To overcome this there is
+        // currently no other solution but to wait a bit until the threads are really waiting in the
+        // condition variable.
+        stdx::this_thread::sleep_for(stdx::chrono::milliseconds(50));
+
+        ASSERT_EQ(stats["queueLength"], 2);
+        ticket.reset();
+
+        // Normal priority thread takes the ticket.
+        normalPriorityThread.join();
+        ASSERT_TRUE(ticketNormalPriority);
+        ASSERT_EQ(stats["removedFromQueue"], 1);
+        ticketNormalPriority.reset();
+
+        // Low priority thread takes the ticket.
+        lowPriorityThread.join();
+        ASSERT_TRUE(ticketLowPriority);
+        ASSERT_EQ(stats["removedFromQueue"], 2);
+        ticketLowPriority.reset();
+    }
+
+    ASSERT_EQ(stats["addedToQueue"], 2);
+    ASSERT_EQ(stats["removedFromQueue"], 2);
+    ASSERT_EQ(stats["queueLength"], 0);
+}
+
+TEST_F(TicketHolderTest, PriorityTwoNormalOneLowQueuedOperations) {
+    ServiceContext serviceContext;
+    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+    PriorityTicketHolder holder(1, &serviceContext);
+    Stats stats(&holder);
+
+    {
+        // Allocate the only available ticket. Priority is irrelevant when there are tickets
+        // available.
+        AdmissionContext admCtx;
+        admCtx.setPriority(AdmissionContext::AcquisitionPriority::kLow);
+        boost::optional<Ticket> ticket =
+            holder.waitForTicket(_opCtx.get(), &admCtx, TicketHolder::WaitMode::kInterruptible);
+        ASSERT(ticket);
+
+        // Create a client corresponding to a low priority operation that will queue.
+        boost::optional<Ticket> ticketLowPriority;
+        auto clientLowPriority = this->getServiceContext()->makeClient("clientLowPriority");
+        auto opCtxLowPriority = clientLowPriority->makeOperationContext();
+        // Each ticket is assigned with a pointer to an AdmissionContext. The AdmissionContext must
+        // survive the lifetime of the ticket.
+        AdmissionContext admCtxLowPriority;
+        admCtxLowPriority.setPriority(AdmissionContext::AcquisitionPriority::kLow);
+
+        stdx::thread lowPriorityThread([&]() {
+            ticketLowPriority = holder.waitForTicket(opCtxLowPriority.get(),
+                                                     &admCtxLowPriority,
+                                                     TicketHolder::WaitMode::kUninterruptible);
+        });
+
+        // Create a client corresponding to a normal priority operation that will queue.
+        boost::optional<Ticket> ticketNormal1Priority;
+        auto clientNormal1Priority = this->getServiceContext()->makeClient("clientNormal1Priority");
+        auto opCtxNormal1Priority = clientNormal1Priority->makeOperationContext();
+        // Each ticket is assigned with a pointer to an AdmissionContext. The AdmissionContext must
+        // survive the lifetime of the ticket.
+        AdmissionContext admCtxNormal1Priority;
+        admCtxNormal1Priority.setPriority(AdmissionContext::AcquisitionPriority::kNormal);
+
+        stdx::thread normal1PriorityThread([&]() {
+            ticketNormal1Priority = holder.waitForTicket(opCtxNormal1Priority.get(),
+                                                         &admCtxNormal1Priority,
+                                                         TicketHolder::WaitMode::kUninterruptible);
+        });
+
+        // Wait for threads on the queue
+        while (holder.queued() < 2) {
+        }
+
+        // Waiting for a condition variable in MongoDB is not an atomic operation for the underlying
+        // mutex (release + wait the CV is not an atomic operation). To overcome this there is
+        // currently no other solution but to wait a bit until the threads are really waiting in the
+        // condition variable.
+        stdx::this_thread::sleep_for(stdx::chrono::milliseconds(50));
+
+        // Release the ticket.
+        ticket.reset();
+
+        // Normal priority thread takes the ticket
+        normal1PriorityThread.join();
+        ASSERT_TRUE(ticketNormal1Priority);
+        ASSERT_EQ(stats["removedFromQueue"], 1);
+
+        // Create a client corresponding to a second normal priority operation that will be
+        // prioritized over the queued low priority operation.
+        boost::optional<Ticket> ticketNormal2Priority;
+        auto clientNormal2Priority = this->getServiceContext()->makeClient("clientNormal2Priority");
+        auto opCtxNormal2Priority = clientNormal2Priority->makeOperationContext();
+        // Each ticket is assigned with a pointer to an AdmissionContext. The AdmissionContext must
+        // survive the lifetime of the ticket.
+        AdmissionContext admCtxNormal2Priority;
+        admCtxNormal2Priority.setPriority(AdmissionContext::AcquisitionPriority::kNormal);
+        stdx::thread normal2PriorityThread([&]() {
+            ticketNormal2Priority = holder.waitForTicket(opCtxNormal2Priority.get(),
+                                                         &admCtxNormal2Priority,
+                                                         TicketHolder::WaitMode::kUninterruptible);
+        });
+
+        // Wait for the new thread on the queue.
+        while (holder.queued() < 2) {
+        }
+
+        // Waiting for a condition variable in MongoDB is not an atomic operation for the underlying
+        // mutex (release + wait the CV is not an atomic operation). To overcome this there is
+        // currently no other solution but to wait a bit until the threads are really waiting in the
+        // condition variable.
+        stdx::this_thread::sleep_for(stdx::chrono::milliseconds(50));
+
+        // Release the ticket.
+        ticketNormal1Priority.reset();
+
+        // The other normal priority thread takes the ticket.
+        normal2PriorityThread.join();
+        ASSERT_TRUE(ticketNormal2Priority);
+        ASSERT_EQ(stats["removedFromQueue"], 2);
+        ticketNormal2Priority.reset();
+
+        // Low priority thread takes the ticket.
+        lowPriorityThread.join();
+        ASSERT_TRUE(ticketLowPriority);
+        ASSERT_EQ(stats["removedFromQueue"], 3);
+        ticketLowPriority.reset();
+    }
+    ASSERT_EQ(stats["addedToQueue"], 3);
+    ASSERT_EQ(stats["removedFromQueue"], 3);
+    ASSERT_EQ(stats["queueLength"], 0);
 }
 
 }  // namespace

@@ -367,6 +367,8 @@ public:
 
     int available() const override final;
 
+    int queued() const override final;
+
 private:
     bool _tryAcquireTicket();
 
@@ -400,6 +402,7 @@ private:
 
     QueueMutex _queueMutex;
     AtomicWord<int> _ticketsAvailable;
+    AtomicWord<int> _enqueuedElements;
     ServiceContext* _serviceContext;
 };
 
@@ -419,6 +422,22 @@ private:
 
     std::uint32_t _readerWeight;
     std::uint32_t _totalWeight;
+};
+
+class PriorityTicketHolder final : public SchedulingTicketHolder {
+public:
+    explicit PriorityTicketHolder(int numTickets, ServiceContext* serviceContext);
+
+private:
+    enum class QueueType : unsigned int {
+        LowPriorityQueue = 0,
+        NormalPriorityQueue = 1,
+        QueueTypeSize = 2
+    };
+
+    void _dequeueWaitingThread() override final;
+
+    Queue& _getQueueToUse(OperationContext* opCtx, const AdmissionContext* admCtx) override final;
 };
 
 /**

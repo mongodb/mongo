@@ -576,12 +576,17 @@ SchedulingTicketHolder::SchedulingTicketHolder(int numTickets,
     }
     _queues.shrink_to_fit();
     _ticketsAvailable.store(numTickets);
+    _enqueuedElements.store(0);
 }
 
 SchedulingTicketHolder::~SchedulingTicketHolder() {}
 
 int SchedulingTicketHolder::available() const {
     return _ticketsAvailable.load();
+}
+
+int SchedulingTicketHolder::queued() const {
+    return _enqueuedElements.loadRelaxed();
 }
 
 void SchedulingTicketHolder::_releaseQueue(AdmissionContext* admCtx) noexcept {
@@ -640,6 +645,8 @@ boost::optional<Ticket> SchedulingTicketHolder::_waitForTicketUntilImpl(Operatio
     bool assigned;
     {
         stdx::unique_lock lk(_queueMutex);
+        _enqueuedElements.addAndFetch(1);
+        ON_BLOCK_EXIT([&] { _enqueuedElements.subtractAndFetch(1); });
         assigned = queue.enqueue(interruptible, lk, until);
     }
     if (assigned) {
@@ -759,4 +766,30 @@ StochasticTicketHolder::StochasticTicketHolder(int numTickets,
     : SchedulingTicketHolder(numTickets, 2, serviceContext),
       _readerWeight(readerWeight),
       _totalWeight(readerWeight + writerWeight) {}
+
+PriorityTicketHolder::PriorityTicketHolder(int numTickets, ServiceContext* serviceContext)
+    : SchedulingTicketHolder(numTickets, 2, serviceContext) {}
+
+void PriorityTicketHolder::_dequeueWaitingThread() {
+    int currentIndexQueue = static_cast<unsigned int>(QueueType::QueueTypeSize) - 1;
+    while (!_queues[currentIndexQueue].attemptToDequeue()) {
+        if (currentIndexQueue == 0)
+            break;
+        else
+            currentIndexQueue--;
+    }
+}
+
+SchedulingTicketHolder::Queue& PriorityTicketHolder::_getQueueToUse(
+    OperationContext* opCtx, const AdmissionContext* admCtx) {
+    auto priority = admCtx->getPriority();
+    switch (priority) {
+        case AdmissionContext::AcquisitionPriority::kLow:
+            return _queues[static_cast<unsigned int>(QueueType::LowPriorityQueue)];
+        case AdmissionContext::AcquisitionPriority::kNormal:
+            return _queues[static_cast<unsigned int>(QueueType::NormalPriorityQueue)];
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
 }  // namespace mongo

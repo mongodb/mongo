@@ -97,14 +97,14 @@ public:
         _priority = priority;
     }
 
-    AcquisitionPriority getPriority() {
+    AcquisitionPriority getPriority() const {
         invariant(_priority);
         return _priority.get();
     }
 
 private:
-    TickSource::Tick _startProcessingTime{};
-    int admissions{};
+    TickSource::Tick _startProcessingTime{0};
+    int admissions{0};
     LockMode _lockMode = LockMode::MODE_NONE;
     boost::optional<AcquisitionPriority> _priority;
 };

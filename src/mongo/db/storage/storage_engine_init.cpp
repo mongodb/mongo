@@ -181,12 +181,19 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
                 }
                 case QueueingPolicyEnum::SchedulingQueue: {
                     LOGV2_DEBUG(6615200, 1, "Using Scheduling Queue-based ticketing scheduler");
-                    auto ticketHolder = std::make_unique<StochasticTicketHolder>(
-                        readTransactions + writeTransactions,
-                        readTransactions,
-                        writeTransactions,
-                        svcCtx);
-                    TicketHolder::use(svcCtx, std::move(ticketHolder));
+                    if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations
+                            .isEnabledAndIgnoreFCV()) {
+                        auto ticketHolder = std::make_unique<PriorityTicketHolder>(
+                            readTransactions + writeTransactions, svcCtx);
+                        TicketHolder::use(svcCtx, std::move(ticketHolder));
+                    } else {
+                        auto ticketHolder = std::make_unique<StochasticTicketHolder>(
+                            readTransactions + writeTransactions,
+                            readTransactions,
+                            writeTransactions,
+                            svcCtx);
+                        TicketHolder::use(svcCtx, std::move(ticketHolder));
+                    }
                     break;
                 }
             }
