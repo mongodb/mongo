@@ -594,8 +594,7 @@ functions:
           ${python_binary|python3} ../test/evergreen/print_stack_trace.py --unit_test -e ${python_binary|python3} -c WT_TEST -l .
 
           # Look through the stress format directory for any coredumps.
-          cd test/format
-          ${python_binary|python3} ../../../test/evergreen/print_stack_trace.py --format -e ./t -c . -l .
+          ${python_binary|python3} ../test/evergreen/print_stack_trace.py --format -e ./test/format/t -c test/format/. -l test/format/.
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
@@ -2332,7 +2331,8 @@ tasks:
           <<: *configure_flags_tiered_storage_s3
       - func: "run tiered storage test"
         vars:
-          python_binary: venv/bin/python3 # Set this in case of a core to get the correct python binary.
+          # Set this in case of a core to get the correct python binary.
+          python_binary: $(pwd)/venv/bin/python3
           tiered_storage_test_name: tiered
   - name: tiered-test-small
     tags: ["pull_request", "python", "ext"]
@@ -2343,7 +2343,8 @@ tasks:
           <<: *configure_flags_tiered_storage_s3
       - func: "run tiered storage test"
         vars:
-          python_binary: venv/bin/python3  # Set this in case of a core to get the correct python binary.
+          # Set this in case of a core to get the correct python binary.
+          python_binary: $(pwd)/venv/bin/python3
           tiered_storage_test_name: tiered06
   - name: tiered-unittest-test
     tags: ["pull_request", "ext"]
