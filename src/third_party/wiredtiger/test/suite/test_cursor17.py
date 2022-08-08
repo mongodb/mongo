@@ -43,6 +43,7 @@ class test_cursor17(wttest.WiredTigerTestCase):
         ('table-row', dict(type='table:', keyformat='i', valueformat='i', dataset=SimpleDataSet)),
         ('file-var', dict(type='file:', keyformat='r', valueformat='i', dataset=SimpleDataSet)),
         ('table-var', dict(type='table:', keyformat='r', valueformat='i', dataset=SimpleDataSet)),
+        ('file-fix', dict(type='file:', keyformat='r', valueformat='8t', dataset=SimpleDataSet)),
         # ('lsm', dict(type='lsm:', keyformat='i', valueformat='i', dataset=SimpleDataSet)),
         ('table-r-complex', dict(type='table:', keyformat='r', valueformat=None,
             dataset=ComplexDataSet)),
