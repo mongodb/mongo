@@ -145,6 +145,12 @@ structs:
             description: "Queryable Encryption max contention counter"
             type: long
             cpp_name: maxContentionCounter
+          s:
+            description: "Queryable Encryption range hypergraph sparsity factor"
+            type: int
+            cpp_name: sparsity
+            optional: true
+            validator: { gte: 0, lte: 3 }
 
     FLE2InsertUpdatePayload:
         description: "Payload of an indexed field to insert or update"

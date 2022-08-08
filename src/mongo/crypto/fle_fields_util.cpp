@@ -40,6 +40,13 @@ void validateIDLFLE2EncryptionPlaceholder(const FLE2EncryptionPlaceholder* place
         uassert(6720200, "Range placeholder value must be an object.", val.isABSONObj());
         auto obj = val.Obj();
         FLE2RangeSpec::parse(IDLParserContext("v"), obj);
+        uassert(6832501,
+                "Sparsity must be defined for range placeholders.",
+                placeholder->getSparsity());
+    } else {
+        uassert(6832500,
+                "Hypergraph sparsity can only be set for range placeholders.",
+                !placeholder->getSparsity());
     }
 }
 void validateIDLFLE2RangeSpec(const FLE2RangeSpec* placeholder) {
