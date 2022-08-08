@@ -86,7 +86,7 @@ THIRD_PARTY_COMPONENTS_FILE = "etc/third_party_components.yml"
 
 ############################################################################
 
-RE_LETTERS = re.compile("[A-Za-z]{2,}")
+RE_LETTER = re.compile("[A-Za-z]")
 
 
 def default_if_none(value, default):
@@ -331,8 +331,9 @@ class VersionInfo:
             if self.ver_str.endswith('-'):
                 self.ver_str = self.ver_str[0:-1]
 
-            # Boost keeps varying the version strings so filter for anything with 2 or more ascii charaters
-            if RE_LETTERS.search(self.ver_str):
+            # Boost keeps varying the version strings so filter for anything with a letter
+            # Safeint has "3.0.26c" as a version number
+            if RE_LETTER.search(self.ver_str):
                 self.production_version = False
                 return
 
