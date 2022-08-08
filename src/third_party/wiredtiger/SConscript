@@ -2,9 +2,12 @@
 import re
 import textwrap
 
-Import("env debugBuild")
-Import("get_option")
+Import("debugBuild")
 Import("endian")
+Import("env")
+Import("has_option")
+Import("get_option")
+Import("releaseBuild")
 
 env = env.Clone()
 
@@ -21,6 +24,12 @@ env.Append(CPPPATH=[
 if debugBuild:
     env.Append(CPPDEFINES=[
         "HAVE_DIAGNOSTIC",
+    ])
+
+# Enable tracking REF state changes for non release builds
+if not (releaseBuild or has_option("disable-ref-track")):
+    env.Append(CPPDEFINES=[
+        "HAVE_REF_TRACK",
     ])
 
 # Enable optional rich logging

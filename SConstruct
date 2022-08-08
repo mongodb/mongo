@@ -310,6 +310,13 @@ add_option(
 )
 
 add_option(
+    'disable-ref-track',
+    help="Disables runtime tracking of REF state changes for pages within wiredtiger. "
+    "Tracking the REF state changes is useful for debugging but there is a small performance cost.",
+    nargs=0,
+)
+
+add_option(
     'separate-debug',
     choices=['on', 'off'],
     const='on',
@@ -5878,6 +5885,7 @@ Export([
     'jsEngine',
     'module_sconscripts',
     'optBuild',
+    'releaseBuild',
     'selected_experimental_optimizations',
     'serverJs',
     'ssl_provider',
