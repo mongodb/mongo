@@ -627,6 +627,7 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
                       "field"_attr = keyPatternElt.toString());
         verify(0);
     }
+    MONGO_UNREACHABLE;
 }
 
 bool QueryPlannerIXSelect::nodeIsSupportedBySparseIndex(const MatchExpression* queryExpr,
