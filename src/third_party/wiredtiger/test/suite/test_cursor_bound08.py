@@ -48,8 +48,7 @@ class test_cursor_bound08(bound_base):
 
     key_format_values = [
         ('string', dict(key_format='S')),
-        # FIXME-WT-9489: Uncomment once column store search near is implemented.
-        # ('var', dict(key_format='r')),
+        ('var', dict(key_format='r')),
         ('int', dict(key_format='i')),
         ('bytes', dict(key_format='u')),
         ('composite_string', dict(key_format='SSS')),
@@ -65,6 +64,7 @@ class test_cursor_bound08(bound_base):
     scenarios = make_scenarios(types, key_format_values, evict)
 
     def create_session_and_cursor_timestamp(self):
+        nrows = 1000
         uri = self.uri + self.file_name
         create_params = 'value_format=S,key_format={}'.format(self.key_format)
         self.session.create(uri, create_params)
@@ -81,13 +81,13 @@ class test_cursor_bound08(bound_base):
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(200))
 
         self.session.begin_transaction()
-        for i in range(601, 1000):
+        for i in range(601, nrows + 1):
             cursor[self.gen_key(i)] = "value" + str(i)
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(100))
 
         if (self.evict):
             evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
-            for i in range(0, 1000):
+            for i in range(100, nrows + 1):
                 evict_cursor.set_key(self.gen_key(i))
                 evict_cursor.search()
                 evict_cursor.reset()
