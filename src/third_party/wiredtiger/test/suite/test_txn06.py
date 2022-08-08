@@ -31,7 +31,7 @@
 
 from suite_subprocess import suite_subprocess
 from wtdataset import SimpleDataSet
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 
 class test_txn06(wttest.WiredTigerTestCase, suite_subprocess):
@@ -44,7 +44,6 @@ class test_txn06(wttest.WiredTigerTestCase, suite_subprocess):
     format_values = [
         ('row', dict(key_format = 'S', value_format='S')),
         ('var', dict(key_format = 'r', value_format='S')),
-        ('fix', dict(key_format = 'r', value_format='8t')),
     ]
     scenarios = make_scenarios(format_values)
 
