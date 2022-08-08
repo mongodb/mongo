@@ -534,11 +534,10 @@ StatusWithMatchExpression parseExpr(StringData name,
     if ((allowedFeatures & MatchExpressionParser::AllowedFeatures::kExpr) == 0u) {
         return {Status(ErrorCodes::QueryFeatureNotAllowed, "$expr is not allowed in this context")};
     }
-    return {std::make_unique<ExprMatchExpression>(
-        std::move(elem),
-        expCtx,
-        doc_validation_error::createAnnotation(
-            expCtx, elem.fieldNameStringData().toString(), elem.wrap()))};
+
+    auto annotation = doc_validation_error::createAnnotation(
+        expCtx, elem.fieldNameStringData().toString(), elem.wrap());
+    return {std::make_unique<ExprMatchExpression>(std::move(elem), expCtx, std::move(annotation))};
 }
 
 StatusWithMatchExpression parseMOD(StringData name,
