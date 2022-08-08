@@ -19,7 +19,7 @@ load("jstests/libs/sbe_util.js");
 
 // This test is specifically verifying the behavior of the SBE plan cache, which is only enabled
 // when 'featureFlagSbeFull' is on.
-if (!checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+if (!checkSBEEnabled(db, ["featureFlagSbeFull"], true /* checkAllNodes */)) {
     jsTestLog("Skipping test because SBE is not fully enabled");
     return;
 }

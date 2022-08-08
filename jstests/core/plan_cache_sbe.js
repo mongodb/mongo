@@ -23,7 +23,7 @@ load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 const coll = db.plan_cache_sbe;
 coll.drop();
-const isSbeEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
+const isSbeEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"], true /* checkAllNodes */);
 
 assert.commandWorked(coll.insert({a: 1, b: 1}));
 

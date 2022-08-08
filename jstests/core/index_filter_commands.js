@@ -342,7 +342,7 @@ assert.commandFailed(
 filters = getFilters();
 assert.eq(0, filters.length, tojson(filters));
 
-if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+if (checkSBEEnabled(db, ["featureFlagSbeFull"], true /* checkAllNodes */)) {
     //
     // Test that planCacheSetFilter doesn't apply to the inner side of a $lookup.
     //
