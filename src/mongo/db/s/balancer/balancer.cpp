@@ -515,7 +515,6 @@ void Balancer::_consumeActionStreamLoop() {
                         2,
                         "Applying throttling on balancer secondary thread",
                         "sleepingTime"_attr = sleepingTime);
-            // TODO SERVER-64865 interrupt the sleep when a shutwdown request is received
             sleepFor(sleepingTime);
         }
         lastActionTime = Date_t::now();
