@@ -60,7 +60,6 @@ const expectedParamDefaults = {
     internalQuerySlotBasedExecutionDisableLookupPushdown: false,
     internalQuerySlotBasedExecutionDisableGroupPushdown: false,
     allowDiskUseByDefault: true,
-    internalQueryFrameworkControl: "tryBonsai",
 };
 
 function assertDefaultParameterValues() {
