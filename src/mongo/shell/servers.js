@@ -77,18 +77,10 @@ MongoRunner = function() {};
 MongoRunner.dataDir = "/data/db";
 MongoRunner.dataPath = "/data/db/";
 
-var installDir = _getEnv("INSTALL_DIR");
-if (installDir) {
-    MongoRunner.mongodPath = installDir + "/mongod";
-    MongoRunner.mongosPath = installDir + "/mongos";
-    MongoRunner.mongoqPath = installDir + "/mongoqd";
-    MongoRunner.mongoShellPath = installDir + "/mongo";
-} else {
-    MongoRunner.mongodPath = "mongod";
-    MongoRunner.mongosPath = "mongos";
-    MongoRunner.mongoqPath = "mongoqd";
-    MongoRunner.mongoShellPath = "mongo";
-}
+MongoRunner.mongodPath = "mongod";
+MongoRunner.mongosPath = "mongos";
+MongoRunner.mongoqPath = "mongoqd";
+MongoRunner.mongoShellPath = "mongo";
 
 MongoRunner.VersionSub = function(pattern, version) {
     this.pattern = pattern;
