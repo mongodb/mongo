@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/operation_context.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/crypto/fle_crypto.h"
@@ -53,6 +52,7 @@
 #include "mongo/config.h"
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/db/matcher/schema/encrypt_schema_gen.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/rpc/object_check.h"
@@ -1971,5 +1971,201 @@ TEST(EDCServerCollectionTest, GenerateEDCTokens) {
     ASSERT_EQ(EDCServerCollection::generateEDCTokens(edcDatakey, 3).size(), 4);
 }
 
+TEST(RangeTest, Int32_NoBounds) {
+#define ASSERT_EI(x, y) ASSERT_EQ(getTypeInfo32((x), boost::none, boost::none).value, (y));
+
+    ASSERT_EI(2147483647, 4294967295);
+
+    ASSERT_EI(1, 2147483649);
+    ASSERT_EI(0, 2147483648);
+    ASSERT_EI(-1, 2147483647);
+    ASSERT_EI(-2, 2147483646);
+    ASSERT_EI(-2147483647, 1);
+
+    // min int32_t, no equivalent in positive part of integer
+    ASSERT_EI(-2147483648, 0);
+
+#undef ASSERT_EI
+}
+
+bool operator==(const OSTType_Int32& lhs, const OSTType_Int32& rhs) {
+    return std::tie(lhs.value, lhs.min, lhs.max) == std::tie(rhs.value, rhs.min, rhs.max);
+}
+
+std::basic_ostream<char>& operator<<(std::basic_ostream<char>& os, const OSTType_Int32& lhs) {
+    return os << "(" << lhs.value << ", " << lhs.min << ", " << lhs.max << ")";
+}
+
+TEST(RangeTest, Int32_Bounds) {
+#define ASSERT_EIB(x, y, z, e)                   \
+    {                                            \
+        auto _ti = getTypeInfo32((x), (y), (z)); \
+        ASSERT_EQ(_ti, (e));                     \
+    }
+
+    ASSERT_EIB(1, 1, 3, OSTType_Int32(0, 0, 2));
+    ASSERT_EIB(0, 0, 1, OSTType_Int32(0, 0, 1));
+    ASSERT_EIB(-1, -1, 0, OSTType_Int32(0, 0, 1));
+    ASSERT_EIB(-2, -2, 0, OSTType_Int32(0, 0, 2));
+
+    // min int32_t, no equivalent in positive part of integer
+    ASSERT_EIB(-2147483647, -2147483648, 1, OSTType_Int32(1, 0, 2147483649));
+    ASSERT_EIB(-2147483648, -2147483648, 0, OSTType_Int32(0, 0, 2147483648));
+    ASSERT_EIB(0, -2147483648, 1, OSTType_Int32(2147483648, 0, 2147483649));
+    ASSERT_EIB(1, -2147483648, 2, OSTType_Int32(2147483649, 0, 2147483650));
+
+    ASSERT_EIB(2147483647, -2147483647, 2147483647, OSTType_Int32(4294967294, 0, 4294967294));
+    ASSERT_EIB(2147483647, -2147483648, 2147483647, OSTType_Int32(4294967295, 0, 4294967295));
+
+    ASSERT_EIB(15, 10, 26, OSTType_Int32(5, 0, 16));
+
+    ASSERT_EIB(15, -10, 55, OSTType_Int32(25, 0, 65));
+
+#undef ASSERT_EIB
+}
+
+TEST(RangeTest, Int32_Errors) {
+    ASSERT_THROWS_CODE(getTypeInfo32(1, boost::none, 2), AssertionException, 6775001);
+    ASSERT_THROWS_CODE(getTypeInfo32(1, 0, boost::none), AssertionException, 6775001);
+    ASSERT_THROWS_CODE(getTypeInfo32(1, 2, 1), AssertionException, 6775002);
+
+    ASSERT_THROWS_CODE(getTypeInfo32(1, 2, 3), AssertionException, 6775003);
+    ASSERT_THROWS_CODE(getTypeInfo32(4, 2, 3), AssertionException, 6775003);
+
+    ASSERT_THROWS_CODE(getTypeInfo32(4, -2147483648, -2147483648), AssertionException, 6775002);
+}
+
+
+TEST(RangeTest, Int64_NoBounds) {
+#define ASSERT_EI(x, y) ASSERT_EQ(getTypeInfo64((x), boost::none, boost::none).value, (y));
+
+    ASSERT_EI(9223372036854775807LL, 18446744073709551615ULL);
+
+    ASSERT_EI(1, 9223372036854775809ULL);
+    ASSERT_EI(0, 9223372036854775808ULL);
+    ASSERT_EI(-1, 9223372036854775807ULL);
+    ASSERT_EI(-2, 9223372036854775806ULL);
+    ASSERT_EI(-9223372036854775807LL, 1);
+
+    // min Int64_t, no equivalent in positive part of integer
+    ASSERT_EI(LLONG_MIN, 0);
+
+#undef ASSERT_EI
+}
+
+bool operator==(const OSTType_Int64& lhs, const OSTType_Int64& rhs) {
+    return std::tie(lhs.value, lhs.min, lhs.max) == std::tie(rhs.value, rhs.min, rhs.max);
+}
+
+std::basic_ostream<char>& operator<<(std::basic_ostream<char>& os, const OSTType_Int64& lhs) {
+    return os << "(" << lhs.value << ", " << lhs.min << ", " << lhs.max << ")";
+}
+
+
+TEST(RangeTest, Int64_Bounds) {
+#define ASSERT_EIB(x, y, z, e)                   \
+    {                                            \
+        auto _ti = getTypeInfo64((x), (y), (z)); \
+        ASSERT_EQ(_ti, (e));                     \
+    }
+
+    ASSERT_EIB(1, 1, 2, OSTType_Int64(0, 0, 1));
+    ASSERT_EIB(0, 0, 1, OSTType_Int64(0, 0, 1))
+    ASSERT_EIB(-1, -1, 0, OSTType_Int64(0, 0, 1))
+    ASSERT_EIB(-2, -2, 0, OSTType_Int64(0, 0, 2))
+
+    // min Int64_t, no equivalent in positive part of integer
+    ASSERT_EIB(-9223372036854775807LL, LLONG_MIN, 1, OSTType_Int64(1, 0, 9223372036854775809ULL));
+    ASSERT_EIB(LLONG_MIN, LLONG_MIN, 0, OSTType_Int64(0, 0, 9223372036854775808ULL));
+    ASSERT_EIB(0, LLONG_MIN, 37, OSTType_Int64(9223372036854775808ULL, 0, 9223372036854775845ULL));
+    ASSERT_EIB(1, LLONG_MIN, 42, OSTType_Int64(9223372036854775809ULL, 0, 9223372036854775850ULL));
+
+    ASSERT_EIB(9223372036854775807,
+               -9223372036854775807,
+               9223372036854775807,
+               OSTType_Int64(18446744073709551614ULL, 0, 18446744073709551614ULL));
+    ASSERT_EIB(9223372036854775807,
+               LLONG_MIN,
+               9223372036854775807,
+               OSTType_Int64(18446744073709551615ULL, 0, 18446744073709551615ULL));
+
+    ASSERT_EIB(15, 10, 26, OSTType_Int64(5, 0, 16));
+
+    ASSERT_EIB(15, -10, 55, OSTType_Int64(25, 0, 65));
+
+#undef ASSERT_EIB
+}
+
+TEST(RangeTest, Int64_Errors) {
+    ASSERT_THROWS_CODE(getTypeInfo64(1, boost::none, 2), AssertionException, 6775004);
+    ASSERT_THROWS_CODE(getTypeInfo64(1, 0, boost::none), AssertionException, 6775004);
+    ASSERT_THROWS_CODE(getTypeInfo64(1, 2, 1), AssertionException, 6775005);
+
+    ASSERT_THROWS_CODE(getTypeInfo64(1, 2, 3), AssertionException, 6775006);
+    ASSERT_THROWS_CODE(getTypeInfo64(4, 2, 3), AssertionException, 6775006);
+
+    ASSERT_THROWS_CODE(getTypeInfo64(4, LLONG_MIN, LLONG_MIN), AssertionException, 6775005);
+}
+
+
+TEST(RangeTest, Double_Bounds) {
+#define ASSERT_EIB(x, z) ASSERT_EQ(getTypeInfoDouble((x), -1E100, 1E100).value, (z));
+
+    // Larger numbers map to larger uint64
+    ASSERT_EIB(-1, 4607182418800017408ULL);
+    ASSERT_EIB(1, 13830554455654793216ULL);
+    ASSERT_EIB(22, 13850257704024539136ULL);
+    ASSERT_EIB(333, 13867937850999177216ULL);
+
+    // Larger exponents map to larger uint64
+    ASSERT_EIB(33E56, 14690973652625833878ULL);
+    ASSERT_EIB(22E57, 14703137697061005818ULL);
+    ASSERT_EIB(11E58, 14713688953586463292ULL);
+
+    // Smaller exponents map to smaller uint64
+    ASSERT_EIB(1E-6, 13740701229962882445ULL);
+    ASSERT_EIB(1E-7, 13725520251343122248ULL);
+    ASSERT_EIB(1E-8, 13710498295186492474ULL);
+    ASSERT_EIB(1E-56, 12992711961033031890ULL);
+    ASSERT_EIB(1E-57, 12977434315086142017ULL);
+    ASSERT_EIB(1E-58, 12962510038552207822ULL);
+
+    // Smaller negative exponents map to smaller uint64
+    ASSERT_EIB(-1E-6, 4517329193108106637);
+    ASSERT_EIB(-1E-7, 4502148214488346440);
+    ASSERT_EIB(-1E-8, 4487126258331716666);
+    ASSERT_EIB(-1E-56, 3769339924178256082);
+    ASSERT_EIB(-1E-57, 3754062278231366209);
+    ASSERT_EIB(-1E-58, 3739138001697432014);
+
+    // Larger exponents map to larger uint64
+    ASSERT_EIB(-33E56, 5467601615771058070);
+    ASSERT_EIB(-22E57, 5479765660206230010);
+    ASSERT_EIB(-11E58, 5490316916731687484);
+
+#undef ASSERT_EIB
+}
+
+
+TEST(RangeTest, Double_Errors) {
+    ASSERT_THROWS_CODE(getTypeInfoDouble(1, boost::none, 2), AssertionException, 6775007);
+    ASSERT_THROWS_CODE(getTypeInfoDouble(1, 0, boost::none), AssertionException, 6775007);
+    ASSERT_THROWS_CODE(getTypeInfoDouble(1, 2, 1), AssertionException, 6775009);
+
+
+    ASSERT_THROWS_CODE(getTypeInfoDouble(1, 2, 3), AssertionException, 6775010);
+    ASSERT_THROWS_CODE(getTypeInfoDouble(4, 2, 3), AssertionException, 6775010);
+
+
+    ASSERT_THROWS_CODE(getTypeInfoDouble(std::numeric_limits<double>::infinity(), 1, 2),
+                       AssertionException,
+                       6775008);
+    ASSERT_THROWS_CODE(getTypeInfoDouble(std::numeric_limits<double>::quiet_NaN(), 1, 2),
+                       AssertionException,
+                       6775008);
+    ASSERT_THROWS_CODE(getTypeInfoDouble(std::numeric_limits<double>::signaling_NaN(), 1, 2),
+                       AssertionException,
+                       6775008);
+}
 
 }  // namespace mongo

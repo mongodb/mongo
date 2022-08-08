@@ -2531,4 +2531,171 @@ bool hasQueryType(const EncryptedFieldConfig& config, QueryTypeEnum queryType) {
     return false;
 }
 
+/**
+ * Encode a signed 32-bit integer as an unsigned 32-bit integer
+ */
+uint32_t encodeInt32(int32_t v) {
+    if (v < 0) {
+
+        // Signed integers have a value that there is no positive equivalent and must be handled
+        // specially
+        if (v == std::numeric_limits<int32_t>::min()) {
+            return 0;
+        }
+
+        return (v & ~(1U << 31));
+    }
+
+    return v + (1U << 31);
+}
+
+
+OSTType_Int32 getTypeInfo32(int32_t value,
+                            boost::optional<int32_t> min,
+                            boost::optional<int32_t> max) {
+    uassert(6775001,
+            "Must specify both a lower and upper bound or no bounds.",
+            min.has_value() == max.has_value());
+
+    if (!min.has_value()) {
+        uint32_t uv = encodeInt32(value);
+        return {uv, 0, std::numeric_limits<uint32_t>::max()};
+    } else {
+        uassert(6775002,
+                "The minimum value must be less than the maximum value",
+                min.value() < max.value());
+        uassert(6775003,
+                "Value must be greater than or equal to the minimum value and less than or equal "
+                "to the maximum value",
+                value >= min.value() && value <= max.value());
+
+        // Handle min int32 as a special case
+        if (min.value() == std::numeric_limits<int32_t>::min()) {
+            uint32_t uv = encodeInt32(value);
+            return {uv, 0, encodeInt32(max.value())};
+        }
+
+        // For negative numbers, first convert them to unbiased uint32 and then subtract the min
+        // value.
+        if (min.value() < 0) {
+            uint32_t uv = encodeInt32(value);
+            uint32_t min_v = encodeInt32(min.value());
+            uint32_t max_v = encodeInt32(max.value());
+
+            uv -= min_v;
+            max_v -= min_v;
+
+            return {uv, 0, max_v};
+        }
+
+        return {static_cast<uint32_t>(value - min.value()),
+                0,
+                static_cast<uint32_t>(max.value() - min.value())};
+    }
+}
+
+/**
+ * Encode a signed 64-bit integer as an unsigned 64-bit integer
+ */
+uint64_t encodeInt64(int64_t v) {
+    if (v < 0) {
+
+        // Signed integers have a value that there is no positive equivalent and must be handled
+        // specially
+        if (v == std::numeric_limits<int64_t>::min()) {
+            return 0;
+        }
+
+        return (v & ~(1ULL << 63));
+    }
+
+    return v + (1ULL << 63);
+}
+
+OSTType_Int64 getTypeInfo64(int64_t value,
+                            boost::optional<int64_t> min,
+                            boost::optional<int64_t> max) {
+    uassert(6775004,
+            "Must specify both a lower and upper bound or no bounds.",
+            min.has_value() == max.has_value());
+
+    if (!min.has_value()) {
+        uint64_t uv = encodeInt64(value);
+        return {uv, 0, std::numeric_limits<uint64_t>::max()};
+    } else {
+        uassert(6775005,
+                "The minimum value must be less than the maximum value",
+                min.value() < max.value());
+        uassert(6775006,
+                "Value must be greater than or equal to the minimum value and less than or equal "
+                "to the maximum value",
+                value >= min.value() && value <= max.value());
+
+        // Handle min int64 as a special case
+        if (min.value() == std::numeric_limits<int64_t>::min()) {
+            uint64_t uv = encodeInt64(value);
+            return {uv, 0, encodeInt64(max.value())};
+        }
+
+        // For negative numbers, first convert them to unbiased uin64 and then subtract the min
+        // value.
+        if (min.value() < 0) {
+            uint64_t uv = encodeInt64(value);
+            uint64_t min_v = encodeInt64(min.value());
+            uint64_t max_v = encodeInt64(max.value());
+
+            uv -= min_v;
+            max_v -= min_v;
+
+            return {uv, 0, max_v};
+        }
+
+        return {static_cast<uint64_t>(value - min.value()),
+                0,
+                static_cast<uint64_t>(max.value() - min.value())};
+    }
+}
+
+OSTType_Double getTypeInfoDouble(double value,
+                                 boost::optional<double> min,
+                                 boost::optional<double> max) {
+    uassert(6775007,
+            "Must specify both a lower and upper bound or no bounds.",
+            min.has_value() == max.has_value());
+
+    uassert(6775008,
+            "Infinity and Nan double values are not supported.",
+            !std::isinf(value) && !std::isnan(value));
+
+    if (min.has_value()) {
+        uassert(6775009,
+                "The minimum value must be less than the maximum value",
+                min.value() < max.value());
+        uassert(6775010,
+                "Value must be greater than or equal to the minimum value and less than or equal "
+                "to the maximum value",
+                value >= min.value() && value <= max.value());
+    }
+
+    // When we translate the double into "bits", the sign bit means that the negative numbers
+    // get mapped into the higher 63 bits of a 64-bit integer. We want them to map into the lower
+    // 64-bits so we invert the sign bit.
+    //
+    // On Endianness, we support two sets of architectures
+    // 1. Little Endian (ppc64le, x64, aarch64) - in these architectures, int64 and double are both
+    // 64-bits and both arranged in little endian byte order.
+    // 2. Big Endian (s390x) - in these architectures, int64 and double are both
+    // 64-bits and both arranged in big endian byte order.
+    //
+    // Therefore, since the order of bytes on each platform is consistent with itself, the
+    // conversion below converts a double into correct 64-bit integer that produces the same
+    // behavior across plaforms.
+    value *= -1;
+    char* buf = reinterpret_cast<char*>(&value);
+    uint64_t uv = DataView(buf).read<uint64_t>();
+
+    return {uv, 0, std::numeric_limits<uint64_t>::max()};
+}
+
+
 }  // namespace mongo

@@ -1190,6 +1190,64 @@ struct ParsedFindPayload {
     explicit ParsedFindPayload(ConstDataRange cdr);
 };
 
+
+/**
+ * FLE2 Range Utility functions
+ */
+
+/**
+ * Describe the encoding of an BSON int32
+ *
+ * NOTE: It is not a mistake that a int32 is encoded as uint32.
+ */
+struct OSTType_Int32 {
+    OSTType_Int32(uint32_t v, uint32_t minP, uint32_t maxP) : value(v), min(minP), max(maxP) {}
+
+    uint32_t value;
+    uint32_t min;
+    uint32_t max;
+};
+
+OSTType_Int32 getTypeInfo32(int32_t value,
+                            boost::optional<int32_t> min,
+                            boost::optional<int32_t> max);
+
+/**
+ * Describe the encoding of an BSON int64
+ *
+ * NOTE: It is not a mistake that a int64 is encoded as uint64.
+ */
+struct OSTType_Int64 {
+    OSTType_Int64(uint64_t v, uint64_t minP, uint64_t maxP) : value(v), min(minP), max(maxP) {}
+
+    uint64_t value;
+    uint64_t min;
+    uint64_t max;
+};
+
+OSTType_Int64 getTypeInfo64(int64_t value,
+                            boost::optional<int64_t> min,
+                            boost::optional<int64_t> max);
+
+
+/**
+ * Describe the encoding of an BSON double (i.e. IEEE 754 Binary64)
+ *
+ * NOTE: It is not a mistake that a double is encoded as uint64.
+ */
+struct OSTType_Double {
+    OSTType_Double(uint64_t v, uint64_t minP, uint64_t maxP) : value(v), min(minP), max(maxP) {}
+
+    uint64_t value;
+    uint64_t min;
+    uint64_t max;
+};
+
+OSTType_Double getTypeInfoDouble(double value,
+                                 boost::optional<double> min,
+                                 boost::optional<double> max);
+
+
 /**
  * Utility functions manipulating buffers.
  */
