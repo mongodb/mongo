@@ -10,7 +10,6 @@
 
 load("jstests/libs/fail_point_util.js");
 
-const name = jsTestName();
 const rst = new ReplSetTest({
     name: jsTestName(),
     nodes: [{
@@ -23,21 +22,19 @@ const rst = new ReplSetTest({
 rst.startSet();
 rst.initiate();
 
-let primary = rst.getPrimary();
+jsTestLog("Done initiating set. Stopping node.");
 
-jsTestLog("Done initiating set. Restarting.");
+rst.stop(0);
 
-const exitCode = MongoRunner.EXIT_ABRUPT;
-let exceptionThrown = false;
-try {
-    rst.restart(0, {
-        startClean: false,
-    });
-} catch (e) {
-    assert(e.message.includes("MongoDB process stopped with exit code: " + exitCode),
-           () => tojson(e));
-    exceptionThrown = true;
-}
+clearRawMongoProgramOutput();
+
+// We set the fail point to make the node encounter a fatal error while trying to load its on-disk
+// config. This code does not run before the restart because there is no config on disk yet.
+jsTestLog("Restarting node. It should fassert.");
+const node = rst.restart(0, {startClean: false, waitForConnect: false});
+
+const exitCode = waitProgram(node.pid);
+assert.eq(exitCode, MongoRunner.EXIT_ABRUPT);
 
 assert.soon(
     function() {
@@ -45,6 +42,4 @@ assert.soon(
     },
     "Node should have fasserted upon encountering a fatal error during startup",
     ReplSetTest.kDefaultTimeoutMS);
-
-assert(exceptionThrown, "Expected restart to fail.");
 })();
