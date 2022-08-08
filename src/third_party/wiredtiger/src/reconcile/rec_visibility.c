@@ -26,7 +26,7 @@ __rec_update_stable(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE *upd)
  */
 static inline int
 __rec_update_save(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, WT_ROW *rip,
-  WT_UPDATE *onpage_upd, WT_UPDATE *tombstone, bool supd_restore, size_t upd_memsize)
+  WT_UPDATE *onpage_upd, bool supd_restore, size_t upd_memsize)
 {
     WT_SAVE_UPD *supd;
 
@@ -44,7 +44,6 @@ __rec_update_save(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, WT_
     supd->ins = ins;
     supd->rip = rip;
     supd->onpage_upd = onpage_upd;
-    supd->onpage_tombstone = tombstone;
     supd->restore = supd_restore;
     ++r->supd_next;
     r->supd_memsize += upd_memsize;
@@ -758,8 +757,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
           (has_newer_updates || F_ISSET(S2C(session), WT_CONN_IN_MEMORY) ||
             page->type == WT_PAGE_COL_FIX);
 
-        WT_ERR(__rec_update_save(
-          session, r, ins, rip, onpage_upd, tombstone, supd_restore, upd_memsize));
+        WT_ERR(__rec_update_save(session, r, ins, rip, onpage_upd, supd_restore, upd_memsize));
 
         /*
          * Mark the selected update (and potentially the tombstone preceding it) as being destined

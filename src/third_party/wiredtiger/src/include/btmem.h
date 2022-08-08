@@ -255,7 +255,6 @@ struct __wt_save_upd {
     WT_INSERT *ins; /* Insert list reference */
     WT_ROW *rip;    /* Original on-page reference */
     WT_UPDATE *onpage_upd;
-    WT_UPDATE *onpage_tombstone;
     bool restore; /* Whether to restore this saved update chain */
 };
 
