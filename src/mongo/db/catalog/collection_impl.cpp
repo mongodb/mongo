@@ -740,30 +740,6 @@ Collection::Validator CollectionImpl::parseValidator(
     return Collection::Validator{validator, std::move(expCtx), std::move(combinedMatchExpr)};
 }
 
-Status CollectionImpl::insertDocumentsForOplog(OperationContext* opCtx,
-                                               std::vector<Record>* records,
-                                               const std::vector<Timestamp>& timestamps) const {
-    dassert(opCtx->lockState()->isWriteLocked());
-
-    // Since this is only for the OpLog, we can assume these for simplicity.
-    invariant(_validator.isOK());
-    invariant(_validator.filter.getValue() == nullptr);
-    invariant(!_indexCatalog->haveAnyIndexes());
-
-    Status status = _shared->_recordStore->insertRecords(opCtx, records, timestamps);
-    if (!status.isOK())
-        return status;
-
-    // TODO (SERVER-67900): Get rid of the CollectionPtr constructor
-    collection_internal::cappedDeleteUntilBelowConfiguredMaximum(
-        opCtx, CollectionPtr(this, CollectionPtr::NoYieldTag()), records->begin()->id);
-
-    // We do not need to notify capped waiters, as we have not yet updated oplog visibility, so
-    // these inserts will not be visible.  When visibility updates, it will notify capped
-    // waiters.
-    return status;
-}
-
 Status CollectionImpl::insertDocuments(OperationContext* opCtx,
                                        const std::vector<InsertStatement>::const_iterator begin,
                                        const std::vector<InsertStatement>::const_iterator end,

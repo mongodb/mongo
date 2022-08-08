@@ -27,14 +27,10 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/oplog.h"
 
-#include <fmt/format.h>
-
 #include <deque>
+#include <fmt/format.h>
 #include <memory>
 #include <set>
 #include <vector>
@@ -44,6 +40,7 @@
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/catalog/capped_collection_maintenance.h"
 #include "mongo/db/catalog/capped_utils.h"
 #include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection.h"
@@ -111,7 +108,6 @@
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
-
 
 namespace mongo {
 
@@ -184,6 +180,25 @@ StringData getInvalidatingReason(const OplogApplication::Mode mode, const bool i
     }
 
     return ""_sd;
+}
+
+Status insertDocumentsForOplog(OperationContext* opCtx,
+                               const CollectionPtr& oplogCollection,
+                               std::vector<Record>* records,
+                               const std::vector<Timestamp>& timestamps) {
+    invariant(opCtx->lockState()->isWriteLocked());
+
+    Status status = oplogCollection->getRecordStore()->insertRecords(opCtx, records, timestamps);
+    if (!status.isOK())
+        return status;
+
+    collection_internal::cappedDeleteUntilBelowConfiguredMaximum(
+        opCtx, oplogCollection, records->begin()->id);
+
+    // We do not need to notify capped waiters, as we have not yet updated oplog visibility, so
+    // these inserts will not be visible.  When visibility updates, it will notify capped
+    // waiters.
+    return Status::OK();
 }
 
 }  // namespace
@@ -363,7 +378,7 @@ void _logOpsInner(OperationContext* opCtx,
         tenant_migration_access_blocker::checkIfCanWriteOrThrow(opCtx, nss.db(), timestamps.back());
     }
 
-    Status result = oplogCollection->insertDocumentsForOplog(opCtx, records, timestamps);
+    Status result = insertDocumentsForOplog(opCtx, oplogCollection, records, timestamps);
     if (!result.isOK()) {
         LOGV2_FATAL(17322,
                     "write to oplog failed: {error}",

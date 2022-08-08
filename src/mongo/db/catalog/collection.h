@@ -358,14 +358,6 @@ public:
                                   bool fromMigrate = false) const = 0;
 
     /**
-     * Callers must ensure no document validation is performed for this collection when calling
-     * this method.
-     */
-    virtual Status insertDocumentsForOplog(OperationContext* opCtx,
-                                           std::vector<Record>* records,
-                                           const std::vector<Timestamp>& timestamps) const = 0;
-
-    /**
      * Inserts a document into the record store for a bulk loader that manages the index building
      * outside this Collection. The bulk loader is notified with the RecordId of the document
      * inserted into the RecordStore.

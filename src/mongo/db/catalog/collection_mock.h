@@ -161,12 +161,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    Status insertDocumentsForOplog(OperationContext* opCtx,
-                                   std::vector<Record>* records,
-                                   const std::vector<Timestamp>& timestamps) const {
-        MONGO_UNREACHABLE;
-    }
-
     Status insertDocumentForBulkLoader(OperationContext* opCtx,
                                        const BSONObj& doc,
                                        const OnRecordInsertedFn& onRecordInserted) const {
