@@ -12,7 +12,7 @@
 load('jstests/libs/analyze_plan.js');  // For getPlanStages
 load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 
-const isSBEEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
+const isSBEEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"], true /* checkAllNodes */);
 if (!isSBEEnabled) {
     jsTestLog("Skipping test because the SBE feature flag is disabled");
     return;
@@ -36,6 +36,8 @@ assert.commandWorked(coll.insertMany([
 
 let explain = coll.find({a: 3}).hint({a: 1}).explain("executionStats");
 assert(isIxscan(db, getWinningPlan(explain.queryPlanner)));
+// Ensure the query is run on sbe engine.
+assert('slotBasedPlan' in explain.queryPlanner.winningPlan);
 
 let ixscanStages = getPlanStages(explain.executionStats.executionStages, "ixseek");
 assert(ixscanStages.length !== 0);
