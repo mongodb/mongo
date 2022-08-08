@@ -1,6 +1,9 @@
 (function() {
 "use strict";
 
+load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
+load("jstests/libs/sbe_util.js");                   // For checkSBEEnabled.
+
 const coll = db.getSiblingDB(jsTestName()).coll;
 coll.drop();
 
@@ -23,6 +26,8 @@ assert.commandWorked(coll.insert({
     nanDouble: NaN,
     nanDecimal: NumberDecimal("NaN"),
 }));
+
+const isSBEEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 
 // Adding a Decimal128 value to a date literal.
 assert.eq(ISODate("2019-01-30T07:30:10.957Z"),
@@ -61,13 +66,24 @@ assert.eq(ISODate("2019-01-30T07:30:10.957Z"),
           getResultOfExpression({$add: ["$int32Val", "$dateVal"]}));
 
 // Addition with a date and multiple values of differing data types.
-assert.eq(ISODate("2019-01-30T07:30:12.596Z"),
-          getResultOfExpression({$add: ["$dateVal", "$decimalVal", "$doubleVal", "$int64Val"]}));
-assert.eq(ISODate("2019-01-30T07:30:12.596Z"),
-          getResultOfExpression({$add: ["$decimalVal", "$dateVal", "$doubleVal", "$int64Val"]}));
+// TODO SERVER-68543: classic and sbe returns different values now, should update after fix.
+if (isSBEEnabled) {
+    assert.eq(
+        ISODate("2019-01-30T07:30:12.597Z"),
+        getResultOfExpression({$add: ["$dateVal", "$decimalVal", "$doubleVal", "$int64Val"]}));
+    assert.eq(
+        ISODate("2019-01-30T07:30:12.597Z"),
+        getResultOfExpression({$add: ["$decimalVal", "$dateVal", "$doubleVal", "$int64Val"]}));
+} else {
+    assert.eq(
+        ISODate("2019-01-30T07:30:12.596Z"),
+        getResultOfExpression({$add: ["$dateVal", "$decimalVal", "$doubleVal", "$int64Val"]}));
+    assert.eq(
+        ISODate("2019-01-30T07:30:12.596Z"),
+        getResultOfExpression({$add: ["$decimalVal", "$dateVal", "$doubleVal", "$int64Val"]}));
+}
 assert.eq(ISODate("2019-01-30T07:30:12.596Z"),
           getResultOfExpression({$add: ["$decimalVal", "$doubleVal", "$int64Val", "$dateVal"]}));
-
 // The result of an addition must remain in the range of int64_t in order to convert back to a Date;
 // an overflow into the domain of double-precision floating point numbers triggers a query-fatal
 // error.
@@ -85,13 +101,27 @@ assert.throwsWithCode(
     () => getResultOfExpression({$add: ["$int64Val", "$dateVal", "$overflowDouble"]}),
     ErrorCodes.Overflow);
 
-// One quirk of date addition semantics is that an overflow into the domain of Decimal128 is not
-// fatal and instead results in an invalid "NaN" Date value.
-const nanDate = new Date("");
-assert.eq(nanDate, getResultOfExpression({$add: ["$dateVal", "$overflowDecimal"]}));
-assert.eq(nanDate,
-          getResultOfExpression({$add: ["$dateVal", "$overflowDouble", "$overflowDecimal"]}));
-assert.eq(nanDate, getResultOfExpression({$add: ["$int64Val", "$dateVal", "$overflowDecimal"]}));
+// TODO SERVER-68544: classic and sbe have different behavior now, should update after fix.
+if (isSBEEnabled) {
+    // An overflow into the domain of Decimal128 results in an overflow exception.
+    assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", "$overflowDecimal"]}),
+                          ErrorCodes.Overflow);
+    assert.throwsWithCode(
+        () => getResultOfExpression({$add: ["$dateVal", "$overflowDouble", "$overflowDecimal"]}),
+        ErrorCodes.Overflow);
+    assert.throwsWithCode(
+        () => getResultOfExpression({$add: ["$int64Val", "$dateVal", "$overflowDecimal"]}),
+        ErrorCodes.Overflow);
+} else {
+    // One quirk of date addition semantics is that an overflow into the domain of Decimal128 is not
+    // fatal and instead results in an invalid "NaN" Date value.
+    const nanDate = new Date("");
+    assert.eq(nanDate, getResultOfExpression({$add: ["$dateVal", "$overflowDecimal"]}));
+    assert.eq(nanDate,
+              getResultOfExpression({$add: ["$dateVal", "$overflowDouble", "$overflowDecimal"]}));
+    assert.eq(nanDate,
+              getResultOfExpression({$add: ["$int64Val", "$dateVal", "$overflowDecimal"]}));
+}
 
 // Adding a double-typed NaN to a date value.
 assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", "$nanDouble"]}),
@@ -101,13 +131,34 @@ assert.throwsWithCode(() => getResultOfExpression({$add: ["$nanDouble", "$dateVa
                       ErrorCodes.Overflow);
 
 // Adding a Decimal128-typed NaN to a date value.
-assert.eq(nanDate, getResultOfExpression({$add: ["$dateVal", "$nanDecimal"]}));
-assert.eq(nanDate, getResultOfExpression({$add: ["$nanDecimal", "$dateVal"]}));
+// TODO SERVER-68544: classic and sbe have different behavior now, should update after fix.
+if (isSBEEnabled) {
+    // An NaN Decimal128 added to date results in an overflow exception.
+    assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", "$nanDecimal"]}),
+                          ErrorCodes.Overflow);
+    assert.throwsWithCode(() => getResultOfExpression({$add: ["$nanDecimal", "$dateVal"]}),
+                          ErrorCodes.Overflow);
+} else {
+    const nanDate = new Date("");
+    assert.eq(nanDate, getResultOfExpression({$add: ["$dateVal", "$nanDecimal"]}));
+    assert.eq(nanDate, getResultOfExpression({$add: ["$nanDecimal", "$dateVal"]}));
+}
 
 // Addition with a date, a double-typed NaN, and a third value.
 assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", "$doubleVal", "$nanDouble"]}),
                       ErrorCodes.Overflow);
 
 // Addition with a date, and both types of NaN.
-assert.eq(nanDate, getResultOfExpression({$add: ["$dateVal", "$nanDouble", "$nanDecimal"]}));
+// TODO SERVER-68544: classic and sbe have different behavior now, should update after fix.
+if (isSBEEnabled) {
+    assert.throwsWithCode(
+        () => getResultOfExpression({$add: ["$dateVal", "$nanDouble", "$nanDecimal"]}),
+        ErrorCodes.Overflow);
+} else {
+    const nanDate = new Date("");
+    assert.eq(nanDate, getResultOfExpression({$add: ["$dateVal", "$nanDouble", "$nanDecimal"]}));
+}
+
+// Throw error when there're two or more date in $add.
+assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", 1, "$dateVal"]}), 4974202);
 }());

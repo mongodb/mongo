@@ -796,48 +796,6 @@ public:
         if (arity == 0) {
             // Return a zero constant if the expression has no operand children.
             _context->pushExpr(makeConstant(sbe::value::TypeTags::NumberInt32, 0));
-        } else if (arity == 2) {
-            auto rhs = _context->popExpr();
-            auto lhs = _context->popExpr();
-            auto binds = sbe::makeEs(std::move(lhs), std::move(rhs));
-            sbe::EVariable lhsVar{frameId, 0};
-            sbe::EVariable rhsVar{frameId, 1};
-
-            auto addExpr = makeLocalBind(
-                _context->state.frameIdGenerator,
-                [&](sbe::EVariable lhsIsDate, sbe::EVariable rhsIsDate) {
-                    return buildMultiBranchConditional(
-                        CaseValuePair{makeBinaryOp(sbe::EPrimBinary::logicOr,
-                                                   generateNullOrMissing(frameId, 0),
-                                                   generateNullOrMissing(frameId, 1)),
-                                      sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0)},
-                        CaseValuePair{
-                            makeBinaryOp(sbe::EPrimBinary::logicOr,
-                                         generateNotNumberOrDate(0),
-                                         generateNotNumberOrDate(1)),
-                            sbe::makeE<sbe::EFail>(
-                                ErrorCodes::Error{4974201},
-                                "only numbers and dates are allowed in an $add expression")},
-                        CaseValuePair{
-                            makeBinaryOp(
-                                sbe::EPrimBinary::logicAnd, lhsIsDate.clone(), rhsIsDate.clone()),
-                            sbe::makeE<sbe::EFail>(ErrorCodes::Error{4974202},
-                                                   "only one date allowed in an $add expression")},
-                        // An EPrimBinary::add expression, which compiles directly into an "add"
-                        // instruction, efficiently handles the general case for for $add with
-                        // exactly two operands, but when one of the operands is a date, we need to
-                        // use the "doubleDoubleSum" function to perform the required conversions.
-                        CaseValuePair{
-                            makeBinaryOp(
-                                sbe::EPrimBinary::logicOr, lhsIsDate.clone(), rhsIsDate.clone()),
-                            makeFunction("doubleDoubleSum", lhsVar.clone(), rhsVar.clone())},
-                        makeBinaryOp(sbe::EPrimBinary::add, lhsVar.clone(), rhsVar.clone()));
-                },
-                makeFunction("isDate", lhsVar.clone()),
-                makeFunction("isDate", rhsVar.clone()));
-
-            _context->pushExpr(
-                sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(addExpr)));
         } else {
             sbe::EExpression::Vector binds;
             sbe::EExpression::Vector argVars;
@@ -876,15 +834,28 @@ public:
                 [](auto&& acc, auto&& ex) {
                     return makeBinaryOp(sbe::EPrimBinary::logicOr, std::move(acc), std::move(ex));
                 });
-            auto addExpr = sbe::makeE<sbe::EIf>(
-                std::move(checkNullAllArguments),
-                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0),
-                sbe::makeE<sbe::EIf>(
+            auto addOp = std::move(argVars[0]);
+            for (size_t idx = 1; idx < arity; ++idx) {
+                addOp = makeLocalBind(
+                    _context->state.frameIdGenerator,
+                    [&](sbe::EVariable var1, sbe::EVariable var2) {
+                        return sbe::makeE<sbe::EIf>(
+                            makeBinaryOp(sbe::EPrimBinary::logicAnd,
+                                         makeFunction("isDate", var1.clone()),
+                                         makeFunction("isDate", var2.clone())),
+                            makeFail(4974202, "only one date allowed in an $add expression"),
+                            makeBinaryOp(sbe::EPrimBinary::add, var1.clone(), var2.clone()));
+                    },
+                    std::move(addOp),
+                    std::move(argVars[idx]));
+            }
+            auto addExpr = buildMultiBranchConditional(
+                CaseValuePair{std::move(checkNullAllArguments),
+                              makeConstant(sbe::value::TypeTags::Null, 0)},
+                CaseValuePair{
                     std::move(checkNotNumberOrDateAllArguments),
-                    sbe::makeE<sbe::EFail>(
-                        ErrorCodes::Error{4974203},
-                        "only numbers and dates are allowed in an $add expression"),
-                    sbe::makeE<sbe::EFunction>("doubleDoubleSum", std::move(argVars))));
+                    makeFail(4974201, "only numbers and dates are allowed in an $add expression")},
+                std::move(addOp));
             _context->pushExpr(
                 sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(addExpr)));
         }
