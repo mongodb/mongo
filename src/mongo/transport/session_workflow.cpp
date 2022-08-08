@@ -116,6 +116,36 @@ boost::optional<Message> makeExhaustMessage(Message requestMsg, DbResponse& resp
 
     return exhaustMessage;
 }
+
+/**
+ * If `in` encodes a "getMore" command, make a best-effort attempt to kill its
+ * cursor. Returns true if such an attempt was successful. If the killCursors request
+ * fails here for any reasons, it will still be cleaned up once the cursor times
+ * out.
+ */
+bool killExhaust(const Message& in, ServiceEntryPoint* sep, Client* client) {
+    try {
+        auto inRequest = OpMsgRequest::parse(in, client);
+        const BSONObj& body = inRequest.body;
+        const auto& [cmd, firstElement] = body.firstElement();
+        if (cmd != "getMore"_sd)
+            return false;
+        StringData db = inRequest.getDatabase();
+        sep->handleRequest(
+               client->makeOperationContext().get(),
+               OpMsgRequest::fromDBAndBody(
+                   db,
+                   KillCursorsCommandRequest(NamespaceString(db, body["collection"].String()),
+                                             {CursorId{firstElement.Long()}})
+                       .toBSON(BSONObj{}))
+                   .serialize())
+            .get();
+        return true;
+    } catch (const DBException& e) {
+        LOGV2(22992, "Error cleaning up resources for exhaust request", "error"_attr = e);
+    }
+    return false;
+}
 }  // namespace
 
 class SessionWorkflow::Impl {
@@ -182,8 +212,11 @@ public:
 
     /*
      * Releases all the resources associated with the exhaust request.
+     * When the session is closing, the most recently synthesized exhaust
+     * `WorkItem` may refer to a cursor that we won't need anymore, so we can
+     * try to kill it early as an optimization.
      */
-    void cleanupExhaustResources() noexcept;
+    void cleanupExhaustResources();
 
     /*
      * Gets the transport::Session associated with this connection
@@ -199,29 +232,16 @@ public:
         return ServiceExecutorContext::get(client())->getServiceExecutor();
     }
 
-    MessageCompressorManager& compressor() const {
-        return MessageCompressorManager::forSession(session());
+    bool isTLS() const {
+#ifdef MONGO_CONFIG_SSL
+        return SSLPeerInfo::forSession(session()).isTLS;
+#else
+        return false;
+#endif
     }
 
 private:
-    struct WorkItem {
-        explicit WorkItem(Message in) : in{std::move(in)} {}
-
-        Message in;
-        boost::optional<MessageCompressorId> compressorId;
-        bool isExhaust = false;
-        ServiceContext::UniqueOperationContext opCtx;
-        Message out;
-    };
-
-    /**
-     * If the incoming message has the exhaust flag set, then we bypass the normal RPC
-     * behavior. We will sink the response to the network, but we also synthesize a new
-     * request, as if we sourced a new message from the network. This new request is
-     * sent to the database once again to be processed. This cycle repeats as long as
-     * the command indicates the exhaust stream should continue.
-     */
-    std::unique_ptr<WorkItem> makeExhaustWorkItem(DbResponse& response);
+    class WorkItem;
 
     /** Alias: refers to this Impl, but holds a ref to the enclosing workflow. */
     std::shared_ptr<Impl> shared_from_this() {
@@ -239,6 +259,92 @@ private:
     std::unique_ptr<WorkItem> _nextWork; /**< created by exhaust responses */
 };
 
+class SessionWorkflow::Impl::WorkItem {
+public:
+    WorkItem(Impl* swf, Message in) : _swf{swf}, _in{std::move(in)} {}
+
+    bool isExhaust() const {
+        return _isExhaust;
+    }
+
+    void initOperation() {
+        auto newOpCtx = _swf->client()->makeOperationContext();
+        if (_isExhaust)
+            newOpCtx->markKillOnClientDisconnect();
+        if (_in.operation() == dbCompressed)
+            newOpCtx->setOpCompressed(true);
+        _opCtx = std::move(newOpCtx);
+    }
+
+    OperationContext* opCtx() const {
+        return _opCtx.get();
+    }
+
+    const Message& in() const {
+        return _in;
+    }
+
+    void decompressRequest() {
+        if (_in.operation() != dbCompressed)
+            return;
+        MessageCompressorId cid;
+        _in = uassertStatusOK(compressorMgr().decompressMessage(_in, &cid));
+        _compressorId = cid;
+    }
+
+    Message compressResponse(Message msg) {
+        if (!_compressorId)
+            return msg;
+        auto cid = *_compressorId;
+        return uassertStatusOK(compressorMgr().compressMessage(msg, &cid));
+    }
+
+    bool hasCompressorId() const {
+        return !!_compressorId;
+    }
+
+    Message consumeOut() {
+        return std::move(*std::exchange(_out, {}));
+    }
+
+    bool hasOut() const {
+        return !!_out;
+    }
+
+    void setOut(Message out) {
+        _out = std::move(out);
+    }
+
+    /**
+     * If the incoming message has the exhaust flag set, then we bypass the normal RPC
+     * behavior. We will sink the response to the network, but we also synthesize a new
+     * request, as if we sourced a new message from the network. This new request is
+     * sent to the database once again to be processed. This cycle repeats as long as
+     * the command indicates the exhaust stream should continue.
+     */
+    std::unique_ptr<WorkItem> synthesizeExhaust(DbResponse& response) {
+        auto m = makeExhaustMessage(_in, response);
+        if (!m)
+            return nullptr;
+        auto synth = std::make_unique<WorkItem>(_swf, std::move(*m));
+        synth->_isExhaust = true;
+        synth->_compressorId = _compressorId;
+        return synth;
+    }
+
+private:
+    MessageCompressorManager& compressorMgr() const {
+        return MessageCompressorManager::forSession(_swf->session());
+    }
+
+    Impl* _swf;
+    Message _in;
+    bool _isExhaust = false;
+    ServiceContext::UniqueOperationContext _opCtx;
+    boost::optional<MessageCompressorId> _compressorId;
+    boost::optional<Message> _out;
+};
+
 void SessionWorkflow::Impl::sourceMessage() {
     invariant(!_work);
     try {
@@ -247,7 +353,7 @@ void SessionWorkflow::Impl::sourceMessage() {
             return session()->sourceMessage();
         }());
         invariant(!msg.empty());
-        _work = std::make_unique<WorkItem>(std::move(msg));
+        _work = std::make_unique<WorkItem>(this, std::move(msg));
     } catch (const DBException& ex) {
         auto remote = session()->remote();
         const auto& status = ex.toStatus();
@@ -284,7 +390,7 @@ void SessionWorkflow::Impl::sinkMessage() {
     // end the session.
     //
     // Otherwise, return from this function to let startNewLoop() continue the future chaining.
-    if (auto status = session()->sinkMessage(std::exchange(_work->out, {})); !status.isOK()) {
+    if (auto status = session()->sinkMessage(_work->consumeOut()); !status.isOK()) {
         LOGV2(22989,
               "Error sending response to client. Ending connection from remote",
               "error"_attr = status,
@@ -300,45 +406,23 @@ void SessionWorkflow::Impl::sinkMessage() {
     executor()->yieldIfAppropriate();
 }
 
-std::unique_ptr<SessionWorkflow::Impl::WorkItem> SessionWorkflow::Impl::makeExhaustWorkItem(
-    DbResponse& response) {
-    invariant(_work);
-    auto m = makeExhaustMessage(_work->in, response);
-    if (!m)
-        return nullptr;
-    auto wi = std::make_unique<WorkItem>(std::move(*m));
-    wi->isExhaust = true;
-    wi->compressorId = _work->compressorId;
-    return wi;
-}
-
 Future<void> SessionWorkflow::Impl::processMessage() {
     invariant(_work);
-    invariant(!_work->in.empty());
+    invariant(!_work->in().empty());
 
     TrafficRecorder::get(_serviceContext)
-        .observe(session(), _serviceContext->getPreciseClockSource()->now(), _work->in);
+        .observe(session(), _serviceContext->getPreciseClockSource()->now(), _work->in());
 
+    _work->decompressRequest();
 
-    if (_work->in.operation() == dbCompressed) {
-        MessageCompressorId compressorId;
-        _work->in = uassertStatusOK(compressor().decompressMessage(_work->in, &compressorId));
-        _work->compressorId = compressorId;
-    }
-
-    networkCounter.hitLogicalIn(_work->in.size());
+    networkCounter.hitLogicalIn(_work->in().size());
 
     // Pass sourced Message to handler to generate response.
-    _work->opCtx = Client::getCurrent()->makeOperationContext();
-    if (_work->isExhaust)
-        _work->opCtx->markKillOnClientDisconnect();
-    if (_work->in.operation() == dbCompressed) {
-        _work->opCtx->setOpCompressed(true);
-    }
+    _work->initOperation();
 
     // The handleRequest is implemented in a subclass for mongod/mongos and actually all the
     // database work for this request.
-    return _sep->handleRequest(_work->opCtx.get(), _work->in)
+    return _sep->handleRequest(_work->opCtx(), _work->in())
         .then([this](DbResponse response) mutable {
             // opCtx must be killed and delisted here so that the operation cannot show up in
             // currentOp results after the response reaches the client. Destruction of the already
@@ -347,48 +431,39 @@ Future<void> SessionWorkflow::Impl::processMessage() {
             // Note that destroying futures after execution, rather that postponing the destruction
             // until completion of the future-chain, would expose the cost of destroying opCtx to
             // the critical path and result in serious performance implications.
-            _serviceContext->killAndDelistOperation(_work->opCtx.get(),
+            _serviceContext->killAndDelistOperation(_work->opCtx(),
                                                     ErrorCodes::OperationIsKilledAndDelisted);
             // Format our response, if we have one
             Message& toSink = response.response;
             if (toSink.empty())
                 return;
-            invariant(!OpMsg::isFlagSet(_work->in, OpMsg::kMoreToCome));
+            invariant(!OpMsg::isFlagSet(_work->in(), OpMsg::kMoreToCome));
             invariant(!OpMsg::isFlagSet(toSink, OpMsg::kChecksumPresent));
 
             // Update the header for the response message.
             toSink.header().setId(nextMessageId());
-            toSink.header().setResponseToMsgId(_work->in.header().getId());
-            if (OpMsg::isFlagSet(_work->in, OpMsg::kChecksumPresent)) {
-#ifdef MONGO_CONFIG_SSL
-                if (!SSLPeerInfo::forSession(session()).isTLS) {
-                    OpMsg::appendChecksum(&toSink);
-                }
-#else
+            toSink.header().setResponseToMsgId(_work->in().header().getId());
+            if (!isTLS() && OpMsg::isFlagSet(_work->in(), OpMsg::kChecksumPresent))
                 OpMsg::appendChecksum(&toSink);
-#endif
-            }
 
             // If the incoming message has the exhaust flag set, then bypass the normal RPC
             // behavior. Sink the response to the network, but also synthesize a new
             // request, as if a new message was sourced from the network. This new request is
             // sent to the database once again to be processed. This cycle repeats as long as
             // the dbresponses continue to indicate the exhaust stream should continue.
-            _nextWork = makeExhaustWorkItem(response);
+            _nextWork = _work->synthesizeExhaust(response);
 
             networkCounter.hitLogicalOut(toSink.size());
 
             beforeCompressingExhaustResponse.executeIf(
-                [&](auto&&) {}, [&](auto&&) { return _work->compressorId && _nextWork; });
+                [&](auto&&) {}, [&](auto&&) { return _work->hasCompressorId() && _nextWork; });
 
-            if (_work->compressorId)
-                toSink =
-                    uassertStatusOK(compressor().compressMessage(toSink, &*_work->compressorId));
+            toSink = _work->compressResponse(toSink);
 
             TrafficRecorder::get(_serviceContext)
                 .observe(session(), _serviceContext->getPreciseClockSource()->now(), toSink);
 
-            _work->out = std::move(toSink);
+            _work->setOut(std::move(toSink));
         });
 }
 
@@ -441,7 +516,7 @@ void SessionWorkflow::Impl::startNewLoop(const Status& executorStatus) {
         return processMessage();
     })
         .then([this] {
-            if (!_work->out.empty()) {
+            if (_work->hasOut()) {
                 sinkMessage();
             }
         })
@@ -474,28 +549,11 @@ void SessionWorkflow::Impl::terminateIfTagsDontMatch(transport::Session::TagMask
     terminate();
 }
 
-void SessionWorkflow::Impl::cleanupExhaustResources() noexcept try {
-    WorkItem* w = _work && _work->isExhaust ? &*_work : _nextWork ? &*_nextWork : nullptr;
-    if (!w)
-        return;
-    auto request = OpMsgRequest::parse(w->in, Client::getCurrent());
-    // Clean up cursor for exhaust getMore request.
-    if (request.getCommandName() == "getMore"_sd) {
-        auto cursorId = request.body["getMore"].Long();
-        auto opCtx = Client::getCurrent()->makeOperationContext();
-        // Fire and forget. This is a best effort attempt to immediately clean up the exhaust
-        // cursor. If the killCursors request fails here for any reasons, it will still be cleaned
-        // up once the cursor times out.
-        auto nss = NamespaceString(request.getDatabase(), request.body["collection"].String());
-        auto req = OpMsgRequest::fromDBAndBody(
-            request.getDatabase(), KillCursorsCommandRequest(nss, {cursorId}).toBSON(BSONObj{}));
-        _sep->handleRequest(opCtx.get(), req.serialize()).get();
-    }
-} catch (const DBException& e) {
-    LOGV2(22992,
-          "Error cleaning up resources for exhaust requests: {error}",
-          "Error cleaning up resources for exhaust requests",
-          "error"_attr = e.toStatus());
+void SessionWorkflow::Impl::cleanupExhaustResources() {
+    auto clean = [&](auto& w) {
+        return w && w->isExhaust() && killExhaust(w->in(), _sep, client());
+    };
+    clean(_nextWork) || clean(_work);
 }
 
 void SessionWorkflow::Impl::cleanupSession(const Status& status) {
