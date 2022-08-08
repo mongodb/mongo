@@ -110,7 +110,7 @@ class test_truncate12(wttest.WiredTigerTestCase):
         expectNone(keep + 1, nrows + 1)
 
     def test_truncate12(self):
-        nrows = 5000
+        nrows = 10000
         keep_rows = 5
 
         # Create two tables.
@@ -170,11 +170,11 @@ class test_truncate12(wttest.WiredTigerTestCase):
         self.assertEqual(err, 0)
         self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(30))
 
-        # Make sure we did at least one fast-delete. For columns, there's no fast-delete
-        # support (yet) so assert we didn't.
+        # Make sure we did at least one fast-delete. (Unless we specifically didn't want to,
+        # or running on FLCS where it isn't supported.)
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         fastdelete_pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
-        if self.key_format == 'r' or self.trunc_with_remove:
+        if self.value_format == '8t' or self.trunc_with_remove:
             self.assertEqual(fastdelete_pages, 0)
         else:
             self.assertGreater(fastdelete_pages, 0)

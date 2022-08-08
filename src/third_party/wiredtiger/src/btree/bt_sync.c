@@ -526,12 +526,13 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
 
         /*
          * Perform checkpoint cleanup when not in startup or shutdown phase by traversing internal
-         * pages looking for obsolete child pages. This is row-store specific, column-store pages
-         * cannot be discarded and must be rewritten as they contain chunks of the name space. For
-         * the same reason, only read in-memory pages when doing column-store checkpoints (row-store
-         * reads all of the internal pages to improve cleanup).
+         * pages looking for obsolete child pages. This is a form of fast-truncate and so it works
+         * only for row-store and VLCS pages. FLCS pages cannot be discarded and must be rewritten
+         * as implicitly filling in missing chunks of FLCS namespace is problematic. For the same
+         * reason, only read in-memory pages when doing FLCS checkpoints. (Otherwise we read all of
+         * the internal pages to improve cleanup.)
          */
-        if (btree->type == BTREE_ROW)
+        if (btree->type == BTREE_ROW || btree->type == BTREE_COL_VAR)
             internal_cleanup = !F_ISSET(conn, WT_CONN_RECOVERING | WT_CONN_CLOSING_CHECKPOINT);
         else {
             LF_SET(WT_READ_CACHE);

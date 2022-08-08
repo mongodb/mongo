@@ -400,8 +400,9 @@ struct __wt_page_modify {
 #define mod_root_split u2.intl.root_split
         struct {
             /*
-             * Appended items to column-stores: there is only a single one of these active at a time
-             * per column-store tree.
+             * Appended items to column-stores. Actual appends to the tree only happen on the last
+             * page, but gaps created in the namespace by truncate operations can result in the
+             * append lists of other pages becoming populated.
              */
             WT_INSERT_HEAD **append;
 
@@ -415,9 +416,10 @@ struct __wt_page_modify {
             WT_INSERT_HEAD **update;
 
             /*
-             * Split-saved last column-store page record. If a column-store page is split, we save
-             * the first record number moved so that during reconciliation we know the page's last
-             * record and can write any implicitly created deleted records for the page.
+             * Split-saved last column-store page record. If a fixed-length column-store page is
+             * split, we save the first record number moved so that during reconciliation we know
+             * the page's last record and can write any implicitly created deleted records for the
+             * page. No longer used by VLCS.
              */
             uint64_t split_recno;
         } column_leaf;

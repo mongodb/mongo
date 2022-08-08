@@ -269,9 +269,9 @@ __tree_walk_internal(WT_SESSION_IMPL *session, WT_REF **refp, uint64_t *walkcntp
 
     /*
      * !!!
-     * Fast-truncate currently only works on row-store trees.
+     * Fast-truncate does not currently work for FLCS trees.
      */
-    if (btree->type != BTREE_ROW)
+    if (btree->type == BTREE_COL_FIX)
         LF_CLR(WT_READ_TRUNCATE);
 
     prev = LF_ISSET(WT_READ_PREV) ? 1 : 0;

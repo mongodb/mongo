@@ -680,8 +680,16 @@ __split_parent(WT_SESSION_IMPL *session, WT_REF *ref, WT_REF **ref_new, uint32_t
             next_ref = pindex->index[i];
             WT_ASSERT(session, next_ref->state != WT_REF_SPLIT);
 
-            /* Protect against including the replaced WT_REF in the list of deleted items. */
+            /*
+             * Protect against including the replaced WT_REF in the list of deleted items. Also, in
+             * VLCS, avoid dropping the leftmost page even if it's deleted, because the namespace
+             * gap that produces causes search to fail. (For other gaps, search just takes the next
+             * page to the left; but for the leftmost page in an internal page that doesn't work
+             * unless we update the internal page's start recno on the fly and restart the search,
+             * which seems like asking for trouble.)
+             */
             if (next_ref != ref && next_ref->state == WT_REF_DELETED &&
+              (btree->type != BTREE_COL_VAR || i != 0) &&
               __wt_delete_page_skip(session, next_ref, true) &&
               WT_REF_CAS_STATE(session, next_ref, WT_REF_DELETED, WT_REF_LOCKED)) {
                 if (scr == NULL)
@@ -1846,9 +1854,9 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
     /*
      * Allocation operations completed, we're going to split.
      *
-     * Record the split column-store page record, used in reconciliation.
+     * Record the fixed-length column-store split page record, used in reconciliation.
      */
-    if (type != WT_PAGE_ROW_LEAF) {
+    if (type == WT_PAGE_COL_FIX) {
         WT_ASSERT(session, page->modify->mod_col_split_recno == WT_RECNO_OOB);
         page->modify->mod_col_split_recno = child->ref_recno;
     }
@@ -1978,9 +1986,9 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
     /*
      * Failure.
      *
-     * Reset the split column-store page record.
+     * Reset the fixed-length column-store split page record.
      */
-    if (type != WT_PAGE_ROW_LEAF)
+    if (type == WT_PAGE_COL_FIX)
         page->modify->mod_col_split_recno = WT_RECNO_OOB;
 
     /*

@@ -172,10 +172,10 @@ class test_rollback_to_stable33(test_rollback_to_stable_base):
         lo_cursor.close()
 
         # Check stats to make sure we fast-deleted at least one page.
-        # Since VLCS and FLCS do not (yet) support fast-delete, instead assert we didn't.
+        # (Except for FLCS, where it's not supported and we should fast-delete zero pages.)
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         fastdelete_pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
-        if self.key_format == 'r':
+        if self.value_format == '8t':
             self.assertEqual(fastdelete_pages, 0)
         else:
             self.assertGreater(fastdelete_pages, 0)

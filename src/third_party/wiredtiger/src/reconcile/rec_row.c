@@ -297,7 +297,7 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
 
     btree = S2BT(session);
     child = NULL;
-    WT_TIME_AGGREGATE_INIT(&ft_ta);
+    WT_TIME_AGGREGATE_INIT_MERGE(&ft_ta);
 
     key = &r->k;
     kpack = &_kpack;
@@ -434,14 +434,8 @@ __wt_rec_row_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
          * in the internal page's aggregate information for RTS to find it.
          */
         WT_TIME_AGGREGATE_COPY(&ta, source_ta);
-        if (page_del != NULL) {
-            ft_ta.newest_start_durable_ts = ta.newest_start_durable_ts;
-            ft_ta.newest_stop_durable_ts = page_del->durable_timestamp;
-            ft_ta.oldest_start_ts = ta.oldest_start_ts;
-            ft_ta.newest_txn = page_del->txnid;
-            ft_ta.newest_stop_ts = page_del->timestamp;
-            ft_ta.newest_stop_txn = page_del->txnid;
-        }
+        if (page_del != NULL)
+            WT_TIME_AGGREGATE_UPDATE_PAGE_DEL(session, &ft_ta, page_del);
         WT_CHILD_RELEASE_ERR(session, cms.hazard, ref);
 
         /* Build key cell. Truncate any 0th key, internal pages don't need 0th keys. */

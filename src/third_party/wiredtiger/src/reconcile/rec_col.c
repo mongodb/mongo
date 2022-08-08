@@ -215,14 +215,16 @@ __wt_rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
     WT_CHILD_MODIFY_STATE cms;
     WT_DECL_RET;
     WT_PAGE *child, *page;
+    WT_PAGE_DELETED *page_del;
     WT_REC_KV *val;
     WT_REF *ref;
-    WT_TIME_AGGREGATE ta;
+    WT_TIME_AGGREGATE ft_ta, ta;
 
     btree = S2BT(session);
     page = pageref->page;
     child = NULL;
     WT_TIME_AGGREGATE_INIT(&ta);
+    WT_TIME_AGGREGATE_INIT_MERGE(&ft_ta);
 
     val = &r->v;
     vpack = &_vpack;
@@ -242,6 +244,7 @@ __wt_rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
         WT_ERR(__wt_rec_child_modify(session, r, ref, &cms));
         addr = NULL;
         child = ref->page;
+        page_del = NULL;
 
         switch (cms.state) {
         case WT_CHILD_IGNORE:
@@ -255,11 +258,6 @@ __wt_rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
              */
             switch (child->modify->rec_result) {
             case WT_PM_REC_EMPTY:
-                /*
-                 * Column-store pages are almost never empty, as discarding a page would remove a
-                 * chunk of the name space. The exceptions are pages created when the tree is
-                 * created, and never filled.
-                 */
                 WT_CHILD_RELEASE_ERR(session, cms.hazard, ref);
                 continue;
             case WT_PM_REC_MULTIBLOCK:
@@ -277,37 +275,46 @@ __wt_rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
             /* Original child. */
             break;
         case WT_CHILD_PROXY:
-            /*
-             * Deleted child where we write a proxy cell, not yet supported for column-store.
-             */
-            WT_ERR(__wt_illegal_value(session, cms.state));
+            /* Deleted child where we write a proxy cell. */
+            page_del = &cms.del;
+            break;
         }
 
         /*
          * Build the value cell. The child page address is in one of 3 places: if the page was
-         * replaced, the page's modify structure references it and we built the value cell just
-         * above in the switch statement. Else, the WT_REF->addr reference points to an on-page cell
-         * or an off-page WT_ADDR structure: if it's an on-page cell and we copy it from the page,
-         * else build a new cell.
+         * replaced, the page's modify structure references it and we assigned it just above in the
+         * switch statement. Otherwise, the WT_REF->addr reference points to either an on-page cell
+         * or an off-page WT_ADDR structure: if it's an on-page cell we copy it from the page, else
+         * build a new cell.
          */
         if (addr == NULL && __wt_off_page(page, ref->addr))
             addr = ref->addr;
-        if (addr == NULL) {
+        if (addr != NULL) {
+            __wt_rec_cell_build_addr(session, r, addr, NULL, ref->ref_recno, page_del);
+            WT_TIME_AGGREGATE_COPY(&ta, &addr->ta);
+        } else {
             __wt_cell_unpack_addr(session, page->dsk, ref->addr, vpack);
-            if (F_ISSET(vpack, WT_CELL_UNPACK_TIME_WINDOW_CLEARED)) {
-                /* Need to rebuild the cell with the updated time info. */
-                __wt_rec_cell_build_addr(session, r, NULL, vpack, ref->ref_recno, NULL);
+            if (cms.state == WT_CHILD_PROXY || F_ISSET(vpack, WT_CELL_UNPACK_TIME_WINDOW_CLEARED)) {
+                /*
+                 * Need to build a proxy (page-deleted) cell or rebuild the cell with updated time
+                 * info. If we don't have page-delete information already, propagate any that exists
+                 * in the cell. This can be needed if we get back WT_CHILD_ORIGINAL and the time
+                 * window gets cleared.
+                 */
+                if (page_del == NULL && vpack->type == WT_CELL_ADDR_DEL)
+                    page_del = &vpack->page_del;
+                __wt_rec_cell_build_addr(session, r, NULL, vpack, ref->ref_recno, page_del);
             } else {
+                /* Copy the entire existing cell, including any page-delete information. */
                 val->buf.data = ref->addr;
                 val->buf.size = __wt_cell_total_len(vpack);
                 val->cell_len = 0;
                 val->len = val->buf.size;
             }
             WT_TIME_AGGREGATE_COPY(&ta, &vpack->ta);
-        } else {
-            __wt_rec_cell_build_addr(session, r, addr, NULL, ref->ref_recno, NULL);
-            WT_TIME_AGGREGATE_COPY(&ta, &addr->ta);
         }
+        if (page_del != NULL)
+            WT_TIME_AGGREGATE_UPDATE_PAGE_DEL(session, &ft_ta, page_del);
         WT_CHILD_RELEASE_ERR(session, cms.hazard, ref);
 
         /* Boundary: split or write the page. */
@@ -316,6 +323,8 @@ __wt_rec_col_int(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REF *pageref)
 
         /* Copy the value (which is in val, val == r->v) onto the page. */
         __wt_rec_image_copy(session, r, val);
+        if (page_del != NULL)
+            WT_TIME_AGGREGATE_MERGE(session, &r->cur_ptr->ta, &ft_ta);
         WT_TIME_AGGREGATE_MERGE(session, &r->cur_ptr->ta, &ta);
     }
     WT_INTL_FOREACH_END;
@@ -1201,7 +1210,7 @@ __wt_rec_col_var(
     WT_UPDATE_SELECT upd_select;
     uint64_t n, nrepeat, repeat_count, rle, skip, src_recno;
     uint32_t i, size;
-    bool deleted, orig_deleted, orig_stale, ovfl_used, update_no_copy;
+    bool deleted, orig_deleted, orig_stale, ovfl_used, update_no_copy, wrote_real_values;
     const void *data;
 
     btree = S2BT(session);
@@ -1212,6 +1221,7 @@ __wt_rec_col_var(
     upd = NULL;
     size = 0;
     orig_stale = false;
+    wrote_real_values = false;
     data = NULL;
 
     cbt = &r->update_modify_cbt;
@@ -1377,6 +1387,8 @@ record_loop:
                     WT_ERR(__rec_col_var_helper(
                       session, r, salvage, last.value, twp, repeat_count, false, &ovfl_used));
 
+                    wrote_real_values = true;
+
                     /*
                      * Salvage may have caused us to skip the overflow item, only update overflow
                      * items we use.
@@ -1464,6 +1476,8 @@ compare:
                     rle += repeat_count;
                     continue;
                 }
+                if (!last.deleted)
+                    wrote_real_values = true;
                 WT_ERR(__rec_col_var_helper(
                   session, r, salvage, last.value, &last.tw, rle, last.deleted, NULL));
             }
@@ -1504,32 +1518,16 @@ compare:
 
     /* Walk any append list. */
     for (ins = WT_SKIP_FIRST(WT_COL_APPEND(page));; ins = WT_SKIP_NEXT(ins)) {
-        if (ins == NULL) {
+        if (ins == NULL)
             /*
-             * If the page split, instantiate any missing records in
-             * the page's name space. (Imagine record 98 is
-             * transactionally visible, 99 wasn't created or is not
-             * yet visible, 100 is visible. Then the page splits and
-             * record 100 moves to another page. When we reconcile
-             * the original page, we write record 98, then we don't
-             * see record 99 for whatever reason. If we've moved
-             * record 100, we don't know to write a deleted record
-             * 99 on the page.)
-             *
-             * Assert the recorded record number is past the end of
-             * the page.
-             *
-             * The record number recorded during the split is the
-             * first key on the split page, that is, one larger than
-             * the last key on this page, we have to decrement it.
+             * Stop when we reach the end of the append list. There might be a gap between that and
+             * the beginning of the next page. (Imagine record 98 is written, then record 100 is
+             * written, then the page splits and record 100 moves to another page. There is no entry
+             * for record 99 and we don't write one out.) In VLCS we (now) tolerate such gaps as
+             * they are, though likely smaller, equivalent to gaps created by fast-truncate.
              */
-            if ((n = page->modify->mod_col_split_recno) == WT_RECNO_OOB)
-                break;
-            WT_ASSERT(session, n >= src_recno);
-            n -= 1;
-
-            upd = NULL;
-        } else {
+            break;
+        else {
             WT_ERR(__wt_rec_upd_select(session, r, ins, NULL, NULL, &upd_select));
             upd = upd_select.upd;
             n = WT_INSERT_RECNO(ins);
@@ -1610,6 +1608,8 @@ compare:
                     ++rle;
                     goto next;
                 }
+                if (!last.deleted)
+                    wrote_real_values = true;
                 WT_ERR(__rec_col_var_helper(
                   session, r, salvage, last.value, &last.tw, rle, last.deleted, NULL));
             }
@@ -1653,12 +1653,35 @@ next:
     }
 
     /* If we were tracking a record, write it. */
-    if (rle != 0)
+    if (rle != 0) {
+        if (!last.deleted)
+            wrote_real_values = true;
         WT_ERR(
           __rec_col_var_helper(session, r, salvage, last.value, &last.tw, rle, last.deleted, NULL));
+    }
+
+    /*
+     * If we have not generated any real values but only deleted-value cells, bail out and call the
+     * page empty instead. (Note that this should always be exactly one deleted-value cell, because
+     * of the RLE handling, so we can't have split.) This will create a namespace gap like those
+     * produced by truncate.
+     *
+     * Skip this step if:
+     *     - We're in salvage, to avoid any odd interactions with the way salvage reconstructs the
+     *       namespace.
+     *     - There were invisible updates, because then the page isn't really empty. Also, at least
+     *       for now if we try to restore updates to an empty page col_modify will trip on its
+     *       shoelaces.
+     */
+    if (!wrote_real_values && salvage == NULL && r->leave_dirty == false) {
+        WT_ASSERT(session, r->entries == 1);
+        r->entries = 0;
+        WT_STAT_CONN_DATA_INCR(session, rec_vlcs_emptied_pages);
+        /* Don't bother adjusting r->space_avail or r->first_free. */
+    }
 
     /* Write the remnant page. */
-    ret = __wt_rec_split_finish(session, r);
+    WT_ERR(__wt_rec_split_finish(session, r));
 
 err:
     __wt_scr_free(session, &orig);

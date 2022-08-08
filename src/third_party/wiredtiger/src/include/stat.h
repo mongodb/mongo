@@ -505,6 +505,8 @@ struct __wt_connection_stats {
     int64_t cache_write;
     int64_t cache_write_restore;
     int64_t cache_overhead;
+    int64_t cache_reverse_splits;
+    int64_t cache_reverse_splits_skipped_vlcs;
     int64_t cache_hs_insert_full_update;
     int64_t cache_hs_insert_reverse_modify;
     int64_t cache_bytes_internal;
@@ -724,6 +726,7 @@ struct __wt_connection_stats {
     int64_t perf_hist_opwrite_latency_lt1000;
     int64_t perf_hist_opwrite_latency_lt10000;
     int64_t perf_hist_opwrite_latency_gt10000;
+    int64_t rec_vlcs_emptied_pages;
     int64_t rec_time_window_bytes_ts;
     int64_t rec_time_window_bytes_txn;
     int64_t rec_page_delete_fast;
@@ -993,6 +996,8 @@ struct __wt_dsrc_stats {
     int64_t cache_eviction_pages_seen;
     int64_t cache_write;
     int64_t cache_write_restore;
+    int64_t cache_reverse_splits;
+    int64_t cache_reverse_splits_skipped_vlcs;
     int64_t cache_hs_insert_full_update;
     int64_t cache_hs_insert_reverse_modify;
     int64_t cache_bytes_dirty;
@@ -1100,6 +1105,7 @@ struct __wt_dsrc_stats {
     int64_t cursor_update;
     int64_t cursor_update_bytes;
     int64_t cursor_update_bytes_changed;
+    int64_t rec_vlcs_emptied_pages;
     int64_t rec_time_window_bytes_ts;
     int64_t rec_time_window_bytes_txn;
     int64_t rec_dictionary;

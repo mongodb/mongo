@@ -49,11 +49,11 @@ class test_truncate15(wttest.WiredTigerTestCase):
     ]
 
     format_values = [
-        # Do not run against VLCS or FLCS until/unless they get fast-truncate support.
+        # Do not run against FLCS until/unless it gets fast-truncate support.
         # The issue at hand is specific to fast-truncate pages and is not relevant to slow-truncate.
-        #('column', dict(key_format='r', value_format='S', extraconfig='')),
         #('column_fix', dict(key_format='r', value_format='8t',
         #    extraconfig=',allocation_size=512,leaf_page_max=512')),
+        ('column', dict(key_format='r', value_format='S', extraconfig='')),
         ('integer_row', dict(key_format='i', value_format='S', extraconfig='')),
     ]
 
@@ -165,11 +165,11 @@ class test_truncate15(wttest.WiredTigerTestCase):
         self.session.timestamp_transaction('commit_timestamp=' + self.timestamp_str(25))
         self.session.commit_transaction('durable_timestamp=' + self.timestamp_str(30))
 
-        # Make sure we did at least one fast-delete. For columns, there's no fast-delete
-        # support (yet) so assert we didn't.
+        # Make sure we did at least one fast-delete. For FLCS, there's no fast-delete
+        # support, so assert we didn't.
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         fastdelete_pages = stat_cursor[stat.conn.rec_page_delete_fast][2]
-        if self.key_format == 'r':
+        if self.value_format == '8t':
             self.assertEqual(fastdelete_pages, 0)
         else:
             self.assertGreater(fastdelete_pages, 0)

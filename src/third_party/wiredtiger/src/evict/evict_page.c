@@ -286,16 +286,28 @@ __evict_delete_ref(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
          * This will consume the deleted ref (and eventually free it). If the reverse split can't
          * get the access it needs because something is busy, be sure that the page still ends up
          * marked deleted.
+         *
+         * Don't do it if we are a VLCS tree and the child we're deleting is the leftmost child. The
+         * reverse split will automatically remove the page entirely, creating a namespace gap at
+         * the beginning of the internal page, and that leaves search nowhere to go. Note that the
+         * situation will be handled safely if another child gets deleted, or if eviction comes for
+         * a visit.
          */
         if (ndeleted > pindex->entries / 10 && pindex->entries > 1) {
-            if ((ret = __wt_split_reverse(session, ref)) == 0)
-                return (0);
-            WT_RET_BUSY_OK(ret);
+            if (S2BT(session)->type == BTREE_COL_VAR && ref == pindex->index[0])
+                WT_STAT_CONN_DATA_INCR(session, cache_reverse_splits_skipped_vlcs);
+            else {
+                if ((ret = __wt_split_reverse(session, ref)) == 0) {
+                    WT_STAT_CONN_DATA_INCR(session, cache_reverse_splits);
+                    return (0);
+                }
+                WT_RET_BUSY_OK(ret);
 
-            /*
-             * The child must be locked after a failed reverse split.
-             */
-            WT_ASSERT(session, ref->state == WT_REF_LOCKED);
+                /*
+                 * The child must be locked after a failed reverse split.
+                 */
+                WT_ASSERT(session, ref->state == WT_REF_LOCKED);
+            }
         }
     }
 
