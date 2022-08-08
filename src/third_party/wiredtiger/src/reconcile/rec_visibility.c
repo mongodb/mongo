@@ -60,7 +60,7 @@ __rec_append_orig_value(
       "__rec_append_orig_value requires an onpage, non-prepared update");
 
     append = oldest_upd = tombstone = NULL;
-    total_size = 0;
+    size = total_size = 0;
     tombstone_globally_visible = false;
 
     /* Review the current update list, checking conditions that mean no work is needed. */

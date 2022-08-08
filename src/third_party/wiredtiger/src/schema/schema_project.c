@@ -27,6 +27,7 @@ __wt_schema_project_in(WT_SESSION_IMPL *session, WT_CURSOR **cp, const char *pro
     const uint8_t *next;
     char *proj;
 
+    len = 0;
     p = end = NULL; /* -Wuninitialized */
 
     /* Reset any of the buffers we will be setting. */
@@ -218,6 +219,7 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp, const char *
     char *proj;
     bool skip;
 
+    len = 0;
     p = end = NULL; /* -Wuninitialized */
 
     WT_RET(__pack_init(session, &vpack, vformat));
@@ -384,6 +386,7 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session, WT_CURSOR **cp, const char *
     const uint8_t *p, *end;
     char *proj;
 
+    len = 0;
     p = end = NULL; /* -Wuninitialized */
 
     WT_RET(__wt_buf_init(session, value, 0));
