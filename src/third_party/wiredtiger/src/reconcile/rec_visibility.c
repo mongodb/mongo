@@ -201,11 +201,26 @@ static inline bool
 __rec_need_save_upd(
   WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE_SELECT *upd_select, bool has_newer_updates)
 {
+    WT_UPDATE *upd;
+
     if (upd_select->tw.prepare)
         return (true);
 
     if (F_ISSET(r, WT_REC_EVICT) && has_newer_updates)
         return (true);
+
+    /* No need to save the update chain if we want to delete the key from the disk image. */
+    if (upd_select->upd != NULL && upd_select->upd->type == WT_UPDATE_TOMBSTONE)
+        return (false);
+
+    /* Save the update chain to delete the update from the history store later. */
+    for (upd = upd_select->upd; upd != NULL; upd = upd->next) {
+        if (upd->txnid == WT_TXN_ABORTED)
+            continue;
+
+        if (F_ISSET(upd, WT_UPDATE_TO_DELETE_FROM_HS))
+            return (true);
+    }
 
     /*
      * Don't save updates for any reconciliation that doesn't involve history store (in-memory
@@ -292,6 +307,17 @@ __rec_validate_upd_chain(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE *s
      */
     if (!F_ISSET(r, WT_REC_CHECKPOINT_RUNNING))
         return (0);
+
+    for (upd = select_upd; upd != NULL; upd = upd->next) {
+        if (upd->txnid == WT_TXN_ABORTED)
+            continue;
+
+        /* Cannot delete the update from history store when checkpoint is running. */
+        if (F_ISSET(upd, WT_UPDATE_TO_DELETE_FROM_HS)) {
+            WT_STAT_CONN_DATA_INCR(session, cache_eviction_blocked_remove_hs_race_with_checkpoint);
+            return (EBUSY);
+        }
+    }
 
     /*
      * The selected time window may contain information that isn't visible given the selected
@@ -396,6 +422,9 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
     size_t upd_memsize;
     uint64_t max_txn, session_txnid, txnid;
     bool has_newer_updates, is_hs_page, supd_restore, upd_saved;
+#ifdef HAVE_DIAGNOSTIC
+    bool seen_prepare;
+#endif
 
     /*
      * The "saved updates" return value is used independently of returning an update we can write,
@@ -415,6 +444,10 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
     has_newer_updates = supd_restore = upd_saved = false;
     is_hs_page = F_ISSET(session->dhandle, WT_DHANDLE_HS);
     session_txnid = WT_SESSION_TXN_SHARED(session)->id;
+
+#ifdef HAVE_DIAGNOSTIC
+    seen_prepare = false;
+#endif
 
     /*
      * If called with a WT_INSERT item, use its WT_UPDATE list (which must exist), otherwise check
@@ -503,6 +536,10 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
                  */
                 if (upd->start_ts < r->min_skipped_ts)
                     r->min_skipped_ts = upd->start_ts;
+
+#ifdef HAVE_DIAGNOSTIC
+                seen_prepare = true;
+#endif
                 continue;
             } else {
                 /*
@@ -784,9 +821,16 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
      * Paranoia: check that we didn't choose an update that has since been rolled back.
      */
     WT_ASSERT(session, upd_select->upd == NULL || upd_select->upd->txnid != WT_TXN_ABORTED);
-    /* We should never select an update that has been written to the history store. */
-    WT_ASSERT(session, upd_select->upd == NULL || !F_ISSET(upd_select->upd, WT_UPDATE_HS));
-    WT_ASSERT(session, tombstone == NULL || !F_ISSET(tombstone, WT_UPDATE_HS));
+    /*
+     * We should never select an update that has been written to the history store except checkpoint
+     * writes the update that is older than a prepared update.
+     */
+    WT_ASSERT(session,
+      upd_select->upd == NULL || !F_ISSET(upd_select->upd, WT_UPDATE_HS) ||
+        (!F_ISSET(r, WT_REC_EVICT) && seen_prepare));
+    WT_ASSERT(session,
+      tombstone == NULL || !F_ISSET(tombstone, WT_UPDATE_HS) ||
+        (!F_ISSET(r, WT_REC_EVICT) && seen_prepare));
 
     /*
      * Returning an update means the original on-page value might be lost, and that's a problem if
@@ -808,6 +852,9 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
         WT_ERR(__rec_append_orig_value(session, page, upd_select->upd, vpack));
 
     __wt_rec_time_window_clear_obsolete(session, upd_select, NULL, r);
+    WT_ASSERT(
+      session, upd_select->tw.stop_txn != WT_TXN_MAX || upd_select->tw.stop_ts == WT_TS_MAX);
+
 err:
     __wt_scr_free(session, &tmp);
     return (ret);
