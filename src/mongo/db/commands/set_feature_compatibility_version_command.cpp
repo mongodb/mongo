@@ -293,37 +293,7 @@ public:
             return true;
         }
 
-        boost::optional<Timestamp> changeTimestamp;
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            // The Config Server creates a new ID (i.e., timestamp) when it receives an upgrade or
-            // downgrade request. Alternatively, the request refers to a previously aborted
-            // operation for which the local FCV document must contain the ID to be reused.
-            if (!serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
-                const auto now = VectorClock::get(opCtx)->getTime();
-                changeTimestamp = now.clusterTime().asTimestamp();
-            } else {
-                auto fcvObj =
-                    FeatureCompatibilityVersion::findFeatureCompatibilityVersionDocument(opCtx);
-                auto fcvDoc = FeatureCompatibilityVersionDocument::parse(
-                    IDLParserContext("featureCompatibilityVersionDocument"), fcvObj.value());
-                changeTimestamp = fcvDoc.getChangeTimestamp();
-                uassert(5722800,
-                        "The 'changeTimestamp' field is missing in the FCV document persisted by "
-                        "the Config Server. This may indicate that this document has been "
-                        "explicitly amended causing an internal data inconsistency.",
-                        changeTimestamp);
-            }
-        } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
-                   request.getPhase()) {
-            // Shards receive the timestamp from the Config Server's request.
-            changeTimestamp = request.getChangeTimestamp();
-            uassert(5563500,
-                    "The 'changeTimestamp' field is missing even though the node is running as a "
-                    "shard. This may indicate that the 'setFeatureCompatibilityVersion' command "
-                    "was invoked directly against the shard or that the config server has not been "
-                    "upgraded to at least version 5.0.",
-                    changeTimestamp);
-        }
+        const boost::optional<Timestamp> changeTimestamp = getChangeTimestamp(opCtx, request);
 
         FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
             opCtx, request, actualVersion);
@@ -772,6 +742,33 @@ private:
                 splitDonorService->abortAllSplits(opCtx);
             }
         }
+    }
+
+    /**
+     * For sharded cluster servers:
+     *  Generate a new changeTimestamp if change fcv is called on config server,
+     *  otherwise retrieve changeTimestamp from the Config Server request.
+     */
+    boost::optional<Timestamp> getChangeTimestamp(mongo::OperationContext* opCtx,
+                                                  mongo::SetFeatureCompatibilityVersion request) {
+        boost::optional<Timestamp> changeTimestamp;
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            // The Config Server always creates a new ID (i.e., timestamp) when it receives an
+            // upgrade or downgrade request.
+            const auto now = VectorClock::get(opCtx)->getTime();
+            changeTimestamp = now.clusterTime().asTimestamp();
+        } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+                   request.getPhase()) {
+            // Shards receive the timestamp from the Config Server's request.
+            changeTimestamp = request.getChangeTimestamp();
+            uassert(5563500,
+                    "The 'changeTimestamp' field is missing even though the node is running as a "
+                    "shard. This may indicate that the 'setFeatureCompatibilityVersion' command "
+                    "was invoked directly against the shard or that the config server has not been "
+                    "upgraded to at least version 5.0.",
+                    changeTimestamp);
+        }
+        return changeTimestamp;
     }
 
 } setFeatureCompatibilityVersionCommand;

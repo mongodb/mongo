@@ -120,10 +120,15 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
 
     let newPrimary = rollbackTest.getPrimary();
     // As a rule, we forbid downgrading a node while a node is still in the upgrading state and
-    // vice versa. Ensure that the in-memory and on-disk FCV are consistent by checking that this
-    // rule is upheld after rollback.
-    assert.commandFailedWithCode(newPrimary.adminCommand({setFeatureCompatibilityVersion: toFCV}),
-                                 5147403);
+    // vice versa (except for the added path kDowngradingFromLatestToLastLTS ->
+    // kUpgradingFromLastLTSToLatest -> kLatest). Ensure that the in-memory and on-disk FCV are
+    // consistent by checking that this rule is upheld after rollback.
+    if (fromFCV === lastLTSFCV && toFCV === latestFCV) {
+        assert.commandWorked(newPrimary.adminCommand({setFeatureCompatibilityVersion: toFCV}));
+    } else {
+        assert.commandFailedWithCode(
+            newPrimary.adminCommand({setFeatureCompatibilityVersion: toFCV}), 5147403);
+    }
 }
 
 const testName = jsTest.name();

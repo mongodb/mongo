@@ -109,6 +109,10 @@ public:
                 // lastLTS then the second loop iteration just overwrites the first.
                 _transitions[{from, to, isFromConfigServer}] = upgrading;
                 _transitions[{upgrading, to, isFromConfigServer}] = to;
+                // allow downgrading->upgrading->latest path
+                _transitions[{GenericFCV::kDowngradingFromLatestToLastLTS,
+                              GenericFCV::kLatest,
+                              isFromConfigServer}] = GenericFCV::kUpgradingFromLastLTSToLatest;
             }
             _fcvDocuments[upgrading] = makeFCVDoc(from /* effective */, to /* target */);
         }
@@ -326,7 +330,11 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
     // Only transition to fully upgraded or downgraded states when we
     // have completed all required upgrade/downgrade behavior.
     auto transitioningVersion = setTargetVersion &&
-            serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading(fromVersion)
+            serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading(fromVersion) &&
+            // if kDowngradingFromLatestToLastLTS->kLatest, we want to get the transitional version
+            // i.e. kUpgradingFromLastLTSToLatest
+            !(fromVersion == GenericFCV::kDowngradingFromLatestToLastLTS &&
+              newVersion == GenericFCV::kLatest)
         ? fromVersion
         : fcvTransitions.getTransitionalVersion(fromVersion, newVersion, isFromConfigServer);
     FeatureCompatibilityVersionDocument fcvDoc =
