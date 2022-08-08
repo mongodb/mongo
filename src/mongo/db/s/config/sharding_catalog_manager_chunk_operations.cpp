@@ -570,6 +570,11 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
     const std::vector<BSONObj>& splitPoints,
     const std::string& shardName,
     const bool fromChunkSplitter) {
+
+    // Mark opCtx as interruptible to ensure that all reads and writes to the metadata collections
+    // under the exclusive _kChunkOpLock happen on the same term.
+    opCtx->setAlwaysInterruptAtStepDownOrUp();
+
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
     // strictly monotonously increasing collection versions
     Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
@@ -797,6 +802,10 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunksMerge(
         return {ErrorCodes::IllegalOperation, "chunk operation requires validAfter timestamp"};
     }
 
+    // Mark opCtx as interruptible to ensure that all reads and writes to the metadata collections
+    // under the exclusive _kChunkOpLock happen on the same term.
+    opCtx->setAlwaysInterruptAtStepDownOrUp();
+
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
     // strictly monotonously increasing collection versions
     Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
@@ -951,6 +960,10 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     if (!validAfter) {
         return {ErrorCodes::IllegalOperation, "chunk operation requires validAfter timestamp"};
     }
+
+    // Mark opCtx as interruptible to ensure that all reads and writes to the metadata collections
+    // under the exclusive _kChunkOpLock happen on the same term.
+    opCtx->setAlwaysInterruptAtStepDownOrUp();
 
     // Must hold the shard lock until the entire commit finishes to serialize with removeShard.
     Lock::SharedLock shardLock(opCtx->lockState(), _kShardMembershipLock);
@@ -1263,6 +1276,10 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
     auto const catalogClient = Grid::get(opCtx)->catalogClient();
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
+    // Mark opCtx as interruptible to ensure that all reads and writes to the metadata collections
+    // under the exclusive _kChunkOpLock happen on the same term.
+    opCtx->setAlwaysInterruptAtStepDownOrUp();
+
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
     // migrations.
     Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
@@ -1395,6 +1412,10 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
                                             const NamespaceString& nss,
                                             const OID& collectionEpoch,
                                             const ChunkRange& chunk) {
+    // Mark opCtx as interruptible to ensure that all reads and writes to the metadata collections
+    // under the exclusive _kChunkOpLock happen on the same term.
+    opCtx->setAlwaysInterruptAtStepDownOrUp();
+
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
     // strictly monotonously increasing collection versions
     Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
@@ -1513,6 +1534,10 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
                                                              const BSONObj& minKey,
                                                              const BSONObj& maxKey,
                                                              const ChunkVersion& version) {
+    // Mark opCtx as interruptible to ensure that all reads and writes to the metadata collections
+    // under the exclusive _kChunkOpLock happen on the same term.
+    opCtx->setAlwaysInterruptAtStepDownOrUp();
+
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
     // strictly monotonously increasing collection versions
     Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
@@ -1710,6 +1735,10 @@ void ShardingCatalogManager::bumpMultipleCollectionVersionsAndChangeMetadataInTx
     unique_function<void(OperationContext*, TxnNumber)> changeMetadataFunc,
     const WriteConcernOptions& writeConcern) {
 
+    // Mark opCtx as interruptible to ensure that all reads and writes to the metadata collections
+    // under the exclusive _kChunkOpLock happen on the same term.
+    opCtx->setAlwaysInterruptAtStepDownOrUp();
+
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
     // migrations
     Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
@@ -1814,6 +1843,10 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
     bool allowMigrations) {
     std::set<ShardId> shardsIds;
     {
+        // Mark opCtx as interruptible to ensure that all reads and writes to the metadata
+        // collections under the exclusive _kChunkOpLock happen on the same term.
+        opCtx->setAlwaysInterruptAtStepDownOrUp();
+
         // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
         // migrations
         Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
