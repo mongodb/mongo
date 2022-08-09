@@ -92,8 +92,3 @@ feature_flags:
       of queries, including NLJ $lookup plans. Also enables the SBE plan cache."
       cpp_varname: gFeatureFlagSbeFull
       default: false
-
-    featureFlagTimeSeriesChangeStreams:
-      description: "Feature flag for $changeStream support for time series"
-      cpp_varname: gFeatureFlagTimeSeriesChangeStreams
-      default: false
