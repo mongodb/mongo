@@ -553,6 +553,11 @@ ReshardingRecipientService::RecipientStateMachine::_makeDataReplication(Operatio
                                                                         bool cloningDone) {
     invariant(_cloneTimestamp);
 
+    // We refresh the routing information for the source collection to ensure the
+    // ReshardingOplogApplier is making its decisions according to the chunk distribution after the
+    // sharding metadata was frozen.
+    _externalState->refreshCatalogCache(opCtx, _metadata.getSourceNss());
+
     auto myShardId = _externalState->myShardId(opCtx->getServiceContext());
     auto sourceChunkMgr =
         _externalState->getShardedCollectionRoutingInfo(opCtx, _metadata.getSourceNss());
