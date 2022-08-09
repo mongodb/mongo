@@ -2036,7 +2036,7 @@ buildvariants:
     distros:
     - ubuntu1804-xlarge
   - name: jsCore
-  - name: .aggregation !.encrypt
+  - name: .aggregation !.encrypt !.feature_flag_guarded
   - name: replica_sets_jscore_passthrough
   - name: sharded_collections_jscore_passthrough
   - name: sharding_gen
