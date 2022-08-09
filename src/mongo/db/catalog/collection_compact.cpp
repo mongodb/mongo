@@ -74,10 +74,10 @@ StatusWith<int64_t> compactCollection(OperationContext* opCtx,
     Database* database = autoDb.getDb();
     uassert(ErrorCodes::NamespaceNotFound, "database does not exist", database);
 
-    // The collection lock will be downgraded to an intent lock if the record store supports
-    // online compaction.
+    // The collection lock will be upgraded to an exclusive lock if the record store does not
+    // support online compaction.
     boost::optional<Lock::CollectionLock> collLk;
-    collLk.emplace(opCtx, collectionNss, MODE_X);
+    collLk.emplace(opCtx, collectionNss, MODE_IX);
 
     CollectionPtr collection = getCollectionForCompact(opCtx, collectionNss);
     DisableDocumentValidation validationDisabler(opCtx);
@@ -91,10 +91,9 @@ StatusWith<int64_t> compactCollection(OperationContext* opCtx,
                       str::stream() << "cannot compact collection with record store: "
                                     << recordStore->name());
 
-    if (recordStore->supportsOnlineCompaction()) {
-        // Storage engines that allow online compaction should do so using an intent lock on the
-        // collection.
-        collLk.emplace(opCtx, collectionNss, MODE_IX);
+    if (!recordStore->supportsOnlineCompaction()) {
+        // Storage engines that disallow online compaction should compact under an exclusive lock.
+        collLk.emplace(opCtx, collectionNss, MODE_X);
 
         // Ensure the collection was not dropped during the re-lock.
         collection = getCollectionForCompact(opCtx, collectionNss);
