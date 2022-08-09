@@ -31,8 +31,6 @@
 
 #include "mongo/db/s/balancer/migration_test_fixture.h"
 
-#include "mongo/db/s/type_locks.h"
-
 namespace mongo {
 
 using unittest::assertGet;
@@ -136,7 +134,7 @@ void MigrationTestFixture::setUpMigration(const NamespaceString& ns,
                                                     kMajorityWriteConcern));
 }
 
-void MigrationTestFixture::checkMigrationsCollectionIsEmptyAndLocksAreUnlocked() {
+void MigrationTestFixture::checkMigrationsCollectionIsEmpty() {
     auto statusWithMigrationsQueryResponse =
         shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
             operationContext(),
@@ -149,17 +147,6 @@ void MigrationTestFixture::checkMigrationsCollectionIsEmptyAndLocksAreUnlocked()
     Shard::QueryResponse migrationsQueryResponse =
         uassertStatusOK(statusWithMigrationsQueryResponse);
     ASSERT_EQUALS(0U, migrationsQueryResponse.docs.size());
-
-    auto statusWithLocksQueryResponse = shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-        operationContext(),
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        repl::ReadConcernLevel::kMajorityReadConcern,
-        LocksType::ConfigNS,
-        BSON(LocksType::state(LocksType::LOCKED) << LocksType::name("{ '$ne' : 'balancer'}")),
-        BSONObj(),
-        boost::none);
-    Shard::QueryResponse locksQueryResponse = uassertStatusOK(statusWithLocksQueryResponse);
-    ASSERT_EQUALS(0U, locksQueryResponse.docs.size());
 }
 
 }  // namespace mongo

@@ -173,6 +173,27 @@ void abortAllReshardCollection(OperationContext* opCtx) {
     }
 }
 
+// TODO SERVER-68551: Remove once 7.0 becomes last-lts
+void dropDistLockCollections(OperationContext* opCtx) {
+    LOGV2(6589100, "Dropping deprecated distributed locks collections");
+    static const std::vector<NamespaceString> collectionsToDrop{
+        NamespaceString::kLockpingsNamespace, NamespaceString::kDistLocksNamepsace};
+
+    for (const auto& nss : collectionsToDrop) {
+        DropReply dropReply;
+        const auto dropStatus =
+            dropCollection(opCtx,
+                           nss,
+                           &dropReply,
+                           DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
+        if (dropStatus != ErrorCodes::NamespaceNotFound) {
+            uassertStatusOKWithContext(
+                dropStatus,
+                str::stream() << "Failed to drop deprecated distributed locks collection " << nss);
+        }
+    }
+}
+
 void uassertStatusOKIgnoreNSNotFound(Status status) {
     if (status.isOK() || status == ErrorCodes::NamespaceNotFound) {
         return;
@@ -477,10 +498,14 @@ private:
                 !failUpgrading.shouldFail());
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+
             // Always abort the reshardCollection regardless of version to ensure that it will run
             // on a consistent version from start to finish. This will ensure that it will be able
             // to apply the oplog entries correctly.
             abortAllReshardCollection(opCtx);
+
+            // TODO SERVER-68551: Remove once 7.0 becomes last-lts
+            dropDistLockCollections(opCtx);
 
             // Tell the shards to enter phase-2 of setFCV (fully upgraded)
             _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kComplete);

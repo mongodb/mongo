@@ -112,11 +112,6 @@ protected:
     virtual std::unique_ptr<ShardRegistry> makeShardRegistry(ConnectionString configConnStr);
 
     /**
-     * Allows tests to conditionally construct a DistLockManager
-     */
-    virtual std::unique_ptr<DistLockManager> makeDistLockManager();
-
-    /**
      * Base class returns nullptr.
      */
     virtual std::unique_ptr<ClusterCursorManager> makeClusterCursorManager();

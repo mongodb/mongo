@@ -88,12 +88,8 @@ for (const uuid of [aCollUUID, bCollUUID]) {
 assert.eq(1, mongos.getDB("config").getCollection("collections").find({_id: "test.a"}).count());
 assert.eq(1, mongos.getDB("config").getCollection("collections").find({_id: "test.b"}).count());
 
-assert.eq(1, mongos.getDB("config").getCollection("locks").find({_id: "test"}).count());
-assert.eq(1, mongos.getDB("config").getCollection("locks").find({_id: "test.a"}).count());
-assert.eq(1, mongos.getDB("config").getCollection("locks").find({_id: "test.b"}).count());
-assert.eq(1, mongos.getDB("config").getCollection("locks").find({_id: "unusedDB"}).count());
-
 assert.eq(1, mongos.getDB("config").getCollection("databases").find({_id: "test"}).count());
+
 assert.eq(1, mongos.getDB("config").getCollection("databases").find({_id: "unusedDB"}).count());
 
 s.stop({noCleanData: true});
@@ -153,11 +149,6 @@ assert.eq(0,
 
 assert.eq(1, conn.getDB("config").getCollection("collections").find({_id: "test.a"}).count());
 assert.eq(0, conn.getDB("config").getCollection("collections").find({_id: "test.b"}).count());
-
-assert.eq(1, conn.getDB("config").getCollection("locks").find({_id: "test"}).count());
-assert.eq(1, conn.getDB("config").getCollection("locks").find({_id: "test.a"}).count());
-assert.eq(0, conn.getDB("config").getCollection("locks").find({_id: "test.b"}).count());
-assert.eq(0, conn.getDB("config").getCollection("locks").find({_id: "unusedDB"}).count());
 
 assert.eq(1, conn.getDB("config").getCollection("databases").find({_id: "test"}).count());
 assert.eq(0, conn.getDB("config").getCollection("databases").find({_id: "unusedDB"}).count());

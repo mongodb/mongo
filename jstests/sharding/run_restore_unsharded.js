@@ -32,8 +32,6 @@ const collUUID =
 
 // Only sharded collections appear in config.collections
 assert.eq(0, mongos.getDB("config").getCollection("collections").find({_id: "test.a"}).count());
-
-assert.eq(1, mongos.getDB("config").getCollection("locks").find({_id: "test"}).count());
 assert.eq(1, mongos.getDB("config").getCollection("databases").find({_id: "test"}).count());
 
 s.stop({noCleanData: true});
@@ -58,9 +56,6 @@ assert.commandWorked(conn.getDB("admin").runCommand({_configsvrRunRestore: 1}));
 // Only sharded collections appear in config.collections
 assert.eq(0, conn.getDB("config").getCollection("collections").find({_id: "test.a"}).count());
 
-let locks = conn.getDB("config").getCollection("locks").find({_id: "test"}).toArray();
-assert.eq(1, locks.length);
-assert.eq(0, locks[0].state);  // State::UNLOCKED
 assert.eq(1, conn.getDB("config").getCollection("databases").find({_id: "test"}).count());
 
 MongoRunner.stopMongod(conn);

@@ -39,88 +39,28 @@
 namespace mongo {
 namespace {
 
-const auto getDistLockManager =
-    ServiceContext::declareDecoration<std::unique_ptr<DistLockManager>>();
+// TODO SERVER-68551: Remove once 7.0 becomes last-lts
+MONGO_FAIL_POINT_DEFINE(disableReplSetDistLockManager);
+
+const auto distLockManagerDecorator = ServiceContext::declareDecoration<DistLockManager>();
 
 }  // namespace
 
 const Minutes DistLockManager::kDefaultLockTimeout(5);
 const Milliseconds DistLockManager::kSingleLockAttemptTimeout(0);
 
-DistLockManager::ScopedDistLock::ScopedDistLock(OperationContext* opCtx,
-                                                StringData lockName,
-                                                ScopedLock&& scopedLock,
-                                                DistLockManager* lockManager)
-    : _opCtx(opCtx),
-      _lockName(lockName.toString()),
-      _scopedLock(std::move(scopedLock)),
-      _lockManager(lockManager) {}
-
-DistLockManager::ScopedDistLock::~ScopedDistLock() {
-    if (_lockManager) {
-        _lockManager->unlock(_opCtx, _lockName);
-    }
-}
-
-DistLockManager::ScopedDistLock::ScopedDistLock(ScopedDistLock&& other)
-    : ScopedDistLock(other._opCtx,
-                     std::move(other._lockName),
-                     std::move(other._scopedLock),
-                     other._lockManager) {
-    other._opCtx = nullptr;
-    other._lockManager = nullptr;
-}
-
-DistLockManager::ScopedDistLock DistLockManager::ScopedDistLock::moveToAnotherThread() {
-    auto unownedScopedDistLock(std::move(*this));
-    unownedScopedDistLock._opCtx = nullptr;
-    return unownedScopedDistLock;
-}
-
-void DistLockManager::ScopedDistLock::assignNewOpCtx(OperationContext* opCtx) {
-    invariant(!_opCtx);
-    _opCtx = opCtx;
-}
-
-DistLockManager::DistLockManager(OID lockSessionID) : _lockSessionID(std::move(lockSessionID)) {}
-
 DistLockManager* DistLockManager::get(ServiceContext* service) {
-    return getDistLockManager(service).get();
+    return &distLockManagerDecorator(service);
 }
 
 DistLockManager* DistLockManager::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
-void DistLockManager::create(ServiceContext* service,
-                             std::unique_ptr<DistLockManager> distLockManager) {
-    invariant(!getDistLockManager(service));
-    getDistLockManager(service) = std::move(distLockManager);
-}
-
-StatusWith<DistLockManager::ScopedDistLock> DistLockManager::lock(OperationContext* opCtx,
-                                                                  StringData name,
-                                                                  StringData reason,
-                                                                  Milliseconds waitFor) {
-    boost::optional<ScopedLock> scopedLock;
-    try {
-        scopedLock.emplace(lockDirectLocally(opCtx, name, reason, waitFor));
-    } catch (const DBException& ex) {
-        return ex.toStatus();
-    }
-
-    auto status = lockDirect(opCtx, name, reason, waitFor);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    return DistLockManager::ScopedDistLock(opCtx, name, std::move(*scopedLock), this);
-}
-
-DistLockManager::ScopedLock DistLockManager::lockDirectLocally(OperationContext* opCtx,
-                                                               StringData ns,
-                                                               StringData reason,
-                                                               Milliseconds waitFor) {
+DistLockManager::ScopedLock DistLockManager::lock(OperationContext* opCtx,
+                                                  StringData ns,
+                                                  StringData reason,
+                                                  Milliseconds waitFor) {
     stdx::unique_lock<Latch> lock(_mutex);
     auto iter = _inProgressMap.find(ns);
 
@@ -144,7 +84,7 @@ DistLockManager::ScopedLock DistLockManager::lockDirectLocally(OperationContext*
     }
 
     LOGV2(6855301, "Acquired DDL lock", "resource"_attr = ns, "reason"_attr = reason);
-    return ScopedLock(ns, reason, this);
+    return {ns, reason, this};
 }
 
 DistLockManager::ScopedLock::ScopedLock(StringData ns,

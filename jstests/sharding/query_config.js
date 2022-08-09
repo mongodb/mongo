@@ -79,8 +79,7 @@ var setupTestCollections = function(st) {
 var testListConfigCollections = function(st) {
     // This test depends on all the collections in the configCollList being in the config
     // database.
-    var configCollList =
-        ["chunks", "collections", "databases", "lockpings", "locks", "shards", "tags", "version"];
+    var configCollList = ["chunks", "collections", "databases", "shards", "tags", "version"];
     var configDB = st.s.getDB("config");
     var userAddedColl = configDB.userAddedColl;
     var cursor;

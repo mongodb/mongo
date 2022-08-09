@@ -167,32 +167,6 @@ std::unique_ptr<ShardRegistry> ShardingMongodTestFixture::makeShardRegistry(
         getServiceContext(), std::move(shardFactory), configConnStr);
 }
 
-std::unique_ptr<DistLockManager> ShardingMongodTestFixture::makeDistLockManager() {
-    class DistLockManagerNoop : public DistLockManager {
-    public:
-        DistLockManagerNoop() : DistLockManager(OID::gen()) {}
-        void startUp() override {}
-        void shutDown(OperationContext* opCtx) {}
-        std::string getProcessID() override {
-            return "DistLockManagerNoop";
-        }
-        Status lockDirect(OperationContext* opCtx,
-                          StringData name,
-                          StringData whyMessage,
-                          Milliseconds waitFor) override {
-            return Status::OK();
-        }
-        Status tryLockDirectWithLocalWriteConcern(OperationContext* opCtx,
-                                                  StringData name,
-                                                  StringData whyMessage) override {
-            return Status::OK();
-        }
-        void unlock(Interruptible* intr, StringData name) override {}
-        void unlockAll(OperationContext* opCtx) override {}
-    };
-    return std::make_unique<DistLockManagerNoop>();
-}
-
 std::unique_ptr<ClusterCursorManager> ShardingMongodTestFixture::makeClusterCursorManager() {
     return nullptr;
 }
@@ -227,11 +201,6 @@ Status ShardingMongodTestFixture::initializeGlobalShardingStateForMongodForTest(
                makeBalancerConfiguration(),
                std::move(executorPoolPtr),
                _mockNetwork);
-
-    DistLockManager::create(getServiceContext(), makeDistLockManager());
-    if (DistLockManager::get(operationContext())) {
-        DistLockManager::get(operationContext())->startUp();
-    }
 
     return Status::OK();
 }
@@ -297,10 +266,6 @@ void ShardingMongodTestFixture::setUp() {
 
 void ShardingMongodTestFixture::tearDown() {
     ReplicaSetMonitor::cleanup();
-
-    if (DistLockManager::get(operationContext())) {
-        DistLockManager::get(operationContext())->shutDown(operationContext());
-    }
 
     if (Grid::get(operationContext())->getExecutorPool() && !_executorPoolShutDown) {
         Grid::get(operationContext())->getExecutorPool()->shutdownAndJoin();

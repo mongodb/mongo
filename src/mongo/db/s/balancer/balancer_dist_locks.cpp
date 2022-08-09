@@ -45,16 +45,11 @@ Status BalancerDistLocks::acquireFor(OperationContext* opCtx, const NamespaceStr
     } else {
         boost::optional<DistLockManager::ScopedLock> scopedLock;
         try {
-            scopedLock.emplace(DistLockManager::get(opCtx)->lockDirectLocally(
-                opCtx,
-                nss.ns(),
-                "moveRange" /* reason */,
-                DistLockManager::kSingleLockAttemptTimeout));
-
-            const std::string whyMessage(str::stream()
-                                         << "Migrating chunk(s) in collection " << nss.ns());
-            uassertStatusOK(DistLockManager::get(opCtx)->lockDirect(
-                opCtx, nss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout));
+            scopedLock.emplace(
+                DistLockManager::get(opCtx)->lock(opCtx,
+                                                  nss.ns(),
+                                                  "moveRange" /* reason */,
+                                                  DistLockManager::kSingleLockAttemptTimeout));
         } catch (const DBException& ex) {
             return ex.toStatus(str::stream() << "Could not acquire collection lock for " << nss.ns()
                                              << " to migrate chunks");
@@ -70,7 +65,6 @@ void BalancerDistLocks::releaseFor(OperationContext* opCtx, const NamespaceStrin
     if (it == _distLocksByCollection.end()) {
         return;
     } else if (it->second.references == 1) {
-        DistLockManager::get(opCtx)->unlock(opCtx, nss.ns());
         _distLocksByCollection.erase(it);
     } else {
         --it->second.references;

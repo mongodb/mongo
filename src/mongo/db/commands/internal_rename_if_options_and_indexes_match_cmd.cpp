@@ -89,9 +89,9 @@ public:
             // - Check safely if the target collection is sharded or not.
             static constexpr StringData lockReason{"internalRenameCollection"_sd};
             auto distLockManager = DistLockManager::get(opCtx);
-            auto fromLocalDistlock = distLockManager->lockDirectLocally(
+            auto fromCollDDLLock = distLockManager->lock(
                 opCtx, fromNss.ns(), lockReason, DistLockManager::kDefaultLockTimeout);
-            auto toLocalDistLock = distLockManager->lockDirectLocally(
+            auto toCollDDLLock = distLockManager->lock(
                 opCtx, toNss.ns(), lockReason, DistLockManager::kDefaultLockTimeout);
 
             uassert(ErrorCodes::IllegalOperation,

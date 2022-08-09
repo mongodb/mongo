@@ -81,7 +81,6 @@
 #include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/config/index_on_config.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/periodic_balancer_config_refresher.h"
 #include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
@@ -910,9 +909,6 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
             }
             fassert(40217, status);
         }
-
-        // Free any leftover locks from previous instantiations.
-        DistLockManager::get(opCtx)->unlockAll(opCtx);
 
         if (auto validator = LogicalTimeValidator::get(_service)) {
             validator->enableKeyGenerator(opCtx, true);

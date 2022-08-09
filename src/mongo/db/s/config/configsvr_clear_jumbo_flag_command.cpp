@@ -70,12 +70,10 @@ public:
             const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
             // Acquire distlocks on the namespace's database and collection.
-            DistLockManager::ScopedDistLock dbDistLock(
-                uassertStatusOK(DistLockManager::get(opCtx)->lock(
-                    opCtx, nss.db(), "clearJumboFlag", DistLockManager::kDefaultLockTimeout)));
-            DistLockManager::ScopedDistLock collDistLock(
-                uassertStatusOK(DistLockManager::get(opCtx)->lock(
-                    opCtx, nss.ns(), "clearJumboFlag", DistLockManager::kDefaultLockTimeout)));
+            const auto dbDDLock = DistLockManager::get(opCtx)->lock(
+                opCtx, nss.db(), "clearJumboFlag", DistLockManager::kDefaultLockTimeout);
+            const auto collDDLLock = DistLockManager::get(opCtx)->lock(
+                opCtx, nss.ns(), "clearJumboFlag", DistLockManager::kDefaultLockTimeout);
 
             CollectionType collType;
             try {

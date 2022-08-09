@@ -30,10 +30,8 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/oid.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/stdx/chrono.h"
 #include "mongo/stdx/condition_variable.h"
 
 namespace mongo {
@@ -89,57 +87,14 @@ public:
         DistLockManager* _lockManager;
     };
 
-    /**
-     * RAII type for the distributed lock.
-     */
-    class ScopedDistLock {
-        ScopedDistLock(const ScopedDistLock&) = delete;
-        ScopedDistLock& operator=(const ScopedDistLock&) = delete;
-
-    public:
-        ScopedDistLock(OperationContext* opCtx,
-                       StringData lockName,
-                       ScopedLock&& scopedLock,
-                       DistLockManager* lockManager);
-        ~ScopedDistLock();
-
-        ScopedDistLock(ScopedDistLock&& other);
-
-        ScopedDistLock moveToAnotherThread();
-        void assignNewOpCtx(OperationContext* opCtx);
-
-    private:
-        OperationContext* _opCtx;
-        std::string _lockName;
-        ScopedLock _scopedLock;
-        DistLockManager* _lockManager;
-    };
-
-    virtual ~DistLockManager() = default;
+    DistLockManager() = default;
+    ~DistLockManager() = default;
 
     /**
      * Retrieves the DistLockManager singleton for the node.
      */
     static DistLockManager* get(ServiceContext* service);
     static DistLockManager* get(OperationContext* opCtx);
-    static void create(ServiceContext* service, std::unique_ptr<DistLockManager> distLockManager);
-
-    /**
-     * Performs bootstrapping for the manager. Implementation do not need to guarantee
-     * thread safety so callers should employ proper synchronization when calling this method.
-     */
-    virtual void startUp() = 0;
-
-    /**
-     * Cleanup the manager's resources. Implementations do not need to guarantee thread safety
-     * so callers should employ proper synchronization when calling this method.
-     */
-    virtual void shutDown(OperationContext* opCtx) = 0;
-
-    /**
-     * Returns the process ID for this DistLockManager.
-     */
-    virtual std::string getProcessID() = 0;
 
     /**
      * Tries multiple times to lock, using the specified lock try interval, until
@@ -154,62 +109,12 @@ public:
      * Returns ErrorCodes::DistributedClockSkewed when a clock skew is detected.
      * Returns ErrorCodes::LockBusy if the lock is being held.
      */
-    StatusWith<ScopedDistLock> lock(OperationContext* opCtx,
-                                    StringData name,
-                                    StringData whyMessage,
-                                    Milliseconds waitFor);
-
-    /**
-     * Ensures that two dist lock within the same process will serialise with each other.
-     */
-    ScopedLock lockDirectLocally(OperationContext* opCtx,
-                                 StringData ns,
-                                 StringData reason,
-                                 Milliseconds waitFor);
-
-    /**
-     * Same behavior as lock(...) above, except doesn't return a scoped object, so it is the
-     * responsibility of the caller to call unlock for the same name.
-     *
-     * This is useful for a process running on the config primary after a failover. A lock can be
-     * immediately reacquired if "lockSessionID" matches that of the lock, rather than waiting for
-     * the inactive lock to expire.
-     */
-    virtual Status lockDirect(OperationContext* opCtx,
-                              StringData name,
-                              StringData whyMessage,
-                              Milliseconds waitFor) = 0;
-
-    /**
-     * Specialized locking method, which only succeeds if the specified lock name is not held by
-     * anyone. Uses local write concern and does not attempt to overtake the lock or check whether
-     * the lock lease has expired.
-     *
-     * This method is only used by the Balancer, which re-acquires dist locks while in drain mode.
-     */
-    virtual Status tryLockDirectWithLocalWriteConcern(OperationContext* opCtx,
-                                                      StringData name,
-                                                      StringData whyMessage) = 0;
-
-    /**
-     * Unlocks the given lockHandle. Will keep retrying (asynchronously) until the lock is freed or
-     * some terminal error occurs where a lock cannot be freed (such as a local NotWritablePrimary).
-     *
-     * The provided interruptible object can be nullptr in which case the method will not attempt to
-     * wait for the unlock to be confirmed.
-     */
-    virtual void unlock(Interruptible* intr, StringData name) = 0;
-
-    /**
-     * Makes a best-effort attempt to unlock all locks owned by the given processID.
-     */
-    virtual void unlockAll(OperationContext* opCtx) = 0;
+    ScopedLock lock(OperationContext* opCtx,
+                    StringData name,
+                    StringData whyMessage,
+                    Milliseconds waitFor);
 
 protected:
-    DistLockManager(OID lockSessionID);
-
-    const OID _lockSessionID;
-
     struct NSLock {
         NSLock(StringData reason) : reason(reason.toString()) {}
 

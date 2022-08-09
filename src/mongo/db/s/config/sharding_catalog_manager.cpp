@@ -48,8 +48,6 @@
 #include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/db/s/config/index_on_config.h"
 #include "mongo/db/s/sharding_util.h"
-#include "mongo/db/s/type_lockpings.h"
-#include "mongo/db/s/type_locks.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/config_server_version.h"
@@ -440,27 +438,6 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
         opCtx, NamespaceString::kConfigsvrShardsNamespace, BSON(ShardType::host() << 1), unique);
     if (!result.isOK()) {
         return result.withContext("couldn't create host_1 index on config db");
-    }
-
-    result = createIndexOnConfigCollection(
-        opCtx, LocksType::ConfigNS, BSON(LocksType::lockID() << 1), !unique);
-    if (!result.isOK()) {
-        return result.withContext("couldn't create lock id index on config db");
-    }
-
-    result =
-        createIndexOnConfigCollection(opCtx,
-                                      LocksType::ConfigNS,
-                                      BSON(LocksType::state() << 1 << LocksType::process() << 1),
-                                      !unique);
-    if (!result.isOK()) {
-        return result.withContext("couldn't create state and process id index on config db");
-    }
-
-    result = createIndexOnConfigCollection(
-        opCtx, LockpingsType::ConfigNS, BSON(LockpingsType::ping() << 1), !unique);
-    if (!result.isOK()) {
-        return result.withContext("couldn't create lockping ping time index on config db");
     }
 
     result = createIndexOnConfigCollection(

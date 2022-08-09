@@ -179,6 +179,9 @@ const NamespaceString NamespaceString::kShardIndexCatalogNamespace(NamespaceStri
 const NamespaceString NamespaceString::kShardCollectionCatalogNamespace(NamespaceString::kConfigDb,
                                                                         "shard.collections");
 
+const NamespaceString NamespaceString::kLockpingsNamespace(NamespaceString::kConfigDb, "lockpings");
+const NamespaceString NamespaceString::kDistLocksNamepsace(NamespaceString::kConfigDb, "locks");
+
 NamespaceString NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(StringData ns) {
     if (!gMultitenancySupport) {
         return NamespaceString(ns, boost::none);

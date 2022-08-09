@@ -57,7 +57,16 @@ var $config = extendWorkload($config, function($config, $super) {
     // migrated back in. The particular error code is replaced with a more generic one, so this
     // is identified by the failed migration's error message.
     $config.data.isMoveChunkErrorAcceptable = (err) => {
-        const codes = [ErrorCodes.LockBusy, ErrorCodes.ShardKeyNotFound, ErrorCodes.LockTimeout];
+        const codes = [
+            // TODO SERVER-68551: Remove lockbusy error since the balancer won't acquire anymore the
+            // DDL lock for migrations
+            ErrorCodes.LockBusy,
+            ErrorCodes.ShardKeyNotFound,
+            ErrorCodes.LockTimeout,
+            // The refienCollectionCoordinator interrupt all migrations by setting `allowMigration`
+            // to false
+            ErrorCodes.Interrupted,
+        ];
         return (err.code && codes.includes(err.code)) ||
             (err.message &&
              (err.message.includes("CommandFailed") ||
@@ -89,6 +98,8 @@ var $config = extendWorkload($config, function($config, $super) {
             // It is also possible to receive a LockBusy error if refineCollectionShardKey is unable
             // to acquire the distlock before timing out due to ongoing migrations acquiring the
             // distlock first.
+            // TODO SERVER-68551: Remove lockbusy error since the balancer won't acquire anymore the
+            // DDL lock for migrations
             if (e.code == ErrorCodes.StaleEpoch || e.code == ErrorCodes.LockBusy) {
                 print("Ignoring acceptable refineCollectionShardKey error: " + tojson(e));
                 return;

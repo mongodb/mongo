@@ -216,11 +216,7 @@ ExecutorFuture<void> ShardingDDLCoordinator::_acquireLockAsync(
                    return DistLockManager::kDefaultLockTimeout;
                }();
 
-               auto distLock =
-                   distLockManager->lockDirectLocally(opCtx, resource, coorName, lockTimeOut);
-
-               uassertStatusOK(distLockManager->lockDirect(opCtx, resource, coorName, lockTimeOut));
-               _scopedLocks.emplace(std::move(distLock));
+               _scopedLocks.emplace(distLockManager->lock(opCtx, resource, coorName, lockTimeOut));
            })
         .until([this, resource = resource.toString()](Status status) {
             if (!status.isOK()) {
@@ -444,20 +440,8 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                 }
             }
 
-            if (!cleanup()) {
-                LOGV2(5950000,
-                      "Not releasing distributed locks because the node is stepping down or "
-                      "shutting down",
-                      "coordinatorId"_attr = _coordId,
-                      "status"_attr = status);
-            }
-
+            // Release all DDL locks
             while (!_scopedLocks.empty()) {
-                if (cleanup()) {
-                    // (SERVER-59500) Only release the remote locks in case of no stepdown/shutdown
-                    const auto& resource = _scopedLocks.top().getNs();
-                    DistLockManager::get(opCtx)->unlock(opCtx, resource);
-                }
                 _scopedLocks.pop();
             }
 

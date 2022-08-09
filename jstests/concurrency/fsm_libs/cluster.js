@@ -599,9 +599,11 @@ var Cluster = function(options) {
 
         // We record the contents of the 'lockpings' and 'locks' collections to make it easier to
         // debug issues with distributed locks in the sharded cluster.
+        // TODO SERVER-68551: remove once 7.0 becomes last-lts
         data.lockpings = configDB.lockpings.find({ping: {$gte: clusterStartTime}}).toArray();
 
         // We suppress some fields from the result set to reduce the amount of data recorded.
+        // TODO SERVER-68551: remove once 7.0 becomes last-lts
         data.locks =
             configDB.locks.find({when: {$gte: clusterStartTime}}, {process: 0, ts: 0}).toArray();
 

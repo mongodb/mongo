@@ -22,6 +22,7 @@ TestData.skipCheckRoutingTableConsistency = true;
  * To prevent this, disable the pinger threads to prevent them reaching out to the config server.
  */
 const failpointParams = {
+    // TODO SERVER-68551: Remove once 7.0 becomes last-lts
     setParameter: {"failpoint.disableReplSetDistLockManager": "{mode: 'alwaysOn'}"}
 };
 

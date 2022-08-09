@@ -109,11 +109,10 @@ protected:
     void setUpMigration(const NamespaceString& ns, const ChunkType& chunk, const ShardId& toShard);
 
     /**
-     * Asserts that config.migrations is empty and config.locks contains no locked documents other
-     * than the balancer's, both of which should be true if the MigrationManager is inactive and
-     * behaving properly.
+     * Asserts that config.migrations is empty, that should be true if the MigrationManager is
+     * inactive and behaving properly.
      */
-    void checkMigrationsCollectionIsEmptyAndLocksAreUnlocked();
+    void checkMigrationsCollectionIsEmpty();
 
     // Random static initialization order can result in X constructor running before Y constructor
     // if X and Y are defined in different source files. Defining variables here to enforce order.

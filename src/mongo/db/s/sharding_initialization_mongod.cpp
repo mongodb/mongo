@@ -46,8 +46,6 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/chunk_splitter.h"
-#include "mongo/db/s/dist_lock_catalog_replset.h"
-#include "mongo/db/s/dist_lock_manager_replset.h"
 #include "mongo/db/s/periodic_balancer_config_refresher.h"
 #include "mongo/db/s/read_only_catalog_cache_loader.h"
 #include "mongo/db/s/shard_local.h"
@@ -282,8 +280,6 @@ void ShardingInitializationMongoD::shutDown(OperationContext* opCtx) {
     auto const shardingState = ShardingState::get(opCtx);
     if (!shardingState->enabled())
         return;
-
-    DistLockManager::get(opCtx)->shutDown(opCtx);
 
     auto const grid = Grid::get(opCtx);
     grid->shardRegistry()->shutdown();
@@ -578,15 +574,6 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
                                       // We only need one task executor here because sharding task
                                       // executors aren't used for user queries in mongod.
                                       1));
-
-    DistLockManager::create(
-        service,
-        std::make_unique<ReplSetDistLockManager>(service,
-                                                 shardId,
-                                                 std::make_unique<DistLockCatalogImpl>(),
-                                                 ReplSetDistLockManager::kDistLockPingInterval,
-                                                 ReplSetDistLockManager::kDistLockExpirationTime));
-    DistLockManager::get(opCtx)->startUp();
 
     auto const replCoord = repl::ReplicationCoordinator::get(service);
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&

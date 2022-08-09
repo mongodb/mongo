@@ -239,6 +239,12 @@ public:
     // Namespace used for storing the collection catalog on the shards.
     static const NamespaceString kShardCollectionCatalogNamespace;
 
+    // TODO SERVER-68551: remove once 7.0 becomes last-lts
+    static const NamespaceString kLockpingsNamespace;
+
+    // TODO SERVER-68551: remove once 7.0 becomes last-lts
+    static const NamespaceString kDistLocksNamepsace;
+
     /**
      * Constructs an empty NamespaceString.
      */

@@ -102,7 +102,6 @@ const stdx::unordered_map<NamespaceString,
         {NamespaceString("config.chunks"), std::make_pair(boost::none, std::string("uuid"))},
         {NamespaceString("config.collections"),
          std::make_pair(std::string("_id"), std::string("uuid"))},
-        {NamespaceString("config.locks"), std::make_pair(std::string("_id"), boost::none)},
         {NamespaceString("config.migrationCoordinators"),
          std::make_pair(std::string("nss"), std::string("collectionUuid"))},
         {NamespaceString("config.tags"), std::make_pair(std::string("ns"), boost::none)},
@@ -235,7 +234,7 @@ public:
 
         {
             const std::vector<NamespaceString> databasesEntries = {
-                NamespaceString("config.databases"), NamespaceString("config.locks")};
+                NamespaceString("config.databases")};
 
             // Remove database entries from the config collections if no collection for the given
             // database was restored.
