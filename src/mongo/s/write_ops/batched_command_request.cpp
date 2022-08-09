@@ -266,7 +266,8 @@ BatchedCommandRequest BatchedCommandRequest::buildUpdateOp(const NamespaceString
                                                            const BSONObj& query,
                                                            const BSONObj& update,
                                                            bool upsert,
-                                                           bool multi) {
+                                                           bool multi,
+                                                           const boost::optional<BSONObj>& hint) {
     return BatchedCommandRequest([&] {
         write_ops::UpdateCommandRequest updateOp(nss);
         updateOp.setUpdates({[&] {
@@ -275,6 +276,9 @@ BatchedCommandRequest BatchedCommandRequest::buildUpdateOp(const NamespaceString
             entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
             entry.setUpsert(upsert);
             entry.setMulti(multi);
+            if (hint) {
+                entry.setHint(hint.value());
+            }
             return entry;
         }()});
         return updateOp;
