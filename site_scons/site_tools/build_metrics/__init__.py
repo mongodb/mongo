@@ -37,6 +37,7 @@ from .per_action_metrics import PerActionMetrics
 from .artifacts import CollectArtifacts
 from .scons import SConsStats
 from .cache_dir import CacheDirCollector, CacheDirValidateWithMetrics
+from .libdeps import LibdepsCollector
 
 _SEC_TO_NANOSEC_FACTOR = 1000000000.0
 _METRICS_COLLECTORS = []
@@ -48,6 +49,7 @@ def finalize_build_metrics(env):
     for m in _METRICS_COLLECTORS:
         start_time = timer()
         sys.stdout.write(f"Processing {m.get_name()}...")
+        sys.stdout.flush()
         key, value = m.finalize()
         sys.stdout.write(f" {timer() - start_time}s\n")
         metrics[key] = value
@@ -90,7 +92,8 @@ def generate(env, **kwargs):
         PerActionMetrics(),
         CollectArtifacts(env),
         SConsStats(),
-        CacheDirCollector()
+        CacheDirCollector(),
+        LibdepsCollector(env)
     ]
 
     env['CACHEDIR_CLASS'] = CacheDirValidateWithMetrics

@@ -158,7 +158,7 @@ class CollectArtifacts(BuildMetricsCollector):
         self._env = env
         self._build_dir = env.get("BUILD_METRICS_ARTIFACTS_DIR", env.Dir('#').abspath)
         self._artifacts = []
-        self._bloaty_bin = env.get("BUILD_METRICS_BLOATY", "bloaty")
+        self._bloaty_bin = env.get("BUILD_METRICS_BLOATY", env.WhereIs('bloaty'))
         self._metrics = {"total_artifact_size": 0, "num_artifacts": 0, "artifacts": []}
 
     def get_name(self):
@@ -202,7 +202,7 @@ class CollectArtifacts(BuildMetricsCollector):
 
                 if type_ == ArtifactType.UNKNOWN and any(s in magic_out for s in _TEXT_IDENTIFIERS):
                     type_ = ArtifactType.TEXT
-            except puremagic.main.PureError:
+            except (puremagic.main.PureError, ValueError):
                 # exception means that puremagic failed to id the filetype. We'll
                 # fallback to file extension in this case.
                 pass

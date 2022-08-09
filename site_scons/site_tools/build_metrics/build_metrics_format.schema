@@ -106,10 +106,10 @@
                         "items": { "type": "string"}
                     },
                     "action": {"type" : "string"}
-                },
-                "required": ["array_index", "start_time", "end_time", "cpu_time", "builder", "mem_usage", "inputs", "outputs", "action"],
-                "additionalProperties": false
-            }
+                }
+            },
+            "required": ["array_index", "start_time", "end_time", "cpu_time", "builder", "mem_usage", "inputs", "outputs", "action"],
+            "additionalProperties": false
         },
         "cache_metrics": {
             "type": "object",
@@ -134,49 +134,65 @@
             "required": ["cache_artifacts", "push_time", "pull_time", "cache_size"],
             "additionalProperties": false
         },
-        "scons_metrics": {
+        "libdeps_metrics": {
             "type": "object",
             "properties": {
-                "memory": {
+                "NODE": {"type": "integer"},
+                "EDGE": {"type": "integer"},
+                "DIR_EDGE": {"type": "integer"},
+                "TRANS_EDGE": {"type": "integer"},
+                "DIR_PUB_EDGE": {"type": "integer"},
+                "PUB_EDGE": {"type": "integer"},
+                "PRIV_EDGE": {"type": "integer"},
+                "IF_EDGE": {"type": "integer"},
+                "PROG": {"type": "integer"},
+                "LIB": {"type": "integer"}
+            },
+            "additionalProperties": false
+        }
+    },
+    "scons_metrics": {
+        "type": "object",
+        "properties": {
+            "memory": {
+                "type": "object",
+                "properties": {
+                    "pre_read": {"$ref": "#/$defs/bytes"},
+                    "post_read": {"$ref": "#/$defs/bytes"},
+                    "pre_build": {"$ref": "#/$defs/bytes"},
+                    "post_build": {"$ref": "#/$defs/bytes"}
+                },
+                "required": ["pre_read", "post_read", "pre_build", "post_build"],
+                "additionalProperties": false
+            },
+            "time": {
+                "type": "object",
+                "properties": {
+                    "total": {"type": "number"},
+                    "sconscript_exec": {"type": "number"},
+                    "scons_exec": {"type": "number"},
+                    "command_exec": {"type": "number"}
+                },
+                "required": ["total", "sconscript_exec", "scons_exec", "command_exec"],
+                "additionalProperties": false
+            },
+            "counts": {
+                "type": "array",
+                "items": {
                     "type": "object",
                     "properties": {
+                        "array_index": {"type": "integer"},
+                        "item_name": {"type": "string"},
                         "pre_read": {"$ref": "#/$defs/bytes"},
                         "post_read": {"$ref": "#/$defs/bytes"},
                         "pre_build": {"$ref": "#/$defs/bytes"},
                         "post_build": {"$ref": "#/$defs/bytes"}
                     },
-                    "required": ["pre_read", "post_read", "pre_build", "post_build"],
+                    "required": ["array_index", "item_name", "pre_read", "post_read", "pre_build", "post_build"],
                     "additionalProperties": false
-                },
-                "time": {
-                    "type": "object",
-                    "properties": {
-                        "total": {"type": "number"},
-                        "sconscript_exec": {"type": "number"},
-                        "scons_exec": {"type": "number"},
-                        "command_exec": {"type": "number"}
-                    },
-                    "required": ["total", "sconscript_exec", "scons_exec", "command_exec"],
-                    "additionalProperties": false
-                },
-                "counts": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "array_index": {"type": "integer"},
-                            "item_name": {"type": "string"},
-                            "pre_read": {"$ref": "#/$defs/bytes"},
-                            "post_read": {"$ref": "#/$defs/bytes"},
-                            "pre_build": {"$ref": "#/$defs/bytes"},
-                            "post_build": {"$ref": "#/$defs/bytes"}
-                        },
-                        "required": ["array_index", "item_name", "pre_read", "post_read", "pre_build", "post_build"],
-                        "additionalProperties": false
-                    }
-                },
-                "additionalProperties": false
+                }
             }
-        }
+        },
+        "additionalProperties": false
     }
 }

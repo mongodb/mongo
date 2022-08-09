@@ -2259,7 +2259,7 @@ if env['_LIBDEPS'] == '$_LIBDEPS_OBJS':
     env["BUILDERS"]["StaticLibrary"].action = SCons.Action.Action(
         write_uuid_to_file, "Generating placeholder library $TARGET")
 
-import libdeps
+import libdeps_tool as libdeps
 
 libdeps.setup_environment(
     env,

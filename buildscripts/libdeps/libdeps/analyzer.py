@@ -368,14 +368,19 @@ def counter_factory(dependency_graph, counters, progressbar=True):
         counters = [counters]
 
     counter_objs = []
-    for counter in counters:
-        if counter in counter_map:
+    if CountTypes.ALL.name in counters:
+        for counter in counter_map:
             counter_obj = counter_map[counter](dependency_graph)
             counter_obj.set_progress(progressbar)
             counter_objs.append(counter_obj)
-
-        else:
-            print(f"Skipping unknown counter: {counter}")
+    else:
+        for counter in counters:
+            if counter in counter_map:
+                counter_obj = counter_map[counter](dependency_graph)
+                counter_obj.set_progress(progressbar)
+                counter_objs.append(counter_obj)
+            else:
+                print(f"Skipping unknown counter: {counter}")
 
     return counter_objs
 
