@@ -3894,17 +3894,8 @@ ExpressionInternalFLEEqual::ExpressionInternalFLEEqual(ExpressionContext* const 
                                                        int64_t contentionFactor,
                                                        ConstDataRange edcToken)
     : Expression(expCtx, {std::move(field)}),
-      _serverToken(PrfBlockfromCDR(serverToken)),
-      _edcToken(PrfBlockfromCDR(edcToken)),
-      _contentionFactor(contentionFactor) {
+      _evaluator(serverToken, contentionFactor, {edcToken}) {
     expCtx->sbeCompatible = false;
-
-    auto tokens =
-        EDCServerCollection::generateEDCTokens(ConstDataRange(_edcToken), _contentionFactor);
-
-    for (auto& token : tokens) {
-        _cachedEDCTokens.insert(std::move(token.data));
-    }
 }
 
 void ExpressionInternalFLEEqual::_doAddDependencies(DepsTracker* deps) const {
@@ -3926,27 +3917,24 @@ intrusive_ptr<Expression> ExpressionInternalFLEEqual::parse(ExpressionContext* c
 
     auto serverTokenPair = fromEncryptedConstDataRange(fleEq.getServerEncryptionToken());
 
-    uassert(6672405,
+    uassert(6762901,
             "Invalid server token",
             serverTokenPair.first == EncryptedBinDataType::kFLE2TransientRaw &&
                 serverTokenPair.second.length() == sizeof(PrfBlock));
 
     auto edcTokenPair = fromEncryptedConstDataRange(fleEq.getEdcDerivedToken());
 
-    uassert(6672406,
+    uassert(6762902,
             "Invalid edc token",
             edcTokenPair.first == EncryptedBinDataType::kFLE2TransientRaw &&
                 edcTokenPair.second.length() == sizeof(PrfBlock));
 
 
     auto cf = fleEq.getMaxCounter();
-    uassert(6672408, "Contention factor must be between 0 and 10000", cf >= 0 && cf < 10000);
+    uassert(6762903, "Contention factor must be between 0 and 10000", cf >= 0 && cf < 10000);
 
-    return new ExpressionInternalFLEEqual(expCtx,
-                                          std::move(fieldExpr),
-                                          serverTokenPair.second,
-                                          fleEq.getMaxCounter(),
-                                          edcTokenPair.second);
+    return new ExpressionInternalFLEEqual(
+        expCtx, std::move(fieldExpr), serverTokenPair.second, cf, edcTokenPair.second);
 }
 
 Value toValue(const std::array<std::uint8_t, 32>& buf) {
@@ -3955,47 +3943,116 @@ Value toValue(const std::array<std::uint8_t, 32>& buf) {
 }
 
 Value ExpressionInternalFLEEqual::serialize(bool explain) const {
-    return Value(Document{{kInternalFleEq,
-                           Document{{"field", _children[0]->serialize(explain)},
-                                    {"edc", toValue(_edcToken)},
-                                    {"counter", Value(static_cast<long long>(_contentionFactor))},
-                                    {"server", toValue(_serverToken)}}}});
+    return Value(Document{
+        {kInternalFleEq,
+         Document{{"field", _children[0]->serialize(explain)},
+                  {"edc", toValue(_evaluator.edcTokens()[0])},
+                  {"counter", Value(static_cast<long long>(_evaluator.contentionFactor()))},
+                  {"server", toValue(_evaluator.serverToken())}}}});
 }
 
 Value ExpressionInternalFLEEqual::evaluate(const Document& root, Variables* variables) const {
-    // Inputs
-    // 1. Value for FLE2IndexedEqualityEncryptedValue field
-
-    Value fieldValue = _children[0]->evaluate(root, variables);
-
+    auto fieldValue = _children[0]->evaluate(root, variables);
     if (fieldValue.nullish()) {
         return Value(BSONNULL);
     }
-
-    if (fieldValue.getType() != BinData) {
-        return Value(false);
-    }
-
-    auto fieldValuePair = fromEncryptedBinData(fieldValue);
-
-    uassert(6672407,
-            "Invalid encrypted indexed field",
-            fieldValuePair.first == EncryptedBinDataType::kFLE2EqualityIndexedValue);
-
-    // Value matches if
-    // 1. Decrypt field is successful
-    // 2. EDC_u Token is in GenTokens(EDC Token, ContentionFactor)
-    //
-    auto swIndexed =
-        EDCServerCollection::decryptAndParse(ConstDataRange(_serverToken), fieldValuePair.second);
-    uassertStatusOK(swIndexed);
-    auto indexed = swIndexed.getValue();
-
-    return Value(_cachedEDCTokens.count(indexed.edc.data) == 1);
+    return Value(_evaluator.evaluate<FLE2IndexedEqualityEncryptedValue>(
+        fieldValue,
+        EncryptedBinDataType::kFLE2EqualityIndexedValue,
+        [](auto token, auto serverValue) {
+            return EDCServerCollection::decryptAndParse(token, serverValue);
+        }));
 }
 
 const char* ExpressionInternalFLEEqual::getOpName() const {
     return kInternalFleEq.rawData();
+}
+
+/* ----------------------- ExpressionInternalFLEBetween ---------------------------- */
+
+constexpr auto kInternalFleBetween = "$_internalFleBetween"_sd;
+
+ExpressionInternalFLEBetween::ExpressionInternalFLEBetween(ExpressionContext* const expCtx,
+                                                           boost::intrusive_ptr<Expression> field,
+                                                           ConstDataRange serverToken,
+                                                           int64_t contentionFactor,
+                                                           std::vector<ConstDataRange> edcTokens)
+    : Expression(expCtx, {std::move(field)}), _evaluator(serverToken, contentionFactor, edcTokens) {
+    expCtx->sbeCompatible = false;
+}
+
+void ExpressionInternalFLEBetween::_doAddDependencies(DepsTracker* deps) const {
+    for (auto&& operand : _children) {
+        operand->addDependencies(deps);
+    }
+}
+
+REGISTER_STABLE_EXPRESSION(_internalFleBetween, ExpressionInternalFLEBetween::parse);
+
+intrusive_ptr<Expression> ExpressionInternalFLEBetween::parse(ExpressionContext* const expCtx,
+                                                              BSONElement expr,
+                                                              const VariablesParseState& vps) {
+    IDLParserContext ctx(kInternalFleBetween);
+    auto fleBetween = InternalFleBetweenStruct::parse(ctx, expr.Obj());
+
+    auto fieldExpr = Expression::parseOperand(expCtx, fleBetween.getField().getElement(), vps);
+
+    auto serverTokenPair = fromEncryptedConstDataRange(fleBetween.getServerEncryptionToken());
+
+    uassert(6762904,
+            "Invalid server token",
+            serverTokenPair.first == EncryptedBinDataType::kFLE2TransientRaw &&
+                serverTokenPair.second.length() == sizeof(PrfBlock));
+
+    std::vector<ConstDataRange> edcTokens;
+    for (auto& elem : fleBetween.getEdcDerivedTokens()) {
+        auto [first, second] = fromEncryptedConstDataRange(elem);
+        uassert(6762905,
+                "Invalid edc token",
+                first == EncryptedBinDataType::kFLE2TransientRaw &&
+                    second.length() == sizeof(PrfBlock));
+        edcTokens.push_back(second);
+    }
+
+    auto cf = fleBetween.getMaxCounter();
+    uassert(6762906, "Contention factor must be between 0 and 10000", cf >= 0 && cf < 10000);
+
+    return new ExpressionInternalFLEBetween(
+        expCtx, std::move(fieldExpr), serverTokenPair.second, cf, edcTokens);
+}
+
+Value ExpressionInternalFLEBetween::serialize(bool explain) const {
+    std::vector<Value> edcValues;
+    edcValues.reserve(_evaluator.edcTokens().size());
+    for (auto& token : _evaluator.edcTokens()) {
+        edcValues.push_back(toValue(PrfBlockfromCDR(token)));
+    }
+    return Value(Document{
+        {kInternalFleBetween,
+         Document{{"field", _children[0]->serialize(explain)},
+                  {"edc", Value(edcValues)},
+                  {"counter", Value(static_cast<long long>(_evaluator.contentionFactor()))},
+                  {"server", toValue(_evaluator.serverToken())}}}});
+}
+
+Value ExpressionInternalFLEBetween::evaluate(const Document& root, Variables* variables) const {
+    // TODO(SERVER-67627): Uncomment for runtime tag matching.
+    // auto fieldValue = _children[0]->evaluate(root, variables);
+    // if (fieldValue.nullish()) {
+    //     return Value(BSONNULL);
+    // }
+    // return Value(_evaluator.evaluate<FLE2IndexedRangeEncryptedValue>(
+    //     fieldValue,
+    //     EncryptedBinDataType::kFLE2RangeIndexedValue,
+    //     [](auto token, auto serverValue) {
+    //         return EDCServerCollection::decryptAndParseRange(token, serverValue);
+    //     }));
+    uasserted(ErrorCodes::InternalErrorNotSupported,
+              str::stream() << "$_internalFleBetween not supported.");
+}
+
+const char* ExpressionInternalFLEBetween::getOpName() const {
+    return kInternalFleBetween.rawData();
 }
 
 /* ------------------------ ExpressionNary ----------------------------- */

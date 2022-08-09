@@ -3210,5 +3210,20 @@ OSTType_Double getTypeInfoDouble(double value,
     return {uv, 0, std::numeric_limits<uint64_t>::max()};
 }
 
+EncryptedPredicateEvaluator::EncryptedPredicateEvaluator(ConstDataRange serverToken,
+                                                         int64_t contentionFactor,
+                                                         std::vector<ConstDataRange> edcTokens)
+    : _serverToken(PrfBlockfromCDR(serverToken)), _contentionFactor(contentionFactor) {
+    for (auto cdr : edcTokens) {
+        _edcTokens.push_back(PrfBlockfromCDR(cdr));
+    }
+    for (auto& prf : _edcTokens) {
+        for (auto& token :
+             EDCServerCollection::generateEDCTokens(ConstDataRange(prf), _contentionFactor)) {
+            _cachedEDCTokens.insert(std::move(token.data));
+        }
+    }
+}
+
 
 }  // namespace mongo

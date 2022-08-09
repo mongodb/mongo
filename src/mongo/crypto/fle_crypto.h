@@ -1339,4 +1339,61 @@ std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedBinData(const Value
 bool hasQueryType(const EncryptedField& field, QueryTypeEnum queryType);
 bool hasQueryType(const EncryptedFieldConfig& config, QueryTypeEnum queryType);
 
+class EncryptedPredicateEvaluator {
+public:
+    EncryptedPredicateEvaluator(ConstDataRange serverToken,
+                                int64_t contentionFactor,
+                                std::vector<ConstDataRange> edcTokens);
+
+    /**
+     * Evaluates an encrypted predicate (equality or range), as defined by a contention factor along
+     * with a list of edc tokens, over an encrypted value.
+     *
+     * Returns a boolean indicator.
+     */
+    template <typename T>
+    bool evaluate(
+        Value fieldValue,
+        EncryptedBinDataType indexedValueType,
+        std::function<StatusWith<T>(ConstDataRange, ConstDataRange)> decryptAndParse) const {
+
+        if (fieldValue.getType() != BinData) {
+            return false;
+        }
+
+        auto fieldValuePair = fromEncryptedBinData(fieldValue);
+
+        uassert(
+            6672400, "Invalid encrypted indexed field", fieldValuePair.first == indexedValueType);
+
+        // Value matches if
+        // 1. Decrypt field is successful
+        // 2. EDC_u Token is in GenTokens(EDC Token, ContentionFactor)
+        //
+        auto swIndexed = decryptAndParse(ConstDataRange(_serverToken), fieldValuePair.second);
+        uassertStatusOK(swIndexed);
+        auto indexed = swIndexed.getValue();
+
+        return _cachedEDCTokens.count(indexed.edc.data) == 1;
+    }
+
+    std::vector<PrfBlock> edcTokens() const {
+        return _edcTokens;
+    }
+
+    PrfBlock serverToken() const {
+        return _serverToken;
+    }
+
+    int64_t contentionFactor() const {
+        return _contentionFactor;
+    }
+
+private:
+    PrfBlock _serverToken;
+    std::vector<PrfBlock> _edcTokens;
+    int64_t _contentionFactor;
+    stdx::unordered_set<PrfBlock> _cachedEDCTokens;
+};
+
 }  // namespace mongo

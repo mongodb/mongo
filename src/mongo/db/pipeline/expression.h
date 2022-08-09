@@ -41,6 +41,7 @@
 #include <vector>
 
 #include "mongo/base/init.h"
+#include "mongo/crypto/fle_crypto.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
@@ -2253,6 +2254,35 @@ public:
     }
 };
 
+class ExpressionInternalFLEBetween final : public Expression {
+public:
+    ExpressionInternalFLEBetween(ExpressionContext* expCtx,
+                                 boost::intrusive_ptr<Expression> field,
+                                 ConstDataRange serverToken,
+                                 int64_t contentionFactor,
+                                 std::vector<ConstDataRange> edcTokens);
+    Value serialize(bool explain) const final;
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+    const char* getOpName() const;
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement expr,
+                                                  const VariablesParseState& vps);
+    void _doAddDependencies(DepsTracker* deps) const final;
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+private:
+    EncryptedPredicateEvaluator _evaluator;
+};
+
 class ExpressionInternalFLEEqual final : public Expression {
 public:
     ExpressionInternalFLEEqual(ExpressionContext* expCtx,
@@ -2279,10 +2309,7 @@ public:
     }
 
 private:
-    std::array<std::uint8_t, 32> _serverToken;
-    std::array<std::uint8_t, 32> _edcToken;
-    int64_t _contentionFactor;
-    stdx::unordered_set<std::array<std::uint8_t, 32>> _cachedEDCTokens;
+    EncryptedPredicateEvaluator _evaluator;
 };
 
 class ExpressionMap final : public Expression {
