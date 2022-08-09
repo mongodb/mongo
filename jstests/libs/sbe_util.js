@@ -25,6 +25,7 @@ function checkSBEEnabled(theDB, featureFlags = [], checkAllNodes = false) {
         //  2. try..catch in the loop to try the next node if the current is killed (if we aren't
         //  checking to ensure that all feature flags are enabled on all nodes).
         let nodes;
+        checkResult = true;
         try {
             nodes = DiscoverTopology.findNonConfigNodes(theDB.getMongo());
         } catch (e) {
@@ -42,11 +43,25 @@ function checkSBEEnabled(theDB, featureFlags = [], checkAllNodes = false) {
 
                 const getParam = conn.adminCommand({
                     getParameter: 1,
+                    internalQueryForceClassicEngine: 1,
                     internalQueryFrameworkControl: 1,
                 });
 
-                if (!getParam.hasOwnProperty("internalQueryFrameworkControl") ||
-                    getParam.internalQueryFrameworkControl == "forceClassicEngine") {
+                // v6.0 does not include the new internalQueryFrameworkControl server parameter.
+                // Here, we are accounting for both the old and new frameworks (where enabling a
+                // certain engine differs semantically).
+                if (getParam.hasOwnProperty("internalQueryForceClassicEngine") &&
+                    getParam.internalQueryForceClassicEngine) {
+                    checkResult = false;
+                }
+
+                if (getParam.hasOwnProperty("internalQueryFrameworkControl") &&
+                    getParam.internalQueryFrameworkControl === "forceClassicEngine") {
+                    checkResult = false;
+                }
+
+                if (!getParam.hasOwnProperty("internalQueryForceClassicEngine") &&
+                    !getParam.hasOwnProperty("internalQueryFrameworkControl")) {
                     checkResult = false;
                 }
 
