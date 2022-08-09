@@ -59,67 +59,73 @@ using std::stringstream;
 
 namespace {
 
-class CmdRenameCollection : public ErrmsgCommandDeprecated {
+class CmdRenameCollection final : public TypedCommand<CmdRenameCollection> {
 public:
-    CmdRenameCollection() : ErrmsgCommandDeprecated("renameCollection") {}
+    using Request = RenameCollectionCommand;
+
     virtual bool adminOnly() const {
         return true;
     }
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
-    }
 
     bool collectsResourceConsumptionMetrics() const override {
         return true;
     }
 
-    virtual Status checkAuthForCommand(Client* client,
-                                       const std::string& dbname,
-                                       const BSONObj& cmdObj) const {
-        return rename_collection::checkAuthForRenameCollectionCommand(client, dbname, cmdObj);
-    }
     std::string help() const override {
         return " example: { renameCollection: foo.a, to: bar.b }";
     }
 
-    NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj) const override {
-        return NamespaceString(dbName.tenantId(), CommandHelpers::parseNsFullyQualified(cmdObj));
-    }
-
-    virtual bool errmsgRun(OperationContext* opCtx,
-                           const string& dbname,
-                           const BSONObj& cmdObj,
-                           string& errmsg,
-                           BSONObjBuilder& result) {
-        auto renameRequest =
-            RenameCollectionCommand::parse(IDLParserContext("renameCollection"), cmdObj);
-
-        const auto& fromNss = renameRequest.getCommandParameter();
-        const auto& toNss = renameRequest.getTo();
-
-        uassert(
-            ErrorCodes::IllegalOperation, "Can't rename a collection to itself", fromNss != toNss);
-
-        RenameCollectionOptions options;
-        options.stayTemp = renameRequest.getStayTemp();
-        options.expectedSourceUUID = renameRequest.getCollectionUUID();
-        stdx::visit(
-            OverloadedVisitor{
-                [&options](bool dropTarget) { options.dropTarget = dropTarget; },
-                [&options](const UUID& uuid) {
-                    options.dropTarget = true;
-                    options.expectedTargetUUID = uuid;
-                },
-            },
-            renameRequest.getDropTarget());
-
-        validateAndRunRenameCollection(
-            opCtx, renameRequest.getCommandParameter(), renameRequest.getTo(), options);
+    bool allowedWithSecurityToken() const final {
         return true;
     }
+
+    class Invocation final : public InvocationBase {
+    public:
+        using InvocationBase::InvocationBase;
+
+        void typedRun(OperationContext* opCtx) {
+            const auto& fromNss = ns();
+            const auto& toNss = request().getTo();
+
+            uassert(ErrorCodes::IllegalOperation,
+                    "Can't rename a collection to itself",
+                    fromNss != toNss);
+
+            RenameCollectionOptions options;
+            options.stayTemp = request().getStayTemp();
+            options.expectedSourceUUID = request().getCollectionUUID();
+            stdx::visit(
+                OverloadedVisitor{
+                    [&options](bool dropTarget) { options.dropTarget = dropTarget; },
+                    [&options](const UUID& uuid) {
+                        options.dropTarget = true;
+                        options.expectedTargetUUID = uuid;
+                    },
+                },
+                request().getDropTarget());
+
+            validateAndRunRenameCollection(opCtx, fromNss, toNss, options);
+        }
+
+    private:
+        NamespaceString ns() const override {
+            return request().getCommandParameter();
+        }
+
+        bool supportsWriteConcern() const override {
+            return true;
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassertStatusOK(rename_collection::checkAuthForRenameCollectionCommand(
+                opCtx->getClient(),
+                request().getDbName().toStringWithTenantId(),
+                request().toBSON(BSONObj())));
+        }
+    };
 
 } cmdrenamecollection;
 
