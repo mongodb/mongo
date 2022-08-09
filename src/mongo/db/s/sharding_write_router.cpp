@@ -56,6 +56,10 @@ ShardingWriteRouter::ShardingWriteRouter(OperationContext* opCtx,
 
             _reshardingChunkMgr = uassertStatusOK(catalogCache->getCollectionRoutingInfo(
                 opCtx, donorFields->getTempReshardingNss(), true /* allowLocks */));
+
+            tassert(6862800,
+                    "Routing information for the temporary resharing collection is stale",
+                    _reshardingChunkMgr->isSharded());
         }
     }
 }
