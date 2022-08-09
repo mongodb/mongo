@@ -179,13 +179,8 @@ const awaitIndexBuild = IndexBuildTest.startIndexBuild(conn,
                                                        {name: buildingIndexName},
                                                        [],
                                                        /*commitQuorum=*/"votingMembers");
-// Provide a custom filter to target the op id of task on the index build thread pool,
-// not the client connection.
-const filter = {
-    connectionId: {$exists: false}
-};
 const buildingOpId =
-    IndexBuildTest.waitForIndexBuildToStart(db, collName, buildingIndexName, filter);
+    IndexBuildTest.waitForIndexBuildToScanCollection(db, collName, buildingIndexName);
 
 // Add a non-resumable index build to the listIndexes result by providing a commit quorum of zero,
 // though any commit quorum other than the default of all voting members will do the job.
@@ -198,7 +193,7 @@ const awaitIndexBuildNonResumable =
                                    [],
                                    /*commitQuorum=*/0);
 const buildingOpIdNonResumable =
-    IndexBuildTest.waitForIndexBuildToStart(db, collName, buildingIndexNameNonResumable, filter);
+    IndexBuildTest.waitForIndexBuildToScanCollection(db, collName, buildingIndexNameNonResumable);
 
 // Wait for the new indexes to appear in listIndexes output.
 assert.soonNoExcept(() => {
