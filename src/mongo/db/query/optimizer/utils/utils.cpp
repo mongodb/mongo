@@ -1046,7 +1046,6 @@ CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
         // If we formed bounds using at least one requirement (as opposed to having only residual
         // requirements).
         bool hasExactMatch = false;
-        bool indexSuitable = true;
 
         const IndexCollationSpec& indexCollationSpec = indexDef.getCollationSpec();
         for (size_t indexField = 0; indexField < indexCollationSpec.size(); indexField++) {
@@ -1149,9 +1148,6 @@ CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
                     }
                 }
             }
-        }
-        if (!indexSuitable) {
-            continue;
         }
         if (!hasExactMatch) {
             continue;
