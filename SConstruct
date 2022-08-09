@@ -3891,14 +3891,19 @@ def doConfigure(myenv):
         using_lsan = 'leak' in sanitizer_list
         using_tsan = 'thread' in sanitizer_list
         using_ubsan = 'undefined' in sanitizer_list
+        using_msan = 'memory' in sanitizer_list
 
         if using_lsan:
             env.FatalError("Please use --sanitize=address instead of --sanitize=leak")
 
-        if using_asan and env['MONGO_ALLOCATOR'] in ['tcmalloc', 'tcmalloc-experimental']:
+        if (using_asan
+                or using_msan) and env['MONGO_ALLOCATOR'] in ['tcmalloc', 'tcmalloc-experimental']:
             # There are multiply defined symbols between the sanitizer and
             # our vendorized tcmalloc.
-            env.FatalError("Cannot use --sanitize=address with tcmalloc")
+            env.FatalError("Cannot use --sanitize=address or --sanitize=memory with tcmalloc")
+
+        if not myenv.ToolchainIs('clang') and using_msan:
+            env.FatalError('Memory Sanitizer (MSan) is only supported with clang.')
 
         if using_fsan:
 
@@ -3982,6 +3987,7 @@ def doConfigure(myenv):
             "address": myenv.File("#etc/asan.denylist"),
             "thread": myenv.File("#etc/tsan.denylist"),
             "undefined": myenv.File("#etc/ubsan.denylist"),
+            "memory": myenv.File("#etc/msan.denylist"),
         }
 
         # Select those unique deny files that are associated with the
@@ -4104,9 +4110,9 @@ def doConfigure(myenv):
 
             symbolizer_option = f":external_symbolizer_path=\"{llvm_symbolizer}\""
 
-        elif using_asan or using_tsan or using_ubsan:
+        elif using_asan or using_tsan or using_ubsan or using_msan:
             myenv.FatalError(
-                "The address, thread, and undefined behavior sanitizers require llvm-symbolizer for meaningful reports. Please set LLVM_SYMBOLIZER to the path to llvm-symbolizer in your SCons invocation"
+                "The address, thread, memory, and undefined behavior sanitizers require llvm-symbolizer for meaningful reports. Please set LLVM_SYMBOLIZER to the path to llvm-symbolizer in your SCons invocation"
             )
 
         if using_asan:
@@ -4134,6 +4140,10 @@ def doConfigure(myenv):
             env['ENV']['ASAN_OPTIONS'] = asan_options + symbolizer_option
             env['ENV']['LSAN_OPTIONS'] = lsan_options + symbolizer_option
 
+        if using_msan:
+            # Makes it easier to debug memory failures at the cost of some perf
+            myenv.Append(CCFLAGS=['-fsanitize-memory-track-origins'])
+            env['ENV']['MSAN_OPTIONS'] = symbolizer_option
         if using_tsan:
 
             if use_libunwind:
