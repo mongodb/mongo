@@ -1831,6 +1831,9 @@ buildvariants:
     test_flags: >-
       --excludeWithAnyTags=future_git_tag_incompatible
   tasks:
+  - name: version_expansions_gen
+    distros:
+    - rhel80-small
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
     - rhel80-xlarge
