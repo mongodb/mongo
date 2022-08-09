@@ -45,6 +45,7 @@
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/future_util.h"
 
@@ -300,13 +301,14 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
             return ExecutorFuture<void>(**executor);
         })
         .then([this, executor, token, anchor = shared_from_this()] {
-            if (
+            if (!_firstExecution ||
+                // The Feature flag is disabled
+                !feature_flags::gImplicitDDLTimeseriesNssTranslation.isEnabled(
+                    serverGlobalParams.featureCompatibility) ||
                 // this DDL operation operates on a DB
                 originalNss().coll().empty() ||
                 // this DDL operation operates directly on a bucket nss
-                originalNss().isTimeseriesBucketsCollection() ||
-                // The translation already happened
-                metadata().getBucketNss()) {
+                originalNss().isTimeseriesBucketsCollection()) {
                 return ExecutorFuture<void>(**executor);
             }
             return _translateTimeseriesNss(executor, token);

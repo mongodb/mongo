@@ -350,6 +350,16 @@ public:
         invariant(serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
         invariant(!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kComplete);
 
+        // If we are downgrading to a version that doesn't support implicit translation of
+        // Timeseries collection in sharding DDL Coordinators we need to drain all ongoing
+        // coordinators
+        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+            !feature_flags::gImplicitDDLTimeseriesNssTranslation.isEnabledOnVersion(
+                requestedVersion)) {
+            ShardingDDLCoordinatorService::getService(opCtx)->waitForOngoingCoordinatorsToFinish(
+                opCtx);
+        }
+
         if (requestedVersion > actualVersion) {
             _runUpgrade(opCtx, request, changeTimestamp);
         } else {
