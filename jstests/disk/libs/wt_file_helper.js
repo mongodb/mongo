@@ -320,3 +320,37 @@ let insertDocSymbolField = function(coll, uri, conn, numDocs) {
     };
     rewriteTable(uri, conn, makeSymbolField);
 };
+
+/**
+ * Inserts documents with invalid regex options into the MongoDB server.
+ */
+let insertInvalidRegex = function(coll, mongod, nDocuments) {
+    const regex = "a*.conn";
+    const options = 'gimsuy';
+
+    // First, insert valid expressions which will not be rejected by the JS interpreter.
+    for (let i = 0; i < nDocuments; i++) {
+        coll.insert({a: RegExp(regex, options)});
+    }
+
+    // Insert one valid expression and 4 invalid expressions.
+    let swapOptions = function(lines) {
+        const toInsert = ["imlsux", "imzsux", "xuslmi", "amlsux"];
+        const offsetToOptionStr = 64;
+        const toHexStr = function(str) {
+            return str.split('')
+                .map((a) => {
+                    return a.charCodeAt(0).toString(16);
+                })
+                .join('');
+        };
+
+        let modifiedOptions;
+        for (let i = wtHeaderLines; i < lines.length; i += 2) {
+            modifiedOptions = toHexStr(toInsert[((i - wtHeaderLines) / 2) % toInsert.length]);
+            lines[i] = lines[i].substring(0, offsetToOptionStr) + modifiedOptions +
+                lines[i].substring(offsetToOptionStr + modifiedOptions.length);
+        }
+    };
+    rewriteTable(getUriForColl(coll), mongod, swapOptions);
+};

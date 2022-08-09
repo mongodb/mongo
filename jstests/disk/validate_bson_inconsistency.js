@@ -66,6 +66,35 @@ resetDbpath(dbpath);
     MongoRunner.stopMongod(mongod, null, {skipValidation: true});
 })();
 
+(function validateDocumentsInvalidRegexOptions() {
+    let mongod = startMongodOnExistingPath(dbpath);
+    let db = mongod.getDB(baseName);
+
+    const collName = collNamePrefix + count++;
+    db.getCollection(collName).drop();
+    assert.commandWorked(db.createCollection(collName));
+    let coll = db[collName];
+
+    jsTestLog(
+        "Checks that issues are found when we validate regex expressions with invalid options.");
+    insertInvalidRegex(coll, mongod, 5);
+    mongod = startMongodOnExistingPath(dbpath);
+    db = mongod.getDB(baseName);
+    coll = db[collName];
+
+    let res = coll.validate({checkBSONConsistency: false});
+    assert(res.valid, tojson(res));
+    assert.eq(res.nNonCompliantDocuments, 5);
+    assert.eq(res.warnings.length, 1);
+
+    res = coll.validate({checkBSONConsistency: true});
+    assert(res.valid, tojson(res));
+    assert.eq(res.nNonCompliantDocuments, 5);
+    assert.eq(res.warnings.length, 1);
+
+    MongoRunner.stopMongod(mongod, null, {skipValidation: true});
+})();
+
 (function validateDocumentsInvalidMD5Length() {
     jsTestLog("Validate document with invalid MD5 length");
 

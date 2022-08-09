@@ -451,6 +451,35 @@ TEST(BSONValidateFast, MaxNestingDepth) {
     ASSERT_EQ(status.code(), ErrorCodes::Overflow);
 }
 
+TEST(BSONValidateExtended, RegexOptions) {
+    // Checks that RegEx with invalid options strings (either an unknown flag or not in alphabetical
+    // order) throws a warning.
+    std::pair<Status, Status> stats{Status::OK(), Status::OK()};
+    auto fullyValidate = [&](BSONObj obj) {
+        return std::pair{validateBSON(obj.objdata(), obj.objsize(), BSONValidateMode::kExtended),
+                         validateBSON(obj.objdata(), obj.objsize(), BSONValidateMode::kFull)};
+    };
+    BSONObj obj = BSON("a" << BSONRegEx("a*.conn", "ilmsux"));
+    stats = fullyValidate(obj);
+    ASSERT_OK(stats.first);
+    ASSERT_OK(stats.second);
+
+    obj = BSON("a" << BSONRegEx("a*.conn", "ilmxus"));
+    stats = fullyValidate(obj);
+    ASSERT_EQ(stats.first, ErrorCodes::NonConformantBSON);
+    ASSERT_EQ(stats.second, ErrorCodes::NonConformantBSON);
+
+    obj = BSON("a" << BSONRegEx("a*.conn", "ikl"));
+    stats = fullyValidate(obj);
+    ASSERT_EQ(stats.first, ErrorCodes::NonConformantBSON);
+    ASSERT_EQ(stats.second, ErrorCodes::NonConformantBSON);
+
+    obj = BSON("a" << BSONRegEx("a*.conn", "ilmz"));
+    stats = fullyValidate(obj);
+    ASSERT_EQ(stats.first, ErrorCodes::NonConformantBSON);
+    ASSERT_EQ(stats.second, ErrorCodes::NonConformantBSON);
+}
+
 TEST(BSONValidateExtended, UUIDLength) {
     // Checks that an invalid UUID length (!= 16 bytes) throws a warning.
     std::pair<Status, Status> stats{Status::OK(), Status::OK()};

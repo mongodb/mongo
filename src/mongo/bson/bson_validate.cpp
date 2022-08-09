@@ -100,10 +100,11 @@ public:
             case BSONType::Undefined:
             case BSONType::DBRef:
             case BSONType::Symbol:
-            case BSONType::CodeWScope:
+            case BSONType::CodeWScope: {
                 uasserted(NonConformantBSON, fmt::format("Use of deprecated BSON type {}", type));
                 break;
-            case BSONType::BinData:
+            }
+            case BSONType::BinData: {
                 uint8_t subtype =
                     ConstDataView(ptr + sizeof(uint32_t)).read<LittleEndian<uint8_t>>();
                 switch (subtype) {
@@ -132,12 +133,38 @@ public:
                                 md5Size == md5Length);
                         break;
                 }
+                break;
+            }
+            case BSONType::RegEx: {
+                // Skips regular expression cstring.
+                const char* options = ptr + strlen(ptr) + 1;
+                _checkRegexOptions(options);  // this might not work
+                break;
+            }
         }
     }
 
     void checkUTF8Char() {}
 
     void checkDuplicateFieldName() {}
+
+private:
+    void _checkRegexOptions(const char* options) {
+        // Checks that the options are in ascending alphabetical order and that they're all valid.
+        std::string validRegexOptions("ilmsux");
+        for (const auto& option : std::string(options)) {
+            uassert(
+                NonConformantBSON,
+                fmt::format("Valid regex options are [ i, l, m, s, u, x], but found '{}' instead.",
+                            option),
+                validRegexOptions.find(option) != std::string::npos);
+            uassert(NonConformantBSON,
+                    fmt::format("Regex options should be in ascending alphabetical order. "
+                                "Found {} instead.",
+                                options),
+                    &option == options || option > *(&option - 1));
+        }
+    }
 };
 
 class FullValidator : private ExtendedValidator {
