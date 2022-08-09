@@ -761,7 +761,8 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
         WT_IS_METADATA(btree->dhandle));
 
     /* Fail 0.1% of the time. */
-    if (__wt_failpoint(session, WT_TIMING_STRESS_FAILPOINT_EVICTION_FAIL_AFTER_RECONCILIATION, 10))
+    if (!closing &&
+      __wt_failpoint(session, WT_TIMING_STRESS_FAILPOINT_EVICTION_FAIL_AFTER_RECONCILIATION, 10))
         return (EBUSY);
 
     return (0);

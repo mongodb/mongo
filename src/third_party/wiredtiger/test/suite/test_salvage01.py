@@ -34,10 +34,10 @@ from wtscenario import make_scenarios
 # test_salvage01.py
 #    Utilities: wt salvage
 
-# Note that this class is reused by test_encrypt07; be sure to test any changes with
-# that version as well.
+# Note that this class is reused by test_encrypt07 test_salvage02; be sure
+# to test any changes with that version as well.
 
-class test_salvage(wttest.WiredTigerTestCase, suite_subprocess):
+class test_salvage01(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_salvage01.a'
     nentries = 1000
 
@@ -46,7 +46,19 @@ class test_salvage(wttest.WiredTigerTestCase, suite_subprocess):
         ('column', dict(key_format='r', value_format='S')),
         ('column-fix', dict(key_format='r', value_format='8t')),
     ]
-    scenarios = make_scenarios(format_values)
+
+    failpoint_enabled = [
+        ('fail-point', dict(failpoint=True)),
+        ('no-fail-point', dict(failpoint=False)),
+    ]
+
+    scenarios = make_scenarios(format_values, failpoint_enabled)
+
+    def conn_config(self):
+        if self.failpoint_enabled:
+            return 'timing_stress_for_test=[failpoint_eviction_fail_after_reconciliation]'
+        else:
+            return ''
 
     def moreinit(self):
         format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)

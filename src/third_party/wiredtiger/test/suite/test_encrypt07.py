@@ -37,7 +37,7 @@ import wttest
 import test_salvage01
 
 # Run the regular salvage test, but with encryption on
-class test_encrypt07(test_salvage01.test_salvage):
+class test_encrypt07(test_salvage01.test_salvage01):
 
     uri='table:test_encrypt07'
     sys_encrypt='rotn'
