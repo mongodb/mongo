@@ -37,45 +37,82 @@ namespace mongo::str {
 namespace {
 constexpr char kHexChar[] = "0123456789abcdef";
 
+// Appends the bytes in the range [begin, end) to the output buffer,
+// which can either be a fmt::memory_buffer, or a std::string.
+template <typename Buffer, typename Iterator>
+void appendBuffer(Buffer& buffer, Iterator begin, Iterator end) {
+    buffer.append(begin, end);
+}
+
 // 'singleHandler' Function to write a valid single byte UTF-8 sequence with desired escaping.
 // 'invalidByteHandler' Function to write a byte of invalid UTF-8 encoding
 // 'twoEscaper' Function to write a valid two byte UTF-8 sequence with desired escaping, for C1
 // control codes.
+// 'maxLength' Max length to write into output buffer; A value of std::string::npos means unbounded.
+// An escape sequence will not be written if appending the entire sequence will exceed this limit.
+// 'wouldWrite' Output to contain the total bytes that would have been written to the buffer if no
+// size limit is in place.
+//
 // All these functions take a function object as their first parameter to perform the
 // writing of any escaped data. This function expects the number of handled bytes as its first
 // parameter and the corresponding escaped string as the second. They are templates to they can be
 // inlined.
-template <typename SingleByteHandler, typename InvalidByteHandler, typename TwoByteEscaper>
-void escape(fmt::memory_buffer& buffer,
+template <typename Buffer,
+          typename SingleByteHandler,
+          typename InvalidByteHandler,
+          typename TwoByteEscaper>
+void escape(Buffer& buffer,
             StringData str,
             SingleByteHandler singleHandler,
             InvalidByteHandler invalidByteHandler,
-            TwoByteEscaper twoEscaper) {
-    // The range [begin, it) contains input that does not need to be escaped and that has not been
+            TwoByteEscaper twoEscaper,
+            size_t maxLength,
+            size_t* wouldWrite) {
+    // The range [inFirst, it) contains input that does not need to be escaped and that has not been
     // written to output yet.
-    // The range [it end) contains remaining input to scan 'begin' is pointing to the beginning of
-    // the input that has not yet been written to 'escaped'.
-    // 'it' is pointing to the beginning of the unicode code point we're currently processing in the
-    // while-loop below. 'end' is the end of the input sequence.
-    auto begin = str.begin();
-    auto it = str.begin();
-    auto end = str.end();
+    // The range [it, inLast) contains remaining input to scan. 'inFirst' is pointing to the
+    // beginning of the input that has not yet been written to 'escaped'. 'it' is pointing to the
+    // beginning of the unicode code point we're currently processing in the while-loop below.
+    // 'inLast' is the end of the input sequence.
+    auto inFirst = str.begin();
+    auto inLast = str.end();
+    auto it = inFirst;
+    size_t cap = maxLength;
+    size_t total = 0;
 
     // Writes an escaped sequence to output after flushing pending input that does not need to be
     // escaped. 'it' is assumed to be at the beginning of the input sequence represented by the
     // escaped data.
     // 'numHandled' the number of bytes of unescaped data being written escaped in 'escapeSequence'
     auto flushAndWrite = [&](size_t numHandled, StringData escapeSequence) {
+        // Appends the range [wFirst, wLast) to the output if the result is within the max length.
+        // 'canTruncate' controls the behavior if appending the entire range would exceed the limit.
+        // If true, this appends input up to the length limit. Otherwise, none is appended.
+        auto boundedWrite = [&](auto wFirst, auto wLast, bool canTruncate) {
+            size_t len = std::distance(wFirst, wLast);
+            total += len;
+            if (maxLength != std::string::npos) {
+                if (len > cap) {
+                    if (!canTruncate) {
+                        cap = 0;
+                    }
+                    len = cap;
+                }
+                cap -= len;
+            }
+            appendBuffer(buffer, wFirst, wFirst + len);
+        };
+
         // Flush range of unmodified input
-        buffer.append(begin, it);
-        begin = it + numHandled;
+        boundedWrite(inFirst, it, true);
+        inFirst = it + numHandled;
 
         // Write escaped data
-        buffer.append(escapeSequence.rawData(), escapeSequence.rawData() + escapeSequence.size());
+        boundedWrite(escapeSequence.begin(), escapeSequence.end(), false);
     };
 
     auto isValidCodePoint = [&](auto pos, int len) {
-        return std::distance(pos, end) >= len &&
+        return std::distance(pos, inLast) >= len &&
             std::all_of(pos + 1, pos + len, [](uint8_t c) { return (c >> 6) == 0b10; });
     };
 
@@ -98,7 +135,7 @@ void escape(fmt::memory_buffer& buffer,
     auto writeInvalid = [&](uint8_t c) { invalidByteHandler(flushAndWrite, c); };
 
 
-    while (it != end) {
+    while (it != inLast) {
         uint8_t c = *it;
         bool bit7 = (c >> 7) & 1;
         if (MONGO_likely(!bit7)) {
@@ -156,10 +193,15 @@ void escape(fmt::memory_buffer& buffer,
         }
     }
     // Write last block
-    buffer.append(begin, it);
+    flushAndWrite(0, {});
+    if (wouldWrite) {
+        *wouldWrite = total;
+    }
 }
 }  // namespace
-void escapeForText(fmt::memory_buffer& buffer, StringData str) {
+
+template <typename Buffer>
+void escapeForTextCommon(Buffer& buffer, StringData str, size_t maxLength, size_t* wouldWrite) {
     auto singleByteHandler = [](const auto& writer, uint8_t unescaped) {
         switch (unescaped) {
             case '\0':
@@ -287,16 +329,26 @@ void escapeForText(fmt::memory_buffer& buffer, StringData str) {
                   str,
                   std::move(singleByteHandler),
                   std::move(invalidByteHandler),
-                  std::move(twoByteEscaper));
+                  std::move(twoByteEscaper),
+                  maxLength,
+                  wouldWrite);
 }
 
-std::string escapeForText(StringData str) {
-    fmt::memory_buffer buffer;
-    escapeForText(buffer, str);
-    return fmt::to_string(buffer);
+void escapeForText(fmt::memory_buffer& buffer,
+                   StringData str,
+                   size_t maxLength,
+                   size_t* wouldWrite) {
+    escapeForTextCommon(buffer, str, maxLength, wouldWrite);
 }
 
-void escapeForJSON(fmt::memory_buffer& buffer, StringData str) {
+std::string escapeForText(StringData str, size_t maxLength, size_t* wouldWrite) {
+    std::string buffer;
+    escapeForTextCommon(buffer, str, maxLength, wouldWrite);
+    return buffer;
+}
+
+template <typename Buffer>
+void escapeForJSONCommon(Buffer& buffer, StringData str, size_t maxLength, size_t* wouldWrite) {
     auto singleByteHandler = [](const auto& writer, uint8_t unescaped) {
         switch (unescaped) {
             case '\0':
@@ -427,11 +479,21 @@ void escapeForJSON(fmt::memory_buffer& buffer, StringData str) {
                   str,
                   std::move(singleByteHandler),
                   std::move(invalidByteHandler),
-                  std::move(twoByteEscaper));
+                  std::move(twoByteEscaper),
+                  maxLength,
+                  wouldWrite);
 }
-std::string escapeForJSON(StringData str) {
-    fmt::memory_buffer buffer;
-    escapeForJSON(buffer, str);
-    return fmt::to_string(buffer);
+
+void escapeForJSON(fmt::memory_buffer& buffer,
+                   StringData str,
+                   size_t maxLength,
+                   size_t* wouldWrite) {
+    escapeForJSONCommon(buffer, str, maxLength, wouldWrite);
+}
+
+std::string escapeForJSON(StringData str, size_t maxLength, size_t* wouldWrite) {
+    std::string buffer;
+    escapeForJSONCommon(buffer, str, maxLength, wouldWrite);
+    return buffer;
 }
 }  // namespace mongo::str

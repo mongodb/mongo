@@ -168,16 +168,27 @@ private:
     void storeQuoted(StringData name, const T& value) {
         format_to(std::back_inserter(_buffer), FMT_COMPILE(R"({}"{}":")"), _separator, name);
         std::size_t before = _buffer.size();
-        str::escapeForJSON(_buffer, value);
-        if (_attributeMaxSize != 0) {
+        std::size_t wouldWrite = 0;
+        std::size_t written = 0;
+        str::escapeForJSON(
+            _buffer, value, _attributeMaxSize ? _attributeMaxSize : std::string::npos, &wouldWrite);
+        written = _buffer.size() - before;
+
+        if (wouldWrite > written) {
+            // The bounded escape may have reached the limit and
+            // stopped writing while in the middle of a UTF-8 sequence,
+            // in which case the incomplete UTF-8 octets at the tail of the
+            // buffer have to be trimmed.
+            // Push a dummy byte so that the UTF-8 safe truncation
+            // will truncate back down to the correct size.
+            _buffer.push_back('x');
             auto truncatedEnd =
-                str::UTF8SafeTruncation(_buffer.begin() + before, _buffer.end(), _attributeMaxSize);
-            if (truncatedEnd != _buffer.end()) {
-                BSONObjBuilder truncationInfo = _truncated.subobjStart(name);
-                truncationInfo.append("type"_sd, typeName(BSONType::String));
-                truncationInfo.append("size"_sd, static_cast<int64_t>(_buffer.size() - before));
-                truncationInfo.done();
-            }
+                str::UTF8SafeTruncation(_buffer.begin() + before, _buffer.end(), written);
+
+            BSONObjBuilder truncationInfo = _truncated.subobjStart(name);
+            truncationInfo.append("type"_sd, typeName(BSONType::String));
+            truncationInfo.append("size"_sd, static_cast<int64_t>(wouldWrite));
+            truncationInfo.done();
 
             _buffer.resize(truncatedEnd - _buffer.begin());
         }
