@@ -204,7 +204,7 @@ boost::optional<std::vector<OplogEntry>> SessionUpdateTracker::_updateSessionInf
             return {};
         }
 
-        if (!entry.getObject2()) {
+        if (!entry.getObject2() || entry.getObject2()->isEmpty()) {
             return {};
         }
     }
