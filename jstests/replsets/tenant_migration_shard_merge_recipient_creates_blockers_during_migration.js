@@ -26,27 +26,26 @@ const existingRecipientTenantId = "existingRecipientTenantId";
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
 function assertRecipientAccessBlockerPresentFor({tenantId, migrationId}) {
-    const {nodes: recipientNodes} = tenantMigrationTest.getRecipientRst();
+    const {nodes} = tenantMigrationTest.getRecipientRst();
 
     const {recipientAccessBlockers} =
-        TenantMigrationUtil.getTenantMigrationAccessBlockers({recipientNodes, tenantId});
+        TenantMigrationUtil.getTenantMigrationAccessBlockers({recipientNodes: nodes, tenantId});
 
     assert.eq(recipientAccessBlockers.length,
-              recipientNodes.length,
+              nodes.length,
               `recipient access blocker count for "${tenantId}"`);
 
-    recipientAccessBlockers.forEach(({migrationId: recipientAccessBlockerMigrationId}) => {
-        assert.eq(recipientAccessBlockerMigrationId,
-                  migrationId,
-                  `recipient access blocker for "${tenantId}"`);
+    recipientAccessBlockers.forEach(accessBlocker => {
+        assert.eq(
+            accessBlocker.migrationId, migrationId, `recipient access blocker for "${tenantId}"`);
     });
 }
 
 function assertRecipientAccessBlockerNotPresentFor({tenantId, migrationId}) {
-    const {nodes: recipientNodes} = tenantMigrationTest.getRecipientRst();
+    const {nodes} = tenantMigrationTest.getRecipientRst();
 
     const {recipientAccessBlockers} =
-        TenantMigrationUtil.getTenantMigrationAccessBlockers({recipientNodes, tenantId});
+        TenantMigrationUtil.getTenantMigrationAccessBlockers({recipientNodes: nodes, tenantId});
 
     assert.eq(
         recipientAccessBlockers.length, 0, `found recipient access blocker for "${tenantId}"`);
