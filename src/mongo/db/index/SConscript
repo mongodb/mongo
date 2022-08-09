@@ -159,6 +159,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/fts/base_fts',
         '$BUILD_DIR/mongo/db/index_names',
+        '$BUILD_DIR/mongo/db/resumable_index_builds_idl',
         'column_store_index',
         'expression_params',
         'key_generator',

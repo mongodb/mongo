@@ -1,8 +1,8 @@
 /**
  * Tests the eligibility of certain queries to use a columnstore index.
  * @tags: [
- *   # TODO SERVER-66925 We could potentially need to resume an index build in the event of a
- *   # stepdown, which is not yet implemented.
+ *   # Refusing to run a test that issues an aggregation command with explain because it may return
+ *   # incomplete results if interrupted by a stepdown.
  *   does_not_support_stepdowns,
  *   # Cannot run aggregate with explain in a transaction.
  *   does_not_support_transactions,

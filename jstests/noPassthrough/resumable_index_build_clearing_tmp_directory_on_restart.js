@@ -12,6 +12,7 @@
 "use strict";
 
 load("jstests/noPassthrough/libs/index_build.js");
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 const dbName = "test";
 
@@ -27,6 +28,8 @@ rst.initiate();
 
 // Insert enough data so that the collection scan spills to disk.
 const primary = rst.getPrimary();
+const columnstoreEnabled = checkSBEEnabled(
+    primary.getDB(dbName), ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true);
 const coll = primary.getDB(dbName).getCollection(jsTestName());
 const bulk = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < numDocuments; i++) {
@@ -42,11 +45,12 @@ writeFile(tmpDir + "garbage", "");
 
 // Runs a resumable index build till completed to make sure the spilled files in "_tmp" directory
 // are not deleted with the garbage file.
+
 ResumableIndexBuildTest.run(
     rst,
     dbName,
     coll.getName(),
-    [[{a: 1}]],
+    columnstoreEnabled ? [[{"$**": "columnstore"}]] : [[{a: 1}]],
     [{name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion", logIdWithBuildUUID: 20386}],
     // Each document is at least 1 MB, so the index build must have spilled to disk by this point.
     maxIndexBuildMemoryUsageMB,

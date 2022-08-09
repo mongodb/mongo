@@ -130,10 +130,13 @@ ColumnStoreAccessMethod::BulkBuilder::BulkBuilder(ColumnStoreAccessMethod* index
                                                   const IndexStateInfo& stateInfo,
                                                   StringData dbName)
     : _columnsAccess(index),
-      _sorter(maxMemoryUsageBytes, dbName, bulkBuilderFileStats(), bulkBuilderTracker()) {
+      _sorter(maxMemoryUsageBytes,
+              dbName,
+              bulkBuilderFileStats(),
+              stateInfo.getFileName()->toString(),
+              *stateInfo.getRanges()),
+      _keysInserted(stateInfo.getNumKeys().value_or(0)) {
     countResumedBuildInStats();
-    // TODO SERVER-66925: Add this support.
-    tasserted(6548103, "No support for resuming interrupted columnstore index builds.");
 }
 
 Status ColumnStoreAccessMethod::BulkBuilder::insert(
@@ -172,9 +175,15 @@ int64_t ColumnStoreAccessMethod::BulkBuilder::getKeysInserted() const {
     return _keysInserted;
 }
 
-mongo::IndexStateInfo ColumnStoreAccessMethod::BulkBuilder::persistDataForShutdown() {
-    uasserted(ErrorCodes::NotImplemented,
-              "ColumnStoreAccessMethod::BulkBuilder::persistDataForShutdown()");
+IndexStateInfo ColumnStoreAccessMethod::BulkBuilder::persistDataForShutdown() {
+    auto state = _sorter.persistDataForShutdown();
+
+    IndexStateInfo stateInfo;
+    stateInfo.setFileName(StringData(state.fileName));
+    stateInfo.setNumKeys(_keysInserted);
+    stateInfo.setRanges(std::move(state.ranges));
+
+    return stateInfo;
 }
 
 Status ColumnStoreAccessMethod::BulkBuilder::commit(OperationContext* opCtx,
@@ -377,9 +386,8 @@ std::unique_ptr<IndexAccessMethod::BulkBuilder> ColumnStoreAccessMethod::initiat
     size_t maxMemoryUsageBytes,
     const boost::optional<IndexStateInfo>& stateInfo,
     StringData dbName) {
-    // TODO support resuming an index build.
-    invariant(!stateInfo);
-    return std::make_unique<BulkBuilder>(this, maxMemoryUsageBytes, dbName);
+    return stateInfo ? std::make_unique<BulkBuilder>(this, maxMemoryUsageBytes, *stateInfo, dbName)
+                     : std::make_unique<BulkBuilder>(this, maxMemoryUsageBytes, dbName);
 }
 
 Ident* ColumnStoreAccessMethod::getIdentPtr() const {

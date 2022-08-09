@@ -609,6 +609,14 @@ public:
      */
     void writeChunk();
 
+    static std::shared_ptr<Iterator> createFileIteratorForResume(
+        std::shared_ptr<typename Sorter<Key, Value>::File> file,
+        std::streamoff fileStartOffset,
+        std::streamoff fileEndOffset,
+        const Settings& settings,
+        const boost::optional<std::string>& dbName,
+        uint32_t checksum);
+
 private:
     const Settings _settings;
     std::shared_ptr<typename Sorter<Key, Value>::File> _file;

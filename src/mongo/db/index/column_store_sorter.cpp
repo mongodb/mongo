@@ -33,6 +33,8 @@
 
 #include "mongo/db/index/column_store_sorter.h"
 
+#include <boost/filesystem/operations.hpp>
+
 namespace mongo {
 struct ComparisonForPathAndRid {
     int operator()(const std::pair<ColumnStoreSorter::Key, ColumnStoreSorter::Value>& left,
@@ -84,6 +86,37 @@ ColumnStoreSorter::ColumnStoreSorter(size_t maxMemoryUsageBytes,
       _maxMemoryUsageBytes(maxMemoryUsageBytes),
       _spillFile(std::make_shared<Sorter<Key, Value>::File>(pathForNewSpillFile(), _fileStats)) {}
 
+ColumnStoreSorter::ColumnStoreSorter(size_t maxMemoryUsageBytes,
+                                     StringData dbName,
+                                     SorterFileStats* stats,
+                                     StringData fileName,
+                                     const std::vector<SorterRange>& ranges,
+                                     SorterTracker* tracker)
+    : SorterBase(tracker),
+      _dbName(dbName.toString()),
+      _fileStats(stats),
+      _maxMemoryUsageBytes(maxMemoryUsageBytes),
+      _spillFile(std::make_shared<Sorter<Key, Value>::File>(
+          pathForResumeSpillFile(fileName.toString()), _fileStats)) {
+    uassert(6692500,
+            str::stream() << "Unexpected empty file: " << this->_spillFile->path().string(),
+            ranges.empty() || boost::filesystem::file_size(this->_spillFile->path()) != 0);
+
+    _spilledFileIterators.reserve(ranges.size());
+    std::transform(ranges.begin(),
+                   ranges.end(),
+                   std::back_inserter(_spilledFileIterators),
+                   [this](const SorterRange& range) {
+                       return SortedFileWriter<Key, Value>::createFileIteratorForResume(
+                           _spillFile,
+                           range.getStartOffset(),
+                           range.getEndOffset(),
+                           {},
+                           _dbName,
+                           range.getChecksum());
+                   });
+}
+
 void ColumnStoreSorter::add(PathView path, const RecordId& recordId, CellView cellContents) {
     auto& cellListAtPath = _dataByPath[path];
     if (cellListAtPath.empty()) {
@@ -119,6 +152,10 @@ std::string ColumnStoreSorter::pathForNewSpillFile() {
     static const uint64_t randomSuffix = static_cast<uint64_t>(SecureRandom().nextInt64());
     return str::stream() << tempDir() << "/ext-sort-column-store-index."
                          << fileNameCounter.fetchAndAdd(1) << "-" << randomSuffix;
+}
+
+std::string ColumnStoreSorter::pathForResumeSpillFile(std::string fileName) {
+    return str::stream() << tempDir() << "/" << fileName;
 }
 
 void ColumnStoreSorter::spill() {
@@ -215,6 +252,21 @@ ColumnStoreSorter::Iterator* ColumnStoreSorter::done() {
     spill();
     return SortIteratorInterface<Key, Value>::merge(
         _spilledFileIterators, makeSortOptions(_dbName, _fileStats), ComparisonForPathAndRid());
+}
+
+Sorter<ColumnStoreSorter::Key, ColumnStoreSorter::Value>::PersistedState
+ColumnStoreSorter::persistDataForShutdown() {
+    spill();
+    this->_spillFile->keep();
+
+    std::vector<SorterRange> ranges;
+    ranges.reserve(_spilledFileIterators.size());
+    std::transform(_spilledFileIterators.begin(),
+                   _spilledFileIterators.end(),
+                   std::back_inserter(ranges),
+                   [](const auto it) { return it->getRange(); });
+
+    return {_spillFile->path().filename().string(), ranges};
 }
 
 /**

@@ -13,12 +13,16 @@
 "use strict";
 
 load("jstests/noPassthrough/libs/index_build.js");
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 const dbName = "test";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
+
+const columnstoreEnabled = checkSBEEnabled(
+    rst.getPrimary().getDB(dbName), ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true);
 
 const runTests = function(docs, indexSpecsFlat, collNameSuffix) {
     const coll = rst.getPrimary().getDB(dbName).getCollection(jsTestName() + collNameSuffix);
@@ -54,6 +58,9 @@ runTests([{a: [1, 2], b: 1}, {a: 2, b: [1, 2]}], [{a: 1}, {b: 1}], "_multikey_mi
 runTests([{a: [1, 2], b: {c: [3, 4]}, d: ""}, {e: "", f: [[]], g: null, h: 8}],
          [{"$**": 1}, {h: 1}],
          "_wildcard");
+if (columnstoreEnabled) {
+    runTests([{a: 1, b: 1}, {a: 2, b: 2}], [{"$**": "columnstore"}, {b: 1}], "_columnstore");
+}
 
 rst.stopSet();
 })();

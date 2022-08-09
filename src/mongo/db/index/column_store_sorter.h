@@ -57,6 +57,13 @@ public:
                       SorterFileStats* stats,
                       SorterTracker* tracker = nullptr);
 
+    ColumnStoreSorter(size_t maxMemoryUsageBytes,
+                      StringData dbName,
+                      SorterFileStats* stats,
+                      StringData fileName,
+                      const std::vector<SorterRange>& ranges,
+                      SorterTracker* tracker = nullptr);
+
     void add(PathView path, const RecordId& recordId, CellView cellContents);
 
     struct Key {
@@ -101,12 +108,14 @@ public:
     using Iterator = SortIteratorInterface<Key, Value>;
 
     Iterator* done();
+    Sorter<Key, Value>::PersistedState persistDataForShutdown();
 
 private:
     class InMemoryIterator;
 
     static SortOptions makeSortOptions(const std::string& dbName, SorterFileStats* stats);
     static std::string pathForNewSpillFile();
+    static std::string pathForResumeSpillFile(std::string fileName);
 
     void spill();
 

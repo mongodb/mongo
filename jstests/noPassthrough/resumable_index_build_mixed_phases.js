@@ -12,12 +12,16 @@
 "use strict";
 
 load("jstests/noPassthrough/libs/index_build.js");
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 const dbName = "test";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
+
+const columnstoreEnabled = checkSBEEnabled(
+    rst.getPrimary().getDB(dbName), ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true);
 
 const runTest = function(docs, indexSpecs, failPoints, resumePhases, resumeChecks, collNameSuffix) {
     const coll = rst.getPrimary().getDB(dbName).getCollection(
@@ -101,5 +105,38 @@ runTests(
     ["bulk load", "drain writes"],
     [{skippedPhaseLogID: 20391}, {skippedPhaseLogID: 20392}]);
 
+// TODO (SERVER-65978): Add sidewrites to tests and combine columnTests with normal runTests once
+// side writes are implemented as the numbers for numScannedAfterResume will match
+if (columnstoreEnabled) {
+    const runColumnTests = function(failPoints, resumePhases, resumeChecks) {
+        const docs = [{a: 1, b: 1}, {a: 2, b: 2}, {a: 3, b: 3}];
+        const coll = rst.getPrimary().getDB(dbName).getCollection(
+            jsTestName() + "_" + resumePhases[0].replace(" ", "_") + "_" +
+            resumePhases[1].replace(" ", "_") + "_columnstore");
+        assert.commandWorked(coll.insert(docs));
+
+        ResumableIndexBuildTest.run(rst,
+                                    dbName,
+                                    coll.getName(),
+                                    [[{b: 1}], [{"$**": "columnstore"}]],
+                                    failPoints,
+                                    1,
+                                    resumePhases,
+                                    resumeChecks,
+                                    [],
+                                    [{a: 7, b: 7}, {a: 8, b: 8}, {a: 9, b: 9}]);
+    };
+
+    runColumnTests(
+        [
+            {name: "hangIndexBuildBeforeWaitingUntilMajorityOpTime", logIdWithBuildUUID: 4940901},
+            {
+                name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion",
+                logIdWithBuildUUID: 20386
+            }
+        ],
+        ["initialized", "collection scan"],
+        [{numScannedAfterResume: 3}, {numScannedAfterResume: 2}]);
+}
 rst.stopSet();
 })();

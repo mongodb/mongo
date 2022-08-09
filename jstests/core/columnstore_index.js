@@ -1,9 +1,6 @@
 /**
  * Tests some basic use cases and functionality of a columnstore index.
  * @tags: [
- *   # TODO SERVER-66925 We could potentially need to resume an index build in the event of a
- *   # stepdown, which is not yet implemented.
- *   does_not_support_stepdowns,
  *   # Uses $indexStats which is not supported inside a transaction.
  *   does_not_support_transactions,
  *   # columnstore indexes are new in 6.1.

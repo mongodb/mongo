@@ -5,9 +5,6 @@
  *   requires_fcv_61,
  *   # Runs explain on an aggregate command which is only compatible with readConcern local.
  *   assumes_read_concern_unchanged,
- *   # TODO SERVER-66925 We could potentially need to resume an index build in the event of a
- *   # stepdown, which is not yet implemented.
- *   does_not_support_stepdowns,
  *   uses_column_store_index,
  * ]
  */

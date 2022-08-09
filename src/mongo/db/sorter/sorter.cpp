@@ -1359,6 +1359,20 @@ SortIteratorInterface<Key, Value>* SortedFileWriter<Key, Value>::done() {
         _file, _fileStartOffset, _file->currentOffset(), _settings, _dbName, _checksum);
 }
 
+template <typename Key, typename Value>
+std::shared_ptr<SortIteratorInterface<Key, Value>>
+SortedFileWriter<Key, Value>::createFileIteratorForResume(
+    std::shared_ptr<typename Sorter<Key, Value>::File> file,
+    std::streamoff fileStartOffset,
+    std::streamoff fileEndOffset,
+    const Settings& settings,
+    const boost::optional<std::string>& dbName,
+    const uint32_t checksum) {
+
+    return std::shared_ptr<SortIteratorInterface<Key, Value>>(new sorter::FileIterator<Key, Value>(
+        file, fileStartOffset, fileEndOffset, settings, dbName, checksum));
+}
+
 template <typename Key, typename Value, typename Comparator, typename BoundMaker>
 BoundedSorter<Key, Value, Comparator, BoundMaker>::BoundedSorter(const SortOptions& opts,
                                                                  Comparator comp,

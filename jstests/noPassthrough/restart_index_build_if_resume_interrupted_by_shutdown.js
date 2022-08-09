@@ -13,6 +13,7 @@
 "use strict";
 
 load("jstests/noPassthrough/libs/index_build.js");
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 const dbName = "test";
 const collName = jsTestName();
@@ -22,6 +23,8 @@ rst.startSet();
 rst.initiate();
 
 let primary = rst.getPrimary();
+const columnstoreEnabled = checkSBEEnabled(
+    primary.getDB(dbName), ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true);
 
 ResumableIndexBuildTest.runResumeInterruptedByShutdown(
     rst,
@@ -47,5 +50,20 @@ ResumableIndexBuildTest.runResumeInterruptedByShutdown(
     [{a: 77}, {a: 88}],
     [{a: 99}, {a: 100}]);
 
+// TODO (SERVER-65978): Add side writes to these test cases once they are supported by column store
+// index builds.
+if (columnstoreEnabled) {
+    ResumableIndexBuildTest.runResumeInterruptedByShutdown(
+        rst,
+        dbName,
+        collName + "_collscan_drain_column_store",
+        {"$**": "columnstore"},    // index key pattern
+        "resumable_index_build3",  // index name
+        {name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion", logIdWithBuildUUID: 20386},
+        "collection scan",
+        {a: 1},  // initial doc
+        [],
+        [{a: 4}, {a: 5}]);
+}
 rst.stopSet();
 })();
