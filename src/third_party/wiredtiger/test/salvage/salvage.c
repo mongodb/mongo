@@ -28,8 +28,6 @@
 
 #include "test_util.h"
 
-#include <assert.h>
-
 #define HOME "WT_TEST"
 #define DUMP "WT_TEST/__slvg.dump"   /* Dump file */
 #define LOAD "WT_TEST/__slvg.load"   /* Build file */
@@ -545,7 +543,7 @@ build(int ikey, int ivalue, int cnt)
           PSIZE, PSIZE, PSIZE, OSIZE, OSIZE));
         break;
     default:
-        assert(0);
+        testutil_assert(0);
     }
     testutil_check(session->create(session, LOAD_URI, config));
     testutil_check(session->open_cursor(session, LOAD_URI, NULL, "bulk,append", &cursor));

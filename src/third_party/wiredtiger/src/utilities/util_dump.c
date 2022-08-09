@@ -6,7 +6,6 @@
  * See the file LICENSE for redistribution information.
  */
 
-#include <assert.h>
 #include "util.h"
 #include "util_dump.h"
 
@@ -422,8 +421,8 @@ dump_projection(WT_SESSION *session, const char *config, WT_CURSOR *cursor, char
 
             /* copy names of projected values */
             p = strchr(cursor->uri, '(');
-            assert(p != NULL);
-            assert(p[strlen(p) - 1] == ')');
+            WT_ASSERT((WT_SESSION_IMPL *)session, p != NULL);
+            WT_ASSERT((WT_SESSION_IMPL *)session, p[strlen(p) - 1] == ')');
             p++;
             if (*p != ')')
                 WT_RET(dump_add_config(session, &newconfig, &len, "%s", ","));
@@ -437,7 +436,7 @@ dump_projection(WT_SESSION *session, const char *config, WT_CURSOR *cursor, char
     if (ret != WT_NOTFOUND)
         return (util_err(session, ret, "WT_CONFIG_PARSER.next"));
 
-    assert(len > 0);
+    WT_ASSERT((WT_SESSION_IMPL *)session, len > 0);
     if ((ret = parser->close(parser)) != 0)
         return (util_err(session, ret, "WT_CONFIG_PARSER.close"));
 

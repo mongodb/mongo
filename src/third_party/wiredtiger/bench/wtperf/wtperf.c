@@ -1052,7 +1052,7 @@ monitor(void *arg)
 
     wtperf = (WTPERF *)arg;
     opts = wtperf->opts;
-    assert(opts->sample_interval != 0);
+    testutil_assert(opts->sample_interval != 0);
 
     fp = jfp = NULL;
     first = true;

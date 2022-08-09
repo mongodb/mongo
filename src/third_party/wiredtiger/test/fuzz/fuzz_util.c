@@ -27,7 +27,6 @@
  */
 #include "fuzz_util.h"
 
-#include <assert.h>
 #include <stdint.h>
 #include <stddef.h>
 
@@ -61,7 +60,7 @@ fuzzutil_setup(void)
     char home[100];
 
     if (fuzz_state.conn != NULL) {
-        assert(fuzz_state.session != NULL);
+        testutil_assert(fuzz_state.session != NULL);
         return;
     }
 

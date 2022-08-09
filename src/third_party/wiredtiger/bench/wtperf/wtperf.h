@@ -31,7 +31,6 @@
 
 #include "test_util.h"
 
-#include <assert.h>
 #include <math.h>
 
 #include "config_opt.h"
