@@ -515,7 +515,7 @@ functions:
     params:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
-      remote_file: ${project}/${version_id}/version_expansions.yml
+      remote_file: ${project}/${version_id}/${bv_future_git_tag|version}_expansions.yml
       bucket: mciuploads
       local_file: src/version_expansions.yml
 
@@ -523,6 +523,10 @@ functions:
     command: expansions.update
     params:
       file: src/version_expansions.yml
+
+  "get and apply version expansions":
+    - *get_version_expansions
+    - *apply_version_expansions
 
   "fetch benchmarks": &fetch_benchmarks
     command: s3.get
@@ -1240,23 +1244,28 @@ functions:
       args:
       - "src/evergreen/scons_compile.sh"
 
-  "generate version expansions":
-  - *f_expansions_write
-  - command: subprocess.exec
+  "generate version expansions": &generate_version_expansions
+    command: subprocess.exec
     params:
       binary: bash
       args:
       - "src/evergreen/functions/version_expansions_generate.sh"
-  - command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: src/version_expansions.yml
-      remote_file: ${project}/${version_id}/version_expansions.yml
-      bucket: mciuploads
-      permissions: public-read
-      content_type: application/x-yaml
-      display_name: version expansions
+
+  "upload version expansions": &upload_version_expansions
+   command: s3.put
+   params:
+     aws_key: ${aws_key}
+     aws_secret: ${aws_secret}
+     local_file: src/version_expansions.yml
+     remote_file: ${project}/${version_id}/${bv_future_git_tag|version}_expansions.yml
+     bucket: mciuploads
+     permissions: public-read
+     content_type: application/x-yaml
+     display_name: version expansions
+
+  "generate and upload version expansions":
+  - *generate_version_expansions
+  - *upload_version_expansions
 
   "generate compile expansions":
   - *f_expansions_write
@@ -1532,6 +1541,8 @@ functions:
       - "./src/evergreen/powercycle_exit.sh"
 
   "run packager.py":
+  - *get_version_expansions
+  - *apply_version_expansions
   - *f_expansions_write
   - command: subprocess.exec
     params:
@@ -2855,8 +2866,7 @@ tasks:
   depends_on:
   - name: stitch_support_install_tests
   commands:
-  - func: "get version expansions"
-  - func: "apply version expansions"
+  - func: "get and apply version expansions"
   - *f_expansions_write
   - command: subprocess.exec
     type: test
@@ -2976,8 +2986,7 @@ tasks:
   depends_on:
   - name: crypt_install_tests
   commands:
-  - func: "get version expansions"
-  - func: "apply version expansions"
+  - func: "get and apply version expansions"
   - *f_expansions_write
   - command: subprocess.exec
     type: test
@@ -4273,7 +4282,7 @@ tasks:
   - *cleanup_environment
   - func: "set up venv"
   - func: "upload pip requirements"
-  - func: "generate version expansions"
+  - func: "generate and upload version expansions"
 
 - name: selected_tests_gen
   tags: []
@@ -6635,6 +6644,7 @@ tasks:
   commands:
   - command: manifest.load
   - func: "git get project and add git tag"
+  - func: "get and apply version expansions"
   - func: "f_expansions_write"
   - func: "kill processes"
   - func: "cleanup environment"
@@ -7118,6 +7128,8 @@ tasks:
   - func: "set up venv"
   - func: "upload pip requirements"
   - func: "get buildnumber"
+  - func: "f_expansions_write"
+  - func: "get and apply version expansions"
   - func: "f_expansions_write"
   - func: "generate compile expansions"
   - func: "apply compile expansions"
