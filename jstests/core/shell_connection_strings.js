@@ -1,6 +1,7 @@
 // Test mongo shell connect strings.
 // @tags: [
 //   uses_multiple_connections,
+//   docker_incompatible,
 // ]
 (function() {
 'use strict';
