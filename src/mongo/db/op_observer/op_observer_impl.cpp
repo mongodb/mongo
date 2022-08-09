@@ -1009,8 +1009,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         MutableOplogEntry oplogEntry;
         boost::optional<BSONObj> deletedDocForOplog = boost::none;
 
-        if (args.retryableFindAndModifyLocation == RetryableFindAndModifyLocation::kOplog ||
-            args.preImageRecordingEnabledForCollection) {
+        if (args.preImageRecordingEnabledForCollection) {
             tassert(5868702,
                     "Deleted document must be present for pre-image recording",
                     args.deletedDoc);
