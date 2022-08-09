@@ -36,6 +36,7 @@ from .memory import MemoryMonitor
 from .per_action_metrics import PerActionMetrics
 from .artifacts import CollectArtifacts
 from .scons import SConsStats
+from .cache_dir import CacheDirCollector, CacheDirValidateWithMetrics
 
 _SEC_TO_NANOSEC_FACTOR = 1000000000.0
 _METRICS_COLLECTORS = []
@@ -88,8 +89,11 @@ def generate(env, **kwargs):
         MemoryMonitor(psutil.Process().memory_info().vms),
         PerActionMetrics(),
         CollectArtifacts(env),
-        SConsStats()
+        SConsStats(),
+        CacheDirCollector()
     ]
+
+    env['CACHEDIR_CLASS'] = CacheDirValidateWithMetrics
 
 
 def exists(env):

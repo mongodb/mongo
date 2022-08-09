@@ -13,16 +13,14 @@
             "description": "Size in bytes",
             "minimum": 0
         },
-        "seconds": {
-            "type": "integer",
-            "description": "Number of seconds"
-        },
         "binsize": {
             "type": "object",
             "properties": {
                 "filesize": { "$ref": "#/$defs/bytes" },
                 "vmsize": { "$ref": "#/$defs/bytes" }
-            }
+            },
+            "required": ["filesize", "vmsize"],
+            "additionalProperties": false
         }
     },
     "type" : "object",
@@ -48,7 +46,9 @@
                 "max": { "$ref": "#/$defs/memory" },
                 "arithmetic_mean": {"type": "number"},
                 "start_mem": { "$ref": "#/$defs/memory" }
-            }
+            },
+            "required": ["mem_over_time", "max", "arithmetic_mean", "start_mem"],
+            "additionalProperties": false
         },
         "artifact_metrics": {
             "type": "object",
@@ -83,66 +83,99 @@
                         }
                     }
                 }
-            }
+            },
+            "additionalProperties": false
         },
         "build_tasks" : {
             "type": "array",
-            "task": {
+            "items": {
                 "type": "object",
                 "properties": {
                     "array_index": {"type": "integer"},
                     "start_time": {"$ref": "#/$defs/timestamp"},
                     "end_time" : {"$ref": "#/$defs/timestamp"},
                     "cpu_time" : {"type" : "integer"},
-                    "builder" : {"type" : "str"},
+                    "builder" : {"type" : "string"},
                     "mem_usage": {"$ref": "#/$defs/memory"},
                     "inputs" : {
                         "type": "array",
-                        "input": { "type": "str"}
+                        "items": { "type": "string"}
                     },
                     "outputs" : {
                         "type": "array",
-                        "output": { "type": "str"}
+                        "items": { "type": "string"}
                     },
-                    "action": {"type" : "str"}
-                }
+                    "action": {"type" : "string"}
+                },
+                "required": ["array_index", "start_time", "end_time", "cpu_time", "builder", "mem_usage", "inputs", "outputs", "action"],
+                "additionalProperties": false
             }
-        }
-    },
-    "scons_metrics": {
-        "type": "object",
-        "properties": {
-            "memory": {
-                "type": "object",
-                "properties": {
-                    "pre_read": {"$ref": "#/$defs/bytes"},
-                    "post_read": {"$ref": "#/$defs/bytes"},
-                    "pre_build": {"$ref": "#/$defs/bytes"},
-                    "post_build": {"$ref": "#/$defs/bytes"}
-                }
+        },
+        "cache_metrics": {
+            "type": "object",
+            "properties": {
+                "cache_artifacts": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "array_index": {"type": "integer"},
+                            "name": {"type": "string"},
+                            "size": {"$ref": "#/$defs/bytes"}
+                        },
+                        "required": ["array_index", "name", "size"],
+                        "additionalProperties": false
+                    }
+                },
+                "push_time": { "$ref": "#/$defs/timestamp" },
+                "pull_time": { "$ref": "#/$defs/timestamp" },
+                "cache_size": { "$ref": "#/$defs/bytes" }
             },
-            "time": {
-                "type": "object",
-                "properties": {
-                    "total": {"type": "number"},
-                    "sconscript_exec": {"type": "number"},
-                    "scons_exec": {"type": "number"},
-                    "command_exec": {"type": "number"}
-                }
-            },
-            "counts": {
-                "type": "array",
-                "items": {
+            "required": ["cache_artifacts", "push_time", "pull_time", "cache_size"],
+            "additionalProperties": false
+        },
+        "scons_metrics": {
+            "type": "object",
+            "properties": {
+                "memory": {
                     "type": "object",
                     "properties": {
-                        "array_index": {"type": "integer"},
-                        "item_name": {"type": "str"},
                         "pre_read": {"$ref": "#/$defs/bytes"},
                         "post_read": {"$ref": "#/$defs/bytes"},
                         "pre_build": {"$ref": "#/$defs/bytes"},
                         "post_build": {"$ref": "#/$defs/bytes"}
+                    },
+                    "required": ["pre_read", "post_read", "pre_build", "post_build"],
+                    "additionalProperties": false
+                },
+                "time": {
+                    "type": "object",
+                    "properties": {
+                        "total": {"type": "number"},
+                        "sconscript_exec": {"type": "number"},
+                        "scons_exec": {"type": "number"},
+                        "command_exec": {"type": "number"}
+                    },
+                    "required": ["total", "sconscript_exec", "scons_exec", "command_exec"],
+                    "additionalProperties": false
+                },
+                "counts": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "array_index": {"type": "integer"},
+                            "item_name": {"type": "string"},
+                            "pre_read": {"$ref": "#/$defs/bytes"},
+                            "post_read": {"$ref": "#/$defs/bytes"},
+                            "pre_build": {"$ref": "#/$defs/bytes"},
+                            "post_build": {"$ref": "#/$defs/bytes"}
+                        },
+                        "required": ["array_index", "item_name", "pre_read", "post_read", "pre_build", "post_build"],
+                        "additionalProperties": false
                     }
-                }
+                },
+                "additionalProperties": false
             }
         }
     }
