@@ -2,7 +2,7 @@
  * Tests that retryable internal transactions for findAndModify are retryable and other kinds of
  * transactions for findAndModify are not retryable.
  *
- * @tags: [requires_fcv_60, uses_transactions]
+ * @tags: [requires_fcv_60, uses_transactions, exclude_from_large_txns]
  */
 (function() {
 'use strict';

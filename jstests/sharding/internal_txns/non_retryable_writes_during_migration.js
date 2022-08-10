@@ -2,7 +2,7 @@
  * Tests that a chunk migration does not transfer the history for non-retryable internal
  * transactions that commit or abort on the donor during the migration to the recipient.
  *
- * @tags: [requires_fcv_60, uses_transactions, requires_persistence]
+ * @tags: [requires_fcv_60, uses_transactions, requires_persistence, exclude_from_large_txns]
  */
 (function() {
 "use strict";

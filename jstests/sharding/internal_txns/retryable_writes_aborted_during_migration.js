@@ -3,7 +3,7 @@
  * transactions that start and abort on the donor during a chunk migration are retryable on the
  * recipient after the migration.
  *
- * @tags: [requires_fcv_60, uses_transactions, requires_persistence]
+ * @tags: [requires_fcv_60, uses_transactions, requires_persistence, exclude_from_large_txns]
  */
 (function() {
 "use strict";

@@ -5,6 +5,7 @@
  * @tags: [
  * requires_fcv_60,
  * uses_transactions,
+ * exclude_from_large_txns,
  * ]
  */
 (function() {
