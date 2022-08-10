@@ -56,38 +56,102 @@ void deleteRangeDeletionTaskDocument(OperationContext* opCtx, UUID migrationId) 
     store.remove(opCtx, BSON(RangeDeletionTask::kIdFieldName << migrationId));
 }
 
+// Ensure that `expectedChunkRanges` range deletion tasks are scheduled for collection with UUID
+// `uuidColl`
+void verifyRangeDeletionTasks(OperationContext* opCtx,
+                              UUID uuidColl,
+                              std::vector<ChunkRange> expectedChunkRanges) {
+    auto rds = RangeDeleterService::get(opCtx);
+
+    // Get chunk ranges inserted to be deleted by RangeDeleterService
+    BSONObj dumpState = rds->dumpState();
+    BSONElement chunkRangesElem = dumpState.getField(uuidColl.toString());
+    if (!chunkRangesElem.ok() && expectedChunkRanges.size() == 0) {
+        return;
+    }
+    ASSERT(chunkRangesElem.ok()) << "Expected to find range deletion tasks from collection "
+                                 << uuidColl.toString();
+
+    const auto chunkRanges = chunkRangesElem.Array();
+    ASSERT_EQ(chunkRanges.size(), expectedChunkRanges.size());
+
+    // Sort expectedChunkRanges vector to replicate RangeDeleterService dumpState order
+    struct {
+        bool operator()(const ChunkRange& a, const ChunkRange& b) {
+            return a.getMin().woCompare(b.getMin()) < 0;
+        }
+    } RANGES_COMPARATOR;
+
+    std::sort(expectedChunkRanges.begin(), expectedChunkRanges.end(), RANGES_COMPARATOR);
+
+    // Check expectedChunkRanges are exactly the same as the returned ones
+    for (size_t i = 0; i < expectedChunkRanges.size(); ++i) {
+        ASSERT(ChunkRange::fromBSONThrowing(chunkRanges[i].Obj()) == expectedChunkRanges[i])
+            << "Expected " << ChunkRange::fromBSONThrowing(chunkRanges[i].Obj()).toBSON()
+            << " == " << expectedChunkRanges[i].toBSON();
+    }
+}
+
 /**
 ** TESTS
 */
 
 TEST_F(RangeDeleterServiceTest, InsertNewRangeDeletionTaskDocumentWithPendingFieldAsTrue) {
     auto rds = RangeDeleterService::get(opCtx);
-    RangeDeletionTask rdt = createRangeDeletionTask(
-        uuidCollA, BSON("a" << 0), BSON("a" << 10), CleanWhenEnum::kDelayed);
 
-    insertRangeDeletionTaskDocument(opCtx, rdt);
+    RangeDeletionTask rdt1 = createRangeDeletionTask(
+        uuidCollA, BSON("a" << 0), BSON("a" << 10), CleanWhenEnum::kDelayed);
+    RangeDeletionTask rdt2 = createRangeDeletionTask(
+        uuidCollA, BSON("a" << 10), BSON("a" << 20), CleanWhenEnum::kDelayed);
+
+    insertRangeDeletionTaskDocument(opCtx, rdt1);
+    insertRangeDeletionTaskDocument(opCtx, rdt2);
+
+    verifyRangeDeletionTasks(opCtx, uuidCollA, {});
+
     ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollA), 0);
 }
 
 TEST_F(RangeDeleterServiceTest, InsertNewRangeDeletionTaskDocumentWithPendingFieldAsFalse) {
     auto rds = RangeDeleterService::get(opCtx);
-    RangeDeletionTask rdt = createRangeDeletionTask(
+    RangeDeletionTask rdt1 = createRangeDeletionTask(
         uuidCollA, BSON("a" << 0), BSON("a" << 10), CleanWhenEnum::kDelayed, false);
+    RangeDeletionTask rdt2 = createRangeDeletionTask(
+        uuidCollA, BSON("a" << 10), BSON("a" << 20), CleanWhenEnum::kDelayed, false);
 
-    insertRangeDeletionTaskDocument(opCtx, rdt);
-    ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollA), 1);
+    insertRangeDeletionTaskDocument(opCtx, rdt1);
+    insertRangeDeletionTaskDocument(opCtx, rdt2);
+
+    verifyRangeDeletionTasks(opCtx, uuidCollA, {rdt1.getRange(), rdt2.getRange()});
+    verifyRangeDeletionTasks(opCtx, uuidCollB, {});
+
+    ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollA), 2);
 }
 
 TEST_F(RangeDeleterServiceTest, UpdateRangeDeletionTaskPendingFieldToFalse) {
     auto rds = RangeDeleterService::get(opCtx);
-    RangeDeletionTask rdt = createRangeDeletionTask(
+    RangeDeletionTask rdt1 = createRangeDeletionTask(
         uuidCollA, BSON("a" << 0), BSON("a" << 10), CleanWhenEnum::kDelayed);
+    RangeDeletionTask rdt2 = createRangeDeletionTask(
+        uuidCollA, BSON("a" << 10), BSON("a" << 20), CleanWhenEnum::kDelayed);
 
-    insertRangeDeletionTaskDocument(opCtx, rdt);
+    insertRangeDeletionTaskDocument(opCtx, rdt1);
+    insertRangeDeletionTaskDocument(opCtx, rdt2);
+    verifyRangeDeletionTasks(opCtx, uuidCollA, {});
+    verifyRangeDeletionTasks(opCtx, uuidCollB, {});
     ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollA), 0);
+    ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollB), 0);
 
-    updatePendingField(opCtx, rdt.getId(), false);
-    ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollA), 1);
+    updatePendingField(opCtx, rdt2.getId(), false);
+    verifyRangeDeletionTasks(opCtx, uuidCollA, {rdt2.getRange()});
+    verifyRangeDeletionTasks(opCtx, uuidCollB, {});
+
+    updatePendingField(opCtx, rdt1.getId(), false);
+    verifyRangeDeletionTasks(opCtx, uuidCollA, {rdt1.getRange(), rdt2.getRange()});
+    verifyRangeDeletionTasks(opCtx, uuidCollB, {});
+
+    ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollA), 2);
+    ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollB), 0);
 }
 
 TEST_F(RangeDeleterServiceTest, UpdateRangeDeletionTaskPendingFieldToTrue) {
@@ -96,9 +160,11 @@ TEST_F(RangeDeleterServiceTest, UpdateRangeDeletionTaskPendingFieldToTrue) {
         uuidCollA, BSON("a" << 0), BSON("a" << 10), CleanWhenEnum::kDelayed);
 
     insertRangeDeletionTaskDocument(opCtx, rdt);
+    verifyRangeDeletionTasks(opCtx, uuidCollA, {});
     ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollA), 0);
 
     updatePendingField(opCtx, rdt.getId(), true);
+    verifyRangeDeletionTasks(opCtx, uuidCollA, {});
     ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollA), 0);
 }
 
@@ -117,16 +183,30 @@ TEST_F(RangeDeleterServiceTest, UpdateRangeDeletionTaskPendingFieldToTrue) {
 
 TEST_F(RangeDeleterServiceTest, RemoveRangeDeletionTask) {
     auto rds = RangeDeleterService::get(opCtx);
-    RangeDeletionTask rdt = createRangeDeletionTask(
-        uuidCollA, BSON("a" << 0), BSON("a" << 10), CleanWhenEnum::kDelayed);
+    RangeDeletionTask rdt1 = createRangeDeletionTask(
+        uuidCollA, BSON("a" << 5), BSON("a" << 15), CleanWhenEnum::kDelayed);
+    RangeDeletionTask rdt2 = createRangeDeletionTask(
+        uuidCollA, BSON("a" << 15), BSON("a" << 20), CleanWhenEnum::kDelayed);
 
-    insertRangeDeletionTaskDocument(opCtx, rdt);
+    insertRangeDeletionTaskDocument(opCtx, rdt1);
+    insertRangeDeletionTaskDocument(opCtx, rdt2);
+    verifyRangeDeletionTasks(opCtx, uuidCollA, {});
     ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollA), 0);
 
-    updatePendingField(opCtx, rdt.getId(), false);
+    updatePendingField(opCtx, rdt1.getId(), false);
+    verifyRangeDeletionTasks(opCtx, uuidCollA, {rdt1.getRange()});
     ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollA), 1);
 
-    deleteRangeDeletionTaskDocument(opCtx, rdt.getId());
+    updatePendingField(opCtx, rdt2.getId(), false);
+    verifyRangeDeletionTasks(opCtx, uuidCollA, {rdt1.getRange(), rdt2.getRange()});
+    ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollA), 2);
+
+    deleteRangeDeletionTaskDocument(opCtx, rdt2.getId());
+    verifyRangeDeletionTasks(opCtx, uuidCollA, {rdt1.getRange()});
+    ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollA), 1);
+
+    deleteRangeDeletionTaskDocument(opCtx, rdt1.getId());
+    verifyRangeDeletionTasks(opCtx, uuidCollA, {});
     ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollA), 0);
 }
 
