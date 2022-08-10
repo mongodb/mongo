@@ -890,10 +890,10 @@ server_parameters:
     cpp_vartype: AtomicWord<bool>
     default: false
 
-  internalQueryFLEAlwaysUseHighCardinalityMode:
+  internalQueryFLEAlwaysUseEncryptedCollScanMode:
     description: "Boolean flag to force FLE to always use low selectivity mode"
     set_at: [ startup, runtime ]
-    cpp_varname: "internalQueryFLEAlwaysUseHighCardinalityMode"
+    cpp_varname: "internalQueryFLEAlwaysUseEncryptedCollScanMode"
     cpp_vartype: AtomicWord<bool>
     default:
         expr: false

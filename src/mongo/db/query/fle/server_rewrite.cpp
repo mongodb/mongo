@@ -218,7 +218,7 @@ public:
                 "field path",
                 leftFieldPath != nullptr);
 
-        if (!queryRewriter->isForceHighCardinality()) {
+        if (!queryRewriter->isForceEncryptedCollScan()) {
             try {
                 for (auto& equality : equalitiesList) {
                     // For each expression representing a FleFindPayload...
@@ -250,8 +250,8 @@ public:
                             "FLE Max tag limit hit during aggregation $in rewrite",
                             "__error__"_attr = ex.what());
 
-                if (queryRewriter->getHighCardinalityMode() !=
-                    FLEQueryRewriter::HighCardinalityMode::kUseIfNeeded) {
+                if (queryRewriter->getEncryptedCollScanMode() !=
+                    FLEQueryRewriter::EncryptedCollScanMode::kUseIfNeeded) {
                     throw;
                 }
 
@@ -305,7 +305,7 @@ public:
         auto fieldPath = leftFieldPath ? leftFieldPath : rightFieldPath;
         auto constChild = isLeftFFP ? leftConstant : rightConstant;
 
-        if (!queryRewriter->isForceHighCardinality()) {
+        if (!queryRewriter->isForceEncryptedCollScan()) {
             try {
                 std::vector<boost::intrusive_ptr<Expression>> orListElems;
 
@@ -333,8 +333,8 @@ public:
                             "FLE Max tag limit hit during query $in rewrite",
                             "__error__"_attr = ex.what());
 
-                if (queryRewriter->getHighCardinalityMode() !=
-                    FLEQueryRewriter::HighCardinalityMode::kUseIfNeeded) {
+                if (queryRewriter->getEncryptedCollScanMode() !=
+                    FLEQueryRewriter::EncryptedCollScanMode::kUseIfNeeded) {
                     throw;
                 }
 
@@ -392,7 +392,7 @@ BSONObj rewriteEncryptedFilter(const FLEStateCollectionReader& escReader,
                                const FLEStateCollectionReader& eccReader,
                                boost::intrusive_ptr<ExpressionContext> expCtx,
                                BSONObj filter,
-                               HighCardinalityModeAllowed mode) {
+                               EncryptedCollScanModeAllowed mode) {
 
     if (auto rewritten =
             FLEQueryRewriter(expCtx, escReader, eccReader, mode).rewriteMatchExpression(filter)) {
@@ -455,7 +455,7 @@ public:
                   const NamespaceString& nss,
                   const EncryptionInformation& encryptInfo,
                   const BSONObj toRewrite,
-                  HighCardinalityModeAllowed mode)
+                  EncryptedCollScanModeAllowed mode)
         : RewriteBase(expCtx, nss, encryptInfo), userFilter(toRewrite), _mode(mode) {}
 
     ~FilterRewrite(){};
@@ -465,7 +465,7 @@ public:
 
     const BSONObj userFilter;
     BSONObj rewrittenFilter;
-    HighCardinalityModeAllowed _mode;
+    EncryptedCollScanModeAllowed _mode;
 };
 
 // This helper executes the rewrite(s) inside a transaction. The transaction runs in a separate
@@ -508,7 +508,7 @@ BSONObj rewriteEncryptedFilterInsideTxn(FLEQueryInterface* queryImpl,
                                         const EncryptedFieldConfig& efc,
                                         boost::intrusive_ptr<ExpressionContext> expCtx,
                                         BSONObj filter,
-                                        HighCardinalityModeAllowed mode) {
+                                        EncryptedCollScanModeAllowed mode) {
     auto makeCollectionReader = [&](FLEQueryInterface* queryImpl, const StringData& coll) {
         NamespaceString nss(dbName, coll);
         auto docCount = queryImpl->countDocuments(nss);
@@ -526,7 +526,7 @@ BSONObj rewriteQuery(OperationContext* opCtx,
                      const EncryptionInformation& info,
                      BSONObj filter,
                      GetTxnCallback getTransaction,
-                     HighCardinalityModeAllowed mode) {
+                     EncryptedCollScanModeAllowed mode) {
     auto sharedBlock = std::make_shared<FilterRewrite>(expCtx, nss, info, filter, mode);
     doFLERewriteInTxn(opCtx, sharedBlock, getTransaction);
     return sharedBlock->rewrittenFilter.getOwned();
@@ -552,7 +552,7 @@ void processFindCommand(OperationContext* opCtx,
                                         findCommand->getEncryptionInformation().value(),
                                         findCommand->getFilter().getOwned(),
                                         getTransaction,
-                                        HighCardinalityModeAllowed::kAllow));
+                                        EncryptedCollScanModeAllowed::kAllow));
     // The presence of encryptionInformation is a signal that this is a FLE request that requires
     // special processing. Once we've rewritten the query, it's no longer a "special" FLE query, but
     // a normal query that can be executed by the query system like any other, so remove
@@ -577,7 +577,7 @@ void processCountCommand(OperationContext* opCtx,
                                         countCommand->getEncryptionInformation().value(),
                                         countCommand->getQuery().getOwned(),
                                         getTxn,
-                                        HighCardinalityModeAllowed::kAllow));
+                                        EncryptedCollScanModeAllowed::kAllow));
     // The presence of encryptionInformation is a signal that this is a FLE request that requires
     // special processing. Once we've rewritten the query, it's no longer a "special" FLE query, but
     // a normal query that can be executed by the query system like any other, so remove
@@ -699,7 +699,7 @@ std::unique_ptr<MatchExpression> FLEQueryRewriter::rewriteEq(const EqualityMatch
         return nullptr;
     }
 
-    if (_mode != HighCardinalityMode::kForceAlways) {
+    if (_mode != EncryptedCollScanMode::kForceAlways) {
         try {
             auto obj = rewritePayloadAsTags(ffp);
 
@@ -718,7 +718,7 @@ std::unique_ptr<MatchExpression> FLEQueryRewriter::rewriteEq(const EqualityMatch
                         "FLE Max tag limit hit during query $eq rewrite",
                         "__error__"_attr = ex.what());
 
-            if (_mode != HighCardinalityMode::kUseIfNeeded) {
+            if (_mode != EncryptedCollScanMode::kUseIfNeeded) {
                 throw;
             }
 
@@ -749,7 +749,7 @@ std::unique_ptr<MatchExpression> FLEQueryRewriter::rewriteIn(const InMatchExpres
         "If any elements in a $in expression are encrypted, then all elements should be encrypted.",
         numFFPs == expr->getEqualities().size());
 
-    if (_mode != HighCardinalityMode::kForceAlways) {
+    if (_mode != EncryptedCollScanMode::kForceAlways) {
 
         try {
             auto backingBSONBuilder = BSONArrayBuilder();
@@ -779,7 +779,7 @@ std::unique_ptr<MatchExpression> FLEQueryRewriter::rewriteIn(const InMatchExpres
                         "FLE Max tag limit hit during query $in rewrite",
                         "__error__"_attr = ex.what());
 
-            if (_mode != HighCardinalityMode::kUseIfNeeded) {
+            if (_mode != EncryptedCollScanMode::kUseIfNeeded) {
                 throw;
             }
 

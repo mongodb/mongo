@@ -274,7 +274,7 @@ BSONObj processFLEWriteExplainD(OperationContext* opCtx,
                              info,
                              query,
                              &getTransactionWithRetriesForMongoD,
-                             fle::HighCardinalityModeAllowed::kAllow);
+                             fle::EncryptedCollScanModeAllowed::kAllow);
 }
 
 std::pair<write_ops::FindAndModifyCommandRequest, OpMsgRequest>

@@ -440,7 +440,7 @@ protected:
 
 
 TEST_F(FLEServerHighCardRewriteTest, HighCard_TopLevel_Equality) {
-    _mock.setForceHighCardinalityForTest();
+    _mock.setForceEncryptedCollScanForTest();
 
     auto match = generateFFP("ssn", 1);
     auto expected = fromjson(R"({
@@ -472,7 +472,7 @@ TEST_F(FLEServerHighCardRewriteTest, HighCard_TopLevel_Equality) {
 
 
 TEST_F(FLEServerHighCardRewriteTest, HighCard_TopLevel_In) {
-    _mock.setForceHighCardinalityForTest();
+    _mock.setForceEncryptedCollScanForTest();
 
     auto ffp1 = generateFFP("ssn", 1);
     auto ffp2 = generateFFP("ssn", 2);
@@ -559,7 +559,7 @@ TEST_F(FLEServerHighCardRewriteTest, HighCard_TopLevel_In) {
 
 TEST_F(FLEServerHighCardRewriteTest, HighCard_TopLevel_Expr) {
 
-    _mock.setForceHighCardinalityForTest();
+    _mock.setForceEncryptedCollScanForTest();
 
     auto ffp = generateFFP("$ssn", 1);
     int len;
@@ -595,7 +595,7 @@ TEST_F(FLEServerHighCardRewriteTest, HighCard_TopLevel_Expr) {
 
 TEST_F(FLEServerHighCardRewriteTest, HighCard_TopLevel_Expr_In) {
 
-    _mock.setForceHighCardinalityForTest();
+    _mock.setForceEncryptedCollScanForTest();
 
     auto ffp = generateFFP("$ssn", 1);
     int len;
