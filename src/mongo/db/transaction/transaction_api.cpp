@@ -337,7 +337,7 @@ SemiFuture<BatchedCommandResponse> SEPTransactionClient::runCRUDOp(
     return runCommand(cmd.getNS().db(), cmdBob.obj())
         .thenRunOn(_executor)
         .then([](BSONObj reply) {
-            uassertStatusOK(getStatusFromCommandResult(reply));
+            uassertStatusOK(getStatusFromWriteCommandReply(reply));
 
             BatchedCommandResponse response;
             std::string errmsg;

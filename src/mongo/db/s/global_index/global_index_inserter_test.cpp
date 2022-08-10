@@ -207,16 +207,14 @@ TEST_F(GlobalIndexInserterTest, ClonerRetriesWhenItEncountersWCE) {
     ASSERT_TRUE(indexEntryDoc.isEmpty());
 }
 
-// TODO: SERVER-67820 Enable after bug is fixed.
-#if 0
 TEST_F(GlobalIndexInserterTest, ClonerThrowsIfIndexEntryAlreadyExists) {
-    GlobalIndexInserter cloner(ns(), indexName(), indexUUID(), getExecutor());
+    GlobalIndexInserter cloner(nss(), indexName(), indexUUID(), getExecutor());
 
     const auto indexKeyValues = BSON("x" << 34);
     const auto documentKey = BSON("_id" << 12 << "x" << 34);
 
     DBDirectClient client(operationContext());
-    write_ops::InsertCommandRequest globalIndexInsert(globalIndexNs());
+    write_ops::InsertCommandRequest globalIndexInsert(globalIndexNss());
     GlobalIndexEntry indexEntry(indexKeyValues, documentKey);
     globalIndexInsert.setDocuments({indexEntry.toBSON()});
     client.insert(globalIndexInsert);
@@ -225,7 +223,6 @@ TEST_F(GlobalIndexInserterTest, ClonerThrowsIfIndexEntryAlreadyExists) {
                        DBException,
                        ErrorCodes::DuplicateKey);
 }
-#endif
 
 }  // namespace
 }  // namespace global_index
