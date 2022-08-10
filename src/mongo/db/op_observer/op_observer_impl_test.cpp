@@ -2284,6 +2284,7 @@ const bool kChangeStreamImagesEnabled = true;
 const bool kChangeStreamImagesDisabled = false;
 
 const auto kNotRetryable = RetryableFindAndModifyLocation::kNone;
+const auto kRecordInOplog = RetryableFindAndModifyLocation::kOplog;
 const auto kRecordInSideCollection = RetryableFindAndModifyLocation::kSideCollection;
 
 const std::vector<bool> kInMultiDocumentTransactionCases{false, true};
@@ -2321,6 +2322,8 @@ struct UpdateTestCase {
         switch (retryableOptions) {
             case kNotRetryable:
                 return "Not retryable";
+            case kRecordInOplog:
+                return "Images in oplog";
             case kRecordInSideCollection:
                 return "Images in side collection";
         }
@@ -2352,6 +2355,10 @@ protected:
             case kNotRetryable:
                 update->updateArgs->stmtIds = {kUninitializedStmtId};
                 break;
+            case kRecordInOplog:
+                update->retryableFindAndModifyLocation = RetryableFindAndModifyLocation::kOplog;
+                update->updateArgs->stmtIds = {1};
+                break;
             case kRecordInSideCollection:
                 update->retryableFindAndModifyLocation =
                     RetryableFindAndModifyLocation::kSideCollection;
@@ -2374,6 +2381,81 @@ protected:
             BSON("$set" << BSON("postImage" << true) << "$unset" << BSON("preImage" << 1));
         update->updateArgs->criteria = BSON("_id" << 0);
         update->updateArgs->storeDocOption = testCase.imageType;
+    }
+
+    void checkPreImageInOplogIfNeeded(
+        const UpdateTestCase& testCase,
+        const OplogUpdateEntryArgs& update,
+        const std::vector<BSONObj>& oplogs,
+        const OplogEntry& updateOplogEntry,
+        const boost::optional<OplogEntry>& applyOpsOplogEntry = boost::none) {
+        const bool checkPreImageInOplog = testCase.alwaysRecordPreImages ||
+            (testCase.imageType == StoreDocOption::PreImage &&
+             testCase.retryableOptions == kRecordInOplog);
+        if (checkPreImageInOplog) {
+            ASSERT(updateOplogEntry.getPreImageOpTime());
+            if (applyOpsOplogEntry) {
+                ASSERT_FALSE(applyOpsOplogEntry->getPreImageOpTime());
+            }
+
+            const Timestamp preImageOpTime = updateOplogEntry.getPreImageOpTime()->getTimestamp();
+            ASSERT_FALSE(preImageOpTime.isNull());
+            OplogEntry preImage = *findByTimestamp(oplogs, preImageOpTime);
+            ASSERT_BSONOBJ_EQ(update.updateArgs->preImageDoc.value(), preImage.getObject());
+            if (updateOplogEntry.getSessionId()) {
+                ASSERT_EQ(*updateOplogEntry.getSessionId(), *preImage.getSessionId());
+            }
+            if (updateOplogEntry.getTxnNumber()) {
+                ASSERT_EQ(*updateOplogEntry.getTxnNumber(), *preImage.getTxnNumber());
+            }
+            if (!updateOplogEntry.getStatementIds().empty()) {
+                const auto& updateOplogStmtIds = updateOplogEntry.getStatementIds();
+                const auto& preImageOplogStmtIds = preImage.getStatementIds();
+                ASSERT_EQ(updateOplogStmtIds.size(), preImageOplogStmtIds.size());
+                for (size_t i = 0; i < updateOplogStmtIds.size(); i++) {
+                    ASSERT_EQ(updateOplogStmtIds[i], preImageOplogStmtIds[i]);
+                }
+            }
+        } else {
+            ASSERT_FALSE(updateOplogEntry.getPreImageOpTime());
+        }
+    }
+
+    void checkPostImageInOplogIfNeeded(
+        const UpdateTestCase& testCase,
+        const OplogUpdateEntryArgs& update,
+        const std::vector<BSONObj>& oplogs,
+        const OplogEntry& updateOplogEntry,
+        const boost::optional<OplogEntry>& applyOpsOplogEntry = boost::none) {
+        const bool checkPostImageInOplog = testCase.imageType == StoreDocOption::PostImage &&
+            testCase.retryableOptions == kRecordInOplog;
+        if (checkPostImageInOplog) {
+            ASSERT(updateOplogEntry.getPostImageOpTime());
+            if (applyOpsOplogEntry) {
+                ASSERT_FALSE(applyOpsOplogEntry->getPostImageOpTime());
+            }
+
+            const Timestamp postImageOpTime = updateOplogEntry.getPostImageOpTime()->getTimestamp();
+            ASSERT_FALSE(postImageOpTime.isNull());
+            OplogEntry postImage = *findByTimestamp(oplogs, postImageOpTime);
+            ASSERT_BSONOBJ_EQ(update.updateArgs->updatedDoc, postImage.getObject());
+            if (updateOplogEntry.getSessionId()) {
+                ASSERT_EQ(*updateOplogEntry.getSessionId(), *postImage.getSessionId());
+            }
+            if (updateOplogEntry.getTxnNumber()) {
+                ASSERT_EQ(*updateOplogEntry.getTxnNumber(), *postImage.getTxnNumber());
+            }
+            if (!updateOplogEntry.getStatementIds().empty()) {
+                const auto& updateOplogStmtIds = updateOplogEntry.getStatementIds();
+                const auto& postImageOplogStmtIds = postImage.getStatementIds();
+                ASSERT_EQ(updateOplogStmtIds.size(), postImageOplogStmtIds.size());
+                for (size_t i = 0; i < updateOplogStmtIds.size(); i++) {
+                    ASSERT_EQ(updateOplogStmtIds[i], postImageOplogStmtIds[i]);
+                }
+            }
+        } else {
+            ASSERT_FALSE(updateOplogEntry.getPostImageOpTime());
+        }
     }
 
     void checkSideCollectionIfNeeded(
@@ -2444,22 +2526,30 @@ protected:
         // Regular updates.
         {kNonFaM, kDoNotRecordPreImages, kChangeStreamImagesDisabled, kNotRetryable, 1},
         {kNonFaM, kDoNotRecordPreImages, kChangeStreamImagesEnabled, kNotRetryable, 1},
+        {kNonFaM, kDoNotRecordPreImages, kChangeStreamImagesEnabled, kRecordInOplog, 1},
         {kNonFaM, kDoNotRecordPreImages, kChangeStreamImagesEnabled, kRecordInSideCollection, 1},
         {kNonFaM, kRecordPreImages, kChangeStreamImagesDisabled, kNotRetryable, 2},
+        {kNonFaM, kRecordPreImages, kChangeStreamImagesDisabled, kRecordInOplog, 2},
         {kNonFaM, kRecordPreImages, kChangeStreamImagesDisabled, kRecordInSideCollection, 2},
         // FindAndModify asking for a preImage.
         {kFaMPre, kDoNotRecordPreImages, kChangeStreamImagesDisabled, kNotRetryable, 1},
+        {kFaMPre, kDoNotRecordPreImages, kChangeStreamImagesDisabled, kRecordInOplog, 2},
         {kFaMPre, kDoNotRecordPreImages, kChangeStreamImagesDisabled, kRecordInSideCollection, 1},
         {kFaMPre, kDoNotRecordPreImages, kChangeStreamImagesEnabled, kNotRetryable, 1},
+        {kFaMPre, kDoNotRecordPreImages, kChangeStreamImagesEnabled, kRecordInOplog, 2},
         {kFaMPre, kDoNotRecordPreImages, kChangeStreamImagesEnabled, kRecordInSideCollection, 1},
         {kFaMPre, kRecordPreImages, kChangeStreamImagesDisabled, kNotRetryable, 2},
+        {kFaMPre, kRecordPreImages, kChangeStreamImagesDisabled, kRecordInOplog, 2},
         {kFaMPre, kRecordPreImages, kChangeStreamImagesDisabled, kRecordInSideCollection, 2},
         // FindAndModify asking for a postImage.
         {kFaMPost, kDoNotRecordPreImages, kChangeStreamImagesDisabled, kNotRetryable, 1},
+        {kFaMPost, kDoNotRecordPreImages, kChangeStreamImagesDisabled, kRecordInOplog, 2},
         {kFaMPost, kDoNotRecordPreImages, kChangeStreamImagesDisabled, kRecordInSideCollection, 1},
         {kFaMPost, kDoNotRecordPreImages, kChangeStreamImagesEnabled, kNotRetryable, 1},
+        {kFaMPost, kDoNotRecordPreImages, kChangeStreamImagesEnabled, kRecordInOplog, 2},
         {kFaMPost, kDoNotRecordPreImages, kChangeStreamImagesEnabled, kRecordInSideCollection, 1},
         {kFaMPost, kRecordPreImages, kChangeStreamImagesDisabled, kNotRetryable, 2},
+        {kFaMPost, kRecordPreImages, kChangeStreamImagesDisabled, kRecordInOplog, 3},
         {kFaMPost, kRecordPreImages, kChangeStreamImagesDisabled, kRecordInSideCollection, 2}};
 
     const NamespaceString _nss{boost::none, "test", "coll"};
@@ -2504,6 +2594,8 @@ TEST_F(OnUpdateOutputsTest, TestNonTransactionFundamentalOnUpdateOutputs) {
         std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, testCase.numOutputOplogs);
         // Entries are returned in ascending timestamp order.
         auto updateOplogEntry = assertGet(OplogEntry::parse(oplogs.back()));
+        checkPreImageInOplogIfNeeded(testCase, updateEntryArgs, oplogs, updateOplogEntry);
+        checkPostImageInOplogIfNeeded(testCase, updateEntryArgs, oplogs, updateOplogEntry);
         checkSideCollectionIfNeeded(opCtx, testCase, updateEntryArgs, oplogs, updateOplogEntry);
         checkChangeStreamImagesIfNeeded(opCtx, testCase, updateEntryArgs, updateOplogEntry);
     }
@@ -2551,6 +2643,10 @@ TEST_F(OnUpdateOutputsTest, TestFundamentalTransactionOnUpdateOutputs) {
         // Entries are returned in ascending timestamp order.
         auto applyOpsOplogEntry = assertGet(OplogEntry::parse(oplogs.back()));
         auto updateOplogEntry = getInnerEntryFromApplyOpsOplogEntry(applyOpsOplogEntry);
+        checkPreImageInOplogIfNeeded(
+            testCase, updateEntryArgs, oplogs, updateOplogEntry, applyOpsOplogEntry);
+        checkPostImageInOplogIfNeeded(
+            testCase, updateEntryArgs, oplogs, updateOplogEntry, applyOpsOplogEntry);
         checkSideCollectionIfNeeded(
             opCtx, testCase, updateEntryArgs, oplogs, updateOplogEntry, applyOpsOplogEntry);
         checkChangeStreamImagesIfNeeded(opCtx, testCase, updateEntryArgs, updateOplogEntry);
@@ -2704,6 +2800,8 @@ struct DeleteTestCase {
         switch (retryableOptions) {
             case kNotRetryable:
                 return "Not retryable";
+            case kRecordInOplog:
+                return "Images in oplog";
             case kRecordInSideCollection:
                 return "Images in side collection";
         }
@@ -3342,6 +3440,9 @@ protected:
             case kNotRetryable:
                 deleteArgs->retryableFindAndModifyLocation = kNotRetryable;
                 break;
+            case kRecordInOplog:
+                deleteArgs->retryableFindAndModifyLocation = kRecordInOplog;
+                break;
             case kRecordInSideCollection:
                 deleteArgs->retryableFindAndModifyLocation = kRecordInSideCollection;
                 break;
@@ -3349,6 +3450,43 @@ protected:
         if (testCase.isRetryable() || testCase.alwaysRecordPreImages ||
             testCase.changeStreamImagesEnabled) {
             deleteArgs->deletedDoc = &_deletedDoc;
+        }
+    }
+
+    void checkPreImageInOplogIfNeeded(
+        const DeleteTestCase& testCase,
+        const OplogDeleteEntryArgs& deleteArgs,
+        const std::vector<BSONObj>& oplogs,
+        const OplogEntry& deleteOplogEntry,
+        const boost::optional<OplogEntry> applyOpsOplogEntry = boost::none) {
+        const bool checkPreImageInOplog = deleteArgs.preImageRecordingEnabledForCollection ||
+            deleteArgs.retryableFindAndModifyLocation == kRecordInOplog;
+        if (checkPreImageInOplog) {
+            ASSERT(deleteOplogEntry.getPreImageOpTime());
+            if (applyOpsOplogEntry) {
+                ASSERT_FALSE(applyOpsOplogEntry->getPreImageOpTime());
+            }
+
+            const Timestamp preImageOpTime = deleteOplogEntry.getPreImageOpTime()->getTimestamp();
+            ASSERT_FALSE(preImageOpTime.isNull());
+            OplogEntry preImage = *findByTimestamp(oplogs, preImageOpTime);
+            ASSERT_BSONOBJ_EQ(_deletedDoc, preImage.getObject());
+            if (deleteOplogEntry.getSessionId()) {
+                ASSERT_EQ(*deleteOplogEntry.getSessionId(), *preImage.getSessionId());
+            }
+            if (deleteOplogEntry.getTxnNumber()) {
+                ASSERT_EQ(*deleteOplogEntry.getTxnNumber(), *preImage.getTxnNumber());
+            }
+            if (!deleteOplogEntry.getStatementIds().empty()) {
+                const auto& deleteOplogStmtIds = deleteOplogEntry.getStatementIds();
+                const auto& preImageOplogStmtIds = preImage.getStatementIds();
+                ASSERT_EQ(deleteOplogStmtIds.size(), preImageOplogStmtIds.size());
+                for (size_t i = 0; i < deleteOplogStmtIds.size(); i++) {
+                    ASSERT_EQ(deleteOplogStmtIds[i], preImageOplogStmtIds[i]);
+                }
+            }
+        } else {
+            ASSERT_FALSE(deleteOplogEntry.getPreImageOpTime());
         }
     }
 
@@ -3406,10 +3544,13 @@ protected:
 
     std::vector<DeleteTestCase> _cases{
         {kDoNotRecordPreImages, kChangeStreamImagesDisabled, kNotRetryable, 1},
+        {kDoNotRecordPreImages, kChangeStreamImagesDisabled, kRecordInOplog, 2},
         {kDoNotRecordPreImages, kChangeStreamImagesDisabled, kRecordInSideCollection, 1},
         {kDoNotRecordPreImages, kChangeStreamImagesEnabled, kNotRetryable, 1},
+        {kDoNotRecordPreImages, kChangeStreamImagesEnabled, kRecordInOplog, 2},
         {kDoNotRecordPreImages, kChangeStreamImagesEnabled, kRecordInSideCollection, 1},
         {kRecordPreImages, kChangeStreamImagesDisabled, kNotRetryable, 2},
+        {kRecordPreImages, kChangeStreamImagesDisabled, kRecordInOplog, 2},
         {kRecordPreImages, kChangeStreamImagesDisabled, kRecordInSideCollection, 2}};
 
     const NamespaceString _nss{boost::none, "test", "coll"};
@@ -3460,6 +3601,7 @@ TEST_F(OnDeleteOutputsTest, TestNonTransactionFundamentalOnDeleteOutputs) {
         std::vector<BSONObj> oplogs = getNOplogEntries(opCtx, testCase.numOutputOplogs);
         // Entries are returned in ascending timestamp order.
         auto deleteOplogEntry = assertGet(OplogEntry::parse(oplogs.back()));
+        checkPreImageInOplogIfNeeded(testCase, deleteEntryArgs, oplogs, deleteOplogEntry);
         checkSideCollectionIfNeeded(opCtx, testCase, deleteEntryArgs, oplogs, deleteOplogEntry);
         checkChangeStreamImagesIfNeeded(opCtx, testCase, deleteEntryArgs, deleteOplogEntry);
     }
@@ -3511,6 +3653,8 @@ TEST_F(OnDeleteOutputsTest, TestTransactionFundamentalOnDeleteOutputs) {
         // Entries are returned in ascending timestamp order.
         auto applyOpsOplogEntry = assertGet(OplogEntry::parse(oplogs.back()));
         auto deleteOplogEntry = getInnerEntryFromApplyOpsOplogEntry(applyOpsOplogEntry);
+        checkPreImageInOplogIfNeeded(
+            testCase, deleteEntryArgs, oplogs, deleteOplogEntry, applyOpsOplogEntry);
         checkSideCollectionIfNeeded(
             opCtx, testCase, deleteEntryArgs, oplogs, deleteOplogEntry, applyOpsOplogEntry);
         checkChangeStreamImagesIfNeeded(opCtx, testCase, deleteEntryArgs, deleteOplogEntry);

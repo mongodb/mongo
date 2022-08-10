@@ -54,6 +54,9 @@ enum class RetryableFindAndModifyLocation {
 
     // Store the pre-image in the side collection.
     kSideCollection,
+
+    // Store the pre-image in the oplog.
+    kOplog,
 };
 
 /**
