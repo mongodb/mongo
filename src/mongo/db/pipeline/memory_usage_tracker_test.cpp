@@ -100,27 +100,25 @@ TEST_F(MemoryUsageTrackerTest, UpdateUsageUpdatesGlobal) {
 }
 
 DEATH_TEST_F(MemoryUsageTrackerTest,
-             UpdateGlobalToNegativeIsDisallowed,
+             UpdateFunctionUsageToNegativeIsDisallowed,
+             "Underflow on memory tracking") {
+    _funcTracker.set(50LL);
+    ASSERT_EQ(_funcTracker.currentMemoryBytes(), 50LL);
+    ASSERT_EQ(_funcTracker.maxMemoryBytes(), 50LL);
+    ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
+    ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
+
+    _funcTracker.update(-100);
+}
+
+DEATH_TEST_F(MemoryUsageTrackerTest,
+             UpdateMemUsageToNegativeIsDisallowed,
              "Underflow on memory tracking") {
     _tracker.set(50LL);
     ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
     ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
 
     _tracker.update(-100);
-}
-
-TEST_F(MemoryUsageTrackerTest, UpdateFunctionUsageToNegativeIsDisallowed) {
-    _funcTracker.set(50LL);
-    ASSERT_EQ(_tracker.currentMemoryBytes(), 50LL);
-    ASSERT_EQ(_tracker.maxMemoryBytes(), 50LL);
-
-    // TODO SERVER-61281: Temporarily disable the assert (and associated test) in
-    // PerFunctionMemoryTracker.update() to prevent inaccurate tracking to cause underflow errors
-    // Once accurate tracking is implemented and no underflow should happen, this negative test
-    // could be restored to verify that "Underflow on memory tracking" is reported.
-
-    _funcTracker.update(-100);
-    ASSERT_EQ(_tracker.currentMemoryBytes(), 0LL);
 }
 
 }  // namespace

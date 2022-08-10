@@ -191,7 +191,8 @@ public:
 
     /**
      * Get the approximate size of the Document, plus its underlying storage and sub-values. Returns
-     * size in bytes.
+     * size in bytes. The return value of this function is snapshotted. All subsequent calls of this
+     * method will return the same value.
      *
      * Note: Some memory may be shared with other Documents or between fields within a single
      * Document so this can overestimate usage.
@@ -200,6 +201,11 @@ public:
      * the document.
      */
     size_t getApproximateSize() const;
+
+    /**
+     * Same as 'getApproximateSize()', but this method re-computes the size on every call.
+     */
+    size_t getCurrentApproximateSize() const;
 
     /**
      * Return the approximate amount of space used by metadata.
@@ -370,12 +376,6 @@ private:
     getNestedFieldNonCachingHelper(const FieldPath& dottedField, size_t level) const;
 
     boost::intrusive_ptr<const DocumentStorage> _storage;
-
-    /**
-     * Returns the approximate size of this `Document` instance without considering the size of its
-     * backing BSON object.
-     */
-    size_t getApproximateSizeWithoutBackingBSON() const;
 };
 
 //
@@ -654,6 +654,7 @@ public:
      *  TODO: there are some optimizations that may make sense at freeze time.
      */
     Document freeze() {
+        resetSnapshottedApproximateSize();
         // This essentially moves _storage into a new Document by way of temp.
         Document ret;
         boost::intrusive_ptr<const DocumentStorage> temp(storagePtr(), /*inc_ref_count=*/false);
@@ -672,8 +673,12 @@ public:
      *  Note that unlike freeze(), this indicates intention to continue
      *  modifying this document. The returned Document will not observe
      *  future changes to this MutableDocument.
+     *
+     *  Note that the computed snapshotted approximate size of the Document
+     *  is not preserved across calls.
      */
     Document peek() {
+        resetSnapshottedApproximateSize();
         return Document(storagePtr());
     }
 
@@ -739,10 +744,17 @@ private:
     MutableValue getNestedFieldHelper(const FieldPath& dottedField, size_t level);
     MutableValue getNestedFieldHelper(const std::vector<Position>& positions, size_t level);
 
-    // this should only be called by storage methods and peek/freeze
+    // this should only be called by storage methods and peek/freeze/resetsnapshottedApproximateSize
     const DocumentStorage* storagePtr() const {
         dassert(!_storage || typeid(*_storage) == typeid(const DocumentStorage));
         return static_cast<const DocumentStorage*>(_storage);
+    }
+
+    void resetSnapshottedApproximateSize() {
+        auto mutableStorage = const_cast<DocumentStorage*>(storagePtr());
+        if (mutableStorage) {
+            mutableStorage->resetSnapshottedApproximateSize();
+        }
     }
 
     // These are both const to prevent modifications bypassing storage() method.

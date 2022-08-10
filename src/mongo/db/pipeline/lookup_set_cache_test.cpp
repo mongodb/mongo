@@ -214,7 +214,7 @@ TEST(LookupSetCacheTest, DocumentWithStorageCachePopulated) {
     // initialization.
     BSONObj input = BSON("a" << 1);
     const auto doc1 = Document(input);
-    const auto sizeOfDoc1Before = doc1.getApproximateSize();
+    const auto sizeOfDoc1Before = doc1.getCurrentApproximateSize();
     auto key = Value("foo"_sd);
 
     // Insert a cache entry and verify that both the key and the document are accounted for in the
@@ -228,14 +228,14 @@ TEST(LookupSetCacheTest, DocumentWithStorageCachePopulated) {
     auto prevCacheSize = cache.getMemoryUsage();
     const auto doc2 = Document({{"a", 2}});
     cache.insert(key, doc2);
-    ASSERT_EQ(cache.getMemoryUsage(), prevCacheSize + doc2.getApproximateSize());
+    ASSERT_EQ(cache.getMemoryUsage(), prevCacheSize + doc2.getCurrentApproximateSize());
 
     // Calling serializeForSorter() should grow the overall document size. Verify that growing the
     // size of the 'Document' object does not have impact on the size stored in 'cache'.
     prevCacheSize = cache.getMemoryUsage();
     BufBuilder builder;
     doc1.serializeForSorter(builder);
-    ASSERT_LT(sizeOfDoc1Before, doc1.getApproximateSize());
+    ASSERT_LT(sizeOfDoc1Before, doc1.getCurrentApproximateSize());
     ASSERT_EQ(prevCacheSize, cache.getMemoryUsage());
 
     cache.evictOne();

@@ -16,9 +16,8 @@ coll.drop();
 const bigStr = Array(1025).toString();  // 1KB of ','
 const nDocs = 1000;
 const nPartitions = 50;
-// Initial docSize is 1292, after fields are loaded into Document's cache they are 2332.
-// Not const because post-cache doc size changes based on the number of fields accessed.
-let docSize = 2332;
+// Size was found through logging in 'SpillableCache' class.
+const docSize = 1292;
 
 let bulk = coll.initializeUnorderedBulkOp();
 for (let i = 1; i <= nDocs; i++) {
@@ -138,8 +137,6 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotalMe
     // The partition iterator will only hold five documents at once. After they are added to the
     // removable document executor they will be released.
     const numDocsHeld = 5;
-    // This test accesses fewer fields, reduce docSize accordingly.
-    docSize = 1292;
     let pipeline = [
         {
             $setWindowFields: {

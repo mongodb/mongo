@@ -56,17 +56,17 @@ public:
     explicit WindowFunctionTopBottomN(ExpressionContext* const expCtx, SortPattern sp, long long n)
         : WindowFunctionState(expCtx), _acc(expCtx, std::move(sp), true) {
         _acc.startNewGroup(Value(n));
-        _memUsageBytes = sizeof(*this);
+        updateMemUsage();
     }
 
     void add(Value value) final {
         _acc.process(value, false);
-        _memUsageBytes = _acc.getMemUsage();
+        updateMemUsage();
     }
 
     void remove(Value value) final {
         _acc.remove(value);
-        _memUsageBytes = _acc.getMemUsage();
+        updateMemUsage();
     }
 
     Value getValue() const final {
@@ -75,10 +75,14 @@ public:
 
     void reset() final {
         _acc.reset();
-        _memUsageBytes = _acc.getMemUsage();
+        updateMemUsage();
     }
 
 private:
+    void updateMemUsage() {
+        _memUsageBytes = sizeof(*this) + _acc.getMemUsage();
+    }
+
     AccumulatorTopBottomN<sense, single> _acc;
 };
 
