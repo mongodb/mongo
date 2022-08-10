@@ -54,7 +54,6 @@ private:
 class RangeDeleterServiceTest : public ShardServerTestFixture {
 public:
     void setUp() override;
-
     void tearDown() override;
 
     OperationContext* opCtx;
@@ -66,7 +65,7 @@ public:
                                               CleanWhenEnum whenToClean = CleanWhenEnum::kNow,
                                               bool pending = true);
 
-    RangeDeletionWithOngoingQueries createRangeDeletionTaskWithOngoingQueries(
+    std::shared_ptr<RangeDeletionWithOngoingQueries> createRangeDeletionTaskWithOngoingQueries(
         const UUID& collectionUUID,
         const BSONObj& min,
         const BSONObj& max,
@@ -74,14 +73,14 @@ public:
         bool pending = true);
 
     // Instantiate some collection UUIDs and tasks to be used for testing
-    const UUID uuidCollA = UUID::gen();
-    RangeDeletionWithOngoingQueries rangeDeletionTask0ForCollA =
-        createRangeDeletionTaskWithOngoingQueries(uuidCollA, BSON("a" << 0), BSON("a" << 10));
-    RangeDeletionWithOngoingQueries rangeDeletionTask1ForCollA =
-        createRangeDeletionTaskWithOngoingQueries(uuidCollA, BSON("a" << 10), BSON("a" << 20));
-    const UUID uuidCollB = UUID::gen();
-    RangeDeletionWithOngoingQueries rangeDeletionTask0ForCollB =
-        createRangeDeletionTaskWithOngoingQueries(uuidCollB, BSON("a" << 0), BSON("a" << 10));
+    UUID uuidCollA = UUID::gen();
+    inline static const NamespaceString nsCollA = NamespaceString("test", "collA");
+    std::shared_ptr<RangeDeletionWithOngoingQueries> rangeDeletionTask0ForCollA;
+    std::shared_ptr<RangeDeletionWithOngoingQueries> rangeDeletionTask1ForCollA;
+
+    UUID uuidCollB = UUID::gen();
+    inline static const NamespaceString nsCollB = NamespaceString("test", "collB");
+    std::shared_ptr<RangeDeletionWithOngoingQueries> rangeDeletionTask0ForCollB;
 
 private:
     RAIIServerParameterControllerForTest enableFeatureFlag{"featureFlagRangeDeleterService", true};
