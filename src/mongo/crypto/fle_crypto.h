@@ -1315,6 +1315,35 @@ OSTType_Double getTypeInfoDouble(double value,
 
 
 /**
+ * Edges calculator
+ */
+
+class Edges {
+public:
+    Edges(std::string leaf, int sparsity);
+    std::vector<StringData> get();
+
+private:
+    std::string _leaf;
+    int _sparsity;
+};
+
+std::unique_ptr<Edges> getEdgesInt32(int32_t value,
+                                     boost::optional<int32_t> min,
+                                     boost::optional<int32_t> max,
+                                     int sparsity);
+
+std::unique_ptr<Edges> getEdgesInt64(int64_t value,
+                                     boost::optional<int64_t> min,
+                                     boost::optional<int64_t> max,
+                                     int sparsity);
+
+std::unique_ptr<Edges> getEdgesDouble(double value,
+                                      boost::optional<double> min,
+                                      boost::optional<double> max,
+                                      int sparsity);
+
+/**
  * Utility functions manipulating buffers.
  */
 PrfBlock PrfBlockfromCDR(const ConstDataRange& block);

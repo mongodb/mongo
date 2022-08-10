@@ -54,6 +54,7 @@
 #include "mongo/db/matcher/schema/encrypt_schema_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -62,6 +63,7 @@
 #include "mongo/util/hex.h"
 #include "mongo/util/time_support.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 
@@ -2345,6 +2347,104 @@ TEST(RangeTest, Double_Errors) {
     ASSERT_THROWS_CODE(getTypeInfoDouble(std::numeric_limits<double>::signaling_NaN(), 1, 2),
                        AssertionException,
                        6775008);
+}
+
+// Edge calculator
+
+template <typename T>
+struct EdgeCalcTestVector {
+    std::function<std::unique_ptr<Edges>(T, boost::optional<T>, boost::optional<T>, int)> getEdgesT;
+    T value;
+    boost::optional<T> min, max;
+    int sparsity;
+    stdx::unordered_set<std::string> expectedEdges;
+
+    bool validate() const {
+        auto edgeCalc = getEdgesT(value, min, max, sparsity);
+        auto edges = edgeCalc->get();
+        for (const std::string& ee : expectedEdges) {
+            if (!std::any_of(edges.begin(), edges.end(), [ee](auto edge) { return edge == ee; })) {
+                LOGV2_ERROR(6775120,
+                            "Expected edge not found",
+                            "expected-edge"_attr = ee,
+                            "value"_attr = value,
+                            "min"_attr = min,
+                            "max"_attr = max,
+                            "sparsity"_attr = sparsity,
+                            "edges"_attr = edges,
+                            "expected-edges"_attr = expectedEdges);
+                return false;
+            }
+        }
+
+        for (const StringData& edgeSd : edges) {
+            std::string edge = edgeSd.toString();
+            if (std::all_of(expectedEdges.begin(), expectedEdges.end(), [edge](auto ee) {
+                    return edge != ee;
+                })) {
+                LOGV2_ERROR(6775121,
+                            "An edge was found that is not expected",
+                            "edge"_attr = edge,
+                            "value"_attr = value,
+                            "min"_attr = min,
+                            "max"_attr = max,
+                            "sparsity"_attr = sparsity,
+                            "edges"_attr = edges,
+                            "expected-edges"_attr = expectedEdges);
+                return false;
+            }
+        }
+
+        if (edges.size() != expectedEdges.size()) {
+            LOGV2_ERROR(6775122,
+                        "Unexpected number of elements in edges. Check for duplicates",
+                        "value"_attr = value,
+                        "min"_attr = min,
+                        "max"_attr = max,
+                        "sparsity"_attr = sparsity,
+                        "edges"_attr = edges,
+                        "expected-edges"_attr = expectedEdges);
+            return false;
+        }
+
+        return true;
+    }
+};
+
+TEST(EdgeCalcTest, Int32_TestVectors) {
+    std::vector<EdgeCalcTestVector<int32_t>> testVectors = {
+#include "test_vectors/edges_int32.cstruct"
+    };
+    for (const auto& testVector : testVectors) {
+        ASSERT_TRUE(testVector.validate());
+    }
+}
+
+TEST(EdgeCalcTest, Int64_TestVectors) {
+    std::vector<EdgeCalcTestVector<int64_t>> testVectors = {
+#include "test_vectors/edges_int64.cstruct"
+    };
+    for (const auto& testVector : testVectors) {
+        ASSERT_TRUE(testVector.validate());
+    }
+}
+
+TEST(EdgeCalcTest, Double_TestVectors) {
+    std::vector<EdgeCalcTestVector<double>> testVectors = {
+#include "test_vectors/edges_double.cstruct"
+    };
+    for (const auto& testVector : testVectors) {
+        ASSERT_TRUE(testVector.validate());
+    }
+}
+
+TEST(EdgeCalcTest, SparsityConstraints) {
+    ASSERT_THROWS_CODE(getEdgesInt32(1, 0, 8, 0), AssertionException, 6775101);
+    ASSERT_THROWS_CODE(getEdgesInt32(1, 0, 8, -1), AssertionException, 6775101);
+    ASSERT_THROWS_CODE(getEdgesInt64(1, 0, 8, 0), AssertionException, 6775101);
+    ASSERT_THROWS_CODE(getEdgesInt64(1, 0, 8, -1), AssertionException, 6775101);
+    ASSERT_THROWS_CODE(getEdgesDouble(1.0, 0.0, 8.0, 0), AssertionException, 6775101);
+    ASSERT_THROWS_CODE(getEdgesDouble(1.0, 0.0, 8.0, -1), AssertionException, 6775101);
 }
 
 }  // namespace mongo

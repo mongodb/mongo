@@ -3225,5 +3225,67 @@ EncryptedPredicateEvaluator::EncryptedPredicateEvaluator(ConstDataRange serverTo
     }
 }
 
+// Edges
+
+Edges::Edges(std::string leaf, int sparsity) : _leaf(std::move(leaf)), _sparsity(sparsity) {
+    uassert(6775101, "sparsity must be 1 or larger", _sparsity > 0);
+    dassert(std::all_of(_leaf.begin(), _leaf.end(), [](char c) { return c == '1' || c == '0'; }));
+}
+
+std::vector<StringData> Edges::get() {
+    static const StringData kRoot = "root"_sd;
+    StringData leaf = _leaf;
+
+    std::vector<StringData> result{
+        kRoot,
+        leaf,
+    };
+
+    for (size_t i = 1; i < _leaf.size(); ++i) {
+        if (i % _sparsity == 0) {
+            result.push_back(leaf.substr(0, i));
+        }
+    }
+    return result;
+}
+
+template <typename T>
+std::unique_ptr<Edges> getEdgesT(T value, T min, T max, int sparsity) {
+    static_assert(std::is_unsigned<T>::value);
+    static_assert(std::numeric_limits<T>::is_integer);
+
+    constexpr size_t bits = std::numeric_limits<T>::digits;
+
+    dassert(0 == min);
+
+    size_t maxlen = 64 - countLeadingZeros64(max);
+    std::string valueBin = std::bitset<bits>(value).to_string();
+    std::string valueBinTrimmed = valueBin.substr(bits - maxlen, maxlen);
+    return std::make_unique<Edges>(valueBinTrimmed, sparsity);
+}
+
+std::unique_ptr<Edges> getEdgesInt32(int32_t value,
+                                     boost::optional<int32_t> min,
+                                     boost::optional<int32_t> max,
+                                     int sparsity) {
+    auto aost = getTypeInfo32(value, min, max);
+    return getEdgesT(aost.value, aost.min, aost.max, sparsity);
+}
+
+std::unique_ptr<Edges> getEdgesInt64(int64_t value,
+                                     boost::optional<int64_t> min,
+                                     boost::optional<int64_t> max,
+                                     int sparsity) {
+    auto aost = getTypeInfo64(value, min, max);
+    return getEdgesT(aost.value, aost.min, aost.max, sparsity);
+}
+
+std::unique_ptr<Edges> getEdgesDouble(double value,
+                                      boost::optional<double> min,
+                                      boost::optional<double> max,
+                                      int sparsity) {
+    auto aost = getTypeInfoDouble(value, min, max);
+    return getEdgesT(aost.value, aost.min, aost.max, sparsity);
+}
 
 }  // namespace mongo
