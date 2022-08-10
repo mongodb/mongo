@@ -901,8 +901,6 @@ __curhs_insert(WT_CURSOR *cursor)
      * update as the update after the tombstone.
      */
     if (WT_TIME_WINDOW_HAS_STOP(&hs_cursor->time_window)) {
-        /* We should not see a tombstone with max transaction id. */
-        WT_ASSERT(session, hs_cursor->time_window.stop_txn != WT_TXN_MAX);
         /*
          * Insert a delete record to represent stop time point for the actual record to be inserted.
          * Set the stop time point as the commit time point of the history store delete record.
