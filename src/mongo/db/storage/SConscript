@@ -571,6 +571,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/multitenancy',
+        '$BUILD_DIR/mongo/db/storage/storage_options',
         'durable_catalog_impl',
         'kv/kv_drop_pending_ident_reaper',
     ],

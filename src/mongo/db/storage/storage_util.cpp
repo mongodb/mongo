@@ -41,6 +41,7 @@
 #include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -121,7 +122,8 @@ void removeIndex(OperationContext* opCtx,
     const bool isTwoPhaseDrop =
         storageEngine->supportsPendingDrops() && dataRemoval == DataRemoval::kTwoPhase;
 
-    if (isTwoPhaseDrop) {
+    // TODO SERVER-68674: Remove feature flag check.
+    if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV() && isTwoPhaseDrop) {
         invariant(entry);
         CollectionCatalog::get(opCtx)->dropIndex(
             opCtx, collection->ns(), entry, /*isDropPending=*/true);
@@ -141,7 +143,9 @@ void removeIndex(OperationContext* opCtx,
             [svcCtx, storageEngine, nss, ident = ident->getIdent(), isTwoPhaseDrop] {
                 removeEmptyDirectory(svcCtx, storageEngine, nss);
 
-                if (isTwoPhaseDrop) {
+                // TODO SERVER-68674: Remove feature flag check.
+                if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV() &&
+                    isTwoPhaseDrop) {
                     CollectionCatalog::write(svcCtx, [&](CollectionCatalog& catalog) {
                         catalog.notifyIdentDropped(ident);
                     });
@@ -207,7 +211,9 @@ Status dropCollection(OperationContext* opCtx,
                 [svcCtx, storageEngine, nss, ident = ident->getIdent()] {
                     removeEmptyDirectory(svcCtx, storageEngine, nss);
 
-                    if (storageEngine->supportsPendingDrops()) {
+                    // TODO SERVER-68674: Remove feature flag check.
+                    if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV() &&
+                        storageEngine->supportsPendingDrops()) {
                         CollectionCatalog::write(svcCtx, [&](CollectionCatalog& catalog) {
                             catalog.notifyIdentDropped(ident);
                         });

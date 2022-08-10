@@ -40,6 +40,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot_helper.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"
@@ -1219,7 +1220,8 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(OperationCon
     invariant(_collections.find(ns) != _collections.end());
     invariant(_orderedCollections.find(dbIdPair) != _orderedCollections.end());
 
-    if (isDropPending) {
+    // TODO SERVER-68674: Remove feature flag check.
+    if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV() && isDropPending) {
         auto ident = coll->getSharedIdent()->getIdent();
         LOGV2_DEBUG(6825300, 1, "Registering drop pending collection ident", "ident"_attr = ident);
 
@@ -1346,7 +1348,8 @@ void CollectionCatalog::clearViews(OperationContext* opCtx, const DatabaseName& 
 void CollectionCatalog::deregisterIndex(OperationContext* opCtx,
                                         std::shared_ptr<IndexCatalogEntry> indexEntry,
                                         bool isDropPending) {
-    if (!isDropPending) {
+    // TODO SERVER-68674: Remove feature flag check.
+    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV() || !isDropPending) {
         // No-op.
         return;
     }
