@@ -91,21 +91,6 @@ structs:
                 type: namespacestring
                 description: "The full namespace (with the database prefix)."
                 optional: false
-            epoch:
-                type: objectid
-                optional: false
-                description: "Uniquely identifies this instance of the collection, in case of
-                              drop/create or shard key refine."
-            timestamp:
-                type: timestamp
-                optional: false
-                description: "Uniquely identifies this incarnation of the collection. Only changes
-                              in case of drop and create, or shard key refine.
-                              This field will store the ClusterTime of the Config Server when the
-                              collection was created or it's shard key last refined. Because
-                              timestamps are comparable, we are able to define a total order in time
-                              in the collection. This field will replace Epoch, which are not
-                              comparable."
             uuid:
                 type: uuid
                 description: "The UUID that will be used to create the local collection on each of
@@ -125,26 +110,6 @@ structs:
                 type: bool
                 description: "Uniqueness of the sharding key."
                 optional: false
-            refreshing:
-                type: bool
-                description: "Set by primaries and used by shard secondaries to safely refresh chunk
-                              metadata. Indicates whether the chunks collection is current being
-                              updated, which means read results won't provide a complete view of the
-                              chunk metadata."
-                optional: true
-            lastRefreshedCollectionVersion:
-                type: timestamp
-                cpp_name: lastRefreshedCollectionMajorMinorVersion
-                description: "Set by primaries and used by shard secondaries to safely refresh chunk
-                              metadata. Indicates the collection version of the last complete chunk
-                              metadata refresh, and is used to indicate if a refresh occurred if the
-                              value is different than when the caller last checked -- because
-                              'refreshing' will be false both before and after a refresh occurs."
-                optional: true
-            enterCriticalSectionCounter:
-                type: int
-                description: "Currently just an OpObserver signal, thus otherwise ignored."
-                optional: true
             reshardingFields:
                 description: "Resharding-related fields. Only set when this collection is either the
                               original collection undergoing a resharding operation or this
@@ -176,4 +141,41 @@ structs:
                 type: TypeCollectionTimeseriesFields
                 description: "Time-series collection fields. Only set when this is a time-series
                               buckets collection."
+                optional: true
+
+            # What follows below are fields which control DDL operations on the collection object
+
+            enterCriticalSectionCounter:
+                type: int
+                description: "Currently just an OpObserver signal, thus otherwise ignored."
+                optional: true
+            refreshing:
+                type: bool
+                description: "Set by primaries and used by shard secondaries to safely refresh chunk
+                              metadata. Indicates whether the chunks collection is current being
+                              updated, which means read results won't provide a complete view of the
+                              chunk metadata."
+                optional: true
+            epoch:
+                type: objectid
+                description: "Uniquely identifies this instance of the collection, in case of
+                              drop/create or shard key refine."
+                optional: false
+            timestamp:
+                type: timestamp
+                description: "Uniquely identifies this incarnation of the collection. Only changes
+                              in case of drop and create, or shard key refine.
+                              This field will store the ClusterTime of the Config Server when the
+                              collection was created or it's shard key last refined. Because
+                              timestamps are comparable, we are able to define a total order in time
+                              in the collection. This field will replace Epoch, which are not
+                              comparable."
+            lastRefreshedCollectionVersion:
+                type: timestamp
+                cpp_name: lastRefreshedCollectionMajorMinorVersion
+                description: "Set by primaries and used by shard secondaries to safely refresh chunk
+                              metadata. Indicates the collection version of the last complete chunk
+                              metadata refresh, and is used to indicate if a refresh occurred if the
+                              value is different than when the caller last checked -- because
+                              'refreshing' will be false both before and after a refresh occurs."
                 optional: true

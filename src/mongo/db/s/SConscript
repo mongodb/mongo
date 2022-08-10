@@ -148,6 +148,8 @@ env.Library(
         'start_chunk_clone_request.cpp',
         'type_shard_collection.cpp',
         'type_shard_collection.idl',
+        'type_shard_database.cpp',
+        'type_shard_database.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/remote_command_targeter',

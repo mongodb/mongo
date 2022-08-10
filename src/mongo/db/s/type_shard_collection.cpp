@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/type_shard_collection.h"
 
 namespace mongo {
@@ -40,11 +38,11 @@ ShardCollectionType::ShardCollectionType(NamespaceString nss,
                                          KeyPattern keyPattern,
                                          bool unique)
     : ShardCollectionTypeBase(std::move(nss),
-                              std::move(epoch),
-                              std::move(timestamp),
                               std::move(uuid),
                               std::move(keyPattern),
-                              unique) {}
+                              unique,
+                              std::move(epoch),
+                              std::move(timestamp)) {}
 
 ShardCollectionType::ShardCollectionType(const BSONObj& obj) {
     ShardCollectionTypeBase::parseProtected(IDLParserContext("ShardCollectionType"), obj);

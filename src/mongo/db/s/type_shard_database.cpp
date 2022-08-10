@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,25 +27,12 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/s/type_shard_database_gen.h"
+#include "mongo/db/s/type_shard_database.h"
 
 namespace mongo {
 
-class ShardDatabaseType : private ShardDatabaseTypeBase {
-public:
-    // Make field names accessible.
-    using ShardDatabaseTypeBase::kEnterCriticalSectionCounterFieldName;
-    using ShardDatabaseTypeBase::kNameFieldName;
-
-    // Make getters and setters accessible.
-    using ShardDatabaseTypeBase::getName;
-    using ShardDatabaseTypeBase::getPrimary;
-    using ShardDatabaseTypeBase::getSharded;
-    using ShardDatabaseTypeBase::getVersion;
-
-    explicit ShardDatabaseType(const BSONObj& obj);
-};
+ShardDatabaseType::ShardDatabaseType(const BSONObj& obj) {
+    ShardDatabaseTypeBase::parseProtected(IDLParserContext("ShardDatabaseTypeBase"), obj);
+}
 
 }  // namespace mongo

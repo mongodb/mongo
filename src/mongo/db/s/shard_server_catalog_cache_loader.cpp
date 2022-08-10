@@ -772,7 +772,18 @@ StatusWith<DatabaseType> ShardServerCatalogCacheLoader::_runSecondaryGetDatabase
                               "and replication of database",
                               "db"_attr = dbName,
                               "duration"_attr = Milliseconds(t.millis()));
-    return readShardDatabasesEntry(opCtx, dbName);
+    auto swShardDatabase = readShardDatabasesEntry(opCtx, dbName);
+    if (!swShardDatabase.isOK())
+        return swShardDatabase.getStatus();
+
+    const auto& shardDatabase = swShardDatabase.getValue();
+    DatabaseType dbt;
+    dbt.setName(shardDatabase.getName());
+    dbt.setPrimary(shardDatabase.getPrimary());
+    dbt.setSharded(shardDatabase.getSharded());
+    dbt.setVersion(shardDatabase.getVersion());
+
+    return dbt;
 }
 
 StatusWith<DatabaseType> ShardServerCatalogCacheLoader::_schedulePrimaryGetDatabase(
