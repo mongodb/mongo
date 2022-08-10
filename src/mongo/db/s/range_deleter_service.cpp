@@ -31,6 +31,7 @@
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/s/range_deleter_service_op_observer.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingRangeDeleter
 
@@ -47,6 +48,10 @@ RangeDeleterService* RangeDeleterService::get(OperationContext* opCtx) {
 }
 
 void RangeDeleterService::onStepUpComplete(OperationContext* opCtx, long long term) {
+    if (!feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
+        return;
+    }
+
     auto lock = _acquireMutexUnconditionally();
     dassert(_state.load() == kDown, "Service expected to be down before stepping up");
 
@@ -83,6 +88,10 @@ void RangeDeleterService::_recoverRangeDeletionsOnStepUp() {
 }
 
 void RangeDeleterService::onStepDown() {
+    if (!feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
+        return;
+    }
+
     auto lock = _acquireMutexUnconditionally();
     dassert(_state.load() != kDown, "Service expected to be initializing/up before stepping down");
 
@@ -205,7 +214,7 @@ SharedSemiFuture<void> RangeDeleterService::getOverlappingRangeDeletionsFuture(
 
     std::vector<ExecutorFuture<void>> overlappingRangeDeletionsFutures;
 
-    auto rangeDeletions = mapEntry->second;
+    auto& rangeDeletions = mapEntry->second;
     const auto rangeSharedPtr = std::make_shared<ChunkRange>(range);
     auto forwardIt = rangeDeletions.lower_bound(rangeSharedPtr);
     if (forwardIt != rangeDeletions.begin()) {

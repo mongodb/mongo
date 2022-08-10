@@ -114,7 +114,9 @@ public:
         : _opCtx(opCtx), _task(std::move(task)) {}
 
     void commit(boost::optional<Timestamp>) override {
-        migrationutil::submitRangeDeletionTask(_opCtx, _task).getAsync([](auto) {});
+        if (!feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
+            migrationutil::submitRangeDeletionTask(_opCtx, _task).getAsync([](auto) {});
+        }
     }
 
     void rollback() override {}

@@ -38,9 +38,11 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/range_arithmetic.h"
 #include "mongo/db/s/migration_util.h"
+#include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/time_support.h"
@@ -375,15 +377,23 @@ SharedSemiFuture<void> MetadataManager::_submitRangeForDeletion(
     const ChunkRange& range,
     const UUID& migrationId,
     Seconds delayForActiveQueriesOnSecondariesToComplete) {
-    auto cleanupComplete =
-        removeDocumentsInRange(_executor,
-                               std::move(waitForActiveQueriesToComplete),
-                               _nss,
-                               _metadata.back()->metadata->getChunkManager()->getUUID(),
-                               _metadata.back()->metadata->getKeyPattern().getOwned(),
-                               range,
-                               migrationId,
-                               delayForActiveQueriesOnSecondariesToComplete);
+    auto cleanupComplete = [&]() {
+        const auto collUUID = _metadata.back()->metadata->getChunkManager()->getUUID();
+
+        if (feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
+            return RangeDeleterService::get(_serviceContext)
+                ->getOverlappingRangeDeletionsFuture(collUUID, range);
+        }
+
+        return removeDocumentsInRange(_executor,
+                                      std::move(waitForActiveQueriesToComplete),
+                                      _nss,
+                                      collUUID,
+                                      _metadata.back()->metadata->getKeyPattern().getOwned(),
+                                      range,
+                                      migrationId,
+                                      delayForActiveQueriesOnSecondariesToComplete);
+    }();
 
     _rangesScheduledForDeletion.emplace_front(range, cleanupComplete);
     // Attach a continuation so that once the range has been deleted, we will remove the deletion

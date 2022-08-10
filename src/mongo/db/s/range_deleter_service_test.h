@@ -30,6 +30,7 @@
 
 #include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 
 namespace mongo {
 
@@ -81,6 +82,9 @@ public:
     const UUID uuidCollB = UUID::gen();
     RangeDeletionWithOngoingQueries rangeDeletionTask0ForCollB =
         createRangeDeletionTaskWithOngoingQueries(uuidCollB, BSON("a" << 0), BSON("a" << 10));
+
+private:
+    RAIIServerParameterControllerForTest enableFeatureFlag{"featureFlagRangeDeleterService", true};
 };
 
 }  // namespace mongo

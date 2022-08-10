@@ -15,3 +15,6 @@
 # Disable 'featureFlagServerlessChangeStreams' until the change collection becomes stable.
 # TODO SERVER-67267 remove the flag.
 - featureFlagServerlessChangeStreams
+
+# Disable 'featureFlagRangeDeleterService' as long as the service is not performing actual range deletions
+- featureFlagRangeDeleterService
