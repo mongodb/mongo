@@ -86,13 +86,13 @@ class ResmokeSymbolizer:
         if dbpath is None:
             return
 
-        test.logger.info("Looking for stacktrace files in '%s'", dbpath)
-        files = self.collect_stacktrace_files(dbpath)
-        if not files:
-            test.logger.info("No failure logs/stacktrace files found, skipping symbolization")
-            return
-
         with _lock:
+            test.logger.info("Looking for stacktrace files in '%s'", dbpath)
+            files = self.collect_stacktrace_files(dbpath)
+            if not files:
+                test.logger.info("No failure logs/stacktrace files found, skipping symbolization")
+                return
+
             test.logger.info("Found stacktrace files. \nBEGIN Symbolization")
             test.logger.info("Stacktrace files: %s", files)
 
