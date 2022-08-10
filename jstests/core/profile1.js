@@ -2,7 +2,6 @@
 //   assumes_superuser_permissions,
 //   creates_and_authenticates_user,
 //   does_not_support_stepdowns,
-//   no_selinux,
 //   requires_capped,
 //   requires_collstats,
 //   requires_non_retryable_commands,
@@ -21,14 +20,6 @@ function profileCursor(query) {
     return db.system.profile.find(query);
 }
 
-function getProfileAString() {
-    var s = "\n";
-    profileCursor().forEach(function(z) {
-        s += tojson(z) + " ,\n";
-    });
-    return s;
-}
-
 function resetProfile(level, slowms) {
     db.setProfilingLevel(0);
     db.system.profile.drop();
@@ -45,6 +36,8 @@ db.dropDatabase();
 
 try {
     db.createUser({user: username, pwd: "password", roles: jsTest.basicUserRoles});
+
+    db.logout();
     db.auth(username, "password");
 
     // expect error given unrecognized options
@@ -116,6 +109,7 @@ try {
 } finally {
     // disable profiling for subsequent tests
     assert.commandWorked(db.runCommand({profile: 0}));
+    db.logout();
     db = stddb;
 }
 }());

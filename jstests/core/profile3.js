@@ -1,7 +1,6 @@
 // @tags: [
 //   assumes_superuser_permissions,
 //   creates_and_authenticates_user,
-//   no_selinux,
 //   requires_profiling,
 //   # This test depends on hardcoded database name equality.
 //   tenant_migration_incompatible,
@@ -24,6 +23,8 @@ profileCursor = function(query) {
 try {
     username = "jstests_profile3_user";
     db.createUser({user: username, pwd: "password", roles: jsTest.basicUserRoles});
+
+    db.logout();
     db.auth(username, "password");
 
     db.setProfilingLevel(0);
@@ -52,5 +53,6 @@ try {
 
 } finally {
     db.setProfilingLevel(0);
+    db.logout();
     db = stddb;
 }

@@ -34,6 +34,7 @@ var a = mydb.getMongo().getDB("admin");
 a.dropAllUsers();
 pass = "c" + Math.random();
 a.createUser({user: "super", pwd: pass, roles: jsTest.adminUserRoles});
+
 assert(a.auth("super", pass), "auth failed");
 assert(!a.auth("super", pass + "a"), "auth should have failed");
 
@@ -61,3 +62,7 @@ assert.eq(before, after, "C4");
 
 // Clean up after ourselves so other tests using authentication don't get messed up.
 mydb.dropAllUsers();
+mydb.logout();
+
+a.dropAllUsers();
+a.logout();
