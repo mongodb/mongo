@@ -105,6 +105,11 @@ function(create_test_executable target)
         target_link_libraries(${target} windows_shim)
     endif()
 
+    if(ENABLE_TCMALLOC)
+        # Order matters on linking as WT lib depends on tcmalloc when enabled.
+        target_link_libraries(${target} wt::wiredtiger wt::tcmalloc)
+    endif()
+
     # Install any additional files, scripts, etc in the output test binary
     # directory. Useful if we need to setup an additional wrappers needed to run the test
     # executable.

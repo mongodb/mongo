@@ -72,9 +72,6 @@ macro(define_wiredtiger_library target type)
     if(ENABLE_MEMKIND)
         target_link_libraries(${target} PRIVATE wt::memkind)
     endif()
-    if(ENABLE_TCMALLOC)
-        target_link_libraries(${target} PRIVATE wt::tcmalloc)
-    endif()
 
     # We want to capture any transitive dependencies associated with the builtin library
     # target and ensure we are explicitly linking the 3rd party libraries.
