@@ -37,7 +37,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/dist_lock_manager.h"
+#include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_concern.h"
@@ -113,7 +113,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
 
     DBDirectClient client(opCtx);
 
-    boost::optional<DistLockManager::ScopedLock> dbLock;
+    boost::optional<DDLLockManager::ScopedLock> dbLock;
 
     const auto dbMatchFilter = [&] {
         BSONObjBuilder filterBuilder;
@@ -143,8 +143,8 @@ DatabaseType ShardingCatalogManager::createDatabase(
 
         // Do another loop, with the db lock held in order to avoid taking the expensive path on
         // concurrent create database operations
-        dbLock.emplace(DistLockManager::get(opCtx)->lock(
-            opCtx, dbName, "createDatabase" /* reason */, DistLockManager::kDefaultLockTimeout));
+        dbLock.emplace(DDLLockManager::get(opCtx)->lock(
+            opCtx, dbName, "createDatabase" /* reason */, DDLLockManager::kDefaultLockTimeout));
     }
 
     // Expensive createDatabase code path

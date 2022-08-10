@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/s/dist_lock_manager.h"
+#include "mongo/db/s/ddl_lock_manager.h"
 
 namespace mongo {
 
@@ -50,10 +50,10 @@ public:
 
 private:
     struct ReferenceCountedLock {
-        ReferenceCountedLock(DistLockManager::ScopedLock&& lock)
+        ReferenceCountedLock(DDLLockManager::ScopedLock&& lock)
             : lock(std::move(lock)), references(1) {}
 
-        DistLockManager::ScopedLock lock;
+        DDLLockManager::ScopedLock lock;
         int references;
     };
 

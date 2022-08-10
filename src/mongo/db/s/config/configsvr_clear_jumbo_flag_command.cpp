@@ -35,7 +35,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/s/dist_lock_manager.h"
+#include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
@@ -70,10 +70,10 @@ public:
             const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
             // Acquire distlocks on the namespace's database and collection.
-            const auto dbDDLock = DistLockManager::get(opCtx)->lock(
-                opCtx, nss.db(), "clearJumboFlag", DistLockManager::kDefaultLockTimeout);
-            const auto collDDLLock = DistLockManager::get(opCtx)->lock(
-                opCtx, nss.ns(), "clearJumboFlag", DistLockManager::kDefaultLockTimeout);
+            const auto dbDDLock = DDLLockManager::get(opCtx)->lock(
+                opCtx, nss.db(), "clearJumboFlag", DDLLockManager::kDefaultLockTimeout);
+            const auto collDDLLock = DDLLockManager::get(opCtx)->lock(
+                opCtx, nss.ns(), "clearJumboFlag", DDLLockManager::kDefaultLockTimeout);
 
             CollectionType collType;
             try {

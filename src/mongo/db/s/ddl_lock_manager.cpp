@@ -28,7 +28,7 @@
  */
 
 
-#include "mongo/db/s/dist_lock_manager.h"
+#include "mongo/db/s/ddl_lock_manager.h"
 
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
@@ -42,25 +42,25 @@ namespace {
 // TODO SERVER-68551: Remove once 7.0 becomes last-lts
 MONGO_FAIL_POINT_DEFINE(disableReplSetDistLockManager);
 
-const auto distLockManagerDecorator = ServiceContext::declareDecoration<DistLockManager>();
+const auto ddlLockManagerDecorator = ServiceContext::declareDecoration<DDLLockManager>();
 
 }  // namespace
 
-const Minutes DistLockManager::kDefaultLockTimeout(5);
-const Milliseconds DistLockManager::kSingleLockAttemptTimeout(0);
+const Minutes DDLLockManager::kDefaultLockTimeout(5);
+const Milliseconds DDLLockManager::kSingleLockAttemptTimeout(0);
 
-DistLockManager* DistLockManager::get(ServiceContext* service) {
-    return &distLockManagerDecorator(service);
+DDLLockManager* DDLLockManager::get(ServiceContext* service) {
+    return &ddlLockManagerDecorator(service);
 }
 
-DistLockManager* DistLockManager::get(OperationContext* opCtx) {
+DDLLockManager* DDLLockManager::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
-DistLockManager::ScopedLock DistLockManager::lock(OperationContext* opCtx,
-                                                  StringData ns,
-                                                  StringData reason,
-                                                  Milliseconds waitFor) {
+DDLLockManager::ScopedLock DDLLockManager::lock(OperationContext* opCtx,
+                                                StringData ns,
+                                                StringData reason,
+                                                Milliseconds timeout) {
     stdx::unique_lock<Latch> lock(_mutex);
     auto iter = _inProgressMap.find(ns);
 
@@ -71,12 +71,12 @@ DistLockManager::ScopedLock DistLockManager::lock(OperationContext* opCtx,
         nsLock->numWaiting++;
         ScopeGuard guard([&] { nsLock->numWaiting--; });
         if (!opCtx->waitForConditionOrInterruptFor(
-                nsLock->cvLocked, lock, waitFor, [nsLock]() { return !nsLock->isInProgress; })) {
+                nsLock->cvLocked, lock, timeout, [nsLock]() { return !nsLock->isInProgress; })) {
             using namespace fmt::literals;
             uasserted(
                 ErrorCodes::LockBusy,
                 "Failed to acquire DDL lock for namespace '{}' after {} that is currently locked with reason '{}'"_format(
-                    ns, waitFor.toString(), reason));
+                    ns, timeout.toString(), reason));
         }
         guard.dismiss();
         nsLock->reason = reason.toString();
@@ -87,19 +87,19 @@ DistLockManager::ScopedLock DistLockManager::lock(OperationContext* opCtx,
     return {ns, reason, this};
 }
 
-DistLockManager::ScopedLock::ScopedLock(StringData ns,
-                                        StringData reason,
-                                        DistLockManager* distLockManager)
-    : _ns(ns.toString()), _reason(reason.toString()), _lockManager(distLockManager) {}
+DDLLockManager::ScopedLock::ScopedLock(StringData ns,
+                                       StringData reason,
+                                       DDLLockManager* lockManager)
+    : _ns(ns.toString()), _reason(reason.toString()), _lockManager(lockManager) {}
 
-DistLockManager::ScopedLock::ScopedLock(ScopedLock&& other)
+DDLLockManager::ScopedLock::ScopedLock(ScopedLock&& other)
     : _ns(std::move(other._ns)),
       _reason(std::move(other._reason)),
       _lockManager(other._lockManager) {
     other._lockManager = nullptr;
 }
 
-DistLockManager::ScopedLock::~ScopedLock() {
+DDLLockManager::ScopedLock::~ScopedLock() {
     if (_lockManager) {
         stdx::unique_lock<Latch> lock(_lockManager->_mutex);
         auto iter = _lockManager->_inProgressMap.find(_ns);

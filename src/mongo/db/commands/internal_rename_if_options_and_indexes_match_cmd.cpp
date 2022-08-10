@@ -38,7 +38,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
-#include "mongo/db/s/dist_lock_manager.h"
+#include "mongo/db/s/ddl_lock_manager.h"
 
 namespace mongo {
 MONGO_FAIL_POINT_DEFINE(blockBeforeInternalRenameIfOptionsAndIndexesMatch);
@@ -88,11 +88,11 @@ public:
             // collections.
             // - Check safely if the target collection is sharded or not.
             static constexpr StringData lockReason{"internalRenameCollection"_sd};
-            auto distLockManager = DistLockManager::get(opCtx);
-            auto fromCollDDLLock = distLockManager->lock(
-                opCtx, fromNss.ns(), lockReason, DistLockManager::kDefaultLockTimeout);
-            auto toCollDDLLock = distLockManager->lock(
-                opCtx, toNss.ns(), lockReason, DistLockManager::kDefaultLockTimeout);
+            auto ddlLockManager = DDLLockManager::get(opCtx);
+            auto fromCollDDLLock = ddlLockManager->lock(
+                opCtx, fromNss.ns(), lockReason, DDLLockManager::kDefaultLockTimeout);
+            auto toCollDDLLock = ddlLockManager->lock(
+                opCtx, toNss.ns(), lockReason, DDLLockManager::kDefaultLockTimeout);
 
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << "cannot rename to sharded collection '" << toNss << "'",

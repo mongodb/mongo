@@ -34,7 +34,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/s/database_sharding_state.h"
-#include "mongo/db/s/dist_lock_manager.h"
+#include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
@@ -153,13 +153,13 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
                 return timeoutMillisecs;
             }
         }
-        return DistLockManager::kDefaultLockTimeout;
+        return DDLLockManager::kDefaultLockTimeout;
     }();
 
     static constexpr StringData lockReason{"dropIndexes"_sd};
 
-    auto distLockManager = DistLockManager::get(opCtx);
-    auto dbDDLLock = distLockManager->lock(opCtx, ns().db(), lockReason, lockTimeout);
+    auto ddlLockManager = DDLLockManager::get(opCtx);
+    auto dbDDLLock = ddlLockManager->lock(opCtx, ns().db(), lockReason, lockTimeout);
 
     // Check under the dbLock if this is still the primary shard for the database
     catalog_helper::assertIsPrimaryShardForDb(opCtx, ns().db());
@@ -177,7 +177,7 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
         resolvedNs = ns().makeTimeseriesBucketsNamespace();
     }
 
-    auto collDDLLock = distLockManager->lock(opCtx, resolvedNs.ns(), lockReason, lockTimeout);
+    auto collDDLLock = ddlLockManager->lock(opCtx, resolvedNs.ns(), lockReason, lockTimeout);
 
     StaleConfigRetryState retryState;
     return shardVersionRetry(

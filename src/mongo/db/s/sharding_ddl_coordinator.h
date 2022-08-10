@@ -35,7 +35,7 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
-#include "mongo/db/s/dist_lock_manager.h"
+#include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
@@ -170,7 +170,7 @@ private:
     SharedPromise<void> _constructionCompletionPromise;
     SharedPromise<void> _completionPromise;
 
-    std::stack<DistLockManager::ScopedLock> _scopedLocks;
+    std::stack<DDLLockManager::ScopedLock> _scopedLocks;
 };
 
 template <class StateDoc>

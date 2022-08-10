@@ -514,7 +514,7 @@ collections, such as config.shards, config.chunks, and config.tags. For example,
 mergeChunks, and moveChunk all take the chunk ResourceMutex.
 
 #### Code references
-* [**DistLockManager class**](https://github.com/mongodb/mongo/blob/master/src/mongo/db/s/dist_lock_manager.h)
+* [**DDLLockManager class**](https://github.com/mongodb/mongo/blob/master/src/mongo/db/s/ddl_lock_manager.h)
 * The
 [**global ResourceMutexes**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/s/config/sharding_catalog_manager.h#L555-L581)
 

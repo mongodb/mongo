@@ -185,8 +185,8 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveChunkCommand) {
         auto opCtx = Client::getCurrent()->getOperationContext();
         const std::string whyMessage(str::stream()
                                      << "Test acquisition of distLock for " << kNss.ns());
-        ASSERT_DOES_NOT_THROW(DistLockManager::get(opCtx)->lock(
-            opCtx, kNss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout));
+        ASSERT_DOES_NOT_THROW(DDLLockManager::get(opCtx)->lock(
+            opCtx, kNss.ns(), whyMessage, DDLLockManager::kSingleLockAttemptTimeout));
     }
     deferredCleanupCompletedCheckpoint->setMode(FailPoint::off, 0);
     _scheduler.stop();
@@ -219,8 +219,8 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveRangeCommand) {
         auto opCtx = Client::getCurrent()->getOperationContext();
         const std::string whyMessage(str::stream()
                                      << "Test acquisition of distLock for " << kNss.ns());
-        ASSERT_DOES_NOT_THROW(DistLockManager::get(opCtx)->lock(
-            opCtx, kNss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout));
+        ASSERT_DOES_NOT_THROW(DDLLockManager::get(opCtx)->lock(
+            opCtx, kNss.ns(), whyMessage, DDLLockManager::kSingleLockAttemptTimeout));
     }
     deferredCleanupCompletedCheckpoint->setMode(FailPoint::off, 0);
     _scheduler.stop();
@@ -355,8 +355,8 @@ TEST_F(BalancerCommandsSchedulerTest, CommandFailsWhenNetworkReturnsError) {
         auto opCtx = Client::getCurrent()->getOperationContext();
         const std::string whyMessage(str::stream()
                                      << "Test acquisition of distLock for " << kNss.ns());
-        ASSERT_DOES_NOT_THROW(DistLockManager::get(opCtx)->lock(
-            opCtx, kNss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout));
+        ASSERT_DOES_NOT_THROW(DDLLockManager::get(opCtx)->lock(
+            opCtx, kNss.ns(), whyMessage, DDLLockManager::kSingleLockAttemptTimeout));
     }
     deferredCleanupCompletedCheckpoint->setMode(FailPoint::off, 0);
     _scheduler.stop();
@@ -374,8 +374,8 @@ TEST_F(BalancerCommandsSchedulerTest, CommandFailsWhenSchedulerIsStopped) {
         auto opCtx = Client::getCurrent()->getOperationContext();
         const std::string whyMessage(str::stream()
                                      << "Test acquisition of distLock for " << kNss.ns());
-        ASSERT_DOES_NOT_THROW(DistLockManager::get(opCtx)->lock(
-            opCtx, kNss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout));
+        ASSERT_DOES_NOT_THROW(DDLLockManager::get(opCtx)->lock(
+            opCtx, kNss.ns(), whyMessage, DDLLockManager::kSingleLockAttemptTimeout));
     }
 }
 
@@ -401,8 +401,8 @@ TEST_F(BalancerCommandsSchedulerTest, CommandCanceledIfUnsubmittedBeforeBalancer
         auto opCtx = Client::getCurrent()->getOperationContext();
         const std::string whyMessage(str::stream()
                                      << "Test acquisition of distLock for " << kNss.ns());
-        ASSERT_DOES_NOT_THROW(DistLockManager::get(opCtx)->lock(
-            opCtx, kNss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout));
+        ASSERT_DOES_NOT_THROW(DDLLockManager::get(opCtx)->lock(
+            opCtx, kNss.ns(), whyMessage, DDLLockManager::kSingleLockAttemptTimeout));
     }
 }
 
@@ -503,8 +503,8 @@ TEST_F(BalancerCommandsSchedulerTest, DistLockPreventsMoveChunkWithConcurrentDDL
         opCtx = Client::getCurrent()->getOperationContext();
         const std::string whyMessage(str::stream()
                                      << "Test acquisition of distLock for " << kNss.ns());
-        auto scopedDistLock = DistLockManager::get(opCtx)->lock(
-            opCtx, kNss.ns(), whyMessage, DistLockManager::kSingleLockAttemptTimeout);
+        auto scopedDDLLock = DDLLockManager::get(opCtx)->lock(
+            opCtx, kNss.ns(), whyMessage, DDLLockManager::kSingleLockAttemptTimeout);
         failpoint->setMode(FailPoint::Mode::off);
         MigrateInfo migrateInfo = makeMigrationInfo(0, kShardId1, kShardId0);
         auto futureResponse = _scheduler.requestMoveChunk(operationContext(),

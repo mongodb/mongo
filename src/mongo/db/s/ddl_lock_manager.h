@@ -37,22 +37,9 @@
 namespace mongo {
 
 /**
- * Interface for handling distributed locks.
- *
- * Usage:
- *
- * auto scopedDistLock = mgr->lock(...);
- *
- * if (!scopedDistLock.isOK()) {
- *   // Did not get lock. scopedLockStatus destructor will not call unlock.
- * }
- *
- * if (!status.isOK()) {
- *   // Someone took over the lock! Unlock will still be called at destructor, but will
- *   // practically be a no-op since it doesn't own the lock anymore.
- * }
+ * Service to manage DDL locks.
  */
-class DistLockManager {
+class DDLLockManager {
 public:
     // Default timeout which will be used if one is not passed to the lock method.
     static const Minutes kDefaultLockTimeout;
@@ -62,14 +49,14 @@ public:
     static const Milliseconds kSingleLockAttemptTimeout;
 
     /**
-     * RAII type for the local lock.
+     * RAII type for the DDL lock.
      */
     class ScopedLock {
         ScopedLock(const ScopedLock&) = delete;
         ScopedLock& operator=(const ScopedLock&) = delete;
 
     public:
-        ScopedLock(StringData lockName, StringData reason, DistLockManager* distLockManager);
+        ScopedLock(StringData lockName, StringData reason, DDLLockManager* lockManager);
         ~ScopedLock();
 
         ScopedLock(ScopedLock&& other);
@@ -84,35 +71,34 @@ public:
     private:
         std::string _ns;
         std::string _reason;
-        DistLockManager* _lockManager;
+        DDLLockManager* _lockManager;
     };
 
-    DistLockManager() = default;
-    ~DistLockManager() = default;
+    DDLLockManager() = default;
+    ~DDLLockManager() = default;
 
     /**
-     * Retrieves the DistLockManager singleton for the node.
+     * Retrieves the DDLLockManager singleton.
      */
-    static DistLockManager* get(ServiceContext* service);
-    static DistLockManager* get(OperationContext* opCtx);
+    static DDLLockManager* get(ServiceContext* service);
+    static DDLLockManager* get(OperationContext* opCtx);
 
     /**
-     * Tries multiple times to lock, using the specified lock try interval, until
-     * a certain amount of time has passed or when any error that is not LockBusy
-     * occurred.
+     * Returns a RAII style lock on the given namespace @ns.
      *
-     * waitFor = 0 indicates there should only be one attempt to acquire the lock, and
-     * no waiting.
-     * waitFor = -1 indicates we should retry indefinitely.
+     * @ns		Namespace to lock (both database and collections).
+     * @reason 	Reson for which the lock is being acquired (e.g. 'createCollection').
+     * @timeout Time after which this acquisition attempt will give up in case of lock contention.
+     * 			A timeout value of -1 means the acquisition will be retried forever.
      *
-     * Returns OK if the lock was successfully acquired.
-     * Returns ErrorCodes::DistributedClockSkewed when a clock skew is detected.
-     * Returns ErrorCodes::LockBusy if the lock is being held.
+     *
+     * Throws ErrorCodes::LockBusy in case the timeout is reached.
+     * Throws ErrorCategory::Interruption in case the opeartion context is interrupted.
      */
     ScopedLock lock(OperationContext* opCtx,
-                    StringData name,
-                    StringData whyMessage,
-                    Milliseconds waitFor);
+                    StringData ns,
+                    StringData reason,
+                    Milliseconds timeout);
 
 protected:
     struct NSLock {
@@ -124,7 +110,7 @@ protected:
         std::string reason;
     };
 
-    Mutex _mutex = MONGO_MAKE_LATCH("NamespaceSerializer::_mutex");
+    Mutex _mutex = MONGO_MAKE_LATCH("DDLLockManager::_mutex");
     StringMap<std::shared_ptr<NSLock>> _inProgressMap;
 };
 

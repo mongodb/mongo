@@ -43,13 +43,13 @@ Status BalancerDistLocks::acquireFor(OperationContext* opCtx, const NamespaceStr
         ++it->second.references;
         return Status::OK();
     } else {
-        boost::optional<DistLockManager::ScopedLock> scopedLock;
+        boost::optional<DDLLockManager::ScopedLock> scopedLock;
         try {
             scopedLock.emplace(
-                DistLockManager::get(opCtx)->lock(opCtx,
-                                                  nss.ns(),
-                                                  "moveRange" /* reason */,
-                                                  DistLockManager::kSingleLockAttemptTimeout));
+                DDLLockManager::get(opCtx)->lock(opCtx,
+                                                 nss.ns(),
+                                                 "moveRange" /* reason */,
+                                                 DDLLockManager::kSingleLockAttemptTimeout));
         } catch (const DBException& ex) {
             return ex.toStatus(str::stream() << "Could not acquire collection lock for " << nss.ns()
                                              << " to migrate chunks");

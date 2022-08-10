@@ -199,7 +199,7 @@ ExecutorFuture<void> ShardingDDLCoordinator::_acquireLockAsync(
     return AsyncTry([this, resource = resource.toString()] {
                auto opCtxHolder = cc().makeOperationContext();
                auto* opCtx = opCtxHolder.get();
-               auto distLockManager = DistLockManager::get(opCtx);
+               auto ddlLockManager = DDLLockManager::get(opCtx);
 
                const auto coorName = DDLCoordinatorType_serializer(_coordId.getOperationType());
 
@@ -213,10 +213,10 @@ ExecutorFuture<void> ShardingDDLCoordinator::_acquireLockAsync(
                            return timeoutMillisecs;
                        }
                    }
-                   return DistLockManager::kDefaultLockTimeout;
+                   return DDLLockManager::kDefaultLockTimeout;
                }();
 
-               _scopedLocks.emplace(distLockManager->lock(opCtx, resource, coorName, lockTimeOut));
+               _scopedLocks.emplace(ddlLockManager->lock(opCtx, resource, coorName, lockTimeOut));
            })
         .until([this, resource = resource.toString()](Status status) {
             if (!status.isOK()) {

@@ -123,8 +123,8 @@ void DropDatabaseCoordinator::_dropShardedCollection(
     // Acquire the collection distributed lock in order to synchronize with an eventual ongoing
     // moveChunk and to prevent new ones from happening.
     const auto coorName = DDLCoordinatorType_serializer(_coordId.getOperationType());
-    auto collDDLLock = DistLockManager::get(opCtx)->lock(
-        opCtx, nss.ns(), coorName, DistLockManager::kDefaultLockTimeout);
+    auto collDDLLock = DDLLockManager::get(opCtx)->lock(
+        opCtx, nss.ns(), coorName, DDLLockManager::kDefaultLockTimeout);
 
     sharding_ddl_util::removeCollAndChunksMetadataFromConfig(
         opCtx, coll, ShardingCatalogClient::kMajorityWriteConcern);

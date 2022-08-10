@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/s/dist_lock_manager.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/s/sharding_test_fixture_common.h"
 

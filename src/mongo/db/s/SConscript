@@ -284,7 +284,7 @@ env.Library(
         'config/sharding_catalog_manager_zone_operations.cpp',
         'config/sharding_catalog_manager.cpp',
         'config/index_on_config.cpp',
-        'dist_lock_manager.cpp',
+        'ddl_lock_manager.cpp',
         'participant_block.idl',
         'remove_tags.idl',
         'sharded_index_catalog_commands.idl',
