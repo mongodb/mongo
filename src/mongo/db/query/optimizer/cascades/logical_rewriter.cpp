@@ -831,7 +831,8 @@ struct SubstituteConvert<EvaluationNode> {
             if (auto inputPtr = evalPathPtr->getInput().cast<Variable>();
                 inputPtr != nullptr && inputPtr->name() == scanProjName) {
                 if (auto pathKeepPtr = evalPathPtr->getPath().cast<PathKeep>();
-                    pathKeepPtr != nullptr) {
+                    pathKeepPtr != nullptr &&
+                    pathKeepPtr->getNames().size() < LogicalRewriter::kMaxPartialSchemaReqCount) {
                     // Optimization. If we are retaining fields on the root level, generate
                     // EvalNodes with the intention of converting later to a SargableNode after
                     // reordering, in order to be able to cover the fields using a physical scan or

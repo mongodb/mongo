@@ -1637,7 +1637,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinKeepFields(Arit
 
     // Build the set of fields to keep.
     StringSet keepFieldsSet;
-    for (uint8_t idx = 1; idx < arity; ++idx) {
+    for (ArityType idx = 1; idx < arity; ++idx) {
         auto [owned, tag, val] = getFromStack(idx);
 
         if (!value::isString(tag)) {

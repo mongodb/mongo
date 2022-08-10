@@ -33,7 +33,6 @@ selector:
   - jstests/core/field_name_empty.js
   - jstests/core/field_name_validation.js
   # TODO SERVER-67638
-  - jstests/core/grow_hash_table.js
   - jstests/core/profile2.js
   # TODO SERVER-67639
   - jstests/core/index_stats.js
