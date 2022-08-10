@@ -90,7 +90,6 @@ enum class TypeTags : uint8_t {
     NumberInt32,
     NumberInt64,
     NumberDouble,
-    NumberDecimal,
 
     // Date data types.
     Date,
@@ -99,6 +98,15 @@ enum class TypeTags : uint8_t {
     Boolean,
     Null,
     StringSmall,
+
+    MinKey,
+    MaxKey,
+
+    // Special marker
+    EndOfShallowValues = MaxKey,
+
+    // Heap values
+    NumberDecimal,
     StringBig,
     Array,
     ArraySet,
@@ -106,9 +114,6 @@ enum class TypeTags : uint8_t {
 
     ObjectId,
     RecordId,
-
-    MinKey,
-    MaxKey,
 
     // Raw bson values.
     bsonObject,
@@ -205,8 +210,11 @@ inline constexpr bool isCollatableType(TypeTags tag) noexcept {
     return isString(tag) || isArray(tag) || isObject(tag);
 }
 
+inline constexpr bool isShallowType(TypeTags tag) noexcept {
+    return tag <= TypeTags::EndOfShallowValues;
+}
+
 BSONType tagToType(TypeTags tag) noexcept;
-bool isShallowType(TypeTags tag) noexcept;
 
 /**
  * This function takes an SBE TypeTag, looks up the corresponding BSONType t, and then returns a
@@ -232,11 +240,27 @@ enum class SortDirection : uint8_t { Descending, Ascending };
 /**
  * Forward declarations.
  */
-void releaseValue(TypeTags tag, Value val) noexcept;
+
+/**
+ * Releases memory allocated for the value. If the value does not have any memory allocated for it,
+ * does nothing.
+ *
+ * NOTE: This function is intentionally marked as 'noexcept' and must not throw. It is used in the
+ *       destructors of several classes to implement RAII concept for values.
+ */
+void releaseValueDeep(TypeTags tag, Value val) noexcept;
 std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val);
 std::size_t hashValue(TypeTags tag,
                       Value val,
                       const CollatorInterface* collator = nullptr) noexcept;
+
+inline void releaseValue(TypeTags tag, Value val) noexcept {
+    if (!isShallowType(tag)) {
+        releaseValueDeep(tag, val);
+    } else {
+        // No action is needed to release "shallow" values.
+    }
+}
 
 /**
  * Overloads for writing values and tags to stream.
@@ -1315,15 +1339,6 @@ std::pair<TypeTags, Value> makeCopySortSpec(const SortSpec&);
 std::pair<TypeTags, Value> makeCopyCollator(const CollatorInterface& collator);
 
 std::pair<TypeTags, Value> makeCopyIndexBounds(const IndexBounds& collator);
-
-/**
- * Releases memory allocated for the value. If the value does not have any memory allocated for it,
- * does nothing.
- *
- * NOTE: This function is intentionally marked as 'noexcept' and must not throw. It is used in the
- *       destructors of several classes to implement RAII concept for values.
- */
-void releaseValue(TypeTags tag, Value val) noexcept;
 
 inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
     switch (tag) {

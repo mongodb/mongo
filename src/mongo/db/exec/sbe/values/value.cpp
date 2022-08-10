@@ -239,7 +239,7 @@ std::pair<TypeTags, Value> makeCopyIndexBounds(const IndexBounds& bounds) {
 }
 
 
-void releaseValue(TypeTags tag, Value val) noexcept {
+void releaseValueDeep(TypeTags tag, Value val) noexcept {
     switch (tag) {
         case TypeTags::RecordId:
             delete getRecordIdView(val);
@@ -388,45 +388,6 @@ BSONType tagToType(TypeTags tag) noexcept {
             return BSONType::DBRef;
         case TypeTags::bsonCodeWScope:
             return BSONType::CodeWScope;
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
-bool isShallowType(TypeTags tag) noexcept {
-    switch (tag) {
-        case TypeTags::Nothing:
-        case TypeTags::Null:
-        case TypeTags::NumberInt32:
-        case TypeTags::NumberInt64:
-        case TypeTags::NumberDouble:
-        case TypeTags::Date:
-        case TypeTags::Timestamp:
-        case TypeTags::Boolean:
-        case TypeTags::StringSmall:
-        case TypeTags::MinKey:
-        case TypeTags::MaxKey:
-        case TypeTags::bsonUndefined:
-        case TypeTags::LocalLambda:
-            return true;
-        case TypeTags::RecordId:
-        case TypeTags::NumberDecimal:
-        case TypeTags::StringBig:
-        case TypeTags::bsonString:
-        case TypeTags::bsonSymbol:
-        case TypeTags::Array:
-        case TypeTags::ArraySet:
-        case TypeTags::Object:
-        case TypeTags::ObjectId:
-        case TypeTags::bsonObjectId:
-        case TypeTags::bsonObject:
-        case TypeTags::bsonArray:
-        case TypeTags::bsonBinData:
-        case TypeTags::ksValue:
-        case TypeTags::bsonRegex:
-        case TypeTags::bsonJavascript:
-        case TypeTags::bsonDBPointer:
-            return false;
         default:
             MONGO_UNREACHABLE;
     }
