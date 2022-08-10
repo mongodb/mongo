@@ -5,6 +5,8 @@
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
  *   incompatible_with_shard_merge,
+ *   # Some tenant migration statistics field names were changed in 6.1.
+ *   requires_fcv_61,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
@@ -77,18 +79,8 @@ function testRecipientSyncDataInterrupt(interruptFunc, recipientRestarted) {
                                                       TenantMigrationTest.DonorState.kCommitted);
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 
-    tenantMigrationTest.awaitTenantMigrationStatsCounts(donorPrimary,
-                                                        {totalSuccessfulMigrationsDonated: 1});
-    recipientPrimary = tenantMigrationTest.getRecipientPrimary();  // Could change after interrupt.
-    if (!recipientRestarted) {
-        tenantMigrationTest.awaitTenantMigrationStatsCounts(recipientPrimary,
-                                                            {totalSuccessfulMigrationsReceived: 1});
-    } else {
-        // In full restart the count could be lost completely.
-        const stats = tenantMigrationTest.getTenantMigrationStats(recipientPrimary);
-        assert(1 == stats.totalSuccessfulMigrationsReceived ||
-               0 == stats.totalSuccessfulMigrationsReceived);
-    }
+    const donorStats = tenantMigrationTest.getTenantMigrationStats(donorPrimary);
+    assert.eq(1, donorStats.totalMigrationDonationsCommitted);
 
     tenantMigrationTest.stop();
     recipientRst.stopSet();

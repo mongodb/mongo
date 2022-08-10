@@ -563,44 +563,6 @@ function TenantMigrationTest({
     };
 
     /**
-     * Awaits the condition when every stats counter reaches the specified count.
-     */
-    this.awaitTenantMigrationStatsCounts = function(node, {
-        currentMigrationsDonating = 0,
-        currentMigrationsReceiving = 0,
-        totalSuccessfulMigrationsDonated = 0,
-        totalSuccessfulMigrationsReceived = 0,
-        totalFailedMigrationsDonated = 0,
-        totalFailedMigrationsReceived = 0
-    }) {
-        const check = function(expectedVal, stats, fieldName) {
-            if (expectedVal == stats[fieldName]) {
-                return true;  // Condition reached, true means the counter reached the target.
-            }
-            assert.gt(expectedVal,
-                      stats[fieldName],
-                      `Stat ${fieldName} value ${stats[fieldName]} exceeded the target`);
-            return false;
-        };
-        let stats;
-        assert.soon(() => {
-            stats = this.getTenantMigrationStats(node);
-            if (check(currentMigrationsDonating, stats, "currentMigrationsDonating") &&
-                check(currentMigrationsReceiving, stats, "currentMigrationsReceiving") &&
-                check(
-                    totalSuccessfulMigrationsDonated, stats, "totalSuccessfulMigrationsDonated") &&
-                check(totalSuccessfulMigrationsReceived,
-                      stats,
-                      "totalSuccessfulMigrationsReceived") &&
-                check(totalFailedMigrationsDonated, stats, "totalFailedMigrationsDonated") &&
-                check(totalFailedMigrationsReceived, stats, "totalFailedMigrationsReceived")) {
-                return true;  // Done.
-            }
-            return false;
-        }, `Awaiting for tenant migration stats to reach target, got ${tojson(stats)}`);
-    };
-
-    /**
      * Returns the donor ReplSetTest.
      */
     this.getDonorRst = function() {

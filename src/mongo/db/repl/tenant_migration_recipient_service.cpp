@@ -2928,7 +2928,6 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             }
 
             _cleanupOnDataSyncCompletion(status);
-            _setMigrationStatsOnCompletion(status);
 
             // Handle recipientForgetMigration.
             stdx::lock_guard lk(_mutex);
@@ -2998,35 +2997,6 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             _taskState.setState(TaskState::kDone);
         })
         .semi();
-}
-
-void TenantMigrationRecipientService::Instance::_setMigrationStatsOnCompletion(
-    Status completionStatus) const {
-    bool success = false;
-
-    if (completionStatus.code() == ErrorCodes::TenantMigrationForgotten) {
-        stdx::lock_guard lk(_mutex);
-        if (_stateDoc.getExpireAt()) {
-            // Avoid double counting tenant migration statistics after failover.
-            return;
-        }
-        // The migration committed if and only if it received recipientForgetMigration after it has
-        // applied data past the returnAfterReachingDonorTimestamp, saved in state doc as
-        // rejectReadsBeforeTimestamp.
-        if (_stateDoc.getRejectReadsBeforeTimestamp().has_value()) {
-            success = true;
-        }
-    } else if (ErrorCodes::isRetriableError(completionStatus)) {
-        // The migration was interrupted due to shutdown or stepdown, avoid incrementing the count
-        // for failed migrations since the migration will be resumed on stepup.
-        return;
-    }
-
-    if (success) {
-        TenantMigrationStatistics::get(_serviceContext)->incTotalSuccessfulMigrationsReceived();
-    } else {
-        TenantMigrationStatistics::get(_serviceContext)->incTotalFailedMigrationsReceived();
-    }
 }
 
 const UUID& TenantMigrationRecipientService::Instance::getMigrationUUID() const {

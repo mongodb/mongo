@@ -72,6 +72,7 @@ MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeFetchingKeys);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorBeforeWaitingForKeysToReplicate);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorBeforeMarkingStateGarbageCollectable);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorAfterMarkingStateGarbageCollectable);
+MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorBeforeDeletingStateDoc);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeEnteringFutureChain);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationAfterFetchingAndStoringKeys);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorWhileUpdatingStateDoc);
@@ -206,9 +207,6 @@ void TenantMigrationDonorService::abortAllMigrations(OperationContext* opCtx) {
     }
 }
 
-// Note this index is required on both the donor and recipient in a tenant migration, since each
-// will copy cluster time keys from the other. The donor service is set up on all mongods on stepup
-// to primary, so this index will be created on both donors and recipients.
 ExecutorFuture<void> TenantMigrationDonorService::createStateDocumentTTLIndex(
     std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
     return AsyncTry([this] {
@@ -267,6 +265,9 @@ ExecutorFuture<void> TenantMigrationDonorService::createExternalKeysTTLIndex(
 ExecutorFuture<void> TenantMigrationDonorService::_rebuildService(
     std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
     return createStateDocumentTTLIndex(executor, token).then([this, executor, token] {
+        // Since a tenant migration donor and recipient both copy signing keys from each other and
+        // put them in the same external keys collection, they share this TTL index (the recipient
+        // service does not also build this TTL index).
         return createExternalKeysTTLIndex(executor, token);
     });
 }
@@ -672,6 +673,25 @@ TenantMigrationDonorService::Instance::_markStateDocAsGarbageCollectable(
         .on(**executor, token);
 }
 
+ExecutorFuture<void> TenantMigrationDonorService::Instance::_removeStateDoc(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
+    return AsyncTry([this, self = shared_from_this()] {
+               auto opCtxHolder = cc().makeOperationContext();
+               auto opCtx = opCtxHolder.get();
+
+               pauseTenantMigrationDonorBeforeDeletingStateDoc.pauseWhileSet(opCtx);
+
+               PersistentTaskStore<TenantMigrationDonorDocument> store(_stateDocumentsNS);
+               store.remove(
+                   opCtx,
+                   BSON(TenantMigrationDonorDocument::kIdFieldName << _migrationUuid),
+                   WriteConcernOptions(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)));
+           })
+        .until([](Status status) { return status.isOK(); })
+        .withBackoffBetweenIterations(kExponentialBackoff)
+        .on(**executor, token);
+}
+
 ExecutorFuture<void> TenantMigrationDonorService::Instance::_waitForMajorityWriteConcern(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     repl::OpTime opTime,
@@ -922,16 +942,19 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                 // happens after this block and before the state doc GC is persisted.
                 if (_abortReason) {
                     TenantMigrationStatistics::get(_serviceContext)
-                        ->incTotalFailedMigrationsDonated();
+                        ->incTotalMigrationDonationsAborted();
                 } else {
                     TenantMigrationStatistics::get(_serviceContext)
-                        ->incTotalSuccessfulMigrationsDonated();
+                        ->incTotalMigrationDonationsCommitted();
                 }
             }
         })
         .then([this, self = shared_from_this(), executor, token, recipientTargeterRS] {
             return _waitForForgetMigrationThenMarkMigrationGarbageCollectable(
                 executor, recipientTargeterRS, token);
+        })
+        .then([this, self = shared_from_this(), executor, token] {
+            return _waitForGarbageCollectionDelayThenDeleteStateDoc(executor, token);
         })
         .onCompletion([this,
                        self = shared_from_this(),
@@ -944,11 +967,6 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
 
             stdx::lock_guard<Latch> lg(_mutex);
 
-            LOGV2(4920400,
-                  "Marked migration state as garbage collectable",
-                  "migrationId"_attr = _migrationUuid,
-                  "expireAt"_attr = _stateDoc.getExpireAt(),
-                  "status"_attr = status);
             setPromiseFromStatusIfNotReady(lg, _forgetMigrationDurablePromise, status);
 
             LOGV2(5006601,
@@ -1433,7 +1451,7 @@ TenantMigrationDonorService::Instance::_waitForForgetMigrationThenMarkMigrationG
         })
         .then([this, self = shared_from_this(), executor, token] {
             LOGV2(6104911,
-                  "Marking migration as garbage-collectable.",
+                  "Marking external keys as garbage collectable.",
                   "migrationId"_attr = _migrationUuid,
                   "tenantId"_attr = _tenantId);
             // Note marking the keys as garbage collectable is not atomic with marking the
@@ -1448,6 +1466,10 @@ TenantMigrationDonorService::Instance::_waitForForgetMigrationThenMarkMigrationG
                 token);
         })
         .then([this, self = shared_from_this(), executor, token] {
+            LOGV2(6523600,
+                  "Marking state document as garbage collectable.",
+                  "migrationId"_attr = _migrationUuid,
+                  "tenantId"_attr = _tenantId);
             return _markStateDocAsGarbageCollectable(executor, token);
         })
         .then([this, self = shared_from_this(), executor, token](repl::OpTime opTime) {
@@ -1455,6 +1477,30 @@ TenantMigrationDonorService::Instance::_waitForForgetMigrationThenMarkMigrationG
         })
         .then([this, self = shared_from_this()] {
             pauseTenantMigrationDonorAfterMarkingStateGarbageCollectable.pauseWhileSet();
+            stdx::lock_guard<Latch> lg(_mutex);
+            setPromiseOkIfNotReady(lg, _forgetMigrationDurablePromise);
+        });
+}
+
+ExecutorFuture<void>
+TenantMigrationDonorService::Instance::_waitForGarbageCollectionDelayThenDeleteStateDoc(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const CancellationToken& token) {
+
+    LOGV2(8423362,
+          "Waiting for garbage collection delay before deleting state document",
+          "migrationId"_attr = _migrationUuid,
+          "tenantId"_attr = _tenantId,
+          "expireAt"_attr = *_stateDoc.getExpireAt());
+
+    stdx::lock_guard<Latch> lg(_mutex);
+    return (*executor)
+        ->sleepUntil(*_stateDoc.getExpireAt(), token)
+        .then([this, self = shared_from_this(), executor, token]() {
+            LOGV2(8423363,
+                  "Deleting state document",
+                  "migrationId"_attr = _migrationUuid,
+                  "tenantId"_attr = _tenantId);
+            return _removeStateDoc(executor, token);
         });
 }
 

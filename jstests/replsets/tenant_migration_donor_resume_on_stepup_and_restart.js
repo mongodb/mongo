@@ -7,6 +7,8 @@
  *   incompatible_with_macos,
  *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
+ *   # Some tenant migration statistics field names were changed in 6.1.
+ *   requires_fcv_61,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   # Tenant migrations are only used in serverless.
@@ -99,13 +101,13 @@ function testDonorStartMigrationInterrupt(interruptFunc,
     jsTestLog(`Stats at the donor primary: ${tojson(donorStats)}`);
     if (donorRestarted) {
         // If full restart happened the count could be lost completely.
-        assert.gte(1, donorStats.totalSuccessfulMigrationsDonated);
+        assert.gte(1, donorStats.totalMigrationDonationsCommitted);
     } else {
         // The double counting happens when the failover happens after migration completes
         // but before the state doc GC mark is persisted. While this test is targeting this
         // scenario it is low probability in production.
-        assert(1 == donorStats.totalSuccessfulMigrationsDonated ||
-               2 == donorStats.totalSuccessfulMigrationsDonated);
+        assert(1 == donorStats.totalMigrationDonationsCommitted ||
+               2 == donorStats.totalMigrationDonationsCommitted);
     }
     // Skip checking the stats on the recipient since enableRecipientTesting is false
     // so the recipient is forced to respond to recipientSyncData without starting the

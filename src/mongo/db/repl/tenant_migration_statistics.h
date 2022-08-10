@@ -49,20 +49,16 @@ public:
     std::unique_ptr<ScopeGuard<std::function<void()>>> getScopedOutstandingDonatingCount();
     std::unique_ptr<ScopeGuard<std::function<void()>>> getScopedOutstandingReceivingCount();
 
-    void incTotalSuccessfulMigrationsDonated();
-    void incTotalSuccessfulMigrationsReceived();
-    void incTotalFailedMigrationsDonated();
-    void incTotalFailedMigrationsReceived();
+    void incTotalMigrationDonationsCommitted();
+    void incTotalMigrationDonationsAborted();
 
     void appendInfoForServerStatus(BSONObjBuilder* builder) const;
 
 private:
     AtomicWord<long long> _currentMigrationsDonating;
     AtomicWord<long long> _currentMigrationsReceiving;
-    AtomicWord<long long> _totalSuccessfulMigrationsDonated;
-    AtomicWord<long long> _totalSuccessfulMigrationsReceived;
-    AtomicWord<long long> _totalFailedMigrationsDonated;
-    AtomicWord<long long> _totalFailedMigrationsReceived;
+    AtomicWord<long long> _totalMigrationDonationsCommitted;
+    AtomicWord<long long> _totalMigrationDonationsAborted;
 };
 
 }  // namespace mongo

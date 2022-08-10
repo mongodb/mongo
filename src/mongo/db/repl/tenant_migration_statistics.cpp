@@ -54,29 +54,19 @@ TenantMigrationStatistics::getScopedOutstandingReceivingCount() {
         [this] { _currentMigrationsReceiving.fetchAndAddRelaxed(-1); });
 }
 
-void TenantMigrationStatistics::incTotalSuccessfulMigrationsDonated() {
-    _totalSuccessfulMigrationsDonated.fetchAndAddRelaxed(1);
+void TenantMigrationStatistics::incTotalMigrationDonationsCommitted() {
+    _totalMigrationDonationsCommitted.fetchAndAddRelaxed(1);
 }
 
-void TenantMigrationStatistics::incTotalSuccessfulMigrationsReceived() {
-    _totalSuccessfulMigrationsReceived.fetchAndAddRelaxed(1);
-}
-
-void TenantMigrationStatistics::incTotalFailedMigrationsDonated() {
-    _totalFailedMigrationsDonated.fetchAndAddRelaxed(1);
-}
-
-void TenantMigrationStatistics::incTotalFailedMigrationsReceived() {
-    _totalFailedMigrationsReceived.fetchAndAddRelaxed(1);
+void TenantMigrationStatistics::incTotalMigrationDonationsAborted() {
+    _totalMigrationDonationsAborted.fetchAndAddRelaxed(1);
 }
 
 void TenantMigrationStatistics::appendInfoForServerStatus(BSONObjBuilder* builder) const {
     builder->append("currentMigrationsDonating", _currentMigrationsDonating.load());
     builder->append("currentMigrationsReceiving", _currentMigrationsReceiving.load());
-    builder->append("totalSuccessfulMigrationsDonated", _totalSuccessfulMigrationsDonated.load());
-    builder->append("totalSuccessfulMigrationsReceived", _totalSuccessfulMigrationsReceived.load());
-    builder->append("totalFailedMigrationsDonated", _totalFailedMigrationsDonated.load());
-    builder->append("totalFailedMigrationsReceived", _totalFailedMigrationsReceived.load());
+    builder->append("totalMigrationDonationsCommitted", _totalMigrationDonationsCommitted.load());
+    builder->append("totalMigrationDonationsAborted", _totalMigrationDonationsAborted.load());
 }
 
 }  // namespace mongo

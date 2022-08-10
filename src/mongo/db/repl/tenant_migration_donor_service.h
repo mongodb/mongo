@@ -201,6 +201,10 @@ public:
             std::shared_ptr<RemoteCommandTargeter> recipientTargeterRS,
             const CancellationToken& token);
 
+        ExecutorFuture<void> _waitForGarbageCollectionDelayThenDeleteStateDoc(
+            const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+            const CancellationToken& token);
+
         /**
          * Makes a task executor for executing commands against the recipient. If the server
          * parameter 'tenantMigrationDisableX509Auth' is false, configures the executor to use the
@@ -225,6 +229,14 @@ public:
             std::shared_ptr<executor::ScopedTaskExecutor> executor,
             TenantMigrationDonorStateEnum nextState,
             const CancellationToken& token);
+
+        /**
+         * Deletes the state document. Does not return the opTime for the delete, since it's not
+         * necessary to wait for this delete to be majority committed (this is the last step in the
+         * chain, and if the delete rolls back, the new primary will re-do the delete).
+         */
+        ExecutorFuture<void> _removeStateDoc(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                             const CancellationToken& token);
 
         /**
          * Sets the "expireAt" time for the state document to be garbage collected, and returns the

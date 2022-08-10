@@ -582,12 +582,6 @@ public:
         void _compareRecipientAndDonorFCV() const;
 
         /*
-         * Increments either 'totalSuccessfulMigrationsReceived' or 'totalFailedMigrationsReceived'
-         * in TenantMigrationStatistics by examining status and promises.
-         */
-        void _setMigrationStatsOnCompletion(Status completionStatus) const;
-
-        /*
          * Sets up internal state to begin migration.
          */
         void _setup();
