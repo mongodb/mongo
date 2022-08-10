@@ -1365,7 +1365,7 @@ void IndexCatalogImpl::_deleteIndexFromDisk(OperationContext* opCtx,
                                    IndexCatalog::InclusionPolicy::kFrozen));
 
     catalog::DataRemoval dataRemoval = catalog::DataRemoval::kTwoPhase;
-    if (!entry || (entry && !entry->getSharedIdent())) {
+    if (!entry || !entry->getSharedIdent()) {
         // getSharedIdent() returns a nullptr for unfinished index builds. These indexes can be
         // removed immediately as they weren't ready for use yet.
         dataRemoval = catalog::DataRemoval::kImmediate;
