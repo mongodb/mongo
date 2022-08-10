@@ -357,6 +357,46 @@ TEST(DocumentGetFieldNonCaching, TraverseArray) {
     checkArrayTagIsReturned();
 }
 
+TEST(DocumentSize, ApproximateSizeIsSnapshotted) {
+    const auto rawBson = BSON("field"
+                              << "value");
+    const Document document{rawBson};
+    const auto noCacheSize = document.getApproximateSize();
+
+    // Force the cache construction, making the total size of the 'Document' bigger.
+    // 'getApproximateSize()' must still return the same value.
+    document.fillCache();
+    const auto fullCacheSizeSnapshot = document.getApproximateSize();
+    const auto fullCacheSizeCurrent = document.getCurrentApproximateSize();
+    ASSERT_EQ(noCacheSize, fullCacheSizeSnapshot);
+    ASSERT_LT(noCacheSize, fullCacheSizeCurrent);
+}
+
+TEST(DocumentSize, ApproximateSizeDuringBuildIsUpdated) {
+    MutableDocument builder;
+    builder.addField("a1", Value(1));
+    builder.addField("a2", mongo::Value(2));
+    builder.addField("a3", mongo::Value(3));
+    auto middleBuildSize = builder.getApproximateSize();
+
+    builder.addField("a4", Value(4));
+    builder.addField("a5", mongo::Value(5));
+    builder.addField("a6", mongo::Value(6));
+    auto peekSize = builder.peek().getApproximateSize();
+
+    builder.addField("a7", Value(7));
+    builder.addField("a8", mongo::Value(8));
+    builder.addField("a9", mongo::Value(9));
+    auto beforeFreezeSize = builder.getApproximateSize();
+
+    Document result = builder.freeze();
+    auto frozenSize = result.getApproximateSize();
+
+    ASSERT_LT(middleBuildSize, peekSize);
+    ASSERT_LT(peekSize, beforeFreezeSize);
+    ASSERT_EQ(beforeFreezeSize, frozenSize);
+}
+
 /** Add Document fields. */
 class AddField {
 public:

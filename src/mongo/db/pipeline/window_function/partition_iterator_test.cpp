@@ -499,7 +499,7 @@ TEST_F(PartitionIteratorTest, MemoryUsageAccountsForDocumentIteratorCache) {
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
 
     [[maybe_unused]] auto accessor = makeDefaultAccessor(mock, boost::none);
-    size_t initialDocSize = docs[0].getDocument().getApproximateSize();
+    size_t initialDocSize = docs[0].getDocument().getCurrentApproximateSize();
 
     // Pull in the first document, and verify the reported size of the iterator is roughly double
     // the size of the document. The size of the iterator is double the size of the document because
@@ -525,7 +525,7 @@ TEST_F(PartitionIteratorTest, MemoryUsageAccountsForArraysInDocumentIteratorCach
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
 
     [[maybe_unused]] auto accessor = makeDefaultAccessor(mock, boost::none);
-    size_t initialDocSize = docs[0].getDocument().getApproximateSize();
+    size_t initialDocSize = docs[0].getDocument().getCurrentApproximateSize();
 
     // Pull in the first document, and verify the reported size of the iterator is roughly
     // triple the size of the document. The reason for this is that 'largeStr' is cached twice; once
@@ -550,7 +550,7 @@ TEST_F(PartitionIteratorTest, MemoryUsageAccountsForNestedArraysInDocumentIterat
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
 
     [[maybe_unused]] auto accessor = makeDefaultAccessor(mock, boost::none);
-    size_t initialDocSize = docs[0].getDocument().getApproximateSize();
+    size_t initialDocSize = docs[0].getDocument().getCurrentApproximateSize();
 
     // Pull in the first document, and verify the reported size of the iterator is roughly
     // triple the size of the document. The reason for this is that 'largeStr' is cached twice; once
@@ -575,7 +575,7 @@ TEST_F(PartitionIteratorTest, MemoryUsageAccountsForNestedObjInDocumentIteratorC
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
 
     [[maybe_unused]] auto accessor = makeDefaultAccessor(mock, boost::none);
-    size_t initialDocSize = docs[0].getDocument().getApproximateSize();
+    size_t initialDocSize = docs[0].getDocument().getCurrentApproximateSize();
 
     // Pull in the first document, and verify the reported size. TODO SERVER-57011: The approximate
     // size should not double count the nested strings.
@@ -592,7 +592,7 @@ TEST_F(PartitionIteratorTest, MemoryUsageAccountsForReleasedDocuments) {
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
 
     auto accessor = makeDefaultAccessor(mock, boost::none);
-    size_t initialDocSize = docs[0].getDocument().getApproximateSize();
+    size_t initialDocSize = docs[0].getDocument().getCurrentApproximateSize();
 
     // Pull in the first document, and verify the reported size of the iterator is roughly double
     // the size of the document.
