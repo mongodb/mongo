@@ -23,7 +23,20 @@ if (assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryFramewor
     return;
 }
 
-function assertUsesFallback(cmd, testOnly) {
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: 'enableExplainInBonsai', 'mode': 'alwaysOn'}));
+
+function assertSupportedByBonsaiFully(cmd) {
+    // A supported stage must use the new optimizer.
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
+    const defaultExplain = assert.commandWorked(db.runCommand({explain: cmd}));
+    assert(usedBonsaiOptimizer(defaultExplain), tojson(defaultExplain));
+
+    assert.commandWorked(db.runCommand(cmd));
+}
+
+function assertNotSupportedByBonsai(cmd, testOnly) {
     // An unsupported stage should not use the new optimizer.
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
@@ -56,100 +69,106 @@ function assertUsesFallback(cmd, testOnly) {
     }
 }
 
+// Sanity check we use bonsai for supported cases.
+assertSupportedByBonsaiFully({find: coll.getName()});
+
+// Sort in find() is not supported by bonsai generally - test only supported.
+assertNotSupportedByBonsai({find: coll.getName(), sort: {x: 1}}, true);
+
 // Unsupported aggregation stage.
-assertUsesFallback({aggregate: coll.getName(), pipeline: [{$sample: {size: 1}}], cursor: {}},
-                   false);
+assertNotSupportedByBonsai(
+    {aggregate: coll.getName(), pipeline: [{$sample: {size: 1}}], cursor: {}}, false);
 
 // Test-only aggregation stage.
-assertUsesFallback(
+assertNotSupportedByBonsai(
     {aggregate: coll.getName(), pipeline: [{$group: {_id: null, a: {$sum: "$b"}}}], cursor: {}},
     true);
 
 // Unsupported match expression.
-assertUsesFallback({find: coll.getName(), filter: {a: {$mod: [4, 0]}}}, false);
-assertUsesFallback(
+assertNotSupportedByBonsai({find: coll.getName(), filter: {a: {$mod: [4, 0]}}}, false);
+assertNotSupportedByBonsai(
     {aggregate: coll.getName(), pipeline: [{$match: {a: {$mod: [4, 0]}}}], cursor: {}}, false);
-assertUsesFallback({find: coll.getName(), filter: {a: {$in: [/^b/, 1]}}}, false);
+assertNotSupportedByBonsai({find: coll.getName(), filter: {a: {$in: [/^b/, 1]}}}, false);
 
 // Test-only match expression.
-assertUsesFallback({find: coll.getName(), filter: {$alwaysFalse: 1}}, true);
-assertUsesFallback({aggregate: coll.getName(), pipeline: [{$match: {$alwaysFalse: 1}}], cursor: {}},
-                   true);
+assertNotSupportedByBonsai({find: coll.getName(), filter: {$alwaysFalse: 1}}, true);
+assertNotSupportedByBonsai(
+    {aggregate: coll.getName(), pipeline: [{$match: {$alwaysFalse: 1}}], cursor: {}}, true);
 
 // Unsupported projection expression.
-assertUsesFallback(
+assertNotSupportedByBonsai(
     {find: coll.getName(), filter: {}, projection: {a: {$concatArrays: [["$b"], ["suppported"]]}}},
     false);
-assertUsesFallback({
+assertNotSupportedByBonsai({
     aggregate: coll.getName(),
     pipeline: [{$project: {a: {$concatArrays: [["$b"], ["suppported"]]}}}],
     cursor: {}
 },
-                   false);
+                           false);
 
 // Test-only projection spec.
-assertUsesFallback(
+assertNotSupportedByBonsai(
     {find: coll.getName(), filter: {}, projection: {a: {$concat: ["test", "-only"]}}}, true);
-assertUsesFallback({
+assertNotSupportedByBonsai({
     aggregate: coll.getName(),
     pipeline: [{$project: {a: {$concat: ["test", "-only"]}}}],
     cursor: {}
 },
-                   true);
+                           true);
 
 // Numeric path components are not supported, either in a match expression or projection.
-assertUsesFallback({find: coll.getName(), filter: {'a.0': 5}});
-assertUsesFallback({find: coll.getName(), filter: {'a.0.b': 5}});
-assertUsesFallback({find: coll.getName(), filter: {}, projection: {'a.0': 1}});
-assertUsesFallback({find: coll.getName(), filter: {}, projection: {'a.5.c': 0}});
+assertNotSupportedByBonsai({find: coll.getName(), filter: {'a.0': 5}});
+assertNotSupportedByBonsai({find: coll.getName(), filter: {'a.0.b': 5}});
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}, projection: {'a.0': 1}});
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}, projection: {'a.5.c': 0}});
 
 // Test for unsupported expressions within a branching expression such as $or.
-assertUsesFallback({find: coll.getName(), filter: {$or: [{'a.0': 5}, {a: 1}]}});
-assertUsesFallback({find: coll.getName(), filter: {$or: [{a: 5}, {a: {$mod: [4, 0]}}]}});
+assertNotSupportedByBonsai({find: coll.getName(), filter: {$or: [{'a.0': 5}, {a: 1}]}});
+assertNotSupportedByBonsai({find: coll.getName(), filter: {$or: [{a: 5}, {a: {$mod: [4, 0]}}]}});
 
 // Unsupported command options.
-assertUsesFallback({find: coll.getName(), filter: {}, collation: {locale: "fr_CA"}}, true);
-assertUsesFallback({
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}, collation: {locale: "fr_CA"}}, true);
+assertNotSupportedByBonsai({
     aggregate: coll.getName(),
     pipeline: [{$match: {$alwaysFalse: 1}}],
     collation: {locale: "fr_CA"},
     cursor: {}
 },
-                   true);
+                           true);
 
 // Unsupported index type.
 assert.commandWorked(coll.createIndex({a: 1}, {sparse: true}));
-assertUsesFallback({find: coll.getName(), filter: {}});
-assertUsesFallback({aggregate: coll.getName(), pipeline: [], cursor: {}});
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}});
+assertNotSupportedByBonsai({aggregate: coll.getName(), pipeline: [], cursor: {}});
 coll.drop();
 assert.commandWorked(coll.insert({a: 1}));
 assert.commandWorked(coll.createIndex({"$**": 1}));
-assertUsesFallback({find: coll.getName(), filter: {}});
-assertUsesFallback({aggregate: coll.getName(), pipeline: [], cursor: {}});
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}});
+assertNotSupportedByBonsai({aggregate: coll.getName(), pipeline: [], cursor: {}});
 
 // Test-only index type.
 coll.drop();
 assert.commandWorked(coll.insert({a: 1}));
 assert.commandWorked(coll.createIndex({a: 1}, {partialFilterExpression: {a: {$gt: 0}}}));
-assertUsesFallback({find: coll.getName(), filter: {}}, true);
-assertUsesFallback({aggregate: coll.getName(), pipeline: [], cursor: {}}, true);
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}}, true);
+assertNotSupportedByBonsai({aggregate: coll.getName(), pipeline: [], cursor: {}}, true);
 
 // Unsupported collection types. Note that a query against the user-facing timeseries collection
 // will fail due to the unsupported $unpackBucket stage.
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), {timeseries: {timeField: "time"}}));
-assertUsesFallback({find: coll.getName(), filter: {}}, false);
-assertUsesFallback({aggregate: coll.getName(), pipeline: [], cursor: {}}, false);
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}}, false);
+assertNotSupportedByBonsai({aggregate: coll.getName(), pipeline: [], cursor: {}}, false);
 
 const bucketColl = db.getCollection('system.buckets.' + coll.getName());
-assertUsesFallback({find: bucketColl.getName(), filter: {}}, false);
-assertUsesFallback({aggregate: bucketColl.getName(), pipeline: [], cursor: {}}, false);
+assertNotSupportedByBonsai({find: bucketColl.getName(), filter: {}}, false);
+assertNotSupportedByBonsai({aggregate: bucketColl.getName(), pipeline: [], cursor: {}}, false);
 
 // Collection-default collation is not supported if non-simple.
 coll.drop();
 assert.commandWorked(db.createCollection(coll.getName(), {collation: {locale: "fr_CA"}}));
-assertUsesFallback({find: coll.getName(), filter: {}}, false);
-assertUsesFallback({aggregate: coll.getName(), pipeline: [], cursor: {}}, false);
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}}, false);
+assertNotSupportedByBonsai({aggregate: coll.getName(), pipeline: [], cursor: {}}, false);
 
 // Queries over views are supported as long as the resolved pipeline is valid in CQF.
 coll.drop();
@@ -158,7 +177,7 @@ assert.commandWorked(
     db.runCommand({create: "view", viewOn: coll.getName(), pipeline: [{$match: {a: 1}}]}));
 
 // Unsupported expression on top of the view.
-assertUsesFallback({find: "view", filter: {a: {$mod: [4, 0]}}}, false);
+assertNotSupportedByBonsai({find: "view", filter: {a: {$mod: [4, 0]}}}, false);
 
 // Supported expression on top of the view.
 assert.commandWorked(
@@ -166,17 +185,17 @@ assert.commandWorked(
 assert.commandWorked(db.runCommand({find: "view", filter: {b: 4}}));
 
 // Test-only expression on top of a view.
-assertUsesFallback({find: "view", filter: {$alwaysFalse: 1}}, true);
+assertNotSupportedByBonsai({find: "view", filter: {$alwaysFalse: 1}}, true);
 
 // Create a view with an unsupported expression.
 assert.commandWorked(db.runCommand(
     {create: "invalidView", viewOn: coll.getName(), pipeline: [{$match: {a: {$mod: [4, 0]}}}]}));
 
 // Any expression, supported or not, should not use CQF over the invalid view.
-assertUsesFallback({find: "invalidView", filter: {b: 4}}, false);
+assertNotSupportedByBonsai({find: "invalidView", filter: {b: 4}}, false);
 
 // Test only expression should also fail.
-assertUsesFallback({find: "invalidView", filter: {$alwaysFalse: 1}}, true);
+assertNotSupportedByBonsai({find: "invalidView", filter: {$alwaysFalse: 1}}, true);
 
 MongoRunner.stopMongod(conn);
 

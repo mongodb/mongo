@@ -11,16 +11,6 @@ selector:
   - jstests/core/nan.js
   # TODO SERVER-67506
   - jstests/core/arrayfind5.js
-  - jstests/core/arrayfind8.js
-  # TODO SERVER-67371 These tests all use unsupported command options.
-  - jstests/core/batch_size.js
-  - jstests/core/find_getmore_cmd.js
-  - jstests/core/finda.js
-  - jstests/core/idhack.js
-  - jstests/core/index_diag.js
-  - jstests/core/kill_cursors.js
-  - jstests/core/minmax.js
-  - jstests/core/show_record_id.js
   # TODO SERVER-68512
   - jstests/core/collation_with_reverse_index.js
   # TODO SERVER-23229 on classic which is fixed by SERVER-67548 in CQF.
@@ -28,7 +18,6 @@ selector:
   - jstests/core/null_query_semantics.js
   # TODO SERVER-62407 translate to ABT directly from find.
   - jstests/core/currentop_cursors.js
-  - jstests/core/profile_getmore.js
   # TODO SERVER-67517
   - jstests/core/field_name_empty.js
   - jstests/core/field_name_validation.js
@@ -63,12 +52,6 @@ selector:
   - jstests/core/projection_meta_index_key.js
   - jstests/core/positional_projection.js
   - jstests/core/positional_projection_multiple_array_fields.js
-  - jstests/core/elemmatch_projection.js
-  - jstests/core/slice1.js
-  - jstests/core/explain_sort_type.js
-  - jstests/core/sortl.js
-  - jstests/core/index_filter_commands.js
-  - jstests/core/introspect_hidden_index_plan_cache_entries.js
   # Transactions are not supported on MongoDB standalone nodes, so we do not run these tests in the
   # 'core' suite. Instead we run them against a 1-node replica set in the 'core_txns' suite.
   - jstests/core/txns/**/*.js

@@ -33,6 +33,7 @@
 #include "mongo/db/exec/add_fields_projection_executor.h"
 #include "mongo/db/exec/exclusion_projection_executor.h"
 #include "mongo/db/exec/inclusion_projection_executor.h"
+#include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
@@ -662,6 +663,8 @@ boost::optional<bool> shouldForceEligibility() {
 
 }  // namespace
 
+MONGO_FAIL_POINT_DEFINE(enableExplainInBonsai);
+
 bool isEligibleForBonsai(const AggregateCommandRequest& request,
                          const Pipeline& pipeline,
                          OperationContext* opCtx,
@@ -670,9 +673,15 @@ bool isEligibleForBonsai(const AggregateCommandRequest& request,
         return *forceBonsai;
     }
 
+    // Explain is not currently supported but is allowed if the failpoint is set
+    // for testing purposes.
+    if (!MONGO_unlikely(enableExplainInBonsai.shouldFail()) && request.getExplain()) {
+        return false;
+    }
+
     bool commandOptionsEligible = isEligibleCommon(request, opCtx, collection) &&
         !request.getUnwrappedReadPref() && !request.getRequestReshardingResumeToken().has_value() &&
-        !request.getExchange() && !request.getExplain();
+        !request.getExchange();
 
     // Early return to avoid unnecessary work of walking the input pipeline.
     if (!commandOptionsEligible) {
@@ -701,23 +710,42 @@ bool isEligibleForBonsai(const CanonicalQuery& cq,
         return *forceBonsai;
     }
 
+    // Explain is not currently supported but is allowed if the failpoint is set
+    // for testing purposes.
+    if (!MONGO_unlikely(enableExplainInBonsai.shouldFail()) && cq.getExplain()) {
+        return false;
+    }
+
     auto request = cq.getFindCommandRequest();
     auto expression = cq.root();
     bool commandOptionsEligible = isEligibleCommon(request, opCtx, collection) &&
-        !cq.getExplain() && !request.getReturnKey() && !request.getSingleBatch() &&
-        !request.getTailable();
+        request.getSort().isEmpty() && request.getMin().isEmpty() && request.getMax().isEmpty() &&
+        !request.getReturnKey() && !request.getSingleBatch() && !request.getTailable() &&
+        !request.getSkip() && !request.getLimit() && !request.getNoCursorTimeout();
 
     // Early return to avoid unnecessary work of walking the input expression.
     if (!commandOptionsEligible) {
         return false;
     }
 
-    bool eligibleMatch = true;
-    ABTMatchExpressionVisitor visitor(eligibleMatch);
+    bool eligible = true;
+    ABTMatchExpressionVisitor visitor(eligible);
     MatchExpressionWalker walker(nullptr /*preVisitor*/, nullptr /*inVisitor*/, &visitor);
     tree_walker::walk<true, MatchExpression>(expression, &walker);
 
-    return eligibleMatch;
+    if (cq.getProj()) {
+        // TODO SERVER-66846 Replace this with ProjectionAST walker
+        auto projExecutor = projection_executor::buildProjectionExecutor(
+            cq.getExpCtx(),
+            cq.getProj(),
+            ProjectionPolicies::findProjectionPolicies(),
+            projection_executor::BuilderParamsBitSet{projection_executor::kDefaultBuilderParams});
+        ABTTransformerVisitor visitor(eligible);
+        TransformerInterfaceWalker walker(&visitor);
+        walker.walk(projExecutor.get());
+    }
+
+    return eligible;
 }
 
 }  // namespace mongo
