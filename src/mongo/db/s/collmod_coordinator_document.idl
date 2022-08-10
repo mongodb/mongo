@@ -68,3 +68,8 @@ structs:
                 type: uuid
                 description: "Collection uuid."
                 optional: true
+            # TODO SERVER-68008 remove once 7.0 becomes last LTS
+            migrationsAlreadyBlockedForBucketNss:
+                type: safeBool
+                description: "Flag set by the coordinator before acquiring critical section on bucket namespace"
+                optional: true
