@@ -44,6 +44,7 @@ enum IndexType {
     INDEX_BTREE,
     INDEX_COLUMN,
     INDEX_2D,
+    INDEX_ENCRYPTED_RANGE,
     INDEX_HAYSTACK,
     INDEX_2DSPHERE,
     INDEX_2DSPHERE_BUCKET,
@@ -67,6 +68,7 @@ public:
     static const std::string TEXT;
     static const std::string WILDCARD;
     static const std::string COLUMN;
+    static const std::string ENCRYPTED_RANGE;
 
     /**
      * Return the first std::string value in the provided object.  For an index key pattern,
