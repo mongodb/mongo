@@ -31,6 +31,8 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/analyze_command_gen.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 
@@ -66,6 +68,58 @@ public:
         }
 
         void typedRun(OperationContext* opCtx) {
+            const auto& cmd = request();
+            const NamespaceString& nss = ns();
+
+            // Validate collection
+            // Namespace exists
+            AutoGetCollectionForReadMaybeLockFree autoColl(opCtx, nss);
+            const auto& collection = autoColl.getCollection();
+            uassert(6799700, str::stream() << "Couldn't find collection " << nss.ns(), collection);
+
+            // Namespace cannot be capped collection
+            const bool isCapped = collection->isCapped();
+            uassert(6799701, "Analyze command is not supported on capped collections", !isCapped);
+
+            // Namespace is normal or clustered collection
+            const bool isNormalColl = nss.isNormalCollection();
+            const bool isClusteredColl = collection->isClustered();
+            uassert(6799702,
+                    str::stream() << nss.toString() << " is not a normal or clustered collection",
+                    isNormalColl || isClusteredColl);
+
+            // Validate key
+            auto key = cmd.getKey();
+            if (key) {
+                const FieldRef keyFieldRef(*key);
+
+                // Empty path
+                uassert(6799703, "Key path is empty", !keyFieldRef.empty());
+
+                for (size_t i = 0; i < keyFieldRef.numParts(); ++i) {
+                    FieldPath::uassertValidFieldName(keyFieldRef.getPart(i));
+                }
+
+                // Numerics
+                const auto numericPathComponents = keyFieldRef.getNumericPathComponents(0);
+                uassert(6799704,
+                        str::stream() << "Key path contains numeric component "
+                                      << keyFieldRef.getPart(*(numericPathComponents.begin())),
+                        numericPathComponents.empty());
+            }
+
+            // Sample rate and sample size can't both be present
+            auto sampleRate = cmd.getSampleRate();
+            auto sampleSize = cmd.getSampleSize();
+            uassert(6799705,
+                    "Only one of sample rate and sample size may be present",
+                    !sampleRate || !sampleSize);
+
+            if (sampleSize || sampleRate) {
+                uassert(
+                    6799706, "It is illegal to pass sampleRate or sampleSize without a key", key);
+            }
+
             uassert(6660400,
                     "Analyze command requires common query framework feature flag to be enabled",
                     serverGlobalParams.featureCompatibility.isVersionInitialized() &&

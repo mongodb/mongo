@@ -17,6 +17,7 @@ foreignColl.drop();
 assert.commandWorked(localColl.insert([{a: 1}, {b: 1}, {a: 2}]));
 assert.commandWorked(foreignColl.insert({a: 1}));
 
+db.setProfilingLevel(0);
 db.system.profile.drop();
 db.setProfilingLevel(2);
 
