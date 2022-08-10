@@ -528,12 +528,126 @@ prepare_test_data_wt_8395()
     rm *.tar.gz; cd ../..
 }
 
+#############################################################
+# create_file:
+#       arg1: branch
+#       arg2: file
+#############################################################
+create_file()
+{
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "Branch \"$1\" creating and populating \"$2\""
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+
+    wt_cmd="$1/build/wt"
+    test_dir="$1/build/WT_TEST/"
+    uri="file:$2"
+
+    # Make the home directory.
+    mkdir -p $test_dir
+
+    # Create the file and populate with a few key/values.
+    $wt_cmd -h $test_dir create -c "key_format=S,value_format=S" $uri
+    $wt_cmd -h $test_dir write $uri abc 123 def 456 hij 789
+}
+
+#############################################################
+# import_file:
+#       arg1: source branch
+#       arg2: dest branch
+#       arg3: file
+#############################################################
+import_file()
+{
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "Importing file \"$3\" from \"$1\" to \"$2\""
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+
+    wt_cmd="$2/build/wt"
+    test_dir="$2/build/WT_TEST/"
+    mkdir -p $test_dir
+
+    # Move the file across to the destination branch's home directory.
+    import_file="$1/build/WT_TEST/$3"
+    cp $import_file $test_dir
+
+    # Run import via the wt tool.
+    uri="file:$3"
+    $wt_cmd -h $test_dir create -c "import=(enabled,repair=true)" $uri
+}
+
+#############################################################
+# verify_file:
+#       arg1: branch
+#       arg2: file
+#############################################################
+verify_file()
+{
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "Branch \"$1\" verifying \"$2\""
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+
+    wt_cmd="$1/build/wt"
+    test_dir="$1/build/WT_TEST/"
+    uri="file:$2"
+
+    $wt_cmd -h $test_dir verify $uri
+}
+
+#############################################################
+# cleanup_branch:
+#       arg1: branch
+#############################################################
+cleanup_branch()
+{
+    test_dir="$1/build/WT_TEST/"
+    if [ -d $test_dir ]; then
+        rm -rf $test_dir
+    fi
+}
+
+#############################################################
+# import_compatibility_test:
+#       arg1: older branch
+#       arg2: newer branch
+#############################################################
+import_compatibility_test()
+{
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "Testing import compatibility between \"$2\" and \"$1\""
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+
+    # Remove any leftover data files.
+    cleanup_branch $1
+    cleanup_branch $2
+
+    # Create a file in the older branch.
+    create_file $1 test_import
+
+    # Now import it into the newer branch and verify.
+    import_file $1 $2 test_import
+    verify_file $2 test_import
+
+    # Now downgrade by running wt from the older branch and dumping the table contents.
+    #
+    # Before trying this, we must remove the base configuration. The wt tool produces this file
+    # however MongoDB will not so we should emulate this.
+    rm $2/build/WT_TEST/WiredTiger.basecfg
+    $1/build/wt -h $2/build/WT_TEST/ dump file:test_import
+}
+
 # Only one of below flags will be set by the 1st argument of the script.
+import=false
 older=false
 newer=false
 wt_standalone=false
 patch_version=false
 upgrade_to_latest=false
+
+# This array is used to configure the release branches we'd like to use for testing the importing
+# of files created in previous versions of WiredTiger. Go all the way back to mongodb-4.2 since
+# that's the first release where we don't support live import.
+import_release_branches=(develop mongodb-6.0 mongodb-5.0 mongodb-4.4 mongodb-4.2)
 
 # Branches in below 2 arrays should be put in newer-to-older order.
 #
@@ -562,6 +676,7 @@ test_checkpoint_release_branches=(develop mongodb-6.0 mongodb-5.0 mongodb-4.4)
 upgrade_to_latest_upgrade_downgrade_release_branches=(mongodb-6.0 mongodb-5.0 mongodb-4.4)
 
 declare -A scopes
+scopes[import]="import files from previous versions"
 scopes[newer]="newer stable release branches"
 scopes[older]="older stable release branches"
 scopes[patch_version]="patch versions of the same release branch"
@@ -612,7 +727,8 @@ get_build_system()
 #############################################################
 usage()
 {
-    echo -e "Usage: \tcompatibility_test_for_releases [-n|-o|-p|-u|-w|-v]"
+    echo -e "Usage: \tcompatibility_test_for_releases [-i|-n|-o|-p|-u|-w|-v]"
+    echo -e "\t-i\trun compatibility tests for ${scopes[import]}"
     echo -e "\t-n\trun compatibility tests for ${scopes[newer]}"
     echo -e "\t-o\trun compatibility tests for ${scopes[older]}"
     echo -e "\t-p\trun compatibility tests for ${scopes[patch_version]}"
@@ -628,6 +744,12 @@ fi
 
 # Script argument processing
 case $1 in
+"-i")
+    import=true
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "Performing compatibility tests for ${scopes[import]}"
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+;;
 "-n")
     newer=true
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
@@ -675,6 +797,26 @@ esac
 top="test-compatibility-run"
 rm -rf "$top" && mkdir "$top"
 cd "$top"
+
+# Import compatibility testing.
+if [ "$import" = true ]; then
+    for b in ${import_release_branches[@]}; do
+        (build_branch $b)
+    done
+
+    for i in ${!import_release_branches[@]}; do
+        newer=${import_release_branches[$i]}
+
+        # MongoDB v4.2 doesn't support live import so it should only ever be used as the "older" branch
+        # that we're importing from.
+        if [ $newer = mongodb-4.2 ]; then
+            continue
+        fi
+
+        older=${import_release_branches[$i+1]}
+        import_compatibility_test $older $newer
+    done
+fi
 
 if [ "$upgrade_to_latest" = true ]; then
     test_root=$(pwd)

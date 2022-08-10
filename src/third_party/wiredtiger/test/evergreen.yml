@@ -2117,7 +2117,7 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            test/evergreen/import_compatibility_test.sh
+            test/evergreen/compatibility_test_for_releases.sh -i
 
   - name: generate-datafile-little-endian
     commands:
