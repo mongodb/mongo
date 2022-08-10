@@ -211,14 +211,27 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
 
                 if (_isPre61Compatible() && _collInfo->isSharded) {
-                    _doc.setCollUUID(sharding_ddl_util::getCollectionUUID(
-                        opCtx, originalNss(), true /* allowViews */));
-                    sharding_ddl_util::stopMigrations(opCtx, originalNss(), _doc.getCollUUID());
+                    const auto migrationsAlreadyBlockedForBucketNss =
+                        hasTimeSeriesGranularityUpdate(_request) &&
+                        _doc.getMigrationsAlreadyBlockedForBucketNss();
+
+                    if (!migrationsAlreadyBlockedForBucketNss) {
+                        _doc.setCollUUID(sharding_ddl_util::getCollectionUUID(
+                            opCtx, _collInfo->nsForTargeting, true /* allowViews */));
+                        sharding_ddl_util::stopMigrations(
+                            opCtx, _collInfo->nsForTargeting, _doc.getCollUUID());
+                    }
                 }
 
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 
                 if (_collInfo->isSharded && hasTimeSeriesGranularityUpdate(_request)) {
+                    if (_isPre61Compatible()) {
+                        auto newDoc = _doc;
+                        newDoc.setMigrationsAlreadyBlockedForBucketNss(true);
+                        _updateStateDocument(opCtx, std::move(newDoc));
+                    }
+
                     ShardsvrParticipantBlock blockCRUDOperationsRequest(_collInfo->nsForTargeting);
                     const auto cmdObj = CommandHelpers::appendMajorityWriteConcern(
                         blockCRUDOperationsRequest.toBSON({}));
@@ -313,9 +326,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                     }
                     _result = builder.obj();
                     sharding_ddl_util::resumeMigrations(
-                        opCtx,
-                        _isPre61Compatible() ? originalNss() : _collInfo->nsForTargeting,
-                        _doc.getCollUUID());
+                        opCtx, _collInfo->nsForTargeting, _doc.getCollUUID());
                 } else {
                     CollMod cmd(originalNss());
                     cmd.setCollModRequest(_request);
@@ -351,9 +362,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                     getForwardableOpMetadata().setOn(opCtx);
 
                     sharding_ddl_util::resumeMigrations(
-                        opCtx,
-                        _isPre61Compatible() ? originalNss() : _collInfo->nsForTargeting,
-                        _doc.getCollUUID());
+                        opCtx, _collInfo->nsForTargeting, _doc.getCollUUID());
                 }
             }
             return status;
