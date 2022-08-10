@@ -96,4 +96,26 @@ std::tuple<sbe::value::TypeTags, sbe::value::Value, bool, bool> convertInExpress
  */
 std::pair<sbe::value::TypeTags, sbe::value::Value> convertBitTestBitPositions(
     const BitTestMatchExpression* expr);
+
+/**
+ * The following family of functions convert the given MatchExpression that consumes a single input
+ * into an EExpression that consumes the input from the provided slot.
+ */
+EvalExpr generateComparisonExpr(StageBuilderState& state,
+                                const ComparisonMatchExpression* expr,
+                                sbe::EPrimBinary::Op binaryOp,
+                                sbe::value::SlotId inputSlot);
+EvalExpr generateBitTestExpr(StageBuilderState& state,
+                             const BitTestMatchExpression* expr,
+                             const sbe::BitTestBehavior& bitOp,
+                             sbe::value::SlotId inputSlot);
+EvalExpr generateModExpr(StageBuilderState& state,
+                         const ModMatchExpression* expr,
+                         sbe::value::SlotId inputSlot);
+EvalExpr generateRegexExpr(StageBuilderState& state,
+                           const RegexMatchExpression* expr,
+                           sbe::value::SlotId inputSlot);
+EvalExpr generateWhereExpr(StageBuilderState& state,
+                           const WhereMatchExpression* expr,
+                           sbe::value::SlotId inputSlot);
 }  // namespace mongo::stage_builder
