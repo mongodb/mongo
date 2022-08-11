@@ -50,7 +50,9 @@
 #include "mongo/db/s/resharding/resharding_service_test_helpers.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/fail_point.h"
+
 
 namespace mongo {
 namespace {
@@ -213,13 +215,14 @@ public:
 
     void setUp() override {
         repl::PrimaryOnlyServiceMongoDTest::setUp();
-
+        auto clockSource = std::make_unique<ClockSourceMock>();
+        clockSource->advance(Seconds(1));
+        getServiceContext()->setFastClockSource(std::move(clockSource));
         auto serviceContext = getServiceContext();
         auto storageMock = std::make_unique<repl::StorageInterfaceMock>();
         repl::DropPendingCollectionReaper::set(
             serviceContext, std::make_unique<repl::DropPendingCollectionReaper>(storageMock.get()));
         repl::StorageInterface::set(serviceContext, std::move(storageMock));
-
         _controller = std::make_shared<RecipientStateTransitionController>();
         _opObserverRegistry->addObserver(std::make_unique<RecipientOpObserverForTest>(_controller));
     }
@@ -842,22 +845,33 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
         }
         // Step down before the transition to state can complete.
         stateTransitionsGuard.wait(state);
-        if (state == RecipientStateEnum::kStrictConsistency) {
-            auto currOp = recipient
-                              ->reportForCurrentOp(
-                                  MongoProcessInterface::CurrentOpConnectionsMode::kExcludeIdle,
-                                  MongoProcessInterface::CurrentOpSessionsMode::kExcludeIdle)
-                              .get();
+
+        dynamic_cast<ClockSourceMock*>(getServiceContext()->getFastClockSource())
+            ->advance(Seconds(1));
+        auto currOp =
+            recipient
+                ->reportForCurrentOp(MongoProcessInterface::CurrentOpConnectionsMode::kExcludeIdle,
+                                     MongoProcessInterface::CurrentOpSessionsMode::kExcludeIdle)
+                .get();
+
+
+        if (state == RecipientStateEnum::kApplying) {
+            ASSERT_EQ(currOp.getField("totalApplyTimeElapsedSecs").Long(), 0);
+            ASSERT_EQ(currOp.getStringField("recipientState"),
+                      RecipientState_serializer(RecipientStateEnum::kCloning));
+            ASSERT_GT(currOp.getField("totalCopyTimeElapsedSecs").Long(), 0);
+            ASSERT_GT(currOp.getField("approxBytesToCopy").Long(), 0);
+
+        } else if (state == RecipientStateEnum::kStrictConsistency) {
             ASSERT_EQ(currOp.getField("documentsCopied").Long(), 1L);
             ASSERT_EQ(currOp.getField("bytesCopied").Long(), (long)reshardedDoc.objsize());
             ASSERT_EQ(currOp.getStringField("recipientState"),
                       RecipientState_serializer(RecipientStateEnum::kApplying));
+            ASSERT_GT(currOp.getField("totalCopyTimeElapsedSecs").Long(), 0);
+            ASSERT_GT(currOp.getField("totalApplyTimeElapsedSecs").Long(), 0);
+            ASSERT_GT(currOp.getField("approxBytesToCopy").Long(), 0);
+
         } else if (state == RecipientStateEnum::kDone) {
-            auto currOp = recipient
-                              ->reportForCurrentOp(
-                                  MongoProcessInterface::CurrentOpConnectionsMode::kExcludeIdle,
-                                  MongoProcessInterface::CurrentOpSessionsMode::kExcludeIdle)
-                              .get();
             ASSERT_EQ(currOp.getField("documentsCopied").Long(), 1L);
             ASSERT_EQ(currOp.getField("bytesCopied").Long(), (long)reshardedDoc.objsize());
             ASSERT_EQ(currOp.getField("oplogEntriesFetched").Long(),
@@ -866,7 +880,11 @@ TEST_F(ReshardingRecipientServiceTest, RestoreMetricsAfterStepUp) {
                       oplogEntriesAppliedOnEachDonor * doc.getDonorShards().size());
             ASSERT_EQ(currOp.getStringField("recipientState"),
                       RecipientState_serializer(RecipientStateEnum::kStrictConsistency));
+            ASSERT_GT(currOp.getField("totalCopyTimeElapsedSecs").Long(), 0);
+            ASSERT_GT(currOp.getField("totalApplyTimeElapsedSecs").Long(), 0);
+            ASSERT_GT(currOp.getField("approxBytesToCopy").Long(), 0);
         }
+
         stepDown();
 
         ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(),
