@@ -25,7 +25,7 @@ Summary: MongoDB open source document-oriented database system (enterprise metap
 License: Commercial
 URL: http://www.mongodb.org
 Group: Applications/Databases
-Requires: mongodb-enterprise-cryptd, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-database-tools-extra, mongodb-enteprise-shell
+Requires: mongodb-enterprise-cryptd, mongodb-enterprise-mongos, mongodb-enterprise-server, mongodb-enterprise-database-tools-extra, mongodb-enterprise-shell
 
 %if 0%{?rhel} >= 8 || 0%{?fedora} >= 30
 BuildRequires: /usr/bin/pathfix.py, python3-devel
