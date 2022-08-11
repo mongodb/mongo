@@ -327,7 +327,9 @@ public:
     }
 
     Date_t getTimeseriesBucketMinTime() const {
-        invariant(hasTimeseriesBucketMinTime());
+        tassert(6850100,
+                "Document must have timeseries bucket min time metadata field set",
+                hasTimeseriesBucketMinTime());
         return _holder->timeseriesBucketMinTime;
     }
 
@@ -344,7 +346,9 @@ public:
     }
 
     Date_t getTimeseriesBucketMaxTime() const {
-        invariant(hasTimeseriesBucketMaxTime());
+        tassert(6850101,
+                "Document must have timeseries bucket max time metadata field set",
+                hasTimeseriesBucketMaxTime());
         return _holder->timeseriesBucketMaxTime;
     }
 

@@ -34,6 +34,7 @@
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -266,6 +267,34 @@ TEST(DocumentMetadataFieldsTest, CopyFromCopiesAllMetadataThatSourceHas) {
     ASSERT_FALSE(destination.hasSearchHighlights());
     ASSERT_FALSE(destination.hasIndexKey());
     ASSERT_FALSE(destination.hasSearchScoreDetails());
+}
+
+TEST(DocumentMetadataFieldsTest, GetTimeseriesBucketMinTimeExists) {
+    DocumentMetadataFields source;
+    Date_t time;
+    source.setTimeseriesBucketMinTime(time);
+    ASSERT_EQ(source.getTimeseriesBucketMinTime(), time);
+}
+
+TEST(DocumentMetadataFieldsTest, GetTimeseriesBucketMaxTimeExists) {
+    DocumentMetadataFields source;
+    Date_t time;
+    source.setTimeseriesBucketMaxTime(time);
+    ASSERT_EQ(source.getTimeseriesBucketMaxTime(), time);
+}
+
+DEATH_TEST_REGEX(DocumentMetadataFieldsTest,
+                 GetTimeseriesBucketMinTimeDoesntExist,
+                 "Tripwire assertion.*6850100") {
+    DocumentMetadataFields source;
+    source.getTimeseriesBucketMinTime();
+}
+
+DEATH_TEST_REGEX(DocumentMetadataFieldsTest,
+                 GetTimeseriesBucketMaxTimeDoesntExist,
+                 "Tripwire assertion.*6850101") {
+    DocumentMetadataFields source;
+    source.getTimeseriesBucketMaxTime();
 }
 
 }  // namespace mongo
