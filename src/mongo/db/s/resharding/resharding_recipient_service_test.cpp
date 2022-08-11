@@ -63,9 +63,8 @@ using RecipientStateTransitionController =
     resharding_service_test_helpers::StateTransitionController<RecipientStateEnum>;
 using PauseDuringStateTransitions =
     resharding_service_test_helpers::PauseDuringStateTransitions<RecipientStateEnum>;
-using OpObserverForTest =
-    resharding_service_test_helpers::OpObserverForTest<RecipientStateEnum,
-                                                       ReshardingRecipientDocument>;
+using OpObserverForTest = resharding_service_test_helpers::
+    StateTransitionControllerOpObserver<RecipientStateEnum, ReshardingRecipientDocument>;
 const ShardId recipientShardId{"myShardId"};
 
 class ExternalStateForTest : public ReshardingRecipientService::RecipientStateMachineExternalState {
@@ -157,17 +156,6 @@ private:
     const ShardId _someDonorId{"myDonorId"};
 };
 
-class RecipientOpObserverForTest : public OpObserverForTest {
-public:
-    RecipientOpObserverForTest(std::shared_ptr<RecipientStateTransitionController> controller)
-        : OpObserverForTest(std::move(controller),
-                            NamespaceString::kRecipientReshardingOperationsNamespace) {}
-
-    RecipientStateEnum getState(const ReshardingRecipientDocument& recipientDoc) override {
-        return recipientDoc.getMutableState().getState();
-    }
-};
-
 class DataReplicationForTest : public ReshardingDataReplicationInterface {
 public:
     SemiFuture<void> runUntilStrictlyConsistent(
@@ -235,7 +223,12 @@ public:
         repl::StorageInterface::set(serviceContext, std::move(storageMock));
 
         _controller = std::make_shared<RecipientStateTransitionController>();
-        _opObserverRegistry->addObserver(std::make_unique<RecipientOpObserverForTest>(_controller));
+        _opObserverRegistry->addObserver(std::make_unique<OpObserverForTest>(
+            _controller,
+            NamespaceString::kRecipientReshardingOperationsNamespace,
+            [](const ReshardingRecipientDocument& stateDoc) {
+                return stateDoc.getMutableState().getState();
+            }));
     }
 
     RecipientStateTransitionController* controller() {

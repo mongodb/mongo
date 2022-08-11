@@ -64,22 +64,10 @@ namespace {
 
 using CoordinatorStateTransitionController =
     resharding_service_test_helpers::StateTransitionController<CoordinatorStateEnum>;
-using OpObserverForTest =
-    resharding_service_test_helpers::OpObserverForTest<CoordinatorStateEnum,
-                                                       ReshardingCoordinatorDocument>;
+using OpObserverForTest = resharding_service_test_helpers::
+    StateTransitionControllerOpObserver<CoordinatorStateEnum, ReshardingCoordinatorDocument>;
 using PauseDuringStateTransitions =
     resharding_service_test_helpers::PauseDuringStateTransitions<CoordinatorStateEnum>;
-
-class CoordinatorOpObserverForTest : public OpObserverForTest {
-public:
-    CoordinatorOpObserverForTest(std::shared_ptr<CoordinatorStateTransitionController> controller)
-        : OpObserverForTest(std::move(controller),
-                            NamespaceString::kConfigReshardingOperationsNamespace) {}
-
-    CoordinatorStateEnum getState(const ReshardingCoordinatorDocument& coordinatorDoc) override {
-        return coordinatorDoc.getState();
-    }
-};
 
 class ExternalStateForTest : public ReshardingCoordinatorExternalState {
     ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
@@ -169,11 +157,10 @@ public:
         invariant(_opObserverRegistry);
 
         _opObserverRegistry->addObserver(std::make_unique<ReshardingOpObserver>());
-        _opObserverRegistry->addObserver(
-            std::make_unique<CoordinatorOpObserverForTest>(_controller));
-        _opObserverRegistry->addObserver(
-            std::make_unique<repl::PrimaryOnlyServiceOpObserver>(getServiceContext()));
-
+        _opObserverRegistry->addObserver(std::make_unique<OpObserverForTest>(
+            _controller,
+            NamespaceString::kConfigReshardingOperationsNamespace,
+            [](const ReshardingCoordinatorDocument& stateDoc) { return stateDoc.getState(); }));
         _registry = repl::PrimaryOnlyServiceRegistry::get(getServiceContext());
         auto service = makeService(getServiceContext());
         auto serviceName = service->getServiceName();

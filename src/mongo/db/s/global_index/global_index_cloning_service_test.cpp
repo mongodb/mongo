@@ -39,6 +39,7 @@
 #include "mongo/db/s/global_index/global_index_cloning_external_state.h"
 #include "mongo/db/s/global_index/global_index_cloning_service.h"
 #include "mongo/db/s/global_index/global_index_util.h"
+#include "mongo/db/s/resharding/resharding_service_test_helpers.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
@@ -50,6 +51,14 @@
 namespace mongo {
 namespace global_index {
 namespace {
+
+using StateTransitionController =
+    resharding_service_test_helpers::StateTransitionController<GlobalIndexClonerStateEnum>;
+using OpObserverForTest =
+    resharding_service_test_helpers::StateTransitionControllerOpObserver<GlobalIndexClonerStateEnum,
+                                                                         GlobalIndexClonerDoc>;
+using PauseDuringStateTransitions =
+    resharding_service_test_helpers::PauseDuringStateTransitions<GlobalIndexClonerStateEnum>;
 
 const ShardId kRecipientShardId{"myShardId"};
 const NamespaceString kSourceNss{"sourcedb", "sourcecollection"};
@@ -168,72 +177,6 @@ private:
     MockGlobalIndexClonerFetcher* _mockFetcher;
 };
 
-class Blocker {
-public:
-    ~Blocker() {
-        stdx::unique_lock lk(_mutex);
-        _shouldBlock = false;
-        _cvBlocked.notify_all();
-    }
-
-    void blockIfActivated(OperationContext* opCtx) {
-        stdx::unique_lock lk(_mutex);
-        _blockedOnce = true;
-        opCtx->waitForConditionOrInterrupt(_cvBlocked, lk, [this] { return !_shouldBlock; });
-    }
-
-    void waitUntilBlockedOccurred(OperationContext* opCtx) {
-        stdx::unique_lock lk(_mutex);
-        opCtx->waitForConditionOrInterrupt(_cvBlocked, lk, [this] { return _blockedOnce; });
-    }
-
-    void block() {
-        stdx::unique_lock lk(_mutex);
-        _shouldBlock = true;
-    }
-
-    void unblock() {
-        stdx::unique_lock lk(_mutex);
-        _shouldBlock = false;
-    }
-
-private:
-    Mutex _mutex = MONGO_MAKE_LATCH("GlobalIndexCloningServiceTestBlocker::_mutex");
-    stdx::condition_variable _cvBlocked;
-    bool _shouldBlock{false};
-    bool _blockedOnce{false};
-};
-
-class OpObserverForTest : public OpObserverNoop {
-public:
-    OpObserverForTest(Blocker* insertBlocker, Blocker* deleteBlocker)
-        : _insertBlocker(insertBlocker), _deleteBlocker(deleteBlocker) {}
-
-    void onInserts(OperationContext* opCtx,
-                   const CollectionPtr& coll,
-                   std::vector<InsertStatement>::const_iterator begin,
-                   std::vector<InsertStatement>::const_iterator end,
-                   bool fromMigrate) override {
-        if (NamespaceString::kGlobalIndexClonerNamespace == coll->ns()) {
-            _insertBlocker->blockIfActivated(opCtx);
-        }
-    }
-
-    void onDelete(OperationContext* opCtx,
-                  const NamespaceString& nss,
-                  const UUID& uuid,
-                  StmtId stmtId,
-                  const OplogDeleteEntryArgs& args) override {
-        if (NamespaceString::kGlobalIndexClonerNamespace == nss) {
-            _deleteBlocker->blockIfActivated(opCtx);
-        }
-    }
-
-private:
-    Blocker* _insertBlocker;
-    Blocker* _deleteBlocker;
-};
-
 GlobalIndexCloningService::InstanceID extractInstanceId(const GlobalIndexClonerDoc& doc) {
     return BSON("_id" << doc.getIndexCollectionUUID());
 }
@@ -257,8 +200,13 @@ public:
         // so we should manually instantiate it to ensure it exists in our tests.
         ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getFetchDefaultsFn());
 
+        _stateTransitionController = std::make_shared<StateTransitionController>();
         _opObserverRegistry->addObserver(
-            std::make_unique<OpObserverForTest>(&_stateDocInsertBlocker, &_stateDocDeleteBlocker));
+            std::make_unique<OpObserverForTest>(_stateTransitionController,
+                                                NamespaceString::kGlobalIndexClonerNamespace,
+                                                [](const GlobalIndexClonerDoc& stateDoc) {
+                                                    return stateDoc.getMutableState().getState();
+                                                }));
 
         // Create config.transactions collection
         auto opCtx = serviceContext->makeOperationContext(Client::getCurrent());
@@ -331,12 +279,8 @@ public:
         return false;
     }
 
-    Blocker* getStateDocInsertBlocker() {
-        return &_stateDocInsertBlocker;
-    }
-
-    Blocker* getStateDocDeleteBlocker() {
-        return &_stateDocDeleteBlocker;
+    StateTransitionController* stateTransitionController() {
+        return _stateTransitionController.get();
     }
 
     void replaceFetcherResultList(
@@ -377,8 +321,7 @@ private:
     const BSONObj _indexSpec{BSON("key" << BSON(_indexKey << 1) << "unique" << true)};
 
     ReadWriteConcernDefaultsLookupMock _lookupMock;
-    Blocker _stateDocInsertBlocker;
-    Blocker _stateDocDeleteBlocker;
+    std::shared_ptr<StateTransitionController> _stateTransitionController;
 
     MockGlobalIndexClonerFetcher _mockFetcher;
     MockGlobalIndexClonerFetcher _fetcherCopyForVerification;
@@ -391,6 +334,8 @@ TEST_F(GlobalIndexClonerServiceTest, CloneInsertsToGlobalIndexCollection) {
 
     auto cloner = GlobalIndexStateMachine::getOrCreate(rawOpCtx, _service, doc.toBSON());
     auto future = cloner->getCompletionFuture();
+    cloner->getReadyToCommitFuture().get();
+    cloner->cleanup();
     future.get();
 
     ASSERT_TRUE(doesCollectionExist(rawOpCtx, skipIdNss(doc.getNss(), doc.getIndexName())));
@@ -402,38 +347,56 @@ TEST_F(GlobalIndexClonerServiceTest, ShouldBeSafeToRetryOnStepDown) {
     auto opCtx = makeOperationContext();
     auto rawOpCtx = opCtx.get();
 
-    auto stateDocInsertBlocker = getStateDocInsertBlocker();
-    stateDocInsertBlocker->block();
-    auto stateDocDeleteBlocker = getStateDocDeleteBlocker();
-    stateDocDeleteBlocker->block();
+    const std::vector<GlobalIndexClonerStateEnum> states{GlobalIndexClonerStateEnum::kCloning,
+                                                         GlobalIndexClonerStateEnum::kReadyToCommit,
+                                                         GlobalIndexClonerStateEnum::kDone};
+    PauseDuringStateTransitions stateTransitionsGuard{stateTransitionController(), states};
 
-    {
-        auto cloner = GlobalIndexStateMachine::getOrCreate(rawOpCtx, _service, doc.toBSON());
-        stateDocInsertBlocker->waitUntilBlockedOccurred(rawOpCtx);
+    auto prevState = GlobalIndexClonerStateEnum::kUnused;
+    for (const auto& nextState : states) {
+        LOGV2(6870601,
+              "Testing next state",
+              "state"_attr = GlobalIndexClonerState_serializer(nextState));
+
+        auto cloner = ([&] {
+            if (nextState == GlobalIndexClonerStateEnum::kCloning ||
+                nextState == GlobalIndexClonerStateEnum::kReadyToCommit) {
+                return GlobalIndexStateMachine::getOrCreate(rawOpCtx, _service, doc.toBSON());
+            }
+
+            return *GlobalIndexStateMachine::lookup(rawOpCtx, _service, extractInstanceId(doc));
+        })();
+
+        if (prevState != GlobalIndexClonerStateEnum::kUnused) {
+            stateTransitionsGuard.unset(prevState);
+        }
+
+        auto readyToCommitFuture = cloner->getReadyToCommitFuture();
+
+        if (nextState == GlobalIndexClonerStateEnum::kDone) {
+            readyToCommitFuture.get();
+            cloner->cleanup();
+        }
+
+        stateTransitionsGuard.wait(nextState);
         stepDown();
 
+        if (nextState != GlobalIndexClonerStateEnum::kDone) {
+            ASSERT_THROWS(readyToCommitFuture.get(), DBException);
+        }
+
+        // Note: can either throw InterruptDueToRepl or ShutdownInProgress (from executor).
         ASSERT_THROWS(cloner->getCompletionFuture().get(), DBException);
+
+        stepUp(rawOpCtx);
+
+        prevState = nextState;
     }
 
-    stepUp(rawOpCtx);
-
-    {
-        auto cloner = GlobalIndexStateMachine::getOrCreate(rawOpCtx, _service, doc.toBSON());
-        stateDocInsertBlocker->unblock();
-        stateDocDeleteBlocker->waitUntilBlockedOccurred(rawOpCtx);
-        stepDown();
-
-        ASSERT_THROWS(cloner->getCompletionFuture().get(), DBException);
-    }
-
-    stepUp(rawOpCtx);
-
-    // It is possible for the primary only service to run to completion and no longer exists.
-    {
-        auto cloner = GlobalIndexStateMachine::lookup(rawOpCtx, _service, extractInstanceId(doc));
-        stateDocDeleteBlocker->unblock();
-        (*cloner)->getCompletionFuture().get();
-    }
+    auto cloner = *GlobalIndexStateMachine::lookup(rawOpCtx, _service, extractInstanceId(doc));
+    stateTransitionsGuard.unset(GlobalIndexClonerStateEnum::kDone);
+    cloner->cleanup();
+    cloner->getCompletionFuture().get();
 
     checkIndexCollection(rawOpCtx);
 }
@@ -458,6 +421,8 @@ TEST_F(GlobalIndexClonerServiceTest, ShouldBeAbleToConsumeMultipleBatchesWorthof
 
     auto cloner = GlobalIndexStateMachine::getOrCreate(rawOpCtx, _service, doc.toBSON());
     auto future = cloner->getCompletionFuture();
+    cloner->getReadyToCommitFuture().get();
+    cloner->cleanup();
     future.get();
 
     ASSERT_TRUE(doesCollectionExist(rawOpCtx, skipIdNss(doc.getNss(), doc.getIndexName())));
@@ -473,6 +438,8 @@ TEST_F(GlobalIndexClonerServiceTest, ShouldWorkWithEmptyCollection) {
 
     auto cloner = GlobalIndexStateMachine::getOrCreate(rawOpCtx, _service, doc.toBSON());
     auto future = cloner->getCompletionFuture();
+    cloner->getReadyToCommitFuture().get();
+    cloner->cleanup();
     future.get();
 
     ASSERT_TRUE(doesCollectionExist(rawOpCtx, skipIdNss(doc.getNss(), doc.getIndexName())));

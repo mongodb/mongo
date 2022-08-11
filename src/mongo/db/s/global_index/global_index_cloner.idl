@@ -42,8 +42,19 @@ enums:
         values:
             kUnused: "unused"
             kCloning: "cloning"
+            kReadyToCommit: "ready-to-commit"
+            # done is not a real state but only used in tests.
+            kDone: "done"
 
 structs:
+    GlobalIndexClonerMutableState:
+        description: "Contains the mutable state for global index cloning operation."
+        strict: false
+        fields:
+            state:
+                type: GlobalIndexClonerState
+                description: "The current state of cloner."
+
     GlobalIndexClonerDoc:
         description: "Document containing the state and specs of global index cloning operation."
         strict: false
@@ -69,6 +80,4 @@ structs:
                 type: timestamp
                 description: "The minimum timestamp to use for fetching documents from the source
                                 collection"
-            state:
-                type: GlobalIndexClonerState
-                description: "The current state of cloner."
+            mutableState: GlobalIndexClonerMutableState

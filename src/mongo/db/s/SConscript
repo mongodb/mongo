@@ -552,7 +552,6 @@ env.Library(
     target='sharding_mongod_test_fixture',
     source=[
         'sharding_mongod_test_fixture.cpp',
-        'resharding/resharding_service_test_helpers.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper',

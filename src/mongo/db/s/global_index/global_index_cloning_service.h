@@ -94,6 +94,10 @@ public:
 
     void abort();
 
+    SharedSemiFuture<void> getReadyToCommitFuture() const {
+        return _readyToCommitPromise.getFuture();
+    }
+
     /**
      * Returns a Future that will be resolved when all work associated with this Instance is done
      * making forward progress.
@@ -110,6 +114,12 @@ public:
      * Initiates the cancellation of the cloning operation.
      */
     void abort(bool isUserCancelled);
+
+    /**
+     * Tells this cloner to perform cleanup. This can cause this cloner to abort if it is still
+     * running.
+     */
+    void cleanup();
 
     void checkIfOptionsConflict(const BSONObj& stateDoc) const final;
 
@@ -137,10 +147,9 @@ private:
         std::shared_ptr<executor::ScopedTaskExecutor> executor,
         const CancellationToken& cancelToken);
 
-    /**
-     * Deletes the state document from storage.
-     */
-    void _removeStateDocument(OperationContext* opCtx);
+    ExecutorFuture<repl::OpTime> _transitionToReadyToCommit(
+        std::shared_ptr<executor::ScopedTaskExecutor> executor,
+        const CancellationToken& cancelToken);
 
     /**
      * Performs the entire cloning process.
@@ -181,39 +190,60 @@ private:
      */
     void _ensureCollection(OperationContext* opCtx, const NamespaceString& nss);
 
-    ServiceContext* const _serviceContext;
+    GlobalIndexClonerStateEnum _getState() const;
+    GlobalIndexClonerMutableState _getMutableState() const;
+    GlobalIndexClonerDoc _makeClonerDoc() const;
+
+    /**********************************************************************************
+     * Thread safety legend
+     *
+     * (TS) - Thread safe. Object can be accessed concurrently without additional mutex.
+     * (NC) - No concurrent access pattern. So can be used without mutex.
+     * (M) - Mutex required.
+     */
+
+    ServiceContext* const _serviceContext;  // (TS)
 
     // The primary-only service instance corresponding to the cloner instance. Not owned.
-    const GlobalIndexCloningService* const _cloningService;
+    const GlobalIndexCloningService* const _cloningService;  // (TS)
+
+    const UUID _indexCollectionUUID;
+    const NamespaceString _sourceNss;
+    const UUID _sourceCollUUID;
+    const std::string _indexName;
+    const BSONObj _indexSpec;
+    const Timestamp _minFetchTimestamp;
 
     // A separate executor different from the one supplied by the primary only service is needed
     // because the one from POS can be shut down during step down. This will ensure that the
     // operation context created from the cancelableOpCtxFactory can be interrupted when the cancel
     // token is aborted during step down.
-    const std::shared_ptr<ThreadPool> _execForCancelableOpCtx;
+    const std::shared_ptr<ThreadPool> _execForCancelableOpCtx;  // (TS)
 
     boost::optional<resharding::RetryingCancelableOperationContextFactory>
-        _retryingCancelableOpCtxFactory;
+        _retryingCancelableOpCtxFactory;  // (TS)
 
-    Mutex _mutex = MONGO_MAKE_LATCH("GlobalIndexCloningStateMachine::_mutex");
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("GlobalIndexCloningStateMachine::_mutex");
 
-    GlobalIndexClonerDoc _clonerState;
+    GlobalIndexClonerMutableState _mutableState;  // (NC)
 
     // Canceled when there is an unrecoverable error or stepdown.
-    boost::optional<CancellationSource> _abortSource;
+    boost::optional<CancellationSource> _abortSource;  // (M)
 
-    std::unique_ptr<GlobalIndexClonerFetcherFactoryInterface> _fetcherFactory;
-    std::unique_ptr<GlobalIndexClonerFetcherInterface> _fetcher;
-    std::unique_ptr<GlobalIndexInserter> _inserter;
+    std::unique_ptr<GlobalIndexClonerFetcherFactoryInterface> _fetcherFactory;  // (TS)
+    std::unique_ptr<GlobalIndexClonerFetcherInterface> _fetcher;                // (NC)
+    std::unique_ptr<GlobalIndexInserter> _inserter;                             // (NC)
 
     // Keeps track if there is still a posibility that we still have documents that needs to be
     // fetched from the source collection.
-    bool _hasMoreToFetch{true};
+    bool _hasMoreToFetch{true};  // (NC)
 
-    std::queue<GlobalIndexClonerFetcher::FetchedEntry> _fetchedDocs;
+    std::queue<GlobalIndexClonerFetcher::FetchedEntry> _fetchedDocs;  // (NC)
 
-    SharedPromise<void> _completionPromise;
-    const std::unique_ptr<CloningExternalState> _externalState;
+    SharedPromise<void> _completionPromise;                      // (TS)
+    SharedPromise<void> _readyToCommitPromise;                   // (TS)
+    SharedPromise<void> _waitForCleanupPromise;                  // (M)
+    const std::unique_ptr<CloningExternalState> _externalState;  // (TS)
 };
 
 }  // namespace global_index
