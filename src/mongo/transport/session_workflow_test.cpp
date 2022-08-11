@@ -31,9 +31,11 @@
 #include "mongo/platform/basic.h"
 
 #include <memory>
+#include <type_traits>
 #include <vector>
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
@@ -42,8 +44,10 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/stdx/variant.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_entry_point_impl.h"
@@ -78,22 +82,6 @@ public:
 private:
     T& _target;
     T _saved;
-};
-
-/**
- * This class stores and synchronizes the shared state result between the test
- * fixture and its various wrappers.
- */
-struct StateResult {
-    Mutex mutex = MONGO_MAKE_LATCH("StateResult::_mutex");
-    stdx::condition_variable cv;
-
-    AtomicWord<bool> isConnected{true};
-
-    boost::optional<Status> pollResult;
-    boost::optional<StatusWith<Message>> sourceResult;
-    boost::optional<StatusWith<DbResponse>> processResult;
-    boost::optional<Status> sinkResult;
 };
 
 const Status kClosedSessionError{ErrorCodes::SocketException, "Session is closed"};
@@ -201,6 +189,75 @@ constexpr StringData toString(RequestKind kind) {
 std::ostream& operator<<(std::ostream& os, RequestKind kind) {
     return os << toString(kind);
 }
+
+class ResultValue {
+public:
+    ResultValue() = default;
+    explicit ResultValue(Status status) : _value(std::move(status)) {}
+    explicit ResultValue(StatusWith<Message> message) : _value(std::move(message)) {}
+    explicit ResultValue(StatusWith<DbResponse> response) : _value(std::move(response)) {}
+
+    void setResponse(StatusWith<DbResponse> response) {
+        _value = response;
+    }
+
+    StatusWith<DbResponse> getResponse() const {
+        return _convertTo<StatusWith<DbResponse>>();
+    }
+
+    void setMessage(StatusWith<Message> message) {
+        _value = message;
+    }
+
+    StatusWith<Message> getMessage() const {
+        return _convertTo<StatusWith<Message>>();
+    }
+
+    void setStatus(Status status) {
+        _value = status;
+    }
+
+    Status getStatus() const {
+        return _convertTo<Status>();
+    }
+
+    bool empty() const {
+        return _value.index() == 0;
+    }
+
+    explicit operator bool() const {
+        return !empty();
+    }
+
+private:
+    template <typename Target>
+    Target _convertTo() const {
+        return stdx::visit(
+            [](auto alt) -> Target {
+                if constexpr (std::is_convertible<decltype(alt), Target>())
+                    return alt;
+                invariant(false, "ResultValue not convertible to target type");
+                MONGO_COMPILER_UNREACHABLE;
+            },
+            _value);
+    }
+
+    stdx::variant<stdx::monostate, Status, StatusWith<Message>, StatusWith<DbResponse>> _value;
+};
+
+/**
+ * This class stores and synchronizes the shared state result between the test
+ * fixture and its various wrappers.
+ */
+struct StateResult {
+    Mutex mutex = MONGO_MAKE_LATCH("StateResult::_mutex");
+    stdx::condition_variable cv;
+
+    AtomicWord<bool> isConnected{true};
+
+    ResultValue result;
+    SessionState state;
+};
 
 class CallbackMockSession : public MockSessionBase {
 public:
@@ -317,20 +374,12 @@ public:
      * This function stores an external response to be delivered out of line to the
      * SessionWorkflow.
      */
-    template <SessionState kState, typename ResultT>
-    void setResult(ResultT result) {
+    void setResult(SessionState state, ResultValue result) {
         auto lk = stdx::lock_guard(_stateResult->mutex);
-        if constexpr (kState == SessionState::kPoll) {
-            _stateResult->pollResult = std::move(result);
-        } else if constexpr (kState == SessionState::kSource) {
-            _stateResult->sourceResult = std::move(result);
-        } else if constexpr (kState == SessionState::kProcess) {
-            _stateResult->processResult = std::move(result);
-        } else if constexpr (kState == SessionState::kSink) {
-            _stateResult->sinkResult = std::move(result);
-        } else {
-            FAIL("Cannot set a result for this state");
-        }
+        invariant(state == SessionState::kPoll || state == SessionState::kSource ||
+                  state == SessionState::kProcess || state == SessionState::kSink);
+        _stateResult->result = std::move(result);
+        _stateResult->state = state;
         _stateResult->cv.notify_one();
     }
 
@@ -338,33 +387,47 @@ public:
      * This function makes a generic result appropriate for a successful state change given
      * SessionState and RequestKind.
      */
-    template <SessionState kState, RequestKind kKind>
-    auto makeGenericResult() {
-        if constexpr (kState == SessionState::kPoll || kState == SessionState::kSink) {
-            return Status::OK();
-        } else if constexpr (kState == SessionState::kSource) {
-            Message result = _makeIndexedBson();
-            if constexpr (kKind == RequestKind::kExhaust) {
-                OpMsg::setFlag(&result, OpMsg::kExhaustSupported);
-            } else {
-                static_assert(kKind == RequestKind::kDefault || kKind == RequestKind::kMoreToCome);
-            }
-            return result;
-        } else if constexpr (kState == SessionState::kProcess) {
-            DbResponse response;
-            if constexpr (kKind == RequestKind::kDefault) {
-                response.response = _makeIndexedBson();
-            } else if constexpr (kKind == RequestKind::kExhaust) {
-                response.response = _makeIndexedBson();
-                response.shouldRunAgainForExhaust = true;
-            } else {
-                static_assert(kKind == RequestKind::kMoreToCome);
-            }
-            return response;
-        } else {
-            FAIL("Unable to make generic result for this state");
+    ResultValue makeGenericResult(SessionState state, RequestKind kind) {
+        ResultValue result;
+        switch (state) {
+            case SessionState::kPoll:
+            case SessionState::kSink:
+                result.setStatus(Status::OK());
+                break;
+            case SessionState::kSource: {
+                Message message = _makeIndexedBson();
+                switch (kind) {
+                    case RequestKind::kExhaust:
+                        OpMsg::setFlag(&message, OpMsg::kExhaustSupported);
+                        break;
+                    case RequestKind::kDefault:
+                    case RequestKind::kMoreToCome:
+                        break;
+                }
+                result.setMessage(StatusWith<Message>(message));
+            } break;
+            case SessionState::kProcess: {
+                DbResponse response;
+                switch (kind) {
+                    case RequestKind::kDefault:
+                        response.response = _makeIndexedBson();
+                        break;
+                    case RequestKind::kExhaust:
+                        response.response = _makeIndexedBson();
+                        response.shouldRunAgainForExhaust = true;
+                        break;
+                    case RequestKind::kMoreToCome:
+                        break;
+                }
+                result.setResponse(response);
+            } break;
+            default:
+                invariant(
+                    false,
+                    "Unable to make generic result for this state: {}"_format(toString(state)));
         }
-    };
+        return result;
+    }
 
     /**
      * Initialize a new Session.
@@ -441,15 +504,17 @@ private:
 
         auto result = [&]() -> StatusWith<DbResponse> {
             auto lk = stdx::unique_lock(_stateResult->mutex);
-            _stateResult->cv.wait(lk,
-                                  [this] { return _stateResult->processResult || !isConnected(); });
+            _stateResult->cv.wait(lk, [this] {
+                return (_stateResult->result && _stateResult->state == SessionState::kProcess) ||
+                    !isConnected();
+            });
 
             if (!isConnected()) {
                 return kClosedSessionError;
             }
 
-            invariant(_stateResult->processResult);
-            return *std::exchange(_stateResult->processResult, {});
+            invariant(_stateResult->result);
+            return std::exchange(_stateResult->result, {}).getResponse();
         }();
 
         LOGV2(5014100, "Handled request", "error"_attr = result.getStatus());
@@ -476,14 +541,17 @@ private:
 
         auto result = [&]() -> Status {
             auto lk = stdx::unique_lock(_stateResult->mutex);
-            _stateResult->cv.wait(lk,
-                                  [this] { return _stateResult->pollResult || !isConnected(); });
+            _stateResult->cv.wait(lk, [this] {
+                return (_stateResult->result && _stateResult->state == SessionState::kPoll) ||
+                    !isConnected();
+            });
 
             if (!isConnected()) {
                 return kClosedSessionError;
             }
 
-            return *std::exchange(_stateResult->pollResult, {});
+            invariant(_stateResult->result);
+            return std::exchange(_stateResult->result, {}).getStatus();
         }();
 
         LOGV2(5014102, "Finished waiting for data", "error"_attr = result);
@@ -498,15 +566,17 @@ private:
 
         auto result = [&]() -> StatusWith<Message> {
             auto lk = stdx::unique_lock(_stateResult->mutex);
-            _stateResult->cv.wait(lk,
-                                  [this] { return _stateResult->sourceResult || !isConnected(); });
+            _stateResult->cv.wait(lk, [this] {
+                return (_stateResult->result && _stateResult->state == SessionState::kSource) ||
+                    !isConnected();
+            });
 
             if (!isConnected()) {
                 return kClosedSessionError;
             }
 
-            invariant(_stateResult->sourceResult);
-            return *std::exchange(_stateResult->sourceResult, {});
+            invariant(_stateResult->result);
+            return std::exchange(_stateResult->result, {}).getMessage();
         }();
 
         LOGV2(5014103, "Sourced message", "error"_attr = result.getStatus());
@@ -522,15 +592,17 @@ private:
 
         auto result = [&]() -> Status {
             auto lk = stdx::unique_lock(_stateResult->mutex);
-            _stateResult->cv.wait(lk,
-                                  [this] { return _stateResult->sinkResult || !isConnected(); });
+            _stateResult->cv.wait(lk, [this] {
+                return (_stateResult->result && _stateResult->state == SessionState::kSink) ||
+                    !isConnected();
+            });
 
             if (!isConnected()) {
                 return kClosedSessionError;
             }
 
-            invariant(_stateResult->sinkResult);
-            return *std::exchange(_stateResult->sinkResult, {});
+            invariant(_stateResult->result);
+            return std::exchange(_stateResult->result, {}).getStatus();
         }();
 
         LOGV2(5014104, "Sunk message", "error"_attr = result);
@@ -580,7 +652,6 @@ class StepRunner {
     struct Step {
         SessionState state;
         RequestKind kind;
-        unique_function<SessionState(FailureCondition)> func;
     };
     using StepList = std::vector<Step>;
 
@@ -594,11 +665,10 @@ public:
      * Given a FailureCondition, cause an external result to be delivered that is appropriate for
      * the given state and request kind.
      */
-    template <SessionState kState, RequestKind kKind>
-    SessionState doGenericStep(FailureCondition fail) {
+    SessionState doGenericStep(const Step& step, FailureCondition fail) {
         switch (fail) {
             case FailureCondition::kNone: {
-                _fixture->setResult<kState>(_fixture->makeGenericResult<kState, kKind>());
+                _fixture->setResult(step.state, _fixture->makeGenericResult(step.state, step.kind));
             } break;
             case FailureCondition::kTerminate: {
                 _fixture->terminateViaServiceEntryPoint();
@@ -611,13 +681,13 @@ public:
                 // result.
             } break;
             case FailureCondition::kNetwork: {
-                _fixture->setResult<kState>(kNetworkError);
+                _fixture->setResult(step.state, ResultValue(kNetworkError));
             } break;
             case FailureCondition::kShutdown: {
-                _fixture->setResult<kState>(kShutdownError);
+                _fixture->setResult(step.state, ResultValue(kShutdownError));
             } break;
             case FailureCondition::kArbitrary: {
-                _fixture->setResult<kState>(kArbitraryError);
+                _fixture->setResult(step.state, ResultValue(kArbitraryError));
             } break;
         };
 
@@ -627,21 +697,18 @@ public:
     /**
      * Mark an additional expected state in the session workflow.
      */
-    template <SessionState kState, RequestKind kKind>
-    void expectNextState() {
+    void expectNextState(SessionState state, RequestKind kind) {
         auto step = Step{};
-        step.state = kState;
-        step.kind = kKind;
-        step.func = [this](FailureCondition fail) { return doGenericStep<kState, kKind>(fail); };
+        step.state = state;
+        step.kind = kind;
         _steps.emplace_back(std::move(step));
     }
 
     /**
      * Mark the final expected state in the session workflow.
      */
-    template <SessionState kState>
-    void expectFinalState() {
-        _finalState = kState;
+    void expectFinalState(SessionState state) {
+        _finalState = state;
     }
 
     /**
@@ -672,7 +739,8 @@ public:
         LOGV2(5014106, "Running success case");
         _fixture->runWithNewSession([&] {
             for (auto iter = _steps.begin(); iter != _steps.end(); ++iter) {
-                ASSERT_EQ(iter->func(FailureCondition::kNone), getExpectedPostState(iter));
+                ASSERT_EQ(doGenericStep(*iter, FailureCondition::kNone),
+                          getExpectedPostState(iter));
             }
 
             _fixture->endSession();
@@ -699,12 +767,13 @@ public:
                     for (; iter != failIter; ++iter) {
                         // Run through each step until our point of failure with
                         // FailureCondition::kNone.
-                        ASSERT_EQ(iter->func(FailureCondition::kNone), getExpectedPostState(iter))
+                        ASSERT_EQ(doGenericStep(*iter, FailureCondition::kNone),
+                                  getExpectedPostState(iter))
                             << "Current state: (" << iter->state << ", " << iter->kind << ")";
                     }
 
                     // Finally fail on a given step.
-                    ASSERT_EQ(iter->func(fail), SessionState::kEnd);
+                    ASSERT_EQ(doGenericStep(*iter, fail), SessionState::kEnd);
                 });
             }
         }
@@ -826,10 +895,10 @@ TEST_F(SessionWorkflowTest, OnClientDisconnectCalledOnCleanup) {
 TEST_F(SessionWorkflowWithDedicatedThreadsTest, DefaultLoop) {
     auto runner = StepRunner(this);
 
-    runner.expectNextState<SessionState::kSource, RequestKind::kDefault>();
-    runner.expectNextState<SessionState::kProcess, RequestKind::kDefault>();
-    runner.expectNextState<SessionState::kSink, RequestKind::kDefault>();
-    runner.expectFinalState<SessionState::kSource>();
+    runner.expectNextState(SessionState::kSource, RequestKind::kDefault);
+    runner.expectNextState(SessionState::kProcess, RequestKind::kDefault);
+    runner.expectNextState(SessionState::kSink, RequestKind::kDefault);
+    runner.expectFinalState(SessionState::kSource);
 
     runner.run();
 }
@@ -837,12 +906,12 @@ TEST_F(SessionWorkflowWithDedicatedThreadsTest, DefaultLoop) {
 TEST_F(SessionWorkflowWithDedicatedThreadsTest, ExhaustLoop) {
     auto runner = StepRunner(this);
 
-    runner.expectNextState<SessionState::kSource, RequestKind::kExhaust>();
-    runner.expectNextState<SessionState::kProcess, RequestKind::kExhaust>();
-    runner.expectNextState<SessionState::kSink, RequestKind::kExhaust>();
-    runner.expectNextState<SessionState::kProcess, RequestKind::kDefault>();
-    runner.expectNextState<SessionState::kSink, RequestKind::kDefault>();
-    runner.expectFinalState<SessionState::kSource>();
+    runner.expectNextState(SessionState::kSource, RequestKind::kExhaust);
+    runner.expectNextState(SessionState::kProcess, RequestKind::kExhaust);
+    runner.expectNextState(SessionState::kSink, RequestKind::kExhaust);
+    runner.expectNextState(SessionState::kProcess, RequestKind::kDefault);
+    runner.expectNextState(SessionState::kSink, RequestKind::kDefault);
+    runner.expectFinalState(SessionState::kSource);
 
     runner.run();
 }
@@ -850,12 +919,12 @@ TEST_F(SessionWorkflowWithDedicatedThreadsTest, ExhaustLoop) {
 TEST_F(SessionWorkflowWithDedicatedThreadsTest, MoreToComeLoop) {
     auto runner = StepRunner(this);
 
-    runner.expectNextState<SessionState::kSource, RequestKind::kMoreToCome>();
-    runner.expectNextState<SessionState::kProcess, RequestKind::kMoreToCome>();
-    runner.expectNextState<SessionState::kSource, RequestKind::kDefault>();
-    runner.expectNextState<SessionState::kProcess, RequestKind::kDefault>();
-    runner.expectNextState<SessionState::kSink, RequestKind::kDefault>();
-    runner.expectFinalState<SessionState::kSource>();
+    runner.expectNextState(SessionState::kSource, RequestKind::kMoreToCome);
+    runner.expectNextState(SessionState::kProcess, RequestKind::kMoreToCome);
+    runner.expectNextState(SessionState::kSource, RequestKind::kDefault);
+    runner.expectNextState(SessionState::kProcess, RequestKind::kDefault);
+    runner.expectNextState(SessionState::kSink, RequestKind::kDefault);
+    runner.expectFinalState(SessionState::kSource);
 
     runner.run();
 }
@@ -863,11 +932,11 @@ TEST_F(SessionWorkflowWithDedicatedThreadsTest, MoreToComeLoop) {
 TEST_F(SessionWorkflowWithBorrowedThreadsTest, DefaultLoop) {
     auto runner = StepRunner(this);
 
-    runner.expectNextState<SessionState::kPoll, RequestKind::kDefault>();
-    runner.expectNextState<SessionState::kSource, RequestKind::kDefault>();
-    runner.expectNextState<SessionState::kProcess, RequestKind::kDefault>();
-    runner.expectNextState<SessionState::kSink, RequestKind::kDefault>();
-    runner.expectFinalState<SessionState::kPoll>();
+    runner.expectNextState(SessionState::kPoll, RequestKind::kDefault);
+    runner.expectNextState(SessionState::kSource, RequestKind::kDefault);
+    runner.expectNextState(SessionState::kProcess, RequestKind::kDefault);
+    runner.expectNextState(SessionState::kSink, RequestKind::kDefault);
+    runner.expectFinalState(SessionState::kPoll);
 
     runner.run();
 }
@@ -875,13 +944,13 @@ TEST_F(SessionWorkflowWithBorrowedThreadsTest, DefaultLoop) {
 TEST_F(SessionWorkflowWithBorrowedThreadsTest, ExhaustLoop) {
     auto runner = StepRunner(this);
 
-    runner.expectNextState<SessionState::kPoll, RequestKind::kExhaust>();
-    runner.expectNextState<SessionState::kSource, RequestKind::kExhaust>();
-    runner.expectNextState<SessionState::kProcess, RequestKind::kExhaust>();
-    runner.expectNextState<SessionState::kSink, RequestKind::kExhaust>();
-    runner.expectNextState<SessionState::kProcess, RequestKind::kDefault>();
-    runner.expectNextState<SessionState::kSink, RequestKind::kDefault>();
-    runner.expectFinalState<SessionState::kPoll>();
+    runner.expectNextState(SessionState::kPoll, RequestKind::kExhaust);
+    runner.expectNextState(SessionState::kSource, RequestKind::kExhaust);
+    runner.expectNextState(SessionState::kProcess, RequestKind::kExhaust);
+    runner.expectNextState(SessionState::kSink, RequestKind::kExhaust);
+    runner.expectNextState(SessionState::kProcess, RequestKind::kDefault);
+    runner.expectNextState(SessionState::kSink, RequestKind::kDefault);
+    runner.expectFinalState(SessionState::kPoll);
 
     runner.run();
 }
@@ -889,14 +958,14 @@ TEST_F(SessionWorkflowWithBorrowedThreadsTest, ExhaustLoop) {
 TEST_F(SessionWorkflowWithBorrowedThreadsTest, MoreToComeLoop) {
     auto runner = StepRunner(this);
 
-    runner.expectNextState<SessionState::kPoll, RequestKind::kMoreToCome>();
-    runner.expectNextState<SessionState::kSource, RequestKind::kMoreToCome>();
-    runner.expectNextState<SessionState::kProcess, RequestKind::kMoreToCome>();
-    runner.expectNextState<SessionState::kPoll, RequestKind::kDefault>();
-    runner.expectNextState<SessionState::kSource, RequestKind::kDefault>();
-    runner.expectNextState<SessionState::kProcess, RequestKind::kDefault>();
-    runner.expectNextState<SessionState::kSink, RequestKind::kDefault>();
-    runner.expectFinalState<SessionState::kPoll>();
+    runner.expectNextState(SessionState::kPoll, RequestKind::kMoreToCome);
+    runner.expectNextState(SessionState::kSource, RequestKind::kMoreToCome);
+    runner.expectNextState(SessionState::kProcess, RequestKind::kMoreToCome);
+    runner.expectNextState(SessionState::kPoll, RequestKind::kDefault);
+    runner.expectNextState(SessionState::kSource, RequestKind::kDefault);
+    runner.expectNextState(SessionState::kProcess, RequestKind::kDefault);
+    runner.expectNextState(SessionState::kSink, RequestKind::kDefault);
+    runner.expectFinalState(SessionState::kPoll);
 
     runner.run();
 }
