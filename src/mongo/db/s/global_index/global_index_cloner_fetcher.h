@@ -39,17 +39,31 @@
 namespace mongo {
 namespace global_index {
 
-/**
- * Responsible for fetching documents to clone for a particular shard.
- */
-class GlobalIndexClonerFetcher {
+class GlobalIndexClonerFetcherInterface {
 public:
     struct FetchedEntry {
     public:
+        FetchedEntry(BSONObj _documentKey, BSONObj _indexKeyValues)
+            : documentKey(_documentKey.getOwned()), indexKeyValues(_indexKeyValues.getOwned()) {}
+
         BSONObj documentKey;
         BSONObj indexKeyValues;
     };
 
+    virtual ~GlobalIndexClonerFetcherInterface() {}
+
+    /**
+     * Returns the next document to clone.
+     * Returns boost::none if there are no documents left.
+     */
+    virtual boost::optional<FetchedEntry> getNext(OperationContext* opCtx) = 0;
+};
+
+/**
+ * Responsible for fetching documents to clone for a particular shard.
+ */
+class GlobalIndexClonerFetcher : public GlobalIndexClonerFetcherInterface {
+public:
     GlobalIndexClonerFetcher(NamespaceString nss,
                              UUID collUUId,
                              UUID indexUUID,
@@ -58,7 +72,7 @@ public:
                              KeyPattern sourceShardKeyPattern,
                              KeyPattern globalIndexPattern);
 
-    boost::optional<FetchedEntry> getNext(OperationContext* opCtx);
+    boost::optional<FetchedEntry> getNext(OperationContext* opCtx) override;
 
     /**
      * Builds the aggregation pipeline for fetching the documents

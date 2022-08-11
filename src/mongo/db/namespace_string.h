@@ -258,6 +258,9 @@ public:
     // Namespace used to store the state document of 'SetChangeStreamStateCoordinator'.
     static const NamespaceString kSetChangeStreamStateCoordinatorNamespace;
 
+    // Namespace used for storing global index cloner state documents.
+    static const NamespaceString kGlobalIndexClonerNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

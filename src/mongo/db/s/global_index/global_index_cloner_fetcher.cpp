@@ -156,6 +156,10 @@ GlobalIndexClonerFetcher::GlobalIndexClonerFetcher(NamespaceString nss,
 
 boost::optional<GlobalIndexClonerFetcher::FetchedEntry> GlobalIndexClonerFetcher::getNext(
     OperationContext* opCtx) {
+    if (!_pipeline) {
+        _pipeline = _restartPipeline(opCtx);
+    }
+
     _pipeline->reattachToOperationContext(opCtx);
     ON_BLOCK_EXIT([this] { _pipeline->detachFromOperationContext(); });
 
@@ -163,10 +167,6 @@ boost::optional<GlobalIndexClonerFetcher::FetchedEntry> GlobalIndexClonerFetcher
         _pipeline->dispose(opCtx);
         _pipeline.reset();
     });
-
-    if (!_pipeline) {
-        _pipeline = _restartPipeline(opCtx);
-    }
 
     auto next = _pipeline->getNext();
     guard.dismiss();

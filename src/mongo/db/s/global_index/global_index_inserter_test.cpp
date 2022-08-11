@@ -33,6 +33,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/global_index/global_index_entry_gen.h"
+#include "mongo/db/s/global_index/global_index_util.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
@@ -102,8 +103,7 @@ public:
     }
 
     NamespaceString skipIdNss() const {
-        return NamespaceString(NamespaceString::kConfigDb,
-                               "{}.globalIndex.{}.skipList"_format(_nss.coll(), _indexName));
+        return global_index::skipIdNss(_nss, _indexName);
     }
 
     NamespaceString globalIndexNss() const {

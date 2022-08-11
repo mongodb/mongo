@@ -32,6 +32,7 @@
 #include <fmt/format.h>
 
 #include "mongo/db/s/global_index/global_index_entry_gen.h"
+#include "mongo/db/s/global_index/global_index_util.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
@@ -56,12 +57,11 @@ GlobalIndexInserter::GlobalIndexInserter(NamespaceString nss,
       _executor(std::move(executor)) {}
 
 NamespaceString GlobalIndexInserter::_skipIdNss() {
-    return NamespaceString(NamespaceString::kConfigDb,
-                           "{}.globalIndex.{}.skipList"_format(_nss.coll(), _indexName));
+    return skipIdNss(_nss, _indexName);
 }
 
 NamespaceString GlobalIndexInserter::_globalIndexNss() {
-    return NamespaceString(_nss.db(), "{}.globalIndex.{}"_format(_nss.coll(), _indexName));
+    return globalIndexNss(_nss, _indexName);
 }
 
 void GlobalIndexInserter::processDoc(OperationContext* opCtx,

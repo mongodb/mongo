@@ -183,7 +183,6 @@ public:
         return resharding::WithAutomaticRetry([this, body]() { return body(_factory); });
     }
 
-
 private:
     const CancelableOperationContextFactory _factory;
 };
