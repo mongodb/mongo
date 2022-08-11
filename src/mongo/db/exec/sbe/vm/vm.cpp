@@ -916,7 +916,7 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::getFieldOrElement(
     }
 }
 
-std::tuple<bool, value::TypeTags, value::Value> ByteCode::traverseP(const CodeFragment* code) {
+void ByteCode::traverseP(const CodeFragment* code) {
     // Traverse a projection path - evaluate the input lambda on every element of the input array.
     // The traversal is recursive; i.e. we visit nested arrays if any.
     auto [lamOwn, lamTag, lamVal] = getFromStack(0);
@@ -924,34 +924,30 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::traverseP(const CodeFr
 
     if (lamTag != value::TypeTags::LocalLambda) {
         popAndReleaseStack();
-        return {false, value::TypeTags::Nothing, 0};
+        pushStack(false, value::TypeTags::Nothing, 0);
     }
     int64_t lamPos = value::bitcastTo<int64_t>(lamVal);
 
-    return traverseP(code, lamPos);
+    traverseP(code, lamPos);
 }
 
-std::tuple<bool, value::TypeTags, value::Value> ByteCode::traverseP(const CodeFragment* code,
-                                                                    int64_t position) {
+void ByteCode::traverseP(const CodeFragment* code, int64_t position) {
     auto [own, tag, val] = getFromStack(0);
 
-    value::ValueGuard input(own ? tag : value::TypeTags::Nothing, own ? val : 0);
-    popStack();
-
     if (value::isArray(tag)) {
-        return traverseP_nested(code, position, tag, val);
+        value::ValueGuard input(own ? tag : value::TypeTags::Nothing, own ? val : 0);
+        popStack();
+
+        traverseP_nested(code, position, tag, val);
     } else {
-        // Transfer the ownership to the lambda
-        pushStack(own, tag, val);
-        input.reset();
-        return runLambdaInternal(code, position);
+        runLambdaInternal(code, position);
     }
 }
 
-std::tuple<bool, value::TypeTags, value::Value> ByteCode::traverseP_nested(const CodeFragment* code,
-                                                                           int64_t position,
-                                                                           value::TypeTags tagInput,
-                                                                           value::Value valInput) {
+void ByteCode::traverseP_nested(const CodeFragment* code,
+                                int64_t position,
+                                value::TypeTags tagInput,
+                                value::Value valInput) {
     if (value::isArray(tagInput)) {
         auto [tagArrOutput, valArrOutput] = value::makeNewArray();
         auto arrOutput = value::getArrayView(valArrOutput);
@@ -960,7 +956,9 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::traverseP_nested(const
         for (value::ArrayEnumerator enumerator(tagInput, valInput); !enumerator.atEnd();
              enumerator.advance()) {
             auto [elemTag, elemVal] = enumerator.getViewOfValue();
-            auto [retOwn, retTag, retVal] = traverseP_nested(code, position, elemTag, elemVal);
+            traverseP_nested(code, position, elemTag, elemVal);
+            auto [retOwn, retTag, retVal] = getFromStack(0);
+            popStack();
             if (!retOwn) {
                 auto [copyTag, copyVal] = value::copyValue(retTag, retVal);
                 retTag = copyTag;
@@ -970,14 +968,14 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::traverseP_nested(const
         }
 
         guard.reset();
-        return {true, tagArrOutput, valArrOutput};
+        pushStack(true, tagArrOutput, valArrOutput);
     } else {
         pushStack(false, tagInput, valInput);
-        return runLambdaInternal(code, position);
+        runLambdaInternal(code, position);
     }
 }
 
-std::tuple<bool, value::TypeTags, value::Value> ByteCode::traverseF(const CodeFragment* code) {
+void ByteCode::traverseF(const CodeFragment* code) {
     // Traverse a filter path - evaluate the input lambda (predicate) on every element of the input
     // array without resursion.
     auto [numberOwn, numberTag, numberVal] = getFromStack(0);
@@ -987,58 +985,62 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::traverseF(const CodeFr
 
     if (lamTag != value::TypeTags::LocalLambda) {
         popAndReleaseStack();
-        return {false, value::TypeTags::Nothing, 0};
+        pushStack(false, value::TypeTags::Nothing, 0);
     }
     int64_t lamPos = value::bitcastTo<int64_t>(lamVal);
 
     bool compareArray = numberTag == value::TypeTags::Boolean && value::bitcastTo<bool>(numberVal);
 
-    return traverseF(code, lamPos, compareArray);
+    traverseF(code, lamPos, compareArray);
 }
 
-std::tuple<bool, value::TypeTags, value::Value> ByteCode::traverseF(const CodeFragment* code,
-                                                                    int64_t position,
-                                                                    bool compareArray) {
+void ByteCode::traverseF(const CodeFragment* code, int64_t position, bool compareArray) {
+    auto [ownInput, tagInput, valInput] = getFromStack(0);
+
+    if (value::isArray(tagInput)) {
+        traverseFInArray(code, position, compareArray);
+    } else {
+        runLambdaInternal(code, position);
+    }
+}
+
+void ByteCode::traverseFInArray(const CodeFragment* code, int64_t position, bool compareArray) {
     auto [ownInput, tagInput, valInput] = getFromStack(0);
 
     value::ValueGuard input(ownInput ? tagInput : value::TypeTags::Nothing,
                             ownInput ? valInput : 0);
     popStack();
 
-    if (value::isArray(tagInput)) {
-        // Return true if any of the array elements is true.
-        for (value::ArrayEnumerator enumerator(tagInput, valInput); !enumerator.atEnd();
-             enumerator.advance()) {
-            auto [elemTag, elemVal] = enumerator.getViewOfValue();
-            pushStack(false, elemTag, elemVal);
-            auto [retOwn, retTag, retVal] = runLambdaInternal(code, position);
+    // Return true if any of the array elements is true.
+    for (value::ArrayEnumerator enumerator(tagInput, valInput); !enumerator.atEnd();
+         enumerator.advance()) {
+        auto [elemTag, elemVal] = enumerator.getViewOfValue();
+        pushStack(false, elemTag, elemVal);
+        runLambdaInternal(code, position);
+        auto [retOwn, retTag, retVal] = getFromStack(0);
+        popStack();
 
-            bool isTrue = (retTag == value::TypeTags::Boolean) && value::bitcastTo<bool>(retVal);
-            if (retOwn) {
-                value::releaseValue(retTag, retVal);
-            }
-
-            if (isTrue) {
-                return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(true)};
-            }
+        bool isTrue = (retTag == value::TypeTags::Boolean) && value::bitcastTo<bool>(retVal);
+        if (retOwn) {
+            value::releaseValue(retTag, retVal);
         }
 
-        // If this is a filter over a number path then run over the whole array. More details in
-        // SERVER-27442.
-        if (compareArray) {
-            // Transfer the ownership to the lambda
-            pushStack(ownInput, tagInput, valInput);
-            input.reset();
-            return runLambdaInternal(code, position);
+        if (isTrue) {
+            pushStack(false, value::TypeTags::Boolean, value::bitcastFrom<bool>(true));
+            return;
         }
+    }
 
-        return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
-    } else {
+    // If this is a filter over a number path then run over the whole array. More details in
+    // SERVER-27442.
+    if (compareArray) {
         // Transfer the ownership to the lambda
         pushStack(ownInput, tagInput, valInput);
         input.reset();
-        return runLambdaInternal(code, position);
+        runLambdaInternal(code, position);
     }
+
+    pushStack(false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false));
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::setField() {
@@ -4627,39 +4629,34 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
     MONGO_UNREACHABLE;
 }
 
-void ByteCode::swapStack() {
-    auto [rhsOwned, rhsTag, rhsVal] = getFromStack(0);
-    auto [lhsOwned, lhsTag, lhsVal] = getFromStack(1);
+MONGO_COMPILER_NORETURN void reportSwapFailure();
 
-    // Swap values only if they are not physically same. This is necessary for the
-    // "swap and pop" idiom for returning a value from the top of the stack (used
-    // by ELocalBind). For example, consider the case where a series of swap, pop,
-    // swap, pop... instructions are executed and the value at stack[0] and
-    // stack[1] are physically identical, but stack[1] is owned and stack[0] is
-    // not. After swapping them, the 'pop' instruction would free the owned one and
-    // leave the unowned value dangling. The only exception to this is shallow
-    // values (values which fit directly inside a 64 bit Value and don't need
-    // to be freed explicitly).
-    if (!(rhsTag == lhsTag && rhsVal == lhsVal)) {
-        setStack(0, lhsOwned, lhsTag, lhsVal);
-        setStack(1, rhsOwned, rhsTag, rhsVal);
+void ByteCode::swapStack() {
+    auto backOffset = _argStack.size() - 1;
+    auto& rhsOwnedTag = _argStack.ownedAndTag(backOffset);
+    auto& rhsValue = _argStack.value(backOffset);
+    --backOffset;
+    auto& lhsOwnedTag = _argStack.ownedAndTag(backOffset);
+    auto& lhsValue = _argStack.value(backOffset);
+
+    if (rhsValue == lhsValue && rhsOwnedTag.tag == lhsOwnedTag.tag) {
+        if (rhsOwnedTag.owned && !isShallowType(rhsOwnedTag.tag)) {
+            reportSwapFailure();
+        }
     } else {
-        // See explanation above.
-        tassert(56123,
-                "Attempting to swap two identical values when top of stack is owned",
-                !rhsOwned || isShallowType(rhsTag));
+        std::swap(rhsOwnedTag, lhsOwnedTag);
+        std::swap(rhsValue, lhsValue);
     }
 }
 
-std::tuple<bool, value::TypeTags, value::Value> ByteCode::runLambdaInternal(
-    const CodeFragment* code, int64_t position) {
-    runInternal(code, value::bitcastTo<int64_t>(position));
-    auto [retOwn, retTag, retVal] = getFromStack(0);
+MONGO_COMPILER_NORETURN void reportSwapFailure() {
+    tasserted(56123, "Attempting to swap two identical values when top of stack is owned");
+}
+
+void ByteCode::runLambdaInternal(const CodeFragment* code, int64_t position) {
+    runInternal(code, position);
     swapStack();
     popAndReleaseStack();
-    popStack();
-
-    return {retOwn, retTag, retVal};
 }
 
 void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
@@ -5330,9 +5327,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                     break;
                 }
                 case Instruction::traverseP: {
-                    auto [owned, tag, val] = traverseP(code);
-
-                    pushStack(owned, tag, val);
+                    traverseP(code);
                     break;
                 }
                 case Instruction::traversePConst: {
@@ -5340,15 +5335,11 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                     pcPointer += sizeof(offset);
                     auto codePosition = pcPointer - code->instrs().data() + offset;
 
-                    auto [owned, tag, val] = traverseP(code, codePosition);
-
-                    pushStack(owned, tag, val);
+                    traverseP(code, codePosition);
                     break;
                 }
                 case Instruction::traverseF: {
-                    auto [owned, tag, val] = traverseF(code);
-
-                    pushStack(owned, tag, val);
+                    traverseF(code);
                     break;
                 }
                 case Instruction::traverseFConst: {
@@ -5359,10 +5350,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                     pcPointer += sizeof(offset);
                     auto codePosition = pcPointer - code->instrs().data() + offset;
 
-                    auto [owned, tag, val] =
-                        traverseF(code, codePosition, k == Instruction::True ? true : false);
+                    traverseF(code, codePosition, k == Instruction::True ? true : false);
 
-                    pushStack(owned, tag, val);
                     break;
                 }
                 case Instruction::setField: {

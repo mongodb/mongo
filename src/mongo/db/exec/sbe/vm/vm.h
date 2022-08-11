@@ -901,6 +901,10 @@ private:
             growAndResize(newSize);
         }
 
+        void resizeDown() {
+            --_size;
+        }
+
     private:
         MONGO_COMPILER_NOINLINE void growAndResize(size_t newSize);
 
@@ -912,8 +916,7 @@ private:
     Stack _argStack;
 
     void runInternal(const CodeFragment* code, int64_t position);
-    std::tuple<bool, value::TypeTags, value::Value> runLambdaInternal(const CodeFragment* code,
-                                                                      int64_t position);
+    void runLambdaInternal(const CodeFragment* code, int64_t position);
 
     std::tuple<bool, value::TypeTags, value::Value> genericDiv(value::TypeTags lhsTag,
                                                                value::Value lhsValue,
@@ -991,18 +994,16 @@ private:
                                                                       value::TypeTags fieldTag,
                                                                       value::Value fieldValue);
 
-    std::tuple<bool, value::TypeTags, value::Value> traverseP(const CodeFragment* code);
-    std::tuple<bool, value::TypeTags, value::Value> traverseP(const CodeFragment* code,
-                                                              int64_t position);
-    std::tuple<bool, value::TypeTags, value::Value> traverseP_nested(const CodeFragment* code,
-                                                                     int64_t position,
-                                                                     value::TypeTags tag,
-                                                                     value::Value val);
+    void traverseP(const CodeFragment* code);
+    void traverseP(const CodeFragment* code, int64_t position);
+    void traverseP_nested(const CodeFragment* code,
+                          int64_t position,
+                          value::TypeTags tag,
+                          value::Value val);
 
-    std::tuple<bool, value::TypeTags, value::Value> traverseF(const CodeFragment* code);
-    std::tuple<bool, value::TypeTags, value::Value> traverseF(const CodeFragment* code,
-                                                              int64_t position,
-                                                              bool compareArray);
+    void traverseF(const CodeFragment* code);
+    void traverseF(const CodeFragment* code, int64_t position, bool compareArray);
+    void traverseFInArray(const CodeFragment* code, int64_t position, bool compareArray);
     std::tuple<bool, value::TypeTags, value::Value> setField();
 
     std::tuple<bool, value::TypeTags, value::Value> getArraySize(value::TypeTags tag,
@@ -1252,7 +1253,7 @@ private:
     }
 
     void popStack() {
-        _argStack.resize(_argStack.size() - 1);
+        _argStack.resizeDown();
     }
 
     void popAndReleaseStack() {
