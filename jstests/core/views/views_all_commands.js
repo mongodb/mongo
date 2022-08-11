@@ -481,6 +481,7 @@ let viewsCommandTests = {
     listCollections: {skip: "tested in views/views_creation.js"},
     listCommands: {skip: isUnrelated},
     listDatabases: {skip: isUnrelated},
+    listDatabasesForAllTenants: {skip: isUnrelated},
     listIndexes: {command: {listIndexes: "view"}, expectFailure: true},
     listShards: {skip: isUnrelated},
     lockInfo: {skip: isUnrelated},

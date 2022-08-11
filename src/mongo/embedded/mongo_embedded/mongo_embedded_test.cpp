@@ -592,6 +592,7 @@ TEST_F(MongodbCAPITest, RunListCommands) {
                                           "listCollections",
                                           "listCommands",
                                           "listDatabases",
+                                          "listDatabasesForAllTenants",
                                           "listIndexes",
                                           "lockInfo",
                                           "logMessage",

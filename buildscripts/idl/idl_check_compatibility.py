@@ -161,6 +161,7 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     'find-reply-invalidated',
     'getMore-reply-partialResultsReturned',
     'getMore-reply-invalidated',
+    'listDatabasesForAllTenants-reply-tenant',
     'create-param-min',
     'create-param-max',
 ]

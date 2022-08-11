@@ -278,6 +278,18 @@ env.Library(
 )
 
 env.Library(
+    target='list_databases_for_all_tenants_command',
+    source=[
+        'list_databases_for_all_tenants.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/auth/authprivilege',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+env.Library(
     target='create_command',
     source=[
         'create.idl',
@@ -348,6 +360,7 @@ env.Library(
         "lock_info.cpp",
         "list_collections.cpp",
         "list_databases.cpp",
+        'list_databases_for_all_tenants.cpp',
         "list_indexes.cpp",
         "pipeline_command.cpp",
         "plan_cache_clear_command.cpp",
@@ -425,6 +438,7 @@ env.Library(
         'kill_common',
         'list_collections_filter',
         'list_databases_command',
+        'list_databases_for_all_tenants_command',
         'rename_collection_idl',
         'test_commands_enabled',
         'validate_db_metadata_command',

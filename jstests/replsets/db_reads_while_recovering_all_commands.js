@@ -271,6 +271,12 @@ const allCommands = {
         expectFailure: true,
         expectedErrorCode: ErrorCodes.NotPrimaryOrSecondary
     },
+    listDatabasesForAllTenants: {
+        command: {listDatabasesForAllTenants: 1},
+        isAdminCommand: true,
+        expectFailure: true,
+        expectedErrorCode: ErrorCodes.NotPrimaryOrSecondary
+    },
     listIndexes: {
         command: {listIndexes: collName},
         expectFailure: true,
