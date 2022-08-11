@@ -47,18 +47,18 @@ public:
     }
 
     void _explainImpl(OperationContext* opCtx,
+                      const DatabaseName& dbName,
                       const BSONObj& cmd,
                       BSONObjBuilder& result,
                       boost::optional<ExplainOptions::Verbosity> verbosity) const override {
-        runAggregationMapReduce(opCtx, cmd, result, verbosity);
+        runAggregationMapReduce(opCtx, dbName, cmd, result, verbosity);
     }
 
-    bool errmsgRun(OperationContext* opCtx,
-                   const std::string&,
-                   const BSONObj& cmd,
-                   std::string&,
-                   BSONObjBuilder& result) final {
-        return runAggregationMapReduce(opCtx, cmd, result, boost::none);
+    bool run(OperationContext* opCtx,
+             const DatabaseName& dbName,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+        return runAggregationMapReduce(opCtx, dbName, cmdObj, result, boost::none);
     }
 } clusterMapReduceCommand;
 

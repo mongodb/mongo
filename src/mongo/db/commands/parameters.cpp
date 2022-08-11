@@ -208,9 +208,9 @@ Mutex autoServiceDescriptorMutex;
 std::string autoServiceDescriptorValue;
 }  // namespace
 
-class CmdGet : public ErrmsgCommandDeprecated {
+class CmdGet : public BasicCommand {
 public:
-    CmdGet() : ErrmsgCommandDeprecated("getParameter") {}
+    CmdGet() : BasicCommand("getParameter") {}
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
@@ -237,11 +237,10 @@ public:
         h += "{ getParameter:'*' } or { getParameter:{allParameters: true} } to get everything\n";
         return h;
     }
-    bool errmsgRun(OperationContext* opCtx,
-                   const string& dbname,
-                   const BSONObj& cmdObj,
-                   string& errmsg,
-                   BSONObjBuilder& result) override {
+    bool run(OperationContext* opCtx,
+             const DatabaseName& dbName,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
         const auto options = parseGetParameterOptions(cmdObj.firstElement());
         const bool all = options.getAllParameters();
 
@@ -263,17 +262,14 @@ public:
                 }
             }
         }
-        if (before == result.len()) {
-            errmsg = "no option found to get";
-            return false;
-        }
+        uassert(ErrorCodes::InvalidOptions, "no option found to get", before != result.len());
         return true;
     }
 } cmdGet;
 
-class CmdSet : public ErrmsgCommandDeprecated {
+class CmdSet : public BasicCommand {
 public:
-    CmdSet() : ErrmsgCommandDeprecated("setParameter") {}
+    CmdSet() : BasicCommand("setParameter") {}
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kAlways;
     }
@@ -297,11 +293,10 @@ public:
         appendParameterNames(&h);
         return h;
     }
-    bool errmsgRun(OperationContext* opCtx,
-                   const string& dbname,
-                   const BSONObj& cmdObj,
-                   string& errmsg,
-                   BSONObjBuilder& result) {
+    bool run(OperationContext* opCtx,
+             const DatabaseName& dbName,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
         int numSet = 0;
         bool found = false;
 
@@ -330,28 +325,24 @@ public:
             ServerParameter::Map::const_iterator foundParameter = parameterMap.find(parameterName);
 
             // Check to see if this is actually a valid parameter
-            if (foundParameter == parameterMap.end()) {
-                errmsg = str::stream() << "attempted to set unrecognized parameter ["
-                                       << parameterName << "], use help:true to see options ";
-                return false;
-            }
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "attempted to set unrecognized parameter [" << parameterName
+                                  << "], use help:true to see options ",
+                    foundParameter != parameterMap.end());
 
             // Make sure we are allowed to change this parameter
-            if (!foundParameter->second->allowedToChangeAtRuntime()) {
-                errmsg = str::stream()
-                    << "not allowed to change [" << parameterName << "] at runtime";
-                return false;
-            }
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << "not allowed to change [" << parameterName << "] at runtime",
+                    foundParameter->second->allowedToChangeAtRuntime());
 
             // Make sure we are only setting this parameter once
-            if (parametersToSet.count(parameterName)) {
-                errmsg = str::stream()
-                    << "attempted to set parameter [" << parameterName
-                    << "] twice in the same setParameter command, "
-                    << "once to value: [" << parametersToSet[parameterName].toString(false)
-                    << "], and once to value: [" << parameter.toString(false) << "]";
-                return false;
-            }
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "attempted to set parameter [" << parameterName
+                                  << "] twice in the same setParameter command, "
+                                  << "once to value: ["
+                                  << parametersToSet[parameterName].toString(false)
+                                  << "], and once to value: [" << parameter.toString(false) << "]",
+                    parametersToSet.count(parameterName) == 0);
 
             parametersToSet[parameterName] = parameter;
         }
@@ -367,20 +358,19 @@ public:
 
             ServerParameter::Map::const_iterator foundParameter = parameterMap.find(parameterName);
 
-            if (foundParameter == parameterMap.end()) {
-                errmsg = str::stream() << "Parameter: " << parameterName << " that was "
-                                       << "avaliable during our first lookup in the registered "
-                                       << "parameters map is no longer available.";
-                return false;
-            }
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "Parameter: " << parameterName << " that was "
+                                  << "avaliable during our first lookup in the registered "
+                                  << "parameters map is no longer available.",
+                    foundParameter != parameterMap.end());
 
-            if (parameterName == "requireApiVersion" && parameter.trueValue() &&
-                (serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
-                 serverGlobalParams.clusterRole == ClusterRole::ShardServer)) {
-                errmsg = str::stream()
-                    << "Cannot set parameter requireApiVersion=true on a shard or config server";
-                return false;
-            }
+            uassert(
+                ErrorCodes::IllegalOperation,
+                str::stream()
+                    << "Cannot set parameter requireApiVersion=true on a shard or config server",
+                parameterName != "requireApiVersion" || !parameter.trueValue() ||
+                    (serverGlobalParams.clusterRole != ClusterRole::ConfigServer &&
+                     serverGlobalParams.clusterRole != ClusterRole::ShardServer));
 
             auto oldValueObj = ([&] {
                 BSONObjBuilder bb;
@@ -435,10 +425,9 @@ public:
             numSet++;
         }
 
-        if (numSet == 0 && !found) {
-            errmsg = "no option found to set, use help:true to see options ";
-            return false;
-        }
+        uassert(ErrorCodes::InvalidOptions,
+                "no option found to set, use help:true to see options ",
+                numSet != 0 || found);
 
         return true;
     }

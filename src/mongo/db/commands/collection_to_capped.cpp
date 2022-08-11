@@ -44,9 +44,9 @@
 namespace mongo {
 namespace {
 
-class CmdCloneCollectionAsCapped : public ErrmsgCommandDeprecated {
+class CmdCloneCollectionAsCapped : public BasicCommand {
 public:
-    CmdCloneCollectionAsCapped() : ErrmsgCommandDeprecated("cloneCollectionAsCapped") {}
+    CmdCloneCollectionAsCapped() : BasicCommand("cloneCollectionAsCapped") {}
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
@@ -79,13 +79,13 @@ public:
 
         out->push_back(Privilege(ResourcePattern::forExactNamespace(nss), targetActions));
     }
-    bool errmsgRun(OperationContext* opCtx,
-                   const std::string& dbname,
-                   const BSONObj& jsobj,
-                   std::string& errmsg,
-                   BSONObjBuilder& result) {
-        const auto fromElt = jsobj["cloneCollectionAsCapped"];
-        const auto toElt = jsobj["toCollection"];
+
+    bool run(OperationContext* opCtx,
+             const DatabaseName& dbName,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+        const auto fromElt = cmdObj["cloneCollectionAsCapped"];
+        const auto toElt = cmdObj["toCollection"];
 
         uassert(ErrorCodes::TypeMismatch,
                 "'cloneCollectionAsCapped' must be of type String",
@@ -104,16 +104,13 @@ public:
                 str::stream() << "Invalid target collection name: " << to,
                 NamespaceString::validCollectionName(to));
 
-        double size = jsobj.getField("size").number();
-        bool temp = jsobj.getField("temp").trueValue();
+        double size = cmdObj.getField("size").number();
+        bool temp = cmdObj.getField("temp").trueValue();
 
-        if (size == 0) {
-            errmsg = "invalid command spec";
-            return false;
-        }
+        uassert(ErrorCodes::InvalidOptions, "invalid command spec", size != 0);
 
-        NamespaceString fromNs(dbname, from);
-        NamespaceString toNs(dbname, to);
+        NamespaceString fromNs(dbName, from);
+        NamespaceString toNs(dbName, to);
 
         AutoGetCollection autoColl(opCtx, fromNs, MODE_X);
         Lock::CollectionLock collLock(opCtx, toNs, MODE_X);
@@ -127,7 +124,7 @@ public:
         Database* const db = autoColl.getDb();
         if (!db) {
             uasserted(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "database " << dbname << " not found");
+                      str::stream() << "database " << dbName.toString() << " not found");
         }
 
         cloneCollectionAsCapped(opCtx, db, fromNs, toNs, size, temp);
@@ -140,9 +137,9 @@ public:
  * Converts the given collection to a capped collection w/ the specified size. This command is not
  * highly used, and is not currently supported with sharded environments.
  */
-class CmdConvertToCapped : public ErrmsgCommandDeprecated {
+class CmdConvertToCapped : public BasicCommand {
 public:
-    CmdConvertToCapped() : ErrmsgCommandDeprecated("convertToCapped") {}
+    CmdConvertToCapped() : BasicCommand("convertToCapped") {}
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
@@ -165,18 +162,14 @@ public:
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
 
-    bool errmsgRun(OperationContext* opCtx,
-                   const std::string& dbname,
-                   const BSONObj& jsobj,
-                   std::string& errmsg,
-                   BSONObjBuilder& result) {
-        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, jsobj));
-        long long size = jsobj.getField("size").safeNumberLong();
+    bool run(OperationContext* opCtx,
+             const DatabaseName& dbName,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
+        long long size = cmdObj.getField("size").safeNumberLong();
 
-        if (size == 0) {
-            errmsg = "invalid command spec";
-            return false;
-        }
+        uassert(ErrorCodes::InvalidOptions, "invalid command spec", size != 0);
 
         convertToCapped(opCtx, nss, size);
         return true;

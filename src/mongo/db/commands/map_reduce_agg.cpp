@@ -118,6 +118,7 @@ auto makeExpressionContext(OperationContext* opCtx,
 }  // namespace
 
 bool runAggregationMapReduce(OperationContext* opCtx,
+                             const DatabaseName& dbName,
                              const BSONObj& cmd,
                              BSONObjBuilder& result,
                              boost::optional<ExplainOptions::Verbosity> verbosity) {
@@ -139,6 +140,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
 
     Timer cmdTimer;
 
+    // TODO SERVER-68721: create IDLParserContext with tenant id of dbName.
     auto parsedMr = MapReduceCommandRequest::parse(IDLParserContext("mapReduce"), cmd);
     auto expCtx = makeExpressionContext(opCtx, parsedMr, verbosity);
     auto runnablePipeline = [&]() {

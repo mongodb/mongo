@@ -40,9 +40,9 @@
 namespace mongo {
 namespace {
 
-class CmdGetLastError : public ErrmsgCommandDeprecated {
+class CmdGetLastError : public BasicCommand {
 public:
-    CmdGetLastError() : ErrmsgCommandDeprecated("getLastError", "getlasterror") {}
+    CmdGetLastError() : BasicCommand("getLastError", "getlasterror") {}
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
     }
@@ -61,11 +61,10 @@ public:
         return "no longer supported";
     }
 
-    bool errmsgRun(OperationContext* opCtx,
-                   const std::string&,
-                   const BSONObj&,
-                   std::string&,
-                   BSONObjBuilder&) {
+    bool run(OperationContext* opCtx,
+             const DatabaseName&,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
         uasserted(5739000, "getLastError command is not supported");
         return false;
     }

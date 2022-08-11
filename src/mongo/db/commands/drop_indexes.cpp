@@ -55,6 +55,7 @@
 #include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
 
@@ -118,7 +119,7 @@ public:
     };
 } cmdDropIndexes;
 
-class CmdReIndex : public ErrmsgCommandDeprecated {
+class CmdReIndex : public BasicCommand {
 public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         // Even though reIndex is a standalone-only command, this will return that the command is
@@ -139,19 +140,18 @@ public:
         actions.addAction(ActionType::reIndex);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
     }
-    CmdReIndex() : ErrmsgCommandDeprecated("reIndex") {}
+    CmdReIndex() : BasicCommand("reIndex") {}
 
-    bool errmsgRun(OperationContext* opCtx,
-                   const std::string& dbname,
-                   const BSONObj& jsobj,
-                   std::string& errmsg,
-                   BSONObjBuilder& result) {
+    bool run(OperationContext* opCtx,
+             const DatabaseName& dbName,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
         LOGV2_WARNING(6508600,
                       "The reIndex command is deprecated. For more information, see "
                       "https://mongodb.com/docs/manual/reference/command/reIndex/");
 
         const NamespaceString toReIndexNss =
-            CommandHelpers::parseNsCollectionRequired(dbname, jsobj);
+            CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
 
         LOGV2(20457, "CMD: reIndex {namespace}", "CMD reIndex", "namespace"_attr = toReIndexNss);
 
@@ -218,12 +218,12 @@ public:
                 const BSONObj key = spec.getObjectField("key");
                 const Status keyStatus =
                     index_key_validate::validateKeyPattern(key, defaultIndexVersion);
-                if (!keyStatus.isOK()) {
-                    errmsg = str::stream()
+
+                uassertStatusOKWithContext(
+                    keyStatus,
+                    str::stream()
                         << "Cannot rebuild index " << spec << ": " << keyStatus.reason()
-                        << " For more info see http://dochub.mongodb.org/core/index-validation";
-                    return false;
-                }
+                        << " For more info see http://dochub.mongodb.org/core/index-validation");
             }
         }
 

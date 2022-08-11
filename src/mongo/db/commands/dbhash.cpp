@@ -61,9 +61,9 @@ namespace mongo {
 
 namespace {
 
-class DBHashCmd : public ErrmsgCommandDeprecated {
+class DBHashCmd : public BasicCommand {
 public:
-    DBHashCmd() : ErrmsgCommandDeprecated("dbHash", "dbhash") {}
+    DBHashCmd() : BasicCommand("dbHash", "dbhash") {}
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
@@ -114,11 +114,10 @@ public:
         out->push_back(Privilege(ResourcePattern::forDatabaseName(dbname), actions));
     }
 
-    virtual bool errmsgRun(OperationContext* opCtx,
-                           const std::string& dbname,
-                           const BSONObj& cmdObj,
-                           std::string& errmsg,
-                           BSONObjBuilder& result) {
+    bool run(OperationContext* opCtx,
+             const DatabaseName& dbName,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
         Timer timer;
 
         std::set<std::string> desiredCollections;
@@ -126,16 +125,13 @@ public:
             BSONObjIterator i(cmdObj["collections"].Obj());
             while (i.more()) {
                 BSONElement e = i.next();
-                if (e.type() != String) {
-                    errmsg = "collections entries have to be strings";
-                    return false;
-                }
+                uassert(ErrorCodes::BadValue,
+                        "collections entries have to be strings",
+                        e.type() == String);
                 desiredCollections.insert(e.String());
             }
         }
 
-        // TODO SERVER-67827: Pass dbName obj directly.
-        const DatabaseName dbName(boost::none, dbname);
         // For empty databasename on first command field, the following code depends on the "."
         // on ns to find the invalid empty db name instead of checking empty db name directly.
         const std::string ns = parseNs(dbName, cmdObj).ns();
@@ -226,8 +222,7 @@ public:
             shouldNotConflictBlock.emplace(opCtx->lockState());
         }
 
-        // TODO SERVER-67827: Pass dbName obj directly.
-        AutoGetDb autoDb(opCtx, DatabaseName(boost::none, ns), lockMode);
+        AutoGetDb autoDb(opCtx, dbName, lockMode);
         Database* db = autoDb.getDb();
 
         result.append("host", prettyHostName());
@@ -239,17 +234,13 @@ public:
         std::map<std::string, UUID> collectionToUUIDMap;
         std::set<std::string> cappedCollectionSet;
 
-        bool noError = true;
         catalog::forEachCollectionFromDb(
             opCtx, dbName, MODE_IS, [&](const CollectionPtr& collection) {
                 auto collNss = collection->ns();
 
-                if (collNss.size() - 1 <= dbname.size()) {
-                    errmsg = str::stream()
-                        << "weird fullCollectionName [" << collNss.toString() << "]";
-                    noError = false;
-                    return false;
-                }
+                uassert(ErrorCodes::BadValue,
+                        str::stream() << "weird fullCollectionName [" << collNss.toString() << "]",
+                        collNss.size() - 1 > dbName.db().size());
 
                 if (repl::ReplicationCoordinator::isOplogDisabledForNS(collNss)) {
                     return true;
@@ -282,8 +273,6 @@ public:
 
                 return true;
             });
-        if (!noError)
-            return false;
 
         BSONObjBuilder bb(result.subobjStart("collections"));
         BSONArrayBuilder cappedCollections;
@@ -318,7 +307,7 @@ public:
         result.append("md5", hash);
         result.appendNumber("timeMillis", timer.millis());
 
-        return 1;
+        return true;
     }
 
 private:

@@ -145,9 +145,11 @@ Document serializeToCommand(BSONObj originalCmd,
 }  // namespace
 
 bool runAggregationMapReduce(OperationContext* opCtx,
+                             const DatabaseName& dbName,
                              const BSONObj& cmd,
                              BSONObjBuilder& result,
                              boost::optional<ExplainOptions::Verbosity> verbosity) {
+    // TODO SERVER-68721: create IDLParserContext with tenant id of dbName.
     auto parsedMr = MapReduceCommandRequest::parse(IDLParserContext("mapReduce"), cmd);
     stdx::unordered_set<NamespaceString> involvedNamespaces{parsedMr.getNamespace()};
     auto hasOutDB = parsedMr.getOutOptions().getDatabaseName();

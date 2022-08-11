@@ -61,9 +61,9 @@ using std::string;
 using std::stringstream;
 
 /* For testing only, not for general use. Enabled via command-line */
-class GodInsert : public ErrmsgCommandDeprecated {
+class GodInsert : public BasicCommand {
 public:
-    GodInsert() : ErrmsgCommandDeprecated("godinsert") {}
+    GodInsert() : BasicCommand("godinsert") {}
     virtual bool adminOnly() const {
         return false;
     }
@@ -80,20 +80,17 @@ public:
     std::string help() const override {
         return "internal. for testing only.";
     }
-    virtual bool errmsgRun(OperationContext* opCtx,
-                           const string& dbname,
-                           const BSONObj& cmdObj,
-                           string& errmsg,
-                           BSONObjBuilder& result) {
-        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
+    bool run(OperationContext* opCtx,
+             const DatabaseName& dbName,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
         LOGV2(20505,
               "Test-only command 'godinsert' invoked coll:{collection}",
               "Test-only command 'godinsert' invoked",
               "collection"_attr = nss.coll());
         BSONObj obj = cmdObj["obj"].embeddedObjectUserCheck();
 
-        // TODO SERVER-66561 Use DatabaseName obj passed in
-        DatabaseName dbName(boost::none, dbname);
         Lock::DBLock lk(opCtx, dbName, MODE_X);
         OldClientContext ctx(opCtx, nss);
         Database* db = ctx.db();
@@ -104,10 +101,7 @@ public:
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
         if (!collection) {
             collection = db->createCollection(opCtx, nss);
-            if (!collection) {
-                errmsg = "could not create collection";
-                return false;
-            }
+            uassert(ErrorCodes::CannotCreateCollection, "could not create collection", collection);
         }
         OpDebug* const nullOpDebug = nullptr;
         Status status = collection_internal::insertDocument(

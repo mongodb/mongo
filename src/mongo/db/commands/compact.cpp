@@ -47,7 +47,7 @@ namespace mongo {
 using std::string;
 using std::stringstream;
 
-class CompactCmd : public ErrmsgCommandDeprecated {
+class CompactCmd : public BasicCommand {
 public:
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
@@ -72,28 +72,22 @@ public:
                "{ compact : <collection_name>, [force:<bool>] }\n"
                "  force - allows to run on a replica set primary\n";
     }
-    CompactCmd() : ErrmsgCommandDeprecated("compact") {}
+    CompactCmd() : BasicCommand("compact") {}
 
-    virtual bool errmsgRun(OperationContext* opCtx,
-                           const string& db,
-                           const BSONObj& cmdObj,
-                           string& errmsg,
-                           BSONObjBuilder& result) {
-        NamespaceString nss = CommandHelpers::parseNsCollectionRequired(db, cmdObj);
+    bool run(OperationContext* opCtx,
+             const DatabaseName& dbName,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+        NamespaceString nss = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
 
         repl::ReplicationCoordinator* replCoord = repl::ReplicationCoordinator::get(opCtx);
-        if (replCoord->getMemberState().primary() && !cmdObj["force"].trueValue()) {
-            errmsg =
+        uassert(ErrorCodes::IllegalOperation,
                 "will not run compact on an active replica set primary as this is a slow blocking "
-                "operation. use force:true to force";
-            return false;
-        }
+                "operation. use force:true to force",
+                !replCoord->getMemberState().primary() || cmdObj["force"].trueValue());
 
-        if (nss.isSystem()) {
-            // Items in system.* cannot be moved as there might be pointers to them.
-            errmsg = "can't compact a system namespace";
-            return false;
-        }
+        // Items in system.* cannot be moved as there might be pointers to them.
+        uassert(ErrorCodes::InvalidNamespace, "can't compact a system namespace", !nss.isSystem());
 
         // This command is internal to the storage engine and should not block oplog application.
         ShouldNotConflictWithSecondaryBatchApplicationBlock noPBWMBlock(opCtx->lockState());

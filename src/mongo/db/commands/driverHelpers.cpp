@@ -51,9 +51,9 @@ namespace mongo {
 
 using std::string;
 
-class BasicDriverHelper : public ErrmsgCommandDeprecated {
+class BasicDriverHelper : public BasicCommand {
 public:
-    BasicDriverHelper(const char* name) : ErrmsgCommandDeprecated(name) {}
+    BasicDriverHelper(const char* name) : BasicCommand(name) {}
 
     virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
         return false;
@@ -70,15 +70,11 @@ public:
     virtual void addRequiredPrivileges(const std::string& dbname,
                                        const BSONObj& cmdObj,
                                        std::vector<Privilege>* out) const {}  // No auth required
-    virtual bool errmsgRun(OperationContext* opCtx,
-                           const string&,
-                           const BSONObj& cmdObj,
-                           string& errmsg,
-                           BSONObjBuilder& result) {
-        if (cmdObj.firstElement().type() != jstOID) {
-            errmsg = "not oid";
-            return false;
-        }
+    bool run(OperationContext* opCtx,
+             const DatabaseName& dbName,
+             const BSONObj& cmdObj,
+             BSONObjBuilder& result) override {
+        uassert(ErrorCodes::InvalidBSONType, "not oid", cmdObj.firstElement().type() == jstOID);
 
         const OID& oid = cmdObj.firstElement().__oid();
         result.append("oid", oid);

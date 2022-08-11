@@ -35,9 +35,9 @@
 
 namespace mongo {
 
-class MapReduceCommandBase : public ErrmsgCommandDeprecated {
+class MapReduceCommandBase : public BasicCommand {
 public:
-    MapReduceCommandBase() : ErrmsgCommandDeprecated("mapReduce", "mapreduce") {}
+    MapReduceCommandBase() : BasicCommand("mapReduce", "mapreduce") {}
 
     std::string help() const override {
         return "Runs the mapReduce command. See http://dochub.mongodb.org/core/mapreduce for "
@@ -89,6 +89,7 @@ public:
     }
 
     virtual void _explainImpl(OperationContext* opCtx,
+                              const DatabaseName& dbName,
                               const BSONObj& cmd,
                               BSONObjBuilder& result,
                               boost::optional<ExplainOptions::Verbosity> verbosity) const = 0;
@@ -100,7 +101,11 @@ public:
         auto builder = result->getBodyBuilder();
         auto explain = boost::make_optional(verbosity);
         try {
-            _explainImpl(opCtx, request.body, builder, explain);
+            _explainImpl(opCtx,
+                         DatabaseName(request.getValidatedTenantId(), request.getDatabase()),
+                         request.body,
+                         builder,
+                         explain);
         } catch (...) {
             return exceptionToStatus();
         }
