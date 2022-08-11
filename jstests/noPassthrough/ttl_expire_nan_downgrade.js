@@ -1,5 +1,5 @@
 /**
- * Tests that the cluster cannot be downgraded when there are TTL indexes with
+ * Tests that the cluster can be downgraded when there are TTL indexes with
  * NaN for 'expireAfterSeconds'.
  *
  * @tags: [
@@ -34,14 +34,7 @@ try {
 
 assert.commandWorked(coll.insert({_id: 0, t: ISODate()}));
 
-assert.commandFailedWithCode(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}),
-                             ErrorCodes.CannotDowngrade);
-
-assert.commandWorked(
-    db.runCommand({collMod: coll.getName(), index: {name: 't_1', expireAfterSeconds: 60}}));
-
 assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
-assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 
 rst.stopSet();
 })();

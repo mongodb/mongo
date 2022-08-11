@@ -35,7 +35,6 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/coll_mod.h"
-#include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/drop_collection.h"
@@ -679,48 +678,6 @@ private:
     }
 
     /**
-     * TTL indexes with NaN 'expireAfterSeconds' are only supported in 5.0. If the user tries to
-     * downgrade the cluster to an earlier version, they must first remove all TTL indexes with
-     * NaN 'expireAfterSeconds'.
-     */
-    void _disallowTTLIndexesWithNaNExpireAfterSecondsOnDowngrade(OperationContext* opCtx) {
-        auto collCatalog = CollectionCatalog::get(opCtx);
-        for (const auto& db : collCatalog->getAllDbNames()) {
-            for (auto collIt = collCatalog->begin(opCtx, db); collIt != collCatalog->end(opCtx);
-                 ++collIt) {
-                NamespaceStringOrUUID collName(
-                    collCatalog->lookupNSSByUUID(opCtx, collIt.uuid().get()).get());
-                AutoGetCollectionForRead coll(opCtx, collName);
-                if (!coll) {
-                    continue;
-                }
-
-                auto idxCatalog = coll->getIndexCatalog();
-                auto iter = idxCatalog->getIndexIterator(opCtx, /*includeUnfinished=*/true);
-                while (iter->more()) {
-                    opCtx->checkForInterrupt();
-                    auto entry = iter->next();
-                    auto desc = entry->descriptor();
-                    const auto& spec = desc->infoObj();
-                    if (!spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
-                        continue;
-                    }
-                    uassert(
-                        ErrorCodes::CannotDowngrade,
-                        fmt::format("Cannot downgrade the cluster when there are TTL indexes with "
-                                    "NaN 'expireAfterSeconds' in the catalog; drop all TTL indexes "
-                                    "with NaN 'expireAfterSeconds' before downgrading. "
-                                    "First detected index: namespace: {}, UUID: {}, index: {}",
-                                    coll->ns().toString(),
-                                    coll->uuid().toString(),
-                                    spec.toString()),
-                        !spec[IndexDescriptor::kExpireAfterSecondsFieldName].isNaN());
-                }
-            }
-        }
-    }
-
-    /**
      * Partial index filters are only supported in 4.7.0 and above. If the user tries to
      * downgrade the cluster to an earlier version, they must first ensure that there are no
      * indexes with conflicting options.
@@ -839,7 +796,6 @@ private:
                 "Failing upgrade due to 'failDowngrading' failpoint set",
                 !failDowngrading.shouldFail());
 
-        _disallowTTLIndexesWithNaNExpireAfterSecondsOnDowngrade(opCtx);
         _disallowIndexesWithConflictingOptionsOnDowngrade(opCtx);
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {

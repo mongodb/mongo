@@ -128,7 +128,9 @@ Status IndexCatalogImpl::init(OperationContext* opCtx, Collection* collection) {
         }
         auto descriptor = std::make_unique<IndexDescriptor>(_getAccessMethodName(keyPattern), spec);
 
-        // TTL indexes with NaN 'expireAfterSeconds' cause problems in multiversion settings.
+        // TTL indexes with NaN 'expireAfterSeconds' used to cause problems in multiversion
+        // settings. However, we continue to issue a warning message at startup to draw attention
+        // to the presence of these misconfigured indexes.
         if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
             if (spec[IndexDescriptor::kExpireAfterSecondsFieldName].isNaN()) {
                 LOGV2_OPTIONS(6852200,
@@ -139,19 +141,6 @@ Status IndexCatalogImpl::init(OperationContext* opCtx, Collection* collection) {
                               "uuid"_attr = collection->uuid(),
                               "index"_attr = indexName,
                               "spec"_attr = spec);
-                using FCV = ServerGlobalParams::FeatureCompatibility;
-                const auto& fcv = serverGlobalParams.featureCompatibility;
-                if (fcv.isVersionInitialized() &&
-                    fcv.isLessThanOrEqualTo(FCV::Version::kFullyDowngradedTo44)) {
-                    LOGV2_ERROR(6852201,
-                                "TTL indexes with NaN 'expireAfterSeconds' are not supported "
-                                "under FCV 4.4 on a 5.0+ binary.",
-                                "ns"_attr = collection->ns(),
-                                "uuid"_attr = collection->uuid(),
-                                "index"_attr = indexName,
-                                "spec"_attr = spec);
-                    fassertFailed(6852202);
-                }
             }
         }
 
@@ -802,20 +791,6 @@ Status IndexCatalogImpl::_isSpecOk(OperationContext* opCtx,
                                                collection->getDefaultCollator())) {
             return Status(ErrorCodes::CannotCreateIndex,
                           "_id index must have the collection default collation");
-        }
-    }
-
-    // TTL indexes with NaN 'expireAfterSeconds' cause problems in multiversion settings.
-    if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
-        if (spec[IndexDescriptor::kExpireAfterSecondsFieldName].isNaN()) {
-            using FCV = ServerGlobalParams::FeatureCompatibility;
-            const auto& fcv = serverGlobalParams.featureCompatibility;
-            if (fcv.isVersionInitialized() &&
-                fcv.isLessThanOrEqualTo(FCV::Version::kFullyDowngradedTo44)) {
-                return Status(ErrorCodes::CannotCreateIndex,
-                              "TTL indexes cannot have NaN 'expireAfterSeconds' under FCV 4.4 "
-                              "on a 5.0+ binary.");
-            }
         }
     }
 

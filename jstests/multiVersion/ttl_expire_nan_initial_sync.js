@@ -1,6 +1,6 @@
 /**
  * Tests that adding a node running a 5.0+ binary to an existing 4.4 cluster containing
- * a TTL index with NaN for 'expireAfterSeconds' will trigger a fassert on startup.
+ * a TTL index with NaN for 'expireAfterSeconds' is supported.
  *
  * @tags: [
  *     requires_replication,
@@ -30,18 +30,13 @@ const newNode = rst.add({
     setParameter: {numInitialSyncAttempts: 1},
 });
 rst.reInitiate();
-
-// Confirm that we are unable to use a 5.0+ server binary to join the replica set.
-assert.soon(() => {
-    return rawMongoProgramOutput().search(/Fatal assertion/) >= 0;
-});
-rst.stop(newNode, /*signal=*/undefined, {allowedExitCode: MongoRunner.EXIT_ABRUPT});
-
-// Failed startup logs should contain details on the invalid TTL index.
-assert.gte(
-    rawMongoProgramOutput().search(
-        /Fatal assertion.*40088.*CannotCreateIndex.*t_1.*TTL indexes cannot have NaN 'expireAfterSeconds'/),
-    0);
+rst.waitForState(newNode, ReplSetTest.State.SECONDARY);
+rst.awaitReplication();
+const newNodeColl = newNode.getCollection(coll.getFullName());
+const newNodeIndexes = IndexBuildTest.assertIndexes(newNodeColl, 2, ['_id_', 't_1']);
+const newNodeTTLIndex = newNodeIndexes.t_1;
+assert(newNodeTTLIndex.hasOwnProperty('expireAfterSeconds'), tojson(newNodeTTLIndex));
+assert.gt(newNodeTTLIndex.expireAfterSeconds, 0, tojson(newNodeTTLIndex));
 
 rst.stopSet();
 })();
