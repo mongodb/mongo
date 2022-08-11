@@ -174,7 +174,7 @@ void SessionUpdateTracker::_updateSessionInfo(const OplogEntry& entry) {
             return;
         }
 
-        if (!entry.getObject2()) {
+        if (!entry.getObject2() || entry.getObject2()->isEmpty()) {
             return;
         }
     }

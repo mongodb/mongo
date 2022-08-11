@@ -217,7 +217,8 @@ all:
     test_file: jstests/core/internal_apply_oplog_update.js
   - ticket: SERVER-67532
     test_file: jstests/replsets/optime.js
-
+  - ticket: SERVER-67492
+    test_file: jstests/sharding/move_chunk_interrupt_postimage.js
 
 suites:
 

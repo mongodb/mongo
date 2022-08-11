@@ -54,6 +54,8 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(interruptBeforeProcessingPrePostImageOriginatingOp);
+
 const auto kOplogField = "oplog";
 const auto kWaitsForNewOplogField = "waitsForNewOplog";
 const WriteConcernOptions kMajorityWC(WriteConcernOptions::kMajority,
@@ -451,9 +453,21 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
                 lastOpTimeWaited = lastResult.oplogTime;
             }
         }
+
         for (BSONArrayIteratorSorted oplogIter(oplogArray); oplogIter.more();) {
+            auto oplogEntry = oplogIter.next().Obj();
+            interruptBeforeProcessingPrePostImageOriginatingOp.executeIf(
+                [&](const auto&) {
+                    uasserted(6749200,
+                              "Intentionally failing session migration before processing post/pre "
+                              "image originating update oplog entry");
+                },
+                [&](const auto&) {
+                    return !oplogEntry["needsRetryImage"].eoo() ||
+                        !oplogEntry["preImageOpTime"].eoo() || !oplogEntry["postImageOpTime"].eoo();
+                });
             try {
-                lastResult = processSessionOplog(oplogIter.next().Obj(), lastResult);
+                lastResult = processSessionOplog(oplogEntry, lastResult);
             } catch (const ExceptionFor<ErrorCodes::ConfigurationInProgress>&) {
                 // This means that the server has a newer txnNumber than the oplog being
                 // migrated, so just skip it
