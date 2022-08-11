@@ -37,7 +37,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/range_arithmetic',
         '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
         '$BUILD_DIR/mongo/s/grid',
-        '$BUILD_DIR/mongo/s/sharding_routing_table',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/write_block_bypass',
@@ -177,7 +176,6 @@ env.Library(
         '$BUILD_DIR/mongo/s/sharding_initialization',
         'sharding_api_d',
         'sharding_catalog_manager',
-        'sharding_logging',
         'transaction_coordinator',
     ],
     LIBDEPS_PRIVATE=[
@@ -194,6 +192,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/timeseries/bucket_catalog',
         '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/mongo/util/future_util',
+        'sharding_logging',
     ],
 )
 
@@ -497,6 +496,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/sharding_initialization',
         '$BUILD_DIR/mongo/s/sharding_router_api',
         'forwardable_operation_metadata',
+        'sharding_logging',
         'sharding_runtime_d',
         'user_writes_recoverable_critical_section',
     ],
@@ -552,6 +552,9 @@ env.Library(
     LIBDEPS=[
         'sharding_mongod_test_fixture',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
+    ],
 )
 
 env.Library(
@@ -564,6 +567,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/op_observer/oplog_writer_impl',
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
     ],
 )
 

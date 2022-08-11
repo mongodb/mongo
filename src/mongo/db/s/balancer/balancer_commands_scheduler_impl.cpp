@@ -27,8 +27,8 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/s/balancer/balancer_commands_scheduler_impl.h"
+
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/sharding_util.h"
@@ -43,9 +43,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-
 namespace mongo {
-
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(pauseSubmissionsFailPoint);

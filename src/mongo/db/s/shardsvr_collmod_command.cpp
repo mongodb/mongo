@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/coll_mod_gen.h"
@@ -37,13 +36,11 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/s/collmod_coordinator.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/s/sharding_util.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 namespace {

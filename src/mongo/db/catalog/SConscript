@@ -223,18 +223,30 @@ env.Library(
 )
 
 env.Library(
-    target='collection',
+    target='collection_crud',
     source=[
         'capped_collection_maintenance.cpp',
+        'collection_write_path.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/record_id_helpers',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/storage/record_store_base',
+        '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
+        '$BUILD_DIR/mongo/util/fail_point',
+        'collection',
+        'local_oplog_info',
+    ],
+)
+
+env.Library(
+    target='collection',
+    source=[
         'collection.cpp',
         'collection_operation_source.cpp',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/namespace_string',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/storage/record_store_base',
-        '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
     ],
 )
 
@@ -337,7 +349,9 @@ env.Library(
 
 env.Library(
     target="validate_state",
-    source=["validate_state.cpp"],
+    source=[
+        "validate_state.cpp",
+    ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/base",
         "$BUILD_DIR/mongo/db/catalog_raii",
@@ -404,6 +418,7 @@ env.Library(
         'clustered_collection_options',
         'collection',
         'collection_catalog',
+        'collection_crud',
         'collection_options',
         'database_holder',
         'health_log',

@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/capped_collection_maintenance.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog_impl.h"
 #include "mongo/db/catalog/index_consistency.h"
@@ -90,13 +91,6 @@
 namespace mongo {
 namespace {
 
-//  This fail point injects insertion failures for all collections unless a collection name is
-//  provided in the optional data object during configuration:
-//  data: {
-//      collectionNS: <fully-qualified collection namespace>,
-//  }
-MONGO_FAIL_POINT_DEFINE(failCollectionInserts);
-
 // Used to pause after inserting collection data and calling the opObservers.  Inserts to
 // replicated collections that are not part of a multi-statement transaction will have generated
 // their OpTime and oplog entry. Supports parameters to limit pause by namespace and by _id
@@ -107,9 +101,6 @@ MONGO_FAIL_POINT_DEFINE(failCollectionInserts);
 //  }
 MONGO_FAIL_POINT_DEFINE(hangAfterCollectionInserts);
 
-// This fail point throws a WriteConflictException after a successful call to insertRecords.
-MONGO_FAIL_POINT_DEFINE(failAfterBulkLoadDocInsert);
-
 // This fail point allows collections to be given malformed validator. A malformed validator
 // will not (and cannot) be enforced but it will be persisted.
 MONGO_FAIL_POINT_DEFINE(allowSettingMalformedCollectionValidators);
@@ -118,32 +109,6 @@ MONGO_FAIL_POINT_DEFINE(allowSettingMalformedCollectionValidators);
 MONGO_FAIL_POINT_DEFINE(corruptDocumentOnInsert);
 
 MONGO_FAIL_POINT_DEFINE(skipCappedDeletes);
-
-/**
- * Checks the 'failCollectionInserts' fail point at the beginning of an insert operation to see if
- * the insert should fail. Returns Status::OK if The function should proceed with the insertion.
- * Otherwise, the function should fail and return early with the error Status.
- */
-Status checkFailCollectionInsertsFailPoint(const NamespaceString& ns, const BSONObj& firstDoc) {
-    Status s = Status::OK();
-    failCollectionInserts.executeIf(
-        [&](const BSONObj& data) {
-            const std::string msg = str::stream()
-                << "Failpoint (failCollectionInserts) has been enabled (" << data
-                << "), so rejecting insert (first doc): " << firstDoc;
-            LOGV2(20287,
-                  "Failpoint (failCollectionInserts) has been enabled, so rejecting insert",
-                  "data"_attr = data,
-                  "document"_attr = firstDoc);
-            s = {ErrorCodes::FailPointEnabled, msg};
-        },
-        [&](const BSONObj& data) {
-            // If the failpoint specifies no collection or matches the existing one, fail.
-            const auto collElem = data["collectionNS"];
-            return !collElem || ns.ns() == collElem.str();
-        });
-    return s;
-}
 
 // Uses the collator factory to convert the BSON representation of a collator to a
 // CollatorInterface. Returns null if the BSONObj is empty. We expect the stored collation to be
@@ -573,7 +538,7 @@ Status CollectionImpl::checkValidatorAPIVersionCompatability(OperationContext* o
     return Status::OK();
 }
 
-std::pair<CollectionImpl::SchemaValidationResult, Status> CollectionImpl::checkValidation(
+std::pair<Collection::SchemaValidationResult, Status> CollectionImpl::checkValidation(
     OperationContext* opCtx, const BSONObj& document) const {
     if (!_validator.isOK()) {
         return {SchemaValidationResult::kError, _validator.getStatus()};
@@ -621,16 +586,15 @@ std::pair<CollectionImpl::SchemaValidationResult, Status> CollectionImpl::checkV
     return {SchemaValidationResult::kError, status};
 }
 
-Status CollectionImpl::_checkValidationAndParseResult(OperationContext* opCtx,
-                                                      const BSONObj& document) const {
-    std::pair<CollectionImpl::SchemaValidationResult, Status> result =
-        checkValidation(opCtx, document);
+Status CollectionImpl::checkValidationAndParseResult(OperationContext* opCtx,
+                                                     const BSONObj& document) const {
+    std::pair<SchemaValidationResult, Status> result = checkValidation(opCtx, document);
 
-    if (result.first == CollectionImpl::SchemaValidationResult::kPass) {
+    if (result.first == SchemaValidationResult::kPass) {
         return Status::OK();
     }
 
-    if (result.first == CollectionImpl::SchemaValidationResult::kWarn) {
+    if (result.first == SchemaValidationResult::kWarn) {
         LOGV2_WARNING(
             20294,
             "Document would fail validation",
@@ -745,8 +709,8 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
                                        const std::vector<InsertStatement>::const_iterator end,
                                        OpDebug* opDebug,
                                        bool fromMigrate) const {
-
-    auto status = checkFailCollectionInsertsFailPoint(_ns, (begin != end ? begin->doc : BSONObj()));
+    auto status = collection_internal::checkFailCollectionInsertsFailPoint(
+        _ns, (begin != end ? begin->doc : BSONObj()));
     if (!status.isOK()) {
         return status;
     }
@@ -762,7 +726,7 @@ Status CollectionImpl::insertDocuments(OperationContext* opCtx,
                               << _ns.toString());
         }
 
-        auto status = _checkValidationAndParseResult(opCtx, it->doc);
+        auto status = checkValidationAndParseResult(opCtx, it->doc);
         if (!status.isOK()) {
             return status;
         }
@@ -825,69 +789,6 @@ Status CollectionImpl::insertDocument(OperationContext* opCtx,
     std::vector<InsertStatement> docs;
     docs.push_back(docToInsert);
     return insertDocuments(opCtx, docs.begin(), docs.end(), opDebug, fromMigrate);
-}
-
-Status CollectionImpl::insertDocumentForBulkLoader(
-    OperationContext* opCtx, const BSONObj& doc, const OnRecordInsertedFn& onRecordInserted) const {
-
-    auto status = checkFailCollectionInsertsFailPoint(_ns, doc);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    status = _checkValidationAndParseResult(opCtx, doc);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    dassert(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_IX));
-
-    RecordId recordId;
-    if (isClustered()) {
-        invariant(_shared->_recordStore->keyFormat() == KeyFormat::String);
-        recordId = uassertStatusOK(record_id_helpers::keyForDoc(
-            doc, getClusteredInfo()->getIndexSpec(), getDefaultCollator()));
-    }
-
-    // Using timestamp 0 for these inserts, which are non-oplog so we don't have an appropriate
-    // timestamp to use.
-    StatusWith<RecordId> loc = _shared->_recordStore->insertRecord(
-        opCtx, recordId, doc.objdata(), doc.objsize(), Timestamp());
-
-    if (!loc.isOK())
-        return loc.getStatus();
-
-    status = onRecordInserted(loc.getValue());
-
-    if (MONGO_unlikely(failAfterBulkLoadDocInsert.shouldFail())) {
-        LOGV2(20290,
-              "Failpoint failAfterBulkLoadDocInsert enabled. Throwing "
-              "WriteConflictException",
-              logAttrs(_ns));
-        throwWriteConflictException();
-    }
-
-    std::vector<InsertStatement> inserts;
-    OplogSlot slot;
-    // Fetch a new optime now, if necessary.
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (!replCoord->isOplogDisabledFor(opCtx, _ns)) {
-        // Populate 'slot' with a new optime.
-        slot = repl::getNextOpTime(opCtx);
-    }
-    inserts.emplace_back(kUninitializedStmtId, doc, slot);
-
-    opCtx->getServiceContext()->getOpObserver()->onInserts(
-        opCtx, ns(), uuid(), inserts.begin(), inserts.end(), false);
-
-    // TODO (SERVER-67900): Get rid of the CollectionPtr constructor
-    collection_internal::cappedDeleteUntilBelowConfiguredMaximum(
-        opCtx, CollectionPtr(this, CollectionPtr::NoYieldTag()), loc.getValue());
-
-    opCtx->recoveryUnit()->onCommit(
-        [this](boost::optional<Timestamp>) { getRecordStore()->notifyCappedWaitersIfNeeded(); });
-
-    return loc.getStatus();
 }
 
 Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
@@ -1133,14 +1034,14 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
                                         OpDebug* opDebug,
                                         CollectionUpdateArgs* args) const {
     {
-        auto status = _checkValidationAndParseResult(opCtx, newDoc);
+        auto status = checkValidationAndParseResult(opCtx, newDoc);
         if (!status.isOK()) {
             if (validationLevelOrDefault(_metadata->options.validationLevel) ==
                 ValidationLevelEnum::strict) {
                 uassertStatusOK(status);
             }
             // moderate means we have to check the old doc
-            auto oldDocStatus = _checkValidationAndParseResult(opCtx, oldDoc.value());
+            auto oldDocStatus = checkValidationAndParseResult(opCtx, oldDoc.value());
             if (oldDocStatus.isOK()) {
                 // transitioning from good -> bad is not ok
                 uassertStatusOK(status);

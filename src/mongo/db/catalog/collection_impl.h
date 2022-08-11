@@ -118,6 +118,9 @@ public:
     std::pair<SchemaValidationResult, Status> checkValidation(OperationContext* opCtx,
                                                               const BSONObj& document) const final;
 
+    Status checkValidationAndParseResult(OperationContext* opCtx,
+                                         const BSONObj& document) const final;
+
     bool requiresIdIndex() const final;
 
     Snapshotted<BSONObj> docFor(OperationContext* opCtx, const RecordId& loc) const final {
@@ -201,17 +204,6 @@ public:
                           const InsertStatement& doc,
                           OpDebug* opDebug,
                           bool fromMigrate = false) const final;
-
-    /**
-     * Inserts a document into the record store for a bulk loader that manages the index building
-     * outside this Collection. The bulk loader is notified with the RecordId of the document
-     * inserted into the RecordStore.
-     *
-     * NOTE: It is up to caller to commit the indexes.
-     */
-    Status insertDocumentForBulkLoader(OperationContext* opCtx,
-                                       const BSONObj& doc,
-                                       const OnRecordInsertedFn& onRecordInserted) const final;
 
     /**
      * Updates the document @ oldLocation with newDoc.
@@ -472,8 +464,6 @@ private:
                             std::vector<InsertStatement>::const_iterator end,
                             OpDebug* opDebug,
                             bool fromMigrate) const;
-
-    Status _checkValidationAndParseResult(OperationContext* opCtx, const BSONObj& document) const;
 
     /**
      * Writes metadata to the DurableCatalog. Func should have the function signature

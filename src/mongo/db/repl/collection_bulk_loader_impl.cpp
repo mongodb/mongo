@@ -27,14 +27,12 @@
  *    it in the license file.
  */
 
+#include "mongo/db/repl/collection_bulk_loader_impl.h"
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -42,7 +40,6 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/collection_bulk_loader_impl.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/destructor_guard.h"
@@ -50,7 +47,6 @@
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
-
 
 namespace mongo {
 namespace repl {
@@ -153,9 +149,8 @@ Status CollectionBulkLoaderImpl::_insertDocumentsForUncappedCollection(
                     const auto& doc = *insertIter++;
                     bytesInBlock += doc.objsize();
                     // This version of insert will not update any indexes.
-                    const auto status =
-                        (*_collection)
-                            ->insertDocumentForBulkLoader(_opCtx.get(), doc, onRecordInserted);
+                    const auto status = collection_internal::insertDocumentForBulkLoader(
+                        _opCtx.get(), **_collection, doc, onRecordInserted);
                     if (!status.isOK()) {
                         return status;
                     }

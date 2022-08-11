@@ -87,7 +87,6 @@ env.Library(
         "$BUILD_DIR/mongo/db/query/command_request_response",
         "$BUILD_DIR/mongo/db/query/query_common",
         "$BUILD_DIR/mongo/executor/task_executor_interface",
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
         "$BUILD_DIR/mongo/s/client/sharding_client",
         "$BUILD_DIR/mongo/s/sharding_router_api",
     ],

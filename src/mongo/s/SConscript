@@ -75,24 +75,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target='sharding_routing_table',
-    source=[
-        'chunk.cpp',
-        'chunk_manager.cpp',
-        'chunk_writes_tracker.cpp',
-        'shard_key_pattern.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/matcher/expressions',
-        '$BUILD_DIR/mongo/db/query/query_planner',
-        '$BUILD_DIR/mongo/db/storage/key_string',
-        '$BUILD_DIR/mongo/db/update/update_common',
-        '$BUILD_DIR/mongo/util/concurrency/ticketholder',
-        'common_s',
-    ],
-)
-
 # Functionality for initializing all the services used by sharding, which are common between MongoS
 # and MongoD
 env.Library(
@@ -285,19 +267,28 @@ env.Library(
     source=[
         'balancer_configuration.cpp',
         'catalog_cache.cpp',
+        'chunk_manager.cpp',
+        'chunk_writes_tracker.cpp',
+        'chunk.cpp',
         'client/shard_factory.cpp',
         'client/shard_registry.cpp',
         'grid.cpp',
+        'shard_key_pattern.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver_network',
         '$BUILD_DIR/mongo/db/logical_time_metadata_hook',
+        '$BUILD_DIR/mongo/db/matcher/expressions',
+        '$BUILD_DIR/mongo/db/query/query_planner',
+        '$BUILD_DIR/mongo/db/storage/key_string',
+        '$BUILD_DIR/mongo/db/update/update_common',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
         '$BUILD_DIR/mongo/util/caching',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        '$BUILD_DIR/mongo/util/concurrency/ticketholder',
         'client/shard_interface',
+        'common_s',
         'query/cluster_cursor_manager',
-        'sharding_routing_table',
     ],
 )
 
@@ -324,7 +315,6 @@ env.Benchmark(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/s/sharding_api_d',
-        'sharding_routing_table',
     ],
 )
 

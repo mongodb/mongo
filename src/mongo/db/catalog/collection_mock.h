@@ -106,6 +106,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    virtual Status checkValidationAndParseResult(OperationContext* opCtx,
+                                                 const BSONObj& document) const {
+        MONGO_UNREACHABLE;
+    }
+
     bool requiresIdIndex() const {
         MONGO_UNREACHABLE;
     }
@@ -158,12 +163,6 @@ public:
                           const InsertStatement& doc,
                           OpDebug* opDebug,
                           bool fromMigrate) const {
-        MONGO_UNREACHABLE;
-    }
-
-    Status insertDocumentForBulkLoader(OperationContext* opCtx,
-                                       const BSONObj& doc,
-                                       const OnRecordInsertedFn& onRecordInserted) const {
         MONGO_UNREACHABLE;
     }
 

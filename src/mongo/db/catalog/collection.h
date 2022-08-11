@@ -201,11 +201,6 @@ public:
         StatusWith<std::shared_ptr<MatchExpression>> filter = {nullptr};
     };
 
-    /**
-     * Callback function for callers of insertDocumentForBulkLoader().
-     */
-    using OnRecordInsertedFn = std::function<Status(const RecordId& loc)>;
-
     Collection() = default;
     virtual ~Collection() = default;
 
@@ -279,6 +274,13 @@ public:
     enum class SchemaValidationResult { kPass, kWarn, kError };
     virtual std::pair<SchemaValidationResult, Status> checkValidation(
         OperationContext* opCtx, const BSONObj& document) const = 0;
+
+    /**
+     * Extension of `checkValidation` above which converts the tri-modal return value into either a
+     * successful or failed status, printing warning if necessary.
+     */
+    virtual Status checkValidationAndParseResult(OperationContext* opCtx,
+                                                 const BSONObj& document) const = 0;
 
     virtual bool requiresIdIndex() const = 0;
 
@@ -356,18 +358,6 @@ public:
                                   const InsertStatement& doc,
                                   OpDebug* opDebug,
                                   bool fromMigrate = false) const = 0;
-
-    /**
-     * Inserts a document into the record store for a bulk loader that manages the index building
-     * outside this Collection. The bulk loader is notified with the RecordId of the document
-     * inserted into the RecordStore.
-     *
-     * NOTE: It is up to caller to commit the indexes.
-     */
-    virtual Status insertDocumentForBulkLoader(
-        OperationContext* opCtx,
-        const BSONObj& doc,
-        const OnRecordInsertedFn& onRecordInserted) const = 0;
 
     /**
      * Updates the document @ oldLocation with newDoc.
