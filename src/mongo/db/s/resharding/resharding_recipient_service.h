@@ -288,6 +288,8 @@ private:
     RecipientShardContext _recipientCtx;
     std::vector<DonorShardFetchTimestamp> _donorShards;
     boost::optional<Timestamp> _cloneTimestamp;
+    ReshardingRecipientMetrics _timeIntervals;
+    boost::optional<int64_t> _approxBytesToCopy;
 
     const std::unique_ptr<RecipientStateMachineExternalState> _externalState;
 

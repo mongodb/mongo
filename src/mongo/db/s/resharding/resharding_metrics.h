@@ -35,6 +35,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/resharding/donor_document_gen.h"
+#include "mongo/db/s/resharding/recipient_document_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/resharding/common_types_gen.h"
@@ -70,6 +71,29 @@ public:
     void onStepUp(Role role) noexcept;
 
     void onStepUp(DonorStateEnum state, ReshardingDonorMetrics donorMetrics);
+
+    struct ReshardingRecipientCountsAndMetrics {
+        ReshardingRecipientCountsAndMetrics(int64_t documentCountCopied,
+                                            int64_t documentBytesCopied,
+                                            int64_t oplogEntriesFetched,
+                                            int64_t oplogEntriesApplied,
+                                            boost::optional<int64_t> approxBytesToCopy,
+                                            ReshardingRecipientMetrics metrics)
+            : documentCountCopied{documentCountCopied},
+              documentBytesCopied{documentBytesCopied},
+              oplogEntriesFetched{oplogEntriesFetched},
+              oplogEntriesApplied{oplogEntriesApplied},
+              approxBytesToCopy{approxBytesToCopy},
+              metrics{metrics} {}
+        int64_t documentCountCopied;
+        int64_t documentBytesCopied;
+        int64_t oplogEntriesFetched;
+        int64_t oplogEntriesApplied;
+        boost::optional<int64_t> approxBytesToCopy;
+        ReshardingRecipientMetrics metrics;
+    };
+
+    void onStepUp(RecipientStateEnum, const ReshardingRecipientCountsAndMetrics&);
 
     // So long as a resharding operation is in progress, the following may be used to update the
     // state of a donor, a recipient, and a coordinator, respectively.
@@ -112,11 +136,6 @@ public:
     void onOplogEntriesFetched(int64_t entries) noexcept;
     // Allows restoring "oplog entries to apply" metrics.
     void onOplogEntriesApplied(int64_t entries) noexcept;
-
-    void restoreForCurrentOp(int64_t documentCountCopied,
-                             int64_t documentBytesCopied,
-                             int64_t oplogEntriesFetched,
-                             int64_t oplogEntriesApplied) noexcept;
 
     // Allows tracking writes during a critical section when the donor's state is either of
     // "donating-oplog-entries" or "blocking-writes".

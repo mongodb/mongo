@@ -82,6 +82,11 @@ structs:
             startConfigTxnCloneTime:
                 type:  date
                 optional: true
+            approxBytesToCopy:
+                type: long
+                description: >-
+                    Approximate number of bytes to copy during cloning
+                optional: true
             metrics:
                 type: ReshardingRecipientMetrics
                 description: "Metrics related to this recipient."
