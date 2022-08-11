@@ -157,7 +157,7 @@ Use buildscripts/golden_test.py command line tool to manage the test outputs. Th
 ## Setup
 buildscripts/golden_test.py requires a one-time workstation setup.
 
-Note: this setup is only required to use buildscripts/golden_test.py itselfit is NOT required to 
+Note: this setup is only required to use buildscripts/golden_test.py itself. It is NOT required to
 just run the Golden Data tests when not using buildscripts/golden_test.py.
 
 1. Create a yaml config file, as described by golden_test_options.idl (link TBD). 
