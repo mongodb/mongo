@@ -10,6 +10,7 @@
 "use strict";
 
 load("jstests/libs/change_stream_util.js");  // For ChangeStreamTest.
+load("jstests/libs/feature_flag_util.js");
 
 let testDB = db.getSiblingDB(jsTestName());
 testDB.dropDatabase();
@@ -102,6 +103,18 @@ let expectedChanges = [
         }
     },
     {
+        // Only seen if time series scalability improvements enabled
+        "operationType": "createIndexes",
+        "ns": {"db": dbName, "coll": bucketsCollName},
+        "operationDescription": {
+            "indexes": [{
+                "v": 2,
+                "name": "meta_1_ts_1",
+                "key": {"meta": 1, "control.min.ts": 1, "control.max.ts": 1}
+            }]
+        }
+    },
+    {
         "operationType": "create",
         "ns": {"db": dbName, "coll": collName},
         "operationDescription": {
@@ -129,7 +142,8 @@ let expectedChanges = [
             "control": {
                 "version": 1,
                 "min": {"_id": 1, "ts": ISODate("1970-01-01T00:00:00Z")},
-                "max": {"_id": 1, "ts": ISODate("1970-01-01T00:00:01Z")}
+                "max": {"_id": 1, "ts": ISODate("1970-01-01T00:00:01Z")},
+                "closed": false  // Only seen if time series scalability improvements enabled
             },
             "meta": {"a": 1},
             "data": {"_id": {"0": 1}, "ts": {"0": ISODate("1970-01-01T00:00:01Z")}}
@@ -269,6 +283,14 @@ let expectedChanges = [
     {"operationType": "drop", "ns": {"db": dbName, "coll": collName}},
     {"operationType": "drop", "ns": {"db": dbName, "coll": bucketsCollName}}
 ];
+
+if (!FeatureFlagUtil.isEnabled(db, "TimeseriesScalabilityImprovements")) {
+    // Under this feature flag, buckets are created with the closed field set to false.
+    // Remove closed field if the feature flag is not enabled.
+    delete expectedChanges[4].fullDocument.control.closed;
+    // Remove implicitly create index
+    expectedChanges = [expectedChanges[0], ...expectedChanges.slice(2)];
+}
 
 cst.assertNextChangesEqual({cursor: curWithEvents, expectedChanges});
 
