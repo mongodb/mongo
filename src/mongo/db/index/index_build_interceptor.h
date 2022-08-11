@@ -67,7 +67,7 @@ public:
      * table to store any duplicate key constraint violations found during the build, if the index
      * being built has uniqueness constraints.
      */
-    IndexBuildInterceptor(OperationContext* opCtx, IndexCatalogEntry* entry);
+    IndexBuildInterceptor(OperationContext* opCtx, const IndexCatalogEntry* entry);
 
     /**
      * Finds the temporary table associated with storing writes during this index build. Only used
@@ -76,7 +76,7 @@ public:
      * violations found during the build, if the index being built has uniqueness constraints.
      */
     IndexBuildInterceptor(OperationContext* opCtx,
-                          IndexCatalogEntry* entry,
+                          const IndexCatalogEntry* entry,
                           StringData sideWritesIdent,
                           boost::optional<StringData> duplicateKeyTrackerIdent,
                           boost::optional<StringData> skippedRecordTrackerIdent);
@@ -194,7 +194,7 @@ private:
                                    long long iteration) const;
 
     // The entry for the index that is being built.
-    IndexCatalogEntry* _indexCatalogEntry;
+    const IndexCatalogEntry* _indexCatalogEntry;
 
     // This temporary record store records intercepted keys that will be written into the index by
     // calling drainWritesIntoIndex(). It is owned by the interceptor and dropped along with it.

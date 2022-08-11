@@ -46,9 +46,9 @@ class SkippedRecordTracker {
     SkippedRecordTracker(const SkippedRecordTracker&) = delete;
 
 public:
-    explicit SkippedRecordTracker(IndexCatalogEntry* indexCatalogEntry);
+    explicit SkippedRecordTracker(const IndexCatalogEntry* indexCatalogEntry);
     SkippedRecordTracker(OperationContext* opCtx,
-                         IndexCatalogEntry* indexCatalogEntry,
+                         const IndexCatalogEntry* indexCatalogEntry,
                          boost::optional<StringData> ident);
 
     /**
@@ -85,7 +85,7 @@ public:
     }
 
 private:
-    IndexCatalogEntry* _indexCatalogEntry;
+    const IndexCatalogEntry* _indexCatalogEntry;
 
     // This temporary record store is owned by the duplicate key tracker.
     std::unique_ptr<TemporaryRecordStore> _skippedRecordsTable;

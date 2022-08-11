@@ -59,7 +59,8 @@ MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildDrainYieldSecond);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringDrainWritesPhase);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringDrainWritesPhaseSecond);
 
-IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx, IndexCatalogEntry* entry)
+IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
+                                             const IndexCatalogEntry* entry)
     : _indexCatalogEntry(entry),
       _sideWritesTable(opCtx->getServiceContext()->getStorageEngine()->makeTemporaryRecordStore(
           opCtx, KeyFormat::Long)),
@@ -71,7 +72,7 @@ IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx, IndexCatal
 }
 
 IndexBuildInterceptor::IndexBuildInterceptor(OperationContext* opCtx,
-                                             IndexCatalogEntry* entry,
+                                             const IndexCatalogEntry* entry,
                                              StringData sideWritesIdent,
                                              boost::optional<StringData> duplicateKeyTrackerIdent,
                                              boost::optional<StringData> skippedRecordTrackerIdent)
