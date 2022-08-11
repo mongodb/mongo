@@ -71,6 +71,54 @@ commit and all [releases](https://github.com/mongodb/mongo/blob/10439de079b03a98
 from 5.0.0 onwards. This compatibility checker script will run in evergreen patch builds
 and in the commit queue.
 
+## Adding new commands and fields
+***Any additions to the Stable API must be approved by the Stable API PM and code reviewed by the 
+Replication Team.***
+
+Adding a new IDL command requires the `api_version` field, which indicates which Stable API version 
+this command is in. ***By default, the `api_version` field should be `""`.*** Only if you are adding the
+command to the Stable API, then `api_version` should be the API version you are adding it to 
+(currently `"1"`). ***By adding it to the Stable API, this means you cannot remove this
+command within this API version.***
+
+Adding a new command parameter or reply field requires the `stability` field. This field indicates
+whether the command parameter/reply field is part of the Stable API. There are three options for
+field: `unstable`, `internal`, and `stable`. If you are unsure what the `stability` field for the 
+new command parameter or reply field should be, it ***should be marked as `stability: unstable`***.
+
+Only if the field should be added to the Stable API, then you should mark the field as 
+`stability: stable`in IDL. Additionally, in `idl_check_compatibility.py` you must add the field to
+the `ALLOWED_STABLE_FIELDS_LIST`. This list was added so that engineers are aware that by making a
+field part of the stable API, ***the field cannot be changed in any way that would violate the
+Stable API guidelines*** (see [above](https://github.com/mongodb/mongo/blob/master/src/mongo/db/STABLE_API_README.md#compatibility)).
+Crucially, this means the field ***cannot be removed or changed to `stability: unstable` or
+`stability: internal`*** while we are in the current API version.
+
+The format of adding a field to the list is `<command_name>-<command_param_or_reply_field>-<field_name>`.
+
+### `stability: unstable` vs. `stability: internal`
+
+If the field should not be part of the Stable API, it should be marked as either 
+`stability: unstable` or `stability: internal`. Both of these mean that the field will not be a part
+of the Stable API. The difference is that when we send commands from a mongos to a shard, the shard
+will perform parsing validation that checks that all the command fields are part of the Stable API,
+and will throw an `APIStrict` error if the field is marked as `stability: unstable`, but not if the
+field is marked as `stability: internal`. `stability: internal` was added to allow us to get past
+this error while still not adding the field to the Stable API. So in general, a field should be
+marked as `stability: unstable`, unless it will go through this parsing validation, in which case it
+should be marked as `stability: internal`.
+
+### `IGNORE_STABLE_TO_UNSTABLE_LIST`
+The `IGNORE_STABLE_TO_UNSTABLE_LIST` exists because there have been cases where a field was added
+to the Stable API accidentally, and since the field was strictly internal / not documented to users,
+we changed the field to be unstable. (Note that these kinds of changes have to go through the same
+approval process.) Normally changing a field from `stability: stable` to `stability: unstable` or
+`stability: internal` would throw an error, so the `IGNORE_STABLE_TO_UNSTABLE_LIST` acts as an allow
+list for these exceptions. 
+
+***Additions to the `IGNORE_STABLE_TO_UNSTABLE_LIST` must be approved by the Stable API PM and code
+reviewed by the Replication Team.***
+
 ### The BSON serialization `any` type
 
 The `bson_serialization_type` is used to define the BSON type that an IDL field will serialize to.
@@ -80,9 +128,10 @@ serializers, we specify the `bson_serialization_type` to be `any`. However, the 
 checker script can’t type check  `any` , since the main logic for the type exists outside of the
 IDL file. As many commands have valid reasons for using type `any`, we do not restrict usage.
 Instead, the command must be added to an [allowlist](https://github.com/mongodb/mongo/blob/6aaad044a819a50a690b932afeda9aa278ba0f2e/buildscripts/idl/idl_check_compatibility.py#L52).
-This also applies to any `unstable` fields. This is to prevent unexpected errors when modifying
-a field from `unstable` to `stable`. By intentionally opting in, we assume the implementer
-understands the implications and has valid reasons to use `any`.
+This also applies to any fields marked as `stability: unstable`. This is to prevent unexpected
+errors when modifying a field from `stability: unstable` to `stability: stable`. By intentionally
+opting in, we assume the implementer understands the implications and has valid reasons to use
+`any`.
 
 ## Stable API implementation
 

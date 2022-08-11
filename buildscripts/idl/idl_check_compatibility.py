@@ -168,6 +168,8 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
 # Do not add user visible fields already released in earlier versions.
 # We generally don't allow changing a field from stable to unstable, but we permit it in special cases,
 # such as when we want to avoid making internal fields part of the stable API.
+# Additions to this list must be approved by the Stable API PM and code reviewed by the Replication
+# team.
 IGNORE_STABLE_TO_UNSTABLE_LIST: List[str] = [
     # This list is only used in unit-tests.
     'newReplyFieldUnstableIgnoreList-reply-unstableNewFieldIgnoreList',
@@ -227,6 +229,8 @@ IGNORE_STABLE_TO_UNSTABLE_LIST: List[str] = [
 # want to make sure such changes are always intentional. Therefore, the checker will throw errors
 # unless the field is also added to this list below, with which the author ackhowledges they are
 # aware of the above implications.
+# Additions to this list must be approved by the Stable API PM and code reviewed by the Replication
+# team.
 ALLOWED_STABLE_FIELDS_LIST: List[str] = [
     # This list is only used in unit-tests. These cases modify fields from unstable to stable.
     'oldReplyFieldTypeBsonAnyUnstable-reply-oldBsonSerializationTypeAnyUnstableReplyField',
