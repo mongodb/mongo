@@ -168,18 +168,32 @@ TEST_F(RangeDeleterServiceTest, UpdateRangeDeletionTaskPendingFieldToTrue) {
     ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollA), 0);
 }
 
-// SERVER-68552 TODO: Enable test after resolving the ticket
-// TEST_F(RangeDeleterServiceTest, UnsetPendingFieldFromRangeDeletionTask) {
-//     auto rds = RangeDeleterService::get(opCtx);
-//     RangeDeletionTask rdt = createRangeDeletionTask(
-//         uuidCollA, BSON("a" << 0), BSON("a" << 10), CleanWhenEnum::kDelayed);
+TEST_F(RangeDeleterServiceTest, UnsetPendingFieldFromRangeDeletionTask) {
+    auto rds = RangeDeleterService::get(opCtx);
+    RangeDeletionTask rdt1 = createRangeDeletionTask(
+        uuidCollA, BSON("a" << 0), BSON("a" << 10), CleanWhenEnum::kDelayed);
+    RangeDeletionTask rdt2 = createRangeDeletionTask(
+        uuidCollB, BSON("a" << 10), BSON("a" << 20), CleanWhenEnum::kDelayed);
 
-//     insertRangeDeletionTaskDocument(opCtx, rdt);
-//     ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollA), 0);
+    insertRangeDeletionTaskDocument(opCtx, rdt1);
+    insertRangeDeletionTaskDocument(opCtx, rdt2);
+    verifyRangeDeletionTasks(opCtx, uuidCollA, {});
+    verifyRangeDeletionTasks(opCtx, uuidCollB, {});
+    ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollA), 0);
+    ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollB), 0);
 
-//     removePendingField(opCtx, rdt.getId());
-//     ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollA), 1);
-// }
+    removePendingField(opCtx, rdt1.getId());
+    verifyRangeDeletionTasks(opCtx, uuidCollA, {rdt1.getRange()});
+    verifyRangeDeletionTasks(opCtx, uuidCollB, {});
+    ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollA), 1);
+    ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollB), 0);
+
+    removePendingField(opCtx, rdt2.getId());
+    verifyRangeDeletionTasks(opCtx, uuidCollA, {rdt1.getRange()});
+    verifyRangeDeletionTasks(opCtx, uuidCollB, {rdt2.getRange()});
+    ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollA), 1);
+    ASSERT_EQ(rds->getNumRangeDeletionTasksForCollection(uuidCollB), 1);
+}
 
 TEST_F(RangeDeleterServiceTest, RemoveRangeDeletionTask) {
     auto rds = RangeDeleterService::get(opCtx);
