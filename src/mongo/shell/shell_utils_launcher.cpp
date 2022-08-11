@@ -855,7 +855,9 @@ BSONObj ClearRawMongoProgramOutput(const BSONObj& args, void* data) {
 }
 
 BSONObj CheckProgram(const BSONObj& args, void* data) {
-    ProcessId pid = ProcessId::fromNative(singleArg(args).numberInt());
+    uassert(
+        ErrorCodes::BadValue, "Cannot check the program with PID = NaN", !singleArg(args).isNaN());
+    ProcessId pid = ProcessId::fromNative(singleArg(args).safeNumberInt());
     int exit_code = -123456;  // sentinel value
     bool isDead = registry.isPidDead(pid, &exit_code);
     if (!isDead) {
@@ -865,7 +867,9 @@ BSONObj CheckProgram(const BSONObj& args, void* data) {
 }
 
 BSONObj WaitProgram(const BSONObj& a, void* data) {
-    ProcessId pid = ProcessId::fromNative(singleArg(a).numberInt());
+    uassert(
+        ErrorCodes::BadValue, "Cannot wait for the program with PID = NaN", !singleArg(a).isNaN());
+    ProcessId pid = ProcessId::fromNative(singleArg(a).safeNumberInt());
     int exit_code = -123456;  // sentinel value
     registry.waitForPid(pid, true, &exit_code);
     return BSON(string("") << exit_code);
