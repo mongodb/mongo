@@ -185,7 +185,7 @@ BSONObj JSSrand(const BSONObj& a, void* data) {
     // grab the least significant bits of either the supplied argument or
     // a random number from SecureRandom.
     if (a.nFields() == 1 && a.firstElement().isNumber())
-        seed = static_cast<unsigned int>(a.firstElement().numberLong());
+        seed = static_cast<unsigned int>(a.firstElement().safeNumberLong());
     else {
         std::unique_ptr<SecureRandom> rand(SecureRandom::create());
         seed = static_cast<unsigned int>(rand->nextInt64());
