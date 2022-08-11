@@ -165,15 +165,73 @@ std::tuple<bool, value::TypeTags, value::Value> genericArithmeticOp(value::TypeT
     } else if (lhsTag == TypeTags::Date || rhsTag == TypeTags::Date) {
         if (isNumber(lhsTag)) {
             int64_t result;
-            if (!Op::doOperation(
-                    numericCast<int64_t>(lhsTag, lhsValue), bitcastTo<int64_t>(rhsValue), result)) {
-                return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(result)};
+            switch (lhsTag) {
+                case TypeTags::NumberDouble: {
+                    using limits = std::numeric_limits<int64_t>;
+                    double doubleLhs = numericCast<double>(lhsTag, lhsValue);
+                    // The upper bound is exclusive because it rounds up when it is cast to a
+                    // double.
+                    if (doubleLhs >= static_cast<double>(limits::min()) &&
+                        doubleLhs < static_cast<double>(limits::max()) &&
+                        !Op::template doOperation<int64_t>(
+                            llround(doubleLhs), bitcastTo<int64_t>(rhsValue), result)) {
+                        return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(result)};
+                    }
+                    break;
+                }
+                case TypeTags::NumberDecimal: {
+                    using limits = std::numeric_limits<int64_t>;
+                    auto decimalLhs = numericCast<Decimal128>(lhsTag, lhsValue);
+                    if (decimalLhs.isGreaterEqual(Decimal128{limits::min()}) &&
+                        decimalLhs.isLess(Decimal128{limits::max()}) &&
+                        !Op::doOperation(
+                            decimalLhs.toLong(), bitcastTo<int64_t>(rhsValue), result)) {
+                        return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(result)};
+                    }
+                    break;
+                }
+                default: {
+                    if (!Op::doOperation(numericCast<int64_t>(lhsTag, lhsValue),
+                                         bitcastTo<int64_t>(rhsValue),
+                                         result)) {
+                        return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(result)};
+                    }
+                }
             }
         } else if (isNumber(rhsTag)) {
             int64_t result;
-            if (!Op::doOperation(
-                    bitcastTo<int64_t>(lhsValue), numericCast<int64_t>(rhsTag, rhsValue), result)) {
-                return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(result)};
+            switch (rhsTag) {
+                case TypeTags::NumberDouble: {
+                    using limits = std::numeric_limits<int64_t>;
+                    double doubleRhs = numericCast<double>(rhsTag, rhsValue);
+                    // The upper bound is exclusive because it rounds up when it is cast to a
+                    // double.
+                    if (doubleRhs >= static_cast<double>(limits::min()) &&
+                        doubleRhs < static_cast<double>(limits::max()) &&
+                        !Op::template doOperation<int64_t>(
+                            bitcastTo<int64_t>(lhsValue), llround(doubleRhs), result)) {
+                        return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(result)};
+                    }
+                    break;
+                }
+                case TypeTags::NumberDecimal: {
+                    using limits = std::numeric_limits<int64_t>;
+                    auto decimalRhs = numericCast<Decimal128>(rhsTag, rhsValue);
+                    if (decimalRhs.isGreaterEqual(Decimal128{limits::min()}) &&
+                        decimalRhs.isLess(Decimal128{limits::max()}) &&
+                        !Op::doOperation(
+                            bitcastTo<int64_t>(lhsValue), decimalRhs.toLong(), result)) {
+                        return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(result)};
+                    }
+                    break;
+                }
+                default: {
+                    if (!Op::doOperation(bitcastTo<int64_t>(lhsValue),
+                                         numericCast<int64_t>(rhsTag, rhsValue),
+                                         result)) {
+                        return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(result)};
+                    }
+                }
             }
         } else {
             int64_t result;
