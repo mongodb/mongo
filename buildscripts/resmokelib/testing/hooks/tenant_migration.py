@@ -252,6 +252,7 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
         self._test = None
         self._test_report = test_report
         self._shell_options = shell_options
+        self._use_shard_merge_protocol = False
 
         self.__lifecycle = TenantMigrationLifeCycle()
         # Event set when the thread has been stopped using the 'stop()' method.
@@ -442,6 +443,38 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                 migration_opts.migration_id, migration_opts.get_donor_name())
             raise
 
+    def _is_shard_merge_enabled(self, primary_client):  # noqa: D205,D400
+        """Check if the shard merge feature flag is enabled. Returns true if both the shard merge
+        feature flag is set to true and that ignoreShardMergeFeatureFlag is set to false.
+        """
+        shard_merge_feature_enabled = False
+        while True:
+            try:
+                shard_merge_flag_doc = primary_client.admin.command(
+                    {"getParameter": 1, "featureFlagShardMerge": 1})
+                fcv_doc = primary_client.admin.command(
+                    {"getParameter": 1, "featureCompatibilityVersion": 1})
+                flag_doc_is_shard_merge = shard_merge_flag_doc["featureFlagShardMerge"].get("value")
+                if not flag_doc_is_shard_merge:
+                    return False
+                shard_merge_flag_version = shard_merge_flag_doc["featureFlagShardMerge"].get(
+                    "version")
+                fcv_version = fcv_doc["featureCompatibilityVersion"].get("version")
+                shard_merge_feature_enabled = (float(fcv_version) >=
+                                               float(shard_merge_flag_version))
+                break
+            except (pymongo.errors.AutoReconnect, pymongo.errors.NotMasterError):
+                self.logger.info("Retrying connection to primary for shard merge state doc check.")
+                continue
+            time.sleep(self.POLL_INTERVAL_SECS)
+
+        if not shard_merge_feature_enabled:
+            return False
+
+        ignore_shard_merge_feature_flag = self._shell_options["global_vars"]["TestData"].get(
+            "ignoreShardMergeFeatureFlag")
+        return not ignore_shard_merge_feature_flag
+
     def _start_and_wait_for_migration(self, migration_opts):  # noqa: D205,D400
         """Run donorStartMigration to start a tenant migration based on 'migration_opts', wait for
         the migration decision and return the last response for donorStartMigration.
@@ -463,6 +496,13 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                 get_certificate_and_private_key("jstests/libs/tenant_migration_recipient.pem"),
         }
         donor_primary = migration_opts.get_donor_primary()
+        donor_primary_client = self._create_client(donor_primary)
+        is_shard_merge_enabled = self._is_shard_merge_enabled(donor_primary_client)
+        if is_shard_merge_enabled:
+            self._override_abort_failpoints(self._tenant_migration_fixture.common_mongod_options)
+            cmd_obj["protocol"] = "shard merge"
+            self._use_shard_merge_protocol = True
+            self.logger.info("Using shard merge protocol for tenant migration.")
 
         self.logger.info(
             "Starting tenant migration '%s' on donor primary on port %d of replica set '%s'.",
