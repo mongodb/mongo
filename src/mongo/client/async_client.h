@@ -33,6 +33,7 @@
 
 #include "mongo/client/authenticate.h"
 #include "mongo/db/service_context.h"
+#include "mongo/executor/connection_metrics.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
@@ -60,6 +61,7 @@ public:
         ServiceContext* context,
         transport::ReactorHandle reactor,
         Milliseconds timeout,
+        ConnectionMetrics* connectionMetrics,  // must remain valid until the future is ready
         std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext = nullptr);
 
     Future<executor::RemoteCommandResponse> runCommandRequest(

@@ -117,8 +117,10 @@ TEST(TransportLayerASIO, ShortReadsAndWritesWork) {
         thread.join();
     });
 
+    ConnectionMetrics metrics{sc->getFastClockSource()};
     AsyncDBClient::Handle handle =
-        AsyncDBClient::connect(server, transport::kGlobalSSLMode, sc, reactor, Milliseconds::max())
+        AsyncDBClient::connect(
+            server, transport::kGlobalSSLMode, sc, reactor, Milliseconds::max(), &metrics)
             .get();
 
     handle->initWireVersion(__FILE__, nullptr).get();
@@ -151,9 +153,10 @@ TEST(TransportLayerASIO, asyncConnectTimeoutCleansUpSocket) {
     });
 
     FailPointEnableBlock fp("transportLayerASIOasyncConnectTimesOut");
-    auto client =
-        AsyncDBClient::connect(server, transport::kGlobalSSLMode, sc, reactor, Milliseconds{500})
-            .getNoThrow();
+    ConnectionMetrics metrics{sc->getFastClockSource()};
+    auto client = AsyncDBClient::connect(
+                      server, transport::kGlobalSSLMode, sc, reactor, Milliseconds{500}, &metrics)
+                      .getNoThrow();
     ASSERT_EQ(client.getStatus(), ErrorCodes::NetworkTimeout);
 }
 
@@ -170,8 +173,10 @@ TEST(TransportLayerASIO, exhaustIsMasterShouldReceiveMultipleReplies) {
         thread.join();
     });
 
+    ConnectionMetrics metrics{sc->getFastClockSource()};
     AsyncDBClient::Handle handle =
-        AsyncDBClient::connect(server, transport::kGlobalSSLMode, sc, reactor, Milliseconds::max())
+        AsyncDBClient::connect(
+            server, transport::kGlobalSSLMode, sc, reactor, Milliseconds::max(), &metrics)
             .get();
 
     handle->initWireVersion(__FILE__, nullptr).get();
@@ -252,13 +257,17 @@ TEST(TransportLayerASIO, exhaustIsMasterShouldStopOnFailure) {
         thread.join();
     });
 
+    ConnectionMetrics masterMetrics{sc->getFastClockSource()};
     AsyncDBClient::Handle isMasterHandle =
-        AsyncDBClient::connect(server, transport::kGlobalSSLMode, sc, reactor, Milliseconds::max())
+        AsyncDBClient::connect(
+            server, transport::kGlobalSSLMode, sc, reactor, Milliseconds::max(), &masterMetrics)
             .get();
     isMasterHandle->initWireVersion(__FILE__, nullptr).get();
 
+    ConnectionMetrics failpointMetrics{sc->getFastClockSource()};
     AsyncDBClient::Handle failpointHandle =
-        AsyncDBClient::connect(server, transport::kGlobalSSLMode, sc, reactor, Milliseconds::max())
+        AsyncDBClient::connect(
+            server, transport::kGlobalSSLMode, sc, reactor, Milliseconds::max(), &failpointMetrics)
             .get();
     failpointHandle->initWireVersion(__FILE__, nullptr).get();
 

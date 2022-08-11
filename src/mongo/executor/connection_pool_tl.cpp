@@ -35,7 +35,13 @@
 #include "mongo/client/authenticate.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/executor/network_interface_tl_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kASIO
 
@@ -45,13 +51,38 @@ namespace executor {
 namespace connection_pool_tl {
 namespace {
 const auto kMaxTimerDuration = Milliseconds::max();
-
 struct TimeoutHandler {
     AtomicWord<bool> done;
     Promise<void> promise;
 
     explicit TimeoutHandler(Promise<void> p) : promise(std::move(p)) {}
 };
+
+auto makeSeveritySuppressor() {
+    return std::make_unique<logv2::KeyedSeveritySuppressor<HostAndPort>>(
+        Seconds{1}, logv2::LogSeverity::Log(), logv2::LogSeverity::Debug(2));
+}
+
+bool connHealthMetricsEnabled() {
+    return gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV();
+}
+
+void logSlowConnection(const HostAndPort& peer, const ConnectionMetrics& connMetrics) {
+    static auto& severitySuppressor = *makeSeveritySuppressor().release();
+    LOGV2_DEBUG(6496400,
+                severitySuppressor(peer).toInt(),
+                "Slow connection establishment",
+                "hostAndPort"_attr = peer,
+                "dnsResolutionTime"_attr = connMetrics.dnsResolution(),
+                "tcpConnectionTime"_attr = connMetrics.tcpConnection(),
+                "tlsHandshakeTime"_attr = connMetrics.tlsHandshake(),
+                "authTime"_attr = connMetrics.auth(),
+                "hookTime"_attr = connMetrics.connectionHook(),
+                "totalTime"_attr = connMetrics.total());
+}
+
+CounterMetric totalConnectionEstablishmentTime("mongos.totalConnectionEstablishmentTimeMillis",
+                                               connHealthMetricsEnabled);
 
 }  // namespace
 
@@ -331,7 +362,7 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string ins
     auto isMasterHook = std::make_shared<TLConnectionSetupHook>(_onConnectHook, x509AuthOnly);
 
     AsyncDBClient::connect(
-        _peer, _sslMode, _serviceContext, _reactor, timeout, _transientSSLContext)
+        _peer, _sslMode, _serviceContext, _reactor, timeout, &_connMetrics, _transientSSLContext)
         .thenRunOn(_reactor)
         .onError([](StatusWith<AsyncDBClient::Handle> swc) -> StatusWith<AsyncDBClient::Handle> {
             return Status(ErrorCodes::HostUnreachable, swc.getStatus().reason());
@@ -362,6 +393,7 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string ins
             return _client->authenticateInternal(std::move(mechanism), authParametersProvider);
         })
         .then([this] {
+            _connMetrics.onAuthFinished();
             if (!_onConnectHook) {
                 return Future<void>::makeReady();
             }
@@ -371,7 +403,9 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string ins
             }
             return _client->runCommandRequest(*connectHookRequest)
                 .then([this](RemoteCommandResponse response) {
-                    return _onConnectHook->handleReply(_peer, std::move(response));
+                    auto status = _onConnectHook->handleReply(_peer, std::move(response));
+                    _connMetrics.onConnectionHookFinished();
+                    return status;
                 });
         })
         .getAsync([this, handler, anchor](Status status) {
@@ -382,8 +416,18 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string ins
             cancelTimeout();
 
             if (status.isOK()) {
+                if (connHealthMetricsEnabled()) {
+                    totalConnectionEstablishmentTime.increment(_connMetrics.total().count());
+                    if (_connMetrics.total() >=
+                        Milliseconds(gSlowConnectionThresholdMillis.load())) {
+                        logSlowConnection(_peer, _connMetrics);
+                    }
+                }
                 handler->promise.emplaceValue();
             } else {
+                if (ErrorCodes::isNetworkTimeoutError(status) && connHealthMetricsEnabled()) {
+                    logSlowConnection(_peer, _connMetrics);
+                }
                 LOGV2_DEBUG(22584,
                             2,
                             "Failed to connect to {hostAndPort} - {error}",

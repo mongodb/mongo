@@ -67,9 +67,12 @@ Future<AsyncDBClient::Handle> AsyncDBClient::connect(
     ServiceContext* const context,
     transport::ReactorHandle reactor,
     Milliseconds timeout,
+    ConnectionMetrics* connectionMetrics,
     std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext) {
     auto tl = context->getTransportLayer();
-    return tl->asyncConnect(peer, sslMode, std::move(reactor), timeout, transientSSLContext)
+    return tl
+        ->asyncConnect(
+            peer, sslMode, std::move(reactor), timeout, connectionMetrics, transientSSLContext)
         .then([peer, context](transport::SessionHandle session) {
             return std::make_shared<AsyncDBClient>(peer, std::move(session), context);
         });

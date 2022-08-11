@@ -43,3 +43,10 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_vartype: AtomicWord<bool>
     cpp_varname: gOpportunisticSecondaryTargeting
+  slowConnectionThresholdMillis:
+    description: >-
+        Log egress connections that take longer than this threshold, in milliseconds, to establish.
+    set_at: [ startup, runtime ]
+    cpp_vartype: AtomicWord<long long>
+    cpp_varname: gSlowConnectionThresholdMillis
+    default: 100

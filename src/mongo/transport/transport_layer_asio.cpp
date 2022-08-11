@@ -738,7 +738,11 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(
     ConnectSSLMode sslMode,
     const ReactorHandle& reactor,
     Milliseconds timeout,
+    ConnectionMetrics* connectionMetrics,
     std::shared_ptr<const SSLConnectionContext> transientSSLContext) {
+    invariant(connectionMetrics);
+    connectionMetrics->onConnectionStarted();
+
     if (transientSSLContext) {
         uassert(ErrorCodes::InvalidSSLConfiguration,
                 "Specified transient SSL context but connection SSL mode is not set",
@@ -808,8 +812,10 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(
     Date_t timeBefore = Date_t::now();
 
     connector->resolver.asyncResolve(connector->peer, _listenerOptions.enableIPv6)
-        .then([connector, timeBefore](WrappedResolver::EndpointVector results) {
+        .then([connector, timeBefore, connectionMetrics](WrappedResolver::EndpointVector results) {
             try {
+                connectionMetrics->onDNSResolved();
+
                 Date_t timeAfter = Date_t::now();
                 if (timeAfter - timeBefore > kSlowOperationThreshold) {
                     LOGV2_WARNING(23019,
@@ -842,7 +848,9 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(
 #endif
             return connector->socket.async_connect(*connector->resolvedEndpoint, UseFuture{});
         })
-        .then([this, connector, sslMode, transientSSLContext]() -> Future<void> {
+        .then([this, connector, sslMode, transientSSLContext, connectionMetrics]() -> Future<void> {
+            connectionMetrics->onTCPConnectionEstablished();
+
             stdx::unique_lock<Latch> lk(connector->mutex);
             connector->session = [&] {
                 try {
@@ -874,7 +882,9 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(
                 Date_t timeBefore = Date_t::now();
                 return connector->session
                     ->handshakeSSLForEgress(connector->peer, connector->reactor)
-                    .then([connector, timeBefore] {
+                    .then([connector, timeBefore, connectionMetrics] {
+                        connectionMetrics->onTLSHandshakeFinished();
+
                         Date_t timeAfter = Date_t::now();
                         if (timeAfter - timeBefore > kSlowOperationThreshold) {
                             networkCounter.incrementNumSlowSSLOperations();

@@ -36,6 +36,7 @@
 #include "mongo/config.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/executor/connection_metrics.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/ssl_connection_context.h"
 #include "mongo/util/functional.h"
@@ -98,6 +99,7 @@ public:
         ConnectSSLMode sslMode,
         const ReactorHandle& reactor,
         Milliseconds timeout,
+        ConnectionMetrics* connectionMetrics,  // must remain valid until the future is ready
         std::shared_ptr<const SSLConnectionContext> transientSSLContext) = 0;
 
     /**
