@@ -100,6 +100,12 @@ ValidateState::ValidateState(OperationContext* opCtx,
                 _collectionLock.emplace(opCtx, _nss, MODE_X);
             }
             _collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, _nss);
+            uassert(
+                ErrorCodes::NamespaceNotFound,
+                fmt::format(
+                    "Cannot validate a time-series collection without its bucket collection {}.",
+                    _nss.toString()),
+                _collection);
         }
     }
 
