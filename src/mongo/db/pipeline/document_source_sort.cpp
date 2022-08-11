@@ -142,12 +142,15 @@ REGISTER_DOCUMENT_SOURCE(sort,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceSort::createFromBson,
                          AllowedWithApiStrict::kAlways);
+
 REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(
     _internalBoundedSort,
     LiteParsedDocumentSourceDefault::parse,
     DocumentSourceSort::parseBoundedSort,
-    AllowedWithApiStrict::kNeverInVersion1,
-    AllowedWithClientType::kAny,
+    ::mongo::getTestCommandsEnabled() ? AllowedWithApiStrict::kNeverInVersion1
+                                      : AllowedWithApiStrict::kInternal,
+    ::mongo::getTestCommandsEnabled() ? AllowedWithClientType::kAny
+                                      : AllowedWithClientType::kInternal,
     feature_flags::gFeatureFlagBucketUnpackWithSort.getVersion(),
     feature_flags::gFeatureFlagBucketUnpackWithSort.isEnabledAndIgnoreFCV());
 
