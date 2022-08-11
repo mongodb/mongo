@@ -172,6 +172,13 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
     uassertStatusOK(insertionStatus);
 }
 
+bool ChangeStreamPreImagesCollectionManager::hasPreImagesCollection(
+    OperationContext* opCtx, boost::optional<TenantId> tenantId) {
+    auto catalog = CollectionCatalog::get(opCtx);
+    return static_cast<bool>(catalog->lookupCollectionByNamespace(
+        opCtx, NamespaceString::makePreImageCollectionNSS(tenantId)));
+}
+
 namespace {
 RecordId toRecordId(ChangeStreamPreImageId id) {
     return record_id_helpers::keyForElem(

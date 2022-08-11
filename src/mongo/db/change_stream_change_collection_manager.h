@@ -72,19 +72,23 @@ public:
     bool hasChangeCollection(OperationContext* opCtx, boost::optional<TenantId> tenantId) const;
 
     /**
-     * Creates a change collection for the specified tenant, if it doesn't exist. Returns Status::OK
-     * if the change collection already exists.
+     * Returns true if the change stream is enabled for the provided tenant, false otherwise.
+     */
+    bool isChangeStreamEnabled(OperationContext* opCtx, boost::optional<TenantId> tenantId) const;
+
+    /**
+     * Creates a change collection for the specified tenant, if it doesn't exist.
      *
      * TODO: SERVER-65950 make tenantId field mandatory.
      */
-    Status createChangeCollection(OperationContext* opCtx, boost::optional<TenantId> tenantId);
+    void createChangeCollection(OperationContext* opCtx, boost::optional<TenantId> tenantId);
 
     /**
      * Deletes the change collection for the specified tenant, if it already exist.
      *
      * TODO: SERVER-65950 make tenantId field mandatory.
      */
-    Status dropChangeCollection(OperationContext* opCtx, boost::optional<TenantId> tenantId);
+    void dropChangeCollection(OperationContext* opCtx, boost::optional<TenantId> tenantId);
 
     /**
      * Inserts documents to change collections. The parameter 'oplogRecords' is a vector of oplog

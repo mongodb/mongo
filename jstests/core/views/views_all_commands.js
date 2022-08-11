@@ -374,6 +374,7 @@ let viewsCommandTests = {
     fsyncUnlock: {skip: isUnrelated},
     getAuditConfig: {skip: isUnrelated},
     getDatabaseVersion: {skip: isUnrelated},
+    getChangeStreamState: {skip: isUnrelated},
     getClusterParameter: {skip: isUnrelated},
     getCmdLineOpts: {skip: isUnrelated},
     getDefaultRWConcern: {skip: isUnrelated},
@@ -622,6 +623,7 @@ let viewsCommandTests = {
     setFreeMonitoring: {skip: isUnrelated},
     setParameter: {skip: isUnrelated},
     setShardVersion: {skip: isUnrelated},
+    setChangeStreamState: {skip: isUnrelated},
     setClusterParameter: {skip: isUnrelated},
     setUserWriteBlockMode: {skip: isUnrelated},
     shardCollection: {

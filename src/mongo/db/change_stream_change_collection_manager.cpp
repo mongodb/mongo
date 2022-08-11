@@ -38,6 +38,7 @@
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog.h"
@@ -187,32 +188,44 @@ bool ChangeStreamChangeCollectionManager::hasChangeCollection(
         opCtx, NamespaceString::makeChangeCollectionNSS(tenantId)));
 }
 
-Status ChangeStreamChangeCollectionManager::createChangeCollection(
+bool ChangeStreamChangeCollectionManager::isChangeStreamEnabled(
+    OperationContext* opCtx, boost::optional<TenantId> tenantId) const {
+    // A change stream in the serverless is declared as enabled if both the change collection and
+    // the pre-images collection exist for the provided tenant.
+    return isChangeCollectionsModeActive() && hasChangeCollection(opCtx, tenantId) &&
+        ChangeStreamPreImagesCollectionManager::hasPreImagesCollection(opCtx, tenantId);
+}
+
+void ChangeStreamChangeCollectionManager::createChangeCollection(
     OperationContext* opCtx, boost::optional<TenantId> tenantId) {
     // Make the change collection clustered by '_id'. The '_id' field will have the same value as
     // the 'ts' field of the oplog.
     CollectionOptions changeCollectionOptions;
     changeCollectionOptions.clusteredIndex.emplace(clustered_util::makeDefaultClusteredIdIndex());
     changeCollectionOptions.capped = true;
+    const auto changeCollNss = NamespaceString::makeChangeCollectionNSS(tenantId);
 
-    auto status = createCollection(opCtx,
-                                   NamespaceString::makeChangeCollectionNSS(tenantId),
-                                   changeCollectionOptions,
-                                   BSONObj());
-    if (status.code() == ErrorCodes::NamespaceExists) {
-        return Status::OK();
-    }
-
-    return status;
+    const auto status = createCollection(opCtx, changeCollNss, changeCollectionOptions, BSONObj());
+    uassert(status.code(),
+            str::stream() << "Failed to create change collection: " << changeCollNss
+                          << causedBy(status.reason()),
+            status.isOK() || status.code() == ErrorCodes::NamespaceExists);
 }
 
-Status ChangeStreamChangeCollectionManager::dropChangeCollection(
-    OperationContext* opCtx, boost::optional<TenantId> tenantId) {
+void ChangeStreamChangeCollectionManager::dropChangeCollection(OperationContext* opCtx,
+                                                               boost::optional<TenantId> tenantId) {
     DropReply dropReply;
-    return dropCollection(opCtx,
-                          NamespaceString::makeChangeCollectionNSS(tenantId),
-                          &dropReply,
-                          DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
+    const auto changeCollNss = NamespaceString::makeChangeCollectionNSS(tenantId);
+
+    const auto status =
+        dropCollection(opCtx,
+                       changeCollNss,
+                       &dropReply,
+                       DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
+    uassert(status.code(),
+            str::stream() << "Failed to drop change collection: " << changeCollNss
+                          << causedBy(status.reason()),
+            status.isOK() || status.code() == ErrorCodes::NamespaceNotFound);
 }
 
 void ChangeStreamChangeCollectionManager::insertDocumentsToChangeCollection(

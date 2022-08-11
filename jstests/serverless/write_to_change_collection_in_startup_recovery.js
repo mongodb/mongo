@@ -23,6 +23,9 @@ replSetTest.initiate();
 
 let primary = replSetTest.getPrimary();
 
+// Enable the change stream to create the change collection.
+assert.commandWorked(primary.getDB("admin").runCommand({setChangeStreamState: 1, enabled: true}));
+
 // Insert a document to the collection and then capture the corresponding oplog timestamp. This
 // timestamp will be the start timestamp beyond (inclusive) which we will validate the oplog and the
 // change collection entries.

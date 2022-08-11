@@ -544,18 +544,10 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
         }
     });
 
-    // Create the pre-images collection if it doesn't exist yet.
-    ChangeStreamPreImagesCollectionManager::createPreImagesCollection(opCtx,
-                                                                      boost::none /* tenantId */);
-
-    // TODO: SERVER-66631 move the change collection creation logic from here to the PM-2502 hooks.
-    // The change collection will be created when the change stream is enabled.
-    if (ChangeStreamChangeCollectionManager::isChangeCollectionsModeActive()) {
-        auto status = ChangeStreamChangeCollectionManager::get(opCtx).createChangeCollection(
-            opCtx, boost::none);
-        if (!status.isOK()) {
-            fassert(6520900, status);
-        }
+    // Create the pre-images collection if it doesn't exist yet in the non-serverless environment.
+    if (!ChangeStreamChangeCollectionManager::isChangeCollectionsModeActive()) {
+        ChangeStreamPreImagesCollectionManager::createPreImagesCollection(
+            opCtx, boost::none /* tenantId */);
     }
 
     serverGlobalParams.validateFeaturesAsPrimary.store(true);

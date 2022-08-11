@@ -40,6 +40,7 @@
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
+#include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/commands/cqf/cqf_aggregate.h"
 #include "mongo/db/commands/cqf/cqf_command_utils.h"
 #include "mongo/db/curop.h"
@@ -752,14 +753,12 @@ Status runAggregate(OperationContext* opCtx,
             // Replace the execution namespace with the oplog.
             nss = NamespaceString::kRsOplogNamespace;
 
-            // In case of serverless the change stream will be opened on the change collection. We
-            // should first check if the change collection for the particular tenant exists and then
-            // replace the namespace with the change collection.
+            // In case of serverless the change stream will be opened on the change collection.
             if (ChangeStreamChangeCollectionManager::isChangeCollectionsModeActive()) {
                 auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx);
                 uassert(ErrorCodes::ChangeStreamNotEnabled,
                         "Change streams must be enabled before being used.",
-                        changeCollectionManager.hasChangeCollection(opCtx, origNss.tenantId()));
+                        changeCollectionManager.isChangeStreamEnabled(opCtx, origNss.tenantId()));
 
                 nss = NamespaceString::makeChangeCollectionNSS(origNss.tenantId());
             }

@@ -381,7 +381,7 @@ using Mutex = stdx::mutex;  // NOLINT
  * Construct a mongo::Mutex using the result of MONGO_GET_LATCH_DATA with all arguments forwarded
  */
 #ifndef MONGO_CONFIG_USE_RAW_LATCHES
-#define MONGO_MAKE_LATCH(...) ::mongo::Mutex(MONGO_GET_LATCH_DATA(__VA_ARGS__));
+#define MONGO_MAKE_LATCH(...) ::mongo::Mutex(MONGO_GET_LATCH_DATA(__VA_ARGS__))
 #else
-#define MONGO_MAKE_LATCH(...) ::mongo::stdx::mutex();  // NOLINT
+#define MONGO_MAKE_LATCH(...) ::mongo::stdx::mutex()  // NOLINT
 #endif

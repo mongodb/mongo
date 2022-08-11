@@ -186,6 +186,8 @@ enums:
            viewRole :  "viewRole"
            viewUser :  "viewUser"
            applyOps :  "applyOps"
+           setChangeStreamState: "setChangeStreamState"
+           getChangeStreamState: "getChangeStreamState"
 
     # In 'MatchType' the extra_data field "serverlessActionTypes" is used
     # by the AuthorizationSession while in multitenancy mode to determine

@@ -22,6 +22,9 @@ const primary = replSetTest.getPrimary();
 const secondary = replSetTest.getSecondary();
 const testDb = primary.getDB("test");
 
+// Enable the change stream to create the change collection.
+assert.commandWorked(primary.getDB("admin").runCommand({setChangeStreamState: 1, enabled: true}));
+
 // Performs writes on the specified collection.
 function performWrites(coll) {
     const docIds = [1, 2, 3, 4, 5];

@@ -9,24 +9,25 @@
 (function() {
 "use strict";
 
-// TODO SERVER-66631 replace this with change stream disablement command. Extend the test cases for
-// enablement/disablement combinations.
-function disableChangeStream(connection) {
-    const configDB = connection.getDB("config");
-    assert(configDB.system.change_collection.drop());
-}
-
 (function runInReplicaSet() {
     const replSetTest = new ReplSetTest({nodes: 1});
 
     // TODO SERVER-67267 add 'featureFlagServerlessChangeStreams', 'multitenancySupport' and
     // 'serverless' flags and remove 'failpoint.forceEnableChangeCollectionsMode'.
     replSetTest.startSet(
-        {setParameter: "failpoint.forceEnableChangeCollectionsMode=" + tojson({mode: "alwaysOn"})});
+        {setParameter: {"failpoint.forceEnableChangeCollectionsMode": tojson({mode: "alwaysOn"})}});
 
     replSetTest.initiate();
 
     const connection = replSetTest.getPrimary();
+
+    // Enable change stream such that it creates the change collection.
+    // TODO SERVER-65950 pass tenant id to the command.
+    assert.commandWorked(
+        connection.getDB("admin").runCommand({setChangeStreamState: 1, enabled: true}));
+    assert.eq(assert.commandWorked(connection.getDB("admin").runCommand({getChangeStreamState: 1}))
+                  .enabled,
+              true);
 
     // Insert a document to the 'stockPrice' collection.
     const testDb = connection.getDB("test");
@@ -43,7 +44,12 @@ function disableChangeStream(connection) {
     assert.eq(event2.documentKey._id, "tsla");
 
     // Disable the change stream while the change stream cursor is still opened.
-    disableChangeStream(connection);
+    // TODO SERVER-65950 pass tenant id to the command.
+    assert.commandWorked(
+        connection.getDB("admin").runCommand({setChangeStreamState: 1, enabled: false}));
+    assert.eq(assert.commandWorked(connection.getDB("admin").runCommand({getChangeStreamState: 1}))
+                  .enabled,
+              false);
 
     // Verify that the cursor throws 'QueryPlanKilled' exception on doing get next.
     assert.throwsWithCode(() => assert.soon(() => csCursor.hasNext()), ErrorCodes.QueryPlanKilled);

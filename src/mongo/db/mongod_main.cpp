@@ -161,6 +161,7 @@
 #include "mongo/db/service_entry_point_mongod.h"
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/session_killer.h"
+#include "mongo/db/set_change_stream_state_coordinator.h"
 #include "mongo/db/startup_recovery.h"
 #include "mongo/db/startup_warnings_mongod.h"
 #include "mongo/db/stats/counters.h"
@@ -348,6 +349,9 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
             services.push_back(std::make_unique<ShardSplitDonorService>(serviceContext));
         }
     }
+
+    // TODO SERVER-65950 create 'SetChangeStreamStateCoordinatorService' only in the serverless.
+    services.push_back(std::make_unique<SetChangeStreamStateCoordinatorService>(serviceContext));
 
     for (auto& service : services) {
         registry->registerService(std::move(service));
@@ -1549,6 +1553,7 @@ int mongod_main(int argc, char* argv[]) {
     ReadWriteConcernDefaults::create(service, readWriteConcernDefaultsCacheLookupMongoD);
     ChangeStreamOptionsManager::create(service);
 
+    // TODO SERVER-65950 create 'ChangeStreamChangeCollectionManager' only in the serverless.
     ChangeStreamChangeCollectionManager::create(service);
 
 #if defined(_WIN32)

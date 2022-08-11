@@ -42,6 +42,7 @@ executor:
         load('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');
         load('jstests/libs/override_methods/override_fixtures_changestream_multitenancy.js');
   hooks:
+  - class: EnableChangeStream
   - class: CheckReplDBHash
   - class: ValidateCollections
   - class: CleanEveryN

@@ -334,6 +334,8 @@ roles:
                   - setFreeMonitoring
                   - setClusterParameter
                   - getClusterParameter
+                  - setChangeStreamState
+                  - getChangeStreamState
 
             - matchType: any_normal
               actions: &clusterManagerRoleDatabaseActions

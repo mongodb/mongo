@@ -245,6 +245,9 @@ public:
     // TODO SERVER-68551: remove once 7.0 becomes last-lts
     static const NamespaceString kDistLocksNamepsace;
 
+    // Namespace used to store the state document of 'SetChangeStreamStateCoordinator'.
+    static const NamespaceString kSetChangeStreamStateCoordinatorNamespace;
+
     /**
      * Constructs an empty NamespaceString.
      */

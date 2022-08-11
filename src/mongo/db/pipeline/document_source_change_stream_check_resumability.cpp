@@ -33,8 +33,12 @@
 #include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/logv2/log.h"
 
 using boost::intrusive_ptr;
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 namespace mongo {
 namespace {
 
@@ -162,7 +166,10 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamCheckResumability::doGet
         auto nextInput = [this]() {
             try {
                 return pSource->getNext();
-            } catch (const ExceptionFor<ErrorCodes::OplogQueryMinTsMissing>&) {
+            } catch (const ExceptionFor<ErrorCodes::OplogQueryMinTsMissing>& ex) {
+                LOGV2_ERROR(6663107,
+                            "Resume of change stream was not possible",
+                            "reason"_attr = ex.reason());
                 uasserted(ErrorCodes::ChangeStreamHistoryLost,
                           "Resume of change stream was not possible, as the resume point may no "
                           "longer be in the oplog.");

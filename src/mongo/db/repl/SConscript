@@ -1669,6 +1669,7 @@ if wiredtiger:
             'oplog_test.cpp',
             'optime_extract_test.cpp',
             'primary_only_service_test.cpp',
+            'primary_only_service_util_test.cpp',
             'read_concern_args_test.cpp',
             'repl_set_config_checks_test.cpp',
             'repl_set_config_test.cpp',
@@ -1965,6 +1966,7 @@ env.Library(
     target='primary_only_service',
     source=[
         'primary_only_service.cpp',
+        'primary_only_service_util.cpp',
         'primary_only_service_op_observer.cpp',
     ],
     LIBDEPS=[

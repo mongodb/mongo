@@ -23,6 +23,10 @@ replSetTest.startSet(
 replSetTest.initiate();
 
 const primary = replSetTest.getPrimary();
+
+// Enable the change stream to create the change collection.
+assert.commandWorked(primary.getDB("admin").runCommand({setChangeStreamState: 1, enabled: true}));
+
 const primaryChangeColl = primary.getDB("config").system.change_collection;
 
 const mdbStockPriceDoc = {

@@ -302,7 +302,10 @@ void CollectionScan::assertTsHasNotFallenOff(const Record& record) {
     const bool tsHasNotFallenOff = oplogEntry.getTimestamp() <= *_params.assertTsHasNotFallenOff;
 
     uassert(ErrorCodes::OplogQueryMinTsMissing,
-            "Specified timestamp has already fallen off the oplog",
+            str::stream()
+                << "Specified timestamp has already fallen off the oplog for the input timestamp: "
+                << *_params.assertTsHasNotFallenOff
+                << ", oplog entry: " << oplogEntry.getEntry().toString(),
             isNewRS || tsHasNotFallenOff);
     // We don't need to check this assertion again after we've confirmed the first oplog event.
     _params.assertTsHasNotFallenOff = boost::none;
