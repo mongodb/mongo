@@ -109,7 +109,9 @@ fi' >> .bash_profile
     tar --wildcards --strip-components=1 -xzf $BIN_ARCHIVE '*/bin/mongod' '*/bin/mongos' '*/bin/mongo' '*/bin/mongobridge' &
     tar --wildcards --strip-components=1 -xzf $BIN_ARCHIVE '*/lib/*' &
     DBG_ARCHIVE=`ls /data/mci/artifacts-*archive_dist_test_debug/debugsymbols-*.tgz`
-    tar --wildcards --strip-components=1 -xzf $DBG_ARCHIVE '*/bin/mongod.debug' '*/bin/mongos.debug' '*/bin/mongo.debug' '*/bin/mongobridge.debug' &
+    # Support discovering split-dwarf files. Specifically, capture both <file>.debug and <file>.dwp
+    # files.
+    tar --wildcards --strip-components=1 -xzf $DBG_ARCHIVE '*/bin/mongod.d*' '*/bin/mongos.d*' '*/bin/mongo.d*' '*/bin/mongobridge.d*' &
     tar --wildcards --strip-components=1 -xzf $DBG_ARCHIVE '*/lib/*' &
     UNITTEST_ARCHIVE=`ls /data/mci/artifacts-*run_unittests/mongo-unittests-*.tgz`
     tar --wildcards --strip-components=0 -xzf $UNITTEST_ARCHIVE 'bin/*' &
