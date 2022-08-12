@@ -105,8 +105,11 @@ class SconsMetrics:  # pylint: disable=too-many-instance-attributes
             self.total_command_execution_time = self._parse_float(
                 TOTAL_COMMAND_EXECUTION_TIME_REGEX, self.raw_report)
 
-        with open(cache_debug_log_file, "r") as fh:
-            self.final_cache_hit_ratio = self._parse_float(CACHE_HIT_RATIO_REGEX, fh.read())
+        if cache_debug_log_file:
+            with open(cache_debug_log_file, "r") as fh:
+                self.final_cache_hit_ratio = self._parse_float(CACHE_HIT_RATIO_REGEX, fh.read())
+        else:
+            self.final_cache_hit_ratio = 0.0
 
     def make_cedar_report(self) -> List[dict]:
         """Format the data to look like a cedar report json."""
