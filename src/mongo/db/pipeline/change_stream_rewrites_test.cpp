@@ -1127,6 +1127,94 @@ TEST_F(ChangeStreamRewriteTest, CannotExactlyRewritePredicateOnFieldFullDocument
 }
 
 //
+// 'fullDocumentBeforeChange' rewrites
+//
+TEST_F(ChangeStreamRewriteTest, CannotRewriteNullPredicateOnFieldFullDocumentBeforeChange) {
+    auto spec = fromjson("{'fullDocumentBeforeChange': null}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"fullDocumentBeforeChange"});
+
+    // '{fullDocumentBeforeChange: null}' cannot be rewritten
+    ASSERT(rewrittenMatchExpression == nullptr);
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteNonNullPredicateOnFieldFullDocumentBeforeChange) {
+    auto spec = fromjson("{'fullDocumentBeforeChange': 1}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"fullDocumentBeforeChange"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      fromjson("{$or:[{$and:[{op:{$eq:'u'}}]}, {$and:[{op:{$eq:'d'}}]}]}"));
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteNonNullPredicateOnFieldFullDocumentBeforeChangeFoo) {
+    auto spec = fromjson("{'fullDocumentBeforeChange.foo': {$eq: 'bar'}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"fullDocumentBeforeChange"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      fromjson("{$or:[{$and:[{op:{$eq:'u'}}]}, {$and:[{op:{$eq:'d'}}]}]}"));
+}
+
+TEST_F(ChangeStreamRewriteTest, CannotExactlyRewritePredicateOnFieldFullDocumentBeforeChangeFoo) {
+    auto spec = fromjson("{'fullDocumentBeforeChange.foo': {$not: {$eq: 'bar'}}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"fullDocumentBeforeChange"});
+
+    ASSERT(rewrittenMatchExpression == nullptr);
+}
+
+TEST_F(ChangeStreamRewriteTest, CannotExactlyRewritePredicateOnFieldFullDocumentBeforeChangeId) {
+    auto spec = fromjson("{'fullDocumentBeforeChange._id': {$not: {$lt: 3}}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"fullDocumentBeforeChange"});
+
+    ASSERT(rewrittenMatchExpression == nullptr);
+}
+
+TEST_F(ChangeStreamRewriteTest, CanRewriteNonNullPredicateOnFieldFullDocumentBeforeChangeId) {
+    auto spec = fromjson("{'fullDocumentBeforeChange._id': {$lt: 3}}");
+    auto statusWithMatchExpression = MatchExpressionParser::parse(spec, getExpCtx());
+    ASSERT_OK(statusWithMatchExpression.getStatus());
+
+    auto rewrittenMatchExpression = change_stream_rewrite::rewriteFilterForFields(
+        getExpCtx(), statusWithMatchExpression.getValue().get(), {"fullDocumentBeforeChange"});
+    ASSERT(rewrittenMatchExpression);
+
+    auto rewrittenPredicate = rewrittenMatchExpression->serialize();
+    ASSERT_BSONOBJ_EQ(rewrittenPredicate,
+                      fromjson("{$or:["
+                               "   {$and: ["
+                               "       {op: {$eq: 'u'}},"
+                               "       {'o2._id': {$lt: 3}}"
+                               "   ]}, "
+                               "   {$and: ["
+                               "       {op: {$eq: 'd'}},"
+                               "       {'o._id': {$lt: 3}}"
+                               "   ]}"
+                               "]}"));
+}
+
+//
 // 'ns' rewrites
 //
 TEST_F(ChangeStreamRewriteTest, CanRewriteFullNamespaceObject) {
