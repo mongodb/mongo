@@ -129,6 +129,11 @@ env.Append(CCFLAGS=[
     '-Wno-unused-variable',
 ])
 
+if env.ToolchainIs('gcc'):
+    env.Append(CCFLAGS=[
+        '-Wno-uninitialized',
+    ])
+
 if env['TARGET_ARCH'] == 'ppc64le':
     env.Append(CCFLAGS=[
         '-Wno-unused-value',

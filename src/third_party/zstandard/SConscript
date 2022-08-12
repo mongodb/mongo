@@ -49,3 +49,6 @@ env.Library(
         'init-no-global-side-effects',
     ],
 )
+
+if env.ToolchainIs('gcc'):
+    env.Append(CCFLAGS=["-Wno-stringop-overflow"])

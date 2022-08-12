@@ -416,7 +416,7 @@ buildvariants:
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     test_flags: --excludeWithAnyTags=resource_intensive,incompatible_with_gcov
-    compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    compile_flags: --dbg=on --gcov --opt=off --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
     large_distro_name: rhel80-medium
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -497,7 +497,7 @@ buildvariants:
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     test_flags: --excludeWithAnyTags=resource_intensive,incompatible_with_gcov
-    compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --link-model=dynamic
+    compile_flags: --dbg=on --gcov --opt=debug --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --link-model=dynamic
     large_distro_name: rhel80-medium
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -530,7 +530,7 @@ buildvariants:
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     test_flags: --excludeWithAnyTags=resource_intensive,incompatible_with_gcov
-    compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v4_gcc.vars --link-model=dynamic
+    compile_flags: --dbg=on --gcov --opt=off --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v4_gcc.vars --link-model=dynamic
     large_distro_name: rhel80-medium
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -560,7 +560,7 @@ buildvariants:
   expansions:
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     test_flags: --excludeWithAnyTags=resource_intensive,incompatible_with_gcov
-    compile_flags: --dbg=on --gcov --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v4_clang.vars --link-model=dynamic
+    compile_flags: --dbg=on --gcov --opt=debug --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v4_clang.vars --link-model=dynamic
     large_distro_name: rhel80-medium
     multiversion_platform: rhel80
     multiversion_edition: enterprise

@@ -46,6 +46,7 @@
 
 #if !defined(_WIN32)
 #include <sys/resource.h>
+#include <unistd.h>
 #endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
@@ -86,14 +87,31 @@ Status launchServiceWorkerThread(unique_function<void()> task) noexcept {
         struct rlimit limits;
         invariant(getrlimit(RLIMIT_STACK, &limits) == 0);
         if (limits.rlim_cur >= kStackSize) {
-            int failed = pthread_attr_setstacksize(&attrs, kStackSize);
+
+            size_t stackSizeToSet = kStackSize;
+
+#if !defined(_WIN32) && (__SANITIZE_ADDRESS__ || __has_feature(address_sanitizer))
+            // If we are using address sanitizer, we set the stack at
+            // ~75% (rounded up to a multiple of the page size) of our
+            // usual desired. Since ASAN is known to use stack more
+            // aggressively and should positively detect stack overflow,
+            // this gives us increased confidence during testing that we
+            // aren't flirting with our real 1MB limit for any tested
+            // workloads. Note: This calculation only works on POSIX
+            // platforms. If we ever decide to use the MSVC
+            // implementation of ASAN, we will need to revisit it.
+            long page_size = sysconf(_SC_PAGE_SIZE);
+            stackSizeToSet =
+                ((((stackSizeToSet * 3) >> 2) + page_size - 1) / page_size) * page_size;
+#endif
+            int failed = pthread_attr_setstacksize(&attrs, stackSizeToSet);
             if (failed) {
                 LOGV2_WARNING(22949,
                               "pthread_attr_setstacksize failed: {error}",
                               "pthread_attr_setstacksize failed",
                               "error"_attr = errorMessage(posixError(failed)));
             }
-        } else if (limits.rlim_cur < kStackSize) {
+        } else {
             LOGV2_WARNING(22950,
                           "Stack size set to {stackSizeKiB}KiB. We suggest 1024KiB",
                           "Stack size not set to suggested 1024KiB",

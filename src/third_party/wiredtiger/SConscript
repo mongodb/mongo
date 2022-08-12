@@ -82,6 +82,7 @@ elif env.TargetOSIs('linux'):
     else:
         env.Append(CPPPATH=["build_linux"])
         env.Append(CPPDEFINES=["_GNU_SOURCE"])
+        env.Append(CCFLAGS=["-Wno-uninitialized"])
 else:
     print("Wiredtiger is not supported on this platform. " +
           "Please generate an approriate wiredtiger_config.h")

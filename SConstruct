@@ -338,8 +338,9 @@ add_option(
 
 add_option(
     'opt',
-    choices=['on', 'size', 'off'],
+    choices=['on', 'debug', 'size', 'off', 'auto'],
     const='on',
+    default='auto',
     help='Enable compile-time optimization',
     nargs='?',
     type='choice',
@@ -1470,26 +1471,6 @@ boostLibs = ["filesystem", "program_options", "system", "iostreams", "thread", "
 onlyServer = len(COMMAND_LINE_TARGETS) == 0 or (len(COMMAND_LINE_TARGETS) == 1 and str(
     COMMAND_LINE_TARGETS[0]) in ["mongod", "mongos", "test"])
 
-releaseBuild = has_option("release")
-
-dbg_opt_mapping = {
-    # --dbg, --opt   :   dbg    opt
-    ("on", None): (True, False),  # special case interaction
-    ("on", "on"): (True, True),
-    ("on", "off"): (True, False),
-    ("off", None): (False, True),
-    ("off", "on"): (False, True),
-    ("off", "off"): (False, False),
-    ("on", "size"): (True, True),
-    ("off", "size"): (False, True),
-}
-debugBuild, optBuild = dbg_opt_mapping[(get_option('dbg'), get_option('opt'))]
-optBuildForSize = True if optBuild and get_option('opt') == "size" else False
-
-if releaseBuild and (debugBuild or not optBuild):
-    print("Error: A --release build may not have debugging, and must have optimization")
-    Exit(1)
-
 noshell = has_option("noshell")
 
 jsEngine = get_option("js-engine")
@@ -1839,6 +1820,31 @@ def is_toolchain(self, *args):
 env.AddMethod(get_toolchain_name, 'ToolchainName')
 env.AddMethod(is_toolchain, 'ToolchainIs')
 
+releaseBuild = has_option("release")
+optBuild = get_option('opt')
+debugBuild = get_option('dbg') == "on"
+
+if env.ToolchainIs('clang'):
+    # LLVM utilizes the stack extensively without optimization enabled, which
+    # causes the built product to easily blow through our 1M stack size whenever
+    # either gcov or sanitizers are enabled. Ref: SERVER-65684
+    if has_option('gcov') and optBuild not in ("on", "debug"):
+        env.FatalError(("Error: A clang --gcov build must have either debug or full "),
+                       ("optimization to prevent crashes due to excessive stack usage"))
+
+    if has_option('sanitize') and optBuild not in ("on", "debug"):
+        env.FatalError(("Error: A clang --sanitize build must have either debug or "),
+                       ("full optimization to prevent crashes due to excessive stack usage"))
+
+# Special cases - if debug is not enabled and optimization is not specified,
+# default to full optimizationm otherwise turn it off.
+if optBuild == "auto":
+    optBuild = "on" if not debugBuild else "off"
+
+if releaseBuild and (debugBuild or optBuild != "on"):
+    env.FatalError(
+        "Error: A --release build may not have debugging, and must have full optimization")
+
 if env['TARGET_ARCH']:
     if not detectSystem.CheckForProcessor(env['TARGET_ARCH']):
         env.ConfError("Could not detect processor specified in TARGET_ARCH variable")
@@ -2154,7 +2160,7 @@ if link_model.startswith("dynamic"):
 
                 env['LIBDEPS_TAG_EXPANSIONS'].append(libdeps_tags_expand_incomplete)
 
-if optBuild:
+if optBuild != "off":
     env.SetConfigHeaderDefine("MONGO_CONFIG_OPTIMIZED_BUILD")
 
 # Enable the fast decider if explicitly requested or if in 'auto' mode
@@ -2667,23 +2673,30 @@ elif env.TargetOSIs('windows'):
     # /MDd: Defines _DEBUG, _MT, _DLL, and uses MSVCRTD.lib/MSVCRD###.DLL
     env.Append(CCFLAGS=["/MDd" if debugBuild else "/MD"])
 
-    if optBuild:
+    if optBuild == "off":
+        env.Append(CCFLAGS=["/Od"])
+        if debugBuild:
+            # /RTC1: - Enable Stack Frame Run-Time Error Checking; Reports when a variable is used
+            # without having been initialized (implies /Od: no optimizations)
+            env.Append(CCFLAGS=["/RTC1"])
+    else:
         # /O1:  optimize for size
         # /O2:  optimize for speed (as opposed to size)
         # /Oy-: disable frame pointer optimization (overrides /O2, only affects 32-bit)
         # /INCREMENTAL: NO - disable incremental link - avoid the level of indirection for function
         # calls
 
-        optStr = "/O2" if not optBuildForSize else "/O1"
-        env.Append(CCFLAGS=[optStr, "/Oy-"])
-        env.Append(LINKFLAGS=["/INCREMENTAL:NO"])
-    else:
-        env.Append(CCFLAGS=["/Od"])
+        optFlags = []
+        if optBuild == "size":
+            optFlags += ["/Os"]
+        elif optBuild == "debug":
+            optFlags += ["/Ox", "/Zo"]
+        else:
+            optFlags += ["/O2"]
+        optFlags += ["/Oy-"]
 
-    if debugBuild and not optBuild:
-        # /RTC1: - Enable Stack Frame Run-Time Error Checking; Reports when a variable is used
-        # without having been initialized (implies /Od: no optimizations)
-        env.Append(CCFLAGS=["/RTC1"])
+        env.Append(CCFLAGS=optFlags)
+        env.Append(LINKFLAGS=["/INCREMENTAL:NO"])
 
     # Support large object files since some unit-test sources contain a lot of code
     env.Append(CCFLAGS=["/bigobj"])
@@ -2919,15 +2932,21 @@ if env.TargetOSIs('posix'):
             LINKFLAGS=['--coverage'],
         )
 
-    if optBuild and not optBuildForSize:
-        env.Append(CCFLAGS=["-O3" if "O3" in selected_experimental_optimizations else "-O2"])
-    elif optBuild and optBuildForSize:
-        env.Append(CCFLAGS=["-Os"])
-    else:
+    if optBuild == "off":
         env.Append(CCFLAGS=["-O0"])
+    else:
+        if optBuild == "size":
+            env.Append(CCFLAGS=["-Os"])
+        elif optBuild == "debug":
+            env.Append(CCFLAGS=["-Og"])
+        else:
+            if "O3" in selected_experimental_optimizations:
+                env.Append(CCFLAGS=["-O3"])
+            else:
+                env.Append(CCFLAGS=["-O2"])
 
-    if optBuild and "treevec" in selected_experimental_optimizations:
-        env.Append(CCFLAGS=["-ftree-vectorize"])
+        if "treevec" in selected_experimental_optimizations:
+            env.Append(CCFLAGS=["-ftree-vectorize"])
 
 wiredtiger = False
 if get_option('wiredtiger') == 'on':
@@ -4224,7 +4243,7 @@ def doConfigure(myenv):
                 if AddToCCFLAGSIfSupported(myenv, "-fno-sanitize=vptr"):
                     myenv.AppendUnique(LINKFLAGS=["-fno-sanitize=vptr"])
 
-    if myenv.ToolchainIs('msvc') and optBuild:
+    if myenv.ToolchainIs('msvc') and optBuild != "off":
         # http://blogs.msdn.com/b/vcblog/archive/2013/09/11/introducing-gw-compiler-switch.aspx
         #
         myenv.Append(CCFLAGS=["/Gw", "/Gy"])
@@ -4263,7 +4282,7 @@ def doConfigure(myenv):
             if myenv.ToolchainIs('clang') and usingLibStdCxx:
                 env.FatalError(
                     'The --detect-odr-violations flag does not work with clang and libstdc++')
-            if optBuild:
+            if optBuild != "off":
                 env.FatalError(
                     'The --detect-odr-violations flag is expected to only be reliable with --opt=off'
                 )
@@ -4364,7 +4383,7 @@ def doConfigure(myenv):
             AddToCCFLAGSIfSupported(myenv, "-fno-semantic-interposition")
 
     # Avoid deduping symbols on OS X debug builds, as it takes a long time.
-    if not optBuild and myenv.ToolchainIs('clang') and env.TargetOSIs('darwin'):
+    if optBuild == "off" and myenv.ToolchainIs('clang') and env.TargetOSIs('darwin'):
         AddToLINKFLAGSIfSupported(myenv, "-Wl,-no_deduplicate")
 
     # Apply any link time optimization settings as selected by the 'lto' option.
@@ -4393,7 +4412,7 @@ def doConfigure(myenv):
         else:
             myenv.ConfError("Don't know how to enable --lto on current toolchain")
 
-    if get_option('runtime-hardening') == "on" and optBuild:
+    if get_option('runtime-hardening') == "on" and optBuild != "off":
         # Older glibc doesn't work well with _FORTIFY_SOURCE=2. Selecting 2.11 as the minimum was an
         # emperical decision, as that is the oldest non-broken glibc we seem to require. It is possible
         # that older glibc's work, but we aren't trying.

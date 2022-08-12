@@ -40,7 +40,7 @@ namespace mongo {
 namespace sbe {
 namespace {
 TranslatedCell translateCell(PathView path, const SplitCellView& splitCellView) {
-    value::ColumnStoreEncoder encoder;
+    value::ColumnStoreEncoder encoder{};
     SplitCellView::Cursor<value::ColumnStoreEncoder> cellCursor =
         splitCellView.subcellValuesGenerator<value::ColumnStoreEncoder>(std::move(encoder));
     return TranslatedCell{splitCellView.arrInfo, path, std::move(cellCursor)};
