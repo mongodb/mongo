@@ -477,8 +477,8 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
                               "image originating update oplog entry");
                 },
                 [&](const auto&) {
-                    return !oplogEntry["preImageOpTime"].eoo() ||
-                        !oplogEntry["postImageOpTime"].eoo();
+                    return !oplogEntry["needsRetryImage"].eoo() ||
+                        !oplogEntry["preImageOpTime"].eoo() || !oplogEntry["postImageOpTime"].eoo();
                 });
             try {
                 lastResult = processSessionOplog(oplogEntry, lastResult);
