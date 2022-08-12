@@ -34,9 +34,11 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/sharding_state.h"
@@ -543,6 +545,63 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
         ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)),
         Milliseconds::max());
 
+    ASSERT_OK(status);
+    ASSERT(cleanupComplete.isReady());
+}
+
+TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
+       WaitForCleanCorrectEvenAfterClearFollowedBySetFilteringMetadata) {
+    globalFailPointRegistry().find("suspendRangeDeletion")->setMode(FailPoint::alwaysOn);
+    ON_BLOCK_EXIT(
+        [&] { globalFailPointRegistry().find("suspendRangeDeletion")->setMode(FailPoint::off); });
+
+    auto insertRangeDeletionTask = [&](OperationContext* opCtx,
+                                       const NamespaceString& nss,
+                                       const UUID& uuid,
+                                       const ChunkRange& range,
+                                       int64_t numOrphans) -> RangeDeletionTask {
+        PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+        auto migrationId = UUID::gen();
+        RangeDeletionTask t(
+            migrationId, nss, uuid, ShardId("donor"), range, CleanWhenEnum::kDelayed);
+        t.setPending(true);
+        store.add(opCtx, t);
+
+        auto query = BSON(RangeDeletionTask::kIdFieldName << migrationId);
+        t.setPending(boost::none);
+        auto update = t.toBSON();
+        store.update(opCtx, query, update);
+
+        return t;
+    };
+
+    OperationContext* opCtx = operationContext();
+    auto metadata = makeShardedMetadata(opCtx, uuid());
+    csr().setFilteringMetadata(opCtx, metadata);
+    const ChunkRange range = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY));
+    const auto task = insertRangeDeletionTask(opCtx, kTestNss, uuid(), range, 0);
+
+    // Schedule range deletion that will hang due to `suspendRangeDeletion` failpoint
+    auto cleanupComplete =
+        csr().cleanUpRange(range, task.getId(), CollectionShardingRuntime::CleanWhen::kNow);
+
+    // Clear and set again filtering metadata
+    csr().clearFilteringMetadata(opCtx);
+    csr().setFilteringMetadata(opCtx, metadata);
+
+    auto waitForCleanUp = [&](Milliseconds timeout) {
+        return CollectionShardingRuntime::waitForClean(opCtx, kTestNss, uuid(), range, timeout);
+    };
+
+    // Check that the hanging range deletion is still tracked even following a clear of the metadata
+    auto status = waitForCleanUp(Milliseconds(100));
+    ASSERT_NOT_OK(status);
+    ASSERT(!cleanupComplete.isReady());
+
+    globalFailPointRegistry().find("suspendRangeDeletion")->setMode(FailPoint::off);
+
+    // Check that the range deletion is not tracked anymore after it succeeds
+    status = waitForCleanUp(Milliseconds::max());
     ASSERT_OK(status);
     ASSERT(cleanupComplete.isReady());
 }

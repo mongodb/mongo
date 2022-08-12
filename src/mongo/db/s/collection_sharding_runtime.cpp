@@ -209,9 +209,11 @@ void CollectionShardingRuntime::setFilteringMetadata_withLock(OperationContext* 
         _metadataType = MetadataType::kUnsharded;
         _metadataManager.reset();
         ++_numMetadataManagerChanges;
-    } else if (!_metadataManager ||
-               !newMetadata.uuidMatches(_metadataManager->getCollectionUuid())) {
-        _metadataType = MetadataType::kSharded;
+        return;
+    }
+
+    _metadataType = MetadataType::kSharded;
+    if (!_metadataManager || !newMetadata.uuidMatches(_metadataManager->getCollectionUuid())) {
         _metadataManager = std::make_shared<MetadataManager>(
             opCtx->getServiceContext(), _nss, _rangeDeleterExecutor, newMetadata);
         ++_numMetadataManagerChanges;
@@ -234,7 +236,6 @@ void CollectionShardingRuntime::clearFilteringMetadata(OperationContext* opCtx) 
                     "Clearing collection metadata",
                     "namespace"_attr = _nss);
         _metadataType = MetadataType::kUnknown;
-        _metadataManager.reset();
     }
 }
 
@@ -264,7 +265,7 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
 
             // If the metadata was reset, or the collection was dropped and recreated since the
             // metadata manager was created, return an error.
-            if (!self->_metadataManager ||
+            if (self->_metadataType != MetadataType::kSharded ||
                 (collectionUuid != self->_metadataManager->getCollectionUuid())) {
                 return {ErrorCodes::ConflictingOperationInProgress,
                         "Collection being migrated was dropped and created or otherwise had its "
@@ -406,7 +407,7 @@ void CollectionShardingRuntime::appendShardVersion(BSONObjBuilder* builder) {
 
 size_t CollectionShardingRuntime::numberOfRangesScheduledForDeletion() const {
     stdx::lock_guard lk(_metadataManagerLock);
-    if (_metadataManager) {
+    if (_metadataType == MetadataType::kSharded) {
         return _metadataManager->numberOfRangesScheduledForDeletion();
     }
     return 0;
