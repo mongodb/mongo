@@ -165,16 +165,8 @@ CostType::CostType(const bool isInfinite, const double cost)
     uassert(6624346, "Cost is negative", _cost >= 0.0);
 }
 
-bool CostType::operator==(const CostType& other) const {
-    return _isInfinite == other._isInfinite && (_isInfinite || _cost == other._cost);
-}
-
-bool CostType::operator!=(const CostType& other) const {
-    return !(*this == other);
-}
-
 bool CostType::operator<(const CostType& other) const {
-    return !_isInfinite && (other._isInfinite || _cost < other._cost);
+    return !_isInfinite && (other._isInfinite || _cost + kPrecision < other._cost);
 }
 
 CostType CostType::operator+(const CostType& other) const {
@@ -182,8 +174,8 @@ CostType CostType::operator+(const CostType& other) const {
 }
 
 CostType CostType::operator-(const CostType& other) const {
-    uassert(6624001, "Cannot subtract an infinite cost", other != kInfinity);
-    return _isInfinite ? kInfinity : fromDouble(_cost - other._cost);
+    uassert(6624001, "Cannot subtract an infinite cost", !other.isInfinite());
+    return _isInfinite ? kInfinity : fromDouble(std::max(0.0, _cost - other._cost));
 }
 
 CostType& CostType::operator+=(const CostType& other) {

@@ -1192,17 +1192,6 @@ TEST(PhysRewriter, FilterIndexing4) {
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
-    // TODO: SERVER-68006 will investigate why the plan changes without the hints.
-    PartialSchemaSelHints hints;
-    hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())},
-                  kDefaultSelectivity);
-    hints.emplace(PartialSchemaKey{"root", make<PathGet>("b", make<PathIdentity>())},
-                  kDefaultSelectivity);
-    hints.emplace(PartialSchemaKey{"root", make<PathGet>("c", make<PathIdentity>())},
-                  kDefaultSelectivity);
-    hints.emplace(PartialSchemaKey{"root", make<PathGet>("d", make<PathIdentity>())},
-                  kDefaultSelectivity);
-
     // Make sure the intervals do not contain Null.
     ABT evalNode = make<EvaluationNode>(
         "pa",
@@ -1247,7 +1236,6 @@ TEST(PhysRewriter, FilterIndexing4) {
          OptPhaseManager::OptPhase::MemoExplorationPhase,
          OptPhaseManager::OptPhase::MemoImplementationPhase},
         prefixId,
-        false /*requireRID*/,
         {{{"c1",
            ScanDefinition{
                {},
@@ -1259,8 +1247,6 @@ TEST(PhysRewriter, FilterIndexing4) {
                                  false /*isMultiKey*/,
                                  {DistributionType::Centralized},
                                  {}}}}}}}},
-        std::make_unique<HintedCE>(std::move(hints)),
-        std::make_unique<DefaultCosting>(),
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -1360,7 +1346,7 @@ TEST(PhysRewriter, FilterIndexing5) {
 
     ABT optimized = std::move(rootNode);
     ASSERT_TRUE(phaseManager.optimize(optimized));
-    ASSERT_BETWEEN(25, 70, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(20, 30, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // We can cover both fields with the index, and need separate sort on "b".
     ASSERT_EXPLAIN_V2(
@@ -1572,14 +1558,6 @@ TEST(PhysRewriter, FilterIndexingVariable) {
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
-    // TODO: SERVER-68006 will investigate why the plan changes without the hints.
-    PartialSchemaSelHints hints;
-    hints.emplace(PartialSchemaKey{"root",
-                                   make<PathGet>("a",
-                                                 make<PathTraverse>(make<PathIdentity>(),
-                                                                    PathTraverse::kSingleLevel))},
-                  kDefaultSelectivity);
-
     // Encode a condition using two query parameters (expressed as functions):
     // "a" > param_0 AND "a" >= param_1 (observe param_1 comparison is inclusive).
     ABT filterNode = make<FilterNode>(
@@ -1601,14 +1579,11 @@ TEST(PhysRewriter, FilterIndexingVariable) {
          OptPhaseManager::OptPhase::MemoExplorationPhase,
          OptPhaseManager::OptPhase::MemoImplementationPhase},
         prefixId,
-        false /*requireRID*/,
         {{{"c1",
            ScanDefinition{
                {},
                {{"index1",
                  makeIndexDefinition("a", CollationOp::Ascending, false /*isMultiKey*/)}}}}}},
-        std::make_unique<HintedCE>(std::move(hints)),
-        std::make_unique<DefaultCosting>(),
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -2733,7 +2708,7 @@ TEST(PhysRewriter, IndexBoundsIntersect) {
         std::move(filterNode1));
 
     ABT rootNode =
-        make<RootNode>(ProjectionRequirement{ProjectionNameVector{}}, std::move(filterNode2));
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode2));
 
     OptPhaseManager phaseManager(
         {OptPhaseManager::OptPhase::MemoSubstitutionPhase,
@@ -2750,7 +2725,7 @@ TEST(PhysRewriter, IndexBoundsIntersect) {
 
     ABT optimized = rootNode;
     ASSERT_TRUE(phaseManager.optimize(optimized));
-    ASSERT_BETWEEN(30, 40, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(10, 20, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Demonstrate that the predicates >70 and <90 are NOT combined into the same interval (70, 90)
     // since the paths are multiKey. With the heuristic estimate we may get either interval in the
@@ -3047,11 +3022,11 @@ TEST(PhysRewriter, IndexResidualReq) {
 
     ABT optimized = rootNode;
     ASSERT_TRUE(phaseManager.optimize(optimized));
-    ASSERT_BETWEEN(10, 26, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(10, 20, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Make sure we can use the index to cover "b" while testing "b.c" with a separate filter.
     ASSERT_EXPLAIN_PROPS_V2(
-        "Properties [cost: 0.402121, localCost: 0, adjustedCE: 189.571]\n"
+        "Properties [cost: 0.231002, localCost: 0, adjustedCE: 189.571]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 189.571\n"
@@ -3075,7 +3050,7 @@ TEST(PhysRewriter, IndexResidualReq) {
         "|   |       pa\n"
         "|   RefBlock: \n"
         "|       Variable [pa]\n"
-        "Properties [cost: 0.402121, localCost: 0.402121, adjustedCE: 189.571]\n"
+        "Properties [cost: 0.231002, localCost: 0.231002, adjustedCE: 330]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 189.571\n"
@@ -3215,19 +3190,6 @@ TEST(PhysRewriter, IndexResidualReq2) {
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
-    // TODO: SERVER-68006 will investigate why the plan changes without the hints.
-    PartialSchemaSelHints hints;
-    hints.emplace(PartialSchemaKey{"root",
-                                   make<PathGet>("a",
-                                                 make<PathTraverse>(make<PathIdentity>(),
-                                                                    PathTraverse::kSingleLevel))},
-                  kDefaultSelectivity);
-    hints.emplace(PartialSchemaKey{"root",
-                                   make<PathGet>("b",
-                                                 make<PathTraverse>(make<PathIdentity>(),
-                                                                    PathTraverse::kSingleLevel))},
-                  kDefaultSelectivity);
-
     ABT filterANode = make<FilterNode>(
         make<EvalFilter>(
             make<PathGet>("a",
@@ -3252,7 +3214,6 @@ TEST(PhysRewriter, IndexResidualReq2) {
          OptPhaseManager::OptPhase::MemoExplorationPhase,
          OptPhaseManager::OptPhase::MemoImplementationPhase},
         prefixId,
-        false /*requireRID*/,
         {{{"c1",
            ScanDefinition{{},
                           {{"index1",
@@ -3260,8 +3221,6 @@ TEST(PhysRewriter, IndexResidualReq2) {
                                 {{"a", CollationOp::Ascending, true /*isMultiKey*/},
                                  {"c", CollationOp::Ascending, true /*isMultiKey*/},
                                  {"b", CollationOp::Ascending, true /*isMultiKey*/}})}}}}}},
-        std::make_unique<HintedCE>(std::move(hints)),
-        std::make_unique<DefaultCosting>(),
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -3622,6 +3581,9 @@ TEST(PhysRewriter, ArrayConstantIndex) {
         "|   |           Source []\n"
         "|   RefBlock: \n"
         "|       Variable [rid_0]\n"
+        "Unique []\n"
+        "|   projections: \n"
+        "|       rid_0\n"
         "GroupBy []\n"
         "|   |   groupings: \n"
         "|   |       RefBlock: \n"
@@ -3769,16 +3731,13 @@ TEST(PhysRewriter, IndexPartitioning) {
     using namespace properties;
     PrefixId prefixId;
 
-    ABT scanNode = make<ScanNode>("root", "c1");
-
-    // TODO: SERVER-68006 This test results in an failed assert when cardinality estimates change.
-    // The assert is in physical_rewriter.cpp:
-    // "Must optimize successfully if found compatible properties!"
     PartialSchemaSelHints hints;
     hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())},
                   kDefaultSelectivity);
     hints.emplace(PartialSchemaKey{"root", make<PathGet>("b", make<PathIdentity>())},
                   kDefaultSelectivity);
+
+    ABT scanNode = make<ScanNode>("root", "c1");
 
     ABT projectionANode = make<EvaluationNode>(
         "pa",
@@ -3894,18 +3853,6 @@ TEST(PhysRewriter, IndexPartitioning1) {
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
-    // TODO: SERVER-68006 This test results in an failed assert when cardinality estimates change.
-    // The assert is in physical_rewriter.cpp:
-    // "Must optimize successfully if found compatible properties!"
-    // The interesting thing is that it doesn't fail on each test run, but sometimes, which
-    // makes one think the failure depends on rounding errors of cost/cardinality estimates,
-    // which in turn results in different sub-plans.
-    PartialSchemaSelHints hints;
-    hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())},
-                  kDefaultSelectivity);
-    hints.emplace(PartialSchemaKey{"root", make<PathGet>("b", make<PathIdentity>())},
-                  kDefaultSelectivity);
-
     ABT projectionANode = make<EvaluationNode>(
         "pa",
         make<EvalPath>(make<PathGet>("a", make<PathIdentity>()), make<Variable>("root")),
@@ -3939,7 +3886,6 @@ TEST(PhysRewriter, IndexPartitioning1) {
          OptPhaseManager::OptPhase::MemoExplorationPhase,
          OptPhaseManager::OptPhase::MemoImplementationPhase},
         prefixId,
-        false /*requireRID*/,
         {{{"c1",
            ScanDefinition{
                {},
@@ -3957,8 +3903,6 @@ TEST(PhysRewriter, IndexPartitioning1) {
                      {}}}},
                {DistributionType::HashPartitioning, makeSeq(makeNonMultikeyIndexPath("c"))}}}},
          5 /*numberOfPartitions*/},
-        std::make_unique<HintedCE>(std::move(hints)),
-        std::make_unique<DefaultCosting>(),
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;

@@ -167,6 +167,8 @@ using CEType = double;
 using SelectivityType = double;
 
 class CostType {
+    static constexpr double kPrecision = 0.00000001;
+
 public:
     static CostType kInfinity;
     static CostType kZero;
@@ -177,8 +179,8 @@ public:
     CostType(CostType&& other) = default;
     CostType& operator=(const CostType& other) = default;
 
-    bool operator==(const CostType& other) const;
-    bool operator!=(const CostType& other) const;
+    bool operator==(const CostType& other) = delete;
+    bool operator!=(const CostType& other) = delete;
     bool operator<(const CostType& other) const;
 
     CostType operator+(const CostType& other) const;

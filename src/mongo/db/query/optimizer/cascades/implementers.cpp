@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/optimizer/cascades/implementers.h"
 
+#include "mongo/db/query/optimizer/utils/ce_math.h"
 #include "mongo/db/query/optimizer/utils/memo_utils.h"
 
 namespace mongo::optimizer::cascades {
@@ -432,7 +433,7 @@ public:
         }
 
         const auto& ceProperty = getPropertyConst<CardinalityEstimate>(_logicalProps);
-        const CEType currentCE = ceProperty.getEstimate();
+        const CEType currentGroupCE = ceProperty.getEstimate();
         const PartialSchemaKeyCE& partialSchemaKeyCEMap = ceProperty.getPartialSchemaKeyCEMap();
 
         if (indexReqTarget == IndexReqTarget::Index) {
@@ -480,8 +481,6 @@ public:
                         availableDirections._forward || availableDirections._backward);
 
                 auto indexProjectionMap = candidateIndexEntry._fieldProjectionMap;
-                indexProjectionMap._ridProjection = needsRID ? ridProjName : "";
-
                 {
                     // Remove unused projections from the field projection map.
                     auto& fieldProjMap = indexProjectionMap._fieldProjections;
@@ -497,23 +496,31 @@ public:
                     }
                 }
 
-                CEType indexCE = currentCE;
+                CEType indexCE = currentGroupCE;
                 ResidualRequirements residualRequirements;
                 if (!candidateIndexEntry._residualRequirements.empty()) {
-                    SelectivityType residualSelectivity = 1.0;
-                    SelectivityType currentSelectivity = currentCE / scanGroupCE;
-
+                    PartialSchemaKeySet residualQueryKeySet;
                     for (const auto& [residualKey, residualReq] :
                          candidateIndexEntry._residualRequirements) {
                         const auto& queryKey = candidateIndexEntry._residualKeyMap.at(residualKey);
+                        residualQueryKeySet.emplace(queryKey);
                         const CEType ce = partialSchemaKeyCEMap.at(queryKey);
-                        if (scanGroupCE > 0.0) {
-                            residualSelectivity *= ce / scanGroupCE;
-                        }
                         residualRequirements.emplace_back(residualKey, residualReq, ce);
                     }
-                    if (residualSelectivity > 0.0) {
-                        indexCE = scanGroupCE * (currentSelectivity / residualSelectivity);
+
+                    if (scanGroupCE > 0.0) {
+                        std::vector<SelectivityType> indexPredSelectivities;
+                        for (const auto& [key, req] : reqMap) {
+                            if (residualQueryKeySet.count(key) == 0) {
+                                const CEType ce = partialSchemaKeyCEMap.at(key);
+                                indexPredSelectivities.push_back(ce / scanGroupCE);
+                            }
+                        }
+
+                        if (!indexPredSelectivities.empty()) {
+                            indexCE = scanGroupCE *
+                                ce::conjExponentialBackoff(std::move(indexPredSelectivities));
+                        }
                     }
                 }
 
@@ -523,10 +530,12 @@ public:
 
                 // TODO: consider pre-computing as part of the candidateIndexes structure.
                 const auto singularInterval = MultiKeyIntervalReqExpr::getSingularDNF(intervals);
-                const bool needsUniqueStage = singularInterval &&
-                    !areMultiKeyIntervalsEqualities(*singularInterval) && indexDef.isMultiKey() &&
-                    requirements.getDedupRID();
+                const bool needsUniqueStage =
+                    (!singularInterval || !areMultiKeyIntervalsEqualities(*singularInterval)) &&
+                    indexDef.isMultiKey() && requirements.getDedupRID();
 
+                indexProjectionMap._ridProjection =
+                    (needsRID || needsUniqueStage) ? ridProjName : "";
                 if (singularInterval) {
                     physNode =
                         make<IndexScanNode>(std::move(indexProjectionMap),
@@ -555,7 +564,7 @@ public:
                     // Insert unique stage if we need to, after the residual requirements.
                     physNode =
                         make<UniqueNode>(ProjectionNameVector{ridProjName}, std::move(physNode));
-                    nodeCEMap.emplace(physNode.cast<Node>(), currentCE);
+                    nodeCEMap.emplace(physNode.cast<Node>(), currentGroupCE);
                 }
 
                 optimizeChildrenNoAssert(

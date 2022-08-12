@@ -34,6 +34,7 @@
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
+#include "mongo/db/query/optimizer/utils/ce_math.h"
 #include "mongo/db/query/optimizer/utils/interval_utils.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 
@@ -964,10 +965,11 @@ size_t decodeIndexKeyName(const std::string& fieldName) {
 }
 
 /**
- * Checks if one index path is a prefix of another. Considers only Get, Traverse, and Id.
+ * Fuses an index path and a query path to determine a residual path to apply over the index
+ * results. Checks if one index path is a prefix of another. Considers only Get, Traverse, and Id.
  * Return the suffix that doesn't match.
  */
-class PathSuffixExtactor {
+class IndexPathFusor {
 public:
     using ResultType = boost::optional<ABT::reference_type>;
 
@@ -1002,8 +1004,8 @@ public:
         uasserted(6624152, "Unexpected node type");
     }
 
-    static ResultType check(const ABT& node, const ABT& candidatePrefix) {
-        PathSuffixExtactor instance;
+    static ResultType fuse(const ABT& node, const ABT& candidatePrefix) {
+        IndexPathFusor instance;
         return candidatePrefix.visit(instance, node);
     }
 };
@@ -1108,11 +1110,11 @@ CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
             } else {
                 bool foundPathPrefix = false;
                 for (const auto& queryKey : unsatisfiedKeys) {
-                    const auto pathPrefixResult =
-                        PathSuffixExtactor::check(queryKey._path, indexCollationEntry._path);
-                    if (pathPrefixResult) {
+                    const auto fusedPath =
+                        IndexPathFusor::fuse(queryKey._path, indexCollationEntry._path);
+                    if (fusedPath) {
                         ProjectionName tempProj = prefixId.getNextId("evalTemp");
-                        PartialSchemaKey residualKey{tempProj, pathPrefixResult.get()};
+                        PartialSchemaKey residualKey{tempProj, fusedPath.get()};
 
                         {
                             auto range = reqMap.equal_range(queryKey);
@@ -1332,11 +1334,19 @@ void lowerPartialSchemaRequirements(const CEType baseCE,
                                     NodeCEMap& nodeCEMap) {
     sortResidualRequirements(requirements);
 
-    CEType residualCE = baseCE;
+    std::vector<SelectivityType> residualSelectivities;
     for (const auto& [residualKey, residualReq, ce] : requirements) {
-        if (scanGroupCE > 0.0) {
-            residualCE *= ce / scanGroupCE;
+        CEType residualCE = baseCE;
+        if (!residualSelectivities.empty()) {
+            // We are intentionally making a copy of the vector here, we are adding elements to it
+            // below.
+            residualCE *= ce::conjExponentialBackoff(residualSelectivities);
         }
+        if (scanGroupCE > 0.0) {
+            // Compute the selectivity after we assign CE, which is the "input" to the cost.
+            residualSelectivities.push_back(ce / scanGroupCE);
+        }
+
         lowerPartialSchemaRequirement(residualKey, residualReq, physNode, [&](const ABT& node) {
             nodeCEMap.emplace(node.cast<Node>(), residualCE);
         });
