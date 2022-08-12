@@ -87,6 +87,22 @@ void OperationShardingState::setShardRole(OperationContext* opCtx,
     }
 }
 
+void OperationShardingState::unsetShardRoleForLegacyDDLOperationsSentWithShardVersionIfNeeded(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    auto& oss = OperationShardingState::get(opCtx);
+
+    auto it = oss._shardVersions.find(nss.ns());
+    if (it != oss._shardVersions.end()) {
+        auto& tracker = it->second;
+        tassert(6848500,
+                "DDL operation should not recursively use the shard role",
+                --tracker.recursion == 0);
+        if (tracker.recursion == 0)
+            oss._shardVersions.erase(it);
+    }
+    return;
+}
+
 boost::optional<ShardVersion> OperationShardingState::getShardVersion(const NamespaceString& nss) {
     const auto it = _shardVersions.find(nss.ns());
     if (it != _shardVersions.end()) {

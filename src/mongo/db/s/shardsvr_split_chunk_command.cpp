@@ -37,6 +37,7 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/s/chunk_operation_precondition_checks.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
@@ -97,29 +98,6 @@ public:
 
         const NamespaceString nss(parseNs({boost::none, dbname}, cmdObj));
 
-        // throw if the provided shard version is too old
-        {
-            AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-            auto csr = CollectionShardingRuntime::get(opCtx, nss);
-
-            // pre 5.1 client  will send the collection version, which will make
-            // checkShardVersionOrThrow fail. TODO remove try-catch in 6.1
-            try {
-                csr->checkShardVersionOrThrow(opCtx);
-            } catch (const ExceptionFor<ErrorCodes::StaleConfig>& e) {
-                do {
-                    if (auto staleInfo = e.extraInfo<StaleConfigInfo>()) {
-                        if (staleInfo->getVersionWanted() &&
-                            staleInfo->getVersionWanted()->isOlderThan(
-                                staleInfo->getVersionReceived())) {
-                            break;
-                        }
-                    }
-                    throw;  // cause a refresh
-                } while (false);
-            }
-        }
-
         // Check whether parameters passed to splitChunk are sound
         BSONObj keyPatternObj;
         {
@@ -177,6 +155,17 @@ public:
             Status status = bsonExtractBooleanField(cmdObj, "fromChunkSplitter", &field);
             return status.isOK() && field;
         }();
+
+        // Check that the preconditions for split chunk are met and throw StaleShardVersion
+        // otherwise.
+        {
+            OperationShardingState::
+                unsetShardRoleForLegacyDDLOperationsSentWithShardVersionIfNeeded(opCtx, nss);
+            const auto metadata = checkCollectionIdentity(
+                opCtx, nss, expectedCollectionEpoch, expectedCollectionTimestamp);
+            checkShardKeyPattern(opCtx, nss, metadata, chunkRange);
+            checkChunkMatchesRange(opCtx, nss, metadata, chunkRange);
+        }
 
         auto topChunk = uassertStatusOK(splitChunk(opCtx,
                                                    nss,

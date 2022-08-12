@@ -49,6 +49,7 @@ env.Library(
         'active_migrations_registry.cpp',
         'auto_split_vector.cpp',
         'chunk_move_write_concern_options.cpp',
+        'chunk_operation_precondition_checks.cpp',
         'chunk_split_state_driver.cpp',
         'chunk_splitter.cpp',
         'collection_critical_section_document.idl',

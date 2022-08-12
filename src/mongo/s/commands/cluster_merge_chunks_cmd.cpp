@@ -159,7 +159,6 @@ public:
                              firstChunk.getShardId().toString());
         remoteCmdObjB.append("epoch", shardVersion.epoch());
         remoteCmdObjB.append("timestamp", shardVersion.getTimestamp());
-        shardVersion.serialize(ChunkVersion::kChunkVersionField, &remoteCmdObjB);
 
         BSONObj remoteResult;
 

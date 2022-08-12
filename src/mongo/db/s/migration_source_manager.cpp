@@ -39,6 +39,7 @@
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/auto_split_vector.h"
+#include "mongo/db/s/chunk_operation_precondition_checks.h"
 #include "mongo/db/s/commit_chunk_migration_gen.h"
 #include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
 #include "mongo/db/s/migration_coordinator.h"
@@ -189,32 +190,13 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
     const auto [collectionMetadata, collectionUUID] = [&] {
         UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
         AutoGetCollection autoColl(_opCtx, nss(), MODE_IS);
-        uassert(ErrorCodes::InvalidOptions,
-                "cannot move chunks for a collection that doesn't exist",
-                autoColl.getCollection());
-
-        UUID collectionUUID = autoColl.getCollection()->uuid();
 
         auto* const csr = CollectionShardingRuntime::get(_opCtx, nss());
         const auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
 
-        auto optMetadata = csr->getCurrentMetadataIfKnown();
-        uassert(StaleConfigInfo(nss(),
-                                ChunkVersion::IGNORED() /* receivedVersion */,
-                                boost::none /* wantedVersion */,
-                                shardId,
-                                boost::none),
-                "The collection's sharding state was cleared by a concurrent operation",
-                optMetadata);
+        const auto metadata = checkCollectionIdentity(_opCtx, nss(), _args.getEpoch(), boost::none);
 
-        auto& metadata = *optMetadata;
-        uassert(StaleConfigInfo(nss(),
-                                ChunkVersion::IGNORED() /* receivedVersion */,
-                                ChunkVersion::UNSHARDED() /* wantedVersion */,
-                                shardId,
-                                boost::none),
-                "Cannot move chunks for an unsharded collection",
-                metadata.isSharded());
+        UUID collectionUUID = autoColl.getCollection()->uuid();
 
         // Atomically (still under the CSR lock held above) check whether migrations are allowed and
         // register the MigrationSourceManager on the CSR. This ensures that interruption due to the
@@ -228,29 +210,6 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
 
         return std::make_tuple(std::move(metadata), std::move(collectionUUID));
     }();
-
-    const auto collectionVersion = collectionMetadata.getCollVersion();
-    const auto shardVersion = collectionMetadata.getShardVersion();
-
-    uassert(StaleConfigInfo(nss(),
-                            ChunkVersion::IGNORED() /* receivedVersion */,
-                            shardVersion /* wantedVersion */,
-                            shardId,
-                            boost::none),
-            str::stream() << "cannot move chunk " << _args.toBSON({})
-                          << " because collection may have been dropped. "
-                          << "current epoch: " << collectionVersion.epoch()
-                          << ", cmd epoch: " << _args.getEpoch(),
-            _args.getEpoch() == collectionVersion.epoch());
-
-    uassert(StaleConfigInfo(nss(),
-                            ChunkVersion::IGNORED() /* receivedVersion */,
-                            shardVersion /* wantedVersion */,
-                            shardId,
-                            boost::none),
-            str::stream() << "cannot move chunk " << _args.toBSON({})
-                          << " because the shard doesn't contain any chunks",
-            shardVersion.majorVersion() > 0);
 
     // Compute the max bound in case only `min` is set (moveRange)
     if (!_args.getMax().has_value()) {
@@ -269,61 +228,12 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
         _moveTimingHelper.setMax(max);
     }
 
-    const auto& keyPattern = collectionMetadata.getKeyPattern();
-    const bool validBounds = [&]() {
-        // Return true if provided bounds are respecting the shard key format, false otherwise
-        const auto nFields = keyPattern.nFields();
-        if (nFields != (*_args.getMin()).nFields() || nFields != (*_args.getMax()).nFields()) {
-            return false;
-        }
+    checkShardKeyPattern(
+        _opCtx, nss(), collectionMetadata, ChunkRange(*_args.getMin(), *_args.getMax()));
+    checkRangeWithinChunk(
+        _opCtx, nss(), collectionMetadata, ChunkRange(*_args.getMin(), *_args.getMax()));
 
-        BSONObjIterator keyPatternIt(keyPattern), minIt(*_args.getMin()), maxIt(*_args.getMax());
-
-        while (keyPatternIt.more()) {
-            const auto keyPatternField = keyPatternIt.next().fieldNameStringData();
-            const auto minField = minIt.next().fieldNameStringData();
-            const auto maxField = maxIt.next().fieldNameStringData();
-
-            if (keyPatternField != minField || keyPatternField != maxField) {
-                return false;
-            }
-        }
-
-        return true;
-    }();
-    uassert(StaleConfigInfo(nss(),
-                            ChunkVersion::IGNORED() /* receivedVersion */,
-                            shardVersion /* wantedVersion */,
-                            shardId,
-                            boost::none),
-            str::stream() << "Range bounds do not match the shard key pattern. KeyPattern:  "
-                          << keyPattern.toString() << " - Bounds: "
-                          << ChunkRange(*_args.getMin(), *_args.getMax()).toString() << ".",
-            validBounds);
-
-    ChunkType existingChunk;
-    uassert(StaleConfigInfo(nss(),
-                            ChunkVersion::IGNORED() /* receivedVersion */,
-                            shardVersion /* wantedVersion */,
-                            shardId,
-                            boost::none),
-            str::stream() << "Range with bounds "
-                          << ChunkRange(*_args.getMin(), *_args.getMax()).toString()
-                          << " is not owned by this shard.",
-            collectionMetadata.getNextChunk(*_args.getMin(), &existingChunk));
-
-    uassert(StaleConfigInfo(nss(),
-                            ChunkVersion::IGNORED() /* receivedVersion */,
-                            shardVersion /* wantedVersion */,
-                            shardId,
-                            boost::none),
-            str::stream() << "Unable to move range with bounds "
-                          << ChunkRange(*_args.getMin(), *_args.getMax()).toString()
-                          << " . The closest owned chunk is "
-                          << ChunkRange(existingChunk.getMin(), existingChunk.getMax()).toString(),
-            existingChunk.getRange().covers(ChunkRange(*_args.getMin(), *_args.getMax())));
-
-    _collectionEpoch = collectionVersion.epoch();
+    _collectionEpoch = _args.getEpoch();
     _collectionUUID = collectionUUID;
 
     _chunkVersion = collectionMetadata.getChunkManager()

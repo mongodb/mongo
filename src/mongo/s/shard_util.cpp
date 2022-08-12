@@ -208,7 +208,6 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     cmd.append("keyPattern", shardKeyPattern.toBSON());
     cmd.append("epoch", epoch);
     cmd.append("timestamp", timestamp);
-    shardVersion.serialize(ChunkVersion::kChunkVersionField, &cmd);
 
     chunkRange.append(&cmd);
     cmd.append("splitKeys", splitPointsBeginIt, splitPointsEndIt);

@@ -36,6 +36,7 @@
 #include "mongo/db/field_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/active_migrations_registry.h"
+#include "mongo/db/s/chunk_operation_precondition_checks.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
@@ -90,58 +91,17 @@ void mergeChunks(OperationContext* opCtx,
         uassertStatusOK(ActiveMigrationsRegistry::get(opCtx).registerSplitOrMergeChunk(
             opCtx, nss, ChunkRange(minKey, maxKey))));
 
-    auto& oss = OperationShardingState::get(opCtx);
-    if (!oss.getShardVersion(nss)) {
-        onShardVersionMismatch(opCtx, nss, boost::none);
-    }
-
-    const auto metadataBeforeMerge = [&] {
-        AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        auto csr = CollectionShardingRuntime::get(opCtx, nss);
-
-        // If there is a version attached to the OperationContext, validate it
-        if (oss.getShardVersion(nss)) {
-            csr->checkShardVersionOrThrow(opCtx);
-        } else {
-            auto optMetadata = csr->getCurrentMetadataIfKnown();
-
-            ShardId shardId = ShardingState::get(opCtx)->shardId();
-
-            uassert(StaleConfigInfo(nss,
-                                    ChunkVersion::IGNORED() /* receivedVersion */,
-                                    boost::none /* wantedVersion */,
-                                    shardId),
-                    str::stream() << "Collection " << nss.ns() << " needs to be recovered",
-                    optMetadata);
-            uassert(StaleConfigInfo(nss,
-                                    ChunkVersion::IGNORED() /* receivedVersion */,
-                                    ChunkVersion::UNSHARDED() /* wantedVersion */,
-                                    shardId),
-                    str::stream() << "Collection " << nss.ns() << " is not sharded",
-                    optMetadata->isSharded());
-            const auto epoch = optMetadata->getShardVersion().epoch();
-            uassert(StaleConfigInfo(nss,
-                                    ChunkVersion::IGNORED() /* receivedVersion */,
-                                    optMetadata->getShardVersion() /* wantedVersion */,
-                                    shardId),
-                    str::stream() << "Could not merge chunks because collection " << nss.ns()
-                                  << " has changed since merge was sent (sent epoch: "
-                                  << expectedEpoch << ", current epoch: " << epoch << ")",
-                    epoch == expectedEpoch &&
-                        (!expectedTimestamp ||
-                         optMetadata->getShardVersion().getTimestamp() == expectedTimestamp));
-        }
-
-        return *csr->getCurrentMetadataIfKnown();
-    }();
-
     ChunkRange chunkRange(minKey, maxKey);
 
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "could not merge chunks, the range " << chunkRange.toString()
-                          << " is not valid for collection " << nss.ns() << " with key pattern "
-                          << metadataBeforeMerge.getKeyPattern().toString(),
-            metadataBeforeMerge.isValidKey(minKey) && metadataBeforeMerge.isValidKey(maxKey));
+    // Check that the preconditions for merge chunks are met and throw StaleShardVersion otherwise.
+    const auto metadataBeforeMerge = [&]() {
+        OperationShardingState::unsetShardRoleForLegacyDDLOperationsSentWithShardVersionIfNeeded(
+            opCtx, nss);
+        const auto metadata = checkCollectionIdentity(opCtx, nss, expectedEpoch, expectedTimestamp);
+        checkShardKeyPattern(opCtx, nss, metadata, chunkRange);
+        checkRangeOwnership(opCtx, nss, metadata, chunkRange);
+        return metadata;
+    }();
 
     auto cmdResponse = commitMergeOnConfigServer(
         opCtx, nss, expectedEpoch, expectedTimestamp, chunkRange, metadataBeforeMerge);
