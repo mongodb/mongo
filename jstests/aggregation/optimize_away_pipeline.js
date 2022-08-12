@@ -761,6 +761,8 @@ if (!FixtureHelpers.isSharded(coll)) {
 // pipeline. Cannot be run on mongos as profiling can be enabled only on mongod. Also profiling
 // is supported on WiredTiger only.
 if (!FixtureHelpers.isMongos(db) && isWiredTiger(db)) {
+    // Should turn off profiling before dropping system.profile collection.
+    db.setProfilingLevel(0);
     db.system.profile.drop();
     db.setProfilingLevel(2);
     testGetMore({
