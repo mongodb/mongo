@@ -273,10 +273,26 @@ private:
     // Tracks whether the filtering metadata is unknown, unsharded, or sharded
     enum class MetadataType { kUnknown, kUnsharded, kSharded } _metadataType;
 
-    // If the collection is sharded, contains all the metadata associated with this collection.
+    // If the collection state is known and is unsharded, this will be nullptr.
     //
-    // If the collection is unsharded, the metadata has not been set yet, or the metadata has been
-    // specifically reset by calling clearFilteringMetadata(), this will be nullptr;
+    // If the collection state is known and is sharded, this will point to the metadata associated
+    // with this collection.
+    //
+    // If the collection state is unknown:
+    // - If the metadata had never been set yet, this will be nullptr.
+    // - If the collection state was known and was sharded, this contains the metadata that
+    // were known for the collection before the last invocation of clearFilteringMetadata().
+    //
+    // The following matrix enumerates the valid (Y) and invalid (X) scenarios.
+    //                          _________________________________
+    //                         | _metadataType (collection state)|
+    //                         |_________________________________|
+    //                         | UNKNOWN | UNSHARDED |  SHARDED  |
+    //  _______________________|_________|___________|___________|
+    // |_metadataManager unset |    Y    |     Y     |     X     |
+    // |_______________________|_________|___________|___________|
+    // |_metadataManager set   |    Y    |     X     |     Y     |
+    // |_______________________|_________|___________|___________|
     std::shared_ptr<MetadataManager> _metadataManager;
 
     // Used for testing to check the number of times a new MetadataManager has been installed.
