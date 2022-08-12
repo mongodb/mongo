@@ -153,9 +153,11 @@ WriteConcernOptions WriteConcernOptions::deserializerForIDL(const BSONObj& obj) 
 }
 
 StatusWith<WriteConcernOptions> WriteConcernOptions::extractWCFromCommand(const BSONObj& cmdObj) {
-    // Return the default write concern if no write concern is provided. We check for the existence
-    // of the write concern field up front in order to avoid the expense of constructing an error
-    // status in bsonExtractTypedField() below.
+    // If no write concern is provided from the command, return the default write concern
+    // ({w: 1, wtimeout: 0}). If the default write concern is returned, it will be overriden in
+    // extractWriteConcern by the cluster-wide write concern or the implicit default write concern.
+    // We check for the existence of the write concern field up front in order to avoid the expense
+    // of constructing an error status in bsonExtractTypedField() below.
     if (!cmdObj.hasField(kWriteConcernField)) {
         return WriteConcernOptions();
     }

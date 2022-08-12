@@ -71,8 +71,6 @@ bool commandSpecifiesWriteConcern(const BSONObj& cmdObj) {
 StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
                                                     const BSONObj& cmdObj,
                                                     bool isInternalClient) {
-    // The default write concern if empty is {w:1}. Specifying {w:0} is/was allowed, but is
-    // interpreted identically to {w:1}.
     auto wcResult = WriteConcernOptions::extractWCFromCommand(cmdObj);
     if (!wcResult.isOK()) {
         return wcResult.getStatus();
@@ -83,11 +81,17 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
     // This is the WC extracted from the command object, so the CWWC or implicit default hasn't been
     // applied yet, which is why "usedDefaultConstructedWC" flag can be used an indicator of whether
     // the client supplied a WC or not.
+    // If the user supplied write concern from the command is empty (writeConcern: {}),
+    // usedDefaultConstructedWC will be true so we will then use the CWWC or implicit default.
+    // Note that specifying writeConcern: {w:0} is not the same as empty. {w:0} differs from {w:1}
+    // in that the client will not expect a command reply/acknowledgement at all, even in the case
+    // of errors.
     bool clientSuppliedWriteConcern = !writeConcern.usedDefaultConstructedWC;
     bool customDefaultWasApplied = false;
 
     // If no write concern is specified in the command, then use the cluster-wide default WC (if
-    // there is one), or else the default WC {w:1}.
+    // there is one), or else the default implicit WC:
+    // (if [(#arbiters > 0) AND (#arbiters >= ½(#voting nodes) - 1)] then {w:1} else {w:majority}).
     if (!clientSuppliedWriteConcern) {
         writeConcern = ([&]() {
             // WriteConcern defaults can only be applied on regular replica set members.  Operations
@@ -120,11 +124,6 @@ StatusWith<WriteConcernOptions> extractWriteConcern(OperationContext* opCtx,
             }
             return writeConcern;
         })();
-
-        if (writeConcern.isUnacknowledged()) {
-            writeConcern.w = 1;
-        }
-
         writeConcern.notExplicitWValue = true;
     }
 
