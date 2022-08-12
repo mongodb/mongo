@@ -180,14 +180,6 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveChunkCommand) {
     ASSERT_OK(futureResponse.getNoThrow());
     remoteResponsesFuture.default_timed_get();
     deferredCleanupCompletedCheckpoint->waitForTimesEntered(timesEnteredFailPoint + 1);
-    // Ensure DistLock is released correctly
-    {
-        auto opCtx = Client::getCurrent()->getOperationContext();
-        const std::string whyMessage(str::stream()
-                                     << "Test acquisition of distLock for " << kNss.ns());
-        ASSERT_DOES_NOT_THROW(DDLLockManager::get(opCtx)->lock(
-            opCtx, kNss.ns(), whyMessage, DDLLockManager::kSingleLockAttemptTimeout));
-    }
     deferredCleanupCompletedCheckpoint->setMode(FailPoint::off, 0);
     _scheduler.stop();
 }
@@ -214,14 +206,6 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulMoveRangeCommand) {
     ASSERT_OK(futureResponse.getNoThrow());
     remoteResponsesFuture.default_timed_get();
     deferredCleanupCompletedCheckpoint->waitForTimesEntered(timesEnteredFailPoint + 1);
-    // Ensure DistLock is released correctly
-    {
-        auto opCtx = Client::getCurrent()->getOperationContext();
-        const std::string whyMessage(str::stream()
-                                     << "Test acquisition of distLock for " << kNss.ns());
-        ASSERT_DOES_NOT_THROW(DDLLockManager::get(opCtx)->lock(
-            opCtx, kNss.ns(), whyMessage, DDLLockManager::kSingleLockAttemptTimeout));
-    }
     deferredCleanupCompletedCheckpoint->setMode(FailPoint::off, 0);
     _scheduler.stop();
 }
@@ -349,15 +333,6 @@ TEST_F(BalancerCommandsSchedulerTest, CommandFailsWhenNetworkReturnsError) {
     ASSERT_EQUALS(futureResponse.getNoThrow(), timeoutError);
     remoteResponsesFuture.default_timed_get();
     deferredCleanupCompletedCheckpoint->waitForTimesEntered(timesEnteredFailPoint + 1);
-
-    // Ensure DistLock is released correctly
-    {
-        auto opCtx = Client::getCurrent()->getOperationContext();
-        const std::string whyMessage(str::stream()
-                                     << "Test acquisition of distLock for " << kNss.ns());
-        ASSERT_DOES_NOT_THROW(DDLLockManager::get(opCtx)->lock(
-            opCtx, kNss.ns(), whyMessage, DDLLockManager::kSingleLockAttemptTimeout));
-    }
     deferredCleanupCompletedCheckpoint->setMode(FailPoint::off, 0);
     _scheduler.stop();
 }
@@ -369,14 +344,6 @@ TEST_F(BalancerCommandsSchedulerTest, CommandFailsWhenSchedulerIsStopped) {
     ASSERT_EQUALS(futureResponse.getNoThrow(),
                   Status(ErrorCodes::BalancerInterrupted,
                          "Request rejected - balancer scheduler is stopped"));
-    // Ensure DistLock is not taken
-    {
-        auto opCtx = Client::getCurrent()->getOperationContext();
-        const std::string whyMessage(str::stream()
-                                     << "Test acquisition of distLock for " << kNss.ns());
-        ASSERT_DOES_NOT_THROW(DDLLockManager::get(opCtx)->lock(
-            opCtx, kNss.ns(), whyMessage, DDLLockManager::kSingleLockAttemptTimeout));
-    }
 }
 
 TEST_F(BalancerCommandsSchedulerTest, CommandCanceledIfUnsubmittedBeforeBalancerStops) {
@@ -396,14 +363,6 @@ TEST_F(BalancerCommandsSchedulerTest, CommandCanceledIfUnsubmittedBeforeBalancer
     ASSERT_EQUALS(futureResponse.getNoThrow(),
                   Status(ErrorCodes::BalancerInterrupted,
                          "Request cancelled - balancer scheduler is stopping"));
-    // Ensure DistLock is released correctly
-    {
-        auto opCtx = Client::getCurrent()->getOperationContext();
-        const std::string whyMessage(str::stream()
-                                     << "Test acquisition of distLock for " << kNss.ns());
-        ASSERT_DOES_NOT_THROW(DDLLockManager::get(opCtx)->lock(
-            opCtx, kNss.ns(), whyMessage, DDLLockManager::kSingleLockAttemptTimeout));
-    }
 }
 
 TEST_F(BalancerCommandsSchedulerTest, MoveChunkCommandGetsPersistedOnDiskWhenRequestIsSubmitted) {
@@ -428,7 +387,6 @@ TEST_F(BalancerCommandsSchedulerTest, MoveChunkCommandGetsPersistedOnDiskWhenReq
                 MoveChunkCommandInfo::recoverFrom(swPersistedCommand.getValue(), defaultValues);
             ASSERT_EQ(kNss, recoveredCommand->getNameSpace());
             ASSERT_EQ(migrateInfo.from, recoveredCommand->getTarget());
-            ASSERT_TRUE(recoveredCommand->requiresDistributedLock());
 
             MoveChunkCommandInfo originalCommandInfo(migrateInfo.nss,
                                                      migrateInfo.from,
@@ -491,32 +449,6 @@ TEST_F(BalancerCommandsSchedulerTest, PersistedCommandsAreReissuedWhenRecovering
     _scheduler.stop();
     auto persistedCommandDocs = getPersistedCommandDocuments(operationContext());
     ASSERT_EQUALS(0, persistedCommandDocs.size());
-}
-
-TEST_F(BalancerCommandsSchedulerTest, DistLockPreventsMoveChunkWithConcurrentDDL) {
-    OperationContext* opCtx;
-    FailPoint* failpoint = globalFailPointRegistry().find("pauseSubmissionsFailPoint");
-    failpoint->setMode(FailPoint::Mode::alwaysOn);
-    {
-        auto remoteResponsesFuture = setRemoteResponses();
-        _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
-        opCtx = Client::getCurrent()->getOperationContext();
-        const std::string whyMessage(str::stream()
-                                     << "Test acquisition of distLock for " << kNss.ns());
-        auto scopedDDLLock = DDLLockManager::get(opCtx)->lock(
-            opCtx, kNss.ns(), whyMessage, DDLLockManager::kSingleLockAttemptTimeout);
-        failpoint->setMode(FailPoint::Mode::off);
-        MigrateInfo migrateInfo = makeMigrationInfo(0, kShardId1, kShardId0);
-        auto futureResponse = _scheduler.requestMoveChunk(operationContext(),
-                                                          migrateInfo,
-                                                          getMoveChunkSettings(),
-                                                          false /* issuedByRemoteUser */);
-        remoteResponsesFuture.default_timed_get();
-        ASSERT_EQ(
-            futureResponse.getNoThrow(),
-            Status(ErrorCodes::LockBusy, "Failed to acquire dist lock testDb.testColl locally"));
-    }
-    _scheduler.stop();
 }
 
 }  // namespace

@@ -422,24 +422,23 @@ CommandSubmissionResult BalancerCommandsSchedulerImpl::_submit(
     OperationContext* opCtx, const CommandSubmissionParameters& params) {
     LOGV2_DEBUG(
         5847203, 2, "Balancer command request submitted for execution", "reqId"_attr = params.id);
-    bool distLockTaken = false;
 
     const auto shardWithStatus =
         Grid::get(opCtx)->shardRegistry()->getShard(opCtx, params.commandInfo->getTarget());
     if (!shardWithStatus.isOK()) {
-        return CommandSubmissionResult(params.id, distLockTaken, shardWithStatus.getStatus());
+        return CommandSubmissionResult(params.id, shardWithStatus.getStatus());
     }
 
     const auto shardHostWithStatus = shardWithStatus.getValue()->getTargeter()->findHost(
         opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
     if (!shardHostWithStatus.isOK()) {
-        return CommandSubmissionResult(params.id, distLockTaken, shardHostWithStatus.getStatus());
+        return CommandSubmissionResult(params.id, shardHostWithStatus.getStatus());
     }
 
     if (params.commandInfo->requiresRecoveryOnCrash()) {
         auto writeStatus = persistRecoveryInfo(opCtx, *(params.commandInfo));
         if (!writeStatus.isOK()) {
-            return CommandSubmissionResult(params.id, distLockTaken, writeStatus);
+            return CommandSubmissionResult(params.id, writeStatus);
         }
     }
 
@@ -454,18 +453,9 @@ CommandSubmissionResult BalancerCommandsSchedulerImpl::_submit(
             _applyCommandResponse(requestId, args.response);
         };
 
-    if (params.commandInfo->requiresDistributedLock()) {
-        Status lockAcquisitionResponse =
-            _distributedLocks.acquireFor(opCtx, params.commandInfo->getNameSpace());
-        if (!lockAcquisitionResponse.isOK()) {
-            return CommandSubmissionResult(params.id, distLockTaken, lockAcquisitionResponse);
-        }
-        distLockTaken = true;
-    }
-
     auto swRemoteCommandHandle =
         (*_executor)->scheduleRemoteCommand(remoteCommand, onRemoteResponseReceived);
-    return CommandSubmissionResult(params.id, distLockTaken, swRemoteCommandHandle.getStatus());
+    return CommandSubmissionResult(params.id, swRemoteCommandHandle.getStatus());
 }
 
 void BalancerCommandsSchedulerImpl::_applySubmissionResult(
@@ -509,18 +499,14 @@ void BalancerCommandsSchedulerImpl::_applyCommandResponse(
 
 void BalancerCommandsSchedulerImpl::_performDeferredCleanup(
     OperationContext* opCtx,
-    const stdx::unordered_map<UUID, RequestData, UUID::Hash>& requestsHoldingResources,
-    bool includePersistedData) {
+    const stdx::unordered_map<UUID, RequestData, UUID::Hash>& requestsHoldingResources) {
     if (requestsHoldingResources.empty()) {
         return;
     }
 
     DBDirectClient dbClient(opCtx);
     for (const auto& [_, request] : requestsHoldingResources) {
-        if (request.holdsDistributedLock()) {
-            _distributedLocks.releaseFor(opCtx, request.getNamespace());
-        }
-        if (includePersistedData && request.requiresRecoveryCleanupOnCompletion()) {
+        if (request.requiresRecoveryCleanupOnCompletion()) {
             deletePersistedRecoveryInfo(dbClient, request.getCommandInfo());
         }
     }
@@ -582,8 +568,7 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
         // 2.a Free any resource acquired by already completed/aborted requests.
         {
             auto opCtxHolder = cc().makeOperationContext();
-            _performDeferredCleanup(
-                opCtxHolder.get(), completedRequestsToCleanUp, true /*includePersistedData*/);
+            _performDeferredCleanup(opCtxHolder.get(), completedRequestsToCleanUp);
             completedRequestsToCleanUp.clear();
         }
 
@@ -614,18 +599,12 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
     (*_executor)->shutdown();
     (*_executor)->join();
 
-    stdx::unordered_map<UUID, RequestData, UUID::Hash> cancelledRequests;
     {
         stdx::unique_lock<Latch> ul(_mutex);
-        cancelledRequests.swap(_requests);
         _requests.clear();
         _recentlyCompletedRequestIds.clear();
         _executor.reset();
     }
-    auto opCtxHolder = cc().makeOperationContext();
-    // Ensure that the clean up won't delete any request recovery document (the commands will be
-    // reissued once the scheduler is restarted)
-    _performDeferredCleanup(opCtxHolder.get(), cancelledRequests, false /*includePersistedData*/);
 }
 
 

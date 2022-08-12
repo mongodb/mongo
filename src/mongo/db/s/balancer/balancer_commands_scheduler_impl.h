@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/db/s/balancer/balancer_commands_scheduler.h"
-#include "mongo/db/s/balancer/balancer_dist_locks.h"
 #include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/service_context.h"
@@ -79,10 +78,6 @@ public:
     }
 
     virtual bool requiresRecoveryCleanupOnCompletion() const {
-        return false;
-    }
-
-    virtual bool requiresDistributedLock() const {
         return false;
     }
 
@@ -135,10 +130,6 @@ public:
                            &commandBuilder);
         appendCommandMetadataTo(&commandBuilder);
         return commandBuilder.obj();
-    }
-
-    bool requiresDistributedLock() const override {
-        return true;
     }
 
 private:
@@ -226,10 +217,6 @@ public:
     }
 
     bool requiresRecoveryCleanupOnCompletion() const override {
-        return true;
-    }
-
-    bool requiresDistributedLock() const override {
         return true;
     }
 
@@ -451,12 +438,10 @@ struct CommandSubmissionParameters {
  * Helper data structure for storing the outcome of a Command submission.
  */
 struct CommandSubmissionResult {
-    CommandSubmissionResult(UUID id, bool acquiredDistLock, const Status& outcome)
-        : id(id), acquiredDistLock(acquiredDistLock), outcome(outcome) {}
+    CommandSubmissionResult(UUID id, const Status& outcome) : id(id), outcome(outcome) {}
     CommandSubmissionResult(CommandSubmissionResult&& rhs) = default;
     CommandSubmissionResult(const CommandSubmissionResult& rhs) = delete;
     UUID id;
-    bool acquiredDistLock;
     Status outcome;
 };
 
@@ -469,7 +454,6 @@ public:
     RequestData(UUID id, std::shared_ptr<CommandInfo>&& commandInfo)
         : _id(id),
           _completedOrAborted(false),
-          _holdingDistLock(false),
           _commandInfo(std::move(commandInfo)),
           _responsePromise{NonNullPromiseTag{}} {
         invariant(_commandInfo);
@@ -478,7 +462,6 @@ public:
     RequestData(RequestData&& rhs)
         : _id(rhs._id),
           _completedOrAborted(rhs._completedOrAborted),
-          _holdingDistLock(rhs._holdingDistLock),
           _commandInfo(std::move(rhs._commandInfo)),
           _responsePromise(std::move(rhs._responsePromise)) {}
 
@@ -494,7 +477,6 @@ public:
 
     Status applySubmissionResult(CommandSubmissionResult&& submissionResult) {
         invariant(_id == submissionResult.id);
-        _holdingDistLock = submissionResult.acquiredDistLock;
         if (_completedOrAborted) {
             // A remote response was already received by the time the submission gets processed.
             // Keep the original outcome and continue the workflow.
@@ -514,10 +496,6 @@ public:
 
     const NamespaceString& getNamespace() const {
         return _commandInfo->getNameSpace();
-    }
-
-    bool holdsDistributedLock() const {
-        return _holdingDistLock;
     }
 
     bool requiresRecoveryCleanupOnCompletion() const {
@@ -541,8 +519,6 @@ private:
     const UUID _id;
 
     bool _completedOrAborted;
-
-    bool _holdingDistLock;
 
     std::shared_ptr<CommandInfo> _commandInfo;
 
@@ -637,12 +613,6 @@ private:
      */
     std::vector<UUID> _recentlyCompletedRequestIds;
 
-    /**
-     * Centralised accessor for all the distributed locks required by the Scheduler.
-     * Only _workerThread() is supposed to interact with this class.
-     */
-    BalancerDistLocks _distributedLocks;
-
     /*
      * Counter of oustanding requests that were interrupted by a prior step-down/crash event,
      * and that the scheduler is currently submitting as part of its initial recovery phase.
@@ -655,15 +625,13 @@ private:
     void _enqueueRequest(WithLock, RequestData&& request);
 
     /**
-     * Clears any persisted state and releases any distributed lock associated to the list of
-     * requests specified.
+     * Clears any persisted state associated to the list of requests specified.
      * This method must not be called while holding any mutex (this could cause deadlocks if a
      * stepdown request is also being served).
      */
     void _performDeferredCleanup(
         OperationContext* opCtx,
-        const stdx::unordered_map<UUID, RequestData, UUID::Hash>& requestsHoldingResources,
-        bool includePersistedData);
+        const stdx::unordered_map<UUID, RequestData, UUID::Hash>& requestsHoldingResources);
 
     CommandSubmissionResult _submit(OperationContext* opCtx,
                                     const CommandSubmissionParameters& data);
