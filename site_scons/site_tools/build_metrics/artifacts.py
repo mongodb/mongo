@@ -159,6 +159,8 @@ class CollectArtifacts(BuildMetricsCollector):
         self._build_dir = env.get("BUILD_METRICS_ARTIFACTS_DIR", env.Dir('#').abspath)
         self._artifacts = []
         self._bloaty_bin = env.get("BUILD_METRICS_BLOATY", env.WhereIs('bloaty'))
+        if self._bloaty_bin is None:
+            self._bloaty_bin = "bloaty"
         self._metrics = {"total_artifact_size": 0, "num_artifacts": 0, "artifacts": []}
 
     def get_name(self):

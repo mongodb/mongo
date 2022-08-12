@@ -51,7 +51,7 @@ def finalize_build_metrics(env):
         sys.stdout.write(f"Processing {m.get_name()}...")
         sys.stdout.flush()
         key, value = m.finalize()
-        sys.stdout.write(f" {timer() - start_time}s\n")
+        sys.stdout.write(f" {round(timer() - start_time, 2)}s\n")
         metrics[key] = value
 
     with open(os.path.join(os.path.dirname(__file__), "build_metrics_format.schema")) as f:
@@ -63,6 +63,69 @@ def finalize_build_metrics(env):
     else:
         with open(build_metrics_file, 'w') as f:
             json.dump(metrics, f, indent=4, sort_keys=True)
+        with open(f"{os.path.splitext(build_metrics_file)[0]}-chrome-tracer.json", 'w') as f:
+            json.dump(generate_chrome_tracer_json(metrics), f, indent=4)
+
+
+def generate_chrome_tracer_json(metrics):
+    tracer_json = {"traceEvents": []}
+    job_slots = []
+    task_stack = sorted(metrics['build_tasks'], reverse=True, key=lambda x: x['start_time'])
+
+    # Chrome trace organizes tasks per pids, so if we want to have a clean layout which
+    # clearly shows concurrent processes, we are creating job slots by comparing start and
+    # end times, and using "pid" as the job slot identifier. job_slots are a list of chronologically
+    # in order tasks. We keep a list of job slots and always check at the end of the job slot to
+    # compare the lowest end time that will accommodate the next task start time. If there are no
+    # job slots which can accommodate the next task, we create a new job slot. Note the job slots
+    # ordering is similar to how the OS process scheduler would organize and start the processes
+    # from the build, however we are reproducing this retroactively and simplistically and it
+    # is not guaranteed to match exactly.
+    while task_stack:
+        task = task_stack.pop()
+        candidates = [
+            job_slot for job_slot in job_slots if job_slot[-1]['end_time'] < task['start_time']
+        ]
+        if candidates:
+            # We need to find the best job_slot to add this next task too, so we look at the
+            # end_times, the one with the lowest would have been the first one available. We just
+            # arbitrarily guess the first one will be the best, then iterate to find out which
+            # one is the best. We then add to the existing job_slot which best_candidate points to.
+            min_end = candidates[0][-1]['end_time']
+            best_candidate = candidates[0]
+            for candidate in candidates:
+                if candidate[-1]['end_time'] < min_end:
+                    best_candidate = candidate
+                    min_end = candidate[-1]['end_time']
+
+            best_candidate.append(task)
+        else:
+            # None of the current job slots were available to accommodate the new task so we
+            # make a new one.
+            job_slots.append([task])
+
+    for i, job_slot in enumerate(job_slots):
+        for build_task in job_slot:
+
+            tracer_json['traceEvents'].append({
+                'name':
+                    build_task['outputs'][0] if build_task['outputs'] else build_task['builder'],
+                'cat':
+                    build_task['builder'],
+                'ph':
+                    'X',
+                'ts':
+                    build_task['start_time'] / 1000.0,
+                'dur': (build_task['end_time'] - build_task['start_time']) / 1000.0,
+                'pid':
+                    i,
+                'args': {
+                    "cpu": build_task['cpu_time'],
+                    "mem": build_task['mem_usage'],
+                },
+            })
+
+    return tracer_json
 
 
 def generate(env, **kwargs):
