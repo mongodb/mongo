@@ -46,6 +46,7 @@
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -200,6 +201,11 @@ void ChangeStreamChangeCollectionManager::create(ServiceContext* service) {
 }
 
 bool ChangeStreamChangeCollectionManager::isChangeCollectionsModeActive() {
+    // A change collection must not be enabled on the config server.
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        return false;
+    }
+
     // If the force fail point is enabled then declare the change collection mode as active.
     if (MONGO_unlikely(forceEnableChangeCollectionsMode.shouldFail())) {
         return true;

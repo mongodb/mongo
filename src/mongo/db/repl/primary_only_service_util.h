@@ -103,7 +103,7 @@ public:
     /**
      * The name of the 'PrimaryOnlyService::Instance'.
      */
-    virtual const StringData getInstanceName() = 0;
+    virtual StringData getInstanceName() = 0;
 
     /**
      * Interrupts the current running 'DefaultPrimaryOnlyServiceInstance' instance.

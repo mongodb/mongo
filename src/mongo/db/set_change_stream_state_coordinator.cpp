@@ -123,7 +123,7 @@ private:
 
 }  // namespace
 
-const StringData SetChangeStreamStateCoordinator::getInstanceName() {
+StringData SetChangeStreamStateCoordinator::getInstanceName() {
     return kSetChangeStreamStateCoordinatorName;
 }
 

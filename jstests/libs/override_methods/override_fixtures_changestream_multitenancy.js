@@ -20,27 +20,25 @@ ReplSetTest = function(opts) {
         const fpAssertChangeStreamNssColl =
             tojson({mode: "alwaysOn", data: {collectionName: "system.change_collection"}});
 
+        let setParameter = {};
+
         // The 'setParameter' that should be merged with 'newOpts' for the sharded-cluster and the
         // replica-set.
-        const setParameters = {
-            "sharded-cluster": {
+        if (newOptions.hasOwnProperty("shardsvr")) {
+            setParameter = {
                 // TODO SERVER-67267 check if 'forceEnableChangeCollectionsMode' can be removed.
                 "failpoint.forceEnableChangeCollectionsMode": tojson({mode: "alwaysOn"}),
                 "failpoint.assertChangeStreamNssCollection": fpAssertChangeStreamNssColl
-            },
-            "replica-set": {
+            };
+        } else if (!newOptions.hasOwnProperty("configsvr")) {
+            // This is the case for the replica-set. A change collection does not exist in the
+            // config server.
+            setParameter = {
                 featureFlagServerlessChangeStreams: true,
                 "failpoint.assertChangeStreamNssCollection": fpAssertChangeStreamNssColl
-            }
-        };
+            };
+        }
 
-        // TODO SERVER-67634 avoid using change collection in the config server.
-        const clusterTopology =
-            newOptions.hasOwnProperty("configsvr") || newOptions.hasOwnProperty("shardsvr")
-            ? "sharded-cluster"
-            : "replica-set";
-
-        const setParameter = setParameters[clusterTopology];
         newOptions.setParameter = Object.assign({}, newOptions.setParameter, setParameter);
         return this._originalStartSetAsync(newOptions, restart);
     };
@@ -66,24 +64,16 @@ Object.extend(ReplSetTest, originalReplSet);
 const originalShardingTest = ShardingTest;
 
 ShardingTest = function(params) {
-    // Helper to enable change stream on a particular shard.
-    function enableChangeStream(shard) {
-        const adminDb = shard.getPrimary().getDB("admin");
-        assert.commandWorked(adminDb.runCommand({setChangeStreamState: 1, enabled: true}));
-        assert.eq(assert.commandWorked(adminDb.runCommand({getChangeStreamState: 1})).enabled,
-                  true);
-    }
-
     // Call the original 'ShardingTest' fixture.
     const retShardingTest = originalShardingTest.apply(this, [params]);
 
     // For each shard, enable the change stream.
     this._rs.forEach((shardSvr) => {
-        enableChangeStream(shardSvr.test);
+        const adminDb = shardSvr.test.getPrimary().getDB("admin");
+        assert.commandWorked(adminDb.runCommand({setChangeStreamState: 1, enabled: true}));
+        assert.eq(assert.commandWorked(adminDb.runCommand({getChangeStreamState: 1})).enabled,
+                  true);
     });
-
-    // TODO SERVER-67634 Avoid enabling change collection in the config server.
-    enableChangeStream(this.configRS);
 
     return retShardingTest;
 };

@@ -763,6 +763,12 @@ Status runAggregate(OperationContext* opCtx,
                 nss = NamespaceString::makeChangeCollectionNSS(origNss.tenantId());
             }
 
+            // Assert that a change stream on the config server is always opened on the oplog.
+            tassert(6763400,
+                    str::stream() << "Change stream was unexpectedly opened on the namespace: "
+                                  << nss << " in the config server",
+                    serverGlobalParams.clusterRole != ClusterRole::ConfigServer || nss.isOplog());
+
             // If the 'assertChangeStreamNssCollection' failpoint is active then ensure that we are
             // opening the change stream on the correct namespace.
             if (auto scopedFp = assertChangeStreamNssCollection.scoped();

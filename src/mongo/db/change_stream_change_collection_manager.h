@@ -61,8 +61,8 @@ public:
     static ChangeStreamChangeCollectionManager& get(OperationContext* opCtx);
 
     /**
-     * Returns true if change collections are enabled for recording oplog entries, false
-     * otherwise.
+     * Returns true if the server is configured such that change collections can be used to record
+     * oplog entries; ie, we are running in a Serverless context. Returns false otherwise.
      */
     static bool isChangeCollectionsModeActive();
 

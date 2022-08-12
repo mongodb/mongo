@@ -37,13 +37,13 @@ class EnableChangeStream(interface.Hook):
         self.logger.info("Successfully enabled the change stream in the fixture.")
 
     def _set_change_collection_state_in_sharded_cluster(self):
-        # TODO SERVER-67634 avoid using change collection in the config server.
-        EnableChangeStream._set_change_stream_state(self._fixture.configsvr, True)
-
         for shard in self._fixture.shards:
             EnableChangeStream._set_change_stream_state(shard, True)
 
-        # TODO SERVER-68341 remove the sleep. Refer to the ticket for details.
+        # TODO SERVER-68341 Remove the sleep. Sleep for some time such that periodic-noop entries
+        # get written to change collections. This will ensure that the client open the change
+        # stream cursor with the resume token whose timestamp is later than the change collection
+        # first entry. Refer to the ticket for more details.
         sleep(5)
 
     @staticmethod

@@ -57,7 +57,7 @@ public:
         _state = state;
     }
 
-    const BSONObj toBSON() const {
+    BSONObj toBSON() const {
         return BSON("_id" << _state);
     }
 
@@ -74,7 +74,7 @@ PrimaryOnlyServiceStateStore<TestStateDocument> gStateDocStore{
  */
 class TestDefaultPrimaryOnlyServiceInstance : public DefaultPrimaryOnlyServiceInstance {
 public:
-    const StringData getInstanceName() final {
+    StringData getInstanceName() final {
         return kTestPrimaryOnlyServiceInstanceName;
     }
 

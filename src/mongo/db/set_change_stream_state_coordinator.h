@@ -47,7 +47,7 @@ class SetChangeStreamStateCoordinator : public DefaultPrimaryOnlyServiceInstance
 public:
     explicit SetChangeStreamStateCoordinator(const BSONObj& stateDoc);
 
-    const StringData getInstanceName() final;
+    StringData getInstanceName() final;
 
     boost::optional<BSONObj> reportForCurrentOp(
         MongoProcessInterface::CurrentOpConnectionsMode connMode,
