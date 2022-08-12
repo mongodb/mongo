@@ -105,7 +105,7 @@ public:
     std::string getDiagnosticString() override;
 
     Counters getCounters() const override {
-        return Counters();
+        return _counters;
     }
 
     void startup() override;
@@ -446,6 +446,12 @@ private:
 
     // The handshake replies set for each host.
     stdx::unordered_map<HostAndPort, RemoteCommandResponse> _handshakeReplies;  // (M)
+
+    // Track statistics about processed responses. Right now, the mock tracks the total responses
+    // processed with sent, the number of OK responses with succeeded, non-OK responses with failed,
+    // and cancellation errors with canceled. It does not track the timedOut or failedRemotely
+    // statistics.
+    Counters _counters;
 };
 
 /**
@@ -516,6 +522,10 @@ public:
      */
     bool hasReadyRequest() const {
         return !_isProcessing && !_isFinished;
+    }
+
+    bool isFinished() const {
+        return _isFinished;
     }
 
     /**

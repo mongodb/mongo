@@ -157,9 +157,12 @@ void NetworkInterfaceMock::_interruptWithResponse_inlock(const CallbackHandle& c
     auto matchFn = [&cbHandle](const auto& ops) { return ops.isForCallback(cbHandle); };
     auto noi = std::find_if(_operations.begin(), _operations.end(), matchFn);
 
-    // We've effectively observed the NetworkOperation.
-    noi->markAsProcessing();
-    _scheduleResponse_inlock(noi, _now_inlock(), response);
+    if (!noi->isFinished()) {
+        // We've effectively observed the NetworkOperation.
+        noi->markAsProcessing();
+        _counters.canceled++;
+        _scheduleResponse_inlock(noi, _now_inlock(), response);
+    }
 }
 
 Status NetworkInterfaceMock::setAlarm(const TaskExecutor::CallbackHandle& cbHandle,
@@ -600,6 +603,13 @@ void NetworkInterfaceMock::_runReadyNetworkOperations_inlock(stdx::unique_lock<s
               "when"_attr = response.when,
               "request"_attr = noi->getRequest(),
               "response"_attr = response.response);
+
+        _counters.sent++;
+        if (response.response.status.isOK()) {
+            _counters.succeeded++;
+        } else {
+            _counters.failed++;
+        }
 
         if (_metadataHook) {
             _metadataHook

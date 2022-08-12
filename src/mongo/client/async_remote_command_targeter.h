@@ -39,7 +39,8 @@
 namespace mongo {
 namespace remote_command_runner {
 
-class AsyncRemoteCommandTargeter : executor::remote_command_runner::RemoteCommandHostTargeter {
+class AsyncRemoteCommandTargeter
+    : public executor::remote_command_runner::RemoteCommandHostTargeter {
 public:
     AsyncRemoteCommandTargeter(ReadPreferenceSetting readPref,
                                std::shared_ptr<RemoteCommandTargeter> targeter)
