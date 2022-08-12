@@ -34,7 +34,6 @@
 #include "mongo/db/repl/session_update_tracker.h"
 
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session.h"

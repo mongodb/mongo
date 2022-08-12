@@ -502,7 +502,12 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
                               "Intentionally failing session migration before processing post/pre "
                               "image originating update oplog entry");
                 },
-                [&](const auto&) { return !oplogEntry["needsRetryImage"].eoo(); });
+                // SERVER-68728 The latter two conditions are needed if the donor shard is v5.0 in
+                // multi-version clusters
+                [&](const auto&) {
+                    return !oplogEntry["needsRetryImage"].eoo() ||
+                        !oplogEntry["preImageOpTime"].eoo() || !oplogEntry["postImageOpTime"].eoo();
+                });
             try {
                 lastResult =
                     processSessionOplog(oplogEntry, lastResult, service, _cancellationToken);

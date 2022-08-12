@@ -242,6 +242,8 @@ last-continuous:
       test_file: jstests/sharding/move_chunk_interrupt_postimage.js
     - ticket: SERVER-68628
       test_file: jstests/sharding/resharding_temp_ns_routing_info_unsharded.js
+    - ticket: SERVER-68728
+      test_file: jstests/sharding/move_chunk_interrupt_postimage.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -617,6 +619,8 @@ last-lts:
       test_file: jstests/sharding/move_chunk_interrupt_postimage.js
     - ticket: SERVER-68628
       test_file: jstests/sharding/resharding_temp_ns_routing_info_unsharded.js
+    - ticket: SERVER-68728
+      test_file: jstests/sharding/move_chunk_interrupt_postimage.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
