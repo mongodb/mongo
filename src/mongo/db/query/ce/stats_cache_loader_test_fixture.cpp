@@ -27,24 +27,50 @@
  *    it in the license file.
  */
 
-
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/query/ce/stats_cache_loader.h"
+#include <memory>
 
-#include "mongo/db/query/ce/collection_statistics.h"
-#include "mongo/stdx/thread.h"
+#include "mongo/db/query/ce/stats_cache_loader_test_fixture.h"
+
+#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 
 namespace mongo {
 
-const Status StatsCacheLoader::kInternalErrorStatus = {
-    ErrorCodes::InternalError, "Stats cache loader received unexpected request"};
+void StatsCacheLoaderTestFixture::setUp() {
+    // Set up mongod.
+    ServiceContextMongoDTest::setUp();
 
-SemiFuture<CollectionStatistics> StatsCacheLoader::getStats(const NamespaceString& nss) {
-    return makeReadyFutureWith([this] { return _swStatsReturnValueForTest; }).semi();
+    auto service = getServiceContext();
+    _storage = std::make_unique<repl::StorageInterfaceImpl>();
+    _opCtx = cc().makeOperationContext();
+
+    // Set up ReplicationCoordinator and ensure that we are primary.
+    auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service);
+    ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+    repl::ReplicationCoordinator::set(service, std::move(replCoord));
+
+    // Set up oplog collection. If the WT storage engine is used, the oplog collection is expected
+    // to exist when fetching the next opTime (LocalOplogInfo::getNextOpTimes) to use for a write.
+    repl::createOplog(operationContext());
 }
 
-void StatsCacheLoader::setStatsReturnValueForTest(StatusWith<CollectionStatistics> swStats) {
-    _swStatsReturnValueForTest = std::move(swStats);
+void StatsCacheLoaderTestFixture::tearDown() {
+    _storage.reset();
+    _opCtx.reset();
+
+    // Tear down mongod.
+    ServiceContextMongoDTest::tearDown();
 }
+
+OperationContext* StatsCacheLoaderTestFixture::operationContext() {
+    return _opCtx.get();
+}
+
+repl::StorageInterface* StatsCacheLoaderTestFixture::storageInterface() {
+    return _storage.get();
+}
+
 }  // namespace mongo

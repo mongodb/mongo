@@ -27,7 +27,10 @@
  *    it in the license file.
  */
 
-#pragma once
+
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/query/ce/stats_cache_loader_mock.h"
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/ce/collection_statistics.h"
@@ -35,25 +38,16 @@
 
 namespace mongo {
 
-using namespace mongo::ce;
+const Status StatsCacheLoaderMock::kInternalErrorStatus = {
+    ErrorCodes::InternalError, "Stats cache loader received unexpected request"};
 
-class StatsCacheLoader {
-public:
-    /**
-     * Non-blocking call, which returns CollectionStatistics from the the persistent metadata store.
-     *
-     * If for some reason the asynchronous fetch operation cannot be dispatched (for example on
-     * shutdown), throws a DBException.
-     */
-    virtual SemiFuture<CollectionStatistics> getStats(OperationContext* opCtx,
-                                                      const NamespaceString& nss) = 0;
+SemiFuture<CollectionStatistics> StatsCacheLoaderMock::getStats(OperationContext* opCtx,
+                                                                const NamespaceString& nss) {
 
-    virtual void setStatsReturnValueForTest(StatusWith<CollectionStatistics> swStats){};
+    return makeReadyFutureWith([this] { return _swStatsReturnValueForTest; }).semi();
+}
 
-    virtual ~StatsCacheLoader() {}
-
-    static constexpr StringData kStatsDb = "system"_sd;
-    static constexpr StringData kStatsPrefix = "statistics"_sd;
-};
-
+void StatsCacheLoaderMock::setStatsReturnValueForTest(StatusWith<CollectionStatistics> swStats) {
+    _swStatsReturnValueForTest = std::move(swStats);
+}
 }  // namespace mongo

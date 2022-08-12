@@ -49,21 +49,26 @@ const auto statsCacheDecoration = ServiceContext::declareDecoration<std::unique_
 
 }  // namespace
 
-StatsCache::StatsCache(ServiceContext* service, ThreadPoolInterface& threadPool, int size)
+StatsCache::StatsCache(ServiceContext* service,
+                       std::unique_ptr<StatsCacheLoader> cacheLoader,
+                       ThreadPoolInterface& threadPool,
+                       int size)
     : ReadThroughCache(_mutex,
                        service,
                        threadPool,
                        [this](OperationContext* opCtx,
                               const NamespaceString& nss,
                               const ValueHandle& stats) { return _lookupStats(opCtx, nss, stats); },
-                       size) {}
+                       size),
+      _statsCacheLoader(std::move(cacheLoader)) {}
 
 StatsCache::LookupResult StatsCache::_lookupStats(OperationContext* opCtx,
                                                   const NamespaceString& nss,
                                                   const StatsCacheValueHandle& stats) {
 
     try {
-        auto newStats = _statsCacheLoader.getStats(nss).get();
+        invariant(_statsCacheLoader);
+        auto newStats = _statsCacheLoader->getStats(opCtx, nss).get();
         return LookupResult(std::move(newStats));
     } catch (const DBException& ex) {
         if (ex.code() == ErrorCodes::NamespaceNotFound) {

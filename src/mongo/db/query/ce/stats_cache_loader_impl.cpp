@@ -27,33 +27,52 @@
  *    it in the license file.
  */
 
-#pragma once
 
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/query/ce/stats_cache_loader_impl.h"
+
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/ce/collection_statistics.h"
+#include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
 
 namespace mongo {
 
-using namespace mongo::ce;
 
-class StatsCacheLoader {
-public:
-    /**
-     * Non-blocking call, which returns CollectionStatistics from the the persistent metadata store.
-     *
-     * If for some reason the asynchronous fetch operation cannot be dispatched (for example on
-     * shutdown), throws a DBException.
-     */
-    virtual SemiFuture<CollectionStatistics> getStats(OperationContext* opCtx,
-                                                      const NamespaceString& nss) = 0;
+SemiFuture<CollectionStatistics> StatsCacheLoaderImpl::getStats(OperationContext* opCtx,
+                                                                const NamespaceString& nss) {
 
-    virtual void setStatsReturnValueForTest(StatusWith<CollectionStatistics> swStats){};
+    std::string statsColl(kStatsPrefix + "." + nss.ns());
 
-    virtual ~StatsCacheLoader() {}
+    NamespaceString statsNss(kStatsDb, statsColl);
+    DBDirectClient client(opCtx);
+    FindCommandRequest findRequest{statsNss};
+    BSONObj result;
 
-    static constexpr StringData kStatsDb = "system"_sd;
-    static constexpr StringData kStatsPrefix = "statistics"_sd;
-};
+    try {
+        auto cursor = client.find(findRequest);
+
+        if (!cursor) {
+            uasserted(ErrorCodes::OperationFailed,
+                      str::stream() << "Failed to establish a cursor for reading " << nss.ns()
+                                    << " from local storage");
+        }
+
+        std::vector<BSONObj> histograms;
+        while (cursor->more()) {
+            BSONObj document = cursor->nextSafe().getOwned();
+            histograms.push_back(std::move(document));
+        }
+
+        // TODO: SERVER-68745, parse histograms BSONs.
+        CollectionStatistics stats{0};
+        return makeReadyFutureWith([this, stats] { return stats; }).semi();
+    } catch (const DBException& ex) {
+        uassertStatusOK(ex.toStatus());
+    }
+    MONGO_UNREACHABLE
+}
 
 }  // namespace mongo

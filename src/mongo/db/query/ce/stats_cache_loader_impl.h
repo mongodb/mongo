@@ -31,29 +31,17 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/ce/collection_statistics.h"
+#include "mongo/db/query/ce/stats_cache_loader.h"
 #include "mongo/stdx/thread.h"
 
 namespace mongo {
 
 using namespace mongo::ce;
 
-class StatsCacheLoader {
+class StatsCacheLoaderImpl : public StatsCacheLoader {
 public:
-    /**
-     * Non-blocking call, which returns CollectionStatistics from the the persistent metadata store.
-     *
-     * If for some reason the asynchronous fetch operation cannot be dispatched (for example on
-     * shutdown), throws a DBException.
-     */
-    virtual SemiFuture<CollectionStatistics> getStats(OperationContext* opCtx,
-                                                      const NamespaceString& nss) = 0;
-
-    virtual void setStatsReturnValueForTest(StatusWith<CollectionStatistics> swStats){};
-
-    virtual ~StatsCacheLoader() {}
-
-    static constexpr StringData kStatsDb = "system"_sd;
-    static constexpr StringData kStatsPrefix = "statistics"_sd;
+    SemiFuture<CollectionStatistics> getStats(OperationContext* opCtx,
+                                              const NamespaceString& nss) override;
 };
 
 }  // namespace mongo

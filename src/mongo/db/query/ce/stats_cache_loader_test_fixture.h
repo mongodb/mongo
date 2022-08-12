@@ -29,31 +29,32 @@
 
 #pragma once
 
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/query/ce/collection_statistics.h"
-#include "mongo/stdx/thread.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/ce/stats_cache_loader.h"
+#include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 
 namespace mongo {
 
-using namespace mongo::ce;
-
-class StatsCacheLoader {
+/**
+ * Sets up and provides a repl::StorageInterface and OperationContext.
+ * Database data are cleared  between test runs.
+ */
+class StatsCacheLoaderTestFixture : public ServiceContextMongoDTest {
 public:
-    /**
-     * Non-blocking call, which returns CollectionStatistics from the the persistent metadata store.
-     *
-     * If for some reason the asynchronous fetch operation cannot be dispatched (for example on
-     * shutdown), throws a DBException.
-     */
-    virtual SemiFuture<CollectionStatistics> getStats(OperationContext* opCtx,
-                                                      const NamespaceString& nss) = 0;
+    explicit StatsCacheLoaderTestFixture(Options options = {})
+        : ServiceContextMongoDTest(std::move(options)) {}
 
-    virtual void setStatsReturnValueForTest(StatusWith<CollectionStatistics> swStats){};
+    OperationContext* operationContext();
+    repl::StorageInterface* storageInterface();
 
-    virtual ~StatsCacheLoader() {}
+protected:
+    void setUp() override;
+    void tearDown() override;
 
-    static constexpr StringData kStatsDb = "system"_sd;
-    static constexpr StringData kStatsPrefix = "statistics"_sd;
+private:
+    ServiceContext::UniqueOperationContext _opCtx;
+    std::unique_ptr<repl::StorageInterface> _storage;
 };
 
 }  // namespace mongo

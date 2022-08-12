@@ -35,6 +35,7 @@
 #include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/ce/stats_cache.h"
+#include "mongo/db/query/ce/stats_cache_loader_mock.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -59,8 +60,10 @@ protected:
     // ReadThroughCache)
     class CacheWithThreadPool : public StatsCache {
     public:
-        CacheWithThreadPool(ServiceContext* service, size_t size)
-            : StatsCache(service, _threadPool, size) {
+        CacheWithThreadPool(ServiceContext* service,
+                            std::unique_ptr<StatsCacheLoader> cacheLoaderMock,
+                            size_t size)
+            : StatsCache(service, std::move(cacheLoaderMock), _threadPool, size) {
             _threadPool.startup();
         }
 
@@ -87,19 +90,22 @@ TEST(StatsCacheTest, StandaloneValueHandle) {
 TEST_F(StatsCacheTest, KeyDoesNotExist) {
     Status namespaceNotFoundErrorStatus = {ErrorCodes::NamespaceNotFound,
                                            "The key does not exists"};
-    auto cache = CacheWithThreadPool(getServiceContext(), 1);
-    cache.getStatsCacheLoader().setStatsReturnValueForTest(std::move(namespaceNotFoundErrorStatus));
+    auto cacheLoaderMock = std::make_unique<StatsCacheLoaderMock>();
+    auto cache = CacheWithThreadPool(getServiceContext(), std::move(cacheLoaderMock), 1);
+    cache.getStatsCacheLoader()->setStatsReturnValueForTest(
+        std::move(namespaceNotFoundErrorStatus));
     auto handle = cache.acquire(_opCtx, NamespaceString("db", "coll"));
     ASSERT(!handle);
 }
 
 TEST_F(StatsCacheTest, LoadStats) {
-    auto cache = CacheWithThreadPool(getServiceContext(), 1);
+    auto cacheLoaderMock = std::make_unique<StatsCacheLoaderMock>();
+    auto cache = CacheWithThreadPool(getServiceContext(), std::move(cacheLoaderMock), 1);
 
     auto stats1 = CollectionStatistics(1);
     auto stats2 = CollectionStatistics(2);
 
-    cache.getStatsCacheLoader().setStatsReturnValueForTest(std::move(stats1));
+    cache.getStatsCacheLoader()->setStatsReturnValueForTest(std::move(stats1));
 
     auto handle = cache.acquire(_opCtx, NamespaceString("db", "coll1"));
     ASSERT(handle.isValid());
@@ -109,13 +115,13 @@ TEST_F(StatsCacheTest, LoadStats) {
     // from cache.
     Status internalErrorStatus = {ErrorCodes::InternalError,
                                   "Stats cache loader received unexpected request"};
-    cache.getStatsCacheLoader().setStatsReturnValueForTest(std::move(internalErrorStatus));
+    cache.getStatsCacheLoader()->setStatsReturnValueForTest(std::move(internalErrorStatus));
 
     handle = cache.acquire(_opCtx, NamespaceString("db", "coll1"));
     ASSERT(handle.isValid());
     ASSERT_EQ(1, handle->getCardinality());
 
-    cache.getStatsCacheLoader().setStatsReturnValueForTest(std::move(stats2));
+    cache.getStatsCacheLoader()->setStatsReturnValueForTest(std::move(stats2));
     handle = cache.acquire(_opCtx, NamespaceString("db", "coll2"));
     ASSERT(handle.isValid());
     ASSERT_EQ(2, handle->getCardinality());
