@@ -52,7 +52,15 @@ void RangeDeleterServiceOpObserver::onInserts(OperationContext* opCtx,
             auto deletionTask = RangeDeletionTask::parse(
                 IDLParserContext("RangeDeleterServiceOpObserver"), it->doc);
             if (!deletionTask.getPending() || !*(deletionTask.getPending())) {
-                (void)RangeDeleterService::get(opCtx)->registerTask(deletionTask);
+                try {
+                    (void)RangeDeleterService::get(opCtx)->registerTask(deletionTask);
+                } catch (const DBException& ex) {
+                    dassert(ex.code() == ErrorCodes::NotYetInitialized,
+                            str::stream()
+                                << "No error different from `NotYetInitialized` is expected "
+                                   "to be propagated to the range deleter observer. Got error: "
+                                << ex.toStatus());
+                }
             }
         }
     }
@@ -76,7 +84,15 @@ void RangeDeleterServiceOpObserver::onUpdate(OperationContext* opCtx,
         if (pendingFieldIsRemoved || pendingFieldUpdatedToFalse) {
             auto deletionTask = RangeDeletionTask::parse(
                 IDLParserContext("RangeDeleterServiceOpObserver"), args.updateArgs->updatedDoc);
-            (void)RangeDeleterService::get(opCtx)->registerTask(deletionTask);
+            try {
+                (void)RangeDeleterService::get(opCtx)->registerTask(deletionTask);
+            } catch (const DBException& ex) {
+                dassert(ex.code() == ErrorCodes::NotYetInitialized,
+                        str::stream()
+                            << "No error different from `NotYetInitialized` is expected "
+                               "to be propagated to the range deleter observer. Got error: "
+                            << ex.toStatus());
+            }
         }
     }
 }
@@ -100,8 +116,15 @@ void RangeDeleterServiceOpObserver::onDelete(OperationContext* opCtx,
 
         auto deletionTask =
             RangeDeletionTask::parse(IDLParserContext("RangeDeleterServiceOpObserver"), deletedDoc);
-        RangeDeleterService::get(opCtx)->deregisterTask(deletionTask.getCollectionUuid(),
-                                                        deletionTask.getRange());
+        try {
+            RangeDeleterService::get(opCtx)->deregisterTask(deletionTask.getCollectionUuid(),
+                                                            deletionTask.getRange());
+        } catch (const DBException& ex) {
+            dassert(ex.code() == ErrorCodes::NotYetInitialized,
+                    str::stream() << "No error different from `NotYetInitialized` is expected "
+                                     "to be propagated to the range deleter observer. Got error: "
+                                  << ex.toStatus());
+        }
     }
 }
 
