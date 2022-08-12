@@ -14,9 +14,10 @@
 "use strict";
 
 load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/libs/feature_flag_util.js");
 load("jstests/libs/fixture_helpers.js");
 
-if (!TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
+if (!FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
     jsTestLog(
         "Skipped test as the featureFlagTimeseriesMetricIndexes feature flag is not enabled.");
     return;

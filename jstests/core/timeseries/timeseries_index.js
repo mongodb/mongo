@@ -11,8 +11,9 @@
 (function() {
 "use strict";
 
-load("jstests/libs/fixture_helpers.js");
 load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/libs/feature_flag_util.js");
+load("jstests/libs/fixture_helpers.js");
 
 TimeseriesTest.run((insert) => {
     const collNamePrefix = 'timeseries_index_';
@@ -225,7 +226,7 @@ TimeseriesTest.run((insert) => {
     runTest({[metaFieldName + '.location']: "2d", [metaFieldName + '.tag1']: -1},
             {'meta.location': "2d", 'meta.tag1': -1});
 
-    if (TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
+    if (FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
         // Measurement 2dsphere index
         runTest({'loc': '2dsphere'}, {'data.loc': '2dsphere_bucket'});
     }
@@ -242,7 +243,7 @@ TimeseriesTest.run((insert) => {
         coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
     assert.commandWorked(insert(coll, doc), 'failed to insert doc: ' + tojson(doc));
 
-    if (!TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
+    if (!FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
         // Reject index keys that do not include the metadata field.
         assert.commandFailedWithCode(coll.createIndex({not_metadata: 1}),
                                      ErrorCodes.CannotCreateIndex);
@@ -265,7 +266,7 @@ TimeseriesTest.run((insert) => {
                                      [ErrorCodes.CannotCreateIndex, ErrorCodes.InvalidOptions]);
     };
 
-    if (!TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
+    if (!FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
         // Partial indexes are not supported on time-series collections if the time-series metric
         // feature flag is disabled.
         testCreateIndexFailed({[metaFieldName]: 1}, {partialFilterExpression: {meta: {$gt: 5}}});

@@ -7,15 +7,12 @@
 (function() {
 "use strict";
 
+load("jstests/libs/feature_flag_util.js");
+
 const coll = db.index_prepareUnique;
 coll.drop();
 
-const collModIndexUniqueEnabled = assert
-                                      .commandWorked(db.getMongo().adminCommand(
-                                          {getParameter: 1, featureFlagCollModIndexUnique: 1}))
-                                      .featureFlagCollModIndexUnique.value;
-
-if (!collModIndexUniqueEnabled) {
+if (!FeatureFlagUtil.isEnabled(db, "CollModIndexUnique")) {
     jsTestLog('Skipping test because the collMod unique index feature flag is disabled.');
     return;
 }

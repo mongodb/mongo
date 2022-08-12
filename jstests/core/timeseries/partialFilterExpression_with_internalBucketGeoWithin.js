@@ -10,12 +10,11 @@
  */
 
 load("jstests/libs/analyze_plan.js");
+load("jstests/libs/feature_flag_util.js");
 load('jstests/noPassthrough/libs/index_build.js');
-(function() {
-const isFeatureEnabled = db.adminCommand({getParameter: 1, featureFlagTimeseriesMetricIndexes: 1})
-                             .featureFlagTimeseriesMetricIndexes.value;
 
-if (isFeatureEnabled) {
+(function() {
+if (FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
     const timeFieldName = "timestamp";
 
     const coll = db.partialFilterExpression_with_internalBucketGeoWithin;
