@@ -51,19 +51,42 @@ ExecutorFuture<void> whenAllSucceedOn(const std::vector<SharedSemiFuture<void>>&
                             : ExecutorFuture(executor);
 }
 
+std::vector<Future<void>> runAllInlineUnsafe(const std::vector<SharedSemiFuture<void>>& futures) {
+    std::vector<Future<void>> result;
+    result.reserve(futures.size());
+
+    for (const auto& future : futures) {
+        result.emplace_back(future.unsafeToInlineFuture());
+    }
+
+    return result;
+}
+
 ExecutorFuture<void> cancelWhenAnyErrorThenQuiesce(
     const std::vector<SharedSemiFuture<void>>& futures,
     ExecutorPtr executor,
     CancellationSource cancelSource) {
-    return whenAllSucceedOn(futures, executor)
-        .onError([futures, executor, cancelSource](Status originalError) mutable {
+    if (futures.empty()) {
+        return ExecutorFuture(executor);
+    }
+    // Run all futures inline so that the onError callback is called even if that error was caused
+    // by the executor shutting down. This causes the logic for whenAllSucceed, whenAll, and the
+    // onError callback to potentially run on the threads of the setters of the promises
+    // associated with the input futures. Since this logic is thread safe, not blocking, and does
+    // not acquire additional resources, this is safe, but beware if making further changes to this
+    // function.
+    return whenAllSucceed(runAllInlineUnsafe(futures))
+        .unsafeToInlineFuture()
+        .onError([futures, cancelSource](Status originalError) mutable {
             cancelSource.cancel();
 
-            return whenAll(thenRunAllOn(futures, executor))
+            return whenAll(runAllInlineUnsafe(futures))
                 .ignoreValue()
-                .thenRunOn(executor)
+                .unsafeToInlineFuture()
                 .onCompletion([originalError](auto) { return originalError; });
-        });
+        })
+        .thenRunOn(executor);
 }
+
 
 }  // namespace mongo::resharding
