@@ -475,10 +475,9 @@ TEST_F(QueryPlannerColumnarTest, ComplexPredicateSplitDemo) {
     addColumnStoreIndexAndEnableFilterSplitting();
 
     auto complexPredicate = fromjson(R"({
-        a: {$gte: 0, $lt: 10},
-        "addresses.zip": {$in: ["12345", "01234"]},
-        unsubscribed: false,
-        specialAddress: {$exists: true}
+        a: {$gte: 0},
+        "addresses.zip": "12345",
+        unsubscribed: false
     })");
     runQuerySortProj(complexPredicate, BSONObj(), BSON("a" << 1 << "_id" << 0));
     assertNumSolutions(1U);
@@ -488,13 +487,12 @@ TEST_F(QueryPlannerColumnarTest, ComplexPredicateSplitDemo) {
             node: {
                 column_scan: {
                     filtersByPath: {
-                        a: {$and: [{a: {$gte: 0}}, {a: {$lt: 10}}]},
-                        'addresses.zip': {'addresses.zip': {$in: ['12345', '01234']}},
-                        unsubscribed: {unsubscribed: {$eq: false}},
-                        specialAddress: {specialAddress: {$exists: true}}
+                        a: {a: {$gte: 0}},
+                        'addresses.zip': {'addresses.zip': {$eq: '12345'}},
+                        unsubscribed: {unsubscribed: {$eq: false}}
                     },
                     outputFields: ['a'],
-                    matchFields: ['a', 'addresses.zip', 'unsubscribed', 'specialAddress']
+                    matchFields: ['a', 'addresses.zip', 'unsubscribed']
                 }
             }
         }
@@ -506,8 +504,8 @@ TEST_F(QueryPlannerColumnarTest, ComplexPredicateSplitsIntoParts) {
 
     // Same predicate as above, except with exists: false, which disqualifies the whole thing.
     auto complexPredicate = fromjson(R"({
-        a: {$gte: 0, $lt: 10},
-        "addresses.zip": {$in: ["12345", "01234"]},
+        a: {$gte: 0},
+        "addresses.zip": "12345",
         unsubscribed: false,
         specialAddress: {$exists: false},
         doNotContact: {$exists: false}
@@ -519,8 +517,8 @@ TEST_F(QueryPlannerColumnarTest, ComplexPredicateSplitsIntoParts) {
             node: {
                 column_scan: {
                     filtersByPath: {
-                        a: {a: {$gte: 0, $lt: 10}},
-                        "addresses.zip": {"addresses.zip": {$in: ['12345', '01234']}},
+                        a: {a: {$gte: 0}},
+                        'addresses.zip': {'addresses.zip': {$eq: '12345'}},
                         unsubscribed: {unsubscribed: false}
                     },
                     outputFields: ['a'],
@@ -806,33 +804,6 @@ TEST_F(QueryPlannerColumnarTest, SelectsFirstFromMultipleEligibleColumnStoreInde
             indexName: 'first index',
             outputFields: ['a'],
             matchFields: []
-        }
-    })");
-}
-
-TEST_F(QueryPlannerColumnarTest, FullPredicateOption) {
-    params.columnStoreIndexes.emplace_back(kIndexName);
-
-    // Filter that could be pushed down, but isn't due to the lack of the
-    // GENERATE_PER_COLUMN_FILTER flag.
-    auto predicate = fromjson(R"({
-        specialAddress: {$exists: true},
-        doNotContact: {$exists: true}
-    })");
-    runQuerySortProj(predicate, BSONObj(), BSON("a" << 1 << "_id" << 0));
-    assertSolutionExists(R"({
-        proj: {
-            spec: {a: 1, _id: 0},
-            node: {
-                column_scan: {
-                    outputFields: ['a'],
-                    matchFields: ['specialAddress', 'doNotContact'],
-                    postAssemblyFilter: {
-                        specialAddress: {$exists: true},
-                        doNotContact: {$exists: true}
-                    }
-                }
-            }
         }
     })");
 }

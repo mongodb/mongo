@@ -1692,15 +1692,21 @@ TEST(SplitMatchExpressionForColumns, SplitsSafeEqualities) {
             " kiwi: NumberDecimal('22'),"
             " 'loggerhead shrike': {$minKey: 1},"
             " mallard: {$maxKey: 1}}");
+        ParsedMatchExpression minMaxKeyComps(
+            "{'loggerhead shrike': {$minKey: 1},"
+            " mallard: {$maxKey: 1}}");
+
         auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(mixedEquals.get());
-        ASSERT_EQ(splitUp.size(), 12) << splitUp.size();
+        ASSERT_EQ(splitUp.size(), 12 - 2) << splitUp.size();
         ASSERT(splitUp.contains("albatross"));
         ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::EQ)
             << splitUp.at("albatross")->toString();
         ASSERT(splitUp.contains("blackbird"));
         ASSERT(splitUp.at("blackbird")->matchType() == MatchExpression::EQ)
             << splitUp.at("blackbird")->toString();
-        ASSERT(residual == nullptr);
+
+        // Comparison against Min- and MaxKey cannot be pushed down.
+        assertMatchesEqual(minMaxKeyComps, residual);
     }
 }
 
@@ -1737,26 +1743,6 @@ TEST(SplitMatchExpressionForColumns, DoesNotSupportEqualsNull) {
         auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(equalsNull.get());
         ASSERT_EQ(splitUp.size(), 0) << splitUp.size();
         assertMatchesEqual(equalsNull, residual);
-    }
-}
-
-TEST(SplitMatchExpressionForColumns, DoesSupportNotEqualsNull) {
-    {
-        ParsedMatchExpression neNull("{a: {$ne: null}}");
-        auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(neNull.get());
-        ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
-        ASSERT(splitUp.contains("a"));
-        ASSERT(splitUp.at("a")->matchType() == MatchExpression::NOT) << splitUp.at("a")->toString();
-        ASSERT(residual == nullptr);
-    }
-    {
-        ParsedMatchExpression notEqualsNull("{a: {$not: {$eq: null}}}");
-        auto&& [splitUp, residual] =
-            expression::splitMatchExpressionForColumns(notEqualsNull.get());
-        ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
-        ASSERT(splitUp.contains("a"));
-        ASSERT(splitUp.at("a")->matchType() == MatchExpression::NOT) << splitUp.at("a")->toString();
-        ASSERT(residual == nullptr);
     }
 }
 
@@ -1853,7 +1839,7 @@ TEST(SplitMatchExpressionForColumns, SupportsComparisonsLikeEqualities) {
             "{"
             " albatross: {$lt: 100},"
             " blackbird: {$gt: 0},"
-            " cowbird: {$gte: 0, $lte: 100}"
+            " cowbird: 50"
             "}");
         auto&& [splitUp, residual] =
             expression::splitMatchExpressionForColumns(combinationPredicate.get());
@@ -1865,7 +1851,7 @@ TEST(SplitMatchExpressionForColumns, SupportsComparisonsLikeEqualities) {
         ASSERT(splitUp.at("blackbird")->matchType() == MatchExpression::GT)
             << splitUp.at("blackbird")->toString();
         ASSERT(splitUp.contains("cowbird"));
-        ASSERT(splitUp.at("cowbird")->matchType() == MatchExpression::AND)
+        ASSERT(splitUp.at("cowbird")->matchType() == MatchExpression::EQ)
             << splitUp.at("cowbird")->toString();
         ASSERT(residual == nullptr);
     }
@@ -1958,118 +1944,11 @@ TEST(SplitMatchExpressionForColumns, SupportsTypeSpecificPredicates) {
     ASSERT(residual == nullptr);
 }
 
-TEST(SplitMatchExpressionForColumns, SupportsInWithRegexes) {
-    {
-        // First confirm a $in clause is supported without regexes.
-        ParsedMatchExpression stringInClause("{albatross: {$in: ['big', 'ol', 'bird']}}");
-        auto&& [splitUp, residual] =
-            expression::splitMatchExpressionForColumns(stringInClause.get());
-        ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
-        ASSERT(splitUp.contains("albatross"));
-        ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::MATCH_IN)
-            << splitUp.at("albatross")->toString();
-        ASSERT(residual == nullptr);
-    }
-    {
-        // Test that $in with regexes is supported also work.
-        ParsedMatchExpression regexInClause("{albatross: {$in: [/big/, /bird/]}}");
-        auto&& [splitUp, residual] =
-            expression::splitMatchExpressionForColumns(regexInClause.get());
-        ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
-        ASSERT(splitUp.contains("albatross"));
-        ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::MATCH_IN)
-            << splitUp.at("albatross")->toString();
-        ASSERT(residual == nullptr);
-    }
-    {
-        // Test that a mix of both is supported
-        ParsedMatchExpression regexInClause("{albatross: {$in: [/big/, 'bird']}}");
-        auto&& [splitUp, residual] =
-            expression::splitMatchExpressionForColumns(regexInClause.get());
-        ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
-        ASSERT(splitUp.contains("albatross"));
-        ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::MATCH_IN)
-            << splitUp.at("albatross")->toString();
-        ASSERT(residual == nullptr);
-    }
-    {
-        // Test that it is still disallowed if there's a disqualifying equality such as a null.
-        ParsedMatchExpression regexInClause("{albatross: {$in: [/big/, null, 'bird']}}");
-        auto&& [splitUp, residual] =
-            expression::splitMatchExpressionForColumns(regexInClause.get());
-        ASSERT_EQ(splitUp.size(), 0) << splitUp.size();
-        assertMatchesEqual(regexInClause, residual);
-    }
-}
-
-TEST(SplitMatchExpressionForColumns, SupportsExistsTrue) {
-    ParsedMatchExpression existsPredicate("{albatross: {$exists: true}}");
-    auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(existsPredicate.get());
-    ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
-    ASSERT(splitUp.contains("albatross"));
-    ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::EXISTS)
-        << splitUp.at("albatross")->toString();
-    ASSERT(residual == nullptr);
-}
-
 TEST(SplitMatchExpressionForColumns, DoesNotSupportExistsFalse) {
     ParsedMatchExpression existsPredicate("{albatross: {$exists: false}}");
     auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(existsPredicate.get());
     ASSERT_EQ(splitUp.size(), 0) << splitUp.size();
     assertMatchesEqual(existsPredicate, residual);
-}
-
-// $in constraints are similar to equality. Most of them should work, exceptions broken out in the
-// next test.
-TEST(SplitMatchExpressionForColumns, SupportsInPredicates) {
-    {
-        ParsedMatchExpression emptyIn("{albatross: {$in: []}}");
-        auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(emptyIn.get());
-        ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
-        ASSERT(splitUp.contains("albatross"));
-        ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::MATCH_IN)
-            << splitUp.at("albatross")->toString();
-        ASSERT(residual == nullptr);
-    }
-    {
-        ParsedMatchExpression singleElementIn("{albatross: {$in: [4]}}");
-        auto&& [splitUp, residual] =
-            expression::splitMatchExpressionForColumns(singleElementIn.get());
-        ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
-        ASSERT(splitUp.contains("albatross"));
-        ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::MATCH_IN)
-            << splitUp.at("albatross")->toString();
-        ASSERT(residual == nullptr);
-    }
-    {
-        ParsedMatchExpression inWithEmptyArray("{albatross: {$in: [[]]}}");
-        auto&& [splitUp, residual] =
-            expression::splitMatchExpressionForColumns(inWithEmptyArray.get());
-        ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
-        ASSERT(splitUp.contains("albatross"));
-        ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::MATCH_IN)
-            << splitUp.at("albatross")->toString();
-        ASSERT(residual == nullptr);
-    }
-    {
-        ParsedMatchExpression inWithEmptyObject("{albatross: {$in: [{}]}}");
-        auto&& [splitUp, residual] =
-            expression::splitMatchExpressionForColumns(inWithEmptyObject.get());
-        ASSERT_GT(splitUp.size(), 0);
-        ASSERT(splitUp.contains("albatross"));
-        ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::MATCH_IN)
-            << splitUp.at("albatross")->toString();
-        ASSERT(residual == nullptr);
-    }
-    {
-        ParsedMatchExpression mixedTypeIn("{albatross: {$in: [4, {}, [], 'string', /regex/]}}");
-        auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(mixedTypeIn.get());
-        ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
-        ASSERT(splitUp.contains("albatross"));
-        ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::MATCH_IN)
-            << splitUp.at("albatross")->toString();
-        ASSERT(residual == nullptr);
-    }
 }
 
 // We can't support compound types, just like for equality.
@@ -2099,47 +1978,6 @@ TEST(SplitMatchExpressionForColumns, DoesNotSupportCertainInEdgeCases) {
             expression::splitMatchExpressionForColumns(unsupportedMixedInWithSupported.get());
         ASSERT_EQ(splitUp.size(), 0) << splitUp.size();
         assertMatchesEqual(unsupportedMixedInWithSupported, residual);
-    }
-}
-
-TEST(SplitMatchExpressionForColumns, SupportsTypePredicates) {
-    {
-        ParsedMatchExpression intFilter("{albatross: {$type: 'int'}}");
-        auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(intFilter.get());
-        ASSERT_GT(splitUp.size(), 0);
-        ASSERT(splitUp.contains("albatross"));
-        ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::TYPE_OPERATOR)
-            << splitUp.at("albatross")->toString();
-        ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
-        ASSERT(residual == nullptr);
-    }
-    {
-        ParsedMatchExpression numberFilter("{albatross: {$type: 'number'}}");
-        auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(numberFilter.get());
-        ASSERT_GT(splitUp.size(), 0);
-        ASSERT(splitUp.contains("albatross"));
-        ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::TYPE_OPERATOR)
-            << splitUp.at("albatross")->toString();
-        ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
-        ASSERT(residual == nullptr);
-    }
-    {
-        ParsedMatchExpression stringFilter("{albatross: {$type: 'string'}}");
-        auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(stringFilter.get());
-        ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
-        ASSERT(splitUp.contains("albatross"));
-        ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::TYPE_OPERATOR)
-            << splitUp.at("albatross")->toString();
-        ASSERT(residual == nullptr);
-    }
-    {
-        ParsedMatchExpression nullFilter("{albatross: {$type: 'null'}}");
-        auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(nullFilter.get());
-        ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
-        ASSERT(splitUp.contains("albatross"));
-        ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::TYPE_OPERATOR)
-            << splitUp.at("albatross")->toString();
-        ASSERT(residual == nullptr);
     }
 }
 
@@ -2173,44 +2011,16 @@ TEST(SplitMatchExpressionForColumns, DoesNotSupportNotQueries) {
     }
 }
 
-TEST(SplitMatchExpressionForColumns, CanCombinePredicates) {
-    ParsedMatchExpression compoundFilter(
-        "{"
-        " albatross: {$gte: 100},"
-        " albatross: {$mod: [2, 0]}"
-        "}");
-    auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(compoundFilter.get());
-    ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
-    ASSERT(splitUp.contains("albatross"));
-    ASSERT(splitUp["albatross"]->matchType() == MatchExpression::AND)
-        << splitUp.at("albatross")->toString();
-    ASSERT_EQ(splitUp.at("albatross")->numChildren(), 2) << splitUp.at("albatross")->toString();
-    // Don't care about the order.
-    auto andExpr = splitUp.at("albatross").get();
-    auto firstChild = andExpr->getChild(0);
-    if (firstChild->matchType() == MatchExpression::GTE) {
-        ASSERT(firstChild->matchType() == MatchExpression::GTE) << firstChild->toString();
-        ASSERT(andExpr->getChild(1)->matchType() == MatchExpression::MOD) << firstChild->toString();
-    } else {
-        ASSERT(firstChild->matchType() == MatchExpression::MOD) << firstChild->toString();
-        ASSERT(andExpr->getChild(1)->matchType() == MatchExpression::GTE) << firstChild->toString();
-    }
-    ASSERT(residual == nullptr);
-}
-
 TEST(SplitMatchExpressionForColumns, CanSplitPredicate) {
     ParsedMatchExpression complexPredicate(R"({
-        a: {$gte: 0, $lt: 10},
-        "addresses.zip": {$in: ["12345", "01234"]},
+        a: {$gte: 0},
         unsubscribed: false,
         specialAddress: {$exists: false}
         })");
     auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(complexPredicate.get());
-    ASSERT_EQ(splitUp.size(), 3) << splitUp.size();
+    ASSERT_EQ(splitUp.size(), 2) << splitUp.size();
     ASSERT(splitUp.contains("a"));
-    ASSERT(splitUp.at("a")->matchType() == MatchExpression::AND) << splitUp.at("a")->toString();
-    ASSERT_EQ(splitUp.at("a")->numChildren(), 2) << splitUp.at("a")->toString();
-    ASSERT(splitUp.contains("addresses.zip"));
+    ASSERT(splitUp.at("a")->matchType() == MatchExpression::GTE) << splitUp.at("a")->toString();
     ASSERT(splitUp.contains("unsubscribed"));
     ASSERT(!splitUp.contains("specialAddress"));
     ParsedMatchExpression expectedResidual("{specialAddress: {$exists: false}}");
@@ -2224,16 +2034,14 @@ TEST(SplitMatchExpressionForColumns, SupportsDottedPaths) {
         " \"blackbird.feet\": {$mod: [2, 0]},"
         " \"blackbird.softwareUpdates\": {$bitsAllSet: 7},"
         // Stress the path combination logic with some prefixes and suffixes to be sure.
-        " blackbird: {$ne: null},"
-        " bla: {$ne: null},"
-        " blackbirds: {$exists: true},"
-        " \"blackbird.feetsies\": {$ne: null},"
-        " \"cowbird.beakLength\": {$gte: 24, $lt: 40},"
+        " bla: {$eq: \"whatever\"},"
+        " \"blackbird.feetsies\": {$eq: \"whatever\"},"
+        " \"cowbird.beakLength\": {$gte: 24},"
         " \"cowbird.eggSet\": {$bitsAnySet: 7}"
         "}");
     auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(compoundFilter.get());
     ASSERT(residual == nullptr);
-    ASSERT_EQ(splitUp.size(), 9) << splitUp.size();
+    ASSERT_EQ(splitUp.size(), 7) << splitUp.size();
     ASSERT(splitUp.contains("albatross"));
     ASSERT(splitUp.at("albatross")->matchType() == MatchExpression::REGEX)
         << splitUp.at("albatross")->toString();
@@ -2243,17 +2051,9 @@ TEST(SplitMatchExpressionForColumns, SupportsDottedPaths) {
     ASSERT(splitUp.contains("blackbird.softwareUpdates"));
     ASSERT(splitUp.at("blackbird.softwareUpdates")->matchType() == MatchExpression::BITS_ALL_SET)
         << splitUp.at("blackbird.softwareUpdates")->toString();
-    ASSERT(splitUp.contains("blackbird"));
-    ASSERT(splitUp.at("blackbird")->matchType() == MatchExpression::NOT)
-        << splitUp.at("blackbird")->toString();
     ASSERT(splitUp.contains("bla"));
-    ASSERT(splitUp.contains("blackbirds"));
-    ASSERT(splitUp.at("blackbirds")->matchType() == MatchExpression::EXISTS)
-        << splitUp.at("blackbirds")->toString();
     ASSERT(splitUp.contains("blackbird.feetsies"));
-    ASSERT(splitUp.at("cowbird.beakLength")->matchType() == MatchExpression::AND)
-        << splitUp.at("cowbird.beakLength")->toString();
-    ASSERT_EQ(splitUp.at("cowbird.beakLength")->numChildren(), 2)
+    ASSERT(splitUp.at("cowbird.beakLength")->matchType() == MatchExpression::GTE)
         << splitUp.at("cowbird.beakLength")->toString();
     ASSERT(splitUp.at("cowbird.eggSet")->matchType() == MatchExpression::BITS_ANY_SET)
         << splitUp.at("cowbird.eggSet")->toString();
@@ -2266,13 +2066,13 @@ TEST(SplitMatchExpressionForColumns, LeavesOriginalMatchExpressionFunctional) {
         "{"
         " albatross: {$lt: 100},"
         " blackbird: {$gt: 0},"
-        " cowbird: {$gte: 0, $lte: 100}"
+        " cowbird: {$gte: 0}"
         "}");
     auto&& [splitUp, residual] =
         expression::splitMatchExpressionForColumns(combinationPredicate.get());
     ASSERT_GT(splitUp.size(), 0);
     ASSERT(residual == nullptr);
-    // Won't bother asserting on the detaiils here - done above.
+    // Won't bother asserting on the details here - done above.
     ASSERT(combinationPredicate.get()->matchesBSON(
         BSON("albatross" << 45 << "blackbird" << 1 << "cowbird" << 2)));
 }

@@ -58,6 +58,7 @@
 #include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/fts_access_method.h"
+#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/pipeline/abt/field_map_builder.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_visitor.h"
@@ -713,7 +714,85 @@ std::unique_ptr<sbe::EExpression> abtToExpr(optimizer::ABT& abt, optimizer::Slot
     optimizer::SBEExpressionLowering exprLower{env, slotMap};
     return exprLower.optimize(abt);
 }
+
+EvalExpr generatePerColumnFilterExpr(StageBuilderState& state,
+                                     const MatchExpression* me,
+                                     sbe::value::SlotId inputSlot) {
+    switch (me->matchType()) {
+        // These are always safe since they will never match documents missing their field, or where
+        // the element is an object or array.
+        case MatchExpression::REGEX:
+            return generateRegexExpr(
+                state, checked_cast<const RegexMatchExpression*>(me), inputSlot);
+        case MatchExpression::MOD:
+            return generateModExpr(state, checked_cast<const ModMatchExpression*>(me), inputSlot);
+        case MatchExpression::BITS_ALL_SET:
+            return generateBitTestExpr(state,
+                                       checked_cast<const BitTestMatchExpression*>(me),
+                                       sbe::BitTestBehavior::AllSet,
+                                       inputSlot);
+        case MatchExpression::BITS_ALL_CLEAR:
+            return generateBitTestExpr(state,
+                                       checked_cast<const BitTestMatchExpression*>(me),
+                                       sbe::BitTestBehavior::AllClear,
+                                       inputSlot);
+        case MatchExpression::BITS_ANY_SET:
+            return generateBitTestExpr(state,
+                                       checked_cast<const BitTestMatchExpression*>(me),
+                                       sbe::BitTestBehavior::AnySet,
+                                       inputSlot);
+        case MatchExpression::BITS_ANY_CLEAR:
+            return generateBitTestExpr(state,
+                                       checked_cast<const BitTestMatchExpression*>(me),
+                                       sbe::BitTestBehavior::AnyClear,
+                                       inputSlot);
+        case MatchExpression::EXISTS: {
+            uasserted(6733601, "(TODO SERVER-68743) need expr translation to enable $exists");
+        }
+        case MatchExpression::LT:
+            return generateComparisonExpr(state,
+                                          checked_cast<const ComparisonMatchExpression*>(me),
+                                          sbe::EPrimBinary::less,
+                                          inputSlot);
+        case MatchExpression::GT:
+            return generateComparisonExpr(state,
+                                          checked_cast<const ComparisonMatchExpression*>(me),
+                                          sbe::EPrimBinary::greater,
+                                          inputSlot);
+        case MatchExpression::EQ:
+            return generateComparisonExpr(state,
+                                          checked_cast<const ComparisonMatchExpression*>(me),
+                                          sbe::EPrimBinary::eq,
+                                          inputSlot);
+        case MatchExpression::LTE:
+            return generateComparisonExpr(state,
+                                          checked_cast<const ComparisonMatchExpression*>(me),
+                                          sbe::EPrimBinary::lessEq,
+                                          inputSlot);
+        case MatchExpression::GTE:
+            return generateComparisonExpr(state,
+                                          checked_cast<const ComparisonMatchExpression*>(me),
+                                          sbe::EPrimBinary::greaterEq,
+                                          inputSlot);
+        case MatchExpression::MATCH_IN: {
+            uasserted(6733602, "(TODO SERVER-68743) need expr translation to enable $in");
+        }
+        case MatchExpression::TYPE_OPERATOR: {
+            uasserted(6733603, "(TODO SERVER-68743) need expr translation to enable $type");
+        }
+        case MatchExpression::NOT: {
+            uasserted(6733604, "(TODO SERVER-68743) need expr translation to enable $not");
+        }
+
+        default:
+            uasserted(6733605,
+                      std::string("Expression ") + me->serialize().toString() +
+                          " should not be pushed down as a per-column filter");
+    }
+    return {};
+}
 }  // namespace
+
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildColumnScan(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     tassert(6312404,
@@ -725,8 +804,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             "Unexpected filter provided for column scan stage. Expected 'filtersByPath' or "
             "'postAssemblyFilter' to be used instead.",
             !csn->filter);
-
-    tassert(6610251, "Expected no filters by path", csn->filtersByPath.empty());
 
     PlanStageSlots outputs;
 
@@ -768,16 +845,58 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto abt = builder.generateABT();
     auto rowStoreExpr = abt ? abtToExpr(*abt, slotMap) : emptyExpr->clone();
 
-    std::unique_ptr<sbe::PlanStage> stage = std::make_unique<sbe::ColumnScanStage>(
-        getCurrentCollection(reqs)->uuid(),
-        csn->indexEntry.catalogName,
-        std::vector<std::string>{csn->allFields.begin(), csn->allFields.end()},
-        ridSlot,
-        reconstructedRecordSlot,
-        rowStoreSlot,
-        std::move(rowStoreExpr),
-        _yieldPolicy,
-        csn->nodeId());
+    // Get all the paths but make sure "_id" comes first (the order of paths given to the
+    // column_scan stage defines the order of fields in the reconstructed record).
+    std::vector<std::string> paths;
+    paths.reserve(csn->allFields.size());
+    if (csn->allFields.find("_id") != csn->allFields.end()) {
+        paths.push_back("_id");
+    }
+    for (const auto& path : csn->allFields) {
+        if (path != "_id") {
+            paths.push_back(path);
+        }
+    }
+
+    // Identify the filtered columns, if any, and create slots/expressions for them.
+    std::vector<sbe::ColumnScanStage::PathFilter> filteredPaths;
+    filteredPaths.reserve(csn->filtersByPath.size());
+    for (size_t i = 0; i < paths.size(); i++) {
+        auto itFilter = csn->filtersByPath.find(paths[i]);
+        if (itFilter != csn->filtersByPath.end()) {
+            auto filterInputSlot = _slotIdGenerator.generate();
+
+            auto expr = generatePerColumnFilterExpr(_state, itFilter->second.get(), filterInputSlot)
+                            .extractExpr();
+            filteredPaths.emplace_back(i, std::move(expr), filterInputSlot);
+        }
+    }
+
+    // Tag which of the paths should be included into the output.
+    DepsTracker residual;
+    if (csn->postAssemblyFilter) {
+        csn->postAssemblyFilter->addDependencies(&residual);
+    }
+    std::vector<bool> includeInOutput(paths.size(), false);
+    for (size_t i = 0; i < paths.size(); i++) {
+        if (csn->outputFields.find(paths[i]) != csn->outputFields.end() ||
+            residual.fields.find(paths[i]) != residual.fields.end()) {
+            includeInOutput[i] = true;
+        }
+    }
+
+    std::unique_ptr<sbe::PlanStage> stage =
+        std::make_unique<sbe::ColumnScanStage>(getCurrentCollection(reqs)->uuid(),
+                                               csn->indexEntry.catalogName,
+                                               std::move(paths),
+                                               std::move(includeInOutput),
+                                               ridSlot,
+                                               reconstructedRecordSlot,
+                                               rowStoreSlot,
+                                               std::move(rowStoreExpr),
+                                               std::move(filteredPaths),
+                                               _yieldPolicy,
+                                               csn->nodeId());
 
     // Generate post assembly filter.
     if (csn->postAssemblyFilter) {
@@ -793,6 +912,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                csn->nodeId());
         stage = std::move(outputStage.stage);
     }
+
     return {std::move(stage), std::move(outputs)};
 }
 
