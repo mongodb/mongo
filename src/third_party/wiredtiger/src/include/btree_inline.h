@@ -2177,15 +2177,8 @@ __wt_btcur_bounds_early_exit(
     if (!F_ISSET((&cbt->iface), bound_flag))
         return (0);
 
-    if (CUR2BT(cbt)->type == BTREE_ROW) {
-        WT_ASSERT(session, &cbt->iface.key != NULL);
-        WT_RET(__wt_compare_bounds(
-          session, &cbt->iface, &cbt->iface.key, WT_RECNO_OOB, next, key_out_of_boundsp));
-    } else {
-        WT_ASSERT(session, cbt->recno != 0);
-        WT_RET(
-          __wt_compare_bounds(session, &cbt->iface, NULL, cbt->recno, next, key_out_of_boundsp));
-    }
+    WT_RET(__wt_compare_bounds(
+      session, &cbt->iface, &cbt->iface.key, cbt->recno, next, key_out_of_boundsp));
 
     if (*key_out_of_boundsp)
         return (WT_NOTFOUND);

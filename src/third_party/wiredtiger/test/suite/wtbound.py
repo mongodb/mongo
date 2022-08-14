@@ -109,7 +109,7 @@ class bound_base(wttest.WiredTigerTestCase):
     lower_inclusive = True
     upper_inclusive = True
 
-    def create_session_and_cursor(self):
+    def create_session_and_cursor(self, cursor_config=None):
         uri = self.uri + self.file_name
         create_params = 'value_format={},key_format={}'.format(self.value_format, self.key_format)
         if self.use_colgroup:
@@ -123,7 +123,7 @@ class bound_base(wttest.WiredTigerTestCase):
                 suburi = 'colgroup:{0}:g{1}'.format(self.file_name, i)
                 self.session.create(suburi, create_params)
 
-        cursor = self.session.open_cursor(uri)
+        cursor = self.session.open_cursor(uri, None, cursor_config)
         self.session.begin_transaction()
 
         for i in range(self.start_key, self.end_key + 1):
