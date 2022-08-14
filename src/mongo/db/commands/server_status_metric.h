@@ -35,6 +35,7 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/util/synchronized_value.h"
 
 namespace mongo {
 
@@ -234,5 +235,42 @@ public:
 private:
     Counter64& _counter;
 };
+
+/**
+ * Leverage `synchronized_value<T>` to make a thread-safe `T` metric, for `T`
+ * that are not intrinsically thread-safe (e.g. string, int).
+ * T must be usable as an argument to `BSONObjBuilder::append`.
+ */
+template <typename T>
+class SynchronizedMetric : public ServerStatusMetric {
+public:
+    explicit SynchronizedMetric(std::string name) : ServerStatusMetric{std::move(name)} {}
+
+    void appendAtLeaf(BSONObjBuilder& b) const override {
+        b.append(_leafName, **_v);
+    }
+
+    synchronized_value<T>& value() {
+        return _v;
+    }
+
+private:
+    synchronized_value<T> _v;
+};
+
+/**
+ * Make a `synchronized_value<T>`-backed metric.
+ * Example (note the auto& reference):
+ *
+ *     auto& currSize = makeSynchronizedMetric<long long>("some.path.size");
+ *     currSize = message.size();
+ *
+ *     auto& currName = makeSynchronizedMetric<std::string>("some.path.name");
+ *     currName = message.size();
+ */
+template <typename T>
+synchronized_value<T>& makeSynchronizedMetric(std::string path) {
+    return addMetricToTree(std::make_unique<SynchronizedMetric<T>>(std::move(path))).value();
+}
 
 }  // namespace mongo

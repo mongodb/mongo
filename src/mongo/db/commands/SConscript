@@ -829,6 +829,7 @@ env.CppUnitTest(
         "mr_test.cpp" if get_option('js-engine') != 'none' else [],
         "parse_log_component_settings_test.cpp",
         "plan_cache_commands_test.cpp",
+        "server_status_metric_test.cpp",
         "set_cluster_parameter_invocation_test.cpp",
     ],
     LIBDEPS=[

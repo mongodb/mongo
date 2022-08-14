@@ -108,6 +108,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/stacktrace.h"
+#include "mongo/util/synchronized_value.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
@@ -159,9 +160,9 @@ MONGO_FAIL_POINT_DEFINE(throwBeforeRecoveringTenantMigrationAccessBlockers);
 // Number of times we tried to go live as a secondary.
 CounterMetric attemptsToBecomeSecondary("repl.apply.attemptsToBecomeSecondary");
 
-// Tracks the last state transition performed in this replca set.
-std::string& lastStateTransition =
-    makeServerStatusMetric<std::string>("repl.stateTransition.lastStateTransition");
+// Tracks the last state transition performed in this replica set.
+auto& lastStateTransition =
+    makeSynchronizedMetric<std::string>("repl.stateTransition.lastStateTransition");
 
 // Tracks the number of operations killed on state transition.
 CounterMetric userOpsKilled("repl.stateTransition.userOperationsKilled");
@@ -2210,7 +2211,7 @@ void ReplicationCoordinatorImpl::updateAndLogStateTransitionMetrics(
     userOpsRunning.increment(numOpsRunning);
 
     BSONObjBuilder bob;
-    bob.append("lastStateTransition", lastStateTransition);
+    bob.append("lastStateTransition", **lastStateTransition);
     bob.appendNumber("userOpsKilled", userOpsKilled.get());
     bob.appendNumber("userOpsRunning", userOpsRunning.get());
 
