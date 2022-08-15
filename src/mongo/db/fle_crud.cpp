@@ -533,7 +533,7 @@ void processFieldsForInsert(FLEQueryInterface* queryImpl,
             }
         }
 
-        payload.count = count;
+        payload.counts.push_back(count);
 
         auto escInsertReply = uassertStatusOK(queryImpl->insertDocument(
             nssEsc,

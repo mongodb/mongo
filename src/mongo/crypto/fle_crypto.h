@@ -1030,7 +1030,7 @@ struct EDCServerPayloadInfo {
 
     FLE2InsertUpdatePayload payload;
     std::string fieldPathName;
-    uint64_t count;
+    std::vector<uint64_t> counts;
 };
 
 struct EDCIndexedFields {

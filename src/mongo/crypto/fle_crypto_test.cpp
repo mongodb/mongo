@@ -696,7 +696,7 @@ enum class Operation { kFind, kInsert };
 std::vector<char> generatePlaceholder(
     BSONElement value,
     Operation operation,
-    mongo::Fle2AlgorithmInt algorithm = mongo::Fle2AlgorithmInt::kEquality,
+    mongo::Fle2AlgorithmInt algorithm = Fle2AlgorithmInt::kEquality,
     boost::optional<UUID> key = boost::none,
     uint64_t contention = 0) {
     FLE2EncryptionPlaceholder ep;
@@ -710,8 +710,26 @@ std::vector<char> generatePlaceholder(
     ep.setAlgorithm(algorithm);
     ep.setUserKeyId(userKeyId);
     ep.setIndexKeyId(key.value_or(indexKeyId));
-    ep.setValue(value);
+
+    FLE2RangeInsertSpec insertSpec;
+    // Set a default lower and upper bound
+    auto lowerDoc = BSON("lb" << 0);
+    insertSpec.setLowerBound(lowerDoc.firstElement());
+    auto upperDoc = BSON("ub" << 1234567890123456789LL);
+
+    insertSpec.setUpperBound(upperDoc.firstElement());
+    insertSpec.setValue(value);
+    insertSpec.setSparsity(0);
+    auto specDoc = BSON("s" << insertSpec.toBSON());
+
+    if (algorithm == Fle2AlgorithmInt::kRange) {
+        ep.setValue(IDLAnyType(specDoc.firstElement()));
+        ep.setSparsity(0);
+    } else {
+        ep.setValue(value);
+    }
     ep.setMaxContentionCounter(contention);
+
 
     BSONObj obj = ep.toBSON();
 
@@ -735,7 +753,13 @@ BSONObj encryptDocument(BSONObj obj,
     auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(result);
 
     for (auto& payload : serverPayload) {
-        payload.count = 1;
+        if (payload.payload.getEdgeTokenSet().has_value()) {
+            for (size_t i = 0; i < payload.payload.getEdgeTokenSet()->size(); i++) {
+                payload.counts.push_back(1);
+            }
+        }
+
+        payload.counts.push_back(1);
     }
 
     // Finalize document for insert
@@ -925,6 +949,28 @@ TEST(FLE_EDC, Allowed_Types) {
     }
 }
 
+TEST(FLE_EDC, Range_Allowed_Types) {
+
+    const std::vector<std::pair<BSONObj, BSONType>> rangeAllowedObjects{
+        {BSON("sample" << 123.456), NumberDouble},
+        {BSON("sample" << Decimal128()), NumberDecimal},
+        {BSON("sample" << 123456), NumberInt},
+        {BSON("sample" << 12345678901234567LL), NumberLong},
+        {BSON("sample" << Date_t::fromMillisSinceEpoch(12345)), Date},
+    };
+
+    std::vector<Operation> opTypes{
+        Operation::kInsert
+        // TODO -  ,Operation::kFind
+    };
+
+    for (const auto& opType : opTypes) {
+        for (const auto& [obj, objType] : rangeAllowedObjects) {
+            roundTripTest(obj, objType, opType, Fle2AlgorithmInt::kRange);
+        }
+    };
+}
+
 void illegalBSONType(BSONObj doc, BSONType type, Fle2AlgorithmInt algorithm, int expectCode) {
     auto element = doc.firstElement();
     ASSERT_EQ(element.type(), type);
@@ -971,6 +1017,46 @@ TEST(FLE_EDC, Disallowed_Types) {
     illegalBSONType(BSON("sample" << MAXKEY), MaxKey, Fle2AlgorithmInt::kUnindexed);
 }
 
+void illegalRangeBSONType(BSONObj doc, BSONType type) {
+    illegalBSONType(doc, type, Fle2AlgorithmInt::kRange, ErrorCodes::TypeMismatch);
+}
+
+TEST(FLE_EDC, Range_Disallowed_Types) {
+
+    const std::vector<std::pair<BSONObj, BSONType>> disallowedObjects{
+        {BSON("sample"
+              << "value123"),
+         String},
+        {BSON("sample" << BSONBinData(
+                  testValue.data(), testValue.size(), BinDataType::BinDataGeneral)),
+         BinData},
+        {BSON("sample" << OID()), jstOID},
+        {BSON("sample" << false), Bool},
+        {BSON("sample" << true), Bool},
+        {BSON("sample" << BSONRegEx("value1", "value2")), RegEx},
+        {BSON("sample" << Timestamp()), bsonTimestamp},
+        {BSON("sample" << BSONCode("value")), Code},
+        {BSON("sample" << BSON("nested"
+                               << "value")),
+         Object},
+        {BSON("sample" << BSON_ARRAY(1 << 23)), Array},
+        {BSON("sample" << BSONDBRef("value1", OID())), DBRef},
+        {BSON("sample" << BSONSymbol("value")), Symbol},
+        {BSON("sample" << BSONCodeWScope("value",
+                                         BSON("code"
+                                              << "something"))),
+         CodeWScope},
+        {BSON("sample" << MINKEY), MinKey},
+        {BSON("sample" << MAXKEY), MaxKey},
+    };
+
+    for (const auto& typePair : disallowedObjects) {
+        illegalRangeBSONType(typePair.first, typePair.second);
+    }
+
+    illegalBSONType(BSON("sample" << BSONNULL), jstNULL, Fle2AlgorithmInt::kRange, 40414);
+    illegalBSONType(BSON("sample" << BSONUndefined), Undefined, Fle2AlgorithmInt::kRange, 40414);
+}
 
 BSONObj transformBSON(
     const BSONObj& object,
@@ -1096,7 +1182,6 @@ TEST(FLE_EDC, Disallowed_Types_FLE2InsertUpdatePayload) {
     ASSERT_FALSE(isValidBSONType(fakeBSONType));
     disallowedEqualityPayloadType(static_cast<BSONType>(fakeBSONType));
 }
-
 
 TEST(FLE_EDC, ServerSide_Payloads) {
     TestKeyVault keyVault;
@@ -1803,7 +1888,13 @@ BSONObj encryptUpdateDocument(BSONObj obj, FLEKeyVault* keyVault) {
     auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(result);
 
     for (auto& payload : serverPayload) {
-        payload.count = 1;
+        if (payload.payload.getEdgeTokenSet().has_value()) {
+            for (size_t i = 0; i < payload.payload.getEdgeTokenSet()->size(); i++) {
+                payload.counts.push_back(1);
+            }
+        }
+
+        payload.counts.push_back(1);
     }
 
     return EDCServerCollection::finalizeForUpdate(result, serverPayload);

@@ -91,6 +91,19 @@ enums:
             kInsert: 1
             kFind: 2
 
+types:
+  encrypted_numeric_element:
+    bson_serialization_type:
+    - date
+    - decimal
+    - double
+    - int
+    - long
+    description: A value with any encrypted range numeric BSON type.
+    cpp_type: "mongo::IDLAnyType"
+    serializer: mongo::IDLAnyType::serializeToBSON
+    deserializer: mongo::IDLAnyType::parseFromBSON
+
 structs:
     EncryptionPlaceholder:
         description: "Implements Encryption BinData (subtype 6) sub-subtype 0, the intent-to-encrypt
@@ -297,7 +310,7 @@ structs:
             type: bindata_generic
 
     FLE2RangeSpec:
-        description: "Range specification that is encoded inside of a FLE2EncryptionPlaceholder."
+        description: "Range find specification that is encoded inside of a FLE2EncryptionPlaceholder."
         strict: true
         cpp_validator_func: "validateIDLFLE2RangeSpec"
         fields:
@@ -313,3 +326,25 @@ structs:
           maxIncluded:
             description: "Indicates if the upper bound should be included in the range."
             type: bool
+
+    FLE2RangeInsertSpec:
+        description: "Range insert specification that is encoded inside of a FLE2EncryptionPlaceholder."
+        strict: true
+        fields:
+          v:
+            description: "Value to encrypt"
+            type: encrypted_numeric_element
+            cpp_name: value
+          lb:
+            description: "Queryable Encryption lower bound for range"
+            type: encrypted_numeric_element
+            cpp_name: lowerBound
+          ub:
+            description: "Queryable Encryption upper bound for range"
+            type: encrypted_numeric_element
+            cpp_name: upperBound
+          s:
+            description: "Lower value - higher storage overhead, faster query."
+            type: exactInt64
+            cpp_name: sparsity
+            validator: { gte: 0, lte: 3 }

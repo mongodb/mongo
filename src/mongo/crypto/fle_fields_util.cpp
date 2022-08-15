@@ -27,7 +27,8 @@
  *    it in the license file.
  */
 
-#include "fle_fields_util.h"
+#include "mongo/crypto/fle_fields_util.h"
+
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
@@ -36,19 +37,30 @@
 namespace mongo {
 void validateIDLFLE2EncryptionPlaceholder(const FLE2EncryptionPlaceholder* placeholder) {
     if (placeholder->getAlgorithm() == Fle2AlgorithmInt::kRange) {
-        auto val = placeholder->getValue().getElement();
-        uassert(6720200, "Range placeholder value must be an object.", val.isABSONObj());
-        auto obj = val.Obj();
-        FLE2RangeSpec::parse(IDLParserContext("v"), obj);
-        uassert(6832501,
-                "Sparsity must be defined for range placeholders.",
-                placeholder->getSparsity());
+        if (placeholder->getType() == Fle2PlaceholderType::kFind) {
+            auto val = placeholder->getValue().getElement();
+            uassert(6720200, "Range Find placeholder value must be an object.", val.isABSONObj());
+            auto obj = val.Obj();
+            FLE2RangeSpec::parse(IDLParserContext("v"), obj);
+            uassert(6832501,
+                    "Sparsity must be defined for range placeholders.",
+                    placeholder->getSparsity());
+        } else if (placeholder->getType() == Fle2PlaceholderType::kInsert) {
+            auto val = placeholder->getValue().getElement();
+            uassert(6775321, "Range Insert placeholder value must be an object.", val.isABSONObj());
+            auto obj = val.Obj();
+            FLE2RangeInsertSpec::parse(IDLParserContext("v"), obj);
+            uassert(6775322,
+                    "Sparsity must be defined for range placeholders.",
+                    placeholder->getSparsity());
+        }
     } else {
         uassert(6832500,
                 "Hypergraph sparsity can only be set for range placeholders.",
                 !placeholder->getSparsity());
     }
 }
+
 void validateIDLFLE2RangeSpec(const FLE2RangeSpec* placeholder) {
     auto min = placeholder->getMin().getElement();
     auto max = placeholder->getMax().getElement();
