@@ -31,6 +31,7 @@
 #include "mongo/transport/session_asio.h"
 
 #include "mongo/config.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/asio_utils.h"
 #include "mongo/transport/proxy_protocol_header_parser.h"
@@ -94,6 +95,14 @@ Status makeCanceledStatus() {
     return {ErrorCodes::CallbackCanceled, "Operation was canceled"};
 }
 
+bool connHealthMetricsEnabled() {
+    return gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV();
+}
+
+CounterMetric totalIngressTLSConnections("network.totalIngressTLSConnections",
+                                         connHealthMetricsEnabled);
+CounterMetric totalIngressTLSHandshakeTimeMillis("network.totalIngressTLSHandshakeTimeMillis",
+                                                 connHealthMetricsEnabled);
 }  // namespace
 
 
@@ -717,7 +726,8 @@ Future<bool> TransportLayerASIO::ASIOSession::maybeHandshakeSSLForIngress(
                     asio::ssl::stream_base::server, buffer, UseFuture{});
             }
         };
-        return doHandshake().then([this](size_t size) {
+        auto startTimer = Timer();
+        return doHandshake().then([this, startTimer = std::move(startTimer)](size_t size) {
             if (_sslSocket->get_sni()) {
                 auto sniName = _sslSocket->get_sni().value();
                 LOGV2_DEBUG(
@@ -725,6 +735,12 @@ Future<bool> TransportLayerASIO::ASIOSession::maybeHandshakeSSLForIngress(
             } else {
                 LOGV2_DEBUG(4908001, 2, "Client connected without SNI extension");
             }
+            const auto handshakeDurationMillis = durationCount<Milliseconds>(startTimer.elapsed());
+            LOGV2(6723804,
+                  "Ingress TLS handshake complete",
+                  "durationMillis"_attr = handshakeDurationMillis);
+            totalIngressTLSConnections.increment(1);
+            totalIngressTLSHandshakeTimeMillis.increment(handshakeDurationMillis);
             if (SSLPeerInfo::forSession(shared_from_this()).subjectName.empty()) {
                 return getSSLManager()
                     ->parseAndValidatePeerCertificate(

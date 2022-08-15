@@ -1672,11 +1672,14 @@ Future<SSLPeerInfo> SSLManagerApple::parseAndValidatePeerCertificate(
         return swPeerSubjectName.getStatus();
     }
     const auto peerSubjectName = std::move(swPeerSubjectName.getValue());
-    LOGV2_DEBUG(23207,
-                2,
-                "Accepted TLS connection from peer: {peerSubjectName}",
-                "Accepted TLS connection from peer",
-                "peerSubjectName"_attr = peerSubjectName);
+    // The cipher will be presented as a number.
+    ::SSLCipherSuite cipher;
+    uassertOSStatusOK(::SSLGetNegotiatedCipher(ssl, &cipher));
+
+    LOGV2_INFO(6723803,
+               "Accepted TLS connection from peer",
+               "peerSubjectName"_attr = peerSubjectName,
+               "cipher"_attr = cipher);
 
     // Server side.
     if (remoteHost.empty()) {
