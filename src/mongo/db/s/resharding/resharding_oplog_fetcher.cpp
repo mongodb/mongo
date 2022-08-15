@@ -27,19 +27,16 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
-#include <vector>
-
 #include "mongo/db/s/resharding/resharding_oplog_fetcher.h"
 
 #include <fmt/format.h>
+#include <vector>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -55,7 +52,6 @@
 #include "mongo/stdx/mutex.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
-
 
 namespace mongo {
 namespace {
@@ -351,7 +347,8 @@ bool ReshardingOplogFetcher::consume(Client* client,
                 auto startAt = ReshardingDonorOplogId::parse(
                     {"OplogFetcherParsing"}, nextOplog.get_id()->getDocument().toBson());
                 Timer insertTimer;
-                uassertStatusOK(toWriteTo->insertDocument(opCtx, InsertStatement{doc}, nullptr));
+                uassertStatusOK(collection_internal::insertDocument(
+                    opCtx, *toWriteTo, InsertStatement{doc}, nullptr));
                 wuow.commit();
 
                 _env->metrics()->onLocalInsertDuringOplogFetching(
@@ -396,8 +393,8 @@ bool ReshardingOplogFetcher::consume(Client* client,
                     oplog.setOpTime(OplogSlot());
                     oplog.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
 
-                    uassertStatusOK(
-                        toWriteTo->insertDocument(opCtx, InsertStatement{oplog.toBSON()}, nullptr));
+                    uassertStatusOK(collection_internal::insertDocument(
+                        opCtx, *toWriteTo, InsertStatement{oplog.toBSON()}, nullptr));
                     wuow.commit();
 
                     // Also include synthetic oplog in the fetched count so it can match up with the

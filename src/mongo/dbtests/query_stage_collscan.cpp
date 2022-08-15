@@ -31,11 +31,7 @@
  * This file tests db/exec/collection_scan.cpp.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include <fmt/printf.h>
-#include <memory>
 
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
@@ -56,16 +52,12 @@
 #include "mongo/db/storage/record_store.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/logv2/log.h"
-#include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-
+namespace mongo {
 namespace query_stage_collection_scan {
-
-using std::unique_ptr;
-using std::vector;
 
 static const NamespaceString nss{"unittests.QueryStageCollectionScan"};
 
@@ -106,11 +98,11 @@ public:
         StatusWithMatchExpression statusWithMatcher =
             MatchExpressionParser::parse(filterObj, _expCtx);
         verify(statusWithMatcher.isOK());
-        unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
+        std::unique_ptr<MatchExpression> filterExpr = std::move(statusWithMatcher.getValue());
 
         // Make a scan and have the runner own it.
-        unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
-        unique_ptr<PlanStage> ps = std::make_unique<CollectionScan>(
+        std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+        std::unique_ptr<PlanStage> ps = std::make_unique<CollectionScan>(
             _expCtx.get(), collection.getCollection(), params, ws.get(), filterExpr.get());
 
         auto statusWithPlanExecutor =
@@ -135,14 +127,14 @@ public:
 
     void getRecordIds(const CollectionPtr& collection,
                       CollectionScanParams::Direction direction,
-                      vector<RecordId>* out) {
+                      std::vector<RecordId>* out) {
         WorkingSet ws;
 
         CollectionScanParams params;
         params.direction = direction;
         params.tailable = false;
 
-        unique_ptr<CollectionScan> scan(
+        std::unique_ptr<CollectionScan> scan(
             new CollectionScan(_expCtx.get(), collection, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
@@ -207,7 +199,9 @@ public:
         _client.insert(ns.ns(), doc);
     }
 
-    void insertDocuments(const NamespaceString& ns, const vector<BSONObj>& docs, bool ordered) {
+    void insertDocuments(const NamespaceString& ns,
+                         const std::vector<BSONObj>& docs,
+                         bool ordered) {
         _client.insert(ns.ns(), docs, ordered);
     }
 
@@ -266,7 +260,7 @@ public:
         boost::optional<RecordIdBound> minRecord,
         boost::optional<RecordIdBound> maxRecord,
         CollectionScanParams::ScanBoundInclusion boundInclusion,
-        const vector<BSONObj>& expectedResults,
+        const std::vector<BSONObj>& expectedResults,
         const MatchExpression* filter = nullptr) {
 
         AutoGetCollectionForRead autoColl(&_opCtx, ns);
@@ -351,8 +345,8 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderForward) {
     params.tailable = false;
 
     // Make a scan and have the runner own it.
-    unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
-    unique_ptr<PlanStage> ps = std::make_unique<CollectionScan>(
+    std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+    std::unique_ptr<PlanStage> ps = std::make_unique<CollectionScan>(
         _expCtx.get(), collection.getCollection(), params, ws.get(), nullptr);
 
     auto statusWithPlanExecutor =
@@ -384,8 +378,8 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderBackward) {
     params.direction = CollectionScanParams::BACKWARD;
     params.tailable = false;
 
-    unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
-    unique_ptr<PlanStage> ps = std::make_unique<CollectionScan>(
+    std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+    std::unique_ptr<PlanStage> ps = std::make_unique<CollectionScan>(
         _expCtx.get(), collection.getCollection(), params, ws.get(), nullptr);
 
     auto statusWithPlanExecutor =
@@ -416,7 +410,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObject) {
     const CollectionPtr& coll = ctx.getCollection();
 
     // Get the RecordIds that would be returned by an in-order scan.
-    vector<RecordId> recordIds;
+    std::vector<RecordId> recordIds;
     getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
 
     // Configure the scan.
@@ -425,7 +419,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObject) {
     params.tailable = false;
 
     WorkingSet ws;
-    unique_ptr<PlanStage> scan(new CollectionScan(_expCtx.get(), coll, params, &ws, nullptr));
+    std::unique_ptr<PlanStage> scan(new CollectionScan(_expCtx.get(), coll, params, &ws, nullptr));
 
     int count = 0;
     while (count < 10) {
@@ -469,7 +463,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObjectBackw
     const CollectionPtr& coll = ctx.getCollection();
 
     // Get the RecordIds that would be returned by an in-order scan.
-    vector<RecordId> recordIds;
+    std::vector<RecordId> recordIds;
     getRecordIds(coll, CollectionScanParams::BACKWARD, &recordIds);
 
     // Configure the scan.
@@ -478,7 +472,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObjectBackw
     params.tailable = false;
 
     WorkingSet ws;
-    unique_ptr<PlanStage> scan(new CollectionScan(_expCtx.get(), coll, params, &ws, nullptr));
+    std::unique_ptr<PlanStage> scan(new CollectionScan(_expCtx.get(), coll, params, &ws, nullptr));
 
     int count = 0;
     while (count < 10) {
@@ -521,7 +515,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekSuc
     AutoGetCollectionForReadCommand collection(&_opCtx, nss);
 
     // Get the RecordIds that would be returned by an in-order scan.
-    vector<RecordId> recordIds;
+    std::vector<RecordId> recordIds;
     getRecordIds(collection.getCollection(), CollectionScanParams::FORWARD, &recordIds);
 
     // We will resume the collection scan this many results in.
@@ -535,8 +529,8 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekSuc
     params.resumeAfterRecordId = recordIds[offset - 1];
 
     // Create plan stage.
-    unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
-    unique_ptr<PlanStage> ps = std::make_unique<CollectionScan>(
+    std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+    std::unique_ptr<PlanStage> ps = std::make_unique<CollectionScan>(
         _expCtx.get(), collection.getCollection(), params, ws.get(), nullptr);
 
     WorkingSetID id = WorkingSet::INVALID_ID;
@@ -572,7 +566,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekFai
     auto coll = ctx.getCollection();
 
     // Get the RecordIds that would be returned by an in-order scan.
-    vector<RecordId> recordIds;
+    std::vector<RecordId> recordIds;
     getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
 
     // We will resume the collection scan this many results in.
@@ -589,8 +583,8 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekFai
     params.resumeAfterRecordId = recordId;
 
     // Create plan stage.
-    unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
-    unique_ptr<PlanStage> ps =
+    std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+    std::unique_ptr<PlanStage> ps =
         std::make_unique<CollectionScan>(_expCtx.get(), coll, params, ws.get(), nullptr);
 
     WorkingSetID id = WorkingSet::INVALID_ID;
@@ -608,7 +602,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMax) {
     ASSERT(coll->isClustered());
 
     // Get the RecordIds that would be returned by an in-order scan.
-    vector<RecordId> recordIds;
+    std::vector<RecordId> recordIds;
     getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
     ASSERT(recordIds.size());
 
@@ -813,7 +807,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredReverse) {
     ASSERT(coll->isClustered());
 
     // Get the RecordIds that would be returned by a backwards scan.
-    vector<RecordId> recordIds;
+    std::vector<RecordId> recordIds;
     getRecordIds(coll, CollectionScanParams::BACKWARD, &recordIds);
     ASSERT(recordIds.size());
 
@@ -857,7 +851,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMaxFullObjectI
     ASSERT(coll->isClustered());
 
     // Get the RecordIds that would be returned by an in-order scan.
-    vector<RecordId> recordIds;
+    std::vector<RecordId> recordIds;
     getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
     ASSERT(recordIds.size());
 
@@ -901,7 +895,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRange) {
     ASSERT(coll->isClustered());
 
     // Get the RecordIds that would be returned by an in-order scan.
-    vector<RecordId> recordIds;
+    std::vector<RecordId> recordIds;
     getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
     ASSERT(recordIds.size());
 
@@ -950,7 +944,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRangeExclusi
     ASSERT(coll->isClustered());
 
     // Get the RecordIds that would be returned by an in-order scan.
-    vector<RecordId> recordIds;
+    std::vector<RecordId> recordIds;
     getRecordIds(coll, CollectionScanParams::FORWARD, &recordIds);
     ASSERT(recordIds.size());
 
@@ -1015,7 +1009,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRangeExclusi
     ASSERT(coll->isClustered());
 
     // Get the RecordIds that would be returned by a reverse scan.
-    vector<RecordId> recordIds;
+    std::vector<RecordId> recordIds;
     getRecordIds(coll, CollectionScanParams::BACKWARD, &recordIds);
     ASSERT(recordIds.size());
 
@@ -1373,3 +1367,4 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanChangeCollectionGetLatestO
     ASSERT_EQUALS(Timestamp(16, 1), scanStage->getLatestOplogTimestamp());
 }
 }  // namespace query_stage_collection_scan
+}  // namespace mongo

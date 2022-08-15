@@ -27,16 +27,14 @@
  *    it in the license file.
  */
 
-
 #define LOGV2_FOR_TRANSACTION(ID, DLEVEL, MESSAGE, ...) \
     LOGV2_DEBUG_OPTIONS(ID, DLEVEL, {logv2::LogComponent::kTransaction}, MESSAGE, ##__VA_ARGS__)
-
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/transaction/transaction_participant.h"
 
 #include <fmt/format.h>
 
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/local_oplog_info.h"
@@ -80,7 +78,6 @@
 #include "mongo/util/net/socket_utils.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
-
 
 namespace mongo {
 using namespace fmt::literals;
@@ -421,7 +418,8 @@ void updateSessionEntry(OperationContext* opCtx,
 
     if (recordId.isNull()) {
         // Upsert case.
-        auto status = collection->insertDocument(opCtx, InsertStatement(updateMod), nullptr, false);
+        auto status = collection_internal::insertDocument(
+            opCtx, *collection, InsertStatement(updateMod), nullptr, false);
 
         if (status == ErrorCodes::DuplicateKey) {
             throwWriteConflictException(

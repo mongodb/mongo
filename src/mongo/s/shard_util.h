@@ -34,7 +34,6 @@
 #include <vector>
 
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
 
 namespace mongo {

@@ -34,7 +34,7 @@
 #include "mongo/base/init.h"
 #include "mongo/db/catalog/capped_collection_maintenance.h"
 #include "mongo/db/catalog/capped_utils.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -50,11 +50,10 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
-
 namespace {
+
 const NamespaceString kDurableHistoryTestNss("mdb_testing.pinned_timestamp");
 const std::string kTestingDurableHistoryPinName = "_testing";
-}  // namespace
 
 using repl::UnreplicatedWritesBlock;
 using std::endl;
@@ -111,7 +110,8 @@ public:
             }
         }
         OpDebug* const nullOpDebug = nullptr;
-        Status status = collection->insertDocument(opCtx, InsertStatement(obj), nullOpDebug, false);
+        Status status = collection_internal::insertDocument(
+            opCtx, collection, InsertStatement(obj), nullOpDebug, false);
         if (status.isOK()) {
             wunit.commit();
         }
@@ -283,8 +283,9 @@ public:
             uassertStatusOK(opCtx->getServiceContext()->getStorageEngine()->pinOldestTimestamp(
                 opCtx, kTestingDurableHistoryPinName, requestedPinTs, round));
 
-        uassertStatusOK(autoColl->insertDocument(
+        uassertStatusOK(collection_internal::insertDocument(
             opCtx,
+            *autoColl,
             InsertStatement(fixDocumentForInsert(opCtx, BSON("pinTs" << pinTs)).getValue()),
             nullptr));
         wuow.commit();
@@ -296,6 +297,8 @@ public:
 };
 
 MONGO_REGISTER_TEST_COMMAND(DurableHistoryReplicatedTestCmd);
+
+}  // namespace
 
 std::string TestingDurableHistoryPin::getName() {
     return kTestingDurableHistoryPinName;
@@ -321,6 +324,5 @@ boost::optional<Timestamp> TestingDurableHistoryPin::calculatePin(OperationConte
 
     return ret;
 }
-
 
 }  // namespace mongo

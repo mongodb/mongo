@@ -29,12 +29,11 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/change_stream_change_collection_manager.h"
 
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/coll_mod.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog_raii.h"
@@ -105,11 +104,12 @@ public:
             // Writes to the change collection should not be replicated.
             repl::UnreplicatedWritesBlock unReplBlock(opCtx);
 
-            Status status = tenantChangeCollection->insertDocuments(opCtx,
-                                                                    insertStatements.begin(),
-                                                                    insertStatements.end(),
-                                                                    opDebug,
-                                                                    false /* fromMigrate */);
+            Status status = collection_internal::insertDocuments(opCtx,
+                                                                 *tenantChangeCollection,
+                                                                 insertStatements.begin(),
+                                                                 insertStatements.end(),
+                                                                 opDebug,
+                                                                 false /* fromMigrate */);
             if (!status.isOK()) {
                 return Status(status.code(),
                               str::stream()

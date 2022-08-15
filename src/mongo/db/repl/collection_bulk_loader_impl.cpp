@@ -196,8 +196,8 @@ Status CollectionBulkLoaderImpl::_insertDocumentsForCappedCollection(
                 WriteUnitOfWork wunit(_opCtx.get());
                 // For capped collections, we use regular insertDocument, which
                 // will update pre-existing indexes.
-                const auto status =
-                    (*_collection)->insertDocument(_opCtx.get(), InsertStatement(doc), nullptr);
+                const auto status = collection_internal::insertDocument(
+                    _opCtx.get(), **_collection, InsertStatement(doc), nullptr);
                 if (!status.isOK()) {
                     return status;
                 }

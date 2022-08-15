@@ -30,7 +30,6 @@
 #include <limits>
 
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/chunk_version_gen.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

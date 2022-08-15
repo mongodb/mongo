@@ -27,9 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbdirectclient.h"
@@ -118,7 +117,8 @@ TEST_F(ShardingInitializationOpObserverTest, GlobalInitDoesntGetCalledIfWriteAbo
 
         WriteUnitOfWork wuow(operationContext());
         InsertStatement stmt(shardIdentity.toShardIdentityDocument());
-        ASSERT_OK(autoColl.getCollection()->insertDocument(operationContext(), stmt, nullptr));
+        ASSERT_OK(
+            collection_internal::insertDocument(operationContext(), *autoColl, stmt, nullptr));
         ASSERT_EQ(0, getInitCallCount());
     }
 

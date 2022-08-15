@@ -29,6 +29,7 @@
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/logical_session_cache_noop.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
@@ -711,9 +712,10 @@ TEST_F(ReshardingOplogCrudApplicationTest, DeleteOpAtomicallyMovesFromOtherStash
             AutoGetCollection otherStashColl(opCtx.get(), otherStashNss(), MODE_IX);
             WriteUnitOfWork wuow(opCtx.get());
             ASSERT_OK(
-                otherStashColl->insertDocument(opCtx.get(),
-                                               InsertStatement{BSON("_id" << 0 << sk() << -3)},
-                                               nullptr /* opDebug */));
+                collection_internal::insertDocument(opCtx.get(),
+                                                    *otherStashColl,
+                                                    InsertStatement{BSON("_id" << 0 << sk() << -3)},
+                                                    nullptr /* opDebug */));
             wuow.commit();
         }
 

@@ -54,7 +54,6 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 

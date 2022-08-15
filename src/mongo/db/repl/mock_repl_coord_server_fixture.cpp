@@ -27,17 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
+#include "mongo/db/repl/mock_repl_coord_server_fixture.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
-#include "mongo/db/repl/mock_repl_coord_server_fixture.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
@@ -106,10 +103,11 @@ void MockReplCoordServerFixture::insertOplogEntry(const repl::OplogEntry& entry)
     ASSERT_TRUE(coll);
 
     WriteUnitOfWork wuow(opCtx());
-    auto status = coll->insertDocument(opCtx(),
-                                       InsertStatement(entry.getEntry().toBSON()),
-                                       &CurOp::get(opCtx())->debug(),
-                                       /* fromMigrate */ false);
+    auto status = collection_internal::insertDocument(opCtx(),
+                                                      *coll,
+                                                      InsertStatement(entry.getEntry().toBSON()),
+                                                      &CurOp::get(opCtx())->debug(),
+                                                      /* fromMigrate */ false);
     ASSERT_OK(status);
     wuow.commit();
 }

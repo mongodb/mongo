@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -250,7 +251,7 @@ protected:
                   const ReshardingEnv& env) {
         AutoGetCollection coll(opCtx, nss, MODE_IX);
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_OK(coll->insertDocument(opCtx, InsertStatement(doc), nullptr));
+        ASSERT_OK(collection_internal::insertDocument(opCtx, *coll, InsertStatement(doc), nullptr));
         wuow.commit();
     }
 

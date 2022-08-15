@@ -30,8 +30,6 @@
 #pragma once
 
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/chunk_version.h"
-#include "mongo/s/shard_id.h"
 
 namespace mongo {
 

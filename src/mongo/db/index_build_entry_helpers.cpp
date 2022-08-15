@@ -27,11 +27,9 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/index_build_entry_helpers.h"
 
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_build_entry_gen.h"
@@ -236,8 +234,9 @@ Status addIndexBuildEntry(OperationContext* opCtx, const IndexBuildEntry& indexB
             // documents out-of-order into the oplog.
             auto oplogInfo = LocalOplogInfo::get(opCtx);
             auto oplogSlot = oplogInfo->getNextOpTimes(opCtx, 1U)[0];
-            Status status = collection->insertDocument(
+            Status status = collection_internal::insertDocument(
                 opCtx,
+                *collection,
                 InsertStatement(kUninitializedStmtId, indexBuildEntry.toBSON(), oplogSlot),
                 nullptr);
 

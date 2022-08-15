@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <cstdint>
-
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/catalog_raii.h"
@@ -43,8 +39,8 @@
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/dbtests/dbtests.h"
 
+namespace mongo {
 namespace IndexUpdateTests {
-
 namespace {
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 }  // namespace
@@ -137,16 +133,18 @@ public:
         {
             WriteUnitOfWork wunit(_opCtx);
             OpDebug* const nullOpDebug = nullptr;
-            ASSERT_OK(coll->insertDocument(_opCtx,
-                                           InsertStatement(BSON("_id" << 1 << "a"
-                                                                      << "dup")),
-                                           nullOpDebug,
-                                           true));
-            ASSERT_OK(coll->insertDocument(_opCtx,
-                                           InsertStatement(BSON("_id" << 2 << "a"
-                                                                      << "dup")),
-                                           nullOpDebug,
-                                           true));
+            ASSERT_OK(collection_internal::insertDocument(_opCtx,
+                                                          coll.get(),
+                                                          InsertStatement(BSON("_id" << 1 << "a"
+                                                                                     << "dup")),
+                                                          nullOpDebug,
+                                                          true));
+            ASSERT_OK(collection_internal::insertDocument(_opCtx,
+                                                          coll.get(),
+                                                          InsertStatement(BSON("_id" << 2 << "a"
+                                                                                     << "dup")),
+                                                          nullOpDebug,
+                                                          true));
             wunit.commit();
         }
 
@@ -192,16 +190,18 @@ public:
             {
                 WriteUnitOfWork wunit(_opCtx);
                 OpDebug* const nullOpDebug = nullptr;
-                ASSERT_OK(coll->insertDocument(_opCtx,
-                                               InsertStatement(BSON("_id" << 1 << "a"
-                                                                          << "dup")),
-                                               nullOpDebug,
-                                               true));
-                ASSERT_OK(coll->insertDocument(_opCtx,
-                                               InsertStatement(BSON("_id" << 2 << "a"
-                                                                          << "dup")),
-                                               nullOpDebug,
-                                               true));
+                ASSERT_OK(collection_internal::insertDocument(_opCtx,
+                                                              coll.get(),
+                                                              InsertStatement(BSON("_id" << 1 << "a"
+                                                                                         << "dup")),
+                                                              nullOpDebug,
+                                                              true));
+                ASSERT_OK(collection_internal::insertDocument(_opCtx,
+                                                              coll.get(),
+                                                              InsertStatement(BSON("_id" << 2 << "a"
+                                                                                         << "dup")),
+                                                              nullOpDebug,
+                                                              true));
                 wunit.commit();
             }
         }
@@ -256,8 +256,8 @@ public:
                 int32_t nDocs = 1000;
                 OpDebug* const nullOpDebug = nullptr;
                 for (int32_t i = 0; i < nDocs; ++i) {
-                    ASSERT_OK(
-                        coll->insertDocument(_opCtx, InsertStatement(BSON("a" << i)), nullOpDebug));
+                    ASSERT_OK(collection_internal::insertDocument(
+                        _opCtx, coll.get(), InsertStatement(BSON("a" << i)), nullOpDebug));
                 }
                 wunit.commit();
             }
@@ -306,8 +306,12 @@ public:
             int32_t nDocs = 1000;
             OpDebug* const nullOpDebug = nullptr;
             for (int32_t i = 0; i < nDocs; ++i) {
-                ASSERT_OK(coll->insertDocument(
-                    _opCtx, InsertStatement(BSON("_id" << i)), nullOpDebug, true));
+                ASSERT_OK(collection_internal::insertDocument(
+                    _opCtx,
+                    CollectionPtr(coll, CollectionPtr::NoYieldTag{}),
+                    InsertStatement(BSON("_id" << i)),
+                    nullOpDebug,
+                    true));
             }
             wunit.commit();
             // Request an interrupt.
@@ -714,3 +718,4 @@ public:
 OldStyleSuiteInitializer<IndexUpdateTests> indexUpdateTests;
 
 }  // namespace IndexUpdateTests
+}  // namespace mongo

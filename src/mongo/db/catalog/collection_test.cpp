@@ -27,16 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
 #include "mongo/bson/oid.h"
 #include "mongo/db/catalog/capped_utils.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/catalog/collection_validation.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/stdx/thread.h"
@@ -44,15 +40,14 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 
+namespace mongo {
+namespace {
+
 #define ASSERT_ID_EQ(EXPR, ID)                        \
     [](boost::optional<Record> record, RecordId id) { \
         ASSERT(record);                               \
         ASSERT_EQ(record->id, id);                    \
     }((EXPR), (ID));
-
-namespace {
-
-using namespace mongo;
 
 class CollectionTest : public CatalogTestFixture {
 protected:
@@ -555,7 +550,8 @@ TEST_F(CatalogTestFixture, CappedDeleteRecord) {
 
     {
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_OK(coll->insertDocument(operationContext(), InsertStatement(firstDoc), nullptr));
+        ASSERT_OK(collection_internal::insertDocument(
+            operationContext(), coll, InsertStatement(firstDoc), nullptr));
         wuow.commit();
     }
 
@@ -564,7 +560,8 @@ TEST_F(CatalogTestFixture, CappedDeleteRecord) {
     // Inserting the second document will remove the first one.
     {
         WriteUnitOfWork wuow(operationContext());
-        ASSERT_OK(coll->insertDocument(operationContext(), InsertStatement(secondDoc), nullptr));
+        ASSERT_OK(collection_internal::insertDocument(
+            operationContext(), coll, InsertStatement(secondDoc), nullptr));
         wuow.commit();
     }
 
@@ -599,7 +596,8 @@ TEST_F(CatalogTestFixture, CappedDeleteMultipleRecords) {
         WriteUnitOfWork wuow(operationContext());
         for (int i = 0; i < nToInsertFirst; i++) {
             BSONObj doc = BSON("_id" << i);
-            ASSERT_OK(coll->insertDocument(operationContext(), InsertStatement(doc), nullptr));
+            ASSERT_OK(collection_internal::insertDocument(
+                operationContext(), coll, InsertStatement(doc), nullptr));
         }
         wuow.commit();
     }
@@ -610,7 +608,8 @@ TEST_F(CatalogTestFixture, CappedDeleteMultipleRecords) {
         WriteUnitOfWork wuow(operationContext());
         for (int i = nToInsertFirst; i < nToInsertFirst + nToInsertSecond; i++) {
             BSONObj doc = BSON("_id" << i);
-            ASSERT_OK(coll->insertDocument(operationContext(), InsertStatement(doc), nullptr));
+            ASSERT_OK(collection_internal::insertDocument(
+                operationContext(), coll, InsertStatement(doc), nullptr));
         }
         wuow.commit();
     }
@@ -790,7 +789,8 @@ TEST_F(CollectionTest, CappedCursorRollover) {
         WriteUnitOfWork wuow(operationContext());
         for (int i = 0; i < numToInsertFirst; ++i) {
             const BSONObj doc = BSON("_id" << i);
-            ASSERT_OK(coll->insertDocument(operationContext(), InsertStatement(doc), nullptr));
+            ASSERT_OK(collection_internal::insertDocument(
+                operationContext(), coll, InsertStatement(doc), nullptr));
         }
         wuow.commit();
     }
@@ -808,7 +808,8 @@ TEST_F(CollectionTest, CappedCursorRollover) {
         WriteUnitOfWork wuow(operationContext());
         for (int i = numToInsertFirst; i < numToInsertFirst + 10; ++i) {
             const BSONObj doc = BSON("_id" << i);
-            ASSERT_OK(coll->insertDocument(operationContext(), InsertStatement(doc), nullptr));
+            ASSERT_OK(collection_internal::insertDocument(
+                operationContext(), coll, InsertStatement(doc), nullptr));
         }
         wuow.commit();
     }
@@ -855,3 +856,4 @@ TEST_F(CatalogTestFixture, CappedCursorYieldFirst) {
 }
 
 }  // namespace
+}  // namespace mongo

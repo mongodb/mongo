@@ -43,8 +43,8 @@
 #include "mongo/db/catalog/capped_collection_maintenance.h"
 #include "mongo/db/catalog/capped_utils.h"
 #include "mongo/db/catalog/coll_mod.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -1328,11 +1328,12 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 }
 
                 OpDebug* const nullOpDebug = nullptr;
-                Status status = collection->insertDocuments(opCtx,
-                                                            insertObjs.begin(),
-                                                            insertObjs.end(),
-                                                            nullOpDebug,
-                                                            false /* fromMigrate */);
+                Status status = collection_internal::insertDocuments(opCtx,
+                                                                     collection,
+                                                                     insertObjs.begin(),
+                                                                     insertObjs.end(),
+                                                                     nullOpDebug,
+                                                                     false /* fromMigrate */);
                 if (!status.isOK()) {
                     return status;
                 }
@@ -1413,8 +1414,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     }
 
                     OpDebug* const nullOpDebug = nullptr;
-                    Status status = collection->insertDocument(
-                        opCtx, insertStmt, nullOpDebug, false /* fromMigrate */);
+                    Status status = collection_internal::insertDocument(
+                        opCtx, collection, insertStmt, nullOpDebug, false /* fromMigrate */);
 
                     if (status.isOK()) {
                         wuow.commit();

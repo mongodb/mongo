@@ -27,11 +27,10 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/repl/oplog_applier_impl.h"
 
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -54,7 +53,6 @@
 #include "mongo/util/log_with_sampling.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
-
 
 namespace mongo {
 namespace repl {
@@ -142,8 +140,8 @@ Status _insertDocumentsToOplogAndChangeCollections(
             return {ErrorCodes::NamespaceNotFound, "Oplog collection does not exist"};
         }
 
-        auto status = oplogColl->insertDocuments(
-            opCtx, begin, end, nullptr /* OpDebug */, false /* fromMigrate */);
+        auto status = collection_internal::insertDocuments(
+            opCtx, oplogColl, begin, end, nullptr /* OpDebug */, false /* fromMigrate */);
         if (!status.isOK()) {
             return status;
         }

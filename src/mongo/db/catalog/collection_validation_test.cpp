@@ -27,21 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/db/catalog/collection_validation.h"
-
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_validation.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/operation_context.h"  // for UnreplicatedWritesBlock
+#include "mongo/db/operation_context.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
-
 namespace {
 
 const NamespaceString kNss = NamespaceString("test.t");
@@ -176,7 +174,8 @@ int insertDataRange(OperationContext* opCtx, int startIDNum, int endIDNum) {
 
     {
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_OK(coll->insertDocuments(opCtx, inserts.begin(), inserts.end(), nullptr, false));
+        ASSERT_OK(collection_internal::insertDocuments(
+            opCtx, *coll, inserts.begin(), inserts.end(), nullptr, false));
         wuow.commit();
     }
     return endIDNum - startIDNum;

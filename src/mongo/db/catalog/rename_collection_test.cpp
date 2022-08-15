@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <memory>
 #include <set>
 #include <string>
@@ -36,6 +34,7 @@
 
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/rename_collection.h"
@@ -62,9 +61,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
+namespace mongo {
 namespace {
-
-using namespace mongo;
 
 /**
  * Mock OpObserver that tracks dropped collections and databases.
@@ -499,7 +497,8 @@ void _insertDocument(OperationContext* opCtx, const NamespaceString& nss, const 
 
         WriteUnitOfWork wuow(opCtx);
         OpDebug* const opDebug = nullptr;
-        ASSERT_OK(collection->insertDocument(opCtx, InsertStatement(doc), opDebug));
+        ASSERT_OK(
+            collection_internal::insertDocument(opCtx, *collection, InsertStatement(doc), opDebug));
         wuow.commit();
     });
 }
@@ -1148,3 +1147,4 @@ TEST_F(RenameCollectionTest, FailRenameCollectionToSystemJavascript) {
 }
 
 }  // namespace
+}  // namespace mongo

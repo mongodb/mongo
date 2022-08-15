@@ -27,15 +27,12 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/introspect.h"
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
@@ -47,7 +44,6 @@
 #include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
 
 namespace mongo {
 
@@ -147,7 +143,8 @@ void profile(OperationContext* opCtx, NetworkOp op) {
         invariant(!opCtx->shouldParticipateInFlowControl());
         WriteUnitOfWork wuow(opCtx);
         OpDebug* const nullOpDebug = nullptr;
-        uassertStatusOK(coll->insertDocument(opCtx, InsertStatement(p), nullOpDebug, false));
+        uassertStatusOK(collection_internal::insertDocument(
+            opCtx, coll, InsertStatement(p), nullOpDebug, false));
         wuow.commit();
     } catch (const AssertionException& assertionEx) {
         LOGV2_WARNING(20703,

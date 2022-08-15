@@ -556,6 +556,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
+        '$BUILD_DIR/mongo/db/catalog/collection_crud',
         '$BUILD_DIR/mongo/db/change_stream_pre_images_collection_manager',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/dbhelpers',
@@ -574,7 +575,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
-        '$BUILD_DIR/mongo/db/catalog/collection',
+        '$BUILD_DIR/mongo/db/catalog/collection_crud',
         '$BUILD_DIR/mongo/db/catalog_raii',
         '$BUILD_DIR/mongo/db/change_stream_options_manager',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
@@ -1180,6 +1181,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         "$BUILD_DIR/mongo/base",
+        "$BUILD_DIR/mongo/db/catalog/collection_crud",
         "$BUILD_DIR/mongo/db/catalog/commit_quorum_options",
         "$BUILD_DIR/mongo/db/catalog/index_build_entry_idl",
         "$BUILD_DIR/mongo/db/catalog/local_oplog_info",
@@ -1194,10 +1196,10 @@ env.Library(
 )
 
 env.Library(
-    target="cloner",
+    target='cloner',
     source=[
-        "cloner.cpp",
-        "cloner.idl",
+        'cloner.cpp',
+        'cloner.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -1208,13 +1210,14 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/authentication',
-        '$BUILD_DIR/mongo/db/concurrency/exception_util',
-        '$BUILD_DIR/mongo/db/ops/write_ops',
-        '$BUILD_DIR/mongo/db/s/sharding_api_d',
+        'catalog/collection_crud',
         'catalog/database_holder',
         'commands/list_collections_filter',
+        'concurrency/exception_util',
         'index_builds_coordinator_interface',
         'multitenancy',
+        'ops/write_ops',
+        's/sharding_api_d',
     ],
 )
 
@@ -1235,6 +1238,7 @@ env.Library(
         "introspect.cpp",
     ],
     LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/catalog/collection_crud",
         "$BUILD_DIR/mongo/db/catalog/collection_options",
         "$BUILD_DIR/mongo/db/concurrency/exception_util",
         "$BUILD_DIR/mongo/db/stats/resource_consumption_metrics",
@@ -1511,6 +1515,7 @@ env.Library(
         'update/update_driver',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/collection_crud',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
@@ -1526,12 +1531,13 @@ env.Library(
 )
 
 env.Library(
-    target="startup_recovery",
+    target='startup_recovery',
     source=[
-        "startup_recovery.cpp",
+        'startup_recovery.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
+        '$BUILD_DIR/mongo/db/catalog/collection_crud',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/catalog/multi_index_block',
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
@@ -2394,6 +2400,7 @@ env.Library(
         # please add that library as a private libdep of
         # mongod_initializers.
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
+        '$BUILD_DIR/mongo/db/catalog/collection_crud',
         '$BUILD_DIR/mongo/db/change_stream_change_collection_manager',
         '$BUILD_DIR/mongo/db/change_stream_options_manager',
         '$BUILD_DIR/mongo/db/change_streams_cluster_parameter',

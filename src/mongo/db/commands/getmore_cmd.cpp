@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include <fmt/format.h>
-
 #include <memory>
 #include <string>
 
@@ -66,16 +62,13 @@
 #include "mongo/db/stats/top.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/rewrite_state_change_errors.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-
 namespace mongo {
-
 namespace {
 
 using namespace fmt::literals;

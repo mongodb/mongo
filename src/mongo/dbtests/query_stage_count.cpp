@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include <memory>
-
-#include "mongo/platform/basic.h"
-
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -46,10 +43,8 @@
 #include "mongo/db/query/count_command_gen.h"
 #include "mongo/dbtests/dbtests.h"
 
+namespace mongo {
 namespace QueryStageCount {
-
-using std::unique_ptr;
-using std::vector;
 
 const int kDocuments = 100;
 const int kInterjections = kDocuments;
@@ -97,7 +92,7 @@ public:
         params.direction = CollectionScanParams::FORWARD;
         params.tailable = false;
 
-        unique_ptr<CollectionScan> scan(
+        std::unique_ptr<CollectionScan> scan(
             new CollectionScan(_expCtx.get(), _coll, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
@@ -113,7 +108,8 @@ public:
     void insert(const BSONObj& doc) {
         WriteUnitOfWork wunit(&_opCtx);
         OpDebug* const nullOpDebug = nullptr;
-        _coll->insertDocument(&_opCtx, InsertStatement(doc), nullOpDebug).transitional_ignore();
+        collection_internal::insertDocument(&_opCtx, _coll, InsertStatement(doc), nullOpDebug)
+            .transitional_ignore();
         wunit.commit();
     }
 
@@ -150,12 +146,12 @@ public:
         setup();
         getRecordIds();
 
-        unique_ptr<WorkingSet> ws(new WorkingSet);
+        std::unique_ptr<WorkingSet> ws(new WorkingSet);
 
         StatusWithMatchExpression statusWithMatcher =
             MatchExpressionParser::parse(request.getQuery(), _expCtx);
         ASSERT(statusWithMatcher.isOK());
-        unique_ptr<MatchExpression> expression = std::move(statusWithMatcher.getValue());
+        std::unique_ptr<MatchExpression> expression = std::move(statusWithMatcher.getValue());
 
         PlanStage* scan;
         if (indexed) {
@@ -236,7 +232,7 @@ public:
     }
 
 protected:
-    vector<RecordId> _recordIds;
+    std::vector<RecordId> _recordIds;
     const ServiceContext::UniqueOperationContext _opCtxPtr = cc().makeOperationContext();
     OperationContext& _opCtx = *_opCtxPtr;
     Lock::DBLock _dbLock;
@@ -380,3 +376,4 @@ public:
 OldStyleSuiteInitializer<All> queryStageCountAll;
 
 }  // namespace QueryStageCount
+}  // namespace mongo

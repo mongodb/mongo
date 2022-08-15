@@ -34,11 +34,9 @@
 
 #include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/chunk_version.h"
 
 namespace mongo {
 
-class ChunkType;
 class NamespaceString;
 class OperationContext;
 template <typename T>

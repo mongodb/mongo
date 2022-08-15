@@ -27,13 +27,9 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/catalog/validate_state.h"
-
 #include "mongo/db/catalog/catalog_test_fixture.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/catalog/validate_state.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
@@ -87,8 +83,8 @@ void ValidateStateTest::createCollectionAndPopulateIt(OperationContext* opCtx,
     OpDebug* const nullOpDebug = nullptr;
     for (int i = 0; i < 10; i++) {
         WriteUnitOfWork wuow(opCtx);
-        ASSERT_OK(
-            collection->insertDocument(opCtx, InsertStatement(BSON("_id" << i)), nullOpDebug));
+        ASSERT_OK(collection_internal::insertDocument(
+            opCtx, *collection, InsertStatement(BSON("_id" << i)), nullOpDebug));
         wuow.commit();
     }
 }

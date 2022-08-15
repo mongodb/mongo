@@ -27,12 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
@@ -53,6 +49,7 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/dbtests/dbtests.h"
 
+namespace mongo {
 namespace QueryStageCachedPlan {
 
 static const NamespaceString nss("unittests.QueryStageCachedPlan");
@@ -116,7 +113,8 @@ public:
         WriteUnitOfWork wuow(&_opCtx);
 
         OpDebug* const nullOpDebug = nullptr;
-        ASSERT_OK(collection->insertDocument(&_opCtx, InsertStatement(obj), nullOpDebug));
+        ASSERT_OK(collection_internal::insertDocument(
+            &_opCtx, collection, InsertStatement(obj), nullOpDebug));
         wuow.commit();
     }
 
@@ -550,3 +548,4 @@ TEST_F(QueryStageCachedPlan, DoesNotThrowOnYieldRecoveryWhenIndexIsDroppedAferPl
 }
 
 }  // namespace QueryStageCachedPlan
+}  // namespace mongo

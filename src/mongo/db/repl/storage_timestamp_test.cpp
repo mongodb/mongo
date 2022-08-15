@@ -27,17 +27,12 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
-#include <cstdint>
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/drop_database.h"
@@ -100,7 +95,6 @@
 #include "mongo/util/stacktrace.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace {
@@ -372,7 +366,8 @@ public:
         // Insert some documents.
         OpDebug* const nullOpDebug = nullptr;
         const bool fromMigrate = false;
-        ASSERT_OK(coll->insertDocument(_opCtx, stmt, nullOpDebug, fromMigrate));
+        ASSERT_OK(
+            collection_internal::insertDocument(_opCtx, coll, stmt, nullOpDebug, fromMigrate));
     }
 
     void createIndex(CollectionWriter& coll, std::string indexName, const BSONObj& indexKey) {
@@ -2762,8 +2757,9 @@ TEST_F(StorageTimestampTest, IndexBuildsResolveErrorsDuringStateChangeToPrimary)
         LOGV2(22507, "attempting to insert {badDoc3}", "badDoc3"_attr = badDoc3);
         WriteUnitOfWork wuow(_opCtx);
         ASSERT_THROWS_CODE(
-            collection->insertDocument(
+            collection_internal::insertDocument(
                 _opCtx,
+                collection.get(),
                 InsertStatement(badDoc3, indexInit.addTicks(1).asTimestamp(), _presentTerm),
                 /* opDebug */ nullptr,
                 /* noWarn */ false),
@@ -3194,8 +3190,12 @@ TEST_F(StorageTimestampTest, MultipleTimestampsForMultikeyWrites) {
                                     _presentTerm);
 
         WriteUnitOfWork wuow(_opCtx);
-        ASSERT_OK(autoColl.getCollection()->insertDocuments(
-            _opCtx, vectoredInsert.begin(), vectoredInsert.end(), nullptr, false));
+        ASSERT_OK(collection_internal::insertDocuments(_opCtx,
+                                                       autoColl.getCollection(),
+                                                       vectoredInsert.begin(),
+                                                       vectoredInsert.end(),
+                                                       nullptr,
+                                                       false));
         wuow.commit();
     }
 

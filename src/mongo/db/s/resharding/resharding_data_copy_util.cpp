@@ -27,10 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -244,7 +243,8 @@ int insertBatch(OperationContext* opCtx,
             numBytes += insert->doc.objsize();
         }
 
-        uassertStatusOK(outputColl->insertDocuments(opCtx, batch.begin(), batch.end(), nullptr));
+        uassertStatusOK(collection_internal::insertDocuments(
+            opCtx, *outputColl, batch.begin(), batch.end(), nullptr));
         wuow.commit();
 
         return numBytes;

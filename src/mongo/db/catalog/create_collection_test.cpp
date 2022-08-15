@@ -27,26 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
+namespace mongo {
 namespace {
-
-using namespace mongo;
 
 class CreateCollectionTest : public ServiceContextMongoDTest {
 private:
@@ -288,9 +283,10 @@ TEST_F(CreateCollectionTest, ValidationDisabledForTemporaryReshardingCollection)
     // Ensure a document that violates validator criteria can be inserted into the temporary
     // resharding collection.
     auto insertObj = fromjson("{'_id':2, a:1}");
-    auto status =
-        collection->insertDocument(opCtx.get(), InsertStatement(insertObj), nullptr, false);
+    auto status = collection_internal::insertDocument(
+        opCtx.get(), *collection, InsertStatement(insertObj), nullptr, false);
     ASSERT_OK(status);
 }
 
 }  // namespace
+}  // namespace mongo

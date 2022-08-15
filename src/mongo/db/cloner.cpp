@@ -39,8 +39,8 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/authenticate.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -194,9 +194,8 @@ struct Cloner::BatchHandler {
                 WriteUnitOfWork wunit(opCtx);
 
                 BSONObj doc = tmp;
-                OpDebug* const nullOpDebug = nullptr;
-                Status status =
-                    collection->insertDocument(opCtx, InsertStatement(doc), nullOpDebug, true);
+                Status status = collection_internal::insertDocument(
+                    opCtx, collection, InsertStatement(doc), nullptr /* OpDebug */, true);
                 if (!status.isOK() && status.code() != ErrorCodes::DuplicateKey) {
                     LOGV2_ERROR(20424,
                                 "error: exception cloning object",

@@ -70,7 +70,7 @@ env.Library(
 )
 
 env.Program(
-    target="dbtest",
+    target='dbtest',
     source=[
         'basictests.cpp',
         'catalogtests.cpp',
@@ -141,6 +141,7 @@ env.Program(
         "$BUILD_DIR/mongo/db/bson/dotted_path_support",
         "$BUILD_DIR/mongo/db/catalog/catalog_helpers",
         "$BUILD_DIR/mongo/db/catalog/clustered_collection_options",
+        "$BUILD_DIR/mongo/db/catalog/collection_crud",
         "$BUILD_DIR/mongo/db/catalog/collection_validation",
         "$BUILD_DIR/mongo/db/catalog/index_key_validate",
         "$BUILD_DIR/mongo/db/catalog/multi_index_block",

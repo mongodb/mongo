@@ -27,12 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
-#include <iostream>
-#include <limits>
-
 #include "mongo/base/parse_number.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
@@ -49,14 +43,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-
-using std::cout;
-using std::endl;
-using std::string;
-using std::stringstream;
-using std::unique_ptr;
-using std::vector;
-
+namespace mongo {
 namespace JSTests {
 
 using ScopeFactory = Scope* (ScriptEngine::*)();
@@ -74,7 +61,7 @@ template <ScopeFactory scopeFactory>
 class BasicScope {
 public:
     void run() {
-        unique_ptr<Scope> s;
+        std::unique_ptr<Scope> s;
         s.reset((getGlobalScriptEngine()->*scopeFactory)());
 
         s->setNumber("x", 5);
@@ -99,7 +86,7 @@ class ResetScope {
 public:
     void run() {
         /* Currently reset does not clear data in v8 or spidermonkey scopes.  See SECURITY-10
-        unique_ptr<Scope> s;
+       std::unique_ptr<Scope> s;
         s.reset( (getGlobalScriptEngine()->*scopeFactory)() );
 
         s->setBoolean( "x" , true );
@@ -116,7 +103,7 @@ class FalseTests {
 public:
     void run() {
         // Test falsy javascript values
-        unique_ptr<Scope> s;
+        std::unique_ptr<Scope> s;
         s.reset((getGlobalScriptEngine()->*scopeFactory)());
 
         ASSERT(!s->getBoolean("notSet"));
@@ -140,7 +127,7 @@ template <ScopeFactory scopeFactory>
 class SimpleFunctions {
 public:
     void run() {
-        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         s->invoke("x=5;", nullptr, nullptr);
         ASSERT(5 == s->getNumber("x"));
@@ -169,7 +156,7 @@ template <ScopeFactory scopeFactory>
 class ObjectMapping {
 public:
     void run() {
-        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         BSONObj o = BSON("x" << 17.0 << "y"
                              << "eliot"
@@ -227,7 +214,7 @@ template <ScopeFactory scopeFactory>
 class ObjectDecoding {
 public:
     void run() {
-        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         s->invoke("z = { num : 1 };", nullptr, nullptr);
         BSONObj out = s->getObject("z");
@@ -251,7 +238,7 @@ class JSOIDTests {
 public:
     void run() {
 #ifdef MOZJS
-        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         s->localConnect("blah");
 
@@ -283,7 +270,7 @@ template <ScopeFactory scopeFactory>
 class SetImplicit {
 public:
     void run() {
-        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         BSONObj o = BSON("foo"
                          << "bar");
@@ -306,7 +293,7 @@ template <ScopeFactory scopeFactory>
 class ObjectModReadonlyTests {
 public:
     void run() {
-        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         BSONObj o = BSON("x" << 17 << "y"
                              << "eliot"
@@ -345,7 +332,7 @@ template <ScopeFactory scopeFactory>
 class OtherJSTypes {
 public:
     void run() {
-        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         {
             // date
@@ -390,8 +377,8 @@ public:
             s->invoke("z = { a : x.r };", nullptr, nullptr);
 
             BSONObj out = s->getObject("z");
-            ASSERT_EQUALS((string) "^a", out["a"].regex());
-            ASSERT_EQUALS((string) "i", out["a"].regexFlags());
+            ASSERT_EQUALS((std::string) "^a", out["a"].regex());
+            ASSERT_EQUALS((std::string) "i", out["a"].regexFlags());
 
             // This regex used to cause a segfault because x isn't a valid flag for a js RegExp.
             // Now it throws a JS exception.
@@ -443,7 +430,7 @@ template <ScopeFactory scopeFactory>
 class SpecialDBTypes {
 public:
     void run() {
-        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         BSONObjBuilder b;
         b.appendTimestamp("a", 123456789);
@@ -478,7 +465,7 @@ template <ScopeFactory scopeFactory>
 class TypeConservation {
 public:
     void run() {
-        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         //  --  A  --
 
@@ -577,7 +564,7 @@ template <ScopeFactory scopeFactory>
 class NumberLong {
 public:
     void run() {
-        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
         BSONObjBuilder b;
         long long val = (long long)(0xbabadeadbeefbaddULL);
         b.append("a", val);
@@ -590,15 +577,15 @@ public:
         out = s->getObject("b");
         ASSERT_EQUALS(mongo::NumberLong, out.firstElement().type());
         if (val != out.firstElement().numberLong()) {
-            cout << val << endl;
-            cout << out.firstElement().numberLong() << endl;
-            cout << out.toString() << endl;
+            std::cout << val << std::endl;
+            std::cout << out.firstElement().numberLong() << std::endl;
+            std::cout << out.toString() << std::endl;
             ASSERT_EQUALS(val, out.firstElement().numberLong());
         }
 
         ASSERT(s->exec("c = {c:a.a.toString()}", "foo", false, true, false));
         out = s->getObject("c");
-        stringstream ss;
+        std::stringstream ss;
         ss << "NumberLong(\"" << val << "\")";
         ASSERT_EQUALS(ss.str(), out.firstElement().str());
 
@@ -637,7 +624,7 @@ template <ScopeFactory scopeFactory>
 class NumberLong2 {
 public:
     void run() {
-        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         BSONObj in;
         {
@@ -653,9 +640,9 @@ public:
         s->setObject("a", in);
 
         ASSERT(s->exec("x = tojson( a ); ", "foo", false, true, false));
-        string outString = s->getString("x");
+        std::string outString = s->getString("x");
 
-        ASSERT(s->exec((string) "y = " + outString, "foo2", false, true, false));
+        ASSERT(s->exec((std::string) "y = " + outString, "foo2", false, true, false));
         BSONObj out = s->getObject("y");
         ASSERT_BSONOBJ_EQ(in, out);
     }
@@ -665,7 +652,7 @@ template <ScopeFactory scopeFactory>
 class NumberLongUnderLimit {
 public:
     void run() {
-        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         BSONObjBuilder b;
         // limit is 2^53
@@ -680,15 +667,15 @@ public:
         out = s->getObject("b");
         ASSERT_EQUALS(mongo::NumberLong, out.firstElement().type());
         if (val != out.firstElement().numberLong()) {
-            cout << val << endl;
-            cout << out.firstElement().numberLong() << endl;
-            cout << out.toString() << endl;
+            std::cout << val << std::endl;
+            std::cout << out.firstElement().numberLong() << std::endl;
+            std::cout << out.toString() << std::endl;
             ASSERT_EQUALS(val, out.firstElement().numberLong());
         }
 
         ASSERT(s->exec("c = {c:a.a.toString()}", "foo", false, true, false));
         out = s->getObject("c");
-        stringstream ss;
+        std::stringstream ss;
         ss << "NumberLong(\"" << val << "\")";
         ASSERT_EQUALS(ss.str(), out.firstElement().str());
 
@@ -712,7 +699,7 @@ template <ScopeFactory scopeFactory>
 class NumberDecimal {
 public:
     void run() {
-        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
         BSONObjBuilder b;
         Decimal128 val = Decimal128("2.010");
         b.append("a", val);
@@ -729,10 +716,10 @@ public:
         ASSERT_EQUALS(mongo::NumberDecimal, out.firstElement().type());
         ASSERT_TRUE(val.isEqual(out.firstElement().numberDecimal()));
 
-        // Test that the appropriate string output is generated
+        // Test that the appropriatestd::string output is generated
         ASSERT(s->exec("c = {c:a.a.toString()}", "foo", false, true, false));
         out = s->getObject("c");
-        stringstream ss;
+        std::stringstream ss;
         ss << "NumberDecimal(\"" << val.toString() << "\")";
         ASSERT_EQUALS(ss.str(), out.firstElement().str());
     }
@@ -742,7 +729,7 @@ template <ScopeFactory scopeFactory>
 class NumberDecimalGetFromScope {
 public:
     void run() {
-        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
         ASSERT(s->exec("a = 5;", "a", false, true, false));
         ASSERT_TRUE(Decimal128(5).isEqual(s->getNumberDecimal("a")));
     }
@@ -752,7 +739,7 @@ template <ScopeFactory scopeFactory>
 class NumberDecimalBigObject {
 public:
     void run() {
-        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         BSONObj in;
         {
@@ -768,9 +755,9 @@ public:
         s->setObject("a", in);
 
         ASSERT(s->exec("x = tojson( a ); ", "foo", false, true, false));
-        string outString = s->getString("x");
+        std::string outString = s->getString("x");
 
-        ASSERT(s->exec((string) "y = " + outString, "foo2", false, true, false));
+        ASSERT(s->exec((std::string) "y = " + outString, "foo2", false, true, false));
         BSONObj out = s->getObject("y");
         ASSERT_BSONOBJ_EQ(in, out);
     }
@@ -780,7 +767,7 @@ template <ScopeFactory scopeFactory>
 class MaxTimestamp {
 public:
     void run() {
-        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         // Timestamp 't' component can exceed max for int32_t.
         BSONObj in;
@@ -810,7 +797,7 @@ public:
     }
 
     void run() {
-        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         for (int i = 5; i < 100; i += 10) {
             s->setObject("a", build(i), false);
@@ -829,7 +816,7 @@ template <ScopeFactory scopeFactory>
 class ExecTimeout {
 public:
     void run() {
-        unique_ptr<Scope> scope((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> scope((getGlobalScriptEngine()->*scopeFactory)());
 
         // assert timeout occurred
         ASSERT(!scope->exec("var a = 1; while (true) { ; }", "ExecTimeout", false, true, false, 1));
@@ -843,7 +830,7 @@ template <ScopeFactory scopeFactory>
 class ExecNoTimeout {
 public:
     void run() {
-        unique_ptr<Scope> scope((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> scope((getGlobalScriptEngine()->*scopeFactory)());
 
         // assert no timeout occurred
         ASSERT(scope->exec("var a = function() { return 1; }",
@@ -862,7 +849,7 @@ template <ScopeFactory scopeFactory>
 class InvokeTimeout {
 public:
     void run() {
-        unique_ptr<Scope> scope((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> scope((getGlobalScriptEngine()->*scopeFactory)());
 
         // scope timeout after 500ms
         bool caught = false;
@@ -942,7 +929,7 @@ template <ScopeFactory scopeFactory>
 class InvokeNoTimeout {
 public:
     void run() {
-        unique_ptr<Scope> scope((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> scope((getGlobalScriptEngine()->*scopeFactory)());
 
         // invoke completes before timeout
         scope->invokeSafe(
@@ -972,8 +959,8 @@ public:
 private:
     void check(const BSONObj& one, const BSONObj& two) {
         if (one.woCompare(two) != 0) {
-            static string fail =
-                string("Assertion failure expected ") + one.toString() + ", got " + two.toString();
+            static std::string fail = std::string("Assertion failure expected ") + one.toString() +
+                ", got " + two.toString();
             FAIL(fail.c_str());
         }
     }
@@ -998,15 +985,15 @@ public:
     void pp(const char* s, BSONElement e) {
         int len;
         const char* data = e.binData(len);
-        cout << s << ":" << e.binDataType() << "\t" << len << endl;
-        cout << "\t";
+        std::cout << s << ":" << e.binDataType() << "\t" << len << std::endl;
+        std::cout << "\t";
         for (int i = 0; i < len; i++)
-            cout << (int)(data[i]) << " ";
-        cout << endl;
+            std::cout << (int)(data[i]) << " ";
+        std::cout << std::endl;
     }
 
     void run() {
-        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         const char* foo = "asdas\0asdasd";
         const char* base64 = "YXNkYXMAYXNkYXNk";
@@ -1031,14 +1018,14 @@ public:
 
         // check that BinData js class is utilized
         s->invokeSafe("q = x.b.toString();", nullptr, nullptr);
-        stringstream expected;
+        std::stringstream expected;
         expected << "BinData(" << BinDataGeneral << ",\"" << base64 << "\")";
         ASSERT_EQUALS(expected.str(), s->getString("q"));
 
-        stringstream scriptBuilder;
+        std::stringstream scriptBuilder;
         scriptBuilder << "z = { c : new BinData( " << BinDataGeneral << ", \"" << base64
                       << "\" ) };";
-        string script = scriptBuilder.str();
+        std::string script = scriptBuilder.str();
         s->invokeSafe(script.c_str(), nullptr, nullptr);
         out = s->getObject("z");
         //            pp( "out" , out["c"] );
@@ -1057,7 +1044,7 @@ template <ScopeFactory scopeFactory>
 class VarTests {
 public:
     void run() {
-        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         ASSERT(s->exec("a = 5;", "a", false, true, false));
         ASSERT_EQUALS(5, s->getNumber("a"));
@@ -1074,7 +1061,7 @@ public:
         BSONObj start = BSON("x" << 5.0);
         BSONObj empty;
 
-        unique_ptr<Scope> s;
+        std::unique_ptr<Scope> s;
         s.reset((getGlobalScriptEngine()->*scopeFactory)());
 
         ScriptingFunction f = s->createFunction("return this.x + 6;");
@@ -1085,7 +1072,7 @@ public:
             s->invoke(f, &empty, &start);
             ASSERT_EQUALS(11, s->getNumber("__returnValue"));
         }
-        // cout << "speed1: " << ( n / t.millis() ) << " ops/ms" << endl;
+        // std::cout << "speed1: " << ( n / t.millis() ) << " ops/ms" << std::endl;
     }
 };
 
@@ -1093,7 +1080,7 @@ template <ScopeFactory scopeFactory>
 class ScopeOut {
 public:
     void run() {
-        unique_ptr<Scope> s;
+        std::unique_ptr<Scope> s;
         s.reset((getGlobalScriptEngine()->*scopeFactory)());
 
         s->invokeSafe("x = 5;", nullptr, nullptr);
@@ -1120,7 +1107,7 @@ template <ScopeFactory scopeFactory>
 class RenameTest {
 public:
     void run() {
-        unique_ptr<Scope> s;
+        std::unique_ptr<Scope> s;
         s.reset((getGlobalScriptEngine()->*scopeFactory)());
 
         s->setNumber("x", 5);
@@ -1164,7 +1151,7 @@ public:
             0xff,
             0,
         };
-        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         s->setObject("val", BSONObj(reinterpret_cast<char*>(bits)).getOwned());
 
@@ -1177,7 +1164,7 @@ template <ScopeFactory scopeFactory>
 class NoReturnSpecified {
 public:
     void run() {
-        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         s->invoke("x=5;", nullptr, nullptr);
         ASSERT_EQUALS(5, s->getNumber("__returnValue"));
@@ -1232,7 +1219,7 @@ public:
     }
 
     void run() {
-        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         s->injectNative("foo", callback, s.get());
         s->invoke("var x = 1; foo();", nullptr, nullptr);
@@ -1244,7 +1231,7 @@ template <ScopeFactory scopeFactory>
 class ErrorCodeFromInvoke {
 public:
     void run() {
-        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         {
             bool threwException = false;
@@ -1287,7 +1274,7 @@ public:
             return {};
         };
 
-        unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
 
         s->injectNative("foo", sidecarThrowingFunc);
 
@@ -1313,14 +1300,14 @@ public:
 
         // Ensure that by default we can bind owned and unowned
         {
-            unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+            std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
             s->setObject("unowned", unowned, true);
             s->setObject("owned", owned, true);
         }
 
         // After we set the flag, we should only be able to set owned
         {
-            unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+            std::unique_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
             s->requireOwnedObjects();
             s->setObject("owned", owned, true);
 
@@ -1347,7 +1334,7 @@ public:
 template <ScopeFactory scopeFactory>
 class ConvertShardKeyToHashed {
 public:
-    void check(shared_ptr<Scope> s, const mongo::BSONObj& o) {
+    void check(std::shared_ptr<Scope> s, const mongo::BSONObj& o) {
         s->setObject("o", o, true);
         s->invoke("return convertShardKeyToHashed(o);", nullptr, nullptr);
         const auto scopeShardKey = s->getNumber("__returnValue");
@@ -1361,17 +1348,17 @@ public:
         ASSERT_EQUALS(scopeShardKey, trueShardKey);
     }
 
-    void checkNoArgs(shared_ptr<Scope> s) {
+    void checkNoArgs(std::shared_ptr<Scope> s) {
         s->invoke("return convertShardKeyToHashed();", nullptr, nullptr);
     }
 
-    void checkWithExtraArg(shared_ptr<Scope> s, const mongo::BSONObj& o, int seed) {
+    void checkWithExtraArg(std::shared_ptr<Scope> s, const mongo::BSONObj& o, int seed) {
         s->setObject("o", o, true);
         s->invoke("return convertShardKeyToHashed(o, 1);", nullptr, nullptr);
     }
 
     void run() {
-        shared_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
+        std::shared_ptr<Scope> s((getGlobalScriptEngine()->*scopeFactory)());
         shell_utils::installShellUtils(*s);
 
         // Check a few elementary objects
@@ -1399,7 +1386,7 @@ template <ScopeFactory scopeFactory>
 class BasicAsyncJS {
 public:
     void run() {
-        unique_ptr<Scope> scope((getGlobalScriptEngine()->*scopeFactory)());
+        std::unique_ptr<Scope> scope((getGlobalScriptEngine()->*scopeFactory)());
 
         scope->setNumber("x", 0);
         /* The async code will get run after the return, so
@@ -1483,3 +1470,4 @@ public:
 OldStyleSuiteInitializer<All> myall;
 
 }  // namespace JSTests
+}  // namespace mongo

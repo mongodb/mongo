@@ -27,8 +27,9 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/concurrency/deferred_writer.h"
+
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -39,7 +40,6 @@
 #include "mongo/util/concurrency/thread_pool.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
-
 
 namespace mongo {
 
@@ -116,7 +116,8 @@ Status DeferredWriter::_worker(InsertStatement stmt) noexcept try {
 
     Status status = writeConflictRetry(opCtx, "deferred insert", _nss.ns(), [&] {
         WriteUnitOfWork wuow(opCtx);
-        Status status = collection->insertDocument(opCtx, stmt, nullptr, false);
+        Status status =
+            collection_internal::insertDocument(opCtx, collection, stmt, nullptr, false);
         if (!status.isOK()) {
             return status;
         }

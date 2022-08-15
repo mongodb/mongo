@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
@@ -39,6 +38,7 @@
 #include "mongo/db/json.h"
 #include "mongo/dbtests/dbtests.h"
 
+namespace mongo {
 namespace QueryStageIxscan {
 namespace {
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
@@ -73,7 +73,12 @@ public:
     void insert(const BSONObj& doc) {
         WriteUnitOfWork wunit(&_opCtx);
         OpDebug* const nullOpDebug = nullptr;
-        ASSERT_OK(_coll->insertDocument(&_opCtx, InsertStatement(doc), nullOpDebug, false));
+        ASSERT_OK(
+            collection_internal::insertDocument(&_opCtx,
+                                                CollectionPtr(_coll, CollectionPtr::NoYieldTag{}),
+                                                InsertStatement(doc),
+                                                nullOpDebug,
+                                                false));
         wunit.commit();
     }
 
@@ -335,3 +340,4 @@ public:
 OldStyleSuiteInitializer<All> aueryStageIxscanAll;
 
 }  // namespace QueryStageIxscan
+}  // namespace mongo

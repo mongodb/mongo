@@ -38,7 +38,6 @@
 
 using namespace mongo;
 using namespace mongo::unittest;
-using std::shared_ptr;
 
 namespace mongo {
 

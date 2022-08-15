@@ -31,7 +31,6 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/collection_metadata.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
 
 namespace mongo {

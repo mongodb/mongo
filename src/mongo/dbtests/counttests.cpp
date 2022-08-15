@@ -27,9 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
@@ -38,6 +36,7 @@
 #include "mongo/db/json.h"
 #include "mongo/dbtests/dbtests.h"
 
+namespace mongo {
 namespace CountTests {
 
 class Base {
@@ -99,10 +98,12 @@ protected:
             oid.init();
             b.appendOID("_id", &oid);
             b.appendElements(o);
-            _collection->insertDocument(&_opCtx, InsertStatement(b.obj()), nullOpDebug, false)
+            collection_internal::insertDocument(
+                &_opCtx, _collection, InsertStatement(b.obj()), nullOpDebug, false)
                 .transitional_ignore();
         } else {
-            _collection->insertDocument(&_opCtx, InsertStatement(o), nullOpDebug, false)
+            collection_internal::insertDocument(
+                &_opCtx, _collection, InsertStatement(o), nullOpDebug, false)
                 .transitional_ignore();
         }
         wunit.commit();
@@ -174,3 +175,4 @@ public:
 OldStyleSuiteInitializer<All> myall;
 
 }  // namespace CountTests
+}  // namespace mongo

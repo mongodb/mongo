@@ -27,16 +27,13 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/views/durable_view_catalog.h"
 
 #include <string>
 
 #include "mongo/db/audit.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -278,8 +275,8 @@ void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
                     "Insert view to system views catalog",
                     "view"_attr = view,
                     "viewCatalog"_attr = _db->getSystemViewsName());
-        uassertStatusOK(
-            systemViews->insertDocument(opCtx, InsertStatement(view), &CurOp::get(opCtx)->debug()));
+        uassertStatusOK(collection_internal::insertDocument(
+            opCtx, systemViews, InsertStatement(view), &CurOp::get(opCtx)->debug()));
     } else {
         CollectionUpdateArgs args;
         args.update = view;

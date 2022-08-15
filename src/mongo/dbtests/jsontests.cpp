@@ -31,9 +31,6 @@
  * Tests for json.{h,cpp} code and BSONObj::jsonString()
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <fmt/format.h>
@@ -46,12 +43,12 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-
+namespace mongo {
 namespace {
+
 std::string makeJsonEquvalent(const std::string& json) {
     boost::property_tree::ptree tree;
 
@@ -1199,3 +1196,4 @@ TEST(FromJsonTest, MinMaxKey) {
 
 }  // namespace FromJsonTests
 }  // namespace
+}  // namespace mongo

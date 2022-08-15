@@ -31,20 +31,22 @@
  * This file contains tests for building execution stages that implement $lookup operator.
  */
 
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/query/sbe_stage_builder_test_fixture.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/util/assert_util.h"
 
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/query_test_service_context.h"
-
 namespace mongo::sbe {
+namespace {
+
 using namespace value;
 
 class LookupStageBuilderTest : public SbeStageBuilderTestFixture {
@@ -75,14 +77,15 @@ public:
                          std::unique_ptr<AutoGetCollection>& lock,
                          const std::vector<BSONObj>& docs) {
         std::vector<InsertStatement> inserts{docs.begin(), docs.end()};
-        lock = std::make_unique<AutoGetCollection>(operationContext(), nss, LockMode::MODE_X);
+        lock = std::make_unique<AutoGetCollection>(operationContext(), nss, LockMode::MODE_IX);
+
         {
             WriteUnitOfWork wuow{operationContext()};
-            ASSERT_OK(
-                lock.get()
-                    ->getWritableCollection(operationContext())
-                    ->insertDocuments(
-                        operationContext(), inserts.begin(), inserts.end(), nullptr /* opDebug */));
+            ASSERT_OK(collection_internal::insertDocuments(operationContext(),
+                                                           lock.get()->getCollection(),
+                                                           inserts.begin(),
+                                                           inserts.end(),
+                                                           nullptr /* opDebug */));
             wuow.commit();
         }
 
@@ -776,4 +779,5 @@ TEST_F(LookupStageBuilderTest, ThreeComponentAsPathDoesNotPerformArrayTraversal)
         "_id", "_id", "one.two.three", {fromjson("{_id: 0, one: {two: {three: [{_id: 0}]}}}")});
 }
 
+}  // namespace
 }  // namespace mongo::sbe

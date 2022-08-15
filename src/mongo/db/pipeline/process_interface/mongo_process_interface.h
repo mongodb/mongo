@@ -57,7 +57,6 @@
 #include "mongo/db/storage/backup_cursor_state.h"
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/executor/task_executor.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/shard_version.h"
 
 namespace mongo {

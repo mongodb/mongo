@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 
 #include <fmt/format.h>
@@ -79,17 +76,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-
 namespace mongo {
-
-using repl::OpTime;
-using std::set;
-using std::shared_ptr;
-using std::string;
-using std::unique_ptr;
-using std::vector;
-using str::stream;
-
 namespace {
 
 using namespace fmt::literals;
@@ -332,7 +319,7 @@ DatabaseType ShardingCatalogClientImpl::getDatabase(OperationContext* opCtx,
                                                     StringData dbName,
                                                     repl::ReadConcernLevel readConcernLevel) {
     uassert(ErrorCodes::InvalidNamespace,
-            stream() << dbName << " is not a valid db name",
+            str::stream() << dbName << " is not a valid db name",
             NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow));
 
     // The admin database is always hosted on the config server.
@@ -403,7 +390,8 @@ StatusWith<repl::OpTimeWith<DatabaseType>> ShardingCatalogClientImpl::_fetchData
 
     const auto& docsWithOpTime = findStatus.getValue();
     if (docsWithOpTime.value.empty()) {
-        return {ErrorCodes::NamespaceNotFound, stream() << "database " << dbName << " not found"};
+        return {ErrorCodes::NamespaceNotFound,
+                str::stream() << "database " << dbName << " not found"};
     }
 
     invariant(docsWithOpTime.value.size() == 1);
@@ -430,7 +418,7 @@ CollectionType ShardingCatalogClientImpl::getCollection(OperationContext* opCtx,
                                                 1))
             .value;
     uassert(ErrorCodes::NamespaceNotFound,
-            stream() << "collection " << nss.ns() << " not found",
+            str::stream() << "collection " << nss.ns() << " not found",
             !collDoc.empty());
 
     return CollectionType(collDoc[0]);
@@ -449,7 +437,7 @@ CollectionType ShardingCatalogClientImpl::getCollection(OperationContext* opCtx,
                                                 1))
             .value;
     uassert(ErrorCodes::NamespaceNotFound,
-            stream() << "Collection with UUID '" << uuid << "' not found",
+            str::stream() << "Collection with UUID '" << uuid << "' not found",
             !collDoc.empty());
 
     return CollectionType(collDoc[0]);
@@ -576,7 +564,7 @@ StatusWith<std::vector<std::string>> ShardingCatalogClientImpl::getDatabasesForS
     std::vector<std::string> dbs;
     dbs.reserve(values.size());
     for (const BSONObj& obj : values) {
-        string dbName;
+        std::string dbName;
         Status status = bsonExtractStringField(obj, DatabaseType::kNameFieldName, &dbName);
         if (!status.isOK()) {
             return status;
@@ -593,7 +581,7 @@ StatusWith<std::vector<ChunkType>> ShardingCatalogClientImpl::getChunks(
     const BSONObj& query,
     const BSONObj& sort,
     boost::optional<int> limit,
-    OpTime* opTime,
+    repl::OpTime* opTime,
     const OID& epoch,
     const Timestamp& timestamp,
     repl::ReadConcernLevel readConcern,
@@ -616,8 +604,8 @@ StatusWith<std::vector<ChunkType>> ShardingCatalogClientImpl::getChunks(
     for (const BSONObj& obj : chunkDocsOpTimePair.value) {
         auto chunkRes = ChunkType::parseFromConfigBSON(obj, epoch, timestamp);
         if (!chunkRes.isOK()) {
-            return chunkRes.getStatus().withContext(stream() << "Failed to parse chunk with id "
-                                                             << obj[ChunkType::name()]);
+            return chunkRes.getStatus().withContext(
+                str::stream() << "Failed to parse chunk with id " << obj[ChunkType::name()]);
         }
 
         chunks.push_back(std::move(chunkRes.getValue()));
@@ -681,7 +669,7 @@ std::pair<CollectionType, std::vector<ChunkType>> ShardingCatalogClientImpl::get
     }
 
     uassert(ErrorCodes::NamespaceNotFound,
-            stream() << "Collection " << nss.ns() << " not found",
+            str::stream() << "Collection " << nss.ns() << " not found",
             !aggResult.empty());
 
 
@@ -720,7 +708,7 @@ std::pair<CollectionType, std::vector<ChunkType>> ShardingCatalogClientImpl::get
         }
 
         uassert(ErrorCodes::ConflictingOperationInProgress,
-                stream() << "No chunks were found for the collection " << nss,
+                str::stream() << "No chunks were found for the collection " << nss,
                 !chunks.empty());
     }
 
@@ -776,13 +764,13 @@ StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientImpl::
     for (const BSONObj& doc : findStatus.getValue().value) {
         auto shardRes = ShardType::fromBSON(doc);
         if (!shardRes.isOK()) {
-            return shardRes.getStatus().withContext(stream()
+            return shardRes.getStatus().withContext(str::stream()
                                                     << "Failed to parse shard document " << doc);
         }
 
         Status validateStatus = shardRes.getValue().validate();
         if (!validateStatus.isOK()) {
-            return validateStatus.withContext(stream()
+            return validateStatus.withContext(str::stream()
                                               << "Failed to validate shard document " << doc);
         }
 
@@ -950,10 +938,12 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
 
             auto existingDocs = fetchDuplicate.getValue().value;
             if (existingDocs.empty()) {
-                return {status.withContext(
-                    stream() << "DuplicateKey error was returned after a retry attempt, but no "
-                                "documents were found. This means a concurrent change occurred "
-                                "together with the retries.")};
+                return {
+                    status.withContext(
+                        str::stream()
+                        << "DuplicateKey error was returned after a retry attempt, but no "
+                           "documents were found. This means a concurrent change occurred "
+                           "together with the retries.")};
             }
 
             invariant(existingDocs.size() == 1);
@@ -1059,23 +1049,23 @@ Status ShardingCatalogClientImpl::removeConfigDocuments(OperationContext* opCtx,
     return response.toStatus();
 }
 
-StatusWith<repl::OpTimeWith<vector<BSONObj>>> ShardingCatalogClientImpl::_exhaustiveFindOnConfig(
-    OperationContext* opCtx,
-    const ReadPreferenceSetting& readPref,
-    const repl::ReadConcernLevel& readConcern,
-    const NamespaceString& nss,
-    const BSONObj& query,
-    const BSONObj& sort,
-    boost::optional<long long> limit,
-    const boost::optional<BSONObj>& hint) {
+StatusWith<repl::OpTimeWith<std::vector<BSONObj>>>
+ShardingCatalogClientImpl::_exhaustiveFindOnConfig(OperationContext* opCtx,
+                                                   const ReadPreferenceSetting& readPref,
+                                                   const repl::ReadConcernLevel& readConcern,
+                                                   const NamespaceString& nss,
+                                                   const BSONObj& query,
+                                                   const BSONObj& sort,
+                                                   boost::optional<long long> limit,
+                                                   const boost::optional<BSONObj>& hint) {
     auto response = Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
         opCtx, readPref, readConcern, nss, query, sort, limit, hint);
     if (!response.isOK()) {
         return response.getStatus();
     }
 
-    return repl::OpTimeWith<vector<BSONObj>>(std::move(response.getValue().docs),
-                                             response.getValue().opTime);
+    return repl::OpTimeWith<std::vector<BSONObj>>(std::move(response.getValue().docs),
+                                                  response.getValue().opTime);
 }
 
 StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientImpl::getNewKeys(

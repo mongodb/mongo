@@ -29,24 +29,15 @@
 
 #include "mongo/db/catalog/collection_impl.h"
 
-#include "mongo/base/counter.h"
-#include "mongo/base/init.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/crypto/fle_crypto.h"
-#include "mongo/db/catalog/capped_collection_maintenance.h"
-#include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog_impl.h"
-#include "mongo/db/catalog/index_consistency.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/catalog/uncommitted_multikey.h"
-#include "mongo/db/clientcursor.h"
-#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
@@ -60,30 +51,20 @@
 #include "mongo/db/matcher/implicit_validator.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/ops/update_request.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
-#include "mongo/db/storage/key_string.h"
-#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/ttl_collection_cache.h"
-#include "mongo/db/update/update_driver.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/object_check.h"
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -91,22 +72,9 @@
 namespace mongo {
 namespace {
 
-// Used to pause after inserting collection data and calling the opObservers.  Inserts to
-// replicated collections that are not part of a multi-statement transaction will have generated
-// their OpTime and oplog entry. Supports parameters to limit pause by namespace and by _id
-// of first data item in an insert (must be of type string):
-//  data: {
-//      collectionNS: <fully-qualified collection namespace>,
-//      first_id: <string>
-//  }
-MONGO_FAIL_POINT_DEFINE(hangAfterCollectionInserts);
-
 // This fail point allows collections to be given malformed validator. A malformed validator
 // will not (and cannot) be enforced but it will be persisted.
 MONGO_FAIL_POINT_DEFINE(allowSettingMalformedCollectionValidators);
-
-// This fail point introduces corruption to documents during insert.
-MONGO_FAIL_POINT_DEFINE(corruptDocumentOnInsert);
 
 MONGO_FAIL_POINT_DEFINE(skipCappedDeletes);
 
@@ -693,190 +661,6 @@ Collection::Validator CollectionImpl::parseValidator(
                 "expression"_attr = combinedMatchExpr->serialize());
 
     return Collection::Validator{validator, std::move(expCtx), std::move(combinedMatchExpr)};
-}
-
-Status CollectionImpl::insertDocuments(OperationContext* opCtx,
-                                       const std::vector<InsertStatement>::const_iterator begin,
-                                       const std::vector<InsertStatement>::const_iterator end,
-                                       OpDebug* opDebug,
-                                       bool fromMigrate) const {
-    auto status = collection_internal::checkFailCollectionInsertsFailPoint(
-        _ns, (begin != end ? begin->doc : BSONObj()));
-    if (!status.isOK()) {
-        return status;
-    }
-
-    // Should really be done in the collection object at creation and updated on index create.
-    const bool hasIdIndex = _indexCatalog->findIdIndex(opCtx);
-
-    for (auto it = begin; it != end; it++) {
-        if (hasIdIndex && it->doc["_id"].eoo()) {
-            return Status(ErrorCodes::InternalError,
-                          str::stream()
-                              << "Collection::insertDocument got document without _id for ns:"
-                              << _ns.toString());
-        }
-
-        auto status = checkValidationAndParseResult(opCtx, it->doc);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        auto& validationSettings = DocumentValidationSettings::get(opCtx);
-
-        if (getCollectionOptions().encryptedFieldConfig &&
-            !validationSettings.isSchemaValidationDisabled() &&
-            !validationSettings.isSafeContentValidationDisabled() &&
-            it->doc.hasField(kSafeContent)) {
-            return Status(ErrorCodes::BadValue,
-                          str::stream()
-                              << "Cannot insert a document with field name " << kSafeContent);
-        }
-    }
-
-    const SnapshotId sid = opCtx->recoveryUnit()->getSnapshotId();
-
-    status = _insertDocuments(opCtx, begin, end, opDebug, fromMigrate);
-    if (!status.isOK()) {
-        return status;
-    }
-    invariant(sid == opCtx->recoveryUnit()->getSnapshotId());
-
-    opCtx->recoveryUnit()->onCommit(
-        [this](boost::optional<Timestamp>) { getRecordStore()->notifyCappedWaitersIfNeeded(); });
-
-    hangAfterCollectionInserts.executeIf(
-        [&](const BSONObj& data) {
-            const auto& firstIdElem = data["first_id"];
-            std::string whenFirst;
-            if (firstIdElem) {
-                whenFirst += " when first _id is ";
-                whenFirst += firstIdElem.str();
-            }
-            LOGV2(20289,
-                  "hangAfterCollectionInserts fail point enabled. Blocking "
-                  "until fail point is disabled.",
-                  "ns"_attr = _ns,
-                  "whenFirst"_attr = whenFirst);
-            hangAfterCollectionInserts.pauseWhileSet(opCtx);
-        },
-        [&](const BSONObj& data) {
-            const auto& collElem = data["collectionNS"];
-            const auto& firstIdElem = data["first_id"];
-            // If the failpoint specifies no collection or matches the existing one, hang.
-            return (!collElem || _ns.ns() == collElem.str()) &&
-                (!firstIdElem ||
-                 (begin != end && firstIdElem.type() == mongo::String &&
-                  begin->doc["_id"].str() == firstIdElem.str()));
-        });
-
-    return Status::OK();
-}
-
-Status CollectionImpl::insertDocument(OperationContext* opCtx,
-                                      const InsertStatement& docToInsert,
-                                      OpDebug* opDebug,
-                                      bool fromMigrate) const {
-    std::vector<InsertStatement> docs;
-    docs.push_back(docToInsert);
-    return insertDocuments(opCtx, docs.begin(), docs.end(), opDebug, fromMigrate);
-}
-
-Status CollectionImpl::_insertDocuments(OperationContext* opCtx,
-                                        const std::vector<InsertStatement>::const_iterator begin,
-                                        const std::vector<InsertStatement>::const_iterator end,
-                                        OpDebug* opDebug,
-                                        bool fromMigrate) const {
-    dassert(opCtx->lockState()->isCollectionLockedForMode(ns(), MODE_IX));
-
-    const size_t count = std::distance(begin, end);
-    if (isCapped() && _indexCatalog->haveAnyIndexes() && count > 1) {
-        // We require that inserts to indexed capped collections be done one-at-a-time to avoid the
-        // possibility that a later document causes an earlier document to be deleted before it can
-        // be indexed.
-        // TODO SERVER-21512 It would be better to handle this here by just doing single inserts.
-        return {ErrorCodes::OperationCannotBeBatched,
-                "Can't batch inserts into indexed capped collections"};
-    }
-
-    if (needsCappedLock()) {
-        Lock::ResourceLock heldUntilEndOfWUOW{
-            opCtx->lockState(), ResourceId(RESOURCE_METADATA, _ns), MODE_X};
-    }
-
-    std::vector<Record> records;
-    records.reserve(count);
-    std::vector<Timestamp> timestamps;
-    timestamps.reserve(count);
-
-    for (auto it = begin; it != end; it++) {
-        const auto& doc = it->doc;
-
-        RecordId recordId;
-        if (isClustered()) {
-            invariant(_shared->_recordStore->keyFormat() == KeyFormat::String);
-            recordId = uassertStatusOK(record_id_helpers::keyForDoc(
-                doc, getClusteredInfo()->getIndexSpec(), getDefaultCollator()));
-        }
-
-        if (MONGO_unlikely(corruptDocumentOnInsert.shouldFail())) {
-            // Insert a truncated record that is half the expected size of the source document.
-            records.emplace_back(
-                Record{std::move(recordId), RecordData(doc.objdata(), doc.objsize() / 2)});
-            timestamps.emplace_back(it->oplogSlot.getTimestamp());
-            continue;
-        }
-
-        records.emplace_back(Record{std::move(recordId), RecordData(doc.objdata(), doc.objsize())});
-        timestamps.emplace_back(it->oplogSlot.getTimestamp());
-    }
-
-    Status status = _shared->_recordStore->insertRecords(opCtx, &records, timestamps);
-    if (!status.isOK())
-        return status;
-
-    std::vector<BsonRecord> bsonRecords;
-    bsonRecords.reserve(count);
-    int recordIndex = 0;
-    for (auto it = begin; it != end; it++) {
-        RecordId loc = records[recordIndex++].id;
-        if (_shared->_recordStore->keyFormat() == KeyFormat::Long) {
-            invariant(RecordId::minLong() < loc);
-            invariant(loc < RecordId::maxLong());
-        }
-
-        BsonRecord bsonRecord = {
-            std::move(loc), Timestamp(it->oplogSlot.getTimestamp()), &(it->doc)};
-        bsonRecords.emplace_back(std::move(bsonRecord));
-    }
-
-    int64_t keysInserted = 0;
-    status = _indexCatalog->indexRecords(
-        opCtx, {this, CollectionPtr::NoYieldTag{}}, bsonRecords, &keysInserted);
-    if (!status.isOK()) {
-        return status;
-    }
-
-    if (opDebug) {
-        opDebug->additiveMetrics.incrementKeysInserted(keysInserted);
-        // 'opDebug' may be deleted at rollback time in case of multi-document transaction.
-        if (!opCtx->inMultiDocumentTransaction()) {
-            opCtx->recoveryUnit()->onRollback([opDebug, keysInserted]() {
-                opDebug->additiveMetrics.incrementKeysInserted(-keysInserted);
-            });
-        }
-    }
-
-    if (!ns().isImplicitlyReplicated()) {
-        opCtx->getServiceContext()->getOpObserver()->onInserts(
-            opCtx, ns(), uuid(), begin, end, fromMigrate);
-    }
-
-    // TODO (SERVER-67900): Get rid of the CollectionPtr constructor
-    collection_internal::cappedDeleteUntilBelowConfiguredMaximum(
-        opCtx, CollectionPtr(this, CollectionPtr::NoYieldTag()), records.begin()->id);
-
-    return Status::OK();
 }
 
 bool CollectionImpl::needsCappedLock() const {

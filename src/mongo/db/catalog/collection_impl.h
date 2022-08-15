@@ -29,10 +29,8 @@
 
 #pragma once
 
-#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 
 namespace mongo {
 
@@ -180,30 +178,6 @@ public:
         bool noWarn = false,
         Collection::StoreDeletedDoc storeDeletedDoc = Collection::StoreDeletedDoc::Off,
         CheckRecordId checkRecordId = CheckRecordId::Off) const final;
-
-    /*
-     * Inserts all documents inside one WUOW.
-     * Caller should ensure vector is appropriately sized for this.
-     * If any errors occur (including WCE), caller should retry documents individually.
-     *
-     * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
-     */
-    Status insertDocuments(OperationContext* opCtx,
-                           std::vector<InsertStatement>::const_iterator begin,
-                           std::vector<InsertStatement>::const_iterator end,
-                           OpDebug* opDebug,
-                           bool fromMigrate = false) const final;
-
-    /**
-     * this does NOT modify the doc before inserting
-     * i.e. will not add an _id field for documents that are missing it
-     *
-     * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
-     */
-    Status insertDocument(OperationContext* opCtx,
-                          const InsertStatement& doc,
-                          OpDebug* opDebug,
-                          bool fromMigrate = false) const final;
 
     /**
      * Updates the document @ oldLocation with newDoc.
@@ -459,12 +433,6 @@ public:
     bool isCappedAndNeedsDelete(OperationContext* opCtx) const final;
 
 private:
-    Status _insertDocuments(OperationContext* opCtx,
-                            std::vector<InsertStatement>::const_iterator begin,
-                            std::vector<InsertStatement>::const_iterator end,
-                            OpDebug* opDebug,
-                            bool fromMigrate) const;
-
     /**
      * Writes metadata to the DurableCatalog. Func should have the function signature
      * 'void(BSONCollectionCatalogEntry::MetaData&)'

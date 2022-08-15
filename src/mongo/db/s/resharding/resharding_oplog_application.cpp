@@ -27,11 +27,9 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
 
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_access_method.h"
@@ -53,7 +51,6 @@
 #include "mongo/s/sharding_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
-
 
 namespace mongo {
 namespace {
@@ -275,8 +272,11 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
     auto foundDoc = Helpers::findByIdAndNoopUpdate(opCtx, outputColl, idQuery, outputCollDoc);
 
     if (!foundDoc) {
-        uassertStatusOK(outputColl->insertDocument(
-            opCtx, InsertStatement(oField), nullptr /* nullOpDebug*/, false /* fromMigrate */));
+        uassertStatusOK(collection_internal::insertDocument(opCtx,
+                                                            outputColl,
+                                                            InsertStatement(oField),
+                                                            nullptr /* OpDebug */,
+                                                            false /* fromMigrate */));
 
         return;
     }
@@ -304,8 +304,8 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
 
     // The doc does not belong to '_donorShardId' under the original shard key, so apply rule #4
     // and insert the contents of 'op' to the stash collection.
-    uassertStatusOK(stashColl->insertDocument(
-        opCtx, InsertStatement(oField), nullptr /* nullOpDebug */, false /* fromMigrate */));
+    uassertStatusOK(collection_internal::insertDocument(
+        opCtx, stashColl, InsertStatement(oField), nullptr /* OpDebug */, false /* fromMigrate */));
 
     _applierMetrics->onWriteToStashCollections();
 }
@@ -536,8 +536,11 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(OperationContext* opCt
         // Insert the doc we just deleted from one of the stash collections into the output
         // collection.
         if (!doc.isEmpty()) {
-            uassertStatusOK(autoCollOutput->insertDocument(
-                opCtx, InsertStatement(doc), nullptr /* nullOpDebug */, false /* fromMigrate */));
+            uassertStatusOK(collection_internal::insertDocument(opCtx,
+                                                                *autoCollOutput,
+                                                                InsertStatement(doc),
+                                                                nullptr /* OpDebug */,
+                                                                false /* fromMigrate */));
         }
     });
 }

@@ -27,11 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
 #include "mongo/bson/oid.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/query/ce/stats_cache_loader_impl.h"
 #include "mongo/db/query/ce/stats_cache_loader_test_fixture.h"
@@ -39,9 +36,8 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 
+namespace mongo {
 namespace {
-
-using namespace mongo;
 
 class StatsCacheLoaderTest : public StatsCacheLoaderTestFixture {
 protected:
@@ -73,7 +69,8 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoad) {
         WriteUnitOfWork wuow(operationContext());
         // TODO: SERVER-68745, insert histogram.
         BSONObj doc = BSON("_id" << 1);
-        ASSERT_OK(coll->insertDocument(operationContext(), InsertStatement(doc), nullptr));
+        ASSERT_OK(collection_internal::insertDocument(
+            operationContext(), coll, InsertStatement(doc), nullptr));
         wuow.commit();
     }
     auto newStats = _statsCacheLoader.getStats(operationContext(), nss).get();
@@ -81,3 +78,4 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoad) {
 }
 
 }  // namespace
+}  // namespace mongo

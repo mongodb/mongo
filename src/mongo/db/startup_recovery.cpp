@@ -27,12 +27,9 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/startup_recovery.h"
 
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
@@ -131,9 +128,8 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
 
         writeConflictRetry(opCtx, "insertFCVDocument", fcvNss.ns(), [&] {
             WriteUnitOfWork wunit(opCtx);
-            OpDebug* const nullOpDebug = nullptr;
-            uassertStatusOK(fcvColl->insertDocument(
-                opCtx, InsertStatement(fcvDoc.toBSON()), nullOpDebug, false));
+            uassertStatusOK(collection_internal::insertDocument(
+                opCtx, fcvColl, InsertStatement(fcvDoc.toBSON()), nullptr /* OpDebug */, false));
             wunit.commit();
         });
     }

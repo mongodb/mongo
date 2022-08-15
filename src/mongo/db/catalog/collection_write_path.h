@@ -32,6 +32,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {
@@ -50,6 +51,32 @@ Status insertDocumentForBulkLoader(OperationContext* opCtx,
                                    const CollectionPtr& collection,
                                    const BSONObj& doc,
                                    const OnRecordInsertedFn& onRecordInserted);
+
+/**
+ * Inserts all documents inside one WUOW.
+ * Caller should ensure vector is appropriately sized for this.
+ * If any errors occur (including WCE), caller should retry documents individually.
+ *
+ * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
+ */
+Status insertDocuments(OperationContext* opCtx,
+                       const CollectionPtr& collection,
+                       std::vector<InsertStatement>::const_iterator begin,
+                       std::vector<InsertStatement>::const_iterator end,
+                       OpDebug* opDebug,
+                       bool fromMigrate = false);
+
+/**
+ * Does NOT modify the doc before inserting (i.e. will not add an _id field for documents that are
+ * missing it)
+ *
+ * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
+ */
+Status insertDocument(OperationContext* opCtx,
+                      const CollectionPtr& collection,
+                      const InsertStatement& doc,
+                      OpDebug* opDebug,
+                      bool fromMigrate = false);
 
 /**
  * Checks the 'failCollectionInserts' fail point at the beginning of an insert operation to see if

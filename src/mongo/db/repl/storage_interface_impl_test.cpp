@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <algorithm>
 #include <boost/optional.hpp>
 #include <memory>
@@ -36,6 +34,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -61,10 +60,9 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 
+namespace mongo {
+namespace repl {
 namespace {
-
-using namespace mongo;
-using namespace mongo::repl;
 
 const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 
@@ -446,8 +444,8 @@ TEST_F(StorageInterfaceImplTest,
         AutoGetCollection autoCollection(opCtx, nss, MODE_IX);
         WriteUnitOfWork wunit(opCtx);
         ASSERT_EQUALS(ErrorCodes::OperationCannotBeBatched,
-                      autoCollection.getCollection()->insertDocuments(
-                          opCtx, docs.cbegin(), docs.cend(), nullptr, false));
+                      collection_internal::insertDocuments(
+                          opCtx, *autoCollection, docs.cbegin(), docs.cend(), nullptr, false));
     }
     ASSERT_OK(storage.insertDocuments(opCtx, nss, docs));
 
@@ -3305,3 +3303,5 @@ TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeySucceeds) {
 }
 
 }  // namespace
+}  // namespace repl
+}  // namespace mongo

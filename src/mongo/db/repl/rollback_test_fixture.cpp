@@ -27,13 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/rollback_test_fixture.h"
 
-#include <memory>
 #include <string>
 
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
@@ -234,8 +232,8 @@ void RollbackTest::_insertDocument(OperationContext* opCtx,
 
     auto insertDoc = [opCtx, &doc](const CollectionPtr& collection) {
         WriteUnitOfWork wuow(opCtx);
-        OpDebug* const opDebug = nullptr;
-        ASSERT_OK(collection->insertDocument(opCtx, InsertStatement(doc), opDebug));
+        ASSERT_OK(collection_internal::insertDocument(
+            opCtx, collection, InsertStatement(doc), nullptr /* OpDebug */));
         wuow.commit();
     };
     AutoGetCollection collection(opCtx, nss, MODE_X);

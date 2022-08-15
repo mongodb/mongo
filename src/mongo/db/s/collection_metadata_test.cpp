@@ -32,7 +32,6 @@
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/s/catalog/type_chunk.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/sharding_test_fixture_common.h"
 #include "mongo/unittest/unittest.h"
 

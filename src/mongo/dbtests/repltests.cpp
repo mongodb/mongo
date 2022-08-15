@@ -27,12 +27,9 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -51,14 +48,9 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-
 namespace mongo {
 namespace repl {
 namespace ReplTests {
-
-using std::string;
-using std::unique_ptr;
-using std::vector;
 
 /**
  * Creates an OplogEntry with given parameters and preset defaults for this test suite.
@@ -223,7 +215,7 @@ protected:
     }
     void applyAllOperations() {
         Lock::GlobalWrite lk(&_opCtx);
-        vector<BSONObj> ops;
+        std::vector<BSONObj> ops;
         {
             DBDirectClient db(&_opCtx);
             auto cursor = db.find(FindCommandRequest{NamespaceString{cllNS()}});
@@ -242,10 +234,7 @@ protected:
         }
 
         OldClientContext ctx(&_opCtx, nss());
-        for (vector<BSONObj>::iterator i = ops.begin(); i != ops.end(); ++i) {
-            if (0) {
-                LOGV2(22501, "op: {i}", "i"_attr = *i);
-            }
+        for (std::vector<BSONObj>::iterator i = ops.begin(); i != ops.end(); ++i) {
             repl::UnreplicatedWritesBlock uwb(&_opCtx);
             auto entry = uassertStatusOK(OplogEntry::parse(*i));
             // Handle the case of batched writes which generate command-type (applyOps) oplog
@@ -316,7 +305,8 @@ protected:
         OpDebug* const nullOpDebug = nullptr;
         if (o.hasField("_id")) {
             repl::UnreplicatedWritesBlock uwb(&_opCtx);
-            coll->insertDocument(&_opCtx, InsertStatement(o), nullOpDebug, true)
+            collection_internal::insertDocument(
+                &_opCtx, coll, InsertStatement(o), nullOpDebug, true)
                 .transitional_ignore();
             ASSERT_OK(_opCtx.recoveryUnit()->setTimestamp(nextTimestamp));
             wunit.commit();
@@ -329,7 +319,8 @@ protected:
         b.appendOID("_id", &id);
         b.appendElements(o);
         repl::UnreplicatedWritesBlock uwb(&_opCtx);
-        coll->insertDocument(&_opCtx, InsertStatement(b.obj()), nullOpDebug, true)
+        collection_internal::insertDocument(
+            &_opCtx, coll, InsertStatement(b.obj()), nullOpDebug, true)
             .transitional_ignore();
         ASSERT_OK(_opCtx.recoveryUnit()->setTimestamp(nextTimestamp));
         wunit.commit();
@@ -446,7 +437,7 @@ class InsertTwo : public Recovering {
 public:
     InsertTwo() : o_(fromjson("{'_id':1,a:'b'}")), t_(fromjson("{'_id':2,c:'d'}")) {}
     void doIt() const {
-        vector<BSONObj> v;
+        std::vector<BSONObj> v;
         v.push_back(o_);
         v.push_back(t_);
         _client.insert(ns(), v);
@@ -787,7 +778,7 @@ protected:
 
 class MultiInc : public Recovering {
 public:
-    string s() const {
+    std::string s() const {
         StringBuilder ss;
         FindCommandRequest findRequest{NamespaceString{ns()}};
         findRequest.setSort(BSON("_id" << 1));

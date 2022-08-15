@@ -27,14 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/catalog/throttle_cursor.h"
-
 #include "mongo/db/catalog/catalog_test_fixture.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/catalog/throttle_cursor.h"
 #include "mongo/db/catalog/validate_gen.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_access_method.h"
@@ -93,8 +90,8 @@ void ThrottleCursorTest::setUp() {
     for (int i = 0; i < 10; i++) {
         WriteUnitOfWork wuow(operationContext());
 
-        ASSERT_OK(collection->insertDocument(
-            operationContext(), InsertStatement(BSON("_id" << i)), nullOpDebug));
+        ASSERT_OK(collection_internal::insertDocument(
+            operationContext(), *collection, InsertStatement(BSON("_id" << i)), nullOpDebug));
         wuow.commit();
     }
 

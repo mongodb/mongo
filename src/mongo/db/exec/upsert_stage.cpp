@@ -29,6 +29,7 @@
 
 #include "mongo/db/exec/upsert_stage.h"
 
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -180,11 +181,12 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
             insertStmt.oplogSlot = oplogSlots.front();
         }
 
-        uassertStatusOK(collection()->insertDocument(opCtx(),
-                                                     insertStmt,
-                                                     _params.opDebug,
-                                                     _params.request->source() ==
-                                                         OperationSource::kFromMigrate));
+        uassertStatusOK(collection_internal::insertDocument(opCtx(),
+                                                            collection(),
+                                                            insertStmt,
+                                                            _params.opDebug,
+                                                            _params.request->source() ==
+                                                                OperationSource::kFromMigrate));
 
         // Technically, we should save/restore state here, but since we are going to return
         // immediately after, it would just be wasted work.

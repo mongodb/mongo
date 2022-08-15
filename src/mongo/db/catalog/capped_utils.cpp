@@ -31,6 +31,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/drop_collection.h"
@@ -53,7 +54,6 @@
 #include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 
 namespace mongo {
 
@@ -230,7 +230,6 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
             }
 
             WriteUnitOfWork wunit(opCtx);
-            OpDebug* const nullOpDebug = nullptr;
 
             InsertStatement insertStmt(objToClone);
 
@@ -245,8 +244,8 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
                 insertStmt.oplogSlot = oplogSlots.front();
             }
 
-            uassertStatusOK(toCollection->insertDocument(
-                opCtx, InsertStatement(objToClone), nullOpDebug, true));
+            uassertStatusOK(collection_internal::insertDocument(
+                opCtx, toCollection, InsertStatement(objToClone), nullptr /* OpDebug */, true));
             wunit.commit();
 
             // Go to the next document

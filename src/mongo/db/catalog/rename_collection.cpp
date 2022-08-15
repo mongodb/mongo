@@ -33,6 +33,7 @@
 #include "mongo/db/catalog/catalog_helper.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/drop_collection.h"
@@ -698,8 +699,12 @@ Status renameBetweenDBs(OperationContext* opCtx,
                 }
 
                 OpDebug* const opDebug = nullptr;
-                auto status = autoTmpColl->insertDocuments(
-                    opCtx, stmts.begin(), stmts.end(), opDebug, false /* fromMigrate */);
+                auto status = collection_internal::insertDocuments(opCtx,
+                                                                   *autoTmpColl,
+                                                                   stmts.begin(),
+                                                                   stmts.end(),
+                                                                   opDebug,
+                                                                   false /* fromMigrate */);
                 if (!status.isOK()) {
                     return status;
                 }

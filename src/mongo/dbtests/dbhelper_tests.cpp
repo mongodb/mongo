@@ -27,10 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/dbclient_cursor.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
@@ -50,11 +48,7 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
-
 namespace {
-
-using std::set;
-using std::unique_ptr;
 
 /**
  * Unit tests related to DBHelpers
@@ -144,10 +138,10 @@ public:
             WriteUnitOfWork wuow(opCtx1.get());
             collection1 = db->createCollection(opCtx1.get(), nss, CollectionOptions(), true);
             ASSERT_TRUE(collection1 != nullptr);
-            ASSERT_TRUE(collection1
-                            ->insertDocument(
-                                opCtx1.get(), InsertStatement(doc), nullptr /* opDebug */, false)
-                            .isOK());
+            ASSERT_TRUE(
+                collection_internal::insertDocument(
+                    opCtx1.get(), collection1, InsertStatement(doc), nullptr /* opDebug */, false)
+                    .isOK());
             wuow.commit();
         }
 

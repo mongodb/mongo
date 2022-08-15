@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/namespace_string.h"
-#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk.h"
-#include "mongo/s/chunk_version.h"
-#include "mongo/s/shard_id.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

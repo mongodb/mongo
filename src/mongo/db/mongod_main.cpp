@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/mongod_main.h"
 
 #include <boost/filesystem/operations.hpp>
@@ -51,9 +48,9 @@
 #include "mongo/db/auth/auth_op_observer.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/sasl_options.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_impl.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder_impl.h"
@@ -295,8 +292,8 @@ void logStartup(OperationContext* opCtx) {
     }
     invariant(collection);
 
-    OpDebug* const nullOpDebug = nullptr;
-    uassertStatusOK(collection->insertDocument(opCtx, InsertStatement(o), nullOpDebug, false));
+    uassertStatusOK(collection_internal::insertDocument(
+        opCtx, collection, InsertStatement(o), nullptr /* OpDebug */, false));
     wunit.commit();
 }
 

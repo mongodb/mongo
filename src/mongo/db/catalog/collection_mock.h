@@ -151,21 +151,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    Status insertDocuments(OperationContext* opCtx,
-                           std::vector<InsertStatement>::const_iterator begin,
-                           std::vector<InsertStatement>::const_iterator end,
-                           OpDebug* opDebug,
-                           bool fromMigrate) const {
-        MONGO_UNREACHABLE;
-    }
-
-    Status insertDocument(OperationContext* opCtx,
-                          const InsertStatement& doc,
-                          OpDebug* opDebug,
-                          bool fromMigrate) const {
-        MONGO_UNREACHABLE;
-    }
-
     RecordId updateDocument(OperationContext* opCtx,
                             const RecordId& oldLocation,
                             const Snapshotted<BSONObj>& oldDoc,

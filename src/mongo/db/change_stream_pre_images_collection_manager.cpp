@@ -27,13 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
-#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog_raii.h"
@@ -162,8 +160,11 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
             "The change stream pre-images collection is not present",
             changeStreamPreImagesCollection);
 
-    const auto insertionStatus = changeStreamPreImagesCollection->insertDocument(
-        opCtx, InsertStatement{preImage.toBSON()}, &CurOp::get(opCtx)->debug());
+    const auto insertionStatus =
+        collection_internal::insertDocument(opCtx,
+                                            changeStreamPreImagesCollection,
+                                            InsertStatement{preImage.toBSON()},
+                                            &CurOp::get(opCtx)->debug());
     tassert(5868601,
             str::stream() << "Attempted to insert a duplicate document into the pre-images "
                              "collection. Pre-image id: "

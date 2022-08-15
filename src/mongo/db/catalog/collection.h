@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
@@ -38,7 +37,6 @@
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/catalog/collection_options.h"
@@ -334,30 +332,6 @@ public:
                                 bool noWarn = false,
                                 StoreDeletedDoc storeDeletedDoc = StoreDeletedDoc::Off,
                                 CheckRecordId checkRecordId = CheckRecordId::Off) const = 0;
-
-    /*
-     * Inserts all documents inside one WUOW.
-     * Caller should ensure vector is appropriately sized for this.
-     * If any errors occur (including WCE), caller should retry documents individually.
-     *
-     * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
-     */
-    virtual Status insertDocuments(OperationContext* opCtx,
-                                   std::vector<InsertStatement>::const_iterator begin,
-                                   std::vector<InsertStatement>::const_iterator end,
-                                   OpDebug* opDebug,
-                                   bool fromMigrate = false) const = 0;
-
-    /**
-     * this does NOT modify the doc before inserting
-     * i.e. will not add an _id field for documents that are missing it
-     *
-     * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
-     */
-    virtual Status insertDocument(OperationContext* opCtx,
-                                  const InsertStatement& doc,
-                                  OpDebug* opDebug,
-                                  bool fromMigrate = false) const = 0;
 
     /**
      * Updates the document @ oldLocation with newDoc.

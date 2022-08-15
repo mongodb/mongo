@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <chrono>
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
@@ -40,6 +38,7 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/stdx/chrono.h"
 
+namespace mongo {
 namespace deferred_writer_tests {
 
 namespace {
@@ -387,3 +386,4 @@ public:
 OldStyleSuiteInitializer<DeferredWriterTests> deferredWriterTests;
 
 }  // namespace deferred_writer_tests
+}  // namespace mongo

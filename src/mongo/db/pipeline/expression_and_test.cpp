@@ -40,7 +40,6 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/dbtests/dbtests.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace ExpressionTests {

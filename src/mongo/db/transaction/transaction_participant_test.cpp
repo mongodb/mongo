@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/db_raii.h"
@@ -404,7 +401,8 @@ void insertTxnRecord(OperationContext* opCtx, unsigned i, DurableTxnStateEnum st
     auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
     ASSERT(coll);
     OpDebug* const nullOpDebug = nullptr;
-    ASSERT_OK(coll->insertDocument(opCtx, InsertStatement(record.toBSON()), nullOpDebug, false));
+    ASSERT_OK(collection_internal::insertDocument(
+        opCtx, coll, InsertStatement(record.toBSON()), nullOpDebug, false));
     wuow.commit();
 }
 }  // namespace

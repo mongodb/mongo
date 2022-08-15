@@ -29,6 +29,7 @@
 
 #include "mongo/db/catalog/index_repair.h"
 #include "mongo/base/status_with.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/validate_state.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -88,8 +89,8 @@ StatusWith<int> moveRecordToLostAndFound(OperationContext* opCtx,
             }
 
             // Write document to lost_and_found collection and delete from original collection.
-            Status status =
-                localCollection->insertDocument(opCtx, InsertStatement(doc.value()), nullptr);
+            Status status = collection_internal::insertDocument(
+                opCtx, localCollection, InsertStatement(doc.value()), nullptr);
             if (!status.isOK()) {
                 return status;
             }
