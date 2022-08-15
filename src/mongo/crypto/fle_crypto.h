@@ -904,6 +904,7 @@ public:
  * Encrypt(ServerDataEncryptionLevel1Token, Struct(K_KeyId, v, count, d, s, c))
  *
  * struct {
+ *   uint64_t length;
  *   uint8_t[length] cipherText; // UserKeyId + Encrypt(K_KeyId, value),
  *   uint64_t counter;
  *   uint8_t[32] edc;  // EDCDerivedFromDataTokenAndContentionFactorToken
@@ -961,6 +962,66 @@ struct FLE2UnindexedEncryptedValue {
                                                                  ConstDataRange blob);
 
     static constexpr size_t assocDataSize = sizeof(uint8_t) + sizeof(UUID) + sizeof(uint8_t);
+};
+
+struct FLEEdgeToken {
+    EDCDerivedFromDataTokenAndContentionFactorToken edc;
+    ESCDerivedFromDataTokenAndContentionFactorToken esc;
+    ECCDerivedFromDataTokenAndContentionFactorToken ecc;
+};
+
+/**
+ * Class to read/write FLE2 Range Indexed Encrypted Values
+ *
+ * Fields are encrypted with the following:
+ *
+ * struct {
+ *   uint8_t fle_blob_subtype = 9;
+ *   uint8_t key_uuid[16];
+ *   uint8  original_bson_type;
+ *   ciphertext[ciphertext_length];
+ * }
+ *
+ * Encrypt(ServerDataEncryptionLevel1Token, Struct(K_KeyId, v, edgeCount, [count, d, s, c] x
+ *edgeCount ))
+ *
+ * struct {
+ *   uint64_t length;
+ *   uint8_t[length] cipherText; // UserKeyId + Encrypt(K_KeyId, value),
+ *   uint32_t edgeCount;
+ *   struct {
+ *      uint64_t counter;
+ *      uint8_t[32] edc;  // EDCDerivedFromDataTokenAndContentionFactorToken
+ *      uint8_t[32] esc;  // ESCDerivedFromDataTokenAndContentionFactorToken
+ *      uint8_t[32] ecc;  // ECCDerivedFromDataTokenAndContentionFactorToken
+ *   } edges[edgeCount];
+ *}
+ */
+struct FLE2IndexedRangeEncryptedValue {
+    FLE2IndexedRangeEncryptedValue(FLE2InsertUpdatePayload payload,
+                                   std::vector<uint64_t> countersParam);
+
+    FLE2IndexedRangeEncryptedValue(std::vector<FLEEdgeToken> tokens,
+                                   std::vector<uint64_t> countersParam,
+                                   BSONType typeParam,
+                                   UUID indexKeyIdParam,
+                                   std::vector<uint8_t> serializedServerValueParam);
+
+    static StatusWith<FLE2IndexedRangeEncryptedValue> decryptAndParse(
+        ServerDataEncryptionLevel1Token token, ConstDataRange serializedServerValue);
+
+    /**
+     * Read the key id from the payload.
+     */
+    static StatusWith<UUID> readKeyId(ConstDataRange serializedServerValue);
+
+    StatusWith<std::vector<uint8_t>> serialize(ServerDataEncryptionLevel1Token token);
+
+    std::vector<FLEEdgeToken> tokens;
+    std::vector<uint64_t> counters;
+    BSONType bsonType;
+    UUID indexKeyId;
+    std::vector<uint8_t> clientEncryptedValue;
 };
 
 
@@ -1027,6 +1088,9 @@ public:
     static StatusWith<FLE2IndexedEqualityEncryptedValue> decryptAndParse(
         ConstDataRange token, ConstDataRange serializedServerValue);
 
+    static StatusWith<FLE2IndexedRangeEncryptedValue> decryptAndParseRange(
+        ConstDataRange token, ConstDataRange serializedServerValue);
+
     /**
      * Generate a search tag
      *
@@ -1035,6 +1099,8 @@ public:
     static PrfBlock generateTag(EDCTwiceDerivedToken edcTwiceDerived, FLECounter count);
     static PrfBlock generateTag(const EDCServerPayloadInfo& payload);
     static PrfBlock generateTag(const FLE2IndexedEqualityEncryptedValue& indexedValue);
+    static PrfBlock generateTag(const FLEEdgeToken& token, FLECounter count);
+    static std::vector<PrfBlock> generateTags(const FLE2IndexedRangeEncryptedValue& indexedValue);
 
     /**
      * Generate all the EDC tokens
@@ -1270,6 +1336,7 @@ BSONBinData toBSONBinData(const std::vector<uint8_t>& buf);
 
 std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedBinData(const Value& value);
 
+bool hasQueryType(const EncryptedField& field, QueryTypeEnum queryType);
 bool hasQueryType(const EncryptedFieldConfig& config, QueryTypeEnum queryType);
 
 }  // namespace mongo

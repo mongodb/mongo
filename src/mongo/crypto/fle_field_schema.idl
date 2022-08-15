@@ -57,6 +57,9 @@ enums:
           # same as BinDataGeneral but redacted
           kFLE2TransientRaw : 8
 
+          kFLE2RangeIndexedValue : 9    # see FLE2IndexedRangeEncryptedValue
+
+
     FleVersion:
         description: "The version / type of field-level encryption in use."
         type: int
@@ -152,6 +155,27 @@ structs:
             optional: true
             validator: { gte: 0, lte: 3 }
 
+    EdgeTokenSet:
+        description: "Payload of an indexed field to insert or update"
+        strict: true
+        fields:
+          d:
+            description: "EDCDerivedFromDataTokenAndCounter"
+            type: bindata_generic
+            cpp_name: edcDerivedToken
+          s:
+            description: "ESCDerivedFromDataTokenAndCounter"
+            type: bindata_generic
+            cpp_name: escDerivedToken
+          c:
+            description: "ECCDerivedFromDataTokenAndCounter"
+            type: bindata_generic
+            cpp_name: eccDerivedToken
+          p:
+            description: "Encrypted tokens"
+            type: bindata_generic
+            cpp_name: encryptedTokens
+
     FLE2InsertUpdatePayload:
         description: "Payload of an indexed field to insert or update"
         strict: true
@@ -188,6 +212,11 @@ structs:
             description: "ServerDataEncryptionLevel1Token"
             type: bindata_generic
             cpp_name: serverEncryptionToken
+          g:
+            description: "Array of Edges"
+            type: array<EdgeTokenSet>
+            cpp_name: edgeTokenSet
+            optional: true
 
     FLE2DeletePayload:
         description: "Payload of an indexed field to delete"

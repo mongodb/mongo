@@ -1168,6 +1168,94 @@ TEST(FLE_EDC, ServerSide_Payloads) {
                       value.data<uint8_t>()));
 }
 
+TEST(FLE_EDC, ServerSide_Range_Payloads) {
+    TestKeyVault keyVault;
+
+    auto doc = BSON("sample" << 3);
+    auto element = doc.firstElement();
+
+    auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
+
+    auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
+    auto serverEncryptToken =
+        FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(getIndexKey());
+    auto edcToken = FLECollectionTokenGenerator::generateEDCToken(collectionToken);
+    auto escToken = FLECollectionTokenGenerator::generateESCToken(collectionToken);
+    auto eccToken = FLECollectionTokenGenerator::generateECCToken(collectionToken);
+    auto ecocToken = FLECollectionTokenGenerator::generateECOCToken(collectionToken);
+
+    FLECounter counter = 0;
+
+
+    EDCDerivedFromDataToken edcDatakey =
+        FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken, value);
+    ESCDerivedFromDataToken escDatakey =
+        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
+    ECCDerivedFromDataToken eccDatakey =
+        FLEDerivedFromDataTokenGenerator::generateECCDerivedFromDataToken(eccToken, value);
+
+
+    ESCDerivedFromDataTokenAndContentionFactorToken escDataCounterkey =
+        FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
+            generateESCDerivedFromDataTokenAndContentionFactorToken(escDatakey, counter);
+    ECCDerivedFromDataTokenAndContentionFactorToken eccDataCounterkey =
+        FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
+            generateECCDerivedFromDataTokenAndContentionFactorToken(eccDatakey, counter);
+
+    FLE2InsertUpdatePayload iupayload;
+
+
+    iupayload.setEdcDerivedToken(edcDatakey.toCDR());
+    iupayload.setEscDerivedToken(escDatakey.toCDR());
+    iupayload.setEccDerivedToken(eccDatakey.toCDR());
+    iupayload.setServerEncryptionToken(serverEncryptToken.toCDR());
+
+    auto swEncryptedTokens =
+        EncryptedStateCollectionTokens(escDataCounterkey, eccDataCounterkey).serialize(ecocToken);
+    uassertStatusOK(swEncryptedTokens);
+    iupayload.setEncryptedTokens(swEncryptedTokens.getValue());
+    iupayload.setValue(value);
+    iupayload.setType(element.type());
+
+    std::vector<EdgeTokenSet> tokens;
+    EdgeTokenSet ets;
+    ets.setEdcDerivedToken(edcDatakey.toCDR());
+    ets.setEscDerivedToken(escDatakey.toCDR());
+    ets.setEccDerivedToken(eccDatakey.toCDR());
+    ets.setEncryptedTokens(swEncryptedTokens.getValue());
+
+    tokens.push_back(ets);
+    tokens.push_back(ets);
+
+    iupayload.setEdgeTokenSet(tokens);
+
+    FLE2IndexedRangeEncryptedValue serverPayload(iupayload, {123456, 123456, 123456});
+
+    auto swBuf = serverPayload.serialize(serverEncryptToken);
+    ASSERT_OK(swBuf.getStatus());
+
+    auto swServerPayload =
+        FLE2IndexedRangeEncryptedValue::decryptAndParse(serverEncryptToken, swBuf.getValue());
+
+    ASSERT_OK(swServerPayload.getStatus());
+    auto sp = swServerPayload.getValue();
+    ASSERT_EQ(sp.tokens.size(), 3);
+    for (size_t i = 0; i < sp.tokens.size(); i++) {
+        auto ets = sp.tokens[i];
+        auto rhs = serverPayload.tokens[i];
+        ASSERT_EQ(ets.edc, rhs.edc);
+        ASSERT_EQ(ets.esc, rhs.esc);
+        ASSERT_EQ(ets.ecc, rhs.ecc);
+        ASSERT_EQ(sp.counters[i], serverPayload.counters[i]);
+    }
+
+    ASSERT(sp.clientEncryptedValue == serverPayload.clientEncryptedValue);
+    ASSERT_EQ(serverPayload.clientEncryptedValue.size(), value.length());
+    ASSERT(std::equal(serverPayload.clientEncryptedValue.begin(),
+                      serverPayload.clientEncryptedValue.end(),
+                      value.data<uint8_t>()));
+}
+
 TEST(FLE_EDC, DuplicateSafeContent_CompatibleType) {
 
     TestKeyVault keyVault;
