@@ -1,6 +1,6 @@
 /**
  * Test that retryable findAndModify commands will store pre- and post- images in the appropriate
- * collections according to the parameter value of `storeFindAndModifyImagesInSideCollection`.
+ * collections for `storeFindAndModifyImagesInSideCollection=true`.
  *
  * @tags: [requires_replication]
  */
@@ -109,17 +109,8 @@ function checkProfilingLogs(primary) {
     assert.eq(0, configProfileDocs.length);
 }
 
-function runTests(lsid,
-                  mainConn,
-                  primary,
-                  secondary,
-                  storeImagesInSideCollection,
-                  docId,
-                  preImageRecordingEnabled) {
-    const setParam = {
-        setParameter: 1,
-        storeFindAndModifyImagesInSideCollection: storeImagesInSideCollection
-    };
+function runTests(lsid, mainConn, primary, secondary, docId, preImageRecordingEnabled) {
+    const setParam = {setParameter: 1, storeFindAndModifyImagesInSideCollection: true};
     primary.adminCommand(setParam);
 
     let txnNumber = NumberLong(docId);
@@ -175,14 +166,14 @@ function runTests(lsid,
     const expectedWriteTs = Timestamp(0, 0);
     const expectedStmtId = 0;
     let retryArgs = {
-        needsRetryImage: storeImagesInSideCollection,
+        needsRetryImage: true,
         imageKind: "preImage",
         preImageRecordingEnabled: preImageRecordingEnabled
     };
     checkOplogEntry(updateOp, lsid, txnNumber, expectedStmtId, expectedWriteTs, retryArgs);
     checkSessionCatalog(primary, lsid, txnNumber, updateOp.ts);
     checkSessionCatalog(secondary, lsid, txnNumber, updateOp.ts);
-    if (storeImagesInSideCollection && !preImageRecordingEnabled) {
+    if (!preImageRecordingEnabled) {
         const sessionInfo = {sessionId: lsid, txnNum: txnNumber};
         checkImageCollection(primary, sessionInfo, updateOp.ts, expectedPreImage, "preImage");
         checkImageCollection(secondary, sessionInfo, updateOp.ts, expectedPreImage, "preImage");
@@ -217,27 +208,20 @@ function runTests(lsid,
     // Check that the findAndModify oplog entry and sessions record has the appropriate fields
     // and values.
     retryArgs = {
-        needsRetryImage: storeImagesInSideCollection,
+        needsRetryImage: true,
         imageKind: "postImage",
         preImageRecordingEnabled: preImageRecordingEnabled
     };
     checkOplogEntry(updateOp, lsid, txnNumber, expectedStmtId, expectedWriteTs, retryArgs);
     checkSessionCatalog(primary, lsid, txnNumber, updateOp.ts);
     checkSessionCatalog(secondary, lsid, txnNumber, updateOp.ts);
-    if (storeImagesInSideCollection) {
-        const sessionInfo = {sessionId: lsid, txnNum: txnNumber};
-        checkImageCollection(primary, sessionInfo, updateOp.ts, expectedPostImage, "postImage");
-        checkImageCollection(secondary, sessionInfo, updateOp.ts, expectedPostImage, "postImage");
-        if (preImageRecordingEnabled) {
-            const preImage =
-                oplog.findOne({ns: 'test.user', op: 'n', ts: updateOp.preImageOpTime.ts});
-            assert.eq(expectedPreImage, preImage.o);
-        }
-    } else {
-        // The postImage should be stored in the oplog.
-        const postImage =
-            oplog.findOne({ns: 'test.user', op: 'n', ts: updateOp.postImageOpTime.ts});
-        assert.eq(expectedPostImage, postImage.o);
+
+    var sessionInfo = {sessionId: lsid, txnNum: txnNumber};
+    checkImageCollection(primary, sessionInfo, updateOp.ts, expectedPostImage, "postImage");
+    checkImageCollection(secondary, sessionInfo, updateOp.ts, expectedPostImage, "postImage");
+    if (preImageRecordingEnabled) {
+        const preImage = oplog.findOne({ns: 'test.user', op: 'n', ts: updateOp.preImageOpTime.ts});
+        assert.eq(expectedPreImage, preImage.o);
     }
     // Assert that retrying the command will produce the same response.
     retryRes = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
@@ -262,7 +246,7 @@ function runTests(lsid,
     // Get update entry.
     updateOp = oplog.findOne({ns: 'test.user', op: 'u', txnNumber: txnNumber});
     retryArgs = {
-        needsRetryImage: storeImagesInSideCollection,
+        needsRetryImage: true,
         imageKind: "preImage",
         preImageRecordingEnabled: preImageRecordingEnabled
     };
@@ -271,7 +255,7 @@ function runTests(lsid,
     checkOplogEntry(updateOp, lsid, txnNumber, expectedStmtId, expectedWriteTs, retryArgs);
     checkSessionCatalog(primary, lsid, txnNumber, updateOp.ts);
     checkSessionCatalog(secondary, lsid, txnNumber, updateOp.ts);
-    if (storeImagesInSideCollection && !preImageRecordingEnabled) {
+    if (!preImageRecordingEnabled) {
         const sessionInfo = {sessionId: lsid, txnNum: txnNumber};
         checkImageCollection(primary, sessionInfo, updateOp.ts, expectedPreImage, "preImage");
         checkImageCollection(secondary, sessionInfo, updateOp.ts, expectedPreImage, "preImage");
@@ -306,7 +290,7 @@ function runTests(lsid,
     // Get update entry.
     updateOp = oplog.findOne({ns: 'test.user', op: 'u', txnNumber: txnNumber});
     retryArgs = {
-        needsRetryImage: storeImagesInSideCollection,
+        needsRetryImage: true,
         imageKind: "postImage",
         preImageRecordingEnabled: preImageRecordingEnabled
     };
@@ -315,20 +299,13 @@ function runTests(lsid,
     checkOplogEntry(updateOp, lsid, txnNumber, expectedStmtId, expectedWriteTs, retryArgs);
     checkSessionCatalog(primary, lsid, txnNumber, updateOp.ts);
     checkSessionCatalog(secondary, lsid, txnNumber, updateOp.ts);
-    if (storeImagesInSideCollection) {
-        const sessionInfo = {sessionId: lsid, txnNum: txnNumber};
-        checkImageCollection(primary, sessionInfo, updateOp.ts, expectedPostImage, "postImage");
-        checkImageCollection(secondary, sessionInfo, updateOp.ts, expectedPostImage, "postImage");
-        if (preImageRecordingEnabled) {
-            const preImage =
-                oplog.findOne({ns: 'test.user', op: 'n', ts: updateOp.preImageOpTime.ts});
-            assert.eq(expectedPreImage, preImage.o);
-        }
-    } else {
-        // The postImage should be stored in the oplog.
-        const postImage =
-            oplog.findOne({ns: 'test.user', op: 'n', ts: updateOp.postImageOpTime.ts});
-        assert.eq(expectedPostImage, postImage.o);
+
+    sessionInfo = {sessionId: lsid, txnNum: txnNumber};
+    checkImageCollection(primary, sessionInfo, updateOp.ts, expectedPostImage, "postImage");
+    checkImageCollection(secondary, sessionInfo, updateOp.ts, expectedPostImage, "postImage");
+    if (preImageRecordingEnabled) {
+        const preImage = oplog.findOne({ns: 'test.user', op: 'n', ts: updateOp.preImageOpTime.ts});
+        assert.eq(expectedPreImage, preImage.o);
     }
     // Assert that retrying the command will produce the same response.
     retryRes = assert.commandWorked(mainConn.getDB('test').runCommand(cmd));
@@ -353,14 +330,14 @@ function runTests(lsid,
     // Get delete entry from top of oplog.
     const deleteOp = oplog.findOne({ns: 'test.user', op: 'd', txnNumber: txnNumber});
     retryArgs = {
-        needsRetryImage: storeImagesInSideCollection,
+        needsRetryImage: true,
         imageKind: "preImage",
         preImageRecordingEnabled: preImageRecordingEnabled
     };
     checkOplogEntry(deleteOp, lsid, txnNumber, expectedStmtId, expectedWriteTs, retryArgs);
     checkSessionCatalog(primary, lsid, txnNumber, deleteOp.ts);
     checkSessionCatalog(secondary, lsid, txnNumber, deleteOp.ts);
-    if (storeImagesInSideCollection && !preImageRecordingEnabled) {
+    if (!preImageRecordingEnabled) {
         const sessionInfo = {sessionId: lsid, txnNum: txnNumber};
         checkImageCollection(primary, sessionInfo, deleteOp.ts, expectedPreImage, "preImage");
         checkImageCollection(secondary, sessionInfo, deleteOp.ts, expectedPreImage, "preImage");
@@ -389,21 +366,12 @@ runTests(lsid,
          rst.getPrimary(),
          rst.getPrimary(),
          rst.getSecondary(),
-         true,
          40,
          /*preImageRecordingEnabled=*/false);
 runTests(lsid,
          rst.getPrimary(),
          rst.getPrimary(),
          rst.getSecondary(),
-         false,
-         50,
-         /*preImageRecordingEnabled=*/false);
-runTests(lsid,
-         rst.getPrimary(),
-         rst.getPrimary(),
-         rst.getSecondary(),
-         true,
          60,
          /*preImageRecordingEnabled=*/true);
 rst.stopSet();
@@ -415,14 +383,12 @@ runTests(lsid,
          st.s,
          st.rs0.getPrimary(),
          st.rs0.getSecondary(),
-         true,
          70,
          /*preImageRecordingEnabled=*/false);
 runTests(lsid,
          st.s,
          st.rs0.getPrimary(),
          st.rs0.getSecondary(),
-         true,
          80,
          /*preImageRecordingEnabled=*/false);
 st.stop();

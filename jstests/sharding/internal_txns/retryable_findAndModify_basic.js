@@ -36,9 +36,6 @@ const transactionTest = new RetryableInternalTransactionTest();
     transactionTest.runTestsForAllRetryableInternalTransactionTypes(
         transactionTest.runFindAndModifyTestsEnableImageCollection,
         transactionTest.TestMode.kNonRecovery);
-    transactionTest.runTestsForAllRetryableInternalTransactionTypes(
-        transactionTest.runFindAndModifyTestsDisableImageCollection,
-        transactionTest.TestMode.kNonRecovery);
 }
 
 transactionTest.stop();

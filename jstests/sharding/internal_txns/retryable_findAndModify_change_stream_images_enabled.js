@@ -17,7 +17,5 @@ const transactionTest =
     new RetryableInternalTransactionTest({changeStreamPreAndPostImages: {enabled: true}});
 transactionTest.runTestsForAllRetryableInternalTransactionTypes(
     transactionTest.runFindAndModifyTestsEnableImageCollection);
-transactionTest.runTestsForAllRetryableInternalTransactionTypes(
-    transactionTest.runFindAndModifyTestsDisableImageCollection);
 transactionTest.stop();
 })();

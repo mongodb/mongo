@@ -103,11 +103,6 @@ function executeTest(db) {
     rst.getPrimary().adminCommand(
         {setParameter: 1, storeFindAndModifyImagesInSideCollection: true});
     executeTest(rst.getPrimary().getDB("test"));
-
-    // Test the legacy behavior where storeFindAndModifyImagesInSideCollection is false.
-    rst.getPrimary().adminCommand(
-        {setParameter: 1, storeFindAndModifyImagesInSideCollection: false});
-    executeTest(rst.getPrimary().getDB("test"));
     rst.stopSet();
 }
 })();

@@ -71,10 +71,6 @@ var $config = extendWorkload($config, function($config, $super) {
         [$config.data.executionContextTypes.kClientTransaction]: false,
     };
 
-    // This workload sets the 'storeFindAndModifyImagesInSideCollection' parameter to a random bool
-    // during setup() and restores the original value during teardown().
-    $config.data.originalStoreFindAndModifyImagesInSideCollection = {};
-
     // The reap threshold is overriden to get coverage for when it schedules reaps during an active
     // workload.
     $config.data.originalInternalSessionReapThreshold = {};
@@ -500,30 +496,6 @@ var $config = extendWorkload($config, function($config, $super) {
         });
     };
 
-    $config.data.overrideStoreFindAndModifyImagesInSideCollection =
-        function overrideStoreFindAndModifyImagesInSideCollection(cluster) {
-        // Store the findAndModify images in the oplog half of the time.
-        const enableFindAndModifyImageCollection = this.generateRandomBool();
-        cluster.executeOnMongodNodes((db) => {
-            const res = assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                storeFindAndModifyImagesInSideCollection: enableFindAndModifyImageCollection
-            }));
-            this.originalStoreFindAndModifyImagesInSideCollection[db.getMongo().host] = res.was;
-        });
-    };
-
-    $config.data.restoreStoreFindAndModifyImagesInSideCollection =
-        function restoreStoreFindAndModifyImagesInSideCollection(cluster) {
-        cluster.executeOnMongodNodes((db) => {
-            assert.commandWorked(db.adminCommand({
-                setParameter: 1,
-                storeFindAndModifyImagesInSideCollection:
-                    this.originalStoreFindAndModifyImagesInSideCollection[db.getMongo().host]
-            }));
-        });
-    };
-
     $config.data.overrideTransactionLifetimeLimit = function overrideTransactionLifetimeLimit(
         cluster) {
         cluster.executeOnMongodNodes((db) => {
@@ -562,7 +534,6 @@ var $config = extendWorkload($config, function($config, $super) {
             }
         }
         this.overrideInternalTransactionsReapThreshold(cluster);
-        this.overrideStoreFindAndModifyImagesInSideCollection(cluster);
         if (this.lowerTransactionLifetimeLimitSeconds) {
             this.overrideTransactionLifetimeLimit(cluster);
         }
@@ -570,7 +541,6 @@ var $config = extendWorkload($config, function($config, $super) {
 
     $config.teardown = function teardown(db, collName, cluster) {
         this.restoreInternalTransactionsReapThreshold(cluster);
-        this.restoreStoreFindAndModifyImagesInSideCollection(cluster);
         if (this.lowerTransactionLifetimeLimitSeconds) {
             this.restoreTransactionLifetimeLimit(cluster);
         }

@@ -127,17 +127,6 @@ function runTest(st, stepDownShard0PrimaryFunc, testOpts = {
         abortTxnAfterFailover: true,
         enableFindAndModifyImageCollection: true
     });
-    // Test findAnModify with pre/post image when the image collection is disabled.
-    runTest(st, stepDownShard0PrimaryFunc, {
-        runFindAndModifyWithPreOrPostImage: true,
-        abortTxnAfterFailover: false,
-        enableFindAndModifyImageCollection: false
-    });
-    runTest(st, stepDownShard0PrimaryFunc, {
-        runFindAndModifyWithPreOrPostImage: true,
-        abortTxnAfterFailover: true,
-        enableFindAndModifyImageCollection: false
-    });
 
     st.stop();
 }
@@ -173,17 +162,6 @@ function runTest(st, stepDownShard0PrimaryFunc, testOpts = {
         runFindAndModifyWithPreOrPostImage: true,
         abortTxnAfterFailover: true,
         enableFindAndModifyImageCollection: true
-    });
-    // Test findAnModify with pre/post image when the image collection is disabled.
-    runTest(st, stepDownShard0PrimaryFunc, {
-        runFindAndModifyWithPreOrPostImage: true,
-        abortTxnAfterFailover: false,
-        enableFindAndModifyImageCollection: false
-    });
-    runTest(st, stepDownShard0PrimaryFunc, {
-        runFindAndModifyWithPreOrPostImage: true,
-        abortTxnAfterFailover: true,
-        enableFindAndModifyImageCollection: false
     });
 
     st.stop();
@@ -223,17 +201,6 @@ function runTest(st, stepDownShard0PrimaryFunc, testOpts = {
         runFindAndModifyWithPreOrPostImage: true,
         abortTxnAfterFailover: true,
         enableFindAndModifyImageCollection: true
-    });
-    // Test findAnModify with pre/post image when the image collection is disabled.
-    runTest(st, restartShard0Func, {
-        runFindAndModifyWithPreOrPostImage: true,
-        abortTxnAfterFailover: false,
-        enableFindAndModifyImageCollection: false
-    });
-    runTest(st, restartShard0Func, {
-        runFindAndModifyWithPreOrPostImage: true,
-        abortTxnAfterFailover: true,
-        enableFindAndModifyImageCollection: false
     });
 
     st.stop();

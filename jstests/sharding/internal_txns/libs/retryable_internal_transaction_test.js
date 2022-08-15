@@ -613,11 +613,6 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
         runFindAndModifyTests(testOptions);
     };
 
-    this.runFindAndModifyTestsDisableImageCollection = function(testOptions) {
-        testOptions.enableFindAndModifyImageCollection = false;
-        runFindAndModifyTests(testOptions);
-    };
-
     this.runTestsForAllUnpreparedRetryableInternalTransactionTypes = function(runTestsFunc,
                                                                               testMode) {
         const makeSessionIdFunc = makeSessionIdForRetryableInternalTransaction;
