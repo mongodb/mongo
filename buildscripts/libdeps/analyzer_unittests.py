@@ -30,7 +30,7 @@ import unittest
 import networkx
 
 import libdeps.analyzer
-from libdeps.graph import LibdepsGraph, EdgeProps, NodeProps, CountTypes
+from libdeps.graph import DependsReportTypes, LibdepsGraph, EdgeProps, LinterTypes, NodeProps, CountTypes
 from generate_test_graphs import get_double_diamond_mock_graph, get_basic_mock_graph
 
 
@@ -292,6 +292,14 @@ class Tests(unittest.TestCase):
             "PUB_EDGE": 34, "PRIV_EDGE": 0, "IF_EDGE": 0, "PROG": 0, "LIB": 9
         }
         self.run_counts(expected_result, libdeps_graph)
+
+    def test_unqiue_report_enums(self):
+        """Ensure uniqueness of enums used as keys when generating reports."""
+
+        enums = [enum.name for enum in LinterTypes]
+        enums += [enum.name for enum in DependsReportTypes]
+        enums_unique = set(enums)
+        self.assertEqual(len(enums), len(enums_unique))
 
 
 if __name__ == '__main__':
