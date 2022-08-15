@@ -78,4 +78,21 @@ Status dropCollectionForApplyOps(OperationContext* opCtx,
                                  const repl::OpTime& dropOpTime,
                                  DropCollectionSystemCollectionMode systemCollectionMode);
 
+/**
+ * If we are in a replset, every replicated collection must have an _id index. As we scan each
+ * database, we also gather a list of drop-pending collection namespaces for the
+ * DropPendingCollectionReaper to clean up eventually.
+ *
+ * The caller must have the database locked in at least IX mode.
+ */
+void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx,
+                                                const DatabaseName& dbName);
+
+/**
+ * Deletes all temporary collections under the specified database.
+ *
+ * The caller must have the database locked in at least IX mode.
+ */
+void clearTempCollections(OperationContext* opCtx, const DatabaseName& dbName);
+
 }  // namespace mongo

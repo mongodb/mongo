@@ -30,14 +30,11 @@
 #include "mongo/db/catalog/database_impl.h"
 
 #include <algorithm>
+#include <boost/filesystem/operations.hpp>
 #include <memory>
 #include <vector>
 
-#include <boost/filesystem/operations.hpp>
-
-#include "mongo/base/init.h"
 #include "mongo/db/audit.h"
-#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/collection_impl.h"
@@ -80,7 +77,6 @@
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
-
 
 namespace mongo {
 namespace {
@@ -301,39 +297,6 @@ Status DatabaseImpl::init(OperationContext* const opCtx) {
     }
 
     return status;
-}
-
-void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) const {
-    invariant(opCtx->lockState()->isDbLockedForMode(name(), MODE_IX));
-
-    CollectionCatalog::CollectionInfoFn callback = [&](const CollectionPtr& collection) {
-        try {
-            WriteUnitOfWork wuow(opCtx);
-            Status status = dropCollection(opCtx, collection->ns(), {});
-            if (!status.isOK()) {
-                LOGV2_WARNING(20327,
-                              "could not drop temp collection '{namespace}': {error}",
-                              "could not drop temp collection",
-                              "namespace"_attr = collection->ns(),
-                              "error"_attr = redact(status));
-            }
-            wuow.commit();
-        } catch (const WriteConflictException&) {
-            LOGV2_WARNING(
-                20328,
-                "could not drop temp collection '{namespace}' due to WriteConflictException",
-                "could not drop temp collection due to WriteConflictException",
-                "namespace"_attr = collection->ns());
-            opCtx->recoveryUnit()->abandonSnapshot();
-        }
-        return true;
-    };
-
-    CollectionCatalog::CollectionInfoFn predicate = [&](const CollectionPtr& collection) {
-        return collection->getCollectionOptions().temp;
-    };
-
-    catalog::forEachCollectionFromDb(opCtx, name(), MODE_X, callback, predicate);
 }
 
 void DatabaseImpl::setDropPending(OperationContext* opCtx, bool dropPending) {
@@ -939,51 +902,6 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
     }
 
     return collection;
-}
-
-void DatabaseImpl::checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx) const {
-    if (name().db() == "local") {
-        // Collections in the local database are not replicated, so we do not need an _id index on
-        // any collection. For the same reason, it is not possible for the local database to contain
-        // any drop-pending collections (drops are effective immediately).
-        return;
-    }
-
-    auto catalog = CollectionCatalog::get(opCtx);
-    for (const auto& nss : catalog->getAllCollectionNamesFromDb(opCtx, _name)) {
-        if (nss.isDropPendingNamespace()) {
-            auto dropOpTime = fassert(40459, nss.getDropPendingNamespaceOpTime());
-            LOGV2(20321,
-                  "Found drop-pending namespace {namespace} with drop optime {dropOpTime}",
-                  "Found drop-pending namespace",
-                  "namespace"_attr = nss,
-                  "dropOpTime"_attr = dropOpTime);
-            repl::DropPendingCollectionReaper::get(opCtx)->addDropPendingNamespace(
-                opCtx, dropOpTime, nss);
-        }
-
-        if (nss.isSystem())
-            continue;
-
-        const CollectionPtr& coll = catalog->lookupCollectionByNamespace(opCtx, nss);
-        if (!coll)
-            continue;
-
-        if (coll->getIndexCatalog()->findIdIndex(opCtx))
-            continue;
-
-        if (clustered_util::isClusteredOnId(coll->getClusteredInfo())) {
-            continue;
-        }
-
-        LOGV2_OPTIONS(
-            20322,
-            {logv2::LogTag::kStartupWarnings},
-            "Collection lacks a unique index on _id. This index is "
-            "needed for replication to function properly. To fix this, you need to create a unique "
-            "index on _id. See http://dochub.mongodb.org/core/build-replica-set-indexes",
-            "namespace"_attr = nss);
-    }
 }
 
 Status DatabaseImpl::userCreateNS(OperationContext* opCtx,

@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog.h"
@@ -63,6 +59,8 @@
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {
+
+using unittest::assertGet;
 
 const std::unique_ptr<ClockSource> clockSource = std::make_unique<ClockSourceMock>();
 

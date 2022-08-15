@@ -27,12 +27,6 @@
  *    it in the license file.
  */
 
-
-#include <math.h>
-#include <sstream>
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/bson/bson_depth.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_comparator.h"
@@ -42,20 +36,16 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/json.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/dbtests/dbtests.h"
 #include "mongo/logv2/log.h"
+#include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
+namespace mongo {
+namespace {
 
-namespace DocumentTests {
-
-using std::numeric_limits;
-using std::string;
-using std::vector;
-
-mongo::Document::FieldPair getNthField(mongo::Document doc, size_t index) {
-    mongo::FieldIterator it(doc);
+Document::FieldPair getNthField(Document doc, size_t index) {
+    FieldIterator it(doc);
     while (index--)  // advance index times
         it.next();
     return it.next();
@@ -597,7 +587,7 @@ public:
         // setNestedField and ensure the original document is unchanged.
 
         cloneOnDemand.reset(document);
-        vector<Position> path;
+        std::vector<Position> path;
         ASSERT_VALUE_EQ(Value(1), document.getNestedField(FieldPath("a.b"), &path));
 
         cloneOnDemand.setNestedField(path, Value(2));
@@ -742,11 +732,12 @@ public:
         values.push_back(mongo::Value(thing));
     }
 
-    vector<mongo::Value> values;
+    std::vector<mongo::Value> values;
     MutableDocument docBuilder;
     BSONObjBuilder objBuilder;
     BSONArrayBuilder arrBuilder;
 };
+
 }  // namespace Document
 
 namespace MetaFields {
@@ -1080,7 +1071,7 @@ class BSONArrayTest {
 public:
     void run() {
         ASSERT_VALUE_EQ(Value(BSON_ARRAY(1 << 2 << 3)), DOC_ARRAY(1 << 2 << 3));
-        ASSERT_VALUE_EQ(Value(BSONArray()), Value(vector<Value>()));
+        ASSERT_VALUE_EQ(Value(BSONArray()), Value(std::vector<Value>()));
     }
 };
 
@@ -1135,7 +1126,7 @@ public:
 class StringWithNull {
 public:
     void run() {
-        string withNull("a\0b", 3);
+        std::string withNull("a\0b", 3);
         BSONObj objWithNull = BSON("" << withNull);
         ASSERT_EQUALS(withNull, objWithNull[""].str());
         Value value = fromBson(objWithNull);
@@ -1234,9 +1225,9 @@ public:
 class EmptyArray {
 public:
     void run() {
-        vector<Value> array;
+        std::vector<Value> array;
         Value value(array);
-        const vector<Value>& array2 = value.getArray();
+        const std::vector<Value>& array2 = value.getArray();
 
         ASSERT(array2.empty());
         ASSERT_EQUALS(Array, value.getType());
@@ -1249,12 +1240,12 @@ public:
 class Array {
 public:
     void run() {
-        vector<Value> array;
+        std::vector<Value> array;
         array.push_back(Value(5));
         array.push_back(Value("lala"_sd));
         array.push_back(Value(3.14));
         Value value = Value(array);
-        const vector<Value>& array2 = value.getArray();
+        const std::vector<Value>& array2 = value.getArray();
 
         ASSERT(!array2.empty());
         ASSERT_EQUALS(array2.size(), 3U);
@@ -1294,7 +1285,7 @@ class Regex {
 public:
     void run() {
         Value value = fromBson(fromjson("{'':/abc/}"));
-        ASSERT_EQUALS(string("abc"), value.getRegex());
+        ASSERT_EQUALS(std::string("abc"), value.getRegex());
         ASSERT_EQUALS(RegEx, value.getType());
         assertRoundTrips(value);
     }
@@ -1471,7 +1462,7 @@ class ObjectToBool : public ToBoolTrue {
 /** Coerce [] to bool. */
 class ArrayToBool : public ToBoolTrue {
     Value value() {
-        return Value(vector<Value>());
+        return Value(std::vector<Value>());
     }
 };
 
@@ -1895,7 +1886,7 @@ public:
 
 protected:
     virtual Value value() = 0;
-    virtual string expected() {
+    virtual std::string expected() {
         return "";
     }
 };
@@ -1905,7 +1896,7 @@ class DoubleToString : public ToStringBase {
     Value value() {
         return Value(-0.2);
     }
-    string expected() {
+    std::string expected() {
         return "-0.2";
     }
 };
@@ -1915,7 +1906,7 @@ class IntToString : public ToStringBase {
     Value value() {
         return Value(-4);
     }
-    string expected() {
+    std::string expected() {
         return "-4";
     }
 };
@@ -1925,7 +1916,7 @@ class LongToString : public ToStringBase {
     Value value() {
         return Value(10000LL);
     }
-    string expected() {
+    std::string expected() {
         return "10000";
     }
 };
@@ -1935,7 +1926,7 @@ class StringToString : public ToStringBase {
     Value value() {
         return Value("fO_o"_sd);
     }
-    string expected() {
+    std::string expected() {
         return "fO_o";
     }
 };
@@ -1945,7 +1936,7 @@ class TimestampToString : public ToStringBase {
     Value value() {
         return Value(Timestamp(1, 2));
     }
-    string expected() {
+    std::string expected() {
         return Timestamp(1, 2).toStringPretty();
     }
 };
@@ -1955,7 +1946,7 @@ class DateToString : public ToStringBase {
     Value value() {
         return Value(Date_t::fromMillisSinceEpoch(1234567890123LL));
     }
-    string expected() {
+    std::string expected() {
         return "2009-02-13T23:31:30.123Z";
     }  // from js
 };
@@ -2100,9 +2091,10 @@ public:
         assertComparison(-1, -2, 2.1);
         assertComparison(1, 90LL, 89.999);
         assertComparison(-1, 90, 90.1);
-        assertComparison(
-            0, numeric_limits<double>::quiet_NaN(), numeric_limits<double>::signaling_NaN());
-        assertComparison(-1, numeric_limits<double>::quiet_NaN(), 5);
+        assertComparison(0,
+                         std::numeric_limits<double>::quiet_NaN(),
+                         std::numeric_limits<double>::signaling_NaN());
+        assertComparison(-1, std::numeric_limits<double>::quiet_NaN(), 5);
 
         // strings compare between numbers and objects
         assertComparison(1, "abc", 90);
@@ -2121,7 +2113,7 @@ public:
         assertComparison(1, "b-", "b");
         assertComparison(-1, "b-", "ba");
         // With a null character.
-        assertComparison(1, string("a\0", 2), "a");
+        assertComparison(1, std::string("a\0", 2), "a");
 
         // Object.
         assertComparison(0, fromjson("{'':{}}"), fromjson("{'':{}}"));
@@ -2173,8 +2165,8 @@ public:
         assertComparison(-1, Value(1), Value("string"_sd));
         assertComparison(0, Value("string"_sd), Value(BSONSymbol("string")));
         assertComparison(-1, Value("string"_sd), Value(mongo::Document()));
-        assertComparison(-1, Value(mongo::Document()), Value(vector<Value>()));
-        assertComparison(-1, Value(vector<Value>()), Value(BSONBinData("", 0, MD5Type)));
+        assertComparison(-1, Value(mongo::Document()), Value(std::vector<Value>()));
+        assertComparison(-1, Value(std::vector<Value>()), Value(BSONBinData("", 0, MD5Type)));
         assertComparison(-1, Value(BSONBinData("", 0, MD5Type)), Value(mongo::OID()));
         assertComparison(-1, Value(mongo::OID()), Value(false));
         assertComparison(-1, Value(false), Value(Date_t()));
@@ -2250,38 +2242,37 @@ public:
         const Value val = fromBson(fromjson("{'': {a: [{x:1, b:[1, {y:1, c:1234, z:1}, 1]}]}}"));
         // ^ this outer object is removed by fromBson
 
-        ASSERT(val.getType() == mongo::Object);
+        ASSERT(val.getType() == BSONType::Object);
 
         ASSERT(val[999].missing());
         ASSERT(val["missing"].missing());
-        ASSERT(val["a"].getType() == mongo::Array);
+        ASSERT(val["a"].getType() == BSONType::Array);
 
         ASSERT(val["a"][999].missing());
         ASSERT(val["a"]["missing"].missing());
-        ASSERT(val["a"][0].getType() == mongo::Object);
+        ASSERT(val["a"][0].getType() == BSONType::Object);
 
         ASSERT(val["a"][0][999].missing());
         ASSERT(val["a"][0]["missing"].missing());
-        ASSERT(val["a"][0]["b"].getType() == mongo::Array);
+        ASSERT(val["a"][0]["b"].getType() == BSONType::Array);
 
         ASSERT(val["a"][0]["b"][999].missing());
         ASSERT(val["a"][0]["b"]["missing"].missing());
-        ASSERT(val["a"][0]["b"][1].getType() == mongo::Object);
+        ASSERT(val["a"][0]["b"][1].getType() == BSONType::Object);
 
         ASSERT(val["a"][0]["b"][1][999].missing());
         ASSERT(val["a"][0]["b"][1]["missing"].missing());
-        ASSERT(val["a"][0]["b"][1]["c"].getType() == mongo::NumberInt);
+        ASSERT(val["a"][0]["b"][1]["c"].getType() == BSONType::NumberInt);
         ASSERT_EQUALS(val["a"][0]["b"][1]["c"].getInt(), 1234);
     }
 };
-
 
 class SerializationOfMissingForSorter {
     // Can't be tested in AllTypesDoc since missing values are omitted when adding to BSON.
 public:
     void run() {
         const Value missing;
-        const Value arrayOfMissing = Value(vector<Value>(10));
+        const Value arrayOfMissing = Value(std::vector<Value>(10));
 
         BufBuilder bb;
         missing.serializeForSorter(bb);
@@ -2294,8 +2285,6 @@ public:
                         Value::deserializeForSorter(reader, Value::SorterDeserializeSettings()));
     }
 };
-
-namespace {
 
 // Integer limits.
 const int kIntMax = std::numeric_limits<int>::max();
@@ -2320,8 +2309,6 @@ const double kDoubleMax = std::numeric_limits<double>::max();
 const double kDoubleMin = std::numeric_limits<double>::lowest();
 const Decimal128 kDoubleMaxAsDecimal = Decimal128(kDoubleMin);
 const Decimal128 kDoubleMinAsDecimal = Decimal128(kDoubleMin);
-
-}  // namespace
 
 TEST(ValueIntegral, CorrectlyIdentifiesValidIntegralValues) {
     ASSERT_TRUE(Value(kIntMax).integral());
@@ -2365,13 +2352,13 @@ TEST(ValueIntegral, CorrectlyIdentifiesInvalid64BitIntegralValues) {
 
 TEST(ValueOutput, StreamOutputForIllegalDateProducesErrorToken) {
     auto sout = std::ostringstream{};
-    sout << mongo::Value{Date_t::min()};
+    sout << Value{Date_t::min()};
     ASSERT_EQ("illegal date", sout.str());
 }
 
 }  // namespace Value
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("document") {}
 
@@ -2477,6 +2464,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<All> myall;
+unittest::OldStyleSuiteInitializer<All> myall;
 
-}  // namespace DocumentTests
+}  // namespace
+}  // namespace mongo

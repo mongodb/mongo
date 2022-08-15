@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/config.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -44,7 +42,6 @@
 namespace mongo {
 namespace ExpressionTests {
 namespace {
-using boost::intrusive_ptr;
 
 /** Convert BSONObj to a BSONObj with our $const wrappings. */
 static BSONObj constify(const BSONObj& obj, bool parentIsArray = false) {
@@ -58,7 +55,7 @@ static BSONObj constify(const BSONObj& obj, bool parentIsArray = false) {
             // parser
             bob << elem.fieldName() << BSONArray(constify(elem.Obj(), true));
         } else if (elem.fieldNameStringData() == "$const" ||
-                   (elem.type() == mongo::String && elem.valueStringDataSafe().startsWith("$"))) {
+                   (elem.type() == String && elem.valueStringDataSafe().startsWith("$"))) {
             bob.append(elem);
         } else {
             bob.append(elem.fieldName(), BSON("$const" << elem));
@@ -75,7 +72,7 @@ static BSONObj toBson(const Value& value) {
 }
 
 /** Convert Expression to BSON. */
-static BSONObj expressionToBson(const intrusive_ptr<Expression>& expression) {
+static BSONObj expressionToBson(const boost::intrusive_ptr<Expression>& expression) {
     return BSON("" << expression->serialize(false)).firstElement().embeddedObject().getOwned();
 }
 
@@ -105,12 +102,13 @@ public:
         BSONObj specObject = BSON("" << spec());
         BSONElement specElement = specObject.firstElement();
         VariablesParseState vps = expCtx.variablesParseState;
-        intrusive_ptr<Expression> expression = Expression::parseOperand(&expCtx, specElement, vps);
+        boost::intrusive_ptr<Expression> expression =
+            Expression::parseOperand(&expCtx, specElement, vps);
         ASSERT_BSONOBJ_EQ(constify(spec()), expressionToBson(expression));
         ASSERT_BSONOBJ_EQ(
             BSON("" << expectedResult()),
             toBson(expression->evaluate(fromBson(BSON("a" << 1)), &expCtx.variables)));
-        intrusive_ptr<Expression> optimized = expression->optimize();
+        boost::intrusive_ptr<Expression> optimized = expression->optimize();
         ASSERT_BSONOBJ_EQ(BSON("" << expectedResult()),
                           toBson(optimized->evaluate(fromBson(BSON("a" << 1)), &expCtx.variables)));
     }
@@ -128,9 +126,10 @@ public:
         BSONObj specObject = BSON("" << spec());
         BSONElement specElement = specObject.firstElement();
         VariablesParseState vps = expCtx.variablesParseState;
-        intrusive_ptr<Expression> expression = Expression::parseOperand(&expCtx, specElement, vps);
+        boost::intrusive_ptr<Expression> expression =
+            Expression::parseOperand(&expCtx, specElement, vps);
         ASSERT_BSONOBJ_EQ(constify(spec()), expressionToBson(expression));
-        intrusive_ptr<Expression> optimized = expression->optimize();
+        boost::intrusive_ptr<Expression> optimized = expression->optimize();
         ASSERT_BSONOBJ_EQ(expectedOptimized(), expressionToBson(optimized));
     }
 
@@ -392,7 +391,7 @@ class NestedZero : public OptimizeBase {
 
 }  // namespace And
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("expression") {}
 
@@ -425,7 +424,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<All> andAll;
+unittest::OldStyleSuiteInitializer<All> andAll;
 
 }  // namespace
 }  // namespace ExpressionTests

@@ -50,6 +50,9 @@
 #include "mongo/dbtests/dbtests.h"
 
 namespace mongo {
+
+using unittest::assertGet;
+
 namespace QueryStageCachedPlan {
 
 static const NamespaceString nss("unittests.QueryStageCachedPlan");

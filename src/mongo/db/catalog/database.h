@@ -79,8 +79,6 @@ public:
 
     virtual const DatabaseName& name() const = 0;
 
-    virtual void clearTmpCollections(OperationContext* opCtx) const = 0;
-
     /**
      * Sets the 'drop-pending' state of this Database.
      * This is done at the beginning of a dropDatabase operation and is used to reject subsequent
@@ -148,13 +146,6 @@ public:
                                     bool stayTemp) const = 0;
 
     virtual const NamespaceString& getSystemViewsName() const = 0;
-
-    /**
-     * If we are in a replset, every replicated collection must have an _id index.  As we scan each
-     * database, we also gather a list of drop-pending collection namespaces for the
-     * DropPendingCollectionReaper to clean up eventually.
-     */
-    virtual void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx) const = 0;
 };
 
 }  // namespace mongo

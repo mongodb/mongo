@@ -29,10 +29,6 @@
 
 #pragma once
 
-/**
- * Test suite generator headers.
- */
-
 #include "mongo/db/db_raii.h"
 #include "mongo/unittest/unittest.h"
 

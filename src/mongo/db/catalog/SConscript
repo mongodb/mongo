@@ -375,12 +375,12 @@ env.Library(
 env.Library(
     target='catalog_impl',
     source=[
-        "collection_impl.cpp",
-        "database_holder_impl.cpp",
-        "database_impl.cpp",
-        "index_catalog_entry_impl.cpp",
-        "index_catalog_impl.cpp",
-        "index_consistency.cpp",
+        'collection_impl.cpp',
+        'database_holder_impl.cpp',
+        'database_impl.cpp',
+        'index_catalog_entry_impl.cpp',
+        'index_catalog_impl.cpp',
+        'index_consistency.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
@@ -541,6 +541,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/ops/write_ops',
         '$BUILD_DIR/mongo/db/query_exec',
+        '$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/storage/index_entry_comparison',
         '$BUILD_DIR/mongo/db/storage/key_string',

@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/catalog/drop_collection.h"
 
 #include "mongo/db/audit.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -43,6 +43,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/server_options.h"
@@ -51,7 +52,6 @@
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 
 namespace mongo {
 namespace {
@@ -561,6 +561,90 @@ Status dropCollectionForApplyOps(OperationContext* opCtx,
                 opCtx, db, collectionName, dropOpTime, systemCollectionMode, &unusedReply);
         }
     });
+}
+
+void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx,
+                                                const DatabaseName& dbName) {
+    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IX));
+
+    if (dbName.db() == NamespaceString::kLocalDb) {
+        // Collections in the local database are not replicated, so we do not need an _id index on
+        // any collection. For the same reason, it is not possible for the local database to contain
+        // any drop-pending collections (drops are effective immediately).
+        return;
+    }
+
+    auto catalog = CollectionCatalog::get(opCtx);
+
+    for (const auto& nss : catalog->getAllCollectionNamesFromDb(opCtx, dbName)) {
+        if (nss.isDropPendingNamespace()) {
+            auto dropOpTime = fassert(40459, nss.getDropPendingNamespaceOpTime());
+            LOGV2(20321,
+                  "Found drop-pending namespace {namespace} with drop optime {dropOpTime}",
+                  "Found drop-pending namespace",
+                  "namespace"_attr = nss,
+                  "dropOpTime"_attr = dropOpTime);
+            repl::DropPendingCollectionReaper::get(opCtx)->addDropPendingNamespace(
+                opCtx, dropOpTime, nss);
+        }
+
+        if (nss.isSystem())
+            continue;
+
+        CollectionPtr coll = catalog->lookupCollectionByNamespace(opCtx, nss);
+        if (!coll)
+            continue;
+
+        if (coll->getIndexCatalog()->findIdIndex(opCtx))
+            continue;
+
+        if (clustered_util::isClusteredOnId(coll->getClusteredInfo())) {
+            continue;
+        }
+
+        LOGV2_OPTIONS(
+            20322,
+            {logv2::LogTag::kStartupWarnings},
+            "Collection lacks a unique index on _id. This index is "
+            "needed for replication to function properly. To fix this, you need to create a unique "
+            "index on _id. See http://dochub.mongodb.org/core/build-replica-set-indexes",
+            "namespace"_attr = nss);
+    }
+}
+
+void clearTempCollections(OperationContext* opCtx, const DatabaseName& dbName) {
+    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IX));
+
+    auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, dbName);
+    invariant(db);
+
+    CollectionCatalog::CollectionInfoFn callback = [&](const CollectionPtr& collection) {
+        try {
+            WriteUnitOfWork wuow(opCtx);
+            Status status = db->dropCollection(opCtx, collection->ns(), {});
+            if (!status.isOK()) {
+                LOGV2_WARNING(20327,
+                              "could not drop temp collection '{namespace}': {error}",
+                              "could not drop temp collection",
+                              "namespace"_attr = collection->ns(),
+                              "error"_attr = redact(status));
+            }
+            wuow.commit();
+        } catch (const WriteConflictException&) {
+            LOGV2_WARNING(
+                20328,
+                "could not drop temp collection '{namespace}' due to WriteConflictException",
+                "could not drop temp collection due to WriteConflictException",
+                "namespace"_attr = collection->ns());
+            opCtx->recoveryUnit()->abandonSnapshot();
+        }
+        return true;
+    };
+
+    catalog::forEachCollectionFromDb(
+        opCtx, dbName, MODE_X, callback, [&](const CollectionPtr& collection) {
+            return collection->getCollectionOptions().temp;
+        });
 }
 
 }  // namespace mongo

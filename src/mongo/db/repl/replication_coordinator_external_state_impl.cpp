@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/repl/replication_coordinator_external_state_impl.h"
 
 #include <functional>
@@ -42,6 +41,7 @@
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
@@ -123,7 +123,6 @@
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
-
 
 using namespace fmt::literals;
 
@@ -1067,17 +1066,16 @@ void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationC
     for (const auto& dbName : dbNames) {
         // The local db is special because it isn't replicated. It is cleared at startup even on
         // replica set members.
-        if (dbName.db() == "local")
+        if (dbName.db() == NamespaceString::kLocalDb)
             continue;
+
         LOGV2_DEBUG(21309,
                     2,
                     "Removing temporary collections from {db}",
                     "Removing temporary collections",
                     "db"_attr = dbName);
-        AutoGetDb autoDb(opCtx, dbName, MODE_IX);
-        invariant(autoDb.getDb(),
-                  str::stream() << "Unable to get reference to database " << dbName.db());
-        autoDb.getDb()->clearTmpCollections(opCtx);
+        Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+        clearTempCollections(opCtx, dbName);
     }
 }
 

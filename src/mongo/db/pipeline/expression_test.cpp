@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
-#include <climits>
-
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/config.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -54,7 +49,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-
+namespace mongo {
 namespace ExpressionTests {
 
 using boost::intrusive_ptr;
@@ -3249,7 +3244,7 @@ TEST(ExpressionRegexTest, InvalidUTF8InRegex) {
 
 }  // namespace ExpressionRegexTest
 
-class All : public OldStyleSuiteSpecification {
+class All : public unittest::OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("expression") {}
 
@@ -3339,7 +3334,7 @@ public:
     }
 };
 
-OldStyleSuiteInitializer<All> myAll;
+unittest::OldStyleSuiteInitializer<All> myAll;
 
 namespace NowAndClusterTime {
 TEST(NowAndClusterTime, BasicTest) {
@@ -4168,3 +4163,4 @@ TEST(ExpressionFLETest, TestBinData_RoundTrip) {
 }
 
 }  // namespace ExpressionTests
+}  // namespace mongo

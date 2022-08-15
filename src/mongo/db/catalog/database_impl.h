@@ -45,8 +45,6 @@ public:
         return _name;
     }
 
-    void clearTmpCollections(OperationContext* opCtx) const final;
-
     void setDropPending(OperationContext* opCtx, bool dropPending) final;
 
     bool isDropPending(OperationContext* opCtx) const final;
@@ -104,8 +102,6 @@ public:
     const NamespaceString& getSystemViewsName() const final {
         return _viewsName;
     }
-
-    void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx) const final;
 
 private:
     friend class DatabaseHolderImpl;

@@ -31,14 +31,15 @@
 
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/create_collection.h"
-#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_document_gen.h"
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builds_coordinator.h"
@@ -57,15 +58,11 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/quick_exit.h"
 
-#if !defined(_WIN32)
-#include <sys/file.h>
-#endif
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
-
 
 namespace mongo {
 namespace {
+
 using startup_recovery::StartupRecoveryMode;
 
 // Exit after repair has started, but before data is repaired.
@@ -209,10 +206,10 @@ auto downgradeError =
  */
 enum class EnsureIndexPolicy { kBuildMissing, kError };
 Status ensureCollectionProperties(OperationContext* opCtx,
-                                  Database* db,
+                                  const DatabaseName& dbName,
                                   EnsureIndexPolicy ensureIndexPolicy) {
     auto catalog = CollectionCatalog::get(opCtx);
-    for (auto collIt = catalog->begin(opCtx, db->name()); collIt != catalog->end(opCtx); ++collIt) {
+    for (auto collIt = catalog->begin(opCtx, dbName); collIt != catalog->end(opCtx); ++collIt) {
         auto coll = *collIt;
         if (!coll) {
             break;
@@ -267,8 +264,7 @@ void openDatabases(OperationContext* opCtx, const StorageEngine* storageEngine, 
         LOGV2_DEBUG(21010, 1, "    Opening database: {dbName}", "dbName"_attr = dbName);
         auto db = databaseHolder->openDb(opCtx, dbName);
         invariant(db);
-
-        onDatabase(db);
+        onDatabase(db->name());
     }
 }
 
@@ -292,7 +288,7 @@ bool hasReplSetConfigDoc(OperationContext* opCtx) {
  * Check that the oplog is capped, and abort the process if it is not.
  * Caller must lock DB before calling this function.
  */
-void assertCappedOplog(OperationContext* opCtx, Database* db) {
+void assertCappedOplog(OperationContext* opCtx) {
     const NamespaceString oplogNss(NamespaceString::kRsOplogNamespace);
     invariant(opCtx->lockState()->isDbLockedForMode(oplogNss.dbName(), MODE_IS));
     const CollectionPtr& oplogCollection =
@@ -506,10 +502,11 @@ void startupRepair(OperationContext* opCtx, StorageEngine* storageEngine) {
         fassertNoTrace(18506, repair::repairDatabase(opCtx, storageEngine, dbName));
     }
 
-    openDatabases(opCtx, storageEngine, [&](auto db) {
+    openDatabases(opCtx, storageEngine, [&](auto dbName) {
         // Ensures all collections meet requirements such as having _id indexes, and corrects them
         // if needed.
-        uassertStatusOK(ensureCollectionProperties(opCtx, db, EnsureIndexPolicy::kBuildMissing));
+        uassertStatusOK(
+            ensureCollectionProperties(opCtx, dbName, EnsureIndexPolicy::kBuildMissing));
     });
 
     if (MONGO_unlikely(exitBeforeRepairInvalidatesConfig.shouldFail())) {
@@ -567,25 +564,24 @@ void startupRecovery(OperationContext* opCtx,
     const bool shouldClearNonLocalTmpCollections =
         !(hasReplSetConfigDoc(opCtx) || usingReplication);
 
-    openDatabases(opCtx, storageEngine, [&](auto db) {
-        auto dbString = db->name().db();
-
+    openDatabases(opCtx, storageEngine, [&](const DatabaseName& dbName) {
         // Ensures all collections meet requirements such as having _id indexes, and corrects them
         // if needed.
-        uassertStatusOK(ensureCollectionProperties(opCtx, db, EnsureIndexPolicy::kBuildMissing));
+        uassertStatusOK(
+            ensureCollectionProperties(opCtx, dbName, EnsureIndexPolicy::kBuildMissing));
 
         if (usingReplication) {
             // We only care about _id indexes and drop-pending collections if we are in a replset.
-            db->checkForIdIndexesAndDropPendingCollections(opCtx);
+            checkForIdIndexesAndDropPendingCollections(opCtx, dbName);
             // Ensure oplog is capped (mongodb does not guarantee order of inserts on noncapped
             // collections)
-            if (dbString == NamespaceString::kLocalDb) {
-                assertCappedOplog(opCtx, db);
+            if (dbName.db() == NamespaceString::kLocalDb) {
+                assertCappedOplog(opCtx);
             }
         }
 
-        if (shouldClearNonLocalTmpCollections || dbString == NamespaceString::kLocalDb) {
-            db->clearTmpCollections(opCtx);
+        if (shouldClearNonLocalTmpCollections || dbName.db() == NamespaceString::kLocalDb) {
+            clearTempCollections(opCtx, dbName);
         }
     });
 }
