@@ -52,7 +52,7 @@ StringData reduceInt(StringData value) {
 }  // namespace
 
 JWKManager::JWKManager(BSONObj data) {
-    auto keys = JWKSet::parse({"JWKSet"}, data);
+    auto keys = JWKSet::parse(IDLParserContext{"JWKSet"}, data);
     for (const auto& key : keys.getKeys()) {
         uassert(ErrorCodes::BadValue,
                 str::stream() << "Only RSA key types are accepted at this time",

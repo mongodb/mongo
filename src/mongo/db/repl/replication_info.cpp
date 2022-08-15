@@ -549,11 +549,11 @@ public:
         auto ret = result->asTempObj();
         if (ret[ErrorReply::kErrmsgFieldName].eoo()) {
             // Nominal success case, parse the object as-is.
-            HelloCommandReply::parse({"hello.reply"}, ret);
+            HelloCommandReply::parse(IDLParserContext{"hello.reply"}, ret);
         } else {
             // Something went wrong, still try to parse, but accept a few ignorable fields.
             StringDataSet ignorable({ErrorReply::kCodeFieldName, ErrorReply::kErrmsgFieldName});
-            HelloCommandReply::parse({"hello.reply"}, ret.removeFields(ignorable));
+            HelloCommandReply::parse(IDLParserContext{"hello.reply"}, ret.removeFields(ignorable));
         }
     }
 

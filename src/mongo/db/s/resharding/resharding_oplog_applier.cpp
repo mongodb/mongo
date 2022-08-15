@@ -227,9 +227,9 @@ boost::optional<ReshardingOplogApplierProgress> ReshardingOplogApplier::checkSto
 void ReshardingOplogApplier::_clearAppliedOpsAndStoreProgress(OperationContext* opCtx) {
     const auto& lastOplog = _currentBatchToApply.back();
 
-    auto oplogId =
-        ReshardingDonorOplogId::parse({"ReshardingOplogApplier::_clearAppliedOpsAndStoreProgress"},
-                                      lastOplog.get_id()->getDocument().toBson());
+    auto oplogId = ReshardingDonorOplogId::parse(
+        IDLParserContext{"ReshardingOplogApplier::_clearAppliedOpsAndStoreProgress"},
+        lastOplog.get_id()->getDocument().toBson());
 
     PersistentTaskStore<ReshardingOplogApplierProgress> store(
         NamespaceString::kReshardingApplierProgressNamespace);

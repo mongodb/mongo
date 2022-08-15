@@ -428,7 +428,7 @@ public:
         if constexpr (paramType == SPT::kClusterWide) {
             try {
                 BSONObj cspObj = newValueElement.Obj();
-                newValue = element_type::parse({"ClusterServerParameter"}, cspObj);
+                newValue = element_type::parse(IDLParserContext{"ClusterServerParameter"}, cspObj);
             } catch (const DBException& ex) {
                 return ex.toStatus().withContext(
                     str::stream() << "Failed parsing ClusterServerParameter '" << name() << "'");

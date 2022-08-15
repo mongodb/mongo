@@ -183,7 +183,7 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
             try {
                 collectionOptions.changeStreamPreAndPostImagesOptions =
                     ChangeStreamPreAndPostImagesOptions::parse(
-                        {"changeStreamPreAndPostImagesOptions"}, e.Obj());
+                        IDLParserContext{"changeStreamPreAndPostImagesOptions"}, e.Obj());
             } catch (const DBException& ex) {
                 return ex.toStatus();
             }
@@ -204,8 +204,8 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
             }
 
             try {
-                collectionOptions.indexOptionDefaults =
-                    IndexOptionDefaults::parse({"CollectionOptions::parse"}, e.Obj());
+                collectionOptions.indexOptionDefaults = IndexOptionDefaults::parse(
+                    IDLParserContext{"CollectionOptions::parse"}, e.Obj());
             } catch (const DBException& ex) {
                 return ex.toStatus();
             }
@@ -222,7 +222,7 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
 
             try {
                 collectionOptions.validationAction =
-                    ValidationAction_parse({"validationAction"}, e.String());
+                    ValidationAction_parse(IDLParserContext{"validationAction"}, e.String());
             } catch (const DBException& exc) {
                 return exc.toStatus();
             }
@@ -233,7 +233,7 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
 
             try {
                 collectionOptions.validationLevel =
-                    ValidationLevel_parse({"validationLevel"}, e.String());
+                    ValidationLevel_parse(IDLParserContext{"validationLevel"}, e.String());
             } catch (const DBException& exc) {
                 return exc.toStatus();
             }
@@ -292,7 +292,7 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
 
             try {
                 collectionOptions.timeseries =
-                    TimeseriesOptions::parse({"CollectionOptions::parse"}, e.Obj());
+                    TimeseriesOptions::parse(IDLParserContext{"CollectionOptions::parse"}, e.Obj());
             } catch (const DBException& ex) {
                 return ex.toStatus();
             }
@@ -304,7 +304,8 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
             try {
                 collectionOptions.encryptedFieldConfig =
                     collection_options_validation::processAndValidateEncryptedFields(
-                        EncryptedFieldConfig::parse({"CollectionOptions::parse"}, e.Obj()));
+                        EncryptedFieldConfig::parse(IDLParserContext{"CollectionOptions::parse"},
+                                                    e.Obj()));
             } catch (const DBException& ex) {
                 return ex.toStatus();
             }

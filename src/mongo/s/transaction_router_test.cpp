@@ -164,8 +164,8 @@ protected:
                 auto cmdName = request.cmdObj.firstElement().fieldNameStringData();
                 ASSERT_EQ(cmdName, "abortTransaction");
 
-                auto osi = OperationSessionInfoFromClient::parse("expectAbortTransaction"_sd,
-                                                                 request.cmdObj);
+                auto osi = OperationSessionInfoFromClient::parse(
+                    IDLParserContext{"expectAbortTransaction"}, request.cmdObj);
 
                 ASSERT(osi.getSessionId());
                 ASSERT_EQ(lsid.getId(), osi.getSessionId()->getId());
@@ -1020,7 +1020,7 @@ void checkSessionDetails(const BSONObj& cmdObj,
                          const LogicalSessionId& lsid,
                          const TxnNumber txnNum,
                          boost::optional<bool> isCoordinator) {
-    auto osi = OperationSessionInfoFromClient::parse("testTxnRouter"_sd, cmdObj);
+    auto osi = OperationSessionInfoFromClient::parse(IDLParserContext{"testTxnRouter"}, cmdObj);
 
     ASSERT(osi.getSessionId());
     ASSERT_EQ(lsid.getId(), osi.getSessionId()->getId());

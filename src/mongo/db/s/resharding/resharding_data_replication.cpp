@@ -460,7 +460,7 @@ ReshardingDonorOplogId ReshardingDataReplication::getOplogFetcherResumeId(
                 return ReshardingOplogFetcher::kFinalOpAlreadyFetched;
             }
 
-            return ReshardingDonorOplogId::parse({"getOplogFetcherResumeId"},
+            return ReshardingDonorOplogId::parse(IDLParserContext{"getOplogFetcherResumeId"},
                                                  oplogEntry.get_id()->getDocument().toBson());
         }
     }

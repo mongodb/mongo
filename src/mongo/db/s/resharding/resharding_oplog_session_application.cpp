@@ -138,7 +138,7 @@ boost::optional<SharedSemiFuture<void>> ReshardingOplogSessionApplication::tryAp
         isRetryableWrite ? op.getStatementIds() : std::vector<StmtId>{kIncompleteHistoryStmtId};
     invariant(!stmtIds.empty());
 
-    auto opId = ReshardingDonorOplogId::parse({"ReshardingOplogSessionApplication"},
+    auto opId = ReshardingDonorOplogId::parse(IDLParserContext{"ReshardingOplogSessionApplication"},
                                               op.get_id()->getDocument().toBson());
 
     boost::optional<repl::OpTime> preImageOpTime;

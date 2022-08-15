@@ -117,7 +117,7 @@ public:
                 auto resultObj = result.obj();
                 uassertStatusOK(getStatusFromCommandResult(resultObj));
                 // Ensure our reply conforms to the IDL-defined reply structure.
-                return DropReply::parse({"drop"}, resultObj);
+                return DropReply::parse(IDLParserContext{"drop"}, resultObj);
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 uassert(CollectionUUIDMismatchInfo(request().getDbName().toString(),
                                                    *request().getCollectionUUID(),

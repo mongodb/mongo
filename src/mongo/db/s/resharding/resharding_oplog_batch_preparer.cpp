@@ -140,7 +140,9 @@ WriterVectors ReshardingOplogBatchPreparer::makeCrudOpWriterVectors(
 
             for (const auto& innerOp : applyOpsInfo.getOperations()) {
                 unrolledOp.setDurableReplOperation(repl::DurableReplOperation::parse(
-                    {"ReshardingOplogBatchPreparer::makeCrudOpWriterVectors innerOp"}, innerOp));
+                    IDLParserContext{
+                        "ReshardingOplogBatchPreparer::makeCrudOpWriterVectors innerOp"},
+                    innerOp));
 
                 if (isWouldChangeOwningShardSentinelOplogEntry(unrolledOp)) {
                     continue;
@@ -230,7 +232,8 @@ WriterVectors ReshardingOplogBatchPreparer::makeSessionOpWriterVectors(
 
                 for (const auto& innerOp : applyOpsInfo.getOperations()) {
                     auto replOp = repl::ReplOperation::parse(
-                        {"ReshardingOplogBatchPreparer::makeSessionOpWriterVectors innerOp"},
+                        IDLParserContext{
+                            "ReshardingOplogBatchPreparer::makeSessionOpWriterVectors innerOp"},
                         innerOp);
                     if (replOp.getStatementIds().empty()) {
                         // Skip this operation since it is not retryable.

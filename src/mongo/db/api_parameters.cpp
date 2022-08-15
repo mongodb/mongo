@@ -63,7 +63,7 @@ APIParameters APIParameters::fromClient(const APIParametersFromClient& apiParams
 
 APIParameters APIParameters::fromBSON(const BSONObj& cmdObj) {
     return APIParameters::fromClient(
-        APIParametersFromClient::parse("APIParametersFromClient"_sd, cmdObj));
+        APIParametersFromClient::parse(IDLParserContext{"APIParametersFromClient"}, cmdObj));
 }
 
 void APIParameters::appendInfo(BSONObjBuilder* builder) const {

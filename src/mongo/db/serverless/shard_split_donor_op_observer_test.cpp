@@ -150,7 +150,7 @@ protected:
 
     ShardSplitDonorDocument defaultStateDocument() const {
         return ShardSplitDonorDocument::parse(
-            {"donor.document"},
+            IDLParserContext{"donor.document"},
             BSON("_id" << _uuid << "tenantIds" << _tenantIds << "recipientTagName"
                        << _recipientTagName << "recipientSetName" << _recipientSetName));
     }

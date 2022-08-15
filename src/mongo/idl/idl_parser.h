@@ -238,7 +238,8 @@ public:
     static constexpr auto kOpMsgDollarDB = "$db"_sd;
     static constexpr auto kOpMsgDollarDBDefault = "admin"_sd;
 
-    IDLParserContext(StringData fieldName, bool apiStrict = false)
+    explicit IDLParserContext(StringData fieldName) : IDLParserContext{fieldName, false} {}
+    IDLParserContext(StringData fieldName, bool apiStrict)
         : _currentField(fieldName), _apiStrict(apiStrict), _predecessor(nullptr) {}
 
     IDLParserContext(StringData fieldName, const IDLParserContext* predecessor)

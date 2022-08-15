@@ -102,7 +102,7 @@ public:
                 const auto& res = shardResponse.data;
                 uassertStatusOK(getStatusFromCommandResult(res));
 
-                auto parsedResponse = Reply::parse({"dataSize"}, res);
+                auto parsedResponse = Reply::parse(IDLParserContext{"dataSize"}, res);
                 size += parsedResponse.getSize();
                 numObjects += parsedResponse.getNumObjects();
                 millis += parsedResponse.getMillis();

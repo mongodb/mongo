@@ -473,8 +473,8 @@ BSONObj TransactionRouter::Participant::attachTxnFieldsIfNeeded(
         newCmd.append(OperationSessionInfo::kTxnNumberFieldName,
                       sharedOptions.txnNumberAndRetryCounter.getTxnNumber());
     } else {
-        auto osi =
-            OperationSessionInfoFromClient::parse("OperationSessionInfo"_sd, newCmd.asTempObj());
+        auto osi = OperationSessionInfoFromClient::parse(IDLParserContext{"OperationSessionInfo"},
+                                                         newCmd.asTempObj());
         invariant(sharedOptions.txnNumberAndRetryCounter.getTxnNumber() == *osi.getTxnNumber());
     }
 
@@ -515,7 +515,7 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
     }
 
     auto txnResponseMetadata =
-        TxnResponseMetadata::parse("processParticipantResponse"_sd, responseObj);
+        TxnResponseMetadata::parse(IDLParserContext{"processParticipantResponse"}, responseObj);
 
     if (txnResponseMetadata.getReadOnly()) {
         if (participant->readOnly == Participant::ReadOnly::kUnset) {

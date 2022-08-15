@@ -65,7 +65,7 @@ DocumentSourceReshardingOwnershipMatch::createFromBson(
             elem.type() == Object);
 
     auto parsed = DocumentSourceReshardingOwnershipMatchSpec::parse(
-        {"DocumentSourceReshardingOwnershipMatchSpec"}, elem.embeddedObject());
+        IDLParserContext{"DocumentSourceReshardingOwnershipMatchSpec"}, elem.embeddedObject());
 
     return new DocumentSourceReshardingOwnershipMatch(
         parsed.getRecipientShardId(), ShardKeyPattern(parsed.getReshardingKey()), expCtx);

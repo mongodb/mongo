@@ -347,7 +347,7 @@ int removeExpiredTransactionSessionsFromDisk(
     int numReaped = 0;
     while (cursor->more()) {
         auto transactionSession = SessionsCollectionFetchResultIndividualResult::parse(
-            "TransactionSession"_sd, cursor->next());
+            IDLParserContext{"TransactionSession"}, cursor->next());
         const auto transactionSessionId = transactionSession.get_id();
 
         if (expiredTransactionSessionIdsStillInUse.find(transactionSessionId) !=

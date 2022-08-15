@@ -318,7 +318,7 @@ public:
     public:
         Invocation(Command* cmd, const OpMsgRequest& request)
             : CommandInvocation(cmd),
-              _cmd(GetMoreCommandRequest::parse({"getMore"}, request.body)) {
+              _cmd(GetMoreCommandRequest::parse(IDLParserContext{"getMore"}, request.body)) {
             NamespaceString nss(_cmd.getDbName(), _cmd.getCollection());
             uassert(ErrorCodes::InvalidNamespace,
                     str::stream() << "Invalid namespace for getMore: " << nss.ns(),
@@ -810,7 +810,8 @@ public:
 
         void validateResult(rpc::ReplyBuilderInterface* reply) {
             auto ret = reply->getBodyBuilder().asTempObj();
-            CursorGetMoreReply::parse({"CursorGetMoreReply"}, ret.removeField("ok"));
+            CursorGetMoreReply::parse(IDLParserContext{"CursorGetMoreReply"},
+                                      ret.removeField("ok"));
         }
 
         const GetMoreCommandRequest _cmd;

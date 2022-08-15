@@ -214,7 +214,7 @@ private:
 namespace {
 
 LogicalSessionId getLsid(BSONObj obj) {
-    auto osi = OperationSessionInfo::parse("assertSessionIdMetadata"_sd, obj);
+    auto osi = OperationSessionInfo::parse(IDLParserContext{"assertSessionIdMetadata"}, obj);
     ASSERT(osi.getSessionId());
     return *osi.getSessionId();
 }

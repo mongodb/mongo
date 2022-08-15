@@ -223,7 +223,7 @@ TEST(MakeSplitConfig, RecipientConfigValidationTest) {
     const std::string recipientConfigSetName{"newSet"};
 
     auto statedoc = ShardSplitDonorDocument::parse(
-        {"donor.document"},
+        IDLParserContext{"donor.document"},
         BSON("_id" << UUID::gen() << "tenantIds" << tenantIds << "recipientTagName"
                    << recipientTagName << "recipientSetName" << recipientSetName));
 

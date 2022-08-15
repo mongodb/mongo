@@ -107,7 +107,7 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::parse(const BSONObj& obj) t
         return Status(ErrorCodes::FailedToParse, "write concern object cannot be empty");
     }
 
-    auto writeConcernIdl = WriteConcernIdl::parse({"WriteConcernOptions"}, obj);
+    auto writeConcernIdl = WriteConcernIdl::parse(IDLParserContext{"WriteConcernOptions"}, obj);
     auto parsedW = writeConcernIdl.getWriteConcernW();
 
     WriteConcernOptions writeConcern;

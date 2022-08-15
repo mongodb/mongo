@@ -162,7 +162,7 @@ void TestLoopback(TestT test_value) {
     auto element = testDoc.firstElement();
     ASSERT_EQUALS(element.type(), Test_bson_type);
 
-    auto testStruct = ParserT::parse({"test"}, testDoc);
+    auto testStruct = ParserT::parse(IDLParserContext{"test"}, testDoc);
     assert_same_types<decltype(testStruct.getValue()), TestT>();
 
     // We need to use a different unittest macro for comparing obj/array.
@@ -393,7 +393,7 @@ TEST(IDLOneTypeTests, TestBase64StringPositive) {
                     << "ABCD+/0="
                     << "url"
                     << "1234-_0");
-    auto parsed = Two_base64string::parse({"base64"}, doc);
+    auto parsed = Two_base64string::parse(IDLParserContext{"base64"}, doc);
     ASSERT_EQ(parsed.getBasic(), "\x00\x10\x83\xFB\xFD"_sd);
     ASSERT_EQ(parsed.getUrl(), "\xD7m\xF8\xFB\xFD"_sd);
 
@@ -410,8 +410,10 @@ TEST(IDLOneTypeTests, TestBase64StringNegative) {
                         << "ABCD+/0"
                         << "url"
                         << "1234-_0");
-        ASSERT_THROWS_CODE_AND_WHAT(
-            Two_base64string::parse({"base64"}, doc), AssertionException, 10270, "invalid base64");
+        ASSERT_THROWS_CODE_AND_WHAT(Two_base64string::parse(IDLParserContext{"base64"}, doc),
+                                    AssertionException,
+                                    10270,
+                                    "invalid base64");
     }
 
     {
@@ -420,7 +422,7 @@ TEST(IDLOneTypeTests, TestBase64StringNegative) {
                         << "ABCD+_0="
                         << "url"
                         << "1234-_0");
-        ASSERT_THROWS_CODE_AND_WHAT(Two_base64string::parse({"base64"}, doc),
+        ASSERT_THROWS_CODE_AND_WHAT(Two_base64string::parse(IDLParserContext{"base64"}, doc),
                                     AssertionException,
                                     40537,
                                     "Invalid base64 character");
@@ -432,7 +434,7 @@ TEST(IDLOneTypeTests, TestBase64StringNegative) {
                         << "ABCD+/0="
                         << "url"
                         << "1234-/0");
-        ASSERT_THROWS_CODE_AND_WHAT(Two_base64string::parse({"base64"}, doc),
+        ASSERT_THROWS_CODE_AND_WHAT(Two_base64string::parse(IDLParserContext{"base64"}, doc),
                                     AssertionException,
                                     40537,
                                     "Invalid base64 character");
@@ -647,7 +649,7 @@ TEST(IDLVariantTests, TestVariantTwoArrays) {
     // This variant can be array<int> or array<string>. It assumes an empty array is array<int>
     // because that type is declared first in the IDL.
     auto obj = BSON("value" << BSONArray());
-    auto parsed = One_variant_two_arrays::parse({"root"}, obj);
+    auto parsed = One_variant_two_arrays::parse(IDLParserContext{"root"}, obj);
     ASSERT(stdx::get<std::vector<int>>(parsed.getValue()) == std::vector<int>());
     ASSERT_THROWS(stdx::get<std::vector<std::string>>(parsed.getValue()), stdx::bad_variant_access);
 
@@ -658,14 +660,15 @@ TEST(IDLVariantTests, TestVariantTwoArrays) {
         arrayBob.append("1", "test_value");
     }
 
-    ASSERT_THROWS_CODE(
-        One_variant_two_arrays::parse({"root"}, bob.obj()), AssertionException, 40423);
+    ASSERT_THROWS_CODE(One_variant_two_arrays::parse(IDLParserContext{"root"}, bob.obj()),
+                       AssertionException,
+                       40423);
 }
 
 TEST(IDLVariantTests, TestVariantOptional) {
     {
         auto obj = BSON("value" << 1);
-        auto parsed = One_variant_optional::parse({"root"}, obj);
+        auto parsed = One_variant_optional::parse(IDLParserContext{"root"}, obj);
         ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
         ASSERT_EQ(stdx::get<int>(*parsed.getValue()), 1);
     }
@@ -673,13 +676,13 @@ TEST(IDLVariantTests, TestVariantOptional) {
     {
         auto obj = BSON("value"
                         << "test_value");
-        auto parsed = One_variant_optional::parse({"root"}, obj);
+        auto parsed = One_variant_optional::parse(IDLParserContext{"root"}, obj);
         ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
         ASSERT_EQ(stdx::get<std::string>(*parsed.getValue()), "test_value");
     }
 
     // The optional key is absent.
-    auto parsed = One_variant_optional::parse({"root"}, BSONObj());
+    auto parsed = One_variant_optional::parse(IDLParserContext{"root"}, BSONObj());
     ASSERT_FALSE(parsed.getValue().has_value());
     ASSERT_BSONOBJ_EQ(BSONObj(), parsed.toBSON());
 }
@@ -689,7 +692,7 @@ TEST(IDLVariantTests, TestTwoVariants) {
     // parse(), toBSON(), getValue0(), getValue1(), and the constructor.
     {
         auto obj = BSON("value0" << 1 << "value1" << BSONObj());
-        auto parsed = Two_variants::parse({"root"}, obj);
+        auto parsed = Two_variants::parse(IDLParserContext{"root"}, obj);
         ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
         ASSERT_EQ(stdx::get<int>(parsed.getValue0()), 1);
         ASSERT_BSONOBJ_EQ(stdx::get<BSONObj>(parsed.getValue1()), BSONObj());
@@ -700,7 +703,7 @@ TEST(IDLVariantTests, TestTwoVariants) {
         auto obj = BSON("value0"
                         << "test_value"
                         << "value1" << BSONObj());
-        auto parsed = Two_variants::parse({"root"}, obj);
+        auto parsed = Two_variants::parse(IDLParserContext{"root"}, obj);
         ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
         ASSERT_EQ(stdx::get<std::string>(parsed.getValue0()), "test_value");
         ASSERT_BSONOBJ_EQ(stdx::get<BSONObj>(parsed.getValue1()), BSONObj());
@@ -711,7 +714,7 @@ TEST(IDLVariantTests, TestTwoVariants) {
         auto obj = BSON("value0" << 1 << "value1"
                                  << BSON_ARRAY("x"
                                                << "y"));
-        auto parsed = Two_variants::parse({"root"}, obj);
+        auto parsed = Two_variants::parse(IDLParserContext{"root"}, obj);
         ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
         ASSERT_EQ(stdx::get<int>(parsed.getValue0()), 1);
         ASSERT(stdx::get<std::vector<std::string>>(parsed.getValue1()) ==
@@ -725,7 +728,7 @@ TEST(IDLVariantTests, TestTwoVariants) {
                         << "value1"
                         << BSON_ARRAY("x"
                                       << "y"));
-        auto parsed = Two_variants::parse({"root"}, obj);
+        auto parsed = Two_variants::parse(IDLParserContext{"root"}, obj);
         ASSERT_BSONOBJ_EQ(obj, parsed.toBSON());
         ASSERT_EQ(stdx::get<std::string>(parsed.getValue0()), "test_value");
         ASSERT(stdx::get<std::vector<std::string>>(parsed.getValue1()) ==
@@ -4079,7 +4082,7 @@ TEST(IDLFieldTests, TenantOverrideField) {
 
     // Test optionality of $tenant arg.
     {
-        auto obj = BasicIgnoredCommand::parse({"nil"}, mkdoc(boost::none));
+        auto obj = BasicIgnoredCommand::parse(IDLParserContext{"nil"}, mkdoc(boost::none));
         auto tenant = obj.getDollarTenant();
         ASSERT(tenant == boost::none);
     }
@@ -4087,7 +4090,7 @@ TEST(IDLFieldTests, TenantOverrideField) {
     // Test passing an tenant id (acting on behalf of a specific tenant)
     {
         auto id = TenantId(OID::gen());
-        auto obj = BasicIgnoredCommand::parse({"oid"}, mkdoc(id));
+        auto obj = BasicIgnoredCommand::parse(IDLParserContext{"oid"}, mkdoc(id));
         auto tenant = obj.getDollarTenant();
         ASSERT(tenant == id);
     }
@@ -4106,10 +4109,13 @@ TEST(IDLFieldTests, TenantOverrideFieldWithInvalidValue) {
 
     // Negative: Parse invalid types.
     {
-        ASSERT_THROWS(BasicIgnoredCommand::parse({"int"}, mkdoc(123)), DBException);
-        ASSERT_THROWS(BasicIgnoredCommand::parse({"float"}, mkdoc(3.14)), DBException);
-        ASSERT_THROWS(BasicIgnoredCommand::parse({"string"}, mkdoc("bar")), DBException);
-        ASSERT_THROWS(BasicIgnoredCommand::parse({"object"}, mkdoc(BSONObj())), DBException);
+        ASSERT_THROWS(BasicIgnoredCommand::parse(IDLParserContext{"int"}, mkdoc(123)), DBException);
+        ASSERT_THROWS(BasicIgnoredCommand::parse(IDLParserContext{"float"}, mkdoc(3.14)),
+                      DBException);
+        ASSERT_THROWS(BasicIgnoredCommand::parse(IDLParserContext{"string"}, mkdoc("bar")),
+                      DBException);
+        ASSERT_THROWS(BasicIgnoredCommand::parse(IDLParserContext{"object"}, mkdoc(BSONObj())),
+                      DBException);
     }
 }
 

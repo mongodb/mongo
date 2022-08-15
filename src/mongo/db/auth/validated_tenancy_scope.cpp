@@ -72,7 +72,7 @@ ValidatedTenancyScope::ValidatedTenancyScope(BSONObj obj, InitTag tag) : _origin
             "Multitenancy not enabled, refusing to accept securityToken",
             gMultitenancySupport || (tag == InitTag::kInitForShell));
 
-    auto token = SecurityToken::parse({"Security Token"}, obj);
+    auto token = SecurityToken::parse(IDLParserContext{"Security Token"}, obj);
     auto authenticatedUser = token.getAuthenticatedUser();
     uassert(ErrorCodes::BadValue,
             "Security token authenticated user requires a valid Tenant ID",

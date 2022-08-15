@@ -138,7 +138,8 @@ void OpObserverForTest<StateEnum, ReshardingDocument>::onUpdate(OperationContext
         return;
     }
 
-    auto doc = ReshardingDocument::parse({"OpObserverForTest"}, args.updateArgs->updatedDoc);
+    auto doc = ReshardingDocument::parse(IDLParserContext{"OpObserverForTest"},
+                                         args.updateArgs->updatedDoc);
     _controller->_notifyNewStateAndWaitUntilUnpaused(opCtx, getState(doc));
 }
 

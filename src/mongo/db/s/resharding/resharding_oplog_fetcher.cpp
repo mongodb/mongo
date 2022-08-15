@@ -344,8 +344,9 @@ bool ReshardingOplogFetcher::consume(Client* client,
                 WriteUnitOfWork wuow(opCtx);
                 auto nextOplog = uassertStatusOK(repl::OplogEntry::parse(doc));
 
-                auto startAt = ReshardingDonorOplogId::parse(
-                    {"OplogFetcherParsing"}, nextOplog.get_id()->getDocument().toBson());
+                auto startAt =
+                    ReshardingDonorOplogId::parse(IDLParserContext{"OplogFetcherParsing"},
+                                                  nextOplog.get_id()->getDocument().toBson());
                 Timer insertTimer;
                 uassertStatusOK(collection_internal::insertDocument(
                     opCtx, *toWriteTo, InsertStatement{doc}, nullptr));

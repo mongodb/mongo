@@ -178,7 +178,7 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingRecipientService::
     BSONObj initialState) {
     return std::make_shared<RecipientStateMachine>(
         this,
-        ReshardingRecipientDocument::parse({"RecipientStateMachine"}, initialState),
+        ReshardingRecipientDocument::parse(IDLParserContext{"RecipientStateMachine"}, initialState),
         std::make_unique<RecipientStateMachineExternalStateImpl>(),
         ReshardingDataReplication::make,
         _serviceContext);

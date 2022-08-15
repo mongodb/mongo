@@ -1621,7 +1621,8 @@ TEST_F(ReshardingAggWithStorageTest,
     auto operationDocs = applyOpsInfo.getOperations();
     ASSERT_EQ(operationDocs.size(), 1U);
     auto outputInnerOp2 = repl::DurableReplOperation::parse(
-        {"RetryableFindAndModifyInsideInternalTransactionWithImageLookup"}, operationDocs[0]);
+        IDLParserContext{"RetryableFindAndModifyInsideInternalTransactionWithImageLookup"},
+        operationDocs[0]);
     ASSERT_TRUE(outputInnerOp2.getPreImageOpTime());
     ASSERT_FALSE(outputInnerOp2.getNeedsRetryImage());
     ASSERT_EQ(preImageOplog.getOpTime(), *outputInnerOp2.getPreImageOpTime());
@@ -1645,7 +1646,7 @@ TEST_F(ReshardingAggWithStorageTest,
     // Create another pipeline and start fetching from after the doc for the pre-image, and verify
     // that the pipeline does not re-output the applyOps doc that comes before the pre-image doc.
     const auto startAt = ReshardingDonorOplogId::parse(
-        {"RetryableFindAndModifyInsideInternalTransactionWithImageLookup"},
+        IDLParserContext{"RetryableFindAndModifyInsideInternalTransactionWithImageLookup"},
         preImageOplog.get_id()->getDocument().toBson());
     auto newPipeline = createPipeline(startAt);
 

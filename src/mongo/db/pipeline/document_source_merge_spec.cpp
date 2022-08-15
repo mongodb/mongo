@@ -55,7 +55,8 @@ NamespaceString mergeTargetNssParseFromBSON(const BSONElement& elem) {
         return {"", elem.valueStringData()};
     }
 
-    auto spec = NamespaceSpec::parse({elem.fieldNameStringData()}, elem.embeddedObject());
+    auto spec =
+        NamespaceSpec::parse(IDLParserContext{elem.fieldNameStringData()}, elem.embeddedObject());
     auto coll = spec.getColl();
     uassert(5786801,
             "{} 'into' field must specify a 'coll' that is not empty, null or undefined"_format(

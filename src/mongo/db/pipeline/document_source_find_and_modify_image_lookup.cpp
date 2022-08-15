@@ -294,7 +294,8 @@ boost::optional<Document> DocumentSourceFindAndModifyImageLookup::_forgeNoopImag
 
         for (size_t i = 0; i < operationDocs.size(); i++) {
             auto op = repl::DurableReplOperation::parse(
-                {"DocumentSourceFindAndModifyImageLookup::_forgeNoopImageDoc"}, operationDocs[i]);
+                IDLParserContext{"DocumentSourceFindAndModifyImageLookup::_forgeNoopImageDoc"},
+                operationDocs[i]);
 
             if (const auto imageType = op.getNeedsRetryImage()) {
                 // This operation has a retry image.

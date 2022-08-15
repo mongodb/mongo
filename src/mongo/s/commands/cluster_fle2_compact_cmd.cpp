@@ -110,7 +110,7 @@ Cmd::Reply Cmd::Invocation::typedRun(OperationContext* opCtx) {
 
     auto reply = result.obj();
     uassertStatusOK(getStatusFromCommandResult(reply));
-    return Reply::parse({Request::kCommandName}, reply.removeField("ok"_sd));
+    return Reply::parse(IDLParserContext{Request::kCommandName}, reply.removeField("ok"_sd));
 }
 
 }  // namespace

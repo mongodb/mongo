@@ -440,7 +440,8 @@ void SessionCatalogMigrationSource::_extractOplogEntriesForInternalTransactionFo
 
     for (const auto& innerOp : applyOpsInfo.getOperations()) {
         auto replOp = repl::ReplOperation::parse(
-            {"SessionOplogIterator::_extractOplogEntriesForInternalTransactionForRetryableWrite"},
+            IDLParserContext{"SessionOplogIterator::_"
+                             "extractOplogEntriesForInternalTransactionForRetryableWrite"},
             innerOp);
 
         if (replOp.getStatementIds().empty()) {

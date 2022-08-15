@@ -44,7 +44,8 @@ OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* 
                                                               bool requiresAuth,
                                                               bool attachToOpCtx,
                                                               bool isReplSetMemberOrMongos) {
-    auto osi = OperationSessionInfoFromClient::parse("OperationSessionInfo"_sd, requestBody);
+    auto osi = OperationSessionInfoFromClient::parse(IDLParserContext{"OperationSessionInfo"},
+                                                     requestBody);
     auto isAuthorizedForInternalClusterAction =
         AuthorizationSession::get(opCtx->getClient())
             ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),

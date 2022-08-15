@@ -1110,7 +1110,7 @@ TEST_F(AsyncResultsMergerTest, GetMoreBatchSizes) {
     readyEvent = unittest::assertGet(arm->nextEvent());
 
     BSONObj scheduledCmd = getNthPendingRequest(0).cmdObj;
-    auto cmd = GetMoreCommandRequest::parse({"getMore"},
+    auto cmd = GetMoreCommandRequest::parse(IDLParserContext{"getMore"},
                                             scheduledCmd.addField(BSON("$db"
                                                                        << "anydbname")
                                                                       .firstElement()));

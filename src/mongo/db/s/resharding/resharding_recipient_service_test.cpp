@@ -203,7 +203,8 @@ public:
         BSONObj initialState) override {
         return std::make_shared<RecipientStateMachine>(
             this,
-            ReshardingRecipientDocument::parse({"ReshardingRecipientServiceForTest"}, initialState),
+            ReshardingRecipientDocument::parse(
+                IDLParserContext{"ReshardingRecipientServiceForTest"}, initialState),
             std::make_unique<ExternalStateForTest>(),
             [](auto...) { return std::make_unique<DataReplicationForTest>(); },
             _serviceContext);

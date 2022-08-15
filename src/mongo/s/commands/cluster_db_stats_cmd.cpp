@@ -59,7 +59,7 @@ void aggregateResults(int scale,
     for (const auto& response : responses) {
         invariant(response.swResponse.getStatus().isOK());
         const BSONObj& b = response.swResponse.getValue().data;
-        auto resp = DBStats::parse({"dbstats"}, b);
+        auto resp = DBStats::parse(IDLParserContext{"dbstats"}, b);
 
         collections += resp.getCollections();
         views += resp.getViews();
@@ -149,7 +149,7 @@ public:
     }
 
     void validateResult(const BSONObj& resultObj) final {
-        DBStats::parse({"dbstats.reply"}, resultObj);
+        DBStats::parse(IDLParserContext{"dbstats.reply"}, resultObj);
     }
 } clusterDBStatsCmd;
 
