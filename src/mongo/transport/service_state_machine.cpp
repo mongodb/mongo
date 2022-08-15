@@ -615,17 +615,29 @@ void ServiceStateMachine::Impl::cleanupExhaustResources() noexcept try {
     if (!_inExhaust) {
         return;
     }
-    auto request = OpMsgRequest::parse(_inMessage);
+    NamespaceString nss;
+    long long cursorId = 0;
+    if (_inMessage.operation() == dbGetMore) {
+        DbMessage dbm(_inMessage);
+        [[maybe_unused]] const int ntoreturn = dbm.pullInt();
+        cursorId = dbm.pullInt64();
+        nss = NamespaceString(dbm.getns());
+    } else {
+        invariant(_inMessage.operation() == dbMsg);
+        auto request = OpMsgRequest::parse(_inMessage);
+        if (request.getCommandName() == "getMore"_sd) {
+            nss = NamespaceString(request.getDatabase(), request.body["collection"].String());
+            cursorId = request.body["getMore"].Long();
+        }
+    }
     // Clean up cursor for exhaust getMore request.
-    if (request.getCommandName() == "getMore"_sd) {
-        auto cursorId = request.body["getMore"].Long();
+    if (cursorId != 0) {
         auto opCtx = Client::getCurrent()->makeOperationContext();
         // Fire and forget. This is a best effort attempt to immediately clean up the exhaust
         // cursor. If the killCursors request fails here for any reasons, it will still be cleaned
         // up once the cursor times out.
-        auto nss = NamespaceString(request.getDatabase(), request.body["collection"].String());
         auto req = OpMsgRequest::fromDBAndBody(
-            request.getDatabase(), KillCursorsCommandRequest(nss, {cursorId}).toBSON(BSONObj{}));
+            nss.db(), KillCursorsCommandRequest(nss, {cursorId}).toBSON(BSONObj{}));
         _sep->handleRequest(opCtx.get(), req.serialize()).get();
     }
 } catch (const DBException& e) {

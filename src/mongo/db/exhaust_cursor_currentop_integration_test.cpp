@@ -43,178 +43,326 @@
 
 namespace mongo {
 namespace {
-// Specifies the amount of time we are willing to wait for a parallel operation to complete.
-const auto parallelWaitTimeoutMS = Milliseconds(5 * 60 * 1000);
 
-// Obtain a pointer to the global system clock. Used to enforce timeouts in the parallel thread.
-auto* const clock = SystemClockSource::get();
+class CurrentOpExhaustCursorTestFixture : public unittest::Test {
+public:
+    CurrentOpExhaustCursorTestFixture() = default;
+    explicit CurrentOpExhaustCursorTestFixture(NetworkOp op) : _op{op} {}
 
-const NamespaceString testNSS{"exhaust_cursor_currentop.testColl"};
+    std::unique_ptr<DBClientBase> connect() {
+        return connect(testAppName);
+    }
 
-const StringData testAppName = "curop_exhaust_cursor_test";
-std::unique_ptr<DBClientBase> connect(StringData appName = testAppName) {
-    auto swConn = unittest::getFixtureConnectionString().connect(appName.toString());
-    uassertStatusOK(swConn.getStatus());
-    return std::move(swConn.getValue());
-}
-const StringData testBackgroundAppName = "curop_exhaust_cursor_test_bg";
+    std::unique_ptr<DBClientBase> connect(StringData appName) {
+        auto swConn = unittest::getFixtureConnectionString().connect(appName.toString());
+        uassertStatusOK(swConn.getStatus());
+        return std::move(swConn.getValue());
+    }
 
-void initTestCollection(DBClientBase* conn) {
-    // Drop and recreate the test namespace.
-    conn->dropCollection(testNSS.ns());
-    for (int i = 0; i < 10; i++) {
-        auto insertCmd =
-            BSON("insert" << testNSS.coll() << "documents" << BSON_ARRAY(BSON("a" << i)));
-        auto reply = conn->runCommand(OpMsgRequest::fromDBAndBody(testNSS.db(), insertCmd));
+    void initTestCollection(DBClientBase* conn) {
+        // Drop and recreate the test namespace.
+        conn->dropCollection(testNSS.ns());
+        if (_op == dbMsg) {
+            for (int i = 0; i < 10; i++) {
+                auto insertCmd =
+                    BSON("insert" << testNSS.coll() << "documents" << BSON_ARRAY(BSON("a" << i)));
+                auto reply = conn->runCommand(OpMsgRequest::fromDBAndBody(testNSS.db(), insertCmd));
+                ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
+            }
+        } else if (_op == dbQuery) {
+            // For dbQuery exhaust, the getMore batch size is fixed at the server-defined
+            // limit of 16Mb, and can't be manipulated. We need to insert enough documents
+            // to make sure we have multiple batches of getMores given that limit;
+            // as a result, we create approximately 16KB documents and insert 3000 of them
+            // to ensure that three getMores are required to exhaust the cursor.
+            constexpr int numDocs = 3000;
+            constexpr int strSize = 16 * 1024;
+            for (int i = 0; i < numDocs; i++) {
+                std::string bigString("A", strSize);
+                auto insertCmd =
+                    BSON("insert" << testNSS.coll() << "documents"
+                                  << BSON_ARRAY(BSON("a" << i << "data" << bigString)));
+                auto reply = conn->runCommand(OpMsgRequest::fromDBAndBody(testNSS.db(), insertCmd));
+                ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
+            }
+        }
+    }
+
+    void setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(DBClientBase* conn, bool enable) {
+        auto cmdObj =
+            BSON("configureFailPoint"
+                 << "waitWithPinnedCursorDuringGetMoreBatch"
+                 << "mode" << (enable ? "alwaysOn" : "off") << "data"
+                 << BSON("shouldNotdropLock" << true << "shouldContinueOnInterrupt" << true));
+        auto reply = conn->runCommand(OpMsgRequest::fromDBAndBody("admin", cmdObj));
         ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
     }
-}
 
-void setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(DBClientBase* conn, bool enable) {
-    auto cmdObj = BSON("configureFailPoint"
-                       << "waitWithPinnedCursorDuringGetMoreBatch"
-                       << "mode" << (enable ? "alwaysOn" : "off") << "data"
-                       << BSON("shouldNotdropLock" << true << "shouldContinueOnInterrupt" << true));
-    auto reply = conn->runCommand(OpMsgRequest::fromDBAndBody("admin", cmdObj));
-    ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
-}
-
-void setWaitAfterCommandFinishesExecutionFailpoint(DBClientBase* conn, bool enable) {
-    auto cmdObj = BSON("configureFailPoint"
-                       << "waitAfterCommandFinishesExecution"
-                       << "mode" << (enable ? "alwaysOn" : "off") << "data"
-                       << BSON("ns" << testNSS.toString()));
-    auto reply = conn->runCommand(OpMsgRequest::fromDBAndBody("admin", cmdObj));
-    ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
-}
-
-void setWaitBeforeUnpinningOrDeletingCursorAfterGetMoreBatchFailpoint(DBClientBase* conn,
-                                                                      bool enable) {
-    auto cmdObj = BSON("configureFailPoint"
-                       << "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch"
-                       << "mode" << (enable ? "alwaysOn" : "off"));
-    auto reply = conn->runCommand(OpMsgRequest::fromDBAndBody("admin", cmdObj));
-    ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
-}
-
-bool confirmCurrentOpContents(DBClientBase* conn,
-                              BSONObj curOpMatch,
-                              bool expectEmptyResult = false,
-                              Milliseconds timeoutMS = Milliseconds(5 * 60 * 1000),
-                              Milliseconds intervalMS = Milliseconds(200)) {
-    auto curOpCmd = BSON("aggregate" << 1 << "cursor" << BSONObj() << "pipeline"
-                                     << BSON_ARRAY(BSON("$currentOp" << BSON("idleCursors" << true))
-                                                   << BSON("$match" << curOpMatch)));
-    const auto startTime = clock->now();
-    while (clock->now() - startTime < timeoutMS) {
-        auto reply = conn->runCommand(OpMsgRequest::fromDBAndBody("admin", curOpCmd));
-        auto swCursorRes = CursorResponse::parseFromBSON(reply->getCommandReply());
-        ASSERT_OK(swCursorRes.getStatus());
-        if (swCursorRes.getValue().getBatch().empty() == expectEmptyResult) {
-            return true;
-        }
-        sleepFor(intervalMS);
+    std::string setWaitAfterGetMoreFinishesExecutionFailpoint(DBClientBase* conn, bool enable) {
+        // Since one uses the command path and the other uses the OP_GET_MORE path, we
+        // need to select the appropriate post-get-more execution fail point depending on the
+        // op we are using.
+        std::string fpName = (_op == dbMsg) ? "waitAfterCommandFinishesExecution"
+                                            : "waitAfterOpGetMoreFinishesExecution";
+        auto cmdObj = BSON("configureFailPoint" << fpName << "mode" << (enable ? "alwaysOn" : "off")
+                                                << "data" << BSON("ns" << testNSS.toString()));
+        auto reply = conn->runCommand(OpMsgRequest::fromDBAndBody("admin", cmdObj));
+        ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
+        // return the appropriate failPointMsg for the failpoint we chose.
+        return fpName;
     }
-    auto currentOp = BSON("currentOp" << BSON("idleCursors" << true));
-    LOGV2(20606,
-          "confirmCurrentOpContents fails with curOpMatch: {curOpMatch} currentOp: "
-          "{conn_runCommand_OpMsgRequest_fromDBAndBody_admin_currentOp_getCommandReply}",
-          "curOpMatch"_attr = curOpMatch,
-          "conn_runCommand_OpMsgRequest_fromDBAndBody_admin_currentOp_getCommandReply"_attr =
-              conn->runCommand(OpMsgRequest::fromDBAndBody("admin", currentOp))->getCommandReply());
-    return false;
-}
 
-repl::OpTime getLastAppliedOpTime(DBClientBase* conn) {
-    auto reply =
-        conn->runCommand(OpMsgRequest::fromDBAndBody("admin", BSON("replSetGetStatus" << 1)));
-    ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
-    auto lastAppliedOpTime = reply->getCommandReply()["optimes"]["appliedOpTime"];
-    return repl::OpTime(lastAppliedOpTime["ts"].timestamp(), lastAppliedOpTime["t"].numberLong());
-}
+    void setWaitBeforeUnpinningOrDeletingCursorAfterGetMoreBatchFailpoint(DBClientBase* conn,
+                                                                          bool enable) {
+        auto cmdObj = BSON("configureFailPoint"
+                           << "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch"
+                           << "mode" << (enable ? "alwaysOn" : "off"));
+        auto reply = conn->runCommand(OpMsgRequest::fromDBAndBody("admin", cmdObj));
+        ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
+    }
 
-// Start an exhaust request with a batchSize of 2 in the initial 'find' and a batchSize of 1 in
-// subsequent 'getMore's.
-auto startExhaustQuery(
-    DBClientBase* queryConnection,
-    std::unique_ptr<DBClientCursor>& queryCursor,
-    int queryOptions = 0,
-    Milliseconds awaitDataTimeoutMS = Milliseconds(5000),
-    const boost::optional<repl::OpTime>& lastKnownCommittedOpTime = boost::none) {
-    queryOptions = queryOptions | QueryOption_Exhaust;
-    auto queryThread = stdx::async(
-        stdx::launch::async,
-        [&queryCursor,
-         queryConnection,
-         queryOptions,
-         awaitDataTimeoutMS,
-         lastKnownCommittedOpTime] {
-            const auto projSpec = BSON("_id" << 0 << "a" << 1);
-            // Issue the initial 'find' with a batchSize of 2 and the exhaust flag set. We then
-            // iterate through the first batch and confirm that the results are as expected.
-            queryCursor = queryConnection->query(testNSS, {}, 0, 0, &projSpec, queryOptions, 2);
-            for (int i = 0; i < 2; ++i) {
-                ASSERT_BSONOBJ_EQ(queryCursor->nextSafe(), BSON("a" << i));
+    bool confirmCurrentOpContents(DBClientBase* conn,
+                                  BSONObj curOpMatch,
+                                  bool expectEmptyResult = false,
+                                  Milliseconds timeoutMS = Milliseconds(5 * 60 * 1000),
+                                  Milliseconds intervalMS = Milliseconds(200)) {
+        auto curOpCmd =
+            BSON("aggregate" << 1 << "cursor" << BSONObj() << "pipeline"
+                             << BSON_ARRAY(BSON("$currentOp" << BSON("idleCursors" << true))
+                                           << BSON("$match" << curOpMatch)));
+        const auto startTime = clock->now();
+        while (clock->now() - startTime < timeoutMS) {
+            auto reply = conn->runCommand(OpMsgRequest::fromDBAndBody("admin", curOpCmd));
+            auto swCursorRes = CursorResponse::parseFromBSON(reply->getCommandReply());
+            ASSERT_OK(swCursorRes.getStatus());
+            if (swCursorRes.getValue().getBatch().empty() == expectEmptyResult) {
+                return true;
             }
-            // Having exhausted the two results returned by the initial find, we set the batchSize
-            // to 1 and issue a single getMore via DBClientCursor::more(). Because the 'exhaust'
-            // flag is set, the server will generate a series of internal getMores and stream them
-            // back to the client until the cursor is exhausted, without the client sending any
-            // further getMore requests. We expect this request to hang at the
-            // 'waitWithPinnedCursorDuringGetMoreBatch' failpoint.
-            queryCursor->setBatchSize(1);
-            if ((queryOptions & QueryOption_CursorTailable) &&
-                (queryOptions & QueryOption_AwaitData)) {
-                queryCursor->setAwaitDataTimeoutMS(awaitDataTimeoutMS);
-                if (lastKnownCommittedOpTime) {
-                    auto term = lastKnownCommittedOpTime.get().getTerm();
-                    queryCursor->setCurrentTermAndLastCommittedOpTime(term,
-                                                                      lastKnownCommittedOpTime);
+            sleepFor(intervalMS);
+        }
+        auto currentOp = BSON("currentOp" << BSON("idleCursors" << true));
+        LOGV2(20606,
+              "confirmCurrentOpContents fails with curOpMatch: {curOpMatch} currentOp: "
+              "{conn_runCommand_OpMsgRequest_fromDBAndBody_admin_currentOp_getCommandReply}",
+              "curOpMatch"_attr = curOpMatch,
+              "conn_runCommand_OpMsgRequest_fromDBAndBody_admin_currentOp_getCommandReply"_attr =
+                  conn->runCommand(OpMsgRequest::fromDBAndBody("admin", currentOp))
+                      ->getCommandReply());
+        return false;
+    }
+
+    repl::OpTime getLastAppliedOpTime(DBClientBase* conn) {
+        auto reply =
+            conn->runCommand(OpMsgRequest::fromDBAndBody("admin", BSON("replSetGetStatus" << 1)));
+        ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
+        auto lastAppliedOpTime = reply->getCommandReply()["optimes"]["appliedOpTime"];
+        return repl::OpTime(lastAppliedOpTime["ts"].timestamp(),
+                            lastAppliedOpTime["t"].numberLong());
+    }
+
+    // Start an exhaust request with a batchSize of 2 in the initial 'find' and a batchSize of 1 in
+    // subsequent 'getMore's.
+    auto startExhaustQuery(
+        DBClientBase* queryConnection,
+        std::unique_ptr<DBClientCursor>& queryCursor,
+        int queryOptions = 0,
+        Milliseconds awaitDataTimeoutMS = Milliseconds(5000),
+        const boost::optional<repl::OpTime>& lastKnownCommittedOpTime = boost::none) {
+        queryOptions = queryOptions | QueryOption_Exhaust;
+        if (_op == dbQuery) {
+            queryOptions |= DBClientCursor::QueryOptionLocal_forceOpQuery;
+        }
+        auto queryThread = stdx::async(
+            stdx::launch::async,
+            [&queryCursor,
+             queryConnection,
+             queryOptions,
+             awaitDataTimeoutMS,
+             lastKnownCommittedOpTime,
+             this] {
+                // Issue the initial 'find' with a batchSize of 2 and the exhaust flag set. We then
+                // iterate through the first batch and confirm that the results are as expected.
+                queryCursor = queryConnection->query(testNSS, {}, 0, 0, nullptr, queryOptions, 2);
+                for (int i = 0; i < 2; ++i) {
+                    auto doc = queryCursor->nextSafe();
+                    ASSERT(!doc["a"].eoo());
+                    ASSERT(doc["a"].safeNumberInt() == i);
                 }
-            }
-            ASSERT(queryCursor->more());
+                // Having exhausted the two results returned by the initial find, we set the
+                // batchSize to 1 and issue a single getMore via DBClientCursor::more(). Because the
+                // 'exhaust' flag is set, the server will generate a series of internal getMores and
+                // stream them back to the client until the cursor is exhausted, without the client
+                // sending any further getMore requests. We expect this request to hang at the
+                // 'waitWithPinnedCursorDuringGetMoreBatch' failpoint.
+                queryCursor->setBatchSize(1);
+                if ((queryOptions & QueryOption_CursorTailable) &&
+                    (queryOptions & QueryOption_AwaitData)) {
+                    queryCursor->setAwaitDataTimeoutMS(awaitDataTimeoutMS);
+                    if (lastKnownCommittedOpTime) {
+                        auto term = lastKnownCommittedOpTime.get().getTerm();
+                        queryCursor->setCurrentTermAndLastCommittedOpTime(term,
+                                                                          lastKnownCommittedOpTime);
+                    }
+                }
+                ASSERT(queryCursor->more());
+            });
+
+        // Wait until the parallel operation initializes its cursor.
+        const auto startTime = clock->now();
+        while (!queryCursor && (clock->now() - startTime < parallelWaitTimeoutMS)) {
+            sleepFor(Milliseconds(10));
+        }
+        ASSERT(queryCursor);
+        LOGV2(20607,
+              "Started exhaust query with cursorId: {queryCursor_getCursorId}",
+              "queryCursor_getCursorId"_attr = queryCursor->getCursorId());
+        return queryThread;
+    }
+
+    void runOneGetMore(DBClientBase* conn,
+                       const std::unique_ptr<DBClientCursor>& queryCursor,
+                       boost::optional<int> nDocsReturned) {
+        BSONObjBuilder bob;
+        bob.append("command.collection", testNSS.coll());
+        bob.append("command.getMore", queryCursor->getCursorId());
+        bob.append("failpointMsg", "waitWithPinnedCursorDuringGetMoreBatch");
+        if (nDocsReturned) {
+            bob.append("cursor.nDocsReturned", *nDocsReturned);
+        }
+        const auto curOpMatch = bob.done();
+        // Confirm that the initial getMore appears in the $currentOp output.
+        ASSERT(confirmCurrentOpContents(conn, curOpMatch));
+
+        // Airlock the failpoint by releasing it only after we enable a post-getMore failpoint. This
+        // ensures that no subsequent getMores can run before we re-enable the original failpoint.
+        setWaitBeforeUnpinningOrDeletingCursorAfterGetMoreBatchFailpoint(conn, true);
+        setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(conn, false);
+        // Confirm that the getMore completed its batch and hit the post-getMore failpoint.
+        ASSERT(confirmCurrentOpContents(
+            conn,
+            BSON("command.getMore" << queryCursor->getCursorId() << "failpointMsg"
+                                   << "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch")));
+
+        // Re-enable the original failpoint to catch the next getMore, and release the current one.
+        setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(conn, true);
+        setWaitBeforeUnpinningOrDeletingCursorAfterGetMoreBatchFailpoint(conn, false);
+    }
+
+    // Test exhaust cursor is cleaned up on client disconnect. By default, the test client
+    // disconnects while the exhaust getMore is running. If disconnectAfterGetMoreBatch is set to
+    // true, the test client disconnects after the exhaust getMore is run but before the server
+    // sends out the response.
+    void testClientDisconnect(bool disconnectAfterGetMoreBatch) {
+        auto conn = connect();
+
+        // We need to set failpoints around getMore which cause it to hang, so only test against a
+        // single server rather than a replica set or mongoS. Mongos doesn't support exhuast at all
+        // and the failpoints might disrupt the completion of other commands (like monitoring hellos
+        // and heartbeats) for replica sets.
+        if (conn->isReplicaSetMember() || conn->isMongos()) {
+            return;
+        }
+
+        initTestCollection(conn.get());
+
+        // Enable a failpoint to block getMore during execution.
+        setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(conn.get(), true);
+
+        const auto connStr = unittest::getFixtureConnectionString();
+        const auto queryConnection = std::make_unique<DBClientConnection>();
+        uassertStatusOK(
+            queryConnection->connect(connStr.getServers()[0], testBackgroundAppName, boost::none));
+        std::unique_ptr<DBClientCursor> queryCursor;
+
+        // Execute a query on a separate thread, with the 'exhaust' flag set.
+        auto queryThread = startExhaustQuery(queryConnection.get(), queryCursor);
+        // Ensure that, regardless of whether the test completes or fails, we release all
+        // failpoints.
+        ON_BLOCK_EXIT([&conn, &queryThread, this] {
+            setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(conn.get(), false);
+            setWaitBeforeUnpinningOrDeletingCursorAfterGetMoreBatchFailpoint(conn.get(), false);
+            queryThread.wait();
         });
 
-    // Wait until the parallel operation initializes its cursor.
-    const auto startTime = clock->now();
-    while (!queryCursor && (clock->now() - startTime < parallelWaitTimeoutMS)) {
-        sleepFor(Milliseconds(10));
+        // This will allow the initial getMore to run.
+        if (_op == dbQuery) {
+            // We can't know how many docs to expect when using dbQuery
+            // because the batch size is determined by the server.
+            runOneGetMore(conn.get(), queryCursor, boost::none);
+        } else {
+            runOneGetMore(conn.get(), queryCursor, 2);
+        }
+
+        // The next getMore will be an exhaust getMore. Confirm that the exhaust getMore appears in
+        // the $currentOp output.
+        BSONObjBuilder bob;
+        bob.append("command.collection", testNSS.coll());
+        bob.append("command.getMore", queryCursor->getCursorId());
+        bob.append("failpointMsg", "waitWithPinnedCursorDuringGetMoreBatch");
+        if (_op == dbMsg) {
+            // We can't know how many docs to expect when using dbQuery
+            // because the batch size is determined by the server.
+            bob.append("cursor.nDocsReturned", 3);
+        }
+        auto curOpMatch = bob.done();
+        ASSERT(confirmCurrentOpContents(conn.get(), curOpMatch));
+
+        if (disconnectAfterGetMoreBatch) {
+            // Allow the exhaust getMore to run but block it before sending out the response.
+            std::string failPointMsg =
+                setWaitAfterGetMoreFinishesExecutionFailpoint(conn.get(), true);
+            setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(conn.get(), false);
+            ASSERT(confirmCurrentOpContents(conn.get(),
+                                            BSON("command.getMore" << queryCursor->getCursorId()
+                                                                   << "failpointMsg"
+                                                                   << failPointMsg)));
+        }
+
+        // Kill the client connection while the exhaust getMore is blocked on the failpoint.
+        queryConnection->shutdownAndDisallowReconnect();
+        LOGV2(20608, "Killed exhaust connection.");
+
+        if (disconnectAfterGetMoreBatch) {
+            // Disable the failpoint to allow the exhaust getMore to continue sending out the
+            // response after the client disconnects. This will result in a broken pipe error.
+            setWaitAfterGetMoreFinishesExecutionFailpoint(conn.get(), false);
+        }
+
+        curOpMatch = BSON("command.collection" << testNSS.coll() << "command.getMore"
+                                               << queryCursor->getCursorId());
+        // Confirm that the exhaust getMore was interrupted and does not appear in the $currentOp
+        // output.
+        const bool expectEmptyResult = true;
+        ASSERT(confirmCurrentOpContents(conn.get(), curOpMatch, expectEmptyResult));
+
+        setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(conn.get(), false);
+        setWaitBeforeUnpinningOrDeletingCursorAfterGetMoreBatchFailpoint(conn.get(), false);
+
+        curOpMatch = BSON("type"
+                          << "idleCursor"
+                          << "cursor.cursorId" << queryCursor->getCursorId());
+        // Confirm that the cursor was cleaned up and does not appear in the $currentOp idleCursor
+        // output.
+        ASSERT(confirmCurrentOpContents(conn.get(), curOpMatch, expectEmptyResult));
     }
-    ASSERT(queryCursor);
-    LOGV2(20607,
-          "Started exhaust query with cursorId: {queryCursor_getCursorId}",
-          "queryCursor_getCursorId"_attr = queryCursor->getCursorId());
-    return queryThread;
-}
 
-void runOneGetMore(DBClientBase* conn,
-                   const std::unique_ptr<DBClientCursor>& queryCursor,
-                   int nDocsReturned) {
-    const auto curOpMatch =
-        BSON("command.collection" << testNSS.coll() << "command.getMore"
-                                  << queryCursor->getCursorId() << "failpointMsg"
-                                  << "waitWithPinnedCursorDuringGetMoreBatch"
-                                  << "cursor.nDocsReturned" << nDocsReturned);
-    // Confirm that the initial getMore appears in the $currentOp output.
-    ASSERT(confirmCurrentOpContents(conn, curOpMatch));
+    // Specifies the amount of time we are willing to wait for a parallel operation to complete.
+    Milliseconds parallelWaitTimeoutMS = Milliseconds(5 * 60 * 1000);
 
-    // Airlock the failpoint by releasing it only after we enable a post-getMore failpoint. This
-    // ensures that no subsequent getMores can run before we re-enable the original failpoint.
-    setWaitBeforeUnpinningOrDeletingCursorAfterGetMoreBatchFailpoint(conn, true);
-    setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(conn, false);
-    // Confirm that the getMore completed its batch and hit the post-getMore failpoint.
-    ASSERT(confirmCurrentOpContents(
-        conn,
-        BSON("command.getMore" << queryCursor->getCursorId() << "failpointMsg"
-                               << "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch")));
+    // Obtain a pointer to the global system clock. Used to enforce timeouts in the parallel thread.
+    SystemClockSource* clock = SystemClockSource::get();
 
-    // Re-enable the original failpoint to catch the next getMore, and release the current one.
-    setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(conn, true);
-    setWaitBeforeUnpinningOrDeletingCursorAfterGetMoreBatchFailpoint(conn, false);
-}
+    const NamespaceString testNSS{"exhaust_cursor_currentop.testColl"};
+
+    const StringData testAppName = "curop_exhaust_cursor_test";
+
+    const StringData testBackgroundAppName = "curop_exhaust_cursor_test_bg";
+
+    NetworkOp _op{dbMsg};
+};
 }  // namespace
 
-TEST(CurrentOpExhaustCursorTest, CanSeeEachExhaustCursorPseudoGetMoreInCurrentOpOutput) {
+TEST_F(CurrentOpExhaustCursorTestFixture, CanSeeEachExhaustCursorPseudoGetMoreInCurrentOpOutput) {
     auto conn = connect();
 
     // We need to set failpoints around getMore which cause it to hang, so only test against a
@@ -234,7 +382,7 @@ TEST(CurrentOpExhaustCursorTest, CanSeeEachExhaustCursorPseudoGetMoreInCurrentOp
     // Execute a query on a separate thread, with the 'exhaust' flag set.
     auto queryThread = startExhaustQuery(queryConnection.get(), queryCursor);
     // Ensure that, regardless of whether the test completes or fails, we release all failpoints.
-    ON_BLOCK_EXIT([&conn, &queryThread] {
+    ON_BLOCK_EXIT([&conn, &queryThread, this] {
         setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(conn.get(), false);
         setWaitBeforeUnpinningOrDeletingCursorAfterGetMoreBatchFailpoint(conn.get(), false);
         queryThread.wait();
@@ -249,98 +397,31 @@ TEST(CurrentOpExhaustCursorTest, CanSeeEachExhaustCursorPseudoGetMoreInCurrentOp
     }
 }
 
-// Test exhaust cursor is cleaned up on client disconnect. By default, the test client disconnects
-// while the exhaust getMore is running. If disconnectAfterGetMoreBatch is set to true, the test
-// client disconnects after the exhaust getMore is run but before the server sends out the response.
-void testClientDisconnect(bool disconnectAfterGetMoreBatch) {
-    auto conn = connect();
 
-    // We need to set failpoints around getMore which cause it to hang, so only test against a
-    // single server rather than a replica set or mongoS.
-    if (conn->isReplicaSetMember() || conn->isMongos()) {
-        return;
-    }
-
-    initTestCollection(conn.get());
-
-    // Enable a failpoint to block getMore during execution.
-    setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(conn.get(), true);
-
-    const auto connStr = unittest::getFixtureConnectionString();
-    const auto queryConnection = std::make_unique<DBClientConnection>();
-    uassertStatusOK(
-        queryConnection->connect(connStr.getServers()[0], testBackgroundAppName, boost::none));
-    std::unique_ptr<DBClientCursor> queryCursor;
-
-    // Execute a query on a separate thread, with the 'exhaust' flag set.
-    auto queryThread = startExhaustQuery(queryConnection.get(), queryCursor);
-    // Ensure that, regardless of whether the test completes or fails, we release all failpoints.
-    ON_BLOCK_EXIT([&conn, &queryThread] {
-        setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(conn.get(), false);
-        setWaitBeforeUnpinningOrDeletingCursorAfterGetMoreBatchFailpoint(conn.get(), false);
-        queryThread.wait();
-    });
-
-    // This will allow the initial getMore to run.
-    runOneGetMore(conn.get(), queryCursor, 2);
-
-    // The next getMore will be an exhaust getMore. Confirm that the exhaust getMore appears in the
-    // $currentOp output.
-    auto curOpMatch = BSON("command.collection" << testNSS.coll() << "command.getMore"
-                                                << queryCursor->getCursorId() << "failpointMsg"
-                                                << "waitWithPinnedCursorDuringGetMoreBatch"
-                                                << "cursor.nDocsReturned" << 3);
-    ASSERT(confirmCurrentOpContents(conn.get(), curOpMatch));
-
-    if (disconnectAfterGetMoreBatch) {
-        // Allow the exhaust getMore to run but block it before sending out the response.
-        setWaitAfterCommandFinishesExecutionFailpoint(conn.get(), true);
-        setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(conn.get(), false);
-        ASSERT(confirmCurrentOpContents(conn.get(),
-                                        BSON("command.getMore"
-                                             << queryCursor->getCursorId() << "failpointMsg"
-                                             << "waitAfterCommandFinishesExecution")));
-    }
-
-    // Kill the client connection while the exhaust getMore is blocked on the failpoint.
-    queryConnection->shutdownAndDisallowReconnect();
-    LOGV2(20608, "Killed exhaust connection.");
-
-    if (disconnectAfterGetMoreBatch) {
-        // Disable the failpoint to allow the exhaust getMore to continue sending out the response
-        // after the client disconnects. This will result in a broken pipe error.
-        setWaitAfterCommandFinishesExecutionFailpoint(conn.get(), false);
-    }
-
-    curOpMatch = BSON("command.collection" << testNSS.coll() << "command.getMore"
-                                           << queryCursor->getCursorId());
-    // Confirm that the exhaust getMore was interrupted and does not appear in the $currentOp
-    // output.
-    const bool expectEmptyResult = true;
-    ASSERT(confirmCurrentOpContents(conn.get(), curOpMatch, expectEmptyResult));
-
-    setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(conn.get(), false);
-    setWaitBeforeUnpinningOrDeletingCursorAfterGetMoreBatchFailpoint(conn.get(), false);
-
-    curOpMatch = BSON("type"
-                      << "idleCursor"
-                      << "cursor.cursorId" << queryCursor->getCursorId());
-    // Confirm that the cursor was cleaned up and does not appear in the $currentOp idleCursor
-    // output.
-    ASSERT(confirmCurrentOpContents(conn.get(), curOpMatch, expectEmptyResult));
-}
-
-TEST(CurrentOpExhaustCursorTest, InterruptExhaustCursorPseudoGetMoreOnClientDisconnect) {
+TEST_F(CurrentOpExhaustCursorTestFixture, InterruptExhaustCursorPseudoGetMoreOnClientDisconnect) {
     // Test that an exhaust getMore is interrupted on client disconnect.
     testClientDisconnect(false /* disconnectAfterGetMoreBatch */);
 }
 
-TEST(CurrentOpExhaustCursorTest, CleanupExhaustCursorOnBrokenPipe) {
+TEST_F(CurrentOpExhaustCursorTestFixture, CleanupExhaustCursorOnBrokenPipe) {
     // Test that exhaust cursor is cleaned up on broken pipe even if the exhaust getMore succeeded.
     testClientDisconnect(true /* disconnectAfterGetMoreBatch */);
 }
 
-TEST(CurrentOpExhaustCursorTest, ExhaustCursorUpdatesLastKnownCommittedOpTime) {
+TEST_F(CurrentOpExhaustCursorTestFixture,
+       InterruptExhaustCursorPseudoGetMoreOnClientDisconnectDbQuery) {
+    _op = dbQuery;
+    // Test that an exhaust getMore is interrupted on client disconnect.
+    testClientDisconnect(false /* disconnectAfterGetMoreBatch */);
+}
+
+TEST_F(CurrentOpExhaustCursorTestFixture, CleanupExhaustCursorOnBrokenPipeDbQuery) {
+    _op = dbQuery;
+    // Test that exhaust cursor is cleaned up on broken pipe even if the exhaust getMore succeeded.
+    testClientDisconnect(true /* disconnectAfterGetMoreBatch */);
+}
+
+TEST_F(CurrentOpExhaustCursorTestFixture, ExhaustCursorUpdatesLastKnownCommittedOpTime) {
     auto fixtureConn = connect();
 
     // We need to test the lastKnownCommittedOpTime in exhaust getMore requests. So we need a
