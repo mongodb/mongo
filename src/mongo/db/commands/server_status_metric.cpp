@@ -45,8 +45,8 @@ namespace mongo {
 
 using namespace fmt::literals;
 
-ServerStatusMetric::ServerStatusMetric(const std::string& nameIn)
-    : _name(nameIn), _leafName(_parseLeafName(nameIn)) {}
+ServerStatusMetric::ServerStatusMetric(std::string name)
+    : _name(std::move(name)), _leafName(_parseLeafName(_name)) {}
 
 std::string ServerStatusMetric::_parseLeafName(const std::string& name) {
     size_t idx = name.rfind(".");

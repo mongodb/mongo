@@ -43,7 +43,7 @@ class ServerStatusMetric {
 public:
     virtual ~ServerStatusMetric() = default;
 
-    std::string getMetricName() const {
+    const std::string& getMetricName() const {
         return _name;
     }
 
@@ -59,7 +59,7 @@ protected:
      * the serverStatus root otherwise it will live under the "counters"
      * namespace so foo.bar would be serverStatus().counters.foo.bar
      */
-    explicit ServerStatusMetric(const std::string& name);
+    explicit ServerStatusMetric(std::string name);
 
     const std::string _name;
     const std::string _leafName;
@@ -70,6 +70,7 @@ protected:
  * status metrics.
  * Its recommended usage is through the addMetricToTree helper function. Here is an
  * example of a ServerStatusMetricField holding a Counter64.
+ * Note that the metric is a reference.
  *
  * auto& metric =
  *      addMetricToTree(std::make_unique<ServerStatusMetricField<Counter64>>("path.to.counter"));
@@ -88,7 +89,7 @@ protected:
 template <typename T>
 class ServerStatusMetricField : public ServerStatusMetric {
 public:
-    explicit ServerStatusMetricField(const std::string& name) : ServerStatusMetric(name) {}
+    explicit ServerStatusMetricField(std::string name) : ServerStatusMetric(std::move(name)) {}
 
     void appendAtLeaf(BSONObjBuilder& b) const override {
         b.append(_leafName, _t);
@@ -103,39 +104,30 @@ private:
 };
 
 /**
- * GatedServerStatusMetricField is the generic class for storing and reporting server status
- * metrics that are only reported under certain conditions, such as when a feature flag is enabled.
- * Its recommended usage is through the addMetricToTree helper function. Here is an example of a
- * GatedServerStatusMetricField holding a Counter64:
+ * A ServerStatusMetricField that is only reported when a predicate is satisfied.
  *
- *     auto& counter = makeServerStatusMetric<Counter64>("path.to.counter", [](){
- *         return gMyCounterFeatureFlag.isEnabledAndIgnoreFCV();
- *     });
+ * It's recommended to create these same way as ServerStatusMetricField, with the
+ * makeServerStatusMetric helper, but with the predicate as an additional
+ * function argument. Example:
+ *
+ *     auto predicate = [] { return gMyCounterFeatureFlag.isEnabledAndIgnoreFCV(); };
+ *     auto& counter = makeServerStatusMetric<Counter64>("path.to.counter", predicate);
  *     ...
  *     counter.increment();
- *
- * To read the metric from JavaScript:
- *      db.serverStatus().metrics.path.to.counter
  */
 template <typename T>
-class ConditionalServerStatusMetricField : public ServerStatusMetric {
+class ConditionalServerStatusMetricField : public ServerStatusMetricField<T> {
 public:
-    explicit ConditionalServerStatusMetricField(const std::string& name,
-                                                std::function<bool()>&& predicate)
-        : ServerStatusMetric(name), _predicate(std::move(predicate)) {}
+    ConditionalServerStatusMetricField(std::string name, std::function<bool()> predicate)
+        : ServerStatusMetricField<T>{std::move(name)}, _predicate{std::move(predicate)} {}
 
     void appendAtLeaf(BSONObjBuilder& b) const override {
-        if (_predicate()) {
-            b.append(_leafName, _t);
-        }
-    }
-
-    T& value() {
-        return _t;
+        if (_predicate && !_predicate())
+            return;
+        ServerStatusMetricField<T>::appendAtLeaf(b);
     }
 
 private:
-    T _t;
     std::function<bool()> _predicate;
 };
 
@@ -180,14 +172,15 @@ T& addMetricToTree(std::unique_ptr<T> metric, MetricTree* metricTree = globalMet
 }
 
 template <typename T>
-T& makeServerStatusMetric(const std::string& path) {
-    return addMetricToTree(std::make_unique<ServerStatusMetricField<T>>(path)).value();
+T& makeServerStatusMetric(std::string path) {
+    return addMetricToTree(std::make_unique<ServerStatusMetricField<T>>(std::move(path))).value();
 }
 
+/** Make a metric that only appends itself when `predicate` is true. */
 template <typename T>
-T& makeServerStatusMetric(const std::string& path, std::function<bool()>&& predicate) {
-    return addMetricToTree(
-               std::make_unique<ConditionalServerStatusMetricField<T>>(path, std::move(predicate)))
+T& makeServerStatusMetric(std::string path, std::function<bool()> predicate) {
+    return addMetricToTree(std::make_unique<ConditionalServerStatusMetricField<T>>(
+                               std::move(path), std::move(predicate)))
         .value();
 }
 
