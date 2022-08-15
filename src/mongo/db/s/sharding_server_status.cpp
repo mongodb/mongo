@@ -138,10 +138,11 @@ public:
         using Metrics = ShardingDataTransformCumulativeMetrics;
 
         // The serverStatus command is run before the FCV is initialized so we ignore it when
-        // checking whether the resharding feature is enabled here.
+        // checking whether the resharding and global index features are enabled here.
         if (resharding::gFeatureFlagResharding.isEnabledAndIgnoreFCV()) {
             Metrics::getForResharding(sCtx)->reportForServerStatus(bob);
-            // TODO SERVER-67049: move this into a separate feature flag check for global indexes.
+        }
+        if (gFeatureFlagGlobalIndexes.isEnabledAndIgnoreFCV()) {
             Metrics::getForGlobalIndexes(sCtx)->reportForServerStatus(bob);
         }
     }
