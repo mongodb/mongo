@@ -57,7 +57,16 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(hangDropCollectionBeforeLockAcquisition);
 MONGO_FAIL_POINT_DEFINE(hangDuringDropCollection);
 
-Status _checkNssAndReplState(OperationContext* opCtx, const CollectionPtr& coll) {
+Status _checkNssAndReplState(OperationContext* opCtx,
+                             const CollectionPtr& coll,
+                             const NamespaceString& nss,
+                             const boost::optional<UUID>& expectedUUID = boost::none) {
+    try {
+        checkCollectionUUIDMismatch(opCtx, nss, coll, expectedUUID);
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+
     if (!coll) {
         return Status(ErrorCodes::NamespaceNotFound, "ns not found");
     }
@@ -196,18 +205,12 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
 
     CollectionPtr coll =
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, startingNss);
-    Status status = _checkNssAndReplState(opCtx, coll);
+    Status status = _checkNssAndReplState(opCtx, coll, startingNss, expectedUUID);
     if (!status.isOK()) {
         return status;
     }
 
     warnEncryptedCollectionsIfNeeded(opCtx, coll);
-
-    try {
-        checkCollectionUUIDMismatch(opCtx, startingNss, coll, expectedUUID);
-    } catch (const DBException& ex) {
-        return ex.toStatus();
-    }
 
     if (MONGO_unlikely(hangDuringDropCollection.shouldFail())) {
         LOGV2(518090,
@@ -257,7 +260,7 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
         opCtx->recoveryUnit()->abandonSnapshot();
 
         coll = CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, collectionUUID);
-        status = _checkNssAndReplState(opCtx, coll);
+        status = _checkNssAndReplState(opCtx, coll, startingNss, expectedUUID);
         if (!status.isOK()) {
             return status;
         }
@@ -305,7 +308,7 @@ Status _dropCollectionForApplyOps(OperationContext* opCtx,
     Lock::CollectionLock collLock(opCtx, collectionName, MODE_X);
     const CollectionPtr& coll =
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, collectionName);
-    Status status = _checkNssAndReplState(opCtx, coll);
+    Status status = _checkNssAndReplState(opCtx, coll, collectionName);
     if (!status.isOK()) {
         return status;
     }
