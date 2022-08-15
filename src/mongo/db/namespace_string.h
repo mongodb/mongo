@@ -224,7 +224,7 @@ public:
     // Namespace used for CompactParticipantCoordinator service.
     static const NamespaceString kCompactStructuredEncryptionCoordinatorNamespace;
 
-    // Namespace used for storing cluster wide parameters.
+    // Namespace used for storing cluster wide parameters on dedicated configurations.
     static const NamespaceString kClusterParametersNamespace;
 
     // Namespace used for storing the list of shards on the CSRS.
@@ -346,6 +346,12 @@ public:
      * namespace is "<dbName>.$cmd.listCollections".
      */
     static NamespaceString makeListCollectionsNSS(const DatabaseName& dbName);
+
+    /**
+     * Constructs the cluster parameters NamespaceString for the specified tenant. The format for
+     * this namespace is "(<tenantId>_)config.clusterParameters".
+     */
+    static NamespaceString makeClusterParametersNSS(const boost::optional<TenantId>& tenantId);
 
     /**
      * NOTE: DollarInDbNameBehavior::allow is deprecated.

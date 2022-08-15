@@ -64,7 +64,8 @@ bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
     LOGV2_DEBUG(
         6432603, 2, "Updating cluster parameter on-disk", "clusterParameter"_attr = parameterName);
 
-    return uassertStatusOK(_dbService.updateParameterOnDisk(opCtx, query, update, writeConcern));
+    return uassertStatusOK(_dbService.updateParameterOnDisk(
+        opCtx, query, update, writeConcern, cmd.getDbName().tenantId()));
 }
 
 std::pair<BSONObj, BSONObj> SetClusterParameterInvocation::normalizeParameter(
@@ -101,7 +102,8 @@ StatusWith<bool> ClusterParameterDBClientService::updateParameterOnDisk(
     OperationContext* opCtx,
     BSONObj query,
     BSONObj update,
-    const WriteConcernOptions& writeConcern) {
+    const WriteConcernOptions& writeConcern,
+    const boost::optional<TenantId>& tenantId) {
     BSONObj res;
 
     BSONObjBuilder set;
@@ -116,7 +118,7 @@ StatusWith<bool> ClusterParameterDBClientService::updateParameterOnDisk(
             NamespaceString::kConfigDb.toString(),
             [&] {
                 write_ops::UpdateCommandRequest updateOp(
-                    NamespaceString::kClusterParametersNamespace);
+                    NamespaceString::makeClusterParametersNSS(tenantId));
                 updateOp.setUpdates({[&] {
                     write_ops::UpdateOpEntry entry;
                     entry.setQ(query);

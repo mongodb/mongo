@@ -72,6 +72,7 @@ public:
 
         Reply typedRun(OperationContext* opCtx) {
             GetClusterParameterInvocation invocation;
+
             if (gFeatureFlagClusterWideConfigM2.isEnabled(
                     serverGlobalParams.featureCompatibility)) {
                 // Refresh cached cluster server parameters via a majority read from the config

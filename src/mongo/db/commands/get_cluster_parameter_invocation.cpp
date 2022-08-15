@@ -144,14 +144,14 @@ GetClusterParameterInvocation::Reply GetClusterParameterInvocation::getDurablePa
     // Perform the majority read on the config server primary.
     BSONObj query = queryDocBuilder.obj();
     LOGV2_DEBUG(6226101, 2, "Querying config servers for cluster parameters", "query"_attr = query);
-    auto findResponse = uassertStatusOK(
-        configServers->exhaustiveFindOnConfig(opCtx,
-                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                              repl::ReadConcernLevel::kMajorityReadConcern,
-                                              NamespaceString::kClusterParametersNamespace,
-                                              query,
-                                              BSONObj(),
-                                              boost::none));
+    auto findResponse = uassertStatusOK(configServers->exhaustiveFindOnConfig(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        repl::ReadConcernLevel::kMajorityReadConcern,
+        NamespaceString::makeClusterParametersNSS(request.getDbName().tenantId()),
+        query,
+        BSONObj(),
+        boost::none));
 
     // Any parameters that are not included in the response don't have a cluster parameter
     // document yet, which means they still are using the default value.

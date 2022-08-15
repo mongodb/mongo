@@ -307,6 +307,12 @@ bool NamespaceString::mustBeAppliedInOwnOplogBatch() const {
         _ns == kConfigsvrShardsNamespace.ns();
 }
 
+NamespaceString NamespaceString::makeClusterParametersNSS(
+    const boost::optional<TenantId>& tenantId) {
+    return tenantId ? NamespaceString(tenantId, kConfigDb, "clusterParameters")
+                    : kClusterParametersNamespace;
+}
+
 NamespaceString NamespaceString::makeListCollectionsNSS(const DatabaseName& dbName) {
     NamespaceString nss(dbName, listCollectionsCursorCol);
     dassert(nss.isValid());

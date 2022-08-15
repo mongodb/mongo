@@ -101,7 +101,8 @@ public:
     StatusWith<bool> updateParameterOnDisk(OperationContext* opCtx,
                                            BSONObj cmd,
                                            BSONObj info,
-                                           const WriteConcernOptions&) override {
+                                           const WriteConcernOptions&,
+                                           const boost::optional<TenantId>& tenantId) override {
         return updateParameterOnDiskMockImpl(cmd, info);
     }
 
