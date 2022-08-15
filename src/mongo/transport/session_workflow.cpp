@@ -187,11 +187,11 @@ public:
      */
     Future<void> processMessage();
 
-    /*
-     * Source/Sink message from the TransportLayer.
-     */
-    void sourceMessage();
-    void sinkMessage();
+    /** Get a request message from the Session (transport layer). */
+    void receiveMessage();
+
+    /** Send a response message to the Session (transport layer). */
+    void sendMessage();
 
     /*
      * Releases all the resources associated with the session and call the cleanupHook.
@@ -345,7 +345,7 @@ private:
     boost::optional<Message> _out;
 };
 
-void SessionWorkflow::Impl::sourceMessage() {
+void SessionWorkflow::Impl::receiveMessage() {
     invariant(!_work);
     try {
         auto msg = uassertStatusOK([&] {
@@ -383,7 +383,7 @@ void SessionWorkflow::Impl::sourceMessage() {
     }
 }
 
-void SessionWorkflow::Impl::sinkMessage() {
+void SessionWorkflow::Impl::sendMessage() {
     // Sink our response to the client
     //
     // If there was an error sinking the message to the client, then we should print an error and
@@ -510,14 +510,14 @@ void SessionWorkflow::Impl::startNewLoop(const Status& executorStatus) {
         if (_nextWork) {
             _work = std::move(_nextWork);
         } else {
-            sourceMessage();
+            receiveMessage();
         }
 
         return processMessage();
     })
         .then([this] {
             if (_work->hasOut()) {
-                sinkMessage();
+                sendMessage();
             }
         })
         .getAsync([this, anchor = shared_from_this()](Status status) {
