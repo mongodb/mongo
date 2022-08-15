@@ -6,7 +6,7 @@ cd src
 set -o errexit
 set -o verbose
 
-curl -L https://github.com/mongodb/mongo-task-generator/releases/download/v0.5.0/mongo-task-generator --output mongo-task-generator
+curl -L https://github.com/mongodb/mongo-task-generator/releases/download/v0.5.1/mongo-task-generator --output mongo-task-generator
 chmod +x mongo-task-generator
 
 ## Comment above and uncomment below to test unreleased mongo-task-generator changes pushed to <branch-name>
