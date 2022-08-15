@@ -54,7 +54,7 @@ const kTenantDefinedDbName = "0";
 const kTenantId = `${kTenantIdPrefix}-multiWrites`;
 const kDbName = tenantMigrationTest.tenantDB(kTenantId, kTenantDefinedDbName);
 
-const kRecords = 2000;
+const kRecords = 500;
 const kUpdateCycles = 600;
 
 function prepareDatabase(dbName) {
