@@ -113,6 +113,7 @@ MONGO_FAIL_POINT_DEFINE(skipCheckingForNotPrimaryInCommandDispatch);
 MONGO_FAIL_POINT_DEFINE(sleepMillisAfterCommandExecutionBegins);
 MONGO_FAIL_POINT_DEFINE(waitAfterNewStatementBlocksBehindPrepare);
 MONGO_FAIL_POINT_DEFINE(waitAfterCommandFinishesExecution);
+MONGO_FAIL_POINT_DEFINE(waitAfterOpGetMoreFinishesExecution);
 MONGO_FAIL_POINT_DEFINE(failWithErrorCodeInRunCommand);
 MONGO_FAIL_POINT_DEFINE(hangBeforeSessionCheckOut);
 MONGO_FAIL_POINT_DEFINE(hangBeforeSettingTxnInterruptFlag);
@@ -1655,6 +1656,8 @@ DbResponse receivedGetMore(OperationContext* opCtx,
         curop.debug().responseLength = dbresponse.response.header().dataLen();
         curop.debug().nreturned = 1;
         *shouldLogOpDebug = true;
+        CurOpFailpointHelpers::waitWhileFailPointEnabled(
+            &waitAfterOpGetMoreFinishesExecution, opCtx, "waitAfterOpGetMoreFinishesExecution");
         return dbresponse;
     }
 
@@ -1667,6 +1670,8 @@ DbResponse receivedGetMore(OperationContext* opCtx,
         dbresponse.shouldRunAgainForExhaust = true;
     }
 
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &waitAfterOpGetMoreFinishesExecution, opCtx, "waitAfterOpGetMoreFinishesExecution");
     return dbresponse;
 }
 

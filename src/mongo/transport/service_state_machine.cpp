@@ -684,10 +684,20 @@ void ServiceStateMachine::_cleanupExhaustResources() noexcept try {
     if (!_inExhaust) {
         return;
     }
-    auto request = OpMsgRequest::parse(_inMessage);
+    long long cursorId = 0;
+    if (_inMessage.operation() == dbGetMore) {
+        DbMessage dbm(_inMessage);
+        [[maybe_unused]] const int ntoreturn = dbm.pullInt();
+        cursorId = dbm.pullInt64();
+    } else {
+        invariant(_inMessage.operation() == dbMsg);
+        auto request = OpMsgRequest::parse(_inMessage);
+        if (request.getCommandName() == "getMore"_sd) {
+            cursorId = request.body["getMore"].Long();
+        }
+    }
     // Clean up cursor for exhaust getMore request.
-    if (request.getCommandName() == "getMore"_sd) {
-        auto cursorId = request.body["getMore"].Long();
+    if (cursorId != 0) {
         auto opCtx = Client::getCurrent()->makeOperationContext();
         // Fire and forget. This is a best effort attempt to immediately clean up the exhaust
         // cursor. If the killCursors request fails here for any reasons, it will still be
