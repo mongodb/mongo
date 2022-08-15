@@ -325,6 +325,11 @@ void TenantMigrationRecipientService::checkIfConflictsWithOtherInstances(
     const std::vector<const PrimaryOnlyService::Instance*>& existingInstances) {
     auto tenantId = initialStateDoc["tenantId"].valueStringData();
 
+    auto recipientStateDocument = TenantMigrationRecipientDocument::parse(
+        IDLParserContext("recipientStateDoc"), initialStateDoc);
+    auto protocol = recipientStateDocument.getProtocol().value_or(
+        MigrationProtocolEnum::kMultitenantMigrations);
+
     for (auto& instance : existingInstances) {
         auto existingTypedInstance =
             checked_cast<const TenantMigrationRecipientService::Instance*>(instance);
@@ -332,15 +337,24 @@ void TenantMigrationRecipientService::checkIfConflictsWithOtherInstances(
         auto isDone = existingState.getState() == TenantMigrationRecipientStateEnum::kDone &&
             existingState.getExpireAt();
 
+        if (isDone) {
+            continue;
+        }
+
         uassert(ErrorCodes::ConflictingOperationInProgress,
                 "an existing shard merge is in progress",
-                isDone ||
-                    (existingTypedInstance->getProtocol() != MigrationProtocolEnum::kShardMerge &&
-                     existingState.getProtocol() != MigrationProtocolEnum::kShardMerge));
+                existingTypedInstance->getProtocol() != MigrationProtocolEnum::kShardMerge);
+
+        uassert(ErrorCodes::ConflictingOperationInProgress,
+                str::stream() << "cannot start "
+                              << MigrationProtocol_serializer(MigrationProtocolEnum::kShardMerge)
+                              << " migration, tenant " << existingTypedInstance->getTenantId()
+                              << " is already migrating",
+                protocol != MigrationProtocolEnum::kShardMerge);
 
         uassert(ErrorCodes::ConflictingOperationInProgress,
                 str::stream() << "tenant " << tenantId << " is already migrating",
-                isDone || existingTypedInstance->getTenantId() != tenantId);
+                existingTypedInstance->getTenantId() != tenantId);
     }
 }
 
@@ -399,7 +413,9 @@ boost::optional<BSONObj> TenantMigrationRecipientService::Instance::reportForCur
     stdx::lock_guard lk(_mutex);
     bob.append("desc", "tenant recipient migration");
     _migrationUuid.appendToBuilder(&bob, "instanceID"_sd);
-    bob.append("tenantId", _stateDoc.getTenantId());
+    if (getProtocol() == MigrationProtocolEnum::kMultitenantMigrations) {
+        bob.append("tenantId", _stateDoc.getTenantId());
+    }
     bob.append("donorConnectionString", _stateDoc.getDonorConnectionString());
     bob.append("readPreference", _stateDoc.getReadPreference().toInnerBSON());
     bob.append("state", _stateDoc.getState());
@@ -2661,7 +2677,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
     LOGV2(4879607,
           "Starting tenant migration recipient instance: ",
           "migrationId"_attr = getMigrationUUID(),
-          "protocol"_attr = getProtocol(),
+          "protocol"_attr = MigrationProtocol_serializer(getProtocol()),
           "tenantId"_attr = getTenantId(),
           "connectionString"_attr = _donorConnectionString,
           "readPreference"_attr = _readPreference);

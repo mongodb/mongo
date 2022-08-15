@@ -787,8 +787,9 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDa
         MigrationRecipientCommonData commonData(
             _migrationUuid, donorConnString.toString(), _readPreference);
         commonData.setRecipientCertificateForDonor(_recipientCertificateForDonor);
-        // TODO SERVER-63454: Pass tenantId only for 'kMultitenantMigrations' protocol.
-        commonData.setTenantId(_tenantId);
+        if (_protocol == MigrationProtocolEnum::kMultitenantMigrations) {
+            commonData.setTenantId(_tenantId);
+        }
 
         stdx::lock_guard<Latch> lg(_mutex);
 
@@ -818,8 +819,9 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForget
     MigrationRecipientCommonData commonData(
         _migrationUuid, donorConnString.toString(), _readPreference);
     commonData.setRecipientCertificateForDonor(_recipientCertificateForDonor);
-    // TODO SERVER-63454: Pass tenantId only for 'kMultitenantMigrations' protocol.
-    commonData.setTenantId(_tenantId);
+    if (_protocol == MigrationProtocolEnum::kMultitenantMigrations) {
+        commonData.setTenantId(_tenantId);
+    }
 
     commonData.setProtocol(_protocol);
     request.setMigrationRecipientCommonData(commonData);

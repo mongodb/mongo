@@ -118,9 +118,8 @@ function testOplogCloning(ordered) {
     TenantMigrationTest.assertCommitted(
         tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}));
 
-    const donorDoc = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({
-        tenantId: kTenantId
-    });
+    const donorDoc =
+        donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({_id: migrationId});
 
     assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
     tenantMigrationTest.waitForMigrationGarbageCollection(migrationId, kTenantId);

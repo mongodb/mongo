@@ -169,7 +169,7 @@ structs:
             startMigrationDonorTimestamp:
                 type: timestamp
                 description: >-
-                    Timestamp after all index builds for tenant are complete or aborted.  Recipient
+                    Timestamp after all index builds for tenant are complete or aborted. Recipient
                     must not start cloning/fetching oplog entries from the donor until this
                     timestamp is majority committed.
                 validator:

@@ -38,14 +38,9 @@ tenantMigrationTest.insertDonorDB(tenantDB, collName);
 const failpoint = "fpBeforeMarkingCloneSuccess";
 const waitInFailPoint = configureFailPoint(recipientPrimary, failpoint, {action: "hang"});
 
-// In order to prevent the copying of "testTenantId" databases via logical cloning from donor to
-// recipient, start migration on a tenant id which is non-existent on the donor.
 const migrationUuid = UUID();
-const kDummyTenantId = "nonExistentTenantId";
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationUuid),
-    // TODO (SERVER-63454): Remove kDummyTenantId.
-    tenantId: kDummyTenantId,
     readPreference: {mode: 'primary'}
 };
 
@@ -55,12 +50,13 @@ assert.commandWorked(
 
 waitInFailPoint.wait();
 
-tenantMigrationTest.assertRecipientNodesInExpectedState(
-    tenantMigrationTest.getRecipientRst().nodes,
-    migrationUuid,
+tenantMigrationTest.assertRecipientNodesInExpectedState({
+    nodes: tenantMigrationTest.getRecipientRst().nodes,
+    migrationId: migrationUuid,
     tenantId,
-    TenantMigrationTest.RecipientState.kLearnedFilenames,
-    TenantMigrationTest.RecipientAccessState.kReject);
+    expectedState: TenantMigrationTest.RecipientState.kLearnedFilenames,
+    expectedAccessState: TenantMigrationTest.RecipientAccessState.kReject
+});
 
 waitInFailPoint.off();
 

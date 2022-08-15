@@ -143,12 +143,13 @@ function testRollbackInitialState() {
     let steadyStateFunc = (tenantMigrationTest) => {
         // Verify that the migration restarted successfully on the new primary despite rollback.
         TenantMigrationTest.assertCommitted(migrationThread.returnData());
-        tenantMigrationTest.assertRecipientNodesInExpectedState(
-            tenantMigrationTest.getRecipientRst().nodes,
-            migrationId,
-            migrationOpts.tenantId,
-            TenantMigrationTest.RecipientState.kConsistent,
-            TenantMigrationTest.RecipientAccessState.kRejectBefore);
+        tenantMigrationTest.assertRecipientNodesInExpectedState({
+            nodes: tenantMigrationTest.getRecipientRst().nodes,
+            migrationId: migrationId,
+            tenantId: migrationOpts.tenantId,
+            expectedState: TenantMigrationTest.RecipientState.kConsistent,
+            expectedAccessState: TenantMigrationTest.RecipientAccessState.kRejectBefore
+        });
         assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
     };
 

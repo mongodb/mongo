@@ -41,12 +41,12 @@ function cleanup(dbName) {
     const tenantId = `${kTenantId}Commit`;
     const donorDB = `${tenantId}_test`;
     tenantMigrationTest.insertDonorDB(donorDB, "test");
-    const ns = tenantId + "_testDb.testColl";
+    const ns = `${tenantId}_testDb.testColl`;
     const tenantCollOnRecipient = recipientPrimary.getCollection(ns);
 
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
-        tenantId: tenantId,
+        tenantId,
         recipientConnString: tenantMigrationTest.getRecipientConnString(),
     };
 
@@ -108,12 +108,12 @@ function cleanup(dbName) {
     const tenantId = `${kTenantId}AbortBeforeReturnAfterReachingTs`;
     const donorDB = `${tenantId}_test`;
     tenantMigrationTest.insertDonorDB(donorDB, "test");
-    const ns = tenantId + "_testDb.testColl";
+    const ns = `${tenantId}_testDb.testColl`;
     const tenantCollOnRecipient = recipientPrimary.getCollection(ns);
 
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
-        tenantId: tenantId,
+        tenantId,
         recipientConnString: tenantMigrationTest.getRecipientConnString(),
     };
 
@@ -150,12 +150,12 @@ function cleanup(dbName) {
     const tenantId = `${kTenantId}AbortAfterReturnAfterReachingTs`;
     const donorDB = `${tenantId}_test`;
     tenantMigrationTest.insertDonorDB(donorDB, "test");
-    const ns = tenantId + "_testDb.testColl";
+    const ns = `${tenantId}_testDb.testColl`;
     const tenantCollOnRecipient = recipientPrimary.getCollection(ns);
 
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
-        tenantId: kTenantId + "AbortAfterReturnAfterReachingTs",
+        tenantId: `${kTenantId}AbortAfterReturnAfterReachingTs`,
         recipientConnString: tenantMigrationTest.getRecipientConnString(),
     };
 

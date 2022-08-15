@@ -39,9 +39,14 @@ var TenantMigrationUtil = (function() {
      * flag is enabled.
      */
     function donorStartMigrationWithProtocol(cmd, db) {
-        // If we don't pass "protocol", the server uses "multitenant migrations" by default.
-        if (cmd['protocol'] === undefined && isShardMergeEnabled(db)) {
-            return Object.assign(Object.assign({}, cmd), {protocol: "shard merge"});
+        // If we don't pass "protocol" and shard merge is enabled, we set the protocol to
+        // "shard merge". Otherwise, the provided protocol is used, which defaults to
+        // "multitenant migrations" if not provided.
+        if (cmd["protocol"] === undefined && isShardMergeEnabled(db)) {
+            const cmdCopy = Object.assign({}, cmd);
+            delete cmdCopy.tenantId;
+            cmdCopy.protocol = "shard merge";
+            return cmdCopy;
         }
 
         return cmd;
@@ -139,8 +144,8 @@ var TenantMigrationUtil = (function() {
         const cmdObj = {
             donorStartMigration: 1,
             migrationId: UUID(migrationOpts.migrationIdString),
-            recipientConnectionString: migrationOpts.recipientConnString,
             tenantId: migrationOpts.tenantId,
+            recipientConnectionString: migrationOpts.recipientConnString,
             readPreference: migrationOpts.readPreference || {mode: "primary"},
             donorCertificateForRecipient: migrationOpts.donorCertificateForRecipient ||
                 migrationCertificates.donorCertificateForRecipient,

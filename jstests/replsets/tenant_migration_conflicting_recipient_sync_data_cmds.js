@@ -163,7 +163,7 @@ assert.commandWorked(primary.adminCommand({
 
     // Only one instance should have succeeded in persisting the state doc, other should have failed
     // with ErrorCodes.ConflictingOperationInProgress.
-    assert.eq(1, configRecipientsColl.count({tenantId: tenantId}));
+    assert.eq(1, configRecipientsColl.count({}));
 
     // Run another recipientSyncData cmd for the tenant. Since the previous migration hasn't been
     // garbage collected, the migration is considered as active. So this command should fail with
@@ -176,7 +176,7 @@ assert.commandWorked(primary.adminCommand({
     assert.commandFailedWithCode(res2, ErrorCodes.ConflictingOperationInProgress);
 
     // Collection count should remain the same.
-    assert.eq(1, configRecipientsColl.count({tenantId: tenantId}));
+    assert.eq(1, configRecipientsColl.count({}));
     fpPauseBeforeRunTenantMigrationRecipientInstance.off();
 })();
 

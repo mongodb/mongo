@@ -26,15 +26,14 @@ const kTenantIdPrefix = "testTenantId";
 const kUnrelatedDbNameDonor = "unrelatedDBDonor";
 const kUnrelatedDbNameRecipient = "unrelatedDBRecipient";
 const collName = "foo";
-const tenantId = kTenantIdPrefix + "-0";
+const tenantId = `${kTenantIdPrefix}-0`;
 const migrationId = UUID();
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
-    tenantId: tenantId,
 };
 
 const tmt = new TenantMigrationTest({name: jsTestName()});
-tmt.insertDonorDB(tenantId + "_db", collName);
+tmt.insertDonorDB(`${tenantId}_db`, collName);
 
 const donorPrimary = tmt.getDonorPrimary();
 const recipientPrimary = tmt.getRecipientPrimary();

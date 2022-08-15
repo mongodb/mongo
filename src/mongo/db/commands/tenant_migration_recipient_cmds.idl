@@ -68,7 +68,7 @@ structs:
         tenantId:
           description: >-
             The prefix from which the migrating database will be matched. The prefixes 'admin',
-            'local', 'config', the empty string, are not allowed.
+            'local', 'config', and the empty string are not allowed.
           type: string
           default: '""'
           validator:

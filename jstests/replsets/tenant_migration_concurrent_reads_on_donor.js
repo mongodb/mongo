@@ -125,7 +125,7 @@ function testRejectReadsAfterMigrationCommitted(testCase, dbName, collName) {
     donorRst.awaitLastOpCommitted();
 
     const donorDoc = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({
-        tenantId: tenantId
+        _id: UUID(migrationIdString),
     });
     const nodes = testCase.isSupportedOnSecondaries ? donorRst.nodes : [donorPrimary];
     nodes.forEach(node => {
@@ -181,7 +181,7 @@ function testDoNotRejectReadsAfterMigrationAborted(testCase, dbName, collName) {
     donorRst.awaitLastOpCommitted();
 
     const donorDoc = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({
-        tenantId: tenantId
+        _id: UUID(migrationIdString),
     });
     const nodes = testCase.isSupportedOnSecondaries ? donorRst.nodes : [donorPrimary];
     nodes.forEach(node => {
@@ -234,7 +234,7 @@ function testBlockReadsAfterMigrationEnteredBlocking(testCase, dbName, collName)
     donorRst.awaitLastOpCommitted();
 
     const donorDoc = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({
-        tenantId: tenantId
+        _id: UUID(migrationIdString),
     });
     const command = testCase.requiresReadTimestamp
         ? testCase.command(collName, donorDoc.blockTimestamp)
@@ -297,7 +297,7 @@ function testRejectBlockedReadsAfterMigrationCommitted(testCase, dbName, collNam
     donorRst.awaitLastOpCommitted();
 
     const donorDoc = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({
-        tenantId: tenantId
+        _id: UUID(migrationIdString),
     });
     const command = testCase.requiresReadTimestamp
         ? testCase.command(collName, donorDoc.blockTimestamp)
@@ -365,7 +365,7 @@ function testUnblockBlockedReadsAfterMigrationAborted(testCase, dbName, collName
     donorRst.awaitLastOpCommitted();
 
     const donorDoc = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({
-        tenantId: tenantId
+        _id: UUID(migrationIdString),
     });
     const command = testCase.requiresReadTimestamp
         ? testCase.command(collName, donorDoc.blockTimestamp)

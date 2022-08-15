@@ -4,6 +4,7 @@
  * @tags: [
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
+ *   featureFlagShardMerge,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
@@ -47,7 +48,6 @@ load("jstests/replsets/libs/tenant_migration_util.js");
     const migrationUuid = UUID();
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationUuid),
-        tenantId,
         readPreference: {mode: 'primary'}
     };
 

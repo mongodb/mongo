@@ -107,7 +107,7 @@ const kCollName = "testColl";
 
     // Run a read command against one of the secondaries, and wait for it to block.
     const laggedSecondary = donorRst.getSecondary();
-    const donorDoc = donorsColl.findOne({tenantId: tenantId});
+    const donorDoc = donorsColl.findOne({_id: migrationId});
     assert.neq(null, donorDoc);
     const readThread = startReadThread(laggedSecondary, dbName, kCollName, donorDoc.blockTimestamp);
     assert.soon(() => TenantMigrationUtil.getNumBlockedReads(laggedSecondary, tenantId) == 1);
@@ -155,7 +155,7 @@ const kCollName = "testColl";
 
     // Run a read command against one of the secondaries, and wait for it to block.
     const laggedSecondary = donorRst.getSecondary();
-    const donorDoc = donorsColl.findOne({tenantId: tenantId});
+    const donorDoc = donorsColl.findOne({_id: migrationId});
     assert.neq(null, donorDoc);
     const readThread = startReadThread(laggedSecondary, dbName, kCollName, donorDoc.blockTimestamp);
     assert.soon(() => TenantMigrationUtil.getNumBlockedReads(laggedSecondary, tenantId) == 1);
@@ -200,7 +200,7 @@ const kCollName = "testColl";
     blockingFp.wait();
 
     // Run a read command and a write command against the primary, and wait for them to block.
-    const donorDoc = donorsColl.findOne({tenantId: tenantId});
+    const donorDoc = donorsColl.findOne({_id: migrationId});
     assert.neq(null, donorDoc);
     const readThread = startReadThread(donorPrimary, dbName, kCollName, donorDoc.blockTimestamp);
     const writeThread = startWriteThread(donorPrimary, dbName, kCollName);
@@ -212,8 +212,7 @@ const kCollName = "testColl";
 
     // Cannot mark the state doc as garbage collectable before the migration commits or aborts.
     assert.commandFailedWithCode(
-        donorsColl.update({tenantId: tenantId}, {$set: {expireAt: new Date()}}),
-        ErrorCodes.BadValue);
+        donorsColl.update({_id: migrationId}, {$set: {expireAt: new Date()}}), ErrorCodes.BadValue);
 
     // Can drop the state doc collection but this will not cause all blocked reads and writes to
     // hang.

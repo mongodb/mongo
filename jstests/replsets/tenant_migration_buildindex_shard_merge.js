@@ -50,11 +50,9 @@ function createIndexShouldFail(primaryHost, dbName, collName, indexSpec) {
 }
 
 const migrationId = UUID();
-// TODO (SERVER-63454): remove tenantId, and remove kTenant2DbName, db2, tenant2IndexThread, etc.
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
     recipientConnString: tenantMigrationTest.getRecipientConnString(),
-    tenantId: kTenant1Id,
 };
 const donorRstArgs = TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst());
 
@@ -74,9 +72,6 @@ var initFpCount =
         .count;
 const tenant1IndexThread =
     new Thread(createIndexShouldFail, donorPrimary.host, kTenant1DbName, kNonEmptyCollName, {b: 1});
-// Even though tenantId1 is passed to donorStartMigration, the donor aborts this index too
-// because protocol is "shard merge".
-// TODO (SERVER-63454): remove comment above.
 const tenant2IndexThread =
     new Thread(createIndexShouldFail, donorPrimary.host, kTenant2DbName, kNonEmptyCollName, {y: 1});
 tenant1IndexThread.start();

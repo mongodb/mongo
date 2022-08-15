@@ -76,8 +76,8 @@ public:
             const auto& cmd = request();
             const auto migrationProtocol = cmd.getProtocol().value_or(kDefaultMigrationProtocol);
 
-            uassertStatusOK(tenant_migration_util::protocolTenantIdCompatibilityCheck(
-                migrationProtocol, cmd.getTenantId().toString()));
+            tenant_migration_util::protocolTenantIdCompatibilityCheck(migrationProtocol,
+                                                                      cmd.getTenantId().toString());
             tenant_migration_util::protocolStorageOptionsCompatibilityCheck(opCtx,
                                                                             migrationProtocol);
 

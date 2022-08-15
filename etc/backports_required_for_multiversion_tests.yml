@@ -194,6 +194,8 @@ last-continuous:
       test_file: jstests/replsets/apply_ops_dropDatabase.js
     - ticket: SERVER-63732
       test_file: jstests/sharding/shard_collection_basic.js
+    - ticket: SERVER-63454
+      test_file: jstests/replsets/tenant_migration_shard_merge_invalid_inputs.js
     - ticket: SERVER-6491
       test_file: jstests/sharding/shard_key_index_must_exist.js
     - ticket: SERVER-64142
@@ -617,6 +619,8 @@ last-lts:
       test_file: jstests/replsets/tenant_migration_recipient_startup_recovery.js
     - ticket: SERVER-63122
       test_file: jstests/replsets/tenant_migration_network_error_via_rollback.js
+    - ticket: SERVER-63454
+      test_file: jstests/replsets/tenant_migration_shard_merge_invalid_inputs.js
     - ticket: SERVER-63732
       test_file: jstests/sharding/shard_collection_basic.js
     - ticket: SERVER-6491

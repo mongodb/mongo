@@ -50,7 +50,7 @@ function testDonorForgetMigrationAfterMigrationCompletes(
     });
 
     assert.soon(() => 0 === donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).count({
-        tenantId: tenantId
+        _id: migrationId,
     }));
     assert.soon(() => 0 ===
                     donorPrimary.adminCommand({serverStatus: 1})
@@ -68,7 +68,7 @@ function testDonorForgetMigrationAfterMigrationCompletes(
 
     assert.soon(() => 0 ===
                     recipientPrimary.getCollection(TenantMigrationTest.kConfigRecipientsNS).count({
-                        tenantId: tenantId
+                        _id: migrationId,
                     }));
     assert.soon(() => 0 ===
                     recipientPrimary.adminCommand({serverStatus: 1})
@@ -149,11 +149,10 @@ function testStats(node, {
     assert.eq(mtab.donor.state, TenantMigrationTest.DonorAccessState.kBlockWritesAndReads);
     assert(mtab.donor.blockTimestamp);
 
-    let donorDoc = configDonorsColl.findOne({tenantId: kTenantId});
+    let donorDoc = configDonorsColl.findOne({_id: migrationId});
     let blockOplogEntry =
         donorPrimary.getDB("local")
-            .oplog.rs
-            .find({ns: TenantMigrationTest.kConfigDonorsNS, op: "u", "o.tenantId": kTenantId})
+            .oplog.rs.find({ns: TenantMigrationTest.kConfigDonorsNS, op: "u", "o._id": migrationId})
             .sort({"$natural": -1})
             .limit(1)
             .next();
@@ -173,7 +172,7 @@ function testStats(node, {
     TenantMigrationTest.assertCommitted(
         tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
-    donorDoc = configDonorsColl.findOne({tenantId: kTenantId});
+    donorDoc = configDonorsColl.findOne({_id: migrationId});
     let commitOplogEntry = donorPrimary.getDB("local").oplog.rs.findOne(
         {ns: TenantMigrationTest.kConfigDonorsNS, op: "u", o: donorDoc});
     assert.eq(donorDoc.state, TenantMigrationTest.DonorState.kCommitted);
@@ -215,7 +214,7 @@ function testStats(node, {
         tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}));
     abortRecipientFp.off();
 
-    const donorDoc = configDonorsColl.findOne({tenantId: kTenantId});
+    const donorDoc = configDonorsColl.findOne({_id: migrationId});
     const abortOplogEntry = donorPrimary.getDB("local").oplog.rs.findOne(
         {ns: TenantMigrationTest.kConfigDonorsNS, op: "u", o: donorDoc});
     assert.eq(donorDoc.state, TenantMigrationTest.DonorState.kAborted);
@@ -257,7 +256,7 @@ function testStats(node, {
         tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}));
     abortDonorFp.off();
 
-    const donorDoc = configDonorsColl.findOne({tenantId: kTenantId});
+    const donorDoc = configDonorsColl.findOne({_id: migrationId});
     const abortOplogEntry = donorPrimary.getDB("local").oplog.rs.findOne(
         {ns: TenantMigrationTest.kConfigDonorsNS, op: "u", o: donorDoc});
     assert.eq(donorDoc.state, TenantMigrationTest.DonorState.kAborted);

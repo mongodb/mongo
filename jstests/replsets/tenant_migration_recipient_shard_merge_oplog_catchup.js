@@ -33,13 +33,9 @@ const failpoint = "pauseTenantMigrationBeforeLeavingDataSyncState";
 const pauseTenantMigrationBeforeLeavingDataSyncState =
     configureFailPoint(donorPrimary, failpoint, {action: "hang"});
 
-// Start migration on a tenant id which is non-existent on the donor.
 const migrationUuid = UUID();
-const kDummyTenantId = "nonExistentTenantId";
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationUuid),
-    // TODO (SERVER-63454): Remove kDummyTenantId.
-    tenantId: kDummyTenantId,
     readPreference: {mode: 'primary'}
 };
 

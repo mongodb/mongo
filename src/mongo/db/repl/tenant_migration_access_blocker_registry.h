@@ -104,7 +104,7 @@ public:
     void addShardMergeDonorAccessBlocker(std::shared_ptr<TenantMigrationDonorAccessBlocker> mtab);
 
     /**
-     * Invariants that an entry for tenantId exists, and then removes the entry for (tenantId, mtab)
+     * Removes the entry for (tenantId, mtab)
      */
     void remove(StringData tenantId, TenantMigrationAccessBlocker::BlockerType type);
 
@@ -115,9 +115,10 @@ public:
     void removeShardMergeDonorAccessBlocker(const UUID& migrationId);
 
     /**
-     * Remove all recipient access blockers for a migration.
+     * Remove all access blockers of the provided type for a migration.
      */
-    void removeRecipientAccessBlockersForMigration(const UUID& migrationId);
+    void removeAccessBlockersForMigration(const UUID& migrationId,
+                                          TenantMigrationAccessBlocker::BlockerType type);
 
     /**
      * Removes all mtabs of the given type.
@@ -147,12 +148,12 @@ public:
     std::shared_ptr<TenantMigrationAccessBlocker> getTenantMigrationAccessBlockerForTenantId(
         StringData tenantId, TenantMigrationAccessBlocker::BlockerType type);
 
+    using applyAllCallback = std::function<void(
+        std::string tenantId, std::shared_ptr<TenantMigrationAccessBlocker>& mtab)>;
     /**
      * Applies callback to all TenantMigrationAccessBlockers of the desired type.
      */
-    void applyAll(
-        TenantMigrationAccessBlocker::BlockerType type,
-        const std::function<void(std::shared_ptr<TenantMigrationAccessBlocker>)>& callback);
+    void applyAll(TenantMigrationAccessBlocker::BlockerType type, applyAllCallback&& callback);
 
     /**
      * Shuts down each of the TenantMigrationAccessBlockers and releases the shared_ptrs to the

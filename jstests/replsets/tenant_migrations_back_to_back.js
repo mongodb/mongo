@@ -53,7 +53,7 @@ migrationThread.start();
 waitForRejectReadsBeforeTsFp.wait();
 
 const donorDoc =
-    donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({tenantId: kTenantId});
+    donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({_id: migrationId});
 assert.lt(preMigrationTimestamp, donorDoc.blockTimestamp);
 waitForRejectReadsBeforeTsFp.off();
 // Wait for the migration to complete.
@@ -115,7 +115,7 @@ assert.eq(res.inprog[0].lastDurableState, kBlocking, tojson(res.inprog));
 
 // Get the block timestamp for this new migration.
 const donorDoc2 =
-    donor2Primary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({tenantId: kTenantId});
+    donor2Primary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({_id: migration2Id});
 assert.eq(
     mtabStatus.donor.state, TenantMigrationTest.DonorAccessState.kBlockWritesAndReads, mtabStatus);
 assert(mtabStatus.donor.hasOwnProperty("blockTimestamp"), mtabStatus);

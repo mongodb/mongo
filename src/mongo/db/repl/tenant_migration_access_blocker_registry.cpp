@@ -163,21 +163,35 @@ void TenantMigrationAccessBlockerRegistry::removeShardMergeDonorAccessBlocker(
     }
 }
 
-void TenantMigrationAccessBlockerRegistry::removeRecipientAccessBlockersForMigration(
-    const UUID& migrationId) {
+void TenantMigrationAccessBlockerRegistry::removeAccessBlockersForMigration(
+    const UUID& migrationId, TenantMigrationAccessBlocker::BlockerType type) {
+    if (type == MtabType::kDonor) {
+        removeShardMergeDonorAccessBlocker(migrationId);
+    }
+
     stdx::lock_guard<Latch> lg(_mutex);
-    // Clear recipient blockers for migrationId, and erase pairs with no blocker remaining.
+    // Clear blockers for migrationId, and erase pairs with no blocker remaining.
     erase_if(_tenantMigrationAccessBlockers,
              [&](std::pair<const std::string, DonorRecipientAccessBlockerPair> it) {
                  auto& mtabPair = it.second;
-                 auto recipient = checked_pointer_cast<TenantMigrationRecipientAccessBlocker>(
-                     mtabPair.getAccessBlocker(MtabType::kRecipient));
-                 if (!recipient || recipient->getMigrationId() != migrationId) {
+                 auto blocker = mtabPair.getAccessBlocker(type);
+                 if (!blocker || blocker->getMigrationId() != migrationId) {
                      return false;
                  }
 
-                 mtabPair.clearAccessBlocker(MtabType::kRecipient);
-                 return !mtabPair.getAccessBlocker(MtabType::kDonor);
+                 mtabPair.clearAccessBlocker(type);
+                 MtabType oppositeType;
+                 switch (type) {
+                     case MtabType::kRecipient:
+                         oppositeType = MtabType::kDonor;
+                         break;
+                     case MtabType::kDonor:
+                         oppositeType = MtabType::kRecipient;
+                         break;
+                     default:
+                         MONGO_UNREACHABLE;
+                 }
+                 return !mtabPair.getAccessBlocker(oppositeType);
              });
 }
 
@@ -253,13 +267,12 @@ TenantMigrationAccessBlockerRegistry::getTenantMigrationAccessBlockerForTenantId
     }
 }
 
-void TenantMigrationAccessBlockerRegistry::applyAll(
-    TenantMigrationAccessBlocker::BlockerType type,
-    const std::function<void(std::shared_ptr<TenantMigrationAccessBlocker>)>& callback) {
+void TenantMigrationAccessBlockerRegistry::applyAll(TenantMigrationAccessBlocker::BlockerType type,
+                                                    applyAllCallback&& callback) {
     stdx::lock_guard<Latch> lg(_mutex);
     for (auto& [tenantId, mtabPair] : _tenantMigrationAccessBlockers) {
         if (auto mtab = mtabPair.getAccessBlocker(type)) {
-            callback(mtab);
+            callback(tenantId, mtab);
         }
     }
 }

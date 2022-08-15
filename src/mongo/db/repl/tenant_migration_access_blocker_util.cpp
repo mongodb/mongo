@@ -86,10 +86,8 @@ std::shared_ptr<TenantMigrationRecipientAccessBlocker> getTenantMigrationRecipie
             .getTenantMigrationAccessBlockerForTenantId(tenantId, MtabType::kRecipient));
 }
 
-void startRejectingReadsBefore(OperationContext* opCtx,
-                               const UUID& migrationId,
-                               mongo::Timestamp ts) {
-    auto callback = [&](std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
+void startRejectingReadsBefore(OperationContext* opCtx, mongo::Timestamp ts) {
+    auto callback = [&](std::string _, std::shared_ptr<TenantMigrationAccessBlocker>& mtab) {
         auto recipientMtab = checked_pointer_cast<TenantMigrationRecipientAccessBlocker>(mtab);
         recipientMtab->startRejectingReadsBefore(ts);
     };
@@ -347,11 +345,11 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
             return true;
         }
 
-        auto protocol = doc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations);
         auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(opCtx->getServiceContext(),
                                                                         doc.getId());
 
         auto& registry = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext());
+        auto protocol = doc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations);
         if (protocol == MigrationProtocolEnum::kMultitenantMigrations) {
             registry.add(doc.getTenantId(), mtab);
         } else {
@@ -400,6 +398,11 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
             return true;
         }
 
+        auto protocol = doc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations);
+        if (protocol == MigrationProtocolEnum::kShardMerge) {
+            return true;
+        }
+
         auto mtab = std::make_shared<TenantMigrationRecipientAccessBlocker>(
             opCtx->getServiceContext(), doc.getId());
 
@@ -414,12 +417,13 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
             case TenantMigrationRecipientStateEnum::kConsistent:
             case TenantMigrationRecipientStateEnum::kDone:
                 if (doc.getRejectReadsBeforeTimestamp()) {
-                    mtab->startRejectingReadsBefore(doc.getRejectReadsBeforeTimestamp().value());
+                    mtab->startRejectingReadsBefore(doc.getRejectReadsBeforeTimestamp().get());
                 }
                 break;
             case TenantMigrationRecipientStateEnum::kUninitialized:
                 MONGO_UNREACHABLE;
         }
+
         return true;
     });
 

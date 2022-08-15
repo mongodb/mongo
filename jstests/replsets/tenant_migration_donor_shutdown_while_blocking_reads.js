@@ -43,7 +43,7 @@ assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
 
 fp.wait();
 const donorDoc =
-    donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({tenantId: kTenantId});
+    donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({_id: migrationId});
 assert.neq(null, donorDoc);
 
 let readThread = new Thread((host, dbName, collName, afterClusterTime) => {

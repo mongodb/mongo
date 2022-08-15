@@ -122,8 +122,6 @@ jsTestLog("Running a migration");
 const migrationId = UUID();
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
-    // TODO(SERVER-63454): Remove tenantId when it is no longer required for shard merge.
-    tenantId,
 };
 
 const fpAfterFetchingCommittedTransactions =

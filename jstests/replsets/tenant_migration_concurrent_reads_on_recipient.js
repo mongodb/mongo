@@ -131,7 +131,7 @@ function testRejectOnlyReadsWithAtClusterTimeLessThanRejectReadsBeforeTimestamp(
 
     const recipientDoc =
         recipientPrimary.getCollection(TenantMigrationTest.kConfigRecipientsNS).findOne({
-            tenantId: tenantId
+            _id: UUID(migrationOpts.migrationIdString),
         });
     assert.lt(preMigrationTimestamp, recipientDoc.rejectReadsBeforeTimestamp);
 
@@ -276,7 +276,7 @@ function testDoNotRejectReadsAfterMigrationAbortedAfterReachingRejectReadsBefore
 
     const recipientDoc =
         recipientPrimary.getCollection(TenantMigrationTest.kConfigRecipientsNS).findOne({
-            tenantId: tenantId
+            _id: UUID(migrationOpts.migrationIdString),
         });
 
     const nodes = testCase.isSupportedOnSecondaries ? recipientRst.nodes : [recipientPrimary];

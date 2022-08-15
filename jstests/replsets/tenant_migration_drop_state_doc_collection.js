@@ -35,7 +35,7 @@ function makeTenantId() {
 function makeMigrationOpts(tenantMigrationTest, tenantId) {
     return {
         migrationIdString: extractUUIDFromObject(UUID()),
-        tenantId: tenantId,
+        tenantId,
         recipientConnString: tenantMigrationTest.getRecipientConnString()
     };
 }
@@ -69,7 +69,8 @@ function testDroppingStateDocCollections(tenantMigrationTest, fpName, {
 
     let fp;
     if (fpName) {
-        fp = configureFailPoint(donorPrimary, fpName, {tenantId: tenantId});
+        fp = configureFailPoint(
+            donorPrimary, fpName, {migrationId: migrationOptsBeforeDrop.migrationIdString});
         assert.commandWorked(tenantMigrationTest.startMigration(migrationOptsBeforeDrop));
         fp.wait();
     } else {
@@ -80,7 +81,7 @@ function testDroppingStateDocCollections(tenantMigrationTest, fpName, {
     if (dropDonorsCollection) {
         assert(donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).drop());
         let donorDoc = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).findOne({
-            tenantId: tenantId
+            _id: UUID(migrationOptsBeforeDrop.migrationIdString),
         });
         assert.eq(donorDoc, null);
 
@@ -99,7 +100,7 @@ function testDroppingStateDocCollections(tenantMigrationTest, fpName, {
         }));
         let recipientDoc =
             recipientPrimary.getCollection(TenantMigrationTest.kConfigRecipientsNS).findOne({
-                tenantId: tenantId
+                _id: UUID(migrationOptsBeforeDrop.migrationIdString),
             });
         assert.eq(recipientDoc, null);
         const currOpRecipient = assert.commandWorked(

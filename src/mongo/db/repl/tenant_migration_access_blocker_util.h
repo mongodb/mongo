@@ -49,9 +49,7 @@ std::shared_ptr<TenantMigrationRecipientAccessBlocker> getTenantMigrationRecipie
 /**
  * For "shard merge" protocol: tell all recipient access blockers to reject reads before ts.
  */
-void startRejectingReadsBefore(OperationContext* opCtx,
-                               const UUID& migrationId,
-                               mongo::Timestamp ts);
+void startRejectingReadsBefore(OperationContext* opCtx, mongo::Timestamp ts);
 
 /**
  * Add an access blocker if one does not already exist.

@@ -65,8 +65,6 @@ const waitInFailPoint = configureFailPoint(recipientPrimary, failpoint, {action:
 const migrationId = UUID();
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
-    // TODO (SERVER-63454): Remove tenantId.
-    tenantId,
 };
 
 assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));

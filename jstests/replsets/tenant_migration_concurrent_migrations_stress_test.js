@@ -1,9 +1,13 @@
 /**
  * Stress test runs many concurrent migrations against the same recipient.
+ *
+ * TODO SERVER-61231: shard merge can't handle concurrent migrations.
+ *
  * @tags: [
  *   incompatible_with_amazon_linux,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
+ *   incompatible_with_shard_merge,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
@@ -44,14 +48,6 @@ const tenantMigrationTest = new TenantMigrationTest({
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
-
-if (TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("admin"))) {
-    // This test runs multiple concurrent migrations, which shard merge can't handle.
-    jsTestLog(
-        "Skip: featureFlagShardMerge is enabled and this test runs multiple concurrent migrations, which shard merge can't handle.");
-    tenantMigrationTest.stop();
-    return;
-}
 
 setLogVerbosity([donorPrimary, recipientPrimary], {
     "tenantMigration": {"verbosity": 0},
