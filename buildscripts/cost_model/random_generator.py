@@ -296,6 +296,30 @@ class RandomDistribution:
         return list(chain.from_iterable(result))
 
 
+@dataclass
+class ArrayRandomDistribution(RandomDistribution):
+    """Produces random array sequence of the specified values with the specified distribution."""
+
+    lengths_distr: RandomDistribution
+    value_distr: RandomDistribution
+
+    def __init__(self, lengths_distr: RandomDistribution, value_distr: RandomDistribution):
+        self.lengths_distr = lengths_distr
+        self.value_distr = value_distr
+
+    def generate(self, size: int):
+        """Generate random array sequence of the given size."""
+        arrays = []
+        lengths = self.lengths_distr.generate(size)
+
+        for length in lengths:
+            if not isinstance(length, int):
+                raise ValueError("length must be an int for array generation")
+            values = self.value_distr.generate(length)
+            arrays.append(values)
+        return arrays
+
+
 if __name__ == '__main__':
     from collections import Counter
 
@@ -303,13 +327,19 @@ if __name__ == '__main__':
         """Print distribution."""
         print(f'\n{title}\n')
         rs = distr.generate(size)
-        counter = Counter(rs)
-        for value in distr.get_values():
-            count = counter[value]
-            if isinstance(value, float):
-                print(f'{value:.2f}\t{count}\t{(count//10)*"*"}')
-            else:
-                print(f'{value}\t{count}\t{(count//10)*"*"}')
+        has_arrays = any(isinstance(elem, list) for elem in rs)
+
+        if not has_arrays:
+            counter = Counter(rs)
+            for value in distr.get_values():
+                count = counter[value]
+                if isinstance(value, float):
+                    print(f'{value:.2f}\t{count}\t{(count//10)*"*"}')
+                else:
+                    print(f'{value}\t{count}\t{(count//10)*"*"}')
+        else:
+            for elem in rs:
+                print(elem)
 
     choice = RandomDistribution.choice(values=['pooh', 'rabbit', 'piglet', 'Chris'],
                                        weights=[0.5, 0.1, 0.1, 0.3])
@@ -331,3 +361,14 @@ if __name__ == '__main__':
     mixed = RandomDistribution.mixed(children=[float_uniform, str_chisquare2, str_normal2],
                                      weight=[0.3, 0.5, 0.2])
     print_distr("Mixed", mixed, 20_000)
+
+    int_normal = RandomDistribution.normal(RangeGenerator(DataType.INTEGER, 2, 10))
+
+    arr_distr = ArrayRandomDistribution(int_normal, mixed)
+    print_distr("Mixed Arrays", arr_distr, 100)
+
+    mixed_with_arrays = RandomDistribution.mixed(children=[float_uniform, str_normal2, arr_distr],
+                                                 weight=[0.3, 0.2, 0.5])
+    nested_arr_distr = ArrayRandomDistribution(int_normal, mixed_with_arrays)
+
+    print_distr("Mixed Nested Arrays", nested_arr_distr, 100)
