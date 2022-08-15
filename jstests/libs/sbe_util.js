@@ -137,7 +137,7 @@ function checkBothEnginesAreRunOnCluster(theDB) {
                 const getParam = conn.adminCommand({
                     getParameter: 1,
                     internalQueryFrameworkControl: 1,
-                    internalQueryEnableSlotBasedExecutionEngine: 1,
+                    internalQueryForceClassicEngine: 1,
                     featureFlagSbeFull: 1,
                 });
 
@@ -145,21 +145,21 @@ function checkBothEnginesAreRunOnCluster(theDB) {
                     // We say SBE is fully enabled if the engine is on and either
                     // 'featureFlagSbeFull' doesn't exist on the targeted server, or it exists and
                     // is set to true.
-                    if (getParam.internalQueryFrameworkControl != "forceClassicEngine" &&
-                        (!getParam.hasOwnProperty("featureFlagSbeFull") ||
-                         getParam.featureFlagSbeFull.value)) {
+                    if (getParam.internalQueryFrameworkControl !== "forceClassicEngine" &&
+                        getParam.featureFlagSbeFull.value) {
                         engineMap.sbe++;
                     } else {
                         engineMap.classic++;
                     }
-                }
-
-                // Some versions use a different parameter to enable SBE instead of disabling it.
-                if (getParam.hasOwnProperty("internalQueryEnableSlotBasedExecutionEngine")) {
-                    if (!getParam.internalQueryEnableSlotBasedExecutionEngine) {
-                        engineMap.classic++;
-                    } else {
+                } else {
+                    // 'internalQueryForceClassicEngine' should be set on the previous versions
+                    // before 'internalQueryFrameworkControl' is introduced.
+                    assert(getParam.hasOwnProperty("internalQueryForceClassicEngine"), getParam);
+                    if (!getParam.internalQueryForceClassicEngine.value &&
+                        getParam.featureFlagSbeFull.value) {
                         engineMap.sbe++;
+                    } else {
+                        engineMap.classic++;
                     }
                 }
 
