@@ -94,9 +94,11 @@ const std::tuple<BSONObj, BSONObj> getMinMaxExtendedBounds(const ShardKeyIndex& 
 /*
  * Reshuffle fields according to the shard key pattern.
  */
-auto orderShardKeyFields(const BSONObj& keyPattern, BSONObj& key) {
-    return dotted_path_support::extractElementsBasedOnTemplate(
-        prettyKey(keyPattern, key.getOwned()), keyPattern);
+auto orderShardKeyFields(const BSONObj& keyPattern, const BSONObj& key) {
+    // Note: It is correct to hydrate the indexKey 'key' with 'keyPattern', because the index key
+    // pattern is a prefix of 'keyPattern'.
+    return dotted_path_support::extractElementsBasedOnTemplate(key.replaceFieldNames(keyPattern),
+                                                               keyPattern);
 }
 
 }  // namespace

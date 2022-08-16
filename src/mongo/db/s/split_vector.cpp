@@ -57,6 +57,16 @@ BSONObj prettyKey(const BSONObj& keyPattern, const BSONObj& key) {
     return key.replaceFieldNames(keyPattern).clientReadable();
 }
 
+/*
+ * Reshuffle fields according to the shard key pattern.
+ */
+auto orderShardKeyFields(const BSONObj& keyPattern, const BSONObj& key) {
+    // Note: It is correct to hydrate the indexKey 'key' with 'keyPattern', because the index key
+    // pattern is a prefix of 'keyPattern'.
+    return dotted_path_support::extractElementsBasedOnTemplate(key.replaceFieldNames(keyPattern),
+                                                               keyPattern);
+}
+
 }  // namespace
 
 std::vector<BSONObj> splitVector(OperationContext* opCtx,
@@ -222,17 +232,14 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
         // to be removed at the end. If a key appears more times than entries allowed on a
         // chunk, we issue a warning and split on the following key.
         auto tooFrequentKeys = SimpleBSONObjComparator::kInstance.makeBSONObjSet();
-        splitKeys.push_back(dotted_path_support::extractElementsBasedOnTemplate(
-            prettyKey(shardKeyIdx->keyPattern(), currKey.getOwned()), keyPattern));
+        splitKeys.push_back(orderShardKeyFields(keyPattern, currKey.getOwned()));
 
         while (1) {
             while (PlanExecutor::ADVANCED == state) {
                 currCount++;
 
                 if (currCount > keyCount && !force) {
-                    currKey = dotted_path_support::extractElementsBasedOnTemplate(
-                        prettyKey(shardKeyIdx->keyPattern(), currKey.getOwned()), keyPattern);
-
+                    currKey = orderShardKeyFields(keyPattern, currKey.getOwned());
 
                     const auto compareWithPreviousSplitPoint = currKey.woCompare(splitKeys.back());
                     dassert(compareWithPreviousSplitPoint >= 0,
