@@ -1288,6 +1288,60 @@ TEST_F(ServiceContextTest, FindSelfInConfig) {
             .getStatus());
 }
 
+TEST_F(ServiceContextTest, FindSelfInConfigFastAndSlow) {
+    ReplSetConfig newConfig;
+    newConfig = ReplSetConfig::parse(BSON("_id"
+                                          << "rs0"
+                                          << "version" << 2 << "protocolVersion" << 1 << "members"
+                                          << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                                                   << "h1")
+                                                        << BSON("_id" << 2 << "host"
+                                                                      << "h2")
+                                                        << BSON("_id" << 3 << "host"
+                                                                      << "h3"))));
+
+    {
+        // Present once only on the slow path, but fast enough to be found
+        ReplicationCoordinatorExternalStateMock presentOnceExternalState;
+        presentOnceExternalState.addSelfSlow(HostAndPort("h2"), Seconds(29));
+        ASSERT_EQUALS(1,
+                      unittest::assertGet(findSelfInConfig(
+                          &presentOnceExternalState, newConfig, getServiceContext())));
+    }
+
+    {
+        // Present twice only on the slow path, but fast enough to be found both times.
+        ReplicationCoordinatorExternalStateMock presentTwiceExternalState;
+        presentTwiceExternalState.addSelfSlow(HostAndPort("h2"), Seconds(29));
+        presentTwiceExternalState.addSelfSlow(HostAndPort("h3"), Seconds(29));
+        ASSERT_EQUALS(ErrorCodes::InvalidReplicaSetConfig,
+                      findSelfInConfig(&presentTwiceExternalState, newConfig, getServiceContext())
+                          .getStatus());
+    }
+
+    {
+        // Present once on the fast path, once on the slow path. This is expected to erroneously
+        // succeed, because we should not check the slow path if we got a unique result on the fast
+        // path.
+        ReplicationCoordinatorExternalStateMock presentFastAndSlowExternalState;
+        presentFastAndSlowExternalState.addSelf(HostAndPort("h2"));
+        presentFastAndSlowExternalState.addSelfSlow(HostAndPort("h3"), Seconds(29));
+        ASSERT_EQUALS(1,
+                      unittest::assertGet(findSelfInConfig(
+                          &presentFastAndSlowExternalState, newConfig, getServiceContext())));
+    }
+
+    {
+        // Present only on the slow path, with a long timeout.  This will fail.
+        ReplicationCoordinatorExternalStateMock presentLongTimeoutExternalState;
+        presentLongTimeoutExternalState.addSelfSlow(HostAndPort("h2"), Seconds(31));
+        ASSERT_EQUALS(
+            ErrorCodes::NodeNotFound,
+            findSelfInConfig(&presentLongTimeoutExternalState, newConfig, getServiceContext())
+                .getStatus());
+    }
+}
+
 }  // namespace
 }  // namespace repl
 }  // namespace mongo

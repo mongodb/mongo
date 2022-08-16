@@ -55,6 +55,7 @@ TEST_F(ServiceContextTest, DetectsSameHostIPv4) {
     // Fastpath should agree with the result of getBoundAddrs
     // since it uses it...
     for (std::vector<string>::const_iterator it = addrs.begin(); it != addrs.end(); ++it) {
+        ASSERT(isSelfFastPath(HostAndPort(*it, serverGlobalParams.port)));
         ASSERT(isSelf(HostAndPort(*it, serverGlobalParams.port), getGlobalServiceContext()));
     }
 #else
@@ -72,6 +73,7 @@ TEST_F(ServiceContextTest, DetectsSameHostIPv6) {
     // Fastpath should agree with the result of getBoundAddrs
     // since it uses it...
     for (std::vector<string>::const_iterator it = addrs.begin(); it != addrs.end(); ++it) {
+        ASSERT(isSelfFastPath(HostAndPort(*it, serverGlobalParams.port)));
         ASSERT(isSelf(HostAndPort(*it, serverGlobalParams.port), getGlobalServiceContext()));
     }
 #else

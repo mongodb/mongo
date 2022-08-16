@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "mongo/bson/oid.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 struct HostAndPort;
@@ -49,7 +50,21 @@ extern OID instanceId;
 /**
  * Returns true if "hostAndPort" identifies this instance.
  */
-bool isSelf(const HostAndPort& hostAndPort, ServiceContext* ctx);
+bool isSelf(const HostAndPort& hostAndPort,
+            ServiceContext* ctx,
+            Milliseconds timeout = Seconds(30));
+
+/**
+ * Returns true if "hostAndPort" identifies this instance by checking our bound IP addresses,
+ * without going out to the network and running the _isSelf command on the node.
+ */
+bool isSelfFastPath(const HostAndPort& hostAndPort);
+
+/**
+ * Returns true if "hostAndPort" identifies this instance by running the _isSelf command on the
+ * node.
+ */
+bool isSelfSlowPath(const HostAndPort& hostAndPort, ServiceContext* ctx, Milliseconds timeout);
 
 /**
  * Returns all the IP addresses bound to the network interfaces of this machine.
