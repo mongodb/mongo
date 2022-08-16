@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/timeseries/bucket_catalog_helpers.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/logv2/redaction.h"
 
@@ -52,6 +53,34 @@ StatusWith<std::pair<const BSONObj, const BSONObj>> extractMinAndMax(const BSONO
     }
 
     return std::make_pair(minObj, maxObj);
+}
+
+BSONObj generateFindFilters(const Date_t& time,
+                            boost::optional<BSONElement> metadata,
+                            const std::string& controlMinTimePath,
+                            int64_t bucketMaxSpanSeconds) {
+    // The bucket must be uncompressed.
+    auto versionFilter = BSON(kControlVersionPath << kTimeseriesControlDefaultVersion);
+
+    // The bucket cannot be closed (aka open for new measurements).
+    auto closedFlagFilter =
+        BSON("$or" << BSON_ARRAY(BSON(kControlClosedPath << BSON("$exists" << false))
+                                 << BSON(kControlClosedPath << false)));
+
+    // The measurement meta field must match the bucket 'meta' field. If the field is not specified
+    // we can only insert into buckets which also do not have a meta field.
+    auto metaFieldFilter = (metadata && (*metadata).ok())
+        ? (*metadata).wrap(kBucketMetaFieldName)
+        : BSON(kBucketMetaFieldName << BSON("$exists" << false));
+
+    // (minimumTs <= measurementTs) && (minimumTs + maxSpanSeconds > measurementTs)
+    auto measurementMaxDifference = time - Seconds(bucketMaxSpanSeconds);
+    auto lowerBound = BSON(controlMinTimePath << BSON("$lte" << time));
+    auto upperBound = BSON(controlMinTimePath << BSON("$gt" << measurementMaxDifference));
+    auto timeRangeFilter = BSON("$and" << BSON_ARRAY(lowerBound << upperBound));
+
+    return BSON("$and" << BSON_ARRAY(versionFilter << closedFlagFilter << timeRangeFilter
+                                                   << metaFieldFilter));
 }
 
 }  // namespace
@@ -86,6 +115,47 @@ StatusWith<Schema> generateSchemaFromBucketDoc(const BSONObj& bucketDoc,
     } catch (...) {
         return exceptionToStatus();
     }
+}
+
+StatusWith<std::pair<Date_t, boost::optional<BSONElement>>> extractTimeAndMeta(
+    const BSONObj& doc, const TimeseriesOptions& options) {
+    auto timeElem = doc[options.getTimeField()];
+    if (!timeElem || BSONType::Date != timeElem.type()) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "'" << options.getTimeField() << "' must be present and contain a "
+                              << "valid BSON UTC datetime value"};
+    }
+
+    auto time = timeElem.Date();
+    auto metaFieldName = options.getMetaField();
+
+    if (metaFieldName) {
+        return std::make_pair(time, doc[*metaFieldName]);
+    }
+    return std::make_pair(time, boost::none);
+}
+
+BSONObj findSuitableBucket(OperationContext* opCtx,
+                           const NamespaceString& bucketNss,
+                           const TimeseriesOptions& options,
+                           const BSONObj& measurementDoc) {
+    uassert(ErrorCodes::InvalidOptions,
+            "Missing bucketMaxSpanSeconds option.",
+            options.getBucketMaxSpanSeconds());
+
+    auto swDocTimeAndMeta = extractTimeAndMeta(measurementDoc, options);
+    if (!swDocTimeAndMeta.isOK()) {
+        return BSONObj();
+    }
+    auto [time, metadata] = swDocTimeAndMeta.getValue();
+    auto controlMinTimePath = kControlMinFieldNamePrefix.toString() + options.getTimeField();
+
+    // Generate all the filters we need to add to our 'find' query for a suitable bucket.
+    auto fullFilterExpression =
+        generateFindFilters(time, metadata, controlMinTimePath, *options.getBucketMaxSpanSeconds());
+
+    DBDirectClient client(opCtx);
+    return client.findOne(bucketNss, fullFilterExpression);
 }
 
 }  // namespace mongo::timeseries

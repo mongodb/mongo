@@ -33,6 +33,7 @@
 #include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/timeseries/flat_bson.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 
 namespace mongo::timeseries {
 
@@ -53,5 +54,38 @@ StatusWith<MinMax> generateMinMaxFromBucketDoc(const BSONObj& bucketDoc,
  */
 StatusWith<Schema> generateSchemaFromBucketDoc(const BSONObj& bucketDoc,
                                                const StringData::ComparatorInterface* comparator);
+
+/**
+ * Extracts the time field of a measurement document and its meta field if it is present.
+ *
+ * Returns a bad status if the document is malformed.
+ */
+StatusWith<std::pair<Date_t, boost::optional<BSONElement>>> extractTimeAndMeta(
+    const BSONObj& doc, const TimeseriesOptions& options);
+
+/**
+ * Executes a 'find' query on the timeseries bucket collection to find a bucket eligible to
+ * receive a new measurement specified by a document's metadata and timestamp (measurementTs).
+ *
+ * A bucket is deemed suitable for the new measurement iff:
+ * i.   the bucket is uncompressed and not closed
+ * ii.  the meta fields match
+ * iii. the measurementTs is within the allowed time span for the bucket
+ *
+ * {$and:
+ *       [{"control.version":1},
+ *       {$or: [{"control.closed":{$exists:false}},
+ *              {"control.closed":false}]
+ *       },
+ *       {"meta":<metaValue>},
+ *       {$and: [{"control.min.time":{$lte:<measurementTs>}},
+ *               {"control.min.time":{$gt:<measurementTs - maxSpanSeconds>}}]
+ *       }]
+ * }
+ */
+BSONObj findSuitableBucket(OperationContext* opCtx,
+                           const NamespaceString& bucketNss,
+                           const TimeseriesOptions& options,
+                           const BSONObj& measurementDoc);
 
 }  // namespace mongo::timeseries

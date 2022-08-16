@@ -32,6 +32,7 @@ env.Library(
         '$BUILD_DIR/mongo/bson/util/bson_column',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/storage/storage_options',
@@ -150,6 +151,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
+        '$BUILD_DIR/mongo/db/catalog/collection_crud',
         '$BUILD_DIR/mongo/db/catalog_raii',
         'bucket_catalog',
         'bucket_compression',

@@ -62,6 +62,10 @@ static constexpr StringData kPartialFilterExpressionFieldName = "partialFilterEx
 static constexpr int kTimeseriesControlDefaultVersion = 1;
 static constexpr int kTimeseriesControlCompressedVersion = 2;
 
+// These are hard-coded control object subfields.
+static constexpr StringData kControlVersionPath = "control.version"_sd;
+static constexpr StringData kControlClosedPath = "control.closed"_sd;
+
 static const StringDataSet kAllowedCollectionCreationOptions{
     CreateCommand::kStorageEngineFieldName,
     CreateCommand::kIndexOptionDefaultsFieldName,
