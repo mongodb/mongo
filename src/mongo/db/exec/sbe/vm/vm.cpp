@@ -977,7 +977,7 @@ void ByteCode::traverseP_nested(const CodeFragment* code,
 
 void ByteCode::traverseF(const CodeFragment* code) {
     // Traverse a filter path - evaluate the input lambda (predicate) on every element of the input
-    // array without resursion.
+    // array without recursion.
     auto [numberOwn, numberTag, numberVal] = getFromStack(0);
     popAndReleaseStack();
     auto [lamOwn, lamTag, lamVal] = getFromStack(0);
@@ -1037,7 +1037,7 @@ void ByteCode::traverseFInArray(const CodeFragment* code, int64_t position, bool
         // Transfer the ownership to the lambda
         pushStack(ownInput, tagInput, valInput);
         input.reset();
-        runLambdaInternal(code, position);
+        return runLambdaInternal(code, position);
     }
 
     pushStack(false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false));

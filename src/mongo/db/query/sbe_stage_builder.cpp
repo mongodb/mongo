@@ -719,34 +719,36 @@ std::unique_ptr<sbe::EExpression> abtToExpr(optimizer::ABT& abt, optimizer::Slot
 EvalExpr generatePerColumnFilterExpr(StageBuilderState& state,
                                      const MatchExpression* me,
                                      sbe::value::SlotId inputSlot) {
+    auto inputVar = sbe::EVariable{inputSlot};
+
     switch (me->matchType()) {
         // These are always safe since they will never match documents missing their field, or where
         // the element is an object or array.
         case MatchExpression::REGEX:
             return generateRegexExpr(
-                state, checked_cast<const RegexMatchExpression*>(me), inputSlot);
+                state, checked_cast<const RegexMatchExpression*>(me), inputVar);
         case MatchExpression::MOD:
-            return generateModExpr(state, checked_cast<const ModMatchExpression*>(me), inputSlot);
+            return generateModExpr(state, checked_cast<const ModMatchExpression*>(me), inputVar);
         case MatchExpression::BITS_ALL_SET:
             return generateBitTestExpr(state,
                                        checked_cast<const BitTestMatchExpression*>(me),
                                        sbe::BitTestBehavior::AllSet,
-                                       inputSlot);
+                                       inputVar);
         case MatchExpression::BITS_ALL_CLEAR:
             return generateBitTestExpr(state,
                                        checked_cast<const BitTestMatchExpression*>(me),
                                        sbe::BitTestBehavior::AllClear,
-                                       inputSlot);
+                                       inputVar);
         case MatchExpression::BITS_ANY_SET:
             return generateBitTestExpr(state,
                                        checked_cast<const BitTestMatchExpression*>(me),
                                        sbe::BitTestBehavior::AnySet,
-                                       inputSlot);
+                                       inputVar);
         case MatchExpression::BITS_ANY_CLEAR:
             return generateBitTestExpr(state,
                                        checked_cast<const BitTestMatchExpression*>(me),
                                        sbe::BitTestBehavior::AnyClear,
-                                       inputSlot);
+                                       inputVar);
         case MatchExpression::EXISTS: {
             uasserted(6733601, "(TODO SERVER-68743) need expr translation to enable $exists");
         }
@@ -754,27 +756,27 @@ EvalExpr generatePerColumnFilterExpr(StageBuilderState& state,
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::less,
-                                          inputSlot);
+                                          inputVar);
         case MatchExpression::GT:
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::greater,
-                                          inputSlot);
+                                          inputVar);
         case MatchExpression::EQ:
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::eq,
-                                          inputSlot);
+                                          inputVar);
         case MatchExpression::LTE:
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::lessEq,
-                                          inputSlot);
+                                          inputVar);
         case MatchExpression::GTE:
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::greaterEq,
-                                          inputSlot);
+                                          inputVar);
         case MatchExpression::MATCH_IN: {
             uasserted(6733602, "(TODO SERVER-68743) need expr translation to enable $in");
         }

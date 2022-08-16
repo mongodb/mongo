@@ -104,18 +104,18 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> convertBitTestBitPositions(
 EvalExpr generateComparisonExpr(StageBuilderState& state,
                                 const ComparisonMatchExpression* expr,
                                 sbe::EPrimBinary::Op binaryOp,
-                                sbe::value::SlotId inputSlot);
+                                const sbe::EVariable& var);
 EvalExpr generateBitTestExpr(StageBuilderState& state,
                              const BitTestMatchExpression* expr,
                              const sbe::BitTestBehavior& bitOp,
-                             sbe::value::SlotId inputSlot);
+                             const sbe::EVariable& var);
 EvalExpr generateModExpr(StageBuilderState& state,
                          const ModMatchExpression* expr,
-                         sbe::value::SlotId inputSlot);
+                         const sbe::EVariable& var);
 EvalExpr generateRegexExpr(StageBuilderState& state,
                            const RegexMatchExpression* expr,
-                           sbe::value::SlotId inputSlot);
+                           const sbe::EVariable& var);
 EvalExpr generateWhereExpr(StageBuilderState& state,
                            const WhereMatchExpression* expr,
-                           sbe::value::SlotId inputSlot);
+                           const sbe::EVariable& var);
 }  // namespace mongo::stage_builder
