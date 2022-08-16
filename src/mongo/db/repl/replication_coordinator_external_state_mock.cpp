@@ -96,7 +96,22 @@ void ReplicationCoordinatorExternalStateMock::forwardSecondaryProgress() {}
 
 bool ReplicationCoordinatorExternalStateMock::isSelf(const HostAndPort& host,
                                                      ServiceContext* const service) {
+    return sequenceContains(_selfHosts, host) || _selfHostsSlow.find(host) != _selfHostsSlow.end();
+}
+
+bool ReplicationCoordinatorExternalStateMock::isSelfFastPath(const HostAndPort& host) {
     return sequenceContains(_selfHosts, host);
+}
+
+bool ReplicationCoordinatorExternalStateMock::isSelfSlowPath(const HostAndPort& host,
+                                                             ServiceContext* const service,
+                                                             Milliseconds timeout) {
+    if (sequenceContains(_selfHosts, host))
+        return true;
+    auto iter = _selfHostsSlow.find(host);
+    if (iter == _selfHostsSlow.end())
+        return false;
+    return iter->second <= timeout;
 }
 
 void ReplicationCoordinatorExternalStateMock::addSelf(const HostAndPort& host) {
@@ -105,6 +120,11 @@ void ReplicationCoordinatorExternalStateMock::addSelf(const HostAndPort& host) {
 
 void ReplicationCoordinatorExternalStateMock::clearSelfHosts() {
     _selfHosts.clear();
+}
+
+void ReplicationCoordinatorExternalStateMock::addSelfSlow(const HostAndPort& host,
+                                                          Milliseconds timeout) {
+    _selfHostsSlow.emplace(host, timeout);
 }
 
 HostAndPort ReplicationCoordinatorExternalStateMock::getClientHostAndPort(
