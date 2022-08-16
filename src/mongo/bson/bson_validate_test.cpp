@@ -214,6 +214,123 @@ TEST(BSONValidateExtended, MD5Size) {
     ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
 }
 
+TEST(BSONValidateExtended, BSONArrayIndexes) {
+    BSONObj arr = BSON("0"
+                       << "a"
+                       << "1"
+                       << "b");
+    BSONObj x1 = BSON("arr" << BSONArray(arr));
+    ASSERT_OK(validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kExtended));
+    ASSERT_OK(validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kFull));
+
+
+    arr = BSON("a" << 1 << "b" << 2);
+    x1 = BSON("nonNumericalArray" << BSONArray(arr));
+    Status status = validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kExtended);
+    ASSERT_EQ(status, ErrorCodes::NonConformantBSON);
+    status = validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kFull);
+    ASSERT_EQ(status, ErrorCodes::NonConformantBSON);
+
+    arr = BSON("1"
+               << "a"
+               << "2"
+               << "b");
+    x1 = BSON("nonSequentialArray" << BSONArray(arr));
+    status = validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kExtended);
+    ASSERT_EQ(status, ErrorCodes::NonConformantBSON);
+    status = validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kFull);
+    ASSERT_EQ(status, ErrorCodes::NonConformantBSON);
+
+    x1 = BSON("nestedArraysAndObjects" << BSONArray(BSON("0"
+                                                         << "a"
+                                                         << "1"
+                                                         << BSONArray(BSON("0"
+                                                                           << "a"
+                                                                           << "2"
+                                                                           << "b"))
+                                                         << "2"
+                                                         << "b")));
+    status = validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kExtended);
+    ASSERT_EQ(status, ErrorCodes::NonConformantBSON);
+    status = validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kFull);
+    ASSERT_EQ(status, ErrorCodes::NonConformantBSON);
+
+    x1 = BSON("longArray" << BSONArray(BSON("0"
+                                            << "a"
+                                            << "1"
+                                            << "b"
+                                            << "2"
+                                            << "c"
+                                            << "3"
+                                            << "d"
+                                            << "4"
+                                            << "e"
+                                            << "5"
+                                            << "f"
+                                            << "6"
+                                            << "g"
+                                            << "7"
+                                            << "h"
+                                            << "8"
+                                            << "i"
+                                            << "9"
+                                            << "j"
+                                            << "10"
+                                            << "k")));
+    ASSERT_OK(validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kExtended));
+    ASSERT_OK(validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kFull));
+
+    x1 = BSON("longNonSequentialArray" << BSONArray(BSON("0"
+                                                         << "a"
+                                                         << "1"
+                                                         << "b"
+                                                         << "2"
+                                                         << "c"
+                                                         << "3"
+                                                         << "d"
+                                                         << "4"
+                                                         << "e"
+                                                         << "5"
+                                                         << "f"
+                                                         << "6"
+                                                         << "g"
+                                                         << "7"
+                                                         << "h"
+                                                         << "8"
+                                                         << "i"
+                                                         << "9"
+                                                         << "j"
+                                                         << "11"
+                                                         << "k")));
+    status = validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kExtended);
+    ASSERT_EQ(status, ErrorCodes::NonConformantBSON);
+    status = validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kFull);
+    ASSERT_EQ(status, ErrorCodes::NonConformantBSON);
+
+    x1 = BSON("validNestedArraysAndObjects"
+              << BSON("arr" << BSONArray(BSON("0" << BSON("2" << 1 << "1" << 0 << "1"
+                                                              << BSONArray(BSON("0"
+                                                                                << "a"
+                                                                                << "1"
+                                                                                << "b"))
+                                                              << "1"
+                                                              << "b")))));
+    ASSERT_OK(validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kExtended));
+    ASSERT_OK(validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kFull));
+
+    x1 = BSON("invalidNestedArraysAndObjects"
+              << BSON("arr" << BSONArray(BSON("0" << BSON("2" << 1 << "1" << 0 << "1"
+                                                              << BSONArray(BSON("0"
+                                                                                << "a"
+                                                                                << "2"
+                                                                                << "b"))
+                                                              << "1"
+                                                              << "b")))));
+    status = validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kExtended);
+    ASSERT_EQ(status, ErrorCodes::NonConformantBSON);
+    status = validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kFull);
+    ASSERT_EQ(status, ErrorCodes::NonConformantBSON);
+}
 
 TEST(BSONValidateFast, Empty) {
     BSONObj x;

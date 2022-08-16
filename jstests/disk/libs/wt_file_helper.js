@@ -322,6 +322,25 @@ let insertDocSymbolField = function(coll, uri, conn, numDocs) {
 };
 
 /**
+ * Inserts array document with non-sequential indexes into the MongoDB server.
+ */
+let insertNonSequentialArrayIndexes = function(coll, uri, conn, numDocs) {
+    for (let i = 0; i < numDocs; ++i) {
+        coll.insert({arr: [1, 2, [1, [1, 2], 2], 3]});
+    }
+    let makeNonSequentialIndexes = function(lines) {
+        // The offset of the 0th index of the innermost array in the hex string dumped by wt tool.
+        const offsetToNestedIndex0 = 179;
+        // Each record takes two lines with a key and a value. We will only modify the values.
+        for (let i = wtHeaderLines; i < lines.length; i += 2) {
+            lines[i] = lines[i].substring(0, offsetToNestedIndex0) + "4" +
+                lines[i].substring(offsetToNestedIndex0 + 1);
+        }
+    };
+    rewriteTable(uri, conn, makeNonSequentialIndexes);
+};
+
+/**
  * Inserts documents with invalid regex options into the MongoDB server.
  */
 let insertInvalidRegex = function(coll, mongod, nDocuments) {

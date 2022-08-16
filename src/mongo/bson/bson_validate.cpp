@@ -86,25 +86,42 @@ constexpr ErrorCodes::Error NonConformantBSON = ErrorCodes::NonConformantBSON;
 
 class DefaultValidator {
 public:
-    void checkNonConformantElem(const char* ptr, uint8_t type) {}
+    void checkNonConformantElem(const char* ptr, uint32_t offsetToValue, uint8_t type) {}
 
     void checkUTF8Char() {}
 
     void checkDuplicateFieldName() {}
+
+    void popLevel() {}
 };
 
 class ExtendedValidator {
 public:
-    void checkNonConformantElem(const char* ptr, uint8_t type) {
+    void checkNonConformantElem(const char* ptr, uint32_t offsetToValue, uint8_t type) {
+        // Checks the field name before the element, if inside array.
+        checkArrIndex(ptr);
+        // Increments the pointer to the actual element.
+        ptr += offsetToValue;
         switch (type) {
             case BSONType::Undefined:
             case BSONType::DBRef:
             case BSONType::Symbol:
-            case BSONType::CodeWScope: {
+            case BSONType::CodeWScope:
                 uasserted(NonConformantBSON, fmt::format("Use of deprecated BSON type {}", type));
                 break;
+            case BSONType::Array:
+                addIndexLevel(true /* isArr */);
+                break;
+            case BSONType::Object:
+                addIndexLevel(false /* isArr */);
+                break;
+            case BSONType::RegEx: {
+                // Skips regular expression cstring.
+                const char* options = ptr + strlen(ptr) + 1;
+                _checkRegexOptions(options);
+                break;
             }
-            case BSONType::BinData: {
+            case BSONType::BinData:
                 uint8_t subtype =
                     ConstDataView(ptr + sizeof(uint32_t)).read<LittleEndian<uint8_t>>();
                 switch (subtype) {
@@ -134,13 +151,6 @@ public:
                         break;
                 }
                 break;
-            }
-            case BSONType::RegEx: {
-                // Skips regular expression cstring.
-                const char* options = ptr + strlen(ptr) + 1;
-                _checkRegexOptions(options);  // this might not work
-                break;
-            }
         }
     }
 
@@ -148,7 +158,44 @@ public:
 
     void checkDuplicateFieldName() {}
 
+    void popLevel() {
+        if (!indexCount.empty()) {
+            indexCount.pop_back();
+        }
+    }
+
 private:
+    struct Level {
+        DecimalCounter<uint32_t> counter;  // Counter used to check whether indexes are sequential.
+        bool isArr;                        // Indicates whether level is an array or other (object).
+    };
+
+    void addIndexLevel(bool isArr) {
+        if (isArr) {
+            indexCount.push_back(Level{DecimalCounter<uint32_t>(0), true /* isArr */});
+        } else {
+            indexCount.push_back(Level{DecimalCounter<uint32_t>(0), false /* isArr */});
+        }
+    }
+
+    bool inArr() {
+        return !indexCount.empty() && indexCount.back().isArr;
+    }
+
+    void checkArrIndex(const char* ptr) {
+        if (!inArr()) {
+            return;
+        }
+        // Checks the actual index, skipping the type byte.
+        auto actualIndex = StringData(ptr + sizeof(char));
+        uassert(NonConformantBSON,
+                fmt::format("Indices of BSON Array are invalid. Expected {}, but got {}.",
+                            indexCount.back().counter,
+                            actualIndex),
+                indexCount.back().counter == actualIndex);
+        ++indexCount.back().counter;
+    }
+
     void _checkRegexOptions(const char* options) {
         // Checks that the options are in ascending alphabetical order and that they're all valid.
         std::string validRegexOptions("ilmsux");
@@ -165,17 +212,25 @@ private:
                     &option == options || option > *(&option - 1));
         }
     }
+
+protected:
+    // Behaves like a stack, used to validate array index count.
+    std::vector<Level> indexCount;
 };
 
 class FullValidator : private ExtendedValidator {
 public:
-    void checkNonConformantElem(const char* ptr, uint8_t type) {
-        ExtendedValidator::checkNonConformantElem(ptr, type);
+    void checkNonConformantElem(const char* ptr, uint32_t offsetToValue, uint8_t type) {
+        ExtendedValidator::checkNonConformantElem(ptr, offsetToValue, type);
     }
 
     void checkUTF8Char() {}
 
     void checkDuplicateFieldName() {}
+
+    void popLevel() {
+        ExtendedValidator::popLevel();
+    }
 };
 
 template <bool precise, typename BSONValidator>
@@ -265,7 +320,6 @@ private:
         uassert(ErrorCodes::Overflow,
                 "BSONObj exceeds maximum nested object depth",
                 ++_currFrame != _frames.end());
-
         auto obj = cursor.ptr;
         auto len = cursor.template read<int32_t>();
         uassert(ErrorCodes::InvalidBSON, "Nested BSON object has to be at least 5 bytes", len >= 5);
@@ -279,6 +333,7 @@ private:
     }
 
     bool _popFrame() {
+        _validator.popLevel();
         if (_currFrame == _frames.begin())
             return false;
         --_currFrame;
@@ -317,7 +372,7 @@ private:
     const char* _pushCodeWithScope(Cursor cursor) {
         cursor.ptr = _pushFrame(cursor);  // Push a dummy frame to check the CodeWScope size.
         cursor.skipString();              // Now skip the BSON UTF8 string containing the code.
-        _currElem = cursor.ptr - 1;       // Use the terminating NUL as adummy scope element.
+        _currElem = cursor.ptr - 1;       // Use the terminating NUL as a dummy scope element.
         return _pushFrame(cursor);
     }
 
@@ -363,7 +418,7 @@ private:
 
                 // Check if the data is compliant to other BSON specifications if the element is
                 // structurally correct.
-                _validator.checkNonConformantElem(_currElem + len + 1, type);
+                _validator.checkNonConformantElem(_currElem, len + 1, type);
 
                 if constexpr (precise) {
                     // See if the _id field was just validated. If so, set the global scope element.

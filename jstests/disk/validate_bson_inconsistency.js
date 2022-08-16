@@ -178,4 +178,34 @@ resetDbpath(dbpath);
 
     MongoRunner.stopMongod(mongod, null, {skipValidation: true});
 })();
+
+(function validateDocumentsNonSequentialArrayIndexes() {
+    jsTestLog("Validate documents with array indices that are not sequential");
+
+    let mongod = startMongodOnExistingPath(dbpath);
+    let db = mongod.getDB(baseName);
+    const collName = collNamePrefix + count++;
+    db.createCollection(collName);
+    let testColl = db[collName];
+
+    let uri = getUriForColl(testColl);
+    const numDocs = 10;
+    insertNonSequentialArrayIndexes(testColl, uri, mongod, numDocs);
+
+    mongod = startMongodOnExistingPath(dbpath);
+    db = mongod.getDB(baseName);
+    testColl = db[collName];
+
+    res = assert.commandWorked(testColl.validate());
+    assert(res.valid, tojson(res));
+    assert.eq(res.nNonCompliantDocuments, 10);
+    assert.eq(res.warnings.length, 1);
+
+    res = assert.commandWorked(testColl.validate({checkBSONConsistency: true}));
+    assert(res.valid, tojson(res));
+    assert.eq(res.nNonCompliantDocuments, 10);
+    assert.eq(res.warnings.length, 1);
+
+    MongoRunner.stopMongod(mongod, null, {skipValidation: true});
+})();
 })();
