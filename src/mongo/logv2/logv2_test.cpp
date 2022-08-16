@@ -32,7 +32,6 @@
 #include "mongo/platform/basic.h"
 
 #include <fstream>
-#include <signal.h>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -61,7 +60,6 @@
 #include "mongo/logv2/uassert_sink.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/str_escape.h"
@@ -360,43 +358,6 @@ TEST_F(LogV2Test, Basic) {
         LOGV2(4638203, "mismatch {name}", "not_name"_attr = 1);
         ASSERT(StringData(lines.back()).startsWith("Exception during log"_sd));
     }
-}
-
-namespace bl_sinks = boost::log::sinks;
-// Sink backend which will grab a mutex, then immediately segfault.
-class ConsumeSegfaultsBackend
-    : public bl_sinks::basic_formatted_sink_backend<char, bl_sinks::synchronized_feeding> {
-public:
-    static auto create() {
-        return boost::make_shared<bl_sinks::synchronous_sink<ConsumeSegfaultsBackend>>(
-            boost::make_shared<ConsumeSegfaultsBackend>());
-    }
-
-    void consume(boost::log::record_view const& rec, string_type const& formattedString) {
-        if (firstRun) {
-            firstRun = false;
-            raise(SIGSEGV);
-        } else {
-            // Reentrance of consume(), which could cause deadlock. Exit normally, causing the death
-            // test to fail.
-            exit(0);
-        }
-    }
-
-private:
-    bool firstRun = true;
-};
-
-// Test that signals thrown during logging will not hang process death. Uses the
-// ConsumeSegfaultsBackend so that upon the initial log call, ConsumeSegfaultsBackend::consume will
-// be called, sending SIGSEGV. If the signal handler incorrectly invokes the logging subsystem, the
-// ConsumeSegfaultsBackend::consume function will be again invoked, failing the test since this
-// could result in deadlock.
-DEATH_TEST_F(LogV2Test, SIGSEGVDoesNotHang, "Got signal: ") {
-    auto sink = ConsumeSegfaultsBackend::create();
-    attachSink(sink);
-    LOGV2(6384304, "will SIGSEGV {str}", "str"_attr = "sigsegv");
-    // If we get here, we didn't segfault, and the test will fail.
 }
 
 class LogV2TypesTest : public LogV2Test {
