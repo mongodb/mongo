@@ -100,10 +100,9 @@ InternalSessionPool::Session InternalSessionPool::acquireSystemSession() {
     const InternalSessionPool::Session session = [&] {
         stdx::lock_guard<Latch> lock(_mutex);
 
-        const auto& systemUserDigest = makeSystemLogicalSessionId().getUid();
-        auto session = _acquireSession(systemUserDigest, lock);
-        return session ? *session
-                       : InternalSessionPool::Session(makeSystemLogicalSessionId(), TxnNumber(0));
+        const auto& systemSession = makeSystemLogicalSessionId();
+        auto session = _acquireSession(systemSession.getUid(), lock);
+        return session ? *session : InternalSessionPool::Session(systemSession, TxnNumber(0));
     }();
 
     LOGV2_DEBUG(5876603,
