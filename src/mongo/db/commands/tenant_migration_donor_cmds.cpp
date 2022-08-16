@@ -75,16 +75,17 @@ public:
 
             const auto& cmd = request();
             const auto migrationProtocol = cmd.getProtocol().value_or(kDefaultMigrationProtocol);
+            const auto& tenantId = cmd.getTenantId();
 
-            tenant_migration_util::protocolTenantIdCompatibilityCheck(migrationProtocol,
-                                                                      cmd.getTenantId().toString());
+            tenant_migration_util::protocolTenantIdCompatibilityCheck(migrationProtocol, tenantId);
             tenant_migration_util::protocolStorageOptionsCompatibilityCheck(opCtx,
                                                                             migrationProtocol);
 
+            // tenantId will be set to empty string for the "shard merge" protocol.
             TenantMigrationDonorDocument stateDoc(cmd.getMigrationId(),
                                                   cmd.getRecipientConnectionString().toString(),
                                                   cmd.getReadPreference(),
-                                                  cmd.getTenantId().toString());
+                                                  tenantId.value_or("").toString());
 
             if (!repl::tenantMigrationDisableX509Auth) {
                 uassert(ErrorCodes::InvalidOptions,

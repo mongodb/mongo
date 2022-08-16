@@ -164,8 +164,6 @@ structs:
             tenantId:
                 type: string
                 description: "The tenantId for the migration."
-                validator:
-                    callback: "tenant_migration_util::validateDatabasePrefix"
             startMigrationDonorTimestamp:
                 type: timestamp
                 description: >-

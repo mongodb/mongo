@@ -36,7 +36,7 @@ const migrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForTe
 jsTestLog("Testing 'donorStartMigration' command provided with invalid options.");
 
 // Test erroneously included tenantId field and unsupported database prefixes.
-const unsupportedtenantIds = [tenantId, 'admin', 'local', 'config'];
+const unsupportedtenantIds = ['', tenantId, 'admin', 'local', 'config'];
 unsupportedtenantIds.forEach((invalidTenantId) => {
     const cmd = {
         donorStartMigration: 1,

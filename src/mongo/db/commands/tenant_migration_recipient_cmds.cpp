@@ -74,15 +74,16 @@ public:
 
             const auto& cmd = request();
             const auto migrationProtocol = cmd.getProtocol().value_or(kDefaultMigrationProtocol);
+            const auto& tenantId = cmd.getTenantId();
 
-            tenant_migration_util::protocolTenantIdCompatibilityCheck(migrationProtocol,
-                                                                      cmd.getTenantId().toString());
+            tenant_migration_util::protocolTenantIdCompatibilityCheck(migrationProtocol, tenantId);
             tenant_migration_util::protocolStorageOptionsCompatibilityCheck(opCtx,
                                                                             migrationProtocol);
 
+            // tenantId will be set to empty string for the "shard merge" protocol.
             TenantMigrationRecipientDocument stateDoc(cmd.getMigrationId(),
                                                       cmd.getDonorConnectionString().toString(),
-                                                      cmd.getTenantId().toString(),
+                                                      tenantId.value_or("").toString(),
                                                       cmd.getStartMigrationDonorTimestamp(),
                                                       cmd.getReadPreference());
 
@@ -243,9 +244,9 @@ public:
 
             const auto& cmd = request();
             const auto migrationProtocol = cmd.getProtocol().value_or(kDefaultMigrationProtocol);
+            const auto& tenantId = cmd.getTenantId();
 
-            tenant_migration_util::protocolTenantIdCompatibilityCheck(migrationProtocol,
-                                                                      cmd.getTenantId().toString());
+            tenant_migration_util::protocolTenantIdCompatibilityCheck(migrationProtocol, tenantId);
 
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
             auto recipientService =
@@ -258,9 +259,11 @@ public:
             // and persist a state document that's marked garbage collectable (which is done by the
             // main chain).
             const Timestamp kUnusedStartMigrationTimestamp(1, 1);
+
+            // tenantId will be set to empty string for the "shard merge" protocol.
             TenantMigrationRecipientDocument stateDoc(cmd.getMigrationId(),
                                                       cmd.getDonorConnectionString().toString(),
-                                                      cmd.getTenantId().toString(),
+                                                      tenantId.value_or("").toString(),
                                                       kUnusedStartMigrationTimestamp,
                                                       cmd.getReadPreference());
             if (!repl::tenantMigrationDisableX509Auth) {

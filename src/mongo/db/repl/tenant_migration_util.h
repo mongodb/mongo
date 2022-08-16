@@ -51,7 +51,7 @@ constexpr auto kDefaultMigrationProtocol = MigrationProtocolEnum::kMultitenantMi
 
 namespace {
 
-const std::set<std::string> kUnsupportedTenantIds{"admin", "local", "config"};
+const std::set<std::string> kUnsupportedTenantIds{"", "admin", "local", "config"};
 
 }  // namespace
 
@@ -159,20 +159,20 @@ inline Status validatePrivateKeyPEMPayload(const StringData& payload) {
 }
 
 inline void protocolTenantIdCompatibilityCheck(const MigrationProtocolEnum& protocol,
-                                               const std::string& tenantId) {
+                                               const boost::optional<StringData>& tenantId) {
     switch (protocol) {
         case MigrationProtocolEnum::kShardMerge: {
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "'tenantId' must be empty for protocol '"
                                   << MigrationProtocol_serializer(protocol) << "'",
-                    tenantId.empty());
+                    !tenantId);
             break;
         }
         case MigrationProtocolEnum::kMultitenantMigrations: {
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "'tenantId' is required for protocol '"
                                   << MigrationProtocol_serializer(protocol) << "'",
-                    !tenantId.empty());
+                    tenantId);
             break;
         }
         default:
