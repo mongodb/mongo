@@ -497,6 +497,7 @@ void processFieldsForInsert(FLEQueryInterface* queryImpl,
         auto tagToken = FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escToken);
         auto valueToken =
             FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escToken);
+        payload.counts.clear();
 
         int position = 1;
         int count = 1;
