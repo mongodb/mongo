@@ -717,8 +717,8 @@ buildvariants:
   expansions:
     exe: ".exe"
     content_type: application/zip
-    compile_flags: --dbg=on --opt=on --win-version-min=win10 -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") MONGO_DISTMOD=windows
-    num_scons_link_jobs_available: 0.25
+    compile_flags: --dbg=on --opt=on --win-version-min=win10 -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.8") MONGO_DISTMOD=windows
+    num_scons_link_jobs_available: 0.2
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     scons_cache_scope: shared
@@ -789,8 +789,8 @@ buildvariants:
     exe: ".exe"
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi archive-mh archive-mh-debug
     content_type: application/zip
-    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include" LIBPATH="c:/sasl/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5") --win-version-min=win10
-    num_scons_link_jobs_available: 0.25
+    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include" LIBPATH="c:/sasl/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.8") --win-version-min=win10
+    num_scons_link_jobs_available: 0.2
     python: '/cygdrive/c/python/python37/python.exe'
     ext: zip
     scons_cache_scope: shared
