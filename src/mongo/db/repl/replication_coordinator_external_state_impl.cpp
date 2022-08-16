@@ -768,6 +768,16 @@ bool ReplicationCoordinatorExternalStateImpl::isSelf(const HostAndPort& host, Se
     return repl::isSelf(host, ctx);
 }
 
+bool ReplicationCoordinatorExternalStateImpl::isSelfFastPath(const HostAndPort& host) {
+    return repl::isSelfFastPath(host);
+}
+
+bool ReplicationCoordinatorExternalStateImpl::isSelfSlowPath(const HostAndPort& host,
+                                                             ServiceContext* ctx,
+                                                             Milliseconds timeout) {
+    return repl::isSelfSlowPath(host, ctx, timeout);
+}
+
 HostAndPort ReplicationCoordinatorExternalStateImpl::getClientHostAndPort(
     const OperationContext* opCtx) {
     return HostAndPort(opCtx->getClient()->clientAddress(true));

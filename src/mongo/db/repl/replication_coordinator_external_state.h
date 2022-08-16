@@ -155,6 +155,20 @@ public:
     virtual bool isSelf(const HostAndPort& host, ServiceContext* service) = 0;
 
     /**
+     * Returns true if "host" is one of the network identities of this node, without actually
+     * going out to the network and checking.
+     */
+    virtual bool isSelfFastPath(const HostAndPort& host) = 0;
+
+    /**
+     * Returns true if "host" is one of the network identities of this node, without
+     * checking the fast path first.
+     */
+    virtual bool isSelfSlowPath(const HostAndPort& host,
+                                ServiceContext* service,
+                                Milliseconds timeout) = 0;
+
+    /**
      * Gets the replica set config document from local storage, or returns an error.
      */
     virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* opCtx) = 0;

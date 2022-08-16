@@ -381,8 +381,18 @@ StatusWith<int> findSelfInConfig(ReplicationCoordinatorExternalState* externalSt
     for (ReplSetConfig::MemberIterator iter = newConfig.membersBegin();
          iter != newConfig.membersEnd();
          ++iter) {
-        if (externalState->isSelf(iter->getHostAndPort(), ctx)) {
+        if (externalState->isSelfFastPath(iter->getHostAndPort())) {
             meConfigs.push_back(iter);
+        }
+    }
+    if (meConfigs.empty()) {
+        // No self-hosts were found using the fastpath; check with the slow path.
+        for (ReplSetConfig::MemberIterator iter = newConfig.membersBegin();
+             iter != newConfig.membersEnd();
+             ++iter) {
+            if (externalState->isSelfSlowPath(iter->getHostAndPort(), ctx, Seconds(30))) {
+                meConfigs.push_back(iter);
+            }
         }
     }
     if (meConfigs.empty()) {
