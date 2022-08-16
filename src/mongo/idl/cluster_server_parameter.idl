@@ -90,7 +90,8 @@ feature_flags:
     featureFlagClusterWideConfigM2:
         description: Mechanism for cluster-wide configuration options, milestone 2
         cpp_varname: gFeatureFlagClusterWideConfigM2
-        default: false
+        default: true
+        version: 6.1
 
 server_parameters:
     testIntClusterParameter:

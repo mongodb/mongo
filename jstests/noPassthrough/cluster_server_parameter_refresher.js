@@ -4,7 +4,6 @@
  * @tags: [
  *   # Requires all nodes to be running at least 6.1.
  *   requires_fcv_61,
- *   featureFlagClusterWideConfigM2,
  *   does_not_support_stepdowns,
  *   requires_replication,
  *   requires_sharding

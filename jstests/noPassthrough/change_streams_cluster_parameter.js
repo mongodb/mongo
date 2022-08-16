@@ -1,7 +1,6 @@
 // Tests the 'changeStreams' cluster-wide configuration parameter on the replica sets and the
 // sharded cluster.
 // @tags: [
-//  featureFlagClusterWideConfig,
 //  requires_replication,
 //  requires_sharding,
 //  featureFlagServerlessChangeStreams,
