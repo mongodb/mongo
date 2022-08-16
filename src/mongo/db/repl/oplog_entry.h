@@ -354,6 +354,11 @@ public:
     bool isCrudOpType() const;
 
     /**
+     * Returns true if the oplog entry is for an Update or Delete operation.
+     */
+    bool isUpdateOrDelete() const;
+
+    /**
      * Returns if the operation should be prepared. Must be called on an 'applyOps' entry.
      */
     bool shouldPrepare() const;

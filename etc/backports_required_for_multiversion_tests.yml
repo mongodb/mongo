@@ -137,6 +137,8 @@ all:
     test_file: jstests/sharding/read_pref_with_hedging_mode.js
   - ticket: SERVER-57173
     test_file: jstests/replsets/invalidate_images_when_minvalid.js
+  - ticket: SERVER-56127
+    test_file: jstests/sharding/retryable_writes_nested_shard_key.js
   - ticket: SERVER-56468
     test_file: jstests/core/neq_null_correctly_cache.js
   - ticket: SERVER-56377
@@ -261,3 +263,5 @@ suites:
   sharding_multiversion:
   - ticket: SERVER-58203
     test_file: jstests/sharding/query/pipeline_length_limit.js
+  - ticket: SERVER-56127
+    test_file: jstests/sharding/retryable_writes_nested_shard_key.js

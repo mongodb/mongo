@@ -178,6 +178,16 @@ std::pair<BSONElement, bool> extractFieldFromIndexData(
     }
     return output;
 }
+
+BSONElement extractFieldFromDocumentKey(const BSONObj& documentKey, StringData fieldName) {
+    BSONElement output;
+    for (auto&& documentKeyElt : documentKey) {
+        if (fieldName == documentKeyElt.fieldNameStringData()) {
+            return documentKeyElt;
+        }
+    }
+    return output;
+}
 }  // namespace
 
 Status ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(const BSONObj& shardKey) {
@@ -332,6 +342,34 @@ BSONObj ShardKeyPattern::extractShardKeyFromIndexKeyData(
     return keyBuilder.obj();
 }
 
+BSONObj ShardKeyPattern::extractShardKeyFromDocumentKey(const BSONObj& documentKey) const {
+    BSONObjBuilder keyBuilder;
+    for (auto&& shardKeyField : _keyPattern.toBSON()) {
+        auto matchEl =
+            extractFieldFromDocumentKey(documentKey, shardKeyField.fieldNameStringData());
+
+        if (matchEl.eoo()) {
+            matchEl = kNullObj.firstElement();
+        }
+
+        // A shard key field cannot have array values. If we encounter array values return
+        // immediately.
+        if (!isValidShardKeyElementForExtractionFromDocument(matchEl)) {
+            return BSONObj();
+        }
+
+        if (isHashedPatternEl(shardKeyField)) {
+            keyBuilder.append(
+                shardKeyField.fieldNameStringData(),
+                BSONElementHasher::hash64(matchEl, BSONElementHasher::DEFAULT_HASH_SEED));
+        } else {
+            keyBuilder.appendAs(matchEl, shardKeyField.fieldNameStringData());
+        }
+    }
+    dassert(isShardKey(keyBuilder.asTempObj()));
+    return keyBuilder.obj();
+}
+
 BSONObj ShardKeyPattern::extractShardKeyFromDoc(const BSONObj& doc) const {
     BSONObjBuilder keyBuilder;
     for (auto&& patternEl : _keyPattern.toBSON()) {
@@ -358,6 +396,20 @@ BSONObj ShardKeyPattern::extractShardKeyFromDoc(const BSONObj& doc) const {
 
     dassert(isShardKey(keyBuilder.asTempObj()));
     return keyBuilder.obj();
+}
+
+BSONObj ShardKeyPattern::extractShardKeyFromOplogEntry(const repl::OplogEntry& entry) const {
+    if (!entry.isCrudOpType()) {
+        return BSONObj();
+    }
+
+    auto objWithDocumentKey = entry.getObjectContainingDocumentKey();
+
+    if (!entry.isUpdateOrDelete()) {
+        return extractShardKeyFromDoc(objWithDocumentKey);
+    }
+
+    return extractShardKeyFromDocumentKey(objWithDocumentKey);
 }
 
 BSONObj ShardKeyPattern::emplaceMissingShardKeyValuesForDocument(const BSONObj doc) const {

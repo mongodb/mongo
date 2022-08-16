@@ -355,6 +355,20 @@ bool OplogEntry::isCrudOpType() const {
     return isCrudOpType(getOpType());
 }
 
+bool OplogEntry::isUpdateOrDelete() const {
+    auto opType = getOpType();
+    switch (opType) {
+        case OpTypeEnum::kDelete:
+        case OpTypeEnum::kUpdate:
+            return true;
+        case OpTypeEnum::kInsert:
+        case OpTypeEnum::kCommand:
+        case OpTypeEnum::kNoop:
+            return false;
+    }
+    MONGO_UNREACHABLE;
+}
+
 bool OplogEntry::shouldPrepare() const {
     return getCommandType() == CommandType::kApplyOps &&
         getObject()[ApplyOpsCommandInfoBase::kPrepareFieldName].booleanSafe();

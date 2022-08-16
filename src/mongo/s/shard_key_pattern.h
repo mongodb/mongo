@@ -38,6 +38,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/index_bounds.h"
+#include "mongo/db/repl/oplog_entry.h"
 
 namespace mongo {
 
@@ -153,6 +154,30 @@ public:
     BSONObj extractShardKeyFromIndexKeyData(const std::vector<IndexKeyData>& indexKeyData) const;
 
     /**
+     * Given a document key expressed in dotted notation, extracts its shard key, applying hashing
+     * if necessary.
+     * Note: For a shardKeyPattern {a.b: 1, c: 1}
+     *  The documentKey for the document {a: {b: 10}, c: 20} is {a.b: 10, c: 20}
+     *  The documentKey for the document {a: {b: 10, d: 20}, c: 30} is {a.b: 10, c: 30}
+     *  The documentKey for the document {a: {b: {d: 10}}, c: 30} is {a.b: {d: 10}, c: 30}
+     *
+     * Examples:
+     *  If 'this' KeyPattern is {a: 1}
+     *   {a: 10, b: 20} --> returns {a: 10}
+     *   {b: 20} --> returns {a: null}
+     *   {a: {b: 10}} --> returns {a: {b: 10}}
+     *   {a: [1,2]} --> returns {}
+     *  If 'this' KeyPattern is {a.b: 1, c: 1}
+     *   {a.b: 10, c: 20} --> returns {a.b: 10, c: 20}
+     *   {a.b: 10} --> returns {a.b: 10, c: null}
+     *   {a.b: {z: 10}, c: 20} --> returns {a.b: {z: 10}, c: 20}
+     *  If 'this' KeyPattern is {a : "hashed"}
+     *   {a: 10, b: 20} --> returns {a: NumberLong("7766103514953448109")}
+     *   {b: 20} --> returns {a: NumberLong("2338878944348059895")}
+     */
+    BSONObj extractShardKeyFromDocumentKey(const BSONObj& documentKey) const;
+
+    /**
      * Given a document, extracts the shard key corresponding to the key pattern. Paths to shard key
      * fields must not contain arrays at any level, and shard keys may not be array fields or
      * non-storable sub-documents.  If the shard key pattern is a hashed key pattern, this method
@@ -179,6 +204,26 @@ public:
      *   { b: 1 } --> returns { a: null, b: 1 }
      */
     BSONObj extractShardKeyFromDoc(const BSONObj& doc) const;
+
+    /**
+     * Given an Oplog entry, extracts the shard key corresponding to the key pattern for insert,
+     * update, and delete op types. If the op type is not a CRUD operation, an empty BSONObj()
+     * will be returned.
+     *
+     * For update and delete operations, the Oplog entry will contain an object with the document
+     * key.
+     *
+     * For insert operations, the Oplog entry will contain the original document from which the
+     * document key must be extracted
+     *
+     * Examples:
+     *  For KeyPattern {'a.b': 1}
+     *   If the oplog entries contains field op='i'
+     *     oplog contains: { a : { b : "1" } }
+     *   If the oplog entries contains field op='u' or op='d'
+     *     oplog contains: { 'a.b': "1" }
+     */
+    BSONObj extractShardKeyFromOplogEntry(const repl::OplogEntry& entry) const;
 
     /**
      * Returns the document with missing shard key values set to null.
