@@ -39,14 +39,8 @@
 #include "mongo/logv2/log_severity.h"
 #include "mongo/util/errno_util.h"
 
-namespace mongo::logv2 {
-
-// Whether there is a doLogImpl call currently on this thread's stack.
-bool loggingInProgress();
-
-// Write message to stderr in a signal-safe manner.
-void signalSafeWriteToStderr(StringData message);
-namespace detail {
+namespace mongo {
+namespace logv2::detail {
 
 void doLogImpl(int32_t id,
                LogSeverity const& severity,
@@ -131,6 +125,6 @@ void doLog(int32_t id,
         std::tuple_cat(toFlatAttributesTupleRef(args)...));
 }
 
-}  // namespace detail
+}  // namespace logv2::detail
 
-}  // namespace mongo::logv2
+}  // namespace mongo
