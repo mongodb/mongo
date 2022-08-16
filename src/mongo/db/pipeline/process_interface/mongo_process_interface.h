@@ -78,7 +78,7 @@ class MongoProcessInterface {
 public:
     /**
      * Storage for a batch of BSON Objects to be updated in the write namespace. For each element
-     * in the batch we store a tuple of the folliwng elements:
+     * in the batch we store a tuple of the following elements:
      *   1. BSONObj - specifies the query that identifies a document in the to collection to be
      *      updated.
      *   2. write_ops::UpdateModification - either the new document we want to upsert or insert into
@@ -106,6 +106,19 @@ public:
     enum class CurrentOpBacktraceMode { kIncludeBacktrace, kExcludeBacktrace };
 
     /**
+     * Interface which estimates the size of a given write operation.
+     */
+    class WriteSizeEstimator {
+    public:
+        virtual ~WriteSizeEstimator() = default;
+
+        virtual int estimateInsertSizeBytes(const BSONObj& insert) const = 0;
+
+        virtual int estimateUpdateSizeBytes(const BatchObject& batchObject,
+                                            UpsertType type) const = 0;
+    };
+
+    /**
      * Factory function to create MongoProcessInterface of the right type. The implementation will
      * be installed by a lib higher up in the link graph depending on the application type.
      */
@@ -125,6 +138,12 @@ public:
         : taskExecutor(std::move(executor)) {}
 
     virtual ~MongoProcessInterface(){};
+
+    /**
+     * Returns an instance of a 'WriteSizeEstimator' interface.
+     */
+    virtual std::unique_ptr<WriteSizeEstimator> getWriteSizeEstimator(
+        OperationContext* opCtx, const NamespaceString& ns) const = 0;
 
     /**
      * Creates a new TransactionHistoryIterator object. Only applicable in processes which support

@@ -46,6 +46,48 @@ public:
     virtual ~CommonProcessInterface() = default;
 
     /**
+     * Estimates the size of writes that will be executed on the current node. Note that this
+     * does not account for the full size of an update statement.
+     */
+    class LocalWriteSizeEstimator final : public WriteSizeEstimator {
+    public:
+        int estimateInsertSizeBytes(const BSONObj& insert) const override {
+            return insert.objsize();
+        }
+
+        int estimateUpdateSizeBytes(const BatchObject& batchObject,
+                                    UpsertType type) const override {
+            int size = std::get<write_ops::UpdateModification>(batchObject).objsize();
+            if (auto vars = std::get<boost::optional<BSONObj>>(batchObject)) {
+                size += vars->objsize();
+            }
+            return size;
+        }
+    };
+
+    /**
+     * Estimate the size of writes that will be sent to the replica set primary.
+     */
+    class TargetPrimaryWriteSizeEstimator final : public WriteSizeEstimator {
+    public:
+        int estimateInsertSizeBytes(const BSONObj& insert) const override {
+            return insert.objsize() + write_ops::kWriteCommandBSONArrayPerElementOverheadBytes;
+        }
+
+        int estimateUpdateSizeBytes(const BatchObject& batchObject,
+                                    UpsertType type) const override {
+            return getUpdateSizeEstimate(std::get<BSONObj>(batchObject),
+                                         std::get<write_ops::UpdateModification>(batchObject),
+                                         std::get<boost::optional<BSONObj>>(batchObject),
+                                         type != UpsertType::kNone /* includeUpsertSupplied */,
+                                         boost::none /* collation */,
+                                         boost::none /* arrayFilters */,
+                                         BSONObj() /* hint*/) +
+                write_ops::kWriteCommandBSONArrayPerElementOverheadBytes;
+        }
+    };
+
+    /**
      * Returns true if the field names of 'keyPattern' are exactly those in 'uniqueKeyPaths', and
      * each of the elements of 'keyPattern' is numeric, i.e. not "text", "$**", or any other special
      * type of index.
@@ -63,6 +105,9 @@ public:
 
     virtual std::vector<FieldPath> collectDocumentKeyFieldsActingAsRouter(
         OperationContext*, const NamespaceString&) const override;
+
+    std::unique_ptr<WriteSizeEstimator> getWriteSizeEstimator(
+        OperationContext* opCtx, const NamespaceString& ns) const override;
 
     virtual void updateClientOperationTime(OperationContext* opCtx) const final;
 
