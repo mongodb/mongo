@@ -3,6 +3,7 @@ test_kind: js_test
 selector:
   roots:
   - src/mongo/db/modules/*/jstests/fle/*.js
+  - src/mongo/db/modules/*/jstests/fle2_query_analysis/*.js
   exclude_with_any_tags:
   - unsupported_fle_2
 executor:
@@ -17,3 +18,5 @@ executor:
       global_vars:
         TestData:
           useFle2Protocol: true
+          setParametersMongocryptd:
+            featureFlagFLE2Range: true
