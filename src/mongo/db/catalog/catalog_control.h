@@ -39,6 +39,7 @@ using MinVisibleTimestampMap = std::map<UUID, MinVisibleTimestamp>;
 using RequiresTimestampExtendedRangeSupportMap = std::map<UUID, bool>;
 struct PreviousCatalogState {
     MinVisibleTimestampMap minVisibleTimestampMap;
+    MinVisibleTimestampMap minValidTimestampMap;
     RequiresTimestampExtendedRangeSupportMap requiresTimestampExtendedRangeSupportMap;
 };
 

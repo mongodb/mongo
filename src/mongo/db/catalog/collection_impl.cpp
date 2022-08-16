@@ -704,6 +704,12 @@ void CollectionImpl::setMinimumVisibleSnapshot(Timestamp newMinimumVisibleSnapsh
     }
 }
 
+void CollectionImpl::setMinimumValidSnapshot(Timestamp newMinimumValidSnapshot) {
+    if (!_minValidSnapshot || (newMinimumValidSnapshot > _minValidSnapshot.value())) {
+        _minValidSnapshot = newMinimumValidSnapshot;
+    }
+}
+
 void CollectionImpl::deleteDocument(OperationContext* opCtx,
                                     StmtId stmtId,
                                     const RecordId& loc,

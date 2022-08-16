@@ -324,6 +324,14 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    boost::optional<Timestamp> getMinimumValidSnapshot() const {
+        MONGO_UNREACHABLE;
+    }
+
+    void setMinimumValidSnapshot(Timestamp name) override {
+        // no-op, called by unittests
+    }
+
     boost::optional<TimeseriesOptions> getTimeseriesOptions() const {
         MONGO_UNREACHABLE;
     }

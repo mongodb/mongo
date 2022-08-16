@@ -336,12 +336,16 @@ public:
     boost::optional<Timestamp> getMinimumVisibleSnapshot() const final {
         return _minVisibleSnapshot;
     }
+    boost::optional<Timestamp> getMinimumValidSnapshot() const final {
+        return _minValidSnapshot;
+    }
 
     /**
      * Updates the minimum visible snapshot. The 'newMinimumVisibleSnapshot' is ignored if it would
      * set the minimum visible snapshot backwards in time.
      */
     void setMinimumVisibleSnapshot(Timestamp newMinimumVisibleSnapshot) final;
+    void setMinimumValidSnapshot(Timestamp newMinimumValidSnapshot) final;
 
     boost::optional<TimeseriesOptions> getTimeseriesOptions() const final;
     void setTimeseriesOptions(OperationContext* opCtx, const TimeseriesOptions& tsOptions) final;
@@ -500,6 +504,7 @@ private:
 
     // The earliest snapshot that is allowed to use this collection.
     boost::optional<Timestamp> _minVisibleSnapshot;
+    boost::optional<Timestamp> _minValidSnapshot;
 
     bool _initialized = false;
 };

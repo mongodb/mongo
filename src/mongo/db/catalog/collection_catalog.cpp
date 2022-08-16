@@ -95,7 +95,12 @@ public:
     static constexpr size_t kNumStaticActions = 2;
 
     static void setCollectionInCatalog(CollectionCatalog& catalog,
-                                       std::shared_ptr<Collection> collection) {
+                                       std::shared_ptr<Collection> collection,
+                                       boost::optional<Timestamp> commitTime) {
+        if (commitTime) {
+            collection->setMinimumValidSnapshot(*commitTime);
+        }
+
         catalog._collections[collection->ns()] = collection;
         catalog._catalog[collection->uuid()] = collection;
         auto dbIdPair = std::make_pair(collection->ns().dbName(), collection->uuid());
@@ -124,10 +129,10 @@ public:
         for (auto&& entry : entries) {
             switch (entry.action) {
                 case UncommittedCatalogUpdates::Entry::Action::kWritableCollection: {
-                    writeJobs.push_back(
-                        [collection = std::move(entry.collection)](CollectionCatalog& catalog) {
-                            setCollectionInCatalog(catalog, std::move(collection));
-                        });
+                    writeJobs.push_back([collection = std::move(entry.collection),
+                                         commitTime](CollectionCatalog& catalog) {
+                        setCollectionInCatalog(catalog, std::move(collection), commitTime);
+                    });
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kRenamedCollection: {
@@ -155,7 +160,11 @@ public:
                 case UncommittedCatalogUpdates::Entry::Action::kRecreatedCollection: {
                     writeJobs.push_back([opCtx = _opCtx,
                                          collection = entry.collection,
-                                         uuid = *entry.externalUUID](CollectionCatalog& catalog) {
+                                         uuid = *entry.externalUUID,
+                                         commitTime](CollectionCatalog& catalog) {
+                        if (commitTime) {
+                            collection->setMinimumValidSnapshot(commitTime.value());
+                        }
                         catalog.registerCollection(opCtx, uuid, std::move(collection));
                     });
                     // Fallthrough to the createCollection case to finish committing the collection.
@@ -175,6 +184,7 @@ public:
                     // call setCommitted(true).
                     if (commitTime) {
                         collPtr->setMinimumVisibleSnapshot(commitTime.value());
+                        collPtr->setMinimumValidSnapshot(commitTime.value());
                     }
                     collPtr->setCommitted(true);
                     break;
@@ -795,8 +805,11 @@ Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationC
     // on the thread doing the batch write and it would trigger the regular path where we do a
     // copy-on-write on the catalog when committing.
     if (_isCatalogBatchWriter()) {
-        PublishCatalogUpdates::setCollectionInCatalog(*batchedCatalogWriteInstance,
-                                                      std::move(cloned));
+        // Do not update min valid timestamp in batched write as the write is not corresponding to
+        // an oplog entry. If the write require an update to this timestamp it is the responsibility
+        // of the user.
+        PublishCatalogUpdates::setCollectionInCatalog(
+            *batchedCatalogWriteInstance, std::move(cloned), boost::none);
         return ptr;
     }
 
@@ -898,8 +911,11 @@ Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
     // on the thread doing the batch write and it would trigger the regular path where we do a
     // copy-on-write on the catalog when committing.
     if (_isCatalogBatchWriter()) {
-        PublishCatalogUpdates::setCollectionInCatalog(*batchedCatalogWriteInstance,
-                                                      std::move(cloned));
+        // Do not update min valid timestamp in batched write as the write is not corresponding to
+        // an oplog entry. If the write require an update to this timestamp it is the responsibility
+        // of the user.
+        PublishCatalogUpdates::setCollectionInCatalog(
+            *batchedCatalogWriteInstance, std::move(cloned), boost::none);
         return ptr;
     }
 

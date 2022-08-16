@@ -673,6 +673,19 @@ public:
 
     virtual void setMinimumVisibleSnapshot(Timestamp name) = 0;
 
+
+    /**
+     * Get the timestamp this Collection instance was most recently changed at.
+     * TODO SERVER-68270: Should currently not be used until min visible snapshot is removed
+     */
+    virtual boost::optional<Timestamp> getMinimumValidSnapshot() const = 0;
+
+    /**
+     * Sets the timestamp this Collection instance was most recently changed at.
+     * TODO SERVER-68270: Should currently not be used until min visible snapshot is removed
+     */
+    virtual void setMinimumValidSnapshot(Timestamp name) = 0;
+
     /**
      * Returns the time-series options for this buckets collection, or boost::none if not a
      * time-series buckets collection.
