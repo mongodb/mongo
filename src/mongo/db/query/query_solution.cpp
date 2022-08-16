@@ -1100,17 +1100,15 @@ bool IndexScanNode::operator==(const IndexScanNode& other) const {
 ColumnIndexScanNode::ColumnIndexScanNode(ColumnIndexEntry indexEntry,
                                          OrderedPathSet outputFieldsIn,
                                          OrderedPathSet matchFieldsIn,
+                                         OrderedPathSet allFieldsIn,
                                          StringMap<std::unique_ptr<MatchExpression>> filtersByPath,
                                          std::unique_ptr<MatchExpression> postAssemblyFilter)
     : indexEntry(std::move(indexEntry)),
       outputFields(std::move(outputFieldsIn)),
       matchFields(std::move(matchFieldsIn)),
-      allFields(set_util::setUnion(outputFields, matchFields)),
+      allFields(std::move(allFieldsIn)),
       filtersByPath(std::move(filtersByPath)),
-      postAssemblyFilter(std::move(postAssemblyFilter)) {
-    allFields = outputFields;
-    allFields.insert(matchFields.begin(), matchFields.end());
-}
+      postAssemblyFilter(std::move(postAssemblyFilter)) {}
 
 void ColumnIndexScanNode::appendToString(str::stream* ss, int indent) const {
     addIndent(ss, indent);

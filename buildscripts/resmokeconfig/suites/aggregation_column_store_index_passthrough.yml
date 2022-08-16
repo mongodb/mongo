@@ -9,8 +9,6 @@ selector:
   exclude_files:
   - jstests/aggregation/extras/*.js
   - jstests/aggregation/data/*.js
-  # TODO SERVER-67264 there is a bug in projecting "a" and matching on "a.b".
-  - jstests/aggregation/bugs/match.js
 
   exclude_with_any_tags:
   - assumes_no_implicit_index_creation

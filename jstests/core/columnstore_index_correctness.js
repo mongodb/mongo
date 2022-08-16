@@ -191,8 +191,7 @@ const kPrefixProjection = {
     num: 1
 };
 
-// TODO SERVER-62985: Add a hint to this query to ensure it uses the column store index.
-results = coll.find({"a.m": 1}, kPrefixProjection).toArray();
+results = coll.find({"a.m": 1}, kPrefixProjection).hint({"$**": "columnstore"}).toArray();
 assert.gt(results.length, 0);
 for (let res of results) {
     const trueResult =

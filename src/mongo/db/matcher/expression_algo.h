@@ -98,10 +98,18 @@ bool isSplittableBy(const MatchExpression& expr, const OrderedPathSet& pathSet);
 bool areIndependent(const OrderedPathSet& pathSet1, const OrderedPathSet& pathSet2);
 
 /**
- * Return true if any of the fieldPaths in prefixCandidates are identical to or an ancestor of any
- * of the fieldpaths in testSet.  The order of the parameters matters -- it's not commutative.
+ * Return true if any of the paths in 'prefixCandidates' are identical to or an ancestor of any
+ * of the paths in 'testSet'.  The order of the parameters matters -- it's not commutative.
  */
 bool containsDependency(const OrderedPathSet& testSet, const OrderedPathSet& prefixCandidates);
+
+/**
+ * Returns true if any of the paths in 'testSet' are an ancestor of any of the other paths in
+ * 'testSet'. Examples:
+ * containsOverlappingPaths([a.b, a]) --> true
+ * containsOverlappingPaths([ab, a, a-b]) --> false
+ */
+bool containsOverlappingPaths(const OrderedPathSet& testSet);
 
 /**
  * Determine if 'expr' is reliant upon any path from 'pathSet'.

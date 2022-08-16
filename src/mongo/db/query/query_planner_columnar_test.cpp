@@ -280,6 +280,110 @@ TEST_F(QueryPlannerColumnarTest,
     assertSolutionExists(R"({proj: {spec: {a: 1, b: 1, c: 1}, node: {cscan: {dir: 1}}}})");
 }
 
+// Tests that a query which depends on overlapping parent/child fields like 'a.b' and 'a' will not
+// use the column store index.
+TEST_F(QueryPlannerColumnarTest, QueryWithOverlappingDependenciesDoesNotUseColumnarIndex) {
+    addColumnStoreIndexAndEnableFilterSplitting();
+
+    runQuerySortProj(BSONObj(), BSON("a.b" << 1 << "a.c" << 1), BSON("a" << 1));
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({
+        sort: {
+            pattern: {"a.b": 1, "a.c": 1},
+            limit: 0,
+            node: {
+                proj: {
+                    spec: {a: 1},
+                    node: {
+                        cscan: {dir: 1}
+                    }
+                }
+            }
+        }
+    })");
+}
+
+TEST_F(QueryPlannerColumnarTest, QueryWithConflictingAncestralDependenciesDoesNotUseColumnarIndex) {
+    addColumnStoreIndexAndEnableFilterSplitting();
+
+    runQuerySortProj(BSONObj(), BSON("a.b.c" << 1), BSON("a" << 1));
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({
+        sort: {
+            pattern: {"a.b.c": 1},
+            limit: 0,
+            node: {
+                proj: {
+                    spec: {a: 1},
+                    node: {
+                        cscan: {dir: 1}
+                    }
+                }
+            }
+        }
+    })");
+}
+
+// Test like those above, but proving that we do the prefix detection correctly and don't mistake
+// regular (non-path) prefixes.
+TEST_F(QueryPlannerColumnarTest, QueryWithSimilarDependenciesDoesUseColumnarIndex) {
+    addColumnStoreIndexAndEnableFilterSplitting();
+
+    runQuerySortProj(BSONObj(), BSON("abc" << 1), BSON("a" << 1));
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({
+        proj: {
+            spec: {a: 1, _id: 1},
+            node: {
+                sort: {
+                    pattern: {"abc": 1},
+                    limit: 0,
+                    node: {
+                        column_scan: {
+                            filtersByPath: {},
+                            outputFields: ['_id', 'a', 'abc'],
+                            matchFields: []
+                        }
+                    }
+                }
+            }
+        }
+    })");
+}
+
+// Test that adding a hint will allow you to use the column store index for a query with overlapping
+// parent/child dependencies.
+TEST_F(QueryPlannerColumnarTest, HintOverridesOverlappingFieldsCheck) {
+    addColumnStoreIndexAndEnableFilterSplitting();
+
+    runQuerySortProjSkipLimitHint(BSONObj(),
+                                  BSON("a.b.c" << 1),
+                                  BSON("a" << 1),
+                                  0,
+                                  0,
+                                  BSON("$**"
+                                       << "columnstore"));
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({
+        sort: {
+            pattern: {"a.b.c": 1},
+            limit: 0,
+            node: {
+                proj: {
+                    spec: {a: 1, _id: 1},
+                    node: {
+                        column_scan: {
+                            filtersByPath: {},
+                            outputFields: ['_id', 'a', 'a.b.c'],
+                            matchFields: []
+                        }
+                    }
+                }
+            }
+        }
+    })");
+}
+
 TEST_F(QueryPlannerColumnarTest, HintOverridesFieldLimitUnfiltered) {
     addColumnStoreIndexAndEnableFilterSplitting();
     internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan.store(2);

@@ -6,11 +6,6 @@ selector:
   - jstests/fle2/**/*.js
   - src/mongo/db/modules/*/jstests/fle2/*.js
   exclude_files:
-  # TODO SERVER-67264 there is a bug in projecting "a" and matching on "a.b".
-  - jstests/core/sort_dotted_paths.js
-  - jstests/core/sort_dotted_paths_collation.js
-  - jstests/core/computed_projections.js
-  - jstests/core/null_query_semantics.js
   # TODO SERVER-67363 $indexStats double-increments top counters, which makes our overriden
   # 'getIndexes()' implementation (based on $indexStats) visible to the test.
   - jstests/core/top.js

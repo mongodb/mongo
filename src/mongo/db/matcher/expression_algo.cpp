@@ -796,6 +796,22 @@ bool containsDependency(const OrderedPathSet& testSet, const OrderedPathSet& pre
     return false;
 }
 
+bool containsOverlappingPaths(const OrderedPathSet& testSet) {
+    // We will take advantage of the fact that paths with common ancestors are ordered together in
+    // our ordering. Thus if there are any paths that contain a common ancestor, they will be right
+    // next to each other - unless there are multiple pairs, in which case at least one pair will be
+    // right next to each other.
+    if (testSet.empty()) {
+        return false;
+    }
+    for (auto it = std::next(testSet.begin()); it != testSet.end(); ++it) {
+        if (isPathPrefixOf(*std::prev(it), *it)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool areIndependent(const OrderedPathSet& pathSet1, const OrderedPathSet& pathSet2) {
     return !containsDependency(pathSet1, pathSet2) && !containsDependency(pathSet2, pathSet1);
 }

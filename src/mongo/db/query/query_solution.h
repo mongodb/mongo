@@ -513,6 +513,7 @@ struct ColumnIndexScanNode : public QuerySolutionNode {
     ColumnIndexScanNode(ColumnIndexEntry,
                         OrderedPathSet outputFields,
                         OrderedPathSet matchFields,
+                        OrderedPathSet allFields,
                         StringMap<std::unique_ptr<MatchExpression>> filtersByPath,
                         std::unique_ptr<MatchExpression> postAssemblyFilter);
 
@@ -545,6 +546,7 @@ struct ColumnIndexScanNode : public QuerySolutionNode {
         return std::make_unique<ColumnIndexScanNode>(indexEntry,
                                                      outputFields,
                                                      matchFields,
+                                                     allFields,
                                                      std::move(clonedFiltersByPath),
                                                      postAssemblyFilter->shallowClone());
     }

@@ -74,7 +74,7 @@ assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);
 
 // Scan the "a.b" column with a predicate. Dotted paths are supported even if there are arrays
 // encountered. See IS_SPARSE Encoding for more details.
-explain = coll.find({'a.b': 2}, {_id: 0, a: 1}).explain();
+explain = coll.find({'a.b': 2}, {_id: 0, 'a.b': 1}).explain();
 assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);
 
 // 'aggregate' command is supported.

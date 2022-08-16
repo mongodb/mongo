@@ -27,10 +27,12 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include <algorithm>
 #include <set>
 
-#pragma once
+#include "mongo/bson/util/builder_fwd.h"
 
 namespace mongo::set_util {
 
@@ -41,6 +43,19 @@ std::set<T, Comparator> setUnion(const std::set<T, Comparator>& set1,
     std::set_union(
         set1.begin(), set1.end(), set2.begin(), set2.end(), std::inserter(out, out.begin()));
     return out;
+}
+
+template <typename T, typename Comparator>
+std::string setToString(const std::set<T, Comparator>& set) {
+    StackStringBuilder sb;
+    sb << "{";
+    for (auto it = set.begin(); it != set.end(); ++it) {
+        sb << *it;
+        if (std::next(it) != set.end())
+            sb << ",";
+    }
+    sb << "}";
+    return sb.str();
 }
 
 }  // namespace mongo::set_util

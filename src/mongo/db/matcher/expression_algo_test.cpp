@@ -950,6 +950,25 @@ TEST(IsIndependent, EmptyDependencySetsPassIsOnlyDependentOn) {
     ASSERT_TRUE(expression::isOnlyDependentOn(*matchExpression.get(), {}));
 }
 
+TEST(ContainsOverlappingPaths, Basics) {
+    // No overlap cases.
+    ASSERT_FALSE(expression::containsOverlappingPaths({}));
+    ASSERT_FALSE(expression::containsOverlappingPaths({"a"}));
+    ASSERT_FALSE(expression::containsOverlappingPaths({"a.b"}));
+    ASSERT_FALSE(expression::containsOverlappingPaths({"a", "b"}));
+    ASSERT_FALSE(expression::containsOverlappingPaths({"a", "ab", "a-b"}));
+    ASSERT_FALSE(expression::containsOverlappingPaths({"a.b", "ab", "a-b"}));
+    ASSERT_FALSE(expression::containsOverlappingPaths({"a.b", "a.c", "a.d"}));
+    ASSERT_FALSE(
+        expression::containsOverlappingPaths({"users.address.zip", "users.address.state"}));
+
+    // Overlap cases
+    ASSERT_TRUE(expression::containsOverlappingPaths({"a.b", "ab", "a-b", "a"}));
+    ASSERT_TRUE(expression::containsOverlappingPaths({"a.b", "ab", "a-b", "a.b.c"}));
+    ASSERT_TRUE(expression::containsOverlappingPaths({"a", "ab", "a-b", "a.b.c"}));
+    ASSERT_TRUE(expression::containsOverlappingPaths({"users.address", "users.address.state"}));
+}
+
 TEST(SplitMatchExpression, AndWithSplittableChildrenIsSplittable) {
     BSONObj matchPredicate = fromjson("{$and: [{a: 1}, {b: 1}]}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
