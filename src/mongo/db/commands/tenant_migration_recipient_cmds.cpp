@@ -293,7 +293,7 @@ public:
 
             // Instruct the instance run() function to mark this migration garbage collectable.
             recipientInstance->onReceiveRecipientForgetMigration(opCtx);
-            recipientInstance->getCompletionFuture().get(opCtx);
+            recipientInstance->getForgetMigrationDurableFuture().get(opCtx);
         }
 
     private:

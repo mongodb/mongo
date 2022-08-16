@@ -103,7 +103,7 @@ const setUpMigrationSyncSourceTest = function() {
     let res = recipientPrimary.adminCommand({currentOp: true, desc: "tenant recipient migration"});
     let currOp = res.inprog[0];
     // The migration should not be complete.
-    assert.eq(currOp.migrationCompleted, false, tojson(res));
+    assert.eq(currOp.garbageCollectable, false, tojson(res));
     assert.eq(currOp.dataSyncCompleted, false, tojson(res));
     // The sync source can only be 'donorSecondary'.
     assert.eq(donorSecondary.host, currOp.donorSyncSource, tojson(res));
@@ -142,7 +142,7 @@ const setUpMigrationSyncSourceTest = function() {
     currOp = res.inprog[0];
     // The migration should not be complete and there should be no sync source stored, since the new
     // recipient primary does not have a valid sync source to choose from.
-    assert.eq(currOp.migrationCompleted, false, tojson(res));
+    assert.eq(currOp.garbageCollectable, false, tojson(res));
     assert.eq(currOp.dataSyncCompleted, false, tojson(res));
     assert(!currOp.donorSyncSource, tojson(res));
 

@@ -490,7 +490,7 @@ TEST_F(TenantMigrationRecipientServiceTest, BasicTenantMigrationRecipientService
 
     // Wait for task completion.
     ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, InstanceReportsErrorOnFailureWhilePersistingStateDoc) {
@@ -519,7 +519,8 @@ TEST_F(TenantMigrationRecipientServiceTest, InstanceReportsErrorOnFailureWhilePe
     ASSERT_EQ(ErrorCodes::NotWritablePrimary, status.code());
     // Should also fail to mark the state doc garbage collectable if we have failed to persist the
     // state doc at the first place.
-    ASSERT_EQ(ErrorCodes::NotWritablePrimary, instance->getCompletionFuture().getNoThrow());
+    ASSERT_EQ(ErrorCodes::NotWritablePrimary,
+              instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_Primary) {
@@ -571,7 +572,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
 
     // Wait for task completion.
     ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_Secondary) {
@@ -623,7 +624,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_S
 
     // Wait for task completion.
     ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest,
@@ -682,7 +683,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     // Wait for task completion failure.
     ASSERT_EQUALS(ErrorCodes::FailedToSatisfyReadPreference,
                   instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest,
@@ -755,7 +756,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
 
     // Wait for task completion.
     ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest,
@@ -817,7 +818,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     // Wait for task completion failure.
     ASSERT_EQUALS(ErrorCodes::FailedToSatisfyReadPreference,
                   instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest,
@@ -887,7 +888,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
 
     // Wait for task completion.
     ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest,
@@ -960,7 +961,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
 
     // Wait for task completion.
     ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest,
@@ -1022,7 +1023,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     // Wait for task completion failure.
     ASSERT_EQUALS(ErrorCodes::FailedToSatisfyReadPreference,
                   instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest,
@@ -1094,7 +1095,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
 
     // Wait for task completion.
     ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest,
@@ -1276,7 +1277,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
 
     // Wait for task completion.
     ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_BadConnectString) {
@@ -1351,7 +1352,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
 
     // Wait for task completion.
     ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 
     ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartFetchingDonorOpTime());
     ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingDonorOpTime());
@@ -1393,7 +1394,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
 
     // Wait for task completion.
     ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 
     ASSERT_EQ(txnStartOpTime, getStateDoc(instance.get()).getStartFetchingDonorOpTime());
     ASSERT_EQ(topOfOplogOpTime, getStateDoc(instance.get()).getStartApplyingDonorOpTime());
@@ -1426,7 +1427,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
 
     // Wait for task completion.
     ASSERT_NOT_OK(instance->getDataSyncCompletionFuture().getNoThrow());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 
     // Even though we failed, the memory state should still match the on-disk state.
     checkStateDocPersisted(opCtx.get(), instance.get());
@@ -1477,7 +1478,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientStartOplogFe
 
     // Wait for task completion.
     ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientStartsCloner) {
@@ -1546,7 +1547,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientStartsCloner
 
     // Wait for task completion.
     ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherFailsDuringOplogApplication) {
@@ -1602,7 +1603,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherFailsDuringOplogApplicat
     // Wait for task completion failure.
     auto status = instance->getDataSyncCompletionFuture().getNoThrow();
     ASSERT_EQ(4881203, status.code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherResumesFromTopOfOplogBuffer) {
@@ -1708,7 +1709,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherResumesFromTopOfOplogBuf
     // Wait for task completion.  Since we're using a test function to cancel the applier,
     // the actual result is not critical.
     ASSERT_NOT_OK(instance->getDataSyncCompletionFuture().getNoThrow());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherNoDocInBufferToResumeFrom) {
@@ -1816,7 +1817,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherNoDocInBufferToResumeFro
     // Wait for task completion.  Since we're using a test function to cancel the applier,
     // the actual result is not critical.
     ASSERT_NOT_OK(instance->getDataSyncCompletionFuture().getNoThrow());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromLastNoOpOplogEntry) {
@@ -1953,7 +1954,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromLastNoOpOplog
     // Wait for task completion.  Since we're using a test function to cancel the applier,
     // the actual result is not critical.
     ASSERT_NOT_OK(instance->getDataSyncCompletionFuture().getNoThrow());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest,
@@ -2127,7 +2128,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     // Wait for task completion.  Since we're using a test function to cancel the applier,
     // the actual result is not critical.
     ASSERT_NOT_OK(instance->getDataSyncCompletionFuture().getNoThrow());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromStartDonorApplyingOpTime) {
@@ -2273,7 +2274,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromStartDonorApp
     // Wait for task completion.  Since we're using a test function to cancel the applier,
     // the actual result is not critical.
     ASSERT_NOT_OK(instance->getDataSyncCompletionFuture().getNoThrow());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest,
@@ -2381,7 +2382,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     // Wait for task completion.  Since we're using a test function to cancel the applier,
     // the actual result is not critical.
     ASSERT_NOT_OK(instance->getDataSyncCompletionFuture().getNoThrow());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, OplogApplierFails) {
@@ -2449,7 +2450,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierFails) {
 
     // Wait for task completion failure.
     ASSERT_NOT_OK(instance->getDataSyncCompletionFuture().getNoThrow());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, StoppingApplierAllowsCompletion) {
@@ -2504,7 +2505,7 @@ TEST_F(TenantMigrationRecipientServiceTest, StoppingApplierAllowsCompletion) {
     // Wait for task completion.  Since we're using a test function to cancel the applier,
     // the actual result is not critical.
     ASSERT_NOT_OK(instance->getDataSyncCompletionFuture().getNoThrow());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientAddResumeTokenNoopsToBuffer) {
@@ -2612,7 +2613,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientAddResumeTok
 
     // Wait for task completion.
     ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_BeforeRun) {
@@ -2648,7 +2649,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_BeforeRun) 
     fp->setMode(FailPoint::off);
 
     // We should fail to mark the state doc garbage collectable.
-    ASSERT_EQ(instance->getCompletionFuture().getNoThrow(),
+    ASSERT_EQ(instance->getForgetMigrationDurableFuture().getNoThrow(),
               ErrorCodes::InterruptedDueToReplStateChange);
 }
 
@@ -2677,7 +2678,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_FailToIniti
                        ErrorCodes::NotWritablePrimary);
     // We should fail to mark the state doc garbage collectable if we have failed to initialize and
     // persist the state doc at the first place.
-    ASSERT_EQ(instance->getCompletionFuture().getNoThrow(), ErrorCodes::NotWritablePrimary);
+    ASSERT_EQ(instance->getForgetMigrationDurableFuture().getNoThrow(),
+              ErrorCodes::NotWritablePrimary);
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_WaitUntilStateDocInitialized) {
@@ -2741,7 +2743,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_WaitUntilSt
 
     ASSERT_EQ(instance->getDataSyncCompletionFuture().getNoThrow(),
               ErrorCodes::TenantMigrationForgotten);
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 
     const auto doc = getStateDoc(instance.get());
     LOGV2(4881411,
@@ -2807,7 +2809,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterStartO
     fp->setMode(FailPoint::off);
     ASSERT_EQ(instance->getDataSyncCompletionFuture().getNoThrow(),
               ErrorCodes::TenantMigrationForgotten);
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 
     const auto doc = getStateDoc(instance.get());
     LOGV2(4881412,
@@ -2899,7 +2901,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterConsis
     ASSERT_EQ(instance->getDataSyncCompletionFuture().getNoThrow(),
               ErrorCodes::TenantMigrationForgotten);
 
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 
     {
         const auto doc = getStateDoc(instance.get());
@@ -2984,7 +2986,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterFail) 
 
     // The instance should still be running and waiting for the recipientForgetMigration command.
     instance->onReceiveRecipientForgetMigration(opCtx.get());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 
     {
         const auto doc = getStateDoc(instance.get());
@@ -3044,7 +3046,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_FailToMarkG
     // The instance should still be running and waiting for the recipientForgetMigration command.
     instance->onReceiveRecipientForgetMigration(opCtx.get());
     // Check that it fails to mark the state doc garbage collectable.
-    ASSERT_EQ(ErrorCodes::NotWritablePrimary, instance->getCompletionFuture().getNoThrow().code());
+    ASSERT_EQ(ErrorCodes::NotWritablePrimary,
+              instance->getForgetMigrationDurableFuture().getNoThrow().code());
 
     {
         const auto doc = getStateDoc(instance.get());
@@ -3087,7 +3090,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientServiceRecor
 
     // Wait for task completion.
     ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 
     auto doc = getStateDoc(instance.get());
     auto docFCV = doc.getRecipientPrimaryStartingFCV();
@@ -3128,7 +3131,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     // Wait for task completion.
     // The FCV should match so we should exit with the failpoint code rather than an error.
     ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 
     auto doc = getStateDoc(instance.get());
     auto docFCV = doc.getRecipientPrimaryStartingFCV();
@@ -3170,7 +3173,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     // The FCV should differ so we expect to exit with an error.
     std::int32_t expectedCode = 5356201;
     ASSERT_EQ(expectedCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest,
@@ -3219,7 +3222,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     // The FCVs should differ so we expect to exit with an error.
     std::int32_t expectedCode = 5382301;
     ASSERT_EQ(expectedCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest, WaitUntilMigrationReachesReturnAfterReachingTimestamp) {
@@ -3333,7 +3336,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientReceivesRetriableFetcherErr
     fp->setMode(FailPoint::off);
     // Wait for task completion.
     ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 
     doc = getStateDoc(instance.get());
     ASSERT_EQ(doc.getNumRestartsDueToDonorConnectionFailure(), 1);
@@ -3393,7 +3396,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientReceivesNonRetriableFetcher
     // Wait for task completion failure.
     auto status = instance->getDataSyncCompletionFuture().getNoThrow();
     ASSERT_EQ(nonRetriableErrorCode, status.code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 
     doc = getStateDoc(instance.get());
     ASSERT_EQ(doc.getNumRestartsDueToDonorConnectionFailure(), 0);
@@ -3451,7 +3454,8 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientWillNotRetryOnExternalInter
 
     fp->setMode(FailPoint::off);
     // Wait for task completion failure.
-    ASSERT_EQ(instance->getCompletionFuture().getNoThrow(), ErrorCodes::SocketException);
+    ASSERT_EQ(instance->getForgetMigrationDurableFuture().getNoThrow(),
+              ErrorCodes::SocketException);
 
     doc = getStateDoc(instance.get());
     ASSERT_EQ(doc.getNumRestartsDueToDonorConnectionFailure(), 0);
@@ -3523,7 +3527,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientWillNotRetryOnReceivingForg
     hangMigrationBeforeRetryCheckFp->setMode(FailPoint::off);
 
     // Wait for task completion failure.
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 
     auto doc = getStateDoc(instance.get());
     ASSERT_EQ(doc.getNumRestartsDueToDonorConnectionFailure(), 0);
@@ -3596,7 +3600,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientReceivesRetriableClonerErro
 
     // Wait for task completion.
     ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 
     doc = getStateDoc(instance.get());
     ASSERT_EQ(doc.getNumRestartsDueToDonorConnectionFailure(), 1);
@@ -3658,7 +3662,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientReceivesNonRetriableClonerE
 
     // Wait for task completion.
     ASSERT_EQ(nonRetriableErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 
     doc = getStateDoc(instance.get());
     ASSERT_EQ(doc.getNumRestartsDueToDonorConnectionFailure(), 0);
@@ -3710,7 +3714,7 @@ TEST_F(TenantMigrationRecipientServiceTest, IncrementNumRestartsDueToRecipientFa
     ASSERT(instance.get());
 
     ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
 
     const auto stateDoc = getStateDoc(instance.get());
     ASSERT_EQ(stateDoc.getNumRestartsDueToDonorConnectionFailure(), 0);

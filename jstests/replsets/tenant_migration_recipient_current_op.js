@@ -11,6 +11,8 @@
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,
+ *   # The currentOp output field 'migrationCompleted' was renamed to 'garbageCollectable'.
+ *   requires_fcv_61,
  *   serverless,
  * ]
  */
@@ -145,7 +147,7 @@ assert.commandWorked(
     checkStandardFieldsOK(res);
     let currOp = res.inprog[0];
     assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kStarted, res);
-    assert.eq(currOp.migrationCompleted, false, res);
+    assert.eq(currOp.garbageCollectable, false, res);
     assert.eq(currOp.dataSyncCompleted, false, res);
     assert(!currOp.hasOwnProperty("startFetchingDonorOpTime"), res);
     assert(!currOp.hasOwnProperty("startApplyingDonorOpTime"), res);
@@ -171,7 +173,7 @@ assert.commandWorked(
     let currOp = res.inprog[0];
     assert.gt(new Date(), currOp.receiveStart, tojson(res));
     assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kStarted, res);
-    assert.eq(currOp.migrationCompleted, false, res);
+    assert.eq(currOp.garbageCollectable, false, res);
     assert.eq(currOp.dataSyncCompleted, false, res);
     assert(!currOp.hasOwnProperty("expireAt"), res);
     assert(!currOp.hasOwnProperty("cloneFinishedRecipientOpTime"), res);
@@ -201,7 +203,7 @@ assert.commandWorked(
 
     assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kStarted, res);
 
-    assert.eq(currOp.migrationCompleted, false, res);
+    assert.eq(currOp.garbageCollectable, false, res);
     assert.eq(currOp.dataSyncCompleted, false, res);
     assert(!currOp.hasOwnProperty("expireAt"), res);
     // Must exist now.
@@ -247,7 +249,7 @@ assert.commandWorked(
     let currOp = res.inprog[0];
     // State should have changed.
     assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kConsistent, res);
-    assert.eq(currOp.migrationCompleted, false, res);
+    assert.eq(currOp.garbageCollectable, false, res);
     assert.eq(currOp.dataSyncCompleted, false, res);
     assert(!currOp.hasOwnProperty("expireAt"), res);
 
@@ -261,7 +263,7 @@ assert.commandWorked(
     currOp = res.inprog[0];
     // State should have changed.
     assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kConsistent, res);
-    assert.eq(currOp.migrationCompleted, false, res);
+    assert.eq(currOp.garbageCollectable, false, res);
     assert.eq(currOp.dataSyncCompleted, false, res);
     assert(!currOp.hasOwnProperty("expireAt"), res);
     // The oplog applier should have applied at least the noop resume token.
@@ -290,7 +292,7 @@ forgetMigrationThread.start();
     checkPostConsistentFieldsOK(res);
     let currOp = res.inprog[0];
     assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kConsistent, res);
-    assert.eq(currOp.migrationCompleted, false, res);
+    assert.eq(currOp.garbageCollectable, false, res);
     // dataSyncCompleted should have changed.
     assert.eq(currOp.dataSyncCompleted, true, res);
     assert(!currOp.hasOwnProperty("expireAt"), res);
@@ -306,7 +308,7 @@ forgetMigrationThread.start();
     assert.eq(currOp.dataSyncCompleted, true, res);
     // State, completion status and expireAt should have changed.
     assert.eq(currOp.state, TenantMigrationTest.RecipientStateEnum.kDone, res);
-    assert.eq(currOp.migrationCompleted, true, res);
+    assert.eq(currOp.garbageCollectable, true, res);
     assert(currOp.hasOwnProperty("expireAt") && currOp.expireAt instanceof Date, res);
 
     assert(currOp.hasOwnProperty("databases"));

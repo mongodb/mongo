@@ -420,7 +420,7 @@ boost::optional<BSONObj> TenantMigrationRecipientService::Instance::reportForCur
     bob.append("readPreference", _stateDoc.getReadPreference().toInnerBSON());
     bob.append("state", _stateDoc.getState());
     bob.append("dataSyncCompleted", _dataSyncCompletionPromise.getFuture().isReady());
-    bob.append("migrationCompleted", _taskCompletionPromise.getFuture().isReady());
+    bob.append("garbageCollectable", _forgetMigrationDurablePromise.getFuture().isReady());
     bob.append("numRestartsDueToDonorConnectionFailure",
                _stateDoc.getNumRestartsDueToDonorConnectionFailure());
     bob.append("numRestartsDueToRecipientFailure", _stateDoc.getNumRestartsDueToRecipientFailure());
@@ -2282,11 +2282,12 @@ void TenantMigrationRecipientService::Instance::_interrupt(Status status,
         _dataSyncCompletionPromise.setError(status);
 
         // The interrupt() is called before the instance is scheduled to run. If the state doc has
-        // already been marked garbage collectable, resolve the completion promise with OK.
+        // already been marked garbage collectable, resolve the forget migration durable promise
+        // with OK.
         if (_stateDoc.getExpireAt()) {
-            _taskCompletionPromise.emplaceValue();
+            _forgetMigrationDurablePromise.emplaceValue();
         } else {
-            _taskCompletionPromise.setError(status);
+            _forgetMigrationDurablePromise.setError(status);
         }
     }
 
@@ -2999,7 +3000,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                       "migrationId"_attr = getMigrationUUID(),
                       "tenantId"_attr = getTenantId(),
                       "expireAt"_attr = *_stateDoc.getExpireAt());
-                setPromiseOkifNotReady(lk, _taskCompletionPromise);
+                setPromiseOkifNotReady(lk, _forgetMigrationDurablePromise);
             } else {
                 // We should only hit here on a stepDown/shutDown, or a 'conflicting migration'
                 // error.
@@ -3008,7 +3009,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                       "migrationId"_attr = getMigrationUUID(),
                       "tenantId"_attr = getTenantId(),
                       "status"_attr = status);
-                setPromiseErrorifNotReady(lk, _taskCompletionPromise, status);
+                setPromiseErrorifNotReady(lk, _forgetMigrationDurablePromise, status);
             }
             _taskState.setState(TaskState::kDone);
         })
