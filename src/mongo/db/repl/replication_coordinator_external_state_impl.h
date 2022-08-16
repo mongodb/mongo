@@ -85,6 +85,10 @@ public:
     OpTime onTransitionToPrimary(OperationContext* opCtx) override;
     virtual void forwardSlaveProgress();
     virtual bool isSelf(const HostAndPort& host, ServiceContext* service);
+    bool isSelfFastPath(const HostAndPort& host) final;
+    bool isSelfSlowPath(const HostAndPort& host,
+                        ServiceContext* service,
+                        Milliseconds timeout) final;
     Status createLocalLastVoteCollection(OperationContext* opCtx) final;
     virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* opCtx);
     virtual Status storeLocalConfigDocument(OperationContext* opCtx,

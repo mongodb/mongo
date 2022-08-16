@@ -164,10 +164,17 @@ std::vector<std::string> getAddrsForHost(const std::string& iporhost,
 
 }  // namespace
 
-bool isSelf(const HostAndPort& hostAndPort, ServiceContext* const ctx) {
+bool isSelf(const HostAndPort& hostAndPort, ServiceContext* const ctx, Milliseconds timeout) {
+    if (isSelfFastPath(hostAndPort)) {
+        return true;
+    }
+    return isSelfSlowPath(hostAndPort, ctx, timeout);
+}
+
+bool isSelfFastPath(const HostAndPort& hostAndPort) {
     if (MONGO_unlikely(failIsSelfCheck.shouldFail())) {
         LOGV2(356490,
-              "failIsSelfCheck failpoint activated, returning false from isSelf",
+              "failIsSelfCheck failpoint activated, returning false from isSelfFastPath",
               "hostAndPort"_attr = hostAndPort);
         return false;
     }
@@ -223,12 +230,24 @@ bool isSelf(const HostAndPort& hostAndPort, ServiceContext* const ctx) {
             }
         }
     }
+    return false;
+}
 
+bool isSelfSlowPath(const HostAndPort& hostAndPort,
+                    ServiceContext* const ctx,
+                    Milliseconds timeout) {
     ctx->waitForStartupComplete();
+    if (MONGO_unlikely(failIsSelfCheck.shouldFail())) {
+        LOGV2(6605000,
+              "failIsSelfCheck failpoint activated, returning false from isSelfSlowPath",
+              "hostAndPort"_attr = hostAndPort);
+        return false;
+    }
 
     try {
         DBClientConnection conn;
-        conn.setSoTimeout(30);  // 30 second timeout
+        double timeoutSeconds = static_cast<double>(durationCount<Milliseconds>(timeout)) / 1000.0;
+        conn.setSoTimeout(timeoutSeconds);
 
         // We need to avoid the isMaster call triggered by a normal connect, which would
         // cause a deadlock. 'isSelf' is called by the Replication Coordinator when validating

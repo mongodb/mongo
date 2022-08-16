@@ -75,6 +75,10 @@ public:
     OpTime onTransitionToPrimary(OperationContext* opCtx) override;
     virtual void forwardSlaveProgress();
     virtual bool isSelf(const HostAndPort& host, ServiceContext* service);
+    bool isSelfFastPath(const HostAndPort& host) final;
+    bool isSelfSlowPath(const HostAndPort& host,
+                        ServiceContext* service,
+                        Milliseconds timeout) final;
     virtual HostAndPort getClientHostAndPort(const OperationContext* opCtx);
     virtual StatusWith<BSONObj> loadLocalConfigDocument(OperationContext* opCtx);
     virtual Status storeLocalConfigDocument(OperationContext* opCtx,
@@ -107,13 +111,20 @@ public:
 
     /**
      * Adds "host" to the list of hosts that this mock will match when responding to "isSelf"
-     * messages.
+     * messages, including "isSelfFastPath" and "isSelfSlowPath".
      */
     void addSelf(const HostAndPort& host);
 
     /**
+     * Adds "host" to the list of hosts that this mock will match when responding to
+     * "isSelfSlowPath" messages with a timeout less than or equal to that given,
+     * but not "isSelfFastPath" messages.
+     */
+    void addSelfSlow(const HostAndPort& host, Milliseconds timeout);
+
+    /**
      * Remove all hosts from the list of hosts that this mock will match when responding to "isSelf"
-     * messages.
+     * messages.  Clears both regular and slow hosts.
      */
     void clearSelfHosts();
 
@@ -204,6 +215,7 @@ private:
     StatusWith<OpTime> _lastOpTime;
     StatusWith<Date_t> _lastWallTime;
     std::vector<HostAndPort> _selfHosts;
+    stdx::unordered_map<HostAndPort, Milliseconds> _selfHostsSlow;
     bool _canAcquireGlobalSharedLock;
     Status _storeLocalConfigDocumentStatus;
     Status _storeLocalLastVoteDocumentStatus;
