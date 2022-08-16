@@ -151,13 +151,15 @@ void ReplClientInfo::setLastOpToSystemLastOpTime(OperationContext* opCtx) {
     }
 }
 
-void ReplClientInfo::setLastOpToSystemLastOpTimeIgnoringCtxCancelled(OperationContext* opCtx) {
+void ReplClientInfo::setLastOpToSystemLastOpTimeIgnoringShutdownCtxCancelled(
+    OperationContext* opCtx) {
     try {
         repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
     } catch (DBException& e) {
-        if (opCtx && opCtx->getKillStatus() != ErrorCodes::OK) {
-            // In most cases, it is safe to ignore context cancellation errors because we cannot use
-            // the same OperationContext to wait for writeConcern anyways.
+        if (e.isA<ErrorCategory::ShutdownError>() ||
+            (opCtx && opCtx->getKillStatus() != ErrorCodes::OK)) {
+            // In most cases, it is safe to ignore shutdown and context cancellation errors because
+            // we cannot use the same OperationContext to wait for writeConcern anyways.
             LOGV2_DEBUG(21281,
                         2,
                         "Ignoring set last op error: {error}",
@@ -165,7 +167,7 @@ void ReplClientInfo::setLastOpToSystemLastOpTimeIgnoringCtxCancelled(OperationCo
                         "error"_attr = e.toStatus());
             return;
         }
-        // Context was not cancelled, throw error up to caller.
+        // Context was not cancelled and is not of type ShutdownError, throw error up to caller.
         throw;
     }
 }
