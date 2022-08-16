@@ -230,7 +230,9 @@ BSONObj _generateTimeseriesValidator(StringData timeField) {
     //                     properties: {'%s': {bsonType: 'date'}}
     //                 },
     //                 closed: {bsonType: 'bool'},
+    //                 count: {bsonType: 'number', minimum: 1},
     //             },
+    //             additionalProperties: false,
     //         },
     //         data: {bsonType: 'object'},
     //         meta: {}
@@ -293,8 +295,15 @@ BSONObj _generateTimeseriesValidator(StringData timeField) {
                     closed.append("bsonType", "bool");
                     closed.done();
                 }
+                {
+                    BSONObjBuilder count(innerProperties.subobjStart("count"));
+                    count.append("bsonType", "number");
+                    count.append("minimum", 1);
+                    count.done();
+                }
                 innerProperties.done();
             }
+            control.append("additionalProperties", false);
             control.done();
         }
         {

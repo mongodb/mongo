@@ -40,8 +40,10 @@ const expectedValidator = {
                         {"bsonType": "object", "required": [timeField], "properties": properties},
                     "max":
                         {"bsonType": "object", "required": [timeField], "properties": properties},
-                    "closed": {"bsonType": "bool"}
-                }
+                    "closed": {"bsonType": "bool"},
+                    "count": {"bsonType": "number", "minimum": 1}
+                },
+                "additionalProperties": false
             },
             "data": {"bsonType": "object"},
             "meta": {}

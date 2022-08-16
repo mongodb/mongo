@@ -82,8 +82,10 @@ let expectedChanges = [
                                     "required": ["ts"],
                                     "properties": {"ts": {"bsonType": "date"}}
                                 },
-                                "closed": {"bsonType": "bool"}
-                            }
+                                "closed": {"bsonType": "bool"},
+                                "count": {"bsonType": "number", "minimum": 1}
+                            },
+                            "additionalProperties": false
                         },
                         "data": {"bsonType": "object"},
                         "meta": {
@@ -185,8 +187,10 @@ let expectedChanges = [
                                         "required": ["ts"],
                                         "properties": {"ts": {"bsonType": "date"}}
                                     },
-                                    "closed": {"bsonType": "bool"}
-                                }
+                                    "closed": {"bsonType": "bool"},
+                                    "count": {"bsonType": "number", "minimum": 1}
+                                },
+                                "additionalProperties": false
                             },
                             "data": {"bsonType": "object"},
                             "meta": {
@@ -233,8 +237,10 @@ let expectedChanges = [
                                         "required": ["ts"],
                                         "properties": {"ts": {"bsonType": "date"}}
                                     },
-                                    "closed": {"bsonType": "bool"}
-                                }
+                                    "closed": {"bsonType": "bool"},
+                                    "count": {"bsonType": "number", "minimum": 1}
+                                },
+                                "additionalProperties": false
                             },
                             "data": {"bsonType": "object"},
                             "meta": {
