@@ -50,36 +50,36 @@ assert.throws(() => numberDecimalsEqual(NumberDecimal('10.20'), "Wrong parameter
 
 // Verify the behavior of 'numberDecimalsAlmostEqual' helper.
 assert(numberDecimalsAlmostEqual(NumberDecimal("10001"), NumberDecimal("10002"), 3));
-assert.neq(numberDecimalsAlmostEqual(NumberDecimal("10001"), NumberDecimal("10002"), 5));
+assert(!numberDecimalsAlmostEqual(NumberDecimal("10001"), NumberDecimal("10002"), 5));
 
 // Regression tests for BF-24149.
 assert(numberDecimalsAlmostEqual(NumberDecimal("905721242210.0455427920454969568"),
                                  NumberDecimal("905721242210.0453137831269007622941"),
                                  15));
 
-assert.neq(numberDecimalsAlmostEqual(NumberDecimal("905721242210.0455427920454969568"),
-                                     NumberDecimal("905721242210.0453137831269007622941"),
-                                     16));
+assert(!numberDecimalsAlmostEqual(NumberDecimal("905721242210.0455427920454969568"),
+                                  NumberDecimal("905721242210.0453137831269007622941"),
+                                  16));
 
 // Verify helper works the same with negative numers.
 assert(numberDecimalsAlmostEqual(NumberDecimal("-10001"), NumberDecimal("-10002"), 3));
-assert.neq(numberDecimalsAlmostEqual(NumberDecimal("-10001"), NumberDecimal("-10002"), 5));
+assert(!numberDecimalsAlmostEqual(NumberDecimal("-10001"), NumberDecimal("-10002"), 5));
 assert(numberDecimalsAlmostEqual(NumberDecimal("-905721242210.0455427920454969568"),
                                  NumberDecimal("-905721242210.0453137831269007622941"),
                                  15));
-assert.neq(numberDecimalsAlmostEqual(NumberDecimal("-905721242210.0455427920454969568"),
-                                     NumberDecimal("-905721242210.0453137831269007622941"),
-                                     16));
+assert(!numberDecimalsAlmostEqual(NumberDecimal("-905721242210.0455427920454969568"),
+                                  NumberDecimal("-905721242210.0453137831269007622941"),
+                                  16));
 
 // Verify mixed-sign arguments aren't equal.
-assert.neq(numberDecimalsAlmostEqual(NumberDecimal("10001"), NumberDecimal("-10002"), 3));
-assert.neq(numberDecimalsAlmostEqual(NumberDecimal("-10001"), NumberDecimal("10002"), 3));
-assert.neq(numberDecimalsAlmostEqual(NumberDecimal("-905721242210.0455427920454969568"),
-                                     NumberDecimal("905721242210.0453137831269007622941"),
-                                     10));
-assert.neq(numberDecimalsAlmostEqual(NumberDecimal("905721242210.0455427920454969568"),
-                                     NumberDecimal("-905721242210.0453137831269007622941"),
-                                     10));
+assert(!numberDecimalsAlmostEqual(NumberDecimal("10001"), NumberDecimal("-10002"), 3));
+assert(!numberDecimalsAlmostEqual(NumberDecimal("-10001"), NumberDecimal("10002"), 3));
+assert(!numberDecimalsAlmostEqual(NumberDecimal("-905721242210.0455427920454969568"),
+                                  NumberDecimal("905721242210.0453137831269007622941"),
+                                  10));
+assert(!numberDecimalsAlmostEqual(NumberDecimal("905721242210.0455427920454969568"),
+                                  NumberDecimal("-905721242210.0453137831269007622941"),
+                                  10));
 
 // Regression test for BF-25335
 assert(numberDecimalsAlmostEqual(NumberDecimal("-104735446372966662851.0135276410897"),
@@ -87,4 +87,17 @@ assert(numberDecimalsAlmostEqual(NumberDecimal("-104735446372966662851.013527641
                                  10));
 // Regression test for BF-25390
 assert(numberDecimalsAlmostEqual(NumberDecimal("-331.0000000000"), NumberDecimal("-331"), 10));
+
+// Verify numberDecimalsAlmostEqual() works with 0.
+assert(numberDecimalsAlmostEqual(NumberDecimal("0"), NumberDecimal("0"), 10));
+assert(numberDecimalsAlmostEqual(NumberDecimal("0"), NumberDecimal("0.0000000000000001"), 10));
+assert(numberDecimalsAlmostEqual(NumberDecimal("0.0000000000000001"), NumberDecimal("0"), 10));
+assert(!numberDecimalsAlmostEqual(NumberDecimal("1.00000000000000"), NumberDecimal("1.1"), 10));
+assert(numberDecimalsAlmostEqual(
+    NumberDecimal("1.00000000000000"), NumberDecimal("1.00000000000001"), 10));
+assert(numberDecimalsAlmostEqual(NumberDecimal("Infinity"), NumberDecimal("Infinity"), 10));
+assert(!numberDecimalsAlmostEqual(NumberDecimal("Infinity"), NumberDecimal("-Infinity"), 10));
+assert(!numberDecimalsAlmostEqual(NumberDecimal("Infinity"), NumberDecimal("NaN"), 10));
+assert(numberDecimalsAlmostEqual(NumberDecimal("NaN"), NumberDecimal("NaN"), 10));
+assert(!numberDecimalsAlmostEqual(NumberDecimal("0"), NumberDecimal("0.000001"), 10));
 }());
