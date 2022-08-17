@@ -312,12 +312,6 @@ namespace {
  * value is seen or when long arithmetic would overflow.
  */
 class AddState {
-    long long longTotal = 0;
-    double doubleTotal = 0;
-    Decimal128 decimalTotal;
-    BSONType widestType = NumberInt;
-    bool isDate = false;
-
 public:
     /**
      * Update the internal state with another operand. It is up to the caller to validate that the
@@ -331,11 +325,19 @@ public:
         Value valToAdd;
         if (operand.getType() == Date) {
             uassert(16612, "only one date allowed in an $add expression", !isDate);
+            Value oldValue = getValue();
+            longTotal = 0;
+            addToDateValue(oldValue);
             isDate = true;
             valToAdd = Value(operand.getDate().toMillisSinceEpoch());
         } else {
             widestType = Value::getWidestNumeric(widestType, operand.getType());
             valToAdd = operand;
+        }
+
+        if (isDate) {
+            addToDateValue(valToAdd);
+            return;
         }
 
         // If this operation widens the return type, perform any necessary type conversions.
@@ -395,27 +397,9 @@ public:
     }
 
     Value getValue() const {
-        // If one of the operands was a date, then convert the result to a date.
+        // If one of the operands was a date, then return long value as Date.
         if (isDate) {
-            switch (widestType) {
-                case NumberInt:
-                case NumberLong:
-                    return Value(Date_t::fromMillisSinceEpoch(longTotal));
-                case NumberDouble:
-                    using limits = std::numeric_limits<long long>;
-                    uassert(ErrorCodes::Overflow,
-                            "date overflow in $add",
-                            // The upper bound is exclusive because it rounds up when it is cast to
-                            // a double.
-                            doubleTotal >= limits::min() &&
-                                doubleTotal < static_cast<double>(limits::max()));
-                    return Value(Date_t::fromMillisSinceEpoch(llround(doubleTotal)));
-                case NumberDecimal:
-                    // Decimal dates are not checked for overflow.
-                    return Value(Date_t::fromMillisSinceEpoch(decimalTotal.toLong()));
-                default:
-                    MONGO_UNREACHABLE;
-            }
+            return Value(Date_t::fromMillisSinceEpoch(longTotal));
         } else {
             switch (widestType) {
                 case NumberInt:
@@ -431,6 +415,46 @@ public:
             }
         }
     }
+
+private:
+    // Convert current value into date.
+    void addToDateValue(Value valToAdd) {
+        switch (valToAdd.getType()) {
+            case NumberInt:
+            case NumberLong:
+                if (overflow::add(longTotal, valToAdd.coerceToLong(), &longTotal)) {
+                    uasserted(ErrorCodes::Overflow, "date overflow in $add");
+                }
+                break;
+            case NumberDouble: {
+                using limits = std::numeric_limits<long long>;
+                double doubleToAdd = valToAdd.coerceToDouble();
+                uassert(ErrorCodes::Overflow,
+                        "date overflow in $add",
+                        // The upper bound is exclusive because it rounds up when it is cast to
+                        // a double.
+                        doubleToAdd >= static_cast<double>(limits::min()) &&
+                            doubleToAdd < static_cast<double>(limits::max()));
+
+                if (overflow::add(longTotal, llround(doubleToAdd), &longTotal)) {
+                    uasserted(ErrorCodes::Overflow, "date overflow in $add");
+                }
+                break;
+            }
+            case NumberDecimal:
+                // Decimal dates are not checked for overflow.
+                longTotal += valToAdd.coerceToDecimal().toLong();
+                break;
+            default:
+                MONGO_UNREACHABLE;
+        }
+    }
+
+    long long longTotal = 0;
+    double doubleTotal = 0;
+    Decimal128 decimalTotal;
+    BSONType widestType = NumberInt;
+    bool isDate = false;
 };
 
 Status checkAddOperandType(Value val) {

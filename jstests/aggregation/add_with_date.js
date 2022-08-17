@@ -1,5 +1,5 @@
 // Test $add with date
-// TODO SERVER-68543,SERVER-67282: to remove this tag after fix.
+// TODO SERVER-68544: to remove this tag after fix.
 // @tags: [do_not_wrap_aggregations_in_facets]
 (function() {
 "use strict";
@@ -69,22 +69,10 @@ assert.eq(ISODate("2019-01-30T07:30:10.957Z"),
           getResultOfExpression({$add: ["$int32Val", "$dateVal"]}));
 
 // Addition with a date and multiple values of differing data types.
-// TODO SERVER-68543: classic and sbe returns different values now, should update after fix.
-if (isSBEEnabled) {
-    assert.eq(
-        ISODate("2019-01-30T07:30:12.597Z"),
-        getResultOfExpression({$add: ["$dateVal", "$decimalVal", "$doubleVal", "$int64Val"]}));
-    assert.eq(
-        ISODate("2019-01-30T07:30:12.597Z"),
-        getResultOfExpression({$add: ["$decimalVal", "$dateVal", "$doubleVal", "$int64Val"]}));
-} else {
-    assert.eq(
-        ISODate("2019-01-30T07:30:12.596Z"),
-        getResultOfExpression({$add: ["$dateVal", "$decimalVal", "$doubleVal", "$int64Val"]}));
-    assert.eq(
-        ISODate("2019-01-30T07:30:12.596Z"),
-        getResultOfExpression({$add: ["$decimalVal", "$dateVal", "$doubleVal", "$int64Val"]}));
-}
+assert.eq(ISODate("2019-01-30T07:30:12.597Z"),
+          getResultOfExpression({$add: ["$dateVal", "$decimalVal", "$doubleVal", "$int64Val"]}));
+assert.eq(ISODate("2019-01-30T07:30:12.597Z"),
+          getResultOfExpression({$add: ["$decimalVal", "$dateVal", "$doubleVal", "$int64Val"]}));
 assert.eq(ISODate("2019-01-30T07:30:12.596Z"),
           getResultOfExpression({$add: ["$decimalVal", "$doubleVal", "$int64Val", "$dateVal"]}));
 // The result of an addition must remain in the range of int64_t in order to convert back to a Date;
@@ -110,9 +98,6 @@ if (isSBEEnabled) {
     assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", "$overflowDecimal"]}),
                           ErrorCodes.Overflow);
     assert.throwsWithCode(
-        () => getResultOfExpression({$add: ["$dateVal", "$overflowDouble", "$overflowDecimal"]}),
-        ErrorCodes.Overflow);
-    assert.throwsWithCode(
         () => getResultOfExpression({$add: ["$int64Val", "$dateVal", "$overflowDecimal"]}),
         ErrorCodes.Overflow);
 } else {
@@ -121,10 +106,11 @@ if (isSBEEnabled) {
     const nanDate = new Date("");
     assert.eq(nanDate, getResultOfExpression({$add: ["$dateVal", "$overflowDecimal"]}));
     assert.eq(nanDate,
-              getResultOfExpression({$add: ["$dateVal", "$overflowDouble", "$overflowDecimal"]}));
-    assert.eq(nanDate,
               getResultOfExpression({$add: ["$int64Val", "$dateVal", "$overflowDecimal"]}));
 }
+assert.throwsWithCode(
+    () => getResultOfExpression({$add: ["$dateVal", "$overflowDouble", "$overflowDecimal"]}),
+    ErrorCodes.Overflow);
 
 // Adding a double-typed NaN to a date value.
 assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", "$nanDouble"]}),
@@ -152,16 +138,21 @@ assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", "$doubleVa
                       ErrorCodes.Overflow);
 
 // Addition with a date, and both types of NaN.
-// TODO SERVER-68544: classic and sbe have different behavior now, should update after fix.
-if (isSBEEnabled) {
-    assert.throwsWithCode(
-        () => getResultOfExpression({$add: ["$dateVal", "$nanDouble", "$nanDecimal"]}),
-        ErrorCodes.Overflow);
-} else {
-    const nanDate = new Date("");
-    assert.eq(nanDate, getResultOfExpression({$add: ["$dateVal", "$nanDouble", "$nanDecimal"]}));
-}
+assert.throwsWithCode(
+    () => getResultOfExpression({$add: ["$dateVal", "$nanDouble", "$nanDecimal"]}),
+    ErrorCodes.Overflow);
 
 // Throw error when there're two or more date in $add.
 assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", 1, "$dateVal"]}), 4974202);
+
+// Test very large long and verify that we're maintaining the precision of long arithmetic.
+// 2397083434877565865 and 239708343487756586 both cast to the same double value from longs
+assert.eq(ISODate("2019-01-30T07:30:10.958Z"), getResultOfExpression({
+              $add: [
+                  "$dateVal",
+                  NumberLong("2397083434877565865"),
+                  "$doubleVal",
+                  NumberLong("-2397083434877565864")
+              ]
+          }));
 }());
