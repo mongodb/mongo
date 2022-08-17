@@ -4,6 +4,7 @@
  * @tags: [
  *     change_stream_does_not_expect_txns,
  *     assumes_unsharded_collection,
+ *     requires_fcv_61,
  * ]
  */
 (function() {
