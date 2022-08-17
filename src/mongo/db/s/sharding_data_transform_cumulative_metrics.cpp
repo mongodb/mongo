@@ -28,29 +28,24 @@
  */
 
 #include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
+#include "mongo/db/s/global_index_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 
 #include <cstdint>
 
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
-
 namespace mongo {
 
 namespace {
-constexpr auto kGlobalIndex = "globalIndex";
 constexpr auto kActive = "active";
 constexpr auto kOldestActive = "oldestActive";
 constexpr auto kLatencies = "latencies";
 constexpr auto kCurrentInSteps = "currentInSteps";
 
 struct Metrics {
-    Metrics()
-        : _globalIndexes(
-              kGlobalIndex,
-              std::make_unique<ShardingDataTransformCumulativeMetricsFieldNamePlaceholder>()) {}
     ReshardingCumulativeMetrics _resharding;
-    ShardingDataTransformCumulativeMetrics _globalIndexes;
+    GlobalIndexCumulativeMetrics _globalIndexes;
 };
 using MetricsPtr = std::unique_ptr<Metrics>;
 const auto getMetrics = ServiceContext::declareDecoration<MetricsPtr>();

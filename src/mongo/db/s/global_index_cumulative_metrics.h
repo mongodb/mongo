@@ -30,13 +30,14 @@
 #pragma once
 
 #include "mongo/db/s/cumulative_metrics_state_holder.h"
-#include "mongo/db/s/resharding/resharding_cumulative_metrics_field_name_provider.h"
+#include "mongo/db/s/global_index_cumulative_metrics_field_name_provider.h"
 #include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
 
 namespace mongo {
 
-class ReshardingCumulativeMetrics : public ShardingDataTransformCumulativeMetrics {
+class GlobalIndexCumulativeMetrics : public ShardingDataTransformCumulativeMetrics {
 public:
+    // TODO: Replace with actual Global Index Cumulative Metrics state enums by role
     enum class CoordinatorStateEnum : int32_t {
         kUnused = -1,
         kInitializing,
@@ -74,48 +75,21 @@ public:
         kNumStates
     };
 
-    ReshardingCumulativeMetrics();
+    GlobalIndexCumulativeMetrics();
 
-    static StringData fieldNameFor(CoordinatorStateEnum state,
-                                   const ReshardingCumulativeMetricsFieldNameProvider* provider);
-    static StringData fieldNameFor(DonorStateEnum state,
-                                   const ReshardingCumulativeMetricsFieldNameProvider* provider);
-    static StringData fieldNameFor(RecipientStateEnum state,
-                                   const ReshardingCumulativeMetricsFieldNameProvider* provider);
     template <typename T>
     void onStateTransition(boost::optional<T> before, boost::optional<T> after);
-    void onInsertApplied();
-    void onUpdateApplied();
-    void onDeleteApplied();
-    void onOplogEntriesFetched(int64_t numEntries, Milliseconds elapsed);
-    void onOplogEntriesApplied(int64_t numEntries);
-    void onLocalInsertDuringOplogFetching(const Milliseconds& elapsedTime);
-    void onBatchRetrievedDuringOplogApplying(const Milliseconds& elapsedTime);
-    void onOplogLocalBatchApplied(Milliseconds elapsed);
+    static StringData fieldNameFor(CoordinatorStateEnum state,
+                                   const GlobalIndexCumulativeMetricsFieldNameProvider* provider);
+    static StringData fieldNameFor(DonorStateEnum state,
+                                   const GlobalIndexCumulativeMetricsFieldNameProvider* provider);
+    static StringData fieldNameFor(RecipientStateEnum state,
+                                   const GlobalIndexCumulativeMetricsFieldNameProvider* provider);
 
 private:
     template <typename T>
     const AtomicWord<int64_t>* getStateCounter(T state) const;
-    virtual void reportActive(BSONObjBuilder* bob) const;
-    virtual void reportLatencies(BSONObjBuilder* bob) const;
-    virtual void reportCurrentInSteps(BSONObjBuilder* bob) const;
-
-    const ReshardingCumulativeMetricsFieldNameProvider* _fieldNames;
-
-    AtomicWord<int64_t> _insertsApplied{0};
-    AtomicWord<int64_t> _updatesApplied{0};
-    AtomicWord<int64_t> _deletesApplied{0};
-    AtomicWord<int64_t> _oplogEntriesApplied{0};
-    AtomicWord<int64_t> _oplogEntriesFetched{0};
-
-    AtomicWord<int64_t> _oplogFetchingTotalRemoteBatchesRetrieved{0};
-    AtomicWord<int64_t> _oplogFetchingTotalRemoteBatchesRetrievalTimeMillis{0};
-    AtomicWord<int64_t> _oplogFetchingTotalLocalInserts{0};
-    AtomicWord<int64_t> _oplogFetchingTotalLocalInsertTimeMillis{0};
-    AtomicWord<int64_t> _oplogApplyingTotalBatchesRetrieved{0};
-    AtomicWord<int64_t> _oplogApplyingTotalBatchesRetrievalTimeMillis{0};
-    AtomicWord<int64_t> _oplogBatchApplied{0};
-    AtomicWord<int64_t> _oplogBatchAppliedMillis{0};
+    const GlobalIndexCumulativeMetricsFieldNameProvider* _fieldNames;
 
     CumulativeMetricsStateHolder<CoordinatorStateEnum,
                                  static_cast<size_t>(CoordinatorStateEnum::kNumStates)>
@@ -154,14 +128,13 @@ private:
 };
 
 template <typename T>
-void ReshardingCumulativeMetrics::onStateTransition(boost::optional<T> before,
-                                                    boost::optional<T> after) {
+void GlobalIndexCumulativeMetrics::onStateTransition(boost::optional<T> before,
+                                                     boost::optional<T> after) {
     getMutableStateListForRole<T>()->onStateTransition(before, after);
 }
 
-
 template <typename T>
-const AtomicWord<int64_t>* ReshardingCumulativeMetrics::getStateCounter(T state) const {
+const AtomicWord<int64_t>* GlobalIndexCumulativeMetrics::getStateCounter(T state) const {
     return getStateListForRole<T>()->getStateCounter(state);
 }
 }  // namespace mongo

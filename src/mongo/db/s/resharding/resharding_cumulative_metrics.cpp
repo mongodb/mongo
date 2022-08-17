@@ -39,29 +39,7 @@ ReshardingCumulativeMetrics::ReshardingCumulativeMetrics()
     : ShardingDataTransformCumulativeMetrics(
           kResharding, std::make_unique<ReshardingCumulativeMetricsFieldNameProvider>()),
       _fieldNames(
-          static_cast<const ReshardingCumulativeMetricsFieldNameProvider*>(getFieldNames())),
-      _coordinatorStateList{AtomicWord<int64_t>{0},
-                            AtomicWord<int64_t>{0},
-                            AtomicWord<int64_t>{0},
-                            AtomicWord<int64_t>{0},
-                            AtomicWord<int64_t>{0},
-                            AtomicWord<int64_t>{0},
-                            AtomicWord<int64_t>{0},
-                            AtomicWord<int64_t>{0}},
-      _donorStateList{AtomicWord<int64_t>{0},
-                      AtomicWord<int64_t>{0},
-                      AtomicWord<int64_t>{0},
-                      AtomicWord<int64_t>{0},
-                      AtomicWord<int64_t>{0},
-                      AtomicWord<int64_t>{0},
-                      AtomicWord<int64_t>{0}},
-      _recipientStateList{AtomicWord<int64_t>{0},
-                          AtomicWord<int64_t>{0},
-                          AtomicWord<int64_t>{0},
-                          AtomicWord<int64_t>{0},
-                          AtomicWord<int64_t>{0},
-                          AtomicWord<int64_t>{0},
-                          AtomicWord<int64_t>{0}} {}
+          static_cast<const ReshardingCumulativeMetricsFieldNameProvider*>(getFieldNames())) {}
 
 StringData ReshardingCumulativeMetrics::fieldNameFor(
     CoordinatorStateEnum state, const ReshardingCumulativeMetricsFieldNameProvider* provider) {
@@ -163,37 +141,6 @@ StringData ReshardingCumulativeMetrics::fieldNameFor(
     }
 
     MONGO_UNREACHABLE;
-}
-
-
-ReshardingCumulativeMetrics::CoordinatorStateArray* ReshardingCumulativeMetrics::getStateArrayFor(
-    CoordinatorStateEnum state) {
-    return &_coordinatorStateList;
-}
-
-const ReshardingCumulativeMetrics::CoordinatorStateArray*
-ReshardingCumulativeMetrics::getStateArrayFor(CoordinatorStateEnum state) const {
-    return &_coordinatorStateList;
-}
-
-ReshardingCumulativeMetrics::DonorStateArray* ReshardingCumulativeMetrics::getStateArrayFor(
-    DonorStateEnum state) {
-    return &_donorStateList;
-}
-
-const ReshardingCumulativeMetrics::DonorStateArray* ReshardingCumulativeMetrics::getStateArrayFor(
-    DonorStateEnum state) const {
-    return &_donorStateList;
-}
-
-ReshardingCumulativeMetrics::RecipientStateArray* ReshardingCumulativeMetrics::getStateArrayFor(
-    RecipientStateEnum state) {
-    return &_recipientStateList;
-}
-
-const ReshardingCumulativeMetrics::RecipientStateArray*
-ReshardingCumulativeMetrics::getStateArrayFor(RecipientStateEnum state) const {
-    return &_recipientStateList;
 }
 
 void ReshardingCumulativeMetrics::reportActive(BSONObjBuilder* bob) const {
@@ -299,6 +246,5 @@ void ReshardingCumulativeMetrics::onBatchRetrievedDuringOplogApplying(
     _oplogApplyingTotalBatchesRetrievalTimeMillis.fetchAndAdd(
         durationCount<Milliseconds>(elapsedTime));
 }
-
 
 }  // namespace mongo

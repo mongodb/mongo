@@ -19,7 +19,6 @@ function getCurrentOpSection(mongo, role) {
         jsTest.log(tojson(report));
         return false;
     }, `: was unable to find resharding ${role} service in currentOp output from ${mongo.host}`);
-
     return curOpSection;
 }
 
@@ -112,7 +111,6 @@ allNodes.forEach((hostName) => {
     let debugStr = () => {
         return 'server: ' + tojson(hostName) + ', serverStatusSection: ' + tojson(serverStatus);
     };
-
     assert(serverStatus.hasOwnProperty('countSucceeded'), debugStr());
     assert(serverStatus.hasOwnProperty('countFailed'), debugStr());
 
