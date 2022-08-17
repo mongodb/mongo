@@ -64,6 +64,17 @@ public:
     }
 
 protected:
+    static CollectionGeneration IGNORED() {
+        CollectionGeneration gen{OID(), Timestamp()};
+        gen._epoch.init(Date_t(), true);    // ignored OID is zero time, max machineId/inc
+        gen._timestamp = Timestamp::max();  // ignored Timestamp is the largest timestamp
+        return gen;
+    }
+
+    static CollectionGeneration UNSHARDED() {
+        return CollectionGeneration{OID(), Timestamp()};
+    }
+
     OID _epoch;
     Timestamp _timestamp;
 };
@@ -111,7 +122,7 @@ protected:
  * 3. (n, 0), n > 0 - invalid configuration.
  * 4. (n, m), n > 0, m > 0 - normal sharded collection version.
  */
-class ChunkVersion : public CollectionGeneration, public CollectionPlacement {
+class ChunkVersion : public virtual CollectionGeneration, public CollectionPlacement {
 public:
     /**
      * The name for the chunk version information field, which ddl operations use to send only
@@ -128,17 +139,14 @@ public:
      * Indicates that the collection is not sharded.
      */
     static ChunkVersion UNSHARDED() {
-        return ChunkVersion();
+        return ChunkVersion(CollectionGeneration::UNSHARDED(), {0, 0});
     }
 
     /**
      * Indicates that the shard version checking must be skipped.
      */
     static ChunkVersion IGNORED() {
-        ChunkVersion version;
-        version._epoch.init(Date_t(), true);    // ignored OID is zero time, max machineId/inc
-        version._timestamp = Timestamp::max();  // ignored Timestamp is the largest timestamp
-        return version;
+        return ChunkVersion(CollectionGeneration::IGNORED(), {0, 0});
     }
 
     static bool isIgnoredVersion(const ChunkVersion& version) {

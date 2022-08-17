@@ -357,7 +357,7 @@ SemiFuture<DataSizeResponse> BalancerCommandsSchedulerImpl::requestDataSize(
     const NamespaceString& nss,
     const ShardId& shardId,
     const ChunkRange& chunkRange,
-    const ChunkVersion& version,
+    const ShardVersion& version,
     const KeyPattern& keyPattern,
     bool estimatedValue) {
     auto commandInfo = std::make_shared<DataSizeCommandInfo>(nss,

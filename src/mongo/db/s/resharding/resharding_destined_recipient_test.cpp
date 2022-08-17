@@ -176,7 +176,7 @@ protected:
         NamespaceString tempNss;
         UUID sourceUuid;
         ShardId destShard;
-        ChunkVersion version;
+        ShardVersion version;
         DatabaseVersion dbVersion{UUID::gen(), Timestamp(1, 1)};
     };
 
@@ -196,7 +196,7 @@ protected:
 
         ReshardingEnv env(CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, kNss).value());
         env.destShard = kShardList[1].getName();
-        env.version = ChunkVersion({OID::gen(), Timestamp(1, 1)}, {1, 0});
+        env.version = ShardVersion(ChunkVersion({OID::gen(), Timestamp(1, 1)}, {1, 0}));
         env.tempNss =
             NamespaceString(kNss.db(),
                             fmt::format("{}{}",
@@ -391,7 +391,7 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnMultiUpdates)
 
     auto env = setupReshardingEnv(opCtx, true);
 
-    OperationShardingState::setShardRole(opCtx, kNss, ChunkVersion::IGNORED(), env.dbVersion);
+    OperationShardingState::setShardRole(opCtx, kNss, ShardVersion::IGNORED(), env.dbVersion);
     client.update(kNss.ns(),
                   BSON("x" << 0),
                   BSON("$set" << BSON("z" << 5)),

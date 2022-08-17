@@ -62,7 +62,7 @@ void DBPrimaryRouter::appendCRUDUnshardedRoutingTokenToCommand(const ShardId& sh
         BSONObjBuilder dbvBuilder(builder->subobjStart(DatabaseVersion::kDatabaseVersionField));
         dbVersion.serialize(&dbvBuilder);
     }
-    ShardVersion(ChunkVersion::UNSHARDED()).serialize(ShardVersion::kShardVersionField, builder);
+    ShardVersion::UNSHARDED().serialize(ShardVersion::kShardVersionField, builder);
 }
 
 CachedDatabaseInfo DBPrimaryRouter::_getRoutingInfo(OperationContext* opCtx) const {

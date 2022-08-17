@@ -106,10 +106,11 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithoutIdInShardKey) {
     setCollectionFilteringMetadata(operationContext(), metadata);
 
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
-    ScopedSetShardRole scopedSetShardRole{operationContext(),
-                                          kTestNss,
-                                          metadata.getShardVersion() /* shardVersion */,
-                                          boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{
+        operationContext(),
+        kTestNss,
+        ShardVersion(metadata.getShardVersion()) /* shardVersion */,
+        boost::none /* databaseVersion */};
 
     // The order of fields in `doc` deliberately does not match the shard key
     auto doc = BSON("key3"
@@ -133,10 +134,11 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdInShardKey) {
     setCollectionFilteringMetadata(operationContext(), metadata);
 
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
-    ScopedSetShardRole scopedSetShardRole{operationContext(),
-                                          kTestNss,
-                                          metadata.getShardVersion() /* shardVersion */,
-                                          boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{
+        operationContext(),
+        kTestNss,
+        ShardVersion(metadata.getShardVersion()) /* shardVersion */,
+        boost::none /* databaseVersion */};
 
     // The order of fields in `doc` deliberately does not match the shard key
     auto doc = BSON("key2" << true << "key3"
@@ -160,10 +162,11 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdHashInShardKey) {
     setCollectionFilteringMetadata(operationContext(), metadata);
 
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
-    ScopedSetShardRole scopedSetShardRole{operationContext(),
-                                          kTestNss,
-                                          metadata.getShardVersion() /* shardVersion */,
-                                          boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{
+        operationContext(),
+        kTestNss,
+        ShardVersion(metadata.getShardVersion()) /* shardVersion */,
+        boost::none /* databaseVersion */};
 
     auto doc = BSON("key2" << true << "_id"
                            << "hello"

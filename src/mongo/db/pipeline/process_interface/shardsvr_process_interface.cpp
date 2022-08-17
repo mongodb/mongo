@@ -400,7 +400,7 @@ ShardServerProcessInterface::expectUnshardedCollectionInScope(
         ScopedExpectUnshardedCollectionImpl(OperationContext* opCtx,
                                             const NamespaceString& nss,
                                             const boost::optional<DatabaseVersion>& dbVersion)
-            : _expectUnsharded(opCtx, nss, ChunkVersion::UNSHARDED(), dbVersion) {}
+            : _expectUnsharded(opCtx, nss, ShardVersion::UNSHARDED(), dbVersion) {}
 
     private:
         ScopedSetShardRole _expectUnsharded;

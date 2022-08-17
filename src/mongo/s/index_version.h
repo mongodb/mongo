@@ -26,49 +26,39 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
 #pragma once
 
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/index_version.h"
 
 namespace mongo {
 
 /**
- * This class is used to represent the shard version of a collection.
- *
- * It contains the chunk placement information through the ChunkVersion. This class is used for
- * network requests and the shard versioning protocol.
- *
+ * Reflects the index information about a collection.
  */
-class ShardVersion : public ChunkVersion, public CollectionIndexes {
+class CollectionIndexes : public virtual CollectionGeneration {
 public:
-    /**
-     * The name for the shard version information field, which shard-aware commands should include
-     * if they want to convey shard version.
-     */
-    static constexpr StringData kShardVersionField = "shardVersion"_sd;
+    CollectionIndexes(CollectionGeneration generation, boost::optional<Timestamp> index)
+        : CollectionGeneration(generation), _indexVersion(index) {}
 
-    ShardVersion(ChunkVersion chunkVersion, CollectionIndexes indexVersion);
+    CollectionIndexes() : CollectionIndexes({OID(), Timestamp()}, {Timestamp()}) {}
 
-    ShardVersion(ChunkVersion chunkVersion)
-        : CollectionGeneration(chunkVersion.epoch(), chunkVersion.getTimestamp()),
-          ChunkVersion(chunkVersion),
-          CollectionIndexes() {}
-
-    ShardVersion() : ShardVersion(ChunkVersion(), CollectionIndexes()) {}
-
-    static ShardVersion IGNORED() {
-        return ShardVersion(ChunkVersion::IGNORED(), CollectionIndexes::IGNORED());
+    static CollectionIndexes IGNORED() {
+        return CollectionIndexes(CollectionGeneration::IGNORED(), {Timestamp()});
     }
 
-    static ShardVersion UNSHARDED() {
-        return ShardVersion(ChunkVersion::UNSHARDED(), CollectionIndexes::UNSHARDED());
+    static CollectionIndexes UNSHARDED() {
+        return CollectionIndexes(CollectionGeneration::UNSHARDED(), {Timestamp()});
     }
 
-    static ShardVersion parse(const BSONElement& element);
-    void serialize(StringData field, BSONObjBuilder* builder) const;
+    boost::optional<Timestamp> indexVersion() const {
+        return _indexVersion;
+    }
 
     std::string toString() const;
+
+protected:
+    boost::optional<Timestamp> _indexVersion;
 };
 
 }  // namespace mongo

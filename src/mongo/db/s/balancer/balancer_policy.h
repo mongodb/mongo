@@ -41,6 +41,7 @@
 #include "mongo/s/request_types/auto_split_vector_gen.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/s/shard_id.h"
+#include "mongo/s/shard_version.h"
 
 namespace mongo {
 
@@ -181,7 +182,7 @@ struct DataSizeInfo {
                  const NamespaceString& nss,
                  const UUID& uuid,
                  const ChunkRange& chunkRange,
-                 const ChunkVersion& version,
+                 const ShardVersion& version,
                  const KeyPattern& keyPattern,
                  bool estimatedValue);
 
@@ -189,7 +190,9 @@ struct DataSizeInfo {
     NamespaceString nss;
     UUID uuid;
     ChunkRange chunkRange;
-    ChunkVersion version;
+    // Use ShardVersion for CRUD targeting since datasize is considered a CRUD operation, not a DDL
+    // operation.
+    ShardVersion version;
     KeyPattern keyPattern;
     bool estimatedValue;
 };

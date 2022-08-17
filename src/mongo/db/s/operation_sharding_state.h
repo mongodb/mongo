@@ -49,7 +49,7 @@ class ScopedSetShardRole {
 public:
     ScopedSetShardRole(OperationContext* opCtx,
                        NamespaceString nss,
-                       boost::optional<ChunkVersion> shardVersion,
+                       boost::optional<ShardVersion> shardVersion,
                        boost::optional<DatabaseVersion> databaseVersion);
     ~ScopedSetShardRole();
 
@@ -58,7 +58,7 @@ private:
 
     NamespaceString _nss;
 
-    boost::optional<ChunkVersion> _shardVersion;
+    boost::optional<ShardVersion> _shardVersion;
     boost::optional<DatabaseVersion> _databaseVersion;
 };
 
@@ -113,7 +113,7 @@ public:
      */
     static void setShardRole(OperationContext* opCtx,
                              const NamespaceString& nss,
-                             const boost::optional<ChunkVersion>& shardVersion,
+                             const boost::optional<ShardVersion>& shardVersion,
                              const boost::optional<DatabaseVersion>& dbVersion);
 
     /**

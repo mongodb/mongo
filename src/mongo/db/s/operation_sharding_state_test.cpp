@@ -48,7 +48,8 @@ TEST_F(OperationShardingStateTest, ScopedSetShardRoleDbVersion) {
 
 TEST_F(OperationShardingStateTest, ScopedSetShardRoleShardVersion) {
     ChunkVersion shardVersion({OID::gen(), Timestamp(1, 0)}, {1, 0});
-    ScopedSetShardRole scopedSetShardRole(operationContext(), kNss, shardVersion, boost::none);
+    ScopedSetShardRole scopedSetShardRole(
+        operationContext(), kNss, ShardVersion(shardVersion), boost::none);
 
     auto& oss = OperationShardingState::get(operationContext());
     ASSERT_EQ(shardVersion, *oss.getShardVersion(kNss));
@@ -60,13 +61,13 @@ TEST_F(OperationShardingStateTest, ScopedSetShardRoleChangeShardVersionSameNames
     {
         ChunkVersion shardVersion1({OID::gen(), Timestamp(10, 0)}, {1, 0});
         ScopedSetShardRole scopedSetShardRole1(
-            operationContext(), kNss, shardVersion1, boost::none);
+            operationContext(), kNss, ShardVersion(shardVersion1), boost::none);
         ASSERT_EQ(shardVersion1, *oss.getShardVersion(kNss));
     }
     {
         ChunkVersion shardVersion2({OID::gen(), Timestamp(20, 0)}, {1, 0});
         ScopedSetShardRole scopedSetShardRole2(
-            operationContext(), kNss, shardVersion2, boost::none);
+            operationContext(), kNss, ShardVersion(shardVersion2), boost::none);
         ASSERT_EQ(shardVersion2, *oss.getShardVersion(kNss));
     }
 }
@@ -75,9 +76,10 @@ TEST_F(OperationShardingStateTest, ScopedSetShardRoleRecursiveShardVersionDiffer
     ChunkVersion shardVersion1({OID::gen(), Timestamp(10, 0)}, {1, 0});
     ChunkVersion shardVersion2({OID::gen(), Timestamp(20, 0)}, {1, 0});
 
-    ScopedSetShardRole scopedSetShardRole1(operationContext(), kNss, shardVersion1, boost::none);
+    ScopedSetShardRole scopedSetShardRole1(
+        operationContext(), kNss, ShardVersion(shardVersion1), boost::none);
     ScopedSetShardRole scopedSetShardRole2(
-        operationContext(), kAnotherNss, shardVersion2, boost::none);
+        operationContext(), kAnotherNss, ShardVersion(shardVersion2), boost::none);
 
     auto& oss = OperationShardingState::get(operationContext());
     ASSERT_EQ(shardVersion1, *oss.getShardVersion(kNss));

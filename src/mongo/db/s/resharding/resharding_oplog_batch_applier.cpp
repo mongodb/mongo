@@ -90,7 +90,7 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                            ScopedSetShardRole scopedSetShardRole(
                                opCtx.get(),
                                _crudApplication.getOutputNss(),
-                               ChunkVersion::IGNORED() /* shardVersion */,
+                               ShardVersion::IGNORED() /* shardVersion */,
                                boost::none /* databaseVersion */);
 
                            resharding::data_copy::withOneStaleConfigRetry(opCtx.get(), [&] {

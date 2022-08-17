@@ -944,7 +944,7 @@ DataSizeInfo::DataSizeInfo(const ShardId& shardId,
                            const NamespaceString& nss,
                            const UUID& uuid,
                            const ChunkRange& chunkRange,
-                           const ChunkVersion& version,
+                           const ShardVersion& version,
                            const KeyPattern& keyPattern,
                            bool estimatedValue)
     : shardId(shardId),

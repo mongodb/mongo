@@ -1678,7 +1678,7 @@ void ExecCommandDatabase::_initiateCommand() {
             ? bucketNss
             : _invocation->ns();
 
-        boost::optional<ChunkVersion> shardVersion;
+        boost::optional<ShardVersion> shardVersion;
         if (auto shardVersionElem = request.body[ShardVersion::kShardVersionField]) {
             shardVersion = ShardVersion::parse(shardVersionElem);
         }

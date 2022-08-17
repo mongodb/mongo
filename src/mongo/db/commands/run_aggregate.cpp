@@ -885,7 +885,7 @@ Status runAggregate(OperationContext* opCtx,
             // This is prerequisite for future shard versioning checks.
             ScopedSetShardRole scopedSetShardRole(opCtx,
                                                   resolvedView.getNamespace(),
-                                                  ChunkVersion::UNSHARDED() /* shardVersion */,
+                                                  ShardVersion::UNSHARDED() /* shardVersion */,
                                                   boost::none /* databaseVersion */);
 
             uassert(std::move(resolvedView),

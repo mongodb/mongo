@@ -40,6 +40,7 @@
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/util/duration.h"
 
@@ -109,6 +110,12 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
         // No operations should be calling getOwnershipFilter without a shard version
         invariant(optReceivedShardVersion,
                   "getOwnershipFilter called by operation that doesn't specify shard version");
+        uassert(6279300,
+                "Request was received without an attached index version. This could indicate that "
+                "this request was sent by a router of an older version",
+                !feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
+                    serverGlobalParams.featureCompatibility) ||
+                    optReceivedShardVersion->indexVersion());
     }
 
     auto metadata =
@@ -141,6 +148,12 @@ ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
 
     auto optMetadata = _getCurrentMetadataIfKnown(boost::none);
     const auto receivedShardVersion{oss.getShardVersion(_nss)};
+    uassert(6279301,
+            "Request was received without an attached index version. This could indicate that this "
+            "request was sent by a router of an older version",
+            !feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
+                serverGlobalParams.featureCompatibility) ||
+                !receivedShardVersion || receivedShardVersion->indexVersion());
     uassert(
         StaleConfigInfo(_nss,
                         receivedShardVersion ? (ChunkVersion)*receivedShardVersion
@@ -355,6 +368,13 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     // Assume that the received shard version was IGNORED if the current operation wasn't versioned
     const auto& receivedShardVersion =
         optReceivedShardVersion ? (ChunkVersion)*optReceivedShardVersion : ChunkVersion::IGNORED();
+    uassert(6279302,
+            "Request was received without an attached index version. This could indicate that this "
+            "request was sent by a router of an older version",
+            !feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
+                serverGlobalParams.featureCompatibility) ||
+                receivedShardVersion == ChunkVersion::IGNORED() ||
+                optReceivedShardVersion->indexVersion());
 
     auto csrLock = CSRLock::lockShared(opCtx, this);
 

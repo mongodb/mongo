@@ -81,7 +81,7 @@ void runWithTransaction(OperationContext* opCtx,
     // to allow the collection metadata information to be recovered.
     ScopedSetShardRole scopedSetShardRole(asr.opCtx(),
                                           nss,
-                                          ChunkVersion::IGNORED() /* shardVersion */,
+                                          ShardVersion::IGNORED() /* shardVersion */,
                                           boost::none /* databaseVersion */);
 
     MongoDOperationContextSession ocs(asr.opCtx());

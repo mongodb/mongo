@@ -148,10 +148,11 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInTheFuture) {
     ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
 
     AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
-    ScopedSetShardRole scopedSetShardRole{operationContext(),
-                                          kNss,
-                                          metadata.getShardVersion() /* shardVersion */,
-                                          boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{
+        operationContext(),
+        kNss,
+        ShardVersion(metadata.getShardVersion()) /* shardVersion */,
+        boost::none /* databaseVersion */};
     auto* const css = CollectionShardingState::get(operationContext(), kNss);
     testFilterFn(css->getOwnershipFilter(
         operationContext(), CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup));
@@ -176,10 +177,11 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInThePast) {
     ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
 
     AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
-    ScopedSetShardRole scopedSetShardRole{operationContext(),
-                                          kNss,
-                                          metadata.getShardVersion() /* shardVersion */,
-                                          boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{
+        operationContext(),
+        kNss,
+        ShardVersion(metadata.getShardVersion()) /* shardVersion */,
+        boost::none /* databaseVersion */};
     auto* const css = CollectionShardingState::get(operationContext(), kNss);
     testFilterFn(css->getOwnershipFilter(
         operationContext(), CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup));
@@ -212,10 +214,11 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsTooFarInThePastThrowsStal
     ASSERT_OK(readConcernArgs.initialize(readConcern["readConcern"]));
 
     AutoGetCollection autoColl(operationContext(), kNss, MODE_IS);
-    ScopedSetShardRole scopedSetShardRole{operationContext(),
-                                          kNss,
-                                          metadata.getShardVersion() /* shardVersion */,
-                                          boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{
+        operationContext(),
+        kNss,
+        ShardVersion(metadata.getShardVersion()) /* shardVersion */,
+        boost::none /* databaseVersion */};
     auto* const css = CollectionShardingState::get(operationContext(), kNss);
     testFilterFn(css->getOwnershipFilter(
         operationContext(), CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup));

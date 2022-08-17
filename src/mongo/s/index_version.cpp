@@ -26,49 +26,12 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#pragma once
 
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/index_version.h"
-
 namespace mongo {
 
-/**
- * This class is used to represent the shard version of a collection.
- *
- * It contains the chunk placement information through the ChunkVersion. This class is used for
- * network requests and the shard versioning protocol.
- *
- */
-class ShardVersion : public ChunkVersion, public CollectionIndexes {
-public:
-    /**
-     * The name for the shard version information field, which shard-aware commands should include
-     * if they want to convey shard version.
-     */
-    static constexpr StringData kShardVersionField = "shardVersion"_sd;
-
-    ShardVersion(ChunkVersion chunkVersion, CollectionIndexes indexVersion);
-
-    ShardVersion(ChunkVersion chunkVersion)
-        : CollectionGeneration(chunkVersion.epoch(), chunkVersion.getTimestamp()),
-          ChunkVersion(chunkVersion),
-          CollectionIndexes() {}
-
-    ShardVersion() : ShardVersion(ChunkVersion(), CollectionIndexes()) {}
-
-    static ShardVersion IGNORED() {
-        return ShardVersion(ChunkVersion::IGNORED(), CollectionIndexes::IGNORED());
-    }
-
-    static ShardVersion UNSHARDED() {
-        return ShardVersion(ChunkVersion::UNSHARDED(), CollectionIndexes::UNSHARDED());
-    }
-
-    static ShardVersion parse(const BSONElement& element);
-    void serialize(StringData field, BSONObjBuilder* builder) const;
-
-    std::string toString() const;
-};
+std::string CollectionIndexes::toString() const {
+    return _indexVersion ? _indexVersion->toString() : "";
+}
 
 }  // namespace mongo

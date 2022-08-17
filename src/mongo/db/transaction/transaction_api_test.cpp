@@ -1935,7 +1935,7 @@ TEST_F(TxnAPITest, MaxTimeMSIsSetIfOperationContextHasDeadlineAndIgnoresDefaultR
 
 TEST_F(TxnAPITest, CannotBeUsedWithinShardedOperationsIfClientDoesNotSupportIt) {
     OperationShardingState::setShardRole(
-        opCtx(), NamespaceString("foo.bar"), ChunkVersion(), boost::none);
+        opCtx(), NamespaceString("foo.bar"), ShardVersion(), boost::none);
 
     ASSERT_THROWS_CODE(
         resetTxnWithRetries(), DBException, ErrorCodes::duplicateCodeForTest(6638800));
@@ -1943,7 +1943,7 @@ TEST_F(TxnAPITest, CannotBeUsedWithinShardedOperationsIfClientDoesNotSupportIt) 
 
 TEST_F(TxnAPITest, CanBeUsedWithinShardedOperationsIfClientSupportsIt) {
     OperationShardingState::setShardRole(
-        opCtx(), NamespaceString("foo.bar"), ChunkVersion(), boost::none);
+        opCtx(), NamespaceString("foo.bar"), ShardVersion(), boost::none);
 
     // Should not throw.
     resetTxnWithRetriesWithClient(std::make_unique<MockClusterOperationTransactionClient>());

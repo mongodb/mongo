@@ -283,7 +283,7 @@ bool ReshardingCollectionCloner::doOneBatch(OperationContext* opCtx, Pipeline& p
     // recovered.
     ScopedSetShardRole scopedSetShardRole(opCtx,
                                           _outputNss,
-                                          ChunkVersion::IGNORED() /* shardVersion */,
+                                          ShardVersion::IGNORED() /* shardVersion */,
                                           boost::none /* databaseVersion */);
 
     Timer batchInsertTimer;

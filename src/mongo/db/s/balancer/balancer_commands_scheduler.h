@@ -145,7 +145,7 @@ public:
                                                          const NamespaceString& nss,
                                                          const ShardId& shardId,
                                                          const ChunkRange& chunkRange,
-                                                         const ChunkVersion& version,
+                                                         const ShardVersion& version,
                                                          const KeyPattern& keyPattern,
                                                          bool estimatedValue) = 0;
 

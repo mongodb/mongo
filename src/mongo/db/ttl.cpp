@@ -368,7 +368,7 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
         uassertStatusOK(userAllowedWriteNS(opCtx, *nss));
 
         // Attach IGNORED shard version to skip orphans (the range deleter will clear them up)
-        auto scopedRole = ScopedSetShardRole(opCtx, *nss, ChunkVersion::IGNORED(), boost::none);
+        auto scopedRole = ScopedSetShardRole(opCtx, *nss, ShardVersion::IGNORED(), boost::none);
         AutoGetCollection coll(opCtx, *nss, MODE_IX);
         // The collection with `uuid` might be renamed before the lock and the wrong namespace would
         // be locked and looked up so we double check here.

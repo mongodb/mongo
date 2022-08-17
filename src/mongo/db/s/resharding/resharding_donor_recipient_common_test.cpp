@@ -268,10 +268,11 @@ protected:
     void addFilteringMetadata(OperationContext* opCtx, NamespaceString sourceNss, ShardId shardId) {
         AutoGetCollection autoColl(opCtx, sourceNss, LockMode::MODE_IS);
         const auto metadata{makeShardedMetadataForOriginalCollection(opCtx, shardId)};
-        ScopedSetShardRole scopedSetShardRole{opCtx,
-                                              sourceNss,
-                                              metadata.getShardVersion() /* shardVersion */,
-                                              boost::none /* databaseVersion */};
+        ScopedSetShardRole scopedSetShardRole{
+            opCtx,
+            sourceNss,
+            ShardVersion(metadata.getShardVersion()) /* shardVersion */,
+            boost::none /* databaseVersion */};
 
         auto csr = CollectionShardingRuntime::get(opCtx, sourceNss);
         csr->setFilteringMetadata(opCtx, metadata);
@@ -349,10 +350,11 @@ protected:
 TEST_F(ReshardingDonorRecipientCommonInternalsTest, ConstructDonorDocumentFromReshardingFields) {
     OperationContext* opCtx = operationContext();
     auto metadata = makeShardedMetadataForOriginalCollection(opCtx, kThisShard.getShardId());
-    ScopedSetShardRole scopedSetShardRole{opCtx,
-                                          kOriginalNss,
-                                          metadata.getShardVersion() /* shardVersion */,
-                                          boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{
+        opCtx,
+        kOriginalNss,
+        ShardVersion(metadata.getShardVersion()) /* shardVersion */,
+        boost::none /* databaseVersion */};
 
     auto reshardingFields =
         createCommonReshardingFields(kReshardingUUID, CoordinatorStateEnum::kPreparingToDonate);
@@ -368,10 +370,11 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest,
     OperationContext* opCtx = operationContext();
     auto metadata =
         makeShardedMetadataForTemporaryReshardingCollection(opCtx, kThisShard.getShardId());
-    ScopedSetShardRole scopedSetShardRole{opCtx,
-                                          kTemporaryReshardingNss,
-                                          metadata.getShardVersion() /* shardVersion */,
-                                          boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{
+        opCtx,
+        kTemporaryReshardingNss,
+        ShardVersion(metadata.getShardVersion()) /* shardVersion */,
+        boost::none /* databaseVersion */};
 
     auto reshardingFields =
         createCommonReshardingFields(kReshardingUUID, CoordinatorStateEnum::kPreparingToDonate);
@@ -386,10 +389,11 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest,
 TEST_F(ReshardingDonorRecipientCommonTest, CreateDonorServiceInstance) {
     OperationContext* opCtx = operationContext();
     auto metadata = makeShardedMetadataForOriginalCollection(opCtx, kThisShard.getShardId());
-    ScopedSetShardRole scopedSetShardRole{opCtx,
-                                          kOriginalNss,
-                                          metadata.getShardVersion() /* shardVersion */,
-                                          boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{
+        opCtx,
+        kOriginalNss,
+        ShardVersion(metadata.getShardVersion()) /* shardVersion */,
+        boost::none /* databaseVersion */};
 
     auto reshardingFields =
         createCommonReshardingFields(kReshardingUUID, CoordinatorStateEnum::kPreparingToDonate);
@@ -412,10 +416,11 @@ TEST_F(ReshardingDonorRecipientCommonTest, CreateRecipientServiceInstance) {
     OperationContext* opCtx = operationContext();
     auto metadata =
         makeShardedMetadataForTemporaryReshardingCollection(opCtx, kThisShard.getShardId());
-    ScopedSetShardRole scopedSetShardRole{opCtx,
-                                          kTemporaryReshardingNss,
-                                          metadata.getShardVersion() /* shardVersion */,
-                                          boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{
+        opCtx,
+        kTemporaryReshardingNss,
+        ShardVersion(metadata.getShardVersion()) /* shardVersion */,
+        boost::none /* databaseVersion */};
 
     auto reshardingFields =
         createCommonReshardingFields(kReshardingUUID, CoordinatorStateEnum::kPreparingToDonate);
@@ -439,10 +444,11 @@ TEST_F(ReshardingDonorRecipientCommonTest,
        CreateDonorServiceInstanceWithIncorrectCoordinatorState) {
     OperationContext* opCtx = operationContext();
     auto metadata = makeShardedMetadataForOriginalCollection(opCtx, kThisShard.getShardId());
-    ScopedSetShardRole scopedSetShardRole{opCtx,
-                                          kOriginalNss,
-                                          metadata.getShardVersion() /* shardVersion */,
-                                          boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{
+        opCtx,
+        kOriginalNss,
+        ShardVersion(metadata.getShardVersion()) /* shardVersion */,
+        boost::none /* databaseVersion */};
 
     auto reshardingFields =
         createCommonReshardingFields(kReshardingUUID, CoordinatorStateEnum::kCommitting);
@@ -460,10 +466,11 @@ TEST_F(ReshardingDonorRecipientCommonTest,
     OperationContext* opCtx = operationContext();
     auto metadata =
         makeShardedMetadataForTemporaryReshardingCollection(opCtx, kThisShard.getShardId());
-    ScopedSetShardRole scopedSetShardRole{opCtx,
-                                          kTemporaryReshardingNss,
-                                          metadata.getShardVersion() /* shardVersion */,
-                                          boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{
+        opCtx,
+        kTemporaryReshardingNss,
+        ShardVersion(metadata.getShardVersion()) /* shardVersion */,
+        boost::none /* databaseVersion */};
 
     auto reshardingFields =
         createCommonReshardingFields(kReshardingUUID, CoordinatorStateEnum::kCommitting);
@@ -487,10 +494,11 @@ TEST_F(ReshardingDonorRecipientCommonTest,
 TEST_F(ReshardingDonorRecipientCommonTest, ProcessDonorFieldsWhenShardDoesntOwnAnyChunks) {
     OperationContext* opCtx = operationContext();
     auto metadata = makeShardedMetadataForOriginalCollection(opCtx, kOtherShard.getShardId());
-    ScopedSetShardRole scopedSetShardRole{opCtx,
-                                          kOriginalNss,
-                                          metadata.getShardVersion() /* shardVersion */,
-                                          boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{
+        opCtx,
+        kOriginalNss,
+        ShardVersion(metadata.getShardVersion()) /* shardVersion */,
+        boost::none /* databaseVersion */};
 
     auto reshardingFields =
         createCommonReshardingFields(kReshardingUUID, CoordinatorStateEnum::kPreparingToDonate);
@@ -511,10 +519,11 @@ TEST_F(ReshardingDonorRecipientCommonTest, ProcessRecipientFieldsWhenShardDoesnt
     OperationContext* opCtx = operationContext();
     auto metadata =
         makeShardedMetadataForTemporaryReshardingCollection(opCtx, kOtherShard.getShardId());
-    ScopedSetShardRole scopedSetShardRole{opCtx,
-                                          kTemporaryReshardingNss,
-                                          metadata.getShardVersion() /* shardVersion */,
-                                          boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{
+        opCtx,
+        kTemporaryReshardingNss,
+        ShardVersion(metadata.getShardVersion()) /* shardVersion */,
+        boost::none /* databaseVersion */};
 
     auto reshardingFields =
         createCommonReshardingFields(kReshardingUUID, CoordinatorStateEnum::kPreparingToDonate);
@@ -536,10 +545,11 @@ TEST_F(ReshardingDonorRecipientCommonTest, ProcessReshardingFieldsWithoutDonorOr
     OperationContext* opCtx = operationContext();
     auto metadata =
         makeShardedMetadataForTemporaryReshardingCollection(opCtx, kThisShard.getShardId());
-    ScopedSetShardRole scopedSetShardRole{opCtx,
-                                          kTemporaryReshardingNss,
-                                          metadata.getShardVersion() /* shardVersion */,
-                                          boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{
+        opCtx,
+        kTemporaryReshardingNss,
+        ShardVersion(metadata.getShardVersion()) /* shardVersion */,
+        boost::none /* databaseVersion */};
 
     auto reshardingFields =
         createCommonReshardingFields(kReshardingUUID, CoordinatorStateEnum::kPreparingToDonate);

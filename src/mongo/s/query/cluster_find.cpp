@@ -189,8 +189,7 @@ std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
             ShardVersion(cm.getVersion(shardId))
                 .serialize(ShardVersion::kShardVersionField, &cmdBuilder);
         } else if (!query.nss().isOnInternalDb()) {
-            ShardVersion(ChunkVersion::UNSHARDED())
-                .serialize(ShardVersion::kShardVersionField, &cmdBuilder);
+            ShardVersion::UNSHARDED().serialize(ShardVersion::kShardVersionField, &cmdBuilder);
             cmdBuilder.append("databaseVersion", cm.dbVersion().toBSON());
         }
 

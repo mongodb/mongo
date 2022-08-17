@@ -59,14 +59,14 @@ BSONObj selectMedianKey(OperationContext* opCtx,
                         const ShardId& shardId,
                         const NamespaceString& nss,
                         const ShardKeyPattern& shardKeyPattern,
-                        const ChunkVersion& chunkVersion,
+                        const ShardVersion& chunkVersion,
                         const ChunkRange& chunkRange) {
     BSONObjBuilder cmd;
     cmd.append("splitVector", nss.ns());
     cmd.append("keyPattern", shardKeyPattern.toBSON());
     chunkRange.append(&cmd);
     cmd.appendBool("force", true);
-    chunkVersion.serialize(ChunkVersion::kChunkVersionField, &cmd);
+    chunkVersion.serialize(ShardVersion::kShardVersionField, &cmd);
 
     auto shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
 

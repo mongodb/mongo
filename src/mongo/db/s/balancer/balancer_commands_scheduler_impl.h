@@ -337,7 +337,7 @@ public:
                         const BSONObj& lowerBoundKey,
                         const BSONObj& upperBoundKey,
                         bool estimatedValue,
-                        const ChunkVersion& version)
+                        const ShardVersion& version)
         : CommandInfo(shardId, nss, boost::none),
           _shardKeyPattern(shardKeyPattern),
           _lowerBoundKey(lowerBoundKey),
@@ -353,7 +353,7 @@ public:
             .append(kMaxValue, _upperBoundKey)
             .append(kEstimatedValue, _estimatedValue);
 
-        _version.serialize(ChunkVersion::kChunkVersionField, &commandBuilder);
+        _version.serialize(ShardVersion::kShardVersionField, &commandBuilder);
 
         return commandBuilder.obj();
     }
@@ -363,7 +363,7 @@ private:
     BSONObj _lowerBoundKey;
     BSONObj _upperBoundKey;
     bool _estimatedValue;
-    ChunkVersion _version;
+    ShardVersion _version;
 
     static const std::string kCommandName;
     static const std::string kKeyPattern;
@@ -577,7 +577,7 @@ public:
                                                  const NamespaceString& nss,
                                                  const ShardId& shardId,
                                                  const ChunkRange& chunkRange,
-                                                 const ChunkVersion& version,
+                                                 const ShardVersion& version,
                                                  const KeyPattern& keyPattern,
                                                  bool estimatedValue) override;
 
