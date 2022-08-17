@@ -349,7 +349,11 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     // This loop will not result in actually calling getMore against shards, but just loading
     // results from the initial batches (that were obtained while establishing cursors) into
     // 'results'.
-    while (!FindCommon::enoughForFirstBatch(findCommand, results->size())) {
+    bool gotExtraRecord = false;
+    while (!FindCommon::enoughForFirstBatch(findCommand, results->size()) || !gotExtraRecord) {
+        if (FindCommon::enoughForFirstBatch(query.getQueryRequest(), results->size())) {
+            gotExtraRecord = true;
+        }
         auto next = uassertStatusOK(ccc->next());
 
         if (next.isEOF()) {
@@ -364,6 +368,11 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         }
 
         auto nextObj = *next.getResult();
+
+        if (gotExtraRecord) {
+            ccc->queueResult(nextObj);
+            break;
+        }
 
         // If adding this object will cause us to exceed the message size limit, then we stash it
         // for later.
