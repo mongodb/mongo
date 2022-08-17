@@ -223,6 +223,10 @@ public:
         pushArithmeticBinaryExpr(expr, Operations::Div);
     }
 
+    void visit(const ExpressionEncryptedBetween* expr) override final {
+        unsupportedExpression(expr->getOpName());
+    }
+
     void visit(const ExpressionExp* expr) override final {
         pushSingleArgFunctionFromTop("exp");
     }

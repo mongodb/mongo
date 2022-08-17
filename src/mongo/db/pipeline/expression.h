@@ -4392,4 +4392,28 @@ public:
     }
 };
 
+class ExpressionEncryptedBetween : public ExpressionFixedArity<ExpressionEncryptedBetween, 2> {
+public:
+    static constexpr const char* const opName = "$encryptedBetween";
+    explicit ExpressionEncryptedBetween(ExpressionContext* const expCtx)
+        : ExpressionFixedArity<ExpressionEncryptedBetween, 2>(expCtx) {}
+
+    ExpressionEncryptedBetween(ExpressionContext* const expCtx, ExpressionVector&& children)
+        : ExpressionFixedArity<ExpressionEncryptedBetween, 2>(expCtx, std::move(children)) {}
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    const char* getOpName() const final {
+        return opName;
+    }
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+};
+
 }  // namespace mongo

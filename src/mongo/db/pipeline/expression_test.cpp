@@ -4162,6 +4162,34 @@ TEST(ExpressionFLETest, TestBinData_RoundTrip) {
     ASSERT_BSONOBJ_EQ(value.getDocument().toBson(), roundTripExpr);
 }
 
+TEST(ExpressionEncryptedBetweenTest, ParseRoundTrip) {
+    auto input = fromjson(R"({$encryptedBetween: [
+        "age",
+        {$binary: {
+            "base64": "ZW5jcnlwdGVkIHBheWxvYWQ=",
+            "subType": "6"
+        }}]})");
+    auto expCtx = ExpressionContextForTest();
+    auto vps = expCtx.variablesParseState;
+    auto expr = ExpressionEncryptedBetween::parse(&expCtx, input.firstElement(), vps);
+    auto serializedExpr = expr->serialize(false);
+    auto expectedExpr = fromjson(R"({$encryptedBetween: [
+        {$const: "age"},
+        { $const: 
+            {$binary: {
+                "base64": "ZW5jcnlwdGVkIHBheWxvYWQ=",
+                "subType": "6"
+            }}
+        }
+    ]})");
+    ASSERT_BSONOBJ_EQ(expectedExpr, serializedExpr.getDocument().toBson());
+}
+
+TEST(ExpressionEncryptedBetweenTest, EvaluateFails) {
+    ASSERT_THROWS_CODE(
+        evaluateExpression("$encryptedBetween", {"fieldpath"_sd, 1}), AssertionException, 6882800);
+}
+
 TEST(ExpressionFLETest, ParseAndSerializeBetween) {
     auto expCtx = ExpressionContextForTest();
     auto vps = expCtx.variablesParseState;
