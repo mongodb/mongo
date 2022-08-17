@@ -64,11 +64,11 @@ public:
                       const std::vector<SorterRange>& ranges,
                       SorterTracker* tracker = nullptr);
 
-    void add(PathView path, const RecordId& recordId, CellView cellContents);
+    void add(PathView path, RowId rowId, CellView cellContents);
 
     struct Key {
         PathView path;
-        RecordId recordId;
+        RowId rowId;
 
         struct SorterDeserializeSettings {};
 
@@ -80,7 +80,7 @@ public:
         static Key deserializeForSorter(BufReader& buf, SorterDeserializeSettings);
 
         size_t memUsageForSorter() const {
-            return sizeof(path) + path.size() + recordId.memUsage();
+            return sizeof(path) + path.size() + sizeof(rowId);
         }
 
         Key getOwned() const {
@@ -130,7 +130,7 @@ private:
     /**
      * Mapping from path name to the sorted list of (RecordId, Cell) pairs.
      */
-    using CellVector = std::vector<std::pair<RecordId, CellValue>>;
+    using CellVector = std::vector<std::pair<RowId, CellValue>>;
     StringMap<CellVector> _dataByPath;
 
     std::shared_ptr<Sorter<Key, Value>::File> _spillFile;

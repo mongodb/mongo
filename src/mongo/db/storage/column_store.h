@@ -43,15 +43,16 @@ using PathView = StringData;
 using PathValue = std::string;
 using CellView = StringData;
 using CellValue = std::string;
+using RowId = int64_t;
 
 struct FullCellView {
     PathView path;
-    RecordId rid;
+    RowId rid;
     CellView value;
 };
 
 struct CellViewForPath {
-    RecordId rid;
+    RowId rid;
     CellView value;
 };
 
@@ -63,9 +64,9 @@ public:
     class WriteCursor {
     public:
         virtual ~WriteCursor() = default;
-        virtual void insert(PathView, const RecordId&, CellView) = 0;
-        virtual void remove(PathView, const RecordId&) = 0;
-        virtual void update(PathView, const RecordId&, CellView) = 0;
+        virtual void insert(PathView, RowId, CellView) = 0;
+        virtual void remove(PathView, RowId) = 0;
+        virtual void update(PathView, RowId, CellView) = 0;
     };
 
     class CursorForPath {
@@ -77,10 +78,10 @@ public:
                 return {};
             return handleResult(_cursor->next());
         }
-        boost::optional<FullCellView> seekAtOrPast(const RecordId& rid) {
+        boost::optional<FullCellView> seekAtOrPast(RowId rid) {
             return handleResult(_cursor->seekAtOrPast(_path, rid));
         }
-        boost::optional<FullCellView> seekExact(const RecordId& rid) {
+        boost::optional<FullCellView> seekExact(RowId rid) {
             return handleResult(_cursor->seekExact(_path, rid));
         }
 
@@ -127,7 +128,7 @@ public:
     class BulkBuilder {
     public:
         virtual ~BulkBuilder() = default;
-        virtual void addCell(PathView, const RecordId&, CellView) = 0;
+        virtual void addCell(PathView, RowId, CellView) = 0;
     };
 
     /**
@@ -137,6 +138,9 @@ public:
      * This is not a valid real path because it can never appear in valid UTF-8 data.
      */
     static constexpr StringData kRowIdPath = "\xFF"_sd;
+
+    // RowId equivalent of a null RecordId
+    static const RowId kNullRowId = 0;
 
     // This is really just a namespace
     struct Bytes {
@@ -263,9 +267,9 @@ public:
     // CRUD
     //
     virtual std::unique_ptr<WriteCursor> newWriteCursor(OperationContext*) = 0;
-    virtual void insert(OperationContext*, PathView, const RecordId&, CellView) = 0;
-    virtual void remove(OperationContext*, PathView, const RecordId&) = 0;
-    virtual void update(OperationContext*, PathView, const RecordId&, CellView) = 0;
+    virtual void insert(OperationContext*, PathView, RowId, CellView) = 0;
+    virtual void remove(OperationContext*, PathView, RowId) = 0;
+    virtual void update(OperationContext*, PathView, RowId, CellView) = 0;
     virtual std::unique_ptr<Cursor> newCursor(OperationContext*) const = 0;
     std::unique_ptr<CursorForPath> newCursor(OperationContext* opCtx, PathView path) const {
         return std::make_unique<CursorForPath>(path, newCursor(opCtx));
@@ -273,14 +277,14 @@ public:
 
     bool haveAnyWithPath(OperationContext* opCtx, PathView path) const {
         // TODO could avoid extra allocation. May also be more efficient to do a different way.
-        return bool(newCursor(opCtx, path)->seekAtOrPast(RecordId()));
+        return bool(newCursor(opCtx, path)->seekAtOrPast(kNullRowId));
     }
 
     std::vector<PathValue> uniquePaths(OperationContext* opCtx) const {
         std::vector<PathValue> out;
         PathValue nextPath = "";
         auto cursor = newCursor(opCtx);
-        while (auto next = cursor->seekAtOrPast(nextPath, RecordId())) {
+        while (auto next = cursor->seekAtOrPast(nextPath, kNullRowId)) {
             out.push_back(next->path.toString());
             nextPath.assign(next->path.rawData(), next->path.size());
             nextPath += '\x01';  // next possible path (\0 is not allowed)
@@ -354,8 +358,8 @@ protected:
     public:
         virtual ~Cursor() = default;
         virtual boost::optional<FullCellView> next() = 0;
-        virtual boost::optional<FullCellView> seekAtOrPast(PathView, const RecordId&) = 0;
-        virtual boost::optional<FullCellView> seekExact(PathView, const RecordId&) = 0;
+        virtual boost::optional<FullCellView> seekAtOrPast(PathView, RowId) = 0;
+        virtual boost::optional<FullCellView> seekExact(PathView, RowId) = 0;
 
         virtual void save() = 0;
         virtual void saveUnpositioned() {

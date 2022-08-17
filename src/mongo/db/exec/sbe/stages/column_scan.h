@@ -38,6 +38,7 @@
 
 namespace mongo {
 namespace sbe {
+
 /**
  * A stage that scans provided columnar index.
  *
@@ -127,17 +128,17 @@ private:
             return _lastCell;
         }
 
-        boost::optional<FullCellView>& seekAtOrPast(RecordId id) {
+        boost::optional<FullCellView>& seekAtOrPast(RowId rid) {
             _lastCell.reset();
-            _lastCell = _cursor->seekAtOrPast(id);
+            _lastCell = _cursor->seekAtOrPast(rid);
             clearOwned();
             ++_stats.numSeeks;
             return _lastCell;
         }
 
-        boost::optional<FullCellView>& seekExact(RecordId id) {
+        boost::optional<FullCellView>& seekExact(RowId rid) {
             _lastCell.reset();
-            _lastCell = _cursor->seekExact(id);
+            _lastCell = _cursor->seekExact(rid);
             clearOwned();
             ++_stats.numSeeks;
             return _lastCell;
@@ -205,18 +206,18 @@ private:
 
     bool checkFilter(CellView cell, size_t filterIndex, const PathValue& path);
 
-    // Finds the smallest record ID such that:
-    // 1) it is greater or equal to the record ID of all filtered columns cursors prior to the call;
+    // Finds the smallest row ID such that:
+    // 1) it is greater or equal to the row ID of all filtered columns cursors prior to the call;
     // 2) the record with this ID passes the filters of all filtered columns.
-    // Ensures that the cursors are set to this record ID unless it's missing in the column (which
+    // Ensures that the cursors are set to this row ID unless it's missing in the column (which
     // is only possible for the non-filtered columns).
-    RecordId findNextRecordIdForFilteredColumns();
+    RowId findNextRowIdForFilteredColumns();
 
     // Finds the lowest record ID across all cursors. Doesn't move any of the cursors.
-    RecordId findMinRecordId() const;
+    RowId findMinRowId() const;
 
     // Move cursors to the next record to be processed.
-    RecordId advanceCursors();
+    RowId advanceCursors();
 
     // The columnar index this stage is scanning and the associated row store collection.
     const UUID _collUuid;
@@ -237,6 +238,7 @@ private:
     // The record id in the row store that is used to connect the per-path entries in the columnar
     // index and to retrieve the full record from the row store, if necessary.
     RecordId _recordId;
+    RowId _rowId;
     const boost::optional<value::SlotId> _recordIdSlot;
 
     // The object that is equivalent to the record from the associated row store when accessing

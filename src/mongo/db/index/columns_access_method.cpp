@@ -152,7 +152,8 @@ Status ColumnStoreAccessMethod::BulkBuilder::insert(
         obj, [&](PathView path, const column_keygen::UnencodedCellView& cell) {
             _cellBuilder.reset();
             writeEncodedCell(cell, &_cellBuilder);
-            _sorter.add(path, rid, CellView(_cellBuilder.buf(), _cellBuilder.len()));
+            tassert(6762300, "RecordID cannot be a string for column store indexes", !rid.isStr());
+            _sorter.add(path, rid.getLong(), CellView(_cellBuilder.buf(), _cellBuilder.len()));
 
             ++_keysInserted;
         });
@@ -208,7 +209,7 @@ Status ColumnStoreAccessMethod::BulkBuilder::commit(OperationContext* opCtx,
     auto builder = _columnsAccess->_store->makeBulkBuilder(opCtx);
 
     int64_t iterations = 0;
-    boost::optional<std::pair<PathValue, RecordId>> previousPathAndRecordId;
+    boost::optional<std::pair<PathValue, RowId>> previousPathAndRowId;
     std::unique_ptr<ColumnStoreSorter::Iterator> it(_sorter.done());
     while (it->more()) {
         opCtx->checkForInterrupt();
@@ -219,29 +220,28 @@ Status ColumnStoreAccessMethod::BulkBuilder::commit(OperationContext* opCtx,
         // In debug mode only, assert that keys are retrieved from the sorter in strictly increasing
         // order.
         if (kDebugBuild) {
-            if (previousPathAndRecordId &&
-                !(ColumnStoreSorter::Key{previousPathAndRecordId->first,
-                                         previousPathAndRecordId->second} < key)) {
+            if (previousPathAndRowId &&
+                !(ColumnStoreSorter::Key{previousPathAndRowId->first,
+                                         previousPathAndRowId->second} < key)) {
                 LOGV2_FATAL_NOTRACE(6548100,
                                     "Out-of-order result from sorter for column store bulk loader",
-                                    "prevPathName"_attr = previousPathAndRecordId->first,
-                                    "prevRecordId"_attr = previousPathAndRecordId->second,
+                                    "prevPathName"_attr = previousPathAndRowId->first,
+                                    "prevRecordId"_attr = previousPathAndRowId->second,
                                     "nextPathName"_attr = key.path,
-                                    "nextRecordId"_attr = key.recordId,
+                                    "nextRecordId"_attr = key.rowId,
                                     "index"_attr = _columnsAccess->_descriptor->indexName());
             }
 
             // It is not safe to safe to directly store the 'key' object, because it includes a
             // PathView, which may be invalid the next time we read it.
-            previousPathAndRecordId.emplace(key.path, key.recordId);
+            previousPathAndRowId.emplace(key.path, key.rowId);
         }
 
         try {
             writeConflictRetry(opCtx, "addingKey", ns.ns(), [&] {
                 WriteUnitOfWork wunit(opCtx);
                 auto& [columnStoreKey, columnStoreValue] = columnStoreKeyWithValue;
-                builder->addCell(
-                    columnStoreKey.path, columnStoreKey.recordId, columnStoreValue.cell);
+                builder->addCell(columnStoreKey.path, columnStoreKey.rowId, columnStoreValue.cell);
                 wunit.commit();
             });
         } catch (DBException& e) {
@@ -288,7 +288,8 @@ Status ColumnStoreAccessMethod::insert(OperationContext* opCtx,
 
                 buf.reset();
                 column_keygen::writeEncodedCell(cell, &buf);
-                cursor->insert(path, rec.id, CellView{buf.buf(), size_t(buf.len())});
+                invariant(!rec.id.isStr());
+                cursor->insert(path, rec.id.getLong(), CellView{buf.buf(), size_t(buf.len())});
 
                 inc(keysInsertedOut);
             });
@@ -309,7 +310,8 @@ void ColumnStoreAccessMethod::remove(OperationContext* opCtx,
                                      CheckRecordId checkRecordId) {
     auto cursor = _store->newWriteCursor(opCtx);
     column_keygen::visitPathsForDelete(obj, [&](PathView path) {
-        cursor->remove(path, rid);
+        tassert(6762301, "RecordID cannot be a string for column store indexes", !rid.isStr());
+        cursor->remove(path, rid.getLong());
         inc(keysDeletedOut);
     });
 }
@@ -332,7 +334,9 @@ Status ColumnStoreAccessMethod::update(OperationContext* opCtx,
             StringData path,
             const column_keygen::UnencodedCellView* cell) {
             if (diffAction == column_keygen::DiffAction::kDelete) {
-                cursor->remove(path, rid);
+                tassert(
+                    6762302, "RecordID cannot be a string for column store indexes", !rid.isStr());
+                cursor->remove(path, rid.getLong());
                 inc(keysDeletedOut);
                 return;
             }
@@ -346,7 +350,8 @@ Status ColumnStoreAccessMethod::update(OperationContext* opCtx,
             const auto method = diffAction == column_keygen::DiffAction::kInsert
                 ? &ColumnStore::WriteCursor::insert
                 : &ColumnStore::WriteCursor::update;
-            (cursor.get()->*method)(path, rid, CellView{buf.buf(), size_t(buf.len())});
+            tassert(6762303, "RecordID cannot be a string for column store indexes", !rid.isStr());
+            (cursor.get()->*method)(path, rid.getLong(), CellView{buf.buf(), size_t(buf.len())});
 
             inc(keysInsertedOut);
         });

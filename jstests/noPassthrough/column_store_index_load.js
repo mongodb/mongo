@@ -81,7 +81,7 @@ const testProjection = {
 
 const maxMemUsageBytes = 20000;
 const numDocs = testDocs.length;
-const approxDocSize = 800;
+const approxDocSize = 500;
 const approxMemoryUsage = numDocs * approxDocSize;
 const expectedSpilledRanges = Math.ceil(approxMemoryUsage / maxMemUsageBytes);
 

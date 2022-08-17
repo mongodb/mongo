@@ -41,7 +41,9 @@ struct ComparisonForPathAndRid {
                    const std::pair<ColumnStoreSorter::Key, ColumnStoreSorter::Value>& right) const {
         auto stringComparison = left.first.path.compare(right.first.path);
         return (stringComparison != 0) ? stringComparison
-                                       : left.first.recordId.compare(right.first.recordId);
+                                       : ((left.first.rowId == right.first.rowId)
+                                              ? 0
+                                              : (left.first.rowId > right.first.rowId ? 1 : -1));
     }
 };
 
@@ -49,20 +51,20 @@ bool ColumnStoreSorter::Key::operator<(const Key& other) const {
     if (auto cmp = path.compare(other.path); cmp != 0) {
         return cmp < 0;
     } else {
-        return recordId < other.recordId;
+        return rowId < other.rowId;
     }
 }
 
 void ColumnStoreSorter::Key::serializeForSorter(BufBuilder& buf) const {
     buf.appendStr(path);
-    recordId.serializeToken(buf);
+    buf.appendNum(rowId);
 }
 
 ColumnStoreSorter::Key ColumnStoreSorter::Key::deserializeForSorter(
     BufReader& buf, ColumnStoreSorter::Key::SorterDeserializeSettings) {
     // Note: unlike function call parameters, the order of evaluation for initializer
     // parameters is defined.
-    return {buf.readCStr(), RecordId::deserializeToken(buf)};
+    return {buf.readCStr(), buf.read<LittleEndian<int64_t>>()};
 }
 
 void ColumnStoreSorter::Value::serializeForSorter(BufBuilder& buf) const {
@@ -117,7 +119,7 @@ ColumnStoreSorter::ColumnStoreSorter(size_t maxMemoryUsageBytes,
                    });
 }
 
-void ColumnStoreSorter::add(PathView path, const RecordId& recordId, CellView cellContents) {
+void ColumnStoreSorter::add(PathView path, RowId rowId, CellView cellContents) {
     auto& cellListAtPath = _dataByPath[path];
     if (cellListAtPath.empty()) {
         // Track memory usage of this new path.
@@ -127,11 +129,10 @@ void ColumnStoreSorter::add(PathView path, const RecordId& recordId, CellView ce
     // The sorter assumes that RecordIds are added in sorted order.
     tassert(6548102,
             "Out-of-order record during columnar index build",
-            cellListAtPath.empty() || cellListAtPath.back().first < recordId);
+            cellListAtPath.empty() || cellListAtPath.back().first < rowId);
 
-    cellListAtPath.emplace_back(recordId, CellValue(cellContents.rawData(), cellContents.size()));
-    _memUsed += cellListAtPath.back().first.memUsage() + sizeof(CellValue) +
-        cellListAtPath.back().second.size();
+    cellListAtPath.emplace_back(rowId, CellValue(cellContents.rawData(), cellContents.size()));
+    _memUsed += sizeof(RowId) + sizeof(CellValue) + cellListAtPath.back().second.size();
     if (_memUsed > _maxMemoryUsageBytes) {
         spill();
     }
@@ -184,7 +185,7 @@ void ColumnStoreSorter::spill() {
 
         size_t cellVectorSize = std::accumulate(
             cellVector.begin(), cellVector.end(), 0, [& path = path](size_t sum, auto& ridAndCell) {
-                return sum + path.size() + ridAndCell.first.memUsage() + ridAndCell.second.size();
+                return sum + path.size() + sizeof(RowId) + ridAndCell.second.size();
             });
 
         // Add (path, rid, cell) records to the spill file so that the first cell in each contiguous
@@ -222,7 +223,7 @@ void ColumnStoreSorter::spill() {
         }
         for (auto& ridAndCell : cellVector) {
             const auto& cell = ridAndCell.second;
-            currentChunkSize += path.size() + ridAndCell.first.memUsage() + cell.size();
+            currentChunkSize += path.size() + sizeof(RowId) + cell.size();
             writer.addAlreadySorted(Key{path, ridAndCell.first},
                                     Value{CellView{cell.c_str(), cell.size()}});
 

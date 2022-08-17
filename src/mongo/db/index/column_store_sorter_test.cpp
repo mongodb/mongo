@@ -84,8 +84,8 @@ TEST(ColumnStoreSorter, SortTest) {
             // that cell contents travel with the (Field name, RecordId) key. The null-byte
             // delimiter tests that the sorter correctly stores cells with internal null bytes.
             std::string cell = str::stream() << fieldName << "\0" << i;
-            inMemorySorter->add(fieldName, RecordId(i), cell);
-            externalSorter->add(fieldName, RecordId(i), cell);
+            inMemorySorter->add(fieldName, RowId(i), cell);
+            externalSorter->add(fieldName, RowId(i), cell);
         }
     }
 
@@ -100,7 +100,7 @@ TEST(ColumnStoreSorter, SortTest) {
             auto [columnKey, columnValue] = sortedItInMemory->next();
 
             ASSERT_EQ(expected.first, columnKey.path);
-            ASSERT_EQ(RecordId(expected.second), columnKey.recordId);
+            ASSERT_EQ(expected.second, columnKey.rowId);
             ASSERT_EQ(expectedCell, columnValue.cell);
         }
 
@@ -109,7 +109,7 @@ TEST(ColumnStoreSorter, SortTest) {
             auto [columnKey, columnValue] = sortedItExternal->next();
 
             ASSERT_EQ(expected.first, columnKey.path);
-            ASSERT_EQ(RecordId(expected.second), columnKey.recordId);
+            ASSERT_EQ(expected.second, columnKey.rowId);
             ASSERT_EQ(expectedCell, columnValue.cell);
         }
     }

@@ -115,26 +115,18 @@ WiredTigerColumnStore::WiredTigerColumnStore(OperationContext* ctx,
       _desc(desc),
       _indexName(desc->indexName()) {}
 
-std::string& WiredTigerColumnStore::makeKey(std::string& buffer,
-                                            PathView path,
-                                            const RecordId& rid) {
-    const auto ridSize =
-        rid.withFormat([](RecordId::Null) -> unsigned long { return 0; },
-                       [](int64_t) -> unsigned long { return sizeof(int64_t); },
-                       [](const char* data, size_t len) -> unsigned long { MONGO_UNREACHABLE; });
+std::string& WiredTigerColumnStore::makeKey(std::string& buffer, PathView path, RowId rid) {
     buffer.clear();
-    buffer.reserve(path.size() + 1 /*NUL byte*/ + ridSize);
+    buffer.reserve(path.size() + 1 /*NUL byte*/ + sizeof(RowId));
     buffer += path;
     if (path != kRowIdPath) {
         // If we end up reserving more values, the above check should be changed.
         buffer += '\0';
     }
-    rid.withFormat([](RecordId::Null) { /* Do nothing. */ },
-                   [&](int64_t num) {
-                       num = endian::nativeToBig(num);
-                       buffer.append(reinterpret_cast<const char*>(&num), sizeof(num));
-                   },
-                   [&](const char* data, size_t len) { MONGO_UNREACHABLE; });
+    if (rid > 0) {
+        RowId num = endian::nativeToBig(rid);
+        buffer.append(reinterpret_cast<const char*>(&num), sizeof(num));
+    }
     return buffer;
 }
 
@@ -145,9 +137,9 @@ public:
         _curwrap.assertInActiveTxn();
     }
 
-    void insert(PathView, const RecordId&, CellView) override;
-    void remove(PathView, const RecordId&) override;
-    void update(PathView, const RecordId&, CellView) override;
+    void insert(PathView, RowId, CellView) override;
+    void remove(PathView, RowId) override;
+    void update(PathView, RowId, CellView) override;
 
     WT_CURSOR* c() {
         return _curwrap.get();
@@ -165,11 +157,11 @@ std::unique_ptr<ColumnStore::WriteCursor> WiredTigerColumnStore::newWriteCursor(
 
 void WiredTigerColumnStore::insert(OperationContext* opCtx,
                                    PathView path,
-                                   const RecordId& rid,
+                                   RowId rid,
                                    CellView cell) {
     WriteCursor(opCtx, _uri, _tableId).insert(path, rid, cell);
 }
-void WiredTigerColumnStore::WriteCursor::insert(PathView path, const RecordId& rid, CellView cell) {
+void WiredTigerColumnStore::WriteCursor::insert(PathView path, RowId rid, CellView cell) {
     dassert(_opCtx->lockState()->isWriteLocked());
 
     auto key = makeKey(path, rid);
@@ -189,10 +181,10 @@ void WiredTigerColumnStore::WriteCursor::insert(PathView path, const RecordId& r
     }
 }
 
-void WiredTigerColumnStore::remove(OperationContext* opCtx, PathView path, const RecordId& rid) {
+void WiredTigerColumnStore::remove(OperationContext* opCtx, PathView path, RowId rid) {
     WriteCursor(opCtx, _uri, _tableId).remove(path, rid);
 }
-void WiredTigerColumnStore::WriteCursor::remove(PathView path, const RecordId& rid) {
+void WiredTigerColumnStore::WriteCursor::remove(PathView path, RowId rid) {
     dassert(_opCtx->lockState()->isWriteLocked());
 
     auto key = makeKey(path, rid);
@@ -209,11 +201,11 @@ void WiredTigerColumnStore::WriteCursor::remove(PathView path, const RecordId& r
 }
 void WiredTigerColumnStore::update(OperationContext* opCtx,
                                    PathView path,
-                                   const RecordId& rid,
+                                   RowId rid,
                                    CellView cell) {
     WriteCursor(opCtx, _uri, _tableId).update(path, rid, cell);
 }
-void WiredTigerColumnStore::WriteCursor::update(PathView path, const RecordId& rid, CellView cell) {
+void WiredTigerColumnStore::WriteCursor::update(PathView path, RowId rid, CellView cell) {
     dassert(_opCtx->lockState()->isWriteLocked());
 
     auto key = makeKey(path, rid);
@@ -257,12 +249,12 @@ public:
 
         return curr();
     }
-    boost::optional<FullCellView> seekAtOrPast(PathView path, const RecordId& rid) override {
+    boost::optional<FullCellView> seekAtOrPast(PathView path, RowId rid) override {
         makeKey(_buffer, path, rid);
         seekWTCursor();
         return curr();
     }
-    boost::optional<FullCellView> seekExact(PathView path, const RecordId& rid) override {
+    boost::optional<FullCellView> seekExact(PathView path, RowId rid) override {
         makeKey(_buffer, path, rid);
         seekWTCursor(/*exactOnly*/ true);
         return curr();
@@ -371,7 +363,7 @@ private:
         const auto ridStart = static_cast<const char*>(key.data) + out->path.size() + nullByteSize;
 
         invariant(ridSize == 8);
-        out->rid = RecordId(ConstDataView(ridStart).read<BigEndian<int64_t>>());
+        out->rid = ConstDataView(ridStart).read<BigEndian<int64_t>>();
         return out;
     }
 
@@ -395,7 +387,7 @@ public:
     BulkBuilder(WiredTigerColumnStore* idx, OperationContext* opCtx)
         : _opCtx(opCtx), _cursor(idx->uri(), opCtx) {}
 
-    void addCell(PathView path, const RecordId& rid, CellView cell) override {
+    void addCell(PathView path, RowId rid, CellView cell) override {
         const std::string& key = makeKey(_buffer, path, rid);
         WiredTigerItem keyItem(key.c_str(), key.size());
         _cursor->set_key(_cursor.get(), keyItem.Get());

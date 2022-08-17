@@ -303,7 +303,7 @@ void ColumnScanStage::open(bool reOpen) {
                 _specificStats.cursorStats.emplace_back(_paths[i], _includeInOutput[i]));
         }
     }
-    _recordId = RecordId();
+    _rowId = ColumnStore::kNullRowId;
     _open = true;
 }
 
@@ -345,7 +345,7 @@ void ColumnScanStage::readParentsIntoObj(StringData path,
     }
 
     boost::optional<SplitCellView> splitCellView;
-    if (auto optCell = it->second->seekExact(_recordId)) {
+    if (auto optCell = it->second->seekExact(_rowId)) {
         splitCellView = SplitCellView::parse(optCell->value);
     }
 
@@ -468,17 +468,17 @@ bool ColumnScanStage::checkFilter(CellView cell, size_t filterIndex, const PathV
     return false;
 }
 
-RecordId ColumnScanStage::findNextRecordIdForFilteredColumns() {
+RowId ColumnScanStage::findNextRowIdForFilteredColumns() {
     invariant(!_filteredPaths.empty());
 
     // Initialize 'targetRecordId' from the filtered cursor we are currently iterating.
-    RecordId targetRecordId;
+    RowId targetRowId;
     {
         auto& cursor = cursorForFilteredPath(_filteredPaths[_nextUnmatched]);
         if (!cursor.lastCell()) {
-            return RecordId();  // Have exhausted one of the columns.
+            return ColumnStore::kNullRowId;  // Have exhausted one of the columns.
         }
-        targetRecordId = cursor.lastCell()->rid;
+        targetRowId = cursor.lastCell()->rid;
     }
 
     size_t matchedSinceAdvance = 0;
@@ -491,17 +491,17 @@ RecordId ColumnScanStage::findNextRecordIdForFilteredColumns() {
 
         // Avoid seeking into the column that we started with.
         auto& result = cursor.lastCell();
-        if (result && result->rid < targetRecordId) {
-            result = cursor.seekAtOrPast(targetRecordId);
+        if (result && result->rid < targetRowId) {
+            result = cursor.seekAtOrPast(targetRowId);
         }
         if (!result) {
-            return RecordId();
+            return ColumnStore::kNullRowId;
         }
 
-        if (result->rid > targetRecordId) {
+        if (result->rid > targetRowId) {
             // The column skipped ahead - have to restart at this new record ID.
             matchedSinceAdvance = 0;
-            targetRecordId = result->rid;
+            targetRowId = result->rid;
         }
 
         if (!checkFilter(result->value, _nextUnmatched, cursor.path())) {
@@ -509,97 +509,97 @@ RecordId ColumnScanStage::findNextRecordIdForFilteredColumns() {
             do {
                 result = cursor.next();
                 if (!result) {
-                    return RecordId();
+                    return ColumnStore::kNullRowId;
                 }
             } while (!checkFilter(result->value, _nextUnmatched, cursor.path()));
             matchedSinceAdvance = 0;
-            invariant(result->rid > targetRecordId);
-            targetRecordId = result->rid;
+            invariant(result->rid > targetRowId);
+            targetRowId = result->rid;
         }
         ++matchedSinceAdvance;
         _nextUnmatched = (_nextUnmatched + 1) % _filteredPaths.size();
     }
-    invariant(!targetRecordId.isNull());
+    invariant(targetRowId != ColumnStore::kNullRowId);
 
     // Ensure that _all_ cursors have caugth up with the filtered record ID. Some of the cursors
     // might skip ahead, which would mean the column is missing a value for this 'recordId'.
     for (auto& cursor : _columnCursors) {
         const auto& result = cursor.lastCell();
-        if (result && result->rid < targetRecordId) {
-            cursor.seekAtOrPast(targetRecordId);
+        if (result && result->rid < targetRowId) {
+            cursor.seekAtOrPast(targetRowId);
         }
     }
 
-    return targetRecordId;
+    return targetRowId;
 }
 
-RecordId ColumnScanStage::findMinRecordId() const {
+RowId ColumnScanStage::findMinRowId() const {
     if (_denseColumnCursor) {
         // The cursor of the dense column cannot be ahead of any other, so it's always at the
         // minimum.
         auto& result = _denseColumnCursor->lastCell();
         if (!result) {
-            return RecordId();
+            return ColumnStore::kNullRowId;
         }
         return result->rid;
     }
 
-    auto recordId = RecordId();
+    auto recordId = ColumnStore::kNullRowId;
     for (const auto& cursor : _columnCursors) {
         const auto& result = cursor.lastCell();
-        if (result && (recordId.isNull() || result->rid < recordId)) {
+        if (result && (recordId == ColumnStore::kNullRowId || result->rid < recordId)) {
             recordId = result->rid;
         }
     }
     return recordId;
 }
 
-RecordId ColumnScanStage::advanceCursors() {
-    if (_recordId.isNull()) {
+RowId ColumnScanStage::advanceCursors() {
+    if (_rowId == ColumnStore::kNullRowId) {
         if (_denseColumnCursor) {
-            _denseColumnCursor->seekAtOrPast(RecordId());
+            _denseColumnCursor->seekAtOrPast(ColumnStore::kNullRowId);
         }
         for (auto& columnCursor : _columnCursors) {
-            columnCursor.seekAtOrPast(RecordId());
+            columnCursor.seekAtOrPast(ColumnStore::kNullRowId);
         }
-        return _filteredPaths.empty() ? findMinRecordId() : findNextRecordIdForFilteredColumns();
+        return _filteredPaths.empty() ? findMinRowId() : findNextRowIdForFilteredColumns();
     }
 
     if (!_filteredPaths.empty()) {
         // Nudge forward the "active" filtered cursor. The remaining ones will be synchronized
         // by 'findNextRecordIdForFilteredColumns()'.
         cursorForFilteredPath(_filteredPaths[_nextUnmatched]).next();
-        return findNextRecordIdForFilteredColumns();
+        return findNextRowIdForFilteredColumns();
     }
 
     // In absence of filters all cursors iterate forward on their own. Some of the cursors might
-    // be ahead of the current '_recordId' because there are gaps in their columns - don't move
-    // them but only those that are at '_recordId' and therefore their values have been
-    // consumed. While at it, compute the new min record ID.
-    auto nextRecordId = RecordId();
+    // be ahead of the current '_rowId' because there are gaps in their columns - don't move them
+    // but only those that are at '_rowId' and therefore their values have been consumed.
+    // While at it, compute the new min row ID. auto nextRecordId = RecordId();
+    auto nextRowId = ColumnStore::kNullRowId;
     if (_denseColumnCursor) {
-        invariant(_denseColumnCursor->lastCell()->rid == _recordId,
+        invariant(_denseColumnCursor->lastCell()->rid == _rowId,
                   "Dense cursor should always be at the current minimum record ID");
         auto cell = _denseColumnCursor->next();
         if (!cell) {
-            return RecordId();
+            return ColumnStore::kNullRowId;
         }
-        nextRecordId = cell->rid;
+        nextRowId = cell->rid;
     }
     for (auto& cursor : _columnCursors) {
         auto& cell = cursor.lastCell();
         if (!cell) {
             continue;  // this column has been exhausted
         }
-        if (cell->rid == _recordId) {
+        if (cell->rid == _rowId) {
             cell = cursor.next();
         }
-        if (cell && (nextRecordId.isNull() || cell->rid < nextRecordId)) {
+        if (cell && (nextRowId == ColumnStore::kNullRowId || cell->rid < nextRowId)) {
             invariant(!_denseColumnCursor, "Dense cursor should have the next lowest record ID");
-            nextRecordId = cell->rid;
+            nextRowId = cell->rid;
         }
     }
-    return nextRecordId;
+    return nextRowId;
 }
 
 PlanState ColumnScanStage::getNext() {
@@ -612,8 +612,8 @@ PlanState ColumnScanStage::getNext() {
 
     checkForInterrupt(_opCtx);
 
-    _recordId = advanceCursors();
-    if (_recordId.isNull()) {
+    _rowId = advanceCursors();
+    if (_rowId == ColumnStore::kNullRowId) {
         return trackPlanState(PlanState::IS_EOF);
     }
 
@@ -632,7 +632,7 @@ PlanState ColumnScanStage::getNext() {
         auto& lastCell = cursor.lastCell();
 
         boost::optional<SplitCellView> splitCellView;
-        if (lastCell && lastCell->rid == _recordId) {
+        if (lastCell && lastCell->rid == _rowId) {
             splitCellView = SplitCellView::parse(lastCell->value);
         }
 
@@ -658,9 +658,9 @@ PlanState ColumnScanStage::getNext() {
 
     if (useRowStore) {
         ++_specificStats.numRowStoreFetches;
-        // TODO: In some cases we can avoid calling seek() on the row store cursor, and instead
-        // do a next() which should be much cheaper.
-        auto record = _rowStoreCursor->seekExact(_recordId);
+        // TODO: In some cases we can avoid calling seek() on the row store cursor, and instead do
+        // a next() which should be much cheaper.
+        auto record = _rowStoreCursor->seekExact(RecordId(_rowId));
 
         // If there's no record, the index is out of sync with the row store.
         invariant(record);
@@ -684,6 +684,7 @@ PlanState ColumnScanStage::getNext() {
     }
 
     if (_recordIdAccessor) {
+        _recordId = RecordId(_rowId);
         _recordIdAccessor->reset(
             false, value::TypeTags::RecordId, value::bitcastFrom<RecordId*>(&_recordId));
     }
