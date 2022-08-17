@@ -87,4 +87,10 @@ assert(numberDecimalsAlmostEqual(NumberDecimal("-104735446372966662851.013527641
                                  10));
 // Regression test for BF-25390
 assert(numberDecimalsAlmostEqual(NumberDecimal("-331.0000000000"), NumberDecimal("-331"), 10));
+
+// Verify numberDecimalsAlmostEqual() works with 0.
+assert(numberDecimalsAlmostEqual(NumberDecimal("0"), NumberDecimal("0"), 10));
+assert(numberDecimalsAlmostEqual(NumberDecimal("0"), NumberDecimal("0.0000000000000001"), 10));
+assert(numberDecimalsAlmostEqual(NumberDecimal("0.0000000000000001"), NumberDecimal("0"), 10));
+assert.neq(numberDecimalsAlmostEqual(NumberDecimal("0"), NumberDecimal("0.000001"), 10));
 }());
