@@ -75,13 +75,13 @@ function findMatchingLogLine(logLines, fields, ignoreFields) {
 }
 
 /**
- * Ensure the slow query log contains the correct information about the queryExecutionEngine used.
+ * Ensure the slow query log contains the correct information about the queryFramework used.
  */
-function verifySlowQueryLog(db, expectedComment, execEngine) {
+function verifySlowQueryLog(db, expectedComment, queryFramework) {
     const logId = 51803;  // ID for 'Slow Query' commands
     const expectedLog = {command: {comment: expectedComment}};
-    if (execEngine) {
-        expectedLog.queryExecutionEngine = execEngine;
+    if (queryFramework) {
+        expectedLog.queryFramework = queryFramework;
     }
     assert(checkLog.checkContainsWithCountJson(db, logId, expectedLog, 1, null, true),
            "failed to find [" + tojson(expectedLog) + "] in the slow query log");

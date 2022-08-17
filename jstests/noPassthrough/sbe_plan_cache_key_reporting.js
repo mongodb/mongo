@@ -89,8 +89,8 @@ function assertQueryHashAndPlanCacheKey(sbe, classic) {
 
     assert.neq(sbe, null);
     assert.neq(classic, null);
-    assert.eq(sbe.queryExecutionEngine, "sbe", sbe);
-    assert.eq(classic.queryExecutionEngine, "classic", classic);
+    assert.eq(sbe.queryFramework, "sbe", sbe);
+    assert.eq(classic.queryFramework, "classic", classic);
 
     assertQueryHashAndPlanCacheKey(sbe, classic);
 })();
@@ -159,8 +159,8 @@ function assertQueryHashAndPlanCacheKey(sbe, classic) {
 
     assert.neq(sbe, null);
     assert.neq(classic, null);
-    assert.eq(sbe.attr.queryExecutionEngine, "sbe", sbe);
-    assert.eq(classic.attr.queryExecutionEngine, "classic", classic);
+    assert.eq(sbe.attr.queryFramework, "sbe", sbe);
+    assert.eq(classic.attr.queryFramework, "classic", classic);
 
     assertQueryHashAndPlanCacheKey(sbe.attr, classic.attr);
 })();

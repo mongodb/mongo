@@ -70,7 +70,7 @@ void recordCurOpMetrics(OperationContext* opCtx) {
 
     lookupPushdownCounters.incrementLookupCounters(CurOp::get(opCtx)->debug());
 
-    queryEngineCounters.incrementQueryEngineCounters(CurOp::get(opCtx));
+    queryFrameworkCounters.incrementQueryEngineCounters(CurOp::get(opCtx));
 }
 
 }  // namespace mongo

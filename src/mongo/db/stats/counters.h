@@ -308,9 +308,9 @@ public:
 
 extern DotsAndDollarsFieldsCounters dotsAndDollarsFieldsCounters;
 
-class QueryEngineCounters {
+class QueryFrameworkCounters {
 public:
-    QueryEngineCounters() = default;
+    QueryFrameworkCounters() = default;
 
     void incrementQueryEngineCounters(CurOp* curop) {
         auto& debug = curop->debug();
@@ -336,25 +336,32 @@ public:
                     sbeOnlyAggregationCounter.increment();
                 }
             }
+        } else if (debug.cqfUsed) {
+            if (cmdName == "find") {
+                cqfFindQueryCounter.increment();
+            } else {
+                cqfAggregationQueryCounter.increment();
+            }
         }
     }
 
-    // Query counters that record whether a find query was fully or partially executed in SBE, or
-    // fully executed using the classic engine. One or the other will always be incremented during a
-    // query.
-    CounterMetric sbeFindQueryCounter{"query.queryExecutionEngine.find.sbe"};
-    CounterMetric classicFindQueryCounter{"query.queryExecutionEngine.find.classic"};
+    // Query counters that record whether a find query was fully or partially executed in SBE, fully
+    // executed using the classic engine, or fully executed using the common query framework (CQF).
+    // One of these will always be incremented during a query.
+    CounterMetric sbeFindQueryCounter{"query.queryFramework.find.sbe"};
+    CounterMetric classicFindQueryCounter{"query.queryFramework.find.classic"};
+    CounterMetric cqfFindQueryCounter{"query.queryFramework.find.cqf"};
 
     // Aggregation query counters that record whether an aggregation was fully or partially executed
-    // in DocumentSource (an sbe/classic hybrid plan), or fully pushed down to the sbe/classic
-    // layer. Only incremented during aggregations.
-    CounterMetric sbeOnlyAggregationCounter{"query.queryExecutionEngine.aggregate.sbeOnly"};
-    CounterMetric classicOnlyAggregationCounter{"query.queryExecutionEngine.aggregate.classicOnly"};
-    CounterMetric sbeHybridAggregationCounter{"query.queryExecutionEngine.aggregate.sbeHybrid"};
-    CounterMetric classicHybridAggregationCounter{
-        "query.queryExecutionEngine.aggregate.classicHybrid"};
+    // in DocumentSource (an sbe/classic hybrid plan), fully pushed down to the sbe/classic layer,
+    // or executed using CQF. These are only incremented during aggregations.
+    CounterMetric sbeOnlyAggregationCounter{"query.queryFramework.aggregate.sbeOnly"};
+    CounterMetric classicOnlyAggregationCounter{"query.queryFramework.aggregate.classicOnly"};
+    CounterMetric sbeHybridAggregationCounter{"query.queryFramework.aggregate.sbeHybrid"};
+    CounterMetric classicHybridAggregationCounter{"query.queryFramework.aggregate.classicHybrid"};
+    CounterMetric cqfAggregationQueryCounter{"query.queryFramework.aggregate.cqf"};
 };
-extern QueryEngineCounters queryEngineCounters;
+extern QueryFrameworkCounters queryFrameworkCounters;
 
 class LookupPushdownCounters {
 public:

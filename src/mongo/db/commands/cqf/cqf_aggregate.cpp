@@ -30,6 +30,7 @@
 #include "mongo/db/commands/cqf/cqf_aggregate.h"
 
 #include "mongo/db/commands/cqf/cqf_command_utils.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/pipeline/abt/document_source_visitor.h"
 #include "mongo/db/pipeline/abt/match_expression_visitor.h"
@@ -405,6 +406,9 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
     uassert(ErrorCodes::InternalErrorNotSupported,
             "Timeseries collections are not supported",
             !collection || !collection->getTimeseriesOptions());
+
+    auto curOp = CurOp::get(opCtx);
+    curOp->debug().cqfUsed = true;
 
     QueryHints queryHints = getHintsFromQueryKnobs();
 
