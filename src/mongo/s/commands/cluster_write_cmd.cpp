@@ -613,11 +613,6 @@ private:
         return true;
     }
 
-    ReadConcernSupportResult supportsReadConcern(repl::ReadConcernLevel level,
-                                                 bool isImplicitDefault) const final {
-        return ReadConcernSupportResult::allSupportedAndDefaultPermitted();
-    }
-
     void doCheckAuthorization(OperationContext* opCtx) const final {
         try {
             doCheckAuthorizationHook(AuthorizationSession::get(opCtx->getClient()));
