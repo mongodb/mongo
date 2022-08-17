@@ -1077,6 +1077,7 @@ env.Library(
         'multitenancy',
         'not_primary_error_tracker',
         'query_exec',
+        'server_feature_flags',
         'shared_request_handling',
     ],
 )

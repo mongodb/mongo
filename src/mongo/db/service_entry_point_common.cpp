@@ -77,6 +77,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/transaction_coordinator_factory.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_entry_point_common.h"
 #include "mongo/db/session/initialize_operation_session_info.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -128,6 +129,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeSessionCheckOut);
 MONGO_FAIL_POINT_DEFINE(hangAfterSessionCheckOut);
 MONGO_FAIL_POINT_DEFINE(hangBeforeSettingTxnInterruptFlag);
 MONGO_FAIL_POINT_DEFINE(hangAfterCheckingWritabilityForMultiDocumentTransactions);
+MONGO_FAIL_POINT_DEFINE(includeAdditionalParticipantInResponse);
 
 // Tracks the number of times a legacy unacknowledged write failed due to
 // not primary error resulted in network disconnection.
@@ -524,6 +526,35 @@ void appendErrorLabelsAndTopologyVersion(OperationContext* opCtx,
     const auto topologyVersion = replCoord->getTopologyVersion();
     BSONObjBuilder topologyVersionBuilder(commandBodyFieldsBob->subobjStart("topologyVersion"));
     topologyVersion.serialize(&topologyVersionBuilder);
+}
+
+void appendAdditionalParticipants(OperationContext* opCtx,
+                                  BSONObjBuilder* commandBodyFieldsBob,
+                                  const std::string& commandName,
+                                  const std::string& ns) {
+    if (gFeatureFlagAdditionalParticipants.isEnabledAndIgnoreFCV()) {
+        std::vector<BSONElement> shardIdsFromFpData;
+        if (MONGO_unlikely(
+                includeAdditionalParticipantInResponse.shouldFail([&](const BSONObj& data) {
+                    if (data.hasField("cmdName") && data.hasField("ns") &&
+                        data.hasField("shardId")) {
+                        shardIdsFromFpData = data.getField("shardId").Array();
+                        return ((data.getStringField("cmdName") == commandName) &&
+                                (data.getStringField("ns").toString() == ns));
+                    }
+                    return false;
+                }))) {
+
+            std::vector<BSONObj> participantArray;
+            for (auto& element : shardIdsFromFpData) {
+                auto participant = BSON("shardId" << ShardId(element.valueStringData().toString()));
+                participantArray.emplace_back(participant);
+            }
+            auto additionalParticipants = BSON("additionalParticipants" << participantArray);
+
+            commandBodyFieldsBob->appendElements(additionalParticipants);
+        }
+    }
 }
 
 class RunCommandOpTimes {
@@ -1225,6 +1256,8 @@ void RunCommandImpl::_epilogue() {
                                             _isInternalClient(),
                                             _ecd->getLastOpBeforeRun(),
                                             _ecd->getLastOpAfterRun());
+        appendAdditionalParticipants(
+            opCtx, &body, command->getName(), _ecd->getInvocation()->ns().ns());
     }
 
     auto commandBodyBob = replyBuilder->getBodyBuilder();
@@ -1886,6 +1919,8 @@ void ExecCommandDatabase::_handleFailure(Status status) {
                                         _isInternalClient(),
                                         getLastOpBeforeRun(),
                                         getLastOpAfterRun());
+    appendAdditionalParticipants(
+        opCtx, &_extraFieldsBuilder, command->getName(), _execContext->nsString().ns());
 
     BSONObjBuilder metadataBob;
     behaviors.appendReplyMetadata(opCtx, request, &metadataBob);

@@ -565,6 +565,23 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
             p().recoveryShardId = shardId;
         }
     }
+
+    const std::string extraParticipants = "additionalParticipants";
+    if (responseObj.hasField(extraParticipants)) {
+        BSONForEach(e, responseObj.getField(extraParticipants).Array()) {
+            mongo::ShardId addingparticipant = ShardId(
+                std::string(e.Obj().getField(StringData{"shardId"}).checkAndGetStringData()));
+            auto txnPart = _createParticipant(opCtx, addingparticipant);
+            _setReadOnlyForParticipant(
+                opCtx, addingparticipant, Participant::ReadOnly::kNotReadOnly);
+
+            if (!p().isRecoveringCommit) {
+                // Don't update participant stats during recovery since the participant list isn't
+                // known.
+                RouterTransactionsMetrics::get(opCtx)->incrementTotalContactedParticipants();
+            }
+        }
+    }
 }
 
 LogicalTime TransactionRouter::AtClusterTime::getTime() const {
