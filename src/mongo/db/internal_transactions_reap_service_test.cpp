@@ -241,7 +241,6 @@ TEST_F(InternalTransactionsReapServiceTest, CanReapMultipleRounds) {
         auto lsidToReachThreshold = generateLsids(1);
         insertSessionDocuments(lsidToReachThreshold);
         reapService()->addEagerlyReapedSessions(getServiceContext(), lsidToReachThreshold);
-        reapService()->addEagerlyReapedSessions(getServiceContext(), lsidToReachThreshold);
         reapService()->waitForCurrentDrain_forTest();
         assertNoPersistedSessions();
     };
