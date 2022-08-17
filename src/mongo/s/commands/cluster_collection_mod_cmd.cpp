@@ -74,7 +74,8 @@ public:
     Status checkAuthForCommand(Client* client,
                                const std::string& dbname,
                                const BSONObj& cmdObj) const override {
-        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbname, cmdObj));
+        const NamespaceString nss(
+            CommandHelpers::parseNsCollectionRequired({boost::none, dbname}, cmdObj));
         return auth::checkAuthForCollMod(
             client->getOperationContext(), AuthorizationSession::get(client), nss, cmdObj, true);
     }

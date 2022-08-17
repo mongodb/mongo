@@ -465,7 +465,7 @@ public:
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const std::string& dbname,
                                  const BSONObj& cmdObj) const final {
-        const auto nss = CommandHelpers::parseNsCollectionRequired(dbname, cmdObj);
+        const auto nss = CommandHelpers::parseNsCollectionRequired({boost::none, dbname}, cmdObj);
         auto as = AuthorizationSession::get(opCtx->getClient());
         if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(nss),
                                                   ActionType::collStats)) {

@@ -68,7 +68,7 @@ public:
     std::unique_ptr<CommandInvocation> parse(OperationContext* opCtx,
                                              const OpMsgRequest& opMsgRequest) override {
         // TODO: Parse into a QueryRequest here.
-        return std::make_unique<Invocation>(this, opMsgRequest, opMsgRequest.getDatabase());
+        return std::make_unique<Invocation>(this, opMsgRequest);
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext* context) const override {
@@ -97,10 +97,10 @@ public:
 
     class Invocation final : public CommandInvocation {
     public:
-        Invocation(const ClusterFindCmdBase* definition,
-                   const OpMsgRequest& request,
-                   StringData dbName)
-            : CommandInvocation(definition), _request(request), _dbName(dbName) {}
+        Invocation(const ClusterFindCmdBase* definition, const OpMsgRequest& request)
+            : CommandInvocation(definition),
+              _request(request),
+              _dbName(request.getValidatedTenantId(), request.getDatabase()) {}
 
     private:
         bool supportsWriteConcern() const override {
@@ -177,7 +177,7 @@ public:
                 auto aggCmdOnView =
                     uassertStatusOK(query_request_helper::asAggregationCommand(*findCommand));
                 auto viewAggregationCommand =
-                    OpMsgRequest::fromDBAndBody(_dbName, aggCmdOnView).body;
+                    OpMsgRequest::fromDBAndBody(_dbName.db(), aggCmdOnView).body;
 
                 auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
                     opCtx,
@@ -247,7 +247,7 @@ public:
                 auto aggCmdOnView = uassertStatusOK(
                     query_request_helper::asAggregationCommand(cq->getFindCommandRequest()));
                 auto viewAggregationCommand =
-                    OpMsgRequest::fromDBAndBody(_dbName, aggCmdOnView).body;
+                    OpMsgRequest::fromDBAndBody(_dbName.db(), aggCmdOnView).body;
 
                 auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
                     opCtx,
@@ -303,7 +303,7 @@ public:
         }
 
         const OpMsgRequest& _request;
-        const StringData _dbName;
+        const DatabaseName _dbName;
     };
 };
 

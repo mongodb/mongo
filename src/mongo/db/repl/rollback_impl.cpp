@@ -443,7 +443,7 @@ StatusWith<std::set<NamespaceString>> RollbackImpl::_namespacesForOp(const Oplog
                 // For all other command types, we should be able to parse the collection name from
                 // the first command argument.
                 try {
-                    auto cmdNss = CommandHelpers::parseNsCollectionRequired(opNss.db(), obj);
+                    auto cmdNss = CommandHelpers::parseNsCollectionRequired(opNss.dbName(), obj);
                     namespaces.insert(cmdNss);
                 } catch (const DBException& ex) {
                     return ex.toStatus();
@@ -994,8 +994,8 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
                 PendingDropInfo info;
                 info.count = *countResult;
                 const auto& opNss = oplogEntry.getNss();
-                info.nss =
-                    CommandHelpers::parseNsCollectionRequired(opNss.db(), oplogEntry.getObject());
+                info.nss = CommandHelpers::parseNsCollectionRequired(opNss.dbName(),
+                                                                     oplogEntry.getObject());
                 _pendingDrops[uuid] = info;
                 _newCounts[uuid] = info.count;
             } else {

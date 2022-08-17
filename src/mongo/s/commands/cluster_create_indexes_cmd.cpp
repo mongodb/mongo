@@ -87,10 +87,7 @@ public:
                               const BSONObj& cmdObj,
                               const RequestParser&,
                               BSONObjBuilder& output) final {
-        // TODO SERVER-67519 Change CommandHelpers::parseNs* methods to construct NamespaceStrings
-        // with tenantId
-        const NamespaceString nss(
-            CommandHelpers::parseNsCollectionRequired(dbName.toStringWithTenantId(), cmdObj));
+        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
         LOGV2_DEBUG(22750,
                     1,
                     "createIndexes: {namespace} cmd: {command}",

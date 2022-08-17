@@ -677,19 +677,19 @@ Status createCollection(OperationContext* opCtx, const CreateCommand& cmd) {
 
 // TODO SERVER-62395 Pass DatabaseName instead of dbName, and pass to isDbLockedForMode.
 Status createCollectionForApplyOps(OperationContext* opCtx,
-                                   const std::string& dbName,
+                                   const std::string& dbname,
                                    const boost::optional<UUID>& ui,
                                    const BSONObj& cmdObj,
                                    const bool allowRenameOutOfTheWay,
                                    const boost::optional<BSONObj>& idIndex) {
-    invariant(opCtx->lockState()->isDbLockedForMode(DatabaseName(boost::none, dbName), MODE_IX));
+    const DatabaseName dbName(boost::none, dbname);
+    invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IX));
 
     const NamespaceString newCollName(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
     auto newCmd = cmdObj;
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
-    const DatabaseName tenantDbName(boost::none, dbName);
-    auto* const db = databaseHolder->getDb(opCtx, tenantDbName);
+    auto* const db = databaseHolder->getDb(opCtx, dbName);
 
     // If a UUID is given, see if we need to rename a collection out of the way, and whether the
     // collection already exists under a different name. If so, rename it into place. As this is
@@ -735,7 +735,7 @@ Status createCollectionForApplyOps(OperationContext* opCtx,
                                 << ". Future collection name: " << newCollName);
 
         for (int tries = 0; needsRenaming && tries < 10; ++tries) {
-            auto tmpNameResult = makeUniqueCollectionName(opCtx, tenantDbName, "tmp%%%%%.create");
+            auto tmpNameResult = makeUniqueCollectionName(opCtx, dbName, "tmp%%%%%.create");
             if (!tmpNameResult.isOK()) {
                 return tmpNameResult.getStatus().withContext(str::stream()
                                                              << "Cannot generate temporary "

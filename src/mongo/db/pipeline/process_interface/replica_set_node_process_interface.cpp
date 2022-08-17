@@ -156,8 +156,7 @@ void ReplicaSetNodeProcessInterface::createCollection(OperationContext* opCtx,
     if (_canWriteLocally(opCtx, dbNs)) {
         return NonShardServerProcessInterface::createCollection(opCtx, dbName, cmdObj);
     }
-    // TODO SERVER-67519 change CommandHelpers::parseNsCollectionRequired to take in DatabaseName
-    auto ns = CommandHelpers::parseNsCollectionRequired(dbName.toStringWithTenantId(), cmdObj);
+    auto ns = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
     uassertStatusOK(_executeCommandOnPrimary(opCtx, ns, cmdObj));
 }
 

@@ -149,13 +149,13 @@ public:
                    const OpMsgRequest& opMsgRequest,
                    ExplainOptions::Verbosity verbosity,
                    rpc::ReplyBuilderInterface* result) const override {
-        std::string dbname = opMsgRequest.getDatabase().toString();
+        DatabaseName dbName(opMsgRequest.getValidatedTenantId(), opMsgRequest.getDatabase());
         const BSONObj& cmdObj = opMsgRequest.body;
         // Acquire locks. The RAII object is optional, because in the case
         // of a view, the locks need to be released.
         boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
         ctx.emplace(opCtx,
-                    CommandHelpers::parseNsCollectionRequired(dbname, cmdObj),
+                    CommandHelpers::parseNsCollectionRequired(dbName, cmdObj),
                     AutoGetCollectionViewMode::kViewsPermitted);
         const auto nss = ctx->getNss();
 

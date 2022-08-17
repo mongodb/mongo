@@ -377,7 +377,7 @@ public:
                    const OpMsgRequest& request,
                    ExplainOptions::Verbosity verbosity,
                    rpc::ReplyBuilderInterface* result) const override {
-        std::string dbName = request.getDatabase().toString();
+        const DatabaseName dbName(request.getValidatedTenantId(), request.getDatabase());
         const BSONObj& cmdObj = [&]() {
             // Check whether the query portion needs to be rewritten for FLE.
             auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(

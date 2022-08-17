@@ -278,11 +278,6 @@ std::string CommandHelpers::parseNsFullyQualified(const BSONObj& cmdObj) {
     return nss.ns();
 }
 
-NamespaceString CommandHelpers::parseNsCollectionRequired(StringData dbname,
-                                                          const BSONObj& cmdObj) {
-    return parseNsCollectionRequired({boost::none, dbname}, cmdObj);
-}
-
 NamespaceString CommandHelpers::parseNsCollectionRequired(const DatabaseName& dbName,
                                                           const BSONObj& cmdObj) {
     // Accepts both BSON String and Symbol for collection name per SERVER-16260
