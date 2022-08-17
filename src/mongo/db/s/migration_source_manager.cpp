@@ -479,7 +479,7 @@ void MigrationSourceManager::enterCriticalSection() {
     // NOTE: The 'migrateChunkToNewShard' oplog message written by the above call to
     // 'notifyChangeStreamsOnRecipientFirstChunk' depends on this majority write to carry its
     // local write to majority committed.
-    uassertStatusOK(ShardingStateRecovery::startMetadataOp(_opCtx));
+    uassertStatusOKWithContext(ShardingStateRecovery::startMetadataOp(_opCtx), "Start metadata op");
 
     LOGV2_DEBUG_OPTIONS(4817402,
                         2,
@@ -497,17 +497,13 @@ void MigrationSourceManager::enterCriticalSection() {
     // time inclusive of the migration config commit update from accessing secondary data.
     // Note: this write must occur after the critSec flag is set, to ensure the secondary refresh
     // will stall behind the flag.
-    Status signalStatus = shardmetadatautil::updateShardCollectionsEntry(
-        _opCtx,
-        BSON(ShardCollectionType::kNssFieldName << nss().ns()),
-        BSON("$inc" << BSON(ShardCollectionType::kEnterCriticalSectionCounterFieldName << 1)),
-        false /*upsert*/);
-    if (!signalStatus.isOK()) {
-        uasserted(
-            ErrorCodes::OperationFailed,
-            str::stream() << "Failed to persist critical section signal for secondaries due to: "
-                          << signalStatus.toString());
-    }
+    uassertStatusOKWithContext(
+        shardmetadatautil::updateShardCollectionsEntry(
+            _opCtx,
+            BSON(ShardCollectionType::kNssFieldName << nss().ns()),
+            BSON("$inc" << BSON(ShardCollectionType::kEnterCriticalSectionCounterFieldName << 1)),
+            false /*upsert*/),
+        "Persist critical section signal for secondaries");
 
     LOGV2(22017,
           "Migration successfully entered critical section",
