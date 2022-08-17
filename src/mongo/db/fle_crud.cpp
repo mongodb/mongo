@@ -841,6 +841,23 @@ write_ops::DeleteCommandReply processDelete(FLEQueryInterface* queryImpl,
     return deleteReply;
 }
 
+bool hasIndexedFieldsInSchema(const std::vector<EncryptedField>& fields) {
+    for (const auto& field : fields) {
+        if (field.getQueries().has_value()) {
+            const auto& queries = field.getQueries().get();
+            if (stdx::holds_alternative<std::vector<mongo::QueryTypeConfig>>(queries)) {
+                const auto& vec = stdx::get<0>(queries);
+                if (!vec.empty()) {
+                    return true;
+                }
+            } else {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 /**
  * Update is the most complicated FLE operation.
  * It is basically an insert followed by a delete, sort of.
@@ -950,8 +967,11 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
     // Fail if we could not find the new document
     uassert(6371505, "Could not find pre-image document by _id", !newDocument.isEmpty());
 
-    // Check the user did not remove/destroy the __safeContent__ array
-    FLEClientCrypto::validateTagsArray(newDocument);
+    if (hasIndexedFieldsInSchema(efc.getFields())) {
+        // Check the user did not remove/destroy the __safeContent__ array. If there are no
+        // indexed fields, then there will not be a safeContent array in the document.
+        FLEClientCrypto::validateTagsArray(newDocument);
+    }
 
     // Step 5 ----
     auto originalFields = EDCServerCollection::getEncryptedIndexedFields(originalDocument);
@@ -1195,8 +1215,11 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
         // Fail if we could not find the new document
         uassert(6371404, "Could not find pre-image document by _id", !newDocument.isEmpty());
 
-        // Check the user did not remove/destroy the __safeContent__ array
-        FLEClientCrypto::validateTagsArray(newDocument);
+        if (hasIndexedFieldsInSchema(efc.getFields())) {
+            // Check the user did not remove/destroy the __safeContent__ array. If there are no
+            // indexed fields, then there will not be a safeContent array in the document.
+            FLEClientCrypto::validateTagsArray(newDocument);
+        }
 
         newFields = EDCServerCollection::getEncryptedIndexedFields(newDocument);
     }
