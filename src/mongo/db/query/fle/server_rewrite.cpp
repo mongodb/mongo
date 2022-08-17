@@ -193,7 +193,8 @@ public:
         for (auto& equality : equalitiesList) {
             // For each expression representing a FleFindPayload...
             if (auto constChild = dynamic_cast<ExpressionConstant*>(equality.get())) {
-                if (!queryRewriter->isFleFindPayload(constChild->getValue())) {
+                if (!queryRewriter->isFleFindPayload(
+                        constChild->getValue(), EncryptedBinDataType::kFLE2FindEqualityPayload)) {
                     continue;
                 }
 
@@ -224,7 +225,8 @@ public:
                     // For each expression representing a FleFindPayload...
                     if (auto constChild = dynamic_cast<ExpressionConstant*>(equality.get())) {
                         // ... rewrite the payload to a list of tags...
-                        auto tags = queryRewriter->rewritePayloadAsTags(constChild->getValue());
+                        auto tags =
+                            queryRewriter->rewriteEqualityPayloadAsTags(constChild->getValue());
                         for (auto&& tagElt : tags) {
                             // ... and for each tag, construct expression {$in: [tag,
                             // "$__safeContent__"]}.
@@ -281,9 +283,12 @@ public:
         auto leftConstant = dynamic_cast<ExpressionConstant*>(equalitiesList[0].get());
         auto rightConstant = dynamic_cast<ExpressionConstant*>(equalitiesList[1].get());
 
-        bool isLeftFFP = leftConstant && queryRewriter->isFleFindPayload(leftConstant->getValue());
-        bool isRightFFP =
-            rightConstant && queryRewriter->isFleFindPayload(rightConstant->getValue());
+        bool isLeftFFP = leftConstant &&
+            queryRewriter->isFleFindPayload(leftConstant->getValue(),
+                                            EncryptedBinDataType::kFLE2FindEqualityPayload);
+        bool isRightFFP = rightConstant &&
+            queryRewriter->isFleFindPayload(rightConstant->getValue(),
+                                            EncryptedBinDataType::kFLE2FindEqualityPayload);
 
         uassert(6334100,
                 "Cannot compare two encrypted constants to each other",
@@ -309,7 +314,7 @@ public:
             try {
                 std::vector<boost::intrusive_ptr<Expression>> orListElems;
 
-                auto tags = queryRewriter->rewritePayloadAsTags(constChild->getValue());
+                auto tags = queryRewriter->rewriteEqualityPayloadAsTags(constChild->getValue());
                 for (auto&& tagElt : tags) {
                     // ... and for each tag, construct expression {$in: [tag,
                     // "$__safeContent__"]}.
@@ -642,6 +647,13 @@ std::unique_ptr<MatchExpression> FLEQueryRewriter::_rewrite(MatchExpression* exp
             }
             return nullptr;
         }
+        case MatchExpression::ENCRYPTED_BETWEEN: {
+            if (gFeatureFlagFLE2Range.isEnabled(serverGlobalParams.featureCompatibility)) {
+                return rewriteRange(
+                    std::move(static_cast<const EncryptedBetweenMatchExpression*>(expr)));
+            }
+            return nullptr;
+        }
         case MatchExpression::EXPRESSION: {
             // Save the current value of _rewroteLastExpression, since rewriteExpression() may
             // reset it to false and we may have already done a match expression rewrite.
@@ -659,7 +671,7 @@ std::unique_ptr<MatchExpression> FLEQueryRewriter::_rewrite(MatchExpression* exp
     }
 }
 
-BSONObj FLEQueryRewriter::rewritePayloadAsTags(BSONElement fleFindPayload) const {
+BSONObj FLEQueryRewriter::rewriteEqualityPayloadAsTags(BSONElement fleFindPayload) const {
     auto tokens = ParsedFindPayload(fleFindPayload);
     auto tags = readTags(*_escReader,
                          *_eccReader,
@@ -676,7 +688,7 @@ BSONObj FLEQueryRewriter::rewritePayloadAsTags(BSONElement fleFindPayload) const
     return bab.obj().getOwned();
 }
 
-std::vector<Value> FLEQueryRewriter::rewritePayloadAsTags(Value fleFindPayload) const {
+std::vector<Value> FLEQueryRewriter::rewriteEqualityPayloadAsTags(Value fleFindPayload) const {
     auto tokens = ParsedFindPayload(fleFindPayload);
     auto tags = readTags(*_escReader,
                          *_eccReader,
@@ -692,16 +704,25 @@ std::vector<Value> FLEQueryRewriter::rewritePayloadAsTags(Value fleFindPayload) 
     return tagVec;
 }
 
+BSONObj FLEQueryRewriter::rewriteRangePayloadAsTags(BSONElement fleFindPayload) const {
+    // TODO: SERVER-67206
+    return BSONObj();
+}
+
+std::vector<Value> FLEQueryRewriter::rewriteRangePayloadAsTags(Value fleFindPayload) const {
+    // TODO: SERVER-67206
+    return std::vector({Value(0)});
+}
 
 std::unique_ptr<MatchExpression> FLEQueryRewriter::rewriteEq(const EqualityMatchExpression* expr) {
     auto ffp = expr->getData();
-    if (!isFleFindPayload(ffp)) {
+    if (!isFleFindPayload(ffp, EncryptedBinDataType::kFLE2FindEqualityPayload)) {
         return nullptr;
     }
 
     if (_mode != EncryptedCollScanMode::kForceAlways) {
         try {
-            auto obj = rewritePayloadAsTags(ffp);
+            auto obj = rewriteEqualityPayloadAsTags(ffp);
 
             auto tags = std::vector<BSONElement>();
             obj.elems(tags);
@@ -734,7 +755,7 @@ std::unique_ptr<MatchExpression> FLEQueryRewriter::rewriteEq(const EqualityMatch
 std::unique_ptr<MatchExpression> FLEQueryRewriter::rewriteIn(const InMatchExpression* expr) {
     size_t numFFPs = 0;
     for (auto& eq : expr->getEqualities()) {
-        if (isFleFindPayload(eq)) {
+        if (isFleFindPayload(eq, EncryptedBinDataType::kFLE2FindEqualityPayload)) {
             ++numFFPs;
         }
     }
@@ -755,7 +776,7 @@ std::unique_ptr<MatchExpression> FLEQueryRewriter::rewriteIn(const InMatchExpres
             auto backingBSONBuilder = BSONArrayBuilder();
 
             for (auto& eq : expr->getEqualities()) {
-                auto obj = rewritePayloadAsTags(eq);
+                auto obj = rewriteEqualityPayloadAsTags(eq);
                 for (auto&& elt : obj) {
                     backingBSONBuilder.append(elt);
                 }
@@ -798,6 +819,25 @@ std::unique_ptr<MatchExpression> FLEQueryRewriter::rewriteIn(const InMatchExpres
     auto orExpr = std::make_unique<OrMatchExpression>(std::move(matches));
     _rewroteLastExpression = true;
     return orExpr;
+}
+
+std::unique_ptr<MatchExpression> FLEQueryRewriter::rewriteRange(
+    const EncryptedBetweenMatchExpression* expr) {
+    auto ffp = expr->rhs();
+
+    if (!isFleFindPayload(ffp, EncryptedBinDataType::kFLE2FindRangePayload)) {
+        return nullptr;
+    }
+
+    auto obj = rewriteRangePayloadAsTags(ffp);
+    auto tags = std::vector<BSONElement>();
+    obj.elems(tags);
+    auto inExpr = std::make_unique<InMatchExpression>(kSafeContent);
+    inExpr->setBackingBSON(std::move(obj));
+    auto status = inExpr->setEqualities(std::move(tags));
+    uassertStatusOK(status);
+    _rewroteLastExpression = true;
+    return inExpr;
 }
 
 }  // namespace mongo::fle

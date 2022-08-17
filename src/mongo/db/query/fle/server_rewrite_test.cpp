@@ -37,6 +37,7 @@
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/fle/server_rewrite.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
@@ -52,15 +53,41 @@ public:
         auto res = rewriteMatchExpression(obj);
         return res ? res.value() : obj;
     }
+
+    /* Given a vector of BSONArrays, concatenate them into one BSONArray.
+     *
+     * E.g., given vec = [{1, 2, 3}, {4, 5, 6}, {21, 34}] this will return
+     * {1, 2, 3, 4, 5, 6, 21, 34} */
+    BSONArray concatBSONArrays(std::vector<BSONArray> vec) const {
+        auto backingBSONBuilder = BSONArrayBuilder();
+
+        for (auto& arr : vec) {
+            for (auto&& elt : arr) {
+                backingBSONBuilder.append(elt);
+            }
+        }
+        return backingBSONBuilder.arr();
+    }
 };
 
 class MockFLEQueryRewriter : public BasicMockFLEQueryRewriter {
 public:
     MockFLEQueryRewriter() : _tags() {}
 
-    bool isFleFindPayload(const BSONElement& fleFindPayload) const override {
-        return _encryptedFields.find(fleFindPayload.fieldNameStringData()) !=
-            _encryptedFields.end();
+    bool isFleFindPayload(const BSONElement& fleFindPayload,
+                          EncryptedBinDataType type) const override {
+        switch (type) {
+            case EncryptedBinDataType::kFLE2FindEqualityPayload: {
+                return _encryptedFields.find(fleFindPayload.fieldNameStringData()) !=
+                    _encryptedFields.end();
+            }
+            case EncryptedBinDataType::kFLE2FindRangePayload: {
+                // By definition, $encryptedBetween only ever has an encrypted payload.
+                return true;
+            }
+            default:
+                return false;
+        }
     }
 
     void setEncryptedTags(std::pair<StringData, int> fieldvalue, BSONObj tags) {
@@ -69,11 +96,30 @@ public:
     }
 
 private:
-    BSONObj rewritePayloadAsTags(BSONElement fleFindPayload) const override {
+    BSONObj rewriteEqualityPayloadAsTags(BSONElement fleFindPayload) const override {
         ASSERT(fleFindPayload.isNumber());  // Only accept numbers as mock FFPs.
         ASSERT(_tags.find({fleFindPayload.fieldNameStringData(), fleFindPayload.Int()}) !=
                _tags.end());
         return _tags.find({fleFindPayload.fieldNameStringData(), fleFindPayload.Int()})->second;
+    };
+
+    BSONObj rewriteRangePayloadAsTags(BSONElement fleFindPayload) const override {
+        auto parsedPayload = fleFindPayload.Obj().firstElement();
+        auto fieldName = parsedPayload.fieldNameStringData();
+
+        std::vector<BSONElement> range;
+        auto payloadAsArray = parsedPayload.Array();
+        for (auto&& elt : payloadAsArray) {
+            range.push_back(elt);
+        }
+
+        std::vector<BSONArray> allTags;
+        for (auto i = range[0].Number(); i <= range[1].Number(); i++) {
+            ASSERT(_tags.find({fieldName, i}) != _tags.end());
+            auto temp = _tags.find({fieldName, i})->second;
+            allTags.push_back(BSONArray(temp));
+        }
+        return concatBSONArrays(allTags);
     };
 
     std::map<std::pair<StringData, int>, BSONObj> _tags;
@@ -367,6 +413,387 @@ TEST_F(FLEServerRewriteTest, ComparisonToObjectIgnored) {
         auto actual = _mock.rewriteMatchExpressionForTest(match);
         ASSERT_BSONOBJ_EQ(actual, match);
     }
+}
+
+TEST_F(FLEServerRewriteTest, EncryptedBetweenBasic) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2Range", true);
+
+    int start = 1;
+    int end = 3;
+    StringData encField = "ssn";
+
+    // The field redundancy is so that we can pull out the field
+    // name in the mock version of rewriteRangePayloadAsTags.
+    BSONObj query =
+        BSON(encField << BSON("$encryptedBetween" << BSON(encField << BSON_ARRAY(start << end))));
+
+    auto tags1 = BSON_ARRAY(1 << 2 << 3);
+    auto tags2 = BSON_ARRAY("A"
+                            << "F"
+                            << "Q");
+    auto tags3 = BSON_ARRAY("aHb"
+                            << "jkl"
+                            << "q76");
+
+    std::vector<BSONArray> allTags = {tags1, tags2, tags3};
+    BSONArray tagsConcat = _mock.concatBSONArrays(allTags);
+
+    for (int i = 0; i <= (end - start); i++) {
+        _mock.setEncryptedTags({encField, (start + i)}, allTags[i]);
+    }
+
+    auto expected = BSON(kSafeContent << BSON("$in" << tagsConcat));
+    auto actual = _mock.rewriteMatchExpressionForTest(query);
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+TEST_F(FLEServerRewriteTest, EncryptedBetweenFeatureFlagFalse) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2Range", false);
+
+    int start = 1;
+    int end = 3;
+    StringData encField = "ssn";
+
+    BSONObj query =
+        BSON(encField << BSON("$encryptedBetween" << BSON(encField << BSON_ARRAY(start << end))));
+
+    auto tags1 = BSON_ARRAY(1 << 2 << 3);
+    auto tags2 = BSON_ARRAY(4 << 5 << 6);
+    auto tags3 = BSON_ARRAY(7 << 8 << 9);
+
+    std::vector<BSONArray> allTags = {tags1, tags2, tags3};
+    BSONArray tagsConcat = _mock.concatBSONArrays(allTags);
+
+    for (int i = 0; i <= (end - start); i++) {
+        _mock.setEncryptedTags({encField, (start + i)}, allTags[i]);
+    }
+
+    // No rewrite should occur since the feature flag has been set to false.
+    auto actual = _mock.rewriteMatchExpressionForTest(query);
+    ASSERT_BSONOBJ_EQ(actual, query);
+}
+
+TEST_F(FLEServerRewriteTest, EncryptedBetweenVariableNumberOfTags) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2Range", true);
+
+    int start = 1;
+    int end = 3;
+    StringData encField = "ssn";
+
+    BSONObj query =
+        BSON(encField << BSON("$encryptedBetween" << BSON(encField << BSON_ARRAY(start << end))));
+
+    auto tags1 = BSON_ARRAY(1);
+    auto tags2 = BSON_ARRAY("A"
+                            << "F");
+    auto tags3 = BSON_ARRAY("aHb"
+                            << "bcdefdfg12243"
+                            << "c"
+                            << "d"
+                            << "e"
+                            << "f"
+                            << "g"
+                            << "hij"
+                            << "kl78h");
+
+    std::vector<BSONArray> allTags = {tags1, tags2, tags3};
+    BSONArray tagsConcat = _mock.concatBSONArrays(allTags);
+
+    for (int i = 0; i <= (end - start); i++) {
+        _mock.setEncryptedTags({encField, (start + i)}, allTags[i]);
+    }
+
+    auto expected = BSON(kSafeContent << BSON("$in" << tagsConcat));
+    auto actual = _mock.rewriteMatchExpressionForTest(query);
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+TEST_F(FLEServerRewriteTest, EncryptedBetweenInsideNot) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2Range", true);
+
+    int start = 1;
+    int end = 3;
+    StringData encField = "ssn";
+    BSONObj query =
+        BSON(encField << BSON("$not" << BSON("$encryptedBetween"
+                                             << BSON(encField << BSON_ARRAY(start << end)))));
+
+    auto tags1 = BSON_ARRAY(1 << 2 << 3);
+    auto tags2 = BSON_ARRAY("A"
+                            << "F"
+                            << "Q");
+    auto tags3 = BSON_ARRAY("aHb"
+                            << "jkl"
+                            << "q76");
+
+    std::vector<BSONArray> allTags = {tags1, tags2, tags3};
+    BSONArray tagsConcat = _mock.concatBSONArrays(allTags);
+
+    for (int i = 0; i <= (end - start); i++) {
+        _mock.setEncryptedTags({encField, (start + i)}, allTags[i]);
+    }
+
+    auto expected = BSON(kSafeContent << BSON("$not" << BSON("$in" << tagsConcat)));
+    auto actual = _mock.rewriteMatchExpressionForTest(query);
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+TEST_F(FLEServerRewriteTest, EncryptedBetweenDottedPath) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2Range", true);
+
+    int start = 1;
+    int end = 3;
+    StringData encField = "hello.world";
+    BSONObj query =
+        BSON(encField << BSON("$encryptedBetween" << BSON(encField << BSON_ARRAY(start << end))));
+
+    auto tags1 = BSON_ARRAY(1 << 2 << 3);
+    auto tags2 = BSON_ARRAY("A"
+                            << "F"
+                            << "Q");
+    auto tags3 = BSON_ARRAY("aHb"
+                            << "jkl"
+                            << "q76");
+
+    std::vector<BSONArray> allTags = {tags1, tags2, tags3};
+    BSONArray tagsConcat = _mock.concatBSONArrays(allTags);
+
+    for (int i = 0; i <= (end - start); i++) {
+        _mock.setEncryptedTags({encField, (start + i)}, allTags[i]);
+    }
+
+    auto expected = BSON(kSafeContent << BSON("$in" << tagsConcat));
+    auto actual = _mock.rewriteMatchExpressionForTest(query);
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+TEST_F(FLEServerRewriteTest, EncryptedBetweenInsideAnd) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2Range", true);
+
+    int start = 1;
+    int end = 3;
+    StringData encField = "ssn";
+    BSONObj query = BSON(
+        "$and" << BSON_ARRAY(BSON("x" << 5)
+                             << BSON(encField << BSON("$encryptedBetween" << BSON(
+                                                          encField << BSON_ARRAY(start << end))))));
+
+    auto tags1 = BSON_ARRAY(1 << 2 << 3);
+    auto tags2 = BSON_ARRAY("A"
+                            << "F"
+                            << "Q");
+    auto tags3 = BSON_ARRAY("aHb"
+                            << "jkl"
+                            << "q76");
+
+    std::vector<BSONArray> allTags = {tags1, tags2, tags3};
+    BSONArray tagsConcat = _mock.concatBSONArrays(allTags);
+
+    for (int i = 0; i <= (end - start); i++) {
+        _mock.setEncryptedTags({encField, (start + i)}, allTags[i]);
+    }
+
+    auto expected = BSON("$and" << BSON_ARRAY(BSON("x" << BSON("$eq" << 5))
+                                              << BSON(kSafeContent << BSON("$in" << tagsConcat))));
+    auto actual = _mock.rewriteMatchExpressionForTest(query);
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+TEST_F(FLEServerRewriteTest, EncryptedBetweenInsideOr) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2Range", true);
+
+    int start = 1;
+    int end = 3;
+    StringData encField = "ssn";
+    BSONObj query = BSON(
+        "$or" << BSON_ARRAY(BSON("x" << 5)
+                            << BSON(encField << BSON("$encryptedBetween" << BSON(
+                                                         encField << BSON_ARRAY(start << end))))));
+
+    auto tags1 = BSON_ARRAY(1 << 2 << 3);
+    auto tags2 = BSON_ARRAY("A"
+                            << "F"
+                            << "Q");
+    auto tags3 = BSON_ARRAY("aHb"
+                            << "jkl"
+                            << "q76");
+
+    std::vector<BSONArray> allTags = {tags1, tags2, tags3};
+    BSONArray tagsConcat = _mock.concatBSONArrays(allTags);
+
+    for (int i = 0; i <= (end - start); i++) {
+        _mock.setEncryptedTags({encField, (start + i)}, allTags[i]);
+    }
+
+    auto expected = BSON("$or" << BSON_ARRAY(BSON("x" << BSON("$eq" << 5))
+                                             << BSON(kSafeContent << BSON("$in" << tagsConcat))));
+    auto actual = _mock.rewriteMatchExpressionForTest(query);
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+TEST_F(FLEServerRewriteTest, EncryptedBetweeenAndEncryptedEquality) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2Range", true);
+
+    int start = 1;
+    int end = 3;
+    StringData encField = "ssn";
+    BSONObj query = BSON(
+        "$and" << BSON_ARRAY(BSON("x" << 21)
+                             << BSON(encField << BSON("$encryptedBetween" << BSON(
+                                                          encField << BSON_ARRAY(start << end))))));
+
+    auto tags1 = BSON_ARRAY(1 << 2 << 3);
+    auto tags2 = BSON_ARRAY("A"
+                            << "F"
+                            << "Q");
+    auto tags3 = BSON_ARRAY("aHb"
+                            << "jkl"
+                            << "q76");
+
+    std::vector<BSONArray> allTags = {tags1, tags2, tags3};
+    BSONArray tagsConcat = _mock.concatBSONArrays(allTags);
+
+    for (int i = 0; i <= (end - start); i++) {
+        _mock.setEncryptedTags({encField, (start + i)}, allTags[i]);
+    }
+
+    BSONArray equalityTags = BSON_ARRAY(312 << 567 << 897);
+    _mock.setEncryptedTags({"x", 21}, equalityTags);
+
+    auto expected = BSON("$and" << BSON_ARRAY(BSON(kSafeContent << BSON("$in" << equalityTags))
+                                              << BSON(kSafeContent << BSON("$in" << tagsConcat))));
+    auto actual = _mock.rewriteMatchExpressionForTest(query);
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+TEST_F(FLEServerRewriteTest, EncryptedBetweenAndEncryptedIn) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2Range", true);
+
+    int start = 1;
+    int end = 3;
+    StringData encBetweenField = "ssn";
+    StringData encInField = "age";
+    BSONObj query =
+        BSON("$and" << BSON_ARRAY(
+                 BSON(encBetweenField << BSON("$encryptedBetween"
+                                              << BSON(encBetweenField << BSON_ARRAY(start << end))))
+                 << BSON(encInField << BSON("$in" << BSON_ARRAY(10 << 22 << 34)))));
+
+    auto tags1 = BSON_ARRAY(1 << 2 << 3);
+    auto tags2 = BSON_ARRAY("A"
+                            << "F"
+                            << "Q");
+    auto tags3 = BSON_ARRAY("aHb"
+                            << "jkl"
+                            << "q76");
+
+    std::vector<BSONArray> allTags = {tags1, tags2, tags3};
+    BSONArray tagsConcat = _mock.concatBSONArrays(allTags);
+
+    for (int i = 0; i <= (end - start); i++) {
+        _mock.setEncryptedTags({encBetweenField, (start + i)}, allTags[i]);
+    }
+
+    auto inTags1 = BSON_ARRAY(1 << 2);
+    auto inTags2 = BSON_ARRAY(3 << 5);
+    auto inTags3 = BSON_ARRAY(97 << 98 << 99 << 100);
+    std::vector<BSONArray> allInTags = {inTags1, inTags2, inTags3};
+    _mock.setEncryptedTags({"0", 10}, inTags1);
+    _mock.setEncryptedTags({"1", 22}, inTags2);
+    _mock.setEncryptedTags({"2", 34}, inTags3);
+    BSONArray inTagsConcat = _mock.concatBSONArrays(allInTags);
+
+
+    auto expected =
+        BSON("$and" << BSON_ARRAY(BSON(kSafeContent << BSON("$in" << tagsConcat))
+                                  << BSON(kSafeContent << BSON("$in" << inTagsConcat))));
+    auto actual = _mock.rewriteMatchExpressionForTest(query);
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+TEST_F(FLEServerRewriteTest, EncryptedBetweenAndUnencryptedRange) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2Range", true);
+
+    int start = 1;
+    int end = 3;
+    StringData encField = "ssn";
+    BSONObj query = BSON(
+        "$and" << BSON_ARRAY(BSON(encField << BSON("$encryptedBetween"
+                                                   << BSON(encField << BSON_ARRAY(start << end))))
+                             << BSON("$and" << BSON_ARRAY(BSON("x" << BSON("$gt" << 10))
+                                                          << BSON("x" << BSON("$lt" << 25))))));
+
+    auto tags1 = BSON_ARRAY(1 << 2 << 3);
+    auto tags2 = BSON_ARRAY("A"
+                            << "F"
+                            << "Q");
+    auto tags3 = BSON_ARRAY("aHb"
+                            << "jkl"
+                            << "q76");
+
+    std::vector<BSONArray> allTags = {tags1, tags2, tags3};
+    BSONArray tagsConcat = _mock.concatBSONArrays(allTags);
+
+    for (int i = 0; i <= (end - start); i++) {
+        _mock.setEncryptedTags({encField, (start + i)}, allTags[i]);
+    }
+
+    auto expected = BSON(
+        "$and" << BSON_ARRAY(BSON(kSafeContent << BSON("$in" << tagsConcat))
+                             << BSON("$and" << BSON_ARRAY(BSON("x" << BSON("$gt" << 10))
+                                                          << BSON("x" << BSON("$lt" << 25))))));
+    auto actual = _mock.rewriteMatchExpressionForTest(query);
+    ASSERT_BSONOBJ_EQ(actual, expected);
+}
+
+TEST_F(FLEServerRewriteTest, EncryptedBetweenOnTwoDiffFields) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2Range", true);
+
+    int start1 = 1;
+    int end1 = 3;
+    StringData encField1 = "ssn";
+    int start2 = 102;
+    int end2 = 106;
+    StringData encField2 = "age";
+    BSONObj query =
+        BSON("$and" << BSON_ARRAY(
+                 BSON(encField1 << BSON("$encryptedBetween"
+                                        << BSON(encField1 << BSON_ARRAY(start1 << end1))))
+                 << BSON(encField2 << BSON("$encryptedBetween"
+                                           << BSON(encField2 << BSON_ARRAY(start2 << end2))))));
+
+    auto tags1 = BSON_ARRAY(1 << 2 << 3);
+    auto tags2 = BSON_ARRAY("A"
+                            << "F"
+                            << "Q");
+    auto tags3 = BSON_ARRAY("aHb"
+                            << "jkl"
+                            << "q76");
+
+    std::vector<BSONArray> allTags1 = {tags1, tags2, tags3};
+    BSONArray tagsConcat1 = _mock.concatBSONArrays(allTags1);
+
+    for (int i = 0; i <= (end1 - start1); i++) {
+        _mock.setEncryptedTags({encField1, (start1 + i)}, allTags1[i]);
+    }
+
+    auto tags4 = BSON_ARRAY(1 << 2 << 3);
+    auto tags5 = BSON_ARRAY(4 << 5 << 6);
+    auto tags6 = BSON_ARRAY(21 << 25 << 45);
+    auto tags7 = BSON_ARRAY(112 << 212 << 456);
+    auto tags8 = BSON_ARRAY(908 << 1234 << 23467813);
+
+    std::vector<BSONArray> allTags2 = {tags4, tags5, tags6, tags7, tags8};
+    BSONArray tagsConcat2 = _mock.concatBSONArrays(allTags2);
+
+    for (int i = 0; i <= (end2 - start2); i++) {
+        _mock.setEncryptedTags({encField2, (start2 + i)}, allTags2[i]);
+    }
+
+    auto expected = BSON("$and" << BSON_ARRAY(BSON(kSafeContent << BSON("$in" << tagsConcat1))
+                                              << BSON(kSafeContent << BSON("$in" << tagsConcat2))));
+    auto actual = _mock.rewriteMatchExpressionForTest(query);
+    ASSERT_BSONOBJ_EQ(actual, expected);
 }
 
 template <typename T>
