@@ -337,20 +337,21 @@ public:
 
 extern DotsAndDollarsFieldsCounters dotsAndDollarsFieldsCounters;
 
-class QueryEngineCounters {
+class QueryFrameworkCounters {
 public:
-    QueryEngineCounters()
-        : sbeFindQueryMetric("query.queryExecutionEngine.find.sbe", &sbeFindQueryCounter),
-          classicFindQueryMetric("query.queryExecutionEngine.find.classic",
-                                 &classicFindQueryCounter),
-          sbeOnlyAggregationMetric("query.queryExecutionEngine.aggregate.sbeOnly",
+    QueryFrameworkCounters()
+        : sbeFindQueryMetric("query.queryFramework.find.sbe", &sbeFindQueryCounter),
+          classicFindQueryMetric("query.queryFramework.find.classic", &classicFindQueryCounter),
+          cqfFindQueryMetric("query.queryFramework.find.cqf", &cqfFindQueryCounter),
+          sbeOnlyAggregationMetric("query.queryFramework.aggregate.sbeOnly",
                                    &sbeOnlyAggregationCounter),
-          classicOnlyAggregationMetric("query.queryExecutionEngine.aggregate.classicOnly",
+          classicOnlyAggregationMetric("query.queryFramework.aggregate.classicOnly",
                                        &classicOnlyAggregationCounter),
-          sbeHybridAggregationMetric("query.queryExecutionEngine.aggregate.sbeHybrid",
+          sbeHybridAggregationMetric("query.queryFramework.aggregate.sbeHybrid",
                                      &sbeHybridAggregationCounter),
-          classicHybridAggregationMetric("query.queryExecutionEngine.aggregate.classicHybrid",
-                                         &classicHybridAggregationCounter) {}
+          classicHybridAggregationMetric("query.queryFramework.aggregate.classicHybrid",
+                                         &classicHybridAggregationCounter),
+          cqfAggregationMetric("query.queryFramework.aggregate.cqf", &cqfAggregationQueryCounter) {}
 
     void incrementQueryEngineCounters(CurOp* curop) {
         auto& debug = curop->debug();
@@ -376,29 +377,39 @@ public:
                     sbeOnlyAggregationCounter.increment();
                 }
             }
+        } else if (debug.cqfUsed) {
+            if (cmdName == "find") {
+                cqfFindQueryCounter.increment();
+            } else {
+                cqfAggregationQueryCounter.increment();
+            }
         }
     }
 
-    // Query counters that record whether a find query was fully or partially executed in SBE, or
-    // fully executed using the classic engine. One or the other will always be incremented during a
-    // query.
+    // Query counters that record whether a find query was fully or partially executed in SBE, fully
+    // executed using the classic engine, or fully executed using the common query framework (CQF).
+    // One of these will always be incremented during a query.
     Counter64 sbeFindQueryCounter;
     Counter64 classicFindQueryCounter;
+    Counter64 cqfFindQueryCounter;
     ServerStatusMetricField<Counter64> sbeFindQueryMetric;
     ServerStatusMetricField<Counter64> classicFindQueryMetric;
+    ServerStatusMetricField<Counter64> cqfFindQueryMetric;
     // Aggregation query counters that record whether an aggregation was fully or partially executed
-    // in DocumentSource (an sbe/classic hybrid plan), or fully pushed down to the sbe/classic
-    // layer. Only incremented during aggregations.
+    // in DocumentSource (an sbe/classic hybrid plan), fully pushed down to the sbe/classic layer,
+    // or executed using CQF. These are only incremented during aggregations.
     Counter64 sbeOnlyAggregationCounter;
     Counter64 classicOnlyAggregationCounter;
     Counter64 sbeHybridAggregationCounter;
     Counter64 classicHybridAggregationCounter;
+    Counter64 cqfAggregationQueryCounter;
     ServerStatusMetricField<Counter64> sbeOnlyAggregationMetric;
     ServerStatusMetricField<Counter64> classicOnlyAggregationMetric;
     ServerStatusMetricField<Counter64> sbeHybridAggregationMetric;
     ServerStatusMetricField<Counter64> classicHybridAggregationMetric;
+    ServerStatusMetricField<Counter64> cqfAggregationMetric;
 };
-extern QueryEngineCounters queryEngineCounters;
+extern QueryFrameworkCounters queryFrameworkCounters;
 
 /**
  * Generic class for counters of expressions inside various MQL statements.

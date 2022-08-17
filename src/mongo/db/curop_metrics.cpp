@@ -82,7 +82,7 @@ void recordCurOpMetrics(OperationContext* opCtx) {
     if (auto n = debug.additiveMetrics.writeConflicts.load(); n > 0)
         writeConflictsCounter.increment(n);
 
-    queryEngineCounters.incrementQueryEngineCounters(CurOp::get(opCtx));
+    queryFrameworkCounters.incrementQueryEngineCounters(CurOp::get(opCtx));
 }
 
 }  // namespace mongo

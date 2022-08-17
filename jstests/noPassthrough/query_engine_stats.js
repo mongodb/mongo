@@ -10,10 +10,10 @@
 load("jstests/libs/profiler.js");
 load("jstests/libs/sbe_util.js");  // For 'checkSBEEnabled()'.
 
-const conn = MongoRunner.runMongod({});
+let conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod was unable to start up");
 
-const db = conn.getDB(jsTestName());
+let db = conn.getDB(jsTestName());
 
 // This test assumes that SBE is being used for most queries.
 if (!checkSBEEnabled(db, ["featureFlagSbeFull"])) {
@@ -24,7 +24,7 @@ if (!checkSBEEnabled(db, ["featureFlagSbeFull"])) {
 
 assert.commandWorked(db.dropDatabase());
 
-const coll = db.collection;
+let coll = db.collection;
 
 // Set logLevel to 1 so that all queries will be logged.
 assert.commandWorked(db.setLogLevel(1));
@@ -40,78 +40,87 @@ assert.commandWorked(coll.insertMany([
     {_id: 3, a: 4, b: 2, c: 4}
 ]));
 
-const engine = {
-    find: {sbe: "sbe", classic: "classic"},
+const framework = {
+    find: {sbe: "sbe", classic: "classic", cqf: "findCQF"},
     aggregate: {
         sbeHybrid: "sbeHybrid",
         classicHybrid: "classicHybrid",
         sbeOnly: "sbeOnly",
-        classicOnly: "classicOnly"
+        classicOnly: "classicOnly",
+        cqf: "aggCQF"
     }
 };
 
-// Ensure the slow query log contains the correct information about the queryExecutionEngine used.
-function verifySlowQueryLog(expectedComment, execEngine) {
+/**
+ * Ensure the slow query log contains the correct information about the queryFramework used.
+ */
+function verifySlowQueryLog(expectedComment, queryFramework) {
     const logId = 51803;
     const expectedLog = {};
     expectedLog.command = {};
     expectedLog.command.comment = expectedComment;
-    if (execEngine) {
-        expectedLog.queryExecutionEngine = execEngine;
+    if (queryFramework) {
+        expectedLog.queryFramework = queryFramework;
     }
     assert(checkLog.checkContainsWithCountJson(db, logId, expectedLog, 1, null, true),
            "failed to find [" + tojson(expectedLog) + "] in the slow query log");
 }
 
-// Ensure the profile filter contains the correct information about the queryExecutionEngine used.
-function verifyProfiler(expectedComment, execEngine) {
+// Ensure the profile filter contains the correct information about the queryFramework used.
+function verifyProfiler(expectedComment, queryFramework) {
     const profileEntryFilter = {ns: "query_engine_stats.collection"};
     const profileObj = getLatestProfilerEntry(db, profileEntryFilter);
     try {
         assert.eq(profileObj.command.comment, expectedComment);
-        if (execEngine) {
-            assert.eq(profileObj.queryExecutionEngine, execEngine);
+        if (queryFramework) {
+            assert.eq(profileObj.queryFramework, queryFramework);
         }
     } catch (e) {
-        print('failed to find [{ "queryExecutionEngine" : "' + execEngine + '", { "comment" : "' +
+        print('failed to find [{ "queryFramework" : "' + queryFramework + '", { "comment" : "' +
               expectedComment + '"} }] in the latest profiler entry.');
         throw (e);
     }
 }
 
-// Create an object with the correct queryExecutionEngine counter values after the specified type of
+// Create an object with the correct queryFramework counter values after the specified type of
 // query.
-function generateExpectedCounters(execEngine) {
-    let counters = db.serverStatus().metrics.query.queryExecutionEngine;
+function generateExpectedCounters(queryFramework) {
+    let counters = db.serverStatus().metrics.query.queryFramework;
     assert(counters, "counters did not exist");
     let expected = Object.assign(counters);
-    switch (execEngine) {
-        case engine.find.sbe:
+    switch (queryFramework) {
+        case framework.find.sbe:
             expected.find.sbe = NumberLong(expected.find.sbe + 1);
             break;
-        case engine.find.classic:
+        case framework.find.classic:
             expected.find.classic = NumberLong(expected.find.classic + 1);
             break;
-        case engine.aggregate.sbeOnly:
+        case framework.find.cqf:
+            expected.find.cqf = NumberLong(expected.find.cqf + 1);
+            break;
+        case framework.aggregate.sbeOnly:
             expected.aggregate.sbeOnly = NumberLong(expected.aggregate.sbeOnly + 1);
             break;
-        case engine.aggregate.classicOnly:
+        case framework.aggregate.classicOnly:
             expected.aggregate.classicOnly = NumberLong(expected.aggregate.classicOnly + 1);
             break;
-        case engine.aggregate.sbeHybrid:
+        case framework.aggregate.sbeHybrid:
             expected.aggregate.sbeHybrid = NumberLong(expected.aggregate.sbeHybrid + 1);
             break;
-        case engine.aggregate.classicHybrid:
+        case framework.aggregate.classicHybrid:
             expected.aggregate.classicHybrid = NumberLong(expected.aggregate.classicHybrid + 1);
+            break;
+        case framework.aggregate.cqf:
+            expected.aggregate.cqf = NumberLong(expected.aggregate.cqf + 1);
             break;
     }
     return expected;
 }
 
-// Compare the values of the queryExecutionEngine counters to an object that represents the expected
+// Compare the values of the queryFramework counters to an object that represents the expected
 // values.
 function compareQueryEngineCounters(expectedCounters) {
-    let counters = db.serverStatus().metrics.query.queryExecutionEngine;
+    let counters = db.serverStatus().metrics.query.queryFramework;
     assert.docEq(counters, expectedCounters);
 }
 
@@ -119,23 +128,23 @@ function compareQueryEngineCounters(expectedCounters) {
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: true}));
 
 // Run a find command.
-let expectedCounters = generateExpectedCounters(engine.find.classic);
+let expectedCounters = generateExpectedCounters(framework.find.classic);
 let queryComment = "findSbeOff";
 assert.eq(coll.find({a: 3}).comment(queryComment).itcount(), 1);
-verifySlowQueryLog(queryComment, engine.find.classic);
+verifySlowQueryLog(queryComment, framework.find.classic);
 compareQueryEngineCounters(expectedCounters);
-verifyProfiler(queryComment, engine.find.classic);
+verifyProfiler(queryComment, framework.find.classic);
 
 // Run an aggregation that doesn't use DocumentSource.
-expectedCounters = generateExpectedCounters(engine.aggregate.classicOnly);
+expectedCounters = generateExpectedCounters(framework.aggregate.classicOnly);
 queryComment = "aggSbeOff";
 assert.eq(coll.aggregate([{$match: {b: 1, c: 3}}], {comment: queryComment}).itcount(), 1);
-verifySlowQueryLog(queryComment, engine.find.classic);
+verifySlowQueryLog(queryComment, framework.find.classic);
 compareQueryEngineCounters(expectedCounters);
-verifyProfiler(queryComment, engine.find.classic);
+verifyProfiler(queryComment, framework.find.classic);
 
 // Run an aggregation that uses DocumentSource.
-expectedCounters = generateExpectedCounters(engine.aggregate.classicHybrid);
+expectedCounters = generateExpectedCounters(framework.aggregate.classicHybrid);
 queryComment = "docSourceSbeOff";
 assert.eq(coll.aggregate(
                   [
@@ -146,31 +155,31 @@ assert.eq(coll.aggregate(
                   {comment: queryComment})
               .itcount(),
           0);
-verifySlowQueryLog(queryComment, engine.find.classic);
+verifySlowQueryLog(queryComment, framework.find.classic);
 compareQueryEngineCounters(expectedCounters);
-verifyProfiler(queryComment, engine.find.classic);
+verifyProfiler(queryComment, framework.find.classic);
 
 // Turn SBE on.
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryForceClassicEngine: false}));
 
 // Run a find command.
-expectedCounters = generateExpectedCounters(engine.find.sbe);
+expectedCounters = generateExpectedCounters(framework.find.sbe);
 queryComment = "findSbeOn";
 assert.eq(coll.find({a: 3}).comment(queryComment).itcount(), 1);
-verifySlowQueryLog(queryComment, engine.find.sbe);
+verifySlowQueryLog(queryComment, framework.find.sbe);
 compareQueryEngineCounters(expectedCounters);
-verifyProfiler(queryComment, engine.find.sbe);
+verifyProfiler(queryComment, framework.find.sbe);
 
 // Run an aggregation that doesn't use DocumentSource.
-expectedCounters = generateExpectedCounters(engine.aggregate.sbeOnly);
+expectedCounters = generateExpectedCounters(framework.aggregate.sbeOnly);
 queryComment = "aggSbeOn";
 assert.eq(coll.aggregate([{$match: {b: 1, c: 3}}], {comment: queryComment}).itcount(), 1);
-verifySlowQueryLog(queryComment, engine.find.sbe);
+verifySlowQueryLog(queryComment, framework.find.sbe);
 compareQueryEngineCounters(expectedCounters);
-verifyProfiler(queryComment, engine.find.sbe);
+verifyProfiler(queryComment, framework.find.sbe);
 
 // Run an aggregation that uses DocumentSource.
-expectedCounters = generateExpectedCounters(engine.aggregate.sbeHybrid);
+expectedCounters = generateExpectedCounters(framework.aggregate.sbeHybrid);
 queryComment = "docSourceSbeOn";
 assert.eq(coll.aggregate(
                   [
@@ -181,9 +190,46 @@ assert.eq(coll.aggregate(
                   {comment: queryComment})
               .itcount(),
           0);
-verifySlowQueryLog(queryComment, engine.find.sbe);
+verifySlowQueryLog(queryComment, framework.find.sbe);
 compareQueryEngineCounters(expectedCounters);
-verifyProfiler(queryComment, engine.find.sbe);
+verifyProfiler(queryComment, framework.find.sbe);
+
+MongoRunner.stopMongod(conn);
+
+conn = MongoRunner.runMongod({restart: conn, setParameter: 'featureFlagCommonQueryFramework=1'});
+assert.neq(null, conn, "mongod was unable to start up");
+
+db = conn.getDB(jsTestName());
+
+assert.commandWorked(db.setLogLevel(1));
+assert.commandWorked(db.setProfilingLevel(2));
+
+coll = db.collection;
+
+// Run find using CQF
+expectedCounters = generateExpectedCounters(framework.find.cqf);
+queryComment = "cqfFind";
+assert.eq(coll.find({a: 1}).comment(queryComment).itcount(), 1);
+verifySlowQueryLog(queryComment, "cqf");
+compareQueryEngineCounters(expectedCounters);
+verifyProfiler(queryComment, "cqf");
+
+// Run aggregate using CQF
+expectedCounters = generateExpectedCounters(framework.aggregate.cqf);
+queryComment = "cqfAggregate";
+assert.eq(
+    coll.aggregate([{$match: {a: 1}}, {$project: {_id: 0}}], {comment: queryComment}).itcount(), 1);
+verifySlowQueryLog(queryComment, "cqf");
+compareQueryEngineCounters(expectedCounters);
+verifyProfiler(queryComment, "cqf");
+
+// Run CQF query which falls back to SBE (unsupported match expression)
+expectedCounters = generateExpectedCounters(framework.find.sbe);
+queryComment = "cqfFallback";
+assert.eq(coll.find({a: {$mod: [4, 0]}}).comment(queryComment).itcount(), 1);
+verifySlowQueryLog(queryComment, framework.find.sbe);
+compareQueryEngineCounters(expectedCounters);
+verifyProfiler(queryComment, framework.find.sbe);
 
 MongoRunner.stopMongod(conn);
 })();

@@ -29,6 +29,7 @@
 
 #include "mongo/db/commands/cqf/cqf_aggregate.h"
 
+#include "mongo/db/curop.h"
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/pipeline/abt/abt_document_source_visitor.h"
 #include "mongo/db/pipeline/abt/match_expression_visitor.h"
@@ -334,6 +335,9 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
     const std::string uuidStr = collectionExists ? collection->uuid().toString() : "<missing_uuid>";
     const std::string collNameStr = nss.coll().toString();
     const std::string scanDefName = collNameStr + "_" + uuidStr;
+
+    auto curOp = CurOp::get(opCtx);
+    curOp->debug().cqfUsed = true;
 
     QueryHints queryHints = getHintsFromQueryKnobs();
 

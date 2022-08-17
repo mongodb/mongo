@@ -335,7 +335,7 @@ NetworkCounter networkCounter;
 AuthCounter authCounter;
 AggStageCounters aggStageCounters;
 DotsAndDollarsFieldsCounters dotsAndDollarsFieldsCounters;
-QueryEngineCounters queryEngineCounters;
+QueryFrameworkCounters queryFrameworkCounters;
 
 OperatorCounters operatorCountersAggExpressions{"operatorCounters.expressions."};
 OperatorCounters operatorCountersMatchExpressions{"operatorCounters.match."};

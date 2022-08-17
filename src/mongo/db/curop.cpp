@@ -868,7 +868,9 @@ void OpDebug::report(OperationContext* opCtx,
     }
 
     if (classicEngineUsed) {
-        pAttrs->add("queryExecutionEngine", classicEngineUsed.get() ? "classic" : "sbe");
+        pAttrs->add("queryFramework", classicEngineUsed.value() ? "classic" : "sbe");
+    } else if (cqfUsed) {
+        pAttrs->add("queryFramework", "cqf");
     }
 
     if (!errInfo.isOK()) {
@@ -1031,7 +1033,9 @@ void OpDebug::append(OperationContext* opCtx,
     }
 
     if (classicEngineUsed) {
-        b.append("queryExecutionEngine", classicEngineUsed.get() ? "classic" : "sbe");
+        b.append("queryFramework", classicEngineUsed.value() ? "classic" : "sbe");
+    } else if (cqfUsed) {
+        b.append("queryFramework", "cqf");
     }
 
     {
@@ -1307,9 +1311,11 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
         }
     });
 
-    addIfNeeded("queryExecutionEngine", [](auto field, auto args, auto& b) {
+    addIfNeeded("queryFramework", [](auto field, auto args, auto& b) {
         if (args.op.classicEngineUsed) {
-            b.append("queryExecutionEngine", args.op.classicEngineUsed.get() ? "classic" : "sbe");
+            b.append("queryFramework", args.op.classicEngineUsed.value() ? "classic" : "sbe");
+        } else if (args.op.cqfUsed) {
+            b.append("queryFramework", "cqf");
         }
     });
 
