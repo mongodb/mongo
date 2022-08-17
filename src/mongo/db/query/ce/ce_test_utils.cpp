@@ -48,6 +48,36 @@ CETester::CETester(std::string collName, double collCard)
     : _collName(std::move(collName)), _collCard(collCard) {}
 
 double CETester::getCE(const std::string& query, size_t optimizationLevel) const {
+#ifdef CE_TEST_LOG_MODE
+    std::cout << "Query: " << query << "\n";
+#endif
+
+    // Construct ABT from pipeline and optimize.
+    ABT abt = translatePipeline("[{$match: " + query + "}]", _collName);
+
+    // Get cardinality estimate.
+    return getCE(abt, optimizationLevel);
+}
+
+double CETester::getCE(ABT& abt, size_t optimizationLevel) const {
+    OptPhaseManager phaseManager = getPhaseManager(optimizationLevel);
+
+    // Optimize.
+    ASSERT_TRUE(phaseManager.optimize(abt));
+
+    // Get cardinality estimate.
+    auto cht = getCETransport();
+    auto ce = cht->deriveCE(phaseManager.getMemo(), {}, abt.ref());
+
+#ifdef CE_TEST_LOG_MODE
+    std::cout << "ABT: " << ExplainGenerator::explainV2(abt) << "\n";
+    std::cout << "Card: " << _collCard << ", Estimated: " << ce << std::endl;
+#endif
+
+    return ce;
+}
+
+optimizer::OptPhaseManager CETester::getPhaseManager(size_t optimizationLevel) const {
     // Mock memo.
     ScanDefinition sd({}, {}, {DistributionType::Centralized}, true, _collCard);
     Metadata metadata({{_collName, sd}});
@@ -63,28 +93,13 @@ double CETester::getCE(const std::string& query, size_t optimizationLevel) const
 
     // Construct placeholder PhaseManager. Notice that it also creates a Memo internally.
     PrefixId prefixId;
-    OptPhaseManager phaseManager(optPhases,
-                                 prefixId,
-                                 true /*requireRID*/,
-                                 metadata,
-                                 std::make_unique<HeuristicCE>(),
-                                 std::make_unique<DefaultCosting>(),
-                                 DebugInfo::kDefaultForTests);
-
-    // Construct ABT from pipeline and optimize.
-    ABT abt = translatePipeline("[{$match: " + query + "}]", _collName);
-    ASSERT_TRUE(phaseManager.optimize(abt));
-
-    // Get cardinality estimate.
-    auto cht = getCETransport();
-    auto ce = cht->deriveCE(phaseManager.getMemo(), {}, abt.ref());
-
-#ifdef CE_TEST_LOG_MODE
-    std::cout << "Query: " << query << ", card: " << _collCard << ", Estimated: " << ce
-              << std::endl;
-#endif
-
-    return ce;
+    return {optPhases,
+            prefixId,
+            true /*requireRID*/,
+            metadata,
+            std::make_unique<HeuristicCE>(),
+            std::make_unique<DefaultCosting>(),
+            DebugInfo::kDefaultForTests};
 }
 
 }  // namespace mongo::ce

@@ -33,6 +33,7 @@
 #include <sys/types.h>
 
 #include "mongo/db/query/optimizer/cascades/interfaces.h"
+#include "mongo/db/query/optimizer/opt_phase_manager.h"
 
 namespace mongo {
 
@@ -48,7 +49,7 @@ class CEInterface;
 namespace ce {
 
 // Enable this flag to log all estimates, and let all tests pass.
-//#define CE_TEST_LOG_MODE 1
+// #define CE_TEST_LOG_MODE 1
 
 const double kMaxCEError = 0.01;
 
@@ -58,24 +59,23 @@ const double kMaxCEError = 0.01;
  */
 
 #ifndef CE_TEST_LOG_MODE
-#define ASSERT_MATCH_CE(ce, predicate, expectedCE) \
-    ASSERT_APPROX_EQUAL(expectedCE, ce.getCE(predicate), kMaxCEError)
+#define _ASSERT_MATCH_CE(ce, predicate, expectedCE, optLevel) \
+    ASSERT_APPROX_EQUAL(expectedCE, ce.getCE(predicate, optLevel), kMaxCEError)
 #else
-#define ASSERT_MATCH_CE(ce, predicate, expectedCE) \
-    ce.getCE(predicate);                           \
+#define _ASSERT_MATCH_CE(ce, predicate, expectedCE, optLevel) \
+    ce.getCE(predicate, optLevel);                            \
     ASSERT_APPROX_EQUAL(1.0, 1.0, kMaxCEError)
 #endif
 
-#ifndef CE_TEST_LOG_MODE
+#define ASSERT_MATCH_CE(ce, predicate, expectedCE) _ASSERT_MATCH_CE(ce, predicate, expectedCE, 1)
+
 #define ASSERT_MATCH_CE_CARD(ce, predicate, expectedCE, collCard) \
     ce.setCollCard(collCard);                                     \
-    ASSERT_APPROX_EQUAL(expectedCE, ce.getCE(predicate), kMaxCEError)
-#else
-#define ASSERT_MATCH_CE_CARD(ce, predicate, expectedCE, collCard) \
-    ce.setCollCard(collCard);                                     \
-    ce.getCE(predicate);                                          \
-    ASSERT_APPROX_EQUAL(1.0, 1.0, kMaxCEError)
-#endif
+    ASSERT_MATCH_CE(ce, predicate, expectedCE)
+
+#define ASSERT_MATCH_CE_CARD_NO_OPT(ce, predicate, expectedCE, collCard) \
+    ce.setCollCard(collCard);                                            \
+    _ASSERT_MATCH_CE(ce, predicate, expectedCE, 0)
 
 /**
  * A test utility class for helping verify the cardinality of CE transports on a given $match
@@ -89,6 +89,11 @@ public:
      * Returns the estimated cardinality of a given 'matchPredicate'.
      */
     double getCE(const std::string& matchPredicate, size_t optimizationLevel = 1) const;
+
+    /**
+     * Returns the estimated cardinality of a given 'abt'.
+     */
+    double getCE(optimizer::ABT& abt, size_t optimizationLevel) const;
 
     void setCollCard(double card) {
         _collCard = card;
@@ -104,6 +109,9 @@ protected:
 
     // The number of records in the collection we are testing.
     double _collCard;
+
+private:
+    optimizer::OptPhaseManager getPhaseManager(size_t optimizationLevel) const;
 };
 
 }  // namespace ce

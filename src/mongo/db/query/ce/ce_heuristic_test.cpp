@@ -38,6 +38,7 @@
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
+#include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/unittest/unittest.h"
@@ -63,11 +64,566 @@ protected:
 
 HeuristicCETester ht(collName);
 
-TEST(CEHeuristicTest, CEwithoutOptimization) {
+TEST(CEHeuristicTest, CEWithoutOptimizationGtLtNum) {
     std::string query = "{a0 : {$gt : 14, $lt : 21}}";
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 1849.0, kCollCard);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationEqNum) {
+    std::string query = "{a: 123}";
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 2.03205, 3.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 3.34575, 7.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 4.16228, 10.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 20.0, 100.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 1100.0, 10000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationEqStr) {
+    std::string query = "{a: 'foo'}";
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 2.03205, 3.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 3.34575, 7.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 4.16228, 10.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 20.0, 100.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 1100.0, 10000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationGtNum) {
+    std::string query = "{a: {$gt: 44}}";
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 7.2, 9.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 54.45, 99.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 430.0, 1000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationGtStr) {
+    std::string query = "{a: {$gt: 'foo'}}";
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 7.2, 9.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 54.45, 99.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 430.0, 1000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationLtNum) {
+    std::string query = "{a: {$lt: 44}}";
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 7.2, 9.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 54.45, 99.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 430.0, 1000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationDNF1pathSimple) {
+    std::string query =
+        "{$or: ["
+        "{$and: [{a0: {$gt: 9}}, {a0: {$lt: 12}}]},"
+        "{$and: [{a0: {$gt:40}}, {a0: {$lt: 44}}]}"
+        "]}";
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 7.8336, 9.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 50.8359, 99.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 335.612, 1000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationNestedConjAndDisj1) {
+    std::string query =
+        "{$or: ["
+        "{a: {$lt: 3}},"
+        "{$and: [{b: {$gt:5}}, {c: {$lt: 10}}]}"
+        "]}";
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 8.352, 9.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 67.9264, 99.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 535.393, 1000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationNestedConjAndDisj2) {
+    std::string query =
+        "{$and: ["
+        "{a: {$lt: 3}},"
+        "{$or: [{b: {$gt:5}}, {b: {$lt: 10}}]}"
+        "]}";
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 6.912, 9.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 43.4239, 99.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 290.293, 1000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationNestedConjAndDisj3) {
+    std::string query =
+        "{$and: ["
+        "{$and: [{a: {$gt: 5}}, {a: {$lt: 10}}]},"
+        "{$and: ["
+        "   {b: {$gt: 15}},"
+        "   {c: {$lt: 110}},"
+        "   {$or: [{a1: 1}, {b1: 2}, {c1: 3}]}"
+        "]}"
+        "]}";
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 3.48545, 9.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 9.96732, 99.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 25.3708, 1000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationNestedConjAndDisj4) {
+    std::string query =
+        "{$or: ["
+        "{$or: [{a: {$gt: 5}}, {a: {$lt: 10}}]},"
+        "{$or: ["
+        "   {b: {$gt: 15}},"
+        "   {c: {$lt: 110}},"
+        "   {$and: [{a1: 1}, {b1: 2}, {c1: 3}]}"
+        "]}"
+        "]}";
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 8.98677, 9.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 94.9731, 99.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 894.681, 1000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationTraverseSelectivityDoesNotAccumulate) {
+    std::string query =
+        "{$or: ["
+        "{a0: 1},"
+        "{a0: {$lt: -4}},"
+        "{b0: {$gt: 10}}"
+        "]}";
+    std::string queryWithLongPaths =
+        "{$or: ["
+        "{'a0.a1.a2.a3.a4.a5.a6.a7.a8.a9': 1},"
+        "{'a0.a1.a2.a3.a4.a5.a6.a7.a8.a9': {$lt: -4}},"
+        "{'b0.b1.b3': {$gt: 10}}"
+        "]}";
     ht.setCollCard(kCollCard);
-    double ce = ht.getCE(query, 0);
-    ASSERT_APPROX_EQUAL(100.0, ce, kMaxCEError);
+    auto ce1 = ht.getCE(query, 0);
+    auto ce2 = ht.getCE(queryWithLongPaths, 0);
+    ASSERT_APPROX_EQUAL(ce1, ce2, kMaxCEError);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationIntervalWithEqOnSameValue) {
+    std::string query =
+        "{$or: ["
+        "{a: 1},"
+        "{$and: [{a: 2}, {a: 2}]}"
+        "]}";
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 5.6, 9.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 27.8048, 99.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 159.083, 1000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationIntervalWithEqOnDifferentValues) {
+    std::string query =
+        "{$or: ["
+        "{a: 1},"
+        "{$and: [{a: 2}, {a: 3}]}"
+        "]}";
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 3.9, 9.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 19.8499, 99.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 131.623, 1000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationConjunctionWithIn) {
+    std::string query =
+        "{$or: ["
+        "{a: 1},"
+        "{$and: [{a: 2}, {a: {$in: [2, 3, 4]}}]}"
+        "]}";
+    // Estimation for $in is not implemented yet, so we assume it has the default filter selectivity
+    // of 0.1.
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 4.41, 9.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 27.7649, 99.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 218.46, 1000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationOneLowBoundWithoutTraverse) {
+    using namespace properties;
+
+    ABT scanNode = make<ScanNode>("test", "test");
+
+    ABT filterNode = make<FilterNode>(
+        make<EvalFilter>(make<PathGet>("a", make<PathCompare>(Operations::Gt, Constant::int64(42))),
+                         make<Variable>("test")),
+        std::move(scanNode));
+
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"test"}}, std::move(filterNode));
+
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 2.1, 3.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 4.9, 7.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 7.0, 10.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 33.0, 100.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 3300.0, 10000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationOneHighBoundWithoutTraverse) {
+    using namespace properties;
+
+    ABT scanNode = make<ScanNode>("test", "test");
+
+    ABT filterNode = make<FilterNode>(
+        make<EvalFilter>(make<PathGet>("a", make<PathCompare>(Operations::Lt, Constant::int64(42))),
+                         make<Variable>("test")),
+        std::move(scanNode));
+
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"test"}}, std::move(filterNode));
+
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 2.1, 3.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 4.9, 7.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 7.0, 10.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 33.0, 100.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 3300.0, 10000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationTwoLowBoundsWithoutTraverse) {
+    using namespace properties;
+
+    ABT scanNode = make<ScanNode>("test", "test");
+
+    ABT filterNode = make<FilterNode>(
+        make<EvalFilter>(make<PathGet>("a",
+                                       make<PathComposeM>(
+                                           make<PathCompare>(Operations::Gt, Constant::int64(5)),
+                                           make<PathCompare>(Operations::Gt, Constant::int64(10)))),
+                         make<Variable>("test")),
+        std::move(scanNode));
+
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"test"}}, std::move(filterNode));
+
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 2.1, 3.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 4.9, 7.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 7.0, 10.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 33.0, 100.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 3300.0, 10000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationTwoHighBoundsWithoutTraverse) {
+    using namespace properties;
+
+    ABT scanNode = make<ScanNode>("test", "test");
+
+    ABT filterNode = make<FilterNode>(
+        make<EvalFilter>(make<PathGet>("a",
+                                       make<PathComposeM>(
+                                           make<PathCompare>(Operations::Lt, Constant::int64(5)),
+                                           make<PathCompare>(Operations::Lt, Constant::int64(10)))),
+                         make<Variable>("test")),
+        std::move(scanNode));
+
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"test"}}, std::move(filterNode));
+
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 2.1, 3.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 4.9, 7.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 7.0, 10.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 33.0, 100.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 3300.0, 10000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationClosedRangeWithoutTraverse) {
+    using namespace properties;
+
+    ABT scanNode = make<ScanNode>("test", "test");
+
+    ABT filterNode = make<FilterNode>(
+        make<EvalFilter>(make<PathGet>("a",
+                                       make<PathComposeM>(
+                                           make<PathCompare>(Operations::Gt, Constant::int64(7)),
+                                           make<PathCompare>(Operations::Lt, Constant::int64(13)))),
+                         make<Variable>("test")),
+        std::move(scanNode));
+
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"test"}}, std::move(filterNode));
+
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 1.5, 3.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 3.5, 7.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 5.0, 10.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 20.0, 100.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 2000.0, 10000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationIntervalWithDifferentTypes) {
+    using namespace properties;
+
+    ABT scanNode = make<ScanNode>("test", "test");
+
+    ABT filterNode = make<FilterNode>(
+        make<EvalFilter>(
+            make<PathGet>(
+                "a",
+                make<PathComposeM>(make<PathCompare>(Operations::Gt, Constant::int64(5)),
+                                   make<PathCompare>(Operations::Lt, Constant::str("foo")))),
+            make<Variable>("test")),
+        std::move(scanNode));
+
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"test"}}, std::move(filterNode));
+
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 2.1, 3.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 4.9, 7.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 7.0, 10.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 33.0, 100.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 3300.0, 10000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationClosedRangeWithPathExpr) {
+    using namespace properties;
+
+    ABT scanNode = make<ScanNode>("test", "test");
+
+    ABT filterNode = make<FilterNode>(
+        make<EvalFilter>(
+            make<PathComposeM>(
+                make<PathGet>(
+                    "a0",
+                    make<PathTraverse>(
+                        make<PathGet>("a1",
+                                      make<PathTraverse>(
+                                          make<PathCompare>(Operations::Gt, Constant::int64(5)),
+                                          PathTraverse::kSingleLevel)),
+                        PathTraverse::kSingleLevel)),
+                make<PathGet>(
+                    "a0",
+                    make<PathTraverse>(
+                        make<PathGet>("a1",
+                                      make<PathTraverse>(
+                                          make<PathCompare>(Operations::Lt, Constant::int64(10)),
+                                          PathTraverse::kSingleLevel)),
+                        PathTraverse::kSingleLevel))),
+            make<Variable>("test")),
+        std::move(scanNode));
+
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"test"}}, std::move(filterNode));
+
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 1.5, 3.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 3.5, 7.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 5.0, 10.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 20.0, 100.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 2000.0, 10000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationClosedRangeWith1Variable) {
+    using namespace properties;
+
+    ABT scanNode = make<ScanNode>("test", "test");
+
+    ABT filterNode = make<FilterNode>(
+        make<EvalFilter>(
+            make<PathComposeM>(
+                make<PathGet>(
+                    "a0",
+                    make<PathTraverse>(
+                        make<PathGet>("a1",
+                                      make<PathTraverse>(
+                                          make<PathCompare>(Operations::Gt, Constant::int64(5)),
+                                          PathTraverse::kSingleLevel)),
+                        PathTraverse::kSingleLevel)),
+                make<PathGet>(
+                    "a0",
+                    make<PathTraverse>(
+                        make<PathGet>("a1",
+                                      make<PathTraverse>(
+                                          make<PathCompare>(Operations::Lt, make<Variable>("test")),
+                                          PathTraverse::kSingleLevel)),
+                        PathTraverse::kSingleLevel))),
+            make<Variable>("test")),
+        std::move(scanNode));
+
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"test"}}, std::move(filterNode));
+
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 1.5, 3.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 3.5, 7.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 5.0, 10.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 20.0, 100.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 2000.0, 10000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationOpenRangeWith1Variable) {
+    using namespace properties;
+
+    ABT scanNode = make<ScanNode>("test", "test");
+
+    ABT filterNode = make<FilterNode>(
+        make<EvalFilter>(
+            make<PathComposeM>(
+                make<PathGet>(
+                    "a0",
+                    make<PathTraverse>(
+                        make<PathGet>("a1",
+                                      make<PathTraverse>(
+                                          make<PathCompare>(Operations::Lt, Constant::int64(5)),
+                                          PathTraverse::kSingleLevel)),
+                        PathTraverse::kSingleLevel)),
+                make<PathGet>(
+                    "a0",
+                    make<PathTraverse>(
+                        make<PathGet>("a1",
+                                      make<PathTraverse>(
+                                          make<PathCompare>(Operations::Lt, make<Variable>("test")),
+                                          PathTraverse::kSingleLevel)),
+                        PathTraverse::kSingleLevel))),
+            make<Variable>("test")),
+        std::move(scanNode));
+
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"test"}}, std::move(filterNode));
+
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 2.1, 3.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 4.9, 7.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 7.0, 10.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 33.0, 100.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 3300.0, 10000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationConjunctionOfBoundsWithDifferentPaths) {
+    using namespace properties;
+
+    ABT scanNode = make<ScanNode>("test", "test");
+
+    ABT filterNode = make<FilterNode>(
+        make<EvalFilter>(
+            make<PathComposeM>(
+                make<PathGet>(
+                    "a0",
+                    make<PathTraverse>(
+                        make<PathGet>("a1",
+                                      make<PathTraverse>(
+                                          make<PathCompare>(Operations::Gt, Constant::int64(5)),
+                                          PathTraverse::kSingleLevel)),
+                        PathTraverse::kSingleLevel)),
+                make<PathGet>(
+                    "b0",
+                    make<PathTraverse>(
+                        make<PathGet>("b1",
+                                      make<PathTraverse>(
+                                          make<PathCompare>(Operations::Lt, Constant::int64(10)),
+                                          PathTraverse::kSingleLevel)),
+                        PathTraverse::kSingleLevel))),
+            make<Variable>("test")),
+        std::move(scanNode));
+
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"test"}}, std::move(filterNode));
+
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 1.92, 3.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 4.48, 7.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 6.4, 10.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 18.49, 100.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 1849.0, 10000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationDisjunctionOnSamePathWithoutTraverse) {
+    using namespace properties;
+
+    ABT scanNode = make<ScanNode>("test", "test");
+
+    ABT filterNode = make<FilterNode>(
+        make<EvalFilter>(
+            make<PathComposeA>(
+                make<PathGet>(
+                    "a0",
+                    make<PathGet>("a1", make<PathCompare>(Operations::Gt, Constant::int64(5)))),
+                make<PathGet>(
+                    "a0",
+                    make<PathGet>("a1", make<PathCompare>(Operations::Eq, Constant::int64(100))))),
+            make<Variable>("test")),
+        std::move(scanNode));
+
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"test"}}, std::move(filterNode));
+
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 2.61962, 3.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 5.69373, 7.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 7.94868, 10.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 39.7, 100.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 3367.0, 10000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationDisjunctionOnDifferentPathsWithoutTraverse) {
+    using namespace properties;
+
+    ABT scanNode = make<ScanNode>("test", "test");
+
+    ABT filterNode = make<FilterNode>(
+        make<EvalFilter>(
+            make<PathComposeA>(
+                make<PathGet>(
+                    "a0",
+                    make<PathGet>("a1", make<PathCompare>(Operations::Gt, Constant::int64(5)))),
+                make<PathGet>(
+                    "b0",
+                    make<PathGet>("b1", make<PathCompare>(Operations::Eq, Constant::int64(100))))),
+            make<Variable>("test")),
+        std::move(scanNode));
+
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"test"}}, std::move(filterNode));
+
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 0.0, 0.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 2.61962, 3.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 5.69373, 7.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 7.94868, 10.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 39.7, 100.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, rootNode, 3367.0, 10000.0);
+}
+
+TEST(CEHeuristicTest, CEWithoutOptimizationEquivalentConjunctions) {
+    using namespace properties;
+
+    ABT rootNode1 = make<RootNode>(
+        ProjectionRequirement{ProjectionNameVector{"test"}},
+        make<FilterNode>(
+            make<EvalFilter>(
+                make<PathComposeM>(
+                    make<PathGet>(
+                        "a0",
+                        make<PathTraverse>(make<PathCompare>(Operations::Gt, Constant::int64(5)),
+                                           PathTraverse::kSingleLevel)),
+                    make<PathGet>(
+                        "b0",
+                        make<PathTraverse>(make<PathCompare>(Operations::Gt, Constant::int64(10)),
+                                           PathTraverse::kSingleLevel))),
+                make<Variable>("test")),
+            make<ScanNode>("test", "test")));
+
+    ABT rootNode2 = make<RootNode>(
+        ProjectionRequirement{ProjectionNameVector{"test"}},
+        make<FilterNode>(
+            make<EvalFilter>(make<PathGet>("a0",
+                                           make<PathTraverse>(make<PathCompare>(Operations::Gt,
+                                                                                Constant::int64(5)),
+                                                              PathTraverse::kSingleLevel)),
+                             make<Variable>("test")),
+            make<FilterNode>(
+                make<EvalFilter>(
+                    make<PathGet>(
+                        "b0",
+                        make<PathTraverse>(make<PathCompare>(Operations::Gt, Constant::int64(10)),
+                                           PathTraverse::kSingleLevel)),
+                    make<Variable>("test")),
+                make<ScanNode>("test", "test"))));
+
+    ht.setCollCard(kCollCard);
+    auto ce1 = ht.getCE(rootNode1, 0);
+    auto ce2 = ht.getCE(rootNode2, 0);
+    ASSERT_APPROX_EQUAL(ce1, ce2, kMaxCEError);
 }
 
 TEST(CEHeuristicTest, CEAfterMemoSubstitutionPhase_Eq) {
@@ -125,11 +681,10 @@ TEST(CEHeuristicTest, CEAfterMemoSubstitutionPhase_OR1path) {
 
 TEST(CEHeuristicTest, CEAfterMemoSubstitutionPhase_OR2paths) {
     std::string query = "{$or: [{a0: {$gt:44}}, {b0: {$lt: 9}}]}";
-    // TODO: Disjunctions on different paths are not SARGable, and are represented as a single
-    // FilterNode. FilterNode is currenlty estimated to be always 10% selectivity.
-    ASSERT_MATCH_CE_CARD(ht, query, 0.9, 9.0);
-    ASSERT_MATCH_CE_CARD(ht, query, 9.9, 99.0);
-    ASSERT_MATCH_CE_CARD(ht, query, 100.0, 1000.0);
+    // Disjunctions on different paths are not SARGable.
+    ASSERT_MATCH_CE_CARD(ht, query, 8.64, 9.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 78.9525, 99.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 675.1, 1000.0);
 }
 
 TEST(CEHeuristicTest, CEAfterMemoSubstitutionPhase_DNF1pathSimple) {
@@ -143,10 +698,12 @@ TEST(CEHeuristicTest, CEAfterMemoSubstitutionPhase_DNF1pathSimple) {
     ASSERT_MATCH_CE_CARD(ht, query, 225.232, 1000.0);
 }
 
+
 TEST(CEHeuristicTest, CEAfterMemoSubstitutionPhase_DNF1pathComplex) {
-    // Each disjunct has different number of conjuncts, so that its selectivity is different.
-    // We need 5 disjuncts to test exponential backoff which cuts off at the first 4.
-    // The conjuncts are in selectivity order.
+    ht.setCollCard(kCollCard);
+    // Each disjunct has different number of conjuncts,
+    // so that its selectivity is different. We need 5 disjuncts to test exponential backoff which
+    // cuts off at the first 4. The conjuncts are in selectivity order.
     std::string query1 =
         "{$or: ["
         "{$and: [{a0: {$gt: 9}}, {a0: {$lt: 12}}]},"
@@ -174,16 +731,15 @@ TEST(CEHeuristicTest, CEAfterMemoSubstitutionPhase_DNF1pathComplex) {
 }
 
 TEST(CEHeuristicTest, CEAfterMemoSubstitutionPhase_DNF2paths) {
-    // TODO: Disjunctions on different paths are not SARGable, and are represented as a single
-    // FilterNode. FilterNode is currently estimated to be always 10% selectivity.
     std::string query =
         "{$or: ["
         "{$and: [{a0: {$gt: 9}}, {a0: {$lt: 12}}]},"
         "{$and: [{b0: {$gt:40}}, {b0: {$lt: 44}}]}"
         "]}";
-    ASSERT_MATCH_CE_CARD(ht, query, 0.9, 9.0);
-    ASSERT_MATCH_CE_CARD(ht, query, 9.9, 99.0);
-    ASSERT_MATCH_CE_CARD(ht, query, 100.0, 1000.0);
+    // Disjunctions on different paths are not SARGable.
+    ASSERT_MATCH_CE_CARD(ht, query, 7.8336, 9.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 50.8359, 99.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 335.612, 1000.0);
 }
 
 TEST(CEHeuristicTest, CEAfterMemoSubstitutionPhase_CNF1path) {
