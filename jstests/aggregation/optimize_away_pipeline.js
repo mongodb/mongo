@@ -652,7 +652,7 @@ assertProjectionIsNotRemoved([{$project: {'a.b': 1}}, {$group: {_id: "$a.b", s: 
 assertProjectionIsNotRemoved([{$project: {'a.b': 1}}, {$group: {_id: "$a.b", s: {$sum: "$a.c"}}}],
                              "PROJECTION_DEFAULT");
 
-// TODO SERVER-66061 This one could be removed, but is left for future work.
+// TODO SERVER-67323 This one could be removed, but is left for future work.
 assertProjectionIsNotRemoved(
     [{$project: {a: 1, b: 1}}, {$group: {_id: "$a.b", s: {$sum: "$b.c"}}}]);
 
