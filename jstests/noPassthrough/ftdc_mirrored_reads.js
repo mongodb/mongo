@@ -91,46 +91,43 @@ function activateFailPoint(node) {
 assert.commandWorked(primary.adminCommand({setParameter: 1, mirrorReads: {samplingRate: 1.0}}));
 
 jsTestLog("Verifying diagnostic collection for mirrored reads on primary");
-{
-    let statsBeforeReads = getDiagnosticData(primary);
-    // The following metrics are not included by default.
-    assert(!statsBeforeReads.hasOwnProperty('resolved'));
-    assert(!statsBeforeReads.hasOwnProperty('resolvedBreakdown'));
+let statsBeforeReads = getDiagnosticData(primary);
+// The following metrics are not included by default.
+assert(!statsBeforeReads.hasOwnProperty('resolved'));
+assert(!statsBeforeReads.hasOwnProperty('resolvedBreakdown'));
 
-    let initialMirrorableReadsSeen = statsBeforeReads.seen;
-    sendAndCheckReads(rst);
-    assert.soon(() => {
-        let mirrorableReadsSeen = getDiagnosticData(primary).seen;
-        jsTestLog(`Seen ${mirrorableReadsSeen} mirrored reads so far`);
-        return initialMirrorableReadsSeen + kOperations <= mirrorableReadsSeen;
-    }, "Failed to update FTDC metrics within time limit", 30000);
-}
+let initialMirrorableReadsSeen = statsBeforeReads.seen;
+sendAndCheckReads(rst);
+assert.soon(() => {
+    let mirrorableReadsSeen = getDiagnosticData(primary).seen;
+    jsTestLog(`Seen ${mirrorableReadsSeen} mirrored reads so far`);
+    return initialMirrorableReadsSeen + kOperations <= mirrorableReadsSeen;
+}, "Failed to update FTDC metrics within time limit", 30000);
 
 jsTestLog("Verifying diagnostic collection when mirrorMaestroExpectsResponse");
-{
-    activateFailPoint(primary);
-    assert.soon(() => {
-        return getDiagnosticData(primary).hasOwnProperty('resolved');
-    }, "Failed to find 'resolved' in mirrored reads FTDC metrics within time limit", 30000);
-    let resolvedBeforeReads = getDiagnosticData(primary).resolved;
-    sendAndCheckReads(rst);
-    assert.soon(() => {
-        let resolvedAfterReads = getDiagnosticData(primary).resolved;
-        jsTestLog(`Mirrored ${resolvedAfterReads} reads so far`);
-        // There are two secondaries, so `kOperations * 2` reads must be resolved.
-        return resolvedBeforeReads + kOperations * 2 <= resolvedAfterReads;
-    }, "Failed to update extended FTDC metrics within time limit", 10000);
-}
+activateFailPoint(primary);
+assert.soon(() => {
+    return getDiagnosticData(primary).hasOwnProperty('resolved');
+}, "Failed to find 'resolved' in mirrored reads FTDC metrics within time limit", 30000);
+let resolvedBeforeReads = getDiagnosticData(primary).resolved;
+sendAndCheckReads(rst);
+assert.soon(() => {
+    let resolvedAfterReads = getDiagnosticData(primary).resolved;
+    jsTestLog(`Mirrored ${resolvedAfterReads} reads so far`);
+    // There are two secondaries, so `kOperations * 2` reads must be resolved.
+    return resolvedBeforeReads + kOperations * 2 <= resolvedAfterReads;
+}, "Failed to update extended FTDC metrics within time limit", 10000);
 
 jsTestLog("Verifying diagnostic collection for mirrored reads on secondaries");
-{
+assert.soon(() => {
     const mirroredReadsSent = getDiagnosticData(primary).sent;
     let mirroredReadsReceived = 0;
     for (const secondary of rst.getSecondaries()) {
         mirroredReadsReceived += getDiagnosticData(secondary).received;
     }
-    assert.eq(mirroredReadsSent, mirroredReadsReceived);
-}
+    jsTestLog(`Sent: ${mirroredReadsSent}, Received: ${mirroredReadsReceived}`);
+    return mirroredReadsSent == Number(mirroredReadsReceived);
+}, "Failed to observe mirrored operations on secondaries in FTDC metrics", 10000);
 
 rst.stopSet();
 })();
