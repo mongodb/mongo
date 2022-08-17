@@ -6,11 +6,9 @@
  *   featureFlagShardMerge,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
- *   requires_fcv_52,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
- *   __TEMPORARILY_DISABLED__,
  * ]
  */
 
@@ -38,11 +36,21 @@ tmt.insertDonorDB(`${tenantId}_db`, collName);
 const donorPrimary = tmt.getDonorPrimary();
 const recipientPrimary = tmt.getRecipientPrimary();
 
+// Note: including this explicit early return here due to the fact that multiversion
+// suites will execute this test without featureFlagShardMerge enabled (despite the
+// presence of the featureFlagShardMerge tag above), which means the test will attempt
+// to run a multi-tenant migration and fail.
+if (!TenantMigrationUtil.isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
+    tmt.stop();
+    jsTestLog("Skipping Shard Merge-specific test");
+    return;
+}
+
 // Insert a doc on the recipient with {writeConcern: majority} to advance the stable timestamp. We
 // will hold the stable timestamp on the recipient at this ts. This will ensure that when we run the
 // tenant migration, the recipient's stable timestamp will be less than the the timestamp it
 // receives from the donor to use as the startApplyingDonorOpTime.
-let recipientHoldStableTs =
+const recipientHoldStableTs =
     assert
         .commandWorked(recipientPrimary.getDB(kUnrelatedDbNameRecipient).runCommand({
             insert: collName,
@@ -92,7 +100,7 @@ hangBeforeAdvanceStableTsFp.off();
 // recipient advanced its stable timestamp to the timestamp of this write.
 let stableTimestamp;
 assert.soon(function() {
-    let noopEntry = recipientPrimary.getDB("local").oplog.rs.findOne(
+    const noopEntry = recipientPrimary.getDB("local").oplog.rs.findOne(
         {"o": {"msg": "Merge recipient advancing stable timestamp"}});
     if (noopEntry)
         stableTimestamp = noopEntry.ts;
@@ -100,7 +108,7 @@ assert.soon(function() {
     return noopEntry;
 });
 
-let majorityWriteTs =
+const majorityWriteTs =
     assert
         .commandWorked(recipientPrimary.getDB(kUnrelatedDbNameRecipient).runCommand({
             insert: collName,

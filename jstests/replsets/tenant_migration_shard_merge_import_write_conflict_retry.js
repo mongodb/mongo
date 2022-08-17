@@ -8,7 +8,6 @@
  *   featureFlagShardMerge,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
- *   requires_fcv_52,
  *   requires_replication,
  *   requires_persistence,
  *   requires_wiredtiger,

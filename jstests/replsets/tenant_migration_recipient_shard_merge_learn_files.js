@@ -24,6 +24,16 @@ const tenantMigrationTest =
 
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
+// Note: including this explicit early return here due to the fact that multiversion
+// suites will execute this test without featureFlagShardMerge enabled (despite the
+// presence of the featureFlagShardMerge tag above), which means the test will attempt
+// to run a multi-tenant migration and fail.
+if (!TenantMigrationUtil.isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
+    tenantMigrationTest.stop();
+    jsTestLog("Skipping Shard Merge-specific test");
+    return;
+}
+
 jsTestLog(
     "Test that recipient state is correctly set to 'learned filenames' after creating the backup cursor");
 const tenantId = "testTenantId";

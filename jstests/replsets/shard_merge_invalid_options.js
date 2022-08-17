@@ -2,7 +2,7 @@
  * Tests that the donorStartMigration and recipientSyncData commands throw when a node has options
  * set that are incompatible with protocol shard merge.
  *
- * @tags: [requires_fcv_53, featureFlagShardMerge, __TEMPORARILY_DISABLED__]
+ * @tags: [featureFlagShardMerge]
  * ]
  */
 
@@ -13,12 +13,22 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 load("jstests/libs/fail_point_util.js");
 
 function runTest(nodeOptions, expectedError) {
-    let rst = new ReplSetTest({nodes: 1, nodeOptions: nodeOptions});
+    const rst = new ReplSetTest({nodes: 1, nodeOptions: nodeOptions});
     rst.startSet();
     rst.initiate();
 
-    let primary = rst.getPrimary();
-    let adminDB = primary.getDB("admin");
+    // Note: including this explicit early return here due to the fact that multiversion
+    // suites will execute this test without featureFlagShardMerge enabled (despite the
+    // presence of the featureFlagShardMerge tag above), which means the test will attempt
+    // to run a multi-tenant migration and fail.
+    if (!TenantMigrationUtil.isShardMergeEnabled(rst.getPrimary().getDB("admin"))) {
+        rst.stopSet();
+        jsTestLog("Skipping Shard Merge-specific test");
+        return;
+    }
+
+    const primary = rst.getPrimary();
+    const adminDB = primary.getDB("admin");
     const kDummyConnStr = "mongodb://localhost/?replicaSet=foo";
     const readPreference = {mode: 'primary'};
     const migrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForTest();

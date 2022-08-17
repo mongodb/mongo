@@ -10,8 +10,6 @@
  *   requires_persistence,
  *   serverless,
  *   featureFlagShardMerge,
- *   requires_fcv_53,
- *   __TEMPORARILY_DISABLED__,
  * ]
  */
 
@@ -29,6 +27,17 @@ const tenantMigrationTest = new TenantMigrationTest(
     {name: jsTestName(), sharedOptions: {setParameter: {maxNumActiveUserIndexBuilds: 100}}});
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
+
+// Note: including this explicit early return here due to the fact that multiversion
+// suites will execute this test without featureFlagShardMerge enabled (despite the
+// presence of the featureFlagShardMerge tag above), which means the test will attempt
+// to run a multi-tenant migration and fail.
+if (!TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("admin"))) {
+    tenantMigrationTest.stop();
+    jsTestLog("Skipping Shard Merge-specific test");
+    return;
+}
+
 const kTenant1Id = "testTenantId1";
 const kTenant2Id = "testTenantId2";
 const kTenant1DbName = tenantMigrationTest.tenantDB(kTenant1Id, "testDB");

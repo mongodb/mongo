@@ -1,6 +1,6 @@
 /**
  * Tests that the "shard merge" protocol is enabled only in the proper FCV.
- * @tags: [requires_fcv_52, featureFlagShardMerge, __TEMPORARILY_DISABLED__]
+ * @tags: [featureFlagShardMerge]
  */
 
 (function() {
@@ -10,12 +10,23 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 load("jstests/libs/fail_point_util.js");
 
 function runTest(downgradeFCV) {
-    let rst = new ReplSetTest({nodes: 1});
+    const rst = new ReplSetTest({nodes: 1});
     rst.startSet();
     rst.initiate();
 
-    let primary = rst.getPrimary();
-    let adminDB = primary.getDB("admin");
+    const primary = rst.getPrimary();
+
+    // Note: including this explicit early return here due to the fact that multiversion
+    // suites will execute this test without featureFlagShardMerge enabled (despite the
+    // presence of the featureFlagShardMerge tag above), which means the test will attempt
+    // to run a multi-tenant migration and fail.
+    if (!TenantMigrationUtil.isShardMergeEnabled(primary.getDB("admin"))) {
+        rst.stopSet();
+        jsTestLog("Skipping Shard Merge-specific test");
+        return;
+    }
+
+    const adminDB = primary.getDB("admin");
     const kDummyConnStr = "mongodb://localhost/?replicaSet=foo";
     const readPreference = {mode: 'primary'};
     const migrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForTest();

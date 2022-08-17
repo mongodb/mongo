@@ -10,7 +10,6 @@
  *   incompatible_with_windows_tls,
  *   featureFlagShardMerge,
  *   requires_persistence,
- *   requires_fcv_51,
  *   serverless,
  * ]
  */
@@ -25,6 +24,17 @@ const tenantMigrationTest =
     new TenantMigrationTest({name: jsTestName(), enableRecipientTesting: false});
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
+
+// Note: including this explicit early return here due to the fact that multiversion
+// suites will execute this test without featureFlagShardMerge enabled (despite the
+// presence of the featureFlagShardMerge tag above), which means the test will attempt
+// to run a multi-tenant migration and fail.
+if (!TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("admin"))) {
+    tenantMigrationTest.stop();
+    jsTestLog("Skipping Shard Merge-specific test");
+    return;
+}
+
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
 const tenantId = "testTenantId";

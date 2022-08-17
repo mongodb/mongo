@@ -30,6 +30,16 @@ const kCollName = "testColl";
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
+// Note: including this explicit early return here due to the fact that multiversion
+// suites will execute this test without featureFlagShardMerge enabled (despite the
+// presence of the featureFlagShardMerge tag above), which means the test will attempt
+// to run a multi-tenant migration and fail.
+if (!TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("admin"))) {
+    tenantMigrationTest.stop();
+    jsTestLog("Skipping Shard Merge-specific test");
+    return;
+}
+
 const tenantCollection = donorPrimary.getDB(kDbName)[kCollName];
 
 jsTestLog("Run retryable findAndModify prior to the migration startFetchingDonorOpTime");

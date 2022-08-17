@@ -86,12 +86,6 @@ last-continuous:
       test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
     - ticket: SERVER-59525
       test_file: jstests/replsets/tenant_migration_recipient_access_blocker_rollback.js
-    - ticket: SERVER-65820
-      test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_shard_merge.js
-    - ticket: SERVER-64616
-      test_file: jstests/replsets/tenant_migration_recipient_shard_merge_learn_files.js
-    - ticket: SERVER-64616
-      test_file: jstests/replsets/tenant_migration_shard_merge_recipient_creates_blockers_during_migration.js
     - ticket: SERVER-59023
       test_file: jstests/sharding/resharding_secondary_recovers_temp_ns_metadata.js
     - ticket: SERVER-57772
@@ -194,8 +188,6 @@ last-continuous:
       test_file: jstests/replsets/apply_ops_dropDatabase.js
     - ticket: SERVER-63732
       test_file: jstests/sharding/shard_collection_basic.js
-    - ticket: SERVER-63454
-      test_file: jstests/replsets/tenant_migration_shard_merge_invalid_inputs.js
     - ticket: SERVER-6491
       test_file: jstests/sharding/shard_key_index_must_exist.js
     - ticket: SERVER-64142
@@ -521,12 +513,6 @@ last-lts:
       test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_retry.js
     - ticket: SERVER-59525
       test_file: jstests/replsets/tenant_migration_recipient_access_blocker_rollback.js
-    - ticket: SERVER-65820
-      test_file: jstests/replsets/tenant_migration_fetch_committed_transactions_shard_merge.js
-    - ticket: SERVER-64616
-      test_file: jstests/replsets/tenant_migration_recipient_shard_merge_learn_files.js
-    - ticket: SERVER-64616
-      test_file: jstests/replsets/tenant_migration_shard_merge_recipient_creates_blockers_during_migration.js
     - ticket: SERVER-59023
       test_file: jstests/sharding/resharding_secondary_recovers_temp_ns_metadata.js
     - ticket: SERVER-59765
@@ -621,8 +607,6 @@ last-lts:
       test_file: jstests/replsets/tenant_migration_recipient_startup_recovery.js
     - ticket: SERVER-63122
       test_file: jstests/replsets/tenant_migration_network_error_via_rollback.js
-    - ticket: SERVER-63454
-      test_file: jstests/replsets/tenant_migration_shard_merge_invalid_inputs.js
     - ticket: SERVER-63732
       test_file: jstests/sharding/shard_collection_basic.js
     - ticket: SERVER-6491

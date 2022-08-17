@@ -6,10 +6,8 @@
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,
- *   requires_fcv_52,
  *   serverless,
  *   featureFlagShardMerge,
- *   __TEMPORARILY_DISABLED__,
  * ]
  */
 
@@ -27,8 +25,19 @@ const tenantMigrationTest = new TenantMigrationTest({
     sharedOptions: {setParameter: {tenantMigrationGarbageCollectionDelayMS: 1 * 1000}}
 });
 
-const kTenantId = "testTenantId1";
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
+
+// Note: including this explicit early return here due to the fact that multiversion
+// suites will execute this test without featureFlagShardMerge enabled (despite the
+// presence of the featureFlagShardMerge tag above), which means the test will attempt
+// to run a multi-tenant migration and fail.
+if (!TenantMigrationUtil.isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
+    tenantMigrationTest.stop();
+    jsTestLog("Skipping Shard Merge-specific test");
+    return;
+}
+
+const kTenantId = "testTenantId1";
 
 function runVoteCmd(migrationId) {
     // Pretend the primary tells itself it has imported files. This may preempt the primary's real

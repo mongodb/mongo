@@ -25,6 +25,17 @@ const existingRecipientTenantId = "existingRecipientTenantId";
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
+// Note: including this explicit early return here due to the fact that multiversion
+// suites will execute this test without featureFlagShardMerge enabled (despite the
+// presence of the featureFlagShardMerge tag above), which means the test will attempt
+// to run a multi-tenant migration and fail.
+if (!TenantMigrationUtil.isShardMergeEnabled(
+        tenantMigrationTest.getDonorPrimary().getDB("admin"))) {
+    tenantMigrationTest.stop();
+    jsTestLog("Skipping Shard Merge-specific test");
+    return;
+}
+
 function assertRecipientAccessBlockerPresentFor({tenantId, migrationId}) {
     const {nodes} = tenantMigrationTest.getRecipientRst();
 
