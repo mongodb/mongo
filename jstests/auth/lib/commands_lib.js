@@ -106,7 +106,19 @@ var authErrCode = 13;
 var commandNotSupportedCode = 115;
 var shard0name = "shard0000";
 const migrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForTest();
-const isShardMergeEnabled = TestData.setParameters.featureFlagShardMerge;
+
+function buildTenantMigrationCmd(cmd, state) {
+    const {isShardMergeEnabled} = state;
+    const cmdCopy = Object.assign({}, cmd, {
+        protocol: isShardMergeEnabled ? "shard merge" : "multitenant migrations",
+    });
+
+    if (!isShardMergeEnabled) {
+        cmdCopy.tenantId = "testTenantId";
+    }
+
+    return cmdCopy;
+}
 
 // useful shorthand when defining the tests below
 var roles_write =
@@ -3701,15 +3713,18 @@ var authCommandsLib = {
         },
         {
           testname: "donorStartMigration",
-          command: {
-              donorStartMigration: 1,
-              protocol: isShardMergeEnabled ? "shard merge" : "multitenant migrations",
-              tenantId: isShardMergeEnabled ? "" : "testTenantId",
-              migrationId: UUID(),
-              recipientConnectionString: "recipient-rs/localhost:1234",
-              readPreference: {mode: "primary"},
-              donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
-              recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
+          setup: (db) => {
+              return {isShardMergeEnabled: TenantMigrationUtil.isShardMergeEnabled(db)};
+          },
+          command: (state) => {
+              return buildTenantMigrationCmd({
+                  donorStartMigration: 1,
+                  migrationId: UUID(),
+                  recipientConnectionString: "recipient-rs/localhost:1234",
+                  readPreference: {mode: "primary"},
+                  donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
+                  recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
+            }, state);
           },
           skipSharded: true,
           testcases: [
@@ -3726,15 +3741,18 @@ var authCommandsLib = {
         },
         {
           testname: "recipientSyncData",
-          command: {
-              recipientSyncData: 1,
-              migrationId: UUID(),
-              donorConnectionString: "donor-rs/localhost:1234",
-              protocol: isShardMergeEnabled ? "shard merge" : "multitenant migrations",
-              tenantId: isShardMergeEnabled ? "" : "testTenantId",
-              readPreference: {mode: "primary"},
-              startMigrationDonorTimestamp: Timestamp(1, 1),
-              recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
+          setup: (db) => {
+              return {isShardMergeEnabled: TenantMigrationUtil.isShardMergeEnabled(db)};
+          },
+          command: (state) => {
+              return buildTenantMigrationCmd({
+                  recipientSyncData: 1,
+                  migrationId: UUID(),
+                  donorConnectionString: "donor-rs/localhost:1234",
+                  readPreference: {mode: "primary"},
+                  startMigrationDonorTimestamp: Timestamp(1, 1),
+                  recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
+              }, state);
           },
           skipSharded: true,
           testcases: [
@@ -3751,13 +3769,16 @@ var authCommandsLib = {
         },
         {
           testname: "recipientForgetMigration",
-          command: {
-              recipientForgetMigration: 1,
-              migrationId: UUID(),
-              donorConnectionString: "donor-rs/localhost:1234",
-              protocol: isShardMergeEnabled ? "shard merge" : "multitenant migrations",
-              tenantId: isShardMergeEnabled ? "" : "testTenantId",
-              readPreference: {mode: "primary"},
+          setup: (db) => {
+              return {isShardMergeEnabled: TenantMigrationUtil.isShardMergeEnabled(db)};
+          },
+          command: (state) => {
+              return buildTenantMigrationCmd({
+                  recipientForgetMigration: 1,
+                  migrationId: UUID(),
+                  donorConnectionString: "donor-rs/localhost:1234",
+                  readPreference: {mode: "primary"},
+              }, state);
           },
           skipSharded: true,
           testcases: [
