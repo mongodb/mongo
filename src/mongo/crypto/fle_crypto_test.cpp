@@ -50,6 +50,7 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/config.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/db/matcher/schema/encrypt_schema_gen.h"
 #include "mongo/db/operation_context.h"
@@ -721,11 +722,21 @@ std::vector<char> generatePlaceholder(
 
     insertSpec.setUpperBound(upperDoc.firstElement());
     insertSpec.setValue(value);
-    insertSpec.setSparsity(0);
     auto specDoc = BSON("s" << insertSpec.toBSON());
 
+    FLE2RangeSpec findSpec;
+    findSpec.setMin(lowerDoc.firstElement());
+    findSpec.setMinIncluded(true);
+    findSpec.setMax(upperDoc.firstElement());
+    findSpec.setMaxIncluded(true);
+    auto findDoc = BSON("s" << findSpec.toBSON());
+
     if (algorithm == Fle2AlgorithmInt::kRange) {
-        ep.setValue(IDLAnyType(specDoc.firstElement()));
+        if (operation == Operation::kFind) {
+            ep.setValue(IDLAnyType(findDoc.firstElement()));
+        } else if (operation == Operation::kInsert) {
+            ep.setValue(IDLAnyType(specDoc.firstElement()));
+        }
         ep.setSparsity(0);
     } else {
         ep.setValue(value);
@@ -770,16 +781,20 @@ BSONObj encryptDocument(BSONObj obj,
     return finalDoc;
 }
 
-void assertPayload(BSONElement elem, Operation operation) {
+void assertPayload(BSONElement elem, EncryptedBinDataType type) {
     int len;
     const char* data(elem.binData(len));
     ConstDataRange cdr(data, len);
 
     const auto& [encryptedType, subCdr] = fromEncryptedConstDataRange(cdr);
+    ASSERT_TRUE(encryptedType == type);
+}
+
+void assertPayload(BSONElement elem, Operation operation) {
     if (operation == Operation::kFind) {
-        ASSERT_TRUE(encryptedType == EncryptedBinDataType::kFLE2FindEqualityPayload);
+        assertPayload(elem, EncryptedBinDataType::kFLE2FindEqualityPayload);
     } else if (operation == Operation::kInsert) {
-        ASSERT_TRUE(encryptedType == EncryptedBinDataType::kFLE2EqualityIndexedValue);
+        assertPayload(elem, EncryptedBinDataType::kFLE2EqualityIndexedValue);
     } else {
         FAIL("Not implemented.");
     }
@@ -806,12 +821,6 @@ void roundTripTest(BSONObj doc, BSONType type, Operation opType, Fle2AlgorithmIn
     ASSERT_EQ(finalDoc["encrypted"].type(), BinData);
     ASSERT_TRUE(finalDoc["encrypted"].isBinData(BinDataType::Encrypt));
 
-    // TODO : when query enables server side work for Find, remove this
-    // if statement.
-    if (opType == Operation::kFind && algorithm == Fle2AlgorithmInt::kEquality) {
-        assertPayload(finalDoc["encrypted"], opType);
-        return;
-    }
 
     // Decrypt document
     auto decryptedDoc = FLEClientCrypto::decryptDocument(finalDoc, &keyVault);
@@ -819,7 +828,14 @@ void roundTripTest(BSONObj doc, BSONType type, Operation opType, Fle2AlgorithmIn
     // Remove this so the round-trip is clean
     decryptedDoc = decryptedDoc.removeField(kSafeContent);
 
-    ASSERT_BSONOBJ_EQ(inputDoc, decryptedDoc);
+    if (opType == Operation::kFind) {
+        assertPayload(finalDoc["encrypted"],
+                      algorithm == Fle2AlgorithmInt::kEquality
+                          ? EncryptedBinDataType::kFLE2FindEqualityPayload
+                          : EncryptedBinDataType::kFLE2FindRangePayload);
+    } else {
+        ASSERT_BSONOBJ_EQ(inputDoc, decryptedDoc);
+    }
 }
 
 void roundTripTest(BSONObj doc, BSONType type, Operation opType) {
@@ -934,12 +950,15 @@ TEST(FLE_EDC, Allowed_Types) {
     for (const auto& opType : opTypes) {
         for (const auto& [obj, objType] : universallyAllowedObjects) {
             roundTripTest(obj, objType, opType, Fle2AlgorithmInt::kEquality);
-            roundTripTest(obj, objType, opType, Fle2AlgorithmInt::kUnindexed);
-        }
-        for (const auto& [obj, objType] : unindexedAllowedObjects) {
-            roundTripTest(obj, objType, opType, Fle2AlgorithmInt::kUnindexed);
+            if (opType == Operation::kInsert) {
+                roundTripTest(obj, objType, opType, Fle2AlgorithmInt::kUnindexed);
+            }
         }
     };
+
+    for (const auto& [obj, objType] : unindexedAllowedObjects) {
+        roundTripTest(obj, objType, Operation::kInsert, Fle2AlgorithmInt::kUnindexed);
+    }
 
     for (const auto& [obj1, _] : universallyAllowedObjects) {
         for (const auto& [obj2, _] : universallyAllowedObjects) {
@@ -961,10 +980,7 @@ TEST(FLE_EDC, Range_Allowed_Types) {
         {BSON("sample" << Date_t::fromMillisSinceEpoch(12345)), Date},
     };
 
-    std::vector<Operation> opTypes{
-        Operation::kInsert
-        // TODO -  ,Operation::kFind
-    };
+    std::vector<Operation> opTypes{Operation::kInsert, Operation::kFind};
 
     for (const auto& opType : opTypes) {
         for (const auto& [obj, objType] : rangeAllowedObjects) {

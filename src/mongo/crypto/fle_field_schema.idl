@@ -57,8 +57,8 @@ enums:
           # same as BinDataGeneral but redacted
           kFLE2TransientRaw : 8
 
-          kFLE2RangeIndexedValue : 9    # see FLE2IndexedRangeEncryptedValue
-
+          kFLE2RangeIndexedValue : 9      # see FLE2IndexedRangeEncryptedValue
+          kFLE2FindRangePayload : 10      # see FLE2FindRangePayload
 
     FleVersion:
         description: "The version / type of field-level encryption in use."
@@ -271,6 +271,40 @@ structs:
             cpp_name: maxCounter
             optional: true
 
+    EdgeFindTokenSet:
+        description: "Payload of an edge to query for"
+        strict: true
+        fields:
+          d:
+            description: "EDCDerivedFromDataToken"
+            type: bindata_generic
+            cpp_name: edcDerivedToken
+          s:
+            description: "ESCDerivedFromDataToken"
+            type: bindata_generic
+            cpp_name: escDerivedToken
+          c:
+            description: "ECCDerivedFromDataToken"
+            type: bindata_generic
+            cpp_name: eccDerivedToken
+
+    FLE2FindRangePayload:
+        description: "Payload for a range find"
+        strict: true
+        fields:
+          g:
+            description: "Array of Edges"
+            type: array<EdgeFindTokenSet>
+            cpp_name: edges
+          e:
+            description: "ServerDataEncryptionLevel1Token"
+            type: bindata_generic
+            cpp_name: serverEncryptionToken
+          cm:
+            description: "Queryable Encryption max counter"
+            type: long
+            cpp_name: maxCounter
+
     EncryptionInformation:
         description: "Implements Encryption Information which includes the schema for Queryable Encryption that is consumed by query_analysis, queries and write_ops"
         strict: true
@@ -343,8 +377,3 @@ structs:
             description: "Queryable Encryption upper bound for range"
             type: encrypted_numeric_element
             cpp_name: upperBound
-          s:
-            description: "Lower value - higher storage overhead, faster query."
-            type: exactInt64
-            cpp_name: sparsity
-            validator: { gte: 0, lte: 3 }

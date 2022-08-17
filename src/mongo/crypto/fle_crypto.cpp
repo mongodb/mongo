@@ -692,6 +692,12 @@ FLE2InsertUpdatePayload EDCClientPayload::serializeInsertUpdatePayload(FLEIndexK
     return iupayload;
 }
 
+std::vector<std::string> getMinCover(const FLE2RangeSpec& spec, uint8_t sparsity) {
+    std::vector<std::string> edges;
+    // TODO SERVER-68600
+    return edges;
+}
+
 // Note: Does not return the leaf node
 std::vector<std::string> getEdges(BSONElement element,
                                   BSONElement lowerBound,
@@ -1064,19 +1070,31 @@ void convertToFLE2Payload(FLEKeyVault* keyVault,
                                       << "' is not a valid type for Queryable Encryption Range",
                         isFLE2RangeIndexedSupportedType(elRange.type()));
 
-
                 auto iupayload = EDCClientPayload::serializeInsertUpdatePayloadForRange(
                     indexKey,
                     userKey,
                     rangeInsertSpec.getValue().getElement(),
                     rangeInsertSpec.getLowerBound().getElement(),
                     rangeInsertSpec.getUpperBound().getElement(),
-                    rangeInsertSpec.getSparsity(),
+                    ep.getSparsity().value(),  // Enforced as non-optional in this case in IDL
                     contentionFactor(ep));
 
                 toEncryptedBinData(fieldNameToSerialize,
                                    EncryptedBinDataType::kFLE2InsertUpdatePayload,
                                    iupayload,
+                                   builder);
+            } else if (ep.getType() == Fle2PlaceholderType::kFind) {
+                IDLParserContext ctx("root");
+                auto rangeFindSpec = FLE2RangeSpec::parse(ctx, ep.getValue().getElement().Obj());
+
+                auto edges = getMinCover(rangeFindSpec, ep.getSparsity().value());
+
+                auto findpayload = FLEClientCrypto::serializeFindRangePayload(
+                    indexKey, userKey, edges, ep.getMaxContentionCounter());
+
+                toEncryptedBinData(fieldNameToSerialize,
+                                   EncryptedBinDataType::kFLE2FindRangePayload,
+                                   findpayload,
                                    builder);
             } else {
                 uasserted(6775303, "Unsupported Queryable Encryption placeholder type");
@@ -1143,6 +1161,9 @@ void collectEDCServerInfo(std::vector<EDCServerPayloadInfo>* pFields,
     } else if (encryptedType == EncryptedBinDataType::kFLE2FindEqualityPayload) {
         // No-op
         return;
+    } else if (encryptedType == EncryptedBinDataType::kFLE2FindRangePayload) {
+        // No-op
+        return;
     } else if (encryptedType == EncryptedBinDataType::kFLE2UnindexedEncryptedValue) {
         // No-op
         return;
@@ -1171,7 +1192,8 @@ void convertServerPayload(ConstDataRange cdr,
                           StringData fieldPath) {
 
     auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
-    if (encryptedTypeBinding == EncryptedBinDataType::kFLE2FindEqualityPayload) {
+    if (encryptedTypeBinding == EncryptedBinDataType::kFLE2FindEqualityPayload ||
+        encryptedTypeBinding == EncryptedBinDataType::kFLE2FindRangePayload) {
         builder->appendBinData(fieldPath, cdr.length(), BinDataType::Encrypt, cdr.data<char>());
         return;
     } else if (encryptedTypeBinding == EncryptedBinDataType::kFLE2InsertUpdatePayload) {
@@ -1623,6 +1645,8 @@ std::pair<BSONType, std::vector<uint8_t>> FLEClientCrypto::decrypt(ConstDataRang
         // return the unencrypted body. The EOO BSONType signals to the caller that this should
         // maintain the encryption subtype.
         return {EOO, vectorFromCDR(pair.second)};
+    } else if (pair.first == EncryptedBinDataType::kFLE2FindRangePayload) {
+        return {EOO, vectorFromCDR(pair.second)};
     } else if (pair.first == EncryptedBinDataType::kFLE2InsertUpdatePayload) {
         return {EOO, vectorFromCDR(pair.second)};
     } else if (pair.first == EncryptedBinDataType::kFLE2TransientRaw) {
@@ -1697,7 +1721,6 @@ void FLEClientCrypto::validateDocument(const BSONObj& doc,
 
                 auto ieev = decryptAndParseIndexedValue<FLE2IndexedEqualityEncryptedValue>(
                     subCdr, keyVault);
-
                 auto tag = EDCServerCollection::generateTag(ieev);
                 tags.insert({tag, field.first});
             } else if (hasQueryType(configField->second, QueryTypeEnum::Range)) {
@@ -2016,6 +2039,48 @@ FLE2FindEqualityPayload FLEClientCrypto::serializeFindPayload(FLEIndexKeyAndId i
     return payload;
 }
 
+
+FLE2FindRangePayload FLEClientCrypto::serializeFindRangePayload(
+    FLEIndexKeyAndId indexKey,
+    FLEUserKeyAndId userKey,
+    const std::vector<std::string>& edges,
+    uint64_t maxContentionFactor) {
+    auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(indexKey.key);
+    auto serverToken =
+        FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(indexKey.key);
+
+    auto edcToken = FLECollectionTokenGenerator::generateEDCToken(collectionToken);
+    auto escToken = FLECollectionTokenGenerator::generateESCToken(collectionToken);
+    auto eccToken = FLECollectionTokenGenerator::generateECCToken(collectionToken);
+
+    // TODO - should we randomize the sort order of the edges vector?
+    std::vector<EdgeFindTokenSet> tokens;
+    for (auto const& edge : edges) {
+
+        ConstDataRange value(edge.c_str(), edge.size());
+
+        EdgeFindTokenSet tokenSet;
+        tokenSet.setEdcDerivedToken(
+            FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken, value)
+                .toCDR());
+
+        tokenSet.setEscDerivedToken(
+            FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value)
+                .toCDR());
+        tokenSet.setEccDerivedToken(
+            FLEDerivedFromDataTokenGenerator::generateECCDerivedFromDataToken(eccToken, value)
+                .toCDR());
+        tokens.push_back(std::move(tokenSet));
+    }
+
+    FLE2FindRangePayload payload;
+
+    payload.setEdges(std::move(tokens));
+    payload.setMaxCounter(maxContentionFactor);
+    payload.setServerEncryptionToken(serverToken.toCDR());
+
+    return payload;
+}
 
 StatusWith<ECCDocument> ECCCollection::decryptDocument(ECCTwiceDerivedValueToken valueToken,
                                                        const BSONObj& doc) {
@@ -2951,6 +3016,42 @@ ParsedFindPayload::ParsedFindPayload(ConstDataRange cdr) {
 
     maxCounter = payload.getMaxCounter();
 }
+
+ParsedFindRangePayload::ParsedFindRangePayload(BSONElement fleFindPayload)
+    : ParsedFindRangePayload(binDataToCDR(fleFindPayload)){};
+
+ParsedFindRangePayload::ParsedFindRangePayload(const Value& fleFindPayload)
+    : ParsedFindRangePayload(binDataToCDR(fleFindPayload)){};
+
+ParsedFindRangePayload::ParsedFindRangePayload(ConstDataRange cdr) {
+    auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
+    auto encryptedType = encryptedTypeBinding;
+
+    uassert(6869501,
+            str::stream() << "Unexpected encrypted payload type: "
+                          << static_cast<uint32_t>(encryptedType),
+            encryptedType == EncryptedBinDataType::kFLE2FindRangePayload);
+
+    auto payload = parseFromCDR<FLE2FindRangePayload>(subCdr);
+
+    for (auto const& edge : payload.getEdges()) {
+
+        auto escToken =
+            FLETokenFromCDR<FLETokenType::ESCDerivedFromDataToken>(edge.getEscDerivedToken());
+        auto eccToken =
+            FLETokenFromCDR<FLETokenType::ECCDerivedFromDataToken>(edge.getEccDerivedToken());
+        auto edcToken =
+            FLETokenFromCDR<FLETokenType::EDCDerivedFromDataToken>(edge.getEdcDerivedToken());
+
+        edges.push_back({edcToken, escToken, eccToken});
+    }
+
+    serverToken = FLETokenFromCDR<FLETokenType::ServerDataEncryptionLevel1Token>(
+        payload.getServerEncryptionToken());
+
+    maxCounter = payload.getMaxCounter();
+}
+
 
 std::vector<CompactionToken> CompactionHelpers::parseCompactionTokens(BSONObj compactionTokens) {
     std::vector<CompactionToken> parsed;

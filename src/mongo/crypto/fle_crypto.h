@@ -761,6 +761,10 @@ public:
                                                         BSONElement element,
                                                         uint64_t maxContentionFactor);
 
+    static FLE2FindRangePayload serializeFindRangePayload(FLEIndexKeyAndId indexKey,
+                                                          FLEUserKeyAndId userKey,
+                                                          const std::vector<std::string>& edges,
+                                                          uint64_t maxContentionFactor);
 
     /**
      * Generates a client-side payload that is sent to the server.
@@ -1312,6 +1316,23 @@ struct OSTType_Double {
 OSTType_Double getTypeInfoDouble(double value,
                                  boost::optional<double> min,
                                  boost::optional<double> max);
+
+
+struct FLEFindEdgeTokenSet {
+    EDCDerivedFromDataToken edc;
+    ESCDerivedFromDataToken esc;
+    ECCDerivedFromDataToken ecc;
+};
+
+struct ParsedFindRangePayload {
+    std::vector<FLEFindEdgeTokenSet> edges;
+    ServerDataEncryptionLevel1Token serverToken;
+    std::int64_t maxCounter;
+
+    explicit ParsedFindRangePayload(BSONElement fleFindRangePayload);
+    explicit ParsedFindRangePayload(const Value& fleFindRangePayload);
+    explicit ParsedFindRangePayload(ConstDataRange cdr);
+};
 
 
 /**
