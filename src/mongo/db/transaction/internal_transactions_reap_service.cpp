@@ -29,7 +29,7 @@
 
 #include "mongo/db/transaction/internal_transactions_reap_service.h"
 
-#include "mongo/db/session_catalog_mongod.h"
+#include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/transaction/internal_transactions_reap_service_gen.h"
 #include "mongo/logv2/log.h"
 

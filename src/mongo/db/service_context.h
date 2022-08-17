@@ -35,8 +35,8 @@
 #include <memory>
 #include <vector>
 
-#include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_id.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/storage/storage_change_lock.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/platform/atomic_word.h"

@@ -29,8 +29,8 @@
 
 #pragma once
 
-#include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/write_concern_options.h"
 
 namespace mongo {

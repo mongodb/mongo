@@ -36,9 +36,9 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/functional.h"
 

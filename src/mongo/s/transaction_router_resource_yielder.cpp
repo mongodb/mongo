@@ -29,7 +29,7 @@
 
 #include "mongo/s/transaction_router_resource_yielder.h"
 
-#include "mongo/db/session_catalog.h"
+#include "mongo/db/session/session_catalog.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/s/session_catalog_router.h"

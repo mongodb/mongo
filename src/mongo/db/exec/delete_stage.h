@@ -32,7 +32,7 @@
 #include "mongo/db/exec/requires_collection_stage.h"
 #include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/logical_session_id.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/storage/remove_saver.h"
 
 namespace mongo {

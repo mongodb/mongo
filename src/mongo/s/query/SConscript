@@ -120,10 +120,10 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/generic_cursor',
-        '$BUILD_DIR/mongo/db/kill_sessions',
-        '$BUILD_DIR/mongo/db/logical_session_cache',
-        '$BUILD_DIR/mongo/db/logical_session_id',
         '$BUILD_DIR/mongo/db/query/query_knobs',
+        '$BUILD_DIR/mongo/db/session/kill_sessions',
+        '$BUILD_DIR/mongo/db/session/logical_session_cache',
+        '$BUILD_DIR/mongo/db/session/logical_session_id',
     ],
 )
 
@@ -158,9 +158,9 @@ env.CppUnitTest(
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/auth/authmocks",
         "$BUILD_DIR/mongo/db/auth/saslauth",
-        "$BUILD_DIR/mongo/db/logical_session_id",
         "$BUILD_DIR/mongo/db/query/query_request",
         "$BUILD_DIR/mongo/db/query/query_test_service_context",
+        "$BUILD_DIR/mongo/db/session/logical_session_id",
         "$BUILD_DIR/mongo/db/shared_request_handling",
         "$BUILD_DIR/mongo/executor/thread_pool_task_executor_test_fixture",
         "$BUILD_DIR/mongo/s/sharding_router_test_fixture",

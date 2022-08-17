@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/logical_session_id.h"
+#include "mongo/db/session/logical_session_id.h"
 
 namespace mongo {
 static constexpr StringData kErrorLabelsFieldName = "errorLabels"_sd;

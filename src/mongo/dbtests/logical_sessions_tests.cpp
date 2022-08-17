@@ -33,10 +33,10 @@
 
 #include "mongo/client/index_spec.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/sessions_collection_standalone.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/db/session/sessions_collection_standalone.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/time_support.h"
 

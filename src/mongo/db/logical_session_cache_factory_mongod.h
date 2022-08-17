@@ -31,8 +31,8 @@
 
 #include <memory>
 
-#include "mongo/db/logical_session_cache.h"
 #include "mongo/db/service_liaison.h"
+#include "mongo/db/session/logical_session_cache.h"
 
 namespace mongo {
 

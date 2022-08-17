@@ -30,10 +30,10 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/logical_session_id.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

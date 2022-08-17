@@ -32,12 +32,12 @@
 #include "mongo/base/status.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/logical_session_id.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/repl/oplog_applier_impl.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/transaction/session_txn_record_gen.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/session_txn_record_gen.h"
 
 namespace mongo {
 

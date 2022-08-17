@@ -840,7 +840,7 @@ the following steps will be performed:
 * [Place where a session is placed (or replaced) in the logical session cache](https://github.com/mongodb/mongo/blob/1f94484d52064e12baedc7b586a8238d63560baf/src/mongo/db/logical_session_cache.h#L71-L75)
 * [The logical session cache refresh function](https://github.com/mongodb/mongo/blob/1f94484d52064e12baedc7b586a8238d63560baf/src/mongo/db/logical_session_cache_impl.cpp#L207-L355)
 * [The periodic job to clean up the session catalog and transactions table (the "reap" function)](https://github.com/mongodb/mongo/blob/1f94484d52064e12baedc7b586a8238d63560baf/src/mongo/db/logical_session_cache_impl.cpp#L141-L205)
-* [Location of the session catalog and transactions table cleanup code on mongod](https://github.com/mongodb/mongo/blob/1f94484d52064e12baedc7b586a8238d63560baf/src/mongo/db/session_catalog_mongod.cpp#L331-L398)
+* [Location of the session catalog and transactions table cleanup code on mongod](https://github.com/mongodb/mongo/blob/1f94484d52064e12baedc7b586a8238d63560baf/src/mongo/db/session/session_catalog_mongod.cpp#L331-L398)
 
 ## The logical session catalog
 
@@ -856,7 +856,7 @@ or yield the session.
 Checking out an internal/child session additionally checks out its parent session (the session with the same `id` and `uid` value in the lsid, but without a `txnNumber` or `txnUUID` value), and vice versa.
 
 The runtime state for a session consists of the last checkout time and operation, the number of operations
-waiting to check out the session, and the number of kills requested. Retryable internal sessions are reaped from the logical session catalog [eagerly](https://github.com/mongodb/mongo/blob/67e37f8e806a6a5d402e20eee4b3097e2b11f820/src/mongo/db/session_catalog.cpp#L342), meaning that if a transaction session with a higher transaction number has successfully started, sessions with lower txnNumbers are removed from the session catalog and inserted into an in-memory buffer by the [InternalTransactionsReapService](https://github.com/mongodb/mongo/blob/67e37f8e806a6a5d402e20eee4b3097e2b11f820/src/mongo/db/internal_transactions_reap_service.h#L42) until a configurable threshold is met (1000 by default), after which they are deleted from the transactions table (`config.transactions`) and `config.image_collection` all at once. Eager reaping is best-effort, in that the in-memory buffer is cleared on stepdown or restart.
+waiting to check out the session, and the number of kills requested. Retryable internal sessions are reaped from the logical session catalog [eagerly](https://github.com/mongodb/mongo/blob/67e37f8e806a6a5d402e20eee4b3097e2b11f820/src/mongo/db/session/session_catalog.cpp#L342), meaning that if a transaction session with a higher transaction number has successfully started, sessions with lower txnNumbers are removed from the session catalog and inserted into an in-memory buffer by the [InternalTransactionsReapService](https://github.com/mongodb/mongo/blob/67e37f8e806a6a5d402e20eee4b3097e2b11f820/src/mongo/db/internal_transactions_reap_service.h#L42) until a configurable threshold is met (1000 by default), after which they are deleted from the transactions table (`config.transactions`) and `config.image_collection` all at once. Eager reaping is best-effort, in that the in-memory buffer is cleared on stepdown or restart.
 
 The last checkout time is used by
 the [periodic job inside the logical session cache](#periodic-cleanup-of-the-session-catalog-and-transactions-table)
@@ -871,15 +871,15 @@ the first kill request.
 The runtime state in a node's in-memory session catalog is made durable in the node's
 `config.transactions` collection, also called its transactions table. The in-memory session catalog
  is
-[invalidated](https://github.com/mongodb/mongo/blob/56655b06ac46825c5937ccca5947dc84ccbca69c/src/mongo/db/session_catalog_mongod.cpp#L324)
+[invalidated](https://github.com/mongodb/mongo/blob/56655b06ac46825c5937ccca5947dc84ccbca69c/src/mongo/db/session/session_catalog_mongod.cpp#L324)
 if the `config.transactions` collection is dropped and whenever there is a rollback. When
 invalidation occurs, all active sessions are killed, and the in-memory transaction state is marked
 as invalid to force it to be
-[reloaded from storage the next time a session is checked out](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/session_catalog_mongod.cpp#L426).
+[reloaded from storage the next time a session is checked out](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/session/session_catalog_mongod.cpp#L426).
 
 #### Code references
-* [**SessionCatalog class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/session_catalog.h)
-* [**MongoDSessionCatalog class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/session_catalog_mongod.h)
+* [**SessionCatalog class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/session/session_catalog.h)
+* [**MongoDSessionCatalog class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/session/session_catalog_mongod.h)
 * [**RouterSessionCatalog class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/session_catalog_router.h)
 * How [**mongod**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/service_entry_point_common.cpp#L537) and [**mongos**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/s/commands/strategy.cpp#L412) check out a session prior to executing a command.
 
@@ -1135,7 +1135,7 @@ Currently, a retryable internal transaction can only support a **single** `findA
 
 #### Retryability across failover and restart
 
-To be able to guarantee retryability under failover, we need to make sure that a mongod **always** has all the necessary transaction state loaded while executing a retryable write command. To do this, we recover the transaction state of the client and internal sessions [when checking out sessions](https://github.com/mongodb/mongo/blob/master/src/mongo/db/session_catalog_mongod.cpp#L694) on recovery. During checkout, we call [refreshFromStorageIfNeeded()](https://github.com/mongodb/mongo/blob/master/src/mongo/db/transaction_participant.cpp#L2902) on the current client session (if we are running in one) to refresh the TransactionParticipant for that session. We then [fetch any relevant active internal sessions associated with the current client session and refresh the TransactionParticipants for those sessions](https://github.com/mongodb/mongo/blob/master/src/mongo/db/transaction_participant.cpp#L2988).
+To be able to guarantee retryability under failover, we need to make sure that a mongod **always** has all the necessary transaction state loaded while executing a retryable write command. To do this, we recover the transaction state of the client and internal sessions [when checking out sessions](https://github.com/mongodb/mongo/blob/master/src/mongo/db/session/session_catalog_mongod.cpp#L694) on recovery. During checkout, we call [refreshFromStorageIfNeeded()](https://github.com/mongodb/mongo/blob/master/src/mongo/db/transaction_participant.cpp#L2902) on the current client session (if we are running in one) to refresh the TransactionParticipant for that session. We then [fetch any relevant active internal sessions associated with the current client session and refresh the TransactionParticipants for those sessions](https://github.com/mongodb/mongo/blob/master/src/mongo/db/transaction_participant.cpp#L2988).
 
 #### Handling retry conflicts
 
@@ -1161,7 +1161,7 @@ For resharding, the process is similar to how chunk migrations are handled. The 
 
 #### Code References
 
-* [**Session checkout logic**](https://github.com/mongodb/mongo/blob/master/src/mongo/db/session_catalog_mongod.cpp#L694)
+* [**Session checkout logic**](https://github.com/mongodb/mongo/blob/master/src/mongo/db/session/session_catalog_mongod.cpp#L694)
 * [**Cross-section history check logic**](https://github.com/mongodb/mongo/blob/master/src/mongo/db/transaction_participant.cpp#L3206)
 * [**Conflicting internal transaction check logic**](https://github.com/mongodb/mongo/blob/master/src/mongo/db/transaction_participant.cpp#L2814-L2868)
 * [**Refreshing client and internal sessions logic**](https://github.com/mongodb/mongo/blob/master/src/mongo/db/transaction_participant.cpp#L2923-L2986)

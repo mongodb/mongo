@@ -34,10 +34,10 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/sha256_block.h"
-#include "mongo/db/logical_session_cache.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_list_sessions_gen.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/session/logical_session_cache.h"
 
 namespace mongo {
 

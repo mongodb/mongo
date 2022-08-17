@@ -34,7 +34,7 @@ global:
         - "mongo/db/query/cursor_response.h"
 
 imports:
-    - "mongo/db/logical_session_id.idl"
+    - "mongo/db/session/logical_session_id.idl"
     - "mongo/db/query/tailable_mode.idl"
     - "mongo/idl/basic_types.idl"
     - "mongo/util/net/hostandport.idl"

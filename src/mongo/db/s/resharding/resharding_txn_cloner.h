@@ -34,11 +34,11 @@
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/cancelable_operation_context.h"
-#include "mongo/db/logical_session_id_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/transaction/session_txn_record_gen.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/future.h"
 

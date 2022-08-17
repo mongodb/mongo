@@ -38,7 +38,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/error_labels.h"
-#include "mongo/db/logical_session_id_helpers.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"

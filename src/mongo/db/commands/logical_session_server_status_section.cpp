@@ -31,9 +31,9 @@
 
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/logical_session_cache.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/session_catalog.h"
+#include "mongo/db/session/logical_session_cache.h"
+#include "mongo/db/session/session_catalog.h"
 
 namespace mongo {
 namespace {

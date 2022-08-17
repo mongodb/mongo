@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/logical_session_id.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

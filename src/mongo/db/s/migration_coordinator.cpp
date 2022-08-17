@@ -32,9 +32,9 @@
 
 #include "mongo/db/s/migration_coordinator.h"
 
-#include "mongo/db/logical_session_id_helpers.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"

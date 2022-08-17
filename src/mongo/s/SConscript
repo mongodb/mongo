@@ -60,10 +60,10 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
         '$BUILD_DIR/mongo/db/curop',
-        '$BUILD_DIR/mongo/db/logical_session_id_helpers',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongo_process_interface',
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
-        '$BUILD_DIR/mongo/db/session_catalog',
+        '$BUILD_DIR/mongo/db/session/logical_session_id_helpers',
+        '$BUILD_DIR/mongo/db/session/session_catalog',
         '$BUILD_DIR/mongo/db/shared_request_handling',
         'async_requests_sender',
         'grid',
@@ -71,7 +71,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
         '$BUILD_DIR/mongo/db/internal_transactions_feature_flag',
-        '$BUILD_DIR/mongo/db/sessions_collection',
+        '$BUILD_DIR/mongo/db/session/sessions_collection',
     ],
 )
 
@@ -375,8 +375,8 @@ env.Library(
         'sessions_collection_sharded.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/logical_session_id',
-        '$BUILD_DIR/mongo/db/sessions_collection',
+        '$BUILD_DIR/mongo/db/session/logical_session_id',
+        '$BUILD_DIR/mongo/db/session/sessions_collection',
         'sharding_api',
     ],
 )
@@ -400,7 +400,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/not_primary_error_tracker',
         '$BUILD_DIR/mongo/db/read_write_concern_defaults',
-        '$BUILD_DIR/mongo/db/session_catalog',
+        '$BUILD_DIR/mongo/db/session/session_catalog',
         'commands/cluster_commands_common',
         'load_balancer_support',
         'sharding_router_api',
@@ -428,8 +428,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/ftdc/ftdc_mongos',
-        '$BUILD_DIR/mongo/db/logical_session_cache',
-        '$BUILD_DIR/mongo/db/logical_session_cache_impl',
         '$BUILD_DIR/mongo/db/logical_time_metadata_hook',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongos_process_interface_factory',
         '$BUILD_DIR/mongo/db/process_health/fault_manager',
@@ -437,7 +435,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_options',
         '$BUILD_DIR/mongo/db/server_options_base',
         '$BUILD_DIR/mongo/db/service_liaison_mongos',
-        '$BUILD_DIR/mongo/db/session_catalog',
+        '$BUILD_DIR/mongo/db/session/logical_session_cache',
+        '$BUILD_DIR/mongo/db/session/logical_session_cache_impl',
+        '$BUILD_DIR/mongo/db/session/session_catalog',
         '$BUILD_DIR/mongo/db/startup_warnings_common',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/db/windows_options' if env.TargetOSIs('windows') else [],
@@ -500,7 +500,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/read_write_concern_defaults',
         '$BUILD_DIR/mongo/db/serverinit',
         '$BUILD_DIR/mongo/db/service_liaison_mongos',
-        '$BUILD_DIR/mongo/db/session_catalog',
+        '$BUILD_DIR/mongo/db/session/session_catalog',
         '$BUILD_DIR/mongo/db/startup_warnings_common',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter_refresher',
         '$BUILD_DIR/mongo/transport/service_entry_point',

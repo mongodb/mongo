@@ -34,12 +34,12 @@
 
 #include <memory>
 
-#include "mongo/db/logical_session_cache_impl.h"
 #include "mongo/db/s/sessions_collection_config_server.h"
 #include "mongo/db/service_liaison_mongod.h"
-#include "mongo/db/session_catalog_mongod.h"
-#include "mongo/db/sessions_collection_rs.h"
-#include "mongo/db/sessions_collection_standalone.h"
+#include "mongo/db/session/logical_session_cache_impl.h"
+#include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/session/sessions_collection_rs.h"
+#include "mongo/db/session/sessions_collection_standalone.h"
 #include "mongo/s/sessions_collection_sharded.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl

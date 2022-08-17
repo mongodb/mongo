@@ -32,7 +32,7 @@
 
 #include "mongo/s/session_catalog_router.h"
 
-#include "mongo/db/sessions_collection.h"
+#include "mongo/db/session/sessions_collection.h"
 #include "mongo/s/transaction_router.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding

@@ -32,9 +32,9 @@
 #include <string>
 
 #include "mongo/client/connection_string.h"
-#include "mongo/db/logical_session_id.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/migration_session_id.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
 #include "mongo/s/shard_id.h"
 

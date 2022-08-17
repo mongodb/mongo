@@ -30,10 +30,10 @@
 #pragma once
 
 #include "mongo/db/cancelable_operation_context.h"
-#include "mongo/db/logical_session_id.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/resource_yielder.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/write_ops/batched_command_request.h"

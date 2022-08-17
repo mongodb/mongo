@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/session_catalog.h"
+#include "mongo/db/session/session_catalog.h"
 
 namespace mongo {
 

@@ -37,9 +37,9 @@
 
 #include "mongo/db/allocate_cursor_id.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/kill_sessions_common.h"
-#include "mongo/db/logical_session_cache.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/session/kill_sessions_common.h"
+#include "mongo/db/session/logical_session_cache.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/str.h"

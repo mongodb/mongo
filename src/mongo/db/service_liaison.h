@@ -31,8 +31,8 @@
 
 #include <functional>
 
-#include "mongo/db/logical_session_id.h"
-#include "mongo/db/session_killer.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/session_killer.h"
 #include "mongo/util/periodic_runner.h"
 #include "mongo/util/time_support.h"
 

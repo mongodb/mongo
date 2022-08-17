@@ -38,10 +38,10 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/db/logical_session_id.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/session/logical_session_id.h"
 
 namespace mongo {
 

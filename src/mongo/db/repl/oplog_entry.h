@@ -32,11 +32,11 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/logical_session_id.h"
 #include "mongo/db/repl/apply_ops_gen.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/util/overloaded_visitor.h"
 
 namespace mongo {

@@ -33,8 +33,8 @@
 #include <string>
 #include <vector>
 
-#include "mongo/db/logical_session_id.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/transaction_router.h"

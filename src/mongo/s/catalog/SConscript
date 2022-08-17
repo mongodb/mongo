@@ -29,7 +29,7 @@ env.Library(
         'sharding_catalog_client',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/logical_session_id_helpers',
+        '$BUILD_DIR/mongo/db/session/logical_session_id_helpers',
         '$BUILD_DIR/mongo/util/pcre_wrapper',
     ],
 )

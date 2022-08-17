@@ -31,11 +31,11 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/error_labels.h"
-#include "mongo/db/logical_session_id.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

@@ -33,8 +33,8 @@
 #include "mongo/s/commands/kill_sessions_remote.h"
 
 #include "mongo/db/client.h"
-#include "mongo/db/kill_sessions_common.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/session/kill_sessions_common.h"
 #include "mongo/executor/async_multicaster.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/client/shard.h"

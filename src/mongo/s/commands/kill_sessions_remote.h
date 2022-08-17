@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/session_killer.h"
+#include "mongo/db/session/session_killer.h"
 
 namespace mongo {
 
