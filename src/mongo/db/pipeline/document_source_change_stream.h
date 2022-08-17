@@ -243,9 +243,13 @@ public:
 
     // Default regex for collections match which prohibits system collections.
     static constexpr StringData kRegexAllCollections = R"((?!(\$|system\.)))"_sd;
-    // Regex matching all regular collections plus certain system collections.
+
+    // Regex matching all user collections plus collections exposed when 'showSystemEvents' is set.
+    // Does not match a collection named $ or a collection with 'system.' in the name.
+    // However, it will still match collection names starting with system.buckets or a collection
+    // exactly named system.js.
     static constexpr StringData kRegexAllCollectionsShowSystemEvents =
-        R"((?!(\$|system\.(?!(js$)))))"_sd;
+        R"((?!(\$|system\.(?!(js$|buckets\.)))))"_sd;
 
     static constexpr StringData kRegexAllDBs = R"(^(?!(admin|config|local)\.)[^.]+)"_sd;
     static constexpr StringData kRegexCmdColl = R"(\$cmd$)"_sd;
