@@ -42,7 +42,7 @@ commands:
         command_name: setIndexCommitQuorum
         cpp_name: SetIndexCommitQuorum
         description: "Resets the commitQuorum for an index build."
-        strict: false
+        strict: true
         namespace: concatenate_with_db
         api_version: ""
         fields:
