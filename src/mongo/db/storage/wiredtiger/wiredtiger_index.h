@@ -125,6 +125,9 @@ public:
 
     virtual Status initAsEmpty(OperationContext* opCtx);
 
+    virtual void printIndexEntryMetadata(OperationContext* opCtx,
+                                         const KeyString::Value& keyString) const;
+
     Status compact(OperationContext* opCtx) override;
 
     const std::string& uri() const {

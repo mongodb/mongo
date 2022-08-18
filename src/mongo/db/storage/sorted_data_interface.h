@@ -172,6 +172,12 @@ public:
     virtual bool isEmpty(OperationContext* opCtx) = 0;
 
     /**
+     * Prints any storage engine provided metadata for the index entry with key 'keyString'.
+     */
+    virtual void printIndexEntryMetadata(OperationContext* opCtx,
+                                         const KeyString::Value& keyString) const = 0;
+
+    /**
      * Return the number of entries in 'this' index.
      *
      * The default implementation should be overridden with a more
