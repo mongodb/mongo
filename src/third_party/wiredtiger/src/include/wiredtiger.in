@@ -7345,14 +7345,16 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_SESSION_BYTES_WRITE			4001
 /*! session: dhandle lock wait time (usecs) */
 #define	WT_STAT_SESSION_LOCK_DHANDLE_WAIT		4002
+/*! session: dirty bytes in this txn */
+#define	WT_STAT_SESSION_TXN_BYTES_DIRTY			4003
 /*! session: page read from disk to cache time (usecs) */
-#define	WT_STAT_SESSION_READ_TIME			4003
+#define	WT_STAT_SESSION_READ_TIME			4004
 /*! session: page write from cache to disk time (usecs) */
-#define	WT_STAT_SESSION_WRITE_TIME			4004
+#define	WT_STAT_SESSION_WRITE_TIME			4005
 /*! session: schema lock wait time (usecs) */
-#define	WT_STAT_SESSION_LOCK_SCHEMA_WAIT		4005
+#define	WT_STAT_SESSION_LOCK_SCHEMA_WAIT		4006
 /*! session: time waiting for cache (usecs) */
-#define	WT_STAT_SESSION_CACHE_TIME			4006
+#define	WT_STAT_SESSION_CACHE_TIME			4007
 /*! @} */
 /*
  * Statistics section: END
