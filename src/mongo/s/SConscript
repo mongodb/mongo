@@ -146,6 +146,7 @@ env.Library(
         'catalog/type_database.idl',
         'catalog/type_index_catalog.idl',
         'catalog/type_mongos.cpp',
+        'catalog/type_namespace_placement.idl',
         'catalog/type_shard.cpp',
         'catalog/type_tags.cpp',
         'chunk_version.cpp',

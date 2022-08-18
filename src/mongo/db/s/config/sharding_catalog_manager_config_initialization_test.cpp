@@ -48,6 +48,7 @@
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
@@ -303,6 +304,20 @@ TEST_F(ConfigInitializationTest, BuildsNecessaryIndexes) {
 
     auto foundTagsIndexes = assertGet(getIndexes(operationContext(), TagsType::ConfigNS));
     assertBSONObjsSame(expectedTagsIndexes, foundTagsIndexes);
+
+    if (feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        auto expectedPlacementHistoryIndexes =
+            std::vector<BSONObj>{BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
+                                          << "_id_"),
+                                 BSON("v" << 2 << "unique" << true << "key"
+                                          << BSON("nss" << 1 << "timestamp" << 1) << "name"
+                                          << "nss_1_timestamp_1")};
+
+        auto foundlacementHistoryIndexes = assertGet(
+            getIndexes(operationContext(), NamespaceString::kConfigsvrPlacementHistoryNamespace));
+        assertBSONObjsSame(expectedPlacementHistoryIndexes, foundlacementHistoryIndexes);
+    }
 }
 
 }  // unnamed namespace

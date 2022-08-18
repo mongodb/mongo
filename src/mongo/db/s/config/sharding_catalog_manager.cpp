@@ -52,6 +52,7 @@
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_config_version.h"
+#include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/client/shard_registry.h"
@@ -451,6 +452,19 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
     if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
             serverGlobalParams.featureCompatibility)) {
         result = sharding_util::createGlobalIndexesIndexes(opCtx);
+        if (!result.isOK()) {
+            return result;
+        }
+    }
+
+    if (feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        result = createIndexOnConfigCollection(
+            opCtx,
+            NamespaceString::kConfigsvrPlacementHistoryNamespace,
+            BSON(NamespacePlacementType::kNssFieldName
+                 << 1 << NamespacePlacementType::kTimestampFieldName << 1),
+            unique);
         if (!result.isOK()) {
             return result;
         }
