@@ -188,8 +188,8 @@ protected:
 
         OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
             opCtx);
-        Status status = createCollection(
-            operationContext(), kNss.db().toString(), BSON("create" << kNss.coll()));
+        Status status =
+            createCollection(operationContext(), kNss.dbName(), BSON("create" << kNss.coll()));
         if (status != ErrorCodes::NamespaceExists) {
             uassertStatusOK(status);
         }
@@ -204,7 +204,7 @@ protected:
                                         env.sourceUuid.toString()));
 
         uassertStatusOK(createCollection(
-            operationContext(), env.tempNss.db().toString(), BSON("create" << env.tempNss.coll())));
+            operationContext(), env.tempNss.dbName(), BSON("create" << env.tempNss.coll())));
 
         TypeCollectionReshardingFields reshardingFields;
         reshardingFields.setReshardingUUID(UUID::gen());

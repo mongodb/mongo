@@ -152,8 +152,8 @@ protected:
         {
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
                 unsafeCreateCollection(operationContext());
-            uassertStatusOK(createCollection(
-                operationContext(), kNss.db().toString(), BSON("create" << kNss.coll())));
+            uassertStatusOK(
+                createCollection(operationContext(), kNss.dbName(), BSON("create" << kNss.coll())));
         }
 
         const auto uuid = [&] {
@@ -631,8 +631,8 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, ShardKeyIndexNotFound) {
     {
         OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
             operationContext());
-        uassertStatusOK(createCollection(
-            operationContext(), kNss.db().toString(), BSON("create" << kNss.coll())));
+        uassertStatusOK(
+            createCollection(operationContext(), kNss.dbName(), BSON("create" << kNss.coll())));
     }
 
     const ShardsvrMoveRange req =

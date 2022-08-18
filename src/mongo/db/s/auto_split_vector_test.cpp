@@ -78,8 +78,8 @@ public:
         {
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
                 unsafeCreateCollection(opCtx);
-            uassertStatusOK(createCollection(
-                operationContext(), kNss.db().toString(), BSON("create" << kNss.coll())));
+            uassertStatusOK(
+                createCollection(operationContext(), kNss.dbName(), BSON("create" << kNss.coll())));
         }
 
         DBDirectClient client(opCtx);

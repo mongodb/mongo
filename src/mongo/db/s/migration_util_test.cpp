@@ -438,8 +438,8 @@ public:
         {
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
                 unsafeCreateCollection(operationContext());
-            uassertStatusOK(createCollection(
-                operationContext(), nss.db().toString(), BSON("create" << nss.coll())));
+            uassertStatusOK(
+                createCollection(operationContext(), nss.dbName(), BSON("create" << nss.coll())));
         }
 
         AutoGetCollection autoColl(operationContext(), nss, MODE_IX);

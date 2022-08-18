@@ -191,8 +191,7 @@ void NonShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
 void NonShardServerProcessInterface::createCollection(OperationContext* opCtx,
                                                       const DatabaseName& dbName,
                                                       const BSONObj& cmdObj) {
-    // TODO SERVER-67409 change mongo::createCollection to take in DatabaseName
-    uassertStatusOK(mongo::createCollection(opCtx, dbName.toStringWithTenantId(), cmdObj));
+    uassertStatusOK(mongo::createCollection(opCtx, dbName, cmdObj));
 }
 
 void NonShardServerProcessInterface::dropCollection(OperationContext* opCtx,

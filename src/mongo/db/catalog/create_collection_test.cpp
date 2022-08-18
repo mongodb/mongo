@@ -274,7 +274,7 @@ TEST_F(CreateCollectionTest, ValidationDisabledForTemporaryReshardingCollection)
 
     Lock::GlobalLock lk(opCtx.get(), MODE_X);  // Satisfy low-level locking invariants.
     BSONObj createCmdObj = BSON("create" << reshardingNss.coll() << "validator" << BSON("a" << 5));
-    ASSERT_OK(createCollection(opCtx.get(), reshardingNss.db().toString(), createCmdObj));
+    ASSERT_OK(createCollection(opCtx.get(), reshardingNss.dbName(), createCmdObj));
     ASSERT_TRUE(collectionExists(opCtx.get(), reshardingNss));
 
     AutoGetCollection collection(opCtx.get(), reshardingNss, MODE_X);

@@ -74,8 +74,7 @@ public:
         {
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
                 unsafeCreateCollection(_opCtx);
-            uassertStatusOK(
-                createCollection(_opCtx, kNss.db().toString(), BSON("create" << kNss.coll())));
+            uassertStatusOK(createCollection(_opCtx, kNss.dbName(), BSON("create" << kNss.coll())));
         }
 
         AutoGetCollection autoColl(_opCtx, kNss, MODE_IX);

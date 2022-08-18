@@ -75,7 +75,7 @@ Status DeferredWriter::_makeCollection(OperationContext* opCtx) {
     builder.append("create", _nss.coll());
     builder.appendElements(_collectionOptions.toBSON());
     try {
-        return createCollection(opCtx, _nss.db().toString(), builder.obj().getOwned());
+        return createCollection(opCtx, _nss.dbName(), builder.obj().getOwned());
     } catch (const DBException& exception) {
         return exception.toStatus();
     }

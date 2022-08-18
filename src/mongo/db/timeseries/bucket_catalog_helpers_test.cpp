@@ -65,7 +65,7 @@ void BucketCatalogHelpersTest::_insertIntoBucketColl(const BSONObj& bucketDoc) {
 TEST_F(BucketCatalogHelpersTest, GenerateMinMaxBadBucketDocumentsTest) {
     ASSERT_OK(createCollection(
         operationContext(),
-        kNss.db().toString(),
+        kNss.dbName(),
         BSON("create" << kNss.coll() << "timeseries" << BSON("timeField" << _timeField))));
 
     AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IS);
@@ -90,7 +90,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxBadBucketDocumentsTest) {
 TEST_F(BucketCatalogHelpersTest, GenerateMinMaxTest) {
     ASSERT_OK(createCollection(
         operationContext(),
-        kNss.db().toString(),
+        kNss.dbName(),
         BSON("create" << kNss.coll() << "timeseries" << BSON("timeField" << _timeField))));
 
     AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IS);
@@ -121,7 +121,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxTest) {
 
 TEST_F(BucketCatalogHelpersTest, GenerateMinMaxWithLowerCaseFirstCollationTest) {
     ASSERT_OK(createCollection(operationContext(),
-                               kNss.db().toString(),
+                               kNss.dbName(),
                                BSON("create" << kNss.coll() << "timeseries"
                                              << BSON("timeField" << _timeField) << "collation"
                                              << BSON("locale"
@@ -147,7 +147,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxWithLowerCaseFirstCollationTest) 
 
 TEST_F(BucketCatalogHelpersTest, GenerateMinMaxWithUpperCaseFirstCollationTest) {
     ASSERT_OK(createCollection(operationContext(),
-                               kNss.db().toString(),
+                               kNss.dbName(),
                                BSON("create" << kNss.coll() << "timeseries"
                                              << BSON("timeField" << _timeField) << "collation"
                                              << BSON("locale"
@@ -174,7 +174,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxWithUpperCaseFirstCollationTest) 
 TEST_F(BucketCatalogHelpersTest, GenerateMinMaxSucceedsWithMixedSchemaBucketDocumentTest) {
     ASSERT_OK(createCollection(
         operationContext(),
-        kNss.db().toString(),
+        kNss.dbName(),
         BSON("create" << kNss.coll() << "timeseries" << BSON("timeField" << _timeField))));
 
     AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IS);
@@ -195,7 +195,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxSucceedsWithMixedSchemaBucketDocu
 TEST_F(BucketCatalogHelpersTest, GenerateSchemaFailsWithMixedSchemaBucketDocumentTest) {
     ASSERT_OK(createCollection(
         operationContext(),
-        kNss.db().toString(),
+        kNss.dbName(),
         BSON("create" << kNss.coll() << "timeseries" << BSON("timeField" << _timeField))));
 
     AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IS);
@@ -216,7 +216,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateSchemaFailsWithMixedSchemaBucketDocumen
 TEST_F(BucketCatalogHelpersTest, GenerateSchemaWithInvalidMeasurementsTest) {
     ASSERT_OK(createCollection(
         operationContext(),
-        kNss.db().toString(),
+        kNss.dbName(),
         BSON("create" << kNss.coll() << "timeseries" << BSON("timeField" << _timeField))));
 
     AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IS);
@@ -261,7 +261,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateSchemaWithInvalidMeasurementsTest) {
 TEST_F(BucketCatalogHelpersTest, GenerateSchemaWithValidMeasurementsTest) {
     ASSERT_OK(createCollection(
         operationContext(),
-        kNss.db().toString(),
+        kNss.dbName(),
         BSON("create" << kNss.coll() << "timeseries" << BSON("timeField" << _timeField))));
 
     AutoGetCollection autoColl(operationContext(), kNss.makeTimeseriesBucketsNamespace(), MODE_IS);
@@ -296,7 +296,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateSchemaWithValidMeasurementsTest) {
 TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
     ASSERT_OK(createCollection(
         operationContext(),
-        kNss.db().toString(),
+        kNss.dbName(),
         BSON("create" << kNss.coll() << "timeseries"
                       << BSON("timeField" << _timeField << "metaField" << _metaField))));
 
@@ -418,7 +418,7 @@ TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
 TEST_F(BucketCatalogHelpersTest, IncompatibleBucketsForNewMeasurements) {
     ASSERT_OK(createCollection(
         operationContext(),
-        kNss.db().toString(),
+        kNss.dbName(),
         BSON("create" << kNss.coll() << "timeseries"
                       << BSON("timeField" << _timeField << "metaField" << _metaField))));
 

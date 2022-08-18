@@ -47,9 +47,9 @@ void RangeDeleterServiceTest::setUp() {
         OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
             opCtx);
         uassertStatusOK(
-            createCollection(opCtx, nsCollA.db().toString(), BSON("create" << nsCollA.coll())));
+            createCollection(opCtx, nsCollA.dbName(), BSON("create" << nsCollA.coll())));
         uassertStatusOK(
-            createCollection(opCtx, nsCollB.db().toString(), BSON("create" << nsCollB.coll())));
+            createCollection(opCtx, nsCollB.dbName(), BSON("create" << nsCollB.coll())));
     }
 
     {

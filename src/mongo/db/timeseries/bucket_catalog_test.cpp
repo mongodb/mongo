@@ -135,7 +135,7 @@ void BucketCatalogTest::setUp() {
     for (const auto& ns : {_ns1, _ns2, _ns3}) {
         ASSERT_OK(createCollection(
             _opCtx,
-            ns.db().toString(),
+            ns.dbName(),
             BSON("create" << ns.coll() << "timeseries" << _makeTimeseriesOptionsForCreate())));
     }
 }

@@ -136,7 +136,7 @@ public:
 
         uassertStatusOK(createCollection(
             operationContext(),
-            NamespaceString::kSessionTransactionsTableNamespace.db().toString(),
+            NamespaceString::kSessionTransactionsTableNamespace.dbName(),
             BSON("create" << NamespaceString::kSessionTransactionsTableNamespace.coll())));
         DBDirectClient client(operationContext());
         client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace.ns(),
@@ -144,13 +144,12 @@ public:
 
         OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
             operationContext());
-        uassertStatusOK(createCollection(operationContext(),
-                                         kAppliedToNs.db().toString(),
-                                         BSON("create" << kAppliedToNs.coll())));
         uassertStatusOK(createCollection(
-            operationContext(), kStashNs.db().toString(), BSON("create" << kStashNs.coll())));
+            operationContext(), kAppliedToNs.dbName(), BSON("create" << kAppliedToNs.coll())));
+        uassertStatusOK(createCollection(
+            operationContext(), kStashNs.dbName(), BSON("create" << kStashNs.coll())));
         uassertStatusOK(createCollection(operationContext(),
-                                         kOtherDonorStashNs.db().toString(),
+                                         kOtherDonorStashNs.dbName(),
                                          BSON("create" << kOtherDonorStashNs.coll())));
 
         _cm = createChunkManagerForOriginalColl();

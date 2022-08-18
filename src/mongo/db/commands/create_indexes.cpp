@@ -390,7 +390,7 @@ CreateIndexesReply runCreateIndexesOnNewCollection(
         OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
             opCtx);
         auto createStatus =
-            createCollection(opCtx, ns.db().toString(), builder.obj().getOwned(), idIndexSpec);
+            createCollection(opCtx, ns.dbName(), builder.obj().getOwned(), idIndexSpec);
 
         if (createStatus == ErrorCodes::NamespaceExists) {
             throwWriteConflictException(

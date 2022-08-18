@@ -44,7 +44,7 @@ class BSONElement;
  * default _id index.
  */
 Status createCollection(OperationContext* opCtx,
-                        const std::string& dbName,
+                        const DatabaseName& dbName,
                         const BSONObj& cmdObj,
                         const BSONObj& idIndex = BSONObj());
 

@@ -161,7 +161,7 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
         BSONObjBuilder cmd;
         cmd.append("create", toNss.coll());
         cmd.appendElements(options.toBSON());
-        uassertStatusOK(createCollection(opCtx, toNss.db().toString(), cmd.done()));
+        uassertStatusOK(createCollection(opCtx, toNss.dbName(), cmd.done()));
     }
 
     CollectionPtr toCollection =

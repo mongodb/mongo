@@ -121,7 +121,7 @@ protected:
         OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
             operationContext());
         uassertStatusOK(createCollection(
-            operationContext(), tempNss.db().toString(), BSON("create" << tempNss.coll())));
+            operationContext(), tempNss.dbName(), BSON("create" << tempNss.coll())));
     }
 
     void tearDown() override {

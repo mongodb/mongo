@@ -99,8 +99,7 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
               "Re-creating featureCompatibilityVersion document that was deleted. Creating new "
               "document with last LTS version.",
               "version"_attr = multiversion::toString(multiversion::GenericFCV::kLastLTS));
-        uassertStatusOK(
-            createCollection(opCtx, fcvNss.db().toString(), BSON("create" << fcvNss.coll())));
+        uassertStatusOK(createCollection(opCtx, fcvNss.dbName(), BSON("create" << fcvNss.coll())));
     }
 
     const CollectionPtr& fcvColl =

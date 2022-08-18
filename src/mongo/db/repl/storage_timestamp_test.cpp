@@ -1450,7 +1450,7 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnInsert) {
     // WUOW.
     ASSERT_OK(createCollection(
         _opCtx,
-        nss.db().toString(),
+        nss.dbName(),
         BSON("create" << nss.coll() << "capped" << true << "size" << 1 * 1024 * 1024)));
     auto uuid = [&]() {
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
@@ -2136,7 +2136,7 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuilds) {
         _opCtx, NamespaceString::kIndexBuildEntryNamespace));
     ASSERT_OK(
         createCollection(_opCtx,
-                         NamespaceString::kIndexBuildEntryNamespace.db().toString(),
+                         NamespaceString::kIndexBuildEntryNamespace.dbName(),
                          BSON("create" << NamespaceString::kIndexBuildEntryNamespace.coll())));
 
     NamespaceString nss("unittests.timestampMultiIndexBuilds");
@@ -2354,7 +2354,7 @@ TEST_F(StorageTimestampTest, TimestampAbortIndexBuild) {
         _opCtx, NamespaceString::kIndexBuildEntryNamespace));
     ASSERT_OK(
         createCollection(_opCtx,
-                         NamespaceString::kIndexBuildEntryNamespace.db().toString(),
+                         NamespaceString::kIndexBuildEntryNamespace.dbName(),
                          BSON("create" << NamespaceString::kIndexBuildEntryNamespace.coll())));
 
     NamespaceString nss("unittests.timestampAbortIndexBuild");
@@ -3026,7 +3026,7 @@ TEST_F(StorageTimestampTest, ViewCreationSeparateTransaction) {
     const NamespaceString systemViewsNss("unittests.system.views");
 
     ASSERT_OK(createCollection(_opCtx,
-                               viewNss.db().toString(),
+                               viewNss.dbName(),
                                BSON("create" << viewNss.coll() << "pipeline" << BSONArray()
                                              << "viewOn" << backingCollNss.coll())));
 
@@ -3070,7 +3070,7 @@ TEST_F(StorageTimestampTest, CreateCollectionWithSystemIndex) {
 
     { ASSERT_FALSE(AutoGetCollectionForReadCommand(_opCtx, nss).getCollection()); }
 
-    ASSERT_OK(createCollection(_opCtx, nss.db().toString(), BSON("create" << nss.coll())));
+    ASSERT_OK(createCollection(_opCtx, nss.dbName(), BSON("create" << nss.coll())));
 
     RecordId catalogId;
     {
@@ -3143,7 +3143,7 @@ TEST_F(StorageTimestampTest, MultipleTimestampsForMultikeyWrites) {
         _opCtx, NamespaceString::kIndexBuildEntryNamespace));
     ASSERT_OK(
         createCollection(_opCtx,
-                         NamespaceString::kIndexBuildEntryNamespace.db().toString(),
+                         NamespaceString::kIndexBuildEntryNamespace.dbName(),
                          BSON("create" << NamespaceString::kIndexBuildEntryNamespace.coll())));
 
     NamespaceString nss("unittests.timestampVectoredInsertMultikey");
