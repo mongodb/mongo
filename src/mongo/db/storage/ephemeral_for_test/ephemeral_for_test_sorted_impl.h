@@ -99,6 +99,8 @@ public:
                                            RecordId rid) override {
         MONGO_UNREACHABLE;
     }
+    void printIndexEntryMetadata(OperationContext* opCtx, const KeyString::Value& keyString) const {
+    }
 
 protected:
     // These two are the same as before.

@@ -236,6 +236,9 @@ public:
         return true;
     }
 
+    virtual void printIndexEntryMetadata(OperationContext* opCtx,
+                                         const KeyString::Value& keyString) const {}
+
     virtual std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
                                                                    bool isForward) const {
         return {};

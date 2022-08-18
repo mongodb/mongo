@@ -455,6 +455,74 @@ bool WiredTigerIndex::isEmpty(OperationContext* opCtx) {
     return false;
 }
 
+void WiredTigerIndex::printIndexEntryMetadata(OperationContext* opCtx,
+                                              const KeyString::Value& keyString) const {
+    // Printing the index entry metadata requires a new session. We cannot open other cursors when
+    // there are open history store cursors in the session. We also need to make sure that the
+    // existing session has not written data to avoid potential deadlocks.
+    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
+    WiredTigerSession session(WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->conn());
+
+    // Per the version cursor API:
+    // - A version cursor can only be called with the read timestamp as the oldest timestamp.
+    // - If there is no oldest timestamp, the version cursor can only be called with a read
+    //   timestamp of 1.
+    // - If there is an oldest timestamp, reading at timestamp 1 will get rounded up.
+    const std::string config = "read_timestamp=1,roundup_timestamps=(read=true)";
+    WiredTigerBeginTxnBlock beginTxn(session.getSession(), config.c_str());
+
+    // Open a version cursor. This is a debug cursor that enables iteration through the history of
+    // values for a given index entry.
+    WT_CURSOR* cursor = session.getNewCursor(_uri, "debug=(dump_version=true)");
+
+    const WiredTigerItem searchKey(keyString.getBuffer(), keyString.getSize());
+    cursor->set_key(cursor, searchKey.Get());
+
+    int ret = cursor->search(cursor);
+    while (ret != WT_NOTFOUND) {
+        invariantWTOK(ret, cursor->session);
+
+        uint64_t startTs = 0, startDurableTs = 0, stopTs = 0, stopDurableTs = 0;
+        uint64_t startTxnId = 0, stopTxnId = 0;
+        uint8_t flags = 0, location = 0, prepare = 0, type = 0;
+        WT_ITEM value;
+
+        invariantWTOK(cursor->get_value(cursor,
+                                        &startTxnId,
+                                        &startTs,
+                                        &startDurableTs,
+                                        &stopTxnId,
+                                        &stopTs,
+                                        &stopDurableTs,
+                                        &type,
+                                        &prepare,
+                                        &flags,
+                                        &location,
+                                        &value),
+                      cursor->session);
+
+        auto indexKey = KeyString::toBson(
+            keyString.getBuffer(), keyString.getSize(), _ordering, keyString.getTypeBits());
+
+        LOGV2(6601200,
+              "WiredTiger index entry metadata",
+              "keyString"_attr = keyString,
+              "indexKey"_attr = indexKey,
+              "startTxnId"_attr = startTxnId,
+              "startTs"_attr = Timestamp(startTs),
+              "startDurableTs"_attr = Timestamp(startDurableTs),
+              "stopTxnId"_attr = stopTxnId,
+              "stopTs"_attr = Timestamp(stopTs),
+              "stopDurableTs"_attr = Timestamp(stopDurableTs),
+              "type"_attr = type,
+              "prepare"_attr = prepare,
+              "flags"_attr = flags,
+              "location"_attr = location);
+
+        ret = cursor->next(cursor);
+    }
+}
+
 long long WiredTigerIndex::getSpaceUsedBytes(OperationContext* opCtx) const {
     dassert(opCtx->lockState()->isReadLocked());
     auto ru = WiredTigerRecoveryUnit::get(opCtx);
