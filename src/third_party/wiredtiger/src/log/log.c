@@ -600,7 +600,8 @@ __log_prealloc(WT_SESSION_IMPL *session, WT_FH *fh)
 
     /*
      * We have exclusive access to the log file and there are no other writes happening
-     * concurrently, so there are no locking issues.
+     * concurrently, so there are no locking issues. We don't need to worry about hot backup because
+     * logging never reduces the length of the file in pre-allocate.
      */
     ret = __wt_fextend(session, fh, conn->log_extend_len);
     return (ret == EBUSY || ret == ENOTSUP ? 0 : ret);

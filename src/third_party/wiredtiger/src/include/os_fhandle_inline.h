@@ -51,6 +51,9 @@ static inline int
 __wt_fextend(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
 {
     WT_FILE_HANDLE *handle;
+#ifdef HAVE_DIAGNOSTIC
+    wt_off_t cur_size;
+#endif
 
     WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
     WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
@@ -63,6 +66,13 @@ __wt_fextend(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
      * function to call.
      */
     handle = fh->handle;
+#ifdef HAVE_DIAGNOSTIC
+    /* Make sure we don't try to shrink the file during backup. */
+    if (handle->fh_size != NULL) {
+        WT_RET(handle->fh_size(handle, (WT_SESSION *)session, &cur_size));
+        WT_ASSERT(session, cur_size <= offset || S2C(session)->hot_backup_start == 0);
+    }
+#endif
     if (handle->fh_extend_nolock != NULL)
         return (handle->fh_extend_nolock(handle, (WT_SESSION *)session, offset));
     if (handle->fh_extend != NULL)
@@ -135,6 +145,9 @@ static inline int
 __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
 {
     WT_FILE_HANDLE *handle;
+#ifdef HAVE_DIAGNOSTIC
+    wt_off_t cur_size;
+#endif
 
     WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_READONLY));
 
@@ -146,6 +159,13 @@ __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, wt_off_t offset)
      * function to call.
      */
     handle = fh->handle;
+#ifdef HAVE_DIAGNOSTIC
+    /* Make sure we don't try to shrink the file during backup. */
+    if (handle->fh_size != NULL) {
+        WT_RET(handle->fh_size(handle, (WT_SESSION *)session, &cur_size));
+        WT_ASSERT(session, cur_size <= offset || S2C(session)->hot_backup_start == 0);
+    }
+#endif
     if (handle->fh_truncate != NULL)
         return (handle->fh_truncate(handle, (WT_SESSION *)session, offset));
     return (__wt_set_return(session, ENOTSUP));
