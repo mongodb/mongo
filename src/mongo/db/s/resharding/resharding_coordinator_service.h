@@ -35,11 +35,11 @@
 #include "mongo/db/s/resharding/resharding_coordinator_observer.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_tags.h"
-#include "mongo/s/shard_id.h"
 #include "mongo/util/future.h"
 
 namespace mongo {

@@ -37,7 +37,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
-#include "mongo/s/shard_id.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

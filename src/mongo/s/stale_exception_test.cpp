@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/s/shard_id.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/unittest/unittest.h"
 

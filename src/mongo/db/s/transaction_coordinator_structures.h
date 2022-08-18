@@ -34,7 +34,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/s/shard_id.h"
+#include "mongo/db/shard_id.h"
 
 namespace mongo {
 namespace txn {

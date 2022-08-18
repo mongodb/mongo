@@ -52,7 +52,7 @@ structs:
                 description: "Primary shard for this database."
                 type: shard_id
                 validator:
-                    callback: "validateShardId"
+                    callback: "ShardId::validate"
                 optional: false
             # The following field has been deprecated in 6.0 and should not be used
             # TODO SERVER-63983 make this field optional

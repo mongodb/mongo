@@ -37,9 +37,9 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/add_shard_cmd_gen.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/cluster_identity_loader.h"
-#include "mongo/s/shard_id.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 
 namespace mongo {

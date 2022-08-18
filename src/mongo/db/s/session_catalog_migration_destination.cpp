@@ -46,13 +46,13 @@
 #include "mongo/db/s/session_catalog_migration.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/shard_id.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

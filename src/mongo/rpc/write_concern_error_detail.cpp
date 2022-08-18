@@ -27,13 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/rpc/write_concern_error_detail.h"
-#include "mongo/rpc/write_concern_error_gen.h"
 
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/field_parser.h"
+#include "mongo/rpc/write_concern_error_gen.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

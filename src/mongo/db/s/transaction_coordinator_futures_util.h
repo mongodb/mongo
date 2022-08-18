@@ -33,10 +33,10 @@
 #include <vector>
 
 #include "mongo/client/read_preference.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/client/shard.h"
-#include "mongo/s/shard_id.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/future.h"
 #include "mongo/util/time_support.h"

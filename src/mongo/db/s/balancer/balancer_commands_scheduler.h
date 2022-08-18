@@ -31,9 +31,9 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
-#include "mongo/s/shard_id.h"
 
 namespace mongo {
 

@@ -27,14 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/catalog/commit_quorum_options.h"
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/field_parser.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/util/str.h"
 

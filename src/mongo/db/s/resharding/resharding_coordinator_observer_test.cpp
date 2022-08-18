@@ -34,8 +34,8 @@
 
 #include "mongo/db/s/resharding/resharding_coordinator_observer.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/shard_id.h"
 #include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

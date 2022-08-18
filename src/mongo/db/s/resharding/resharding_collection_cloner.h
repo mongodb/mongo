@@ -37,7 +37,7 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/s/shard_id.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"

@@ -32,8 +32,8 @@
 #include <string>
 
 #include "mongo/bson/oid.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/s/shard_id.h"
 
 namespace mongo {
 

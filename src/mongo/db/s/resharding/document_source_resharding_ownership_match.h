@@ -30,8 +30,8 @@
 #pragma once
 
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/s/chunk_manager.h"
-#include "mongo/s/shard_id.h"
 #include "mongo/s/shard_key_pattern.h"
 
 namespace mongo {

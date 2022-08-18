@@ -32,7 +32,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/s/shard_id.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/util/future.h"
 #include "mongo/util/uuid.h"
 

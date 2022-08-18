@@ -33,9 +33,9 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/async_requests_sender.h"
-#include "mongo/s/shard_id.h"
 
 namespace mongo {
 namespace sharding_util {

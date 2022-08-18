@@ -31,8 +31,8 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/s/request_types/move_primary_gen.h"
-#include "mongo/s/shard_id.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {

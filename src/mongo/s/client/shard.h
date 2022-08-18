@@ -39,8 +39,8 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/executor/remote_command_response.h"
-#include "mongo/s/shard_id.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 

@@ -32,7 +32,7 @@
 #include <string>
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/s/shard_id.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {

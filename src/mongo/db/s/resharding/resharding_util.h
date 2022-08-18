@@ -42,11 +42,11 @@
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/db/s/sharding_state_lock.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/resharding/common_types_gen.h"
-#include "mongo/s/shard_id.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

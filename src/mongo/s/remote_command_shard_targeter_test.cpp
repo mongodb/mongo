@@ -32,7 +32,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/s/shard_id.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/s/sharding_initialization.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/sharding_test_fixture_common.h"

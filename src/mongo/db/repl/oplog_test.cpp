@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <algorithm>
 #include <functional>
 #include <map>
@@ -38,7 +36,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/lock_manager_test_help.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/field_parser.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_interface_local.h"
@@ -49,7 +46,6 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/util/concurrency/thread_pool.h"
-
 
 namespace mongo {
 namespace repl {

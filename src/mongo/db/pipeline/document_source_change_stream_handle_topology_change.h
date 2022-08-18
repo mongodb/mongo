@@ -34,8 +34,8 @@
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
-#include "mongo/s/shard_id.h"
 
 namespace mongo {
 

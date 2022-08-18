@@ -10,12 +10,10 @@ env.Library(
         'index_descriptor.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog/index_catalog',
-        '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/matcher/expressions',
-        '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -29,19 +27,18 @@ env.Library(
         'wildcard_key_generator.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/exec/projection_executor',
         '$BUILD_DIR/mongo/db/exec/working_set',
         '$BUILD_DIR/mongo/db/fts/base_fts',
         '$BUILD_DIR/mongo/db/geo/geoparser',
-        '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/mongohasher',
         '$BUILD_DIR/mongo/db/pipeline/document_path_support',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface',
         '$BUILD_DIR/mongo/db/query/projection_ast',
         '$BUILD_DIR/mongo/db/query/sort_pattern',
         '$BUILD_DIR/mongo/db/record_id_helpers',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/third_party/s2/s2',
         'expression_params',
@@ -79,8 +76,7 @@ env.Library(
         'index_access_method_factory.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/index_names',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -138,28 +134,27 @@ iamEnv.Library(
 )
 
 env.Library(
-    target="index_access_methods",
+    target='index_access_methods',
     source=[
-        "2d_access_method.cpp",
-        "columns_access_method.cpp",
-        "btree_access_method.cpp",
-        "fts_access_method.cpp",
-        "hash_access_method.cpp",
-        "index_access_method_factory_impl.cpp",
-        "s2_access_method.cpp",
-        "s2_bucket_access_method.cpp",
-        "wildcard_access_method.cpp",
+        '2d_access_method.cpp',
+        'columns_access_method.cpp',
+        'btree_access_method.cpp',
+        'fts_access_method.cpp',
+        'hash_access_method.cpp',
+        'index_access_method_factory_impl.cpp',
+        's2_access_method.cpp',
+        's2_bucket_access_method.cpp',
+        'wildcard_access_method.cpp',
     ],
     LIBDEPS=[
         'index_access_method',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/fts/base_fts',
-        '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/resumable_index_builds_idl',
+        '$BUILD_DIR/mongo/db/server_base',
         'column_store_index',
         'expression_params',
         'key_generator',

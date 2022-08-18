@@ -64,16 +64,13 @@ env.Library(
 )
 
 env.Library(
-    target="feature_compatibility_parsers",
+    target='feature_compatibility_parsers',
     source=[
-        "feature_compatibility_version_parser.cpp",
+        'feature_compatibility_version_parser.cpp',
         'feature_compatibility_version_document.idl',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/namespace_string',
-    ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
@@ -113,8 +110,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/fle_crud',
         '$BUILD_DIR/mongo/db/mongohasher',
-        '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/session/kill_sessions',
         '$BUILD_DIR/mongo/db/session/logical_session_cache',
@@ -165,12 +162,12 @@ env.Library(
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/log_process_details',
         '$BUILD_DIR/mongo/db/multitenancy',
-        '$BUILD_DIR/mongo/db/multitenancy_params',
         '$BUILD_DIR/mongo/db/pipeline/change_stream_pipeline',
         '$BUILD_DIR/mongo/db/pipeline/document_source_internal_apply_oplog_update',
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
         '$BUILD_DIR/mongo/db/repl/isself',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/session/logical_session_cache',
         '$BUILD_DIR/mongo/db/session/logical_session_cache_impl',
         '$BUILD_DIR/mongo/db/session/logical_session_id',
@@ -493,7 +490,7 @@ env.Library(
         'rename_collection.idl',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
@@ -601,7 +598,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/tenant_migration_donor_service',
         '$BUILD_DIR/mongo/db/repl/tenant_migration_recipient_service',
         '$BUILD_DIR/mongo/db/rw_concern_d',
-        '$BUILD_DIR/mongo/db/s/sharding_api_d',
         '$BUILD_DIR/mongo/db/s/sharding_catalog_manager',
         '$BUILD_DIR/mongo/db/s/sharding_commands_d',
         '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
@@ -678,9 +674,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/pipeline/aggregation_request_helper',
         '$BUILD_DIR/mongo/db/query/command_request_response',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
         'test_commands_enabled',
     ],
@@ -765,20 +761,23 @@ env.Library(
         'map_reduce_agg.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/commands/servers', '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/commands/servers',
+        '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/index/index_access_methods',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongo_process_interface',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongod_process_interface_factory',
-        '$BUILD_DIR/mongo/db/query/map_reduce_output_format', '$BUILD_DIR/mongo/db/query_exec',
-        '$BUILD_DIR/mongo/idl/idl_parser', 'map_reduce_parser'
+        '$BUILD_DIR/mongo/db/query/map_reduce_output_format',
+        '$BUILD_DIR/mongo/db/query_exec',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+        'map_reduce_parser',
     ],
 )
 
 env.CppUnitTest(
-    target="map_reduce_agg_test",
+    target='map_reduce_agg_test',
     source=[
-        "map_reduce_agg_test.cpp",
-        "map_reduce_parse_test.cpp",
+        'map_reduce_agg_test.cpp',
+        'map_reduce_parse_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',

@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/query/find_common.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
@@ -55,7 +56,6 @@
 #include "mongo/s/query/router_stage_remove_metadata_fields.h"
 #include "mongo/s/query/router_stage_skip.h"
 #include "mongo/s/query/store_possible_cursor.h"
-#include "mongo/s/shard_id.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/transaction_router.h"
 

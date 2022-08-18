@@ -124,7 +124,7 @@ BSONObj formatClusterKeyForListIndexes(const ClusteredCollectionInfo& collInfo,
 }
 
 bool isClusteredOnId(const boost::optional<ClusteredCollectionInfo>& collInfo) {
-    return clustered_util::matchesClusterKey(BSON("_id" << 1), collInfo);
+    return matchesClusterKey(BSON("_id" << 1), collInfo);
 }
 
 bool matchesClusterKey(const BSONObj& keyPatternObj,

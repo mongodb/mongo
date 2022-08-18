@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/s/shard_id.h"
+#include "mongo/db/shard_id.h"
 
 #include "mongo/base/string_data.h"
 #include "mongo/platform/basic.h"

@@ -116,9 +116,9 @@ env.Library(
 env.Library(
     target='serveronly_stats',
     source=[
-        "latency_server_status_section.cpp",
-        "lock_server_status_section.cpp",
-        "storage_stats.cpp",
+        'latency_server_status_section.cpp',
+        'lock_server_status_section.cpp',
+        'storage_stats.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',

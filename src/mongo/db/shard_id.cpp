@@ -27,15 +27,9 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
-#include "mongo/s/shard_id.h"
+#include "mongo/db/shard_id.h"
 
 #include <functional>
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 
@@ -43,6 +37,13 @@ const ShardId ShardId::kConfigServerId("config");
 
 bool ShardId::isValid() const {
     return !_shardId.empty();
+}
+
+Status ShardId::validate(const ShardId& value) {
+    if (!value.isValid()) {
+        return {ErrorCodes::NoSuchKey, "Shard ID cannot be empty"};
+    }
+    return Status::OK();
 }
 
 int ShardId::compare(const ShardId& other) const {

@@ -30,9 +30,9 @@
 #pragma once
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
-#include "mongo/s/shard_id.h"
 #include "mongo/util/concurrency/notification.h"
 
 namespace mongo {

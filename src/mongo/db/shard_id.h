@@ -70,6 +70,7 @@ public:
      *  Returns true if _shardId is not empty. Subject to include more validations in the future.
      */
     bool isValid() const;
+    static Status validate(const ShardId& value);
 
     /**
      * Returns -1, 0, or 1 if 'this' is less, equal, or greater than 'other' in

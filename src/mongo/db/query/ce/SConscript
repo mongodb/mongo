@@ -17,6 +17,7 @@ env.Library(
         'stats_cache_loader_impl.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_abt',
         '$BUILD_DIR/mongo/db/query/optimizer/optimizer',
     ],
@@ -58,13 +59,12 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target="stats_cache_loader_test",
+    target='stats_cache_loader_test',
     source=[
-        "stats_cache_loader_test.cpp",
-        "stats_cache_loader_test_fixture.cpp",
+        'stats_cache_loader_test.cpp',
+        'stats_cache_loader_test_fixture.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/catalog/collection_crud',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
@@ -73,7 +73,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/index_builds_coordinator_mongod',
         '$BUILD_DIR/mongo/db/matcher/expressions',
         '$BUILD_DIR/mongo/db/multitenancy',
-        '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/op_observer/op_observer',
         '$BUILD_DIR/mongo/db/op_observer/op_observer_impl',
         '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
@@ -84,6 +83,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',

@@ -27,24 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <type_traits>
 
 #include "mongo/db/write_concern_options.h"
-#include "mongo/db/write_concern_options_gen.h"
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/field_parser.h"
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/write_concern_options_gen.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
-
-using std::string;
-
 namespace {
 
 /**

@@ -63,7 +63,7 @@ structs:
                 type: shard_id
                 description: "ID of the recipient shard"
                 validator:
-                    callback: "validateShardId"
+                    callback: "ShardId::validate"
             min:
                 type: object_owned
                 description: "The min key of the range to move"
@@ -137,7 +137,7 @@ commands:
                 type: shard_id
                 description: "ID of the donor shard"
                 validator:
-                    callback: "validateShardId"
+                    callback: "ShardId::validate"
             maxChunkSizeBytes:
                 type: safeInt64
                 description: "Max size of data to move"

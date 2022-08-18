@@ -39,7 +39,7 @@
 #include "mongo/db/repl/oplog.h"                  // for InsertStatement and OplogLink
 #include "mongo/db/repl/oplog_entry.h"            // for MutableOplogEntry
 #include "mongo/db/session/logical_session_id.h"  // for StmtId
-#include "mongo/s/shard_id.h"
+#include "mongo/db/shard_id.h"
 
 namespace mongo {
 

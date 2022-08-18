@@ -36,12 +36,12 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
-#include "mongo/s/shard_id.h"
 #include "mongo/s/transaction_router.h"
 
 namespace mongo {

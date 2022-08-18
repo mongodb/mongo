@@ -35,9 +35,9 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/s/catalog/type_chunk_base_gen.h"
 #include "mongo/s/chunk_version.h"
-#include "mongo/s/shard_id.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/type_traits.h"
 

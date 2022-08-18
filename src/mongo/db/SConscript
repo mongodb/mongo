@@ -54,6 +54,23 @@ env.SConscript(
     ],
 )
 
+# The 'server_base' library must only contain basic, stateless, value types which are used throughout
+# all the server binaries. It must not depend on anything other than utilities that are outside of
+# the server codebase.
+env.Library(
+    target='server_base', source=[
+        'database_name.cpp',
+        'index_names.cpp',
+        'keypattern.cpp',
+        'multitenancy.idl',
+        'namespace_string.cpp',
+        'shard_id.cpp',
+        'shutdown_in_progress_quiesce_info.cpp',
+    ], LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/server_parameter',
+    ])
+
 #
 # The db/'common' lib has the abstractions that are shared by components of the
 # server. Ideally, many of the object in 'coredb' should be moved here when their dependencies
@@ -66,17 +83,13 @@ env.Library(
         'field_ref.cpp',
         'field_ref_set.cpp',
         'field_parser.cpp',
-        'keypattern.cpp',
         'txn_retry_counter_too_old_info.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog/cannot_convert_index_to_unique_info',
-        '$BUILD_DIR/mongo/db/index_names',
         '$BUILD_DIR/mongo/db/repl/tenant_migration_errors',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/write_concern_options',
-        'process_health_feature_flag',
-        'shutdown_in_progress_quiesce_info',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
@@ -88,25 +101,12 @@ env.Library(
     source=[
         'multitenancy.cpp',
     ],
-    LIBDEPS=[
-        'multitenancy_params',
-    ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/security_token',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/idl/feature_flag',
         'server_feature_flags',
-    ],
-)
-
-env.Library(
-    target='shutdown_in_progress_quiesce_info',
-    source=[
-        'shutdown_in_progress_quiesce_info.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
     ],
 )
 
@@ -200,17 +200,6 @@ env.Library(
 )
 
 env.Library(
-    target='index_names',
-    source=[
-        "index_names.cpp",
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-    ],
-)
-
-env.Library(
     target='mongohasher',
     source=[
         "hasher.cpp",
@@ -229,22 +218,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.Library(
-    target='namespace_string',
-    source=[
-        'namespace_string.cpp',
-        'database_name.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/repl/optime',
-        'multitenancy_params',
-    ],
-    LIBDEPS_PRIVATE=[
-        'server_options_core',
     ],
 )
 
@@ -274,23 +247,9 @@ env.Library(
         'collection_index_usage_tracker.cpp',
         'global_index_usage_tracker.cpp',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/server_status_core',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/index_names',
-    ],
-)
-
-env.Library(
-    target='multitenancy_params',
-    source=[
-        'multitenancy.idl',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -582,10 +541,10 @@ env.Library(
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/db_raii',
-        '$BUILD_DIR/mongo/db/namespace_string',
         '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/db/record_id_helpers',
         '$BUILD_DIR/mongo/db/repl/storage_interface',
+        'server_base',
     ],
 )
 
@@ -799,7 +758,7 @@ env.Library(
         'audit',
         'coll_mod_command_idl',
         'index_commands_idl',
-        'namespace_string',
+        'server_base',
     ],
 )
 
@@ -849,16 +808,6 @@ env.Library(
 )
 
 env.Library(
-    target='process_health_feature_flag',
-    source=[
-        'process_health/health_monitoring.idl',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/idl/feature_flag',
-    ],
-)
-
-env.Library(
     target='catalog_raii',
     source=[
         'catalog/catalog_helper.cpp',
@@ -868,7 +817,6 @@ env.Library(
         'catalog/collection',
         'catalog/collection_catalog',
         'concurrency/lock_manager',
-        'namespace_string',
         'views/views',
     ],
     LIBDEPS_PRIVATE=[
@@ -876,6 +824,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
         '$BUILD_DIR/mongo/db/s/sharding_api_d',
         'multitenancy',
+        'server_base',
     ],
 )
 
@@ -1176,7 +1125,7 @@ env.Library(
         "catalog_raii",
         "db_raii",
         "dbhelpers",
-        "namespace_string",
+        "server_base",
         "service_context",
     ],
 )
@@ -1793,7 +1742,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
         'keys_collection_document',
         'logical_time',
-        'namespace_string',
+        'server_base',
     ],
 )
 
@@ -2001,7 +1950,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/idl/idl_parser',
-        'namespace_string',
+        'server_base',
         'service_context',
     ],
 )
@@ -2406,17 +2355,19 @@ if wiredtiger:
         source=[
             'cancelable_operation_context_test.cpp',
             'catalog_raii_test.cpp',
-            'client_strand_test.cpp',
             'client_context_test.cpp',
+            'client_strand_test.cpp',
             'collection_index_usage_tracker_test.cpp',
+            'commands_test_example.idl',
             'commands_test.cpp',
             'curop_test.cpp',
             'database_name_test.cpp',
+            'db_raii_multi_collection_test.cpp',
+            'db_raii_test.cpp',
             'dbdirectclient_test.cpp',
             'dbmessage_test.cpp',
-            'db_raii_test.cpp',
-            'db_raii_multi_collection_test.cpp',
-            "explain_test.cpp",
+            'error_labels_test.cpp',
+            'explain_test.cpp',
             'field_parser_test.cpp',
             'field_ref_set_test.cpp',
             'field_ref_test.cpp',
@@ -2450,6 +2401,7 @@ if wiredtiger:
             'session/logical_session_id_test.cpp',
             'session/session_catalog_mongod_test.cpp',
             'session/session_catalog_test.cpp',
+            'shard_id_test.cpp',
             'startup_warnings_mongod_test.cpp',
             'thread_client_test.cpp',
             'time_proof_service_test.cpp',
@@ -2464,11 +2416,8 @@ if wiredtiger:
             'vector_clock_test.cpp',
             'wire_version_test.cpp',
             'write_concern_options_test.cpp',
-            'error_labels_test.cpp',
-            'commands_test_example.idl',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
             '$BUILD_DIR/mongo/bson/util/bson_extract',
             '$BUILD_DIR/mongo/client/read_preference',
             '$BUILD_DIR/mongo/crypto/encrypted_field_config',
@@ -2542,14 +2491,13 @@ if wiredtiger:
             'logical_time',
             'mirror_maestro',
             'multitenancy',
-            'multitenancy_params',
-            'namespace_string',
             'operation_time_tracker',
             'query_exec',
             'range_arithmetic',
             'read_write_concern_defaults_mock',
             'record_id_helpers',
             'rw_concern_d',
+            'server_base',
             'server_options_core',
             'server_options_servers',
             'service_context',

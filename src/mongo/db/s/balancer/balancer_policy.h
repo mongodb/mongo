@@ -37,10 +37,10 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/balancer/cluster_statistics.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/request_types/auto_split_vector_gen.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
-#include "mongo/s/shard_id.h"
 #include "mongo/s/shard_version.h"
 
 namespace mongo {

@@ -35,7 +35,7 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/s/shard_id.h"
+#include "mongo/db/shard_id.h"
 
 namespace mongo {
 

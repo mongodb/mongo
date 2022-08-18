@@ -35,11 +35,11 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/s/move_primary_source_manager.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/write_block_bypass.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/shard_id.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

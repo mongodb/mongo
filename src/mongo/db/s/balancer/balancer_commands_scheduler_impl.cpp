@@ -32,12 +32,12 @@
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/sharding_util.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
 #include "mongo/s/request_types/shardsvr_join_migrations_request_gen.h"
-#include "mongo/s/shard_id.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/fail_point.h"
 

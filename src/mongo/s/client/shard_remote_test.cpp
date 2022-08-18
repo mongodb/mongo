@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/connection_string.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/query/cursor_response.h"
@@ -38,7 +36,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/client/shard_remote.h"
 #include "mongo/s/query/establish_cursors.h"
-#include "mongo/s/shard_id.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 
 namespace mongo {

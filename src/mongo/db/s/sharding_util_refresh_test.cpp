@@ -30,10 +30,10 @@
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/sharding_util.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/shard_id.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

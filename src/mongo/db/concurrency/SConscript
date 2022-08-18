@@ -60,7 +60,6 @@ env.Library(
         'replication_state_transition_lock_guard.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/storage/storage_engine_parameters',
         '$BUILD_DIR/mongo/util/background_job',
@@ -72,7 +71,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/concurrency/flow_control_ticketholder',
-        '$BUILD_DIR/mongo/db/namespace_string',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
