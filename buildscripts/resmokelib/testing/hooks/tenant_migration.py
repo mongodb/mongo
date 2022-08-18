@@ -443,13 +443,14 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                 migration_opts.migration_id, migration_opts.get_donor_name())
             raise
 
-    def _is_shard_merge_enabled(self, primary_client):  # noqa: D205,D400
+    def _is_shard_merge_enabled(self, donor_primary):  # noqa: D205,D400
         """Check if the shard merge feature flag is enabled. Returns true if both the shard merge
         feature flag is set to true and that ignoreShardMergeFeatureFlag is set to false.
         """
         shard_merge_feature_enabled = False
         while True:
             try:
+                primary_client = self._create_client(donor_primary)
                 shard_merge_flag_doc = primary_client.admin.command(
                     {"getParameter": 1, "featureFlagShardMerge": 1})
                 fcv_doc = primary_client.admin.command(
@@ -496,8 +497,7 @@ class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-inst
                 get_certificate_and_private_key("jstests/libs/tenant_migration_recipient.pem"),
         }
         donor_primary = migration_opts.get_donor_primary()
-        donor_primary_client = self._create_client(donor_primary)
-        is_shard_merge_enabled = self._is_shard_merge_enabled(donor_primary_client)
+        is_shard_merge_enabled = self._is_shard_merge_enabled(donor_primary)
         if is_shard_merge_enabled:
             self._override_abort_failpoints(self._tenant_migration_fixture.common_mongod_options)
             cmd_obj["protocol"] = "shard merge"
