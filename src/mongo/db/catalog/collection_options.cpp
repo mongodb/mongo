@@ -324,8 +324,7 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
     return collectionOptions;
 }
 
-CollectionOptions CollectionOptions::fromCreateCommand(const NamespaceString& nss,
-                                                       const CreateCommand& cmd) {
+CollectionOptions CollectionOptions::fromCreateCommand(const CreateCommand& cmd) {
     CollectionOptions options;
 
     options.validationLevel = cmd.getValidationLevel();
@@ -399,7 +398,8 @@ CollectionOptions CollectionOptions::fromCreateCommand(const NamespaceString& ns
     }
     if (auto encryptedFieldConfig = cmd.getEncryptedFields()) {
         options.encryptedFieldConfig = std::move(*encryptedFieldConfig);
-        setEncryptedDefaultEncryptedCollectionNames(nss, options.encryptedFieldConfig.get_ptr());
+        setEncryptedDefaultEncryptedCollectionNames(cmd.getNamespace(),
+                                                    options.encryptedFieldConfig.get_ptr());
     }
 
     return options;

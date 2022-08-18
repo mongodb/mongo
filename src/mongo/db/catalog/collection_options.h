@@ -29,9 +29,8 @@
 
 #pragma once
 
-#include <string>
-
 #include <boost/optional.hpp>
+#include <string>
 
 #include "mongo/base/status.h"
 #include "mongo/crypto/encryption_fields_gen.h"
@@ -80,8 +79,7 @@ struct CollectionOptions {
     /**
      * Converts a client "create" command invocation.
      */
-    static CollectionOptions fromCreateCommand(const NamespaceString& nss,
-                                               const CreateCommand& cmd);
+    static CollectionOptions fromCreateCommand(const CreateCommand& cmd);
 
     static StatusWith<long long> checkAndAdjustCappedSize(long long cappedSize);
     static StatusWith<long long> checkAndAdjustCappedMaxDocs(long long cappedMaxDocs);

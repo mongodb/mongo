@@ -663,18 +663,16 @@ Status createCollection(OperationContext* opCtx,
                             CollectionOptions::parseForCommand);
 }
 
-Status createCollection(OperationContext* opCtx,
-                        const NamespaceString& ns,
-                        const CreateCommand& cmd) {
-    auto options = CollectionOptions::fromCreateCommand(ns, cmd);
+Status createCollection(OperationContext* opCtx, const CreateCommand& cmd) {
+    auto options = CollectionOptions::fromCreateCommand(cmd);
     auto idIndex = std::exchange(options.idIndex, {});
     bool hasExplicitlyDisabledClustering = cmd.getClusteredIndex() &&
         stdx::holds_alternative<bool>(*cmd.getClusteredIndex()) &&
         !stdx::get<bool>(*cmd.getClusteredIndex());
     if (!hasExplicitlyDisabledClustering) {
-        options = clusterByDefaultIfNecessary(ns, std::move(options), idIndex);
+        options = clusterByDefaultIfNecessary(cmd.getNamespace(), std::move(options), idIndex);
     }
-    return createCollection(opCtx, ns, options, idIndex);
+    return createCollection(opCtx, cmd.getNamespace(), options, idIndex);
 }
 
 // TODO SERVER-62395 Pass DatabaseName instead of dbName, and pass to isDbLockedForMode.

@@ -51,10 +51,7 @@ Status createCollection(OperationContext* opCtx,
 /**
  * Creates a collection as parsed in 'cmd'.
  */
-Status createCollection(OperationContext* opCtx,
-                        const NamespaceString& ns,
-                        const CreateCommand& cmd);
-
+Status createCollection(OperationContext* opCtx, const CreateCommand& cmd);
 
 /**
  * Creates the collection or the view as described by 'options'.

@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/catalog/create_collection.h"
@@ -46,7 +43,6 @@
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 
 namespace mongo {
 namespace {
@@ -338,7 +334,7 @@ public:
 
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
                 unsafeCreateCollection(opCtx);
-            uassertStatusOK(createCollection(opCtx, cmd.getNamespace(), cmd));
+            uassertStatusOK(createCollection(opCtx, cmd));
             return reply;
         }
     };
