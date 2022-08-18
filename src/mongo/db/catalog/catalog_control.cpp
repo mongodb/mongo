@@ -34,6 +34,7 @@
 
 #include "mongo/db/catalog/catalog_control.h"
 
+#include "mongo/db/catalog/catalog_stats.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database.h"
@@ -227,6 +228,10 @@ PreviousCatalogState closeCatalog(OperationContext* opCtx) {
     // Close the storage engine's catalog.
     LOGV2(20272, "closeCatalog: closing storage engine catalog");
     opCtx->getServiceContext()->getStorageEngine()->closeCatalog(opCtx);
+
+    // Reset the stats counter for extended range time-series collections. This is maintained
+    // outside the catalog itself.
+    catalog_stats::requiresTimeseriesExtendedRangeSupport.store(0);
 
     reopenOnFailure.dismiss();
     return previousCatalogState;

@@ -39,16 +39,24 @@ bool dateOutsideStandardRange(Date_t date) {
     return timeSeconds < 0 || timeSeconds > kMaxNormalRangeTimestamp;
 }
 
-bool measurementsHaveDateOutsideStandardRange(const TimeseriesOptions& options,
-                                              const std::vector<BSONObj>& measurements) {
-    return std::any_of(measurements.begin(), measurements.end(), [&](const BSONObj& doc) -> bool {
-        auto timeElem = doc[options.getTimeField()];
-        if (!timeElem || BSONType::Date != timeElem.type()) {
-            // This measurement is missing a valid time element.
-            return false;
-        }
-        auto date = timeElem.Date();
+bool bucketsHaveDateOutsideStandardRange(const TimeseriesOptions& options,
+                                         std::vector<InsertStatement>::const_iterator first,
+                                         std::vector<InsertStatement>::const_iterator last) {
+    return std::any_of(first, last, [&](const InsertStatement& stmt) -> bool {
+        auto controlElem = stmt.doc.getField(timeseries::kBucketControlFieldName);
+        uassert(6781400,
+                "Time series bucket document is missing 'control' field",
+                controlElem.isABSONObj());
+        auto minElem = controlElem.Obj().getField(timeseries::kBucketControlMinFieldName);
+        uassert(6781401,
+                "Time series bucket document is missing 'control.min' field",
+                minElem.isABSONObj());
+        auto timeElem = minElem.Obj().getField(options.getTimeField());
+        uassert(6781402,
+                "Time series bucket document does not have a valid min time element",
+                timeElem && BSONType::Date == timeElem.type());
 
+        auto date = timeElem.Date();
         return dateOutsideStandardRange(date);
     });
 }

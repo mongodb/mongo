@@ -49,33 +49,49 @@ TEST(TimeseriesExtendedRangeSupport, DateOutsideStandardRange) {
     ASSERT_TRUE(timeseries::dateOutsideStandardRange(extendedHigh));
 }
 
-TEST(TimeseriesExtendedRangeSupport, MeasurementsHaveDateOutsideStandardRange) {
+TEST(TimeseriesExtendedRangeSupport, BucketsHaveDateOutsideStandardRange) {
     TimeseriesOptions options;
     options.setTimeField("time"_sd);
 
-    std::vector<BSONObj> standardRange = {
-        mongo::fromjson(R"({"time": {"$date": "1970-01-01T00:00:00.000Z"}})"),
-        mongo::fromjson(R"({"time": {"$date": "2000-01-01T00:00:00.000Z"}})"),
-        mongo::fromjson(R"({"time": {"$date": "2038-01-01T00:00:00.000Z"}})"),
+    std::vector<InsertStatement> standardRange = {
+        {0,
+         mongo::fromjson(
+             R"({"control": {"min": {"time": {"$date": "1970-01-01T00:00:00.000Z"}}}})")},
+        {1,
+         mongo::fromjson(
+             R"({"control": {"min": {"time": {"$date": "2000-01-01T00:00:00.000Z"}}}})")},
+        {2,
+         mongo::fromjson(
+             R"({"control": {"min": {"time": {"$date": "2038-01-01T00:00:00.000Z"}}}})")},
     };
 
-    std::vector<BSONObj> extendedRangeLow = {
+    std::vector<InsertStatement> extendedRangeLow = {
         // Dates before Unix epoch have to be hard-coded as seconds-offset rather than date strings
-        mongo::fromjson(R"({"time": {"$date": -2147483649000}})"),  // -((1 << 31) + 1) seconds
-        mongo::fromjson(R"({"time": {"$date": -1000}})"),
+        {3,
+         // -((1 << 31) + 1) seconds
+         mongo::fromjson(R"({"control": {"min": {"time": {"$date": -2147483649000}}}})")},
+        {4, mongo::fromjson(R"({"control": {"min": {"time": {"$date": -1000}}}})")},
     };
 
-    std::vector<BSONObj> extendedRangeHigh = {
-        mongo::fromjson(R"({"time": {"$date": "2039-01-01T00:00:00.000Z"}})"),
-        mongo::fromjson(R"({"time": {"$date": "2110-01-01T00:00:00.000Z"}})"),
+    std::vector<InsertStatement> extendedRangeHigh = {
+        {5,
+         mongo::fromjson(
+             R"({"control": {"min": {"time": {"$date": "2039-01-01T00:00:00.000Z"}}}})")},
+        {6,
+         mongo::fromjson(
+             R"({"control": {"min": {"time": {"$date": "2110-01-01T00:00:00.000Z"}}}})")},
     };
 
-    ASSERT_FALSE(timeseries::measurementsHaveDateOutsideStandardRange(options, standardRange));
-    ASSERT_TRUE(timeseries::measurementsHaveDateOutsideStandardRange(options, extendedRangeLow));
-    ASSERT_TRUE(timeseries::measurementsHaveDateOutsideStandardRange(options, extendedRangeHigh));
+    ASSERT_FALSE(timeseries::bucketsHaveDateOutsideStandardRange(
+        options, standardRange.begin(), standardRange.end()));
+    ASSERT_TRUE(timeseries::bucketsHaveDateOutsideStandardRange(
+        options, extendedRangeLow.begin(), extendedRangeLow.end()));
+    ASSERT_TRUE(timeseries::bucketsHaveDateOutsideStandardRange(
+        options, extendedRangeHigh.begin(), extendedRangeHigh.end()));
 
-    std::vector<BSONObj> mixed = {standardRange[0], standardRange[1], extendedRangeLow[0]};
-    ASSERT_TRUE(timeseries::measurementsHaveDateOutsideStandardRange(options, mixed));
+    std::vector<InsertStatement> mixed = {standardRange[0], standardRange[1], extendedRangeLow[0]};
+    ASSERT_TRUE(
+        timeseries::bucketsHaveDateOutsideStandardRange(options, mixed.begin(), mixed.end()));
 }
 
 }  // namespace

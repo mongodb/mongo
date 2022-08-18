@@ -1340,33 +1340,6 @@ public:
                 curOp.debug().additiveMetrics.ninserted = 0;
             }
 
-            {
-                // Check if any of the measurements have dates outside the standard range. We need
-                // to do this before we start doing any inserts so we can mark the collection as
-                // requiring extended range support before the measurements land. (Other threads
-                // could potentially commit our inserts for us.)
-                //
-                // If our writes end up erroring out or getting rolled back, then this flag will
-                // stay set. This is okay though, as it only disables some query optimizations and
-                // won't result in any correctness issues if the flag is set when it doesn't need to
-                // be (as opposed to NOT being set when it DOES need to be -- that will cause
-                // correctness issues). Additionally, if the user tried to insert measurements with
-                // dates outside the standard range, chances are they will do so again, and we will
-                // have just set the flag a little early.
-                auto bucketsNs = makeTimeseriesBucketsNamespace(ns());
-                auto bucketsColl =
-                    CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx,
-                                                                                      bucketsNs);
-                auto timeSeriesOptions = *bucketsColl->getTimeseriesOptions();
-
-                if (auto currentSetting = bucketsColl->getRequiresTimeseriesExtendedRangeSupport();
-                    !currentSetting &&
-                    timeseries::measurementsHaveDateOutsideStandardRange(
-                        timeSeriesOptions, request().getDocuments())) {
-                    bucketsColl->setRequiresTimeseriesExtendedRangeSupport(opCtx);
-                }
-            }
-
             std::vector<write_ops::WriteError> errors;
             boost::optional<repl::OpTime> opTime;
             boost::optional<OID> electionId;

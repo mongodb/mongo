@@ -29,39 +29,10 @@
 
 #pragma once
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/platform/atomic_word.h"
 
-namespace mongo::timeseries {
+namespace mongo::catalog_stats {
 
-/**
- * Determines whether the given 'date' is outside the standard supported range and requires extended
- * range support. Standard range dates can be expressed as a number of seconds since the Unix epoch
- * in 31 unsigned bits.
- */
-bool dateOutsideStandardRange(Date_t date);
+extern AtomicWord<int> requiresTimeseriesExtendedRangeSupport;
 
-/**
- * Determines whether any of the given buckets have control.min.timeField values that lie outside
- * the standard range.
- */
-bool bucketsHaveDateOutsideStandardRange(const TimeseriesOptions& options,
-                                         std::vector<InsertStatement>::const_iterator first,
-                                         std::vector<InsertStatement>::const_iterator last);
-
-/**
- * Uses a heuristic to determine whether a given time-series collection may contain measurements
- * with dates that fall outside the standard range.
- */
-bool collectionMayRequireExtendedRangeSupport(OperationContext* opCtx,
-                                              const CollectionPtr& collection);
-
-/**
- * Determines whether a time-series collection has an index primarily ordered by a time field. This
- * excludes the clustered index, and is testing specifically if an index's key pattern's first field
- * is either control.min.<timeField> or control.max.<timeField>.
- */
-bool collectionHasTimeIndex(OperationContext* opCtx, const Collection& collection);
-
-}  // namespace mongo::timeseries
+}  // namespace mongo::catalog_stats

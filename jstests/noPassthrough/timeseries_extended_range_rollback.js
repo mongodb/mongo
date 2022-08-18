@@ -10,38 +10,54 @@
 
 load('jstests/replsets/libs/rollback_test.js');
 
+const getExtendedRangeCount = (db) => {
+    return assert.commandWorked(db.adminCommand({serverStatus: 1}))
+        .catalogStats.timeseriesExtendedRange;
+};
+
 const collName = "test.standard";
 
 // Operations that will be present on both nodes, before the common point.
 let CommonOps = (node) => {
     const coll = node.getCollection(collName);
-    const db = coll.getDB();
+    const db = coll.getDB("test");
 
     assert.commandWorked(db.createCollection("standard", {timeseries: {timeField: "time"}}));
     assert.commandWorked(db.createCollection("extended", {timeseries: {timeField: "time"}}));
-    assert.commandWorked(db.standard.insert({time: ISODate("1980-01-01T00:00:00.000Z")}));
-    assert.commandWorked(db.extended.insert({time: ISODate("2040-01-01T00:00:00.000Z")}));
+    assert.commandWorked(db.standard.insert({time: ISODate("1980-01-01T00:00:00.000Z")}, {w: 2}));
+    assert.commandWorked(db.extended.insert({time: ISODate("2040-01-01T00:00:00.000Z")}, {w: 2}));
 };
 
 // Operations that will be performed on the rollback node past the common point.
 let RollbackOps = (node) => {
     const coll = node.getCollection(collName);
-    const db = coll.getDB();
+    const db = coll.getDB("test");
 
     assert.commandWorked(db.createCollection("extra", {timeseries: {timeField: "time"}}));
 };
 
 // Set up Rollback Test.
 const rollbackTest = new RollbackTest();
-CommonOps(rollbackTest.getPrimary());
+const primary = rollbackTest.getPrimary();
+const secondary = rollbackTest.getSecondary();
+assert.eq(undefined, getExtendedRangeCount(primary));
+assert.eq(undefined, getExtendedRangeCount(secondary));
+CommonOps(primary);
+
+// Make sure the collections got flagged properly during the initial write.
+assert(checkLog.checkContainsWithCountJson(
+    primary, 6679402, {"nss": "test.standard", "timeField": "time"}, 0));
+assert(checkLog.checkContainsWithCountJson(
+    secondary, 6679402, {"nss": "test.standard", "timeField": "time"}, 0));
+assert(checkLog.checkContainsWithCountJson(
+    primary, 6679402, {"nss": "test.extended", "timeField": "time"}, 1));
+assert(checkLog.checkContainsWithCountJson(
+    secondary, 6679402, {"nss": "test.extended", "timeField": "time"}, 1));
+
+assert.eq(1, getExtendedRangeCount(primary));
+assert.eq(1, getExtendedRangeCount(secondary));
 
 const rollbackNode = rollbackTest.transitionToRollbackOperations();
-// Make sure the collections got flagged properly during the initial write.
-checkLog.checkContainsWithCountJson(
-    rollbackNode, 6679401, {"ns": "test.standard"}, 0, "WARNING", true);
-checkLog.checkContainsWithCountJson(
-    rollbackNode, 6679401, {"ns": "test.extended"}, 1, "WARNING", true);
-
 RollbackOps(rollbackNode);
 
 rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
@@ -49,10 +65,12 @@ rollbackTest.transitionToSyncSourceOperationsDuringRollback();
 rollbackTest.transitionToSteadyStateOperations();
 
 // Make sure the collections get flagged properly again during rollback.
-checkLog.checkContainsWithCountJson(
-    rollbackNode, 6679401, {"ns": "test.standard"}, 0, "WARNING", true);
-checkLog.checkContainsWithCountJson(
-    rollbackNode, 6679401, {"ns": "test.extended"}, 2, "WARNING", true);
+assert(checkLog.checkContainsWithCountJson(
+    rollbackNode, 6679402, {"nss": "test.standard", "timeField": "time"}, 0));
+assert(checkLog.checkContainsWithCountJson(
+    rollbackNode, 6679402, {"nss": "test.extended", "timeField": "time"}, 2));
+
+assert.eq(1, getExtendedRangeCount(rollbackNode));
 
 rollbackTest.stop();
 })();

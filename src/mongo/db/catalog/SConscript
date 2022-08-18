@@ -341,6 +341,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_extended_range',
+        'catalog_stats',
         'collection',
         'collection_catalog',
         'database_holder',

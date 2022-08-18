@@ -33,6 +33,7 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/crypto/fle_crypto.h"
+#include "mongo/db/catalog/catalog_stats.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/index_catalog_impl.h"
 #include "mongo/db/catalog/index_key_validate.h"
@@ -1032,14 +1033,17 @@ void CollectionImpl::setRequiresTimeseriesExtendedRangeSupport(OperationContext*
 
     bool expected = false;
     bool set = _shared->_requiresTimeseriesExtendedRangeSupport.compareAndSwap(&expected, true);
-    if (set && !timeseries::collectionHasTimeIndex(opCtx, *this)) {
-        LOGV2_WARNING(
-            6679402,
-            "Time-series collection contains dates outside the standard range. Some query "
-            "optimizations may be disabled. Please consider building an index on timeField to "
-            "re-enable them.",
-            "nss"_attr = ns().getTimeseriesViewNamespace(),
-            "timeField"_attr = _metadata->options.timeseries->getTimeField());
+    if (set) {
+        catalog_stats::requiresTimeseriesExtendedRangeSupport.fetchAndAdd(1);
+        if (!timeseries::collectionHasTimeIndex(opCtx, *this)) {
+            LOGV2_WARNING(
+                6679402,
+                "Time-series collection contains dates outside the standard range. Some query "
+                "optimizations may be disabled. Please consider building an index on timeField to "
+                "re-enable them.",
+                "nss"_attr = ns().getTimeseriesViewNamespace(),
+                "timeField"_attr = _metadata->options.timeseries->getTimeField());
+        }
     }
 }
 
