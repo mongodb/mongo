@@ -42,7 +42,7 @@ namespace mongo {
 namespace {
 
 static int kTickets = 128;
-static int kThreadMin = 8;
+static int kThreadMin = 16;
 static int kThreadMax = 1024;
 static TicketHolder::WaitMode waitMode = TicketHolder::WaitMode::kUninterruptible;
 
@@ -69,86 +69,6 @@ public:
 };
 
 template <class TicketHolderImpl>
-void BM_tryAcquire(benchmark::State& state) {
-    static std::unique_ptr<TicketHolderFixture<TicketHolderImpl>> p;
-    if (state.thread_index == 0) {
-        p = std::make_unique<TicketHolderFixture<TicketHolderImpl>>(state.threads);
-    }
-    double attempted = 0, acquired = 0;
-    for (auto _ : state) {
-        AdmissionContext admCtx;
-        auto ticket = p->ticketHolder->tryAcquire(&admCtx);
-        state.PauseTiming();
-        sleepmicros(1);
-        attempted++;
-        if (ticket) {
-            acquired++;
-            p->ticketHolder->release(&admCtx, std::move(*ticket));
-        }
-        state.ResumeTiming();
-    }
-    state.counters["Attempted"] = attempted;
-    state.counters["Acquired"] = acquired;
-}
-
-BENCHMARK_TEMPLATE(BM_tryAcquire, SemaphoreTicketHolder)->ThreadRange(kThreadMin, kThreadMax);
-
-BENCHMARK_TEMPLATE(BM_tryAcquire, FifoTicketHolder)->ThreadRange(kThreadMin, kThreadMax);
-
-template <class TicketHolderImpl>
-void BM_acquire(benchmark::State& state) {
-    static std::unique_ptr<TicketHolderFixture<TicketHolderImpl>> p;
-    if (state.thread_index == 0) {
-        p = std::make_unique<TicketHolderFixture<TicketHolderImpl>>(state.threads);
-    }
-    double acquired = 0;
-    for (auto _ : state) {
-        AdmissionContext admCtx;
-        auto opCtx = p->opCtxs[state.thread_index].get();
-        auto ticket = p->ticketHolder->waitForTicket(opCtx, &admCtx, waitMode);
-        state.PauseTiming();
-        sleepmicros(1);
-        p->ticketHolder->release(&admCtx, std::move(ticket));
-        acquired++;
-        state.ResumeTiming();
-    }
-    state.counters["Acquired"] = benchmark::Counter(acquired, benchmark::Counter::kIsRate);
-    state.counters["AcquiredPerThread"] =
-        benchmark::Counter(acquired, benchmark::Counter::kAvgThreadsRate);
-}
-
-BENCHMARK_TEMPLATE(BM_acquire, SemaphoreTicketHolder)->ThreadRange(kThreadMin, kThreadMax);
-
-BENCHMARK_TEMPLATE(BM_acquire, FifoTicketHolder)->ThreadRange(kThreadMin, kThreadMax);
-
-template <class TicketHolderImpl>
-void BM_release(benchmark::State& state) {
-    static std::unique_ptr<TicketHolderFixture<TicketHolderImpl>> p;
-    if (state.thread_index == 0) {
-        p = std::make_unique<TicketHolderFixture<TicketHolderImpl>>(state.threads);
-    }
-    double acquired = 0;
-    for (auto _ : state) {
-        AdmissionContext admCtx;
-        auto opCtx = p->opCtxs[state.thread_index].get();
-        state.PauseTiming();
-        auto ticket = p->ticketHolder->waitForTicket(opCtx, &admCtx, waitMode);
-        sleepmicros(1);
-        state.ResumeTiming();
-        p->ticketHolder->release(&admCtx, std::move(ticket));
-        acquired++;
-    }
-    state.counters["Acquired"] = benchmark::Counter(acquired, benchmark::Counter::kIsRate);
-    state.counters["AcquiredPerThread"] =
-        benchmark::Counter(acquired, benchmark::Counter::kAvgThreadsRate);
-}
-
-BENCHMARK_TEMPLATE(BM_release, SemaphoreTicketHolder)->ThreadRange(kThreadMin, kThreadMax);
-
-BENCHMARK_TEMPLATE(BM_release, FifoTicketHolder)->ThreadRange(kThreadMin, kThreadMax);
-
-
-template <class TicketHolderImpl>
 void BM_acquireAndRelease(benchmark::State& state) {
     static std::unique_ptr<TicketHolderFixture<TicketHolderImpl>> p;
     if (state.thread_index == 0) {
@@ -171,9 +91,14 @@ void BM_acquireAndRelease(benchmark::State& state) {
 }
 
 BENCHMARK_TEMPLATE(BM_acquireAndRelease, SemaphoreTicketHolder)
-    ->ThreadRange(kThreadMin, kThreadMax);
+    ->Threads(kThreadMin)
+    ->Threads(kTickets)
+    ->Threads(kThreadMax);
 
-BENCHMARK_TEMPLATE(BM_acquireAndRelease, FifoTicketHolder)->ThreadRange(kThreadMin, kThreadMax);
+BENCHMARK_TEMPLATE(BM_acquireAndRelease, FifoTicketHolder)
+    ->Threads(kThreadMin)
+    ->Threads(kTickets)
+    ->Threads(kThreadMax);
 
 }  // namespace
 }  // namespace mongo
