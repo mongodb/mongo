@@ -279,7 +279,7 @@ function runTests({conn, currentOp, truncatedOps, localOps}) {
             {
                 test: function(db) {
                     assert.commandWorked(db.currentop_query.mapReduce(() => {}, (a, b) => {}, {
-                        query: {$comment: "currentop_query_mr"},
+                        query: {a: 1, $comment: "currentop_query_mr"},
                         out: {inline: 1},
                     }));
                 },
