@@ -219,7 +219,7 @@ DBCollection.prototype._massageObject = function(q) {
     throw Error("don't know how to massage : " + type);
 };
 
-DBCollection.prototype.find = function(query, fields, limit, skip, batchSize, options) {
+DBCollection.prototype.find = function(filter, projection, limit, skip, batchSize, options) {
     // Verify that API version parameters are not supplied via the shell helper.
     assert.noAPIParams(options);
 
@@ -227,8 +227,8 @@ DBCollection.prototype.find = function(query, fields, limit, skip, batchSize, op
                              this._db,
                              this,
                              this._fullName,
-                             this._massageObject(query),
-                             fields,
+                             this._massageObject(filter),
+                             projection,
                              limit,
                              skip,
                              batchSize,
@@ -253,8 +253,9 @@ DBCollection.prototype.find = function(query, fields, limit, skip, batchSize, op
     return cursor;
 };
 
-DBCollection.prototype.findOne = function(query, fields, options, readConcern, collation) {
-    var cursor = this.find(query, fields, -1 /* limit */, 0 /* skip*/, 0 /* batchSize */, options);
+DBCollection.prototype.findOne = function(filter, projection, options, readConcern, collation) {
+    var cursor =
+        this.find(filter, projection, -1 /* limit */, 0 /* skip*/, 0 /* batchSize */, options);
 
     if (readConcern) {
         cursor = cursor.readConcern(readConcern);

@@ -90,25 +90,22 @@ var DBExplainQuery = (function() {
                 // True means to always apply the skip and limit values.
                 innerCmd = this._query._convertToCountCmd(this._applySkipLimit);
             } else {
-                var canAttachReadPref = false;
-                innerCmd = this._query._convertToCommand(canAttachReadPref);
+                innerCmd = this._query._convertToCommand();
             }
 
             var explainCmd = {explain: innerCmd};
             explainCmd["verbosity"] = this._verbosity;
-            // If "maxTimeMS" is set on innerCmd, it needs to be propagated to the top-level
-            // of explainCmd so that it has the intended effect.
+
+            // If "maxTimeMS" or "$readPreference" are  set on 'innerCmd', they need to be
+            // propagated to the top-level of 'explainCmd' in order to have the intended effect.
             if (innerCmd.hasOwnProperty("maxTimeMS")) {
                 explainCmd.maxTimeMS = innerCmd.maxTimeMS;
             }
-
-            var explainDb = this._query._db;
-
-            if ("$readPreference" in this._query._query) {
-                var prefObj = this._query._query.$readPreference;
-                explainCmd = explainDb._attachReadPreferenceToCommand(explainCmd, prefObj);
+            if (innerCmd.hasOwnProperty("$readPreference")) {
+                explainCmd["$readPreference"] = innerCmd["$readPreference"];
             }
 
+            var explainDb = this._query._db;
             var explainResult = explainDb.runReadCommand(explainCmd, null, this._query._options);
 
             return Explainable.throwOrReturn(explainResult);

@@ -667,10 +667,6 @@ var crudAPISpecTests = function crudAPISpecTests() {
     var cursor = coll.find({}).sort({a: 1}).tailable(false);
     assert.eq(2, (cursor._options & ~DBQuery.Option.slaveOk));
 
-    // Check modifiers
-    var cursor = coll.find({}).modifiers({$hint: 'a_1'});
-    assert.eq('a_1', cursor._query['$hint']);
-
     // allowPartialResults
     var cursor = coll.find({}).allowPartialResults();
     assert.eq(128, (cursor._options & ~DBQuery.Option.slaveOk));

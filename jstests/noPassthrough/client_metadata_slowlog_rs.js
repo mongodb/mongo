@@ -5,8 +5,6 @@
  *   requires_replication,
  * ]
  */
-load("jstests/libs/logv2_helpers.js");
-
 (function() {
 'use strict';
 

@@ -138,19 +138,19 @@ function runCommandWithReadPreferenceSecondary(
             !bsonBinaryEqual({_: commandObj.$readPreference}, {_: kReadPreferenceSecondary})) {
             throw new Error("Cowardly refusing to override read preference of command: " +
                             tojson(commandObj));
-        }
+        } else if (!commandObj.hasOwnProperty("$readPreference")) {
+            if (commandObj === commandObjUnwrapped) {
+                // We wrap the command object using a "query" field rather than a "$query" field to
+                // match the implementation of DB.prototype._attachReadPreferenceToCommand().
+                commandObj = {query: commandObj};
+            } else {
+                // We create a copy of 'commandObj' to avoid mutating the parameter the caller
+                // specified.
+                commandObj = Object.assign({}, commandObj);
+            }
 
-        if (commandObj === commandObjUnwrapped) {
-            // We wrap the command object using a "query" field rather than a "$query" field to
-            // match the implementation of DB.prototype._attachReadPreferenceToCommand().
-            commandObj = {query: commandObj};
-        } else {
-            // We create a copy of 'commandObj' to avoid mutating the parameter the caller
-            // specified.
-            commandObj = Object.assign({}, commandObj);
+            commandObj.$readPreference = kReadPreferenceSecondary;
         }
-
-        commandObj.$readPreference = kReadPreferenceSecondary;
     }
 
     const serverResponse = func.apply(conn, makeFuncArgs(commandObj));

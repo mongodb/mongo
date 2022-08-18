@@ -59,7 +59,9 @@ void DBQueryInfo::construct(JSContext* cx, JS::CallArgs args) {
     o.setValue(InternedString::_collection, args.get(2));
     o.setValue(InternedString::_ns, args.get(3));
 
-    JS::RootedObject emptyObj(cx);
+    JSObject* newPlainObject = JS_NewPlainObject(cx);
+    uassert(6887104, "failed to create new JS object", newPlainObject);
+    JS::RootedObject emptyObj{cx, newPlainObject};
     JS::RootedValue emptyObjVal(cx);
     emptyObjVal.setObjectOrNull(emptyObj);
 
@@ -67,15 +69,15 @@ void DBQueryInfo::construct(JSContext* cx, JS::CallArgs args) {
     nullVal.setNull();
 
     if (args.length() > 4 && args.get(4).isObject()) {
-        o.setValue(InternedString::_query, args.get(4));
+        o.setValue(InternedString::_filter, args.get(4));
     } else {
-        o.setValue(InternedString::_query, emptyObjVal);
+        o.setValue(InternedString::_filter, nullVal);
     }
 
     if (args.length() > 5 && args.get(5).isObject()) {
-        o.setValue(InternedString::_fields, args.get(5));
+        o.setValue(InternedString::_projection, args.get(5));
     } else {
-        o.setValue(InternedString::_fields, nullVal);
+        o.setValue(InternedString::_projection, nullVal);
     }
 
     if (args.length() > 6 && args.get(6).isNumber()) {
@@ -102,9 +104,10 @@ void DBQueryInfo::construct(JSContext* cx, JS::CallArgs args) {
         o.setNumber(InternedString::_options, 0);
     }
 
+    o.setValue(InternedString::_additionalCmdParams, emptyObjVal);
+
     o.setValue(InternedString::_cursor, nullVal);
     o.setNumber(InternedString::_numReturned, 0);
-    o.setBoolean(InternedString::_special, false);
 
     args.rval().setObjectOrNull(thisv);
 }

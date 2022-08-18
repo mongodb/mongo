@@ -2,8 +2,6 @@
  * Confirms that the log output for find and getMore are in the expected format.
  * @tags: [requires_profiling]
  */
-load("jstests/libs/logv2_helpers.js");
-
 (function() {
 "use strict";
 
@@ -55,17 +53,9 @@ cursor.next();  // Perform initial query and retrieve first document in batch.
 let cursorid = getLatestProfilerEntry(testDB).cursorid;
 
 let logLine = [
-    'command log_getmore.test appName: "MongoDB Shell" command: find { find: "test", filter:' +
-        ' { a: { $gt: 0.0 } }, skip: 1.0, batchSize: 5.0, limit: 10.0, singleBatch: false, sort:' +
-        ' { a: 1.0 }, hint: { a: 1.0 }',
-    'queryHash:'
+    '"msg":"Slow query","attr":{"type":"command","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}',
+    '"queryHash":'
 ];
-if (isJsonLog(conn)) {
-    logLine = [
-        '"msg":"Slow query","attr":{"type":"command","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}',
-        '"queryHash":'
-    ];
-}
 
 // Check the logs to verify that find appears as above.
 assertLogLineContains(conn, logLine);
@@ -87,22 +77,11 @@ function cursorIdToString(cursorId) {
 }
 
 logLine = [
-    'command log_getmore.test appName: "MongoDB Shell" command: getMore { getMore: ' +
-        cursorIdToString(cursorid) + ', collection: "test", batchSize: 5.0',
-    'originatingCommand: { find: "test", ' +
-        'filter: { a: { $gt: 0.0 } }, skip: 1.0, batchSize: 5.0, limit: 10.0, singleBatch: ' +
-        'false, sort: { a: 1.0 }, hint: { a: 1.0 }',
-    'queryHash:'
+    `"msg":"Slow query","attr":{"type":"command","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"getMore":${
+        cursorIdToString(cursorid)},"collection":"test","batchSize":5,`,
+    '"originatingCommand":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}',
+    '"queryHash":'
 ];
-
-if (isJsonLog(conn)) {
-    logLine = [
-        `"msg":"Slow query","attr":{"type":"command","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"getMore":${
-            cursorIdToString(cursorid)},"collection":"test","batchSize":5,`,
-        '"originatingCommand":{"find":"test","filter":{"a":{"$gt":0}},"skip":1,"batchSize":5,"limit":10,"singleBatch":false,"sort":{"a":1},"hint":{"a":1}',
-        '"queryHash":'
-    ];
-}
 
 assertLogLineContains(conn, logLine);
 
@@ -113,19 +92,10 @@ cursorid = getLatestProfilerEntry(testDB).cursorid;
 assert.eq(cursor.itcount(), 10);
 
 logLine = [
-    'command log_getmore.test appName: "MongoDB Shell" command: getMore { getMore: ' +
-        cursorIdToString(cursorid) + ', collection: "test"',
-    'originatingCommand: { aggregate: "test", pipeline: ' +
-        '[ { $match: { a: { $gt: 0.0 } } } ], cursor: { batchSize: 0.0 }, hint: { a: 1.0 }'
+    `"msg":"Slow query","attr":{"type":"command","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"getMore":${
+        cursorIdToString(cursorid)},"collection":"test"`,
+    '"originatingCommand":{"aggregate":"test","pipeline":[{"$match":{"a":{"$gt":0}}}],"cursor":{"batchSize":0},"hint":{"a":1}'
 ];
-
-if (isJsonLog(conn)) {
-    logLine = [
-        `"msg":"Slow query","attr":{"type":"command","ns":"log_getmore.test","appName":"MongoDB Shell","command":{"getMore":${
-            cursorIdToString(cursorid)},"collection":"test"`,
-        '"originatingCommand":{"aggregate":"test","pipeline":[{"$match":{"a":{"$gt":0}}}],"cursor":{"batchSize":0},"hint":{"a":1}'
-    ];
-}
 
 assertLogLineContains(conn, logLine);
 
