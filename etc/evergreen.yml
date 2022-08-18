@@ -374,7 +374,7 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt !.multiversion
   - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns !.multiversion
-  - name: .sharding .common !.multiversion
+  - name: .sharding .common !.multiversion !.jstestfuzz
   - name: .stitch
   - name: secondary_reads_passthrough_gen
   - name: server_discovery_and_monitoring_json_test_TG
@@ -993,7 +993,6 @@ buildvariants:
   - name: disk_wiredtiger
   - name: .jscore .common !.auth
   - name: json_schema
-  - name: .jstestfuzz !.initsync !.flow_control !.stepdowns
   - name: powercycle_gen
   - name: .query_fuzzer
   - name: .read_write_concern
@@ -2359,7 +2358,7 @@ buildvariants:
   - name: secondary_reads_passthrough_gen
   - name: session_jscore_passthrough
   - name: .sharding .jscore !.wo_snapshot
-  - name: .sharding .common !.csrs
+  - name: .sharding .common !.csrs !.jstestfuzz
   - name: .watchdog
   - name: .stitch
   - name: .serverless
@@ -2438,7 +2437,7 @@ buildvariants:
   - name: secondary_reads_passthrough_gen
   - name: session_jscore_passthrough
   - name: .sharding .jscore !.wo_snapshot
-  - name: .sharding .common !.csrs
+  - name: .sharding .common !.csrs !.jstestfuzz
   - name: .stitch
   - name: .serverless
   - name: .updatefuzzer
@@ -2512,7 +2511,7 @@ buildvariants:
   - name: secondary_reads_passthrough_gen
   - name: session_jscore_passthrough
   - name: .sharding .jscore !.wo_snapshot
-  - name: .sharding .common !.csrs
+  - name: .sharding .common !.csrs !.jstestfuzz
   - name: .stitch
   - name: .updatefuzzer
   - name: .serverless
