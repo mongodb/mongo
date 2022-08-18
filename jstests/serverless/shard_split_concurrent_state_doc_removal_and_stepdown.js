@@ -1,6 +1,5 @@
 /**
- * Tests that forgetShardSplit command doesn't hang if failover occurs immediately after the
- * state doc for the split has been removed.
+ * Tests that forgetShardSplit command doesn't hang if failover occurs while it is being processed.
  *
  * @tags: [
  *   incompatible_with_eft,
@@ -43,9 +42,8 @@ test.removeAndStopRecipientNodes();
 
 const forgetMigrationThread = operation.forgetAsync();
 
+// Wait until `forgetShardSplit` has been received to trigger the stepdown.
 fp.wait();
-
-test.waitForGarbageCollection(operation.migrationId, tenantIds);
 
 // Force a stepdown on the primary.
 assert.commandWorked(

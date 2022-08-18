@@ -63,6 +63,7 @@ MONGO_FAIL_POINT_DEFINE(abortShardSplitBeforeLeavingBlockingState);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeBlockingState);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterBlocking);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterDecision);
+MONGO_FAIL_POINT_DEFINE(skipShardSplitGarbageCollectionTimeout);
 MONGO_FAIL_POINT_DEFINE(skipShardSplitWaitForSplitAcceptance);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeRecipientCleanup);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterMarkingStateGarbageCollectable);
@@ -204,39 +205,6 @@ void ShardSplitDonorService::abortAllSplits(OperationContext* opCtx) {
             checked_pointer_cast<ShardSplitDonorService::DonorStateMachine>(instance);
         typedInstance->tryAbort();
     }
-}
-
-ExecutorFuture<void> ShardSplitDonorService::_createStateDocumentTTLIndex(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
-    return AsyncTry([this] {
-               auto nss = getStateDocumentsNS();
-
-               AllowOpCtxWhenServiceRebuildingBlock allowOpCtxBlock(Client::getCurrent());
-               auto opCtxHolder = cc().makeOperationContext();
-               auto opCtx = opCtxHolder.get();
-               DBDirectClient client(opCtx);
-
-               BSONObj result;
-               client.runCommand(
-                   nss.db().toString(),
-                   BSON("createIndexes"
-                        << nss.coll().toString() << "indexes"
-                        << BSON_ARRAY(BSON("key" << BSON("expireAt" << 1) << "name" << kTTLIndexName
-                                                 << "expireAfterSeconds" << 0))),
-                   result);
-               uassertStatusOK(getStatusFromCommandResult(result));
-           })
-        .until([](Status status) { return status.isOK(); })
-        .withBackoffBetweenIterations(kExponentialBackoff)
-        .on(**executor, token);
-}
-
-ExecutorFuture<void> ShardSplitDonorService::_rebuildService(
-    std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
-    if (!repl::feature_flags::gShardSplit.isEnabled(serverGlobalParams.featureCompatibility)) {
-        return ExecutorFuture(**executor);
-    }
-    return _createStateDocumentTTLIndex(executor, token);
 }
 
 boost::optional<TaskExecutorPtr>
@@ -444,26 +412,10 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
             .unsafeToInlineFuture();
     });
 
-    _completionPromise.setWith([&] {
+    _garbageCollectablePromise.setWith([&] {
         if (shouldRemoveStateDocumentOnRecipient) {
             return ExecutorFuture(**executor)
                 .then([&] { return _decisionPromise.getFuture().semi().ignoreValue(); })
-                .onCompletion(
-                    [this, executor, anchor = shared_from_this(), primaryToken](Status status) {
-                        if (!status.isOK()) {
-                            LOGV2_ERROR(6753100,
-                                        "Failed to cleanup the state document on recipient nodes",
-                                        "id"_attr = _migrationId,
-                                        "abortReason"_attr = _abortReason,
-                                        "status"_attr = status);
-                        } else {
-                            LOGV2(6753101,
-                                  "Successfully cleaned up the state document on recipient nodes.",
-                                  "id"_attr = _migrationId,
-                                  "abortReason"_attr = _abortReason,
-                                  "status"_attr = status);
-                        }
-                    })
                 .unsafeToInlineFuture();
         }
 
@@ -485,22 +437,49 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
 
                 return _waitForForgetCmdThenMarkGarbageCollectable(executor, primaryToken);
             })
-            .onCompletion([this, primaryToken, anchor = shared_from_this()](Status status) {
-                stdx::lock_guard<Latch> lg(_mutex);
-                // Propagate any errors from the donor stepping down.
-                if (primaryToken.isCanceled() ||
-                    _stateDoc.getState() < ShardSplitDonorStateEnum::kCommitted) {
-                    return status;
-                }
+            .unsafeToInlineFuture();
+    });
 
-                LOGV2(8423356,
-                      "Shard split completed.",
-                      "id"_attr = _stateDoc.getId(),
-                      "status"_attr = status,
-                      "abortReason"_attr = _abortReason);
+    _completionPromise.setWith([&] {
+        if (shouldRemoveStateDocumentOnRecipient) {
+            return ExecutorFuture(**executor)
+                .then([&] { return _garbageCollectablePromise.getFuture().semi().ignoreValue(); })
+                .onCompletion(
+                    [this, executor, anchor = shared_from_this(), primaryToken](Status status) {
+                        if (!status.isOK()) {
+                            LOGV2_ERROR(6753100,
+                                        "Failed to cleanup the state document on recipient nodes",
+                                        "id"_attr = _migrationId,
+                                        "abortReason"_attr = _abortReason,
+                                        "status"_attr = status);
+                        } else {
+                            LOGV2(6753101,
+                                  "Successfully cleaned up the state document on recipient nodes.",
+                                  "id"_attr = _migrationId,
+                                  "abortReason"_attr = _abortReason,
+                                  "status"_attr = status);
+                        }
+                    })
+                .unsafeToInlineFuture();
+        }
 
-                return Status::OK();
+        return ExecutorFuture(**executor)
+            .then([&] { return _garbageCollectablePromise.getFuture().semi().ignoreValue(); })
+            .then([this, executor, primaryToken, anchor = shared_from_this()] {
+                return _waitForGarbageCollectionTimeoutThenDeleteStateDoc(executor, primaryToken);
             })
+            .onCompletion(
+                [this, executor, primaryToken, anchor = shared_from_this()](Status status) {
+                    stdx::lock_guard<Latch> lg(_mutex);
+
+                    LOGV2(8423356,
+                          "Shard split completed.",
+                          "id"_attr = _stateDoc.getId(),
+                          "status"_attr = status,
+                          "abortReason"_attr = _abortReason);
+
+                    return status;
+                })
             .unsafeToInlineFuture();
     });
 
@@ -1050,10 +1029,7 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_waitForMajority
     const ScopedTaskExecutorPtr& executor, repl::OpTime opTime, const CancellationToken& token) {
     return WaitForMajorityService::get(_serviceContext)
         .waitUntilMajority(std::move(opTime), token)
-        .thenRunOn(**executor)
-        .then([this, self = shared_from_this()] {
-            pauseShardSplitAfterMarkingStateGarbageCollectable.pauseWhileSet();
-        });
+        .thenRunOn(**executor);
 }
 
 void ShardSplitDonorService::DonorStateMachine::_initiateTimeout(
@@ -1152,7 +1128,7 @@ ExecutorFuture<void>
 ShardSplitDonorService::DonorStateMachine::_waitForForgetCmdThenMarkGarbageCollectable(
     const ScopedTaskExecutorPtr& executor, const CancellationToken& primaryToken) {
     stdx::lock_guard<Latch> lg(_mutex);
-    if (_stateDoc.getExpireAt() || _stateDoc.getState() < ShardSplitDonorStateEnum::kCommitted) {
+    if (_stateDoc.getExpireAt()) {
         return ExecutorFuture(**executor);
     }
 
@@ -1179,7 +1155,49 @@ ShardSplitDonorService::DonorStateMachine::_waitForForgetCmdThenMarkGarbageColle
         })
         .then([this, self = shared_from_this(), executor, primaryToken](repl::OpTime opTime) {
             return _waitForMajorityWriteConcern(executor, std::move(opTime), primaryToken);
+        })
+        .then([this, self = shared_from_this()] {
+            pauseShardSplitAfterMarkingStateGarbageCollectable.pauseWhileSet();
         });
+}
+
+ExecutorFuture<void>
+ShardSplitDonorService::DonorStateMachine::_waitForGarbageCollectionTimeoutThenDeleteStateDoc(
+    const ScopedTaskExecutorPtr& executor, const CancellationToken& primaryToken) {
+    auto expireAt = [&]() {
+        stdx::lock_guard<Latch> lg(_mutex);
+        return _stateDoc.getExpireAt();
+    }();
+
+    if (!expireAt) {
+        return ExecutorFuture(**executor);
+    }
+
+    if (skipShardSplitGarbageCollectionTimeout.shouldFail()) {
+        LOGV2(673701, "Skipping shard split garbage collection timeout");
+        return ExecutorFuture(**executor);
+    }
+
+    LOGV2(6737300,
+          "Waiting until the garbage collection timeout expires",
+          "id"_attr = _migrationId,
+          "expireAt"_attr = *expireAt);
+    return (*executor)->sleepUntil(*expireAt, primaryToken).then([this, executor, primaryToken] {
+        return AsyncTry([this, executor, primaryToken] {
+                   auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                   auto deleted =
+                       uassertStatusOK(serverless::deleteStateDoc(opCtx.get(), _migrationId));
+                   uassert(ErrorCodes::ConflictingOperationInProgress,
+                           str::stream() << "Did not find active shard split with migration id "
+                                         << _migrationId,
+                           deleted);
+                   return repl::ReplClientInfo::forClient(opCtx.get()->getClient()).getLastOp();
+               })
+            .until([](StatusWith<repl::OpTime> swOpTime) { return swOpTime.getStatus().isOK(); })
+            .withBackoffBetweenIterations(kExponentialBackoff)
+            .on(**executor, primaryToken)
+            .then([](StatusWith<repl::OpTime> swOpTime) { return swOpTime.getStatus(); });
+    });
 }
 
 ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_removeSplitConfigFromDonor(

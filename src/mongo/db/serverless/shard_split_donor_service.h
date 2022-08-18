@@ -76,9 +76,6 @@ private:
     ExecutorFuture<void> _createStateDocumentTTLIndex(
         std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token);
 
-    ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                                         const CancellationToken& token) override;
-
     ServiceContext* const _serviceContext;
 };
 
@@ -121,6 +118,10 @@ public:
 
     SharedSemiFuture<void> completionFuture() const {
         return _completionPromise.getFuture();
+    }
+
+    SharedSemiFuture<void> garbageCollectableFuture() const {
+        return _garbageCollectablePromise.getFuture();
     }
 
     UUID getId() const {
@@ -178,6 +179,9 @@ private:
     ExecutorFuture<void> _waitForForgetCmdThenMarkGarbageCollectable(
         const ScopedTaskExecutorPtr& executor, const CancellationToken& primaryToken);
 
+    ExecutorFuture<void> _waitForGarbageCollectionTimeoutThenDeleteStateDoc(
+        const ScopedTaskExecutorPtr& executor, const CancellationToken& primaryToken);
+
     ExecutorFuture<void> _removeSplitConfigFromDonor(const ScopedTaskExecutorPtr& executor,
                                                      const CancellationToken& primaryToken);
 
@@ -230,8 +234,12 @@ private:
     // A promise fulfilled when the shard split has committed or aborted.
     SharedPromise<DurableState> _decisionPromise;
 
-    // A promise fulfilled when the shard split operation has fully completed.
+    // A promise fulfilled when the shard split state document has been removed following the
+    // completion of the operation.
     SharedPromise<void> _completionPromise;
+
+    // A promise fulfilled when expireAt has been set following the end of the split.
+    SharedPromise<void> _garbageCollectablePromise;
 
     // A promise fulfilled when all recipient nodes have accepted the split.
     SharedPromise<void> _splitAcceptancePromise;

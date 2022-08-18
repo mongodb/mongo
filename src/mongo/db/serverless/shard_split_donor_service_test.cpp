@@ -438,6 +438,9 @@ protected:
     std::unique_ptr<FailPointEnableBlock> _skipAcceptanceFP =
         std::make_unique<FailPointEnableBlock>("skipShardSplitWaitForSplitAcceptance");
 
+    std::unique_ptr<FailPointEnableBlock> _skipGarbageTimeoutFP =
+        std::make_unique<FailPointEnableBlock>("skipShardSplitGarbageCollectionTimeout");
+
 
     // for mocking split acceptance
     executor::NetworkInterfaceMock* _net;

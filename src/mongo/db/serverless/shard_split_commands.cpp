@@ -247,7 +247,7 @@ public:
                     decision.state == ShardSplitDonorStateEnum::kAborted);
 
             donorPtr->tryForget();
-            donorPtr->completionFuture().get(opCtx);
+            donorPtr->garbageCollectableFuture().get(opCtx);
         }
 
     private:
