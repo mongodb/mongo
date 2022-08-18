@@ -42,7 +42,7 @@ namespace mongo {
 namespace {
 
 static int kTickets = 128;
-static int kThreadMin = 8;
+static int kThreadMin = 16;
 static int kThreadMax = 1024;
 static TicketHolder::WaitMode waitMode = TicketHolder::WaitMode::kUninterruptible;
 
@@ -71,175 +71,6 @@ public:
 static Mutex isReadyMutex;
 static stdx::condition_variable isReadyCv;
 static bool isReady = false;
-
-template <class TicketHolderImpl>
-static void BM_tryAcquire(benchmark::State& state) {
-    static std::unique_ptr<TicketHolderFixture<TicketHolderImpl>> readTicketHolder;
-    static std::unique_ptr<TicketHolderFixture<TicketHolderImpl>> writeTicketHolder;
-    static ServiceContext::UniqueServiceContext serviceContext;
-    {
-        stdx::unique_lock lk(isReadyMutex);
-        if (state.thread_index == 0) {
-            serviceContext = ServiceContext::make();
-            serviceContext->setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
-            serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-            readTicketHolder = std::make_unique<TicketHolderFixture<TicketHolderImpl>>(
-                state.threads, serviceContext.get());
-            writeTicketHolder = std::make_unique<TicketHolderFixture<TicketHolderImpl>>(
-                state.threads, serviceContext.get());
-            isReady = true;
-            isReadyCv.notify_all();
-        } else {
-            isReadyCv.wait(lk, [&] { return isReady; });
-        }
-    }
-    auto mode = (state.thread_index % 2) == 0 ? MODE_IS : MODE_IX;
-    double attempted = 0, acquired = 0;
-    TicketHolderFixture<TicketHolderImpl>* fixture;
-    if constexpr (std::is_base_of_v<SchedulingTicketHolder, TicketHolderImpl>) {
-        fixture = readTicketHolder.get();
-    } else {
-        fixture = (mode == MODE_IS ? readTicketHolder : writeTicketHolder).get();
-    }
-    for (auto _ : state) {
-        AdmissionContext admCtx;
-        admCtx.setLockMode(mode);
-        auto ticket = fixture->ticketHolder->tryAcquire(&admCtx);
-        state.PauseTiming();
-        sleepmicros(1);
-        attempted++;
-        if (ticket) {
-            acquired++;
-        }
-        ticket.reset();
-        state.ResumeTiming();
-    }
-    state.counters["Attempted"] = attempted;
-    state.counters["Acquired"] = acquired;
-    if (state.thread_index == 0) {
-        readTicketHolder.reset();
-        writeTicketHolder.reset();
-        serviceContext.reset();
-        isReady = false;
-    }
-}
-
-BENCHMARK_TEMPLATE(BM_tryAcquire, SemaphoreTicketHolder)->ThreadRange(kThreadMin, kThreadMax);
-
-BENCHMARK_TEMPLATE(BM_tryAcquire, FifoTicketHolder)->ThreadRange(kThreadMin, kThreadMax);
-
-template <class TicketHolderImpl>
-void BM_acquire(benchmark::State& state) {
-    static std::unique_ptr<TicketHolderFixture<TicketHolderImpl>> readTicketHolder;
-    static std::unique_ptr<TicketHolderFixture<TicketHolderImpl>> writeTicketHolder;
-    static ServiceContext::UniqueServiceContext serviceContext;
-    {
-        stdx::unique_lock lk(isReadyMutex);
-        if (state.thread_index == 0) {
-            serviceContext = ServiceContext::make();
-            serviceContext->setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
-            serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-            readTicketHolder = std::make_unique<TicketHolderFixture<TicketHolderImpl>>(
-                state.threads, serviceContext.get());
-            writeTicketHolder = std::make_unique<TicketHolderFixture<TicketHolderImpl>>(
-                state.threads, serviceContext.get());
-            isReady = true;
-            isReadyCv.notify_all();
-        } else {
-            isReadyCv.wait(lk, [&] { return isReady; });
-        }
-    }
-    double acquired = 0;
-    auto mode = (state.thread_index % 2) == 0 ? MODE_IS : MODE_IX;
-    TicketHolderFixture<TicketHolderImpl>* fixture;
-    if constexpr (std::is_base_of_v<SchedulingTicketHolder, TicketHolderImpl>) {
-        fixture = readTicketHolder.get();
-    } else {
-        fixture = (mode == MODE_IS ? readTicketHolder : writeTicketHolder).get();
-    }
-    for (auto _ : state) {
-        AdmissionContext admCtx;
-        admCtx.setLockMode(mode);
-        auto opCtx = fixture->opCtxs[state.thread_index].get();
-        {
-            auto ticket = fixture->ticketHolder->waitForTicket(opCtx, &admCtx, waitMode);
-            state.PauseTiming();
-            sleepmicros(1);
-        }
-        acquired++;
-        state.ResumeTiming();
-    }
-    state.counters["Acquired"] = benchmark::Counter(acquired, benchmark::Counter::kIsRate);
-    state.counters["AcquiredPerThread"] =
-        benchmark::Counter(acquired, benchmark::Counter::kAvgThreadsRate);
-    if (state.thread_index == 0) {
-        readTicketHolder.reset();
-        writeTicketHolder.reset();
-        serviceContext.reset();
-        isReady = false;
-    }
-}
-
-BENCHMARK_TEMPLATE(BM_acquire, SemaphoreTicketHolder)->ThreadRange(kThreadMin, kThreadMax);
-
-BENCHMARK_TEMPLATE(BM_acquire, FifoTicketHolder)->ThreadRange(kThreadMin, kThreadMax);
-
-template <class TicketHolderImpl>
-void BM_release(benchmark::State& state) {
-    static std::unique_ptr<TicketHolderFixture<TicketHolderImpl>> readTicketHolder;
-    static std::unique_ptr<TicketHolderFixture<TicketHolderImpl>> writeTicketHolder;
-    static ServiceContext::UniqueServiceContext serviceContext;
-    {
-        stdx::unique_lock lk(isReadyMutex);
-        if (state.thread_index == 0) {
-            serviceContext = ServiceContext::make();
-            serviceContext->setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
-            serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-            readTicketHolder = std::make_unique<TicketHolderFixture<TicketHolderImpl>>(
-                state.threads, serviceContext.get());
-            writeTicketHolder = std::make_unique<TicketHolderFixture<TicketHolderImpl>>(
-                state.threads, serviceContext.get());
-            isReady = true;
-            isReadyCv.notify_all();
-        } else {
-            isReadyCv.wait(lk, [&] { return isReady; });
-        }
-    }
-    double acquired = 0;
-    auto mode = (state.thread_index % 2) == 0 ? MODE_IS : MODE_IX;
-    TicketHolderFixture<TicketHolderImpl>* fixture;
-    if constexpr (std::is_base_of_v<SchedulingTicketHolder, TicketHolderImpl>) {
-        fixture = readTicketHolder;
-    } else {
-        fixture = (mode == MODE_IS ? readTicketHolder : writeTicketHolder).get();
-    }
-    for (auto _ : state) {
-        AdmissionContext admCtx;
-        admCtx.setLockMode(mode);
-        auto opCtx = fixture->opCtxs[state.thread_index].get();
-        state.PauseTiming();
-        {
-            auto ticket = fixture->ticketHolder->waitForTicket(opCtx, &admCtx, waitMode);
-            sleepmicros(1);
-            state.ResumeTiming();
-        }
-        acquired++;
-    }
-    state.counters["Acquired"] = benchmark::Counter(acquired, benchmark::Counter::kIsRate);
-    state.counters["AcquiredPerThread"] =
-        benchmark::Counter(acquired, benchmark::Counter::kAvgThreadsRate);
-    if (state.thread_index == 0) {
-        readTicketHolder.reset();
-        writeTicketHolder.reset();
-        serviceContext.reset();
-        isReady = false;
-    }
-}
-
-BENCHMARK_TEMPLATE(BM_release, SemaphoreTicketHolder)->ThreadRange(kThreadMin, kThreadMax);
-
-BENCHMARK_TEMPLATE(BM_release, FifoTicketHolder)->ThreadRange(kThreadMin, kThreadMax);
-
 
 template <class TicketHolderImpl>
 void BM_acquireAndRelease(benchmark::State& state) {
@@ -278,9 +109,9 @@ void BM_acquireAndRelease(benchmark::State& state) {
             auto ticket = fixture->ticketHolder->waitForTicket(opCtx, &admCtx, waitMode);
             state.PauseTiming();
             sleepmicros(1);
+            acquired++;
             state.ResumeTiming();
         }
-        acquired++;
     }
     state.counters["Acquired"] = benchmark::Counter(acquired, benchmark::Counter::kIsRate);
     state.counters["AcquiredPerThread"] =
@@ -294,12 +125,19 @@ void BM_acquireAndRelease(benchmark::State& state) {
 }
 
 BENCHMARK_TEMPLATE(BM_acquireAndRelease, SemaphoreTicketHolder)
-    ->ThreadRange(kThreadMin, kThreadMax);
+    ->Threads(kThreadMin)
+    ->Threads(kTickets)
+    ->Threads(kThreadMax);
 
-BENCHMARK_TEMPLATE(BM_acquireAndRelease, FifoTicketHolder)->ThreadRange(kThreadMin, kThreadMax);
+BENCHMARK_TEMPLATE(BM_acquireAndRelease, FifoTicketHolder)
+    ->Threads(kThreadMin)
+    ->Threads(kTickets)
+    ->Threads(kThreadMax);
 
 BENCHMARK_TEMPLATE(BM_acquireAndRelease, StochasticTicketHolder)
-    ->ThreadRange(kThreadMin, kThreadMax);
+    ->Threads(kThreadMin)
+    ->Threads(kTickets)
+    ->Threads(kThreadMax);
 
 }  // namespace
 }  // namespace mongo
