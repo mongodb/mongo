@@ -121,6 +121,9 @@ public:
         }
     }
 
+    // TODO (SERVER-67900): Remove once the CollectionPtr variant of OpObserver::onInserts becomes
+    // part of the interface
+    using OpObserver::onInserts;
     void onInserts(OperationContext* const opCtx,
                    const NamespaceString& nss,
                    const UUID& uuid,
