@@ -80,7 +80,8 @@ Status TrialStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         }
         if (mustYield || yieldPolicy->shouldYieldOrInterrupt(expCtx()->opCtx)) {
             if (mustYield && !yieldPolicy->canAutoYield()) {
-                throwWriteConflictException();
+                throwWriteConflictException(
+                    "Write conflict during TrialStage plan selection and yielding is disabled.");
             }
             auto yieldStatus = yieldPolicy->yieldOrInterrupt(expCtx()->opCtx);
             if (!yieldStatus.isOK()) {

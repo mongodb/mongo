@@ -198,7 +198,7 @@ TEST_F(ShardingCatalogManagerBumpCollectionVersionAndChangeMetadataTest,
             operationContext(), kNss, [&](OperationContext*, TxnNumber) {
                 ++numCalls;
                 if (numCalls < 5) {
-                    throwWriteConflictException();
+                    throwWriteConflictException("Simulating transient transaction errors.");
                 }
             });
 

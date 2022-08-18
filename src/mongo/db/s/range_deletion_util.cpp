@@ -150,7 +150,9 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
         BSONObj deletedObj;
 
         if (throwWriteConflictExceptionInDeleteRange.shouldFail()) {
-            throwWriteConflictException();
+            throwWriteConflictException(
+                str::stream() << "Hit failpoint '"
+                              << throwWriteConflictExceptionInDeleteRange.getName() << "'.");
         }
 
         if (throwInternalErrorInDeleteRange.shouldFail()) {

@@ -464,7 +464,8 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
                 // We're yielding because of a WriteConflictException.
                 if (!_yieldPolicy->canAutoYield() ||
                     MONGO_unlikely(skipWriteConflictRetries.shouldFail())) {
-                    throwWriteConflictException();
+                    throwWriteConflictException(
+                        "Write conflict during plan execution and yielding is disabled.");
                 }
 
                 CurOp::get(_opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);

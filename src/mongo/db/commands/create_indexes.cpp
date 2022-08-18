@@ -428,7 +428,8 @@ CreateIndexesReply runCreateIndexesOnNewCollection(
     const int numIndexesAfter = IndexBuildsCoordinator::getNumIndexesTotal(opCtx, collection.get());
 
     if (MONGO_unlikely(createIndexesWriteConflict.shouldFail())) {
-        throwWriteConflictException();
+        throwWriteConflictException(str::stream() << "Hit failpoint '"
+                                                  << createIndexesWriteConflict.getName() << "'.");
     }
     wunit.commit();
 

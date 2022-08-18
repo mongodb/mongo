@@ -66,12 +66,11 @@ void handleTemporarilyUnavailableExceptionInTransaction(OperationContext* opCtx,
  * other. For example if two operations get the same version of a document, and then both try to
  * modify that document, this exception will get thrown by one of them.
  */
-[[noreturn]] inline void throwWriteConflictException(StringData context = {}) {
-    Status status{ErrorCodes::WriteConflict,
-                  "WriteConflict error: this operation conflicted with another operation. "
-                  "Please retry your operation or multi-document transaction."_sd};
-    if (!context.empty())
-        status.addContext(context);
+[[noreturn]] inline void throwWriteConflictException(StringData context) {
+    Status status{
+        ErrorCodes::WriteConflict,
+        str::stream() << "Caused by :: "_sd << context
+                      << " :: Please retry your operation or multi-document transaction."_sd};
     iasserted(status);
 }
 

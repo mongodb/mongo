@@ -324,7 +324,9 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
     WriteUnitOfWork wuow(opCtx(), true /* groupOplogEntries */);
     for (; *bufferOffset < _stagedDeletesBuffer.size(); ++*bufferOffset) {
         if (MONGO_unlikely(throwWriteConflictExceptionInBatchedDeleteStage.shouldFail())) {
-            throwWriteConflictException();
+            throwWriteConflictException(
+                str::stream() << "Hit failpoint '"
+                              << throwWriteConflictExceptionInBatchedDeleteStage.getName() << "'.");
         }
 
         auto workingSetMemberID = _stagedDeletesBuffer.at(*bufferOffset);

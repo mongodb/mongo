@@ -149,7 +149,7 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
             // subject to TemporarilyUnavailableException's.
             invariant(!expCtx()->getTemporarilyUnavailableException());
             if (!yieldPolicy->canAutoYield()) {
-                throwWriteConflictException();
+                throwWriteConflictException("Write conflict during best plan selection period.");
             }
 
             if (yieldPolicy->canAutoYield()) {

@@ -850,7 +850,7 @@ void BucketCatalog::clear(const OID& oid) {
     auto result = _setBucketState(oid, BucketState::kCleared);
     if (result && *result == BucketState::kPreparedAndCleared) {
         hangTimeseriesDirectModificationBeforeWriteConflict.pauseWhileSet();
-        throwWriteConflictException();
+        throwWriteConflictException("Prepared bucket can no longer be inserted into.");
     }
 }
 

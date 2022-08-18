@@ -427,7 +427,7 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
             LOGV2_ERROR(5703401,
                         "Found a violation of multi-timestamp constraint. Retrying operation to "
                         "collect extra debugging context for the involved writes.");
-            throwWriteConflictException();
+            throwWriteConflictException("Violation of multi-timestamp constraint.");
         }
         if (commit) {
             LOGV2_FATAL(

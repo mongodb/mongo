@@ -1296,7 +1296,8 @@ void CollectionCatalog::_ensureNamespaceDoesNotExist(OperationContext* opCtx,
         LOGV2(5725001,
               "Conflicted registering namespace, already have a collection with the same namespace",
               "nss"_attr = nss);
-        throwWriteConflictException();
+        throwWriteConflictException(str::stream() << "Collection namespace '" << nss.ns()
+                                                  << "' is already in use.");
     }
 
     if (type == NamespaceType::kAll) {
@@ -1304,7 +1305,8 @@ void CollectionCatalog::_ensureNamespaceDoesNotExist(OperationContext* opCtx,
             LOGV2(5725002,
                   "Conflicted registering namespace, already have a view with the same namespace",
                   "nss"_attr = nss);
-            throwWriteConflictException();
+            throwWriteConflictException(str::stream() << "Collection namespace '" << nss.ns()
+                                                      << "' is already in use.");
         }
 
         if (auto viewsForDb = _getViewsForDatabase(opCtx, nss.dbName())) {

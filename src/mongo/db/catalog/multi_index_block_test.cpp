@@ -176,7 +176,8 @@ TEST_F(MultiIndexBlockTest, InitWriteConflictException) {
                                          coll,
                                          {spec},
                                          [](std::vector<BSONObj>& specs) -> Status {
-                                             throwWriteConflictException();
+                                             throwWriteConflictException(
+                                                 "Throw WriteConflictException in 'OnInitFn'.");
                                          }),
                            DBException,
                            ErrorCodes::WriteConflict);

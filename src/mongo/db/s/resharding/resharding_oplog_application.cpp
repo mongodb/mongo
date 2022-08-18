@@ -204,8 +204,12 @@ Status ReshardingOplogApplicationRules::applyOperation(OperationContext* opCtx,
 
             return Status::OK();
         } catch (const DBException& ex) {
-            if (ex.code() == ErrorCodes::WriteConflict || ex.code() == ErrorCodes::LockTimeout) {
-                throwWriteConflictException();
+            if (ex.code() == ErrorCodes::WriteConflict) {
+                throwWriteConflictException("Conflict when applying an oplog entry.");
+            }
+
+            if (ex.code() == ErrorCodes::LockTimeout) {
+                throwWriteConflictException("Timeout when applying an oplog entry.");
             }
 
             return ex.toStatus();

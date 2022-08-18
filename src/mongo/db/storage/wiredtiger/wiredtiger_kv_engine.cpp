@@ -1423,7 +1423,9 @@ Status WiredTigerKVEngine::importRecordStore(OperationContext* opCtx,
               "Failpoint WTWriteConflictExceptionForImportCollection enabled. Throwing "
               "WriteConflictException",
               "ident"_attr = ident);
-        throwWriteConflictException();
+        throwWriteConflictException(
+            str::stream() << "Hit failpoint '"
+                          << WTWriteConflictExceptionForImportCollection.getName() << "'.");
     }
 
     std::string config = uassertStatusOK(
@@ -1631,7 +1633,9 @@ Status WiredTigerKVEngine::importSortedDataInterface(OperationContext* opCtx,
               "Failpoint WTWriteConflictExceptionForImportIndex enabled. Throwing "
               "WriteConflictException",
               "ident"_attr = ident);
-        throwWriteConflictException();
+        throwWriteConflictException(str::stream()
+                                    << "Hit failpoint '"
+                                    << WTWriteConflictExceptionForImportIndex.getName() << "'.");
     }
 
     std::string config = uassertStatusOK(

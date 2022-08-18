@@ -721,7 +721,8 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
                       str::stream()
                           << "Cannot create collection " << nss << " - collection already exists.");
         } else {
-            throwWriteConflictException();
+            throwWriteConflictException(str::stream() << "Collection namespace '" << nss.ns()
+                                                      << "' is already in use.");
         }
     }
 
@@ -729,7 +730,8 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
         opCtx->inMultiDocumentTransaction()) {
         LOGV2(4696600,
               "Throwing WriteConflictException due to failpoint 'throwWCEDuringTxnCollCreate'");
-        throwWriteConflictException();
+        throwWriteConflictException(str::stream() << "Hit failpoint '"
+                                                  << throwWCEDuringTxnCollCreate.getName() << "'.");
     }
 
     uassert(28838, "cannot create a non-capped oplog collection", options.capped || !nss.isOplog());

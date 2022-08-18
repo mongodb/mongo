@@ -320,7 +320,9 @@ void writeToImageCollection(OperationContext* opCtx,
     } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
         // We can get a duplicate key when two upserts race on inserting a document.
         *upsertConfigImage = false;
-        throwWriteConflictException();
+        // This write conflict is always retried internally and never exposed to the user.
+        throwWriteConflictException(
+            "DuplicateKey error when inserting a document into the pre-images collection.");
     }
 }
 
@@ -1950,7 +1952,9 @@ Status applyCommand_inlock(OperationContext* opCtx,
             case ErrorCodes::WriteConflict: {
                 // Need to throw this up to a higher level where it will be caught and the
                 // operation retried.
-                throwWriteConflictException();
+                throwWriteConflictException(str::stream()
+                                            << "WriteConflict caught during oplog application."
+                                            << " Original error: " << status.reason());
             }
             case ErrorCodes::BackgroundOperationInProgressForDatabase: {
                 invariant(mode == OplogApplication::Mode::kInitialSync);

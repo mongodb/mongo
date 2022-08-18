@@ -189,7 +189,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
         // Either the document has already been deleted, or it has been updated such that it no
         // longer matches the predicate.
         if (shouldRestartDeleteIfNoLongerMatches(_params.get())) {
-            throwWriteConflictException();
+            throwWriteConflictException("Document no longer matches the predicate.");
         }
         return PlanStage::NEED_TIME;
     }

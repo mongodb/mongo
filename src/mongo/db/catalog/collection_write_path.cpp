@@ -221,7 +221,8 @@ Status insertDocumentForBulkLoader(OperationContext* opCtx,
               "Failpoint failAfterBulkLoadDocInsert enabled. Throwing "
               "WriteConflictException",
               logAttrs(nss));
-        throwWriteConflictException();
+        throwWriteConflictException(str::stream() << "Hit failpoint '"
+                                                  << failAfterBulkLoadDocInsert.getName() << "'.");
     }
 
     std::vector<InsertStatement> inserts;

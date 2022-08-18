@@ -241,7 +241,9 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
                                                           isDataConsistent,
                                                           incrementOpsAppliedStats);
                     if (!status.isOK() && status.code() == ErrorCodes::WriteConflict) {
-                        throwWriteConflictException();
+                        throwWriteConflictException(
+                            str::stream() << "WriteConflict caught when applying operation."
+                                          << " Original error: " << status.reason());
                     }
                     return status;
                 } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {

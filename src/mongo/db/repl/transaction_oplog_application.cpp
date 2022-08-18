@@ -489,7 +489,8 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
         }
 
         if (status == ErrorCodes::WriteConflict) {
-            throwWriteConflictException();
+            throwWriteConflictException(
+                "Conflict encountered when applying a prepare transaction.");
         }
         fassert(31137, status);
 

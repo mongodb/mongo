@@ -2224,7 +2224,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
 
         // Force a retry of the operation from our last known position by acting as-if
         // we received a WT_ROLLBACK error.
-        throwWriteConflictException();
+        throwWriteConflictException("WTCursor::next -- next was not greater than last.");
     }
 
     WT_ITEM value;

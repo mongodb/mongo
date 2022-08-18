@@ -336,7 +336,9 @@ bool MultiPlanStage::workAllPlans(size_t numResults, PlanYieldPolicy* yieldPolic
             // subject to TemporarilyUnavailableException's.
             invariant(!expCtx()->getTemporarilyUnavailableException());
             if (!yieldPolicy->canAutoYield()) {
-                throwWriteConflictException();
+                throwWriteConflictException(
+                    "Write conflict during multi-planning selection period "
+                    "and yielding is disabled.");
             }
 
             if (yieldPolicy->canAutoYield()) {

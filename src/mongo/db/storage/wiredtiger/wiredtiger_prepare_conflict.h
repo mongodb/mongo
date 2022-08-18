@@ -83,7 +83,7 @@ int wiredTigerPrepareConflictRetry(OperationContext* opCtx, F&& f) {
         // be blocking on a prepared update that requires replication to make progress, creating a
         // stall in the MDB cluster.
         wiredTigerPrepareConflictOplogResourceLog();
-        throwWriteConflictException();
+        throwWriteConflictException("Holding a resource (oplog slot).");
     }
 
     auto recoveryUnit = WiredTigerRecoveryUnit::get(opCtx);

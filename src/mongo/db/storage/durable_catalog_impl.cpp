@@ -601,7 +601,8 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalogImpl
     invariant(nss.coll().size() > 0);
 
     if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
-        throwWriteConflictException();
+        throwWriteConflictException(str::stream()
+                                    << "Namespace '" << nss.ns() << "' is already in use.");
     }
 
     StatusWith<Entry> swEntry = _addEntry(opCtx, nss, options);
