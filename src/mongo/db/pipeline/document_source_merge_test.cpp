@@ -967,7 +967,7 @@ TEST_F(DocumentSourceMergeServerlessTest,
     ASSERT_EQ(1, namespaceSet.size());
     ASSERT_EQ(1ul, namespaceSet.count(NamespaceString(tenantId, "test", "target_collection")));
 
-    // TODO SERVER-66708 Add a test case once IDL parsed objects have access to tenantId.
+    // TODO SERVER-68564 Add a test case once IDL parsed objects have access to tenantId.
 }
 
 TEST_F(DocumentSourceMergeServerlessTest, CreateFromBSONContainsExpectedNamespacesInServerless) {
@@ -1001,7 +1001,7 @@ TEST_F(DocumentSourceMergeServerlessTest, CreateFromBSONContainsExpectedNamespac
     serialized = mergeSource->serialize().getDocument();
     ASSERT_DOCUMENT_EQ(serialized["$merge"][kIntoFieldName].getDocument(), expectedDoc);
 
-    // TODO SERVER-66708 Add a test case once IDL parsed objects have access to tenantId.
+    // TODO SERVER-68564 Add a test case once IDL parsed objects have access to tenantId.
 }
 
 }  // namespace

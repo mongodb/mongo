@@ -630,8 +630,7 @@ TEST_F(OpObserverTest, OnDropCollectionInlcudesTenantId) {
 
     OplogEntry oplogEntry = assertGet(OplogEntry::parse(getSingleOplogEntry(opCtx.get())));
     ASSERT_EQUALS(tid, *oplogEntry.getTid());
-    // TODO: SERVER-67155 perform check against getCommandNS after oplogEntry.getNss() contains tid
-    ASSERT_EQUALS(NamespaceString(boost::none, nss.dbName().db(), "$cmd"), oplogEntry.getNss());
+    ASSERT_EQUALS(nss.getCommandNS(), oplogEntry.getNss());
 }
 
 TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
@@ -734,9 +733,7 @@ TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOn) {
     // Ensure that renameCollection fields were properly added to oplog entry.
     ASSERT_EQUALS(uuid, unittest::assertGet(UUID::parse(oplogEntryObj["ui"])));
     ASSERT_EQUALS(tid, *oplogEntry.getTid());
-    // TODO: SERVER-67155 perform check against getCommandNS after oplogEntry.getNss() contains tid
-    ASSERT_EQUALS(NamespaceString(boost::none, sourceNss.dbName().db(), "$cmd"),
-                  oplogEntry.getNss());
+    ASSERT_EQUALS(sourceNss.getCommandNS(), oplogEntry.getNss());
 
     auto oExpected =
         BSON("renameCollection" << sourceNss.toString() << "to" << targetNss.toString()
@@ -891,11 +888,8 @@ TEST_F(OpObserverTest, SingleStatementInsertTestIncludesTenantId) {
     auto oplogEntryObj = getSingleOplogEntry(opCtx.get());
     const repl::OplogEntry& entry = assertGet(repl::OplogEntry::parse(oplogEntryObj));
 
-    // TODO SERVER-67155 Check that (nss == entry.getNss()) and uncomment the
-    // line below once the OplogEntry deserializer passes "tid" to the NamespaceString
-    // constructor
-    ASSERT_EQ(NamespaceString(boost::none, nss.ns()), entry.getNss());
-    // ASSERT(nss.tenantId().has_value());
+    ASSERT_EQ(nss, entry.getNss());
+    ASSERT(nss.tenantId().has_value());
 
     ASSERT_EQ(*nss.tenantId(), *entry.getTid());
     ASSERT_EQ(uuid, *entry.getUuid());
@@ -927,9 +921,7 @@ TEST_F(OpObserverTest, SingleStatementUpdateTestIncludesTenantId) {
 
     ASSERT(nss.tenantId().has_value());
     ASSERT_EQ(*nss.tenantId(), *entry.getTid());
-    // TODO SERVER-67155 Check that (nss == entry.getNss()) once the OplogEntry deserializer passes
-    // "tid" to the NamespaceString constructor
-    ASSERT_EQ(NamespaceString(boost::none, nss.ns()), entry.getNss());
+    ASSERT_EQ(nss, entry.getNss());
     ASSERT_EQ(uuid, *entry.getUuid());
 }
 
@@ -954,10 +946,8 @@ TEST_F(OpObserverTest, SingleStatementDeleteTestIncludesTenantId) {
     auto oplogEntryObj = getSingleOplogEntry(opCtx.get());
     const repl::OplogEntry& entry = assertGet(repl::OplogEntry::parse(oplogEntryObj));
 
-    // TODO SERVER-67155 Check that (nss == entry.getNss()) once the OplogEntry deserializer passes
-    // "tid" to the NamespaceString constructor
-    // ASSERT(nss.tenantId().has_value());
-    ASSERT_EQ(NamespaceString(boost::none, nss.ns()), entry.getNss());
+    ASSERT(nss.tenantId().has_value());
+    ASSERT_EQ(nss, entry.getNss());
     ASSERT_EQ(*nss.tenantId(), *entry.getTid());
     ASSERT_EQ(uuid, *entry.getUuid());
 }
@@ -2966,12 +2956,8 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateIncludesTenantId) 
         const auto innerEntry = innerEntries[0];
         ASSERT(innerEntry.getCommandType() == OplogEntry::CommandType::kNotCommand);
         ASSERT(innerEntry.getOpType() == repl::OpTypeEnum::kInsert);
-        // TODO SERVER-67155 Check that (innerEntry.getNss() == _nssWithTid) and uncomment the
-        // 2 lines below once the OplogEntry deserializer passes "tid" to the NamespaceString
-        // constructor
-        ASSERT(innerEntry.getNss() == NamespaceString(boost::none, _nssWithTid.ns()));
-        // ASSERT(innerEntry.getNss().tenantId().has_value());
-        // ASSERT(*innerEntry.getNss().tenantId() == *_nssWithTid.tenantId());
+
+        ASSERT_EQ(innerEntry.getNss(), _nssWithTid);
 
         ASSERT(innerEntry.getTid().has_value());
         ASSERT(*innerEntry.getTid() == *_nssWithTid.tenantId());
@@ -2984,12 +2970,8 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateIncludesTenantId) 
         const auto innerEntry = innerEntries[1];
         ASSERT(innerEntry.getCommandType() == OplogEntry::CommandType::kNotCommand);
         ASSERT(innerEntry.getOpType() == repl::OpTypeEnum::kDelete);
-        // TODO SERVER-67155 Check that (innerEntry.getNss() == _nssWithTid) and uncomment the
-        // 2 lines below once the OplogEntry deserializer passes "tid" to the NamespaceString
-        // constructor
-        ASSERT(innerEntry.getNss() == NamespaceString(boost::none, _nssWithTid.ns()));
-        // ASSERT(innerEntry.getNss().tenantId().has_value());
-        // ASSERT(*innerEntry.getNss().tenantId() == *_nssWithTid.tenantId());
+
+        ASSERT_EQ(innerEntry.getNss(), _nssWithTid);
 
         ASSERT(innerEntry.getTid().has_value());
         ASSERT(*innerEntry.getTid() == *_nssWithTid.tenantId());
@@ -3000,12 +2982,8 @@ TEST_F(BatchedWriteOutputsTest, TestApplyOpsInsertDeleteUpdateIncludesTenantId) 
         const auto innerEntry = innerEntries[2];
         ASSERT(innerEntry.getCommandType() == OplogEntry::CommandType::kNotCommand);
         ASSERT(innerEntry.getOpType() == repl::OpTypeEnum::kUpdate);
-        // TODO SERVER-67155 Check that (innerEntry.getNss() == _nssWithTid) and uncomment the
-        // 2 lines below once the OplogEntry deserializer passes "tid" to the NamespaceString
-        // constructor
-        ASSERT(innerEntry.getNss() == NamespaceString(boost::none, _nssWithTid.ns()));
-        // ASSERT(innerEntry.getNss().tenantId().has_value());
-        // ASSERT(*innerEntry.getNss().tenantId() == *_nssWithTid.tenantId());
+
+        ASSERT_EQ(innerEntry.getNss(), _nssWithTid);
 
         ASSERT(innerEntry.getTid().has_value());
         ASSERT(*innerEntry.getTid() == *_nssWithTid.tenantId());

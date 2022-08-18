@@ -1812,7 +1812,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 return
 
             # Deserialize all the fields
-            field_usage_check = self._gen_fields_deserializer_common(struct, "bsonObject")
+            field_usage_check = self._gen_fields_deserializer_common(struct, "bsonObject",
+                                                                     "ctxt.getTenantId()")
 
             # Check for required fields
             field_usage_check.add_final_checks()

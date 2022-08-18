@@ -239,8 +239,15 @@ public:
     static constexpr auto kOpMsgDollarDBDefault = "admin"_sd;
 
     explicit IDLParserContext(StringData fieldName) : IDLParserContext{fieldName, false} {}
+
     IDLParserContext(StringData fieldName, bool apiStrict)
-        : _currentField(fieldName), _apiStrict(apiStrict), _predecessor(nullptr) {}
+        : IDLParserContext{fieldName, apiStrict, boost::none} {}
+
+    IDLParserContext(StringData fieldName, bool apiStrict, boost::optional<TenantId> tenantId)
+        : _currentField(fieldName),
+          _apiStrict(apiStrict),
+          _tenantId(std::move(tenantId)),
+          _predecessor(nullptr) {}
 
     IDLParserContext(StringData fieldName, const IDLParserContext* predecessor)
         : _currentField(fieldName), _predecessor(predecessor) {}
@@ -359,6 +366,8 @@ public:
                                               const std::vector<StringData>& knownFields,
                                               BSONObjBuilder* builder);
 
+    const boost::optional<TenantId>& getTenantId() const;
+
 private:
     /**
      * See comment on getElementPath below.
@@ -387,6 +396,8 @@ private:
 
     // Whether the 'apiStrict' parameter is set in the user request.
     const bool _apiStrict = false;
+
+    const boost::optional<TenantId> _tenantId;
 
     // Pointer to a parent parser context.
     // This provides a singly linked list of parent pointers, and use to produce a full path to a

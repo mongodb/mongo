@@ -279,9 +279,14 @@ ReplOperation MutableOplogEntry::makeDeleteOperation(const NamespaceString& nss,
 }
 
 StatusWith<MutableOplogEntry> MutableOplogEntry::parse(const BSONObj& object) {
+    boost::optional<TenantId> tid;
+    if (object.hasElement("tid"))
+        tid = TenantId::parseFromBSON(object["tid"]);
+
     try {
         MutableOplogEntry oplogEntry;
-        oplogEntry.parseProtected(IDLParserContext("OplogEntryBase"), object);
+        oplogEntry.parseProtected(IDLParserContext("OplogEntryBase", false /* apiStrict */, tid),
+                                  object);
         return oplogEntry;
     } catch (...) {
         return exceptionToStatus();
@@ -322,7 +327,11 @@ StatusWith<DurableOplogEntry> DurableOplogEntry::parse(const BSONObj& object) {
 DurableOplogEntry::DurableOplogEntry(BSONObj rawInput) : _raw(std::move(rawInput)) {
     _raw = _raw.getOwned();
 
-    parseProtected(IDLParserContext("OplogEntryBase"), _raw);
+    boost::optional<TenantId> tid;
+    if (_raw.hasElement("tid"))
+        tid = TenantId::parseFromBSON(_raw["tid"]);
+
+    parseProtected(IDLParserContext("OplogEntryBase", false /* apiStrict */, tid), _raw);
 
     // Parse command type from 'o' and 'o2' fields.
     if (isCommand()) {

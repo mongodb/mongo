@@ -41,7 +41,7 @@
 namespace mongo {
 using namespace fmt::literals;
 
-// TODO SERVER-66708 Ensure the correct tenantId is passed when deserializing the merge target nss.
+// TODO SERVER-68564 Ensure the correct tenantId is passed when deserializing the merge target nss.
 NamespaceString mergeTargetNssParseFromBSON(const BSONElement& elem) {
     uassert(51178,
             "{} 'into' field  must be either a string or an object, "

@@ -141,7 +141,7 @@ TEST(OplogEntryTest, OpTimeBaseNonStrictParsing) {
 }
 
 TEST(OplogEntryTest, InsertIncludesTidField) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     const BSONObj doc = BSON("_id" << docId << "a" << 5);
     TenantId tid(OID::gen());
@@ -151,11 +151,82 @@ TEST(OplogEntryTest, InsertIncludesTidField) {
 
     ASSERT(entry.getTid());
     ASSERT_EQ(*entry.getTid(), tid);
-    // TODO SERVER-66708 Check that (entry.getNss() == nss) once the OplogEntry deserializer
-    // passes "tid" to the NamespaceString constructor
-    ASSERT_EQ(entry.getNss(), NamespaceString(boost::none, nss.ns()));
+    ASSERT_EQ(entry.getNss(), nss);
     ASSERT_BSONOBJ_EQ(entry.getIdElement().wrap("_id"), BSON("_id" << docId));
     ASSERT_BSONOBJ_EQ(entry.getOperationToApply(), doc);
+}
+
+TEST(OplogEntryTest, ParseMutableOplogEntryIncludesTidField) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+
+    const TenantId tid(OID::gen());
+
+    const NamespaceString nssWithTid{tid, nss.ns()};
+
+    const BSONObj oplogBson = [&] {
+        BSONObjBuilder bob;
+        bob.append("ts", Timestamp(0, 0));
+        bob.append("t", 0LL);
+        bob.append("op", "c");
+        tid.serializeToBSON("tid", &bob);
+        bob.append("ns", nssWithTid.ns());
+        bob.append("wall", Date_t());
+        BSONObjBuilder{bob.subobjStart("o")}.append("_id", 1);
+        return bob.obj();
+    }();
+
+    auto oplogEntry = unittest::assertGet(MutableOplogEntry::parse(oplogBson));
+    ASSERT(oplogEntry.getTid());
+    ASSERT_EQ(oplogEntry.getTid(), tid);
+    ASSERT_EQ(oplogEntry.getNss(), nssWithTid);
+}
+
+TEST(OplogEntryTest, ParseDurableOplogEntryIncludesTidField) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+
+    const TenantId tid(OID::gen());
+    const NamespaceString nssWithTid{tid, nss.ns()};
+
+    const BSONObj oplogBson = [&] {
+        BSONObjBuilder bob;
+        bob.append("ts", Timestamp(0, 0));
+        bob.append("t", 0LL);
+        bob.append("op", "i");
+        tid.serializeToBSON("tid", &bob);
+        bob.append("ns", nssWithTid.ns());
+        bob.append("wall", Date_t());
+        BSONObjBuilder{bob.subobjStart("o")}.append("_id", 1).append("data", "x");
+        BSONObjBuilder{bob.subobjStart("o2")}.append("_id", 1);
+        return bob.obj();
+    }();
+
+    auto oplogEntry = unittest::assertGet(DurableOplogEntry::parse(oplogBson));
+    ASSERT(oplogEntry.getTid());
+    ASSERT_EQ(oplogEntry.getTid(), tid);
+    ASSERT_EQ(oplogEntry.getNss(), nssWithTid);
+}
+
+TEST(OplogEntryTest, ParseReplOperationIncludesTidField) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+
+    UUID uuid(UUID::gen());
+    TenantId tid(OID::gen());
+    NamespaceString nssWithTid(tid, nss.ns());
+
+    auto op = repl::DurableOplogEntry::makeInsertOperation(
+        nssWithTid,
+        uuid,
+        BSONObjBuilder{}.append("_id", 1).append("data", "x").obj(),
+        BSONObjBuilder{}.append("_id", 1).obj());
+    BSONObj oplogBson = op.toBSON();
+
+    auto replOp = ReplOperation::parse(IDLParserContext("ReplOperation", false, tid), oplogBson);
+    ASSERT(replOp.getTid());
+    ASSERT_EQ(replOp.getTid(), tid);
+    ASSERT_EQ(replOp.getNss(), nssWithTid);
 }
 
 }  // namespace
