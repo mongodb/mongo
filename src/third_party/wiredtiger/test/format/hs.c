@@ -39,6 +39,7 @@ hs_cursor(void *arg)
 #if WIREDTIGER_VERSION_MAJOR < 10
     WT_UNUSED(arg);
 #else
+    SAP sap;
     WT_CONNECTION *conn;
     WT_CURSOR *cursor;
     WT_DECL_RET;
@@ -60,7 +61,8 @@ hs_cursor(void *arg)
      *
      * Open a session.
      */
-    testutil_check(conn->open_session(conn, NULL, NULL, &session));
+    memset(&sap, 0, sizeof(sap));
+    wt_wrap_open_session(conn, &sap, NULL, &session);
 
     memset(&hs_key, 0, sizeof(hs_key));
     memset(&hs_value, 0, sizeof(hs_value));
@@ -98,7 +100,7 @@ hs_cursor(void *arg)
             break;
     }
 
-    testutil_check(session->close(session, NULL));
+    wt_wrap_close_session(session);
 #endif
 
     return (WT_THREAD_RET_VALUE);

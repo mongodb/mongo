@@ -168,7 +168,8 @@ __modify_apply_one(WT_SESSION_IMPL *session, WT_ITEM *value, WT_MODIFY *modify, 
      */
     if (value->size <= offset) {
         if (value->size < offset)
-            memset((uint8_t *)value->data + value->size, sformat ? ' ' : 0, offset - value->size);
+            memset((uint8_t *)value->data + value->size,
+              sformat ? ' ' : __wt_process.modify_pad_byte, offset - value->size);
         memcpy((uint8_t *)value->data + offset, data, data_size);
         value->size = offset + data_size;
         return (0);

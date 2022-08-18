@@ -30,6 +30,14 @@ struct __wt_process {
     bool fast_truncate_2022; /* fast-truncate fix run-time configuration */
 
     WT_CACHE_POOL *cache_pool; /* shared cache information */
+
+    /*
+     * WT_CURSOR.modify operations set unspecified bytes to space in 'S' format and to a nul byte in
+     * all other formats. It makes it easier to debug format test program stress failures if strings
+     * are printable and don't require encoding to trace them in the log; this is a hook that allows
+     * format to set the modify pad byte to a printable character.
+     */
+    uint8_t modify_pad_byte;
 };
 extern WT_PROCESS __wt_process;
 

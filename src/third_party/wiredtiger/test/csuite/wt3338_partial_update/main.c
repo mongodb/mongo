@@ -206,7 +206,7 @@ modify_run(TEST_OPTS *opts)
             modify_build();
             testutil_check(__wt_buf_set(session, &cursor->value, localA->data, localA->size));
             testutil_check(__wt_modify_apply_api(cursor, entries, nentries));
-            testutil_modify_apply(localA, &modtmp, entries, nentries);
+            testutil_modify_apply(localA, &modtmp, entries, nentries, '\0');
             compare(localB, localA, &cursor->value);
 
             /*

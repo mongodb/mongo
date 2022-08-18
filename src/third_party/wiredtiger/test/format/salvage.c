@@ -122,6 +122,7 @@ corrupt(TABLE *table)
 void
 wts_salvage(TABLE *table, void *arg)
 {
+    SAP sap;
     WT_CONNECTION *conn;
     WT_SESSION *session;
     char buf[MAX_FORMAT_PATH * 5], path[MAX_FORMAT_PATH];
@@ -139,17 +140,19 @@ wts_salvage(TABLE *table, void *arg)
     testutil_check(system(buf));
 
     /* Salvage, then verify. */
-    wts_open(g.home, &conn, &session, true);
-    session->app_private = table->track_prefix;
+    wts_open(g.home, &conn, true);
+    memset(&sap, 0, sizeof(sap));
+    wt_wrap_open_session(conn, &sap, table->track_prefix, &session);
     testutil_check(session->salvage(session, table->uri, "force=true"));
-    wts_verify(table, conn);
-    wts_close(&conn, &session);
+    table_verify(table, conn);
+    wts_close(&conn);
 
     /* Corrupt the file randomly, salvage, then verify. */
     corrupt(table);
-    wts_open(g.home, &conn, &session, false);
+    wts_open(g.home, &conn, false);
+    memset(&sap, 0, sizeof(sap));
+    wt_wrap_open_session(conn, &sap, table->track_prefix, &session);
     testutil_check(session->salvage(session, table->uri, "force=true"));
-    wts_verify(table, conn);
-
-    wts_close(&conn, &session);
+    table_verify(table, conn);
+    wts_close(&conn);
 }

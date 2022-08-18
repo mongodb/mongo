@@ -29,6 +29,29 @@
 #include "format.h"
 
 /*
+ * key_init_random --
+ *     Fill in random key lengths.
+ */
+static void
+key_init_random(TABLE *table)
+{
+    size_t i;
+    uint32_t max;
+
+    /*
+     * Fill in random key lengths. Focus on relatively small items, admitting the possibility of
+     * larger items. Pick a size close to the minimum most of the time, only create a larger item 1
+     * in 20 times.
+     */
+    for (i = 0; i < WT_ELEMENTS(table->key_rand_len); ++i) {
+        max = TV(BTREE_KEY_MAX);
+        if (i % 20 != 0 && max > TV(BTREE_KEY_MIN) + 20)
+            max = TV(BTREE_KEY_MIN) + 20;
+        table->key_rand_len[i] = mmrand(NULL, TV(BTREE_KEY_MIN), max);
+    }
+}
+
+/*
  * key_init --
  *     Initialize the keys for a run.
  */
@@ -36,13 +59,17 @@ void
 key_init(TABLE *table, void *arg)
 {
     FILE *fp;
-    size_t i;
-    uint32_t max;
+    u_int i;
     char buf[MAX_FORMAT_PATH];
 
     (void)arg; /* unused argument */
     testutil_assert(table != NULL);
 
+    /* Key initialization is only required by row-store objects. */
+    if (table->type != ROW)
+        return;
+
+    /* Backward compatibility, built the correct path to the saved key-length file. */
     if (ntables == 0)
         testutil_check(__wt_snprintf(buf, sizeof(buf), "%s", g.home_key));
     else
@@ -59,24 +86,15 @@ key_init(TABLE *table, void *arg)
     if (g.reopen) {
         if ((fp = fopen(buf, "r")) == NULL)
             testutil_die(errno, "%s", buf);
-        for (i = 0; i < WT_ELEMENTS(table->key_rand_len); ++i)
-            fp_readv(fp, buf, &table->key_rand_len[i]);
+        for (i = 0; i < WT_ELEMENTS(table->key_rand_len); ++i) {
+            testutil_assert_errno(fgets(buf, sizeof(buf), fp) != NULL);
+            table->key_rand_len[i] = atou32(__func__, buf, '\n');
+        }
         fclose_and_clear(&fp);
         return;
     }
 
-    /*
-     * Fill in the random key lengths.
-     *
-     * Focus on relatively small items, admitting the possibility of larger items. Pick a size close
-     * to the minimum most of the time, only create a larger item 1 in 20 times.
-     */
-    for (i = 0; i < WT_ELEMENTS(table->key_rand_len); ++i) {
-        max = TV(BTREE_KEY_MAX);
-        if (i % 20 != 0 && max > TV(BTREE_KEY_MIN) + 20)
-            max = TV(BTREE_KEY_MIN) + 20;
-        table->key_rand_len[i] = mmrand(NULL, TV(BTREE_KEY_MIN), max);
-    }
+    key_init_random(table);
 
     /* Write out the values for a subsequent reopen. */
     if ((fp = fopen(buf, "w")) == NULL)
@@ -277,48 +295,97 @@ val_gen_teardown(WT_ITEM *value)
 }
 
 /*
+ * val_to_flcs --
+ *     Take a RS or VLCS value, and choose an FLCS value in a reproducible way.
+ */
+void
+val_to_flcs(TABLE *table, WT_ITEM *value, uint8_t *bitvp)
+{
+    uint32_t i, max_check;
+    uint8_t bitv;
+    const char *p;
+
+    /* Use the first random byte of the key being cautious around the length of the value. */
+    bitv = FIX_MIRROR_DNE;
+    max_check = (uint32_t)WT_MIN(PREFIX_LEN_CONFIG_MIN + 10, value->size);
+    for (p = value->data, i = 0; i < max_check; ++p, ++i)
+        if (p[0] == '/' && i < max_check - 1) {
+            bitv = (uint8_t)p[1];
+            break;
+        }
+
+    switch (TV(BTREE_BITCNT)) {
+    case 8:
+        break;
+    case 7:
+        bitv &= 0x7f;
+        break;
+    case 6:
+        bitv &= 0x3f;
+        break;
+    case 5:
+        bitv &= 0x1f;
+        break;
+    case 4:
+        bitv &= 0x0f;
+        break;
+    case 3:
+        bitv &= 0x07;
+        break;
+    case 2:
+        bitv &= 0x03;
+        break;
+    case 1:
+        bitv &= 0x01;
+        break;
+    }
+    *bitvp = bitv;
+}
+
+/*
  * val_gen --
  *     Generate a new value.
  */
 void
-val_gen(TABLE *table, WT_RAND_STATE *rnd, WT_ITEM *value, uint64_t keyno)
+val_gen(TABLE *table, WT_RAND_STATE *rnd, WT_ITEM *value, uint8_t *bitvp, uint64_t keyno)
 {
     char *p;
 
-    p = value->mem;
-    value->data = value->mem;
+    value->data = NULL;
+    value->size = 0;
+    *bitvp = FIX_VALUE_WRONG;
 
-    /*
-     * Fixed-length records: take the low N bits from the last digit of the record number.
-     */
     if (table->type == FIX) {
+        /*
+         * FLCS remove is the same as storing a zero value, so where there are more than a couple of
+         * bits to work with, stay away from 0 values.
+         */
         switch (TV(BTREE_BITCNT)) {
         case 8:
-            p[0] = (char)mmrand(rnd, 1, 0xff);
+            *bitvp = (u_int8_t)mmrand(rnd, 1, 0xff);
             break;
         case 7:
-            p[0] = (char)mmrand(rnd, 1, 0x7f);
+            *bitvp = (u_int8_t)mmrand(rnd, 1, 0x7f);
             break;
         case 6:
-            p[0] = (char)mmrand(rnd, 1, 0x3f);
+            *bitvp = (u_int8_t)mmrand(rnd, 1, 0x3f);
             break;
         case 5:
-            p[0] = (char)mmrand(rnd, 1, 0x1f);
+            *bitvp = (u_int8_t)mmrand(rnd, 1, 0x1f);
             break;
         case 4:
-            p[0] = (char)mmrand(rnd, 1, 0x0f);
+            *bitvp = (u_int8_t)mmrand(rnd, 1, 0x0f);
             break;
         case 3:
-            p[0] = (char)mmrand(rnd, 1, 0x07);
+            *bitvp = (u_int8_t)mmrand(rnd, 1, 0x07);
             break;
         case 2:
-            p[0] = (char)mmrand(rnd, 1, 0x03);
+            *bitvp = (u_int8_t)mmrand(rnd, 0, 0x03);
             break;
         case 1:
-            p[0] = 1;
+            *bitvp = (u_int8_t)mmrand(rnd, 0, 1);
             break;
         }
-        value->size = 1;
         return;
     }
 
@@ -327,7 +394,7 @@ val_gen(TABLE *table, WT_RAND_STATE *rnd, WT_ITEM *value, uint64_t keyno)
      * zero-length data item every so often.
      */
     if (keyno % 63 == 0) {
-        p[0] = '\0';
+        *(uint8_t *)value->mem = 0x0;
         value->size = 0;
         return;
     }
@@ -336,6 +403,8 @@ val_gen(TABLE *table, WT_RAND_STATE *rnd, WT_ITEM *value, uint64_t keyno)
      * Data items have unique leading numbers by default and random lengths; variable-length
      * column-stores use a duplicate data value to test RLE.
      */
+    p = value->mem;
+    value->data = value->mem;
     if (table->type == VAR && mmrand(rnd, 1, 100) < TV(BTREE_REPEAT_DATA_PCT)) {
         value->size = table->val_dup_data_len;
         memcpy(p, table->val_base, value->size);
@@ -346,5 +415,8 @@ val_gen(TABLE *table, WT_RAND_STATE *rnd, WT_ITEM *value, uint64_t keyno)
         memcpy(p, table->val_base, value->size);
         u64_to_string_zf(keyno, p, 11);
         p[10] = '/';
+
+        /* Randomize the first character, we use it for FLCS values. */
+        p[11] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"[mmrand(rnd, 0, 51)];
     }
 }

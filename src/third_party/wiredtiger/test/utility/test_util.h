@@ -364,7 +364,7 @@ void testutil_copy_data(const char *);
 void testutil_copy_file(WT_SESSION *, const char *);
 void testutil_create_backup_directory(const char *);
 void testutil_make_work_dir(const char *);
-void testutil_modify_apply(WT_ITEM *, WT_ITEM *, WT_MODIFY *, int);
+void testutil_modify_apply(WT_ITEM *, WT_ITEM *, WT_MODIFY *, int, uint8_t);
 int testutil_parse_opts(int, char *const *, TEST_OPTS *);
 void testutil_print_command_line(int argc, char *const *argv);
 void testutil_progress(TEST_OPTS *, const char *);

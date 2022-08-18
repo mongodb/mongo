@@ -36,13 +36,11 @@ static void
 bulk_begin_transaction(WT_SESSION *session)
 {
     uint64_t ts;
-    char buf[64];
 
     /* Writes require snapshot isolation. */
-    wiredtiger_begin_transaction(session, NULL);
-    ts = __wt_atomic_addv64(&g.timestamp, 1);
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "read_timestamp=%" PRIx64, ts));
-    testutil_check(session->timestamp_transaction(session, buf));
+    wt_wrap_begin_transaction(session, NULL);
+    ts = __wt_atomic_fetch_addv64(&g.timestamp, 1);
+    testutil_check(session->timestamp_transaction_uint(session, WT_TS_TXN_TYPE_READ, ts));
 }
 
 /*
@@ -53,11 +51,10 @@ static void
 bulk_commit_transaction(WT_SESSION *session)
 {
     uint64_t ts;
-    char buf[64];
 
-    ts = __wt_atomic_addv64(&g.timestamp, 1);
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "commit_timestamp=%" PRIx64, ts));
-    testutil_check(session->commit_transaction(session, buf));
+    ts = __wt_atomic_fetch_addv64(&g.timestamp, 1);
+    testutil_check(session->timestamp_transaction_uint(session, WT_TS_TXN_TYPE_COMMIT, ts));
+    testutil_check(session->commit_transaction(session, NULL));
 
     /* Update the oldest timestamp, otherwise updates are pinned in memory. */
     timestamp_once(session, false, false);
@@ -74,39 +71,40 @@ bulk_rollback_transaction(WT_SESSION *session)
 }
 
 /*
- * wts_load --
- *     Bulk load a table.
+ * table_load --
+ *     Load a single table.
  */
-void
-wts_load(TABLE *table, void *arg)
+static void
+table_load(TABLE *base, TABLE *table)
 {
+    SAP sap;
     WT_CONNECTION *conn;
-    WT_CURSOR *cursor;
+    WT_CURSOR *base_cursor, *cursor;
     WT_DECL_RET;
     WT_ITEM key, value;
     WT_SESSION *session;
-    uint32_t committed_keyno, keyno, v;
-    char track_buf[128];
+    uint32_t committed_keyno, keyno, rows_current, v;
+    uint8_t bitv;
+    char config[100], track_buf[128];
     bool is_bulk;
-
-    (void)arg; /* unused argument */
-    testutil_assert(table != NULL);
 
     conn = g.wts_conn;
 
-    testutil_check(__wt_snprintf(track_buf, sizeof(track_buf), "table %u bulk load", table->id));
-    trace_msg("=============== %s bulk load start", table->uri);
+    memset(&sap, 0, sizeof(sap));
+    wt_wrap_open_session(conn, &sap, NULL, &session);
 
-    /*
-     * No bulk load with custom collators, the order of insertion will not match the collation
-     * order.
-     */
-    is_bulk = true;
-    if (TV(BTREE_REVERSE))
-        is_bulk = false;
+    testutil_check(__wt_snprintf(track_buf, sizeof(track_buf), "table %u %s load", table->id,
+      base == NULL ? "bulk" : "mirror"));
+    trace_msg(session, "=============== %s bulk load start", table->uri);
 
-    testutil_check(conn->open_session(conn, NULL, NULL, &session));
-    wiredtiger_open_cursor(session, table->uri, is_bulk ? "bulk,append" : NULL, &cursor);
+    /* Optionally open the base mirror. */
+    base_cursor = NULL;
+    if (base != NULL)
+        wt_wrap_open_cursor(session, base->uri, NULL, &base_cursor);
+
+    /* No bulk load with custom collators, insertion order won't match collation order. */
+    is_bulk = TV(BTREE_REVERSE) == 0;
+    wt_wrap_open_cursor(session, table->uri, is_bulk ? "bulk,append" : NULL, &cursor);
 
     /* Set up the key/value buffers. */
     key_gen_init(&key);
@@ -115,31 +113,44 @@ wts_load(TABLE *table, void *arg)
     if (g.transaction_timestamps_config)
         bulk_begin_transaction(session);
 
-    for (committed_keyno = keyno = 0; ++keyno <= table->rows_current;) {
-        val_gen(table, NULL, &value, keyno);
+    /* The final number of rows in the table can change, get a local copy of the starting value. */
+    rows_current = TV(RUNS_ROWS);
 
+    for (committed_keyno = keyno = 0; ++keyno <= rows_current;) {
+        /* Build a key; build a value, or take the next value from the base mirror. */
+        if (table->type == ROW)
+            key_gen(table, &key, keyno);
+        if (base == NULL)
+            val_gen(table, NULL, &value, &bitv, keyno);
+        else {
+            testutil_assert(read_op(base_cursor, NEXT, NULL) == 0);
+            testutil_check(base_cursor->get_value(base_cursor, &value));
+            val_to_flcs(table, &value, &bitv);
+        }
+
+        /* Insert the key/value pair into the new table. */
         switch (table->type) {
         case FIX:
             if (!is_bulk)
                 cursor->set_key(cursor, keyno);
-            cursor->set_value(cursor, *(uint8_t *)value.data);
-            if (g.trace_all)
-                trace_msg("bulk %" PRIu32 " {0x%02" PRIx8 "}", keyno, ((uint8_t *)value.data)[0]);
+            cursor->set_value(cursor, bitv);
+            if (FLD_ISSET(g.trace_flags, TRACE_BULK))
+                trace_msg(session, "bulk %" PRIu32 " {0x%02" PRIx8 "}", keyno, bitv);
             break;
         case VAR:
             if (!is_bulk)
                 cursor->set_key(cursor, keyno);
             cursor->set_value(cursor, &value);
-            if (g.trace_all)
-                trace_msg("bulk %" PRIu32 " {%.*s}", keyno, (int)value.size, (char *)value.data);
+            if (FLD_ISSET(g.trace_flags, TRACE_BULK))
+                trace_msg(
+                  session, "bulk %" PRIu32 " {%.*s}", keyno, (int)value.size, (char *)value.data);
             break;
         case ROW:
-            key_gen(table, &key, keyno);
             cursor->set_key(cursor, &key);
             cursor->set_value(cursor, &value);
-            if (g.trace_all)
-                trace_msg("bulk %" PRIu32 " {%.*s}, {%.*s}", keyno, (int)key.size, (char *)key.data,
-                  (int)value.size, (char *)value.data);
+            if (FLD_ISSET(g.trace_flags, TRACE_BULK))
+                trace_msg(session, "bulk %" PRIu32 " {%.*s}, {%.*s}", keyno, (int)key.size,
+                  (char *)key.data, (int)value.size, (char *)value.data);
             break;
         }
 
@@ -195,21 +206,65 @@ wts_load(TABLE *table, void *arg)
     if (g.transaction_timestamps_config)
         bulk_commit_transaction(session);
 
+    trace_msg(session, "=============== %s bulk load stop", table->uri);
+    wt_wrap_close_session(session);
+
     /*
      * Ideally, the insert loop runs until the number of rows plus one, in which case row counts are
      * correct. If the loop exited early, reset the table's row count and rewrite the CONFIG file
      * (so reopens aren't surprised).
      */
-    if (keyno != table->rows_current + 1) {
-        table->rows_current = g.transaction_timestamps_config ? committed_keyno : (keyno - 1);
-        testutil_assert(table->rows_current > 0);
+    if (keyno != rows_current + 1) {
+        testutil_assertfmt(
+          base == NULL, "table %u: unable to load matching rows into a mirrored table", table->id);
 
+        rows_current = g.transaction_timestamps_config ? committed_keyno : (keyno - 1);
+        testutil_assert(rows_current > 0);
+
+        testutil_check(__wt_snprintf(config, sizeof(config), "runs.rows=%" PRIu32, rows_current));
+        config_single(table, config, false);
         config_print(false);
     }
 
-    testutil_check(session->close(session, NULL));
-    trace_msg("=============== %s bulk load stop", table->uri);
+    /* The number of rows in the table can change during normal ops, set the starting value. */
+    table->rows_current = TV(RUNS_ROWS);
 
     key_gen_teardown(&key);
     val_gen_teardown(&value);
+}
+
+/*
+ * wts_load --
+ *     Bulk load the tables.
+ */
+void
+wts_load(void)
+{
+    SAP sap;
+    WT_CONNECTION *conn;
+    WT_SESSION *session;
+    u_int i;
+
+    conn = g.wts_conn;
+
+    if (ntables == 0)
+        table_load(NULL, tables[0]);
+    else {
+        /* If it's a mirrored run, load the base mirror table. */
+        if (g.base_mirror != NULL)
+            table_load(NULL, g.base_mirror);
+
+        /* Load any tables not yet loaded. */
+        for (i = 1; i <= ntables; ++i)
+            if (tables[i] != g.base_mirror)
+                table_load(tables[i]->mirror ? g.base_mirror : NULL, tables[i]);
+    }
+
+    /* Checkpoint to ensure bulk loaded records are durable. */
+    if (!GV(RUNS_IN_MEMORY)) {
+        memset(&sap, 0, sizeof(sap));
+        wt_wrap_open_session(conn, &sap, NULL, &session);
+        testutil_check(session->checkpoint(session, NULL));
+        wt_wrap_close_session(session);
+    }
 }

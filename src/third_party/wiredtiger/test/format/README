@@ -1,0 +1,84 @@
+Tracing format operations can be useful in debugging.
+
+Turn on tracing with the "-T" flag:
+
+    -T	Trace operations into a WiredTiger log
+
+That causes format to write trace messages into a WiredTiger log, using WT_SESSION.log_printf()
+to track operations.  Operations are logged into a separate database from the run, "OPS.TRACE"
+in the run's home directory.
+
+By default only modifications and transactions are traced to limit how much data is stored. The
+-T option takes an argument, so to configure the default use an empty string, '-T ""'.
+
+You can trace more operations by adding comma or white-space separated arguments to the -T option:
+
+    all         trace everything
+    bulk        trace bulk loads
+    cursor      trace cursor operations
+    mirror_fail	trace multiple failures in mirror checks (up to a maximum of 20).
+    read        trace read operations
+    retain=N    log files are retained by default, retain N instead.
+    timestamp   trace timestamp operations (setting oldest, stable TS)
+    txn         add transactional information to the trace log on operations
+
+For example, to trace the usual operations plus bulk load, and retain 25 log files, use:
+
+    -T "bulk,retain=25"
+
+Additionally if tracing is configured, verbose messages written by the database itself will be
+logged as well. For example, to trace the usual operations and include verbose block manager
+operations, use:
+
+    -C 'verbose=(block)' -T ""
+
+After the run, you can dump the trace records from the WiredTiger log files with the wt utility,
+for example:
+
+    wt -h RUNDIR/OPS.TRACE printlog -um > LOG
+
+The first step is to determine which record failed and then look for transactions involving
+that record. For example, imagine that record number 1063233 failed, you can grep for it in
+the LOG and the output will look something like this:
+
+    % grep 1063233 LOG
+    [1641602344:13689][3028368:0x7fa21affd700], t: [WT_VERB_TEMPORARY][INFO]: 63842 table:wt: insert 1063233 {0x7e}
+    [1641602357:730642][3028368:0x7fa21a7fc700], t: [WT_VERB_TEMPORARY][INFO]: 134675 commit read-ts=1062901, commit-ts=1063233
+    [1641602377:413530][3028368:0x7fa2197fa700], t: [WT_VERB_TEMPORARY][INFO]: 216631 table:wt: remove 1063233
+    [1641602399:300000][3028368:0x7fa221ffb700], t: [WT_VERB_TEMPORARY][INFO]: 224868 table:wt: reserve 1063233
+    [1641602399:300014][3028368:0x7fa221ffb700], t: [WT_VERB_TEMPORARY][INFO]: 224868 table:wt: update 1063233 {0x5e}
+
+The white-space separated fields are a timestamp, a thread and session ID, the program name,
+the debug message classification, the format operation ID and then the operation. When the
+operation is per record (like an update or remove), there's additionally the object name,
+an operation and a row number, and perhaps the updated value.
+
+The next step is to examine the complete format operation. For example, to find the transaction for
+the update at timestamp [1641602399:300014], you can grep for the operation ID. Note that threads
+use the same operation numbers, so you should grep for the session ID followed by the operation ID:
+
+    % egrep '0x7fa221ffb700.*: 224868' LOG
+    [1641602399:299982][3028368:0x7fa221ffb700], t: [WT_VERB_TEMPORARY][INFO]: 224868 begin snapshot read-ts=1797649 (not repeatable)
+    [1641602399:300000][3028368:0x7fa221ffb700], t: [WT_VERB_TEMPORARY][INFO]: 224868 table:wt: reserve 1063233
+    [1641602399:300014][3028368:0x7fa221ffb700], t: [WT_VERB_TEMPORARY][INFO]: 224868 table:wt: update 1063233 {0x5e}
+    [1641602399:300149][3028368:0x7fa221ffb700], t: [WT_VERB_TEMPORARY][INFO]: 224868 table:wt: remove 189864
+    [1641602399:312617][3028368:0x7fa221ffb700], t: [WT_VERB_TEMPORARY][INFO]: 224868 table:wt: remove 903917
+    [1641602399:312737][3028368:0x7fa221ffb700], t: [WT_VERB_TEMPORARY][INFO]: 224868 table:wt: update 175251 {0x7e}
+    [1641602399:312859][3028368:0x7fa221ffb700], t: [WT_VERB_TEMPORARY][INFO]: 224868 commit read-ts=1797649, commit-ts=1797672
+
+And that gives you the complete transaction.
+
+Or, something like:
+
+    % grep -w 224868 | sort -T: -k2,3 LOG
+
+will list all of the operations ID appearances in the log, sorted by session ID.
+
+When format detects a mismatch in the row that's about to be returned and the row the read
+expected, it will dump the cursor page that was the source of the row that didn't match the
+expected value, as well as the history store. The dumps are in format's run directory, in files
+named "FAIL.pagedump" and "FAIL.HSdump". Alternatively, if you have a debugger attached to the
+failure, you can dump the underlying Btree pages the cursor references, using either a WT_CURSOR
+or WT_CURSOR_BTREE cursor:
+
+    (gdb) print __wt_debug_cursor_page(cursor, "/tmp/XX")

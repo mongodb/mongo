@@ -130,12 +130,18 @@ track_ops(TINFO *tinfo)
       "%s, "
       "U %" PRIu64
       "%s, "
-      "R %" PRIu64 "%s%s",
+      "R %" PRIu64
+      "%s, "
+      "M %" PRIu64
+      "%s, "
+      "T %" PRIu64 "%s%s",
       tinfo->search > M(9) ? tinfo->search / M(1) : tinfo->search, tinfo->search > M(9) ? "M" : "",
       tinfo->insert > M(9) ? tinfo->insert / M(1) : tinfo->insert, tinfo->insert > M(9) ? "M" : "",
       tinfo->update > M(9) ? tinfo->update / M(1) : tinfo->update, tinfo->update > M(9) ? "M" : "",
       tinfo->remove > M(9) ? tinfo->remove / M(1) : tinfo->remove, tinfo->remove > M(9) ? "M" : "",
-      ts_msg));
+      tinfo->modify > M(9) ? tinfo->modify / M(1) : tinfo->modify, tinfo->modify > M(9) ? "M" : "",
+      tinfo->truncate > M(9) ? tinfo->truncate / M(1) : tinfo->truncate,
+      tinfo->truncate > M(9) ? "M" : "", ts_msg));
 
     track_write(msg, len);
 }
@@ -174,6 +180,12 @@ path_setup(const char *home)
     /* Home directory. */
     g.home = dstrdup(home == NULL ? "RUNDIR" : home);
 
+    /* Backup file. */
+    name = "WiredTiger.backup";
+    len = strlen(g.home) + strlen(name) + 2;
+    g.home_backup = dmalloc(len);
+    testutil_check(__wt_snprintf(g.home_backup, len, "%s/%s", g.home, name));
+
     /* Configuration file. */
     name = "CONFIG";
     len = strlen(g.home) + strlen(name) + 2;
@@ -186,44 +198,11 @@ path_setup(const char *home)
     g.home_key = dmalloc(len);
     testutil_check(__wt_snprintf(g.home_key, len, "%s/%s", g.home, name));
 
-    /* History store dump file. */
-    name = "FAIL.HSdump";
-    len = strlen(g.home) + strlen(name) + 2;
-    g.home_hsdump = dmalloc(len);
-    testutil_check(__wt_snprintf(g.home_hsdump, len, "%s/%s", g.home, name));
-
-    /* Page dump file. */
-    name = "FAIL.pagedump";
-    len = strlen(g.home) + strlen(name) + 2;
-    g.home_pagedump = dmalloc(len);
-    testutil_check(__wt_snprintf(g.home_pagedump, len, "%s/%s", g.home, name));
-
     /* Statistics file. */
     name = "OPERATIONS.stats";
     len = strlen(g.home) + strlen(name) + 2;
     g.home_stats = dmalloc(len);
     testutil_check(__wt_snprintf(g.home_stats, len, "%s/%s", g.home, name));
-}
-
-/*
- * fp_readv --
- *     Read and return a value from a file.
- */
-bool
-fp_readv(FILE *fp, char *name, uint32_t *vp)
-{
-    u_long ulv;
-    char *endptr, buf[64];
-
-    if (fgets(buf, sizeof(buf), fp) == NULL)
-        testutil_die(errno, "%s: read-value error", name);
-
-    errno = 0;
-    ulv = strtoul(buf, &endptr, 10);
-    testutil_assert(errno == 0 && endptr[0] == '\n');
-    testutil_assert(ulv <= UINT32_MAX);
-    *vp = (uint32_t)ulv;
-    return (false);
 }
 
 /*
@@ -240,185 +219,6 @@ fclose_and_clear(FILE **fpp)
     *fpp = NULL;
     if (fclose(fp) != 0)
         testutil_die(errno, "fclose");
-}
-
-/*
- * timestamp_parse --
- *     Parse a timestamp to an integral value.
- */
-static void
-timestamp_parse(const char *p, uint64_t *tsp)
-{
-    char *endptr;
-
-    errno = 0;
-    *tsp = __wt_strtouq(p, &endptr, 16);
-    testutil_assert(errno == 0 && endptr[0] == '\0');
-}
-
-/*
- * timestamp_init --
- *     Set the stable timestamp on open.
- */
-void
-timestamp_init(void)
-{
-    WT_CONNECTION *conn;
-    char timestamp_buf[2 * sizeof(uint64_t) + 1];
-
-    conn = g.wts_conn;
-
-    testutil_check(conn->query_timestamp(conn, timestamp_buf, "get=recovery"));
-    timestamp_parse(timestamp_buf, &g.timestamp);
-}
-
-/*
- * timestamp_once --
- *     Update the timestamp once.
- */
-void
-timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
-{
-    static const char *oldest_timestamp_str = "oldest_timestamp=";
-    static const char *stable_timestamp_str = "stable_timestamp=";
-    WT_CONNECTION *conn;
-    WT_DECL_RET;
-    uint64_t all_durable;
-    char buf[WT_TS_HEX_STRING_SIZE * 2 + 64];
-
-    conn = g.wts_conn;
-
-    /* Lock out transaction timestamp operations. */
-    lock_writelock(session, &g.ts_lock);
-
-    if (final)
-        g.oldest_timestamp = g.stable_timestamp = ++g.timestamp;
-    else {
-        if ((ret = conn->query_timestamp(conn, buf, "get=all_durable")) == 0)
-            all_durable = testutil_timestamp_parse(buf);
-        else {
-            testutil_assert(ret == WT_NOTFOUND);
-            lock_writeunlock(session, &g.ts_lock);
-            return;
-        }
-
-        /*
-         * If a lag is permitted, move the oldest timestamp half the way to the current
-         * "all_durable" timestamp. Move the stable timestamp to "all_durable".
-         */
-        if (allow_lag)
-            g.oldest_timestamp = (all_durable + g.oldest_timestamp) / 2;
-        else
-            g.oldest_timestamp = all_durable;
-        g.stable_timestamp = all_durable;
-    }
-
-    lock_writeunlock(session, &g.ts_lock);
-
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s%" PRIx64 ",%s%" PRIx64, oldest_timestamp_str,
-      g.oldest_timestamp, stable_timestamp_str, g.stable_timestamp));
-
-    lock_writelock(session, &g.prepare_commit_lock);
-    testutil_check(conn->set_timestamp(conn, buf));
-    lock_writeunlock(session, &g.prepare_commit_lock);
-    trace_msg(
-      "%-10s oldest=%" PRIu64 ", stable=%" PRIu64, "setts", g.oldest_timestamp, g.stable_timestamp);
-}
-
-/*
- * timestamp --
- *     Periodically update the oldest timestamp.
- */
-WT_THREAD_RET
-timestamp(void *arg)
-{
-    WT_CONNECTION *conn;
-    WT_SESSION *session;
-
-    (void)arg; /* Unused argument */
-
-    conn = g.wts_conn;
-
-    /* Locks need session */
-    testutil_check(conn->open_session(conn, NULL, NULL, &session));
-
-    /* Update the oldest and stable timestamps at least once every 15 seconds. */
-    while (!g.workers_finished) {
-        random_sleep(&g.rnd, 15);
-
-        timestamp_once(session, true, false);
-    }
-
-    testutil_check(session->close(session, NULL));
-    return (WT_THREAD_RET_VALUE);
-}
-
-/*
- * timestamp_teardown --
- *     Wrap up timestamp operations.
- */
-void
-timestamp_teardown(WT_SESSION *session)
-{
-    /*
-     * Do a final bump of the oldest and stable timestamps, otherwise recent operations can prevent
-     * verify from running.
-     */
-    timestamp_once(session, false, true);
-}
-
-/*
- * set_oldest_timestamp --
- *     Query the oldest timestamp from wiredtiger and set it as our global oldest timestamp. This
- *     should only be called on runs for pre existing databases.
- */
-void
-set_oldest_timestamp(void)
-{
-    static const char *oldest_timestamp_str = "oldest_timestamp=";
-
-    WT_CONNECTION *conn;
-    WT_DECL_RET;
-    uint64_t oldest_ts;
-    char buf[WT_TS_HEX_STRING_SIZE * 2 + 64], tsbuf[WT_TS_HEX_STRING_SIZE];
-
-    conn = g.wts_conn;
-
-    if ((ret = conn->query_timestamp(conn, tsbuf, "get=oldest_timestamp")) == 0) {
-        oldest_ts = testutil_timestamp_parse(tsbuf);
-        g.timestamp = oldest_ts;
-        testutil_check(
-          __wt_snprintf(buf, sizeof(buf), "%s%" PRIx64, oldest_timestamp_str, g.oldest_timestamp));
-    } else if (ret != WT_NOTFOUND)
-        /*
-         * Its possible there may not be an oldest timestamp as such we could get not found. This
-         * should be okay assuming timestamps are not configured if they are, it's still okay as we
-         * could have configured timestamps after not running with timestamps. As such only error if
-         * we get a non not found error. If we were supposed to fail with not found we'll see an
-         * error later on anyway.
-         */
-        testutil_die(ret, "unable to query oldest timestamp");
-}
-
-/*
- * maximum_read_ts --
- *     Return the largest safe read timestamp.
- */
-uint64_t
-maximum_read_ts(void)
-{
-    TINFO **tlp;
-    uint64_t ts;
-
-    /*
-     *  We can't use a read timestamp that's ahead of a commit timestamp. Find the maximum safe read
-     * timestamp.
-     */
-    for (ts = g.timestamp, tlp = tinfo_list; *tlp != NULL; ++tlp)
-        ts = WT_MIN(ts, (*tlp)->commit_ts);
-    if (ts != 0)
-        --ts;
-    return (ts);
 }
 
 /*
@@ -446,11 +246,169 @@ lock_init(WT_SESSION *session, RWLOCK *lock)
 void
 lock_destroy(WT_SESSION *session, RWLOCK *lock)
 {
-    testutil_assert(LOCK_INITIALIZED(lock));
-
-    if (lock->lock_type == LOCK_WT)
-        __wt_rwlock_destroy((WT_SESSION_IMPL *)session, &lock->l.wt);
-    else
+    switch (lock->lock_type) {
+    case LOCK_NONE:
+        break;
+    case LOCK_PTHREAD:
         testutil_check(pthread_rwlock_destroy(&lock->l.pthread));
+        break;
+    case LOCK_WT:
+        __wt_rwlock_destroy((WT_SESSION_IMPL *)session, &lock->l.wt);
+        break;
+    }
     lock->lock_type = LOCK_NONE;
+}
+
+/*
+ * cursor_dump_page --
+ *     Dump a cursor page to a backing file.
+ */
+void
+cursor_dump_page(WT_CURSOR *cursor, const char *tag)
+{
+#ifdef HAVE_DIAGNOSTIC
+    static int next;
+    char buf[MAX_FORMAT_PATH];
+
+    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/FAIL.pagedump.%d", g.home, ++next));
+
+    fprintf(stderr, "%s: dumping to %s\n", tag, buf);
+    trace_msg(CUR2S(cursor), "%s: dumping to %s", tag, buf);
+
+    /*
+     * We are calling into the debug code directly which does not take locks, so it's possible we
+     * will simply drop core. Turn off core dumps, those core files aren't interesting.
+     */
+    set_core(true);
+    testutil_check(__wt_debug_cursor_page(cursor, buf));
+    set_core(false);
+#endif
+
+    WT_UNUSED(cursor);
+    WT_UNUSED(tag);
+}
+
+/*
+ * table_dump_page --
+ *     Dump a page from a table (at a given key number) to a backing file.
+ */
+void
+table_dump_page(
+  WT_SESSION *session, const char *checkpoint, TABLE *tbl, uint64_t keyno, const char *tag)
+{
+    WT_CURSOR *cursor;
+    WT_ITEM key;
+    int exactp, ret;
+    char cfg[256];
+
+    if (checkpoint != NULL)
+        testutil_check(__wt_snprintf(cfg, sizeof(cfg), "checkpoint=%s", checkpoint));
+
+    wt_wrap_open_cursor(session, tbl->uri, checkpoint == NULL ? NULL : cfg, &cursor);
+    switch (tbl->type) {
+    case FIX:
+    case VAR:
+        cursor->set_key(cursor, keyno);
+        break;
+    case ROW:
+        key_gen_init(&key);
+        key_gen(tbl, &key, keyno);
+        cursor->set_key(cursor, &key);
+        key_gen_teardown(&key);
+        break;
+    }
+    ret = cursor->search_near(cursor, &exactp);
+    if (ret == 0)
+        cursor_dump_page(cursor, tag);
+    else
+        fprintf(stderr, "%s: Not dumping (error %d from search_near)\n", tag, ret);
+    testutil_check(cursor->close(cursor));
+}
+
+/*
+ * set_core --
+ *     Turn core dumps off/on.
+ */
+void
+set_core(bool off)
+{
+#ifdef HAVE_SETRLIMIT
+    static bool saved = false;
+    static struct rlimit saved_rlim;
+    struct rlimit rlim;
+
+    /*
+     * This could race if a lot of threads failed at the same time, but it's unlikely (and
+     * unimportant) enough that I'm not fixing it.
+     */
+    if (!saved) {
+        testutil_assert_errno(getrlimit(RLIMIT_CORE, &saved_rlim) == 0);
+        saved = true;
+    }
+    rlim = saved_rlim;
+    if (off)
+        rlim.rlim_cur = 0;
+    testutil_assert_errno(setrlimit(RLIMIT_CORE, &rlim) == 0);
+#endif
+}
+
+/*
+ * atou32 --
+ *     String to uint32_t helper function.
+ */
+uint32_t
+atou32(const char *tag, const char *s, int match)
+{
+    long v;
+    char *endptr;
+
+    errno = 0;
+    v = strtol(s, &endptr, 10);
+    if ((errno == ERANGE && (v == LONG_MAX || v == LONG_MIN)) || (errno != 0 && v == 0) ||
+      *endptr != match || v < 0 || v > UINT32_MAX)
+        testutil_die(EINVAL, "%s: %s: illegal numeric value or value out of range", progname, tag);
+    return ((uint32_t)v);
+}
+
+/*
+ * wt_wrap_open_session --
+ *     Open a WiredTiger session.
+ */
+void
+wt_wrap_open_session(WT_CONNECTION *conn, SAP *sap, const char *track, WT_SESSION **sessionp)
+{
+    WT_SESSION *session;
+
+    *sessionp = NULL;
+
+    testutil_check(conn->open_session(conn, NULL, NULL, &session));
+
+    if (g.trace_conn != NULL && sap->trace == NULL)
+        testutil_check(g.trace_conn->open_session(g.trace_conn, NULL, NULL, &sap->trace));
+
+    sap->track = track;
+    session->app_private = sap;
+
+    *sessionp = session;
+}
+
+/*
+ * wt_wrap_close_session --
+ *     Close a WiredTiger session.
+ */
+void
+wt_wrap_close_session(WT_SESSION *session)
+{
+    SAP *sap;
+    WT_SESSION *trace;
+
+    trace = NULL;
+    if ((sap = session->app_private) != NULL) {
+        trace = sap->trace;
+        if (trace != NULL)
+            testutil_check(trace->close(trace, NULL));
+        memset(sap, 0, sizeof(*sap));
+    }
+
+    testutil_check(session->close(session, NULL));
 }

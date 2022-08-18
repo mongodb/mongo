@@ -31,7 +31,7 @@ struct __wt_hazard {
 };
 
 /* Get the connection implementation for a session */
-#define S2C(session) ((WT_CONNECTION_IMPL *)(session)->iface.connection)
+#define S2C(session) ((WT_CONNECTION_IMPL *)((WT_SESSION_IMPL *)(session))->iface.connection)
 
 /* Get the btree for a session */
 #define S2BT(session) ((WT_BTREE *)(session)->dhandle->handle)
@@ -61,6 +61,9 @@ struct __wt_session_impl {
     WT_EVENT_HANDLER *event_handler; /* Application's event handlers */
 
     void *lang_private; /* Language specific private storage */
+
+    void (*format_private)(int, void *); /* Format test program private callback. */
+    void *format_private_arg;
 
     u_int active; /* Non-zero if the session is in-use */
 

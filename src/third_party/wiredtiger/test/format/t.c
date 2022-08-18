@@ -133,6 +133,36 @@ format_process_env(void)
 }
 
 /*
+ * locks_init --
+ *     Initialize locks to single-thread backups and timestamps.
+ */
+static void
+locks_init(WT_CONNECTION *conn)
+{
+    WT_SESSION *session;
+
+    testutil_check(conn->open_session(conn, NULL, NULL, &session));
+    lock_init(session, &g.backup_lock);
+    lock_init(session, &g.prepare_commit_lock);
+    testutil_check(session->close(session, NULL));
+}
+
+/*
+ * locks_destroy --
+ *     Discard locks to single-thread backups and timestamps.
+ */
+static void
+locks_destroy(WT_CONNECTION *conn)
+{
+    WT_SESSION *session;
+
+    testutil_check(conn->open_session(conn, NULL, NULL, &session));
+    lock_destroy(session, &g.backup_lock);
+    lock_destroy(session, &g.prepare_commit_lock);
+    testutil_check(session->close(session, NULL));
+}
+
+/*
  * TIMED_MAJOR_OP --
  *	Set a timer and perform a major operation (for example, verify or salvage).
  */
@@ -158,7 +188,7 @@ main(int argc, char *argv[])
     u_int ops_seconds;
     int ch, reps;
     const char *config, *home;
-    bool quiet_flag;
+    bool is_backup, quiet_flag, verify_only;
 
     custom_die = format_die; /* Local death handler. */
 
@@ -178,8 +208,8 @@ main(int argc, char *argv[])
 
     /* Set values from the command line. */
     home = NULL;
-    quiet_flag = syntax_check = false;
-    while ((ch = __wt_getopt(progname, argc, argv, "1BC:c:h:qRSrT:t")) != EOF)
+    quiet_flag = syntax_check = verify_only = false;
+    while ((ch = __wt_getopt(progname, argc, argv, "1BC:c:h:qRSrT:v")) != EOF)
         switch (ch) {
         case '1':
             /* Ignored for backward compatibility. */
@@ -205,11 +235,11 @@ main(int argc, char *argv[])
         case 'S': /* Configuration syntax check */
             syntax_check = true;
             break;
-        case 'T': /* Trace specifics. */
+        case 'T': /* Trace  */
             trace_config(__wt_optarg);
-            /* FALLTHROUGH */
-        case 't': /* Trace  */
-            g.trace = true;
+            break;
+        case 'v': /* Verify only */
+            verify_only = true;
             break;
         default:
             usage();
@@ -223,9 +253,6 @@ main(int argc, char *argv[])
     }
 
     __wt_random_init_seed(NULL, &g.rnd); /* Initialize the RNG. */
-
-    /* Printable thread ID. */
-    testutil_check(__wt_thread_str(g.tidbuf, sizeof(g.tidbuf)));
 
     /* Initialize lock to ensure single threading during failure handling */
     testutil_check(pthread_rwlock_init(&g.death_lock, NULL));
@@ -280,11 +307,6 @@ main(int argc, char *argv[])
     if (syntax_check)
         exit(0);
 
-    /* Initialize locks to single-thread backups and timestamps. */
-    lock_init(g.wts_session, &g.backup_lock);
-    lock_init(g.wts_session, &g.ts_lock);
-    lock_init(g.wts_session, &g.prepare_commit_lock);
-
     __wt_seconds(NULL, &start);
     track("starting up", 0ULL);
 
@@ -292,18 +314,27 @@ main(int argc, char *argv[])
     if (g.reopen) {
         if (GV(RUNS_IN_MEMORY))
             testutil_die(0, "reopen impossible after in-memory run");
-        wts_open(g.home, &g.wts_conn, &g.wts_session, true);
+        /*
+         * If we are reopening from a backup then we do not want to verify the metadata. That is, if
+         * it is a backup, send false to wts_open. If we are a normal reopen then send in true to
+         * wts_open.
+         */
+        is_backup = false;
+        if (access(g.home_backup, F_OK) == 0)
+            is_backup = true;
+        wts_open(g.home, &g.wts_conn, !is_backup);
         timestamp_init();
-        set_oldest_timestamp();
+        timestamp_set_oldest();
     } else {
         wts_create_home();
         config_print(false);
+        trace_init();
         wts_create_database();
-        wts_open(g.home, &g.wts_conn, &g.wts_session, true);
+        wts_open(g.home, &g.wts_conn, true);
         timestamp_init();
     }
 
-    trace_init(); /* Initialize operation tracing. */
+    locks_init(g.wts_conn);
 
     /*
      * Initialize key/value information. Load and verify initial records (at least a brief scan if
@@ -312,10 +343,11 @@ main(int argc, char *argv[])
     tables_apply(key_init, NULL);
     tables_apply(val_init, NULL);
     if (!g.reopen)
-        TIMED_MAJOR_OP(tables_apply(wts_load, NULL));
-    TIMED_MAJOR_OP(tables_apply(wts_verify, g.wts_conn));
-    if (GV(OPS_VERIFY) == 0)
-        TIMED_MAJOR_OP(tables_apply(wts_read_scan, g.wts_conn));
+        TIMED_MAJOR_OP(wts_load());
+    TIMED_MAJOR_OP(wts_verify(g.wts_conn, true));
+    if (verify_only)
+        goto skip_operations;
+    TIMED_MAJOR_OP(tables_apply(wts_read_scan, g.wts_conn));
 
     /* Optionally start checkpoints. */
     wts_checkpoints();
@@ -336,17 +368,21 @@ main(int argc, char *argv[])
     /* Copy out the run's statistics. */
     TIMED_MAJOR_OP(wts_stats());
 
+skip_operations:
+    locks_destroy(g.wts_conn);
+
     /*
      * Verify the objects. Verify closes the underlying handle and discards the statistics, read
      * them first.
      */
-    TIMED_MAJOR_OP(tables_apply(wts_verify, g.wts_conn));
+    TIMED_MAJOR_OP(wts_verify(g.wts_conn, true));
 
     track("shutting down", 0ULL);
-    wts_close(&g.wts_conn, &g.wts_session);
+    wts_close(&g.wts_conn);
 
     /* Salvage testing. */
-    TIMED_MAJOR_OP(tables_apply(wts_salvage, NULL));
+    if (!verify_only)
+        TIMED_MAJOR_OP(tables_apply(wts_salvage, NULL));
 
     trace_teardown();
 
@@ -358,10 +394,6 @@ main(int argc, char *argv[])
     fflush(stdout);
 
     config_clear();
-
-    lock_destroy(g.wts_session, &g.backup_lock);
-    lock_destroy(g.wts_session, &g.ts_lock);
-    lock_destroy(g.wts_session, &g.prepare_commit_lock);
 
     return (EXIT_SUCCESS);
 }
@@ -384,7 +416,7 @@ format_die(void)
      * stuff in flight to be sure.
      */
     GV(QUIET) = 1;
-    g.trace = 0;
+    FLD_CLR(g.trace_flags, TRACE);
 
     /*
      * Single-thread error handling, our caller exits after calling us (we never release the lock).
@@ -400,36 +432,9 @@ format_die(void)
     if (g.configured)
         config_print(true);
 
-    /* Flush the logs, they may contain debugging information. */
-    if (GV(LOGGING) && g.wts_session != NULL)
-        testutil_check(g.wts_session->log_flush(g.wts_session, "sync=off"));
-
     /* Now about to close shared resources, give them a chance to empty. */
     __wt_sleep(2, 0);
     trace_teardown();
-
-#ifdef HAVE_DIAGNOSTIC
-    /*
-     * We have a mismatch, optionally dump WiredTiger datastore pages. In doing so, we are calling
-     * into the debug code directly which does not take locks, so it's possible we will simply drop
-     * core. Turn off core dumps, those core files aren't interesting.
-     *
-     * The most important information is the key/value mismatch information. Then try to dump out
-     * additional information. We dump the entire history store table including what is on disk,
-     * which can potentially be very large. If it becomes a problem, this can be modified to just
-     * dump out the page this key is on.
-     */
-    if (GV(RUNS_VERIFY_FAILURE_DUMP) && g.page_dump_cursor != NULL) {
-        set_core_off();
-
-        fprintf(stderr, "snapshot-isolation error: Dumping page to %s\n", g.home_pagedump);
-        testutil_check(__wt_debug_cursor_page(g.page_dump_cursor, g.home_pagedump));
-        fprintf(stderr, "snapshot-isolation error: Dumping HS to %s\n", g.home_hsdump);
-#if WIREDTIGER_VERSION_MAJOR >= 10
-        testutil_check(__wt_debug_cursor_tree_hs(CUR2S(g.page_dump_cursor), g.home_hsdump));
-#endif
-    }
-#endif
 }
 
 /*
@@ -440,19 +445,18 @@ static void
 usage(void)
 {
     fprintf(stderr,
-      "usage: %s [-1BqRt] [-C wiredtiger-config]\n    "
-      "[-c config-file] [-h home] [-T trace-options] [name=value ...]\n",
+      "usage: %s [-BqRv]\n    "
+      "[-C wiredtiger-config] [-c config-file] [-h home] [-T trace-config] [name=value ...]\n",
       progname);
     fprintf(stderr, "%s",
-      "\t-1 run once then quit\n"
       "\t-B maintain 3.3 release log and configuration option compatibility\n"
-      "\t-C specify wiredtiger_open configuration arguments\n"
+      "\t-C additional wiredtiger_open configuration arguments\n"
       "\t-c read test program configuration from a file (default 'CONFIG')\n"
-      "\t-h home directory (default 'RUNDIR')\n"
-      "\t-q run quietly\n"
-      "\t-R run on an existing database\n"
-      "\t-T all|local\n"
-      "\t-t trace operations\n");
+      "\t-h run directory (default 'RUNDIR')\n"
+      "\t-q quiet\n"
+      "\t-R reopen an existing database\n"
+      "\t-T trace operations in the WiredTiger log\n"
+      "\t-v verify database and exit\n");
 
     config_error();
     exit(EXIT_FAILURE);

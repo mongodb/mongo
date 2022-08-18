@@ -35,6 +35,7 @@
 WT_THREAD_RET
 compact(void *arg)
 {
+    SAP sap;
     TABLE *table;
     WT_CONNECTION *conn;
     WT_DECL_RET;
@@ -43,9 +44,11 @@ compact(void *arg)
 
     (void)(arg);
 
-    /* Open a session. */
     conn = g.wts_conn;
-    testutil_check(conn->open_session(conn, NULL, NULL, &session));
+
+    /* Open a session. */
+    memset(&sap, 0, sizeof(sap));
+    wt_wrap_open_session(conn, &sap, NULL, &session);
 
     /*
      * Perform compaction at somewhere under 15 seconds (so we get at least one done), and then at
@@ -74,7 +77,7 @@ compact(void *arg)
           "WT_SESSION.compact failed: %s: %d", table->uri, ret);
     }
 
-    testutil_check(session->close(session, NULL));
+    wt_wrap_close_session(session);
 
     return (WT_THREAD_RET_VALUE);
 }

@@ -38,6 +38,23 @@ read_op(WT_CURSOR *cursor, read_operation op, int *exactp)
     WT_DECL_RET;
     uint64_t start, now;
 
+    switch (op) {
+    case NEXT:
+        ret = cursor->next(cursor);
+        break;
+    case PREV:
+        ret = cursor->prev(cursor);
+        break;
+    case SEARCH:
+        ret = cursor->search(cursor);
+        break;
+    case SEARCH_NEAR:
+        ret = cursor->search_near(cursor, exactp);
+        break;
+    }
+    if (ret != WT_PREPARE_CONFLICT)
+        return (ret);
+
     /*
      * Read operations wait out prepare-conflicts. (As part of the snapshot isolation checks, we
      * repeat reads that succeeded before, they should be repeatable.)
@@ -236,11 +253,11 @@ table_select_type(table_type type)
 }
 
 /*
- * wiredtiger_open_cursor --
+ * wt_wrap_open_cursor --
  *     Open a WiredTiger cursor.
  */
 static inline void
-wiredtiger_open_cursor(
+wt_wrap_open_cursor(
   WT_SESSION *session, const char *uri, const char *config, WT_CURSOR **cursorp)
 {
     WT_DECL_RET;
@@ -270,17 +287,17 @@ table_cursor(TINFO *tinfo, u_int id)
     if (tinfo->cursors[id] == NULL) {
         /* Configure "append", in the case of column stores, we append when inserting new rows. */
         config = table->type == ROW ? NULL : "append";
-        wiredtiger_open_cursor(tinfo->session, table->uri, config, &tinfo->cursors[id]);
+        wt_wrap_open_cursor(tinfo->session, table->uri, config, &tinfo->cursors[id]);
     }
     return (tinfo->cursors[id]);
 }
 
 /*
- * wiredtiger_begin_transaction --
+ * wt_wrap_begin_transaction --
  *     Start a WiredTiger transaction.
  */
 static inline void
-wiredtiger_begin_transaction(WT_SESSION *session, const char *config)
+wt_wrap_begin_transaction(WT_SESSION *session, const char *config)
 {
     WT_DECL_RET;
 
@@ -323,8 +340,6 @@ key_gen_insert(TABLE *table, WT_RAND_STATE *rnd, WT_ITEM *key, uint64_t keyno)
 static inline int
 lock_try_writelock(WT_SESSION *session, RWLOCK *lock)
 {
-    testutil_assert(LOCK_INITIALIZED(lock));
-
     if (lock->lock_type == LOCK_WT)
         return (__wt_try_writelock((WT_SESSION_IMPL *)session, &lock->l.wt));
     return (pthread_rwlock_trywrlock(&lock->l.pthread));
@@ -337,8 +352,6 @@ lock_try_writelock(WT_SESSION *session, RWLOCK *lock)
 static inline void
 lock_writelock(WT_SESSION *session, RWLOCK *lock)
 {
-    testutil_assert(LOCK_INITIALIZED(lock));
-
     if (lock->lock_type == LOCK_WT)
         __wt_writelock((WT_SESSION_IMPL *)session, &lock->l.wt);
     else
@@ -352,8 +365,6 @@ lock_writelock(WT_SESSION *session, RWLOCK *lock)
 static inline void
 lock_writeunlock(WT_SESSION *session, RWLOCK *lock)
 {
-    testutil_assert(LOCK_INITIALIZED(lock));
-
     if (lock->lock_type == LOCK_WT)
         __wt_writeunlock((WT_SESSION_IMPL *)session, &lock->l.wt);
     else
@@ -367,8 +378,6 @@ lock_writeunlock(WT_SESSION *session, RWLOCK *lock)
 static inline void
 lock_readlock(WT_SESSION *session, RWLOCK *lock)
 {
-    testutil_assert(LOCK_INITIALIZED(lock));
-
     if (lock->lock_type == LOCK_WT)
         __wt_readlock((WT_SESSION_IMPL *)session, &lock->l.wt);
     else
@@ -382,46 +391,37 @@ lock_readlock(WT_SESSION *session, RWLOCK *lock)
 static inline void
 lock_readunlock(WT_SESSION *session, RWLOCK *lock)
 {
-    testutil_assert(LOCK_INITIALIZED(lock));
-
     if (lock->lock_type == LOCK_WT)
         __wt_readunlock((WT_SESSION_IMPL *)session, &lock->l.wt);
     else
         testutil_check(pthread_rwlock_unlock(&lock->l.pthread));
 }
 
-#define trace_msg(fmt, ...)                                                                        \
-    do {                                                                                           \
-        if (g.trace) {                                                                             \
-            struct timespec __ts;                                                                  \
-            WT_SESSION *__s = g.trace_session;                                                     \
-            __wt_epoch((WT_SESSION_IMPL *)__s, &__ts);                                             \
-            testutil_check(                                                                        \
-              __s->log_printf(__s, "[%" PRIuMAX ":%" PRIuMAX "][%s] " fmt, (uintmax_t)__ts.tv_sec, \
-                (uintmax_t)__ts.tv_nsec / WT_THOUSAND, g.tidbuf, __VA_ARGS__));                    \
-        }                                                                                          \
+#define trace_msg(s, fmt, ...)                                                               \
+    do {                                                                                     \
+        if (FLD_ISSET(g.trace_flags, TRACE))                                                 \
+            __wt_verbose_worker(                                                             \
+              (WT_SESSION_IMPL *)(s), WT_VERB_TEMPORARY, WT_VERBOSE_INFO, fmt, __VA_ARGS__); \
     } while (0)
-#define trace_op(tinfo, fmt, ...)                                                             \
-    do {                                                                                      \
-        if (g.trace) {                                                                        \
-            struct timespec __ts;                                                             \
-            WT_SESSION *__s = (tinfo)->trace;                                                 \
-            __wt_epoch((WT_SESSION_IMPL *)__s, &__ts);                                        \
-            testutil_check(__s->log_printf(__s, "[%" PRIuMAX ":%" PRIuMAX "][%s]:%s " fmt,    \
-              (uintmax_t)__ts.tv_sec, (uintmax_t)__ts.tv_nsec / WT_THOUSAND, (tinfo)->tidbuf, \
-              (tinfo)->table->uri, __VA_ARGS__));                                             \
-        }                                                                                     \
+#define trace_uri_op(tinfo, uri, fmt, ...)                                                        \
+    do {                                                                                          \
+        WT_SESSION_IMPL *__s;                                                                     \
+        uint32_t __i;                                                                             \
+        __s = (WT_SESSION_IMPL *)(tinfo)->session;                                                \
+        if (FLD_ISSET(g.trace_flags, TRACE)) {                                                    \
+            __wt_verbose_worker(__s, WT_VERB_TEMPORARY, WT_VERBOSE_INFO, "%" PRIu64 " %s%s" fmt,  \
+              (tinfo)->opid, (uri) == NULL ? "" : (uri), (uri) == NULL ? "" : ": ", __VA_ARGS__); \
+            if (FLD_ISSET(g.trace_flags, TRACE_TXN)) {                                            \
+                __wt_verbose_worker(__s, WT_VERB_TEMPORARY, WT_VERBOSE_INFO,                      \
+                  "%s%s txn id %" PRIu64 " snap_min %" PRIu64 " snap_max %" PRIu64                \
+                  " snap count %" PRIu32,                                                         \
+                  (uri) == NULL ? "" : (uri), (uri) == NULL ? "" : ": ", __s->txn->id,            \
+                  __s->txn->snap_min, __s->txn->snap_max, __s->txn->snapshot_count);              \
+                for (__i = 0; __i < __s->txn->snapshot_count; ++__i)                              \
+                    __wt_verbose_worker(__s, WT_VERB_TEMPORARY, WT_VERBOSE_INFO,                  \
+                      "%s%s txn snapshot[%" PRIu32 "]: %" PRIu64, (uri) == NULL ? "" : (uri),     \
+                      (uri) == NULL ? "" : ": ", __i, __s->txn->snapshot[__i]);                   \
+            }                                                                                     \
+        }                                                                                         \
     } while (0)
-
-/*
- * trace_bytes --
- *     Return a byte string formatted for display.
- */
-static inline const char *
-trace_bytes(TINFO *tinfo, const uint8_t *data, size_t size)
-{
-    testutil_check(
-      __wt_raw_to_esc_hex((WT_SESSION_IMPL *)tinfo->session, data, size, &tinfo->vprint));
-    return (tinfo->vprint.mem);
-}
-#define trace_item(tinfo, buf) trace_bytes(tinfo, (buf)->data, (buf)->size)
+#define trace_op(tinfo, fmt, ...) trace_uri_op(tinfo, (tinfo)->table->uri, fmt, __VA_ARGS__)

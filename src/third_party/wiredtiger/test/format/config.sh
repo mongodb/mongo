@@ -73,8 +73,6 @@ done<<END_OF_INPUT>$fc
 CONFIG configuration_list[] = {
 {"assert.read_timestamp", "assert read_timestamp", C_BOOL, 2, 0, 0}
 
-{"assert.write_timestamp", "set write_timestamp_usage and assert write_timestamp", C_BOOL, 2, 0, 0}
-
 {"backup", "configure backups", C_BOOL, 20, 0, 0}
 
 {"backup.incremental", "backup type (off | block | log)", C_IGNORE | C_STRING, 0, 0, 0}
@@ -221,6 +219,8 @@ CONFIG configuration_list[] = {
 {"runs.in_memory", "configure in-memory", C_BOOL | C_IGNORE, 0, 0, 1}
 
 {"runs.ops", "operations per run", 0x0, 0, M(2), M(100)}
+
+{"runs.mirror", "mirror tables", C_BOOL | C_IGNORE | C_TABLE, 0, 0, 0}
 
 {"runs.rows", "number of rows", C_TABLE, 10, M(1), M(100)}
 

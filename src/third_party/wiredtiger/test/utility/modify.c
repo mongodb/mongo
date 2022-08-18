@@ -33,7 +33,8 @@
  *     algorithms.
  */
 void
-testutil_modify_apply(WT_ITEM *value, WT_ITEM *workspace, WT_MODIFY *entries, int nentries)
+testutil_modify_apply(
+  WT_ITEM *value, WT_ITEM *workspace, WT_MODIFY *entries, int nentries, uint8_t pad_byte)
 {
     WT_ITEM *ta, *tb, *tmp, _tmp;
     size_t len, size;
@@ -77,7 +78,7 @@ testutil_modify_apply(WT_ITEM *value, WT_ITEM *workspace, WT_MODIFY *entries, in
         if (entries[i].offset >= ta->size) {
             memcpy(tb->mem, ta->mem, ta->size);
             if (entries[i].offset > ta->size)
-                memset((uint8_t *)tb->mem + ta->size, '\0', entries[i].offset - ta->size);
+                memset((uint8_t *)tb->mem + ta->size, pad_byte, entries[i].offset - ta->size);
         } else if (entries[i].offset > 0)
             memcpy(tb->mem, ta->mem, entries[i].offset);
         tb->size = entries[i].offset;
