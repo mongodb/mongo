@@ -1,8 +1,6 @@
 /**
  * Tests that the 'appendOplogNote' command on mongos correctly performs a no-op write on each
  * shard and advances the $clusterTime.
- *
- * @tags: [requires_fcv_60]
  */
 
 (function() {
