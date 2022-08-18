@@ -2624,11 +2624,12 @@ tasks:
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
-      - func: "format test script"
-        vars:
-          smp_command: -j $(grep -c ^processor /proc/cpuinfo)
-          # run for 10 minutes.
-          format_test_script_args: -t 10 rows=10000 ops=50000
+      # FIXME-WT-9770
+      # - func: "format test script"
+      #   vars:
+      #     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
+      #     # run for 10 minutes.
+      #     format_test_script_args: -t 10 rows=10000 ops=50000
 
   - name: format-smoke-test
     commands:
@@ -3029,9 +3030,10 @@ tasks:
         vars:
           <<: *configure_flags_with_builtins
           CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v3_gcc.cmake
-      - func: "format test script"
-        vars:
-          format_test_script_args: -a -t 30
+      # FIXME-WT-9767
+      # - func: "format test script"
+      #   vars:
+      #     format_test_script_args: -a -t 30
 
   - name: many-collection-test
     commands:
