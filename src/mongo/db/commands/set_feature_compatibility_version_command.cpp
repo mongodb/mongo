@@ -317,6 +317,20 @@ public:
             return true;
         }
 
+        const auto upgradeOrDowngrade = requestedVersion > actualVersion ? "upgrade" : "downgrade";
+        const auto server_type = serverGlobalParams.clusterRole == ClusterRole::ConfigServer
+            ? "config server"
+            : (request.getPhase() ? "shard server" : "replica set/standalone");
+
+        if (!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kStart) {
+            LOGV2(6744300,
+                  "setFeatureCompatibilityVersion command called",
+                  "upgradeOrDowngrade"_attr = upgradeOrDowngrade,
+                  "serverType"_attr = server_type,
+                  "fromVersion"_attr = actualVersion,
+                  "toVersion"_attr = requestedVersion);
+        }
+
         const boost::optional<Timestamp> changeTimestamp = getChangeTimestamp(opCtx, request);
 
         FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
@@ -336,7 +350,8 @@ public:
                     FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
 
                 uassert(ErrorCodes::Error(6744303),
-                        "Failing upgrade due to 'failBeforeTransitioning' failpoint set",
+                        "Failing setFeatureCompatibilityVersion before reaching the FCV "
+                        "transitional stage due to 'failBeforeTransitioning' failpoint set",
                         !failBeforeTransitioning.shouldFail());
 
                 FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
@@ -346,6 +361,13 @@ public:
                     isFromConfigServer,
                     changeTimestamp,
                     true /* setTargetVersion */);
+
+                LOGV2(6744301,
+                      "setFeatureCompatibilityVersion has set the FCV to the transitional state",
+                      "upgradeOrDowngrade"_attr = upgradeOrDowngrade,
+                      "serverType"_attr = server_type,
+                      "fromVersion"_attr = actualVersion,
+                      "toVersion"_attr = requestedVersion);
             }
 
             if (request.getPhase() == SetFCVPhaseEnum::kStart) {
@@ -413,6 +435,13 @@ public:
                 changeTimestamp,
                 false /* setTargetVersion */);
         }
+
+        LOGV2(6744302,
+              "setFeatureCompatibilityVersion succeeded",
+              "upgradeOrDowngrade"_attr = upgradeOrDowngrade,
+              "serverType"_attr = server_type,
+              "fromVersion"_attr = actualVersion,
+              "toVersion"_attr = requestedVersion);
 
         return true;
     }
