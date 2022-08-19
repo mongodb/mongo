@@ -2426,6 +2426,16 @@ tasks:
       targets: install-all-meta
       compiling_for_test: true
 
+- name: compile_all_but_not_unittests
+  tags: []
+  depends_on:
+  - name: compile_dist_test
+  commands:
+  - func: "scons compile"
+    vars:
+      targets: install-all-meta-but-not-unittests
+      compiling_for_test: true
+
 ## clang_tidy - run clang_tidy
 - name: clang_tidy
   tags: []
@@ -7516,8 +7526,9 @@ task_groups:
   - compile_all
   - package
 
-# The *no_unittests_TG taskgroups remove compile/run unittests to work around
-# limitations in the size of debug info. See SERVER-68024.
+# The *no_unittests_TG taskgroups are useful for static builds,
+# were the static binaries of the unittests can take up to
+# a terabyte of data.
 - <<: *compile_task_group_template
   name: compile_test_and_package_serial_no_unittests_TG
   tasks:
@@ -7527,6 +7538,7 @@ task_groups:
   - compile_dbtest
   - run_dbtest
   - archive_dbtest
+  - compile_all_but_not_unittests
   - package
 
 - <<: *compile_task_group_template
@@ -7541,8 +7553,12 @@ task_groups:
   - run_dbtest
   - archive_dbtest
   - compile_upload_benchmarks
+  - compile_all
   - package
 
+# The *no_unittests_TG taskgroups are useful for static builds,
+# were the static binaries of the unittests can take up to
+# a terabyte of data.
 - <<: *compile_task_group_template
   name: compile_test_benchmark_and_package_serial_no_unittests_TG
   tasks:
@@ -7553,6 +7569,7 @@ task_groups:
   - run_dbtest
   - archive_dbtest
   - compile_upload_benchmarks
+  - compile_all_but_not_unittests
   - package
 
 - <<: *compile_task_group_template
