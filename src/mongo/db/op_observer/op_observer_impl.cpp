@@ -2400,9 +2400,10 @@ void OpObserverImpl::_onReplicationRollback(OperationContext* opCtx,
             timeseriesNamespaces.insert(ns.getTimeseriesViewNamespace());
         }
     }
-    BucketCatalog::get(opCtx).clear([&timeseriesNamespaces](const NamespaceString& bucketNs) {
-        return timeseriesNamespaces.contains(bucketNs);
-    });
+    BucketCatalog::get(opCtx).clear(
+        [timeseriesNamespaces = std::move(timeseriesNamespaces)](const NamespaceString& bucketNs) {
+            return timeseriesNamespaces.contains(bucketNs);
+        });
 }
 
 }  // namespace mongo

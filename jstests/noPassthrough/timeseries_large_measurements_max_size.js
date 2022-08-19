@@ -12,6 +12,12 @@
 
 load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
 
+const conn = MongoRunner.runMongod();
+
+const dbName = jsTestName();
+const db = conn.getDB(dbName);
+assert.commandWorked(db.dropDatabase());
+
 const coll = db.getCollection(jsTestName());
 const bucketColl = db.getCollection("system.buckets." + jsTestName());
 
@@ -26,6 +32,8 @@ const areTimeseriesScalabilityImprovementsEnabled =
     TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db);
 
 const numMeasurements = 4;
+let expectedNumBucketsClosedDueToSize = 0;
+let expectedNumBucketsKeptOpenDueToLargeMeasurements = 0;
 const checkBucketSize = (() => {
     const timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
 
@@ -44,8 +52,9 @@ const checkBucketSize = (() => {
         assert.eq(numMeasurements - 1, bucketDocs[1].control.min._id);
         assert.eq(numMeasurements - 1, bucketDocs[1].control.max._id);
 
-        assert.eq(1, timeseriesStats.numBucketsClosedDueToSize);
-        assert.eq(1, timeseriesStats.numBucketsKeptOpenDueToLargeMeasurements);
+        assert.eq(++expectedNumBucketsClosedDueToSize, timeseriesStats.numBucketsClosedDueToSize);
+        assert.eq(++expectedNumBucketsKeptOpenDueToLargeMeasurements,
+                  timeseriesStats.numBucketsKeptOpenDueToLargeMeasurements);
     } else {
         // Only one measurement per bucket without time-series scalability improvements.
         const bucketDocs = bucketColl.find().sort({'control.min._id': 1}).toArray();
@@ -77,4 +86,5 @@ for (let i = 0; i < numMeasurements; i++) {
 assert.commandWorked(coll.insertMany(batch));
 
 checkBucketSize();
+MongoRunner.stopMongod(conn);
 }());

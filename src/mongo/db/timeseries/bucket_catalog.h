@@ -279,7 +279,7 @@ public:
      * Returns an empty document if the given bucket cannot be found or if this time-series
      * collection was not created with a metadata field name.
      */
-    BSONObj getMetadata(const BucketHandle& bucket) const;
+    BSONObj getMetadata(const BucketHandle& bucket);
 
     /**
      * Tries to insert 'doc' into a suitable bucket. If an open bucket is full (or has incompatible
@@ -548,7 +548,7 @@ protected:
         // Returns whether the Bucket has been marked as cleared by checking against the
         // clearRegistry. Advances Bucket's era up to current global era if the bucket has not been
         // cleared.
-        bool hasBeenCleared(Bucket* bucket);
+        bool hasBeenCleared(WithLock catalogLock, Bucket* bucket);
 
     protected:
         void _decrementEraCountHelper(uint64_t era);
@@ -760,7 +760,7 @@ protected:
     const Bucket* _findBucket(const Stripe& stripe,
                               WithLock stripeLock,
                               const OID& id,
-                              ReturnClearedBuckets mode = ReturnClearedBuckets::kNo) const;
+                              ReturnClearedBuckets mode = ReturnClearedBuckets::kNo);
 
     /**
      * Retrieve a bucket for write use.
@@ -941,9 +941,10 @@ protected:
     void _appendExecutionStatsToBuilder(const ExecutionStats* stats, BSONObjBuilder* builder) const;
 
     /**
-     * Retreives the bucket state if it is tracked in the catalog.
+     * Retrieves the bucket state if it is tracked in the catalog. Modifies the bucket state if the
+     * bucket is found to have been cleared.
      */
-    boost::optional<BucketState> _getBucketState(const OID& id) const;
+    boost::optional<BucketState> _getBucketState(Bucket* bucket);
 
     /**
      * Initializes state for the given bucket to kNormal.
@@ -956,6 +957,14 @@ protected:
     void _eraseBucketState(const OID& id);
 
     /**
+     * Checks whether the bucket has been cleared before changing the bucket state to the target
+     * state. If the bucket has been cleared, it will set the state to kCleared instead and ignore
+     * the target state. The return value, if set, is the final state of the bucket
+     * with the given id.
+     */
+    boost::optional<BucketState> _setBucketState(Bucket* bucket, BucketState target);
+
+    /**
      * Changes the bucket state, taking into account the current state, the specified target state,
      * and allowed state transitions. The return value, if set, is the final state of the bucket
      * with the given id; if no such bucket exists, the return value will not be set.
@@ -963,7 +972,9 @@ protected:
      * Ex. For a bucket with state kPrepared, and a target of kCleared, the return will be
      * kPreparedAndCleared.
      */
-    boost::optional<BucketState> _setBucketState(const OID& id, BucketState target);
+    boost::optional<BucketState> _setBucketState(WithLock withLock,
+                                                 const OID& id,
+                                                 BucketState target);
 
     /**
      * Calculates the marginal memory usage for an archived bucket. The

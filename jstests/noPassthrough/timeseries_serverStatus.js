@@ -6,6 +6,7 @@
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallel_shell_helpers.js");
+load("jstests/libs/feature_flag_util.js");
 
 const conn = MongoRunner.runMongod();
 
@@ -101,7 +102,9 @@ expectedMetrics.numIdleBuckets++;
 checkServerStatus();
 
 assert(coll.drop());
-checkNoServerStatus();
+if (!FeatureFlagUtil.isEnabled(conn, "TimeseriesScalabilityImprovements")) {
+    checkNoServerStatus();
+}
 
 MongoRunner.stopMongod(conn);
 })();

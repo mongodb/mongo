@@ -41,7 +41,7 @@ public:
     Bucket* createBucket(const CreationInfo& info) {
         auto ptr = _allocateBucket(&_stripes[info.stripe], withLock, info);
         ptr->setNamespace(info.key.ns);
-        ASSERT_FALSE(_eraManager.hasBeenCleared(ptr));
+        ASSERT_FALSE(_eraManager.hasBeenCleared(withLock, ptr));
         return ptr;
     }
 
@@ -58,7 +58,7 @@ public:
     }
 
     bool cannotAccessBucket(Bucket* bucket) {
-        if (_eraManager.hasBeenCleared(bucket)) {
+        if (_eraManager.hasBeenCleared(withLock, bucket)) {
             _removeBucket(&_stripes[bucket->stripe()], withLock, bucket, false);
             return true;
         } else {
@@ -66,7 +66,20 @@ public:
         }
     }
 
-    Stripe stripe;
+    void checkAndRemoveClearedBucket(Bucket* bucket, BucketKey bucketKey, WithLock withLock) {
+        auto a = _findBucket(_stripes[_getStripeNumber(bucketKey)],
+                             withLock,
+                             bucket->id(),
+                             ReturnClearedBuckets::kYes);
+        ASSERT(a == bucket);
+        auto b = _findBucket(_stripes[_getStripeNumber(bucketKey)],
+                             withLock,
+                             bucket->id(),
+                             ReturnClearedBuckets::kNo);
+        ASSERT(b == nullptr);
+        _removeBucket(&_stripes[_getStripeNumber(bucketKey)], withLock, bucket, false);
+    }
+
     WithLock withLock = WithLock::withoutLock();
     NamespaceString ns1{"db.test1"};
     NamespaceString ns2{"db.test2"};
@@ -104,8 +117,7 @@ TEST_F(BucketCatalogEraTest, EraAdvancesAsExpected) {
     // bucket era values should remain unchanged.
     clear(ns1);
     ASSERT_EQ(_eraManager.getEra(), 1);
-    // TODO (SERVER-66698): Add checks on the buckets' era values.
-    // ASSERT_EQ(b1->era(), 0);
+    ASSERT_EQ(bucket1->getEra(), 0);
 
     // When clearing buckets of one namespace, we expect the era of buckets of any other namespace
     // to not change.
@@ -117,21 +129,20 @@ TEST_F(BucketCatalogEraTest, EraAdvancesAsExpected) {
     clear(ns1);
     ASSERT_EQ(_eraManager.getEra(), 2);
     ASSERT_EQ(bucket3->getEra(), 1);
-    // TODO (SERVER-66698): Add checks on the buckets' era values.
-    // ASSERT_EQ(b1->era(), 0);
-    // ASSERT_EQ(b2->era(), 1);
+    ASSERT_EQ(bucket1->getEra(), 0);
+    ASSERT_EQ(bucket2->getEra(), 1);
 }
 
 TEST_F(BucketCatalogEraTest, EraCountMapUpdatedCorrectly) {
     RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
                                                     true};
 
-    // TODO (SERVER-66698): Change count assertions now that Buckets are cleared lazily.
     // Creating a bucket in a new era should add a counter for that era to the map.
     auto bucket1 = createBucket(info1);
     ASSERT_EQ(bucket1->getEra(), 0);
     ASSERT_EQ(_eraManager.getCountForEra(0), 1);
     clear(ns1);
+    checkAndRemoveClearedBucket(bucket1, bucketKey1, withLock);
 
     // When the last bucket in an era is destructed, the counter in the map should be removed.
     ASSERT_EQ(_eraManager.getCountForEra(0), 0);
@@ -144,6 +155,7 @@ TEST_F(BucketCatalogEraTest, EraCountMapUpdatedCorrectly) {
     ASSERT_EQ(bucket3->getEra(), 1);
     ASSERT_EQ(_eraManager.getCountForEra(1), 2);
     clear(ns2);
+    checkAndRemoveClearedBucket(bucket3, bucketKey2, withLock);
     ASSERT_EQ(_eraManager.getCountForEra(1), 1);
 
     // A bucket in one era being destroyed and the counter decrementing should not affect a
@@ -152,6 +164,7 @@ TEST_F(BucketCatalogEraTest, EraCountMapUpdatedCorrectly) {
     ASSERT_EQ(bucket4->getEra(), 2);
     ASSERT_EQ(_eraManager.getCountForEra(2), 1);
     clear(ns2);
+    checkAndRemoveClearedBucket(bucket4, bucketKey2, withLock);
     ASSERT_EQ(_eraManager.getCountForEra(2), 0);
     ASSERT_EQ(_eraManager.getCountForEra(1), 1);
 }
@@ -220,56 +233,65 @@ TEST_F(BucketCatalogEraTest, ClearRegistryGarbageCollection) {
     ASSERT_EQ(bucket2->getEra(), 0);
     ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 0);
     clear(ns1);
+    checkAndRemoveClearedBucket(bucket1, bucketKey1, withLock);
     // Era 0 still has non-zero count after this clear because bucket2 is still in era 0.
     ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 1);
     clear(ns2);
+    checkAndRemoveClearedBucket(bucket2, bucketKey2, withLock);
     // Bucket2 gets deleted, which makes era 0's count decrease to 0, then clear registry gets
-    // cleaned (which removes the clear with era 1), and then inserts the new clear with era 2 into
-    // the registry.
-    ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 1);
+    // cleaned.
+    ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 0);
 
     auto bucket3 = createBucket(info1);
     auto bucket4 = createBucket(info2);
     ASSERT_EQ(bucket3->getEra(), 2);
     ASSERT_EQ(bucket4->getEra(), 2);
     clear(ns1);
+    checkAndRemoveClearedBucket(bucket3, bucketKey1, withLock);
     // Era 2 still has bucket4 in it, so its count remains non-zero.
-    ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 2);
+    ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 1);
     auto bucket5 = createBucket(info1);
     auto bucket6 = createBucket(info2);
     ASSERT_EQ(bucket5->getEra(), 3);
     ASSERT_EQ(bucket6->getEra(), 3);
     clear(ns1);
+    checkAndRemoveClearedBucket(bucket5, bucketKey1, withLock);
     // Eras 2 and 3 still have bucket4 and bucket6 in them respectively, so their counts remain
     // non-zero.
-    ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 3);
+    ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 2);
     clear(ns2);
+    checkAndRemoveClearedBucket(bucket4, bucketKey2, withLock);
+    checkAndRemoveClearedBucket(bucket6, bucketKey2, withLock);
     // Eras 2 and 3 have their counts become 0 because bucket4 and bucket6 are cleared. The clear
-    // ops with eras 2-4 are removed, and then clear op with era 5 is inserted.
-    ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 1);
+    // registry is emptied.
+    ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 0);
 
     auto bucket7 = createBucket(info1);
     auto bucket8 = createBucket(info3);
     ASSERT_EQ(bucket7->getEra(), 5);
     ASSERT_EQ(bucket8->getEra(), 5);
     clear(ns3);
+    checkAndRemoveClearedBucket(bucket8, bucketKey3, withLock);
     // Era 5 still has bucket7 in it so its count remains non-zero.
-    ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 2);
+    ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 1);
     auto bucket9 = createBucket(info2);
     ASSERT_EQ(bucket9->getEra(), 6);
     clear(ns2);
-    // Era 6's count becomes 0. The clear op with era 5 is removed from the clear registry.
+    checkAndRemoveClearedBucket(bucket9, bucketKey2, withLock);
+    // Era 6's count becomes 0. Since era 5 is the smallest era with non-zero count, no clear ops
+    // are removed.
     ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 2);
     auto bucket10 = createBucket(info3);
     ASSERT_EQ(bucket10->getEra(), 7);
     clear(ns3);
+    checkAndRemoveClearedBucket(bucket10, bucketKey3, withLock);
     // Era 7's count becomes 0. Since era 5 is the smallest era with non-zero count, no clear ops
     // are removed.
     ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 3);
     clear(ns1);
-    // Era 5's count becomes 0. No eras with non-zero counts remain, so all clear ops are removed
-    // (namely, clear ops with eras 6 and 7).
-    ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 1);
+    checkAndRemoveClearedBucket(bucket7, bucketKey1, withLock);
+    // Era 5's count becomes 0. No eras with non-zero counts remain, so all clear ops are removed.
+    ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 0);
 }
 
 
