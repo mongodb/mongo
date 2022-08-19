@@ -104,7 +104,7 @@ Future<SingleResponse> whenAnyThat(std::vector<ExecutorFuture<SingleResponse>>&&
                 });
     }
 
-    return std::move(future);
+    return future;
 }
 }  // namespace
 
