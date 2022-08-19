@@ -35,7 +35,6 @@
 
 #include "mongo/unittest/unittest.h"
 
-#include <boost/lexical_cast.hpp>
 
 namespace {
 
@@ -144,8 +143,8 @@ public:
 
     static CloningFunctionType getCloningFunction() {
         return [calls = 0](const FunctorWithDynamicStateClonable& c) mutable {
-            return std::make_unique<FunctorWithDynamicStateClonable>(
-                c.data + boost::lexical_cast<std::string>(++calls));
+            return std::make_unique<FunctorWithDynamicStateClonable>(c.data +
+                                                                     std::to_string(++calls));
         };
     }
 };
@@ -933,7 +932,7 @@ public:
     void consumeText(const std::string&) override {}
 
     std::string produceText() override {
-        return root + boost::lexical_cast<std::string>(++generation);
+        return root + std::to_string(++generation);
     }
 };
 

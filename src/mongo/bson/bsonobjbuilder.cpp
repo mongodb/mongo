@@ -30,8 +30,6 @@
 
 #include "mongo/db/jsobj.h"
 
-#include <boost/lexical_cast.hpp>
-
 #include "mongo/bson/timestamp.h"
 #include "mongo/logv2/log.h"
 
