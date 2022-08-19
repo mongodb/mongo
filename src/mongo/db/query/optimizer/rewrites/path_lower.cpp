@@ -160,10 +160,11 @@ void EvalPathLowering::transport(ABT& n, const PathTraverse& p, ABT& inner) {
 
     const std::string& name = _prefixId.getNextId("valTraverse");
 
-    n = make<LambdaAbstraction>(
-        name,
-        make<FunctionCall>("traverseP",
-                           makeSeq(make<Variable>(name), std::exchange(inner, make<Blackhole>()))));
+    n = make<LambdaAbstraction>(name,
+                                make<FunctionCall>("traverseP",
+                                                   makeSeq(make<Variable>(name),
+                                                           std::exchange(inner, make<Blackhole>()),
+                                                           Constant::nothing())));
     _changed = true;
 }
 

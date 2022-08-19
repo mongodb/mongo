@@ -147,90 +147,68 @@ struct ExpressionVisitorContext {
     std::stack<int> filterExprChildrenCounter;
 };
 
-std::pair<sbe::value::SlotId, EvalStage> generateTraverseHelper(
-    EvalStage inputStage,
-    sbe::value::SlotId inputSlot,
+std::unique_ptr<sbe::EExpression> generateTraverseHelper(
+    const sbe::EVariable& inputVar,
     const FieldPath& fp,
     size_t level,
-    PlanNodeId planNodeId,
-    sbe::value::SlotIdGenerator* slotIdGenerator) {
+    sbe::value::FrameIdGenerator* frameIdGenerator) {
     using namespace std::literals;
 
     invariant(level < fp.getPathLength());
 
-    // The field we will be traversing at the current nested level.
-    auto fieldSlot{slotIdGenerator->generate()};
-
-    // Generate the projection stage to read a sub-field at the current nested level and bind it
-    // to 'fieldSlot'.
-    inputStage = makeProject(std::move(inputStage),
-                             planNodeId,
-                             fieldSlot,
-                             makeFunction("getField"_sd,
-                                          sbe::makeE<sbe::EVariable>(inputSlot),
-                                          sbe::makeE<sbe::EConstant>(fp.getFieldName(level))));
+    // Generate an expression to read a sub-field at the current nested level.
+    auto fieldName = sbe::makeE<sbe::EConstant>(fp.getFieldName(level));
+    auto fieldExpr = makeFunction("getField"_sd, inputVar.clone(), std::move(fieldName));
 
     if (level == fp.getPathLength() - 1) {
         // For the last level, we can just return the field slot without the need for a
         // traverse stage.
-        return {fieldSlot, std::move(inputStage)};
+        return fieldExpr;
     }
 
     // Generate nested traversal.
-    auto [innerResultSlot, innerBranch] = generateTraverseHelper(
-        makeLimitCoScanStage(planNodeId), fieldSlot, fp, level + 1, planNodeId, slotIdGenerator);
+    auto lambdaFrameId = frameIdGenerator->generate();
+    auto lambdaParam = sbe::EVariable{lambdaFrameId, 0};
+
+    auto resultExpr = generateTraverseHelper(lambdaParam, fp, level + 1, frameIdGenerator);
+
+    auto lambdaExpr = sbe::makeE<sbe::ELocalLambda>(lambdaFrameId, std::move(resultExpr));
 
     // Generate the traverse stage for the current nested level.
-    auto outputSlot{slotIdGenerator->generate()};
-    return {outputSlot,
-            makeTraverse(std::move(inputStage),
-                         std::move(innerBranch),
-                         fieldSlot,
-                         outputSlot,
-                         innerResultSlot,
-                         nullptr,
-                         nullptr,
-                         planNodeId,
-                         1)};
+    return makeFunction("traverseP",
+                        std::move(fieldExpr),
+                        std::move(lambdaExpr),
+                        makeConstant(sbe::value::TypeTags::NumberInt32, 1));
 }
 
 /**
  * For the given MatchExpression 'expr', generates a path traversal SBE plan stage sub-tree
  * implementing the comparison expression.
  */
-std::pair<sbe::value::SlotId, EvalStage> generateTraverse(
-    EvalStage inputStage,
-    sbe::value::SlotId inputSlot,
-    bool expectsDocumentInputOnly,
-    const FieldPath& fp,
-    PlanNodeId planNodeId,
-    sbe::value::SlotIdGenerator* slotIdGenerator) {
+std::unique_ptr<sbe::EExpression> generateTraverse(const sbe::EVariable& inputVar,
+                                                   bool expectsDocumentInputOnly,
+                                                   const FieldPath& fp,
+                                                   sbe::value::FrameIdGenerator* frameIdGenerator) {
+    size_t level = 0;
+
     if (expectsDocumentInputOnly) {
-        // When we know for sure that 'inputSlot' will be a document and _not_ an array (such as
+        // When we know for sure that 'inputVar' will be a document and _not_ an array (such as
         // when traversing the root document), we can generate a simpler expression.
-        return generateTraverseHelper(
-            std::move(inputStage), inputSlot, fp, 0, planNodeId, slotIdGenerator);
+        return generateTraverseHelper(inputVar, fp, level, frameIdGenerator);
     } else {
-        // The general case: the value in the 'inputSlot' may be an array that will require
+        // The general case: the value in the 'inputVar' may be an array that will require
         // traversal.
-        auto outputSlot{slotIdGenerator->generate()};
-        auto [innerBranchOutputSlot, innerBranch] =
-            generateTraverseHelper(makeLimitCoScanStage(planNodeId),
-                                   inputSlot,
-                                   fp,
-                                   0,  // level
-                                   planNodeId,
-                                   slotIdGenerator);
-        return {outputSlot,
-                makeTraverse(std::move(inputStage),
-                             std::move(innerBranch),
-                             inputSlot,
-                             outputSlot,
-                             innerBranchOutputSlot,
-                             nullptr,
-                             nullptr,
-                             planNodeId,
-                             1)};
+        auto lambdaFrameId = frameIdGenerator->generate();
+        auto lambdaParam = sbe::EVariable{lambdaFrameId, 0};
+
+        auto resultExpr = generateTraverseHelper(lambdaParam, fp, level, frameIdGenerator);
+
+        auto lambdaExpr = sbe::makeE<sbe::ELocalLambda>(lambdaFrameId, std::move(resultExpr));
+
+        return makeFunction("traverseP",
+                            inputVar.clone(),
+                            std::move(lambdaExpr),
+                            makeConstant(sbe::value::TypeTags::NumberInt32, 1));
     }
 }
 
@@ -1907,14 +1885,13 @@ public:
 
         // Dereference a dotted path, which may contain arrays requiring implicit traversal.
         const bool expectsDocumentInputOnly = slotId == *(_context->optionalRootSlot);
-        auto [outputSlot, stage] = generateTraverse(_context->extractCurrentEvalStage(),
-                                                    slotId,
-                                                    expectsDocumentInputOnly,
-                                                    expr->getFieldPathWithoutCurrentPrefix(),
-                                                    _context->planNodeId,
-                                                    _context->state.slotIdGenerator);
 
-        _context->pushExpr(outputSlot, std::move(stage));
+        auto resultExpr = generateTraverse(sbe::EVariable{slotId},
+                                           expectsDocumentInputOnly,
+                                           expr->getFieldPathWithoutCurrentPrefix(),
+                                           _context->state.frameIdGenerator);
+
+        _context->pushExpr(std::move(resultExpr));
     }
     void visit(const ExpressionFilter* expr) final {
         // Remove index tracking current child of $filter expression, since it is not used anymore.

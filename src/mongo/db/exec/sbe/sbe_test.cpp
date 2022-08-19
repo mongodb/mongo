@@ -468,16 +468,21 @@ TEST(SBEVM, CodeFragmentToStringArgs) {
         vm::CodeFragment code;
         std::string toStringPattern{kAddrPattern};
 
-        code.appendFillEmpty(vm::Instruction::True);
-        toStringPattern += instrPattern("fillEmptyConst", "k: True");
         code.appendFillEmpty(vm::Instruction::Null);
         toStringPattern += instrPattern("fillEmptyConst", "k: Null");
         code.appendFillEmpty(vm::Instruction::False);
         toStringPattern += instrPattern("fillEmptyConst", "k: False");
+        code.appendFillEmpty(vm::Instruction::True);
+        toStringPattern += instrPattern("fillEmptyConst", "k: True");
 
-        code.appendTraverseP(0xAA);
-        auto offsetP = 0xAA - code.instrs().size();
-        toStringPattern += instrPattern("traversePConst", "offset: " + std::to_string(offsetP));
+        code.appendTraverseP(0xAA, vm::Instruction::Nothing);
+        auto offsetP1 = 0xAA - code.instrs().size();
+        toStringPattern +=
+            instrPattern("traversePConst", "k: Nothing, offset: " + std::to_string(offsetP1));
+        code.appendTraverseP(0xAA, vm::Instruction::Int32One);
+        auto offsetP2 = 0xAA - code.instrs().size();
+        toStringPattern +=
+            instrPattern("traversePConst", "k: 1, offset: " + std::to_string(offsetP2));
         code.appendTraverseF(0xBB, vm::Instruction::True);
         auto offsetF = 0xBB - code.instrs().size();
         toStringPattern +=

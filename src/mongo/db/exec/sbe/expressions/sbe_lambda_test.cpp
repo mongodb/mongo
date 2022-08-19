@@ -43,7 +43,8 @@ TEST_F(SBELambdaTest, AddOneToArray) {
                     makeE<ELocalLambda>(frame,
                                         makeE<EPrimBinary>(EPrimBinary::Op::add,
                                                            makeE<EVariable>(frame, 0),
-                                                           makeE<EConstant>(constTag, constVal)))));
+                                                           makeE<EConstant>(constTag, constVal))),
+                    makeE<EConstant>(value::TypeTags::Nothing, 0)));
     auto compiledExpr = compileExpression(*lambdaExpr);
     auto bsonArr = BSON_ARRAY(1 << 2 << 3);
 

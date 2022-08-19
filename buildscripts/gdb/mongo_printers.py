@@ -795,7 +795,7 @@ class SbeCodeFragmentPrinter(object):
 
             # Some instructions have extra arguments, embedded into the ops stream.
             args = ''
-            if op_name in ['pushLocalVal', 'pushMoveLocalVal', 'pushLocalLambda', 'traversePConst']:
+            if op_name in ['pushLocalVal', 'pushMoveLocalVal', 'pushLocalLambda']:
                 args = 'arg: ' + str(read_as_integer(cur_op, int_size))
                 cur_op += int_size
             elif op_name in ['jmp', 'jmpTrue', 'jmpNothing']:
@@ -829,7 +829,7 @@ class SbeCodeFragmentPrinter(object):
             elif op_name in ['fillEmptyConst']:
                 args = 'Instruction::Constants: ' + str(read_as_integer(cur_op, uint8_size))
                 cur_op += uint8_size
-            elif op_name in ['traverseFConst']:
+            elif op_name in ['traverseFConst', 'traversePConst']:
                 const_enum = read_as_integer(cur_op, uint8_size)
                 cur_op += uint8_size
                 args = \

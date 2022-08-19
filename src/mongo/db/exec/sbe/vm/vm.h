@@ -327,19 +327,25 @@ struct Instruction {
     };
 
     enum Constants : uint8_t {
+        Nothing,
         Null,
-        True,
         False,
+        True,
+        Int32One,
     };
 
     static const char* toStringConstants(Constants k) {
         switch (k) {
+            case Nothing:
+                return "Nothing";
             case Null:
                 return "Null";
             case True:
                 return "True";
             case False:
                 return "False";
+            case Int32One:
+                return "1";
             default:
                 return "unknown";
         }
@@ -738,7 +744,7 @@ public:
     void appendTraverseP() {
         appendSimpleInstruction(Instruction::traverseP);
     }
-    void appendTraverseP(int codePosition);
+    void appendTraverseP(int codePosition, Instruction::Constants k);
     void appendTraverseF() {
         appendSimpleInstruction(Instruction::traverseF);
     }
@@ -995,11 +1001,12 @@ private:
                                                                       value::Value fieldValue);
 
     void traverseP(const CodeFragment* code);
-    void traverseP(const CodeFragment* code, int64_t position);
+    void traverseP(const CodeFragment* code, int64_t position, int64_t maxDepth);
     void traverseP_nested(const CodeFragment* code,
                           int64_t position,
                           value::TypeTags tag,
-                          value::Value val);
+                          value::Value val,
+                          int64_t maxDepth);
 
     void traverseF(const CodeFragment* code);
     void traverseF(const CodeFragment* code, int64_t position, bool compareArray);

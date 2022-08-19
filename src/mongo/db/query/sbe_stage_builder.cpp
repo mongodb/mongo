@@ -2290,11 +2290,12 @@ EvalStage optimizeFieldPaths(StageBuilderState& state,
         if (!state.preGeneratedExprs.contains(fieldPathStr)) {
             auto [curEvalExpr, curEvalStage] = generateExpression(
                 state, fieldExpr, std::move(retEvalStage), optionalRootSlot, nodeId);
-            auto optionalFieldPathSlot = curEvalExpr.getSlot();
-            tassert(
-                6089300, "Must have a valid slot for "_format(fieldPathStr), optionalFieldPathSlot);
-            state.preGeneratedExprs.emplace(fieldPathStr, std::move(curEvalExpr));
-            retEvalStage = std::move(curEvalStage);
+
+            auto [slot, stage] = projectEvalExpr(
+                std::move(curEvalExpr), std::move(curEvalStage), nodeId, state.slotIdGenerator);
+
+            state.preGeneratedExprs.emplace(fieldPathStr, slot);
+            retEvalStage = std::move(stage);
         }
     });
 
@@ -2344,20 +2345,12 @@ std::tuple<sbe::value::SlotVector, EvalStage, std::unique_ptr<sbe::EExpression>>
                                        nodeId,
                                        slotIdGenerator);
 
-            if (auto optionalSlot = groupByEvalExpr.getSlot(); optionalSlot.has_value()) {
-                slots.push_back(*optionalSlot);
-                retEvalStage = std::move(groupByEvalStage);
-            } else {
-                // A projection stage is not generated from 'generateExpression'. So, generates one
-                // and binds the slot to the field name.
-                auto [slot, tempEvalStage] = projectEvalExpr(groupByEvalExpr.extractExpr(),
-                                                             std::move(groupByEvalStage),
-                                                             nodeId,
-                                                             slotIdGenerator);
-                slots.push_back(slot);
-                groupByEvalExpr = makeVariable(slot);
-                retEvalStage = std::move(tempEvalStage);
-            }
+            auto [slot, stage] = projectEvalExpr(
+                std::move(groupByEvalExpr), std::move(groupByEvalStage), nodeId, slotIdGenerator);
+
+            slots.push_back(slot);
+            groupByEvalExpr = slot;
+            retEvalStage = std::move(stage);
 
             exprs.emplace_back(makeConstant(fieldName));
             exprs.emplace_back(groupByEvalExpr.extractExpr());

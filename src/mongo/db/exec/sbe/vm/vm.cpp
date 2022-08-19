@@ -113,7 +113,7 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     -1,  // getElement
     -1,  // collComparisonKey
     -1,  // getFieldOrElement
-    -1,  // traverseP
+    -2,  // traverseP
     0,   // traversePConst
     -2,  // traverseF
     0,   // traverseFConst
@@ -247,8 +247,7 @@ std::string CodeFragment::toString() const {
                 break;
             }
             // Instructions with a single integer argument.
-            case Instruction::pushLocalLambda:
-            case Instruction::traversePConst: {
+            case Instruction::pushLocalLambda: {
                 auto offset = readFromMemory<int>(pcPointer);
                 pcPointer += sizeof(offset);
                 ss << "offset: " << offset;
@@ -270,6 +269,7 @@ std::string CodeFragment::toString() const {
                 break;
             }
             // Instructions with other kinds of arguments.
+            case Instruction::traversePConst:
             case Instruction::traverseFConst: {
                 auto k = readFromMemory<Instruction::Constants>(pcPointer);
                 pcPointer += sizeof(k);
@@ -637,17 +637,18 @@ void CodeFragment::appendIsRecordId() {
     appendSimpleInstruction(Instruction::isRecordId);
 }
 
-void CodeFragment::appendTraverseP(int codePosition) {
+void CodeFragment::appendTraverseP(int codePosition, Instruction::Constants k) {
     Instruction i;
     i.tag = Instruction::traversePConst;
     adjustStackSimple(i);
 
-    auto size = sizeof(Instruction) + sizeof(codePosition);
+    auto size = sizeof(Instruction) + sizeof(codePosition) + sizeof(k);
     auto offset = allocateSpace(size);
 
     int codeOffset = codePosition - _instrs.size();
 
     offset += writeToMemory(offset, i);
+    offset += writeToMemory(offset, k);
     offset += writeToMemory(offset, codeOffset);
 }
 
@@ -919,26 +920,38 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::getFieldOrElement(
 void ByteCode::traverseP(const CodeFragment* code) {
     // Traverse a projection path - evaluate the input lambda on every element of the input array.
     // The traversal is recursive; i.e. we visit nested arrays if any.
+    auto [maxDepthOwn, maxDepthTag, maxDepthVal] = getFromStack(0);
+    popAndReleaseStack();
     auto [lamOwn, lamTag, lamVal] = getFromStack(0);
     popAndReleaseStack();
 
-    if (lamTag != value::TypeTags::LocalLambda) {
+    if ((maxDepthTag != value::TypeTags::Nothing && maxDepthTag != value::TypeTags::NumberInt32) ||
+        lamTag != value::TypeTags::LocalLambda) {
         popAndReleaseStack();
         pushStack(false, value::TypeTags::Nothing, 0);
+        return;
     }
-    int64_t lamPos = value::bitcastTo<int64_t>(lamVal);
 
-    traverseP(code, lamPos);
+    int64_t lamPos = value::bitcastTo<int64_t>(lamVal);
+    int64_t maxDepth = maxDepthTag == value::TypeTags::NumberInt32
+        ? value::bitcastTo<int32_t>(maxDepthVal)
+        : std::numeric_limits<int64_t>::max();
+
+    traverseP(code, lamPos, maxDepth);
 }
 
-void ByteCode::traverseP(const CodeFragment* code, int64_t position) {
+void ByteCode::traverseP(const CodeFragment* code, int64_t position, int64_t maxDepth) {
     auto [own, tag, val] = getFromStack(0);
 
-    if (value::isArray(tag)) {
+    if (value::isArray(tag) && maxDepth > 0) {
         value::ValueGuard input(own ? tag : value::TypeTags::Nothing, own ? val : 0);
         popStack();
 
-        traverseP_nested(code, position, tag, val);
+        if (maxDepth != std::numeric_limits<int64_t>::max()) {
+            --maxDepth;
+        }
+
+        traverseP_nested(code, position, tag, val, maxDepth);
     } else {
         runLambdaInternal(code, position);
     }
@@ -947,32 +960,37 @@ void ByteCode::traverseP(const CodeFragment* code, int64_t position) {
 void ByteCode::traverseP_nested(const CodeFragment* code,
                                 int64_t position,
                                 value::TypeTags tagInput,
-                                value::Value valInput) {
-    if (value::isArray(tagInput)) {
-        auto [tagArrOutput, valArrOutput] = value::makeNewArray();
-        auto arrOutput = value::getArrayView(valArrOutput);
-        value::ValueGuard guard{tagInput, valArrOutput};
+                                value::Value valInput,
+                                int64_t maxDepth) {
+    auto decrement = [](int64_t d) { return d == std::numeric_limits<int64_t>::max() ? d : d - 1; };
 
-        for (value::ArrayEnumerator enumerator(tagInput, valInput); !enumerator.atEnd();
-             enumerator.advance()) {
-            auto [elemTag, elemVal] = enumerator.getViewOfValue();
-            traverseP_nested(code, position, elemTag, elemVal);
-            auto [retOwn, retTag, retVal] = getFromStack(0);
-            popStack();
-            if (!retOwn) {
-                auto [copyTag, copyVal] = value::copyValue(retTag, retVal);
-                retTag = copyTag;
-                retVal = copyVal;
-            }
-            arrOutput->push_back(retTag, retVal);
+    auto [tagArrOutput, valArrOutput] = value::makeNewArray();
+    auto arrOutput = value::getArrayView(valArrOutput);
+    value::ValueGuard guard{tagInput, valArrOutput};
+
+    for (value::ArrayEnumerator enumerator(tagInput, valInput); !enumerator.atEnd();
+         enumerator.advance()) {
+        auto [elemTag, elemVal] = enumerator.getViewOfValue();
+
+        if (maxDepth > 0 && value::isArray(elemTag)) {
+            traverseP_nested(code, position, elemTag, elemVal, decrement(maxDepth));
+        } else {
+            pushStack(false, elemTag, elemVal);
+            runLambdaInternal(code, position);
         }
 
-        guard.reset();
-        pushStack(true, tagArrOutput, valArrOutput);
-    } else {
-        pushStack(false, tagInput, valInput);
-        runLambdaInternal(code, position);
+        auto [retOwn, retTag, retVal] = getFromStack(0);
+        popStack();
+        if (!retOwn) {
+            auto [copyTag, copyVal] = value::copyValue(retTag, retVal);
+            retTag = copyTag;
+            retVal = copyVal;
+        }
+        arrOutput->push_back(retTag, retVal);
     }
+
+    guard.reset();
+    pushStack(true, tagArrOutput, valArrOutput);
 }
 
 void ByteCode::traverseF(const CodeFragment* code) {
@@ -986,6 +1004,7 @@ void ByteCode::traverseF(const CodeFragment* code) {
     if (lamTag != value::TypeTags::LocalLambda) {
         popAndReleaseStack();
         pushStack(false, value::TypeTags::Nothing, 0);
+        return;
     }
     int64_t lamPos = value::bitcastTo<int64_t>(lamVal);
 
@@ -5198,6 +5217,8 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                     auto [lhsOwned, lhsTag, lhsVal] = getFromStack(0);
                     if (lhsTag == value::TypeTags::Nothing) {
                         switch (k) {
+                            case Instruction::Nothing:
+                                break;
                             case Instruction::Null:
                                 topStack(false, value::TypeTags::Null, 0);
                                 break;
@@ -5210,6 +5231,11 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                                 topStack(false,
                                          value::TypeTags::Boolean,
                                          value::bitcastFrom<bool>(false));
+                                break;
+                            case Instruction::Int32One:
+                                topStack(false,
+                                         value::TypeTags::NumberInt32,
+                                         value::bitcastFrom<int32_t>(1));
                                 break;
                             default:
                                 MONGO_UNREACHABLE;
@@ -5331,11 +5357,17 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                     break;
                 }
                 case Instruction::traversePConst: {
+                    auto k = readFromMemory<Instruction::Constants>(pcPointer);
+                    pcPointer += sizeof(k);
+
                     auto offset = readFromMemory<int>(pcPointer);
                     pcPointer += sizeof(offset);
                     auto codePosition = pcPointer - code->instrs().data() + offset;
 
-                    traverseP(code, codePosition);
+                    traverseP(code,
+                              codePosition,
+                              k == Instruction::Nothing ? std::numeric_limits<int64_t>::max() : 1);
+
                     break;
                 }
                 case Instruction::traverseF: {

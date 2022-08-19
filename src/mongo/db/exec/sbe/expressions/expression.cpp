@@ -546,7 +546,7 @@ static stdx::unordered_map<std::string, InstrFn> kInstrFunctions = {
     {"fillEmpty",
      InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendFillEmpty, false}},
     {"traverseP",
-     InstrFn{[](size_t n) { return n == 2; }, &vm::CodeFragment::appendTraverseP, false}},
+     InstrFn{[](size_t n) { return n == 3; }, &vm::CodeFragment::appendTraverseP, false}},
     {"traverseF",
      InstrFn{[](size_t n) { return n == 3; }, &vm::CodeFragment::appendTraverseF, false}},
     {"setField",
@@ -679,21 +679,28 @@ vm::CodeFragment EFunction::compileDirect(CompileCtx& ctx) const {
                                  value::bitcastTo<bool>(val) ? vm::Instruction::True
                                                              : vm::Instruction::False);
             return code;
-        } else if (_name == "traverseP" && _nodes[1]->as<ELocalLambda>()) {
-            auto lambda = _nodes[1]->as<ELocalLambda>();
+        } else if (_name == "traverseP" && _nodes[1]->as<ELocalLambda>() &&
+                   _nodes[2]->as<EConstant>()) {
+            auto [tag, val] = _nodes[2]->as<EConstant>()->getConstant();
+            if ((tag == value::TypeTags::NumberInt32 && value::bitcastTo<int32_t>(val) == 1) ||
+                tag == value::TypeTags::Nothing) {
+                auto lambda = _nodes[1]->as<ELocalLambda>();
 
-            auto body = lambda->compileBodyDirect(ctx);
-            // Jump around the body.
-            code.appendJump(body.instrs().size());
+                auto body = lambda->compileBodyDirect(ctx);
+                // Jump around the body.
+                code.appendJump(body.instrs().size());
 
-            // Remember the position and append the body.
-            auto bodyPosition = code.instrs().size();
-            code.appendNoStack(std::move(body));
+                // Remember the position and append the body.
+                auto bodyPosition = code.instrs().size();
+                code.appendNoStack(std::move(body));
 
-            code.append(_nodes[0]->compileDirect(ctx));
-            code.appendTraverseP(bodyPosition);
+                code.append(_nodes[0]->compileDirect(ctx));
 
-            return code;
+                code.appendTraverseP(bodyPosition,
+                                     tag == value::TypeTags::Nothing ? vm::Instruction::Nothing
+                                                                     : vm::Instruction::Int32One);
+                return code;
+            }
         } else if (_name == "applyClassicMatcher") {
             tassert(6681400,
                     "First argument to applyClassicMatcher must be constant",

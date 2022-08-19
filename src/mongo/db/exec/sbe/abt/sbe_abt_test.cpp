@@ -104,10 +104,10 @@ TEST_F(ABTSBE, Lower4) {
 
     auto tree = make<FunctionCall>(
         "traverseP",
-        makeSeq(
-            make<Constant>(tagArr, valArr),
-            make<LambdaAbstraction>(
-                "x", make<BinaryOp>(Operations::Add, make<Variable>("x"), Constant::int64(10)))));
+        makeSeq(make<Constant>(tagArr, valArr),
+                make<LambdaAbstraction>(
+                    "x", make<BinaryOp>(Operations::Add, make<Variable>("x"), Constant::int64(10))),
+                Constant::nothing()));
     auto env = VariableEnvironment::build(tree);
     SlotVarMap map;
 
