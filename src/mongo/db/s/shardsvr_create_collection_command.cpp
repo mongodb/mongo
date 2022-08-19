@@ -141,8 +141,6 @@ public:
             }
 
             const auto createCollectionCoordinator = [&] {
-                FixedFCVRegion fixedFcvRegion(opCtx);
-
                 auto coordinatorDoc = [&] {
                     auto doc = CreateCollectionCoordinatorDocument();
                     doc.setShardingDDLCoordinatorMetadata(
