@@ -1,13 +1,16 @@
 /*
  * Tests startup with a node in downgrading state.
  * Starts a replica set with 2 nodes.
+ *
+ * @tags: [featureFlagDowngradingToUpgrading]
  */
-
-load('jstests/multiVersion/libs/verify_versions.js');
-load('jstests/libs/fail_point_util.js');
 
 (function() {
 "use strict";
+
+load('jstests/multiVersion/libs/verify_versions.js');
+load('jstests/libs/fail_point_util.js');
+load("jstests/libs/feature_flag_util.js");
 
 function runReplicaSet() {
     let fcvDoc;

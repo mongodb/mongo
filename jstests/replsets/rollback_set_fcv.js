@@ -16,6 +16,7 @@ load("jstests/replsets/libs/rollback_test.js");
 load('jstests/libs/parallel_shell_helpers.js');
 load("jstests/libs/fail_point_util.js");
 load("jstests/replsets/rslib.js");
+load("jstests/libs/feature_flag_util.js");
 
 function setFCV(fcv) {
     assert.commandFailedWithCode(db.adminCommand({setFeatureCompatibilityVersion: fcv}),
@@ -119,11 +120,16 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
     checkFCV(secondaryAdminDB, lastLTSFCV, fromFCV);
 
     let newPrimary = rollbackTest.getPrimary();
+    const newPrimaryAdminDB = newPrimary.getDB('admin');
     // As a rule, we forbid downgrading a node while a node is still in the upgrading state and
-    // vice versa (except for the added path kDowngradingFromLatestToLastLTS ->
-    // kUpgradingFromLastLTSToLatest -> kLatest). Ensure that the in-memory and on-disk FCV are
-    // consistent by checking that this rule is upheld after rollback.
-    if (fromFCV === lastLTSFCV && toFCV === latestFCV) {
+    // vice versa (except for the added path from downgrading to upgrading).
+    // Ensure that the in-memory and on-disk FCV are consistent by checking that this rule is
+    // upheld after rollback.
+    if (fromFCV === lastLTSFCV && toFCV === latestFCV &&
+        FeatureFlagUtil.isEnabled(newPrimaryAdminDB,
+                                  "DowngradingToUpgrading",
+                                  null /* user not specified */,
+                                  true /* ignores FCV */)) {
         assert.commandWorked(newPrimary.adminCommand({setFeatureCompatibilityVersion: toFCV}));
     } else {
         assert.commandFailedWithCode(

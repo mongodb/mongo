@@ -7,9 +7,13 @@ load("jstests/libs/fixture_helpers.js");
  */
 var FeatureFlagUtil = class {
     /**
-     * Returns true if feature flag is enabled, false otherwise.
+     * If 'ignoreFCV' is true, return whether or not the given feature flag is enabled,
+     * regardless of the current FCV version (this is used when a feature flag needs to be enabled
+     * in downgraded FCV versions).
+     * If 'ignoreFCV' is false or null, we only return true if the flag is enabled and this FCV
+     * version is greater or equal to the required version for the flag.
      */
-    static isEnabled(db, featureFlag, user) {
+    static isEnabled(db, featureFlag, user, ignoreFCV) {
         // In order to get an accurate answer for whether a feature flag is enabled, we need to ask
         // a mongod. If db represents a connection to mongos, or some other configuration, we need
         // to obtain the correct connection to a mongod.
@@ -46,9 +50,11 @@ var FeatureFlagUtil = class {
             return false;
         }
 
-        return flagDoc.hasOwnProperty(fullFlagName) && flagDoc[fullFlagName].value &&
-            (!fcvDoc.hasOwnProperty("featureCompatibilityVersion") ||
-             MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version,
-                                            flagDoc[fullFlagName].version) >= 0);
+        const flagIsEnabled = flagDoc.hasOwnProperty(fullFlagName) && flagDoc[fullFlagName].value;
+        const flagVersionIsValid = !fcvDoc.hasOwnProperty("featureCompatibilityVersion") ||
+            MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version,
+                                           flagDoc[fullFlagName].version) >= 0;
+
+        return flagIsEnabled && (ignoreFCV || flagVersionIsValid);
     }
 };

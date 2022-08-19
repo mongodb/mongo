@@ -43,6 +43,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -74,7 +75,8 @@ namespace {
  * Utility class for recording permitted transitions between feature compatibility versions and
  * their on-disk representation as FeatureCompatibilityVersionDocument objects.
  */
-const class FCVTransitions {
+// TODO SERVER-65269: Add back 'const' qualifier to FCVTransitions class declaration
+class FCVTransitions {
 public:
     FCVTransitions() {
         auto makeFCVDoc = [](
@@ -109,10 +111,6 @@ public:
                 // lastLTS then the second loop iteration just overwrites the first.
                 _transitions[{from, to, isFromConfigServer}] = upgrading;
                 _transitions[{upgrading, to, isFromConfigServer}] = to;
-                // allow downgrading->upgrading->latest path
-                _transitions[{GenericFCV::kDowngradingFromLatestToLastLTS,
-                              GenericFCV::kLatest,
-                              isFromConfigServer}] = GenericFCV::kUpgradingFromLastLTSToLatest;
             }
             _fcvDocuments[upgrading] = makeFCVDoc(from /* effective */, to /* target */);
         }
@@ -142,6 +140,20 @@ public:
             _fcvDocuments[downgrading] =
                 makeFCVDoc(to /* effective */, to /* target */, GenericFCV::kLatest /* previous */
                 );
+        }
+    }
+
+    /**
+     * If feature flag gDowngradingToUpgrading is enabled,
+     * we add the new downgrading->upgrading->latest path.
+     */
+    void featureFlaggedAddNewTransitionState() {
+        if (repl::feature_flags::gDowngradingToUpgrading.isEnabledAndIgnoreFCV()) {
+            for (auto isFromConfigServer : std::vector{false, true}) {
+                _transitions[{GenericFCV::kDowngradingFromLatestToLastLTS,
+                              GenericFCV::kLatest,
+                              isFromConfigServer}] = GenericFCV::kUpgradingFromLastLTSToLatest;
+            }
         }
     }
 
@@ -327,14 +339,13 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
     // We may have just stepped down, in which case we should not proceed.
     opCtx->checkForInterrupt();
 
-    // Only transition to fully upgraded or downgraded states when we
-    // have completed all required upgrade/downgrade behavior.
-    // If kDowngradingFromLatestToLastLTS->kLatest, we want to get the transitional version
-    // i.e. kUpgradingFromLastLTSToLatest
+    // Only transition to fully upgraded or downgraded states when we have completed all required
+    // upgrade/downgrade behavior, unless it is the newly added downgrading to upgrading path.
     auto transitioningVersion = setTargetVersion &&
             serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading(fromVersion) &&
-            !(fromVersion == GenericFCV::kDowngradingFromLatestToLastLTS &&
-              newVersion == GenericFCV::kLatest)
+            !(repl::feature_flags::gDowngradingToUpgrading.isEnabledAndIgnoreFCV() &&
+              (fromVersion == GenericFCV::kDowngradingFromLatestToLastLTS &&
+               newVersion == GenericFCV::kLatest))
         ? fromVersion
         : fcvTransitions.getTransitionalVersion(fromVersion, newVersion, isFromConfigServer);
     FeatureCompatibilityVersionDocument fcvDoc =
@@ -486,6 +497,10 @@ void FeatureCompatibilityVersion::fassertInitializedAfterStartup(OperationContex
     }
 
     auto fcvDocument = findFeatureCompatibilityVersionDocument(opCtx);
+
+    // TODO SERVER-65269: Move downgrading->upgrading transition back to FCVTransitions constructor.
+    // Adding the new fcv downgrading -> upgrading path
+    fcvTransitions.featureFlaggedAddNewTransitionState();
 
     auto const storageEngine = opCtx->getServiceContext()->getStorageEngine();
     auto dbNames = storageEngine->listDatabases();

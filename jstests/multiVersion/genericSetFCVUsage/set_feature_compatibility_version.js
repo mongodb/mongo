@@ -15,6 +15,7 @@ TestData.skipCheckDBHashes = true;
 load("jstests/libs/index_catalog_helpers.js");
 load("jstests/libs/write_concern_util.js");
 load("jstests/replsets/rslib.js");
+load("jstests/libs/feature_flag_util.js");
 
 let dbpath = MongoRunner.dataPath + "feature_compatibility_version";
 resetDbpath(dbpath);
@@ -336,6 +337,16 @@ function runReplicaSetTest(downgradeVersion) {
     assert.eq(0, res.ok);
     assert.commandFailedWithCode(res, ErrorCodes.WriteConcernFailed);
     restartServerReplication(secondary);
+
+    // If downgrading->upgrading feature is not enabled,
+    // upgrading the FCV should fail if a previous downgrade has not yet completed.
+    if (!FeatureFlagUtil.isEnabled(primaryAdminDB,
+                                   "DowngradingToUpgrading",
+                                   null /* user not specified */,
+                                   true /* ignores FCV */)) {
+        assert.commandFailedWithCode(
+            primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}), 5147403);
+    }
 
     if (lastContinuousFCV !== lastLTSFCV) {
         // We will fail if we have not yet completed a downgrade and attempt to downgrade to a
