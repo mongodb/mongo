@@ -40,6 +40,7 @@
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/exec/bucket_unpacker.h"
+#include "mongo/db/exec/projection_executor_utils.h"
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_algo.h"
@@ -158,7 +159,6 @@ bool hintMatchesNameOrPattern(const BSONObj& hintObj,
         firstHintElt.type() == BSONType::String) {
         // An index name is provided by the hint.
         return indexName == firstHintElt.valueStringData();
-        ;
     }
 
     // An index spec is provided by the hint.
@@ -191,10 +191,8 @@ bool hintMatchesClusterKey(const boost::optional<ClusteredCollectionInfo>& clust
  */
 bool hintMatchesColumnStoreIndex(const BSONObj& hintObj, const ColumnIndexEntry& columnStoreIndex) {
     // TODO SERVER-68400: Should be possible to have some other keypattern.
-    return hintMatchesNameOrPattern(hintObj,
-                                    columnStoreIndex.catalogName,
-                                    BSON("$**"
-                                         << "columnstore"));
+    return hintMatchesNameOrPattern(
+        hintObj, columnStoreIndex.identifier.catalogName, columnStoreIndex.keyPattern);
 }
 
 /**
@@ -258,7 +256,6 @@ std::unique_ptr<QuerySolution> makeColumnScanPlan(
     std::unique_ptr<MatchExpression> residualPredicate) {
     dassert(columnScanIsPossible(query, params));
 
-    // TODO SERVER-67140: Check if the columnar index actually provides the fields we need.
     return QueryPlannerAnalysis::analyzeDataAccess(
         query,
         params,
@@ -288,10 +285,35 @@ Status checkColumnScanFieldLimits(
     }
     return Status::OK();
 }
+
+bool checkProjectionCoversQuery(OrderedPathSet& fields, const ColumnIndexEntry& columnStoreIndex) {
+    const auto projectedFields = projection_executor_utils::applyProjectionToFields(
+        columnStoreIndex.indexPathProjection->exec(), fields);
+    // If the number of fields is equal to the number of fields preserved, then the projection
+    // covers the query.
+    return projectedFields.size() == fields.size();
+}
+
 /**
- * Attempts to build a plan using a columnstore index. Returns a non-OK status if it can't build
- * one
- * - with the code and message indicating the problem - or a QuerySolution if it can.
+ * A helper function that returns the number of column store indexes that cover the query,
+ * as well as an arbitary, valid column store index for the column scan.
+ */
+std::pair<int, const ColumnIndexEntry*> getValidColumnIndex(
+    OrderedPathSet& fields, const std::vector<ColumnIndexEntry>& columnStoreIndexes) {
+    const ColumnIndexEntry* chosenIndex;
+    int numValid = 0;
+    for (const auto& columnStoreIndex : columnStoreIndexes) {
+        if (checkProjectionCoversQuery(fields, columnStoreIndex)) {
+            chosenIndex = numValid == 0 ? &columnStoreIndex : chosenIndex;
+            ++numValid;
+        }
+    }
+    return {numValid, chosenIndex};
+}
+
+/**
+ * Attempts to build a plan using a column store index. Returns a non-OK status if it can't build
+ * one with the code and message indicating the problem - or a QuerySolution if it can.
  */
 StatusWith<std::unique_ptr<QuerySolution>> tryToBuildColumnScan(
     const QueryPlannerParams& params,
@@ -302,16 +324,6 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildColumnScan(
     }
 
     invariant(params.columnStoreIndexes.size() >= 1);
-    const auto& columnStoreIndex = hintedIndex.value_or(params.columnStoreIndexes.front());
-    if (!hintedIndex && params.columnStoreIndexes.size() > 1) {
-        // TODO SERVER-67140 only warnn if there is more than one index that is actually eligible
-        // for use.
-        LOGV2_DEBUG(6298500,
-                    2,
-                    "Multiple column store indexes present. Selecting the first "
-                    "one arbitrarily",
-                    "indexName"_attr = columnStoreIndex.catalogName);
-    }
 
     auto [filterDeps, outputDeps] = computeDeps(params, query);
     auto allFieldsReferenced = set_util::setUnion(filterDeps.fields, outputDeps.fields);
@@ -319,7 +331,7 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildColumnScan(
         // TODO SERVER-66284 Would like to enable a plan when hinted, even if we need the whole
         // document. Something like COLUMN_SCAN -> FETCH.
         return {ErrorCodes::Error{6298501},
-                "cannot use columnstore index because the query requires seeing the entire "
+                "cannot use column store index because the query requires seeing the entire "
                 "document"};
     } else if (!hintedIndex && expression::containsOverlappingPaths(allFieldsReferenced)) {
         // The query needs a path and a parent or ancestor path. For example, the query needs to
@@ -333,7 +345,34 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildColumnScan(
                               << set_util::setToString(allFieldsReferenced)};
     }
 
-    // TODO SERVER-67140: Check if the columnar index actually provides the fields we need.
+    // Ensures that hinted index is eligible for the column scan.
+    if (hintedIndex && !checkProjectionCoversQuery(allFieldsReferenced, *hintedIndex)) {
+        return {ErrorCodes::Error{6714002},
+                "the hinted column store index cannot be used because it does not cover the query"};
+    }
+
+    // Check that union of the dependency fields can be successfully projected by at least one
+    // column store index.
+    auto [numValid, selectedColumnStoreIndex] =
+        getValidColumnIndex(allFieldsReferenced, params.columnStoreIndexes);
+
+    // If not columnar index can support the projection, we will not use column scan.
+    if (numValid == 0) {
+        return {ErrorCodes::Error{6714001},
+                "cannot use column store index because there exists no column store index for this "
+                "collection that covers the query"};
+    }
+    invariant(selectedColumnStoreIndex);
+
+    if (!hintedIndex && numValid > 1) {
+        LOGV2_DEBUG(6298500,
+                    2,
+                    "Multiple column store indexes present. Selecting the first "
+                    "one arbitrarily",
+                    "indexName"_attr = selectedColumnStoreIndex->identifier.catalogName);
+    }
+
+    const auto& columnStoreIndex = hintedIndex.value_or(*selectedColumnStoreIndex);
     std::unique_ptr<MatchExpression> residualPredicate;
     StringMap<std::unique_ptr<MatchExpression>> filterSplitByColumn;
     std::tie(filterSplitByColumn, residualPredicate) =

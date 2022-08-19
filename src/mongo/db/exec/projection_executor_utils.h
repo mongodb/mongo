@@ -45,9 +45,17 @@ bool applyProjectionToOneField(projection_executor::ProjectionExecutor* executor
  * Applies the projection to each field from the 'fields' set and stores it in the returned set
  * if the projection would allow that field to remain in a document.
  **/
+template <typename Container>
 stdx::unordered_set<std::string> applyProjectionToFields(
-    projection_executor::ProjectionExecutor* executor,
-    const stdx::unordered_set<std::string>& fields);
+    projection_executor::ProjectionExecutor* executor, Container const& fields) {
+    stdx::unordered_set<std::string> out;
+    for (const auto& field : fields) {
+        if (applyProjectionToOneField(executor, field)) {
+            out.insert(field);
+        }
+    }
+    return out;
+}
 
 /**
  * Applies a positional projection on the first array found in the 'path' on a projection

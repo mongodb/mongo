@@ -37,21 +37,6 @@ bool applyProjectionToOneField(projection_executor::ProjectionExecutor* executor
     md.setNestedField(fp, Value{1.0});
     auto output = executor->applyTransformation(md.freeze());
     return !output.getNestedField(fp).missing();
-    return false;
-}
-
-stdx::unordered_set<std::string> applyProjectionToFields(
-    projection_executor::ProjectionExecutor* executor,
-    const stdx::unordered_set<std::string>& fields) {
-    stdx::unordered_set<std::string> out;
-
-    for (const auto& field : fields) {
-        if (applyProjectionToOneField(executor, field)) {
-            out.insert(field);
-        }
-    }
-
-    return out;
 }
 
 namespace {

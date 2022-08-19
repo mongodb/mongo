@@ -42,6 +42,7 @@
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_executor_utils.h"
 #include "mongo/db/fts/fts_spec.h"
+#include "mongo/db/index/columns_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/query/classic_plan_cache.h"
@@ -127,10 +128,14 @@ void CollectionQueryInfo::computeIndexKeys(OperationContext* opCtx, const Collec
         const IndexDescriptor* descriptor = entry->descriptor();
         const IndexAccessMethod* iam = entry->accessMethod();
 
-        if (descriptor->getAccessMethodName() == IndexNames::WILDCARD) {
+        if (bool isWildcard = (descriptor->getAccessMethodName() == IndexNames::WILDCARD);
+            isWildcard || descriptor->getAccessMethodName() == IndexNames::COLUMN) {
             // Obtain the projection used by the $** index's key generator.
-            const auto* pathProj =
-                static_cast<const WildcardAccessMethod*>(iam)->getWildcardProjection();
+            const auto* pathProj = isWildcard
+                ? static_cast<const IndexPathProjection*>(
+                      static_cast<const WildcardAccessMethod*>(iam)->getWildcardProjection())
+                : static_cast<const IndexPathProjection*>(
+                      static_cast<const ColumnStoreAccessMethod*>(iam)->getColumnstoreProjection());
             // If the projection is an exclusion, then we must check the new document's keys on all
             // updates, since we do not exhaustively know the set of paths to be indexed.
             if (pathProj->exec()->getType() ==
@@ -145,8 +150,6 @@ void CollectionQueryInfo::computeIndexKeys(OperationContext* opCtx, const Collec
                     _indexedPaths.addPath(path);
                 }
             }
-        } else if (descriptor->getAccessMethodName() == IndexNames::COLUMN) {
-            _indexedPaths.allPathsIndexed();
         } else if (descriptor->getAccessMethodName() == IndexNames::TEXT) {
             fts::FTSSpec ftsSpec(descriptor->infoObj());
 

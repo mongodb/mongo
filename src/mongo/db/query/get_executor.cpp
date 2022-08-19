@@ -56,6 +56,7 @@
 #include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/exec/subplan.h"
 #include "mongo/db/exec/upsert_stage.h"
+#include "mongo/db/index/columns_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/index_names.h"
@@ -256,6 +257,30 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
             wildcardProjection};
 }
 
+ColumnIndexEntry columnIndexEntryFromIndexCatalogEntry(OperationContext* opCtx,
+                                                       const CollectionPtr& collection,
+                                                       const IndexCatalogEntry& ice) {
+
+    auto desc = ice.descriptor();
+    invariant(desc);
+
+    auto accessMethod = ice.accessMethod();
+    invariant(accessMethod);
+
+    auto cam = static_cast<const ColumnStoreAccessMethod*>(accessMethod);
+    const auto columnstoreProjection = cam->getColumnstoreProjection();
+
+    return {desc->keyPattern(),
+            desc->getIndexType(),
+            desc->version(),
+            desc->isSparse(),
+            desc->unique(),
+            ColumnIndexEntry::Identifier{desc->indexName()},
+            ice.getFilterExpression(),
+            ice.getCollator(),
+            columnstoreProjection};
+}
+
 /**
  * If query supports index filters, filter params.indices according to any index filters that have
  * been configured. In addition, sets that there were indeed index filters applied.
@@ -303,7 +328,8 @@ void fillOutIndexEntries(OperationContext* opCtx,
             continue;
 
         if (indexType == IndexType::INDEX_COLUMN) {
-            columnEntries.emplace_back(ice->descriptor()->indexName());
+            columnEntries.emplace_back(
+                columnIndexEntryFromIndexCatalogEntry(opCtx, collection, *ice));
         } else {
             entries.emplace_back(
                 indexEntryFromIndexCatalogEntry(opCtx, collection, *ice, canonicalQuery));

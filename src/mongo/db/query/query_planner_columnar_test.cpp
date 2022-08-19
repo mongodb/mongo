@@ -29,6 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/index/column_key_generator.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/inner_pipeline_stage_impl.h"
 #include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
@@ -43,6 +44,8 @@
 
 namespace mongo {
 const std::string kIndexName = "indexName";
+const BSONObj kKeyPattern = BSON("$**"
+                                 << "columnstore");
 
 /**
  * A specialization of the QueryPlannerTest fixture which makes it easy to present the planner with
@@ -68,10 +71,24 @@ protected:
             kInternalQueryMaxNumberOfFieldsToChooseFilteredColumnScanDefault);
     }
 
-    void addColumnStoreIndexAndEnableFilterSplitting(StringData indexName = kIndexName) {
-        params.columnStoreIndexes.emplace_back(indexName.toString());
-
-        params.options |= QueryPlannerParams::GENERATE_PER_COLUMN_FILTERS;
+    void addColumnStoreIndexAndEnableFilterSplitting(bool genPerColFilter = true,
+                                                     StringData indexName = kIndexName,
+                                                     const IndexPathProjection* proj = nullptr,
+                                                     BSONObj keyPattern = kKeyPattern,
+                                                     MatchExpression* partialFilterExpr = nullptr,
+                                                     CollatorInterface* collator = nullptr) {
+        params.columnStoreIndexes.emplace_back(keyPattern,
+                                               IndexType::INDEX_COLUMN,
+                                               IndexDescriptor::kLatestIndexVersion,
+                                               false /* sparse */,
+                                               false /* unique */,
+                                               IndexEntry::Identifier{indexName.toString()},
+                                               partialFilterExpr,
+                                               collator,
+                                               proj ? proj : &_defaultPathProj);
+        if (genPerColFilter) {
+            params.options |= QueryPlannerParams::GENERATE_PER_COLUMN_FILTERS;
+        }
     }
 
     std::vector<std::unique_ptr<InnerPipelineStageInterface>> makeInnerPipelineStages(
@@ -83,10 +100,18 @@ protected:
         return stages;
     }
 
+    IndexPathProjection makeProjection(BSONObj columnstoreProjection,
+                                       BSONObj keyPattern = kKeyPattern) {
+        return column_keygen::ColumnKeyGenerator::createProjectionExecutor(keyPattern,
+                                                                           columnstoreProjection);
+    }
+
 private:
     // SBE must be enabled in order to test columnar indexes.
     RAIIServerParameterControllerForTest _controllerSBE{"internalQueryFrameworkControl",
                                                         "trySbeEngine"};
+    IndexPathProjection _defaultPathProj =
+        column_keygen::ColumnKeyGenerator::createProjectionExecutor(kKeyPattern, BSONObj());
 };
 
 TEST_F(QueryPlannerColumnarTest, InclusionProjectionUsesColumnStoreIndex) {
@@ -718,7 +743,7 @@ TEST_F(QueryPlannerColumnarTest, MatchGroupTest) {
             node: {
                 column_scan: {
                     filtersByPath: {name: {name: {$eq: 'bob'}}},
-                    outputFields: ['foo', 'x'], 
+                    outputFields: ['foo', 'x'],
                     matchFields: ['name']
                 }
             }
@@ -758,7 +783,7 @@ TEST_F(QueryPlannerColumnarTest, MatchGroupWithOverlappingFieldsTest) {
                 node: {
                     column_scan: {
                         filtersByPath: {name: {name: {$eq: 'bob'}}},
-                        outputFields: ['foo', 'x', 'name'], 
+                        outputFields: ['foo', 'x', 'name'],
                         matchFields: ['name']
                     }
                 }
@@ -831,7 +856,7 @@ TEST_F(QueryPlannerColumnarTest, DottedFieldsWithGroupStageDoesNotRequireProject
                 node: {
                     column_scan: {
                         filtersByPath: {name: {name: {$eq: 'bob'}}},
-                        outputFields: ['foo.bar', 'x.y', 'name'], 
+                        outputFields: ['foo.bar', 'x.y', 'name'],
                         matchFields: ['name']
                     }
                 }
@@ -899,8 +924,8 @@ TEST_F(QueryPlannerColumnarTest, ShardKeyFieldsCountTowardsFieldLimit) {
 }
 
 TEST_F(QueryPlannerColumnarTest, SelectsFirstFromMultipleEligibleColumnStoreIndexes) {
-    addColumnStoreIndexAndEnableFilterSplitting("first index"_sd);
-    params.columnStoreIndexes.emplace_back("second index");
+    addColumnStoreIndexAndEnableFilterSplitting(true, "first index"_sd);
+    addColumnStoreIndexAndEnableFilterSplitting(false, "second index"_sd);
 
     runQuerySortProj(BSONObj(), BSONObj(), BSON("a" << 1 << "_id" << 0));
     assertSolutionExists(R"({
@@ -911,4 +936,270 @@ TEST_F(QueryPlannerColumnarTest, SelectsFirstFromMultipleEligibleColumnStoreInde
         }
     })");
 }
+
+TEST_F(QueryPlannerColumnarTest, FullPredicateOption) {
+    addColumnStoreIndexAndEnableFilterSplitting(false, kIndexName);
+
+    // Filter that could be pushed down, but isn't due to the lack of the
+    // GENERATE_PER_COLUMN_FILTER flag.
+    auto predicate = fromjson(R"({
+        specialAddress: {$exists: true},
+        doNotContact: {$exists: true}
+    })");
+    runQuerySortProj(predicate, BSONObj(), BSON("a" << 1 << "_id" << 0));
+    assertSolutionExists(R"({
+        proj: {
+            spec: {a: 1, _id: 0},
+            node: {
+                column_scan: {
+                    outputFields: ['a'],
+                    matchFields: ['specialAddress', 'doNotContact'],
+                    postAssemblyFilter: {
+                        specialAddress: {$exists: true},
+                        doNotContact: {$exists: true}
+                    }
+                }
+            }
+        }
+    })");
+}
+
+TEST_F(QueryPlannerColumnarTest, UseColumnStoreWithExactFields) {
+    auto firstProj = makeProjection(fromjson(R"({"d": true, "b.c": true, "_id": false})"));
+    addColumnStoreIndexAndEnableFilterSplitting(true, "first index"_sd, &firstProj);
+
+    auto secondProj = makeProjection(fromjson(R"({"a": true, "b.c": true, "_id": false})"));
+    addColumnStoreIndexAndEnableFilterSplitting(true, "second index"_sd, &secondProj);
+
+    // Should use the second index, despite the third index being valid, because the second index
+    // was seen first.
+    auto thirdProj = makeProjection(fromjson(R"({"a": true, "b.c": true, "_id": false})"));
+    addColumnStoreIndexAndEnableFilterSplitting(true, "third index"_sd, &thirdProj);
+
+    runQuerySortProj(
+        BSON("a" << BSON("$gt" << 3)), BSONObj(), BSON("a" << 1 << "b.c" << 1 << "_id" << 0));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({
+        proj: {
+            spec: {a: 1, 'b.c': 1, _id: 0},
+            node: {
+                column_scan: {
+                    indexName: 'second index',
+                    filtersByPath: {a: {a: {$gt: 3}}},
+                    outputFields: ['a', 'b.c'],
+                    matchFields: ['a']
+                }
+            }
+        }
+    })");
+}
+
+TEST_F(QueryPlannerColumnarTest, UseColumnStoreWithExtraFields) {
+    auto firstProj = makeProjection(fromjson(
+        R"({"a": true, "unsubscribed": true, "test field": true, "another test field": true, "_id": false})"));
+    addColumnStoreIndexAndEnableFilterSplitting(true, "first index", &firstProj);
+
+    auto secondProj = makeProjection(fromjson(R"({
+            "a": true,
+            "addresses.zip": true,
+            "unsubscribed": true,
+            "specialAddress": true,
+            "doNotContact": true,
+            "test field": true,
+            "another test field": true,
+            "_id": false
+    })"));
+    addColumnStoreIndexAndEnableFilterSplitting(true, "second index"_sd, &secondProj);
+
+    // Same predicate as above, except with exists: false, which disqualifies the whole thing.
+    auto complexPredicate = fromjson(R"({
+        a: {$gte: 0},
+        "addresses.zip": "12345",
+        unsubscribed: false,
+        specialAddress: {$exists: false},
+        doNotContact: {$exists: false}
+    })");
+    runQuerySortProj(complexPredicate, BSONObj(), BSON("a" << 1 << "_id" << 0));
+    assertSolutionExists(R"({
+        proj: {
+            spec: {a: 1, _id: 0},
+            node: {
+                column_scan: {
+                    index_name: 'second index',
+                    filtersByPath: {
+                        a: {a: {$gte: 0}},
+                        'addresses.zip': {'addresses.zip': {$eq: '12345'}},
+                        unsubscribed: {unsubscribed: false}
+                    },
+                    outputFields: ['a'],
+                    postAssemblyFilter: {
+                        specialAddress: {$exists: false},
+                        doNotContact: {$exists: false}
+                    },
+                    matchFields:
+                        ['a', 'addresses.zip', 'unsubscribed', 'specialAddress', 'doNotContact']
+                }
+            }
+        }
+    })");
+}
+
+TEST_F(QueryPlannerColumnarTest, UseColumnStoreWithSinglePath) {
+    addColumnStoreIndexAndEnableFilterSplitting(true, "first index"_sd);
+    addColumnStoreIndexAndEnableFilterSplitting(true, "second index"_sd);
+
+
+    runQuerySortProj(BSONObj(), BSONObj(), BSON("a" << 1 << "_id" << 0));
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({
+        column_scan: {
+            indexName: 'first index',
+            filtersByPath: {},
+            outputFields: ['a'],
+            matchFields: []
+        }
+    })");
+}
+
+TEST_F(QueryPlannerColumnarTest, UseColumnStoreWithAncestorField) {
+    auto firstProj = makeProjection(fromjson(R"({"foo": true, "x": true, "name": true})"));
+    addColumnStoreIndexAndEnableFilterSplitting(true, "first index"_sd, &firstProj);
+
+    auto secondProj = makeProjection(BSONObj(),
+                                     BSON("foo.$**"
+                                          << "columnstore"));
+    addColumnStoreIndexAndEnableFilterSplitting(true,
+                                                "second index"_sd,
+                                                &secondProj,
+                                                BSON("foo.$**"
+                                                     << "columnstore"));
+
+    auto pipeline = Pipeline::parse(
+        {fromjson("{$group: {_id: '$foo.bar', s: {$sum: '$x.y'}, name: {$first: '$name'}}}")},
+        expCtx);
+
+    runQueryWithPipeline(BSON("name"
+                              << "bob"),
+                         BSON("foo.bar" << 1 << "x.y" << 1 << "name" << 1 << "_id" << 0),
+                         makeInnerPipelineStages(*pipeline));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({
+        proj: {
+            spec: {'foo.bar': 1, 'x.y': 1, name: 1, _id: 0},
+            node: {
+                column_scan: {
+                    indexName: 'first index',
+                    filtersByPath: {name: {name: {$eq: 'bob'}}},
+                    outputFields: ['foo.bar', 'x.y', 'name'],
+                    matchFields: ['name']
+                }
+            }
+        }
+    })");
+
+    ASSERT(!cq->pipeline().empty());
+    auto solution =
+        QueryPlanner::extendWithAggPipeline(*cq, std::move(solns[0]), {} /* secondaryCollInfos
+        */);
+    ASSERT_OK(QueryPlannerTestLib::solutionMatches(R"({
+            group: {
+                key: {_id: '$foo.bar'},
+                accs: [{s: {$sum: '$x.y'}}, {name: {$first: '$name'}}],
+                node: {
+                    column_scan: {
+                        indexName: 'first index',
+                        filtersByPath: {name: {name: {$eq: 'bob'}}},
+                        outputFields: ['foo.bar', 'x.y', 'name'],
+                        matchFields: ['name']
+                    }
+                }
+            }
+        })",
+                                                   solution->root()))
+        << solution->root()->toString();
+}
+
+TEST_F(QueryPlannerColumnarTest, DontUseColumnStoreWithSinglePath) {
+    auto firstProj = makeProjection(BSONObj(),
+                                    BSON("a.$**"
+                                         << "columnstore"));
+    addColumnStoreIndexAndEnableFilterSplitting(true,
+                                                "first index"_sd,
+                                                &firstProj,
+                                                BSON("a.$**"
+                                                     << "columnstore"));
+    internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan.store(2);
+    runQuerySortProj(BSONObj(), BSONObj(), BSON("b" << 1));
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({proj: {spec: {b: 1}, node: {cscan: {dir: 1}}}})");
+}
+
+TEST_F(QueryPlannerColumnarTest, DontUseColumnStoreMissingField) {
+    auto firstProj = makeProjection(fromjson(R"({"a": false})"));
+    addColumnStoreIndexAndEnableFilterSplitting(true, "first index"_sd, &firstProj);
+
+    auto secondProj = makeProjection(fromjson(R"({"b": true})"));
+    addColumnStoreIndexAndEnableFilterSplitting(true, "second index"_sd, &secondProj);
+
+    runQuerySortProj(BSONObj(), BSONObj(), BSON("a" << 1 << "_id" << 0));
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({proj: {spec: {a: 1, _id: 0}, node: {cscan: {dir: 1}}}})");
+}
+
+TEST_F(QueryPlannerColumnarTest, DontUseColumnStoreMissingMultipleField) {
+    auto firstProj = makeProjection(fromjson(R"({"a": true, "c": true, "d": true})"));
+    addColumnStoreIndexAndEnableFilterSplitting(true, "first index"_sd, &firstProj);
+
+    auto secondProj = makeProjection(fromjson(R"({"b": true, "c": true, "d": true})"));
+    addColumnStoreIndexAndEnableFilterSplitting(true, "second index"_sd, &secondProj);
+
+    runQuerySortProj(BSON("a" << 1), BSONObj(), BSON("a" << true << "b" << true));
+    assertNumSolutions(1U);
+    assertSolutionExists(
+        R"({proj: {spec: {a: 1, b: 1}, node: {cscan: {dir: 1, filter: {a: {$eq: 1}}}}}})");
+}
+
+TEST_F(QueryPlannerColumnarTest, DontUseColumnStoreSpecifiedSubField) {
+    auto firstProj = makeProjection(fromjson(R"({"a.b": true, "b.c": true, "c": true})"));
+    addColumnStoreIndexAndEnableFilterSplitting(true, "first_index"_sd, &firstProj);
+
+    auto secondProj = makeProjection(fromjson(R"({"a": true, "b.c": true, "d": true})"));
+    addColumnStoreIndexAndEnableFilterSplitting(true, "second_index"_sd, &secondProj);
+
+    internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan.store(2);
+    runQuerySortProj(BSONObj(), BSONObj(), BSON("a" << 1 << "c" << 1));
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({proj: {spec: {a: 1, c: 1}, node: {cscan: {dir: 1}}}})");
+}
+
+TEST_F(QueryPlannerColumnarTest, HintIndexDoesNotCoverQuery) {
+    // Column Store Index does not cover query.
+    auto firstProj = makeProjection(BSONObj(),
+                                    BSON("b.$**"
+                                         << "columnstore"));
+    addColumnStoreIndexAndEnableFilterSplitting(true, "first index", &firstProj);
+    ASSERT_THROWS(runQuerySortProjSkipLimitHint(BSONObj(),
+                                                BSONObj(),
+                                                BSON("a" << 1 << "_id" << 0),
+                                                0,
+                                                0,
+                                                BSON("$hint"
+                                                     << "first index")),
+                  unittest::TestAssertionFailureException);
+}
+
+TEST_F(QueryPlannerColumnarTest, NoColumnIndexCoversQuery) {
+    auto firstProj = makeProjection(fromjson(R"({b: 1, d: 1})"));
+    addColumnStoreIndexAndEnableFilterSplitting(true, "first index", &firstProj);
+    auto secondProj = makeProjection(fromjson(R"({c: 1, d: 1})"));
+    addColumnStoreIndexAndEnableFilterSplitting(true, "second index", &secondProj);
+
+    // Valid for column scan, but no column store indices that cover the query.
+    runQuerySortProj(BSONObj(), BSONObj(), BSON("a" << 1));
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({proj: {spec: {a: 1}, node: {cscan: {dir: 1}}}})");
+}
+
 }  // namespace mongo

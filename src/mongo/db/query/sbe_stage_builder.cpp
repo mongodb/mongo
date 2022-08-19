@@ -888,7 +888,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     std::unique_ptr<sbe::PlanStage> stage =
         std::make_unique<sbe::ColumnScanStage>(getCurrentCollection(reqs)->uuid(),
-                                               csn->indexEntry.catalogName,
+                                               csn->indexEntry.identifier.catalogName,
                                                std::move(paths),
                                                std::move(includeInOutput),
                                                ridSlot,

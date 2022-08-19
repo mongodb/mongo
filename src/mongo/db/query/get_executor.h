@@ -128,6 +128,15 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
                                            const CanonicalQuery* canonicalQuery = nullptr);
 
 /**
+ * Converts the catalog metadata for an index into an ColumnIndexEntry, which is a format that is
+ * meant to be consumed by the query planner. This function can perform index reads and should not
+ * be called unless access to the storage engine is permitted.
+ */
+ColumnIndexEntry columnIndexEntryFromIndexCatalogEntry(OperationContext* opCtx,
+                                                       const CollectionPtr& collection,
+                                                       const IndexCatalogEntry& ice);
+
+/**
  * Determines whether or not to wait for oplog visibility for a query. This is only used for
  * collection scans on the oplog.
  */

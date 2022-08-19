@@ -61,17 +61,17 @@ struct CoreIndexInfo {
                   Identifier ident,
                   const MatchExpression* fe = nullptr,
                   const CollatorInterface* ci = nullptr,
-                  const WildcardProjection* wildcardProj = nullptr)
+                  const IndexPathProjection* indexPathProj = nullptr)
         : identifier(std::move(ident)),
           keyPattern(kp),
           filterExpr(fe),
           type(type),
           sparse(sp),
           collator(ci),
-          wildcardProjection(wildcardProj) {
-        // We always expect a projection executor for $** indexes, and none otherwise.
-        // TODO SERVER-67140: Add columnstoreProjection and invariant
-        invariant((type == IndexType::INDEX_WILDCARD) == (wildcardProjection != nullptr));
+          indexPathProjection(indexPathProj) {
+        // If a projection executor exists, we always expect a $** index
+        if (indexPathProjection != nullptr)
+            invariant(type == IndexType::INDEX_WILDCARD || type == IndexType::INDEX_COLUMN);
     }
 
     virtual ~CoreIndexInfo() = default;
@@ -138,8 +138,9 @@ struct CoreIndexInfo {
     const CollatorInterface* collator = nullptr;
 
     // For $** indexes, a pointer to the projection executor owned by the index access method. Null
-    // unless this IndexEntry represents a wildcard index, in which case this is always non-null.
-    const WildcardProjection* wildcardProjection = nullptr;
+    // unless this IndexEntry represents a wildcard or column storeindex, in which case this is
+    // always non-null.
+    const IndexPathProjection* indexPathProjection = nullptr;
 };
 
 /**
@@ -259,12 +260,34 @@ struct IndexEntry : CoreIndexInfo {
 /**
  * Represents a columnar index.
  */
-struct ColumnIndexEntry {
-    ColumnIndexEntry(std::string catalogName) : catalogName(std::move(catalogName)) {}
+struct ColumnIndexEntry : CoreIndexInfo {
+    ColumnIndexEntry(const BSONObj& keyPattern,
+                     IndexType type,
+                     IndexDescriptor::IndexVersion version,
+                     bool sparse,
+                     bool unique,
+                     Identifier ident,
+                     const MatchExpression* filterExpression,
+                     const CollatorInterface* ci,
+                     const IndexPathProjection* columnstoreProjection)
+        : CoreIndexInfo(keyPattern,
+                        type,
+                        sparse,
+                        std::move(ident),
+                        filterExpression,
+                        ci,
+                        columnstoreProjection),
+          version(version),
+          unique(unique) {}
 
-    std::string catalogName;
+    ColumnIndexEntry(const ColumnIndexEntry&) = default;
+    ColumnIndexEntry(ColumnIndexEntry&&) = default;
+    ColumnIndexEntry& operator=(const ColumnIndexEntry&) = default;
+    ColumnIndexEntry& operator=(ColumnIndexEntry&&) = default;
+    ~ColumnIndexEntry() = default;
 
-    // TODO SERVER-67140: Projection, probably need some kind of disambiguator.
+    IndexDescriptor::IndexVersion version;
+    bool unique;
 };
 
 std::ostream& operator<<(std::ostream& stream, const IndexEntry::Identifier& ident);

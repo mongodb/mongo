@@ -1312,8 +1312,8 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
         auto obj = expectedElem.Obj();
 
         if (auto indexName = obj["indexName"]) {
-            if (auto nameStatus =
-                    indexNamesMatch(indexName, actualColumnIxScanNode->indexEntry.catalogName);
+            if (auto nameStatus = indexNamesMatch(
+                    indexName, actualColumnIxScanNode->indexEntry.identifier.catalogName);
                 !nameStatus.isOK()) {
                 return nameStatus;
             }

@@ -361,7 +361,7 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
     invariant(wildcardIndex.multikeyPaths.empty());
 
     // Obtain the projection executor from the parent wildcard IndexEntry.
-    auto* wildcardProjection = wildcardIndex.wildcardProjection;
+    auto* wildcardProjection = wildcardIndex.indexPathProjection;
     invariant(wildcardProjection);
 
     const auto projectedFields =
@@ -411,7 +411,7 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
                          wildcardIndex.filterExpr,
                          wildcardIndex.infoObj,
                          wildcardIndex.collator,
-                         wildcardIndex.wildcardProjection);
+                         wildcardIndex.indexPathProjection);
 
         invariant("$_path"_sd != fieldName);
         out->push_back(std::move(entry));
