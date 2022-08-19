@@ -33,6 +33,7 @@
 #include <fstream>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
@@ -583,7 +584,7 @@ BSONObj getBsonFromJsonFile(std::string fileName) {
     std::ifstream infile(filename.c_str());
     std::string data((std::istreambuf_iterator<char>(infile)), std::istreambuf_iterator<char>());
     BSONObj obj = fromjson(data);
-    ASSERT_TRUE(obj.valid());
+    ASSERT_TRUE(validateBSON(obj).isOK());
     ASSERT_TRUE(obj.hasField("tests"));
     BSONObj arr = obj.getField("tests").embeddedObject().getOwned();
     ASSERT_TRUE(arr.couldBeArray());

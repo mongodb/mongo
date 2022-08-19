@@ -638,11 +638,6 @@ public:
     bool hasFieldNames() const;
 
     /**
-     * Returns true if this object is valid and returns false otherwise.
-     */
-    bool valid() const;
-
-    /**
      * add all elements of the object to the specified vector
      */
     void elems(std::vector<BSONElement>&) const;

@@ -35,6 +35,7 @@
 #include "mongo/base/data_view.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
@@ -142,13 +143,14 @@ public:
                             l == UUIDLength);
                         break;
                     }
-                    case BinDataType::MD5Type:
+                    case BinDataType::MD5Type: {
                         constexpr uint32_t md5Length = 16;
                         auto md5Size = ConstDataView(ptr).read<LittleEndian<uint32_t>>();
                         uassert(NonConformantBSON,
                                 fmt::format("MD5 must be 16 bytes, got {} instead.", md5Size),
                                 md5Size == md5Length);
                         break;
+                    }
                 }
                 break;
         }
@@ -222,6 +224,25 @@ class FullValidator : private ExtendedValidator {
 public:
     void checkNonConformantElem(const char* ptr, uint32_t offsetToValue, uint8_t type) {
         ExtendedValidator::checkNonConformantElem(ptr, offsetToValue, type);
+        switch (type) {
+            case BSONType::BinData: {
+                uint8_t subtype = ConstDataView(ptr + offsetToValue + sizeof(uint32_t))
+                                      .read<LittleEndian<uint8_t>>();
+                switch (subtype) {
+                    case BinDataType::Column: {
+                        // Check for exceptions when decompressing.
+                        // Calling size() decompresses the entire column.
+                        try {
+                            BSONColumn(BSONElement(ptr)).size();
+                        } catch (...) {
+                            uasserted(NonConformantBSON,
+                                      "Exception ocurred while decompressing a BSON column.");
+                        }
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     void checkUTF8Char() {}
@@ -489,5 +510,9 @@ Status validateBSON(const char* originalBuffer,
             .validate();
     else
         MONGO_UNREACHABLE;
+}
+
+Status validateBSON(const BSONObj& obj, BSONValidateMode mode) {
+    return validateBSON(obj.objdata(), obj.objsize(), mode);
 }
 }  // namespace mongo

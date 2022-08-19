@@ -32,7 +32,6 @@
 #include "mongo/db/jsobj.h"
 
 #include "mongo/base/data_range.h"
-#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/generator_extended_canonical_2_0_0.h"
 #include "mongo/bson/generator_extended_relaxed_2_0_0.h"
@@ -300,9 +299,6 @@ BSONObj BSONObj::jsonStringBuffer(JsonStringFormat format,
     }
 }
 
-bool BSONObj::valid() const {
-    return validateBSON(objdata(), objsize()).isOK();
-}
 
 int BSONObj::woCompare(const BSONObj& r,
                        const Ordering& o,

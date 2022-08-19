@@ -37,6 +37,7 @@
 #include <cmath>
 #include <iostream>
 
+#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonobj_comparator.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/util/builder.h"
@@ -507,7 +508,7 @@ public:
             bb << "a" << 1;
             BSONObj tmp = bb.asTempObj();
             ASSERT(tmp.objsize() == 4 + (1 + 2 + 4) + 1);
-            ASSERT(tmp.valid());
+            ASSERT(validateBSON(tmp).isOK());
             ASSERT(tmp.hasField("a"));
             ASSERT(!tmp.hasField("b"));
             ASSERT_BSONOBJ_EQ(tmp, BSON("a" << 1));
@@ -515,7 +516,7 @@ public:
             bb << "b" << 2;
             BSONObj obj = bb.obj();
             ASSERT_EQUALS(obj.objsize(), 4 + (1 + 2 + 4) + (1 + 2 + 4) + 1);
-            ASSERT(obj.valid());
+            ASSERT(validateBSON(obj).isOK());
             ASSERT(obj.hasField("a"));
             ASSERT(obj.hasField("b"));
             ASSERT_BSONOBJ_EQ(obj, BSON("a" << 1 << "b" << 2));
@@ -525,7 +526,7 @@ public:
             bb << "a" << GT << 1;
             BSONObj tmp = bb.asTempObj();
             ASSERT(tmp.objsize() == 4 + (1 + 2 + (4 + 1 + 4 + 4 + 1)) + 1);
-            ASSERT(tmp.valid());
+            ASSERT(validateBSON(tmp).isOK());
             ASSERT(tmp.hasField("a"));
             ASSERT(!tmp.hasField("b"));
             ASSERT_BSONOBJ_EQ(tmp, BSON("a" << BSON("$gt" << 1)));
@@ -534,7 +535,7 @@ public:
             BSONObj obj = bb.obj();
             ASSERT(obj.objsize() ==
                    4 + (1 + 2 + (4 + 1 + 4 + 4 + 1)) + (1 + 2 + (4 + 1 + 4 + 4 + 1)) + 1);
-            ASSERT(obj.valid());
+            ASSERT(validateBSON(obj).isOK());
             ASSERT(obj.hasField("a"));
             ASSERT(obj.hasField("b"));
             ASSERT_BSONOBJ_EQ(obj, BSON("a" << BSON("$gt" << 1) << "b" << BSON("$lt" << 2)));
@@ -544,7 +545,7 @@ public:
             bb << "a" << 1;
             BSONObj tmp = bb.asTempObj();
             ASSERT(tmp.objsize() == 4 + (1 + 2 + 4) + 1);
-            ASSERT(tmp.valid());
+            ASSERT(validateBSON(tmp).isOK());
             ASSERT(tmp.hasField("a"));
             ASSERT(!tmp.hasField("b"));
             ASSERT_BSONOBJ_EQ(tmp, BSON("a" << 1));
@@ -556,7 +557,7 @@ public:
             }
             bb << "b" << arr.arr();
             BSONObj obj = bb.obj();
-            ASSERT(obj.valid());
+            ASSERT(validateBSON(obj).isOK());
             ASSERT(obj.hasField("a"));
             ASSERT(obj.hasField("b"));
         }
@@ -758,8 +759,8 @@ class Base {
 public:
     virtual ~Base() {}
     void run() {
-        ASSERT(valid().valid());
-        ASSERT(!invalid().valid());
+        ASSERT(validateBSON(valid()).isOK());
+        ASSERT(!validateBSON(invalid()).isOK());
     }
 
 protected:
@@ -808,7 +809,7 @@ public:
         b.appendNull("a");
         BSONObj o = b.done();
         set(o, 4, mongo::Undefined);
-        ASSERT(o.valid());
+        ASSERT(validateBSON(o).isOK());
     }
 };
 
@@ -992,7 +993,7 @@ public:
     void run() {
         const char data[] = {0x07, 0x00, 0x00, 0x00, char(type_), 'a', 0x00};
         BSONObj o(data);
-        ASSERT(!o.valid());
+        ASSERT(!validateBSON(o).isOK());
     }
 
 private:
@@ -1331,7 +1332,7 @@ public:
         b2.done();
         b1.append("f", 10.0);
         BSONObj ret = b1.done();
-        ASSERT(ret.valid());
+        ASSERT(validateBSON(ret).isOK());
         ASSERT(ret.woCompare(fromjson("{a:'bcd',foo:{ggg:44},f:10}")) == 0);
     }
 };
@@ -1352,7 +1353,7 @@ public:
         BSONObj o = BSON("now" << DATENOW);
         Date_t after = jsTime();
 
-        ASSERT(o.valid());
+        ASSERT(validateBSON(o).isOK());
 
         BSONElement e = o["now"];
         ASSERT(e.type() == Date);
@@ -1370,7 +1371,7 @@ public:
         b.appendTimeT("now", aTime);
         BSONObj o = b.obj();
 
-        ASSERT(o.valid());
+        ASSERT(validateBSON(o).isOK());
 
         BSONElement e = o["now"];
         ASSERT_EQUALS(Date, e.type());
@@ -1384,8 +1385,8 @@ public:
         BSONObj min = BSON("a" << MINKEY);
         BSONObj max = BSON("b" << MAXKEY);
 
-        ASSERT(min.valid());
-        ASSERT(max.valid());
+        ASSERT(validateBSON(min).isOK());
+        ASSERT(validateBSON(max).isOK());
 
         BSONElement minElement = min["a"];
         BSONElement maxElement = max["b"];

@@ -32,6 +32,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
@@ -124,7 +125,7 @@ TEST(IndexBuildEntryTest, SerializeAndDeserialize) {
     entry.setCommitReadyMembers(generateCommitReadyMembers(3));
 
     BSONObj obj = entry.toBSON();
-    ASSERT_TRUE(obj.valid());
+    ASSERT_TRUE(validateBSON(obj).isOK());
 
     IDLParserContext ctx("IndexBuildsEntry Parser");
     IndexBuildEntry rebuiltEntry = IndexBuildEntry::parse(ctx, obj);

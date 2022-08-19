@@ -30,6 +30,7 @@
 #include <boost/optional.hpp>
 #include <iostream>
 
+#include "mongo/bson/bson_validate.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/multi_index_block.h"
@@ -1204,7 +1205,7 @@ public:
         std::unique_ptr<DBClientCursor> cursor = _client.find(std::move(findRequest));
         while (cursor->more()) {
             BSONObj o = cursor->next();
-            verify(o.valid());
+            verify(validateBSON(o).isOK());
         }
     }
     void run() {

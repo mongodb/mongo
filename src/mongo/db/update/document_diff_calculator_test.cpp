@@ -32,6 +32,7 @@
 #include <functional>
 
 #include "mongo/bson/bson_depth.h"
+#include "mongo/bson/bson_validate.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/unittest/unittest.h"
@@ -295,7 +296,7 @@ TEST(DocumentDiffCalculatorTest, DeeplyNestObjectGenerateDiff) {
     preBob.append("largeField", largeValue);
     buildDeepObj(&preBob, "subObj", 0, maxDepth, functionToApply);
     auto preObj = preBob.done();
-    ASSERT(preObj.valid());
+    ASSERT_OK(validateBSON(preObj));
 
     BSONObjBuilder postBob;
     postBob.append("largeField", largeValue);
@@ -312,7 +313,7 @@ TEST(DocumentDiffCalculatorTest, DeeplyNestObjectGenerateDiff) {
     // Deleting the deepest field should give the post object.
     diffOutput = doc_diff::computeDiff(preObj, postBob2.done(), 0, nullptr);
     ASSERT(diffOutput);
-    ASSERT(diffOutput->diff.valid());
+    ASSERT_OK(validateBSON(diffOutput->diff));
 
     BSONObjBuilder expectedOutputBuilder;
     buildDeepObj(&expectedOutputBuilder,
@@ -341,17 +342,17 @@ TEST(DocumentDiffCalculatorTest, DeepestObjectSubDiff) {
     value = 1;
     buildDeepObj(&bob1, "subObj", 0, BSONDepth::getMaxDepthForUserStorage(), functionToApply);
     auto preObj = bob1.done();
-    ASSERT(preObj.valid());
+    ASSERT_OK(validateBSON(preObj));
 
     BSONObjBuilder postBob;
     value = 2;
     buildDeepObj(&postBob, "subObj", 0, BSONDepth::getMaxDepthForUserStorage(), functionToApply);
     auto postObj = postBob.done();
-    ASSERT(postObj.valid());
+    ASSERT_OK(validateBSON(postObj));
 
     auto diffOutput = doc_diff::computeDiff(preObj, postObj, 0, nullptr);
     ASSERT(diffOutput);
-    ASSERT(diffOutput->diff.valid());
+    ASSERT_OK(validateBSON(diffOutput->diff));
 
     BSONObjBuilder expectedOutputBuilder;
     buildDeepObj(&expectedOutputBuilder,

@@ -32,6 +32,7 @@
 #include <cstdint>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 
 namespace mongo {
@@ -69,4 +70,6 @@ enum class BSONValidateMode {
 Status validateBSON(const char* buf,
                     uint64_t maxLength,
                     BSONValidateMode mode = BSONValidateMode::kDefault) noexcept;
+
+Status validateBSON(const BSONObj& obj, BSONValidateMode mode = BSONValidateMode::kDefault);
 }  // namespace mongo

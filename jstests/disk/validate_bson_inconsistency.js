@@ -179,6 +179,35 @@ resetDbpath(dbpath);
     MongoRunner.stopMongod(mongod, null, {skipValidation: true});
 })();
 
+(function validateDocumentsCorruptedBinDataColumn() {
+    jsTestLog("Validate documents with corrupted or misformed BinData Columns.");
+
+    let mongod = startMongodOnExistingPath(dbpath);
+    let db = mongod.getDB(baseName);
+    const collName = collNamePrefix + count++;
+    db.createCollection(collName);
+    let testColl = db[collName];
+
+    // Inserts a rubbish (random string) BSON Column.
+    testColl.insert({a: BinData(7, "O2FkZmdqYWtsamhnJ2xhamhkZzthaCdmZGphZ2hkYQ==")});
+    // Inserts one valid BSON Column to check that it doesn't cause a false positive.
+    testColl.insert(
+        {a: BinData(7, "AQAAAAAAAAAAQJN/AAAAAAAAAAIAAAAAAAAABwAAAAAAAAAOAAAAAAAAAAA=")});
+
+    // Calling validate without 'checkBSONConsistency' should not return any warnings.
+    let res = assert.commandWorked(testColl.validate());
+    assert(res.valid, tojson(res));
+    assert.eq(res.warnings.length, 0);
+    assert.eq(res.nNonCompliantDocuments, 0);
+
+    res = assert.commandWorked(testColl.validate({checkBSONConsistency: true}));
+    assert(res.valid, tojson(res));
+    assert.eq(res.warnings.length, 1);
+    assert.eq(res.nNonCompliantDocuments, 1);
+
+    MongoRunner.stopMongod(mongod, null, {skipValidation: true});
+})();
+
 (function validateDocumentsNonSequentialArrayIndexes() {
     jsTestLog("Validate documents with array indices that are not sequential");
 
