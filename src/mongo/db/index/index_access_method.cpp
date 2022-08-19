@@ -43,6 +43,7 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/index/bulk_builder_common.h"
 #include "mongo/db/index/index_build_interceptor.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
@@ -665,7 +666,8 @@ void IndexAccessMethod::BulkBuilder::yield(OperationContext* opCtx,
     yieldable->restore();
 }
 
-class SortedDataIndexAccessMethod::BulkBuilderImpl final : public IndexAccessMethod::BulkBuilder {
+class SortedDataIndexAccessMethod::BulkBuilderImpl final
+    : public BulkBuilderCommon<SortedDataIndexAccessMethod::BulkBuilderImpl> {
 public:
     using Sorter = mongo::Sorter<KeyString::Value, mongo::NullValue>;
 
@@ -687,18 +689,29 @@ public:
                   const std::function<void()>& saveCursorBeforeWrite,
                   const std::function<void()>& restoreCursorAfterWrite) final;
 
-    Status commit(OperationContext* opCtx,
-                  const CollectionPtr& collection,
-                  bool dupsAllowed,
-                  int32_t yieldIterations,
-                  const KeyHandlerFn& onDuplicateKeyInserted,
-                  const RecordIdHandlerFn& onDuplicateRecord) final;
-
     const MultikeyPaths& getMultikeyPaths() const final;
 
     bool isMultikey() const final;
 
     IndexStateInfo persistDataForShutdown() final;
+
+    std::unique_ptr<Sorter::Iterator> finalizeSort();
+
+    std::unique_ptr<SortedDataBuilderInterface> setUpBulkInserter(OperationContext* opCtx,
+                                                                  bool dupsAllowed);
+
+    void debugEnsureSorted(const Sorter::Data& data);
+
+    bool duplicateCheck(OperationContext* opCtx,
+                        const Sorter::Data& data,
+                        bool dupsAllowed,
+                        const RecordIdHandlerFn& onDuplicateRecord);
+
+    void insertKey(std::unique_ptr<SortedDataBuilderInterface>& inserter, const Sorter::Data& data);
+
+    Status keyCommitted(const KeyHandlerFn& onDuplicateKeyInserted,
+                        const Sorter::Data& data,
+                        bool isDup);
 
 private:
     void _insertMultikeyMetadataKeysIntoSorter();
@@ -713,7 +726,8 @@ private:
 
     SortedDataIndexAccessMethod* _iam;
     std::unique_ptr<Sorter> _sorter;
-    int64_t _keysInserted = 0;
+
+    KeyString::Value _previousKey;
 
     // Set to true if any document added to the BulkBuilder causes the index to become multikey.
     bool _isMultiKey = false;
@@ -740,7 +754,11 @@ std::unique_ptr<IndexAccessMethod::BulkBuilder> SortedDataIndexAccessMethod::ini
 SortedDataIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(SortedDataIndexAccessMethod* iam,
                                                               size_t maxMemoryUsageBytes,
                                                               StringData dbName)
-    : _iam(iam), _sorter(_makeSorter(maxMemoryUsageBytes, dbName)) {
+    : BulkBuilderCommon(0,
+                        "Index Build: inserting keys from external sorter into index",
+                        iam->_descriptor->indexName()),
+      _iam(iam),
+      _sorter(_makeSorter(maxMemoryUsageBytes, dbName)) {
     countNewBuildInStats();
 }
 
@@ -748,10 +766,12 @@ SortedDataIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(SortedDataIndexAcc
                                                               size_t maxMemoryUsageBytes,
                                                               const IndexStateInfo& stateInfo,
                                                               StringData dbName)
-    : _iam(iam),
+    : BulkBuilderCommon(stateInfo.getNumKeys().value_or(0),
+                        "Index Build: inserting keys from external sorter into index",
+                        iam->_descriptor->indexName()),
+      _iam(iam),
       _sorter(
           _makeSorter(maxMemoryUsageBytes, dbName, stateInfo.getFileName(), stateInfo.getRanges())),
-      _keysInserted(stateInfo.getNumKeys().value_or(0)),
       _isMultiKey(stateInfo.getIsMultikey()),
       _indexMultikeyPaths(createMultikeyPaths(stateInfo.getMultikeyPaths())) {
     countResumedBuildInStats();
@@ -888,135 +908,65 @@ SortedDataIndexAccessMethod::BulkBuilderImpl::_makeSorter(
                        _makeSorterSettings());
 }
 
-Status SortedDataIndexAccessMethod::BulkBuilderImpl::commit(
+std::unique_ptr<mongo::Sorter<KeyString::Value, mongo::NullValue>::Iterator>
+SortedDataIndexAccessMethod::BulkBuilderImpl::finalizeSort() {
+    _insertMultikeyMetadataKeysIntoSorter();
+    return std::unique_ptr<Sorter::Iterator>(_sorter->done());
+}
+
+std::unique_ptr<SortedDataBuilderInterface>
+SortedDataIndexAccessMethod::BulkBuilderImpl::setUpBulkInserter(OperationContext* opCtx,
+                                                                bool dupsAllowed) {
+    _ns = _iam->_indexCatalogEntry->getNSSFromCatalog(opCtx);
+    return _iam->getSortedDataInterface()->makeBulkBuilder(opCtx, dupsAllowed);
+}
+
+
+void SortedDataIndexAccessMethod::BulkBuilderImpl::debugEnsureSorted(const Sorter::Data& data) {
+    if (data.first.compare(_previousKey) < 0) {
+        LOGV2_FATAL_NOTRACE(31171,
+                            "Expected the next key to be greater than or equal to the previous key",
+                            "nextKey"_attr = data.first.toString(),
+                            "previousKey"_attr = _previousKey.toString(),
+                            "index"_attr = _indexName);
+    }
+}
+
+bool SortedDataIndexAccessMethod::BulkBuilderImpl::duplicateCheck(
     OperationContext* opCtx,
-    const CollectionPtr& collection,
+    const Sorter::Data& data,
     bool dupsAllowed,
-    int32_t yieldIterations,
-    const KeyHandlerFn& onDuplicateKeyInserted,
     const RecordIdHandlerFn& onDuplicateRecord) {
 
-    Timer timer;
+    auto descriptor = _iam->_descriptor;
 
-    const auto descriptor = _iam->_descriptor;
-    auto ns = _iam->_indexCatalogEntry->getNSSFromCatalog(opCtx);
-
-    _insertMultikeyMetadataKeysIntoSorter();
-    std::unique_ptr<Sorter::Iterator> it(_sorter->done());
-
-    static constexpr char message[] = "Index Build: inserting keys from external sorter into index";
-    ProgressMeterHolder pm;
-    {
-        stdx::unique_lock<Client> lk(*opCtx->getClient());
-        pm.set(
-            CurOp::get(opCtx)->setProgress_inlock(message, _keysInserted, 3 /* secondsBetween */));
+    bool isDup = false;
+    if (descriptor->unique()) {
+        int cmpData = (_iam->getSortedDataInterface()->rsKeyFormat() == KeyFormat::Long)
+            ? data.first.compareWithoutRecordIdLong(_previousKey)
+            : data.first.compareWithoutRecordIdStr(_previousKey);
+        isDup = (cmpData == 0);
     }
 
-    auto builder = _iam->getSortedDataInterface()->makeBulkBuilder(opCtx, dupsAllowed);
-
-    KeyString::Value previousKey;
-
-    for (int64_t i = 0; it->more(); i++) {
-        opCtx->checkForInterrupt();
-
-        auto failPointHang = [opCtx, i, &indexName = descriptor->indexName()](FailPoint* fp) {
-            fp->executeIf(
-                [fp, opCtx, i, &indexName](const BSONObj& data) {
-                    LOGV2(4924400,
-                          "Hanging index build during bulk load phase",
-                          "iteration"_attr = i,
-                          "index"_attr = indexName);
-
-                    fp->pauseWhileSet(opCtx);
-                },
-                [i, &indexName](const BSONObj& data) {
-                    auto indexNames = data.getObjectField("indexNames");
-                    return i == data["iteration"].numberLong() &&
-                        std::any_of(indexNames.begin(),
-                                    indexNames.end(),
-                                    [&indexName](const auto& elem) {
-                                        return indexName == elem.String();
-                                    });
-                });
-        };
-        failPointHang(&hangIndexBuildDuringBulkLoadPhase);
-        failPointHang(&hangIndexBuildDuringBulkLoadPhaseSecond);
-
-        // Get the next datum and add it to the builder.
-        Sorter::Data data = it->next();
-
-        // Assert that keys are retrieved from the sorter in non-decreasing order, but only in debug
-        // builds since this check can be expensive.
-        int cmpData;
-        if (descriptor->unique()) {
-            cmpData = (_iam->getSortedDataInterface()->rsKeyFormat() == KeyFormat::Long)
-                ? data.first.compareWithoutRecordIdLong(previousKey)
-                : data.first.compareWithoutRecordIdStr(previousKey);
-        }
-
-        if (kDebugBuild && data.first.compare(previousKey) < 0) {
-            LOGV2_FATAL_NOTRACE(
-                31171,
-                "Expected the next key to be greater than or equal to the previous key",
-                "nextKey"_attr = data.first.toString(),
-                "previousKey"_attr = previousKey.toString(),
-                "index"_attr = descriptor->indexName());
-        }
-
-        // Before attempting to insert, perform a duplicate key check.
-        bool isDup = (descriptor->unique()) ? (cmpData == 0) : false;
-        if (isDup && !dupsAllowed) {
-            Status status = _iam->_handleDuplicateKey(opCtx, data.first, onDuplicateRecord);
-            if (!status.isOK()) {
-                return status;
-            }
-            continue;
-        }
-
-        Status status = writeConflictRetry(opCtx, "addingKey", ns.ns(), [&] {
-            WriteUnitOfWork wunit(opCtx);
-            Status status = builder->addKey(data.first);
-            if (!status.isOK()) {
-                return status;
-            }
-
-            wunit.commit();
-            return Status::OK();
-        });
-
-        if (!status.isOK()) {
-            // Duplicates are checked before inserting.
-            invariant(status.code() != ErrorCodes::DuplicateKey);
-            return status;
-        }
-
-        previousKey = data.first;
-
-        if (isDup) {
-            status = onDuplicateKeyInserted(data.first);
-            if (!status.isOK())
-                return status;
-        }
-
-        // Starts yielding locks after the first non-zero 'yieldIterations' inserts.
-        if (yieldIterations && (i + 1) % yieldIterations == 0) {
-            yield(opCtx, &collection, ns);
-        }
-
-        // If we're here either it's a dup and we're cool with it or the addKey went just fine.
-        pm.hit();
+    // Before attempting to insert, perform a duplicate key check.
+    if (isDup && !dupsAllowed) {
+        uassertStatusOK(_iam->_handleDuplicateKey(opCtx, data.first, onDuplicateRecord));
     }
+    return isDup;
+}
 
-    pm.finished();
+void SortedDataIndexAccessMethod::BulkBuilderImpl::insertKey(
+    std::unique_ptr<SortedDataBuilderInterface>& inserter, const Sorter::Data& data) {
+    uassertStatusOK(inserter->addKey(data.first));
+}
 
-    LOGV2(20685,
-          "Index build: inserted {bulk_getKeysInserted} keys from external sorter into index in "
-          "{timer_seconds} seconds",
-          "Index build: inserted keys from external sorter into index",
-          logAttrs(ns),
-          "index"_attr = descriptor->indexName(),
-          "keysInserted"_attr = _keysInserted,
-          "duration"_attr = Milliseconds(Seconds(timer.seconds())));
+Status SortedDataIndexAccessMethod::BulkBuilderImpl::keyCommitted(
+    const KeyHandlerFn& onDuplicateKeyInserted, const Sorter::Data& data, bool isDup) {
+    _previousKey = data.first;
+
+    if (isDup) {
+        return onDuplicateKeyInserted(data.first);
+    }
     return Status::OK();
 }
 

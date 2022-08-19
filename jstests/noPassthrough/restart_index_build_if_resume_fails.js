@@ -12,6 +12,7 @@
 "use strict";
 
 load("jstests/noPassthrough/libs/index_build.js");
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 const dbName = "test";
 const collName = jsTestName();
@@ -22,6 +23,8 @@ rst.initiate();
 
 let primary = rst.getPrimary();
 let coll = primary.getDB(dbName).getCollection(collName);
+const columnstoreEnabled = checkSBEEnabled(
+    primary.getDB(dbName), ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true);
 
 assert.commandWorked(coll.insert({a: 1}));
 
@@ -49,6 +52,35 @@ ResumableIndexBuildTest.runFailToResume(rst,
                                         {removeTempFilesBeforeStartup: true},
                                         [{a: 10}, {a: 11}],
                                         [{a: 12}, {a: 13}]);
+
+// TODO (SERVER-65978): Add side writes to these test cases once they are supported by column store
+// index builds.
+if (columnstoreEnabled) {
+    ResumableIndexBuildTest.runFailToResume(rst,
+                                            dbName,
+                                            collName,
+                                            {"$**": "columnstore"},
+                                            {failPointAfterStartup: "failToParseResumeIndexInfo"},
+                                            [],
+                                            [{a: 4}, {a: 5}],
+                                            true /* failWhileParsing */);
+
+    ResumableIndexBuildTest.runFailToResume(rst,
+                                            dbName,
+                                            collName,
+                                            {"$**": "columnstore"},
+                                            {failPointAfterStartup: "failSetUpResumeIndexBuild"},
+                                            [],
+                                            [{a: 8}, {a: 9}]);
+
+    ResumableIndexBuildTest.runFailToResume(rst,
+                                            dbName,
+                                            collName,
+                                            {"$**": "columnstore"},
+                                            {removeTempFilesBeforeStartup: true},
+                                            [],
+                                            [{a: 12}, {a: 13}]);
+}
 
 rst.stopSet();
 })();

@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/create_collection.h"
@@ -42,6 +40,8 @@
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 
@@ -522,3 +522,5 @@ TEST_F(TTLTest, TTLSubPassesStartRemovingFromNewTTLIndex) {
 
 }  // namespace
 }  // namespace mongo
+
+#undef MONGO_LOGV2_DEFAULT_COMPONENT

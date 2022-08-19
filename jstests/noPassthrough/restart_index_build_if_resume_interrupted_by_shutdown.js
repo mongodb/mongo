@@ -64,6 +64,18 @@ if (columnstoreEnabled) {
         {a: 1},  // initial doc
         [],
         [{a: 4}, {a: 5}]);
+
+    ResumableIndexBuildTest.runResumeInterruptedByShutdown(
+        rst,
+        dbName,
+        collName + "_bulkload_drain_column_store",
+        {"$**": "columnstore"},    // index key pattern
+        "resumable_index_build4",  // index name
+        {name: "hangIndexBuildDuringBulkLoadPhase", logIdWithIndexName: 4924400},
+        "bulk load",
+        {a: [11, 22, 33]},  // initial doc
+        [],
+        [{a: 99}, {a: 100}]);
 }
 rst.stopSet();
 })();

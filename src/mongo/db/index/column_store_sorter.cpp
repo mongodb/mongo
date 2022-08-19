@@ -29,8 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/index/column_store_sorter.h"
 
 #include <boost/filesystem/operations.hpp>
@@ -117,6 +115,7 @@ ColumnStoreSorter::ColumnStoreSorter(size_t maxMemoryUsageBytes,
                            _dbName,
                            range.getChecksum());
                    });
+    this->_stats.setSpilledRanges(_spilledFileIterators.size());
 }
 
 void ColumnStoreSorter::add(PathView path, RowId rowId, CellView cellContents) {
@@ -251,6 +250,7 @@ ColumnStoreSorter::Iterator* ColumnStoreSorter::done() {
     }
 
     spill();
+
     return SortIteratorInterface<Key, Value>::merge(
         _spilledFileIterators, makeSortOptions(_dbName, _fileStats), ComparisonForPathAndRid());
 }

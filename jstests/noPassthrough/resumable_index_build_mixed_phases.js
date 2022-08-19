@@ -137,6 +137,26 @@ if (columnstoreEnabled) {
         ],
         ["initialized", "collection scan"],
         [{numScannedAfterResume: 3}, {numScannedAfterResume: 2}]);
+
+    runColumnTests(
+        [
+            {name: "hangIndexBuildBeforeWaitingUntilMajorityOpTime", logIdWithBuildUUID: 4940901},
+            {name: "hangIndexBuildDuringBulkLoadPhase", logIdWithIndexName: 4924400}
+
+        ],
+        ["initialized", "bulk load"],
+        [{numScannedAfterResume: 3}, {skippedPhaseLogID: 20391}]);
+
+    runColumnTests(
+        [
+            {
+                name: "hangIndexBuildDuringCollectionScanPhaseBeforeInsertion",
+                logIdWithBuildUUID: 20386
+            },
+            {name: "hangIndexBuildDuringBulkLoadPhase", logIdWithIndexName: 4924400}
+        ],
+        ["collection scan", "bulk load"],
+        [{numScannedAfterResume: 2}, {skippedPhaseLogID: 20391}]);
 }
 rst.stopSet();
 })();

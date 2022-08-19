@@ -66,6 +66,5 @@ if (columnstoreEnabled) {
         ["collection scan"],
         [{numScannedAfterResume: numDocuments - maxIndexBuildMemoryUsageMB}]);
 }
-
 rst.stopSet();
 })();
