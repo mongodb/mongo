@@ -38,6 +38,8 @@ public:
     static Status updateConcurrentWriteTransactions(const int& newWriteTransactions);
 
     static Status updateConcurrentReadTransactions(const int& newReadTransactions);
+
+    static Status updateConcurrentTotalTransactions(const int& newTotalTransactions);
 };
 
 }  // namespace mongo

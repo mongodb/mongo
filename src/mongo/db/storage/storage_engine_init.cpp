@@ -183,8 +183,11 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
                     LOGV2_DEBUG(6615200, 1, "Using Scheduling Queue-based ticketing scheduler");
                     if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations
                             .isEnabledAndIgnoreFCV()) {
-                        auto ticketHolder = std::make_unique<PriorityTicketHolder>(
-                            readTransactions + writeTransactions, svcCtx);
+                        auto totalTransactions = gConcurrentTotalTransactions.load();
+                        totalTransactions =
+                            totalTransactions == 0 ? DEFAULT_TICKETS_VALUE : totalTransactions;
+                        auto ticketHolder =
+                            std::make_unique<PriorityTicketHolder>(totalTransactions, svcCtx);
                         TicketHolder::use(svcCtx, std::move(ticketHolder));
                     } else {
                         auto ticketHolder = std::make_unique<StochasticTicketHolder>(
