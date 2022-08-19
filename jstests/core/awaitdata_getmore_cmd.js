@@ -171,7 +171,7 @@ const topology = DiscoverTopology.findConnectedNodes(db.getMongo());
 if (topology.type !== Topology.kStandalone) {
     const readConcern =
         assert.commandWorked(db.adminCommand({getDefaultRWConcern: 1})).defaultReadConcern;
-    if (readConcern.level == "majority") {
+    if (readConcern.level == "majority" || TestData.defaultReadConcernLevel === "majority") {
         return;
     }
 }
@@ -214,7 +214,8 @@ assert.soon(() => db.await_data.findOne({_id: "signal parent shell"}) !== null);
 // Now issue a getMore which will match the parallel shell's currentOp filter, signalling it to
 // write a non-matching document into the collection. Confirm that we do not receive this
 // document and that we subsequently time out.
-cmdRes = db.runCommand({getMore: cmdRes.cursor.id, collection: collName, maxTimeMS: 4000});
+cmdRes = db.runCommand(
+    {getMore: cmdRes.cursor.id, collection: collName, maxTimeMS: ReplSetTest.kDefaultTimeoutMS});
 assert.commandWorked(cmdRes);
 jsTestLog("Waiting insertion shell to terminate...");
 assert.eq(insertshell(), 0);
