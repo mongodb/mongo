@@ -501,8 +501,8 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
                     WildcardKeyGenerator::createProjectionExecutor(key,
                                                                    indexSpecElem.embeddedObject());
                 } else {
-                    ColumnKeyGenerator::createProjectionExecutor(key,
-                                                                 indexSpecElem.embeddedObject());
+                    column_keygen::ColumnKeyGenerator::createProjectionExecutor(
+                        key, indexSpecElem.embeddedObject());
                 }
 
             } catch (const DBException& ex) {

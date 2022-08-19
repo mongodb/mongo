@@ -55,7 +55,6 @@ public:
         return _keyGen.getColumnstoreProjection();
     }
 
-
     //
     // Generic IndexAccessMethod APIs
     //
@@ -119,6 +118,6 @@ private:
     const std::unique_ptr<ColumnStore> _store;
     IndexCatalogEntry* const _indexCatalogEntry;  // owned by IndexCatalog
     const IndexDescriptor* const _descriptor;
-    const ColumnKeyGenerator _keyGen;
+    const column_keygen::ColumnKeyGenerator _keyGen;
 };
 }  // namespace mongo

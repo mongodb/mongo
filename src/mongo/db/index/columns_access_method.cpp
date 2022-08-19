@@ -165,10 +165,10 @@ Status ColumnStoreAccessMethod::BulkBuilder::insert(
     const InsertDeleteOptions& options,
     const std::function<void()>& saveCursorBeforeWrite,
     const std::function<void()>& restoreCursorAfterWrite) {
-    column_keygen::visitCellsForInsert(
+    _columnsAccess->_keyGen.visitCellsForInsert(
         obj, [&](PathView path, const column_keygen::UnencodedCellView& cell) {
             _cellBuilder.reset();
-            writeEncodedCell(cell, &_cellBuilder);
+            column_keygen::writeEncodedCell(cell, &_cellBuilder);
             tassert(6762300, "RecordID cannot be a string for column store indexes", !rid.isStr());
             _sorter.add(path, rid.getLong(), CellView(_cellBuilder.buf(), _cellBuilder.len()));
 
@@ -269,9 +269,9 @@ Status ColumnStoreAccessMethod::insert(OperationContext* opCtx,
     try {
         PooledFragmentBuilder buf(pooledBufferBuilder);
         auto cursor = _store->newWriteCursor(opCtx);
-        column_keygen::visitCellsForInsert(
+        _keyGen.visitCellsForInsert(
             bsonRecords,
-            [&](PathView path,
+            [&](StringData path,
                 const BsonRecord& rec,
                 const column_keygen::UnencodedCellView& cell) {
                 if (!rec.ts.isNull()) {
@@ -301,7 +301,7 @@ void ColumnStoreAccessMethod::remove(OperationContext* opCtx,
                                      int64_t* keysDeletedOut,
                                      CheckRecordId checkRecordId) {
     auto cursor = _store->newWriteCursor(opCtx);
-    column_keygen::visitPathsForDelete(obj, [&](PathView path) {
+    _keyGen.visitPathsForDelete(obj, [&](StringData path) {
         tassert(6762301, "RecordID cannot be a string for column store indexes", !rid.isStr());
         cursor->remove(path, rid.getLong());
         inc(keysDeletedOut);
@@ -319,13 +319,13 @@ Status ColumnStoreAccessMethod::update(OperationContext* opCtx,
                                        int64_t* keysDeletedOut) {
     PooledFragmentBuilder buf(pooledBufferBuilder);
     auto cursor = _store->newWriteCursor(opCtx);
-    column_keygen::visitDiffForUpdate(
+    _keyGen.visitDiffForUpdate(
         oldDoc,
         newDoc,
-        [&](column_keygen::DiffAction diffAction,
+        [&](column_keygen::ColumnKeyGenerator::DiffAction diffAction,
             StringData path,
             const column_keygen::UnencodedCellView* cell) {
-            if (diffAction == column_keygen::DiffAction::kDelete) {
+            if (diffAction == column_keygen::ColumnKeyGenerator::DiffAction::kDelete) {
                 tassert(
                     6762302, "RecordID cannot be a string for column store indexes", !rid.isStr());
                 cursor->remove(path, rid.getLong());
@@ -339,7 +339,7 @@ Status ColumnStoreAccessMethod::update(OperationContext* opCtx,
             buf.reset();
             column_keygen::writeEncodedCell(*cell, &buf);
 
-            const auto method = diffAction == column_keygen::DiffAction::kInsert
+            const auto method = diffAction == column_keygen::ColumnKeyGenerator::DiffAction::kInsert
                 ? &ColumnStore::WriteCursor::insert
                 : &ColumnStore::WriteCursor::update;
             tassert(6762303, "RecordID cannot be a string for column store indexes", !rid.isStr());

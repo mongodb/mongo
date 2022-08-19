@@ -3082,8 +3082,9 @@ std::vector<BSONObj> IndexBuildsCoordinator::normalizeIndexSpecs(
         auto indexPathProjection = isWildcard
             ? static_cast<IndexPathProjection>(WildcardKeyGenerator::createProjectionExecutor(
                   kFieldSetKeyPattern, pathProjectionSpec))
-            : static_cast<IndexPathProjection>(ColumnKeyGenerator::createProjectionExecutor(
-                  kFieldSetKeyPattern, pathProjectionSpec));
+            : static_cast<IndexPathProjection>(
+                  column_keygen::ColumnKeyGenerator::createProjectionExecutor(kFieldSetKeyPattern,
+                                                                              pathProjectionSpec));
         auto normalizedProjection =
             indexPathProjection.exec()->serializeTransformation(boost::none).toBson();
         return spec.addField(BSON(projectionName << normalizedProjection).firstElement());
