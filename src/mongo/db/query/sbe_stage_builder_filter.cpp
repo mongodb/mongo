@@ -756,12 +756,21 @@ void generatePredicateExpr(MatchExpressionVisitorContext* context,
 }
 
 /**
+ * Generates and pushes a constant boolean expression for either alwaysTrue or alwaysFalse.
+ */
+void generateAlwaysBoolean(MatchExpressionVisitorContext* context, bool value) {
+    auto& frame = context->evalStack.topFrame();
+    frame.pushExpr(context->stateHelper.makeState(value));
+}
+
+/**
  * Generates a path traversal SBE plan stage sub-tree for matching arrays with '$size'. Applies
  * an extra project on top of the sub-tree to filter based on user provided value.
  */
 void generateArraySize(MatchExpressionVisitorContext* context,
                        const SizeMatchExpression* matchExpr) {
-    int size = matchExpr->getData();
+    int32_t size = matchExpr->getData();
+
     // If there's an "inputParamId" in 'matchExpr' meaning this expr got parameterized, we can
     // register a SlotId for it and use the slot directly.
     boost::optional<sbe::value::SlotId> inputParamSlotId;
@@ -769,67 +778,22 @@ void generateArraySize(MatchExpressionVisitorContext* context,
         inputParamSlotId = context->state.registerInputParamSlot(*inputParam);
     }
 
-    auto makePredicate = [&](sbe::value::SlotId inputSlot,
-                             EvalStage inputStage) -> EvalExprStagePair {
-        // Generate a traverse that projects the integer value 1 for each element in the array and
-        // then sums up the 1's, resulting in the count of elements in the array.
-        auto innerSlot = context->state.slotId();
-        auto innerBranch =
-            makeProject(EvalStage{},
-                        context->planNodeId,
-                        innerSlot,
-                        sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
-                                                   sbe::value::bitcastFrom<int64_t>(1)));
+    // If the expr did not get parametrized and it is less than 0, then we should always
+    // return false.
+    if (size < 0 && !inputParamSlotId) {
+        generateAlwaysBoolean(context, false);
+        return;
+    }
 
-        auto traverseSlot = context->state.slotId();
-        auto traverseStage = makeTraverse(EvalStage{},
-                                          std::move(innerBranch),
-                                          inputSlot,
-                                          traverseSlot,
-                                          innerSlot,
-                                          makeBinaryOp(sbe::EPrimBinary::add,
-                                                       sbe::makeE<sbe::EVariable>(traverseSlot),
-                                                       sbe::makeE<sbe::EVariable>(innerSlot)),
-                                          nullptr,
-                                          context->planNodeId,
-                                          1);
-
+    auto makePredicateExpr = [&](const sbe::EVariable& var) {
         auto sizeExpr = inputParamSlotId ? makeVariable(*inputParamSlotId)
-                                         : makeConstant(sbe::value::TypeTags::NumberInt64,
-                                                        sbe::value::bitcastFrom<int64_t>(size));
-        // If the traversal result was not Nothing, compare it to the user provided value. If the
-        // traversal result was Nothing, that means the array was empty, so replace Nothing with 0
-        // and compare it to the user provided value.
-        auto sizeOutput = makeBinaryOp(
-            sbe::EPrimBinary::eq,
-            std::move(sizeExpr),
-            sbe::makeE<sbe::EIf>(makeFunction("exists", sbe::makeE<sbe::EVariable>(traverseSlot)),
-                                 sbe::makeE<sbe::EVariable>(traverseSlot),
-                                 sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,
-                                                            sbe::value::bitcastFrom<int64_t>(0))));
-
-        std::vector<EvalExprStagePair> branches;
-
-        // Check that the thing we are about traverse is indeed an array.
-        branches.emplace_back(
-            makeFillEmptyFalse(makeFunction("isArray", sbe::makeE<sbe::EVariable>(inputSlot))),
-            EvalStage{});
-
-        branches.emplace_back(std::move(sizeOutput), std::move(traverseStage));
-
-        auto [opOutput, opStage] = generateShortCircuitingLogicalOp(sbe::EPrimBinary::logicAnd,
-                                                                    std::move(branches),
-                                                                    context->planNodeId,
-                                                                    context->state.slotIdGenerator,
-                                                                    BooleanStateHelper{});
-
-        inputStage = makeLoopJoin(std::move(inputStage), std::move(opStage), context->planNodeId);
-
-        return {context->stateHelper.makeState(opOutput.extractExpr()), std::move(inputStage)};
+                                         : makeConstant(sbe::value::TypeTags::NumberInt32, size);
+        return makeFillEmptyFalse(makeBinaryOp(
+            sbe::EPrimBinary::eq, makeFunction("getArraySize", var.clone()), std::move(sizeExpr)));
     };
 
-    generatePredicate(
-        context, matchExpr->fieldRef(), makePredicate, LeafTraversalMode::kDoNotTraverseLeaf);
+    generatePredicateExpr(
+        context, matchExpr->fieldRef(), makePredicateExpr, LeafTraversalMode::kDoNotTraverseLeaf);
 }
 
 /**
@@ -870,14 +834,6 @@ void generateComparison(MatchExpressionVisitorContext* context,
 
     generatePredicateExpr(
         context, expr->fieldRef(), makePredicateExpr, traversalMode, true, matchesNothing);
-}
-
-/**
- * Generates and pushes a constant boolean expression for either alwaysTrue or alwaysFalse.
- */
-void generateAlwaysBoolean(MatchExpressionVisitorContext* context, bool value) {
-    auto& frame = context->evalStack.topFrame();
-    frame.pushExpr(context->stateHelper.makeState(value));
 }
 
 /**
