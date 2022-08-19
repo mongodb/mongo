@@ -3895,19 +3895,6 @@ TEST_F(HeartbeatResponseTestV1, ShouldChangeSyncSourceWhenSyncSourceFormsCycleAn
                                "host1:27017" /* syncSourceHost */),
         lastOpTimeFetched,
         now()));
-
-    // Show that we still do not like it when syncSourceHost is not set, but we can rely on
-    // syncSourceIndex to decide if a sync source selection cycle has been formed.
-    nextAction = receiveUpHeartbeat(
-        HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
-    ASSERT_NO_ACTION(nextAction.getAction());
-    ASSERT_TRUE(getTopoCoord().shouldChangeSyncSource(
-        HostAndPort("host2"),
-        makeReplSetMetadata(OpTime() /* visibleOpTime */, false /* isPrimary */),
-        // Sync source is also syncing from us.
-        makeOplogQueryMetadata(syncSourceOpTime, -1 /* primaryIndex */, 0 /* syncSourceIndex */),
-        lastOpTimeFetched,
-        now()));
 }
 
 TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenFresherMemberIsDown) {

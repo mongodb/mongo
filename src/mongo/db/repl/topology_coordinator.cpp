@@ -3201,14 +3201,7 @@ bool TopologyCoordinator::_shouldChangeSyncSourceToBreakCycle(
     // Change sync source if our sync source is also syncing from us when we are in primary
     // catchup mode, forming a sync source selection cycle, and the sync source is not ahead
     // of us. This is to prevent a deadlock situation. See SERVER-58988 for details.
-    // When checking the sync source, we use syncSourceHost if it is set, otherwise fall back
-    // to use syncSourceIndex. The difference is that syncSourceIndex might not point to the
-    // node that we think of because it was inferred from the sender node, which could have
-    // a different config. This is acceptable since we are just choosing a different sync
-    // source if that happens and reconfigs are rare.
-    const bool isSyncingFromMe = !syncSourceHost.empty()
-        ? syncSourceHost == _selfMemberData().getHostAndPort().toString()
-        : syncSourceIndex == _selfIndex;
+    const bool isSyncingFromMe = syncSourceHost == _selfMemberData().getHostAndPort().toString();
 
     if (isSyncingFromMe && _currentPrimaryIndex == _selfIndex &&
         currentSourceOpTime <= lastOpTimeFetched) {

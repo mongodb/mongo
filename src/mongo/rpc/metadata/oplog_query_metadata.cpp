@@ -91,10 +91,7 @@ StatusWith<OplogQueryMetadata> OplogQueryMetadata::readFromMetadata(const BSONOb
 
     std::string syncSourceHost;
     status = bsonExtractStringField(oqMetadataObj, kSyncSourceHostFieldName, &syncSourceHost);
-    // SyncSourceHost might not be set in older versions, checking NoSuchKey error
-    // for backward compatibility.
-    // TODO SERVER-59732: Remove the compatibility check once 6.0 is released.
-    if (!status.isOK() && status.code() != ErrorCodes::NoSuchKey)
+    if (!status.isOK())
         return status;
 
     long long rbid;
