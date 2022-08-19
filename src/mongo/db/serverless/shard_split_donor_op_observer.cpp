@@ -176,7 +176,7 @@ void onTransitionToBlocking(OperationContext* opCtx, const ShardSplitDonorDocume
     invariant(donorStateDoc.getTenantIds());
 
     auto tenantIds = *donorStateDoc.getTenantIds();
-    for (auto tenantId : tenantIds) {
+    for (auto&& tenantId : tenantIds) {
         auto mtab = tenant_migration_access_blocker::getTenantMigrationDonorAccessBlocker(
             opCtx->getServiceContext(), tenantId);
         invariant(mtab);
@@ -254,7 +254,7 @@ public:
         if (_donorStateDoc.getExpireAt()) {
             if (_donorStateDoc.getTenantIds()) {
                 auto tenantIds = _donorStateDoc.getTenantIds().value();
-                for (auto tenantId : tenantIds) {
+                for (auto&& tenantId : tenantIds) {
                     auto mtab =
                         tenant_migration_access_blocker::getTenantMigrationDonorAccessBlocker(
                             _opCtx->getServiceContext(), tenantId);
@@ -420,7 +420,7 @@ void ShardSplitDonorOpObserver::onDelete(OperationContext* opCtx,
         // document, the call to remove access blockers there will be a no-op.
 
         auto& registry = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext());
-        for (auto& tenantId : *tenantIdsToDeleteDecoration(opCtx)) {
+        for (auto&& tenantId : *tenantIdsToDeleteDecoration(opCtx)) {
             registry.remove(tenantId, TenantMigrationAccessBlocker::BlockerType::kDonor);
         }
     });
