@@ -52,5 +52,8 @@ cfg.members.push(removedMember[0]);
 cfg.version++;
 assert.commandWorked(primary.adminCommand({replSetReconfig: cfg}));
 
+// Make sure all nodes, including the once-removed node, have the final config.
+rst.waitForConfigReplication(primary);
+
 rst.stopSet();
 })();
