@@ -103,11 +103,14 @@ namespace {
 
 using GenericFCV = multiversion::GenericFCV;
 
+MONGO_FAIL_POINT_DEFINE(failBeforeTransitioning);
 MONGO_FAIL_POINT_DEFINE(failUpgrading);
 MONGO_FAIL_POINT_DEFINE(hangWhileUpgrading);
+MONGO_FAIL_POINT_DEFINE(failBeforeSendingShardsToDowngrading);
 MONGO_FAIL_POINT_DEFINE(failDowngrading);
 MONGO_FAIL_POINT_DEFINE(hangWhileDowngrading);
 MONGO_FAIL_POINT_DEFINE(hangBeforeUpdatingFcvDoc);
+MONGO_FAIL_POINT_DEFINE(failBeforeUpdatingFcvDoc);
 
 /**
  * Ensures that only one instance of setFeatureCompatibilityVersion can run at a given time.
@@ -332,6 +335,10 @@ public:
                 const auto fcvChangeRegion(
                     FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
 
+                uassert(ErrorCodes::Error(6744303),
+                        "Failing upgrade due to 'failBeforeTransitioning' failpoint set",
+                        !failBeforeTransitioning.shouldFail());
+
                 FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                     opCtx,
                     actualVersion,
@@ -391,6 +398,10 @@ public:
             // Complete transition by updating the local FCV document to the fully upgraded or
             // downgraded requestedVersion.
             const auto fcvChangeRegion(FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
+
+            uassert(ErrorCodes::Error(6794601),
+                    "Failing downgrade due to 'failBeforeUpdatingFcvDoc' failpoint set",
+                    !failBeforeUpdatingFcvDoc.shouldFail());
 
             hangBeforeUpdatingFcvDoc.pauseWhileSet();
 
@@ -731,6 +742,9 @@ private:
         boost::optional<SharedSemiFuture<void>> chunkResizeAsyncTask;
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            uassert(ErrorCodes::Error(6794600),
+                    "Failing downgrade due to 'failBeforeSendingShardsToDowngrading' failpoint set",
+                    !failBeforeSendingShardsToDowngrading.shouldFail());
             // Tell the shards to enter phase-1 of setFCV
             _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kStart);
         }

@@ -329,10 +329,10 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
 
     // Only transition to fully upgraded or downgraded states when we
     // have completed all required upgrade/downgrade behavior.
+    // If kDowngradingFromLatestToLastLTS->kLatest, we want to get the transitional version
+    // i.e. kUpgradingFromLastLTSToLatest
     auto transitioningVersion = setTargetVersion &&
             serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading(fromVersion) &&
-            // if kDowngradingFromLatestToLastLTS->kLatest, we want to get the transitional version
-            // i.e. kUpgradingFromLastLTSToLatest
             !(fromVersion == GenericFCV::kDowngradingFromLatestToLastLTS &&
               newVersion == GenericFCV::kLatest)
         ? fromVersion
