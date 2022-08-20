@@ -373,3 +373,23 @@ let insertInvalidRegex = function(coll, mongod, nDocuments) {
     };
     rewriteTable(getUriForColl(coll), mongod, swapOptions);
 };
+
+/**
+ * Inserts document with invalid UTF-8 string into the MongoDB server.
+ */
+let insertInvalidUTF8 = function(coll, uri, conn, numDocs) {
+    for (let i = 0; i < numDocs; ++i) {
+        coll.insert({validString: "\x70"});
+    }
+    let makeInvalidUTF8 = function(lines) {
+        // The offset of the first byte of the string, flips \x70 to \x80 (10000000) - invalid
+        // because single byte UTF-8 cannot have a leading 1.
+        const offsetToString = 76;
+        // Each record takes two lines with a key and a value. We will only modify the values.
+        for (let i = wtHeaderLines; i < lines.length; i += 2) {
+            lines[i] = lines[i].substring(0, offsetToString) + "8" +
+                lines[i].substring(offsetToString + 1);
+        }
+    };
+    rewriteTable(uri, conn, makeInvalidUTF8);
+};

@@ -33,6 +33,8 @@
 #include <array>
 #include <iterator>
 
+#include "mongo/util/assert_util.h"
+
 namespace mongo::str {
 namespace {
 constexpr char kHexChar[] = "0123456789abcdef";
@@ -495,5 +497,25 @@ std::string escapeForJSON(StringData str, size_t maxLength, size_t* wouldWrite) 
     std::string buffer;
     escapeForJSONCommon(buffer, str, maxLength, wouldWrite);
     return buffer;
+}
+
+void checkInvalidUTF8(StringData str, size_t maxLength, size_t* wouldWrite) {
+    // No-op buffer and handlers, defined to re-use escape method logic.
+    std::string buffer;
+    auto singleByteHandler = [](const auto& writer, uint8_t unescaped) {};
+    auto twoByteEscaper = [](const auto& writer, uint8_t first, uint8_t second) {};
+
+    // Throws an exception when an invalid UTF8 character is detected.
+    auto invalidByteHandler = [](const auto& writer, uint8_t) {
+        uasserted(ErrorCodes::BadValue, "Invalid UTF-8 Character");
+    };
+
+    escape(buffer,
+           str,
+           std::move(singleByteHandler),
+           std::move(invalidByteHandler),
+           std::move(twoByteEscaper),
+           maxLength,
+           wouldWrite);
 }
 }  // namespace mongo::str

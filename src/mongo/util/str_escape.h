@@ -106,4 +106,9 @@ void escapeForJSON(fmt::memory_buffer& buffer,
 std::string escapeForJSON(StringData str,
                           size_t maxLength = std::string::npos,
                           size_t* wouldWrite = nullptr);
+
+
+void checkInvalidUTF8(StringData str,
+                      size_t maxLength = std::string::npos,
+                      size_t* wouldWrite = nullptr);
 }  // namespace mongo::str

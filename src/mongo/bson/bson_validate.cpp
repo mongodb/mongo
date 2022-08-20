@@ -37,6 +37,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/str_escape.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -88,8 +89,6 @@ constexpr ErrorCodes::Error NonConformantBSON = ErrorCodes::NonConformantBSON;
 class DefaultValidator {
 public:
     void checkNonConformantElem(const char* ptr, uint32_t offsetToValue, uint8_t type) {}
-
-    void checkUTF8Char() {}
 
     void checkDuplicateFieldName() {}
 
@@ -156,8 +155,6 @@ public:
             }
         }
     }
-
-    void checkUTF8Char() {}
 
     void checkDuplicateFieldName() {}
 
@@ -226,6 +223,8 @@ public:
     void checkNonConformantElem(const char* ptr, uint32_t offsetToValue, uint8_t type) {
         registerFieldName(ptr + 1);
         ExtendedValidator::checkNonConformantElem(ptr, offsetToValue, type);
+        // Check the field name is UTF-8 encoded.
+        checkUTF8Char(ptr + 1);
         switch (type) {
             case BSONType::Array: {
                 objFrames.push_back({std::vector<std::string>(), false});
@@ -248,9 +247,13 @@ public:
                             uasserted(NonConformantBSON,
                                       "Exception ocurred while decompressing a BSON column.");
                         }
-                        break;
                     }
                 }
+                break;
+            }
+            case BSONType::String: {
+                // Increment pointer to actual value and then four more to skip size.
+                checkUTF8Char(ptr + offsetToValue + 4);
             }
         }
     }
@@ -286,6 +289,15 @@ private:
         if (objFrames.back().second) {
             objFrames.back().first.emplace_back(str);
         };
+    }
+
+private:
+    void checkUTF8Char(const char* ptr) {
+        try {
+            str::checkInvalidUTF8(ptr);
+        } catch (const ExceptionFor<ErrorCodes::BadValue>&) {
+            uasserted(NonConformantBSON, "Found string that doesn't follow UTF-8 encoding.");
+        }
     }
 };
 

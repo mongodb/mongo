@@ -333,6 +333,63 @@ TEST(BSONValidateExtended, BSONArrayIndexes) {
     ASSERT_EQ(status, ErrorCodes::NonConformantBSON);
 }
 
+TEST(BSONValidateExtended, BSONUTF8) {
+    auto x1 = BSON("ValidString"
+                   << "\x00"
+                   << "ValidString2"
+                   << "str");
+    ASSERT_OK(validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kExtended));
+    ASSERT_OK(validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kFull));
+
+    // Invalid UTF-8 - 10000000; leading bit cannot be set for single byte UTF-8.
+    x1 = BSON("InvalidOneByteString"
+              << "\x80");
+    auto status = validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kExtended);
+    ASSERT_OK(status);
+    status = validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kFull);
+    ASSERT_EQ(status, ErrorCodes::NonConformantBSON);
+
+    x1 = BSON("ValidTwoByteString"
+              << "\x40\x40");
+    ASSERT_OK(validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kExtended));
+    ASSERT_OK(validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kFull));
+
+    // Invalid UTF-8 - 11011111 11001111; second bit of second byte cannot be set.
+    x1 = BSON("InvalidTwoByteString"
+              << "\xDF\xCF");
+    status = validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kExtended);
+    ASSERT_OK(status);
+    status = validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kFull);
+    ASSERT_EQ(status, ErrorCodes::NonConformantBSON);
+
+    x1 = BSON("ValidThreeByteString"
+              << "\x40\x40\x40");
+    ASSERT_OK(validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kExtended));
+    ASSERT_OK(validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kFull));
+
+    // Invalid UTF-8 - 11101111 10111111 11111111 - second bit of third byte cannot be set.
+    x1 = BSON("InvalidThreeByteString"
+              << "\xEF\xBF\xFF");
+    status = validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kExtended);
+    ASSERT_OK(status);
+    status = validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kFull);
+    ASSERT_EQ(status, ErrorCodes::NonConformantBSON);
+
+    x1 = BSON("ValidFourByteString"
+              << "\x40\x40\x40\x40");
+    ASSERT_OK(validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kExtended));
+    ASSERT_OK(validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kFull));
+
+    // Invalid UTF-8 - 11110000 10011000 10011010 11111111 - second bit of fourth byte cannot be
+    // set.
+    x1 = BSON("InvalidFourByteString"
+              << "\xF0\x98\x9A\xFF");
+    status = validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kExtended);
+    ASSERT_OK(status);
+    status = validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kFull);
+    ASSERT_EQ(status, ErrorCodes::NonConformantBSON);
+}
+
 TEST(BSONValidateFast, Empty) {
     BSONObj x;
     ASSERT_OK(validateBSON(x));
