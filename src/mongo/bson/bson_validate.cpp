@@ -122,7 +122,7 @@ public:
                 _checkRegexOptions(options);
                 break;
             }
-            case BSONType::BinData:
+            case BSONType::BinData: {
                 uint8_t subtype =
                     ConstDataView(ptr + sizeof(uint32_t)).read<LittleEndian<uint8_t>>();
                 switch (subtype) {
@@ -153,6 +153,7 @@ public:
                     }
                 }
                 break;
+            }
         }
     }
 
@@ -223,8 +224,17 @@ protected:
 class FullValidator : private ExtendedValidator {
 public:
     void checkNonConformantElem(const char* ptr, uint32_t offsetToValue, uint8_t type) {
+        registerFieldName(ptr + 1);
         ExtendedValidator::checkNonConformantElem(ptr, offsetToValue, type);
         switch (type) {
+            case BSONType::Array: {
+                objFrames.push_back({std::vector<std::string>(), false});
+                break;
+            }
+            case BSONType::Object: {
+                objFrames.push_back({std::vector<std::string>(), true});
+                break;
+            };
             case BSONType::BinData: {
                 uint8_t subtype = ConstDataView(ptr + offsetToValue + sizeof(uint32_t))
                                       .read<LittleEndian<uint8_t>>();
@@ -245,12 +255,37 @@ public:
         }
     }
 
-    void checkUTF8Char() {}
-
-    void checkDuplicateFieldName() {}
+    void checkDuplicateFieldName() {
+        invariant(!objFrames.empty());
+        auto& curr = objFrames.back().first;
+        // If curr is not an object frame, it will always be empty, so no need to check.
+        if (curr.empty()) {
+            objFrames.pop_back();
+            return;
+        }
+        invariant(objFrames.back().second);
+        std::sort(curr.begin(), curr.end());
+        auto duplicate = std::adjacent_find(curr.begin(), curr.end());
+        uassert(NonConformantBSON,
+                fmt::format("A BSON document contains a duplicate field name : {}", *duplicate),
+                duplicate == curr.end());
+        objFrames.pop_back();
+    }
 
     void popLevel() {
         ExtendedValidator::popLevel();
+        checkDuplicateFieldName();
+    }
+
+private:
+    // A given frame is an object if and only if frame.second == true.
+    std::vector<std::pair<std::vector<std::string>, bool>> objFrames = {
+        {std::vector<std::string>(), true}};
+
+    void registerFieldName(std::string str) {
+        if (objFrames.back().second) {
+            objFrames.back().first.emplace_back(str);
+        };
     }
 };
 
@@ -354,10 +389,10 @@ private:
     }
 
     bool _popFrame() {
-        _validator.popLevel();
         if (_currFrame == _frames.begin())
             return false;
         --_currFrame;
+        _validator.popLevel();
         return true;
     }
 
@@ -453,6 +488,9 @@ private:
             uassert(InvalidBSON, "incorrect BSON length", ++cursor.ptr == _currFrame->end);
             _maybePopCodeWithScope(cursor);
         } while (_popFrame());  // Finished when there are no frames left.
+
+        // Check the top level field names.
+        _validator.checkDuplicateFieldName();
     }
 
     /**

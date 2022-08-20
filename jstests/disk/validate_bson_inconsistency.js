@@ -31,9 +31,20 @@ resetDbpath(dbpath);
     mongod = startMongodOnExistingPath(dbpath);
     db = mongod.getDB(baseName);
     testColl = db[collName];
+    testColl.insert({a: 1, b: 2, c: {b: 3}, d: {a: [2, 3, 4], b: {a: 2}}});
+    testColl.insert({a: 1, b: 1});
 
+    // Warnings should be triggered iff checkBSONConsistency is set to true.
     let res = assert.commandWorked(testColl.validate());
     assert(res.valid, tojson(res));
+    assert.eq(res.nNonCompliantDocuments, 0);
+    assert.eq(res.warnings.length, 0);
+
+    res = assert.commandWorked(testColl.validate({checkBSONConsistency: true}));
+    assert(res.valid, tojson(res));
+    assert.eq(res.nNonCompliantDocuments, numDocs);
+    assert.eq(res.warnings.length, 1);
+
     MongoRunner.stopMongod(mongod, null, {skipValidation: true});
 })();
 

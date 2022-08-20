@@ -309,12 +309,12 @@ TEST(BSONValidateExtended, BSONArrayIndexes) {
     ASSERT_EQ(status, ErrorCodes::NonConformantBSON);
 
     x1 = BSON("validNestedArraysAndObjects"
-              << BSON("arr" << BSONArray(BSON("0" << BSON("2" << 1 << "1" << 0 << "1"
+              << BSON("arr" << BSONArray(BSON("0" << BSON("2" << 1 << "1" << 0 << "3"
                                                               << BSONArray(BSON("0"
                                                                                 << "a"
                                                                                 << "1"
                                                                                 << "b"))
-                                                              << "1"
+                                                              << "4"
                                                               << "b")))));
     ASSERT_OK(validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kExtended));
     ASSERT_OK(validateBSON(x1.objdata(), x1.objsize(), mongo::BSONValidateMode::kFull));
@@ -657,6 +657,28 @@ TEST(BSONValidateExtended, DeprecatedTypes) {
     ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
     status = validateBSON(obj, BSONValidateMode::kFull);
     ASSERT_EQ(status.code(), ErrorCodes::NonConformantBSON);
+}
+
+TEST(BSONValidateExtended, DuplicateFieldNames) {
+    std::pair<Status, Status> stats{Status::OK(), Status::OK()};
+    auto fullyValidate = [&](BSONObj obj) {
+        return std::pair{validateBSON(obj.objdata(), obj.objsize(), BSONValidateMode::kExtended),
+                         validateBSON(obj.objdata(), obj.objsize(), BSONValidateMode::kFull)};
+    };
+    BSONObj x = BSON("a" << 1 << "b" << 2);
+    stats = fullyValidate(x);
+    ASSERT_OK(stats.first);
+    ASSERT_OK(stats.second);
+
+    x = BSON("a" << 1 << "b" << 1 << "a" << 3);
+    stats = fullyValidate(x);
+    ASSERT_OK(stats.first);
+    ASSERT_EQ(stats.second, ErrorCodes::NonConformantBSON);
+
+    x = BSON("a" << 1 << "b" << BSON("a" << 1 << "b" << BSON("a" << 1) << "a" << 3) << "c" << 3);
+    stats = fullyValidate(x);
+    ASSERT_OK(stats.first);
+    ASSERT_EQ(stats.second, ErrorCodes::NonConformantBSON);
 }
 
 TEST(BSONValidateExtended, BSONColumn) {
