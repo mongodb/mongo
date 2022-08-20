@@ -720,6 +720,38 @@ private:
         }
     }
 
+    /**
+     * Partial index filters are only supported in 4.7.0 and above. If the user tries to
+     * downgrade the cluster to an earlier version, they must first ensure that there are no
+     * indexes with conflicting options.
+     */
+    void _disallowIndexesWithConflictingOptionsOnDowngrade(OperationContext* opCtx) {
+        auto collCatalog = CollectionCatalog::get(opCtx);
+        for (const auto& db : collCatalog->getAllDbNames()) {
+            for (auto collIt = collCatalog->begin(opCtx, db); collIt != collCatalog->end(opCtx);
+                 ++collIt) {
+                NamespaceStringOrUUID collName(
+                    collCatalog->lookupNSSByUUID(opCtx, collIt.uuid().get()).get());
+                AutoGetCollectionForRead coll(opCtx, collName);
+                if (!coll) {
+                    continue;
+                }
+
+                SimpleBSONObjUnorderedSet indexKeyPatterns;
+                auto indexIterator = coll->getIndexCatalog()->getIndexIterator(
+                    opCtx, /* includeUnfinishedIndexes  */ true);
+                while (indexIterator->more()) {
+                    auto indexKeyPattern = indexIterator->next()->descriptor()->keyPattern();
+                    uassert(ErrorCodes::CannotDowngrade,
+                            str::stream() << "Cannot downgrade the cluster as collection "
+                                          << coll->ns() << " has indexes with conflicting options",
+                            indexKeyPatterns.find(indexKeyPattern) == indexKeyPatterns.end());
+                    indexKeyPatterns.emplace(indexKeyPattern.getOwned());
+                }
+            }
+        }
+    }
+
     void _runDowngrade(OperationContext* opCtx,
                        const SetFeatureCompatibilityVersion& request,
                        boost::optional<Timestamp> changeTimestamp) {
@@ -762,7 +794,6 @@ private:
             });
         }
 
-        _disallowTTLIndexesWithNaNExpireAfterSecondsOnDowngrade(opCtx);
         // TODO (SERVER-56171): Remove once 5.0 is last-lts.
         removeTimeseriesEntriesFromConfigTransactions(opCtx);
 
@@ -807,6 +838,9 @@ private:
         uassert(ErrorCodes::Error(549181),
                 "Failing upgrade due to 'failDowngrading' failpoint set",
                 !failDowngrading.shouldFail());
+
+        _disallowTTLIndexesWithNaNExpireAfterSecondsOnDowngrade(opCtx);
+        _disallowIndexesWithConflictingOptionsOnDowngrade(opCtx);
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             // Always abort the reshardCollection regardless of version to ensure that it will run
