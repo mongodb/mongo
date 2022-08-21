@@ -320,6 +320,54 @@ class ArrayRandomDistribution(RandomDistribution):
         return arrays
 
 
+@dataclass
+class DocumentRandomDistribution(RandomDistribution):
+    """Produces random document sequence of the specified values with the specified distribution."""
+
+    number_of_fields_distr: RandomDistribution
+    fields_distr: RandomDistribution
+    field_to_distribution: dict
+
+    def __init__(self, number_of_fields_distr: RandomDistribution, fields_distr: RandomDistribution,
+                 field_to_distribution: dict):
+        self.number_of_fields_distr = number_of_fields_distr
+        self.fields_distr = fields_distr
+        self.field_to_distribution = field_to_distribution
+
+        for field in self.get_fields():
+            if field not in self.field_to_distribution:
+                raise ValueError("Must provide a RandomDistribution for each field")
+
+    def generate(self, size: int):
+        """Generate random document sequence of the given size."""
+        docs = []
+        nums = self.number_of_fields_distr.generate(size)
+        field_to_values = {}
+
+        # Pre-generate values for each field with corresponding distribution.
+        # Note that not all values generated would be used because the number of fields of a document is randomly generated as well.
+        for field in self.get_fields():
+            field_to_values[field] = self.field_to_distribution[field].generate(size)
+
+        idx = 0
+        for idx, num in enumerate(nums):
+            doc = {}
+            if not isinstance(num, int):
+                raise ValueError("the number of fields must be an int for document generation")
+
+            field_names = self.fields_distr.generate(num)
+            for field in field_names:
+                doc[field] = field_to_values[field][idx]
+
+            docs.append(doc)
+
+        return docs
+
+    def get_fields(self):
+        """Return a list of field names used to generate a random document."""
+        return self.fields_distr.get_values()
+
+
 if __name__ == '__main__':
     from collections import Counter
 
@@ -328,8 +376,9 @@ if __name__ == '__main__':
         print(f'\n{title}\n')
         rs = distr.generate(size)
         has_arrays = any(isinstance(elem, list) for elem in rs)
+        has_dict = any(isinstance(elem, dict) for elem in rs)
 
-        if not has_arrays:
+        if not has_arrays and not has_dict:
             counter = Counter(rs)
             for value in distr.get_values():
                 count = counter[value]
@@ -372,3 +421,19 @@ if __name__ == '__main__':
     nested_arr_distr = ArrayRandomDistribution(int_normal, mixed_with_arrays)
 
     print_distr("Mixed Nested Arrays", nested_arr_distr, 100)
+
+    simple_doc_distr = DocumentRandomDistribution(
+        RandomDistribution.normal(RangeGenerator(DataType.INTEGER, 1, 2)),
+        RandomDistribution.uniform(["obj"]), {"obj": int_normal})
+
+    field_name_choice = RandomDistribution.uniform(['a', 'b', 'c', 'd', 'e', 'f'])
+
+    field_to_distr = {
+        'a': int_normal, 'b': str_normal, 'c': mixed, 'd': arr_distr, 'e': nested_arr_distr,
+        'f': simple_doc_distr
+    }
+    nested_doc_distr = DocumentRandomDistribution(
+        RandomDistribution.normal(RangeGenerator(DataType.INTEGER, 0, 7)), field_name_choice,
+        field_to_distr)
+
+    print_distr("Nested Document generation", nested_doc_distr, 100)
