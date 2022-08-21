@@ -57,6 +57,7 @@
 #include "mongo/db/catalog/health_log.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/change_collection_expired_documents_remover.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/client.h"
@@ -778,13 +779,15 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         }
     }
 
-    // Start a background task to periodically remove expired pre-images from the 'system.preimages'
-    // collection if not in standalone mode.
+    // If not in standalone mode, start background tasks to:
+    //  * Periodically remove expired pre-images from the 'system.preimages'
+    //  * Periodically remove expired documents from change collections
     const auto isStandalone =
         repl::ReplicationCoordinator::get(serviceContext)->getReplicationMode() ==
         repl::ReplicationCoordinator::modeNone;
     if (!isStandalone) {
         startChangeStreamExpiredPreImagesRemover(serviceContext);
+        startChangeCollectionExpiredDocumentsRemover(serviceContext);
     }
 
     // Set up the logical session cache
@@ -1413,6 +1416,8 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
 
     LOGV2(6278511, "Shutting down the Change Stream Expired Pre-images Remover");
     shutdownChangeStreamExpiredPreImagesRemover(serviceContext);
+
+    shutdownChangeCollectionExpiredDocumentsRemover(serviceContext);
 
     // We should always be able to acquire the global lock at shutdown.
     // An OperationContext is not necessary to call lockGlobal() during shutdown, as it's only used

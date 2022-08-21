@@ -479,10 +479,11 @@ private:
  *                          the oplog in the same 'WriteUnitOfWork' and assumes that the global IX
  *                          lock is already held.
  *   kWrite - takes the IX lock on a tenant's change collection to perform any writes.
+ *   kRead  - takes the IS lock on a tenant's change collection to perform any reads.
  */
 class AutoGetChangeCollection {
 public:
-    enum class AccessMode { kWriteInOplogContext, kWrite };
+    enum class AccessMode { kWriteInOplogContext, kWrite, kRead };
 
     AutoGetChangeCollection(OperationContext* opCtx,
                             AccessMode mode,
@@ -498,6 +499,8 @@ public:
 
 private:
     boost::optional<AutoGetCollection> _coll;
+
+    boost::optional<AllowLockAcquisitionOnTimestampedUnitOfWork> _allowLockAcquisitionTsWuow;
 };
 
 }  // namespace mongo

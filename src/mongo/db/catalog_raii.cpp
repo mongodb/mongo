@@ -587,12 +587,15 @@ AutoGetChangeCollection::AutoGetChangeCollection(OperationContext* opCtx,
         invariant(opCtx->lockState()->isWriteLocked());
     }
 
-    // TODO SERVER-66715 avoid taking 'AutoGetCollection' and remove
-    // 'AllowLockAcquisitionOnTimestampedUnitOfWork'.
-    AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
+    if (mode != AccessMode::kRead) {
+        // TODO SERVER-66715 avoid taking 'AutoGetCollection' and remove
+        // 'AllowLockAcquisitionOnTimestampedUnitOfWork'.
+        _allowLockAcquisitionTsWuow.emplace(opCtx->lockState());
+    }
+
     _coll.emplace(opCtx,
                   NamespaceString::makeChangeCollectionNSS(tenantId),
-                  LockMode::MODE_IX,
+                  mode == AccessMode::kRead ? MODE_IS : MODE_IX,
                   AutoGetCollectionViewMode::kViewsForbidden,
                   deadline);
 }

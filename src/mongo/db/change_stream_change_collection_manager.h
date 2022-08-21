@@ -121,6 +121,24 @@ public:
         std::vector<InsertStatement>::const_iterator endOplogEntries,
         bool isGlobalIXLockAcquired,
         OpDebug* opDebug);
-};
 
+    /**
+     * Forward-scans the given change collection to return the recordId of the last, non-terminal
+     * document having the wall time less than the 'expirationTime'. Returns 'boost::none' if the
+     * collection is empty, or there are no expired documents, or the collection contains a single
+     * expired document.
+     */
+    static boost::optional<RecordIdBound> getChangeCollectionMaxExpiredRecordId(
+        OperationContext* opCtx,
+        const CollectionPtr* changeCollection,
+        const Date_t& expirationTime);
+
+    /**
+     * Removes expired documents from the change collection for the provided 'tenantId'. A document
+     * whose retention time is less than the 'expirationTime' is deleted.
+     */
+    static size_t removeExpiredChangeCollectionsDocuments(OperationContext* opCtx,
+                                                          boost::optional<TenantId> tenantId,
+                                                          const Date_t& expirationTime);
+};
 }  // namespace mongo

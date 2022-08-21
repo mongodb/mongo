@@ -527,6 +527,19 @@ env.Library(
 )
 
 env.Library(
+    target='change_collection_expired_change_remover',
+    source=[
+        'change_collection_expired_documents_remover.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/change_stream_change_collection_manager',
+        '$BUILD_DIR/mongo/db/change_streams_cluster_parameter',
+        '$BUILD_DIR/mongo/db/query_exec',
+        '$BUILD_DIR/mongo/util/periodic_runner',
+    ],
+)
+
+env.Library(
     target='change_stream_pre_images_collection_manager',
     source=[
         'change_stream_pre_images_collection_manager.cpp',
@@ -2278,6 +2291,7 @@ env.Library(
         # mongod_initializers.
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
         '$BUILD_DIR/mongo/db/catalog/collection_crud',
+        '$BUILD_DIR/mongo/db/change_collection_expired_change_remover',
         '$BUILD_DIR/mongo/db/change_stream_change_collection_manager',
         '$BUILD_DIR/mongo/db/change_stream_options_manager',
         '$BUILD_DIR/mongo/db/change_streams_cluster_parameter',
@@ -2456,6 +2470,7 @@ if wiredtiger:
         source=[
             'cancelable_operation_context_test.cpp',
             'catalog_raii_test.cpp',
+            'change_collection_expired_change_remover_test.cpp',
             'client_context_test.cpp',
             'client_strand_test.cpp',
             'collection_index_usage_tracker_test.cpp',
@@ -2531,6 +2546,8 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/catalog/import_collection_oplog_entry',
             '$BUILD_DIR/mongo/db/catalog/index_build_entry_idl',
             '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
+            '$BUILD_DIR/mongo/db/change_collection_expired_change_remover',
+            '$BUILD_DIR/mongo/db/change_stream_change_collection_manager',
             '$BUILD_DIR/mongo/db/change_streams_cluster_parameter',
             '$BUILD_DIR/mongo/db/mongohasher',
             '$BUILD_DIR/mongo/db/op_observer/fcv_op_observer',
