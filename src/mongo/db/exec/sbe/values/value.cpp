@@ -33,7 +33,9 @@
 
 #include "mongo/base/compare_numbers.h"
 #include "mongo/db/exec/js_function.h"
+#include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/values/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"
@@ -193,6 +195,47 @@ size_t SortSpec::getApproximateSize() const {
     return size;
 }
 
+size_t MakeObjSpec::getApproximateSize() const {
+    auto size = sizeof(MakeObjSpec);
+    size += size_estimator::estimate(_fields);
+    size += size_estimator::estimate(_projectFields);
+    size += size_estimator::estimate(_allFieldsMap);
+    return size;
+}
+
+StringMap<size_t> MakeObjSpec::buildAllFieldsMap() const {
+    return buildAllFieldsMap(_fields, _projectFields);
+}
+
+void MakeObjSpec::keepOrDropFields(value::TypeTags rootTag,
+                                   value::Value rootVal,
+                                   UniqueBSONObjBuilder& bob) const {
+    keepOrDropFields(rootTag, rootVal, _fieldBehavior, _fields.size(), _allFieldsMap, bob);
+}
+
+std::string MakeObjSpec::toString() const {
+    StringBuilder builder;
+    builder << (_fieldBehavior == MakeObjSpec::FieldBehavior::keep ? "keep" : "drop") << ", [";
+
+    for (size_t i = 0; i < _fields.size(); ++i) {
+        if (i != 0) {
+            builder << ", ";
+        }
+        builder << '"' << _fields[i] << '"';
+    }
+    builder << "], [";
+
+    for (size_t i = 0; i < _projectFields.size(); ++i) {
+        if (i != 0) {
+            builder << ", ";
+        }
+        builder << '"' << _projectFields[i] << '"';
+    }
+    builder << "]";
+
+    return builder.str();
+}
+
 std::pair<TypeTags, Value> makeCopyJsFunction(const JsFunction& jsFunction) {
     auto ownedJsFunction = bitcastFrom<JsFunction*>(new JsFunction(jsFunction));
     return {TypeTags::jsFunction, ownedJsFunction};
@@ -211,6 +254,11 @@ std::pair<TypeTags, Value> makeCopyFtsMatcher(const fts::FTSMatcher& matcher) {
 std::pair<TypeTags, Value> makeCopySortSpec(const SortSpec& ss) {
     auto ssCopy = bitcastFrom<SortSpec*>(new SortSpec(ss));
     return {TypeTags::sortSpec, ssCopy};
+}
+
+std::pair<TypeTags, Value> makeCopyMakeObjSpec(const MakeObjSpec& mos) {
+    auto mosCopy = bitcastFrom<MakeObjSpec*>(new MakeObjSpec(mos));
+    return {TypeTags::makeObjSpec, mosCopy};
 }
 
 std::pair<TypeTags, Value> makeCopyCollator(const CollatorInterface& collator) {
@@ -290,6 +338,9 @@ void releaseValueDeep(TypeTags tag, Value val) noexcept {
             break;
         case TypeTags::sortSpec:
             delete getSortSpecView(val);
+            break;
+        case TypeTags::makeObjSpec:
+            delete getMakeObjSpecView(val);
             break;
         case TypeTags::collator:
             delete getCollatorView(val);

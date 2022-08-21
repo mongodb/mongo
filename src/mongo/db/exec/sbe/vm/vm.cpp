@@ -40,6 +40,7 @@
 #include "mongo/db/exec/sbe/accumulator_sum_value_enum.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/values/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/sbe_pattern_value_cmp.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/value.h"
@@ -4167,6 +4168,32 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinGenerateSortKey
                 new KeyString::Value(ss->generateSortKey(obj, collator)))};
 }
 
+std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinMakeBsonObj(ArityType arity) {
+    invariant(arity >= 2);
+    tassert(6897002,
+            str::stream() << "Unsupported number of arguments passed to makeBsonObj(): " << arity,
+            arity >= 2);
+
+    auto [mosOwned, mosTag, mosVal] = getFromStack(0);
+    auto [objOwned, objTag, objVal] = getFromStack(1);
+
+    if (mosTag != value::TypeTags::makeObjSpec) {
+        return {false, value::TypeTags::Nothing, 0};
+    }
+
+    auto mos = value::getMakeObjSpecView(mosVal);
+
+    // For produceBsonObject()'s 'getArg' parameter, we pass in a lambda that will retrieve the
+    // value of each projected field from the VM stack.
+    auto [tag, val] = mos->produceBsonObject(
+        objTag, objVal, [&](size_t idx) -> std::pair<value::TypeTags, value::Value> {
+            auto [_, tag, val] = getFromStack(2 + idx);
+            return {tag, val};
+        });
+
+    return {true, tag, val};
+}
+
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinReverseArray(ArityType arity) {
     invariant(arity == 1);
     auto [inputOwned, inputType, inputVal] = getFromStack(0);
@@ -4637,6 +4664,8 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builti
             return builtinFtsMatch(arity);
         case Builtin::generateSortKey:
             return builtinGenerateSortKey(arity);
+        case Builtin::makeBsonObj:
+            return builtinMakeBsonObj(arity);
         case Builtin::tsSecond:
             return builtinTsSecond(arity);
         case Builtin::tsIncrement:

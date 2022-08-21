@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 #include "mongo/db/exec/sbe/values/value_printer.h"
+#include "mongo/db/exec/sbe/values/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/platform/basic.h"
@@ -153,6 +154,9 @@ void ValuePrinter<T>::writeTagToStream(TypeTags tag) {
             break;
         case TypeTags::sortSpec:
             stream << "sortSpec";
+            break;
+        case TypeTags::makeObjSpec:
+            stream << "makeObjSpec";
             break;
         case TypeTags::indexBounds:
             stream << "indexBounds";
@@ -454,7 +458,7 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
             stream << ')';
             break;
         }
-        case value::TypeTags::ftsMatcher: {
+        case TypeTags::ftsMatcher: {
             auto ftsMatcher = getFtsMatcherView(val);
             stream << "FtsMatcher(";
             writeObjectToStream(ftsMatcher->query().toBSON());
@@ -465,6 +469,9 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
             stream << "SortSpec(";
             writeObjectToStream(getSortSpecView(val)->getPattern());
             stream << ')';
+            break;
+        case TypeTags::makeObjSpec:
+            stream << "MakeObjSpec(" << getMakeObjSpecView(val)->toString() << ")";
             break;
         case TypeTags::indexBounds:
             // When calling toString() we don't know if the index has a non-simple collation or

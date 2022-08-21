@@ -29,15 +29,11 @@
 
 #pragma once
 
+#include "mongo/db/exec/sbe/makeobj_enums.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/value.h"
 
 namespace mongo::sbe {
-
-enum class MakeObjFieldBehavior { drop, keep };
-
-enum class MakeObjOutputType { object, bsonObject };
-
 /**
  * Base stage for creating a bsonObject or object.
  *

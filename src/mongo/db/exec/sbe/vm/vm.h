@@ -611,6 +611,7 @@ enum class Builtin : uint8_t {
     hash,
     ftsMatch,
     generateSortKey,
+    makeBsonObj,
     tsSecond,
     tsIncrement,
     typeMatch,
@@ -1208,6 +1209,7 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinHash(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinFtsMatch(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinGenerateSortKey(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinMakeBsonObj(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinTsSecond(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinTsIncrement(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinTypeMatch(ArityType arity);

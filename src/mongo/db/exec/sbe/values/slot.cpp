@@ -36,6 +36,7 @@
 #include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/values/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
 #include "mongo/db/storage/key_string.h"
@@ -704,6 +705,9 @@ int getApproximateSize(TypeTags tag, Value val) {
             break;
         case TypeTags::sortSpec:
             result += getSortSpecView(val)->getApproximateSize();
+            break;
+        case TypeTags::makeObjSpec:
+            result += getMakeObjSpecView(val)->getApproximateSize();
             break;
         case TypeTags::indexBounds:
             result += size_estimator::estimate(*getIndexBoundsView(val));

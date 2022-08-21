@@ -33,6 +33,7 @@
 
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/values/makeobj_spec.h"
 #include "mongo/util/str.h"
 
 namespace mongo::sbe {
@@ -109,18 +110,12 @@ void MakeObjStageBase<O>::prepare(CompileCtx& ctx) {
     if (_rootSlot) {
         _root = _children[0]->getAccessor(ctx, *_rootSlot);
     }
-    for (auto& p : _fields) {
-        // Mark the values from _fields with 'std::numeric_limits<size_t>::max()'.
-        auto [it, inserted] = _allFieldsMap.emplace(p, std::numeric_limits<size_t>::max());
-        uassert(4822818, str::stream() << "duplicate field: " << p, inserted);
-    }
+
+    _allFieldsMap = value::MakeObjSpec::buildAllFieldsMap(_fields, _projectFields);
 
     for (size_t idx = 0; idx < _projectFields.size(); ++idx) {
-        auto& p = _projectFields[idx];
-        // Mark the values from _projectFields with their corresponding index.
-        auto [it, inserted] = _allFieldsMap.emplace(p, idx);
-        uassert(4822819, str::stream() << "duplicate field: " << p, inserted);
-        _projects.emplace_back(p, _children[0]->getAccessor(ctx, _projectVars[idx]));
+        _projects.emplace_back(_projectFields[idx],
+                               _children[0]->getAccessor(ctx, _projectVars[idx]));
     }
 
     _compiled = true;
@@ -273,46 +268,9 @@ void MakeObjStageBase<MakeObjOutputType::bsonObject>::produceObject() {
         auto [tag, val] = _root->getViewOfValue();
 
         size_t nFieldsNeededIfInclusion = _fields.size();
-        if (tag == value::TypeTags::bsonObject) {
-            if (!(nFieldsNeededIfInclusion == 0 && _fieldBehavior == FieldBehavior::keep)) {
-                auto be = value::bitcastTo<const char*>(val);
-                // Skip document length.
-                be += 4;
-                while (*be != 0) {
-                    auto sv = bson::fieldNameView(be);
-                    auto key = StringMapHasher{}.hashed_key(StringData(sv));
-
-                    auto nextBe = bson::advance(be, sv.size());
-
-                    if (!isFieldProjectedOrRestricted(key)) {
-                        bob.append(BSONElement(be, sv.size() + 1, nextBe - be));
-                        --nFieldsNeededIfInclusion;
-                    }
-
-                    if (nFieldsNeededIfInclusion == 0 && _fieldBehavior == FieldBehavior::keep) {
-                        break;
-                    }
-
-                    be = nextBe;
-                }
-            }
-        } else if (tag == value::TypeTags::Object) {
-            if (!(nFieldsNeededIfInclusion == 0 && _fieldBehavior == FieldBehavior::keep)) {
-                auto objRoot = value::getObjectView(val);
-                for (size_t idx = 0; idx < objRoot->size(); ++idx) {
-                    auto key = StringMapHasher{}.hashed_key(StringData(objRoot->field(idx)));
-
-                    if (!isFieldProjectedOrRestricted(key)) {
-                        auto [tag, val] = objRoot->getAt(idx);
-                        bson::appendValueToBsonObj(bob, objRoot->field(idx), tag, val);
-                        --nFieldsNeededIfInclusion;
-                    }
-
-                    if (nFieldsNeededIfInclusion == 0 && _fieldBehavior == FieldBehavior::keep) {
-                        break;
-                    }
-                }
-            }
+        if (value::isObject(tag)) {
+            value::MakeObjSpec::keepOrDropFields(
+                tag, val, _fieldBehavior, nFieldsNeededIfInclusion, _allFieldsMap, bob);
         } else {
             for (size_t idx = 0; idx < _projects.size(); ++idx) {
                 projectField(&bob, idx);

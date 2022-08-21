@@ -76,6 +76,7 @@ using IndexKeysInclusionSet = std::bitset<Ordering::kMaxCompoundIndexKeys>;
 
 namespace value {
 class SortSpec;
+class MakeObjSpec;
 
 static constexpr size_t kNewUUIDLength = 16;
 
@@ -156,6 +157,9 @@ enum class TypeTags : uint8_t {
 
     // Pointer to a SortSpec object.
     sortSpec,
+
+    // Pointer to a MakeObjSpec object.
+    makeObjSpec,
 
     // Pointer to a IndexBounds object.
     indexBounds,
@@ -1210,6 +1214,10 @@ inline SortSpec* getSortSpecView(Value val) noexcept {
     return reinterpret_cast<SortSpec*>(val);
 }
 
+inline MakeObjSpec* getMakeObjSpecView(Value val) noexcept {
+    return reinterpret_cast<MakeObjSpec*>(val);
+}
+
 inline IndexBounds* getIndexBoundsView(Value val) noexcept {
     return reinterpret_cast<IndexBounds*>(val);
 }
@@ -1336,6 +1344,8 @@ std::pair<TypeTags, Value> makeCopyFtsMatcher(const fts::FTSMatcher&);
 
 std::pair<TypeTags, Value> makeCopySortSpec(const SortSpec&);
 
+std::pair<TypeTags, Value> makeCopyMakeObjSpec(const MakeObjSpec&);
+
 std::pair<TypeTags, Value> makeCopyCollator(const CollatorInterface& collator);
 
 std::pair<TypeTags, Value> makeCopyIndexBounds(const IndexBounds& collator);
@@ -1406,6 +1416,8 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
             return makeCopyFtsMatcher(*getFtsMatcherView(val));
         case TypeTags::sortSpec:
             return makeCopySortSpec(*getSortSpecView(val));
+        case TypeTags::makeObjSpec:
+            return makeCopyMakeObjSpec(*getMakeObjSpecView(val));
         case TypeTags::collator:
             return makeCopyCollator(*getCollatorView(val));
         case TypeTags::indexBounds:

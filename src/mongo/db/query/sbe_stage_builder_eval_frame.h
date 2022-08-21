@@ -32,6 +32,7 @@
 #include <stack>
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/stdx/variant.h"
 
 namespace mongo::stage_builder {
 
@@ -44,57 +45,75 @@ class EvalExpr {
 public:
     EvalExpr() = default;
 
-    EvalExpr(EvalExpr&& e) : _expr(std::move(e._expr)), _slot(e._slot) {
-        e._slot = boost::none;
+    EvalExpr(EvalExpr&& e) : _exprOrSlot(std::move(e._exprOrSlot)) {
+        e.reset();
     }
 
-    EvalExpr(std::unique_ptr<sbe::EExpression>&& e) : _expr(std::move(e)) {}
+    EvalExpr(std::unique_ptr<sbe::EExpression>&& e) : _exprOrSlot(std::move(e)) {}
 
-    EvalExpr(sbe::value::SlotId s) : _expr(sbe::makeE<sbe::EVariable>(s)), _slot(s) {}
+    EvalExpr(sbe::value::SlotId s) : _exprOrSlot(s) {}
 
     EvalExpr& operator=(EvalExpr&& e) {
         if (this == &e) {
             return *this;
         }
 
-        _expr = std::move(e._expr);
-        _slot = e._slot;
-        e._slot = boost::none;
+        _exprOrSlot = std::move(e._exprOrSlot);
+        e.reset();
         return *this;
     }
 
     EvalExpr& operator=(std::unique_ptr<sbe::EExpression>&& e) {
-        _expr = std::move(e);
-        _slot = boost::none;
+        _exprOrSlot = std::move(e);
+        e.reset();
         return *this;
     }
 
     EvalExpr& operator=(sbe::value::SlotId s) {
-        _expr = sbe::makeE<sbe::EVariable>(s);
-        _slot = s;
+        _exprOrSlot = s;
         return *this;
     }
 
+    boost::optional<sbe::value::SlotId> getSlot() const {
+        return hasSlot() ? boost::make_optional(stdx::get<sbe::value::SlotId>(_exprOrSlot))
+                         : boost::none;
+    }
+
+    bool hasSlot() const {
+        return stdx::holds_alternative<sbe::value::SlotId>(_exprOrSlot);
+    }
+
+    EvalExpr clone() const {
+        if (hasSlot()) {
+            return stdx::get<sbe::value::SlotId>(_exprOrSlot);
+        }
+
+        const auto& expr = stdx::get<std::unique_ptr<sbe::EExpression>>(_exprOrSlot);
+
+        tassert(
+            6897007, "Unexpected: clone() method invoked on null EvalExpr", expr.get() != nullptr);
+
+        return expr->clone();
+    }
+
     explicit operator bool() const {
-        return static_cast<bool>(_expr);
+        return hasSlot() || stdx::get<std::unique_ptr<sbe::EExpression>>(_exprOrSlot) != nullptr;
     }
 
     void reset() {
-        _expr.reset();
-        _slot = boost::none;
+        _exprOrSlot = std::unique_ptr<sbe::EExpression>();
     }
 
     std::unique_ptr<sbe::EExpression> extractExpr() {
-        return std::move(_expr);
-    }
+        if (hasSlot()) {
+            return sbe::makeE<sbe::EVariable>(stdx::get<sbe::value::SlotId>(_exprOrSlot));
+        }
 
-    boost::optional<sbe::value::SlotId> getSlot() const {
-        return _slot;
+        return std::move(stdx::get<std::unique_ptr<sbe::EExpression>>(_exprOrSlot));
     }
 
 private:
-    std::unique_ptr<sbe::EExpression> _expr;
-    boost::optional<sbe::value::SlotId> _slot;
+    stdx::variant<std::unique_ptr<sbe::EExpression>, sbe::value::SlotId> _exprOrSlot;
 };
 
 /**
