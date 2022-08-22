@@ -133,10 +133,12 @@ add_option(
     choices=list(BUILD_PROFILES.keys()),
     default='default',
     type='choice',
-    help='''Short hand for common build options. These profiles are well supported by SDP and are
-    kept up to date. Unless you need something specific, it is recommended that you only build with
-    these. san is the recommended profile since it exposes bugs before they are found in patch
-    builds. Check out site_scons/mongo/build_profiles.py to see each profile.''',
+    help='''Short hand for common build configurations. These profiles are well supported by the build
+    and are kept up to date. The 'default' profile should be used unless you have the required
+    prerequisites in place to use the other profiles, i.e. having the mongodbtoolchain installed
+    and being connected to an icecream cluster. For mongodb developers, it is recommended to use
+    the 'san' (sanitizer) profile to identify bugs as soon as possible. Check out
+    site_scons/mongo/build_profiles.py to see each profile.''',
 )
 
 build_profile = BUILD_PROFILES[get_option('build-profile')]
