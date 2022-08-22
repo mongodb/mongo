@@ -340,7 +340,7 @@ add_option(
     'opt',
     choices=['on', 'debug', 'size', 'off', 'auto'],
     const='on',
-    default='auto',
+    default=build_profile.opt,
     help='Enable compile-time optimization',
     nargs='?',
     type='choice',
