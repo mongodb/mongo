@@ -694,7 +694,7 @@ FLE2InsertUpdatePayload EDCClientPayload::serializeInsertUpdatePayload(FLEIndexK
 
 std::vector<std::string> getMinCover(const FLE2RangeSpec& spec, uint8_t sparsity) {
     std::vector<std::string> edges;
-    // TODO SERVER-69013
+    // TODO SERVER-68600
     return edges;
 }
 
@@ -703,7 +703,7 @@ std::vector<std::string> getEdges(BSONElement element,
                                   BSONElement lowerBound,
                                   BSONElement upperBound,
                                   uint8_t sparsity) {
-    // TODO SERVER-69013
+    // TODO - SERVER-67751
     return {"1", "01", "001"};
 }
 
@@ -3387,134 +3387,6 @@ std::unique_ptr<Edges> getEdgesDouble(double value,
                                       int sparsity) {
     auto aost = getTypeInfoDouble(value, min, max);
     return getEdgesT(aost.value, aost.min, aost.max, sparsity);
-}
-
-template <typename T>
-class MinCoverGenerator {
-public:
-    static std::vector<std::string> minCover(T rangeMin, T rangeMax, T max, int sparsity) {
-        MinCoverGenerator<T> mcg(rangeMin, rangeMax, max, sparsity);
-        std::vector<std::string> c;
-        mcg.minCoverRec(c, 0, mcg._maxlen);
-        return c;
-    }
-
-private:
-    MinCoverGenerator(T rangeMin, T rangeMax, T max, int sparsity)
-        : _rangeMin(rangeMin),
-          _rangeMax(rangeMax),
-          _sparsity(sparsity),
-          _maxlen(64 - countLeadingZeros64(max)) {
-        static_assert(std::is_unsigned<T>::value);
-        static_assert(std::numeric_limits<T>::is_integer);
-        uassert(6860001, "Min must be less than max for range search", rangeMin <= rangeMax);
-        dassert(rangeMin >= 0 && rangeMax <= max);
-    }
-
-    // Generate and apply a mask to an integer, filling masked bits with 1;
-    // bits from 0 to bits-1 will be set to 1. Other bits are left as-is.
-    // for example: applyMask(0b00000000, 4) = 0b00001111
-    static T applyMask(T value, int maskedBits) {
-        constexpr T ones = ~static_cast<T>(0);
-
-        invariant(maskedBits <= std::numeric_limits<T>::digits);
-        invariant(maskedBits >= 0);
-
-        if (maskedBits == 0) {
-            return value;
-        }
-
-        const T mask = ones >> (std::numeric_limits<T>::digits - maskedBits);
-        return value | mask;
-    }
-
-    // Some levels are discarded when sparsity does not divide current level
-    // Discarded levels are replaced by the set of edges on the next level
-    // Return true if level is stored
-    bool isLevelStored(int maskedBits) {
-        int level = _maxlen - maskedBits;
-        return 0 == maskedBits || 0 == (level % _sparsity);
-    }
-
-    std::string toString(T start, int maskedBits) {
-        constexpr size_t bits = std::numeric_limits<T>::digits;
-        dassert(maskedBits <= _maxlen);
-        if (maskedBits == _maxlen) {
-            return "root";
-        }
-        std::string valueBin = std::bitset<bits>(start >> maskedBits).to_string();
-        return valueBin.substr(bits - _maxlen + maskedBits, _maxlen - maskedBits);
-    }
-
-    // Generate a minCover recursively for the minimum set of edges covered
-    // by [_rangeMin, _rangeMax]. Edges on a level discarded due to sparsity are
-    // replaced with the edges from next level
-    void minCoverRec(std::vector<std::string>& c, T blockStart, int maskedBits) {
-        const T blockEnd = applyMask(blockStart, maskedBits);
-
-        if (blockEnd < _rangeMin || blockStart > _rangeMax) {
-            return;
-        }
-
-        if (blockStart >= _rangeMin && blockEnd <= _rangeMax && isLevelStored(maskedBits)) {
-            c.push_back(toString(blockStart, maskedBits));
-            return;
-        }
-
-        invariant(maskedBits > 0);
-
-        const int newBits = maskedBits - 1;
-        minCoverRec(c, blockStart, newBits);
-        minCoverRec(c, blockStart | (static_cast<T>(1) << newBits), newBits);
-    }
-
-private:
-    T _rangeMin;
-    T _rangeMax;
-    int _sparsity;
-    int _maxlen;
-};
-
-template <typename T>
-std::vector<std::string> minCover(T rangeMin, T rangeMax, T min, T max, int sparsity) {
-    dassert(0 == min);
-    return MinCoverGenerator<T>::minCover(rangeMin, rangeMax, max, sparsity);
-}
-
-std::vector<std::string> minCoverInt32(int32_t rangeMin,
-                                       int32_t rangeMax,
-                                       boost::optional<int32_t> min,
-                                       boost::optional<int32_t> max,
-                                       int sparsity) {
-    auto a = getTypeInfo32(rangeMin, min, max);
-    auto b = getTypeInfo32(rangeMax, min, max);
-    dassert(a.min == b.min);
-    dassert(a.max == b.max);
-    return minCover(a.value, b.value, a.min, a.max, sparsity);
-}
-
-std::vector<std::string> minCoverInt64(int64_t rangeMin,
-                                       int64_t rangeMax,
-                                       boost::optional<int64_t> min,
-                                       boost::optional<int64_t> max,
-                                       int sparsity) {
-    auto a = getTypeInfo64(rangeMin, min, max);
-    auto b = getTypeInfo64(rangeMax, min, max);
-    dassert(a.min == b.min);
-    dassert(a.max == b.max);
-    return minCover(a.value, b.value, a.min, a.max, sparsity);
-}
-
-std::vector<std::string> minCoverDouble(double rangeMin,
-                                        double rangeMax,
-                                        boost::optional<double> min,
-                                        boost::optional<double> max,
-                                        int sparsity) {
-    auto a = getTypeInfoDouble(rangeMin, min, max);
-    auto b = getTypeInfoDouble(rangeMax, min, max);
-    dassert(a.min == b.min);
-    dassert(a.max == b.max);
-    return minCover(a.value, b.value, a.min, a.max, sparsity);
 }
 
 }  // namespace mongo

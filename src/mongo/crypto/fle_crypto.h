@@ -1365,28 +1365,6 @@ std::unique_ptr<Edges> getEdgesDouble(double value,
                                       int sparsity);
 
 /**
- * Mincover calculator
- */
-
-std::vector<std::string> minCoverInt32(int32_t rangeMin,
-                                       int32_t rangeMax,
-                                       boost::optional<int32_t> min,
-                                       boost::optional<int32_t> max,
-                                       int sparsity);
-
-std::vector<std::string> minCoverInt64(int64_t rangeMin,
-                                       int64_t rangeMax,
-                                       boost::optional<int64_t> min,
-                                       boost::optional<int64_t> max,
-                                       int sparsity);
-
-std::vector<std::string> minCoverDouble(double rangeMin,
-                                        double rangeMax,
-                                        boost::optional<double> min,
-                                        boost::optional<double> max,
-                                        int sparsity);
-
-/**
  * Utility functions manipulating buffers.
  */
 PrfBlock PrfBlockfromCDR(const ConstDataRange& block);
