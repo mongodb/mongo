@@ -16,10 +16,19 @@ const replTest = new ReplSetTest({
 replTest.startSet();
 replTest.initiate();
 
+function setLog(db) {
+    db.setLogLevel(5, 'command');
+    db.setLogLevel(5, 'index');
+    db.setLogLevel(5, 'query');
+    db.setLogLevel(5, 'replication');
+    db.setLogLevel(5, 'write');
+}
+
 /**
  * Setup the primary and secondary collections.
  */
 let primary = replTest.getPrimary();
+setLog(primary.getDB("test"));
 const insertColl = primary.getDB("test").foo;
 const cRecords = 50;
 for (let i = 0; i < cRecords; ++i) {
@@ -29,6 +38,7 @@ for (let i = 0; i < cRecords; ++i) {
 }
 
 let secondary = replTest.getSecondary();
+setLog(secondary.getDB("test"));
 const readColl = secondary.getDB("test").foo;
 
 /**
@@ -74,7 +84,7 @@ const readColl = secondary.getDB("test").foo;
             writeConcern: {"w": "majority"}
         };
         const res = readColl.aggregate(pipeline, aggOptions).toArray();
-        assert.eq(res.length, cRecords);  // the group-by key is unique
+        assert.eq(res.length, cRecords, res);  // the group-by key is unique
 
         // In SBE also check the statistics for disk usage. Note: 'explain()' doesn't support the
         // 'writeConcern' option so we test spilling on the secondary but without using the concern.
