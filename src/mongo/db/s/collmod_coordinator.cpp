@@ -197,7 +197,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                         sharding_ddl_util::stopMigrations(
                             opCtx, _collInfo->nsForTargeting, _doc.getCollUUID());
                     }
-                });
+                })();
         })
         .then(_executePhase(
             Phase::kBlockShards,
