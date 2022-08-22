@@ -1829,12 +1829,12 @@ if env.ToolchainIs('clang'):
     # causes the built product to easily blow through our 1M stack size whenever
     # either gcov or sanitizers are enabled. Ref: SERVER-65684
     if has_option('gcov') and optBuild not in ("on", "debug"):
-        env.FatalError(("Error: A clang --gcov build must have either debug or full "),
-                       ("optimization to prevent crashes due to excessive stack usage"))
+        env.FatalError("Error: A clang --gcov build must have either --opt=debug or --opt=on to " +
+                       "prevent crashes due to excessive stack usage")
 
     if has_option('sanitize') and optBuild not in ("on", "debug"):
-        env.FatalError(("Error: A clang --sanitize build must have either debug or "),
-                       ("full optimization to prevent crashes due to excessive stack usage"))
+        env.FatalError("Error: A clang --sanitize build must have either --opt=debug or --opt=on " +
+                       "to prevent crashes due to excessive stack usage")
 
 # Special cases - if debug is not enabled and optimization is not specified,
 # default to full optimizationm otherwise turn it off.
