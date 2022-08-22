@@ -271,7 +271,7 @@ protected:
         };
     }
 
-    void _enterPhase(const Phase& newPhase) {
+    virtual void _enterPhase(const Phase& newPhase) {
         auto newDoc = [&] {
             stdx::lock_guard lk{_docMutex};
             return _doc;

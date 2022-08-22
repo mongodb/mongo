@@ -79,6 +79,9 @@ private:
             DDLCoordinatorTypeEnum::kCompactStructuredEncryptionDataPre61Compatible;
     }
 
+    // TODO SERVER-68373 remove once 7.0 becomes last LTS
+    void _enterPhase(const Phase& newPhase) override;
+
 private:
     boost::optional<CompactStructuredEncryptionDataCommandReply> _response;
     bool _skipCompact{false};
