@@ -71,7 +71,6 @@ if get_option('ssl') == 'on':
         ],
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/base',
-            '$BUILD_DIR/mongo/bson/bson_validate',
             '$BUILD_DIR/mongo/db/server_options_core',  # For object_check.h
             '$BUILD_DIR/mongo/idl/idl_parser',
             '$BUILD_DIR/third_party/shim_kms_message',

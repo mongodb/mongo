@@ -514,7 +514,6 @@ env.Library(
         'shutdown.idl',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/bson/bson_validate',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/util/fail_point',
     ],

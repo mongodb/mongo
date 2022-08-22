@@ -225,7 +225,6 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
-        '$BUILD_DIR/mongo/bson/bson_validate',
         "$BUILD_DIR/mongo/idl/server_parameter",
     ],
 )

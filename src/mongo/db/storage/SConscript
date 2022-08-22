@@ -383,15 +383,16 @@ env.Library(
 )
 
 env.Library(
-    target='storage_engine_metadata', source=[
+    target='storage_engine_metadata',
+    source=[
         'storage_engine_metadata.cpp',
-    ], LIBDEPS=[
+    ],
+    LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/server_options_core',
-    ], LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/bson/bson_validate',
-    ])
+    ],
+)
 
 env.Library(
     target='storage_file_util',
