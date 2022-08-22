@@ -408,6 +408,11 @@ function sslProviderSupportsTLS1_0() {
         const cryptoPolicy = cat("/etc/crypto-policies/config");
         return cryptoPolicy.includes("LEGACY");
     }
+
+    if (isOpenSSL3orGreater()) {
+        return false;
+    }
+
     return !isDebian10() && !isUbuntu2004();
 }
 
@@ -416,7 +421,22 @@ function sslProviderSupportsTLS1_1() {
         const cryptoPolicy = cat("/etc/crypto-policies/config");
         return cryptoPolicy.includes("LEGACY");
     }
+
+    if (isOpenSSL3orGreater()) {
+        return false;
+    }
+
     return !isDebian10() && !isUbuntu2004();
+}
+
+function isOpenSSL3orGreater() {
+    // Windows and macOS do not have "openssl.compiled" in buildInfo but they do have "running"
+    const opensslCompiledIn = getBuildInfo().openssl.compiled !== undefined;
+    if (!opensslCompiledIn) {
+        return false;
+    }
+
+    return opensslVersionAsInt() > 0x3000000;
 }
 
 function opensslVersionAsInt() {
