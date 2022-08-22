@@ -187,7 +187,7 @@ const joinResumeReplicationShell =
             assert.soon(
                 function() {
                     return changeStreamDB
-                               .currentOpLegacy({
+                               .currentOp({
                                    op: "command",
                                    // Note the namespace here happens to be database.$cmd, because
                                    // we're blocked waiting for the read concern, which happens
@@ -199,7 +199,7 @@ const joinResumeReplicationShell =
                                .inprog.length === 1;
                 },
                 () => "Failed to find update lookup in currentOp(): " +
-                    tojson(changeStreamDB.currentOpLegacy().inprog));
+                    tojson(changeStreamDB.currentOp().inprog));
 
             // Then restart replication - this should eventually unblock the lookup.
             restartServerReplication(pausedSecondary);`,

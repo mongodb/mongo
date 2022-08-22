@@ -801,13 +801,6 @@ DB.prototype.hello = function() {
 };
 
 DB.prototype.currentOp = function(arg) {
-    // TODO CLOUDP-89361: The shell is connected to the Atlas Proxy, which currently does not
-    // support the $currentOp aggregation stage. Remove the legacy server command path once the
-    // proxy can support $currentOp.
-    if (this.serverStatus().hasOwnProperty("atlasVersion")) {
-        return this.currentOpLegacy(arg);
-    }
-
     try {
         const results = this.currentOpCursor(arg).toArray();
         let res = {"inprog": results.length > 0 ? results : [], "ok": 1};
@@ -821,21 +814,6 @@ DB.prototype.currentOp = function(arg) {
     } catch (e) {
         return {"ok": 0, "code": e.code, "errmsg": "Error executing $currentOp: " + e.message};
     }
-};
-DB.prototype.currentOP = DB.prototype.currentOp;
-
-DB.prototype.currentOpLegacy = function(arg) {
-    let q = {};
-    if (arg) {
-        if (typeof (arg) == "object")
-            Object.extend(q, arg);
-        else if (arg)
-            q["$all"] = true;
-    }
-
-    var commandObj = {"currentOp": 1};
-    Object.extend(commandObj, q);
-    return this.adminCommand(commandObj);
 };
 
 DB.prototype.currentOpCursor = function(arg) {
