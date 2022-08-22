@@ -284,8 +284,9 @@ add_option('spider-monkey-dbg',
 )
 
 add_option('opt',
-    choices=['on', 'size', 'off'],
+    choices=['on', 'size', 'off', 'auto'],
     const='on',
+    default=build_profile.opt,
     help='Enable compile-time optimization',
     nargs='?',
     type='choice',
@@ -1184,6 +1185,8 @@ dbg_opt_mapping = {
     ( "off", "off" ) : ( False, False ),
     ( "on",  "size"  ) : ( True,  True ),
     ( "off", "size"  ) : ( False, True ),
+    ( "on",  "auto"  ) : ( True,  False ),
+    ( "off", "auto"  ) : ( False, True ),
 }
 debugBuild, optBuild = dbg_opt_mapping[(get_option('dbg'), get_option('opt'))]
 optBuildForSize = True if optBuild and get_option('opt') == "size" else False

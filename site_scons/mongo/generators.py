@@ -88,6 +88,7 @@ def empty_buildinfo_environment_data():
     return {}
 
 
+# TODO: SERVER-69064 Improve default_variant_dir_generator in Build System
 def default_variant_dir_generator(target, source, env, for_signature):
 
     if env.GetOption('cache') != None:
