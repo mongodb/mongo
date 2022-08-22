@@ -152,7 +152,7 @@ public:
      * Get extra system stats
      */
     void appendSystemDetails(BSONObjBuilder& details) const {
-        details.append(StringData("extra"), sysInfo()._extraStats.copy());
+        details.appendElements(sysInfo()._extraStats);
     }
 
     /**
