@@ -529,7 +529,9 @@ BSONObj numberDecimalsAlmostEqual(const BSONObj& input, void*) {
     auto ten = Decimal128(10);
     auto exponent = a.toAbs().logarithm(ten).round();
 
-    if (a.isZero() && b.isZero()) {
+    // Early exit for zero, infinity and NaN cases.
+    if ((a.isZero() && b.isZero()) || (a.isNaN() && b.isNaN()) ||
+        (a.isInfinite() && b.isInfinite() && (a.isNegative() == b.isNegative()))) {
         return BSON("" << true /* isErrorAcceptable */);
     } else if (!a.isZero() && !b.isZero()) {
         // Return early if arguments are not the same order of magnitude.
@@ -538,8 +540,10 @@ BSONObj numberDecimalsAlmostEqual(const BSONObj& input, void*) {
         }
 
         // Put the whole number behind the decimal point.
-        a = a.divide(ten.power(exponent));
-        b = b.divide(ten.power(exponent));
+        if (!exponent.isZero()) {
+            a = a.divide(ten.power(exponent));
+            b = b.divide(ten.power(exponent));
+        }
     }
 
     auto places = third.numberDecimal();
