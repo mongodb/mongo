@@ -1059,14 +1059,6 @@ DispatchShardPipelineResults dispatchShardPipeline(
     boost::optional<ShardedExchangePolicy> exchangeSpec;
     boost::optional<SplitPipeline> splitPipelines;
 
-    // If set, the pipeline is not valid to be run if the collection is sharded. The given string
-    // is the error message to print if the collection is sharded.
-    boost::optional<std::string> errMsgOnShardedCollection = boost::none;
-    auto srvcCtxt = opCtx->getServiceContext();
-    if (srvcCtxt && pipeline) {
-        errMsgOnShardedCollection =
-            getSearchHelpers(srvcCtxt)->validatePipelineForShardedCollection(*pipeline.get());
-    }
 
     if (needsSplit) {
         LOGV2_DEBUG(20906,
@@ -1173,22 +1165,11 @@ DispatchShardPipelineResults dispatchShardPipeline(
             // else.
             auto staleInfo = e.extraInfo<StaleConfigInfo>();
             tassert(6441003, "StaleConfigInfo was null during sharded aggregation", staleInfo);
-            if (errMsgOnShardedCollection && staleInfo->getVersionWanted() &&
-                staleInfo->getVersionWanted() != ChunkVersion::UNSHARDED()) {
-                // If we thought the collection was not sharded, we were wrong. Collection must be
-                // sharded.
-                uassert(5858100, *errMsgOnShardedCollection, executionNsRoutingInfo->isSharded());
-            }
             throw;
         } catch (const ExceptionFor<ErrorCodes::CollectionUUIDMismatch>& ex) {
             uassertStatusOK(populateCollectionUUIDMismatch(opCtx, ex.toStatus()));
             MONGO_UNREACHABLE_TASSERT(6487201);
         }
-        // If we thought the collection was sharded and the shard confirmed this, fail if the query
-        // isn't valid on a sharded collection.
-        uassert(6347900,
-                *errMsgOnShardedCollection,
-                !errMsgOnShardedCollection || !executionNsRoutingInfo->isSharded());
 
         invariant(cursors.size() % shardIds.size() == 0,
                   str::stream() << "Number of cursors (" << cursors.size()

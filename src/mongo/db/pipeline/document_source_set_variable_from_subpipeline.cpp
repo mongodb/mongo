@@ -48,13 +48,10 @@ using boost::intrusive_ptr;
 
 constexpr StringData DocumentSourceSetVariableFromSubPipeline::kStageName;
 
-REGISTER_INTERNAL_DOCUMENT_SOURCE(
-    setVariableFromSubPipeline,
-    LiteParsedDocumentSourceDefault::parse,
-    DocumentSourceSetVariableFromSubPipeline::createFromBson,
-    // This can only be generated in certain versions, and registering document sources is too early
-    // to check the FCV.
-    feature_flags::gFeatureFlagSearchShardedFacets.isEnabledAndIgnoreFCV());
+REGISTER_INTERNAL_DOCUMENT_SOURCE(setVariableFromSubPipeline,
+                                  LiteParsedDocumentSourceDefault::parse,
+                                  DocumentSourceSetVariableFromSubPipeline::createFromBson,
+                                  true);
 
 Value DocumentSourceSetVariableFromSubPipeline::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {

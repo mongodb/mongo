@@ -59,12 +59,6 @@ feature_flags:
       cpp_varname: gFeatureFlagCommonQueryFramework
       default: false
 
-    featureFlagSearchShardedFacets:
-      description: "Enable use of $$SEARCH_META on sharded collections"
-      cpp_varname: gFeatureFlagSearchShardedFacets
-      default: true
-      version: 6.0
-
     featureFlagBucketUnpackWithSort:
       description: "Enables a time-series optimization that allows for partially-blocking sort on time"
       cpp_varname: gFeatureFlagBucketUnpackWithSort

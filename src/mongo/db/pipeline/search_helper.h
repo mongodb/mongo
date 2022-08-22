@@ -69,15 +69,6 @@ public:
         boost::optional<UUID> uuid) {
         return nullptr;
     }
-
-    /**
-     * Check if the passed in pipeline is valid in a sharded collection. If it is not, return the
-     * error message, otherwise return boost::none.
-     */
-    virtual boost::optional<std::string> validatePipelineForShardedCollection(
-        const Pipeline& pipeline) {
-        return boost::none;
-    }
 };
 
 /**
