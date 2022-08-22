@@ -297,7 +297,7 @@ class search_near_01 : public test {
              * prefix search nears can traverse and that the prefix fast path has increased by the
              * number of threads minus the number of search nears with z key.
              */
-            testutil_assert(num_threads * expected_entries + (2 * num_threads) >=
+            testutil_assert(num_threads * expected_entries + (3 * num_threads) >=
               entries_stat - prev_entries_stat);
             testutil_assert(prefix_stat - prev_prefix_stat == num_threads - z_key_searches);
             z_key_searches = 0;
