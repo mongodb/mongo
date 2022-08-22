@@ -35,6 +35,7 @@
 #include <cstdint>
 #include <iostream>
 #include <limits>
+#include <sstream>
 #include <stack>
 #include <string>
 #include <tuple>
@@ -2465,15 +2466,24 @@ TEST(EdgeCalcTest, SparsityConstraints) {
 
 template <typename T>
 struct MinCoverTestVector {
-    std::function<std::vector<std::string>(T, T, boost::optional<T>, boost::optional<T>, int)> algo;
     T rangeMin, rangeMax;
-    boost::optional<T> min, max;
+    T min, max;
     int sparsity;
-    std::vector<std::string> expect;
+    const char* expect;
 
-    bool validate() const {
+    bool validate(
+        std::function<std::vector<std::string>(T, T, boost::optional<T>, boost::optional<T>, int)>
+            algo) const {
         auto result = algo(rangeMin, rangeMax, min, max, sparsity);
-        if (std::equal(result.begin(), result.end(), expect.begin())) {
+
+        std::stringstream ss(expect);
+        std::vector<std::string> vexpect;
+        std::string item;
+        while (std::getline(ss, item, '\n') && !item.empty()) {
+            vexpect.push_back(std::move(item));
+        }
+
+        if (std::equal(result.begin(), result.end(), vexpect.begin())) {
             return true;
         }
 
@@ -2498,7 +2508,7 @@ TEST(MinCoverCalcTest, Int32_TestVectors) {
 #include "test_vectors/mincover_int32.cstruct"
     };
     for (const auto& testVector : testVectors) {
-        ASSERT_TRUE(testVector.validate());
+        ASSERT_TRUE(testVector.validate(minCoverInt32));
     }
 }
 
@@ -2507,7 +2517,7 @@ TEST(MinCoverCalcTest, Int64_TestVectors) {
 #include "test_vectors/mincover_int64.cstruct"
     };
     for (const auto& testVector : testVectors) {
-        ASSERT_TRUE(testVector.validate());
+        ASSERT_TRUE(testVector.validate(minCoverInt64));
     }
 }
 
