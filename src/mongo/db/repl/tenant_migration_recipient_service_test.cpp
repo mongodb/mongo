@@ -2722,12 +2722,6 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_WaitUntilSt
                        AssertionException,
                        opCtx->getTimeoutError());
 
-    // Hang the chain before deleting the state doc until it can be verified that the state doc was
-    // persisted.
-    FailPointEnableBlock fpDeletingStateDoc("pauseTenantMigrationRecipientBeforeDeletingStateDoc",
-                                            BSON("action"
-                                                 << "hang"));
-
     {
         // Hang the chain after persisting the state doc.
         FailPointEnableBlock fpPersistingStateDoc(

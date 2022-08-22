@@ -214,9 +214,6 @@ public:
     private:
         friend class TenantMigrationRecipientServiceTest;
 
-        const NamespaceString _stateDocumentsNS =
-            NamespaceString::kTenantMigrationRecipientsNamespace;
-
         using ConnectionPair =
             std::pair<std::unique_ptr<DBClientConnection>, std::unique_ptr<DBClientConnection>>;
 
@@ -335,16 +332,6 @@ public:
          * Throws on shutdown / notPrimary errors.
          */
         SemiFuture<void> _markStateDocAsGarbageCollectable();
-
-        /**
-         * Deletes the state document. Does not return the opTime for the delete, since it's not
-         * necessary to wait for this delete to be majority committed (this is one of the last steps
-         * in the chain, and if the delete rolls back, the new primary will re-do the delete).
-         */
-        SemiFuture<void> _removeStateDoc(const CancellationToken& token);
-
-        SemiFuture<void> _waitForGarbageCollectionDelayThenDeleteStateDoc(
-            const CancellationToken& token);
 
         /**
          * Creates a client, connects it to the donor. If '_transientSSLParams' is not none, uses

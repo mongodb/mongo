@@ -49,7 +49,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/ops/write_ops_exec.h"
-#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/cloner_utils.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
@@ -147,7 +146,6 @@ MONGO_FAIL_POINT_DEFINE(skipComparingRecipientAndDonorFCV);
 MONGO_FAIL_POINT_DEFINE(autoRecipientForgetMigration);
 MONGO_FAIL_POINT_DEFINE(skipFetchingCommittedTransactions);
 MONGO_FAIL_POINT_DEFINE(skipFetchingRetryableWritesEntriesBeforeStartOpTime);
-MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationRecipientBeforeDeletingStateDoc);
 
 // Fails before waiting for the state doc to be majority replicated.
 MONGO_FAIL_POINT_DEFINE(failWhilePersistingTenantMigrationRecipientInstanceStateDoc);
@@ -2986,13 +2984,6 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             return storageInterface->dropCollection(opCtx.get(),
                                                     getOplogBufferNs(getMigrationUUID()));
         })
-        .then([this, self = shared_from_this(), token] {
-            {
-                stdx::lock_guard lk(_mutex);
-                setPromiseOkifNotReady(lk, _forgetMigrationDurablePromise);
-            }
-            return _waitForGarbageCollectionDelayThenDeleteStateDoc(token);
-        })
         .thenRunOn(_recipientService->getInstanceCleanupExecutor())
         .onCompletion([this,
                        self = shared_from_this(),
@@ -3001,7 +2992,16 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
             // is safe even on shutDown/stepDown.
             stdx::lock_guard lk(_mutex);
             invariant(_dataSyncCompletionPromise.getFuture().isReady());
-            if (!status.isOK()) {
+            if (status.isOK()) {
+                LOGV2(4881401,
+                      "Migration marked to be garbage collectable due to "
+                      "recipientForgetMigration "
+                      "command",
+                      "migrationId"_attr = getMigrationUUID(),
+                      "tenantId"_attr = getTenantId(),
+                      "expireAt"_attr = *_stateDoc.getExpireAt());
+                setPromiseOkifNotReady(lk, _forgetMigrationDurablePromise);
+            } else {
                 // We should only hit here on a stepDown/shutDown, or a 'conflicting migration'
                 // error.
                 LOGV2(4881402,
@@ -3012,48 +3012,6 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                 setPromiseErrorifNotReady(lk, _forgetMigrationDurablePromise, status);
             }
             _taskState.setState(TaskState::kDone);
-        })
-        .semi();
-}
-
-SemiFuture<void> TenantMigrationRecipientService::Instance::_removeStateDoc(
-    const CancellationToken& token) {
-    return AsyncTry([this, self = shared_from_this()] {
-               auto opCtxHolder = cc().makeOperationContext();
-               auto opCtx = opCtxHolder.get();
-
-               pauseTenantMigrationRecipientBeforeDeletingStateDoc.pauseWhileSet(opCtx);
-
-               PersistentTaskStore<TenantMigrationRecipientDocument> store(_stateDocumentsNS);
-               store.remove(
-                   opCtx,
-                   BSON(TenantMigrationRecipientDocument::kIdFieldName << _migrationUuid),
-                   WriteConcernOptions(1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)));
-           })
-        .until([](Status status) { return status.isOK(); })
-        .withBackoffBetweenIterations(kExponentialBackoff)
-        .on(**_scopedExecutor, token)
-        .semi();
-}
-
-SemiFuture<void>
-TenantMigrationRecipientService::Instance::_waitForGarbageCollectionDelayThenDeleteStateDoc(
-    const CancellationToken& token) {
-    stdx::lock_guard<Latch> lg(_mutex);
-    LOGV2(8423364,
-          "Waiting for garbage collection delay before deleting state document",
-          "migrationId"_attr = _migrationUuid,
-          "tenantId"_attr = _tenantId,
-          "expireAt"_attr = *_stateDoc.getExpireAt());
-
-    return (**_scopedExecutor)
-        ->sleepUntil(*_stateDoc.getExpireAt(), token)
-        .then([this, self = shared_from_this(), token]() {
-            LOGV2(8423365,
-                  "Deleting state document",
-                  "migrationId"_attr = _migrationUuid,
-                  "tenantId"_attr = _tenantId);
-            return _removeStateDoc(token);
         })
         .semi();
 }
