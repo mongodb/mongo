@@ -208,9 +208,7 @@ public:
 
     void getFlowControlTicket(OperationContext* opCtx, LockMode lockMode) override;
 
-    FlowControlTicketholder::CurOp getFlowControlStats() const override {
-        return _flowControlStats;
-    }
+    FlowControlTicketholder::CurOp getFlowControlStats() const override;
 
     //
     // Below functions are for testing only.
