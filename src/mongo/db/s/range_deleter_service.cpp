@@ -83,6 +83,12 @@ void RangeDeleterService::onStepUpComplete(OperationContext* opCtx, long long te
 }
 
 void RangeDeleterService::_recoverRangeDeletionsOnStepUp() {
+
+    if (disableResumableRangeDeleter.load()) {
+        _state.store(kDown);
+        return;
+    }
+
     // TODO SERVER-68348 Asynchronously register tasks on the range deleter service on step-up
     _state.store(kUp);
 }
@@ -115,6 +121,14 @@ BSONObj RangeDeleterService::dumpState() {
 
 SharedSemiFuture<void> RangeDeleterService::registerTask(
     const RangeDeletionTask& rdt, SemiFuture<void>&& waitForActiveQueriesToComplete) {
+
+    if (disableResumableRangeDeleter.load()) {
+        return SemiFuture<void>::makeReady(
+                   Status(ErrorCodes::ResumableRangeDeleterDisabled,
+                          "Not submitting any range deletion task because the "
+                          "disableResumableRangeDeleter server parameter is set to true"))
+            .share();
+    }
 
     // Block the scheduling of the task while populating internal data structures
     SharedPromise<void> blockUntilRegistered;
@@ -204,6 +218,15 @@ int RangeDeleterService::getNumRangeDeletionTasksForCollection(const UUID& colle
 
 SharedSemiFuture<void> RangeDeleterService::getOverlappingRangeDeletionsFuture(
     const UUID& collectionUUID, const ChunkRange& range) {
+
+    if (disableResumableRangeDeleter.load()) {
+        return SemiFuture<void>::makeReady(
+                   Status(ErrorCodes::ResumableRangeDeleterDisabled,
+                          "Not submitting any range deletion task because the "
+                          "disableResumableRangeDeleter server parameter is set to true"))
+            .share();
+    }
+
     auto lock = _acquireMutexFailIfServiceNotUp();
 
     auto mapEntry = _rangeDeletionTasks.find(collectionUUID);

@@ -535,4 +535,36 @@ TEST_F(RangeDeleterServiceTest, DumpState) {
         << "Expected " << state << " == " << expectedState;
 }
 
+TEST_F(RangeDeleterServiceTest, RegisterTaskWithDisableResumableRangeDeleterFlagEnabled) {
+
+    RAIIServerParameterControllerForTest enableFeatureFlag{"disableResumableRangeDeleter", true};
+
+    auto rds = RangeDeleterService::get(opCtx);
+    auto taskWithOngoingQueries = rangeDeletionTask0ForCollA;
+    auto completionFuture = rds->registerTask(taskWithOngoingQueries->getTask(),
+                                              taskWithOngoingQueries->getOngoingQueriesFuture());
+    ASSERT(completionFuture.isReady());
+    ASSERT_EQ(0, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+}
+
+TEST_F(RangeDeleterServiceTest,
+       GetOverlappingRangeDeletionsFutureWithDisableResumableRangeDeleterFlagEnabled) {
+
+    auto rds = RangeDeleterService::get(opCtx);
+    auto taskWithOngoingQueries = rangeDeletionTask0ForCollA;
+    auto completionFuture = rds->registerTask(taskWithOngoingQueries->getTask(),
+                                              taskWithOngoingQueries->getOngoingQueriesFuture());
+    ASSERT(!completionFuture.isReady());
+    ASSERT_EQ(1, rds->getNumRangeDeletionTasksForCollection(uuidCollA));
+
+    auto overlappingRangeFuture = rds->getOverlappingRangeDeletionsFuture(
+        uuidCollA, taskWithOngoingQueries->getTask().getRange());
+    ASSERT(!overlappingRangeFuture.isReady());
+
+    RAIIServerParameterControllerForTest enableFeatureFlag{"disableResumableRangeDeleter", true};
+    auto overlappingRangeFutureWhenDisabled = rds->getOverlappingRangeDeletionsFuture(
+        uuidCollA, taskWithOngoingQueries->getTask().getRange());
+    ASSERT(overlappingRangeFutureWhenDisabled.isReady());
+}
+
 }  // namespace mongo
