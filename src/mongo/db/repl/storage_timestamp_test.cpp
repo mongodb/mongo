@@ -2519,7 +2519,8 @@ TEST_F(StorageTimestampTest, TimestampIndexDropsWildcard) {
         OneOffRead oor(_opCtx, beforeDropTs.addTicks(i + 1).asTimestamp());
 
         auto ident = getDroppedIndexIdent(durableCatalog, origIdents);
-        indexIdents.erase(std::remove(indexIdents.begin(), indexIdents.end(), ident));
+        indexIdents.erase(std::remove(indexIdents.begin(), indexIdents.end(), ident),
+                          indexIdents.end());
 
         origIdents = durableCatalog->getAllIdents(_opCtx);
     }
@@ -2589,7 +2590,8 @@ TEST_F(StorageTimestampTest, TimestampIndexDropsListed) {
         OneOffRead oor(_opCtx, beforeDropTs.addTicks(i + 1).asTimestamp());
 
         auto ident = getDroppedIndexIdent(durableCatalog, origIdents);
-        indexIdents.erase(std::remove(indexIdents.begin(), indexIdents.end(), ident));
+        indexIdents.erase(std::remove(indexIdents.begin(), indexIdents.end(), ident),
+                          indexIdents.end());
 
         origIdents = durableCatalog->getAllIdents(_opCtx);
     }
