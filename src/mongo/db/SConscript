@@ -66,10 +66,24 @@ env.Library(
         'namespace_string.cpp',
         'shard_id.cpp',
         'shutdown_in_progress_quiesce_info.cpp',
+        'tenant_id.cpp',
     ], LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/idl/server_parameter',
+        'logical_time',
     ])
+
+env.Library(
+    target='logical_time',
+    source=[
+        'logical_time.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
 
 #
 # The db/'common' lib has the abstractions that are shared by components of the
@@ -88,8 +102,8 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/cannot_convert_index_to_unique_info',
         '$BUILD_DIR/mongo/db/repl/tenant_migration_errors',
-        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/write_concern_options',
+        'server_base',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
@@ -104,8 +118,8 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/security_token',
-        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/idl/feature_flag',
+        'server_base',
         'server_feature_flags',
     ],
 )
@@ -222,16 +236,6 @@ env.Library(
 )
 
 env.Library(
-    target='tenant_id',
-    source=[
-        'tenant_id.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
-env.Library(
     target='update_index_data',
     source=[
         'update_index_data.cpp',
@@ -249,7 +253,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/server_status_core',
-        '$BUILD_DIR/mongo/db/server_base',
+        'server_base',
     ],
 )
 
@@ -455,8 +459,9 @@ env.Library(
     source=[
         'change_stream_options.idl',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/cluster_server_parameter',
+        'server_base',
     ],
 )
 
@@ -474,17 +479,23 @@ env.Library(
 
 env.Library(
     target='change_streams_cluster_parameter',
-    source=['change_streams_cluster_parameter.idl', 'change_streams_cluster_parameter.cpp'],
-    LIBDEPS=[
+    source=[
+        'change_streams_cluster_parameter.idl',
+        'change_streams_cluster_parameter.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/cluster_server_parameter',
+        'server_base',
     ],
 )
 
 env.Library(
     target='change_stream_state',
-    source=['change_stream_state.idl'],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/idl/idl_parser',
+    source=[
+        'change_stream_state.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        'server_base',
     ],
 )
 
@@ -721,7 +732,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        'server_base',
     ],
 )
 
@@ -730,12 +741,9 @@ env.Library(
     source=[
         'dbcommands.idl',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/pipeline/document_sources_idl',
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        'server_base',
     ],
 )
 
@@ -1126,21 +1134,21 @@ env.Library(
 env.Library(
     target='index_build_entry_helpers',
     source=[
-        "index_build_entry_helpers.cpp",
+        'index_build_entry_helpers.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/catalog/collection_crud",
-        "$BUILD_DIR/mongo/db/catalog/commit_quorum_options",
-        "$BUILD_DIR/mongo/db/catalog/index_build_entry_idl",
-        "$BUILD_DIR/mongo/db/catalog/local_oplog_info",
-        "$BUILD_DIR/mongo/db/concurrency/exception_util",
-        "$BUILD_DIR/mongo/db/storage/write_unit_of_work",
-        "catalog_raii",
-        "db_raii",
-        "dbhelpers",
-        "server_base",
-        "service_context",
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/collection_crud',
+        '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
+        '$BUILD_DIR/mongo/db/catalog/index_build_entry_idl',
+        '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
+        '$BUILD_DIR/mongo/db/concurrency/exception_util',
+        '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
+        'catalog_raii',
+        'db_raii',
+        'dbhelpers',
+        'server_base',
+        'service_context',
     ],
 )
 
@@ -1671,7 +1679,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        'server_base',
     ],
 )
 
@@ -1725,24 +1733,12 @@ env.Library(
 )
 
 env.Library(
-    target='logical_time',
-    source=[
-        'logical_time.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/idl/idl_parser',
-    ],
-)
-
-env.Library(
     target='operation_time_tracker',
     source=[
         'operation_time_tracker.cpp',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        'logical_time',
+    LIBDEPS_PRIVATE=[
+        'server_base',
         'service_context',
     ],
 )
@@ -1753,12 +1749,12 @@ env.Library(
         'operation_killer.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         'service_context',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
+        'server_base',
     ],
 )
 
@@ -1789,9 +1785,9 @@ env.Library(
     source=[
         'signed_logical_time.cpp',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/crypto/sha1_block',
-        'logical_time',
+        'server_base',
     ],
 )
 
@@ -1800,9 +1796,9 @@ env.Library(
     source=[
         'time_proof_service.cpp',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
-        'logical_time',
+        'server_base',
     ],
 )
 
@@ -1822,8 +1818,8 @@ env.Library(
     source=[
         'keys_collection_document.idl',
     ],
-    LIBDEPS=[
-        'logical_time',
+    LIBDEPS_PRIVATE=[
+        'server_base',
         'time_proof_service',
     ],
 )
@@ -1834,13 +1830,13 @@ env.Library(
         'keys_collection_client_direct.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
-        '$BUILD_DIR/mongo/s/client/shard_interface',
         'keys_collection_document',
-        'logical_time',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
+        '$BUILD_DIR/mongo/s/client/shard_interface',
         'rs_local_client',
+        'server_base',
     ],
 )
 
@@ -1852,7 +1848,6 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client',
         'keys_collection_document',
-        'logical_time',
         'server_base',
     ],
 )
@@ -1876,13 +1871,13 @@ env.Library(
         'global_settings',
         'keys_collection_client_sharded',
         'keys_collection_document',
-        'logical_time',
         'repl/repl_coordinator_interface',
         'service_context',
         'signed_logical_time',
         'time_proof_service',
     ],
     LIBDEPS_PRIVATE=[
+        'server_base',
         'server_options_core',
     ],
 )
@@ -2060,7 +2055,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/repl/optime',
-        '$BUILD_DIR/mongo/idl/idl_parser',
         'server_base',
         'service_context',
     ],
@@ -2581,8 +2575,6 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/transaction/transaction',
             '$BUILD_DIR/mongo/db/transaction/transaction_api',
             '$BUILD_DIR/mongo/executor/async_timer_mock',
-            '$BUILD_DIR/mongo/idl/idl_parser',
-            '$BUILD_DIR/mongo/idl/server_parameter',
             '$BUILD_DIR/mongo/rpc/command_status',
             '$BUILD_DIR/mongo/rpc/rpc',
             '$BUILD_DIR/mongo/transport/transport_layer_mock',
@@ -2603,7 +2595,6 @@ if wiredtiger:
             'index_builds_coordinator_mongod',
             'keys_collection_client_direct',
             'keys_collection_document',
-            'logical_time',
             'mirror_maestro',
             'multitenancy',
             'operation_time_tracker',

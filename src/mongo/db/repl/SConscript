@@ -841,21 +841,20 @@ env.Library(
 
 env.Library(
     'read_concern_args',
-    [
+    source=[
         'read_concern_args.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/db/logical_time',
         '$BUILD_DIR/mongo/db/read_write_concern_provenance',
+        '$BUILD_DIR/mongo/db/server_base',
         'optime',
     ],
 )
 
 env.Library(
     'speculative_majority_read_info',
-    [
+    source=[
         'speculative_majority_read_info.cpp',
     ],
     LIBDEPS=[
@@ -1267,16 +1266,14 @@ env.Library(
 )
 
 env.Library(
-    target="hello_command",
+    target='hello_command',
     source=[
-        "hello.idl",
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        'hello.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/rpc/metadata',
         'optime',
@@ -1489,7 +1486,6 @@ env.Library(
         'sync_source_feedback.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/clientdriver_network',
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/change_stream_pre_images_collection_manager',
@@ -1497,10 +1493,10 @@ env.Library(
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/free_mon/free_mon_mongod',
-        '$BUILD_DIR/mongo/db/logical_time',
         '$BUILD_DIR/mongo/db/not_primary_error_tracker',
         '$BUILD_DIR/mongo/db/op_observer/op_observer',
         '$BUILD_DIR/mongo/db/query_exec',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/session/kill_sessions_local',
         '$BUILD_DIR/mongo/db/stats/counters',
@@ -1696,7 +1692,6 @@ if wiredtiger:
             'tenant_migration_recipient_service_test.cpp',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
             '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
             '$BUILD_DIR/mongo/client/replica_set_monitor_protocol_test_util',
             '$BUILD_DIR/mongo/db/auth/authmocks',
@@ -1711,13 +1706,13 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/index/index_access_methods',
             '$BUILD_DIR/mongo/db/index_build_entry_helpers',
             '$BUILD_DIR/mongo/db/index_builds_coordinator_mongod',
-            '$BUILD_DIR/mongo/db/logical_time',
             '$BUILD_DIR/mongo/db/multitenancy',
             '$BUILD_DIR/mongo/db/op_observer/op_observer_impl',
             '$BUILD_DIR/mongo/db/op_observer/oplog_writer_impl',
             '$BUILD_DIR/mongo/db/pipeline/change_stream_expired_pre_image_remover',
             '$BUILD_DIR/mongo/db/query/command_request_response',
             '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
+            '$BUILD_DIR/mongo/db/server_base',
             '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
             '$BUILD_DIR/mongo/db/service_context_test_fixture',
             '$BUILD_DIR/mongo/db/session/logical_session_id_helpers',

@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -47,84 +45,6 @@ namespace cluster_server_parameter_test_util {
 constexpr auto kCSPTest = "cspTest"_sd;
 constexpr auto kConfigDB = "config"_sd;
 const auto kNilCPT = LogicalTime::kUninitialized;
-
-void upsert(BSONObj doc) {
-    const auto kMajorityWriteConcern = BSON("writeConcern" << BSON("w"
-                                                                   << "majority"));
-
-    auto uniqueOpCtx = cc().makeOperationContext();
-    auto* opCtx = uniqueOpCtx.get();
-
-    BSONObj res;
-    DBDirectClient client(opCtx);
-
-    client.runCommand(
-        kConfigDB.toString(),
-        [&] {
-            write_ops::UpdateCommandRequest updateOp(NamespaceString::kClusterParametersNamespace);
-            updateOp.setUpdates({[&] {
-                write_ops::UpdateOpEntry entry;
-                entry.setQ(BSON(ClusterServerParameter::k_idFieldName << kCSPTest));
-                entry.setU(
-                    write_ops::UpdateModification::parseFromClassicUpdate(BSON("$set" << doc)));
-                entry.setMulti(false);
-                entry.setUpsert(true);
-                return entry;
-            }()});
-            return updateOp.toBSON(kMajorityWriteConcern);
-        }(),
-        res);
-
-    BatchedCommandResponse response;
-    std::string errmsg;
-    if (!response.parseBSON(res, &errmsg)) {
-        uasserted(ErrorCodes::FailedToParse, str::stream() << "Failure: " << errmsg);
-    }
-
-    uassertStatusOK(response.toStatus());
-    uassert(ErrorCodes::OperationFailed, "No documents upserted", response.getN());
-}
-
-void remove() {
-    auto uniqueOpCtx = cc().makeOperationContext();
-    auto* opCtx = uniqueOpCtx.get();
-
-    BSONObj res;
-    DBDirectClient(opCtx).runCommand(
-        kConfigDB.toString(),
-        [] {
-            write_ops::DeleteCommandRequest deleteOp(NamespaceString::kClusterParametersNamespace);
-            deleteOp.setDeletes({[] {
-                write_ops::DeleteOpEntry entry;
-                entry.setQ(BSON(ClusterServerParameter::k_idFieldName << kCSPTest));
-                entry.setMulti(true);
-                return entry;
-            }()});
-            return deleteOp.toBSON({});
-        }(),
-        res);
-
-    BatchedCommandResponse response;
-    std::string errmsg;
-    if (!response.parseBSON(res, &errmsg)) {
-        uasserted(ErrorCodes::FailedToParse,
-                  str::stream() << "Failed to parse reply to delete command: " << errmsg);
-    }
-    uassertStatusOK(response.toStatus());
-}
-
-BSONObj makeClusterParametersDoc(const LogicalTime& cpTime, int intValue, StringData strValue) {
-    ClusterServerParameter csp;
-    csp.set_id(kCSPTest);
-    csp.setClusterParameterTime(cpTime);
-
-    ClusterServerParameterTest cspt;
-    cspt.setClusterServerParameter(std::move(csp));
-    cspt.setIntValue(intValue);
-    cspt.setStrValue(strValue);
-
-    return cspt.toBSON();
-}
 
 class ClusterServerParameterTestBase : public ServiceContextMongoDTest {
 public:
@@ -163,6 +83,10 @@ private:
         return settings;
     }
 };
+
+void upsert(BSONObj doc);
+void remove();
+BSONObj makeClusterParametersDoc(const LogicalTime& cpTime, int intValue, StringData strValue);
 
 }  // namespace cluster_server_parameter_test_util
 }  // namespace mongo

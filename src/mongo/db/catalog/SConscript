@@ -500,9 +500,9 @@ env.Library(
         'local_oplog_info.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/logical_time',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/storage/flow_control',
         '$BUILD_DIR/mongo/db/storage/record_store_base',
         '$BUILD_DIR/mongo/db/vector_clock_mutable',

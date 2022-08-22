@@ -96,7 +96,7 @@ void beginRetryableWriteWithTxnNumber(
                                    {*opCtx->getTxnNumber()},
                                    boost::none /* autocommit */,
                                    boost::none /* startTransaction */);
-};
+}
 
 void beginNonRetryableTransactionWithTxnNumber(
     OperationContext* opCtx,
@@ -110,7 +110,7 @@ void beginNonRetryableTransactionWithTxnNumber(
     auto txnParticipant = TransactionParticipant::get(opCtx);
     txnParticipant.beginOrContinue(
         opCtx, {*opCtx->getTxnNumber()}, false /* autocommit */, true /* startTransaction */);
-};
+}
 
 void beginRetryableInternalTransactionWithTxnNumber(
     OperationContext* opCtx,
@@ -124,7 +124,7 @@ void beginRetryableInternalTransactionWithTxnNumber(
     auto txnParticipant = TransactionParticipant::get(opCtx);
     txnParticipant.beginOrContinue(
         opCtx, {*opCtx->getTxnNumber()}, false /* autocommit */, true /* startTransaction */);
-};
+}
 
 template <typename OpObserverType>
 void commitUnpreparedTransaction(OperationContext* opCtx, OpObserverType& opObserver) {

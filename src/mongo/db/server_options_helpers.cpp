@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/server_options_helpers.h"
 
 #ifdef _WIN32
@@ -62,10 +61,6 @@
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
-
-
-using std::endl;
-using std::string;
 
 namespace mongo {
 
@@ -311,7 +306,8 @@ Status storeBaseOptions(const moe::Environment& params) {
         if (component == logv2::LogComponent::kDefault) {
             continue;
         }
-        const string dottedName = "systemLog.component." + component.getDottedName() + ".verbosity";
+        const std::string dottedName =
+            "systemLog.component." + component.getDottedName() + ".verbosity";
         if (params.count(dottedName)) {
             int verbosity = params[dottedName].as<int>();
             // Clear existing log level if log level is negative.
@@ -339,7 +335,7 @@ Status storeBaseOptions(const moe::Environment& params) {
     }
 
     if (params.count("systemLog.timeStampFormat")) {
-        std::string formatterName = params["systemLog.timeStampFormat"].as<string>();
+        std::string formatterName = params["systemLog.timeStampFormat"].as<std::string>();
         if (formatterName == "iso8601-utc") {
             serverGlobalParams.logTimestampFormat = logv2::LogTimestampFormat::kISO8601UTC;
             setDateFormatIsLocalTimezone(false);
@@ -386,7 +382,7 @@ Status storeBaseOptions(const moe::Environment& params) {
 
 #ifndef _WIN32
     if (params.count("systemLog.syslogFacility")) {
-        std::string facility = params["systemLog.syslogFacility"].as<string>();
+        std::string facility = params["systemLog.syslogFacility"].as<std::string>();
         bool set = false;
         // match facility string to facility value
         size_t facilitynamesLength = sizeof(facilitynames) / sizeof(facilitynames[0]);
@@ -413,7 +409,7 @@ Status storeBaseOptions(const moe::Environment& params) {
     }
 
     if (params.count("systemLog.logRotate")) {
-        std::string logRotateParam = params["systemLog.logRotate"].as<string>();
+        std::string logRotateParam = params["systemLog.logRotate"].as<std::string>();
         if (logRotateParam == "reopen") {
             serverGlobalParams.logRenameOnRotate = false;
 
@@ -434,11 +430,12 @@ Status storeBaseOptions(const moe::Environment& params) {
     }
 
     if (params.count("processManagement.pidFilePath")) {
-        serverGlobalParams.pidFile = params["processManagement.pidFilePath"].as<string>();
+        serverGlobalParams.pidFile = params["processManagement.pidFilePath"].as<std::string>();
     }
 
     if (params.count("processManagement.timeZoneInfo")) {
-        serverGlobalParams.timeZoneInfoPath = params["processManagement.timeZoneInfo"].as<string>();
+        serverGlobalParams.timeZoneInfoPath =
+            params["processManagement.timeZoneInfo"].as<std::string>();
     }
 
     if (params.count("setParameter")) {

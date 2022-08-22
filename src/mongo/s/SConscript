@@ -208,7 +208,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_request',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/db/server_options',
-        '$BUILD_DIR/mongo/idl/idl_parser',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',

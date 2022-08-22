@@ -17,7 +17,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/idl/feature_flag',
-        '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
 
@@ -227,7 +226,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/audit',  # audit:logLogout in AuthZSession.
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/stats/counters',
-        '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/mongo/util/caching',
         'auth_types',
         'auth_umc',
@@ -254,7 +252,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/audit',
-        '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )
 

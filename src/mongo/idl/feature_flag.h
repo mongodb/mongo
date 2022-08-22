@@ -35,7 +35,6 @@
 #include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/server_options.h"
 #include "mongo/idl/server_parameter.h"
-#include "mongo/idl/server_parameter_with_storage.h"
 #include "mongo/util/version/releases.h"
 
 namespace mongo {

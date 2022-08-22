@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/op_observer/user_write_block_mode_op_observer.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
@@ -68,6 +66,8 @@ protected:
                 const NamespaceString& nss,
                 bool shouldSucceed,
                 bool fromMigrate) {
+        ASSERT(nss.isValid());
+
         UserWriteBlockModeOpObserver opObserver;
         std::vector<InsertStatement> inserts;
         CollectionUpdateArgs collectionUpdateArgs;
@@ -106,7 +106,7 @@ protected:
         runCUD(opCtx, nss, shouldSucceed, fromMigrate);
         UserWriteBlockModeOpObserver opObserver;
         auto uuid = UUID::gen();
-        NamespaceString adminNss = NamespaceString("admin");
+        NamespaceString adminNss = NamespaceString("admin.collForRename");
 
         if (shouldSucceed) {
             try {
@@ -193,10 +193,10 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingDisabledNoBypass) {
     ASSERT(!WriteBlockBypass::get(opCtx.get()).isWriteBlockBypassEnabled());
 
     // Ensure writes succeed
-    runCheckedOps(opCtx.get(), NamespaceString("a.b"), true);
-    runCheckedOps(opCtx.get(), NamespaceString("admin"), true);
-    runCheckedOps(opCtx.get(), NamespaceString("local"), true);
-    runCheckedOps(opCtx.get(), NamespaceString("config"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("userDB.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("admin.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("local.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("config.coll"), true);
 }
 
 TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingDisabledWithBypass) {
@@ -213,10 +213,10 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingDisabledWithBypass) {
     ASSERT(WriteBlockBypass::get(opCtx.get()).isWriteBlockBypassEnabled());
 
     // Ensure writes succeed
-    runCheckedOps(opCtx.get(), NamespaceString("a.b"), true);
-    runCheckedOps(opCtx.get(), NamespaceString("admin"), true);
-    runCheckedOps(opCtx.get(), NamespaceString("local"), true);
-    runCheckedOps(opCtx.get(), NamespaceString("config"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("userDB.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("admin.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("local.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("config.coll"), true);
 }
 
 TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingEnabledNoBypass) {
@@ -228,17 +228,17 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingEnabledNoBypass) {
     ASSERT(!WriteBlockBypass::get(opCtx.get()).isWriteBlockBypassEnabled());
 
     // Ensure user writes now fail, while non-user writes still succeed
-    runCheckedOps(opCtx.get(), NamespaceString("a.b"), false);
-    runCheckedOps(opCtx.get(), NamespaceString("admin"), true);
-    runCheckedOps(opCtx.get(), NamespaceString("local"), true);
-    runCheckedOps(opCtx.get(), NamespaceString("config"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("userDB.coll"), false);
+    runCheckedOps(opCtx.get(), NamespaceString("admin.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("local.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("config.coll"), true);
 
     // Ensure that CUD ops from migrations succeed
-    runCUD(opCtx.get(), NamespaceString("a.b"), true, true /* fromMigrate */);
+    runCUD(opCtx.get(), NamespaceString("userDB.coll"), true, true /* fromMigrate */);
 
     // Ensure that writes to the <db>.system.profile collections are always allowed
     runCUD(opCtx.get(),
-           NamespaceString("a.system.profile"),
+           NamespaceString("userDB.system.profile"),
            true /* shouldSucceed */,
            false /* fromMigrate */);
 }
@@ -258,10 +258,10 @@ TEST_F(UserWriteBlockModeOpObserverTest, WriteBlockingEnabledWithBypass) {
 
     // Ensure user writes succeed
 
-    runCheckedOps(opCtx.get(), NamespaceString("a.b"), true);
-    runCheckedOps(opCtx.get(), NamespaceString("admin"), true);
-    runCheckedOps(opCtx.get(), NamespaceString("local"), true);
-    runCheckedOps(opCtx.get(), NamespaceString("config"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("userDB.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("admin.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("local.coll"), true);
+    runCheckedOps(opCtx.get(), NamespaceString("config.coll"), true);
 }
 
 }  // namespace

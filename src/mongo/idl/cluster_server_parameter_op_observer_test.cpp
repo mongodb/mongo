@@ -27,16 +27,11 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
-#include "mongo/idl/cluster_server_parameter_test_util.h"
-
 #include "mongo/idl/cluster_server_parameter_op_observer.h"
+#include "mongo/idl/cluster_server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
-
 
 namespace mongo {
 namespace {

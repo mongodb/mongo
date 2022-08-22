@@ -197,6 +197,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/read_write_concern_defaults',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -213,6 +214,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/authentication_session',
         '$BUILD_DIR/mongo/db/auth/cluster_auth_mode',
         '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/rpc/client_metadata',
         '$BUILD_DIR/mongo/util/net/ssl_manager',
         'test_commands_enabled',
@@ -269,8 +271,8 @@ env.Library(
         'list_databases.idl',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
@@ -281,8 +283,8 @@ env.Library(
         'list_databases_for_all_tenants.idl',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
@@ -293,13 +295,13 @@ env.Library(
         'create.idl',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/crypto/encrypted_field_config',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/pipeline/change_stream_pre_and_post_images_options',
         '$BUILD_DIR/mongo/db/query/query_knobs',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_options',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/idl/basic_types',
@@ -314,7 +316,7 @@ env.Library(
         'validate_db_metadata.idl',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
@@ -325,7 +327,7 @@ env.Library(
         'cluster_server_parameter_cmds.idl',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter',
     ],
 )
@@ -481,6 +483,7 @@ env.Library(
         'set_user_write_block_mode.idl',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
@@ -502,7 +505,7 @@ env.Library(
         'set_feature_compatibility_version.idl',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/db/server_base',
         'feature_compatibility_parsers',
     ],
 )
@@ -514,7 +517,8 @@ env.Library(
         'shutdown.idl',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/bson/bson_validate',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/util/fail_point',
     ],
 )
@@ -559,7 +563,6 @@ env.Library(
         'vote_commit_index_build.idl',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
         '$BUILD_DIR/mongo/crypto/fle_crypto',
         '$BUILD_DIR/mongo/db/auth/address_restriction',
@@ -604,10 +607,10 @@ env.Library(
         '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
         '$BUILD_DIR/mongo/db/s/transaction_coordinator',
         '$BUILD_DIR/mongo/db/s/user_writes_recoverable_critical_section',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/serverless/shard_split_donor_service',
         '$BUILD_DIR/mongo/db/set_change_stream_state_coordinator',
-        '$BUILD_DIR/mongo/db/tenant_id',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/db/transaction/transaction_api',
         '$BUILD_DIR/mongo/idl/idl_parser',
@@ -738,8 +741,8 @@ env.Library(
         "txn_two_phase_commit_cmds.idl",
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
@@ -751,6 +754,7 @@ env.Library(
         'map_reduce.idl',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/write_concern_options',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],

@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/idl/server_parameter_with_storage.h"
 #include "mongo/idl/server_parameter_with_storage_test_gen.h"

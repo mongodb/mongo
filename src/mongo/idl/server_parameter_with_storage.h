@@ -66,41 +66,8 @@ using TenantIdMap = std::map<boost::optional<TenantId>, U>;
 
 namespace idl_server_parameter_detail {
 
-template <typename T>
-inline StatusWith<T> coerceFromString(StringData str) {
-    T value;
-    Status status = NumberParser{}(str, &value);
-    if (!status.isOK()) {
-        return status;
-    }
-    return value;
-}
+// Predicate rules for bounds conditions
 
-template <>
-inline StatusWith<bool> coerceFromString<bool>(StringData str) {
-    if ((str == "1") || (str == "true")) {
-        return true;
-    }
-    if ((str == "0") || (str == "false")) {
-        return false;
-    }
-    return {ErrorCodes::BadValue, "Value is not a valid boolean"};
-}
-
-template <>
-inline StatusWith<std::string> coerceFromString<std::string>(StringData str) {
-    return str.toString();
-}
-
-template <>
-inline StatusWith<std::vector<std::string>> coerceFromString<std::vector<std::string>>(
-    StringData str) {
-    std::vector<std::string> v;
-    str::splitStringDelim(str.toString(), &v, ',');
-    return v;
-}
-
-// Predicate rules for bounds conditions.
 struct GT {
     static constexpr StringData description = "greater than"_sd;
     template <typename T, typename U>
