@@ -725,10 +725,8 @@ void ShardingCatalogManager::withTransaction(
 
     size_t attempt = 1;
     while (true) {
-        // Some ErrorCategory::Interruption errors are also considered transient transaction
-        // errors. We don't attempt to enumerate them explicitly. Instead, we retry on all
-        // ErrorCategory::Interruption errors (e.g. LockTimeout) and detect whether asr.opCtx()
-        // was killed by explicitly checking if it has been interrupted.
+        // We retry on transient transaction errors like LockTimeout and detect whether
+        // asr.opCtx() was killed by explicitly checking if it has been interrupted.
         asr.opCtx()->checkForInterrupt();
         ++txnNumber;
 
