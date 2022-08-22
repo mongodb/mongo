@@ -434,8 +434,8 @@ void InitialSyncer::_appendInitialSyncProgressMinimal_inlock(BSONObjBuilder* bob
         const auto approxTotalDataSize = allDbClonerStats.dataSize;
         bob->appendNumber("approxTotalDataSize", approxTotalDataSize);
         long long approxTotalBytesCopied = 0;
-        for (auto dbClonerStats : allDbClonerStats.databaseStats) {
-            for (auto collClonerStats : dbClonerStats.collectionStats) {
+        for (auto&& dbClonerStats : allDbClonerStats.databaseStats) {
+            for (auto&& collClonerStats : dbClonerStats.collectionStats) {
                 approxTotalBytesCopied += collClonerStats.approxBytesCopied;
             }
         }
