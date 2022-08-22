@@ -1,6 +1,7 @@
 """Script to configure a sharded cluster in Antithesis from the mongos container."""
 import json
 import subprocess
+from time import sleep
 from utils import mongo_process_running, retry_until_success
 
 CONFIGSVR_CONFIG = {
@@ -155,4 +156,4 @@ retry_until_success(
     })
 
 while True:
-    continue
+    sleep(10)

@@ -3092,7 +3092,7 @@ buildvariants:
     scons_cache_scope: shared
   tasks:
   - name: compile_and_archive_dist_test_TG
-  - name: antithesis_image_push
+  - name: antithesis_build_test_push_TG
   - name: generate_buildid_to_debug_symbols_mapping
 
 - <<: *enterprise-windows-nopush-template

@@ -11,6 +11,7 @@
  *   featureFlagBalanceAccordingToDataSize,
  *   # TODO SERVER-67813 review tag when data size aware balancing lands in v6.0
  *   requires_fcv_61,
+ *   antithesis_incompatible,
  *  ]
  */
 

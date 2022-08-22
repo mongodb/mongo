@@ -2060,27 +2060,6 @@ functions:
       content_type: text/plain
       display_name: Resmoke.py Invocation for Local Usage
 
-  "antithesis image build":
-  - command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/antithesis_image_build.sh"
-
-  "antithesis image push":
-  - command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/antithesis_image_push.sh"
-
-  "antithesis dry run":
-  - command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/antithesis_dry_run.sh"
-
 # Pre task steps
 pre:
 - func: "set task expansion macros"
@@ -7365,16 +7344,10 @@ tasks:
       args:
       - "./src/evergreen/feature_flag_tags_check.sh"
 
-- name: antithesis_image_push
+- name: antithesis_image_build
   tags: ["antithesis"]
-  # this is not patchable to avoid hitting the docker registry excessively.
-  # When iterating on this task, feel free to make this patchable for
-  # testing purposes. Your image changes will be pushed with the
-  # evergreen-patch tag, so as to not clobber the waterfall. Use the
-  # antithesis_image_tag build parameter to override this if required.
   depends_on:
   - name: archive_dist_test_debug
-  exec_timeout_secs: 7200
   commands:
   - *f_expansions_write
   - func: "git get project no modules"
@@ -7390,9 +7363,34 @@ tasks:
       remote_file: ${mongo_debugsymbols}
       bucket: mciuploads
       local_file: src/mongo-debugsymbols.tgz
-  - func: "antithesis image build"
-  - func: "antithesis dry run"
-  - func: "antithesis image push"
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/antithesis_image_build.sh"
+
+- name: antithesis_image_push
+  tags: ["antithesis"]
+  depends_on:
+  - name: antithesis_image_build
+  commands:
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/antithesis_image_push.sh"
+
+- name: antithesis_image_test
+  tags: ["antithesis"]
+  exec_timeout_secs: 14400 # Time out the task if it runs for more than 4 hours.
+  depends_on:
+  - name: antithesis_image_build
+  commands:
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/antithesis_dry_run.sh"
 
 - name: generate_buildid_to_debug_symbols_mapping
   tags: ["symbolizer"]
@@ -7819,3 +7817,14 @@ task_groups:
   - "crypt_create_debug_lib"
   - "crypt_install_tests"
   - "crypt_run_tests"
+
+- name: antithesis_build_test_push_TG
+  max_hosts: 1
+  share_processes: true
+  setup_task:
+  - func: "set task expansion macros"
+  - func: "f_expansions_write"
+  tasks:
+    - antithesis_image_build
+    - antithesis_image_push
+    - antithesis_image_test
