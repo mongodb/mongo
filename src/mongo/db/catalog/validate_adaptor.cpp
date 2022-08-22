@@ -316,6 +316,47 @@ Status _validateTimeseriesMinMax(const BSONObj& recordBson, const CollectionPtr&
     return Status::OK();
 }
 
+
+Status _validateTimeSeriesDataIndexes(const BSONObj& recordBson, const CollectionPtr& coll) {
+    BSONObj data = recordBson.getField(timeseries::kBucketDataFieldName).Obj();
+    int maxIndex;
+
+    // go through once, validating id and timestamps and getting count of total number of entries
+    // for maxIndex.
+    for (auto field : data) {
+        // Checks that indices are consecutively increasing numbers starting from 0.
+        auto fieldName = field.fieldNameStringData();
+        if (fieldName == coll->getTimeseriesOptions()->getTimeField() || fieldName == "_id") {
+            int counter = 0;
+            for (auto idx : field.Obj()) {
+                if (auto idxAsNum = idx.fieldNameStringData();
+                    std::stoi(idxAsNum.toString()) != counter) {
+                    return Status(ErrorCodes::BadValue, "wrong index");
+                }
+                ++counter;
+            }
+            maxIndex = counter;
+        }
+    }
+
+    for (auto field : data) {
+        auto fieldName = field.fieldNameStringData();
+        if (fieldName != coll->getTimeseriesOptions()->getTimeField() && fieldName != "_id") {
+            // Checks that indices are in increasing order and within correct range.
+            // Smallest int
+            int prev = INT_MIN;
+            for (auto idx : field.Obj()) {
+                auto idxAsNum = std::stoi(idx.fieldNameStringData().toString());
+                if (idxAsNum <= prev || idxAsNum > maxIndex || idxAsNum < 0) {
+                    return Status(ErrorCodes::BadValue, "wrong index");
+                }
+                prev = idxAsNum;
+            }
+        }
+    }
+    return Status::OK();
+}
+
 /**
  * Validates the consistency of a time-series bucket.
  */
@@ -333,6 +374,13 @@ Status _validateTimeSeriesBucketRecord(const CollectionPtr& collection,
 
     if (Status status = _validateTimeseriesMinMax(recordBson, collection); !status.isOK()) {
         return status;
+    }
+
+    if (_getTimeseriesBucketVersion(recordBson) == 1) {
+        if (Status status = _validateTimeSeriesDataIndexes(recordBson, collection);
+            !status.isOK()) {
+            return status;
+        }
     }
 
     if (Status status = _validateTimeseriesCount(
