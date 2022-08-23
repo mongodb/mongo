@@ -387,60 +387,6 @@ TEST(IDLOneTypeTests, TestNamespaceString) {
     }
 }
 
-// Positive: Test base64 encoded strings.
-TEST(IDLOneTypeTests, TestBase64StringPositive) {
-    auto doc = BSON("basic"
-                    << "ABCD+/0="
-                    << "url"
-                    << "1234-_0");
-    auto parsed = Two_base64string::parse(IDLParserContext{"base64"}, doc);
-    ASSERT_EQ(parsed.getBasic(), "\x00\x10\x83\xFB\xFD"_sd);
-    ASSERT_EQ(parsed.getUrl(), "\xD7m\xF8\xFB\xFD"_sd);
-
-    BSONObjBuilder builder;
-    parsed.serialize(&builder);
-    ASSERT_BSONOBJ_EQ(doc, builder.obj());
-}
-
-// Negative: Test base64 encoded strings.
-TEST(IDLOneTypeTests, TestBase64StringNegative) {
-    {
-        // No terminator on basic.
-        auto doc = BSON("basic"
-                        << "ABCD+/0"
-                        << "url"
-                        << "1234-_0");
-        ASSERT_THROWS_CODE_AND_WHAT(Two_base64string::parse(IDLParserContext{"base64"}, doc),
-                                    AssertionException,
-                                    10270,
-                                    "invalid base64");
-    }
-
-    {
-        // Invalid chars in basic.
-        auto doc = BSON("basic"
-                        << "ABCD+_0="
-                        << "url"
-                        << "1234-_0");
-        ASSERT_THROWS_CODE_AND_WHAT(Two_base64string::parse(IDLParserContext{"base64"}, doc),
-                                    AssertionException,
-                                    40537,
-                                    "Invalid base64 character");
-    }
-
-    {
-        // Invalid chars in url
-        auto doc = BSON("basic"
-                        << "ABCD+/0="
-                        << "url"
-                        << "1234-/0");
-        ASSERT_THROWS_CODE_AND_WHAT(Two_base64string::parse(IDLParserContext{"base64"}, doc),
-                                    AssertionException,
-                                    40537,
-                                    "Invalid base64 character");
-    }
-}
-
 // Postive: Test any type
 TEST(IDLOneTypeTests, TestAnyType) {
     IDLParserContext ctxt("root");

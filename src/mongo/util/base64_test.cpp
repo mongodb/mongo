@@ -48,40 +48,30 @@ TEST(Base64Test, transcode) {
         int line;
         StringData plain;
         StringData encoded;
-        StringData encodedUrl;
     } const tests[] = {
-        {__LINE__, ""_sd, ""_sd},
-        {__LINE__, "a"_sd, "YQ=="_sd, "YQ"_sd},
-        {__LINE__, "aa"_sd, "YWE="_sd, "YWE"_sd},
-        {__LINE__, "aaa"_sd, "YWFh"_sd, "YWFh"_sd},
-        {__LINE__, "aaaa"_sd, "YWFhYQ=="_sd, "YWFhYQ"_sd},
+        {__LINE__, "", ""},
+        {__LINE__, "a", "YQ=="},
+        {__LINE__, "aa", "YWE="},
+        {__LINE__, "aaa", "YWFh"},
+        {__LINE__, "aaaa", "YWFhYQ=="},
 
-        {__LINE__, "A"_sd, "QQ=="_sd, "QQ"_sd},
-        {__LINE__, "AA"_sd, "QUE="_sd, "QUE"_sd},
-        {__LINE__, "AAA"_sd, "QUFB"_sd, "QUFB"_sd},
-        {__LINE__, "AAAA"_sd, "QUFBQQ=="_sd, "QUFBQQ"_sd},
+        {__LINE__, "A", "QQ=="},
+        {__LINE__, "AA", "QUE="},
+        {__LINE__, "AAA", "QUFB"},
+        {__LINE__, "AAAA", "QUFBQQ=="},
 
         {__LINE__,
-         "The quick brown fox jumped over the lazy dog."_sd,
-         "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wZWQgb3ZlciB0aGUgbGF6eSBkb2cu"_sd,
-         "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wZWQgb3ZlciB0aGUgbGF6eSBkb2cu"_sd},
-        {__LINE__, "\0\1\2\3\4\5\6\7"_sd, "AAECAwQFBgc="_sd, "AAECAwQFBgc"_sd},
-        {__LINE__, "\0\277\1\276\2\275"_sd, "AL8BvgK9"_sd, "AL8BvgK9"_sd},
-
-        {__LINE__, "\x7E\x8A\x3E\xFD\xB6\xAB"_sd, "foo+/bar"_sd, "foo-_bar"_sd},
+         "The quick brown fox jumped over the lazy dog.",
+         "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wZWQgb3ZlciB0aGUgbGF6eSBkb2cu"},
+        {__LINE__, "\0\1\2\3\4\5\6\7"_sd, "AAECAwQFBgc="},
+        {__LINE__, "\0\277\1\276\2\275"_sd, "AL8BvgK9"},
     };
 
     for (const auto& t : tests) {
-        ASSERT_TRUE(base64::validate(t.encoded)) << t.line;
-        ASSERT_EQUALS(base64::encode(t.plain), t.encoded)
+        ASSERT_TRUE(base64::validate(std::string{t.encoded})) << t.line;
+        ASSERT_EQUALS(base64::encode(std::string{t.plain}), t.encoded)
             << "line: " << t.line << ", plain: '" << t.plain << "'";
-        ASSERT_EQUALS(base64::decode(t.encoded), t.plain)
-            << "line: " << t.line << ", encoded: '" << t.encoded << "'";
-
-        ASSERT_TRUE(base64url::validate(t.encodedUrl)) << t.line;
-        ASSERT_EQUALS(base64url::encode(t.plain), t.encodedUrl)
-            << "line: " << t.line << ", plain: '" << t.plain << "'";
-        ASSERT_EQUALS(base64url::decode(t.encodedUrl), t.plain)
+        ASSERT_EQUALS(base64::decode(std::string{t.encoded}), t.plain)
             << "line: " << t.line << ", encoded: '" << t.encoded << "'";
     }
 }
@@ -99,18 +89,12 @@ TEST(Base64Test, encodeAllPossibleGroups) {
             std::string s = base64::encode(buf);
             ASSERT_EQ(s.size(), 4);
             if (kSuperVerbose) {
-                LOGV2(23509, "buffer", "buf"_attr = mongo::hexblob::encode(buf), "s"_attr = s);
+                LOGV2(23509,
+                      "buf=[{buf}] s=`{s}`",
+                      "buf"_attr = mongo::hexblob::encode(buf),
+                      "s"_attr = s);
             }
             std::string recovered = base64::decode(s);
-            ASSERT_EQ(buf, recovered);
-
-            s = base64url::encode(buf);
-            ASSERT_GTE(s.size(), 2);
-            ASSERT_LTE(s.size(), 4);
-            if (kSuperVerbose) {
-                LOGV2(6746400, "buffer", "buf"_attr = mongo::hexblob::encode(buf), "s"_attr = s);
-            }
-            recovered = base64url::decode(s);
             ASSERT_EQ(buf, recovered);
         }
     }
@@ -122,14 +106,12 @@ TEST(Base64Test, parseFail) {
         StringData encoded;
         boost::optional<int> code;
     } const tests[] = {
-        {__LINE__, "BadLength"_sd, 10270},
-        {__LINE__, "Has Whitespace=="_sd, 40537},
-        {__LINE__, "Hasbadchar$="_sd, 40537},
-        {__LINE__, "Hasbadchar\xFF="_sd, 40537},
-        {__LINE__, "Hasbadchar\t="_sd, 40537},
-        {__LINE__, "Has-dash"_sd, 40537},
-        {__LINE__, "Has_Underscore=="_sd, 40537},
-        {__LINE__, "too=soon"_sd, {}},  // fail, don't care how
+        {__LINE__, "BadLength", 10270},
+        {__LINE__, "Has Whitespace==", 40537},
+        {__LINE__, "Hasbadchar$=", 40537},
+        {__LINE__, "Hasbadchar\xFF=", 40537},
+        {__LINE__, "Hasbadcahr\t=", 40537},
+        {__LINE__, "too=soon", {}},  // fail, don't care how
     };
 
     for (const auto& t : tests) {
@@ -137,36 +119,6 @@ TEST(Base64Test, parseFail) {
 
         try {
             base64::decode(t.encoded);
-            ASSERT_TRUE(false) << t.line;
-        } catch (const AssertionException& e) {
-            if (t.code) {
-                ASSERT_EQ(e.code(), *t.code) << t.line << " e: " << e.toString();
-            }
-        }
-    }
-}
-
-TEST(Base64UrlTest, parseFail) {
-    struct {
-        int line;
-        StringData encoded;
-        boost::optional<int> code;
-    } const tests[] = {
-        {__LINE__, "BadLength"_sd, 10270},
-        {__LINE__, "Has Whitespace=="_sd, 40537},
-        {__LINE__, "Hasbadchar$="_sd, 40537},
-        {__LINE__, "Hasbadchar\xFF="_sd, 40537},
-        {__LINE__, "Hasbadchar\t="_sd, 40537},
-        {__LINE__, "Has+plus"_sd, 40537},
-        {__LINE__, "Has/Solidus="_sd, 40537},
-        {__LINE__, "too=soon"_sd, {}},  // fail, don't care how
-    };
-
-    for (const auto& t : tests) {
-        ASSERT_FALSE(base64url::validate(t.encoded)) << t.line;
-
-        try {
-            base64url::decode(t.encoded);
             ASSERT_TRUE(false) << t.line;
         } catch (const AssertionException& e) {
             if (t.code) {
