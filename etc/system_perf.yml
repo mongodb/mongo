@@ -1258,6 +1258,24 @@ buildvariants:
       - name: linkbench
       - name: linkbench2
 
+  - name: linux-1-node-replSet-all-feature-flags
+    display_name: Linux 1-Node ReplSet (all feature flags)
+    cron: "0 0 * * 4" # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup: single-replica-all-feature-flags
+      infrastructure_provisioning: single
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks:
+      - name: linkbench
+      - name: linkbench2
+
   - name: compile-rhel70
     display_name: Compile for Atlas-like
     modules: *modules
