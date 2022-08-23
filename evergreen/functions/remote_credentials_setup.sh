@@ -1,8 +1,6 @@
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 . "$DIR/../prelude.sh"
 
-set -vx
-
 # Since the macros 'private_key_remote' and 'private_key_file' are not always defined
 # we default to /dev/null to avoid syntax errors of an empty expansion.
 if [ -n "$private_key_remote_bash_var" ]; then
