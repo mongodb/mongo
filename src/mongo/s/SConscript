@@ -207,6 +207,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/index_commands_idl',
         '$BUILD_DIR/mongo/db/query/query_request',
         '$BUILD_DIR/mongo/db/repl/optime',
+        '$BUILD_DIR/mongo/db/s/analyze_shard_key',
         '$BUILD_DIR/mongo/db/server_options',
     ],
     LIBDEPS_PRIVATE=[

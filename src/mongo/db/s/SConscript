@@ -339,6 +339,18 @@ env.Library(
 )
 
 env.Library(
+    target='analyze_shard_key',
+    source=[
+        'analyze_shard_key_feature_flag.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/feature_flag',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
+env.Library(
     target='sharding_commands_d',
     source=[
         'add_shard_cmd.cpp',
@@ -497,6 +509,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/commands/sharded_cluster_sharding_commands',
         '$BUILD_DIR/mongo/s/sharding_initialization',
         '$BUILD_DIR/mongo/s/sharding_router_api',
+        'analyze_shard_key',
         'forwardable_operation_metadata',
         'sharding_logging',
         'sharding_runtime_d',
