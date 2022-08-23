@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/idl/cluster_server_parameter_op_observer.h"
 #include "mongo/idl/cluster_server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
@@ -35,6 +37,7 @@
 
 namespace mongo {
 namespace {
+
 using namespace cluster_server_parameter_test_util;
 
 const std::vector<NamespaceString> kIgnoredNamespaces = {
@@ -44,14 +47,27 @@ const std::vector<NamespaceString> kIgnoredNamespaces = {
 
 class ClusterServerParameterOpObserverTest : public ClusterServerParameterTestBase {
 public:
+    void setUp() override {
+        ClusterServerParameterTestBase::setUp();
+
+        auto opCtx = makeOperationContext();
+        ASSERT_OK(createCollection(opCtx.get(),
+                                   CreateCommand(NamespaceString::kClusterParametersNamespace)));
+        for (auto&& nss : kIgnoredNamespaces) {
+            ASSERT_OK(createCollection(opCtx.get(), CreateCommand(nss)));
+        }
+    }
+
     void doInserts(const NamespaceString& nss, std::initializer_list<BSONObj> docs) {
         std::vector<InsertStatement> stmts;
         std::transform(docs.begin(), docs.end(), std::back_inserter(stmts), [](auto doc) {
             return InsertStatement(doc);
         });
         auto opCtx = cc().makeOperationContext();
+
+        AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
         observer.onInserts(
-            opCtx.get(), nss, UUID::gen(), stmts.cbegin(), stmts.cend(), false /* fromMigrate */);
+            opCtx.get(), *autoColl, stmts.cbegin(), stmts.cend(), false /* fromMigrate */);
     }
 
     void doUpdate(const NamespaceString& nss, BSONObj updatedDoc) {

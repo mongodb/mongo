@@ -36,14 +36,6 @@ namespace {
 const auto getOpObserverTimes = OperationContext::declareDecoration<OpObserver::Times>();
 }  // namespace
 
-void OpObserver::onInserts(OperationContext* opCtx,
-                           const CollectionPtr& coll,
-                           std::vector<InsertStatement>::const_iterator begin,
-                           std::vector<InsertStatement>::const_iterator end,
-                           bool fromMigrate) {
-    onInserts(opCtx, coll->ns(), coll->uuid(), begin, end, fromMigrate);
-}
-
 auto OpObserver::Times::get(OperationContext* const opCtx) -> Times& {
     return getOpObserverTimes(opCtx);
 }

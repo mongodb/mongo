@@ -36,8 +36,9 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingRangeDeleter
 
 namespace mongo {
-
+namespace {
 const auto rangeDeleterServiceDecorator = ServiceContext::declareDecoration<RangeDeleterService>();
+}
 
 RangeDeleterService* RangeDeleterService::get(ServiceContext* serviceContext) {
     return &rangeDeleterServiceDecorator(serviceContext);
@@ -256,4 +257,5 @@ SharedSemiFuture<void> RangeDeleterService::getOverlappingRangeDeletionsFuture(
     }
     return whenAllSucceed(std::move(overlappingRangeDeletionsFutures)).share();
 }
+
 }  // namespace mongo

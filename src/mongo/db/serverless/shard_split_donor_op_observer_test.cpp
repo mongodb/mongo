@@ -29,6 +29,8 @@
 
 #include <utility>
 
+#include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
@@ -76,6 +78,8 @@ public:
         _observer = std::make_unique<ShardSplitDonorOpObserver>();
         _opCtx = makeOperationContext();
         _oplogSlot = 0;
+
+        ASSERT_OK(createCollection(_opCtx.get(), CreateCommand(_nss)));
     }
 
     void tearDown() override {
@@ -94,9 +98,12 @@ protected:
         std::vector<InsertStatement> inserts;
         inserts.emplace_back(_oplogSlot++, stateDocument.toBSON());
 
-        WriteUnitOfWork wow(_opCtx.get());
-        _observer->onInserts(_opCtx.get(), _nss, _uuid, inserts.begin(), inserts.end(), false);
-        wow.commit();
+        {
+            AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_IX);
+            WriteUnitOfWork wow(_opCtx.get());
+            _observer->onInserts(_opCtx.get(), *autoColl, inserts.begin(), inserts.end(), false);
+            wow.commit();
+        }
 
         verifyAndRemoveMtab(tenants, mtabVerifier);
     }
@@ -205,8 +212,10 @@ TEST_F(ShardSplitDonorOpObserverTest, InsertWrongType) {
     inserts1.emplace_back(1,
                           BSON("_id" << 1 << "data"
                                      << "y"));
+
+    AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_IX);
     ASSERT_THROWS_CODE(
-        _observer->onInserts(_opCtx.get(), _nss, _uuid, inserts1.begin(), inserts1.end(), false),
+        _observer->onInserts(_opCtx.get(), *autoColl, inserts1.begin(), inserts1.end(), false),
         DBException,
         ErrorCodes::TypeMismatch);
 }
@@ -241,9 +250,12 @@ TEST_F(ShardSplitDonorOpObserverTest, InsertValidAbortedDocument) {
     std::vector<InsertStatement> inserts;
     inserts.emplace_back(_oplogSlot++, stateDocument.toBSON());
 
-    WriteUnitOfWork wow(_opCtx.get());
-    _observer->onInserts(_opCtx.get(), _nss, _uuid, inserts.begin(), inserts.end(), false);
-    wow.commit();
+    {
+        AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_IX);
+        WriteUnitOfWork wow(_opCtx.get());
+        _observer->onInserts(_opCtx.get(), *autoColl, inserts.begin(), inserts.end(), false);
+        wow.commit();
+    }
 
     for (const auto& tenant : _tenantIds) {
         ASSERT_FALSE(TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext())

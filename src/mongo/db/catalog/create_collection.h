@@ -27,16 +27,17 @@
  *    it in the license file.
  */
 
+#include <boost/optional.hpp>
 #include <string>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/commands/create_gen.h"
 
 namespace mongo {
-class BSONObj;
+
 class OperationContext;
-class BSONElement;
 
 /**
  * Creates a collection as described in "cmdObj" on the database "dbName". Creates the collection's

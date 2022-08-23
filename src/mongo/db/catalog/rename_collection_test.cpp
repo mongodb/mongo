@@ -100,8 +100,7 @@ public:
                            bool fromMigrate) override;
 
     void onInserts(OperationContext* opCtx,
-                   const NamespaceString& nss,
-                   const UUID& uuid,
+                   const CollectionPtr& coll,
                    std::vector<InsertStatement>::const_iterator begin,
                    std::vector<InsertStatement>::const_iterator end,
                    bool fromMigrate) override;
@@ -208,8 +207,7 @@ void OpObserverMock::onAbortIndexBuild(OperationContext* opCtx,
 }
 
 void OpObserverMock::onInserts(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               const UUID& uuid,
+                               const CollectionPtr& coll,
                                std::vector<InsertStatement>::const_iterator begin,
                                std::vector<InsertStatement>::const_iterator end,
                                bool fromMigrate) {
@@ -218,10 +216,10 @@ void OpObserverMock::onInserts(OperationContext* opCtx,
     }
 
     onInsertsIsTargetDatabaseExclusivelyLocked =
-        opCtx->lockState()->isDbLockedForMode(nss.dbName(), MODE_X);
+        opCtx->lockState()->isDbLockedForMode(coll->ns().dbName(), MODE_X);
 
-    _logOp(opCtx, nss, "inserts");
-    OpObserverNoop::onInserts(opCtx, nss, uuid, begin, end, fromMigrate);
+    _logOp(opCtx, coll->ns(), "inserts");
+    OpObserverNoop::onInserts(opCtx, coll, begin, end, fromMigrate);
 }
 
 void OpObserverMock::onCreateCollection(OperationContext* opCtx,

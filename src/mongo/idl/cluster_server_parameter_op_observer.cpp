@@ -27,17 +27,13 @@
  *    it in the license file.
  */
 
-
 #include "mongo/idl/cluster_server_parameter_op_observer.h"
-
-#include <memory>
 
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/idl/cluster_server_parameter_initializer.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
-
 
 namespace mongo {
 
@@ -59,12 +55,11 @@ bool isConfigNamespace(const NamespaceString& nss) {
 }  // namespace
 
 void ClusterServerParameterOpObserver::onInserts(OperationContext* opCtx,
-                                                 const NamespaceString& nss,
-                                                 const UUID& uuid,
+                                                 const CollectionPtr& coll,
                                                  std::vector<InsertStatement>::const_iterator first,
                                                  std::vector<InsertStatement>::const_iterator last,
                                                  bool fromMigrate) {
-    if (!isConfigNamespace(nss)) {
+    if (!isConfigNamespace(coll->ns())) {
         return;
     }
 

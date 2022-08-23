@@ -528,8 +528,7 @@ void OpObserverImpl::onAbortIndexBuild(OperationContext* opCtx,
 }
 
 void OpObserverImpl::onInserts(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               const UUID& uuid,
+                               const CollectionPtr& coll,
                                std::vector<InsertStatement>::const_iterator first,
                                std::vector<InsertStatement>::const_iterator last,
                                bool fromMigrate) {
@@ -537,7 +536,8 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
     const bool inMultiDocumentTransaction =
         txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
 
-    Date_t lastWriteDate;
+    const auto& nss = coll->ns();
+    const auto& uuid = coll->uuid();
 
     std::vector<repl::OpTime> opTimeList;
     repl::OpTime lastOpTime;
@@ -623,7 +623,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         oplogEntryTemplate.setNss(nss);
         oplogEntryTemplate.setUuid(uuid);
         oplogEntryTemplate.setFromMigrateIfTrue(fromMigrate);
-        lastWriteDate = getWallClockTimeForOpLog(opCtx);
+        Date_t lastWriteDate = getWallClockTimeForOpLog(opCtx);
         oplogEntryTemplate.setWallClockTime(lastWriteDate);
 
         opTimeList = _oplogWriter->logInsertOps(

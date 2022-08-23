@@ -179,11 +179,12 @@ ReshardingOpObserver::ReshardingOpObserver() = default;
 ReshardingOpObserver::~ReshardingOpObserver() = default;
 
 void ReshardingOpObserver::onInserts(OperationContext* opCtx,
-                                     const NamespaceString& nss,
-                                     const UUID& uuid,
+                                     const CollectionPtr& coll,
                                      std::vector<InsertStatement>::const_iterator begin,
                                      std::vector<InsertStatement>::const_iterator end,
                                      bool fromMigrate) {
+    const auto& nss = coll->ns();
+
     if (nss == NamespaceString::kDonorReshardingOperationsNamespace) {
         // If a document is inserted into the resharding donor collection with a
         // `minFetchTimestamp`, we assume the document was inserted as part of initial sync and do

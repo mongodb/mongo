@@ -176,13 +176,12 @@ void TenantMigrationRecipientOpObserver::onCreateCollection(OperationContext* op
 
 void TenantMigrationRecipientOpObserver::onInserts(
     OperationContext* opCtx,
-    const NamespaceString& nss,
-    const UUID& uuid,
+    const CollectionPtr& coll,
     std::vector<InsertStatement>::const_iterator first,
     std::vector<InsertStatement>::const_iterator last,
     bool fromMigrate) {
 
-    if (!shard_merge_utils::isDonatedFilesCollection(nss)) {
+    if (!shard_merge_utils::isDonatedFilesCollection(coll->ns())) {
         return;
     }
 

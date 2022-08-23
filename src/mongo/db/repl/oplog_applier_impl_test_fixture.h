@@ -74,8 +74,7 @@ public:
      * This function is called whenever OplogApplierImpl inserts documents into a collection.
      */
     void onInserts(OperationContext* opCtx,
-                   const NamespaceString& nss,
-                   const UUID& uuid,
+                   const CollectionPtr& coll,
                    std::vector<InsertStatement>::const_iterator begin,
                    std::vector<InsertStatement>::const_iterator end,
                    bool fromMigrate) override;

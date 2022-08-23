@@ -28,6 +28,8 @@
  */
 
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/op_observer/user_write_block_mode_op_observer.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
@@ -57,6 +59,15 @@ public:
         // Ensure that we are primary.
         auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
         ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+
+        ASSERT_OK(createCollection(opCtx.get(), CreateCommand(NamespaceString("userDB.coll"))));
+        ASSERT_OK(
+            createCollection(opCtx.get(), CreateCommand(NamespaceString("userDB.system.profile"))));
+        ASSERT_OK(createCollection(opCtx.get(), CreateCommand(NamespaceString("admin.coll"))));
+        ASSERT_OK(
+            createCollection(opCtx.get(), CreateCommand(NamespaceString("admin.collForRename"))));
+        ASSERT_OK(createCollection(opCtx.get(), CreateCommand(NamespaceString("local.coll"))));
+        ASSERT_OK(createCollection(opCtx.get(), CreateCommand(NamespaceString("config.coll"))));
     }
 
 protected:
@@ -67,6 +78,10 @@ protected:
                 bool shouldSucceed,
                 bool fromMigrate) {
         ASSERT(nss.isValid());
+
+        AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+        if (!autoColl)
+            FAIL(str::stream() << "Collection " << nss << " doesn't exist");
 
         UserWriteBlockModeOpObserver opObserver;
         std::vector<InsertStatement> inserts;
@@ -80,7 +95,7 @@ protected:
         deleteArgs.fromMigrate = fromMigrate;
         if (shouldSucceed) {
             try {
-                opObserver.onInserts(opCtx, nss, uuid, inserts.begin(), inserts.end(), fromMigrate);
+                opObserver.onInserts(opCtx, *autoColl, inserts.begin(), inserts.end(), fromMigrate);
                 opObserver.onUpdate(opCtx, updateArgs);
                 opObserver.onDelete(opCtx, nss, uuid, StmtId(), deleteArgs);
             } catch (...) {
@@ -89,7 +104,7 @@ protected:
             }
         } else {
             ASSERT_THROWS(
-                opObserver.onInserts(opCtx, nss, uuid, inserts.begin(), inserts.end(), fromMigrate),
+                opObserver.onInserts(opCtx, *autoColl, inserts.begin(), inserts.end(), fromMigrate),
                 AssertionException);
             ASSERT_THROWS(opObserver.onUpdate(opCtx, updateArgs), AssertionException);
             ASSERT_THROWS(opObserver.onDelete(opCtx, nss, uuid, StmtId(), deleteArgs),

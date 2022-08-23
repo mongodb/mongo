@@ -106,12 +106,11 @@ void ConfigServerOpObserver::_onReplicationRollback(OperationContext* opCtx,
 }
 
 void ConfigServerOpObserver::onInserts(OperationContext* opCtx,
-                                       const NamespaceString& nss,
-                                       const UUID& uuid,
+                                       const CollectionPtr& coll,
                                        std::vector<InsertStatement>::const_iterator begin,
                                        std::vector<InsertStatement>::const_iterator end,
                                        bool fromMigrate) {
-    if (nss != NamespaceString::kConfigsvrShardsNamespace) {
+    if (coll->ns() != NamespaceString::kConfigsvrShardsNamespace) {
         return;
     }
 

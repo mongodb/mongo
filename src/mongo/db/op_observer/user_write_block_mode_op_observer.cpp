@@ -48,16 +48,15 @@ bool isStandaloneOrPrimary(OperationContext* opCtx) {
 }  // namespace
 
 void UserWriteBlockModeOpObserver::onInserts(OperationContext* opCtx,
-                                             const NamespaceString& nss,
-                                             const UUID& uuid,
+                                             const CollectionPtr& coll,
                                              std::vector<InsertStatement>::const_iterator first,
                                              std::vector<InsertStatement>::const_iterator last,
                                              bool fromMigrate) {
     if (!fromMigrate) {
-        _checkWriteAllowed(opCtx, nss);
+        _checkWriteAllowed(opCtx, coll->ns());
     }
 
-    if (nss == NamespaceString::kUserWritesCriticalSectionsNamespace &&
+    if (coll->ns() == NamespaceString::kUserWritesCriticalSectionsNamespace &&
         !user_writes_recoverable_critical_section_util::inRecoveryMode(opCtx)) {
         for (auto it = first; it != last; ++it) {
             const auto& insertedDoc = it->doc;

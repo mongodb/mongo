@@ -75,7 +75,6 @@ Status insertDocumentsImpl(OperationContext* opCtx,
                            OpDebug* opDebug,
                            bool fromMigrate) {
     const auto& nss = collection->ns();
-    const auto& uuid = collection->uuid();
 
     dassert(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 
@@ -170,7 +169,7 @@ Status insertDocumentsImpl(OperationContext* opCtx,
 
     if (!nss.isImplicitlyReplicated()) {
         opCtx->getServiceContext()->getOpObserver()->onInserts(
-            opCtx, nss, uuid, begin, end, fromMigrate);
+            opCtx, collection, begin, end, fromMigrate);
     }
 
     cappedDeleteUntilBelowConfiguredMaximum(opCtx, collection, records.begin()->id);
@@ -185,7 +184,6 @@ Status insertDocumentForBulkLoader(OperationContext* opCtx,
                                    const BSONObj& doc,
                                    const OnRecordInsertedFn& onRecordInserted) {
     const auto& nss = collection->ns();
-    const auto& uuid = collection->uuid();
 
     auto status = checkFailCollectionInsertsFailPoint(nss, doc);
     if (!status.isOK()) {
@@ -236,7 +234,7 @@ Status insertDocumentForBulkLoader(OperationContext* opCtx,
     inserts.emplace_back(kUninitializedStmtId, doc, slot);
 
     opCtx->getServiceContext()->getOpObserver()->onInserts(
-        opCtx, nss, uuid, inserts.begin(), inserts.end(), false);
+        opCtx, collection, inserts.begin(), inserts.end(), false);
 
     cappedDeleteUntilBelowConfiguredMaximum(opCtx, collection, loc.getValue());
 

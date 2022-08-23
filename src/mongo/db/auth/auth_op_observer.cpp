@@ -51,15 +51,14 @@ AuthOpObserver::AuthOpObserver() = default;
 AuthOpObserver::~AuthOpObserver() = default;
 
 void AuthOpObserver::onInserts(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               const UUID& uuid,
+                               const CollectionPtr& coll,
                                std::vector<InsertStatement>::const_iterator first,
                                std::vector<InsertStatement>::const_iterator last,
                                bool fromMigrate) {
     for (auto it = first; it != last; it++) {
-        audit::logInsertOperation(opCtx->getClient(), nss, it->doc);
+        audit::logInsertOperation(opCtx->getClient(), coll->ns(), it->doc);
         AuthorizationManager::get(opCtx->getServiceContext())
-            ->logOp(opCtx, "i", nss, it->doc, nullptr);
+            ->logOp(opCtx, "i", coll->ns(), it->doc, nullptr);
     }
 }
 

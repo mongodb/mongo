@@ -224,12 +224,11 @@ private:
 }  // namespace
 
 void TenantMigrationDonorOpObserver::onInserts(OperationContext* opCtx,
-                                               const NamespaceString& nss,
-                                               const UUID& uuid,
+                                               const CollectionPtr& coll,
                                                std::vector<InsertStatement>::const_iterator first,
                                                std::vector<InsertStatement>::const_iterator last,
                                                bool fromMigrate) {
-    if (nss == NamespaceString::kTenantMigrationDonorsNamespace &&
+    if (coll->ns() == NamespaceString::kTenantMigrationDonorsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         for (auto it = first; it != last; it++) {
             auto donorStateDoc = tenant_migration_access_blocker::parseDonorStateDocument(it->doc);

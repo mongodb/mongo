@@ -148,12 +148,11 @@ void FcvOpObserver::_onInsertOrUpdate(OperationContext* opCtx, const BSONObj& do
 }
 
 void FcvOpObserver::onInserts(OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              const UUID& uuid,
+                              const CollectionPtr& coll,
                               std::vector<InsertStatement>::const_iterator first,
                               std::vector<InsertStatement>::const_iterator last,
                               bool fromMigrate) {
-    if (nss.isServerConfigurationCollection()) {
+    if (coll->ns().isServerConfigurationCollection()) {
         for (auto it = first; it != last; it++) {
             _onInsertOrUpdate(opCtx, it->doc);
         }

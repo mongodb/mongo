@@ -2540,6 +2540,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/change_collection_expired_change_remover',
             '$BUILD_DIR/mongo/db/change_stream_change_collection_manager',
             '$BUILD_DIR/mongo/db/change_streams_cluster_parameter',
+            '$BUILD_DIR/mongo/db/commands/create_command',
             '$BUILD_DIR/mongo/db/mongohasher',
             '$BUILD_DIR/mongo/db/op_observer/fcv_op_observer',
             '$BUILD_DIR/mongo/db/op_observer/op_observer',

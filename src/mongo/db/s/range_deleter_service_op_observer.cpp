@@ -28,26 +28,27 @@
  */
 
 #include "mongo/db/s/range_deleter_service_op_observer.h"
+
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 
 namespace mongo {
-
+namespace {
 // Small hack used to be able to retrieve the full removed document in the `onDelete` method
 const auto deletedDocumentDecoration = OperationContext::declareDecoration<BSONObj>();
+}  // namespace
 
 RangeDeleterServiceOpObserver::RangeDeleterServiceOpObserver() = default;
 RangeDeleterServiceOpObserver::~RangeDeleterServiceOpObserver() = default;
 
 void RangeDeleterServiceOpObserver::onInserts(OperationContext* opCtx,
-                                              const NamespaceString& nss,
-                                              const UUID& uuid,
+                                              const CollectionPtr& coll,
                                               std::vector<InsertStatement>::const_iterator begin,
                                               std::vector<InsertStatement>::const_iterator end,
                                               bool fromMigrate) {
-    if (nss == NamespaceString::kRangeDeletionNamespace) {
+    if (coll->ns() == NamespaceString::kRangeDeletionNamespace) {
         for (auto it = begin; it != end; ++it) {
             auto deletionTask = RangeDeletionTask::parse(
                 IDLParserContext("RangeDeleterServiceOpObserver"), it->doc);

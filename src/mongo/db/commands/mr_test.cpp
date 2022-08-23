@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include <functional>
 #include <memory>
 #include <string>
@@ -58,7 +57,6 @@
 #include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
-
 
 namespace mongo {
 namespace {
@@ -263,8 +261,7 @@ public:
      * collection.
      */
     void onInserts(OperationContext* opCtx,
-                   const NamespaceString& nss,
-                   const UUID& uuid,
+                   const CollectionPtr& coll,
                    std::vector<InsertStatement>::const_iterator begin,
                    std::vector<InsertStatement>::const_iterator end,
                    bool fromMigrate) override;
@@ -320,8 +317,7 @@ void MapReduceOpObserver::onStartIndexBuild(OperationContext* opCtx,
 }
 
 void MapReduceOpObserver::onInserts(OperationContext* opCtx,
-                                    const NamespaceString& nss,
-                                    const UUID& uuid,
+                                    const CollectionPtr& coll,
                                     std::vector<InsertStatement>::const_iterator begin,
                                     std::vector<InsertStatement>::const_iterator end,
                                     bool fromMigrate) {

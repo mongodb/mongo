@@ -161,17 +161,8 @@ public:
                                    const Status& cause,
                                    bool fromMigrate) = 0;
 
-    // TODO (SERVER-67900): Make this variant of onInserts part of the interface and remove the one
-    // below
-    void onInserts(OperationContext* opCtx,
-                   const CollectionPtr& coll,
-                   std::vector<InsertStatement>::const_iterator begin,
-                   std::vector<InsertStatement>::const_iterator end,
-                   bool fromMigrate);
-
     virtual void onInserts(OperationContext* opCtx,
-                           const NamespaceString& nss,
-                           const UUID& uuid,
+                           const CollectionPtr& coll,
                            std::vector<InsertStatement>::const_iterator begin,
                            std::vector<InsertStatement>::const_iterator end,
                            bool fromMigrate) = 0;
