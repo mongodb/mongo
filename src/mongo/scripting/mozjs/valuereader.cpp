@@ -156,7 +156,7 @@ void ValueReader::fromBSONElement(const BSONElement& elem, const BSONObj& parent
             JS::RootedValueArray<2> args(_context);
 
             ValueReader(_context, args[0])
-                .fromDouble(elem.timestampTime().toMillisSinceEpoch() / 1000);
+                .fromDouble(static_cast<double>(elem.timestampTime().toMillisSinceEpoch()) / 1000);
             ValueReader(_context, args[1]).fromDouble(elem.timestampInc());
 
             scope->getProto<TimestampInfo>().newInstance(args, _value);

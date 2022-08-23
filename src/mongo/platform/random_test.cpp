@@ -226,14 +226,14 @@ TEST(RandomTest, NextInt32Uniformity) {
     constexpr int32_t kMax = (int32_t{3} << 29) - 1;
     constexpr size_t kBuckets = 64;
     constexpr size_t kNIter = 1'000'000;
-    constexpr double mu = kNIter / kBuckets;
+    constexpr double mu = static_cast<double>(kNIter) / kBuckets;
     constexpr double muSqInv = 1. / (mu * mu);
     std::vector<size_t> hist(kBuckets);
     for (size_t i = 0; i < kNIter; ++i) {
         auto next = prng.nextInt32(kMax);
         ASSERT_GTE(next, 0);
         ASSERT_LTE(next, kMax);
-        ++hist[double(next) * kBuckets / (kMax + 1)];
+        ++hist[static_cast<double>(next) * static_cast<double>(kBuckets) / (kMax + 1)];
     }
     if (kDebugBuild) {
         for (size_t i = 0; i < hist.size(); ++i) {

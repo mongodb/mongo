@@ -155,7 +155,7 @@ TEST(BSONElementHasher, MinKeyMaxKeyHashesDiffer) {
 // Test squashing very large doubles and very small doubles
 TEST(BSONElementHasher, VeryLargeAndSmallDoubles) {
     long long maxInt = std::numeric_limits<long long>::max();
-    double smallerDouble = maxInt / 2;
+    double smallerDouble = static_cast<double>(maxInt) / 2;
     double biggerDouble = ((double)maxInt) * ((double)maxInt);
     ASSERT_NOT_EQUALS(hashIt(BSON("a" << maxInt)), hashIt(BSON("a" << smallerDouble)));
     ASSERT_EQUALS(hashIt(BSON("a" << maxInt)), hashIt(BSON("a" << biggerDouble)));
