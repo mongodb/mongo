@@ -229,6 +229,16 @@ void CompactStructuredEncryptionDataCoordinator::_enterPhase(Phase newPhase) {
     StateDoc doc(_doc);
     doc.setPhase(newPhase);
 
+    // This coordinator persists the result of the doCompactOperation()
+    // by reusing the compactionTokens field to store the _response BSON.
+    // If newPhase is kDropTempCollection, the compactionTokens field is replaced
+    // on the temporary copy of the state document so that in the event that
+    // updating the persisted document fails, the compaction tokens remain
+    // in the in-memory state document (_doc).
+    if (newPhase == Phase::kDropTempCollection) {
+        doc.setCompactionTokens(_response->toBSON());
+    }
+
     LOGV2_DEBUG(6350490,
                 2,
                 "Transitioning phase for CompactStructuredEncryptionDataCoordinator",
@@ -272,7 +282,24 @@ ExecutorFuture<void> CompactStructuredEncryptionDataCoordinator::_runImpl(
                             [this, anchor = shared_from_this()](const auto& state) {
                                 _response = doCompactOperation(state);
                             }))
-        .then(_executePhase(Phase::kDropTempCollection, doDropOperation));
+        .then(_executePhase(Phase::kDropTempCollection,
+                            [this, anchor = shared_from_this()](const auto& state) {
+                                try {
+                                    // restore the response that was stored in the compactionTokens
+                                    // field
+                                    IDLParserErrorContext ctxt("response");
+                                    _response = CompactStructuredEncryptionDataCommandReply::parse(
+                                        ctxt, state.getCompactionTokens());
+                                } catch (...) {
+                                    LOGV2_ERROR(6846101,
+                                                "Failed to parse response from "
+                                                "CompactStructuredEncryptionDataState document",
+                                                "response"_attr = state.getCompactionTokens());
+                                    // ignore for compatibility with 6.0.0
+                                }
+
+                                doDropOperation(state);
+                            }));
 }
 
 }  // namespace mongo
