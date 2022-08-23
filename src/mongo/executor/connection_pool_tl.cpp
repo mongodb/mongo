@@ -81,8 +81,8 @@ void logSlowConnection(const HostAndPort& peer, const ConnectionMetrics& connMet
                 "totalTime"_attr = connMetrics.total());
 }
 
-CounterMetric totalConnectionEstablishmentTime("mongos.totalConnectionEstablishmentTimeMillis",
-                                               connHealthMetricsEnabled);
+CounterMetric totalConnectionEstablishmentTime(
+    "network.totalEgressConnectionEstablishmentTimeMillis", connHealthMetricsEnabled);
 
 }  // namespace
 

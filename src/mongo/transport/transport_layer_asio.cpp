@@ -106,6 +106,7 @@ boost::optional<Status> maybeTcpFastOpenStatus;
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(transportLayerASIOasyncConnectTimesOut);
+MONGO_FAIL_POINT_DEFINE(transportLayerASIOdelayConnection);
 MONGO_FAIL_POINT_DEFINE(transportLayerASIOhangBeforeAccept);
 
 #ifdef MONGO_CONFIG_SSL
@@ -817,7 +818,30 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(
 
     Date_t timeBefore = Date_t::now();
 
-    connector->resolver.asyncResolve(connector->peer, _listenerOptions.enableIPv6)
+    auto resolverFuture = [&]() {
+        if (auto sfp = transportLayerASIOdelayConnection.scoped(); MONGO_unlikely(sfp.isActive())) {
+            Milliseconds delay{sfp.getData()["millis"].safeNumberInt()};
+            Date_t deadline = reactor->now() + delay;
+            if ((delay > Milliseconds(0)) && (deadline < Date_t::max())) {
+                LOGV2(6885900,
+                      "delayConnection fail point is active, delaying connection establishment",
+                      "delay"_attr = delay);
+
+                // Normally, the unique_ptr returned by makeTimer() is stored somewhere where we can
+                // ensure its validity. Here, we have to make it a shared_ptr and capture it so it
+                // remains valid until the timer fires.
+                std::shared_ptr<ReactorTimer> delayTimer = reactor->makeTimer();
+                return delayTimer->waitUntil(deadline).then(
+                    [delayTimer, connector, enableIPv6 = _listenerOptions.enableIPv6] {
+                        LOGV2(6885901, "finished delaying the connection");
+                        return connector->resolver.asyncResolve(connector->peer, enableIPv6);
+                    });
+            }
+        }
+        return connector->resolver.asyncResolve(connector->peer, _listenerOptions.enableIPv6);
+    }();
+
+    std::move(resolverFuture)
         .then([connector, timeBefore, connectionMetrics](WrappedResolver::EndpointVector results) {
             try {
                 connectionMetrics->onDNSResolved();
