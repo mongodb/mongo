@@ -3,8 +3,8 @@
         "connectionString": "mongodb://localhost",
         "databaseName": "abt_calibration",
         "dumpPath": "~/data/dump",
-        "restoreFromDump": "onlyNew",
-        "dumpOnExit": true
+        "restoreFromDump": "never",
+        "dumpOnExit": false
     },
     "dataGenerator": {
         "enabled": true,
@@ -120,8 +120,8 @@
     "workloadExecution": {
         "enabled": true,
         "outputCollectionName": "calibrationData",
-        "writeMode": "append",
+        "writeMode": "replace",
         "warmupRuns": 1,
-        "runs": 20
+        "runs": 5
     }
 }

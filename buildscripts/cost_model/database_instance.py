@@ -28,7 +28,6 @@
 """A wrapper with useful methods over MongoDB database."""
 
 from __future__ import annotations
-import re
 from typing import Sequence, Mapping, NewType, Any
 import subprocess
 from pymongo import MongoClient, InsertOne
@@ -76,7 +75,6 @@ class DatabaseInstance:
 
     def enable_sbe(self, state: bool) -> None:
         """Enable new query execution engine. Throw pymongo.errors.OperationFailure in case of failure."""
-        # self.client.admin.command({'setParameter': 1, 'internalQueryEnableSlotBasedExecutionEngine': state})
         self.client.admin.command({
             'setParameter': 1,
             'internalQueryFrameworkControl': 'trySbeEngine' if state else 'forceClassicEngine'
@@ -84,6 +82,8 @@ class DatabaseInstance:
 
     def enable_cascades(self, state: bool) -> None:
         """Enable new query optimizer. Requires featureFlagCommonQueryFramework set to True."""
+        self.client.admin.command(
+            {'configureFailPoint': 'enableExplainInBonsai', 'mode': 'alwaysOn'})
         self.client.admin.command({
             'setParameter': 1,
             'internalQueryFrameworkControl': 'tryBonsai' if state else 'trySbeEngine'

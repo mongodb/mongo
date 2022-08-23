@@ -112,8 +112,13 @@ def parse_explain(explain: Mapping[str, any], abt_types: Sequence[str]):
     """Extract ExecutionStats from the given explain for the given ABT types."""
 
     result: Mapping[str, ExecutionStats] = {}
-    et = execution_tree.build_execution_tree(explain['executionStats'])
-    pt = physical_tree.build(explain['queryPlanner']['winningPlan']['optimizerPlan'])
+    try:
+        et = execution_tree.build_execution_tree(explain['executionStats'])
+        pt = physical_tree.build(explain['queryPlanner']['winningPlan']['optimizerPlan'])
+    except Exception as exception:
+        print(f'*** Failed to parse explain with the followinf error: {exception}')
+        print(explain)
+        raise exception
 
     if len(abt_types) == 0:
         abt_types = get_abt_types(pt)

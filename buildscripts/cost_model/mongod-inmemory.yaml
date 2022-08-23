@@ -1,7 +1,8 @@
 storage:
-  dbPath: /home/ubuntu/data/db
+  engine: inMemory
+  dbPath: /home/ubuntu/data/inmemorydb
 systemLog:
-  path: /home/ubuntu/data/logs/mongod.log
+  path: /home/ubuntu/data/logs/mongod-inmemory.log
   destination: file
   logAppend: false
 setParameter:

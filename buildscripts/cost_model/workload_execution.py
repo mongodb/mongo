@@ -71,16 +71,7 @@ def execute(database: DatabaseInstance, config: WorkloadExecutionConfig,
         return
 
     collector = WorkloadExecution(database, config)
-    # run with indexes enabled
-    for coll_info in collection_infos:
-        database.unhide_all_indexes(coll_info.name)
-    print('>>> running queries with indexed enabled')
-    collector.collect(collection_infos, queries)
-
-    # run with indexes disabled
-    for coll_info in collection_infos:
-        database.hide_all_indexes(coll_info.name)
-    print('\n\n>>> running queries with indexed disabled')
+    print('>>> running queries')
     collector.collect(collection_infos, queries)
 
 
