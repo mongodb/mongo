@@ -550,6 +550,7 @@ void InitialSyncer::_setUp_inlock(OperationContext* opCtx, std::uint32_t initial
     _stats.initialSyncStart = _exec->now();
     _stats.maxFailedInitialSyncAttempts = initialSyncMaxAttempts;
     _stats.failedInitialSyncAttempts = 0;
+    _stats.exec = std::weak_ptr<executor::TaskExecutor>(_exec);
 
     _allowedOutageDuration = Seconds(initialSyncTransientErrorRetryPeriodSeconds.load());
 }
@@ -2190,9 +2191,10 @@ void InitialSyncer::Stats::append(BSONObjBuilder* builder) const {
     builder->appendNumber("maxFailedInitialSyncAttempts",
                           static_cast<long long>(maxFailedInitialSyncAttempts));
 
+    auto e = exec.lock();
     if (initialSyncStart != Date_t()) {
         builder->appendDate("initialSyncStart", initialSyncStart);
-        auto elapsedDurationEnd = Date_t::now();
+        auto elapsedDurationEnd = e ? e->now() : Date_t::now();
         if (initialSyncEnd != Date_t()) {
             builder->appendDate("initialSyncEnd", initialSyncEnd);
             elapsedDurationEnd = initialSyncEnd;
