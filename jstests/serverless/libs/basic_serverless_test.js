@@ -323,7 +323,7 @@ class BasicServerlessTest {
             if (this.donor.nodes.includes(node)) {
                 this.donor.remove(node);
             } else {
-                MongoRunner.stopMongod(node);
+                MongoRunner.stopMongod(node, undefined, {skipValidation: true});
             }
         });
     }
