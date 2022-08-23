@@ -67,17 +67,6 @@ server_parameters:
     validator:
       gt: 0
 
-  storageEngineTotalConcurrentTransactions:
-    description: "Storage Engine Total Concurrent Transactions"
-    set_at: [ startup, runtime ]
-    cpp_vartype: AtomicWord<int>
-    cpp_varname: gConcurrentTotalTransactions
-    on_update: "TickerHolderStorageParams::updateConcurrentTotalTransactions"
-    # Default value being 0 means we're allowing the underlying storage engines to use their default values.
-    default: 0
-    validator:
-      gt: 0
-
 feature_flags:
   featureFlagEnableExecutionControl:
     description: Enables the new execution control queueing policy
