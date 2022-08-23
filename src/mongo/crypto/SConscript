@@ -73,17 +73,6 @@ cryptoEnv.Library(
     ],
 )
 
-cryptoEnv.Library(
-    target='asymmetric_crypto',
-    source=[
-        'asymmetric_crypto_{}.cpp'.format(ssl_provider),
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/util/net/openssl_init' if ssl_provider == 'openssl' else '',
-        'rsa_public_key',
-    ],
-)
-
 env.Library(
     target="aead_encryption",
     source=[
@@ -147,7 +136,6 @@ env.CppUnitTest(
     target='crypto_test',
     source=[
         'aead_encryption_test.cpp',
-        'asymmetric_crypto_openssl_test.cpp',
         'encryption_fields_util_test.cpp',
         'fle_crypto_test.cpp',
         'mechanism_scram_test.cpp',
@@ -162,7 +150,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/base/secure_allocator',
         '$BUILD_DIR/mongo/util/net/openssl_init' if ssl_provider == 'openssl' else '',
         'aead_encryption',
-        'asymmetric_crypto',
         'encrypted_field_config',
         'fle_crypto',
         'rsa_public_key',
