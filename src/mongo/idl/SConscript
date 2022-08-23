@@ -123,21 +123,6 @@ env.CppUnitTest(
     ],
 )
 
-env.Library(
-    target='feature_flag',
-    source=[
-        'feature_flag.cpp',
-    ],
-    LIBDEPS=[
-        'server_parameter',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/commands/feature_compatibility_parsers',
-        '$BUILD_DIR/mongo/util/options_parser/options_parser',
-    ],
-)
-
 env.Command(
     target=[
         'feature_flag_test.idl',
@@ -155,6 +140,22 @@ env.Command(
     NINJA_TEMPLATE=True,
 )
 
+env.Library(
+    target='feature_flag',
+    source=[
+        'feature_flag.cpp',
+        'feature_flag_test.idl',
+    ],
+    LIBDEPS=[
+        'server_parameter',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/commands/feature_compatibility_parsers',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+    ],
+)
+
 env.CppUnitTest(
     target='idl_test',
     source=[
@@ -163,7 +164,6 @@ env.CppUnitTest(
         'config_option_test.cpp',
         'config_option_test.idl',
         'feature_flag_test.cpp',
-        'feature_flag_test.idl',
         'idl_test.cpp',
         'server_parameter_specialized_test.cpp',
         'server_parameter_specialized_test.idl',
