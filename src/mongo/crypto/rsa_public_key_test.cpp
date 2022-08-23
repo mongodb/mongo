@@ -47,10 +47,7 @@ TEST(RSAPublickKeyTest, rsaKeyDecode) {
         "wjUu3HKsKPdIPqjf6zdrgv8W3OySt-QSFVBy_OQXraZ2wA7gJPyPmNhBr8L9M3AYRS_"
         "E1XRpsldMSrIe8bfxGyP2B9txiUQXIycWLC-e172SPjAjdUyaK3YLqGRtki6EgQ3qlzRPjoQheE-"
         "r3l62UaaAgHOo6FercdjdsIzT2-vhqZMQk59WhGuvygymiLw"_sd;
-
-    auto eStr = base64url::decode(e);
-    auto nStr = base64url::decode(n);
-    RsaPublicKey key(keyID, {eStr.c_str(), eStr.size()}, {nStr.c_str(), nStr.size()});
+    RsaPublicKey key(keyID, e, n);
 
     std::string strE;
     strE.assign(key.getE().data(), key.getE().length());

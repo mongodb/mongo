@@ -29,16 +29,11 @@
 
 #pragma once
 
-#include <string>
-#include <vector>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/base64.h"
 
 namespace mongo::crypto {
-
 /**
  * Provides an interface for managing parameters to an RSA signing operation.
  * Note that this key contains public material only, and is not suitable for decryption.
@@ -50,7 +45,7 @@ public:
      * The RSA operation parameters of {E} and {N} must be passed as Base64URL encoded values (RFC
      * 4648 §5).
      */
-    RsaPublicKey(StringData keyId, ConstDataRange e, ConstDataRange n);
+    RsaPublicKey(StringData keyId, StringData e, StringData n);
     std::size_t getKeySizeBytes() const {
         return _n.size();
     }
@@ -67,17 +62,10 @@ public:
         return _keyId;
     }
 
-    void appendToBSON(BSONObjBuilder* builder) const;
-    BSONObj toBSON() const {
-        BSONObjBuilder builder;
-        appendToBSON(&builder);
-        return builder.obj();
-    }
-
 private:
-    std::string _keyId;
     std::vector<std::uint8_t> _e;
     std::vector<std::uint8_t> _n;
+    std::string _keyId;
 };
 
 }  // namespace mongo::crypto

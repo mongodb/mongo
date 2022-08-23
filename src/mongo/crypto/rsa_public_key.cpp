@@ -28,24 +28,22 @@
  */
 
 #include "mongo/crypto/rsa_public_key.h"
-#include "mongo/crypto/jwt_types_gen.h"
+
+#include <iterator>
+
+#include "fmt/format.h"
+#include "mongo/base/string_data.h"
 #include "mongo/util/base64.h"
 
 namespace mongo::crypto {
-namespace {
-std::vector<std::uint8_t> vectorFromCDR(ConstDataRange cdr) {
-    return {cdr.data(), cdr.data() + cdr.length()};
+
+RsaPublicKey::RsaPublicKey(StringData keyId, StringData e, StringData n)
+    : _keyId(keyId.toString()) {
+    fmt::memory_buffer eBuffer;
+    base64url::decode(eBuffer, e);
+    std::copy(eBuffer.begin(), eBuffer.end(), std::back_inserter(_e));
+    fmt::memory_buffer nBuffer;
+    base64url::decode(nBuffer, n);
+    std::copy(nBuffer.begin(), nBuffer.end(), std::back_inserter(_n));
 }
-}  // namespace
-
-RsaPublicKey::RsaPublicKey(StringData keyId, ConstDataRange e, ConstDataRange n)
-    : _keyId(keyId.toString()), _e(vectorFromCDR(e)), _n(vectorFromCDR(n)) {}
-
-void RsaPublicKey::appendToBSON(BSONObjBuilder* builder) const {
-    builder->append(JWK::kTypeFieldName, "RSA"_sd);
-    builder->append(JWK::kKeyIdFieldName, _keyId);
-    builder->append(JWK::kEFieldName, base64url::encode(_e.data(), _e.size()));
-    builder->append(JWK::kNFieldName, base64url::encode(_n.data(), _n.size()));
-}
-
 }  // namespace mongo::crypto
