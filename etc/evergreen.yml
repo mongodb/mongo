@@ -274,21 +274,6 @@ buildvariants:
     - rhel80-large
   - name: generate_buildid_to_debug_symbols_mapping
 
-- <<: *linux-64-debug-required-template
-  name: linux-64-debug-wtdevelop
-  display_name: "~ Linux DEBUG WiredTiger develop"
-  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  modules:
-  - wtdevelop
-  expansions:
-    use_wt_develop: true
-    resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=on --enable-http-client=on --link-model=dynamic
-    scons_cache_mode: all
-    scons_cache_scope: shared
-    num_scons_link_jobs_available: 0.99
-    test_flags: --excludeWithAnyTags=requires_http_client
-
 - name: tla-plus
   display_name: TLA+
   run_on:
@@ -3104,17 +3089,6 @@ buildvariants:
     distros:
     - windows-vsCurrent-large
   - name: .benchmarks !benchmarks_orphaned
-
-- <<: *enterprise-windows-nopush-template
-  name: enterprise-windows-wtdevelop
-  display_name: "~ Enterprise Windows WiredTiger develop"
-  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  modules:
-  - enterprise
-  - wtdevelop
-  expansions:
-    <<: *enterprise-windows-nopush-expansions-template
-    use_wt_develop: true
 
 ### QO & QE Patch-Specific Build Variants ###
 - <<: *enterprise-windows-nopush-template
