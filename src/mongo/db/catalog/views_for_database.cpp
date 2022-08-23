@@ -107,10 +107,11 @@ Status ViewsForDatabase::_insert(OperationContext* opCtx,
     }
 
     NamespaceString viewName;
-    // TODO SERVER-65457 Use deserialize function on NamespaceString to reconstruct NamespaceString
+    // TODO SERVER-67155 Use deserialize function on NamespaceString to reconstruct NamespaceString
     // correctly.
-    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility) ||
-        !gMultitenancySupport) {
+    if (!gMultitenancySupport ||
+        (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))) {
         viewName = NamespaceString(tenantId, view["_id"].str());
     } else {
         viewName =

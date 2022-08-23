@@ -72,10 +72,11 @@ void validateViewDefinitionBSON(OperationContext* opCtx,
     }
 
     NamespaceString viewName;
-    // TODO SERVER-65457 Use deserialize function on NamespaceString to reconstruct NamespaceString
+    // TODO SERVER-67155 Use deserialize function on NamespaceString to reconstruct NamespaceString
     // correctly.
-    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility) ||
-        !gMultitenancySupport) {
+    if (!gMultitenancySupport ||
+        (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))) {
         viewName = NamespaceString(dbName.tenantId(), viewDefinition["_id"].str());
     } else {
         viewName = NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(
@@ -142,10 +143,11 @@ Status DurableViewCatalog::onExternalInsert(OperationContext* opCtx,
     auto catalog = CollectionCatalog::get(opCtx);
 
     NamespaceString viewName;
-    // TODO SERVER-65457 Use deserialize function on NamespaceString to reconstruct NamespaceString
+    // TODO SERVER-67155 Use deserialize function on NamespaceString to reconstruct NamespaceString
     // correctly.
-    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility) ||
-        !gMultitenancySupport) {
+    if (!gMultitenancySupport ||
+        (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))) {
         viewName = NamespaceString(name.tenantId(), doc.getStringField("_id"));
     } else {
         viewName = NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(
@@ -258,9 +260,10 @@ void DurableViewCatalogImpl::upsert(OperationContext* opCtx,
     invariant(systemViews);
 
     std::string nssOnDisk;
-    // TODO SERVER-65457 Move this check into a function on NamespaceString.
-    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility) ||
-        !gMultitenancySupport) {
+    // TODO SERVER-67155 Move this check into a function on NamespaceString.
+    if (!gMultitenancySupport ||
+        (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))) {
         nssOnDisk = name.toString();
     } else {
         nssOnDisk = name.toStringWithTenantId();
@@ -301,9 +304,10 @@ void DurableViewCatalogImpl::remove(OperationContext* opCtx, const NamespaceStri
 
 
     std::string nssOnDisk;
-    // TODO SERVER-65457 Move this check into a function on NamespaceString.
-    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility) ||
-        !gMultitenancySupport) {
+    // TODO SERVER-67155 Move this check into a function on NamespaceString.
+    if (!gMultitenancySupport ||
+        (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))) {
         nssOnDisk = name.toString();
     } else {
         nssOnDisk = name.toStringWithTenantId();

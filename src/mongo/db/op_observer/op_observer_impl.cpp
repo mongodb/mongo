@@ -1362,9 +1362,9 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
                                                  bool stayTemp,
                                                  bool markFromMigrate) {
     BSONObjBuilder builder;
-    // TODO SERVER-62114 Change to check for upgraded FCV rather than feature flag
-    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility) ||
-        !gMultitenancySupport) {
+    if (!gMultitenancySupport ||
+        (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))) {
         builder.append("renameCollection", fromCollection.ns());
         builder.append("to", toCollection.ns());
     } else {

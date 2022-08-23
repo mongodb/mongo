@@ -77,8 +77,7 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
     builder.append(OplogEntryBase::kTermFieldName, opTime.getTerm());
     builder.append(OplogEntryBase::kVersionFieldName, version);
     builder.append(OplogEntryBase::kOpTypeFieldName, OpType_serializer(opType));
-    // TODO SERVER-62114 Change to check for upgraded FCV rather than feature flag
-    if (nss.tenantId() &&
+    if (nss.tenantId() && serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
         nss.tenantId()->serializeToBSON(OplogEntryBase::kTidFieldName, &builder);
     }

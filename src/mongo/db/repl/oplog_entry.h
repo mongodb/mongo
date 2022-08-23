@@ -201,8 +201,8 @@ public:
      * entirely.
      */
     void setTid(boost::optional<mongo::TenantId> value) & {
-        // TODO SERVER-62114 Change to check for upgraded FCV rather than feature flag
-        if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))
+        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+            gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))
             DurableReplOperation::setTid(value);
     }
 
@@ -287,8 +287,8 @@ public:
     }
 
     void setTid(boost::optional<mongo::TenantId> value) & {
-        // TODO SERVER-62114 Change to check for upgraded FCV rather than feature flag
-        if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))
+        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+            gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))
             getDurableReplOperation().setTid(std::move(value));
     }
 

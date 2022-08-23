@@ -50,6 +50,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
@@ -797,8 +798,8 @@ BSONObj CommonMongodProcessInterface::_convertRenameToInternalRename(
 
     BSONObjBuilder newCmd;
     newCmd.append("internalRenameIfOptionsAndIndexesMatch", 1);
-    // TODO SERVER-62114 Change to check for upgraded FCV rather than feature flag
-    if (gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
+    if (!gMultitenancySupport ||
+        gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
         newCmd.append("from", sourceNs.ns());
         newCmd.append("to", targetNs.ns());
     } else {
