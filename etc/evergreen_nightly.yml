@@ -18,6 +18,7 @@ parameters:
   value: "etc/evergreen_nightly.yml"
   description: "path to this file"
 
+buildvariants:
 - &linux-64-debug-required-template
   name: linux-64-debug-required
   display_name: "! Shared Library Linux DEBUG"
