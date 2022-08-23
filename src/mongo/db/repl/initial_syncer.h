@@ -194,6 +194,7 @@ public:
         Date_t initialSyncStart;
         Date_t initialSyncEnd;
         std::vector<InitialSyncer::InitialSyncAttemptInfo> initialSyncAttemptInfos;
+        std::weak_ptr<executor::TaskExecutor> exec;
 
         std::string toString() const;
         BSONObj toBSON() const;
