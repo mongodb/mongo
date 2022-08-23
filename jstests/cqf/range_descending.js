@@ -10,77 +10,79 @@
 (function() {
 "use strict";
 
-const coll = db.range_descending;
-let query, res, explain;
-
-coll.drop();
+const coll = db.cqf_range_descending;
 
 /*
  * This is the most basic case: a single range predicate with a descending index.
  */
-assert.commandWorked(coll.insertOne({a: 1}));
-assert.commandWorked(coll.createIndex({a: -1}));
+{
+    coll.drop();
+    assert.commandWorked(coll.insertOne({a: 1}));
+    const indexKey = {a: -1};
+    assert.commandWorked(coll.createIndex(indexKey));
 
-for (let i = 0; i < 100; ++i) {
-    assert.commandWorked(coll.insert({}));
+    for (let i = 0; i < 100; ++i) {
+        assert.commandWorked(coll.insert({}));
+    }
+
+    const query = {a: {$gte: 0, $lte: 2}};
+
+    const res = coll.find(query).hint(indexKey).toArray();
+    assert.eq(res.length, 1);
+
+    const explain = coll.explain("executionStats").find(query).hint(indexKey).finish();
+    printjson(explain);
+    assert.eq("IndexScan", explain.queryPlanner.winningPlan.optimizerPlan.child.leftChild.nodeType);
 }
-
-query = {
-    a: {$gte: 0, $lte: 2}
-};
-
-res = coll.find(query).toArray();
-assert.eq(res.length, 1);
-
-explain = coll.explain("executionStats").find(query).finish();
-assert.eq("IndexScan", explain.queryPlanner.winningPlan.optimizerPlan.child.leftChild.nodeType);
-
-coll.drop();
 
 /*
  * Test a compound index, with a range on the leading field and a descending index on the secondary
  * field.
  */
-for (let i = 10; i <= 30; i += 10) {
-    for (let j = 1; j <= 3; j++) {
-        assert.commandWorked(coll.insert({a: i, b: j}));
+{
+    coll.drop();
+    for (let i = 10; i <= 30; i += 10) {
+        for (let j = 1; j <= 3; j++) {
+            assert.commandWorked(coll.insert({a: i, b: j}));
+        }
     }
+    for (let i = 0; i < 100; ++i) {
+        assert.commandWorked(coll.insert({}));
+    }
+    const indexKey = {a: 1, b: -1};
+    assert.commandWorked(coll.createIndex(indexKey));
+
+    const query = {a: {$gte: 10, $lte: 20}, b: {$gt: 1}};
+
+    const res = coll.find(query).hint(indexKey).toArray();
+    assert.eq(res.length, 4);
+
+    const explain = coll.explain("executionStats").find(query).hint(indexKey).finish();
+    printjson(explain);
+    assert.eq("IndexScan",
+              explain.queryPlanner.winningPlan.optimizerPlan.child.leftChild.child.nodeType);
 }
-for (let i = 0; i < 100; ++i) {
-    assert.commandWorked(coll.insert({}));
-}
-assert.commandWorked(coll.createIndex({a: 1, b: -1}));
-
-query = {
-    a: {$gte: 10, $lte: 20},
-    b: {$gt: 1}
-};
-
-res = coll.find(query).toArray();
-assert.eq(res.length, 4);
-
-explain = coll.explain("executionStats").find(query).finish();
-assert.eq("IndexScan",
-          explain.queryPlanner.winningPlan.optimizerPlan.child.leftChild.child.nodeType);
-
-coll.drop();
 
 /*
  * Test a descending index with range predicates, ensuring that the index plan is chosen.
  */
-assert.commandWorked(coll.insertOne({a: 1, b: 1}));
-for (let i = 0; i < 100; i++) {
-    assert.commandWorked(coll.insert({a: i + 2, b: i + 2}));
+{
+    coll.drop();
+    assert.commandWorked(coll.insertOne({a: 1, b: 1}));
+    for (let i = 0; i < 100; i++) {
+        assert.commandWorked(coll.insert({a: i + 2, b: i + 2}));
+    }
+    const indexKey = {a: -1, b: -1};
+    assert.commandWorked(coll.createIndex(indexKey));
+
+    const query = [{a: 1}, {_id: 0, a: 1, b: 1}];
+
+    const res = coll.find(...query).hint(indexKey).toArray();
+    assert.eq(res.length, 1);
+
+    const explain = coll.explain("executionStats").find(...query).hint(indexKey).finish();
+    printjson(explain);
+    assert.eq("IndexScan",
+              explain.queryPlanner.winningPlan.optimizerPlan.child.child.leftChild.nodeType);
 }
-
-assert.commandWorked(coll.createIndex({a: -1, b: -1}));
-
-query = [{a: 1}, {_id: 0, a: 1, b: 1}];
-
-res = coll.find(...query).toArray();
-assert.eq(res.length, 1);
-
-explain = coll.explain("executionStats").find(...query).finish();
-assert.eq("IndexScan",
-          explain.queryPlanner.winningPlan.optimizerPlan.child.child.leftChild.nodeType);
 }());
