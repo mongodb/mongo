@@ -35,6 +35,7 @@
 #include <fmt/format.h>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
@@ -143,30 +144,23 @@ void schemaValidationFailed(CollectionValidation::ValidateState* state,
     }
 }
 
-int _getTimeseriesBucketVersion(const BSONObj& recordBson) {
-    return recordBson.getField(timeseries::kBucketControlFieldName)
-        .Obj()
-        .getField(timeseries::kBucketControlVersionFieldName)
-        .Number();
-}
-
-// Checks that 'control.count' matches the actual number of measurements in a version 2 document.
-Status _validateTimeseriesCount(const BSONObj& recordBson, StringData timeFieldName) {
-    if (_getTimeseriesBucketVersion(recordBson) == 1) {
+// Checks that 'control.count' matches the actual number of measurements in a closed bucket.
+Status _validateTimeseriesCount(const BSONObj& control, int bucketCount, int version) {
+    if (version == 1) {
         return Status::OK();
     }
-    size_t controlCount = recordBson.getField(timeseries::kBucketControlFieldName)
-                              .Obj()
-                              .getField(timeseries::kBucketControlCountFieldName)
-                              .Number();
-    BSONColumn col{
-        recordBson.getField(timeseries::kBucketDataFieldName).Obj().getField(timeFieldName)};
-    if (controlCount != col.size()) {
+    long long controlCount;
+    if (Status status = bsonExtractIntegerField(
+            control, timeseries::kBucketControlCountFieldName, &controlCount);
+        !status.isOK()) {
+        return status;
+    }
+    if (controlCount != bucketCount) {
         return Status(ErrorCodes::BadValue,
                       fmt::format("The 'control.count' field ({}) does not match the actual number "
                                   "of measurements in the document ({}).",
                                   controlCount,
-                                  col.size()));
+                                  bucketCount));
     }
     return Status::OK();
 }
@@ -196,164 +190,297 @@ Status _validateTimeSeriesIdTimestamp(const CollectionPtr& collection, const BSO
 }
 
 /**
- * Checks the value of the bucket's version and if it matches the types of 'data' fields.
+ * Checks the value of the bucket's version.
  */
-Status _validateTimeseriesControlVersion(const BSONObj& recordBson) {
-    int controlVersion = _getTimeseriesBucketVersion(recordBson);
-    if (controlVersion != 1 && controlVersion != 2) {
+Status _validateTimeseriesControlVersion(const BSONObj& recordBson, int bucketVersion) {
+    if (bucketVersion != 1 && bucketVersion != 2) {
         return Status(
             ErrorCodes::BadValue,
             fmt::format("Invalid value for 'control.version'. Expected 1 or 2, but got {}.",
-                        controlVersion));
-    }
-    auto dataType = controlVersion == 1 ? BSONType::Object : BSONType::BinData;
-    // In addition to checking dataType, make sure that closed buckets have BinData Column subtype.
-    auto isCorrectType = [&](BSONElement el) {
-        if (controlVersion == 1) {
-            return el.type() == BSONType::Object;
-        } else {
-            return el.type() == BSONType::BinData && el.binDataType() == BinDataType::Column;
-        }
-    };
-    BSONObj data = recordBson.getField(timeseries::kBucketDataFieldName).Obj();
-    for (BSONObjIterator bi(data); bi.more();) {
-        BSONElement e = bi.next();
-        if (!isCorrectType(e)) {
-            return Status(ErrorCodes::TypeMismatch,
-                          fmt::format("Mismatch between time-series schema version and data field "
-                                      "type. Expected type {}, but got {}.",
-                                      mongo::typeName(dataType),
-                                      mongo::typeName(e.type())));
-        }
+                        bucketVersion));
     }
     return Status::OK();
 }
 
 /**
- * Checks the equivalence between the min and max fields in 'control' for a bucket and
- * the corresponding value in 'data'.
+ * Checks if the bucket's version matches the types of 'data' fields.
  */
-Status _validateTimeseriesMinMax(const BSONObj& recordBson, const CollectionPtr& coll) {
-    BSONObj data = recordBson.getField(timeseries::kBucketDataFieldName).Obj();
-    BSONObj control = recordBson.getField(timeseries::kBucketControlFieldName).Obj();
-    BSONObj controlMin = control.getField(timeseries::kBucketControlMinFieldName).Obj();
-    BSONObj controlMax = control.getField(timeseries::kBucketControlMaxFieldName).Obj();
+Status _validateTimeseriesDataFieldTypes(const BSONElement& dataField, int bucketVersion) {
+    auto dataType = bucketVersion == 1 ? BSONType::Object : BSONType::BinData;
+    // Checks that open buckets have 'Object' type and closed buckets have 'BinData Column' type.
+    auto isCorrectType = [&](BSONElement el) {
+        if (bucketVersion == 1) {
+            return el.type() == BSONType::Object;
+        } else {
+            return el.type() == BSONType::BinData && el.binDataType() == BinDataType::Column;
+        }
+    };
 
-    auto dataFields = data.getFieldNames<std::set<std::string>>();
-    auto controlMinFields = controlMin.getFieldNames<std::set<std::string>>();
-    auto controlMaxFields = controlMax.getFieldNames<std::set<std::string>>();
-    int version = _getTimeseriesBucketVersion(recordBson);
+    if (!isCorrectType(dataField)) {
+        return Status(ErrorCodes::TypeMismatch,
+                      fmt::format("Mismatch between time-series schema version and data field "
+                                  "type. Expected type {}, but got {}.",
+                                  mongo::typeName(dataType),
+                                  mongo::typeName(dataField.type())));
+    }
+    return Status::OK();
+}
 
-    // Checks that the number of 'control.min' and 'control.max' fields agrees with number of 'data'
-    // fields.
-    if (dataFields.size() != controlMinFields.size() ||
-        dataFields.size() != controlMaxFields.size()) {
+/**
+ * Checks whether the min and max values between 'control' and 'data' match, taking timestamp
+ * granularity into account.
+ */
+Status _validateTimeSeriesMinMax(const CollectionPtr& coll,
+                                 timeseries::MinMax& minmax,
+                                 const BSONElement& controlMin,
+                                 const BSONElement& controlMax,
+                                 StringData fieldName) {
+    auto min = minmax.min();
+    auto max = minmax.max();
+    auto checkMinAndMaxMatch = [&]() {
+        const auto options = coll->getTimeseriesOptions().value();
+        if (fieldName == options.getTimeField()) {
+            return controlMin.Date() ==
+                timeseries::roundTimestampToGranularity(min.getField(fieldName).Date(), options) &&
+                controlMax.Date() == max.getField(fieldName).Date();
+        } else {
+            return controlMin.wrap().woCompare(min) == 0 && controlMax.wrap().woCompare(max) == 0;
+        }
+    };
+
+    if (!checkMinAndMaxMatch()) {
         return Status(
             ErrorCodes::BadValue,
             fmt::format(
-                "Mismatch between the number of time-series control fields and the number "
-                "of data fields. "
-                "Control had {} min fields and {} max fields, but observed data had {} fields.",
-                controlMinFields.size(),
-                controlMaxFields.size(),
-                dataFields.size()));
-    };
-
-    // Validates that the 'control.min' and 'control.max' field values agree with 'data' field
-    // values.
-    for (auto fieldName : dataFields) {
-        timeseries::MinMax minmax;
-        auto field = data.getField(fieldName);
-
-        if (version == 1) {
-            for (const BSONElement& el : field.Obj()) {
-                minmax.update(el.wrap(fieldName), boost::none, coll->getDefaultCollator());
-            }
-        } else {
-            BSONColumn col{field};
-            for (const BSONElement& el : col) {
-                if (!el.eoo()) {
-                    minmax.update(el.wrap(fieldName), boost::none, coll->getDefaultCollator());
-                }
-            }
-        }
-
-        auto controlFieldMin = controlMin.getField(fieldName);
-        auto controlFieldMax = controlMax.getField(fieldName);
-        auto min = minmax.min();
-        auto max = minmax.max();
-
-        // Checks whether the min and max values between 'control' and 'data' match, taking
-        // timestamp granularity into account.
-        auto checkMinAndMaxMatch = [&]() {
-            // Needed for granularity, which determines how the min timestamp is rounded down .
-            const auto options = coll->getTimeseriesOptions().value();
-            if (fieldName == options.getTimeField()) {
-                return controlFieldMin.Date() ==
-                    timeseries::roundTimestampToGranularity(min.getField(fieldName).Date(),
-                                                            options) &&
-                    controlFieldMax.Date() == max.getField(fieldName).Date();
-            } else {
-                return controlFieldMin.wrap().woCompare(min) == 0 &&
-                    controlFieldMax.wrap().woCompare(max) == 0;
-            }
-        };
-
-        if (!checkMinAndMaxMatch()) {
-            return Status(
-                ErrorCodes::BadValue,
-                fmt::format(
-                    "Mismatch between time-series control and observed min or max for field {}. "
-                    "Control had min {} and max {}, but observed data had min {} and max {}.",
-                    fieldName,
-                    controlFieldMin.toString(),
-                    controlFieldMax.toString(),
-                    min.toString(),
-                    max.toString()));
-        }
+                "Mismatch between time-series control and observed min or max for field {}. "
+                "Control had min {} and max {}, but observed data had min {} and max {}.",
+                fieldName,
+                controlMin.toString(),
+                controlMax.toString(),
+                min.toString(),
+                max.toString()));
     }
 
     return Status::OK();
 }
 
+/**
+ * Attempts to parse the field name to integer.
+ */
+int _idxInt(StringData idx) {
+    try {
+        auto idxInt = std::stoi(idx.toString());
+        return idxInt;
+    } catch (const std::invalid_argument&) {
+        return INT_MIN;
+    }
+}
 
-Status _validateTimeSeriesDataIndexes(const BSONObj& recordBson, const CollectionPtr& coll) {
+/**
+ * Validates the indexes of the time field in the data field of a bucket. Checks the min and max
+ * values match the ones in 'control' field. Counts the number of measurements.
+ */
+Status _validateTimeSeriesDataTimeField(const CollectionPtr& coll,
+                                        const BSONElement& timeField,
+                                        const BSONElement& controlMin,
+                                        const BSONElement& controlMax,
+                                        StringData fieldName,
+                                        int version,
+                                        int* bucketCount) {
+    timeseries::MinMax minmax;
+    if (version == 1) {
+        for (const auto& metric : timeField.Obj()) {
+            if (metric.type() != BSONType::Date) {
+                return Status(ErrorCodes::BadValue,
+                              fmt::format("Time-series bucket {} field is not a Date", fieldName));
+            }
+            // Checks that indices are consecutively increasing numbers starting from 0.
+            if (auto idx = _idxInt(metric.fieldNameStringData()); idx != *bucketCount) {
+                return Status(ErrorCodes::BadValue,
+                              fmt::format("The index '{}' in time-series bucket data field '{}' is "
+                                          "not consecutively increasing from '0'",
+                                          metric.fieldNameStringData(),
+                                          fieldName));
+            }
+            minmax.update(metric.wrap(fieldName), boost::none, coll->getDefaultCollator());
+            ++(*bucketCount);
+        }
+    } else {
+        BSONColumn col{timeField};
+        Date_t prevTimestamp = Date_t::min();
+        for (const auto& metric : col) {
+            if (!metric.eoo()) {
+                if (metric.type() != BSONType::Date) {
+                    return Status(
+                        ErrorCodes::BadValue,
+                        fmt::format("Time-series bucket '{}' field is not a Date", fieldName));
+                }
+                // Checks the time values are sorted in increasing order for compressed buckets.
+                Date_t curTimestamp = metric.Date();
+                if (curTimestamp >= prevTimestamp) {
+                    prevTimestamp = curTimestamp;
+                } else {
+                    return Status(
+                        ErrorCodes::BadValue,
+                        fmt::format("Time-series bucket '{}' field is not in ascending order",
+                                    fieldName));
+                }
+                minmax.update(metric.wrap(fieldName), boost::none, coll->getDefaultCollator());
+                ++(*bucketCount);
+            } else {
+                return Status(ErrorCodes::BadValue, "Time-series bucket has missing time fields");
+            }
+        }
+    }
+
+    if (Status status = _validateTimeSeriesMinMax(coll, minmax, controlMin, controlMax, fieldName);
+        !status.isOK()) {
+        return status;
+    }
+
+    return Status::OK();
+}
+
+/**
+ * Validates the indexes of the data measurement fields of a bucket. Checks the min and max values
+ * match the ones in 'control' field.
+ */
+Status _validateTimeSeriesDataField(const CollectionPtr& coll,
+                                    const BSONElement& dataField,
+                                    const BSONElement& controlMin,
+                                    const BSONElement& controlMax,
+                                    StringData fieldName,
+                                    int version,
+                                    int bucketCount) {
+    timeseries::MinMax minmax;
+    if (version == 1) {
+        // Checks that indices are in increasing order and within the correct range.
+        int prevIdx = INT_MIN;
+        for (const auto& metric : dataField.Obj()) {
+            auto idx = _idxInt(metric.fieldNameStringData());
+            if (idx <= prevIdx) {
+                return Status(ErrorCodes::BadValue,
+                              fmt::format("The index '{}' in time-series bucket data field '{}' is "
+                                          "not in increasing order",
+                                          metric.fieldNameStringData(),
+                                          fieldName));
+            }
+            if (idx > bucketCount) {
+                return Status(ErrorCodes::BadValue,
+                              fmt::format("The index '{}' in time-series bucket data field '{}' is "
+                                          "out of range",
+                                          metric.fieldNameStringData(),
+                                          fieldName));
+            }
+            if (idx < 0) {
+                return Status(ErrorCodes::BadValue,
+                              fmt::format("The index '{}' in time-series bucket data field '{}' is "
+                                          "negative or non-numerical",
+                                          metric.fieldNameStringData(),
+                                          fieldName));
+            }
+            minmax.update(metric.wrap(fieldName), boost::none, coll->getDefaultCollator());
+            prevIdx = idx;
+        }
+    } else {
+        BSONColumn col{dataField};
+        for (const auto& metric : col) {
+            if (!metric.eoo()) {
+                minmax.update(metric.wrap(fieldName), boost::none, coll->getDefaultCollator());
+            }
+        }
+    }
+
+    if (Status status = _validateTimeSeriesMinMax(coll, minmax, controlMin, controlMax, fieldName);
+        !status.isOK()) {
+        return status;
+    }
+
+    return Status::OK();
+}
+
+Status _validateTimeSeriesDataFields(const CollectionPtr& coll,
+                                     const BSONObj& recordBson,
+                                     int bucketVersion) {
     BSONObj data = recordBson.getField(timeseries::kBucketDataFieldName).Obj();
-    int maxIndex;
+    BSONObj control = recordBson.getField(timeseries::kBucketControlFieldName).Obj();
+    BSONObj controlMin = control.getField(timeseries::kBucketControlMinFieldName).Obj();
+    BSONObj controlMax = control.getField(timeseries::kBucketControlMaxFieldName).Obj();
 
-    // go through once, validating id and timestamps and getting count of total number of entries
-    // for maxIndex.
-    for (auto field : data) {
-        // Checks that indices are consecutively increasing numbers starting from 0.
-        auto fieldName = field.fieldNameStringData();
-        if (fieldName == coll->getTimeseriesOptions()->getTimeField() || fieldName == "_id") {
-            int counter = 0;
-            for (auto idx : field.Obj()) {
-                if (auto idxAsNum = idx.fieldNameStringData();
-                    std::stoi(idxAsNum.toString()) != counter) {
-                    return Status(ErrorCodes::BadValue, "wrong index");
-                }
-                ++counter;
+    // Builds a hash map for the fields to avoid repeated traversals.
+    auto buildFieldTable = [&](StringMap<BSONElement>* table, const BSONObj& fields) {
+        for (const auto& field : fields) {
+            table->insert({field.fieldNameStringData().toString(), field});
+        }
+    };
+
+    StringMap<BSONElement> dataFields;
+    StringMap<BSONElement> controlMinFields;
+    StringMap<BSONElement> controlMaxFields;
+    buildFieldTable(&dataFields, data);
+    buildFieldTable(&controlMinFields, controlMin);
+    buildFieldTable(&controlMaxFields, controlMax);
+
+    // Checks that the number of 'control.min' and 'control.max' fields agrees with number of 'data'
+    // fields.
+    if (dataFields.size() != controlMinFields.size() ||
+        controlMinFields.size() != controlMaxFields.size()) {
+        return Status(
+            ErrorCodes::BadValue,
+            fmt::format("Mismatch between the number of time-series control fields and the number "
+                        "of data fields. Control had {} min fields and {} max fields, but observed "
+                        "data had {} fields.",
+                        controlMinFields.size(),
+                        controlMaxFields.size(),
+                        dataFields.size()));
+    };
+
+    // Validates the time field.
+    int bucketCount = 0;
+    auto timeFieldName = coll->getTimeseriesOptions().value().getTimeField().toString();
+    if (Status status = _validateTimeseriesDataFieldTypes(dataFields[timeFieldName], bucketVersion);
+        !status.isOK()) {
+        return status;
+    }
+
+    if (Status status = _validateTimeSeriesDataTimeField(coll,
+                                                         dataFields[timeFieldName],
+                                                         controlMinFields[timeFieldName],
+                                                         controlMaxFields[timeFieldName],
+                                                         timeFieldName,
+                                                         bucketVersion,
+                                                         &bucketCount);
+        !status.isOK()) {
+        return status;
+    }
+
+    if (Status status = _validateTimeseriesCount(control, bucketCount, bucketVersion);
+        !status.isOK()) {
+        return status;
+    }
+
+    // Validates the other fields.
+    for (const auto& [fieldName, dataField] : dataFields) {
+        if (fieldName != timeFieldName) {
+            if (Status status =
+                    _validateTimeseriesDataFieldTypes(dataFields[fieldName], bucketVersion);
+                !status.isOK()) {
+                return status;
             }
-            maxIndex = counter;
+
+            if (Status status = _validateTimeSeriesDataField(coll,
+                                                             dataFields[fieldName],
+                                                             controlMinFields[fieldName],
+                                                             controlMaxFields[fieldName],
+                                                             fieldName,
+                                                             bucketVersion,
+                                                             bucketCount);
+                !status.isOK()) {
+                return status;
+            }
         }
     }
 
-    for (auto field : data) {
-        auto fieldName = field.fieldNameStringData();
-        if (fieldName != coll->getTimeseriesOptions()->getTimeField() && fieldName != "_id") {
-            // Checks that indices are in increasing order and within correct range.
-            // Smallest int
-            int prev = INT_MIN;
-            for (auto idx : field.Obj()) {
-                auto idxAsNum = std::stoi(idx.fieldNameStringData().toString());
-                if (idxAsNum <= prev || idxAsNum > maxIndex || idxAsNum < 0) {
-                    return Status(ErrorCodes::BadValue, "wrong index");
-                }
-                prev = idxAsNum;
-            }
-        }
-    }
     return Status::OK();
 }
 
@@ -363,28 +490,20 @@ Status _validateTimeSeriesDataIndexes(const BSONObj& recordBson, const Collectio
 Status _validateTimeSeriesBucketRecord(const CollectionPtr& collection,
                                        const BSONObj& recordBson,
                                        ValidateResults* results) {
-
-    if (Status status = _validateTimeseriesControlVersion(recordBson); !status.isOK()) {
-        return status;
-    }
+    int bucketVersion = recordBson.getField(timeseries::kBucketControlFieldName)
+                            .Obj()
+                            .getIntField(timeseries::kBucketControlVersionFieldName);
 
     if (Status status = _validateTimeSeriesIdTimestamp(collection, recordBson); !status.isOK()) {
         return status;
     }
 
-    if (Status status = _validateTimeseriesMinMax(recordBson, collection); !status.isOK()) {
+    if (Status status = _validateTimeseriesControlVersion(recordBson, bucketVersion);
+        !status.isOK()) {
         return status;
     }
 
-    if (_getTimeseriesBucketVersion(recordBson) == 1) {
-        if (Status status = _validateTimeSeriesDataIndexes(recordBson, collection);
-            !status.isOK()) {
-            return status;
-        }
-    }
-
-    if (Status status = _validateTimeseriesCount(
-            recordBson, collection->getTimeseriesOptions()->getTimeField());
+    if (Status status = _validateTimeSeriesDataFields(collection, recordBson, bucketVersion);
         !status.isOK()) {
         return status;
     }

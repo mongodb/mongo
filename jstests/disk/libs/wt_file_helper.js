@@ -352,7 +352,7 @@ let insertInvalidRegex = function(coll, mongod, nDocuments) {
         coll.insert({a: RegExp(regex, options)});
     }
 
-    // Insert one valid expression and 4 invalid expressions.
+    // Inserts 4 types of invalid expressions.
     let swapOptions = function(lines) {
         const toInsert = ["imlsux", "imzsux", "xuslmi", "amlsux"];
         const offsetToOptionStr = 64;
