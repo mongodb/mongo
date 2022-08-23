@@ -25,7 +25,8 @@ let primary = st.rs0.getPrimary().getDB('TestDB');
 let primaryHost = primary.getMongo().host;
 
 jsTestLog("Ensuring the next connection from mongos to primary mongod will hang.");
-let hangBeforeAcceptFailPoint = configureFailPoint(primary, 'transportLayerASIOhangBeforeAccept');
+let hangBeforeAcceptFailPoint =
+    configureFailPoint(primary, 'transportLayerASIOhangDuringAcceptCallback');
 assert.commandWorked(st.s.adminCommand({dropConnections: 1, hostAndPort: [primaryHost]}));
 assert.commandWorked(
     st.s.adminCommand({setParameter: 1, slowConnectionThresholdMillis: testThresholdMillis}));

@@ -74,7 +74,10 @@ extern FailPoint transportLayerASIOshortOpportunisticReadWrite;
 // Cause an asyncConnect to timeout after it's successfully connected to the remote peer
 extern FailPoint transportLayerASIOasyncConnectTimesOut;
 
-extern FailPoint transportLayerASIOhangBeforeAccept;
+extern FailPoint transportLayerASIOhangBeforeAcceptCallback;
+
+extern FailPoint transportLayerASIOhangDuringAcceptCallback;
+
 
 /**
  * A TransportLayer implementation based on ASIO networking primitives.
@@ -85,6 +88,8 @@ class TransportLayerASIO final : public TransportLayer {
 
 public:
     constexpr static auto kSlowOperationThreshold = Seconds(1);
+
+    constexpr static auto kTCPSocketListenState = 10;
 
     struct Options {
         constexpr static auto kIngress = 0x1;
@@ -208,6 +213,10 @@ public:
         return _listenerOptions.loadBalancerPort;
     }
 
+    int getListenerSocketBacklogQueueDepth() const {
+        return _listenerSocketBacklogQueueDepth.load();
+    }
+
 #ifdef __linux__
     BatonHandle makeBaton(OperationContext* opCtx) const override;
 #endif
@@ -250,6 +259,14 @@ private:
         bool asyncOCSPStaple) const;
 
     void _runListener() noexcept;
+
+    // Must only be called when the listener socket is in the listen state. When the socket is in
+    // the listen state, the tcpi_unacked value will show the socket's backlog queue (read: number
+    // of pending incoming connections). When the socket is in use, the tcpi_unacked value will
+    // show the socket's current unread buffer length. Programmer commentary: it's unfortunate that
+    // the same field can display semantically different information depending on an external
+    // state.
+    void _trySetListenerSocketBacklogQueueDepth(GenericAcceptor& acceptor) noexcept;
 
 #ifdef MONGO_CONFIG_SSL
     SSLParams::SSLModes _sslMode() const;
@@ -310,6 +327,9 @@ private:
     // Tracks the cumulative time the listener spends between accepting incoming connections to
     // handing them off to dedicated connection threads.
     AtomicWord<Microseconds> _listenerProcessingTime;
+
+    // Tracks the amount of incoming connections waiting to be accepted by the transport layer.
+    AtomicWord<int> _listenerSocketBacklogQueueDepth;
 };
 
 }  // namespace transport

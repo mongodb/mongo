@@ -43,6 +43,7 @@
 #include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/basic.h"
@@ -304,7 +305,10 @@ std::unique_ptr<transport::TransportLayerASIO> makeTLA(ServiceEntryPoint* sep) {
  */
 class TestFixture {
 public:
-    TestFixture() : _tla{makeTLA(&_sep)} {}
+    TestFixture()
+        : _tla{makeTLA(&_sep)},
+          _hangBeforeAccept(transport::transportLayerASIOhangBeforeAcceptCallback),
+          _hangDuringAccept(transport::transportLayerASIOhangDuringAcceptCallback) {}
 
     ~TestFixture() {
         _sep.endAllSessions({});
@@ -319,9 +323,37 @@ public:
         return *_tla;
     }
 
+    void setUpHangDuringAcceptingFirstConnection() {
+        _hangDuringAcceptTimesEntered = _hangDuringAccept.setMode(FailPoint::alwaysOn);
+    }
+
+    void waitForHangDuringAcceptingFirstConnection() {
+        _hangDuringAccept.waitForTimesEntered(_hangDuringAcceptTimesEntered + 1);
+    }
+
+    void waitForHangDuringAcceptingNextConnection() {
+        _hangBeforeAcceptTimesEntered = _hangBeforeAccept.setMode(FailPoint::alwaysOn);
+        _hangDuringAccept.setMode(FailPoint::off);
+        _hangBeforeAccept.waitForTimesEntered(_hangBeforeAcceptTimesEntered + 1);
+
+        _hangDuringAcceptTimesEntered = _hangDuringAccept.setMode(FailPoint::alwaysOn);
+        _hangBeforeAccept.setMode(FailPoint::off);
+        _hangDuringAccept.waitForTimesEntered(_hangDuringAcceptTimesEntered + 1);
+    }
+
+    void stopHangDuringAcceptingConnection() {
+        _hangDuringAccept.setMode(FailPoint::off);
+    }
+
 private:
     std::unique_ptr<transport::TransportLayerASIO> _tla;
     MockSEP _sep;
+
+    FailPoint& _hangBeforeAccept;
+    FailPoint& _hangDuringAccept;
+
+    FailPoint::EntryCountT _hangBeforeAcceptTimesEntered{0};
+    FailPoint::EntryCountT _hangDuringAcceptTimesEntered{0};
 };
 
 TEST(TransportLayerASIO, ListenerPortZeroTreatedAsEphemeral) {
@@ -361,7 +393,7 @@ TEST(TransportLayerASIO, TCPResetAfterConnectionIsSilentlySwallowed) {
     tf.sep().setOnStartSession([&](auto&&) { sessionsCreated.fetchAndAdd(1); });
 
     LOGV2(6109515, "connecting");
-    auto& fp = transport::transportLayerASIOhangBeforeAccept;
+    auto& fp = transport::transportLayerASIOhangDuringAcceptCallback;
     auto timesEntered = fp.setMode(FailPoint::alwaysOn);
     ConnectionThread connectThread(tf.tla().listenerPort(), &setNoLinger);
     fp.waitForTimesEntered(timesEntered + 1);
@@ -374,6 +406,49 @@ TEST(TransportLayerASIO, TCPResetAfterConnectionIsSilentlySwallowed) {
     fp.setMode(FailPoint::off);
 
     ASSERT_EQ(sessionsCreated.load(), 0);
+}
+
+/**
+ * Test that the server appropriately handles a client-side socket disconnection, and that the
+ * client sends an RST packet when the socket is forcibly closed.
+ */
+TEST(TransportLayerASIO, TCPCheckQueueDepth) {
+#ifndef __linux__
+    return;
+#endif
+
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagConnHealthMetrics",
+                                                               true);
+    // Set the listenBacklog to a parameter greater than the number of connection threads we intend
+    // to create.
+    serverGlobalParams.listenBacklog = 10;
+    TestFixture tf;
+
+    LOGV2(6400501, "Starting and hanging three connection threads");
+    tf.setUpHangDuringAcceptingFirstConnection();
+
+    ConnectionThread connectThread1(tf.tla().listenerPort());
+    ConnectionThread connectThread2(tf.tla().listenerPort());
+    ConnectionThread connectThread3(tf.tla().listenerPort());
+
+    tf.waitForHangDuringAcceptingFirstConnection();
+    connectThread1.wait();
+    connectThread2.wait();
+    connectThread3.wait();
+
+    LOGV2(6400502, "Processing one connection thread");
+
+    tf.waitForHangDuringAcceptingNextConnection();
+
+    ASSERT_EQ(tf.tla().getListenerSocketBacklogQueueDepth(), 2);
+
+    BSONObjBuilder tlaStatsBuilder;
+    tf.tla().appendStats(&tlaStatsBuilder);
+    BSONObj tlaStats = tlaStatsBuilder.obj();
+
+    ASSERT_EQ(tlaStats.getIntField("listenerSocketBacklogQueueDepth"), 2);
+
+    tf.stopHangDuringAcceptingConnection();
 }
 
 TEST(TransportLayerASIO, ThrowOnNetworkErrorInEnsureSync) {

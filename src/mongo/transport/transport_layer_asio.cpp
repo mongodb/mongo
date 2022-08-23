@@ -106,7 +106,8 @@ boost::optional<Status> maybeTcpFastOpenStatus;
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(transportLayerASIOasyncConnectTimesOut);
-MONGO_FAIL_POINT_DEFINE(transportLayerASIOhangBeforeAccept);
+MONGO_FAIL_POINT_DEFINE(transportLayerASIOhangBeforeAcceptCallback);
+MONGO_FAIL_POINT_DEFINE(transportLayerASIOhangDuringAcceptCallback);
 
 #ifdef MONGO_CONFIG_SSL
 SSLConnectionContext::~SSLConnectionContext() = default;
@@ -1249,8 +1250,10 @@ Status TransportLayerASIO::setup() {
 }
 
 void TransportLayerASIO::appendStats(BSONObjBuilder* bob) const {
-    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV())
+    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV()) {
         bob->append("listenerProcessingTime", _listenerProcessingTime.load().toBSON());
+        bob->append("listenerSocketBacklogQueueDepth", _listenerSocketBacklogQueueDepth.load());
+    }
 }
 
 void TransportLayerASIO::_runListener() noexcept {
@@ -1382,11 +1385,26 @@ ReactorHandle TransportLayerASIO::getReactor(WhichReactor which) {
     MONGO_UNREACHABLE;
 }
 
+namespace {
+void handleConnectionAcceptASIOError(const asio::system_error& e) {
+    // Swallow connection reset errors. Connection reset errors classically present as
+    // asio::error::eof, but can bubble up as asio::error::invalid_argument when calling
+    // into socket.set_option().
+    if (e.code() != asio::error::eof && e.code() != asio::error::invalid_argument) {
+        LOGV2_WARNING(5746600,
+                      "Error accepting new connection: {error}",
+                      "Error accepting new connection",
+                      "error"_attr = e.code().message());
+    }
+}
+
+}  // namespace
+
 void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
     auto acceptCb = [this, &acceptor](const std::error_code& ec,
                                       ASIOSession::GenericSocket peerSocket) mutable {
         Timer timer;
-        transportLayerASIOhangBeforeAccept.pauseWhileSet();
+        transportLayerASIOhangDuringAcceptCallback.pauseWhileSet();
 
         if (auto lk = stdx::lock_guard(_mutex); _isShutdown) {
             return;
@@ -1425,15 +1443,7 @@ void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
                 _sep->startSession(std::move(session));
             }
         } catch (const asio::system_error& e) {
-            // Swallow connection reset errors. Connection reset errors classically present as
-            // asio::error::eof, but can bubble up as asio::error::invalid_argument when calling
-            // into socket.set_option().
-            if (e.code() != asio::error::eof && e.code() != asio::error::invalid_argument) {
-                LOGV2_WARNING(5746600,
-                              "Error accepting new connection: {error}",
-                              "Error accepting new connection",
-                              "error"_attr = e.code().message());
-            }
+            handleConnectionAcceptASIOError(e);
         } catch (const DBException& e) {
             LOGV2_WARNING(23023,
                           "Error accepting new connection: {error}",
@@ -1447,7 +1457,31 @@ void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
         _acceptConnection(acceptor);
     };
 
+    transportLayerASIOhangBeforeAcceptCallback.pauseWhileSet();
+
+    // The following must be called when the listener socket isn't in use -- if ever refactoring
+    // this class, ensure that the function call is placed where you'd expect the listener socket
+    // to be unused.
+    _trySetListenerSocketBacklogQueueDepth(acceptor);
+
     acceptor.async_accept(*_ingressReactor, std::move(acceptCb));
+}
+
+void TransportLayerASIO::_trySetListenerSocketBacklogQueueDepth(
+    GenericAcceptor& acceptor) noexcept {
+#ifdef __linux__
+
+    struct tcp_info tcpInfo;
+    socklen_t infoLen = sizeof(tcpInfo);
+    if (!getsockopt(acceptor.native_handle(), IPPROTO_TCP, TCP_INFO, &tcpInfo, &infoLen)) {
+        if (tcpInfo.tcpi_state == kTCPSocketListenState) {
+            _listenerSocketBacklogQueueDepth.store(tcpInfo.tcpi_unacked);
+        }
+    } else {
+        handleConnectionAcceptASIOError(lastSocketError());
+    }
+
+#endif
 }
 
 #ifdef MONGO_CONFIG_SSL
