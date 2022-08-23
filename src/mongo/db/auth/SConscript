@@ -437,7 +437,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base/secure_allocator',
-        '$BUILD_DIR/mongo/crypto/rsa_public_key',
         '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/util/icu',
