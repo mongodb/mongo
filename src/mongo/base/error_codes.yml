@@ -488,8 +488,6 @@ error_codes:
     - {code: 376, name: ChangeStreamNotEnabled}
     - {code: 377, name: FLEMaxTagLimitExceeded }
     - {code: 378, name: NonConformantBSON, categories: [ValidationError]}
-    - {code: 379, name: InvalidSignature}
-
 
     # Error codes 4000-8999 are reserved.
 
