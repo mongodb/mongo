@@ -6,14 +6,383 @@ include:
 - filename: etc/evergreen_yml_components/variants/atlas.yml
 - filename: etc/evergreen_yml_components/variants/misc_release.yml
 ### Comment out when using this file for a LTS or Rapid release branch. ###
-- filename: etc/evergreen_yml_components/variants/ibm.yml
+#- filename: etc/evergreen_yml_components/variants/ibm.yml
 ### Uncomment when using this file for a LTS release branch. ###
-# - filename: etc/evergreen_yml_components/variants/in_memory.yml
+- filename: etc/evergreen_yml_components/variants/in_memory.yml
 ### Uncomment when using this file for a LTS or Rapid release branch. ###
-# - filename: etc/evergreen_yml_components/variants/sanitizer.yml
+- filename: etc/evergreen_yml_components/variants/sanitizer.yml
 
 
 parameters:
 - key: evergreen_config_file_path
   value: "etc/evergreen_nightly.yml"
   description: "path to this file"
+
+- &linux-64-debug-required-template
+  name: linux-64-debug-required
+  display_name: "! Shared Library Linux DEBUG"
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+  run_on:
+  - rhel80-medium
+  expansions:
+    resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
+    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --enable-free-mon=on --enable-http-client=on --link-model=dynamic
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    test_flags: --excludeWithAnyTags=requires_http_client
+    target_resmoke_time: 15
+    max_sub_suites: 5
+    num_scons_link_jobs_available: 0.99
+    large_distro_name: rhel80-medium
+  tasks:
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+    - rhel80-xlarge
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - rhel80-xlarge
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
+    distros:
+    - rhel80-xlarge
+  - name: .aggregation !.encrypt !.feature_flag_guarded
+  - name: .auth !.audit !.multiversion
+  - name: .causally_consistent !.wo_snapshot
+  - name: .change_streams !.secondary_reads
+  - name: .clustered_collections
+  - name: .misc_js
+  - name: disk_wiredtiger
+  - name: free_monitoring
+  - name: .integration !.audit
+  - name: .jscore .common
+  - name: jsCore_txns_large_txns_format
+  - name: json_schema
+  - name: query_golden_classic
+  - name: libunwind_tests
+  - name: .multi_shard
+  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+  - name: .ocsp
+  - name: .read_write_concern
+  - name: .replica_sets !.encrypt !.ignore_non_generated_replica_sets_jscore_passthrough !.fcbis
+  - name: replica_sets_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
+  - name: .retry
+  - name: .read_only
+  - name: session_jscore_passthrough
+  - name: sharded_multi_stmt_txn_jscore_passthrough
+  - name: .sharding .jscore !.wo_snapshot
+  - name: sharding_gen
+  - name: sharding_opportunistic_secondary_targeting_gen
+  - name: .stitch
+  - name: server_discovery_and_monitoring_json_test_TG
+    distros:
+    - rhel80-large
+  - name: server_selection_json_test_TG
+    distros:
+    - rhel80-large
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- &enterprise-windows-required-template
+  name: enterprise-windows-required
+  display_name: "! Enterprise Windows"
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+  modules:
+  - enterprise
+  run_on:
+  - windows-vsCurrent-small
+  expansions:
+    burn_in_tests_build_variant: enterprise-windows-required
+    exe: ".exe"
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug msi archive-mh archive-mh-debug
+    content_type: application/zip
+    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include" LIBPATH="c:/sasl/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.8") --win-version-min=win10
+    num_scons_link_jobs_available: 0.2
+    python: '/cygdrive/c/python/python37/python.exe'
+    ext: zip
+    scons_cache_scope: shared
+    multiversion_platform: windows
+    multiversion_edition: enterprise
+    jstestfuzz_num_generated_files: 35
+    target_resmoke_time: 20
+    max_sub_suites: 5
+    large_distro_name: windows-vsCurrent-large
+    push_path: windows
+    push_bucket: downloads.10gen.com
+    push_name: windows
+    push_arch: x86_64-enterprise
+    test_flags: &windows_common_test_excludes --excludeWithAnyTags=incompatible_with_windows_tls
+    external_auth_jobs_max: 1
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - windows-vsCurrent-xlarge
+  - name: compile_build_tools_next_TG
+    distros:
+    - windows-vsCurrent-xlarge
+  - name: burn_in_tests_gen
+  - name: audit
+  - name: auth_audit_gen
+  - name: buildscripts_test
+  - name: causally_consistent_jscore_txns_passthrough
+    distros:
+    - windows-vsCurrent-large
+  - name: .crypt
+    distros:
+    - windows-vsCurrent-large
+  - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
+  - name: external_auth
+  - name: external_auth_aws
+  - name: external_auth_windows
+    distros:
+    - windows-2016-dc
+  - name: .jscore .common !.sharding
+  - name: jsCore_auth
+  - name: jsCore_ese
+  - name: jsCore_txns_large_txns_format
+  - name: .jstestfuzz .common
+  - name: mqlrun
+  - name: noPassthrough_gen
+  - name: noPassthroughWithMongod_gen
+  - name: .replica_sets .common !.ignore_non_generated_replica_sets_jscore_passthrough
+  - name: .replica_sets .multi_oplog !.ignore_non_generated_replica_sets_jscore_passthrough
+  - name: replica_sets_jscore_passthrough
+    distros:
+    - windows-vsCurrent-large
+  - name: replica_sets_ese_gen
+  - name: sasl
+  - name: server_discovery_and_monitoring_json_test_TG
+  - name: server_selection_json_test_TG
+  - name: .sharding .txns
+  - name: sharding_auth_gen
+  - name: sharding_auth_audit_gen
+  - name: sharding_ese_gen
+  - name: sharding_opportunistic_secondary_targeting_gen
+  - name: unittest_shell_hang_analyzer_gen
+
+- &enterprise-rhel-80-64-bit-dynamic-required-template
+  name: enterprise-rhel-80-64-bit-dynamic-required
+  display_name: "! Shared Library Enterprise RHEL 8.0"
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+  modules:
+  - enterprise
+  run_on:
+  - rhel80-small
+  expansions: &enterprise-rhel-80-64-bit-dynamic-required-expansions
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    multiversion_platform: rhel80
+    multiversion_edition: enterprise
+    has_packages: false
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    jstestfuzz_num_generated_files: 40
+    jstestfuzz_concurrent_num_files: 10
+    target_resmoke_time: 10
+    max_sub_suites: 5
+    idle_timeout_factor: 1.5
+    exec_timeout_factor: 1.5
+    large_distro_name: rhel80-medium
+    burn_in_tag_buildvariants: enterprise-rhel-80-64-bit-inmem enterprise-rhel-80-64-bit-multiversion
+    num_scons_link_jobs_available: 0.99
+  tasks:
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+    - rhel80-xlarge
+  #  - name: compile_test_and_package_parallel_unittest_stream_with_recording_TG
+  #    distros:
+  #      - rhel80-xlarge
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - rhel80-xlarge
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
+    distros:
+    - rhel80-xlarge
+  - name: .lint
+  - name: lint_fuzzer_sanity_patch
+  - name: test_api_version_compatibility
+  - name: burn_in_tests_gen
+  - name: check_feature_flag_tags
+  - name: check_for_todos
+  - name: .aggfuzzer !.feature_flag_guarded
+  - name: .aggregation !.feature_flag_guarded
+  - name: audit
+  - name: .auth
+  - name: burn_in_tags_gen
+  - name: buildscripts_test
+  - name: resmoke_end2end_tests
+  - name: unittest_shell_hang_analyzer_gen
+  - name: .causally_consistent !.sharding
+  - name: .change_streams
+  - name: .change_stream_fuzzer
+  - name: .misc_js
+  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
+  - name: .concurrency .large !.ubsan !.no_txns !.debug_only
+    distros:
+    - rhel80-medium
+  - name: config_fuzzer_concurrency
+  - name: config_fuzzer_simulate_crash_concurrency_replication
+    distros:
+    - rhel80-large
+  - name: config_fuzzer_concurrency_replication
+    distros:
+    - rhel80-large
+  - name: config_fuzzer_jsCore
+  - name: config_fuzzer_replica_sets_jscore_passthrough
+    distros:
+    - rhel80-large
+  - name: disk_wiredtiger
+  - name: .encrypt
+  - name: idl_tests
+  - name: initial_sync_fuzzer_gen
+  - name: .integration
+    distros:
+    - rhel80-medium
+  - name: jsCore
+    distros:
+    - rhel80-xlarge
+  - name: .jscore .common !jsCore
+  - name: jsCore_minimum_batch_size
+  - name: jsCore_txns_large_txns_format
+  - name: json_schema
+  - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
+  - name: libunwind_tests
+  - name: .multiversion_sanity_check
+  - name: mqlrun
+  - name: .multi_shard
+  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+  - name: multiversion_gen
+  - name: .query_fuzzer
+  - name: .random_multiversion_ds
+  - name: .read_write_concern .large
+    distros:
+    - rhel80-medium
+  - name: .read_write_concern !.large
+  - name: .replica_sets !.encrypt !.auth
+    distros:
+    - rhel80-xlarge
+  - name: replica_sets_api_version_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
+    distros:
+    - rhel80-xlarge
+  - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
+    distros:
+    - rhel80-xlarge
+  - name: retryable_writes_jscore_passthrough_gen
+  - name: retryable_writes_jscore_stepdown_passthrough_gen
+    distros:
+    - rhel80-medium
+  - name: .read_only
+  - name: .rollbackfuzzer
+  - name: sasl
+  - name: search
+  - name: search_auth
+  - name: search_ssl
+  - name: session_jscore_passthrough
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: sharding_api_version_jscore_passthrough_gen
+  - name: .sharding .txns
+  - name: .sharding .common
+  - name: sharding_opportunistic_secondary_targeting_gen
+  - name: .stitch
+  - name: .crypt
+    distros:
+    - rhel80-xlarge
+  - name: crypt_build_debug_and_test
+    distros:
+    - rhel80-xlarge
+  - name: .updatefuzzer
+  - name: secondary_reads_passthrough_gen
+  - name: server_discovery_and_monitoring_json_test_TG
+  - name: .serverless
+    distros:
+    - rhel80-xlarge
+  - name: server_selection_json_test_TG
+    distros:
+    - rhel80-xlarge
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: enterprise-rhel80-dynamic-clang-tidy-required
+  display_name: "! Enterprise Clang Tidy"
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+  modules:
+    - enterprise
+  run_on:
+    - rhel80-xxlarge
+  expansions:
+    lang_environment: LANG=C
+    compile_flags: --link-model=dynamic -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_${clang_tidy_toolchain}_clang.vars
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    show_scons_timings: false
+    clang_tidy_toolchain: v3
+    clang_tidy_file: .clang-tidy-extra-checks
+  tasks:
+  - name: clang_tidy_TG
+
+- &rhel80-debug-aubsan-lite-required-template
+  name: rhel80-debug-aubsan-lite-required
+  display_name: "! Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG"
+  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
+  modules:
+  - enterprise
+  run_on:
+  - rhel80-build
+  stepback: true
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    lang_environment: LANG=C
+    # If you add anything to san_options, make sure the appropriate changes are
+    # also made to SConstruct.
+    san_options: >-
+      UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
+      LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
+      ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
+    compile_flags: --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars --dbg=on --opt=on --allocator=system --sanitize=undefined,address --ssl --ocsp-stapling=off -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic
+    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
+    resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
+    hang_analyzer_dump_core: false
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    max_sub_suites: 3
+    num_scons_link_jobs_available: 0.99
+    separate_debug: off
+    large_distro_name: rhel80-build
+  tasks:
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+    - rhel80-xlarge
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - rhel80-xlarge
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
+    distros:
+    - rhel80-xlarge
+  - name: jsCore
+  - name: jsCore_txns
+  - name: unittest_shell_hang_analyzer_gen
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- <<: *enterprise-rhel-80-64-bit-dynamic-required-template
+  name: commit-queue
+  display_name: "~ Commit Queue"
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
+  stepback: false
+  tasks:
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+    - rhel80-xlarge-commitqueue
+  - name: compile_test_and_package_parallel_unittest_stream_TG
+    distros:
+    - rhel80-xlarge-commitqueue
+  - name: compile_test_and_package_parallel_dbtest_stream_TG
+    distros:
+    - rhel80-xlarge-commitqueue
+  - name: jsCore
+    distros:
+    - rhel80-xlarge-commitqueue
+  - name: .lint
+  - name: test_api_version_compatibility
+  - name: validate_commit_message
+  - name: check_feature_flag_tags
