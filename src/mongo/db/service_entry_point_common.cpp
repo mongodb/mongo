@@ -1827,17 +1827,10 @@ Future<void> ExecCommandDatabase::_commandExec() {
                 serverGlobalParams.clusterRole != ClusterRole::ConfigServer &&
                 !_refreshedCollection) {
                 if (auto sce = s.extraInfo<StaleConfigInfo>()) {
-                    if (sce->getCriticalSectionSignal()) {
-                        _execContext->behaviors->handleReshardingCriticalSectionMetrics(opCtx,
-                                                                                        *sce);
-                        // The shard is in a critical section, so we cannot retry locally
-                        OperationShardingState::waitForCriticalSectionToComplete(
-                            opCtx, *sce->getCriticalSectionSignal())
-                            .ignore();
-                        return s;
-                    }
+                    bool stableLocalVersion =
+                        !sce->getCriticalSectionSignal() && sce->getVersionWanted();
 
-                    if (sce->getVersionWanted() &&
+                    if (stableLocalVersion &&
                         ChunkVersion::isIgnoredVersion(sce->getVersionReceived())) {
                         // Shard is recovered, but the router didn't sent a shard version, therefore
                         // we just need to tell the router how much it needs to advance to
@@ -1845,16 +1838,22 @@ Future<void> ExecCommandDatabase::_commandExec() {
                         return s;
                     }
 
-                    if (sce->getVersionWanted() &&
+                    if (stableLocalVersion &&
                         sce->getVersionReceived().isOlderThan(*sce->getVersionWanted())) {
                         // Shard is recovered and the router is staler than the shard
                         return s;
                     }
 
+                    if (sce->getCriticalSectionSignal()) {
+                        _execContext->behaviors->handleReshardingCriticalSectionMetrics(opCtx,
+                                                                                        *sce);
+                    }
+
                     const auto refreshed = _execContext->behaviors->refreshCollection(opCtx, *sce);
                     if (refreshed) {
                         _refreshedCollection = true;
-                        if (!opCtx->isContinuingMultiDocumentTransaction()) {
+                        if (!opCtx->isContinuingMultiDocumentTransaction() &&
+                            !sce->getCriticalSectionSignal()) {
                             _resetLockerStateAfterShardingUpdate(opCtx);
                             return _commandExec();
                         }

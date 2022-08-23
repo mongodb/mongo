@@ -72,23 +72,16 @@ ScopedOperationCompletionShardingActions::~ScopedOperationCompletionShardingActi
 
     if (auto staleInfo = status->extraInfo<StaleConfigInfo>()) {
         ShardingStatistics::get(_opCtx).countStaleConfigErrors.addAndFetch(1);
+        bool stableLocalVersion =
+            !staleInfo->getCriticalSectionSignal() && staleInfo->getVersionWanted();
 
-        if (staleInfo->getCriticalSectionSignal()) {
-            // The shard is in a critical section
-            OperationShardingState::waitForCriticalSectionToComplete(
-                _opCtx, *staleInfo->getCriticalSectionSignal())
-                .ignore();
-            return;
-        }
-
-        if (staleInfo->getVersionWanted() &&
-            ChunkVersion::isIgnoredVersion(staleInfo->getVersionReceived())) {
+        if (stableLocalVersion && ChunkVersion::isIgnoredVersion(staleInfo->getVersionReceived())) {
             // Shard is recovered, but the router didn't sent a shard version, therefore we just
             // need to tell the router how much it needs to advance to (getVersionWanted).
             return;
         }
 
-        if (staleInfo->getVersionWanted() &&
+        if (stableLocalVersion &&
             staleInfo->getVersionReceived().isOlderThan(*staleInfo->getVersionWanted())) {
             // Shard is recovered and the router is staler than the shard
             return;
