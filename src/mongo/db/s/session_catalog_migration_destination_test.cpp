@@ -138,7 +138,9 @@ public:
         // onStepUp() relies on the storage interface to create the config.transactions table.
         repl::StorageInterface::set(getServiceContext(),
                                     std::make_unique<repl::StorageInterfaceImpl>());
-        MongoDSessionCatalog::onStepUp(operationContext());
+        MongoDSessionCatalog::set(getServiceContext(), std::make_unique<MongoDSessionCatalog>());
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(operationContext());
+        mongoDSessionCatalog->onStepUp(operationContext());
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
 
         setUnshardedFilteringMetadata(kNs);

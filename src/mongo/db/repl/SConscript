@@ -518,6 +518,9 @@ env.Library(
         'rs_rollback',
         'storage_interface_impl',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/transaction/transaction',
+    ],
 )
 
 env.Library(

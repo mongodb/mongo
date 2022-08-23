@@ -267,16 +267,17 @@ protected:
     void setUp() override {
         MockReplCoordServerFixture::setUp();
         const auto service = opCtx()->getServiceContext();
-        auto _storageInterfaceImpl = std::make_unique<repl::StorageInterfaceImpl>();
 
-        // onStepUp() relies on the storage interface to create the config.transactions table.
-        repl::StorageInterface::set(service, std::move(_storageInterfaceImpl));
-        MongoDSessionCatalog::onStepUp(opCtx());
+        // Register a temporary storage interface for MongoDSessionCatalog::onStepUp() create the
+        // config.transactions table.
+        repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceImpl>());
+        MongoDSessionCatalog::set(service, std::make_unique<MongoDSessionCatalog>());
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+        mongoDSessionCatalog->onStepUp(opCtx());
 
         // We use the mocked storage interface here since StorageInterfaceImpl does not support
         // getPointInTimeReadTimestamp().
-        auto _storageInterfaceMock = std::make_unique<repl::StorageInterfaceMock>();
-        repl::StorageInterface::set(service, std::move(_storageInterfaceMock));
+        repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceMock>());
 
         OpObserverRegistry* opObserverRegistry =
             dynamic_cast<OpObserverRegistry*>(service->getOpObserver());
@@ -1079,7 +1080,8 @@ TEST_F(TxnParticipantTest, CleanOperationContextOnStepUp) {
     repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceImpl>());
 
     // onStepUp() must not leave aborted transactions' metadata attached to the operation context.
-    MongoDSessionCatalog::onStepUp(opCtx());
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+    mongoDSessionCatalog->onStepUp(opCtx());
 
     ASSERT_FALSE(opCtx()->inMultiDocumentTransaction());
     ASSERT_FALSE(opCtx()->isStartingMultiDocumentTransaction());
@@ -1856,7 +1858,8 @@ TEST_F(TxnParticipantTest, ReacquireLocksForPreparedTransactionsOnStepUp) {
     const auto service = opCtx()->getServiceContext();
     // onStepUp() relies on the storage interface to create the config.transactions table.
     repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceImpl>());
-    MongoDSessionCatalog::onStepUp(opCtx());
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+    mongoDSessionCatalog->onStepUp(opCtx());
     {
         auto sessionCheckout = checkOutSession({});
         auto txnParticipant = TransactionParticipant::get(opCtx());

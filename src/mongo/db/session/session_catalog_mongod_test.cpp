@@ -84,9 +84,11 @@ TEST_F(MongoDSessionCatalogTest, ReapSomeExpiredSomeNot) {
     _collectionMock->add(LogicalSessionRecord(makeLogicalSessionIdForTest(), clock()->now()));
     _collectionMock->add(LogicalSessionRecord(makeLogicalSessionIdForTest(), clock()->now()));
 
-    ASSERT_EQ(2,
-              MongoDSessionCatalog::reapSessionsOlderThan(
-                  _opCtx, *_collection, clock()->now() - Minutes{30}));
+    auto mongoDSessionCatalog = MongoDSessionCatalog{};
+    auto numReaped = mongoDSessionCatalog.reapSessionsOlderThan(
+        _opCtx, *_collection, clock()->now() - Minutes{30});
+
+    ASSERT_EQ(2, numReaped);
 }
 
 }  // namespace

@@ -289,6 +289,9 @@ public:
             cc().getServiceContext(),
             std::unique_ptr<repl::ReplicationProcess>(replicationProcess));
 
+        MongoDSessionCatalog::set(_opCtx->getServiceContext(),
+                                  std::make_unique<MongoDSessionCatalog>());
+
         _consistencyMarkers =
             repl::ReplicationProcess::get(cc().getServiceContext())->getConsistencyMarkers();
 
@@ -1694,7 +1697,8 @@ TEST_F(StorageTimestampTest, PrimarySetsMultikeyInsideMultiDocumentTransaction) 
     auto service = _opCtx->getServiceContext();
     auto sessionCatalog = SessionCatalog::get(service);
     sessionCatalog->reset_forTest();
-    MongoDSessionCatalog::onStepUp(_opCtx);
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(_opCtx);
+    mongoDSessionCatalog->onStepUp(_opCtx);
 
     NamespaceString nss("unittests.PrimarySetsMultikeyInsideMultiDocumentTransaction");
     create(nss);
@@ -3223,7 +3227,8 @@ public:
         auto service = _opCtx->getServiceContext();
         auto sessionCatalog = SessionCatalog::get(service);
         sessionCatalog->reset_forTest();
-        MongoDSessionCatalog::onStepUp(_opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(_opCtx);
+        mongoDSessionCatalog->onStepUp(_opCtx);
 
         create(nss);
         UUID ui = UUID::gen();
@@ -3427,7 +3432,8 @@ public:
         auto service = _opCtx->getServiceContext();
         auto sessionCatalog = SessionCatalog::get(service);
         sessionCatalog->reset_forTest();
-        MongoDSessionCatalog::onStepUp(_opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(_opCtx);
+        mongoDSessionCatalog->onStepUp(_opCtx);
 
         create(nss);
         UUID ui = UUID::gen();

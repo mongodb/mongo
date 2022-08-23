@@ -28,9 +28,9 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/session/session_catalog_mongod.h"
+
+#include <memory>
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/db/catalog_raii.h"
@@ -59,6 +59,9 @@
 
 namespace mongo {
 namespace {
+
+const auto getMongoDSessionCatalog =
+    ServiceContext::declareDecoration<std::unique_ptr<MongoDSessionCatalog>>();
 
 struct SessionTasksExecutor {
     SessionTasksExecutor()
@@ -477,6 +480,21 @@ void abortInProgressTransactions(OperationContext* opCtx) {
 
 const std::string MongoDSessionCatalog::kConfigTxnsPartialIndexName = "parent_lsid";
 
+MongoDSessionCatalog* MongoDSessionCatalog::get(OperationContext* opCtx) {
+    return get(opCtx->getServiceContext());
+}
+
+MongoDSessionCatalog* MongoDSessionCatalog::get(ServiceContext* service) {
+    const auto& sessionCatalog = getMongoDSessionCatalog(service);
+    invariant(sessionCatalog);
+    return sessionCatalog.get();
+}
+
+void MongoDSessionCatalog::set(ServiceContext* service,
+                               std::unique_ptr<MongoDSessionCatalog> sessionCatalog) {
+    getMongoDSessionCatalog(service) = std::move(sessionCatalog);
+}
+
 BSONObj MongoDSessionCatalog::getConfigTxnPartialIndexSpec() {
     NewIndexSpec index;
     index.setV(int(IndexDescriptor::kLatestIndexVersion));
@@ -489,6 +507,8 @@ BSONObj MongoDSessionCatalog::getConfigTxnPartialIndexSpec() {
     index.setPartialFilterExpression(BSON("parentLsid" << BSON("$exists" << true)));
     return index.toBSON();
 }
+
+MongoDSessionCatalog::MongoDSessionCatalog() {}
 
 void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
     // Invalidate sessions that could have a retryable write on it, so that we can refresh from disk

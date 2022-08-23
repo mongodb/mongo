@@ -204,7 +204,11 @@ private:
             ASSERT_OK(_storageInterface->createCollection(
                 getOperationContext(), testNs, generateOptionsWithUuid()));
 
-            MongoDSessionCatalog::onStepUp(_opCtx.get());
+            MongoDSessionCatalog::set(_opCtx->getServiceContext(),
+                                      std::make_unique<MongoDSessionCatalog>());
+
+            auto mongoDSessionCatalog = MongoDSessionCatalog::get(_opCtx.get());
+            mongoDSessionCatalog->onStepUp(_opCtx.get());
         }
 
         auto observerRegistry = checked_cast<OpObserverRegistry*>(service->getOpObserver());

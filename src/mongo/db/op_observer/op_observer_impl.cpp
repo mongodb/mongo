@@ -673,7 +673,8 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         }
     } else if (nss == NamespaceString::kSessionTransactionsTableNamespace && !lastOpTime.isNull()) {
         for (auto it = first; it != last; it++) {
-            MongoDSessionCatalog::observeDirectWriteToConfigTransactions(opCtx, it->doc);
+            auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+            mongoDSessionCatalog->observeDirectWriteToConfigTransactions(opCtx, it->doc);
         }
     } else if (nss == NamespaceString::kConfigSettingsNamespace) {
         for (auto it = first; it != last; it++) {
@@ -906,7 +907,8 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         DurableViewCatalog::onExternalChange(opCtx, args.nss);
     } else if (args.nss == NamespaceString::kSessionTransactionsTableNamespace &&
                !opTime.writeOpTime.isNull()) {
-        MongoDSessionCatalog::observeDirectWriteToConfigTransactions(opCtx,
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        mongoDSessionCatalog->observeDirectWriteToConfigTransactions(opCtx,
                                                                      args.updateArgs->updatedDoc);
     } else if (args.nss == NamespaceString::kConfigSettingsNamespace) {
         ReadWriteConcernDefaults::get(opCtx).observeDirectWriteToConfigSettings(
@@ -958,7 +960,8 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     OpTimeBundle opTime;
     if (inBatchedWrite) {
         if (nss == NamespaceString::kSessionTransactionsTableNamespace) {
-            MongoDSessionCatalog::observeDirectWriteToConfigTransactions(opCtx,
+            auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+            mongoDSessionCatalog->observeDirectWriteToConfigTransactions(opCtx,
                                                                          documentKey.getId());
         }
         auto operation =
@@ -1113,7 +1116,8 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         DurableViewCatalog::onExternalChange(opCtx, nss);
     } else if (nss == NamespaceString::kSessionTransactionsTableNamespace &&
                !opTime.writeOpTime.isNull()) {
-        MongoDSessionCatalog::observeDirectWriteToConfigTransactions(opCtx, documentKey.getId());
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        mongoDSessionCatalog->observeDirectWriteToConfigTransactions(opCtx, documentKey.getId());
     } else if (nss == NamespaceString::kConfigSettingsNamespace) {
         ReadWriteConcernDefaults::get(opCtx).observeDirectWriteToConfigSettings(
             opCtx, documentKey.getId().firstElement(), boost::none);
@@ -1252,7 +1256,8 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const DatabaseName&
             dbName.db() != NamespaceString::kAdminDb);
 
     if (dbName.db() == NamespaceString::kSessionTransactionsTableNamespace.db()) {
-        MongoDSessionCatalog::invalidateAllSessions(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        mongoDSessionCatalog->invalidateAllSessions(opCtx);
     }
 
     BucketCatalog::get(opCtx).clear(dbName.db());
@@ -1310,7 +1315,8 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
                 "transactions are present.",
                 noPreparedTxns);
 
-        MongoDSessionCatalog::invalidateAllSessions(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        mongoDSessionCatalog->invalidateAllSessions(opCtx);
     } else if (collectionName == NamespaceString::kConfigSettingsNamespace) {
         ReadWriteConcernDefaults::get(opCtx).invalidate();
     } else if (collectionName.isTimeseriesBucketsCollection()) {

@@ -1893,7 +1893,8 @@ void syncFixUp(OperationContext* opCtx,
 
     // If necessary, clear the memory of existing sessions.
     if (fixUpInfo.refetchTransactionDocs) {
-        MongoDSessionCatalog::invalidateAllSessions(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        mongoDSessionCatalog->invalidateAllSessions(opCtx);
     }
 
     if (auto validator = LogicalTimeValidator::get(opCtx)) {
@@ -1934,7 +1935,8 @@ Status _syncRollback(OperationContext* opCtx,
 
     // Find the UUID of the transactions collection. An OperationContext is required because the
     // UUID is not known at compile time, so the SessionCatalog needs to load the collection.
-    how.transactionTableUUID = MongoDSessionCatalog::getTransactionTableUUID(opCtx);
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+    how.transactionTableUUID = mongoDSessionCatalog->getTransactionTableUUID(opCtx);
 
     // Populate the initial list of index builds to restart with the builds that were stopped due to
     // rollback. They may need to be restarted if no associated oplog entries are rolled-back, or

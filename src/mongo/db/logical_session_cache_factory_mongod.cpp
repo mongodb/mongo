@@ -65,8 +65,15 @@ std::unique_ptr<LogicalSessionCache> makeLogicalSessionCacheD(LogicalSessionCach
         MONGO_UNREACHABLE;
     }();
 
+    auto reapSessionsOlderThanFn = [](OperationContext* opCtx,
+                                      SessionsCollection& sessionsCollection,
+                                      Date_t possiblyExpired) {
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        return mongoDSessionCatalog->reapSessionsOlderThan(
+            opCtx, sessionsCollection, possiblyExpired);
+    };
     return std::make_unique<LogicalSessionCacheImpl>(
-        std::move(liaison), std::move(sessionsColl), MongoDSessionCatalog::reapSessionsOlderThan);
+        std::move(liaison), std::move(sessionsColl), std::move(reapSessionsOlderThanFn));
 }
 
 }  // namespace mongo

@@ -83,7 +83,10 @@ public:
         repl::StorageInterface::set(getServiceContext(), std::move(_storageInterfaceImpl));
 
         repl::createOplog(operationContext());
-        MongoDSessionCatalog::onStepUp(operationContext());
+
+        MongoDSessionCatalog::set(getServiceContext(), std::make_unique<MongoDSessionCatalog>());
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(operationContext());
+        mongoDSessionCatalog->onStepUp(operationContext());
     }
 
     void tearDown() override {

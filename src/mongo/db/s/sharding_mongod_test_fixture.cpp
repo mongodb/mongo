@@ -57,6 +57,7 @@
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/shard_local.h"
 #include "mongo/db/s/shard_server_op_observer.h"
+#include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
@@ -250,6 +251,8 @@ void ShardingMongodTestFixture::setUp() {
     setupOpObservers();
 
     repl::createOplog(operationContext());
+
+    MongoDSessionCatalog::set(service, std::make_unique<MongoDSessionCatalog>());
 
     // Set the highest FCV because otherwise it defaults to the lower FCV. This way we default to
     // testing this release's code, not backwards compatibility code.

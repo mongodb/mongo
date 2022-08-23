@@ -158,6 +158,7 @@
 #include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/session_catalog.h"
+#include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_killer.h"
 #include "mongo/db/set_change_stream_state_coordinator.h"
 #include "mongo/db/startup_recovery.h"
@@ -1100,6 +1101,8 @@ void setUpReplication(ServiceContext* serviceContext) {
             serviceContext, makeReplicaSetNodeExecutor(serviceContext));
 
     repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
+
+    MongoDSessionCatalog::set(serviceContext, std::make_unique<MongoDSessionCatalog>());
 
     IndexBuildsCoordinator::set(serviceContext, std::make_unique<IndexBuildsCoordinatorMongod>());
 

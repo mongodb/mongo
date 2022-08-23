@@ -60,7 +60,10 @@ protected:
 
         auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
-        MongoDSessionCatalog::onStepUp(opCtx);
+
+        MongoDSessionCatalog::set(service, std::make_unique<MongoDSessionCatalog>());
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        mongoDSessionCatalog->onStepUp(opCtx);
 
         // Lower the reap threshold for faster tests.
         _originalInternalSessionsReapThreshold = internalSessionsReapThreshold.load();

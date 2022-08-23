@@ -186,7 +186,9 @@ protected:
         MockReplCoordServerFixture::setUp();
         const auto service = opCtx()->getServiceContext();
         repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceImpl>());
-        MongoDSessionCatalog::onStepUp(opCtx());
+        MongoDSessionCatalog::set(service, std::make_unique<MongoDSessionCatalog>());
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+        mongoDSessionCatalog->onStepUp(opCtx());
 
         const auto opObserverRegistry = dynamic_cast<OpObserverRegistry*>(service->getOpObserver());
         opObserverRegistry->addObserver(std::make_unique<OpObserverMock>());

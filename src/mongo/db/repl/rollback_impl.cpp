@@ -577,7 +577,8 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
     // We invalidate sessions before we recover so that we avoid invalidating sessions that had
     // just recovered prepared transactions.
     if (!_observerInfo.rollbackSessionIds.empty()) {
-        MongoDSessionCatalog::invalidateAllSessions(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        mongoDSessionCatalog->invalidateAllSessions(opCtx);
     }
 
     // Recover to the stable timestamp.

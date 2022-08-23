@@ -470,7 +470,8 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     invariant(opCtx->lockState()->isRSTLExclusive());
     invariant(!opCtx->shouldParticipateInFlowControl());
 
-    MongoDSessionCatalog::onStepUp(opCtx);
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+    mongoDSessionCatalog->onStepUp(opCtx);
 
     invariant(
         _replicationProcess->getConsistencyMarkers()->getOplogTruncateAfterPoint(opCtx).isNull());

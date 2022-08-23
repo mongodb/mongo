@@ -136,7 +136,8 @@ void InternalTransactionsReapService::_reapInternalTransactions(ServiceContext* 
                 "Eagerly reaping internal transactions from disk",
                 "numToReap"_attr = lsidsToRemove.size());
 
-    auto numReaped = MongoDSessionCatalog::removeSessionsTransactionRecords(opCtx, lsidsToRemove);
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+    auto numReaped = mongoDSessionCatalog->removeSessionsTransactionRecords(opCtx, lsidsToRemove);
 
     LOGV2_DEBUG(
         6697301, 2, "Eagerly reaped internal transactions from disk", "numReaped"_attr = numReaped);

@@ -173,7 +173,11 @@ protected:
         // Ensure that we are primary.
         auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
         ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
-        MongoDSessionCatalog::onStepUp(opCtx.get());
+
+        MongoDSessionCatalog::set(opCtx->getServiceContext(),
+                                  std::make_unique<MongoDSessionCatalog>());
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx.get());
+        mongoDSessionCatalog->onStepUp(opCtx.get());
 
         ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getFetchDefaultsFn());
 

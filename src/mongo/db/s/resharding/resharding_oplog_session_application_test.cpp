@@ -71,7 +71,9 @@ public:
             auto storageImpl = std::make_unique<repl::StorageInterfaceImpl>();
             repl::StorageInterface::set(serviceContext, std::move(storageImpl));
 
-            MongoDSessionCatalog::onStepUp(opCtx.get());
+            MongoDSessionCatalog::set(serviceContext, std::make_unique<MongoDSessionCatalog>());
+            auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx.get());
+            mongoDSessionCatalog->onStepUp(opCtx.get());
         }
 
         serverGlobalParams.clusterRole = ClusterRole::ShardServer;
