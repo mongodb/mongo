@@ -94,6 +94,8 @@ protected:
     void tearDown() override;
 
     void mockCommandForRecipients(Milliseconds remainingOperationTime);
+    void mockOmitRemainingMillisForRecipients();
+    void mockOmitRemainingMillisForOneRecipient();
     void mockRemaingOperationTimesCommandForRecipients(
         CoordinatorCommitMonitor::RemainingOperationTimes remainingOperationTimes);
 
@@ -195,6 +197,31 @@ void CoordinatorCommitMonitorTest::mockCommandForRecipients(Milliseconds remaini
         _recipientShards.begin(), _recipientShards.end(), [&](const ShardId&) { onCommand(func); });
 }
 
+void CoordinatorCommitMonitorTest::mockOmitRemainingMillisForRecipients() {
+    // Omit remainingMillis from all shard responses.
+    std::for_each(_recipientShards.begin(), _recipientShards.end(), [this](const ShardId&) {
+        onCommand([](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
+            // Return an empty BSON object.
+            return BSONObj();
+        });
+    });
+}
+
+void CoordinatorCommitMonitorTest::mockOmitRemainingMillisForOneRecipient() {
+    // Omit remainingMillis from a single recipient.
+    for (const auto& shard : _recipientShards) {
+        onCommand([&](const executor::RemoteCommandRequest&) -> StatusWith<BSONObj> {
+            if (shard == _recipientShards.front()) {
+                // Return an empty BSON object.
+                return BSONObj();
+            }
+            auto threshold = Milliseconds(gRemainingReshardingOperationTimeThresholdMillis.load());
+            return BSON("remainingMillis"
+                        << durationCount<Milliseconds>(threshold - Milliseconds(1)));
+        });
+    }
+}
+
 void CoordinatorCommitMonitorTest::mockRemaingOperationTimesCommandForRecipients(
     CoordinatorCommitMonitor::RemainingOperationTimes remainingOperationTimes) {
     bool useMin = true;
@@ -275,6 +302,20 @@ TEST_F(CoordinatorCommitMonitorTest, RetriesWhenEncountersErrorsWhileQueryingRec
     }
 
     ASSERT(!future.isReady());
+    respondWithReadyToCommit();
+    future.get();
+}
+
+TEST_F(CoordinatorCommitMonitorTest, BlocksWhenRemainingMillisIsOmitted) {
+    auto future = getCommitMonitor()->waitUntilRecipientsAreWithinCommitThreshold();
+
+    mockOmitRemainingMillisForRecipients();
+    ASSERT(!future.isReady());
+
+    // If even a single shard omits remainingMillis, we cannot begin the critical section.
+    mockOmitRemainingMillisForOneRecipient();
+    ASSERT(!future.isReady());
+
     respondWithReadyToCommit();
     future.get();
 }
