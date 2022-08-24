@@ -65,6 +65,15 @@ public:
         return ShardVersion(ChunkVersion::UNSHARDED(), CollectionIndexes::UNSHARDED());
     }
 
+    bool operator==(const ShardVersion& otherVersion) const {
+        return CollectionIndexes(*this) == CollectionIndexes(otherVersion) &&
+            ChunkVersion(*this) == ChunkVersion(otherVersion);
+    }
+
+    bool operator!=(const ShardVersion& otherVersion) const {
+        return !(otherVersion == *this);
+    }
+
     static ShardVersion parse(const BSONElement& element);
     void serialize(StringData field, BSONObjBuilder* builder) const;
 

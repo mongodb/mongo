@@ -55,7 +55,22 @@ public:
         return _indexVersion;
     }
 
+    bool isSet() const {
+        return getTimestamp() != Timestamp();
+    }
+
+    bool operator==(const CollectionIndexes& otherVersion) const {
+        return otherVersion.getTimestamp() == getTimestamp() &&
+            otherVersion.indexVersion() == indexVersion();
+    }
+
+    bool operator!=(const CollectionIndexes& otherVersion) const {
+        return !(otherVersion == *this);
+    }
+
     std::string toString() const;
+
+    BSONObj toBSONForLogging() const;
 
 protected:
     boost::optional<Timestamp> _indexVersion;

@@ -28,10 +28,17 @@
  */
 
 #include "mongo/s/index_version.h"
+#include "mongo/s/index_version_gen.h"
 namespace mongo {
 
 std::string CollectionIndexes::toString() const {
     return _indexVersion ? _indexVersion->toString() : "";
+}
+
+BSONObj CollectionIndexes::toBSONForLogging() const {
+    CollectionIndexesBase indexVersion;
+    indexVersion.setIndexVersion(_indexVersion);
+    return indexVersion.toBSON();
 }
 
 }  // namespace mongo

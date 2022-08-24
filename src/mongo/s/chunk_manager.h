@@ -357,8 +357,9 @@ private:
  * Constructed to be used exclusively by the CatalogCache as a vector clock (Time) to drive
  * CollectionCache's lookups.
  *
- * The ChunkVersion class contains a non comparable epoch, which makes impossible to compare two
- * ChunkVersions when their epochs's differ.
+ * The ChunkVersion class contains a timestamp for the collection generation which resets to 0 after
+ * the collection is dropped or all chunks are moved off of a shard, in which case the versions
+ * cannot be compared.
  *
  * This class wraps a ChunkVersion object with a node-local sequence number
  * (_epochDisambiguatingSequenceNum) that allows the comparision.
@@ -393,10 +394,6 @@ public:
     ComparableChunkVersion() = default;
 
     std::string toString() const;
-
-    bool sameEpoch(const ComparableChunkVersion& other) const {
-        return _chunkVersion->epoch() == other._chunkVersion->epoch();
-    }
 
     bool operator==(const ComparableChunkVersion& other) const;
 
