@@ -37,6 +37,7 @@
 #include <vector>
 
 #include "mongo/bson/util/builder.h"
+#include "mongo/platform/atomic_word.h"
 
 /**
  * This is the public API for the Sorter (both in-memory and external)
@@ -86,6 +87,14 @@
 namespace mongo {
 
 /**
+ * For collecting file usage metrics.
+ */
+struct SorterFileStats {
+    AtomicWord<long long> opened;
+    AtomicWord<long long> closed;
+};
+
+/**
  * Runtime options that control the Sorter's behavior
  */
 struct SortOptions {
@@ -103,7 +112,14 @@ struct SortOptions {
     // extSortAllowed is true.
     std::string tempDir;
 
-    SortOptions() : limit(0), maxMemoryUsageBytes(64 * 1024 * 1024), extSortAllowed(false) {}
+    // If set, allows us to observe Sorter file handle usage.
+    SorterFileStats* sorterFileStats;
+
+    SortOptions()
+        : limit(0),
+          maxMemoryUsageBytes(64 * 1024 * 1024),
+          extSortAllowed(false),
+          sorterFileStats(nullptr) {}
 
     // Fluent API to support expressions like SortOptions().Limit(1000).ExtSortAllowed(true)
 
@@ -124,6 +140,11 @@ struct SortOptions {
 
     SortOptions& TempDir(const std::string& newTempDir) {
         tempDir = newTempDir;
+        return *this;
+    }
+
+    SortOptions& FileStats(SorterFileStats* newSorterFileStats) {
+        sorterFileStats = newSorterFileStats;
         return *this;
     }
 };
@@ -234,6 +255,8 @@ public:
                               const std::streampos fileStartOffset,
                               const Settings& settings = Settings());
 
+    ~SortedFileWriter();
+
     void addAlreadySorted(const Key&, const Value&);
 
     /**
@@ -265,6 +288,9 @@ private:
     // for the next SortedFileWriter instance using the same file.
     std::streampos _fileStartOffset;
     std::streampos _fileEndOffset;
+
+    // If set, this points to an external metrics holder for tracking file open/close activity.
+    SorterFileStats* _stats;
 };
 }  // namespace mongo
 

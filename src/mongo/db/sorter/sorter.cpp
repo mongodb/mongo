@@ -158,15 +158,23 @@ public:
     FileIterator(const std::string& fileName,
                  std::streampos fileStartOffset,
                  std::streampos fileEndOffset,
-                 const Settings& settings)
+                 const Settings& settings,
+                 SorterFileStats* stats)
         : _settings(settings),
           _done(false),
           _fileName(fileName),
           _fileStartOffset(fileStartOffset),
-          _fileEndOffset(fileEndOffset) {
+          _fileEndOffset(fileEndOffset),
+          _stats(stats) {
         uassert(16815,
                 str::stream() << "unexpected empty file: " << _fileName,
                 boost::filesystem::file_size(_fileName) != 0);
+    }
+
+    ~FileIterator() {
+        if (_stats && _file.is_open()) {
+            _stats->closed.addAndFetch(1);
+        }
     }
 
     void openSource() {
@@ -180,6 +188,10 @@ public:
                 str::stream() << "error seeking starting offset of '" << _fileStartOffset
                               << "' in file \"" << _fileName << "\": " << myErrnoWithDescription(),
                 _file.good());
+
+        if (_stats) {
+            _stats->opened.addAndFetch(1);
+        }
     }
 
     void closeSource() {
@@ -188,6 +200,10 @@ public:
                 str::stream() << "error closing file \"" << _fileName
                               << "\": " << myErrnoWithDescription(),
                 !_file.fail());
+
+        if (_stats) {
+            _stats->closed.addAndFetch(1);
+        }
     }
 
     bool more() {
@@ -313,6 +329,9 @@ private:
     std::streampos _fileStartOffset;  // File offset at which the sorted data range starts.
     std::streampos _fileEndOffset;    // File offset at which the sorted data range ends.
     std::ifstream _file;
+
+    // If set, this points to an external metrics holder for tracking file open/close activity.
+    SorterFileStats* _stats;
 };
 
 /**
@@ -895,7 +914,7 @@ SortedFileWriter<Key, Value>::SortedFileWriter(const SortOptions& opts,
                                                const std::string& fileName,
                                                const std::streampos fileStartOffset,
                                                const Settings& settings)
-    : _settings(settings) {
+    : _settings(settings), _stats(opts.sorterFileStats) {
 
     // This should be checked by consumers, but if we get here don't allow writes.
     uassert(
@@ -924,6 +943,17 @@ SortedFileWriter<Key, Value>::SortedFileWriter(const SortOptions& opts,
 
     // throw on failure
     _file.exceptions(std::ios::failbit | std::ios::badbit | std::ios::eofbit);
+
+    if (_stats) {
+        _stats->opened.addAndFetch(1);
+    }
+}
+
+template <typename Key, typename Value>
+SortedFileWriter<Key, Value>::~SortedFileWriter() {
+    if (_stats && _file.is_open()) {
+        _stats->closed.addAndFetch(1);
+    }
 }
 
 template <typename Key, typename Value>
@@ -999,8 +1029,12 @@ SortIteratorInterface<Key, Value>* SortedFileWriter<Key, Value>::done() {
     _fileEndOffset = currentFileOffset < _fileStartOffset ? _fileStartOffset : currentFileOffset;
     _file.close();
 
+    if (_stats) {
+        _stats->closed.addAndFetch(1);
+    }
+
     return new sorter::FileIterator<Key, Value>(
-        _fileName, _fileStartOffset, _fileEndOffset, _settings);
+        _fileName, _fileStartOffset, _fileEndOffset, _settings, _stats);
 }
 
 //

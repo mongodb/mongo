@@ -279,7 +279,8 @@ class SortedFileWriterAndFileIteratorTests : public ScopedGlobalServiceContextFo
 public:
     void run() {
         unittest::TempDir tempDir("sortedFileWriterTests");
-        const SortOptions opts = SortOptions().TempDir(tempDir.path());
+        SorterFileStats sorterFileStats;
+        const SortOptions opts = SortOptions().TempDir(tempDir.path()).FileStats(&sorterFileStats);
         {  // small
             std::string fileName = opts.tempDir + "/" + nextFileName();
             SortedFileWriter<IntWrapper, IntWrapper> sorter(opts, fileName, 0);
@@ -293,6 +294,10 @@ public:
 
             ASSERT_TRUE(boost::filesystem::remove(fileName));
         }
+
+        ASSERT_EQ(sorterFileStats.opened.load(), 2);
+        ASSERT_EQ(sorterFileStats.closed.load(), 2);
+
         {  // big
             std::string fileName = opts.tempDir + "/" + nextFileName();
             SortedFileWriter<IntWrapper, IntWrapper> sorter(opts, fileName, 0);
@@ -304,6 +309,9 @@ public:
 
             ASSERT_TRUE(boost::filesystem::remove(fileName));
         }
+
+        ASSERT_EQ(sorterFileStats.opened.load(), 4);
+        ASSERT_EQ(sorterFileStats.closed.load(), 4);
 
         ASSERT(boost::filesystem::is_empty(tempDir.path()));
     }
