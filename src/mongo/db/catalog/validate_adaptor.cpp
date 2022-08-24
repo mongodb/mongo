@@ -505,9 +505,12 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                 results->repaired = true;
             } else {
                 auto& curRecordResults = (results->indexResultsMap)[descriptor->indexName()];
-                std::string msg = str::stream() << "Index " << descriptor->indexName()
-                                                << " is not multikey but has more than one"
-                                                << " key in document " << recordId;
+                std::string msg = fmt::format(
+                    "Index {} is not multikey but has more than one key in document with "
+                    "RecordId({}) and {}",
+                    descriptor->indexName(),
+                    recordId.toString(),
+                    recordBson.getField("_id").toString());
                 curRecordResults.errors.push_back(msg);
                 curRecordResults.valid = false;
                 if (crashOnMultikeyValidateFailure.shouldFail()) {
@@ -535,9 +538,11 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                                                               << " multikey paths updated.");
                     results->repaired = true;
                 } else {
-                    std::string msg = str::stream()
-                        << "Index " << descriptor->indexName()
-                        << " multikey paths do not cover a document. RecordId: " << recordId;
+                    std::string msg = fmt::format(
+                        "Index {} multikey paths do not cover a document with RecordId({}) and {}",
+                        descriptor->indexName(),
+                        recordId.toString(),
+                        recordBson.getField("_id").toString());
                     auto& curRecordResults = (results->indexResultsMap)[descriptor->indexName()];
                     curRecordResults.errors.push_back(msg);
                     curRecordResults.valid = false;
