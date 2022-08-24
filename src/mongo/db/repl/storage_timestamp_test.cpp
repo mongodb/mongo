@@ -1735,7 +1735,7 @@ TEST_F(StorageTimestampTest, PrimarySetsMultikeyInsideMultiDocumentTransaction) 
     _opCtx->setInMultiDocumentTransaction();
 
     // Check out the session.
-    MongoDOperationContextSession ocs(_opCtx);
+    auto ocs = mongoDSessionCatalog->checkOutSession(_opCtx);
 
     auto txnParticipant = TransactionParticipant::get(_opCtx);
     ASSERT(txnParticipant);
@@ -3254,7 +3254,7 @@ public:
         const auto txnNumber = 10;
         _opCtx->setTxnNumber(txnNumber);
 
-        ocs.emplace(_opCtx);
+        ocs = mongoDSessionCatalog->checkOutSession(_opCtx);
 
         {
             AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
@@ -3283,7 +3283,7 @@ protected:
     Timestamp beforeOplogTs;
     Timestamp oplogTs;
 
-    boost::optional<MongoDOperationContextSession> ocs;
+    std::unique_ptr<MongoDSessionCatalog::Session> ocs;
 };
 
 TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdate) {
@@ -3458,7 +3458,7 @@ public:
         _opCtx->setTxnNumber(26);
         _opCtx->setInMultiDocumentTransaction();
 
-        ocs.emplace(_opCtx);
+        ocs = mongoDSessionCatalog->checkOutSession(_opCtx);
 
         auto txnParticipant = TransactionParticipant::get(_opCtx);
         ASSERT(txnParticipant);
@@ -3520,7 +3520,7 @@ protected:
     Timestamp beforeTxnTs;
     Timestamp commitEntryTs;
 
-    boost::optional<MongoDOperationContextSession> ocs;
+    std::unique_ptr<MongoDSessionCatalog::Session> ocs;
 };
 
 TEST_F(MultiDocumentTransactionTest, MultiDocumentTransaction) {

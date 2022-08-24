@@ -107,8 +107,9 @@ public:
                 txnParticipant.stashTransactionResources(opCtx);
             }
 
-            MongoDOperationContextSession::checkIn(opCtx,
-                                                   OperationContextSession::CheckInReason::kYield);
+            auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+            mongoDSessionCatalog->checkInUnscopedSession(
+                opCtx, OperationContextSession::CheckInReason::kYield);
         }
         _yielded = (session != nullptr);
     }
@@ -120,7 +121,8 @@ public:
             // unblocking this thread of execution. However, we must wait until the child operation
             // on this shard finishes so we can get the session back. This may limit the throughput
             // of the operation, but it's correct.
-            MongoDOperationContextSession::checkOut(opCtx);
+            auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+            mongoDSessionCatalog->checkOutUnscopedSession(opCtx);
 
             if (auto txnParticipant = TransactionParticipant::get(opCtx)) {
                 // Assumes this is only called from the 'aggregate' or 'getMore' commands.  The code

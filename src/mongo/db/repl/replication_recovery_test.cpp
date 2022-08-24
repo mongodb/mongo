@@ -1341,8 +1341,9 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToReconstructsPreparedTransact
     const auto sessionId = makeLogicalSessionIdForTest();
     opCtx->setLogicalSessionId(sessionId);
 
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     {
-        MongoDOperationContextSession ocs(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
 
         OperationSessionInfo sessionInfo;
         sessionInfo.setSessionId(sessionId);
@@ -1365,7 +1366,7 @@ TEST_F(ReplicationRecoveryTest, RecoverFromOplogUpToReconstructsPreparedTransact
     recovery.recoverFromOplogUpTo(opCtx, Timestamp(3, 3));
 
     {
-        MongoDOperationContextSession ocs(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
 
         auto txnParticipant = TransactionParticipant::get(opCtx);
         ASSERT_EQ(txnParticipant.getPrepareOpTime().getTimestamp(), Timestamp(3, 3));
@@ -1385,8 +1386,9 @@ TEST_F(ReplicationRecoveryTest,
     const auto sessionId = makeLogicalSessionIdForTest();
     opCtx->setLogicalSessionId(sessionId);
 
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     {
-        MongoDOperationContextSession ocs(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
 
         OperationSessionInfo sessionInfo;
         sessionInfo.setSessionId(sessionId);
@@ -1423,7 +1425,7 @@ TEST_F(ReplicationRecoveryTest,
         countTextFormatLogLinesContaining("No stored oplog entries to apply for recovery between"));
 
     {
-        MongoDOperationContextSession ocs(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
 
         auto txnParticipant = TransactionParticipant::get(opCtx);
         ASSERT_EQ(txnParticipant.getPrepareOpTime().getTimestamp(), Timestamp(1, 1));

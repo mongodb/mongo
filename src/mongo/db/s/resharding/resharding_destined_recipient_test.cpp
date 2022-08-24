@@ -65,7 +65,8 @@ void runInTransaction(OperationContext* opCtx, Callable&& func) {
     opCtx->setTxnNumber(txnNum);
     opCtx->setInMultiDocumentTransaction();
 
-    MongoDOperationContextSession ocs(opCtx);
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+    auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
 
     auto txnParticipant = TransactionParticipant::get(opCtx);
     ASSERT(txnParticipant);

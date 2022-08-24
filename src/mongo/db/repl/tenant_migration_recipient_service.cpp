@@ -1321,7 +1321,8 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
     opCtx->setLogicalSessionId(sessionId);
     opCtx->setTxnNumber(txnNumber);
     opCtx->setInMultiDocumentTransaction();
-    MongoDOperationContextSession ocs(opCtx);
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+    auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
 
     LOGV2_DEBUG(5351301,
                 1,

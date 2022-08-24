@@ -448,7 +448,8 @@ void createRetryableFindAndModifyTable(OperationContext* opCtx) {
 }
 
 
-void abortInProgressTransactions(OperationContext* opCtx) {
+void abortInProgressTransactions(OperationContext* opCtx,
+                                 MongoDSessionCatalog* mongoDSessionCatalog) {
     DBDirectClient client(opCtx);
     FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
     findRequest.setFilter(BSON(SessionTxnRecord::kStateFieldName
@@ -464,7 +465,7 @@ void abortInProgressTransactions(OperationContext* opCtx) {
         opCtx->setLogicalSessionId(txnRecord.getSessionId());
         opCtx->setTxnNumber(txnRecord.getTxnNum());
         opCtx->setInMultiDocumentTransaction();
-        MongoDOperationContextSessionWithoutRefresh ocs(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSessionWithoutRefresh(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
         LOGV2_DEBUG(21978,
                     3,
@@ -476,6 +477,18 @@ void abortInProgressTransactions(OperationContext* opCtx) {
         opCtx->resetMultiDocumentTransactionState();
     }
 }
+
+void _checkInUnscopedSession(OperationContext* opCtx,
+                             OperationContextSession::CheckInReason reason) {
+    OperationContextSession::checkIn(opCtx, reason);
+}
+
+void _checkOutUnscopedSession(OperationContext* opCtx) {
+    OperationContextSession::checkOut(opCtx);
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    txnParticipant.refreshFromStorageIfNeeded(opCtx);
+}
+
 }  // namespace
 
 const std::string MongoDSessionCatalog::kConfigTxnsPartialIndexName = "parent_lsid";
@@ -566,7 +579,7 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
             //   expected to cause a deadlock since this 'newOpCtx' will need to acquire the global
             //   lock in the IS mode prior to reading the config.transactions collection but it
             //   cannot do that while the RSTL lock is being held by 'opCtx'.
-            MongoDOperationContextSessionWithoutRefresh ocs(newOpCtx.get());
+            auto ocs = checkOutSessionWithoutRefresh(newOpCtx.get());
             auto txnParticipant = TransactionParticipant::get(newOpCtx.get());
             LOGV2_DEBUG(21979,
                         3,
@@ -580,7 +593,7 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
         }
     }
 
-    abortInProgressTransactions(opCtx);
+    abortInProgressTransactions(opCtx, this);
 
     createTransactionTable(opCtx);
     if (repl::feature_flags::gFeatureFlagRetryableFindAndModify.isEnabledAndIgnoreFCV()) {
@@ -691,7 +704,32 @@ int MongoDSessionCatalog::removeSessionsTransactionRecords(
     return numReaped;
 }
 
-MongoDOperationContextSession::MongoDOperationContextSession(OperationContext* opCtx)
+std::unique_ptr<MongoDSessionCatalog::Session> MongoDSessionCatalog::checkOutSession(
+    OperationContext* opCtx) {
+    return std::make_unique<MongoDOperationContextSession>(opCtx, CheckoutTag());
+}
+
+std::unique_ptr<MongoDSessionCatalog::Session> MongoDSessionCatalog::checkOutSessionWithoutRefresh(
+    OperationContext* opCtx) {
+    return std::make_unique<MongoDOperationContextSessionWithoutRefresh>(opCtx, CheckoutTag());
+}
+
+std::unique_ptr<MongoDSessionCatalog::Session>
+MongoDSessionCatalog::checkOutSessionWithoutOplogRead(OperationContext* opCtx) {
+    return std::make_unique<MongoDOperationContextSessionWithoutOplogRead>(opCtx, CheckoutTag());
+}
+
+void MongoDSessionCatalog::checkInUnscopedSession(OperationContext* opCtx,
+                                                  OperationContextSession::CheckInReason reason) {
+    _checkInUnscopedSession(opCtx, reason);
+}
+
+void MongoDSessionCatalog::checkOutUnscopedSession(OperationContext* opCtx) {
+    _checkOutUnscopedSession(opCtx);
+}
+
+MongoDOperationContextSession::MongoDOperationContextSession(OperationContext* opCtx,
+                                                             MongoDSessionCatalog::CheckoutTag tag)
     : _operationContextSession(opCtx) {
     invariant(!opCtx->getClient()->isInDirectClient());
 
@@ -703,17 +741,15 @@ MongoDOperationContextSession::~MongoDOperationContextSession() = default;
 
 void MongoDOperationContextSession::checkIn(OperationContext* opCtx,
                                             OperationContextSession::CheckInReason reason) {
-    OperationContextSession::checkIn(opCtx, reason);
+    _checkInUnscopedSession(opCtx, reason);
 }
 
 void MongoDOperationContextSession::checkOut(OperationContext* opCtx) {
-    OperationContextSession::checkOut(opCtx);
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-    txnParticipant.refreshFromStorageIfNeeded(opCtx);
+    _checkOutUnscopedSession(opCtx);
 }
 
 MongoDOperationContextSessionWithoutRefresh::MongoDOperationContextSessionWithoutRefresh(
-    OperationContext* opCtx)
+    OperationContext* opCtx, MongoDSessionCatalog::CheckoutTag tag)
     : _operationContextSession(opCtx), _opCtx(opCtx) {
     invariant(!opCtx->getClient()->isInDirectClient());
     const auto clientTxnNumber = *opCtx->getTxnNumber();
@@ -732,7 +768,7 @@ MongoDOperationContextSessionWithoutRefresh::~MongoDOperationContextSessionWitho
 }
 
 MongoDOperationContextSessionWithoutOplogRead::MongoDOperationContextSessionWithoutOplogRead(
-    OperationContext* opCtx)
+    OperationContext* opCtx, MongoDSessionCatalog::CheckoutTag tag)
     : _operationContextSession(opCtx), _opCtx(opCtx) {
     invariant(!opCtx->getClient()->isInDirectClient());
 

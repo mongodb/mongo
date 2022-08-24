@@ -552,7 +552,7 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
     // All the ops will have the same session, so we can retain the scopedSession throughout
     // the loop, except when invalidated by multi-document transactions. This allows us to
     // track the statements in a retryable write.
-    boost::optional<MongoDOperationContextSessionWithoutOplogRead> scopedSession;
+    std::unique_ptr<MongoDSessionCatalog::Session> scopedSession;
 
     // Make sure a partial session doesn't escape.
     ON_BLOCK_EXIT([this, &scopedSession, &opCtx] {
@@ -606,8 +606,11 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                         "op"_attr = redact(entry.toBSONForLogging()));
 
             // Check out the session.
-            if (!scopedSession)
-                scopedSession.emplace(opCtx.get());
+            if (!scopedSession) {
+                auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx.get());
+                scopedSession = mongoDSessionCatalog->checkOutSessionWithoutOplogRead(opCtx.get());
+            }
+
             auto txnParticipant = TransactionParticipant::get(opCtx.get());
             uassert(
                 5351500,
@@ -750,8 +753,11 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
 
             opCtx->setLogicalSessionId(sessionId);
             opCtx->setTxnNumber(txnNumber);
-            if (!scopedSession)
-                scopedSession.emplace(opCtx.get());
+            if (!scopedSession) {
+                auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx.get());
+                scopedSession = mongoDSessionCatalog->checkOutSessionWithoutOplogRead(opCtx.get());
+            }
+
             auto txnParticipant = TransactionParticipant::get(opCtx.get());
             uassert(5350900,
                     str::stream() << "Tenant oplog application failed to get retryable write "
@@ -864,7 +870,7 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
             invariant(txnParticipant);
             txnParticipant.invalidate(opCtx.get());
             opCtx->resetMultiDocumentTransactionState();
-            scopedSession = boost::none;
+            scopedSession = {};
         }
     }
 }

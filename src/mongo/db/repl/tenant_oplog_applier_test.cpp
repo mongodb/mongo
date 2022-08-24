@@ -153,6 +153,8 @@ public:
         _opCtx = cc().makeOperationContext();
         repl::createOplog(_opCtx.get());
 
+        MongoDSessionCatalog::set(service, std::make_unique<MongoDSessionCatalog>());
+
         // Ensure that we are primary.
         auto replCoord = ReplicationCoordinator::get(_opCtx.get());
         ASSERT_OK(replCoord->setFollowerMode(MemberState::RS_PRIMARY));

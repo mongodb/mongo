@@ -257,7 +257,10 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
     auto opCtx = uniqueOpCtx.get();
     opCtx->setLogicalSessionId(result.sessionId);
     opCtx->setTxnNumber(result.txnNum);
-    MongoDOperationContextSession ocs(opCtx);
+
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+    auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
+
     auto txnParticipant = TransactionParticipant::get(opCtx);
 
     try {

@@ -86,11 +86,12 @@ OplogEntry getInnerEntryFromApplyOpsOplogEntry(const OplogEntry& oplogEntry) {
 void beginRetryableWriteWithTxnNumber(
     OperationContext* opCtx,
     TxnNumber txnNumber,
-    std::unique_ptr<MongoDOperationContextSession>& contextSession) {
+    std::unique_ptr<MongoDSessionCatalog::Session>& contextSession) {
     opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
     opCtx->setTxnNumber(txnNumber);
 
-    contextSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+    contextSession = mongoDSessionCatalog->checkOutSession(opCtx);
     auto txnParticipant = TransactionParticipant::get(opCtx);
     txnParticipant.beginOrContinue(opCtx,
                                    {*opCtx->getTxnNumber()},
@@ -101,12 +102,13 @@ void beginRetryableWriteWithTxnNumber(
 void beginNonRetryableTransactionWithTxnNumber(
     OperationContext* opCtx,
     TxnNumber txnNumber,
-    std::unique_ptr<MongoDOperationContextSession>& contextSession) {
+    std::unique_ptr<MongoDSessionCatalog::Session>& contextSession) {
     opCtx->setLogicalSessionId(makeLogicalSessionIdForTest());
     opCtx->setTxnNumber(txnNumber);
     opCtx->setInMultiDocumentTransaction();
 
-    contextSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+    contextSession = mongoDSessionCatalog->checkOutSession(opCtx);
     auto txnParticipant = TransactionParticipant::get(opCtx);
     txnParticipant.beginOrContinue(
         opCtx, {*opCtx->getTxnNumber()}, false /* autocommit */, true /* startTransaction */);
@@ -115,12 +117,13 @@ void beginNonRetryableTransactionWithTxnNumber(
 void beginRetryableInternalTransactionWithTxnNumber(
     OperationContext* opCtx,
     TxnNumber txnNumber,
-    std::unique_ptr<MongoDOperationContextSession>& contextSession) {
+    std::unique_ptr<MongoDSessionCatalog::Session>& contextSession) {
     opCtx->setLogicalSessionId(makeLogicalSessionIdWithTxnNumberAndUUIDForTest());
     opCtx->setTxnNumber(txnNumber);
     opCtx->setInMultiDocumentTransaction();
 
-    contextSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+    contextSession = mongoDSessionCatalog->checkOutSession(opCtx);
     auto txnParticipant = TransactionParticipant::get(opCtx);
     txnParticipant.beginOrContinue(
         opCtx, {*opCtx->getTxnNumber()}, false /* autocommit */, true /* startTransaction */);
@@ -1003,10 +1006,11 @@ TEST_F(OpObserverSessionCatalogRollbackTest,
     const TxnNumber txnNum = 0;
     const StmtId stmtId = 1000;
 
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(getServiceContext());
     {
         auto opCtx = cc().makeOperationContext();
         opCtx->setLogicalSessionId(sessionId);
-        MongoDOperationContextSession ocs(opCtx.get());
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx.get());
         auto txnParticipant = TransactionParticipant::get(opCtx.get());
         txnParticipant.refreshFromStorageIfNeeded(opCtx.get());
 
@@ -1030,7 +1034,7 @@ TEST_F(OpObserverSessionCatalogRollbackTest,
     {
         auto opCtx = cc().makeOperationContext();
         opCtx->setLogicalSessionId(sessionId);
-        MongoDOperationContextSession ocs(opCtx.get());
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx.get());
         auto txnParticipant = TransactionParticipant::get(opCtx.get());
         ASSERT(txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx.get(), stmtId));
     }
@@ -1161,7 +1165,7 @@ private:
     boost::optional<ExposeOpObserverTimes::ReservedTimes> _times;
     boost::optional<TransactionParticipant::Participant> _txnParticipant;
 
-    std::unique_ptr<MongoDOperationContextSession> _sessionCheckout;
+    std::unique_ptr<MongoDSessionCatalog::Session> _sessionCheckout;
     TxnNumber _txnNum = 0;
 };
 
@@ -2427,7 +2431,7 @@ TEST_F(OnUpdateOutputsTest, TestNonTransactionFundamentalOnUpdateOutputs) {
         // Phase 1: Clearing any state and setting up fixtures/the update call.
         resetOplogAndTransactions(opCtx);
 
-        std::unique_ptr<MongoDOperationContextSession> contextSession;
+        std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
         if (testCase.isRetryable()) {
             beginRetryableWriteWithTxnNumber(opCtx, testIdx, contextSession);
         }
@@ -2470,7 +2474,7 @@ TEST_F(OnUpdateOutputsTest, TestFundamentalTransactionOnUpdateOutputs) {
         // Phase 1: Clearing any state and setting up fixtures/the update call.
         resetOplogAndTransactions(opCtx);
 
-        std::unique_ptr<MongoDOperationContextSession> contextSession;
+        std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
         if (testCase.isRetryable()) {
             beginRetryableInternalTransactionWithTxnNumber(opCtx, testIdx, contextSession);
         } else {
@@ -2514,7 +2518,7 @@ TEST_F(OnUpdateOutputsTest,
 
     resetOplogAndTransactions(opCtx);
 
-    std::unique_ptr<MongoDOperationContextSession> contextSession;
+    std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
     beginRetryableInternalTransactionWithTxnNumber(opCtx, 0, contextSession);
 
     CollectionUpdateArgs updateArgs;
@@ -2572,7 +2576,7 @@ TEST_F(OpObserverTest, TestFundamentalOnInsertsOutputs) {
             toInsert.emplace_back(stmtId, BSON("_id" << stmtIdx));
         }
 
-        std::unique_ptr<MongoDOperationContextSession> contextSession;
+        std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
         if (testCase.isRetryableWrite) {
             beginRetryableWriteWithTxnNumber(opCtx, testIdx, contextSession);
         }
@@ -3366,7 +3370,7 @@ TEST_F(OnDeleteOutputsTest, TestNonTransactionFundamentalOnDeleteOutputs) {
         // Phase 1: Clearing any state and setting up fixtures/the delete call.
         resetOplogAndTransactions(opCtx);
 
-        std::unique_ptr<MongoDOperationContextSession> contextSession;
+        std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
         if (testCase.isRetryable()) {
             beginRetryableWriteWithTxnNumber(opCtx, testIdx, contextSession);
         }
@@ -3413,7 +3417,7 @@ TEST_F(OnDeleteOutputsTest, TestTransactionFundamentalOnDeleteOutputs) {
         // Phase 1: Clearing any state and setting up fixtures/the delete call.
         resetOplogAndTransactions(opCtx);
 
-        std::unique_ptr<MongoDOperationContextSession> contextSession;
+        std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
         if (testCase.isRetryable()) {
             beginRetryableInternalTransactionWithTxnNumber(opCtx, testIdx, contextSession);
         } else {
@@ -3461,7 +3465,7 @@ TEST_F(OnDeleteOutputsTest,
 
     resetOplogAndTransactions(opCtx);
 
-    std::unique_ptr<MongoDOperationContextSession> contextSession;
+    std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
     beginRetryableInternalTransactionWithTxnNumber(opCtx, 0, contextSession);
 
     OplogDeleteEntryArgs deleteEntryArgs;

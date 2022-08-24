@@ -86,7 +86,8 @@ public:
         opCtx->setLogicalSessionId(std::move(lsid));
         opCtx->setTxnNumber(txnNumber);
 
-        MongoDOperationContextSession ocs(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(
             opCtx, {txnNumber}, boost::none /* autocommit */, boost::none /* startTransaction */);
@@ -117,7 +118,8 @@ public:
         opCtx->setLogicalSessionId(std::move(lsid));
         opCtx->setTxnNumber(txnNumber);
 
-        MongoDOperationContextSession ocs(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(
             opCtx, {txnNumber}, false /* autocommit */, true /* startTransaction */);
@@ -133,7 +135,8 @@ public:
         opCtx->setLogicalSessionId(std::move(lsid));
         opCtx->setTxnNumber(txnNumber);
 
-        MongoDOperationContextSession ocs(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(
             opCtx, {txnNumber}, false /* autocommit */, true /* startTransaction */);
@@ -165,7 +168,8 @@ public:
         opCtx->setLogicalSessionId(std::move(lsid));
         opCtx->setTxnNumber(txnNumber);
 
-        MongoDOperationContextSession ocs(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(
             opCtx, {txnNumber}, false /* autocommit */, boost::none /* startTransaction */);
@@ -336,7 +340,8 @@ public:
         opCtx->setLogicalSessionId(std::move(lsid));
         opCtx->setTxnNumber(txnNumber);
 
-        MongoDOperationContextSession ocs(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(
             opCtx, {txnNumber}, boost::none /* autocommit */, boost::none /* startTransaction */);

@@ -51,8 +51,9 @@ void TransactionParticipantResourceYielder::yield(OperationContext* opCtx) {
             txnParticipant.stashTransactionResources(opCtx);
         }
 
-        MongoDOperationContextSession::checkIn(opCtx,
-                                               OperationContextSession::CheckInReason::kYield);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        mongoDSessionCatalog->checkInUnscopedSession(
+            opCtx, OperationContextSession::CheckInReason::kYield);
     }
     _yielded = (session != nullptr);
 }
@@ -64,7 +65,8 @@ void TransactionParticipantResourceYielder::unyield(OperationContext* opCtx) {
         // unblocking this thread of execution. However, we must wait until the child operation on
         // this shard finishes so we can get the session back. This may limit the throughput of the
         // operation, but it's correct.
-        MongoDOperationContextSession::checkOut(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        mongoDSessionCatalog->checkOutUnscopedSession(opCtx);
 
         if (auto txnParticipant = TransactionParticipant::get(opCtx)) {
             txnParticipant.unstashTransactionResources(opCtx, _cmdName);

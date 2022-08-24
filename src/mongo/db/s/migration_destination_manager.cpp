@@ -111,7 +111,8 @@ BSONObj makeLocalReadConcernWithAfterClusterTime(Timestamp afterClusterTime) {
 }
 
 void checkOutSessionAndVerifyTxnState(OperationContext* opCtx) {
-    MongoDOperationContextSession::checkOut(opCtx);
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+    mongoDSessionCatalog->checkOutUnscopedSession(opCtx);
     TransactionParticipant::get(opCtx).beginOrContinue(opCtx,
                                                        {*opCtx->getTxnNumber()},
                                                        boost::none /* autocommit */,
@@ -127,7 +128,9 @@ constexpr bool returnsVoid() {
 // throwing, will reacquire the session and verify it is still valid to proceed with the migration.
 template <typename Callable, std::enable_if_t<!returnsVoid<Callable>(), int> = 0>
 auto runWithoutSession(OperationContext* opCtx, Callable&& callable) {
-    MongoDOperationContextSession::checkIn(opCtx, OperationContextSession::CheckInReason::kYield);
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+    mongoDSessionCatalog->checkInUnscopedSession(opCtx,
+                                                 OperationContextSession::CheckInReason::kYield);
 
     auto retVal = callable();
 
@@ -141,7 +144,9 @@ auto runWithoutSession(OperationContext* opCtx, Callable&& callable) {
 // Same as runWithoutSession above but takes a void function.
 template <typename Callable, std::enable_if_t<returnsVoid<Callable>(), int> = 0>
 void runWithoutSession(OperationContext* opCtx, Callable&& callable) {
-    MongoDOperationContextSession::checkIn(opCtx, OperationContextSession::CheckInReason::kYield);
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+    mongoDSessionCatalog->checkInUnscopedSession(opCtx,
+                                                 OperationContextSession::CheckInReason::kYield);
 
     callable();
 
@@ -1083,7 +1088,8 @@ void MigrationDestinationManager::_migrateThread(CancellationToken cancellationT
             opCtx->setLogicalSessionId(_lsid);
             opCtx->setTxnNumber(_txnNumber);
 
-            MongoDOperationContextSession sessionTxnState(opCtx);
+            auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+            auto sessionTxnState = mongoDSessionCatalog->checkOutSession(opCtx);
 
             auto txnParticipant = TransactionParticipant::get(opCtx);
             txnParticipant.beginOrContinue(opCtx,

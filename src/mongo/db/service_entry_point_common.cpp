@@ -856,7 +856,7 @@ private:
 
     ExecCommandDatabase* const _ecd;
 
-    std::unique_ptr<MongoDOperationContextSession> _sessionTxnState;
+    std::unique_ptr<MongoDSessionCatalog::Session> _sessionTxnState;
     bool _shouldCleanUp = false;
 };
 
@@ -976,15 +976,15 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
     // for both multi-statement transactions and retryable writes. Currently, only requests with
     // a transaction number will check out the session.
     hangBeforeSessionCheckOut.pauseWhileSet();
-    _sessionTxnState = std::make_unique<MongoDOperationContextSession>(opCtx);
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+    _sessionTxnState = mongoDSessionCatalog->checkOutSession(opCtx);
     auto txnParticipant = TransactionParticipant::get(opCtx);
     hangAfterSessionCheckOut.pauseWhileSet();
 
     // Used for waiting for an in-progress transaction to transition out of the conflicting state.
-    auto waitForInProgressTxn = [](OperationContext* opCtx, auto& stateTransitionFuture) {
+    auto waitForInProgressTxn = [this](OperationContext* opCtx, auto& stateTransitionFuture) {
         // Check the session back in and wait for the conflict to resolve.
-        MongoDOperationContextSession::checkIn(opCtx,
-                                               OperationContextSession::CheckInReason::kYield);
+        _sessionTxnState->checkIn(opCtx, OperationContextSession::CheckInReason::kYield);
         stateTransitionFuture.wait(opCtx);
         // Wait for any commit or abort oplog entry to be visible in the oplog. This will prevent a
         // new transaction from missing the transaction table update for the previous commit or
@@ -992,7 +992,7 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
         auto storageInterface = repl::StorageInterface::get(opCtx);
         storageInterface->waitForAllEarlierOplogWritesToBeVisible(opCtx);
         // Check out the session again.
-        MongoDOperationContextSession::checkOut(opCtx);
+        _sessionTxnState->checkOut(opCtx);
     };
 
     auto apiParamsFromClient = APIParameters::get(opCtx);

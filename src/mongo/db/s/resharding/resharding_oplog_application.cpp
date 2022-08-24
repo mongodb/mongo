@@ -84,7 +84,9 @@ void runWithTransaction(OperationContext* opCtx,
                                           ShardVersion::IGNORED() /* shardVersion */,
                                           boost::none /* databaseVersion */);
 
-    MongoDOperationContextSession ocs(asr.opCtx());
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(asr.opCtx());
+    auto ocs = mongoDSessionCatalog->checkOutSession(asr.opCtx());
+
     auto txnParticipant = TransactionParticipant::get(asr.opCtx());
 
     ScopeGuard guard([opCtx = asr.opCtx(), &txnParticipant] {

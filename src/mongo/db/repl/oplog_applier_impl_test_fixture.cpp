@@ -46,6 +46,7 @@
 #include "mongo/db/repl/replication_recovery_mock.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/vector_clock_mutable.h"
 
 namespace mongo {
@@ -158,6 +159,8 @@ void OplogApplierImplTest::setUp() {
     ASSERT_OK(ReplicationCoordinator::get(_opCtx.get())->setFollowerMode(MemberState::RS_PRIMARY));
 
     StorageInterface::set(serviceContext, std::make_unique<StorageInterfaceImpl>());
+
+    MongoDSessionCatalog::set(serviceContext, std::make_unique<MongoDSessionCatalog>());
 
     DropPendingCollectionReaper::set(
         serviceContext, std::make_unique<DropPendingCollectionReaper>(getStorageInterface()));

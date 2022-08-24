@@ -335,11 +335,12 @@ protected:
         func(newOpCtx.get());
     }
 
-    std::unique_ptr<MongoDOperationContextSession> checkOutSession(
+    std::unique_ptr<MongoDSessionCatalog::Session> checkOutSession(
         boost::optional<bool> startNewTxn = true) {
         opCtx()->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
         opCtx()->setInMultiDocumentTransaction();
-        auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx());
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+        auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
         auto txnParticipant = TransactionParticipant::get(opCtx());
         txnParticipant.beginOrContinue(opCtx(),
                                        {*opCtx()->getTxnNumber()},
@@ -361,7 +362,8 @@ protected:
                 opCtx->setInMultiDocumentTransaction();
             }
 
-            auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+            auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+            auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx);
 
             if (beginOrContinueTxn) {
                 auto txnParticipant = TransactionParticipant::get(opCtx);
@@ -443,7 +445,8 @@ TEST_F(TxnParticipantTest, TransactionThrowsLockTimeoutIfLockIsUnavailable) {
         newOpCtx.get()->setTxnNumber(newTxnNum);
         newOpCtx.get()->setInMultiDocumentTransaction();
 
-        MongoDOperationContextSession newOpCtxSession(newOpCtx.get());
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx.get());
+        auto newOpCtxSession = mongoDSessionCatalog->checkOutSession(newOpCtx.get());
         auto newTxnParticipant = TransactionParticipant::get(newOpCtx.get());
         newTxnParticipant.beginOrContinue(
             newOpCtx.get(), {newTxnNum}, false /* autocommit */, true /* startTransaction */);
@@ -870,7 +873,8 @@ TEST_F(TxnParticipantTest, KillOpBeforeCommittingPreparedTransaction) {
         opCtx->setInMultiDocumentTransaction();
 
         // Check out the session and continue the transaction.
-        auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx);
         auto newTxnParticipant = TransactionParticipant::get(opCtx);
         newTxnParticipant.beginOrContinue(opCtx,
                                           {*(opCtx->getTxnNumber())},
@@ -914,7 +918,8 @@ TEST_F(TxnParticipantTest, KillOpBeforeAbortingPreparedTransaction) {
         opCtx->setInMultiDocumentTransaction();
 
         // Check out the session and continue the transaction.
-        auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx);
         auto newTxnParticipant = TransactionParticipant::get(opCtx);
         newTxnParticipant.beginOrContinue(opCtx,
                                           {*(opCtx->getTxnNumber())},
@@ -1249,7 +1254,8 @@ TEST_F(TxnParticipantTest, ContinuingATransactionWithNoResourcesAborts) {
     checkOutSession();
 
     // Check out the session again for a new operation.
-    MongoDOperationContextSession sessionCheckout(opCtx());
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+    auto sessionCheckout = mongoDSessionCatalog->checkOutSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
@@ -1264,7 +1270,8 @@ TEST_F(TxnParticipantTest, CannotStartNewTransactionIfNotPrimary) {
     ASSERT_OK(repl::ReplicationCoordinator::get(opCtx())->setFollowerMode(
         repl::MemberState::RS_SECONDARY));
 
-    auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx());
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+    auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Include 'autocommit=false' for transactions.
@@ -1280,7 +1287,8 @@ TEST_F(TxnParticipantTest, CannotStartRetryableWriteIfNotPrimary) {
     ASSERT_OK(repl::ReplicationCoordinator::get(opCtx())->setFollowerMode(
         repl::MemberState::RS_SECONDARY));
 
-    auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx());
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+    auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     // Omit the 'autocommit' field for retryable writes.
@@ -1383,7 +1391,8 @@ TEST_F(TxnParticipantTest, CannotStartNewTransactionWhilePreparedTransactionInPr
                 newOpCtx->setTxnNumber(txnNumberToStart);
                 newOpCtx->setInMultiDocumentTransaction();
 
-                MongoDOperationContextSession ocs(newOpCtx);
+                auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
+                auto ocs = mongoDSessionCatalog->checkOutSession(newOpCtx);
                 auto txnParticipant = TransactionParticipant::get(newOpCtx);
                 ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(newOpCtx,
                                                                   {txnNumberToStart},
@@ -1418,7 +1427,8 @@ TEST_F(TxnParticipantTest, CannotInsertInPreparedTransaction) {
 }
 
 TEST_F(TxnParticipantTest, CannotContinueNonExistentTransaction) {
-    MongoDOperationContextSession opCtxSession(opCtx());
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+    auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
                                                       {*opCtx()->getTxnNumber()},
@@ -1655,7 +1665,8 @@ protected:
     }
 
     void canSpecifyStartTransactionOnRetryableWriteWithNoWritesExecuted() {
-        MongoDOperationContextSession opCtxSession(opCtx());
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+        auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
 
         auto txnParticipant = TransactionParticipant::get(opCtx());
         txnParticipant.beginOrContinue(opCtx(),
@@ -1693,7 +1704,8 @@ protected:
         runFunctionFromDifferentOpCtx([&](OperationContext* opCtx) {
             opCtx->setLogicalSessionId(lsid);
             opCtx->setTxnNumber(txnNumber);
-            auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+            auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+            auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx);
             TransactionParticipant::get(opCtx).beginOrContinue(
                 opCtx, {*opCtx->getTxnNumber()}, boost::none, boost::none);
         });
@@ -1704,7 +1716,8 @@ protected:
             opCtx->setLogicalSessionId(lsid);
             opCtx->setTxnNumber(txnNumber);
             opCtx->setInMultiDocumentTransaction();
-            auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+            auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+            auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx);
 
             auto txnParticipant = TransactionParticipant::get(opCtx);
             txnParticipant.beginOrContinue(opCtx, {*opCtx->getTxnNumber()}, false, true);
@@ -3098,7 +3111,8 @@ TEST_F(TransactionsMetricsTest, ReportUnstashedResourcesForARetryableWrite) {
     opCtx->setLogicalSessionId(_sessionId);
     opCtx->setTxnNumber(_txnNumber);
 
-    MongoDOperationContextSession opCtxSession(opCtx);
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+    auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx);
     auto txnParticipant = TransactionParticipant::get(opCtx);
     txnParticipant.beginOrContinue(opCtx,
                                    {*opCtx->getTxnNumber()},
@@ -3131,7 +3145,8 @@ TEST_F(TransactionsMetricsTest, UseAPIParametersOnOpCtxForARetryableWrite) {
     firstAPIParameters.setAPIDeprecationErrors(true);
     APIParameters::get(opCtx()) = firstAPIParameters;
 
-    MongoDOperationContextSession opCtxSession(opCtx());
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+    auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.beginOrContinue(opCtx(),
                                    {*opCtx()->getTxnNumber()},
@@ -4386,7 +4401,8 @@ TEST_F(TxnParticipantTest, AbortTransactionOnSessionCheckoutWithoutRefresh) {
     // MongoDOperationContextSessionWithoutRefresh will begin a new transaction with txnNumber
     // unconditionally since the participant's _activeTxnNumber is kUninitializedTxnNumber at time
     // of session checkout.
-    MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx());
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+    auto sessionCheckout = mongoDSessionCatalog->checkOutSessionWithoutRefresh(opCtx());
 
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT(txnParticipant.transactionIsOpen());
@@ -4398,13 +4414,15 @@ TEST_F(TxnParticipantTest, AbortTransactionOnSessionCheckoutWithoutRefresh) {
 }
 
 TEST_F(TxnParticipantTest, ResponseMetadataHasHasReadOnlyFalseIfNothingInProgress) {
-    MongoDOperationContextSession opCtxSession(opCtx());
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+    auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT_FALSE(txnParticipant.getResponseMetadata().getReadOnly());
 }
 
 TEST_F(TxnParticipantTest, ResponseMetadataHasReadOnlyFalseIfInRetryableWrite) {
-    MongoDOperationContextSession opCtxSession(opCtx());
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+    auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT_FALSE(txnParticipant.getResponseMetadata().getReadOnly());
 
@@ -4417,7 +4435,8 @@ TEST_F(TxnParticipantTest, ResponseMetadataHasReadOnlyFalseIfInRetryableWrite) {
 }
 
 TEST_F(TxnParticipantTest, ResponseMetadataHasReadOnlyTrueIfInProgressAndOperationsVectorEmpty) {
-    MongoDOperationContextSession opCtxSession(opCtx());
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+    auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT_FALSE(txnParticipant.getResponseMetadata().getReadOnly());
 
@@ -4432,7 +4451,8 @@ TEST_F(TxnParticipantTest, ResponseMetadataHasReadOnlyTrueIfInProgressAndOperati
 
 TEST_F(TxnParticipantTest,
        ResponseMetadataHasReadOnlyFalseIfInProgressAndOperationsVectorNotEmpty) {
-    MongoDOperationContextSession opCtxSession(opCtx());
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+    auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT_FALSE(txnParticipant.getResponseMetadata().getReadOnly());
 
@@ -4452,7 +4472,8 @@ TEST_F(TxnParticipantTest,
 }
 
 TEST_F(TxnParticipantTest, ResponseMetadataHasReadOnlyFalseIfAborted) {
-    MongoDOperationContextSession opCtxSession(opCtx());
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+    auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT_FALSE(txnParticipant.getResponseMetadata().getReadOnly());
 
@@ -4539,7 +4560,8 @@ TEST_F(TxnParticipantTest, OldestActiveTransactionTimestampTimeout) {
 };
 
 TEST_F(TxnParticipantTest, ExitPreparePromiseIsFulfilledOnAbortAfterPrepare) {
-    MongoDOperationContextSession opCtxSession(opCtx());
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+    auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant.beginOrContinue(
@@ -4566,7 +4588,8 @@ TEST_F(TxnParticipantTest, ExitPreparePromiseIsFulfilledOnAbortAfterPrepare) {
 }
 
 TEST_F(TxnParticipantTest, ExitPreparePromiseIsFulfilledOnCommitAfterPrepare) {
-    MongoDOperationContextSession opCtxSession(opCtx());
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+    auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
 
     txnParticipant.beginOrContinue(
@@ -4592,7 +4615,8 @@ TEST_F(TxnParticipantTest, ExitPreparePromiseIsFulfilledOnCommitAfterPrepare) {
 }
 
 TEST_F(ShardTxnParticipantTest, CanSpecifyTxnRetryCounterOnShardSvr) {
-    MongoDOperationContextSession opCtxSession(opCtx());
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+    auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.beginOrContinue(opCtx(),
                                    {*opCtx()->getTxnNumber(), 0},
@@ -4601,7 +4625,8 @@ TEST_F(ShardTxnParticipantTest, CanSpecifyTxnRetryCounterOnShardSvr) {
 }
 
 TEST_F(ConfigTxnParticipantTest, CanSpecifyTxnRetryCounterOnConfigSvr) {
-    MongoDOperationContextSession opCtxSession(opCtx());
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+    auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.beginOrContinue(opCtx(),
                                    {*opCtx()->getTxnNumber(), 0},
@@ -4610,7 +4635,8 @@ TEST_F(ConfigTxnParticipantTest, CanSpecifyTxnRetryCounterOnConfigSvr) {
 }
 
 TEST_F(TxnParticipantTest, CanOnlySpecifyTxnRetryCounterInShardedClusters) {
-    MongoDOperationContextSession opCtxSession(opCtx());
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+    auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
                                                       {*opCtx()->getTxnNumber(), 0},
@@ -4623,7 +4649,8 @@ TEST_F(TxnParticipantTest, CanOnlySpecifyTxnRetryCounterInShardedClusters) {
 DEATH_TEST_F(ShardTxnParticipantTest,
              CannotSpecifyNegativeTxnRetryCounter,
              "Cannot specify a negative txnRetryCounter") {
-    MongoDOperationContextSession opCtxSession(opCtx());
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+    auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     txnParticipant.beginOrContinue(opCtx(),
                                    {*opCtx()->getTxnNumber(), -1},
@@ -4634,7 +4661,8 @@ DEATH_TEST_F(ShardTxnParticipantTest,
 DEATH_TEST_F(ShardTxnParticipantTest,
              CannotSpecifyTxnRetryCounterForRetryableWrite,
              "Cannot specify a txnRetryCounter for retryable write") {
-    MongoDOperationContextSession opCtxSession(opCtx());
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
+    auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx());
     auto txnParticipant = TransactionParticipant::get(opCtx());
     ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(opCtx(),
                                                       {*opCtx()->getTxnNumber(), 0},
@@ -4892,7 +4920,8 @@ TEST_F(ShardTxnParticipantTest, CannotRetryInProgressRetryableTxn_ConflictingRet
         newOpCtx->setTxnNumber(0);
         newOpCtx->setInMultiDocumentTransaction();
 
-        MongoDOperationContextSession ocs(newOpCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(newOpCtx);
         auto txnParticipant = TransactionParticipant::get(newOpCtx);
         txnParticipant.beginOrContinue(
             newOpCtx, {0}, false /* autocommit */, true /* startTransaction */);
@@ -4916,7 +4945,8 @@ TEST_F(ShardTxnParticipantTest, CannotRetryInProgressRetryableTxn_ConflictingRet
         newOpCtx->setTxnNumber(0);
         newOpCtx->setInMultiDocumentTransaction();
 
-        MongoDOperationContextSession ocs(newOpCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(newOpCtx);
         auto txnParticipant = TransactionParticipant::get(newOpCtx);
         ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(
                                newOpCtx, {0}, false /* autocommit */, true /* startTransaction */),
@@ -4930,7 +4960,8 @@ TEST_F(ShardTxnParticipantTest, CannotRetryInProgressRetryableTxn_ConflictingRet
         newOpCtx->setTxnNumber(0);
         newOpCtx->setInMultiDocumentTransaction();
 
-        MongoDOperationContextSession ocs(newOpCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(newOpCtx);
         auto txnParticipant = TransactionParticipant::get(newOpCtx);
         txnParticipant.beginOrContinue(
             newOpCtx, {0}, false /* autocommit */, boost::none /* startTransaction */);
@@ -4959,7 +4990,8 @@ TEST_F(ShardTxnParticipantTest, CannotRetryInProgressRetryableTxn_ConflictingRet
         newOpCtx->setTxnNumber(parentTxnNumber);
 
         // Shouldn't throw.
-        MongoDOperationContextSession ocs(newOpCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(newOpCtx);
         auto txnParticipant = TransactionParticipant::get(newOpCtx);
         txnParticipant.beginOrContinue(newOpCtx,
                                        {parentTxnNumber},
@@ -4994,7 +5026,8 @@ TEST_F(ShardTxnParticipantTest, CannotRetryInProgressRetryableTxn_ConflictingRet
         newOpCtx->setLogicalSessionId(parentLsid);
         newOpCtx->setTxnNumber(parentTxnNumber);
 
-        MongoDOperationContextSession ocs(newOpCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(newOpCtx);
         auto txnParticipant = TransactionParticipant::get(newOpCtx);
         ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(newOpCtx,
                                                           {parentTxnNumber},
@@ -5034,7 +5067,8 @@ TEST_F(ShardTxnParticipantTest, RetryableTransactionInProgressCounterResetsUponN
         newOpCtx->setTxnNumber(0);
         newOpCtx->setInMultiDocumentTransaction();
 
-        MongoDOperationContextSession ocs(newOpCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(newOpCtx);
         auto txnParticipant = TransactionParticipant::get(newOpCtx);
         txnParticipant.beginOrContinue(
             newOpCtx, {0}, false /* autocommit */, true /* startTransaction */);
@@ -5050,7 +5084,8 @@ TEST_F(ShardTxnParticipantTest, RetryableTransactionInProgressCounterResetsUponN
         newOpCtx->setTxnNumber(0);
         newOpCtx->setInMultiDocumentTransaction();
 
-        MongoDOperationContextSession ocs(newOpCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(newOpCtx);
         auto txnParticipant = TransactionParticipant::get(newOpCtx);
         ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(
                                newOpCtx, {0}, false /* autocommit */, true /* startTransaction */),
@@ -5069,7 +5104,8 @@ TEST_F(ShardTxnParticipantTest, RetryableTransactionInProgressCounterResetsUponN
         newOpCtx->setTxnNumber(0);
         newOpCtx->setInMultiDocumentTransaction();
 
-        MongoDOperationContextSession ocs(newOpCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(newOpCtx);
         auto txnParticipant = TransactionParticipant::get(newOpCtx);
         txnParticipant.beginOrContinue(
             newOpCtx, {0}, false /* autocommit */, true /* startTransaction */);
@@ -5083,7 +5119,8 @@ TEST_F(ShardTxnParticipantTest, RetryableTransactionInProgressCounterResetsUponN
         newOpCtx->setTxnNumber(0);
         newOpCtx->setInMultiDocumentTransaction();
 
-        MongoDOperationContextSession ocs(newOpCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(newOpCtx);
         auto txnParticipant = TransactionParticipant::get(newOpCtx);
         txnParticipant.beginOrContinue(
             newOpCtx, {0}, false /* autocommit */, true /* startTransaction */);
@@ -5098,7 +5135,8 @@ TEST_F(ShardTxnParticipantTest, RetryableTransactionInProgressCounterResetsUponN
         newOpCtx->setTxnNumber(0);
         newOpCtx->setInMultiDocumentTransaction();
 
-        MongoDOperationContextSession ocs(newOpCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(newOpCtx);
         auto txnParticipant = TransactionParticipant::get(newOpCtx);
         ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(
                                newOpCtx, {0}, false /* autocommit */, true /* startTransaction */),
@@ -5131,7 +5169,8 @@ TEST_F(ShardTxnParticipantTest, HigherTxnNumberAbortsLowerChildTransactions_Retr
         newOpCtx->setTxnNumber(0);
         newOpCtx->setInMultiDocumentTransaction();
 
-        MongoDOperationContextSession ocs(newOpCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(newOpCtx);
         auto txnParticipant = TransactionParticipant::get(newOpCtx);
         txnParticipant.beginOrContinue(
             newOpCtx, {0}, false /* autocommit */, true /* startTransaction */);
@@ -5160,7 +5199,8 @@ TEST_F(ShardTxnParticipantTest, HigherTxnNumberAbortsLowerChildTransactions_Retr
         newOpCtx->setLogicalSessionId(parentLsid);
         newOpCtx->setTxnNumber(parentTxnNumber);
 
-        MongoDOperationContextSession ocs(newOpCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(newOpCtx);
         auto txnParticipant = TransactionParticipant::get(newOpCtx);
         txnParticipant.beginOrContinue(newOpCtx,
                                        {parentTxnNumber},
@@ -5191,7 +5231,8 @@ TEST_F(ShardTxnParticipantTest, HigherTxnNumberAbortsLowerChildTransactions_Tran
         newOpCtx->setTxnNumber(parentTxnNumber);
         newOpCtx->setInMultiDocumentTransaction();
 
-        MongoDOperationContextSession ocs(newOpCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(newOpCtx);
         auto txnParticipant = TransactionParticipant::get(newOpCtx);
         txnParticipant.beginOrContinue(newOpCtx,
                                        *newOpCtx->getTxnNumber(),
@@ -5229,7 +5270,8 @@ TEST_F(ShardTxnParticipantTest, HigherTxnNumberDoesNotAbortPreparedLowerChildTra
         newOpCtx->setTxnNumber(0);
         newOpCtx->setInMultiDocumentTransaction();
 
-        MongoDOperationContextSession ocs(newOpCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(newOpCtx);
         auto txnParticipant = TransactionParticipant::get(newOpCtx);
         ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(
                                newOpCtx, {0}, false /* autocommit */, true /* startTransaction */),
@@ -5241,7 +5283,8 @@ TEST_F(ShardTxnParticipantTest, HigherTxnNumberDoesNotAbortPreparedLowerChildTra
         newOpCtx->setLogicalSessionId(parentLsid);
         newOpCtx->setTxnNumber(higherParentTxnNumber);
 
-        MongoDOperationContextSession ocs(newOpCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(newOpCtx);
         auto txnParticipant = TransactionParticipant::get(newOpCtx);
         ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(newOpCtx,
                                                           {higherParentTxnNumber},
@@ -5268,7 +5311,8 @@ TEST_F(ShardTxnParticipantTest, HigherTxnNumberDoesNotAbortPreparedLowerChildTra
         newOpCtx->setTxnNumber(0);
         newOpCtx->setInMultiDocumentTransaction();
 
-        MongoDOperationContextSession ocs(newOpCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(newOpCtx);
         auto txnParticipant = TransactionParticipant::get(newOpCtx);
         txnParticipant.beginOrContinue(
             newOpCtx, {0}, false /* autocommit */, true /* startTransaction */);
@@ -5282,7 +5326,8 @@ TEST_F(ShardTxnParticipantTest, HigherTxnNumberDoesNotAbortPreparedLowerChildTra
         newOpCtx->setTxnNumber(0);
         newOpCtx->setInMultiDocumentTransaction();
 
-        MongoDOperationContextSession ocs(newOpCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(newOpCtx);
         auto txnParticipant = TransactionParticipant::get(newOpCtx);
         txnParticipant.beginOrContinue(
             newOpCtx, {0}, false /* autocommit */, true /* startTransaction */);
@@ -5332,7 +5377,8 @@ TEST_F(ShardTxnParticipantTest,
         newOpCtx->setTxnNumber(0);
         newOpCtx->setInMultiDocumentTransaction();
 
-        MongoDOperationContextSession ocs(newOpCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(newOpCtx);
         auto txnParticipant = TransactionParticipant::get(newOpCtx);
         ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(
                                newOpCtx, {0}, false /* autocommit */, true /* startTransaction */),
@@ -5363,7 +5409,8 @@ TEST_F(ShardTxnParticipantTest,
         newOpCtx->setLogicalSessionId(parentLsid);
         newOpCtx->setTxnNumber(parentTxnNumber);
 
-        MongoDOperationContextSession ocs(newOpCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(newOpCtx);
         auto txnParticipant = TransactionParticipant::get(newOpCtx);
         ASSERT_THROWS_CODE(txnParticipant.beginOrContinue(newOpCtx,
                                                           {parentTxnNumber},
@@ -5632,7 +5679,8 @@ TEST_F(ShardTxnParticipantTest,
     newOpCtx.get()->setTxnNumber(20);
     newOpCtx.get()->setTxnRetryCounter(1);
     newOpCtx.get()->setInMultiDocumentTransaction();
-    MongoDOperationContextSession newOpCtxSession(newOpCtx.get());
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(newOpCtx.get());
+    auto newOpCtxSession = mongoDSessionCatalog->checkOutSession(newOpCtx.get());
     auto txnParticipant = TransactionParticipant::get(newOpCtx.get());
 
     txnParticipant.beginOrContinue(newOpCtx.get(),
@@ -5660,8 +5708,9 @@ TEST_F(TxnParticipantTest, UnstashTransactionAfterActiveTxnNumberHasChanged) {
     opCtx->setTxnNumber(_txnNumber);
     opCtx->setInMultiDocumentTransaction();
 
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     {
-        MongoDOperationContextSession opCtxSession(opCtx);
+        auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(
             opCtx, {*opCtx->getTxnNumber()}, false /* autocommit */, true /* startTransaction */);
@@ -5675,7 +5724,7 @@ TEST_F(TxnParticipantTest, UnstashTransactionAfterActiveTxnNumberHasChanged) {
         sideOpCtx.get()->setLogicalSessionId(_sessionId);
         sideOpCtx.get()->setTxnNumber(_txnNumber + 1);
         sideOpCtx.get()->setInMultiDocumentTransaction();
-        MongoDOperationContextSession sideOpCtxSession(sideOpCtx.get());
+        auto sideOpCtxSession = mongoDSessionCatalog->checkOutSession(sideOpCtx.get());
         auto txnParticipant = TransactionParticipant::get(sideOpCtx.get());
 
         txnParticipant.beginOrContinue(sideOpCtx.get(),
@@ -5685,7 +5734,7 @@ TEST_F(TxnParticipantTest, UnstashTransactionAfterActiveTxnNumberHasChanged) {
     }
 
     {
-        MongoDOperationContextSession opCtxSession(opCtx);
+        auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
         ASSERT_THROWS_CODE(txnParticipant.unstashTransactionResources(opCtx, "insert"),
                            AssertionException,
@@ -5701,8 +5750,9 @@ TEST_F(TxnParticipantTest, UnstashRetryableWriteAfterActiveTxnNumberHasChanged) 
     opCtx->setLogicalSessionId(_sessionId);
     opCtx->setTxnNumber(_txnNumber);
 
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     {
-        MongoDOperationContextSession opCtxSession(opCtx);
+        auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {*opCtx->getTxnNumber()},
@@ -5718,7 +5768,7 @@ TEST_F(TxnParticipantTest, UnstashRetryableWriteAfterActiveTxnNumberHasChanged) 
         sideOpCtx.get()->setLogicalSessionId(_sessionId);
         sideOpCtx.get()->setTxnNumber(_txnNumber + 1);
         sideOpCtx.get()->setInMultiDocumentTransaction();
-        MongoDOperationContextSession sideOpCtxSession(sideOpCtx.get());
+        auto sideOpCtxSession = mongoDSessionCatalog->checkOutSession(sideOpCtx.get());
         auto txnParticipant = TransactionParticipant::get(sideOpCtx.get());
 
         txnParticipant.beginOrContinue(sideOpCtx.get(),
@@ -5728,7 +5778,7 @@ TEST_F(TxnParticipantTest, UnstashRetryableWriteAfterActiveTxnNumberHasChanged) 
     }
 
     {
-        MongoDOperationContextSession opCtxSession(opCtx);
+        auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
         ASSERT_THROWS_CODE(txnParticipant.unstashTransactionResources(opCtx, "insert"),
                            AssertionException,
@@ -5745,8 +5795,9 @@ TEST_F(TxnParticipantTest, UnstashTransactionAfterActiveTxnNumberNoLongerCorresp
     opCtx->setTxnNumber(_txnNumber);
     opCtx->setInMultiDocumentTransaction();
 
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     {
-        MongoDOperationContextSession opCtxSession(opCtx);
+        auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(
             opCtx, {*opCtx->getTxnNumber()}, false /* autocommit */, true /* startTransaction */);
@@ -5762,7 +5813,7 @@ TEST_F(TxnParticipantTest, UnstashTransactionAfterActiveTxnNumberNoLongerCorresp
         sideOpCtx.get()->setLogicalSessionId(_sessionId);
         sideOpCtx.get()->setTxnNumber(_txnNumber);
         sideOpCtx.get()->setInMultiDocumentTransaction();
-        MongoDOperationContextSession sideOpCtxSession(sideOpCtx.get());
+        auto sideOpCtxSession = mongoDSessionCatalog->checkOutSession(sideOpCtx.get());
         auto txnParticipant = TransactionParticipant::get(sideOpCtx.get());
 
         txnParticipant.beginOrContinue(sideOpCtx.get(),
@@ -5772,7 +5823,7 @@ TEST_F(TxnParticipantTest, UnstashTransactionAfterActiveTxnNumberNoLongerCorresp
     }
 
     {
-        MongoDOperationContextSession opCtxSession(opCtx);
+        auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
         ASSERT_THROWS_CODE(txnParticipant.unstashTransactionResources(opCtx, "insert"),
                            AssertionException,
@@ -5789,8 +5840,9 @@ TEST_F(TxnParticipantTest,
     opCtx->setLogicalSessionId(_sessionId);
     opCtx->setTxnNumber(_txnNumber);
 
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     {
-        MongoDOperationContextSession opCtxSession(opCtx);
+        auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(opCtx,
                                        {*opCtx->getTxnNumber()},
@@ -5808,7 +5860,7 @@ TEST_F(TxnParticipantTest,
         sideOpCtx.get()->setLogicalSessionId(_sessionId);
         sideOpCtx.get()->setTxnNumber(_txnNumber);
         sideOpCtx.get()->setInMultiDocumentTransaction();
-        MongoDOperationContextSession sideOpCtxSession(sideOpCtx.get());
+        auto sideOpCtxSession = mongoDSessionCatalog->checkOutSession(sideOpCtx.get());
         auto txnParticipant = TransactionParticipant::get(sideOpCtx.get());
 
         txnParticipant.beginOrContinue(sideOpCtx.get(),
@@ -5818,7 +5870,7 @@ TEST_F(TxnParticipantTest,
     }
 
     {
-        MongoDOperationContextSession opCtxSession(opCtx);
+        auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
         ASSERT_THROWS_CODE(txnParticipant.unstashTransactionResources(opCtx, "insert"),
                            AssertionException,
@@ -5970,11 +6022,13 @@ TEST_F(
 
     parentTxnNumber++;
 
+    auto mongoDSessionCatalog = MongoDSessionCatalog::get(getServiceContext());
+
     // Does not call beginOrContinue.
     runFunctionFromDifferentOpCtx([&](OperationContext* opCtx) {
         opCtx->setLogicalSessionId(parentLsid);
         opCtx->setTxnNumber(parentTxnNumber);
-        auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+        auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx);
     });
     // Does not call beginOrContinue.
     auto higherRetryableChildLsid =
@@ -5983,14 +6037,14 @@ TEST_F(
         opCtx->setLogicalSessionId(higherRetryableChildLsid);
         opCtx->setTxnNumber(0);
         opCtx->setInMultiDocumentTransaction();
-        auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+        auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx);
     });
     // beginOrContinue fails because no startTransaction=true.
     runFunctionFromDifferentOpCtx([&](OperationContext* opCtx) {
         opCtx->setLogicalSessionId(parentLsid);
         opCtx->setTxnNumber(parentTxnNumber);
         opCtx->setInMultiDocumentTransaction();
-        auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+        auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx);
 
         auto txnParticipant = TransactionParticipant::get(opCtx);
         ASSERT_THROWS_CODE(
@@ -6052,7 +6106,8 @@ TEST_F(ShardTxnParticipantTest, EagerlyReapLowerTxnNumbers) {
         opCtx->setLogicalSessionId(lowerRetryableChildLsid);
         opCtx->setTxnNumber(0);
         opCtx->setInMultiDocumentTransaction();
-        auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx);
     });
 
     ASSERT_EQ(sessionCatalog->size(), 1);
@@ -6100,7 +6155,8 @@ TEST_F(ShardTxnParticipantTest, EagerlyReapSkipsHigherUnusedTxnNumbers) {
         opCtx->setLogicalSessionId(higherUnusedRetryableChildLsid);
         opCtx->setTxnNumber(0);
         opCtx->setInMultiDocumentTransaction();
-        auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx);
     });
 
     ASSERT_EQ(sessionCatalog->size(), 1);
@@ -6148,7 +6204,8 @@ TEST_F(ShardTxnParticipantTest, EagerlyReapSkipsKilledSessions) {
     runFunctionFromDifferentOpCtx([&](OperationContext* opCtx) {
         opCtx->setLogicalSessionId(parentLsid);
         opCtx->setTxnNumber(parentTxnNumber);
-        auto opCtxSession = std::make_unique<MongoDOperationContextSession>(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto opCtxSession = mongoDSessionCatalog->checkOutSession(opCtx);
 
         TransactionParticipant::get(opCtx).beginOrContinue(
             opCtx, {*opCtx->getTxnNumber()}, boost::none, boost::none);

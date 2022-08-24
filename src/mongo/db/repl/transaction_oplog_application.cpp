@@ -220,7 +220,8 @@ Status applyCommitTransaction(OperationContext* opCtx,
             // The write on transaction table may be applied concurrently, so refreshing state
             // from disk may read that write, causing starting a new transaction on an existing
             // txnNumber. Thus, we start a new transaction without refreshing state from disk.
-            MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
+            auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+            auto sessionCheckout = mongoDSessionCatalog->checkOutSessionWithoutRefresh(opCtx);
 
             auto transaction = TransactionParticipant::get(opCtx);
             invariant(transaction);
@@ -265,7 +266,8 @@ Status applyAbortTransaction(OperationContext* opCtx,
             // The write on transaction table may be applied concurrently, so refreshing state
             // from disk may read that write, causing starting a new transaction on an existing
             // txnNumber. Thus, we start a new transaction without refreshing state from disk.
-            MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
+            auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+            auto sessionCheckout = mongoDSessionCatalog->checkOutSessionWithoutRefresh(opCtx);
 
             auto transaction = TransactionParticipant::get(opCtx);
             transaction.unstashTransactionResources(opCtx, "abortTransaction");
@@ -445,7 +447,8 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
         // from disk may read that write, causing starting a new transaction on an existing
         // txnNumber. Thus, we start a new transaction without refreshing state from disk.
         hangBeforeSessionCheckOutForApplyPrepare.pauseWhileSet();
-        MongoDOperationContextSessionWithoutRefresh sessionCheckout(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto sessionCheckout = mongoDSessionCatalog->checkOutSessionWithoutRefresh(opCtx);
 
         auto txnParticipant = TransactionParticipant::get(opCtx);
 

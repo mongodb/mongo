@@ -240,7 +240,8 @@ protected:
             opCtx->setInMultiDocumentTransaction();
         }
 
-        MongoDOperationContextSession ocs(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
 
         auto txnParticipant = TransactionParticipant::get(opCtx);
         ASSERT(txnParticipant);
@@ -281,7 +282,8 @@ protected:
     void checkTxnHasNotBeenUpdated(LogicalSessionId sessionId, TxnNumber txnNum) {
         auto opCtx = operationContext();
         opCtx->setLogicalSessionId(sessionId);
-        MongoDOperationContextSession ocs(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
 
         DBDirectClient client(operationContext());
@@ -388,7 +390,8 @@ protected:
         opCtx->setLogicalSessionId(std::move(lsid));
         opCtx->setTxnNumber(txnNumber);
 
-        MongoDOperationContextSession ocs(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(
             opCtx, {txnNumber}, false /* autocommit */, true /* startTransaction */);
@@ -404,7 +407,8 @@ protected:
         opCtx->setLogicalSessionId(std::move(lsid));
         opCtx->setTxnNumber(txnNumber);
 
-        MongoDOperationContextSession ocs(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(
             opCtx, {txnNumber}, false /* autocommit */, true /* startTransaction */);
@@ -436,7 +440,8 @@ protected:
         opCtx->setLogicalSessionId(std::move(lsid));
         opCtx->setTxnNumber(txnNumber);
 
-        MongoDOperationContextSession ocs(opCtx);
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
         txnParticipant.beginOrContinue(
             opCtx, {txnNumber}, false /* autocommit */, boost::none /* startTransaction */);

@@ -328,8 +328,9 @@ public:
                         "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter);
 
             boost::optional<SharedSemiFuture<void>> participantExitPrepareFuture;
+            auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
             {
-                MongoDOperationContextSession sessionTxnState(opCtx);
+                auto sessionTxnState = mongoDSessionCatalog->checkOutSession(opCtx);
                 auto txnParticipant = TransactionParticipant::get(opCtx);
                 txnParticipant.beginOrContinue(opCtx,
                                                txnNumberAndRetryCounter,
@@ -349,7 +350,7 @@ public:
             participantExitPrepareFuture->get(opCtx);
 
             {
-                MongoDOperationContextSession sessionTxnState(opCtx);
+                auto sessionTxnState = mongoDSessionCatalog->checkOutSession(opCtx);
                 auto txnParticipant = TransactionParticipant::get(opCtx);
 
                 // Call beginOrContinue again in case the transaction number has changed.
