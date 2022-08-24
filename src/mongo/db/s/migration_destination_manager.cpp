@@ -58,8 +58,8 @@
 #include "mongo/db/s/move_timing_helper.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
-#include "mongo/db/s/recoverable_critical_section_service.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/start_chunk_clone_request.h"
@@ -1636,9 +1636,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             // Enter critical section. Ensure it has been majority commited before _recvChunkCommit
             // returns success to the donor, so that if the recipient steps down, the critical
             // section is kept taken while the donor commits the migration.
-            RecoverableCriticalSectionService::get(opCtx)
-                ->acquireRecoverableCriticalSectionBlockWrites(
-                    opCtx, _nss, critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
+            ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
+                opCtx, _nss, critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
             LOGV2(5899114, "Entered migration recipient critical section", logAttrs(_nss));
             timeInCriticalSection.emplace();
@@ -1670,7 +1669,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
             cc().makeOperationContext(), outerOpCtx->getCancellationToken(), executor);
         auto opCtx = newOpCtxPtr.get();
 
-        RecoverableCriticalSectionService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
+        ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
             opCtx,
             _nss,
             criticalSectionReason(*_sessionId),
@@ -1894,7 +1893,7 @@ void MigrationDestinationManager::awaitCriticalSectionReleaseSignalAndCompleteMi
     LOGV2_DEBUG(5899110, 3, "Exiting critical section");
     const auto critSecReason = criticalSectionReason(*_sessionId);
 
-    RecoverableCriticalSectionService::get(opCtx)->releaseRecoverableCriticalSection(
+    ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
         opCtx, _nss, critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
     const auto timeInCriticalSectionMs = timeInCriticalSection.millis();

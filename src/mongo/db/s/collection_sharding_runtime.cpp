@@ -477,6 +477,17 @@ void CollectionShardingRuntime::resetShardVersionRecoverRefreshFuture(const CSRL
     _shardVersionInRecoverOrRefresh = boost::none;
 }
 
+void CollectionShardingRuntime::setIndexVersion(OperationContext* opCtx,
+                                                const boost::optional<Timestamp>& indexVersion) {
+    auto csrLock = CSRLock::lockExclusive(opCtx, this);
+    _indexVersion = indexVersion;
+}
+
+boost::optional<Timestamp> CollectionShardingRuntime::getIndexVersion(OperationContext* opCtx) {
+    auto csrLock = CSRLock::lockShared(opCtx, this);
+    return _indexVersion;
+}
+
 CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx,
                                                      NamespaceString nss,
                                                      BSONObj reason)

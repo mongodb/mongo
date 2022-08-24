@@ -215,6 +215,16 @@ public:
      */
     void resetShardVersionRecoverRefreshFuture(const CSRLock&);
 
+    /**
+     * Sets an index version under a lock.
+     */
+    void setIndexVersion(OperationContext* opCtx, const boost::optional<Timestamp>& indexVersion);
+
+    /**
+     * Gets an index version under a lock.
+     */
+    boost::optional<Timestamp> getIndexVersion(OperationContext* opCtx);
+
 private:
     friend CSRLock;
 
@@ -301,6 +311,10 @@ private:
     // Tracks ongoing shard version recover/refresh. Eventually set to the semifuture to wait on and
     // a CancellationSource to cancel it
     boost::optional<ShardVersionRecoverOrRefresh> _shardVersionInRecoverOrRefresh;
+
+    // Contains the latest index version of the collection. This is used to indicate the creation or
+    // drop of a global index.
+    boost::optional<Timestamp> _indexVersion;
 };
 
 /**

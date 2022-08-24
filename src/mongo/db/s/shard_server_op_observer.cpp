@@ -45,9 +45,9 @@
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
-#include "mongo/db/s/recoverable_critical_section_service.h"
 #include "mongo/db/s/shard_identity_rollback_notifier.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
+#include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_collection.h"
 #include "mongo/db/s/type_shard_database.h"
@@ -304,6 +304,20 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
             });
         }
 
+        if (nss == NamespaceString::kShardCollectionCatalogNamespace &&
+            !recoverable_critical_section_util::inRecoveryMode(opCtx) &&
+            insertedDoc.hasElement(CollectionType::kIndexVersionFieldName)) {
+            auto indexVersion = insertedDoc[CollectionType::kIndexVersionFieldName].timestamp();
+            auto baseCollectionNss =
+                NamespaceString(insertedDoc[CollectionType::kNssFieldName].str());
+            opCtx->recoveryUnit()->onCommit(
+                [opCtx, baseCollectionNss, indexVersion](boost::optional<Timestamp>) {
+                    AutoGetCollection autoColl(opCtx, baseCollectionNss, MODE_IS);
+                    CollectionShardingRuntime::get(opCtx, baseCollectionNss)
+                        ->setIndexVersion(opCtx, indexVersion);
+                });
+        }
+
         if (metadata && metadata->isSharded()) {
             incrementChunkOnInsertOrUpdate(opCtx,
                                            nss,
@@ -444,6 +458,19 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
                 auto csrLock = CollectionShardingRuntime ::CSRLock::lockExclusive(opCtx, csr);
                 csr->enterCriticalSectionCommitPhase(csrLock, reason);
             });
+    }
+
+    if (args.nss == NamespaceString::kShardCollectionCatalogNamespace &&
+        !recoverable_critical_section_util::inRecoveryMode(opCtx) &&
+        args.updateArgs->updatedDoc.hasElement(CollectionType::kIndexVersionFieldName)) {
+        auto indexVersion =
+            args.updateArgs->updatedDoc[CollectionType::kIndexVersionFieldName].timestamp();
+        auto nss =
+            NamespaceString(args.updateArgs->updatedDoc[CollectionType::kNssFieldName].str());
+        opCtx->recoveryUnit()->onCommit([opCtx, nss, indexVersion](boost::optional<Timestamp>) {
+            AutoGetCollection autoColl(opCtx, nss, MODE_IS);
+            CollectionShardingRuntime::get(opCtx, nss)->setIndexVersion(opCtx, indexVersion);
+        });
     }
 
     auto* const csr = CollectionShardingRuntime::get(opCtx, args.nss);
@@ -675,10 +702,7 @@ void ShardServerOpObserver::onCollMod(OperationContext* opCtx,
 
 void ShardServerOpObserver::_onReplicationRollback(OperationContext* opCtx,
                                                    const RollbackObserverInfo& rbInfo) {
-    if (rbInfo.rollbackNamespaces.find(NamespaceString::kCollectionCriticalSectionsNamespace) !=
-        rbInfo.rollbackNamespaces.end()) {
-        RecoverableCriticalSectionService::get(opCtx)->recoverRecoverableCriticalSections(opCtx);
-    }
+    ShardingRecoveryService::get(opCtx)->recoverStates(opCtx, rbInfo.rollbackNamespaces);
 }
 
 

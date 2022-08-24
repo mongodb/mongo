@@ -43,14 +43,13 @@ bool inRecoveryMode(OperationContext* opCtx);
 
 }
 
-class RecoverableCriticalSectionService
-    : public ReplicaSetAwareServiceShardSvr<RecoverableCriticalSectionService> {
+class ShardingRecoveryService : public ReplicaSetAwareServiceShardSvr<ShardingRecoveryService> {
 
 public:
-    RecoverableCriticalSectionService() = default;
+    ShardingRecoveryService() = default;
 
-    static RecoverableCriticalSectionService* get(ServiceContext* serviceContext);
-    static RecoverableCriticalSectionService* get(OperationContext* opCtx);
+    static ShardingRecoveryService* get(ServiceContext* serviceContext);
+    static ShardingRecoveryService* get(OperationContext* opCtx);
 
     /**
      * Acquires the collection critical section in the catch-up phase (i.e. blocking writes) for the
@@ -96,17 +95,28 @@ public:
                                            const BSONObj& reason,
                                            const WriteConcernOptions& writeConcern);
 
+    /**
+     * Recover all sharding related in memory states from disk.
+     */
+    void recoverStates(OperationContext* opCtx,
+                       const std::set<NamespaceString>& rollbackNamespaces);
 
+private:
     /**
      * This method is called when we have to mirror the state on disk of the recoverable critical
      * section to memory (on startUp or on rollback).
      */
     void recoverRecoverableCriticalSections(OperationContext* opCtx);
 
-private:
+    /**
+     * Recover the index versions from disk into the CSR.
+     */
+    void recoverIndexesCatalog(OperationContext* opCtx);
+
     void onInitialDataAvailable(OperationContext* opCtx,
                                 bool isMajorityDataAvailable) override final {
         recoverRecoverableCriticalSections(opCtx);
+        recoverIndexesCatalog(opCtx);
     }
 
     void onStartup(OperationContext* opCtx) override final {}

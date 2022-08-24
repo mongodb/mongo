@@ -44,11 +44,11 @@
 #include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/create_collection_coordinator.h"
-#include "mongo/db/s/recoverable_critical_section_service.h"
 #include "mongo/db/s/remove_chunks_gen.h"
 #include "mongo/db/s/shard_key_util.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
+#include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
@@ -427,12 +427,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     // The critical section can still be held here if the node committed the
                     // sharding of the collection but then it stepped down before it managed to
                     // delete the coordinator document
-                    RecoverableCriticalSectionService::get(opCtx)
-                        ->releaseRecoverableCriticalSection(
-                            opCtx,
-                            nss(),
-                            _critSecReason,
-                            ShardingCatalogClient::kMajorityWriteConcern);
+                    ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
+                        opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
                     _result = createCollectionResponseOpt;
                     return;
@@ -442,9 +438,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 // calling this method, we need the coordinator document to be persisted (and hence
                 // the kCheck state), otherwise nothing will release the critical section in the
                 // presence of a stepdown.
-                RecoverableCriticalSectionService::get(opCtx)
-                    ->acquireRecoverableCriticalSectionBlockWrites(
-                        opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
+                ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
+                    opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
                 if (!_firstExecution) {
                     auto uuid = sharding_ddl_util::getCollectionUUID(opCtx, nss());
@@ -478,7 +473,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     // Block reads/writes from here on if we need to create the collection on other
                     // shards, this way we prevent reads/writes that should be redirected to another
                     // shard
-                    RecoverableCriticalSectionService::get(opCtx)
+                    ShardingRecoveryService::get(opCtx)
                         ->promoteRecoverableCriticalSectionToBlockAlsoReads(
                             opCtx,
                             nss(),
@@ -492,7 +487,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 }
 
                 // End of the critical section, from now on, read and writes are permitted.
-                RecoverableCriticalSectionService::get(opCtx)->releaseRecoverableCriticalSection(
+                ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
                     opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
                 // Slow path. Create chunks (which might incur in an index scan) and commit must be
@@ -520,7 +515,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
 
-                RecoverableCriticalSectionService::get(opCtx)->releaseRecoverableCriticalSection(
+                ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
                     opCtx, nss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
             }
             return status;

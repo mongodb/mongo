@@ -46,13 +46,13 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
-#include "mongo/db/s/recoverable_critical_section_service.h"
 #include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/write_block_bypass.h"
 #include "mongo/db/write_concern_options.h"
@@ -386,7 +386,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_finishReshardin
                    _externalState->clearFilteringMetadata(
                        opCtx.get(), _metadata.getSourceNss(), _metadata.getTempReshardingNss());
 
-                   RecoverableCriticalSectionService::get(opCtx.get())
+                   ShardingRecoveryService::get(opCtx.get())
                        ->releaseRecoverableCriticalSection(
                            opCtx.get(),
                            _metadata.getSourceNss(),
@@ -699,7 +699,7 @@ void ReshardingDonorService::DonorStateMachine::
 
     {
         auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-        RecoverableCriticalSectionService::get(opCtx.get())
+        ShardingRecoveryService::get(opCtx.get())
             ->acquireRecoverableCriticalSectionBlockWrites(
                 opCtx.get(),
                 _metadata.getSourceNss(),
@@ -797,7 +797,7 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
     }
     {
         auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-        RecoverableCriticalSectionService::get(opCtx.get())
+        ShardingRecoveryService::get(opCtx.get())
             ->promoteRecoverableCriticalSectionToBlockAlsoReads(
                 opCtx.get(),
                 _metadata.getSourceNss(),

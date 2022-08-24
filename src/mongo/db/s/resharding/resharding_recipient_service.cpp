@@ -47,7 +47,6 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_destination_manager.h"
-#include "mongo/db/s/recoverable_critical_section_service.h"
 #include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
@@ -56,6 +55,7 @@
 #include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/s/shard_key_util.h"
+#include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/write_block_bypass.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -377,7 +377,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::_finishR
                                                                _metadata.getSourceNss(),
                                                                _metadata.getTempReshardingNss());
 
-                        RecoverableCriticalSectionService::get(opCtx.get())
+                        ShardingRecoveryService::get(opCtx.get())
                             ->releaseRecoverableCriticalSection(
                                 opCtx.get(),
                                 _metadata.getSourceNss(),
@@ -752,7 +752,7 @@ ExecutorFuture<void> ReshardingRecipientService::RecipientStateMachine::
         .then([this, &factory] {
             if (!_isAlsoDonor) {
                 auto opCtx = factory.makeOperationContext(&cc());
-                RecoverableCriticalSectionService::get(opCtx.get())
+                ShardingRecoveryService::get(opCtx.get())
                     ->acquireRecoverableCriticalSectionBlockWrites(
                         opCtx.get(),
                         _metadata.getSourceNss(),
@@ -814,7 +814,7 @@ void ReshardingRecipientService::RecipientStateMachine::_renameTemporaryReshardi
         // db-primary shard's ReshardCollectionCoordinator.
         WriteBlockBypass::get(opCtx.get()).set(true);
 
-        RecoverableCriticalSectionService::get(opCtx.get())
+        ShardingRecoveryService::get(opCtx.get())
             ->promoteRecoverableCriticalSectionToBlockAlsoReads(
                 opCtx.get(),
                 _metadata.getSourceNss(),

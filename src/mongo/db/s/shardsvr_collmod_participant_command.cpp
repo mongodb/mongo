@@ -34,9 +34,9 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/collmod_coordinator.h"
 #include "mongo/db/s/database_sharding_state.h"
-#include "mongo/db/s/recoverable_critical_section_service.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharded_collmod_gen.h"
+#include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_collmod.h"
@@ -105,7 +105,7 @@ public:
                     CollectionShardingRuntime::get(opCtx, bucketNs)->clearFilteringMetadata(opCtx);
                 }
 
-                auto service = RecoverableCriticalSectionService::get(opCtx);
+                auto service = ShardingRecoveryService::get(opCtx);
                 const auto reason = BSON("command"
                                          << "ShardSvrParticipantBlockCommand"
                                          << "ns" << bucketNs.toString());

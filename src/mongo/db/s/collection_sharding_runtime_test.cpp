@@ -45,6 +45,8 @@
 #include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/util/fail_point.h"
 
+#include "mongo/db/s/sharding_index_catalog_util.h"
+
 namespace mongo {
 namespace {
 
@@ -540,6 +542,35 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
 
     ASSERT_OK(status);
     ASSERT(cleanupComplete.isReady());
+}
+
+TEST_F(CollectionShardingRuntimeWithRangeDeleterTest, IncreaseIndexVersionAsParticipant) {
+    OperationContext* opCtx = operationContext();
+    Timestamp indexVersion(1, 0);
+
+    // Simulate the commit of the index by writing in the config.shard.collections collection.
+    write_ops::UpdateCommandRequest updateCollectionOp(
+        NamespaceString::kShardCollectionCatalogNamespace);
+    updateCollectionOp.setUpdates({[&] {
+        write_ops::UpdateOpEntry entry;
+        entry.setQ(BSON(CollectionType::kNssFieldName << kTestNss.toString()
+                                                      << CollectionType::kUuidFieldName << uuid()));
+        entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
+            BSON("$set" << BSON(CollectionType::kIndexVersionFieldName << indexVersion))));
+        entry.setUpsert(true);
+        entry.setMulti(false);
+        return entry;
+    }()});
+    updateCollectionOp.setWriteCommandRequestBase([] {
+        write_ops::WriteCommandRequestBase wcb;
+        wcb.setStmtId(1);
+        return wcb;
+    }());
+
+    DBDirectClient client(opCtx);
+    write_ops::checkWriteErrors(client.update(updateCollectionOp));
+
+    ASSERT_EQ(indexVersion, csr().getIndexVersion(opCtx).value());
 }
 
 TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,

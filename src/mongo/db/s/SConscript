@@ -83,7 +83,7 @@ env.Library(
         'range_deleter_service_op_observer.cpp',
         'range_deletion_util.cpp',
         'read_only_catalog_cache_loader.cpp',
-        'recoverable_critical_section_service.cpp',
+        'sharding_recovery_service.cpp',
         'resharding/coordinator_document.idl',
         'resharding/document_source_resharding_add_resume_id.cpp',
         'resharding/document_source_resharding_iterate_transaction.cpp',

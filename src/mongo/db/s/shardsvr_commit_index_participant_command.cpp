@@ -32,7 +32,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/recoverable_critical_section_service.h"
 #include "mongo/db/s/sharded_index_catalog_commands_gen.h"
 #include "mongo/db/s/sharding_index_catalog_util.h"
 #include "mongo/db/s/sharding_state.h"

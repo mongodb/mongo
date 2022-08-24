@@ -44,12 +44,12 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/recoverable_critical_section_service.h"
 #include "mongo/db/s/resharding/resharding_change_event_o2_field_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/resharding/resharding_donor_service.h"
 #include "mongo/db/s/resharding/resharding_service_test_helpers.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -755,7 +755,7 @@ TEST_F(ReshardingDonorServiceTest, RestoreMetricsOnKBlockingWrites) {
 
     // This acquires the critical section required by resharding donor machine when it is in
     // kBlockingWrites.
-    RecoverableCriticalSectionService::get(opCtx.get())
+    ShardingRecoveryService::get(opCtx.get())
         ->acquireRecoverableCriticalSectionBlockWrites(opCtx.get(),
                                                        doc.getSourceNss(),
                                                        BSON("command"

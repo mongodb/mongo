@@ -32,7 +32,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/s/recoverable_critical_section_service.h"
+#include "mongo/db/s/sharding_recovery_service.h"
 
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -42,6 +42,7 @@
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 
@@ -65,23 +66,21 @@ bool inRecoveryMode(OperationContext* opCtx) {
 }  // namespace recoverable_critical_section_util
 
 namespace {
-const auto serviceDecorator =
-    ServiceContext::declareDecoration<RecoverableCriticalSectionService>();
+const auto serviceDecorator = ServiceContext::declareDecoration<ShardingRecoveryService>();
 }
 
-RecoverableCriticalSectionService* RecoverableCriticalSectionService::get(
-    ServiceContext* serviceContext) {
+ShardingRecoveryService* ShardingRecoveryService::get(ServiceContext* serviceContext) {
     return &serviceDecorator(serviceContext);
 }
 
-RecoverableCriticalSectionService* RecoverableCriticalSectionService::get(OperationContext* opCtx) {
+ShardingRecoveryService* ShardingRecoveryService::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
-const ReplicaSetAwareServiceRegistry::Registerer<RecoverableCriticalSectionService>
-    recoverableCriticalSectionServiceServiceRegisterer("RecoverableCriticalSectionService");
+const ReplicaSetAwareServiceRegistry::Registerer<ShardingRecoveryService>
+    shardingRecoveryServiceRegisterer("ShardingRecoveryService");
 
-void RecoverableCriticalSectionService::acquireRecoverableCriticalSectionBlockWrites(
+void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const BSONObj& reason,
@@ -169,7 +168,7 @@ void RecoverableCriticalSectionService::acquireRecoverableCriticalSectionBlockWr
                 "writeConcern"_attr = writeConcern);
 }
 
-void RecoverableCriticalSectionService::promoteRecoverableCriticalSectionToBlockAlsoReads(
+void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const BSONObj& reason,
@@ -269,7 +268,7 @@ void RecoverableCriticalSectionService::promoteRecoverableCriticalSectionToBlock
                 "writeConcern"_attr = writeConcern);
 }
 
-void RecoverableCriticalSectionService::releaseRecoverableCriticalSection(
+void ShardingRecoveryService::releaseRecoverableCriticalSection(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const BSONObj& reason,
@@ -362,8 +361,7 @@ void RecoverableCriticalSectionService::releaseRecoverableCriticalSection(
                 "writeConcern"_attr = writeConcern);
 }
 
-void RecoverableCriticalSectionService::recoverRecoverableCriticalSections(
-    OperationContext* opCtx) {
+void ShardingRecoveryService::recoverRecoverableCriticalSections(OperationContext* opCtx) {
     LOGV2_DEBUG(5604000, 2, "Recovering all recoverable critical sections");
 
     // Release all in-memory critical sections
@@ -401,6 +399,56 @@ void RecoverableCriticalSectionService::recoverRecoverableCriticalSections(
     });
 
     LOGV2_DEBUG(5604001, 2, "Recovered all recoverable critical sections");
+}
+
+void ShardingRecoveryService::recoverStates(OperationContext* opCtx,
+                                            const std::set<NamespaceString>& rollbackNamespaces) {
+
+    if (rollbackNamespaces.find(NamespaceString::kCollectionCriticalSectionsNamespace) !=
+        rollbackNamespaces.end()) {
+        ShardingRecoveryService::get(opCtx)->recoverRecoverableCriticalSections(opCtx);
+    }
+
+    if (rollbackNamespaces.find(NamespaceString::kShardCollectionCatalogNamespace) !=
+            rollbackNamespaces.end() ||
+        rollbackNamespaces.find(CollectionType::ConfigNS) != rollbackNamespaces.end()) {
+        ShardingRecoveryService::get(opCtx)->recoverIndexesCatalog(opCtx);
+    }
+}
+
+void ShardingRecoveryService::recoverIndexesCatalog(OperationContext* opCtx) {
+    LOGV2_DEBUG(6686500, 2, "Recovering all sharding index catalog");
+
+    // Reset all in-memory index versions.
+    const auto collectionNames = CollectionShardingState::getCollectionNames(opCtx);
+    for (const auto& collName : collectionNames) {
+        try {
+            AutoGetCollection collLock(opCtx, collName, MODE_IS);
+            auto* const csr = CollectionShardingRuntime::get(opCtx, collName);
+            auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
+            csr->setIndexVersion(opCtx, boost::none);
+        } catch (const ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
+            LOGV2_DEBUG(6686501,
+                        2,
+                        "Skipping attempting to set index version for view in "
+                        "recoverIndexCatalogs",
+                        "namespace"_attr = collName);
+        }
+    }
+
+    DBDirectClient client(opCtx);
+    FindCommandRequest findRequest{NamespaceString::kShardCollectionCatalogNamespace};
+    findRequest.setProjection(BSON(CollectionTypeBase::kNssFieldName
+                                   << 1 << CollectionTypeBase::kIndexVersionFieldName << 1));
+    // Map the index versions that are on disk to memory.
+    client.find(std::move(findRequest), [&opCtx](const BSONObj& coll) {
+        auto nss = NamespaceString(coll[CollectionTypeBase::kNssFieldName].str());
+        auto indexVersion = coll[CollectionTypeBase::kIndexVersionFieldName].timestamp();
+        AutoGetCollection collLock(opCtx, nss, MODE_IS);
+        CollectionShardingRuntime::get(opCtx, nss)->setIndexVersion(opCtx, indexVersion);
+    });
+
+    LOGV2_DEBUG(6686502, 2, "Recovered all index versions");
 }
 
 }  // namespace mongo

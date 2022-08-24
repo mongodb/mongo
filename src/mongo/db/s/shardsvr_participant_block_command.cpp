@@ -32,7 +32,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/s/participant_block_gen.h"
-#include "mongo/db/s/recoverable_critical_section_service.h"
+#include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -77,7 +77,7 @@ public:
 
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-            auto service = RecoverableCriticalSectionService::get(opCtx);
+            auto service = ShardingRecoveryService::get(opCtx);
             const auto reason =
                 request().getReason().get_value_or(BSON("command"
                                                         << "ShardSvrParticipantBlockCommand"

@@ -38,8 +38,8 @@
 #include "mongo/db/s/drop_collection_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deletion_util.h"
-#include "mongo/db/s/recoverable_critical_section_service.h"
 #include "mongo/db/s/sharding_ddl_util.h"
+#include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
@@ -306,7 +306,7 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                 // Acquire source/target critical sections
                 const auto reason =
                     sharding_ddl_util::getCriticalSectionReasonForRename(fromNss(), toNss());
-                auto service = RecoverableCriticalSectionService::get(opCtx);
+                auto service = ShardingRecoveryService::get(opCtx);
                 service->acquireRecoverableCriticalSectionBlockWrites(
                     opCtx, fromNss(), reason, ShardingCatalogClient::kLocalWriteConcern);
                 service->promoteRecoverableCriticalSectionToBlockAlsoReads(
@@ -378,7 +378,7 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                     BSON("command"
                          << "rename"
                          << "from" << fromNss().toString() << "to" << toNss().toString());
-                auto service = RecoverableCriticalSectionService::get(opCtx);
+                auto service = ShardingRecoveryService::get(opCtx);
                 service->releaseRecoverableCriticalSection(
                     opCtx, fromNss(), reason, ShardingCatalogClient::kLocalWriteConcern);
                 service->releaseRecoverableCriticalSection(

@@ -39,9 +39,9 @@
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/recoverable_critical_section_service.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
+#include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -180,7 +180,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     _doc.setTargetUUID(getCollectionUUID(
                         opCtx, toNss, optTargetCollType, /*throwNotFound*/ false));
 
-                    auto criticalSection = RecoverableCriticalSectionService::get(opCtx);
+                    auto criticalSection = ShardingRecoveryService::get(opCtx);
                     if (!targetIsSharded) {
                         // (SERVER-67325) Acquire critical section on the target collection in order
                         // to disallow concurrent `createCollection`
@@ -238,7 +238,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     }
 
                 } catch (const DBException&) {
-                    auto criticalSection = RecoverableCriticalSectionService::get(opCtx);
+                    auto criticalSection = ShardingRecoveryService::get(opCtx);
                     criticalSection->releaseRecoverableCriticalSection(
                         opCtx, toNss, criticalSectionReason, WriteConcerns::kLocalWriteConcern);
                     _completeOnError = true;
