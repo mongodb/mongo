@@ -103,7 +103,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/util/str.h"
@@ -1332,9 +1331,7 @@ std::unique_ptr<PlanYieldPolicySBE> makeSbeYieldPolicy(
                                                 internalQueryExecYieldIterations.load(),
                                                 Milliseconds{internalQueryExecYieldPeriodMS.load()},
                                                 yieldable,
-                                                std::make_unique<YieldPolicyCallbacksImpl>(nss),
-                                                // Use the new yielding behavior if it is enabled.
-                                                gYieldingSupportForSBE);
+                                                std::make_unique<YieldPolicyCallbacksImpl>(nss));
 }
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExecutor(

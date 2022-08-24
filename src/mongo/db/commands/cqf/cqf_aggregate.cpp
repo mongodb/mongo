@@ -307,8 +307,7 @@ static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> optimizeAndCreateExe
                                              internalQueryExecYieldIterations.load(),
                                              Milliseconds{internalQueryExecYieldPeriodMS.load()},
                                              nullptr,
-                                             std::make_unique<YieldPolicyCallbacksImpl>(nss),
-                                             false /*useExperimentalCommitTxnBehavior*/);
+                                             std::make_unique<YieldPolicyCallbacksImpl>(nss));
 
     sbePlan->prepare(data.ctx);
     auto planExec = uassertStatusOK(plan_executor_factory::make(
