@@ -164,13 +164,21 @@ CoordinatorCommitMonitor::queryRemainingOperationTimeForRecipients() const {
         uassertStatusOKWithContext(status, errorContext);
 
         const auto remainingTime = extractOperationRemainingTime(shardResponse.data);
-        // A recipient shard does not report the remaining operation time when there is no data
-        // to copy and no oplog entry to apply.
-        if (remainingTime && remainingTime.get() < minRemainingTime) {
-            minRemainingTime = remainingTime.get();
+
+        // If any recipient omits the "remainingMillis" field of the response then
+        // we cannot conclude that it is safe to begin the critical section.
+        // It is possible that the recipient just had a failover and
+        // was not able to restore its metrics before it replied to the
+        // _shardsvrReshardingOperationTime command.
+        if (!remainingTime) {
+            maxRemainingTime = Milliseconds::max();
+            continue;
         }
-        if (remainingTime && remainingTime.get() > maxRemainingTime) {
-            maxRemainingTime = remainingTime.get();
+        if (remainingTime.value() < minRemainingTime) {
+            minRemainingTime = remainingTime.value();
+        }
+        if (remainingTime.value() > maxRemainingTime) {
+            maxRemainingTime = remainingTime.value();
         }
     }
 
@@ -203,12 +211,20 @@ ExecutorFuture<void> CoordinatorCommitMonitor::_makeFuture() const {
                           "Encountered an error while querying recipients, will retry shortly",
                           "error"_attr = status);
 
-            return RemainingOperationTimes{Milliseconds(0), Milliseconds::max()};
+            // On error we definitely cannot begin the critical section.  Therefore,
+            // return Milliseconds::max for remainingTimes.max (remainingTimes.max is used
+            // for determining whether the critical section should begin).
+            return RemainingOperationTimes{Milliseconds(-1), Milliseconds::max()};
         })
         .then([this, anchor = shared_from_this()](RemainingOperationTimes remainingTimes) {
             auto metrics = ReshardingMetrics::get(cc().getServiceContext());
-            metrics->setMinRemainingOperationTime(remainingTimes.min);
-            metrics->setMaxRemainingOperationTime(remainingTimes.max);
+            // If remainingTimes.max (or remainingTimes.min) is Milliseconds::max, then use -1 so
+            // that the scale of the y-axis is still useful when looking at FTDC metrics.
+            auto clampIfMax = [](Milliseconds t) {
+                return t != Milliseconds::max() ? t : Milliseconds(-1);
+            };
+            metrics->setMinRemainingOperationTime(clampIfMax(remainingTimes.min));
+            metrics->setMaxRemainingOperationTime(clampIfMax(remainingTimes.max));
 
             // Check if all recipient shards are within the commit threshold.
             if (remainingTimes.max <= _threshold)
