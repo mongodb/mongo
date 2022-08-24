@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 #pragma once
+#include <memory>
+
 #include "mongo/client/sdam/server_description.h"
 
 namespace mongo::sdam {
@@ -78,6 +80,6 @@ public:
 private:
     constexpr static auto kHostAndPortNotSet = "address.not.set:1234";
     ServerDescriptionPtr _instance =
-        std::shared_ptr<ServerDescription>(new ServerDescription(HostAndPort(kHostAndPortNotSet)));
+        std::make_shared<ServerDescription>(HostAndPort(kHostAndPortNotSet));
 };
 }  // namespace mongo::sdam

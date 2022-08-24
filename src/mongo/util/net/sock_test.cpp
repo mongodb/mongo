@@ -179,9 +179,8 @@ SocketPair socketPair(const int type, const int protocol) {
     ::freeaddrinfo(res);
     ::freeaddrinfo(connectRes);
 
-    SocketPtr first(new Socket(static_cast<int>(acceptSock), SockAddr()));
-    SocketPtr second(new Socket(static_cast<int>(connectSock), SockAddr()));
-
+    SocketPtr first = std::make_shared<Socket>(static_cast<int>(acceptSock), SockAddr());
+    SocketPtr second = std::make_shared<Socket>(static_cast<int>(connectSock), SockAddr());
     return SocketPair(first, second);
 }
 #else
@@ -195,8 +194,8 @@ SocketPair socketPair(const int type, const int protocol) {
     int socks[2];
     const int result = ::socketpair(domain, type, protocol, socks);
     if (result == 0) {
-        return SocketPair(SocketPtr(new Socket(socks[0], SockAddr())),
-                          SocketPtr(new Socket(socks[1], SockAddr())));
+        return SocketPair(std::make_shared<Socket>(socks[0], SockAddr()),
+                          std::make_shared<Socket>(socks[1], SockAddr()));
     }
     return SocketPair();
 }
