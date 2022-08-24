@@ -21,7 +21,8 @@ const sourceCollection = reshardingTest.createShardedCollection({
 });
 
 const mongos = sourceCollection.getMongo();
-const topology = DiscoverTopology.findConnectedNodes(mongos);
+const ns = sourceCollection.getFullName();
+let topology = DiscoverTopology.findConnectedNodes(mongos);
 
 const recipientShardNames = reshardingTest.recipientShardNames;
 const recipient = new Mongo(topology.shards[recipientShardNames[0]].primary);
@@ -38,6 +39,13 @@ const shardsvrAbortReshardCollectionFailpoint = configureFailPoint(recipient, "f
     failCommands: ["_shardsvrAbortReshardCollection"],
 });
 
+// We pause the _configsvrReshardCollection command upon joining an existing ReshardingCoordinator
+// instance on all of the config server replica set because we don't know which node will be elected
+// primary from calling stepUpNewPrimaryOnShard().
+const configsvrConnections = topology.configsvr.nodes.map(host => new Mongo(host));
+const reshardCollectionJoinedFailPointsList = configsvrConnections.map(
+    conn => configureFailPoint(conn, "reshardCollectionJoinedExistingOperation"));
+
 let awaitAbort;
 reshardingTest.withReshardingInBackground(
     {
@@ -48,7 +56,6 @@ reshardingTest.withReshardingInBackground(
         // Wait until participants are aware of the resharding operation.
         reshardingTest.awaitCloneTimestampChosen();
 
-        const ns = sourceCollection.getFullName();
         awaitAbort = startParallelShell(funWithArgs(function(ns) {
                                             db.adminCommand({abortReshardCollection: ns});
                                         }, ns), mongos.port);
@@ -70,13 +77,12 @@ reshardingTest.withReshardingInBackground(
             // Mongos automatically retries the abortReshardCollection command on retryable errors.
             // We interrupt the abortReshardCollection command running on mongos to verify that the
             // ReshardingCoordinator recovers the decision on its own.
-            const ops =
-                mongos.getDB("admin")
-                    .aggregate([
-                        {$currentOp: {localOps: true}},
-                        {$match: {"command.abortReshardCollection": sourceCollection.getFullName()}}
-                    ])
-                    .toArray();
+            const ops = mongos.getDB("admin")
+                            .aggregate([
+                                {$currentOp: {localOps: true}},
+                                {$match: {"command.abortReshardCollection": ns}}
+                            ])
+                            .toArray();
 
             assert.neq([], ops, "failed to find abortReshardCollection command running on mongos");
             assert.eq(
@@ -88,6 +94,22 @@ reshardingTest.withReshardingInBackground(
             assert.commandWorked(mongos.getDB("admin").killOp(ops[0].opid));
 
             reshardingTest.stepUpNewPrimaryOnShard(reshardingTest.configShardName);
+
+            // After a stepdown, the _configsvrReshardCollection command will be retried by the
+            // primary shard. We use the reshardCollectionJoinedExistingOperation failpoint to
+            // ensure the primary shard upon retrying finds the ongoing resharding operation on the
+            // new config server primary. It would otherwise be possible for the
+            // reshardingPauseCoordinatorBeforeCompletion failpoint to be released by the
+            // ReshardingTest fixture after this function returns, for the ongoing resharding
+            // operation to complete, and for the retried _configsvrReshardCollection command to
+            // spawn an entirely new resharding operation which won't get aborted by the test
+            // client.
+            topology = DiscoverTopology.findConnectedNodes(mongos);
+            const configsvrPrimary = new Mongo(topology.configsvr.primary);
+            const idx = reshardCollectionJoinedFailPointsList.findIndex(fp => fp.conn.host ===
+                                                                            configsvrPrimary.host);
+            reshardCollectionJoinedFailPointsList[idx].wait();
+            reshardCollectionJoinedFailPointsList.forEach(fp => fp.off());
             shardsvrAbortReshardCollectionFailpoint.off();
         },
     });
