@@ -41,14 +41,14 @@ public:
     CollectionIndexes(CollectionGeneration generation, boost::optional<Timestamp> index)
         : CollectionGeneration(generation), _indexVersion(index) {}
 
-    CollectionIndexes() : CollectionIndexes({OID(), Timestamp()}, {Timestamp()}) {}
+    CollectionIndexes() : CollectionIndexes({OID(), Timestamp()}, boost::none) {}
 
     static CollectionIndexes IGNORED() {
-        return CollectionIndexes(CollectionGeneration::IGNORED(), {Timestamp()});
+        return CollectionIndexes(CollectionGeneration::IGNORED(), boost::none);
     }
 
     static CollectionIndexes UNSHARDED() {
-        return CollectionIndexes(CollectionGeneration::UNSHARDED(), {Timestamp()});
+        return CollectionIndexes(CollectionGeneration::UNSHARDED(), boost::none);
     }
 
     boost::optional<Timestamp> indexVersion() const {
