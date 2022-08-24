@@ -209,7 +209,7 @@ buildvariants:
   - name: .aggregation !.feature_flag_guarded
   - name: audit
   - name: .auth
-  - name: burn_in_tags_gen
+  #  - name: burn_in_tags_gen
   - name: buildscripts_test
   - name: resmoke_end2end_tests
   - name: unittest_shell_hang_analyzer_gen
