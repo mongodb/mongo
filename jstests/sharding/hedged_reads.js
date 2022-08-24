@@ -1,6 +1,6 @@
 /**
  * Tests hedging metrics in the serverStatus output.
- * @tags: [requires_fcv_61]
+ * @tags: [requires_fcv_62]
  */
 (function() {
 "use strict";
