@@ -135,10 +135,12 @@ structs:
 
     NewlyAddedStableField:
         description: "This struct contains a field that is added as stable in the new command"
+        is_command_reply: true
 
     UnstableNewFieldReply:
         description: "This reply contains a field that is stable in the old command but is
                       unstable in the new command."
+        is_command_reply: true
         fields:
             unstableNewField:
                 type: string
@@ -147,6 +149,7 @@ structs:
     InternalNewFieldReply:
         description: "This reply contains a field that is stable in the old command but is
                       internal in the new command."
+        is_command_reply: true
         fields:
             internalNewField:
                 type: string
@@ -155,6 +158,7 @@ structs:
     StableNewReplyField:
         description: "This struct contains a reply field that is unstable in the old command but is
                       stable in the new command."
+        is_command_reply: true
         fields:
             stableNewReplyField:
                 type: string
@@ -172,6 +176,7 @@ structs:
     OptionalNewFieldReply:
         description: "This reply contains a field that is required in the old command but is
                       optional in the new command."
+        is_command_reply: true
         fields:
             optionalNewField:
                 type: string
@@ -189,6 +194,7 @@ structs:
     MissingNewFieldReply:
         description: "This reply contains a field that exists in the old command but is
                       missing in the new command."
+        is_command_reply: true
         fields:
             missingNewField:
                 type: string
@@ -197,6 +203,7 @@ structs:
     EnumNotSubsetReply:
         description: "This reply contains an enum field where the new enum values is not a subset
                       of the old reply type's enum values"
+        is_command_reply: true
         fields:
             enumNotSubsetReplyField:
                 type: NewReplyFieldEnumNotSubset
@@ -205,6 +212,7 @@ structs:
     NotEnumFieldReply:
         description: "This reply contains a field that is an enum type in the old command but
                       is not an enum type in the new command"
+        is_command_reply: true
         fields:
             notEnumReplyField:
                 type: NewReplyFieldEnumNotSubset
@@ -213,6 +221,7 @@ structs:
     NotStructFieldReply:
         description: "This reply contains a field that is a struct type in the old command but
                       is not a struct type in the new command"
+        is_command_reply: true
         fields:
             notStructReplyField:
                 type: StructReplyFieldType
@@ -224,6 +233,7 @@ structs:
     EnumOrStructFieldReply:
         description: "This reply contains a field that is a non-enum or struct type in the old
                       command but is an enum or struct in the new command"
+        is_command_reply: true
         fields:
             EnumOrStructReplyField:
                 type: intToIntString
@@ -232,6 +242,7 @@ structs:
     BsonNotSubsetReply:
         description: "This reply contains a field type where the new bson_serialization_type
                       is not a subset of the old bson_serialization_type"
+        is_command_reply: true
         fields:
             bsonNotSubsetReplyField:
                 type: intToIntString
@@ -240,6 +251,7 @@ structs:
     BsonNotSubsetReplyTwo:
         description: "This reply contains a field type where the new bson_serialization_type
                       is not a subset of the old bson_serialization_type"
+        is_command_reply: true
         fields:
             bsonNotSubsetReplyFieldTwo:
                 type: intStringToIntStringBool
@@ -248,6 +260,7 @@ structs:
     OldBsonSerializationTypeAnyReply:
         description: "This reply contains a field whose old type has a bson_serialization_type
                       that contains 'any'"
+        is_command_reply: true
         fields:
             oldBsonSerializationTypeAnyReplyField:
                 type: oldBsonSerializationTypeAny
@@ -256,6 +269,7 @@ structs:
     NewBsonSerializationTypeAnyReply:
         description: "This reply contains a field whose new type has a bson_serialization_type
                       that contains 'any'"
+        is_command_reply: true
         fields:
             newBsonSerializationTypeAnyReplyField:
                 type: newBsonSerializationTypeAny
@@ -264,6 +278,7 @@ structs:
     BsonSerializationTypeAnyReply:
         description: "This reply contains a field whose old and new type have a
                         bson_serialization_type that contains 'any' that is not explicitly allowed"
+        is_command_reply: true
         fields:
             bsonSerializationTypeAnyReplyField:
                 type: bsonSerializationTypeAny
@@ -272,11 +287,13 @@ structs:
     NewlyAddedBsonSerializationTypeAnyReply:
         description: "This reply contains a newly added field whose type has a
                         bson_serialization_type that contains 'any' that is not explicitly allowed"
+        is_command_reply: true
 
     OldBsonSerializationTypeAnyUnstableReply:
         description: "This reply contains a field that is unstable in the old version
                       and whose old type has a bson_serialization_type
                       that contains 'any'"
+        is_command_reply: true
         fields:
             oldBsonSerializationTypeAnyUnstableReplyField:
                 type: oldBsonSerializationTypeAny
@@ -286,6 +303,7 @@ structs:
         description: "This reply contains a field that is unstable in the old version
                       and whose new type has a bson_serialization_type
                       that contains 'any'"
+        is_command_reply: true
         fields:
             newBsonSerializationTypeAnyUnstableReplyField:
                 type: newBsonSerializationTypeAny
@@ -295,6 +313,7 @@ structs:
         description: "This reply contains a field that is unstable in the old version
                       and whose old and new type have a bson_serialization_type
                       that contains 'any' that is not explicitly allowed."
+        is_command_reply: true
         fields:
             bsonSerializationTypeAnyUnstableReplyField:
                 type: bsonSerializationTypeAny
@@ -304,6 +323,7 @@ structs:
         description: "This reply contains a field whose old and new variant types have a
                         bson_serialization_type that contains 'any' that is not compatible
                         and where the old field is unstable"
+        is_command_reply: true
         fields:
             bsonSerializationTypeWithVariantAnyUnstableReplyField:
                 type:
@@ -314,6 +334,7 @@ structs:
         description: "This reply contains a field whose old and new type have a
                         bson_serialization_type that contains 'any' and the cpp_types are
                         not equal and where the old field is unstable"
+        is_command_reply: true
         fields:
             cppTypeNotEqualReplyUnstableField:
                 type: bsonSerializationTypeAnyCppTypeNotEqual
@@ -323,6 +344,7 @@ structs:
         description: "This reply contains a field whose old and new type have a
                         bson_serialization_type that contains 'any' and the serializers are
                         not equal and where the old field is unstable"
+        is_command_reply: true
         fields:
             serializerNotEqualReplyUnstableField:
                 type: bsonSerializationTypeAnySerializerNotEqual
@@ -332,6 +354,7 @@ structs:
         description: "This reply contains a field whose old and new type have a
                         bson_serialization_type that contains 'any' and the deserializers are
                         not equal and where the old field is unstable"
+        is_command_reply: true
         fields:
             deserializerNotEqualReplyUnstableField:
                 type: bsonSerializationTypeAnyDeserializerNotEqual
@@ -350,6 +373,7 @@ structs:
         description: "This struct contains a field that is unstable in the old version
                       and whose old type has a bson_serialization_type
                       that contains 'any'"
+        is_command_reply: true
         fields:
             oldBsonSerializationTypeAnyUnstableStructField:
                 stability: unstable
@@ -359,6 +383,7 @@ structs:
         description: "This struct contains a field that is unstable in the old version
                       and whose new type has a bson_serialization_type
                       that contains 'any'"
+        is_command_reply: true
         fields:
             newBsonSerializationTypeAnyUnstableStructField:
                 stability: unstable
@@ -368,6 +393,7 @@ structs:
         description: "This struct contains a field that is unstable in the old version
                       and whose old and new type have a bson_serialization_type
                       that contains 'any' that is not explicitly allowed."
+        is_command_reply: true
         fields:
             bsonSerializationTypeAnyUnstableStructField:
                 stability: unstable
@@ -376,6 +402,7 @@ structs:
     BsonSerializationTypeWithVariantAnyUnstableStruct:
         description: "This struct contains a field whose old and new variant types have a bson_serialization_type
                         that contains 'any' that is not compatible and where the old field is unstable"
+        is_command_reply: true
         fields:
             bsonSerializationTypeWithVariantAnyUnstableStructField:
                 stability: unstable
@@ -386,6 +413,7 @@ structs:
         description: "This struct contains a field whose old and new type have a
                         bson_serialization_type that contains 'any' and the cpp_types are
                         not equal and where the old field is unstable"
+        is_command_reply: true
         fields:
             cppTypeNotEqualStructUnstableField:
                 stability: unstable
@@ -395,6 +423,7 @@ structs:
         description: "This struct contains a field whose old and new type have a
                         bson_serialization_type that contains 'any' and the serializers are
                         not equal and where the old field is unstable"
+        is_command_reply: true
         fields:
             serializerNotEqualStructUnstableField:
                 stability: unstable
@@ -404,6 +433,7 @@ structs:
         description: "This struct contains a field whose old and new type have a
                         bson_serialization_type that contains 'any' and the deserializers are
                         not equal and where the old field is unstable"
+        is_command_reply: true
         fields:
             deserializerNotEqualStructUnstableField:
                 stability: unstable
@@ -412,6 +442,7 @@ structs:
     BsonSerializationTypeWithVariantAnyStruct:
         description: "This struct contains a field whose old and new variant types have a
                         bson_serialization_type that contains 'any' that is not compatible"
+        is_command_reply: true
         fields:
             bsonSerializationTypeAnyStructField:
                 stability: stable
@@ -421,6 +452,7 @@ structs:
     BsonSerializationTypeWithVariantAnyStructWithArray:
         description: "This struct contains a field whose old and new variant types have a array of
                       bson_serialization_type that contains 'any' that is not compatible"
+        is_command_reply: true
         fields:
             bsonSerializationTypeAnyStructField:
                 stability: stable
@@ -431,6 +463,7 @@ structs:
     CppTypeNotEqualReply:
         description: "This reply contains a field whose old and new type have a
                         bson_serialization_type that contains 'any' and the cpp_types are not equal"
+        is_command_reply: true
         fields:
             cppTypeNotEqualReplyField:
                 type: bsonSerializationTypeAnyCppTypeNotEqual
@@ -440,6 +473,7 @@ structs:
         description: "This reply contains a field whose old and new type have a
                         bson_serialization_type that contains 'any' and
                         the serializers are not equal"
+        is_command_reply: true
         fields:
             serializerNotEqualReplyField:
                 type: bsonSerializationTypeAnySerializerNotEqual
@@ -449,6 +483,7 @@ structs:
         description: "This reply contains a field whose old and new type have a
                         bson_serialization_type that contains 'any' and
                         the deserializers are not equal"
+        is_command_reply: true
         fields:
             deserializerNotEqualReplyField:
                 type: bsonSerializationTypeAnyDeserializerNotEqual
@@ -457,6 +492,7 @@ structs:
     StructFieldTypeRecursiveReplyOne:
         description: "This reply contains a field whose new type is a struct that is not
                       compatible with the old field type"
+        is_command_reply: true
         fields:
             structReplyField:
                 type: UnstableNewFieldReply
@@ -465,6 +501,7 @@ structs:
     StructFieldTypeRecursiveReplyTwo:
         description: "This reply contains a field whose new type is a struct that is not
                       compatible with the old field type"
+        is_command_reply: true
         fields:
             structReplyField:
                 type: StructType
@@ -481,6 +518,7 @@ structs:
     NewVariantTypeReply:
         description: "This reply contains a new field that has a variant type while the old field
                       is not a variant type"
+        is_command_reply: true
         fields:
             newVariantTypeReplyField:
                 type: int
@@ -489,6 +527,7 @@ structs:
     NewVariantNotSubsetReply:
         description: "This reply contains a field whose new variant types are not a subset
                       of the old variant types"
+        is_command_reply: true
         fields:
             variantNotSubsetReplyField:
                 type:
@@ -498,6 +537,7 @@ structs:
     NewVariantNotSubsetReplyWithArray:
         description: "This reply contains a field whose new variant types are not a subset
                       of the old variant types"
+        is_command_reply: true
         fields:
             variantNotSubsetReplyField:
                 stability: stable
@@ -507,6 +547,7 @@ structs:
     NewVariantNotSubsetReplyTwo:
         description: "This reply contains a field whose new variant types are not a subset
                       of the old variant types"
+        is_command_reply: true
         fields:
             variantNotSubsetReplyFieldTwo:
                 stability: stable
@@ -516,6 +557,7 @@ structs:
     NewVariantNotSubsetReplyTwoWithArray:
         description: "This reply contains a field whose new variant types are not a subset
                       of the old variant types"
+        is_command_reply: true
         fields:
             variantNotSubsetReplyFieldTwo:
                 stability: stable
@@ -525,6 +567,7 @@ structs:
     VariantRecursiveReply:
         description: "This reply contains a field that has a new variant type that is not
                       compatible with the old variant type"
+        is_command_reply: true
         fields:
             variantRecursiveReplyField:
                 stability: stable
@@ -534,6 +577,7 @@ structs:
     VariantRecursiveReplyWithArray:
         description: "This reply contains a field that has a new variant type that is not
                       compatible with the old variant type"
+        is_command_reply: true
         fields:
             variantRecursiveReplyField:
                 stability: stable
@@ -543,6 +587,7 @@ structs:
     NewVariantStructNotSubsetReply:
         description: "This reply contains a field whose new variant types are not a subset
                       of the old variant types"
+        is_command_reply: true
         fields:
             variantStructNotSubsetReplyField:
                 stability: stable
@@ -552,6 +597,7 @@ structs:
     NewVariantStructNotSubsetReplyWithArray:
         description: "This reply contains a field whose new variant types are not a subset
                       of the old variant types"
+        is_command_reply: true
         fields:
             variantStructNotSubsetReplyField:
                 stability: stable
@@ -561,6 +607,7 @@ structs:
     VariantStructRecursiveReply:
         description: "This reply contains a field that has a new variant struct type that is not
                       compatible with the old variant struct type"
+        is_command_reply: true
         fields:
             variantStructRecursiveReplyField:
                 stability: stable
@@ -570,6 +617,7 @@ structs:
     VariantStructRecursiveReplyWithArray:
         description: "This reply contains a field that has a new variant struct type that is not
                       compatible with the old variant struct type"
+        is_command_reply: true
         fields:
             variantStructRecursiveReplyField:
                 stability: stable
@@ -595,6 +643,7 @@ structs:
     NewValidatorStruct:
         description: "This struct contains a field where the new version contains a validator while
                       the old version does not"
+        is_command_reply: true
         fields:
             newValidatorField:
                 type: int
@@ -602,6 +651,7 @@ structs:
 
     ValidatorsNotEqualStruct:
         description: "This struct contains a field where the new and old validators are not exactly equal"
+        is_command_reply: true
         fields:
             validatorsNotEqualField:
                 type: double
@@ -733,6 +783,7 @@ structs:
 
     ArrayTypeStruct:
         description: "Struct with ArrayType field."
+        is_command_reply: true
         fields:
             ArrayCommandParameter:
                 type: array<string>
@@ -741,6 +792,7 @@ structs:
     MissingUnstableFieldNewFieldStruct:
         description: "This struct contains a field that missing the 'stability' field in the new
                       command."
+        is_command_reply: true
         fields:
             missingUnstableFieldNewField:
                 type: string
@@ -749,9 +801,11 @@ structs:
     MissingUnstableFieldAddedNewFieldStruct:
         description: "This struct contains an added field in the new command that is missing the
                       'stability' field."
+        is_command_reply: true
 
     IncompatibleChainedStructReply:
         description: "This reply contains an incompatible chained struct"
+        is_command_reply: true
         chained_structs:
             NewVariantNotSubsetReply: NewVariantNotSubsetReply
 
@@ -762,7 +816,8 @@ structs:
 
     NewAddedChainedTypeReply:
         description: "This reply contains an added chained type in the new version"
-
+        is_command_reply: true
+        
     NewRemovedChainedTypeStruct:
         description: "This reply contains an added chained type in the new version"
         chained_types:
@@ -777,6 +832,7 @@ structs:
 
     BoolToOptionalBoolStruct:
         description: "bool field replaced by optionalBool"
+        is_command_reply: true
         fields:
             ok:
                 type: bool

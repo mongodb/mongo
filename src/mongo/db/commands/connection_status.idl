@@ -49,6 +49,7 @@ structs:
 
     ConnectionStatusReply:
         description: 'Reply to connectionStatus command'
+        is_command_reply: true
         fields:
             authInfo:
                 description: 'Authenticated users and roles'

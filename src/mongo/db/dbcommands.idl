@@ -37,6 +37,7 @@ structs:
     DataSizeReply:
         description: Reply from the dataSize command.
         strict: false
+        is_command_reply: true
         fields:
             size:
                 description: Total, possibly estimated size of data.
@@ -59,6 +60,7 @@ structs:
     DBStats:
         description: 'Reply from {dbStats: 1, scale: 1} command. Size fields are reduced by scale field.'
         strict: false
+        is_command_reply: true
         fields:
             db:
                 description: Name of database being examined.

@@ -48,6 +48,7 @@ structs:
 
     ValidateDBMetadataCommandReply:
         description: "The validateDBMetadata command's reply."
+        is_command_reply: true
         fields:
             apiVersionErrors:
                 type: array<ErrorReplyElement>

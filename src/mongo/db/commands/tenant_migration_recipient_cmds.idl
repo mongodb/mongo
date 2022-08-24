@@ -46,6 +46,7 @@ structs:
     recipientSyncDataResponse:
         description: "Response for the 'recipientSyncData' command"
         strict: false
+        is_command_reply: true
         fields:
             majorityAppliedDonorOpTime:
                 type: optime

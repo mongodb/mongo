@@ -40,6 +40,7 @@ structs:
     ConfigSvrCommitChunkMigrationResponse:
         description: "Response of the _configsvrCommitChunkMigration command."
         strict: false
+        is_command_reply: true
         fields:
             shardVersion:
                 type: ChunkVersion

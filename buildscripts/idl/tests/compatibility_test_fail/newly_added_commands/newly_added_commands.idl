@@ -44,12 +44,14 @@ types:
 structs:
     NewStructFieldNoUnstableField:
         description: "new struct field has no unstable field specified"
+        is_command_reply: true
         fields:
             newStructFieldNoUnstableField:
                 type: bool
 
     NewStructFieldTypeContainsAny:
         description: "new struct field type has bson_serialization_type with 'any'"
+        is_command_reply: true
         fields:
             newStructFieldTypeContainsAny:
                 type: bsonSerializationTypeAny

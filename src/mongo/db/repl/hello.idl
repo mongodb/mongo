@@ -75,6 +75,7 @@ structs:
     HelloCommandReply:
         description: "Reply to 'hello' command"
         strict: true
+        is_command_reply: true
         fields:
             helloOk:
                 type: bool

@@ -38,6 +38,7 @@ imports:
 structs:
     DropReply:
         description: "The drop command's reply."
+        is_command_reply: true
         fields:
             nIndexesWas:
                 type: int

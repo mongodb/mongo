@@ -37,6 +37,7 @@ structs:
     DropIndexesReply:
         description: Reply to the dropIndexes command
         strict: false
+        is_command_reply: true
         fields:
             nIndexesWas:
                 description: Number of indexes on the collection at start of dropIndexes command

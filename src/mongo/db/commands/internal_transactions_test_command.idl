@@ -36,6 +36,7 @@ structs:
   TestInternalTransactionsCommandReply:
     description: "Response for internal transaction command."
     strict: false
+    is_command_reply: true
     fields:
       responses:
         description: "List of responses to commands in the transaction."

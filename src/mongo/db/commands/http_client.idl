@@ -35,6 +35,7 @@ imports:
 structs:
     httpClientReply:
         description: "Result of an HTTP(S) GET request"
+        is_command_reply: true
         fields:
             code:
                 description: "Status code returned by server"

@@ -110,6 +110,7 @@ structs:
     InsertCommandReply:
         description: "Contains information related to insert command reply."
         strict: false
+        is_command_reply: true
         chained_structs:
             WriteCommandReplyBase: writeCommandReplyBase
 
@@ -128,6 +129,7 @@ structs:
     UpdateCommandReply:
         description: "Contains information related to update command reply."
         strict: false
+        is_command_reply: true
         chained_structs:
             WriteCommandReplyBase: writeCommandReplyBase
         fields:
@@ -145,6 +147,7 @@ structs:
     DeleteCommandReply:
         description: "Contains information related to delete command reply."
         strict: false
+        is_command_reply: true
         chained_structs:
             WriteCommandReplyBase: writeCommandReplyBase
 
@@ -306,6 +309,7 @@ structs:
     FindAndModifyCommandReply:
         description: "Parser for the response from a `findAndModify` command"
         strict: false
+        is_command_reply: true
         fields:
             lastErrorObject:
                 type: FindAndModifyLastError

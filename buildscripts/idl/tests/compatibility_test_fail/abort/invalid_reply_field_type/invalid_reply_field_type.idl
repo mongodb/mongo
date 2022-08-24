@@ -35,6 +35,7 @@ imports:
 structs:
     InvalidFieldTypeReply:
         description: "This reply contains a field where the type is invalid"
+        is_command_reply: true
         fields:
             invalidReplyField:
                 type: None

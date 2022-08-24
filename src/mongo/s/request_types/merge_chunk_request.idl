@@ -53,6 +53,7 @@ structs:
     ConfigSvrMergeResponse:
         description: "Response of the _configsvrCommitChunksMerge command."
         strict: false
+        is_command_reply: true
         fields:
             shardVersion:
                 type: ChunkVersion

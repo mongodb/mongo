@@ -45,6 +45,7 @@ structs:
     SaslReply:
         description: "Response for saslStart and saslContinue commands"
         strict: false
+        is_command_reply: true
         fields:
             conversationId:
                 # In practice, this field is always populated as 1.

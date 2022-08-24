@@ -95,6 +95,7 @@ structs:
     StableNewFieldReply:
         description: "This reply contains a field that is unstable in the old command but is
                       stable in the new command."
+        is_command_reply: true
         fields:
             stableNewField:
                 type: string
@@ -103,6 +104,7 @@ structs:
     UnstableNewFieldReplyIgnoreList:
         description: "This reply contains a field that is stable in the old command and is
                       unstable in the new command, but the change is explicitly allowed."
+        is_command_reply: true
         fields:
             unstableNewFieldIgnoreList:
                 type: string
@@ -111,6 +113,7 @@ structs:
     NewReplyTypeEnumOrStructIgnoreList:
         description: "the type is a non-enum or struct type in the old command, and an enum or struct
                       in the new command, but the change is explicitly allowed"
+        is_command_reply: true
         fields:
             newReplyTypeEnumOrStructIgnoreList:
                 type: StructType
@@ -119,6 +122,7 @@ structs:
     RequiredNewFieldReply:
         description: "This reply contains a field that is optional in the old command but is
                       required in the new command."
+        is_command_reply: true
         fields:
             requiredNewField:
                 type: string
@@ -135,6 +139,7 @@ structs:
 
     AddedNewFieldReply:
         description: "This reply contains a field that is added in the new command."
+        is_command_reply: true
         fields:
             addedNewField:
                 type: string
@@ -143,6 +148,7 @@ structs:
     UnstableOldFieldReply:
         description: "This reply contains a field that is unstable in the old command and is
                       unstable and optional in the new command."
+        is_command_reply: true
         fields:
             unstableOldField:
                 type: string
@@ -152,6 +158,7 @@ structs:
     UnstableOptionalNewFieldReplyIgnoreList:
         description: "This reply contains a field that is stable in the old command and is
                       unstable and optional in the new command, but the change is allowed"
+        is_command_reply: true
         fields:
             unstableOptionalNewFieldIgnoreList:
                 type: string
@@ -161,6 +168,7 @@ structs:
     EnumSubsetReply:
         description: "This reply contains an enum field where the new enum values is a subset
                       of the old reply type's enum values"
+        is_command_reply: true
         fields:
             replyField:
                 type: NewReplyFieldEnumSubset
@@ -169,6 +177,7 @@ structs:
     BsonSubsetReply:
         description: "This reply contains a field type where the new bson_serialization_type
                       is a subset of the old bson_serialization_type"
+        is_command_reply: true
         fields:
             bsonSubsetReplyField:
                 type: intStringToInt
@@ -177,6 +186,7 @@ structs:
     BsonSubsetReplyTwo:
         description: "This reply contains a field type where the new bson_serialization_type
                       is a subset of the old bson_serialization_type"
+        is_command_reply: true
         fields:
             bsonSubsetReplyFieldTwo:
                 type: intStringBoolToIntString
@@ -185,6 +195,7 @@ structs:
     StructFieldTypeRecursiveReplyIgnoreList:
         description: "This reply contains a field whose new type is a struct that is not
                       compatible with the old field type, but this is explicitly allowed"
+        is_command_reply: true
         fields:
             structReplyField:
                 type: UnstableNewFieldReplyIgnoreList
@@ -193,6 +204,7 @@ structs:
     StructFieldTypeRecursiveReplyOne:
         description: "This reply contains a field whose new type is a struct that is
                       compatible with the old field type"
+        is_command_reply: true
         fields:
             structReplyField:
                 type: StableNewFieldReply
@@ -201,6 +213,7 @@ structs:
     StructFieldTypeRecursiveReplyTwo:
         description: "This reply contains a field whose new type is a struct that is
                       compatible with the old field type"
+        is_command_reply: true
         fields:
             structReplyField:
                 type: StructType
@@ -217,6 +230,7 @@ structs:
     OldVariantTypeReply:
         description: "This reply contains an old field that has a variant type while the new field
                       is not a variant type"
+        is_command_reply: true
         fields:
             oldVariantTypeReplyField:
                 type: int
@@ -225,6 +239,7 @@ structs:
     NewVariantNotSubsetReplyIgnoreList:
         description: "This reply contains a field whose new variant types are not a subset
                       of the old variant types"
+        is_command_reply: true
         fields:
             variantNotSubsetReplyFieldIgnoreList:
                 type:
@@ -234,6 +249,7 @@ structs:
     NewVariantSubsetReply:
         description: "This reply contains a field whose new variant types are a subset
                       of the old variant types"
+        is_command_reply: true
         fields:
             variantSubsetReplyField:
                 stability: stable
@@ -243,6 +259,7 @@ structs:
     NewVariantSubsetReplyTwo:
         description: "This reply contains a field whose new variant types are a subset
                       of the old variant types"
+        is_command_reply: true
         fields:
             variantSubsetReplyFieldTwo:
                 stability: stable
@@ -252,6 +269,7 @@ structs:
     VariantRecursiveReply:
         description: "This reply contains a field that has a new variant type that is compatible
                       with the old variant type"
+        is_command_reply: true
         fields:
             variantRecursiveReplyField:
                 stability: stable
@@ -262,6 +280,7 @@ structs:
     OldVariantStructReply:
         description: "This reply contains a field whose new variant type does not have a variant
                       struct type while the old one does"
+        is_command_reply: true
         fields:
             variantStructReplyField:
                 stability: stable
@@ -271,6 +290,7 @@ structs:
     VariantStructRecursiveReply:
         description: "This reply contains a field that has a new variant struct type that is
                       compatible with the old variant struct type"
+        is_command_reply: true
         fields:
             variantStructRecursiveReplyField:
                 stability: stable
@@ -281,6 +301,7 @@ structs:
     VariantDifferentStructReplyIgnoreList:
         description: "This reply contains a field that has a new variant struct type that is
                       different from the old variant struct type"
+        is_command_reply: true
         fields:
             variantStructRecursiveReplyFieldIgnoreList:
                 stability: unstable
@@ -290,6 +311,7 @@ structs:
     NonVariantToVariantReplyIgnoreList:
         description: "This reply contains a field that changes from a non-variant type to a variant
                       type, but the field is in the ignore list"
+        is_command_reply: true
         fields:
             nonVariantToVariantReplyFieldIgnoreList:
                 stability: unstable
@@ -299,6 +321,7 @@ structs:
     NonEnumToEnumReplyIgnoreList:
         description: "This reply contains a field that changes from a non-enum type to an enum
                       type, but the field is in the ignore list"
+        is_command_reply: true
         fields:
             nonEnumToEnumReplyIgnoreList:
                 type: EnumSubsetReply
@@ -324,6 +347,7 @@ structs:
     OldValidatorStruct:
         description: "This struct contains a field where the old version contains a validator while
                       the new version does not"
+        is_command_reply: true
         fields:
             oldValidatorField:
                 type: int
@@ -331,6 +355,7 @@ structs:
 
     ValidatorsEqualStruct:
         description: "This struct contains a field where the new and old validator are exactly equal"
+        is_command_reply: true
         fields:
             validatorsEqualField:
                 type: double
@@ -477,6 +502,7 @@ structs:
 
     BsonSerializationTypeAnyReply:
         description: "This reply contains a field whose type is 'any' and is explicitly allowed"
+        is_command_reply: true
         fields:
             anyTypeField:
                 type: bsonSerializationTypeAnyAllowed
@@ -485,6 +511,7 @@ structs:
     NewlyAddedBsonSerializationTypeAnyReply:
         description: "This reply contains a newly added field whose type has a bson_serialization_type
                         that contains 'any' that is explicitly allowed"
+        is_command_reply: true
         fields:
             newlyAddedBsonSerializationTypeAnyReplyField:
                 type: bsonSerializationTypeAnyAllowed
@@ -501,6 +528,7 @@ structs:
 
     OldInternalTypeChangesReply:
         description: "This reply contains a field that is internal in the old version and has type changes"
+        is_command_reply: true
         fields:
             oldInternalTypeChangesReplyField:
                 stability: internal
@@ -511,6 +539,7 @@ structs:
     NewUnstableTypeChangesReplyIgnoreList:
         description: "This reply contains a field that is stable in the old version and has type changes,
                       but is also in the ignore list"
+        is_command_reply: true
         fields:
             newUnstableTypeChangesReplyFieldIgnoreList:
                 stability: unstable
@@ -550,6 +579,7 @@ structs:
     BsonSerializationTypeAnyWithVariantReply:
         description: "This reply contains a new reply field with variant types where one of the
                       bson serialization types is 'any' and is explicitly allowed"
+        is_command_reply: true
         fields:
             anyTypeField:
                 stability: stable
@@ -560,6 +590,7 @@ structs:
 
     ArrayTypeStruct:
         description: "Struct with ArrayType field."
+        is_command_reply: true
         fields:
             ArrayCommandParameter:
                 type: array<string>
@@ -568,6 +599,7 @@ structs:
     MissingUnstableFieldNewFieldStruct:
         description: "This struct contains a field that missing the 'stability' field in the new
                       command."
+        is_command_reply: true
         fields:
             missingUnstableFieldNewField:
                 type: string
@@ -575,6 +607,7 @@ structs:
     MissingUnstableFieldOldFieldStruct:
         description: "This struct contains a field that missing the 'stability' field in the old
                       command."
+        is_command_reply: true
         fields:
             missingUnstableFieldNewField:
                 type: string
@@ -582,6 +615,7 @@ structs:
 
     CompatibleChainedStructReply:
         description: "This reply contains an compatible chained struct"
+        is_command_reply: true
         chained_structs:
             StructFieldTypeRecursiveReplyTwo: StructFieldTypeRecursiveReplyTwo
 
@@ -592,6 +626,7 @@ structs:
 
     NewOptionalBoolStruct:
         description: "This struct gets another field of type optionalBool."
+        is_command_reply: true
         fields:
             ok1:
                 type: bool
@@ -603,6 +638,7 @@ structs:
 
     OptionalBoolEquivalenceStruct:
         description: "First two fields get the types swapped."
+        is_command_reply: true
         fields:
             ok1:
                 type: optionalBool
@@ -617,6 +653,7 @@ structs:
 
     OptionalBoolToBoolStruct:
         description: "optionalBool field replaced by bool"
+        is_command_reply: true
         fields:
             ok:
                 type: bool
@@ -624,6 +661,7 @@ structs:
 
     BoolToOptionalBoolStruct:
         description: "bool field replaced by optionalBool"
+        is_command_reply: true
         fields:
             ok:
                 type: optionalBool
@@ -631,6 +669,7 @@ structs:
 
     ReplyWithNewArrayTypeField:
         description: "new field is of ArrayType"
+        is_command_reply: true
         fields:
             ok:
                 type: bool
@@ -642,6 +681,7 @@ structs:
 
     ReplyWithNewNestedArrayTypeField:
         description: "new field is a struct with a field of ArrayType"
+        is_command_reply: true
         fields:
             ok:
                 type: bool

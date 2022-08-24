@@ -47,6 +47,7 @@ structs:
     KillCursorsCommandReply:
         description: 'Response from killCursors command'
         strict: false
+        is_command_reply: true
         fields:
             cursorsKilled:
                 description: 'Cursors successfully killed'

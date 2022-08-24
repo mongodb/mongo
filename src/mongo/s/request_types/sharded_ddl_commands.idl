@@ -73,6 +73,7 @@ structs:
     ConfigsvrCreateDatabaseResponse:
         description: "Response for the create database command"
         strict: false
+        is_command_reply: true
         fields:
             databaseVersion:
                 type: database_version
@@ -108,6 +109,7 @@ structs:
     RenameCollectionResponse:
         description: "Response for the rename collection command"
         strict: false
+        is_command_reply: true
         fields:
             collectionVersion:
                 type: shard_version
@@ -170,6 +172,7 @@ structs:
     CreateCollectionResponse:
         description: "Response of the create collection command"
         strict: false
+        is_command_reply: true
         fields:
             collectionUUID:
                 type: uuid

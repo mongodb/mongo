@@ -205,6 +205,7 @@ structs:
 
     ListIndexesReply:
         description: "The listIndexes command's reply."
+        is_command_reply: true
         fields:
             cursor:
                 type: ListIndexesReplyCursor

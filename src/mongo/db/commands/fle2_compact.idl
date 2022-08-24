@@ -69,6 +69,7 @@ structs:
     CompactStructuredEncryptionDataCommandReply:
         description: "Reply from the {compactStructuredEncryptedData: ...} command"
         strict: true
+        is_command_reply: true
         fields:
             stats: CompactStats
 

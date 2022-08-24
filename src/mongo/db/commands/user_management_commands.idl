@@ -39,6 +39,7 @@ structs:
     dropAllUsersFromDatabaseReply:
         description: "Response for dropAllUsersFromDatabase command"
         strict: false
+        is_command_reply: true
         fields:
             n:
                 description: "Number of users dropped from database"
@@ -48,6 +49,7 @@ structs:
     dropAllRolesFromDatabaseReply:
         description: "Response for dropAllRolesFromDatabase command"
         strict: false
+        is_command_reply: true
         fields:
             n:
                 description: "Number of roles dropped from database"
@@ -57,6 +59,7 @@ structs:
     usersInfoReply:
         description: "Reply from usersInfo command"
         strict: false
+        is_command_reply: true
         fields:
             users:
                 description: "Users descriptions"
@@ -65,6 +68,7 @@ structs:
     rolesInfoReply:
         description: "Reply from rolesInfo command"
         strict: false
+        is_command_reply: true
         fields:
             roles:
                 description: "Users descriptions"
@@ -78,6 +82,7 @@ structs:
     GetUserCacheGenerationReply:
         description: "Reply from _getUserCacheGeneration command"
         strict: false
+        is_command_reply: true
         fields:
             cacheGeneration:
                 description: "Cache generation"

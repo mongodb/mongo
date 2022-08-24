@@ -47,6 +47,7 @@ structs:
     AutoSplitVectorResponse:
         description: "The reply of an autoSplitVector command."
         strict: false
+        is_command_reply: true
         fields:
             splitKeys: bson_vector
             continuation:

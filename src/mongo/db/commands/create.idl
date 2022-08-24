@@ -44,6 +44,7 @@ structs:
     CreateCommandReply:
         description: 'Reply from the {create: ...} command'
         strict: true
+        is_command_reply: true
         fields:
             note:
                 description: 'Warnings or other additional information'

@@ -56,6 +56,7 @@ structs:
 
     ListDatabasesReply:
         description: "The listDatabases command's reply."
+        is_command_reply: true
         fields:
             databases:
                 type: array<ListDatabasesReplyItem>

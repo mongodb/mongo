@@ -120,6 +120,7 @@ structs:
     CursorInitialReply:
         description: "A struct representing a initial cursor reply."
         cpp_validator_func: "validateIDLParsedCursorResponse"
+        is_command_reply: true
         fields:
             cursor:
                 description: "A response cursor object."
@@ -156,6 +157,7 @@ structs:
 
     CursorGetMoreReply:
         description: "A struct representing a getMore cursor reply."
+        is_command_reply: true
         fields:
             cursor:
                 description: "A response cursor object."

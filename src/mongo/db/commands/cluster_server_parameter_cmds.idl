@@ -35,6 +35,7 @@ imports:
 structs:
     GetClusterParameterReply:
         description: "Reply to getClusterParameter command"
+        is_command_reply: true
         fields:
             clusterParameters: array<object>
 

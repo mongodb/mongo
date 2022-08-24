@@ -58,5 +58,6 @@ commands:
 structs:
   exampleIncrementReply:
     description: "reply to exampleIncrement"
+    is_command_reply: true
     fields:
       iPlusOne: int

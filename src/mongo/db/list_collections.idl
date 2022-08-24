@@ -93,6 +93,7 @@ structs:
 
     ListCollectionsReply:
         description: "The listCollection command's reply."
+        is_command_reply: true
         fields:
             cursor:
                 type: ListCollectionsReplyCursor

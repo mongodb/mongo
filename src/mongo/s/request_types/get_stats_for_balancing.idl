@@ -60,6 +60,7 @@ structs:
     ShardsvrGetStatsForBalancingReply:
         description: 'Response for ShardsvrGetStatsForBalancing command'
         strict: false
+        is_command_reply: true
         fields:
             stats:
                 description: 'List of stats for each of the requested collection'
