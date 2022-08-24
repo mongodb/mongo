@@ -252,23 +252,24 @@ class RecordIdPrinter(object):
         if rid_format == 0:
             return "null RecordId"
         elif rid_format == 1:
-            hex_bytes = [int(self.val['_buffer'][i]) for i in range(8)]
-            raw_bytes = bytes(hex_bytes)
-            return "RecordId long: %s" % struct.unpack('l', raw_bytes)[0]
+            long_id = int(self.val['_data']['longId']['id'])
+            return "RecordId long: %d" % (long_id)
         elif rid_format == 2:
-            str_len = int(self.val["_buffer"][0])
-            raw_bytes = [int(self.val['_buffer'][i]) for i in range(1, str_len + 1)]
+            inline_str = self.val['_data']['inlineStr']
+            str_len = int(inline_str['size'])
+            str_array = inline_str['dataArr']
+            # Reading the std::array elements
+            raw_bytes = [int(str_array['_M_elems'][i]) for i in range(0, str_len)]
             hex_bytes = [hex(b & 0xFF)[2:].zfill(2) for b in raw_bytes]
             return "RecordId small string %d hex bytes: %s" % (str_len, str("".join(hex_bytes)))
         elif rid_format == 3:
-            holder_ptr = self.val["_sharedBuffer"]["_buffer"]["_holder"]["px"]
-            holder = holder_ptr.dereference()
-            str_len = int(holder["_capacity"])
-            # Start of data is immediately after pointer for holder
-            start_ptr = (holder_ptr + 1).dereference().cast(gdb.lookup_type("char")).address
-            raw_bytes = [int(start_ptr[i]) for i in range(1, str_len + 1)]
+            heap_str = self.val['_data']['heapStr']
+            str_len = int(heap_str["size"])
+            str_ptr = heap_str['stringPtr']
+            raw_bytes = [int(str_ptr[i]) for i in range(0, str_len)]
             hex_bytes = [hex(b & 0xFF)[2:].zfill(2) for b in raw_bytes]
-            return "RecordId big string %d hex bytes @ %s: %s" % (str_len, holder_ptr + 1,
+            void_ptr = str_ptr.cast(gdb.lookup_type('void').pointer())
+            return "RecordId big string %d hex bytes @ %s: %s" % (str_len, void_ptr,
                                                                   str("".join(hex_bytes)))
         else:
             return "unknown RecordId format: %d" % rid_format
