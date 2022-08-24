@@ -702,8 +702,10 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         // DOES need to be -- that will cause correctness issues). Additionally, if the user tried
         // to insert measurements with dates outside the standard range, chances are they will do so
         // again, and we will have only set the flag a little early.
+        invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
         auto bucketsColl =
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, nss);
+        uassert(ErrorCodes::NamespaceNotFound, "Could not find collection for write", bucketsColl);
         auto timeSeriesOptions = bucketsColl->getTimeseriesOptions();
         if (timeSeriesOptions.has_value()) {
             if (auto currentSetting = bucketsColl->getRequiresTimeseriesExtendedRangeSupport();
