@@ -1,9 +1,11 @@
 /**
  * Tests hedging metrics in the serverStatus output.
+ * @tags: [requires_fcv_61]
  */
 (function() {
 "use strict";
 
+load("jstests/libs/parallel_shell_helpers.js");
 load("jstests/libs/fail_point_util.js");
 
 function setCommandDelay(nodeConn, command, delay, ns) {
@@ -51,6 +53,49 @@ function checkForOpWithComment(conn, comment) {
     return true;
 }
 
+/**
+ * The following starts a parallel shell to run a `count` command against the cluster. The
+ * `failCommand` fail-point is enabled on both nodes that are targeted to run the hedged operation.
+ * `fp1` ensures the main target blocks the command until the fail-point is disabled. `fp2` makes
+ * the hedged target return a `NetworkInterfaceExceededTimeLimit` error code as the result of
+ * running the command. This simulates a situation where the hedged operations fail due to network
+ * timeouts, while the main operation succeeds.
+ */
+function verifyCommandWorksWhenHedgeOperationsFailWithNetworkTimeout(
+    port, dbName, collName, nodes) {
+    jsTestLog("Verify that command works when hedged operations fail due to a network timeout");
+
+    const ns = dbName + "." + collName;
+    let fp1 = configureFailPoint(nodes[0], "failCommand", {
+        failCommands: ["count"],
+        failInternalCommands: true,
+        namespace: ns,
+        blockConnection: true,
+        blockTimeMS: 10000,  // this is not expected to unblock due to a timeout.
+    });
+
+    let fp2 = configureFailPoint(nodes[1], "failCommand", {
+        failCommands: ["count"],
+        failInternalCommands: true,
+        namespace: ns,
+        errorCode: NumberInt(ErrorCodes.NetworkInterfaceExceededTimeLimit),
+    });
+
+    const ps = startParallelShell(funWithArgs(function(dbName, collName) {
+                                      const testDB = db.getSiblingDB(dbName);
+                                      assert.commandWorked(testDB.runCommand(
+                                          {count: collName, $readPreference: {mode: "nearest"}}));
+                                  }, dbName, collName), port);
+
+    fp2.wait();
+    fp2.off();
+
+    fp1.wait();
+    fp1.off();
+
+    ps();
+}
+
 const st = new ShardingTest({
     mongos: [{
         setParameter: {
@@ -88,6 +133,9 @@ assert.commandWorked(testDB.runCommand({
 }));
 
 let sortedNodes = [...st.rs0.nodes].sort((node1, node2) => node1.host.localeCompare(node2.host));
+
+verifyCommandWorksWhenHedgeOperationsFailWithNetworkTimeout(
+    st.s0.port, dbName, collName, sortedNodes);
 
 jsTest.log("Verify that the initial request is canceled when the hedged request responds first");
 try {

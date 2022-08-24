@@ -102,6 +102,19 @@ bool catchingInvoke(F&& f, EH&& eh, StringData hint) {
     }
 }
 
+/**
+ * We ignore a subset of errors that may occur while running hedged operations (e.g., maxTimeMS
+ * expiration), as the operation may safely succeed despite their failure. For example, a network
+ * timeout error indicates the remote host experienced a timeout while running a remote-command as
+ * part of executing the hedged operation. This is by no means an indication that the operation has
+ * failed, as other hedged operations may still succeed.
+ * TODO SERVER-68704 will include other error categories that are safe to ignore.
+ */
+bool skipHedgeResult(const Status& status) {
+    return status == ErrorCodes::MaxTimeMSExpired || status == ErrorCodes::StaleDbVersion ||
+        ErrorCodes::isNetworkTimeoutError(status) || ErrorCodes::isStaleShardVersionError(status);
+}
+
 }  // namespace
 
 /**
@@ -927,20 +940,14 @@ void NetworkInterfaceTL::RequestState::resolve(Future<RemoteCommandResponse> fut
             returnConnection(status);
 
             const auto commandStatus = getStatusFromCommandResult(response.data);
-            if (isHedge) {
-                // Ignore maxTimeMS expiration or any sharding "retargeting needed" error category
-                // for hedged reads without triggering the finish line.
-                if (commandStatus == ErrorCodes::MaxTimeMSExpired ||
-                    commandStatus == ErrorCodes::StaleDbVersion ||
-                    ErrorCodes::isStaleShardVersionError(commandStatus)) {
-                    LOGV2_DEBUG(4660701,
-                                2,
-                                "Hedged request returned status",
-                                "requestId"_attr = request->id,
-                                "target"_attr = request->target,
-                                "status"_attr = commandStatus);
-                    return;
-                }
+            if (isHedge && skipHedgeResult(commandStatus)) {
+                LOGV2_DEBUG(4660701,
+                            2,
+                            "Hedged request returned status",
+                            "requestId"_attr = request->id,
+                            "target"_attr = request->target,
+                            "status"_attr = commandStatus);
+                return;
             }
 
             if (!cmdState->finishLine.arriveStrongly()) {

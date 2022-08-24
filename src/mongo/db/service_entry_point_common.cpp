@@ -1375,6 +1375,7 @@ void RunCommandAndWaitForWriteConcern::_setup() {
 }
 
 Future<void> RunCommandAndWaitForWriteConcern::_runCommandWithFailPoint() {
+    // TODO SERVER-69061 rename `failWithErrorCodeInRunCommand` and remove the following comment.
     // Despite the name, this failpoint only affects commands with write concerns.
     if (auto scoped = failWithErrorCodeInRunCommand.scoped(); MONGO_unlikely(scoped.isActive())) {
         const auto errorCode = scoped.getData()["errorCode"].numberInt();
