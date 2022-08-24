@@ -53,7 +53,7 @@ public:
     ShardVersion(ChunkVersion chunkVersion)
         : CollectionGeneration(chunkVersion.epoch(), chunkVersion.getTimestamp()),
           ChunkVersion(chunkVersion),
-          CollectionIndexes() {}
+          CollectionIndexes({chunkVersion.epoch(), chunkVersion.getTimestamp()}, boost::none) {}
 
     ShardVersion() : ShardVersion(ChunkVersion(), CollectionIndexes()) {}
 

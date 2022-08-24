@@ -8,8 +8,7 @@ var ShardVersioningUtil = (function() {
     const kIgnoredShardVersion = {
         e: ObjectId("00000000ffffffffffffffff"),
         t: Timestamp(Math.pow(2, 32) - 1, Math.pow(2, 32) - 1),
-        v: Timestamp(0, 0),
-        i: Timestamp(0, 0)
+        v: Timestamp(0, 0)
     };
 
     /*
