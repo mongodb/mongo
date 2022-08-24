@@ -54,6 +54,8 @@ constexpr size_t kMaxFlattenedInCombinations = 4000000;
 
 constexpr auto kIdField = "_id"_sd;
 
+const BSONObj kNullObj = BSON("" << BSONNULL);
+
 /**
  * Currently the allowable shard keys are either:
  * i) a hashed single field, e.g. { a : "hashed" }, or
@@ -100,6 +102,10 @@ std::vector<std::unique_ptr<FieldRef>> parseShardKeyPattern(const BSONObj& keyPa
     }
 
     return parsedPaths;
+}
+
+bool isValidShardKeyElementForExtractionFromDocument(const BSONElement& element) {
+    return element.type() != Array;
 }
 
 bool isValidShardKeyElement(const BSONElement& element) {
@@ -152,6 +158,15 @@ BSONElement findEqualityElement(const EqualityMatches& equalities, const FieldRe
     return extractKeyElementFromMatchable(matchable, suffixStr);
 }
 
+BSONElement extractFieldFromDocumentKey(const BSONObj& documentKey, StringData fieldName) {
+    BSONElement output;
+    for (auto&& documentKeyElt : documentKey) {
+        if (fieldName == documentKeyElt.fieldNameStringData()) {
+            return documentKeyElt;
+        }
+    }
+    return output;
+}
 }  // namespace
 
 constexpr int ShardKeyPattern::kMaxShardKeySizeBytes;
@@ -271,9 +286,51 @@ BSONObj ShardKeyPattern::extractShardKeyFromMatchable(const MatchableDocument& m
     return keyBuilder.obj();
 }
 
+BSONObj ShardKeyPattern::extractShardKeyFromDocumentKey(const BSONObj& documentKey) const {
+    BSONObjBuilder keyBuilder;
+    for (auto&& shardKeyField : _keyPattern.toBSON()) {
+        auto matchEl =
+            extractFieldFromDocumentKey(documentKey, shardKeyField.fieldNameStringData());
+
+        if (matchEl.eoo()) {
+            matchEl = kNullObj.firstElement();
+        }
+
+        // A shard key field cannot have array values. If we encounter array values return
+        // immediately.
+        if (!isValidShardKeyElementForExtractionFromDocument(matchEl)) {
+            return BSONObj();
+        }
+
+        if (isHashedPatternEl(shardKeyField)) {
+            keyBuilder.append(
+                shardKeyField.fieldNameStringData(),
+                BSONElementHasher::hash64(matchEl, BSONElementHasher::DEFAULT_HASH_SEED));
+        } else {
+            keyBuilder.appendAs(matchEl, shardKeyField.fieldNameStringData());
+        }
+    }
+    dassert(isShardKey(keyBuilder.asTempObj()));
+    return keyBuilder.obj();
+}
+
 BSONObj ShardKeyPattern::extractShardKeyFromDoc(const BSONObj& doc) const {
     BSONMatchableDocument matchable(doc);
     return extractShardKeyFromMatchable(matchable);
+}
+
+BSONObj ShardKeyPattern::extractShardKeyFromOplogEntry(const repl::OplogEntry& entry) const {
+    if (!entry.isCrudOpType()) {
+        return BSONObj();
+    }
+
+    auto objWithDocumentKey = entry.getObjectContainingDocumentKey();
+
+    if (!entry.isUpdateOrDelete()) {
+        return extractShardKeyFromDoc(objWithDocumentKey);
+    }
+
+    return extractShardKeyFromDocumentKey(objWithDocumentKey);
 }
 
 std::vector<StringData> ShardKeyPattern::findMissingShardKeyFieldsFromDoc(const BSONObj doc) const {

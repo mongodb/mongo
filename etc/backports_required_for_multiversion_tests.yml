@@ -116,6 +116,8 @@ all:
     test_file: jstests/replsets/step_down_chaining_disabled.js
   - ticket: SERVER-50486
     test_file: jstests/replsets/dont_refresh_session_prepare_secondary.js
+  - ticket: SERVER-56127
+    test_file: jstests/sharding/retryable_writes_nested_shard_key.js
   - ticket: SERVER-59197
     test_file: jstests/replsets/sessions_collection_reaping.js
   - ticket: SERVER-37904
@@ -175,8 +177,6 @@ suites:
   - ticket: SERVER-47568
     test_file: jstests/replsets/disable_cluster_time_gossiping_in_unreadable_state.js
 
-  sharding_multiversion:
-
   sharding_jscore_multiversion_passthrough:
   - ticket: SERVER-47469
     test_file: jstests/core/apply_ops_system_dot_views.js
@@ -184,3 +184,7 @@ suites:
   sharded_collections_jscore_multiversion_passthrough:
   - ticket: SERVER-47469
     test_file: jstests/core/apply_ops_system_dot_views.js
+
+  sharding_multiversion:
+  - ticket: SERVER-56127
+    test_file: jstests/sharding/retryable_writes_nested_shard_key.js
