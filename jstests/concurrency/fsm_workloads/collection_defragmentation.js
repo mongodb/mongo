@@ -236,11 +236,7 @@ var $config = (function() {
                 // Enable balancing and wait for balanced
                 assertAlways.commandWorked(mongos.getDB('config').collections.update(
                     {_id: fullNs}, {$set: {"noBalance": false}}));
-                assertAlways.soon(function() {
-                    let res = mongos.adminCommand({balancerCollectionStatus: fullNs});
-                    assertAlways.commandWorked(res);
-                    return res.balancerCompliant;
-                });
+                sh.awaitCollectionBalance(mongos.getCollection(fullNs));
                 // Begin defragmentation again
                 assertAlways.commandWorked(mongos.adminCommand({
                     configureCollectionBalancing: fullNs,
