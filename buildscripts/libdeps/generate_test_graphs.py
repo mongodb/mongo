@@ -23,6 +23,7 @@
 #
 """Test graphs for the graph visualizer and analyzer."""
 
+import os
 import json
 import argparse
 import networkx
@@ -38,6 +39,10 @@ def get_args():
     parser.add_argument('--graph-output-dir', type=str, action='store',
                         help="Directory test graphml files will be saved.",
                         default="build/opt/libdeps")
+
+    parser.add_argument('--generate-big-graphs', action='store_true',
+                        help="Makes graphs which are large for testing scale.", default=False)
+
     return parser.parse_args()
 
 
@@ -54,8 +59,33 @@ def add_edge(graph, from_node, to_node, **kwargs):
         EdgeProps.direct.name: kwargs[EdgeProps.direct.name],
         EdgeProps.visibility.name: int(kwargs[EdgeProps.visibility.name]),
     }
+    if kwargs.get('symbols'):
+        edge_props[EdgeProps.symbols.name] = kwargs.get('symbols')
 
     graph.add_edges_from([(from_node, to_node, edge_props)])
+
+
+def get_big_graph(int_id):
+    """Generate a big graph."""
+
+    graph = LibdepsGraph()
+    graph.graph['build_dir'] = '.'
+    graph.graph['graph_schema_version'] = 2
+    graph.graph['deptypes'] = json.dumps({
+        "Global": 0,
+        "Public": 1,
+        "Private": 2,
+        "Interface": 3,
+    })
+    graph.graph['git_hash'] = f'BIG{int_id.zfill(4)}'
+    num_nodes = 200
+    for i in range(num_nodes):
+        add_node(graph, f'lib{i}.so', 'SharedLibrary')
+        for j in range(num_nodes - i):
+            add_edge(graph, f'lib{i}.so', f'lib{j}.so', direct=True,
+                     visibility=graph.get_deptype('Public'), symbols='\n'.join(
+                         [f"RandomString{i+j}" * 100 for i in range(10)]))
+    return graph
 
 
 def get_double_diamond_mock_graph():
@@ -332,6 +362,8 @@ def main():
     args = get_args()
     output_dir = args.graph_output_dir
 
+    os.makedirs(output_dir, exist_ok=True)
+
     graph = get_double_diamond_mock_graph()
     save_graph_file(graph, output_dir)
 
@@ -343,6 +375,13 @@ def main():
 
     graph = get_simple_directory_graph()
     save_graph_file(graph, output_dir)
+
+    if args.generate_big_graphs:
+        graph = get_big_graph("0")
+        for i in range(1, 30):
+            print(f"generating big graph {i}...")
+            graph.graph['git_hash'] = f'BIG{str(i).zfill(4)}'
+            save_graph_file(graph, output_dir)
 
 
 if __name__ == "__main__":

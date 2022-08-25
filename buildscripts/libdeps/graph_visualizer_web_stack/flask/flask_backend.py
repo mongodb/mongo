@@ -30,12 +30,15 @@ The backend interacts with the graph_analyzer to perform queries on various libd
 from pathlib import Path
 from collections import namedtuple, OrderedDict
 
+import time
+import threading
+import gc
+
 import flask
 import networkx
 import cxxfilt
-
+from pympler.asizeof import asizeof
 from flask_cors import CORS
-from flask_session import Session
 from lxml import etree
 from flask import request
 
@@ -47,7 +50,7 @@ class BackendServer:
     """Create small class for storing variables and state of the backend."""
 
     # pylint: disable=too-many-instance-attributes
-    def __init__(self, graphml_dir, frontend_url):
+    def __init__(self, graphml_dir, frontend_url, memory_limit):
         """Create and setup the state variables."""
         self.app = flask.Flask(__name__)
         self.app.config['CORS_HEADERS'] = 'Content-Type'
@@ -66,8 +69,13 @@ class BackendServer:
                               self.return_paths_between, methods=['POST'])
 
         self.loaded_graphs = {}
+        self.total_graph_size = 0
         self.graphml_dir = Path(graphml_dir)
         self.frontend_url = frontend_url
+        self.loading_locks = {}
+        self.memory_limit_bytes = memory_limit * (10**9) * 0.8
+        self.unloading = False
+        self.unloading_lock = threading.Lock()
 
         self.graph_file_tuple = namedtuple('GraphFile', ['version', 'git_hash', 'graph_file'])
         self.graph_files = self.get_graphml_files()
@@ -305,13 +313,59 @@ class BackendServer:
                 'error': 'Git commit hash (' + git_hash + ') does not have a matching graph file.'
             }, 400
 
+    def perform_unloading(self, git_hash):
+        """Perform the unloading of a graph in a separate thread."""
+        if self.total_graph_size > self.memory_limit_bytes:
+            while self.total_graph_size > self.memory_limit_bytes:
+                self.app.logger.info(
+                    f"Current graph memory: {self.total_graph_size / (10**9)} GB, Unloading to get to {self.memory_limit_bytes / (10**9)} GB"
+                )
+
+                self.unloading_lock.acquire()
+
+                lru_hash = min(
+                    [graph_hash for graph_hash in self.loaded_graphs if graph_hash != git_hash],
+                    key=lambda x: self.loaded_graphs[x]['atime'])
+                if lru_hash:
+                    self.app.logger.info(
+                        f"Unloading {[lru_hash]}, last used {round(time.time() - self.loaded_graphs[lru_hash]['atime'] , 1)}s ago"
+                    )
+                    self.total_graph_size -= self.loaded_graphs[lru_hash]['size']
+                    del self.loaded_graphs[lru_hash]
+                    del self.loading_locks[lru_hash]
+                self.unloading_lock.release()
+            gc.collect()
+            self.app.logger.info(f"Memory limit satisfied: {self.total_graph_size / (10**9)} GB")
+        self.unloading = False
+
+    def unload_graphs(self, git_hash):
+        """Unload least recently used graph when hitting application memory threshold."""
+
+        if not self.unloading:
+            self.unloading = True
+
+            thread = threading.Thread(target=self.perform_unloading, args=(git_hash, ))
+            thread.daemon = True
+            thread.start()
+
     def load_graph(self, git_hash):
         """Load the graph into application memory."""
 
         with self.app.test_request_context():
+            self.unload_graphs(git_hash)
+
+            loaded_graph = None
+
+            self.unloading_lock.acquire()
             if git_hash in self.loaded_graphs:
-                return self.loaded_graphs[git_hash]
-            else:
+                self.loaded_graphs[git_hash]['atime'] = time.time()
+                loaded_graph = self.loaded_graphs[git_hash]['graph']
+            if git_hash not in self.loading_locks:
+                self.loading_locks[git_hash] = threading.Lock()
+            self.unloading_lock.release()
+
+            self.loading_locks[git_hash].acquire()
+            if git_hash not in self.loaded_graphs:
                 if git_hash in self.graph_files:
                     file_path = self.graph_files[git_hash].graph_file
                     nx_graph = networkx.read_graphml(file_path)
@@ -334,7 +388,16 @@ class BackendServer:
                                         nx_graph[source][target].get('symbols').split())
                                 except AttributeError:
                                     nx_graph[source][target]['symbols'] = []
-                    graph = libdeps.graph.LibdepsGraph(nx_graph)
-                    self.loaded_graphs[git_hash] = graph
-                    return graph
-                return None
+                    loaded_graph = libdeps.graph.LibdepsGraph(nx_graph)
+
+                    self.loaded_graphs[git_hash] = {
+                        'graph': loaded_graph,
+                        'size': asizeof(loaded_graph),
+                        'atime': time.time(),
+                    }
+                    self.total_graph_size += self.loaded_graphs[git_hash]['size']
+            else:
+                loaded_graph = self.loaded_graphs[git_hash]['graph']
+            self.loading_locks[git_hash].release()
+
+            return loaded_graph
