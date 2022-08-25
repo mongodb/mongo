@@ -190,9 +190,9 @@ function runTest(st, stepDownShard0PrimaryFunc, testOpts = {
         st.rs0.stopSet(null /* signal */, true /*forRestart */);
         st.rs0.startSet({restart: true});
         st.rs0.getPrimary();
-        // Wait for replication since it is illegal to run commitTransaction before the prepare
-        // oplog entry has been majority committed.
-        st.rs0.awaitReplication();
+        // Wait for replication to recover the lastCommittedOpTime since it is illegal to run
+        // commitTransaction before the prepare oplog entry has been majority committed.
+        st.rs0.awaitLastOpCommitted();
     };
 
     // Test findAnModify without pre/post image.
