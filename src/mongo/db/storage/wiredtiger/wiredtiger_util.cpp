@@ -54,7 +54,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/fail_point.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/static_immortal.h"
@@ -69,49 +68,11 @@
     "oldest pinned transaction ID rolled back for eviction"
 namespace mongo {
 
-MONGO_FAIL_POINT_DEFINE(crashAfterUpdatingFirstTableLoggingSettings);
-
 namespace {
 
 const std::string kTableChecksFileName = "_wt_table_checks";
 const std::string kTableExtension = ".wt";
 const std::string kWiredTigerBackupFile = "WiredTiger.backup";
-
-/**
- * Returns true if the 'kTableChecksFileName' file exists in the dbpath.
- *
- * Must be called before createTableChecksFile() or removeTableChecksFile() to get accurate results.
- */
-bool hasPreviouslyIncompleteTableChecks() {
-    auto path = boost::filesystem::path(storageGlobalParams.dbpath) /
-        boost::filesystem::path(kTableChecksFileName);
-
-    return boost::filesystem::exists(path);
-}
-
-/**
- * Creates the 'kTableChecksFileName' file in the dbpath.
- */
-void createTableChecksFile() {
-    auto path = boost::filesystem::path(storageGlobalParams.dbpath) /
-        boost::filesystem::path(kTableChecksFileName);
-
-    boost::filesystem::ofstream fileStream(path);
-    fileStream << "This file indicates that a WiredTiger table check operation is in progress or "
-                  "incomplete."
-               << std::endl;
-    if (fileStream.fail()) {
-        auto ec = lastSystemError();
-        LOGV2_FATAL_NOTRACE(4366400,
-                            "Failed to write to file",
-                            "file"_attr = path.generic_string(),
-                            "error"_attr = errorMessage(ec));
-    }
-    fileStream.close();
-
-    fassertNoTrace(4366401, fsyncFile(path));
-    fassertNoTrace(4366402, fsyncParentDirectory(path));
-}
 
 /**
  * Removes the 'kTableChecksFileName' file in the dbpath, if it exists.
@@ -162,10 +123,6 @@ void setTableWriteTimestampAssertion(WiredTigerSessionCache* sessionCache,
 }  // namespace
 
 using std::string;
-
-Mutex WiredTigerUtil::_tableLoggingInfoMutex =
-    MONGO_MAKE_LATCH("WiredTigerUtil::_tableLoggingInfoMutex");
-WiredTigerUtil::TableLoggingInfo WiredTigerUtil::_tableLoggingInfo;
 
 bool wasRollbackReasonCachePressure(WT_SESSION* session) {
     if (session) {
@@ -834,18 +791,7 @@ int WiredTigerUtil::verifyTable(OperationContext* opCtx,
 }
 
 void WiredTigerUtil::notifyStartupComplete() {
-    {
-        stdx::lock_guard<Latch> lk(_tableLoggingInfoMutex);
-        invariant(_tableLoggingInfo.isInitializing);
-        _tableLoggingInfo.isInitializing = false;
-    }
-
     removeTableChecksFile();
-}
-
-void WiredTigerUtil::resetTableLoggingInfo() {
-    stdx::lock_guard<Latch> lk(_tableLoggingInfoMutex);
-    _tableLoggingInfo = TableLoggingInfo();
 }
 
 bool WiredTigerUtil::useTableLogging(const NamespaceString& nss) {
@@ -879,119 +825,16 @@ bool WiredTigerUtil::useTableLogging(const NamespaceString& nss) {
 }
 
 Status WiredTigerUtil::setTableLogging(OperationContext* opCtx, const std::string& uri, bool on) {
+    if (gWiredTigerSkipTableLoggingChecksOnStartup) {
+        LOGV2_DEBUG(5548302, 1, "Skipping table logging check", "uri"_attr = uri);
+        return Status::OK();
+    }
+
     // Try to close as much as possible to avoid EBUSY errors.
     WiredTigerRecoveryUnit::get(opCtx)->getSession()->closeAllCursors(uri);
     WiredTigerSessionCache* sessionCache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
     sessionCache->closeAllCursors(uri);
 
-    stdx::lock_guard<Latch> lk(_tableLoggingInfoMutex);
-
-    // Update the table logging settings regardless if we're no longer starting up the process.
-    if (!_tableLoggingInfo.isInitializing) {
-        return _setTableLogging(sessionCache, uri, on);
-    }
-
-    // During the start up process, the table logging settings are checked for each table to verify
-    // that they are set appropriately. We can speed this process up by assuming that the logging
-    // setting is identical for each table.
-    // We cross reference the logging settings for the first table and if it isn't correctly set, we
-    // change the logging settings for all tables during start up.
-    // In the event that the server wasn't shutdown cleanly, the logging settings will be modified
-    // for all tables as a safety precaution, or if repair mode is running.
-    if (_tableLoggingInfo.isFirstTable && hasPreviouslyIncompleteTableChecks()) {
-        _tableLoggingInfo.hasPreviouslyIncompleteTableChecks = true;
-    }
-
-    if (gWiredTigerSkipTableLoggingChecksOnStartup) {
-        if (_tableLoggingInfo.hasPreviouslyIncompleteTableChecks) {
-            LOGV2_FATAL_NOTRACE(
-                5548300,
-                "Cannot use the 'wiredTigerSkipTableLoggingChecksOnStartup' startup parameter when "
-                "there are previously incomplete table checks");
-        }
-
-        // Only log this warning once.
-        if (_tableLoggingInfo.isFirstTable) {
-            _tableLoggingInfo.isFirstTable = false;
-            LOGV2_WARNING_OPTIONS(
-                5548301,
-                {logv2::LogTag::kStartupWarnings},
-                "Skipping table logging checks for all existing WiredTiger tables on startup",
-                "wiredTigerSkipTableLoggingChecksOnStartup"_attr =
-                    gWiredTigerSkipTableLoggingChecksOnStartup);
-        }
-
-        LOGV2_DEBUG(5548302, 1, "Skipping table logging check", "uri"_attr = uri);
-        return Status::OK();
-    }
-
-    if (storageGlobalParams.repair || _tableLoggingInfo.hasPreviouslyIncompleteTableChecks) {
-        if (_tableLoggingInfo.isFirstTable) {
-            _tableLoggingInfo.isFirstTable = false;
-            if (!_tableLoggingInfo.hasPreviouslyIncompleteTableChecks) {
-                createTableChecksFile();
-            }
-
-            LOGV2(4366405,
-                  "Modifying the table logging settings for all existing WiredTiger tables",
-                  "loggingEnabled"_attr = on,
-                  "repair"_attr = storageGlobalParams.repair,
-                  "hasPreviouslyIncompleteTableChecks"_attr =
-                      _tableLoggingInfo.hasPreviouslyIncompleteTableChecks);
-        }
-
-        return _setTableLogging(sessionCache, uri, on);
-    }
-
-    if (!_tableLoggingInfo.isFirstTable) {
-        if (_tableLoggingInfo.changeTableLogging) {
-            return _setTableLogging(sessionCache, uri, on);
-        }
-
-        // The table logging settings do not need to be modified.
-        return Status::OK();
-    }
-
-    invariant(_tableLoggingInfo.isFirstTable);
-    invariant(!_tableLoggingInfo.hasPreviouslyIncompleteTableChecks);
-
-    // When repair or a forced modification to the table logging settings isn't running, check that
-    // the first table is the catalog.
-    invariant(uri == "table:_mdb_catalog", str::stream() << "First table checked was: " << uri);
-    _tableLoggingInfo.isFirstTable = false;
-
-    // Check if the first tables logging settings need to be modified.
-    const std::string setting = on ? "log=(enabled=true)" : "log=(enabled=false)";
-    const std::string existingMetadata = getMetadataCreate(opCtx, uri).getValue();
-    if (existingMetadata.find(setting) != std::string::npos) {
-        // The table is running with the expected logging settings.
-        LOGV2(4366408,
-              "No table logging settings modifications are required for existing WiredTiger tables",
-              "loggingEnabled"_attr = on);
-        return Status::OK();
-    }
-
-    // The first table is running with the incorrect logging settings. All tables will need to have
-    // their logging settings modified.
-    _tableLoggingInfo.changeTableLogging = true;
-    createTableChecksFile();
-
-    LOGV2(4366406,
-          "Modifying the table logging settings for all existing WiredTiger tables",
-          "loggingEnabled"_attr = on);
-
-    Status status = _setTableLogging(sessionCache, uri, on);
-
-    if (MONGO_unlikely(crashAfterUpdatingFirstTableLoggingSettings.shouldFail())) {
-        LOGV2_FATAL_NOTRACE(
-            4366407, "Crashing due to 'crashAfterUpdatingFirstTableLoggingSettings' fail point");
-    }
-    return status;
-}
-
-Status WiredTigerUtil::_setTableLogging(WiredTigerSessionCache* sessionCache,
-                                        const std::string& uri,
-                                        bool on) {
     const std::string setting = on ? "log=(enabled=true)" : "log=(enabled=false)";
 
     // This method does some "weak" parsing to see if the table is in the expected logging
