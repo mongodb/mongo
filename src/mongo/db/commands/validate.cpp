@@ -73,7 +73,7 @@ stdx::condition_variable _validationNotifier;
  *       validate: "collectionNameWithoutTheDBPart",
  *       full: <bool>  // If true, a more thorough (and slower) collection validation is performed.
  *       background: <bool>  // If true, performs validation on the checkpoint of the collection.
- *       checkBSONConsistency: <bool> // If true, validates BSON documents more thoroughly.
+ *       checkBSONConformance: <bool> // If true, validates BSON documents more thoroughly.
  *       metadata: <bool>  // If true, performs a faster validation only on metadata.
  *   }
  */
@@ -92,7 +92,7 @@ public:
             << "\tAdd {full: true} option to do a more thorough check.\n"
             << "\tAdd {background: true} to validate in the background.\n"
             << "\tAdd {repair: true} to run repair mode.\n"
-            << "\tAdd {checkBSONConsistency: true} to validate BSON documents more thoroughly.\n"
+            << "\tAdd {checkBSONConformance: true} to validate BSON documents more thoroughly.\n"
             << "\tAdd {metadata: true} to only check collection metadata.\n"
             << "Cannot specify both {full: true, background: true}.";
     }
@@ -147,19 +147,19 @@ public:
                                     << " and { enforceFastCount: true } is not supported.");
         }
 
-        const auto rawCheckBSONConsistency = cmdObj["checkBSONConsistency"];
-        const bool checkBSONConsistency = rawCheckBSONConsistency.trueValue();
-        if (rawCheckBSONConsistency &&
+        const auto rawcheckBSONConformance = cmdObj["checkBSONConformance"];
+        const bool checkBSONConformance = rawcheckBSONConformance.trueValue();
+        if (rawcheckBSONConformance &&
             !feature_flags::gExtendValidateCommand.isEnabled(
                 serverGlobalParams.featureCompatibility)) {
             uasserted(ErrorCodes::InvalidOptions,
-                      str::stream() << "The 'checkBSONConsistency' option is not supported by the "
+                      str::stream() << "The 'checkBSONConformance' option is not supported by the "
                                        "validate command.");
         }
-        if (rawCheckBSONConsistency && !checkBSONConsistency &&
+        if (rawcheckBSONConformance && !checkBSONConformance &&
             (fullValidate || enforceFastCount)) {
             uasserted(ErrorCodes::InvalidOptions,
-                      str::stream() << "Cannot explicitly set 'checkBSONConsistency: false' with "
+                      str::stream() << "Cannot explicitly set 'checkBSONConformance: false' with "
                                        "full validation set.");
         }
 
@@ -180,10 +180,10 @@ public:
                           << "Running the validate command with both { enforceFastCount: true }"
                           << " and { repair: true } is not supported.");
         }
-        if (checkBSONConsistency && repair) {
+        if (checkBSONConformance && repair) {
             uasserted(ErrorCodes::InvalidOptions,
                       str::stream()
-                          << "Running the validate command with both { checkBSONConsistency: true }"
+                          << "Running the validate command with both { checkBSONConformance: true }"
                           << " and { repair: true } is not supported.");
         }
         repl::ReplicationCoordinator* replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -196,7 +196,7 @@ public:
 
         const bool metadata = cmdObj["metadata"].trueValue();
         if (metadata &&
-            (background || fullValidate || enforceFastCount || checkBSONConsistency || repair)) {
+            (background || fullValidate || enforceFastCount || checkBSONConformance || repair)) {
             uasserted(ErrorCodes::InvalidOptions,
                       str::stream() << "Running the validate command with { metadata: true } is not"
                                     << " supported with any other options");
@@ -209,7 +209,7 @@ public:
                   "background"_attr = background,
                   "full"_attr = fullValidate,
                   "enforceFastCount"_attr = enforceFastCount,
-                  "checkBSONConsistency"_attr = checkBSONConsistency,
+                  "checkBSONConformance"_attr = checkBSONConformance,
                   "repair"_attr = repair);
         }
 
@@ -242,7 +242,7 @@ public:
                 return CollectionValidation::ValidateMode::kMetadata;
             }
             if (background) {
-                if (checkBSONConsistency) {
+                if (checkBSONConformance) {
                     return CollectionValidation::ValidateMode::kBackgroundCheckBSON;
                 }
                 return CollectionValidation::ValidateMode::kBackground;
@@ -253,7 +253,7 @@ public:
             if (fullValidate) {
                 return CollectionValidation::ValidateMode::kForegroundFull;
             }
-            if (checkBSONConsistency) {
+            if (checkBSONConformance) {
                 return CollectionValidation::ValidateMode::kForegroundCheckBSON;
             }
             return CollectionValidation::ValidateMode::kForeground;
