@@ -187,6 +187,12 @@ public:
          std::unique_ptr<LogicalPropsInterface> logicalPropsDerivation,
          std::unique_ptr<CEInterface> ceDerivation);
 
+    // TODO SERVER-68914: Fix object ownership issues of data members of the Memo class.
+    Memo(const Memo&) = delete;
+    Memo& operator=(const Memo&) = delete;
+    Memo(Memo&&) = delete;
+    Memo& operator=(Memo&&) = delete;
+
     const Group& getGroup(GroupIdType groupId) const;
     Group& getGroup(GroupIdType groupId);
     size_t getGroupCount() const;

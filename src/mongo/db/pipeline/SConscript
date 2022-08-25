@@ -223,11 +223,14 @@ pipelineEnv.InjectThirdParty(libraries=['snappy'])
 pipelineEnv.Library(
     target='pipeline',
     source=[
+        'abt/canonical_query_translation.cpp',
         'abt/document_source_visitor.cpp',
         'abt/agg_expression_visitor.cpp',
+        'abt/collation_translation.cpp',
         'abt/expr_algebrizer_context.cpp',
         'abt/field_map_builder.cpp',
         'abt/match_expression_visitor.cpp',
+        'abt/transformer_visitor.cpp',
         'abt/utils.cpp',
         'document_source.cpp',
         'document_source_add_fields.cpp',

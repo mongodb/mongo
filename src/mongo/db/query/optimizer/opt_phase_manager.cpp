@@ -50,14 +50,16 @@ OptPhaseManager::PhaseSet OptPhaseManager::_allRewrites = {OptPhase::ConstEvalPr
 OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
                                  PrefixId& prefixId,
                                  Metadata metadata,
-                                 DebugInfo debugInfo)
+                                 DebugInfo debugInfo,
+                                 QueryHints queryHints)
     : OptPhaseManager(std::move(phaseSet),
                       prefixId,
                       false /*requireRID*/,
                       std::move(metadata),
                       std::make_unique<HeuristicCE>(),
                       std::make_unique<DefaultCosting>(),
-                      std::move(debugInfo)) {}
+                      std::move(debugInfo),
+                      std::move(queryHints)) {}
 
 OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
                                  PrefixId& prefixId,
@@ -65,10 +67,11 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
                                  Metadata metadata,
                                  std::unique_ptr<CEInterface> ceDerivation,
                                  std::unique_ptr<CostingInterface> costDerivation,
-                                 DebugInfo debugInfo)
+                                 DebugInfo debugInfo,
+                                 QueryHints queryHints)
     : _phaseSet(std::move(phaseSet)),
       _debugInfo(std::move(debugInfo)),
-      _hints(),
+      _hints(std::move(queryHints)),
       _metadata(std::move(metadata)),
       _memo(_debugInfo,
             _metadata,

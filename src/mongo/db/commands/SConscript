@@ -338,8 +338,6 @@ env.Library(
     source=[
         "analyze_cmd.cpp",
         "count_cmd.cpp",
-        "cqf/cqf_aggregate.cpp",
-        "cqf/cqf_command_utils.cpp",
         "create_command.cpp",
         "create_indexes.cpp",
         "current_op.cpp",

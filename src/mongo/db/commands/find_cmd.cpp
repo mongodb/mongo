@@ -36,7 +36,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/cqf/cqf_command_utils.h"
 #include "mongo/db/commands/run_aggregate.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/cursor_manager.h"
@@ -48,6 +47,8 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/cqf_command_utils.h"
+#include "mongo/db/query/cqf_get_executor.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/find.h"
@@ -309,9 +310,9 @@ public:
                                              extensionsCallback,
                                              MatchExpressionParser::kAllowAllSpecialFeatures));
 
-            // If we are running a query against a view, or if we are trying to test the new
-            // optimizer, redirect this query through the aggregation system.
-            if (ctx->getView() || isEligibleForBonsai(*cq, opCtx, ctx->getCollection())) {
+            // If we are running a query against a view redirect this query through the aggregation
+            // system.
+            if (ctx->getView()) {
                 // Relinquish locks. The aggregation command will re-acquire them.
                 ctx.reset();
 
@@ -514,9 +515,9 @@ public:
                                              extensionsCallback,
                                              MatchExpressionParser::kAllowAllSpecialFeatures));
 
-            // If we are running a query against a view, or if we are trying to test the new
-            // optimizer, redirect this query through the aggregation system.
-            if (ctx->getView() || isEligibleForBonsai(*cq, opCtx, ctx->getCollection())) {
+            // If we are running a query against a view redirect this query through the aggregation
+            // system.
+            if (ctx->getView()) {
                 // Relinquish locks. The aggregation command will re-acquire them.
                 ctx.reset();
 

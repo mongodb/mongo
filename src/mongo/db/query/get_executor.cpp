@@ -71,6 +71,8 @@
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/cqf_command_utils.h"
+#include "mongo/db/query/cqf_get_executor.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/internal_plans.h"
@@ -1433,6 +1435,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     const auto& mainColl = collections.getMainCollection();
     canonicalQuery->setSbeCompatible(
         sbe::isQuerySbeCompatible(&mainColl, canonicalQuery.get(), plannerParams.options));
+
+    if (isEligibleForBonsai(*canonicalQuery, opCtx, mainColl)) {
+        return getSBEExecutorViaCascadesOptimizer(mainColl, std::move(canonicalQuery));
+    }
 
     // Use SBE if 'canonicalQuery' is SBE compatible.
     if (!canonicalQuery->getForceClassicEngine() && canonicalQuery->isSbeCompatible()) {

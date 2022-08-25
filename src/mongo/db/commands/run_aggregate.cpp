@@ -41,8 +41,6 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
-#include "mongo/db/commands/cqf/cqf_aggregate.h"
-#include "mongo/db/commands/cqf/cqf_command_utils.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
@@ -66,6 +64,8 @@
 #include "mongo/db/pipeline/search_helper.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/cqf_command_utils.h"
+#include "mongo/db/query/cqf_get_executor.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
@@ -976,8 +976,12 @@ Status runAggregate(OperationContext* opCtx,
                     !request.getExchange().has_value());
 
             auto timeBegin = Date_t::now();
-            execs.emplace_back(getSBEExecutorViaCascadesOptimizer(
-                opCtx, expCtx, nss, collections.getMainCollection(), request.getHint(), *pipeline));
+            execs.emplace_back(getSBEExecutorViaCascadesOptimizer(opCtx,
+                                                                  expCtx,
+                                                                  nss,
+                                                                  collections.getMainCollection(),
+                                                                  request.getHint(),
+                                                                  std::move(pipeline)));
             auto elapsed =
                 (Date_t::now().toMillisSinceEpoch() - timeBegin.toMillisSinceEpoch()) / 1000.0;
             OPTIMIZER_DEBUG_LOG(

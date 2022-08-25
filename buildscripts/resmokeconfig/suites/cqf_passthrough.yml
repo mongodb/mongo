@@ -50,6 +50,8 @@ selector:
   - jstests/core/projection_meta_index_key.js
   - jstests/core/positional_projection.js
   - jstests/core/positional_projection_multiple_array_fields.js
+  # TODO SERVER-62034 Prevent distinct() from using CQF.
+  - jstests/core/profile_distinct.js
   # Transactions are not supported on MongoDB standalone nodes, so we do not run these tests in the
   # 'core' suite. Instead we run them against a 1-node replica set in the 'core_txns' suite.
   - jstests/core/txns/**/*.js

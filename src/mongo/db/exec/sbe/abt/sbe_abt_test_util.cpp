@@ -29,12 +29,12 @@
 
 #include "mongo/db/exec/sbe/abt/sbe_abt_test_util.h"
 
-#include "mongo/db/commands/cqf/cqf_command_utils.h"
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/pipeline/abt/document_source_visitor.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/plan_executor.h"

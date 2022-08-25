@@ -29,12 +29,11 @@
 
 #include "mongo/db/pipeline/abt/document_source_visitor.h"
 
-#include "mongo/db/exec/add_fields_projection_executor.h"
-#include "mongo/db/exec/exclusion_projection_executor.h"
-#include "mongo/db/exec/inclusion_projection_executor.h"
 #include "mongo/db/pipeline/abt/agg_expression_visitor.h"
-#include "mongo/db/pipeline/abt/field_map_builder.h"
+#include "mongo/db/pipeline/abt/algebrizer_context.h"
+#include "mongo/db/pipeline/abt/collation_translation.h"
 #include "mongo/db/pipeline/abt/match_expression_visitor.h"
+#include "mongo/db/pipeline/abt/transformer_visitor.h"
 #include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/pipeline/document_source_bucket_auto.h"
 #include "mongo/db/pipeline/document_source_coll_stats.h"
@@ -80,243 +79,9 @@
 
 namespace mongo::optimizer {
 
-/**
- * Used to track information including the current root node of the ABT and the current projection
- * representing output documents.
- */
-class DSAlgebrizerContext {
-public:
-    struct NodeWithRootProjection {
-        NodeWithRootProjection(ProjectionName rootProjection, ABT node)
-            : _rootProjection(std::move(rootProjection)), _node(std::move(node)) {}
-
-        ProjectionName _rootProjection;
-        ABT _node;
-    };
-
-    DSAlgebrizerContext(PrefixId& prefixId, NodeWithRootProjection node)
-        : _node(std::move(node)), _scanProjName(_node._rootProjection), _prefixId(prefixId) {
-        assertNodeSort(_node._node);
-    }
-
-    template <typename T, typename... Args>
-    inline auto setNode(ProjectionName rootProjection, Args&&... args) {
-        setNode(std::move(rootProjection), std::move(ABT::make<T>(std::forward<Args>(args)...)));
-    }
-
-    void setNode(ProjectionName rootProjection, ABT node) {
-        assertNodeSort(node);
-        _node._node = std::move(node);
-        _node._rootProjection = std::move(rootProjection);
-    }
-
-    NodeWithRootProjection& getNode() {
-        return _node;
-    }
-
-    std::string getNextId(const std::string& key) {
-        return _prefixId.getNextId(key);
-    }
-
-    PrefixId& getPrefixId() {
-        return _prefixId;
-    }
-
-    const ProjectionName& getScanProjName() const {
-        return _scanProjName;
-    }
-
-private:
-    NodeWithRootProjection _node;
-    ProjectionName _scanProjName;
-
-    // We don't own this.
-    PrefixId& _prefixId;
-};
-
-class ABTTransformerVisitor : public TransformerInterfaceConstVisitor {
-public:
-    ABTTransformerVisitor(DSAlgebrizerContext& ctx, FieldMapBuilder& builder)
-        : _ctx(ctx), _builder(builder) {}
-
-    void visit(const projection_executor::AddFieldsProjectionExecutor* transformer) override {
-        visitInclusionNode(transformer->getRoot(), true /*isAddingFields*/);
-    }
-
-    void visit(const projection_executor::ExclusionProjectionExecutor* transformer) override {
-        visitExclusionNode(*transformer->getRoot());
-    }
-
-    void visit(const projection_executor::InclusionProjectionExecutor* transformer) override {
-        visitInclusionNode(*transformer->getRoot(), false /*isAddingFields*/);
-    }
-
-    void visit(const GroupFromFirstDocumentTransformation* transformer) override {
-        unsupportedTransformer(transformer);
-    }
-
-    void visit(const ReplaceRootTransformation* transformer) override {
-        auto entry = _ctx.getNode();
-        const std::string& projName = _ctx.getNextId("newRoot");
-        ABT expr = generateAggExpression(
-            transformer->getExpression().get(), entry._rootProjection, projName);
-
-        _ctx.setNode<EvaluationNode>(projName, projName, std::move(expr), std::move(entry._node));
-    }
-
-    // Creates a single EvaluationNode representing simple projections (e.g. inclusion projections)
-    // and computed projections, if present, and updates the context with the new node.
-    void generateCombinedProjection() const {
-        auto result = _builder.generateABT();
-        if (!result) {
-            return;
-        }
-
-        auto entry = _ctx.getNode();
-        const ProjectionName projName = _ctx.getNextId("combinedProjection");
-        _ctx.setNode<EvaluationNode>(
-            projName, projName, std::move(*result), std::move(entry._node));
-    }
-
-private:
-    void unsupportedTransformer(const TransformerInterface* transformer) const {
-        uasserted(ErrorCodes::InternalErrorNotSupported,
-                  str::stream() << "Transformer is not supported (code: "
-                                << static_cast<int>(transformer->getType()) << ")");
-    }
-
-    void assertSupportedPath(const std::string& path) {
-        uassert(ErrorCodes::InternalErrorNotSupported,
-                "Projection contains unsupported numeric path component",
-                !FieldRef(path).hasNumericPathComponents());
-    }
-
-    /**
-     * Handles simple inclusion projections.
-     */
-    void processProjectedPaths(const projection_executor::InclusionNode& node) {
-        // For each preserved path, mark that each path element along the field path should be
-        // included.
-        OrderedPathSet preservedPaths;
-        node.reportProjectedPaths(&preservedPaths);
-
-        for (const std::string& preservedPathStr : preservedPaths) {
-            assertSupportedPath(preservedPathStr);
-
-            _builder.integrateFieldPath(FieldPath(preservedPathStr),
-                                        [](const bool isLastElement, FieldMapEntry& entry) {
-                                            entry._hasLeadingObj = true;
-                                            entry._hasKeep = true;
-                                        });
-        }
-    }
-
-    /**
-     * Handles renamed fields and computed projections.
-     */
-    void processComputedPaths(const projection_executor::InclusionNode& node,
-                              const std::string& rootProjection,
-                              const bool isAddingFields) {
-        OrderedPathSet computedPaths;
-        StringMap<std::string> renamedPaths;
-        node.reportComputedPaths(&computedPaths, &renamedPaths);
-
-        // Handle path renames: essentially single element FieldPath expression.
-        for (const auto& renamedPathEntry : renamedPaths) {
-            ABT path = translateFieldPath(
-                FieldPath(renamedPathEntry.second),
-                make<PathIdentity>(),
-                [](const std::string& fieldName, const bool isLastElement, ABT input) {
-                    return make<PathGet>(
-                        fieldName,
-                        isLastElement
-                            ? std::move(input)
-                            : make<PathTraverse>(std::move(input), PathTraverse::kUnlimited));
-                });
-
-            auto entry = _ctx.getNode();
-            const std::string& renamedProjName = _ctx.getNextId("projRenamedPath");
-            _ctx.setNode<EvaluationNode>(
-                entry._rootProjection,
-                renamedProjName,
-                make<EvalPath>(std::move(path), make<Variable>(entry._rootProjection)),
-                std::move(entry._node));
-
-            _builder.integrateFieldPath(FieldPath(renamedPathEntry.first),
-                                        [&renamedProjName, &isAddingFields](
-                                            const bool isLastElement, FieldMapEntry& entry) {
-                                            if (!isAddingFields) {
-                                                entry._hasKeep = true;
-                                            }
-                                            if (isLastElement) {
-                                                entry._constVarName = renamedProjName;
-                                                entry._hasTrailingDefault = true;
-                                            }
-                                        });
-        }
-
-        // Handle general expression projection.
-        for (const std::string& computedPathStr : computedPaths) {
-            assertSupportedPath(computedPathStr);
-
-            const FieldPath computedPath(computedPathStr);
-
-            auto entry = _ctx.getNode();
-            const std::string& getProjName = _ctx.getNextId("projGetPath");
-            ABT getExpr = generateAggExpression(
-                node.getExpressionForPath(computedPath).get(), rootProjection, getProjName);
-
-            _ctx.setNode<EvaluationNode>(std::move(entry._rootProjection),
-                                         getProjName,
-                                         std::move(getExpr),
-                                         std::move(entry._node));
-
-            _builder.integrateFieldPath(
-                computedPath,
-                [&getProjName, &isAddingFields](const bool isLastElement, FieldMapEntry& entry) {
-                    if (!isAddingFields) {
-                        entry._hasKeep = true;
-                    }
-                    if (isLastElement) {
-                        entry._constVarName = getProjName;
-                        entry._hasTrailingDefault = true;
-                    }
-                });
-        }
-    }
-
-    void visitInclusionNode(const projection_executor::InclusionNode& node,
-                            const bool isAddingFields) {
-        auto entry = _ctx.getNode();
-        const std::string rootProjection = entry._rootProjection;
-
-        processProjectedPaths(node);
-        processComputedPaths(node, rootProjection, isAddingFields);
-    }
-
-    void visitExclusionNode(const projection_executor::ExclusionNode& node) {
-        // Handle simple exclusion projections: for each excluded path, mark that the last field
-        // path element should be dropped.
-        OrderedPathSet excludedPaths;
-        node.reportProjectedPaths(&excludedPaths);
-        for (const std::string& excludedPathStr : excludedPaths) {
-            assertSupportedPath(excludedPathStr);
-            _builder.integrateFieldPath(FieldPath(excludedPathStr),
-                                        [](const bool isLastElement, FieldMapEntry& entry) {
-                                            if (isLastElement) {
-                                                entry._hasDrop = true;
-                                            }
-                                        });
-        }
-    }
-
-    DSAlgebrizerContext& _ctx;
-    FieldMapBuilder& _builder;
-};
-
 class ABTDocumentSourceVisitor : public DocumentSourceConstVisitor {
 public:
-    ABTDocumentSourceVisitor(DSAlgebrizerContext& ctx, const Metadata& metadata)
+    ABTDocumentSourceVisitor(AlgebrizerContext& ctx, const Metadata& metadata)
         : _ctx(ctx), _metadata(metadata) {}
 
     void visit(const DocumentSourceBucketAuto* source) override {
@@ -717,39 +482,7 @@ public:
     }
 
     void visit(const DocumentSourceSort* source) override {
-        ProjectionCollationSpec collationSpec;
-        const SortPattern& pattern = source->getSortKeyPattern();
-        for (size_t i = 0; i < pattern.size(); i++) {
-            const SortPattern::SortPatternPart& part = pattern[i];
-            if (!part.fieldPath.has_value()) {
-                // TODO: consider metadata expression.
-                continue;
-            }
-
-            const std::string& sortProjName = _ctx.getNextId("sort");
-            collationSpec.emplace_back(
-                sortProjName, part.isAscending ? CollationOp::Ascending : CollationOp::Descending);
-
-            const FieldPath& fieldPath = part.fieldPath.value();
-            ABT sortPath = make<PathIdentity>();
-            for (size_t j = 0; j < fieldPath.getPathLength(); j++) {
-                sortPath = make<PathGet>(fieldPath.getFieldName(j).toString(), std::move(sortPath));
-            }
-
-            auto entry = _ctx.getNode();
-            _ctx.setNode<EvaluationNode>(
-                entry._rootProjection,
-                sortProjName,
-                make<EvalPath>(std::move(sortPath), make<Variable>(entry._rootProjection)),
-                std::move(entry._node));
-        }
-
-        if (!collationSpec.empty()) {
-            auto entry = _ctx.getNode();
-            _ctx.setNode<CollationNode>(std::move(entry._rootProjection),
-                                        properties::CollationRequirement(std::move(collationSpec)),
-                                        std::move(entry._node));
-        }
+        generateCollationNode(_ctx, source->getSortKeyPattern());
 
         if (source->getLimit().has_value()) {
             // We need to limit the result of the collation.
@@ -906,7 +639,7 @@ private:
                                     std::move(entry._node));
     }
 
-    DSAlgebrizerContext& _ctx;
+    AlgebrizerContext& _ctx;
     const Metadata& _metadata;
 };
 
@@ -915,7 +648,7 @@ ABT translatePipelineToABT(const Metadata& metadata,
                            ProjectionName scanProjName,
                            ABT initialNode,
                            PrefixId& prefixId) {
-    DSAlgebrizerContext ctx(prefixId, {scanProjName, std::move(initialNode)});
+    AlgebrizerContext ctx(prefixId, {scanProjName, std::move(initialNode)});
     ABTDocumentSourceVisitor visitor(ctx, metadata);
 
     DocumentSourceWalker walker(nullptr /*preVisitor*/, &visitor);

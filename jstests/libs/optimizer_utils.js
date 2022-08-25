@@ -13,12 +13,8 @@ function checkCascadesOptimizerEnabled(theDB) {
  * Given the result of an explain command, returns whether the bonsai optimizer was used.
  */
 function usedBonsaiOptimizer(explain) {
-    if (explain.hasOwnProperty("queryPlanner") &&
-        !explain.queryPlanner.winningPlan.hasOwnProperty("optimizerPlan")) {
-        // Find command explain which means new optimizer was not used.
-        // TODO SERVER-62407 this assumption may no longer hold true if the translation to ABT
-        // happens directly from a find command.
-        return false;
+    if (!isAggregationPlan(explain)) {
+        return explain.queryPlanner.winningPlan.hasOwnProperty("optimizerPlan");
     }
 
     const plannerOutput = getAggPlanStage(explain, "$cursor");

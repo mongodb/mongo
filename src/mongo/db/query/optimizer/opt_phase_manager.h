@@ -70,14 +70,25 @@ public:
 
     using PhaseSet = opt::unordered_set<OptPhase>;
 
-    OptPhaseManager(PhaseSet phaseSet, PrefixId& prefixId, Metadata metadata, DebugInfo debugInfo);
+    OptPhaseManager(PhaseSet phaseSet,
+                    PrefixId& prefixId,
+                    Metadata metadata,
+                    DebugInfo debugInfo,
+                    QueryHints queryHints = {});
     OptPhaseManager(PhaseSet phaseSet,
                     PrefixId& prefixId,
                     bool requireRID,
                     Metadata metadata,
                     std::unique_ptr<CEInterface> ceDerivation,
                     std::unique_ptr<CostingInterface> costDerivation,
-                    DebugInfo debugInfo);
+                    DebugInfo debugInfo,
+                    QueryHints queryHints = {});
+
+    // TODO SERVER-68914: Fix object ownership issues of data members of the Memo class.
+    OptPhaseManager(const OptPhaseManager&) = delete;
+    OptPhaseManager& operator=(const OptPhaseManager&) = delete;
+    OptPhaseManager(OptPhaseManager&&) = delete;
+    OptPhaseManager& operator=(OptPhaseManager&&) = delete;
 
     /**
      * Optimization modifies the input argument.

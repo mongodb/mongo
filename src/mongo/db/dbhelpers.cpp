@@ -120,6 +120,9 @@ RecordId Helpers::findOne(OperationContext* opCtx,
     massertStatusOK(statusWithCQ.getStatus());
     unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
+    // TODO SERVER-69102: Enable CQF once it supports RecordId outputs.
+    cq->setUseCqfIfEligible(false);
+
     auto exec = uassertStatusOK(getExecutor(opCtx,
                                             &collection,
                                             std::move(cq),

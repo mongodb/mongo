@@ -116,6 +116,9 @@ assertNotSupportedByBonsai({
 },
                            true);
 
+// Sort on a find() is not supported.
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}, sort: {a: 1}}, true);
+
 // Numeric path components are not supported, either in a match expression or projection.
 assertNotSupportedByBonsai({find: coll.getName(), filter: {'a.0': 5}});
 assertNotSupportedByBonsai({find: coll.getName(), filter: {'a.0.b': 5}});

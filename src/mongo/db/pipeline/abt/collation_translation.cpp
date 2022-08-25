@@ -27,19 +27,39 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/pipeline/abt/collation_translation.h"
 
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/query/plan_executor.h"
+namespace mongo::optimizer {
 
-namespace mongo {
+void generateCollationNode(AlgebrizerContext& ctx, const SortPattern& sortPattern) {
+    ProjectionCollationSpec collationSpec;
+    auto rootProjection = ctx.getNode()._rootProjection;
+    // Create Evaluation node for each sort field.
+    for (const auto& part : sortPattern) {
+        if (!part.fieldPath.has_value()) {
+            continue;
+        }
+        const auto& sortProjName = ctx.getNextId("sort");
+        collationSpec.emplace_back(
+            sortProjName, part.isAscending ? CollationOp::Ascending : CollationOp::Descending);
+        const FieldPath& fieldPath = part.fieldPath.value();
+        ABT sortPath = make<PathIdentity>();
+        for (size_t j = 0; j < fieldPath.getPathLength(); j++) {
+            sortPath = make<PathGet>(fieldPath.getFieldName(j).toString(), std::move(sortPath));
+        }
 
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOptimizer(
-    OperationContext* opCtx,
-    boost::intrusive_ptr<ExpressionContext> expCtx,
-    const NamespaceString& nss,
-    const CollectionPtr& collection,
-    const boost::optional<BSONObj>& indexHint,
-    const Pipeline& pipeline);
+        ctx.setNode<EvaluationNode>(
+            rootProjection,
+            std::move(sortProjName),
+            make<EvalPath>(std::move(sortPath), make<Variable>(rootProjection)),
+            std::move(ctx.getNode()._node));
+    }
+    if (collationSpec.empty()) {
+        return;
+    }
+    ctx.setNode<CollationNode>(std::move(rootProjection),
+                               properties::CollationRequirement(std::move(collationSpec)),
+                               std::move(ctx.getNode()._node));
+}
 
-}  // namespace mongo
+}  // namespace mongo::optimizer

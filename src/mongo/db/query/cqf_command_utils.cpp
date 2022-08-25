@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/commands/cqf/cqf_command_utils.h"
+#include "mongo/db/query/cqf_command_utils.h"
 
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/exec/add_fields_projection_executor.h"
@@ -746,7 +746,7 @@ bool isEligibleForBonsai(const CanonicalQuery& cq,
         walker.walk(projExecutor.get());
     }
 
-    return eligible;
+    return eligible && cq.useCqfIfEligible();
 }
 
 }  // namespace mongo

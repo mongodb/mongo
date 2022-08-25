@@ -29,8 +29,8 @@
 
 #include "mongo/db/query/ce/ce_sampling.h"
 
-#include "mongo/db/commands/cqf/cqf_command_utils.h"
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
+#include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/utils/abt_hash.h"
