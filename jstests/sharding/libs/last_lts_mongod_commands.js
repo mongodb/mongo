@@ -13,7 +13,8 @@ const commandsRemovedFromMongodSinceLastLTS = [
 // listCommands output of a last LTS version mongod. We will allow these commands to have a
 // test defined without always existing on the mongod being used.
 const commandsAddedToMongodSinceLastLTS = [
-    "analyze",  // TODO SERVER-67707: Remove once 7.0 becomes last LTS
+    "analyze",          // TODO SERVER-67707: Remove once 7.0 becomes last LTS
+    "analyzeShardKey",  // TODO (SERVER-68977): Remove upgrade/downgrade for PM-1858.
     "clusterAbortTransaction",
     "clusterAggregate",
     "clusterCommitTransaction",
@@ -22,6 +23,7 @@ const commandsAddedToMongodSinceLastLTS = [
     "clusterGetMore",
     "clusterInsert",
     "clusterUpdate",
+    "configureQueryAnalyzer",  // TODO (SERVER-68977): Remove upgrade/downgrade for PM-1858.
     "getChangeStreamState",
     "getClusterParameter",
     "listDatabasesForAllTenants",

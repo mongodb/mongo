@@ -223,6 +223,7 @@ let testCases = {
         checkWriteConcern: true,
     },
     analyze: {skip: "TODO SERVER-67772"},
+    analyzeShardKey: {skip: "does not accept read or write concern"},
     appendOplogNote: {
         command: {appendOplogNote: 1, data: {foo: 1}},
         checkReadConcern: false,
@@ -305,6 +306,7 @@ let testCases = {
     },  // TODO SERVER-62374: remove this once 5.3 becomes last continuos release
     configureCollectionBalancing: {skip: "does not accept read or write concern"},
     configureFailPoint: {skip: "does not accept read or write concern"},
+    configureQueryAnalyzer: {skip: "does not accept read or write concern"},
     connPoolStats: {skip: "does not accept read or write concern"},
     connPoolSync: {skip: "internal command"},
     connectionStatus: {skip: "does not accept read or write concern"},

@@ -341,10 +341,13 @@ env.Library(
 env.Library(
     target='analyze_shard_key',
     source=[
+        'analyze_shard_key_cmd.idl',
         'analyze_shard_key_feature_flag.idl',
+        'configure_query_analyzer_cmd.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/idl/feature_flag',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
@@ -354,6 +357,7 @@ env.Library(
     target='sharding_commands_d',
     source=[
         'add_shard_cmd.cpp',
+        'analyze_shard_key_cmd.cpp',
         'auto_split_vector_command.cpp',
         'check_sharding_index_command.cpp',
         'cleanup_orphaned_cmd.cpp',
@@ -368,6 +372,7 @@ env.Library(
         'collmod_coordinator.cpp',
         'compact_structured_encryption_data_coordinator.cpp',
         'compact_structured_encryption_data_coordinator.idl',
+        'configure_query_analyzer_cmd.cpp',
         'config/configsvr_abort_reshard_collection_command.cpp',
         'config/configsvr_add_shard_command.cpp',
         'config/configsvr_add_shard_to_zone_command.cpp',

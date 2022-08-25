@@ -198,6 +198,12 @@ let viewsCommandTests = {
     addShardToZone: {skip: isUnrelated},
     aggregate: {command: {aggregate: "view", pipeline: [{$match: {}}], cursor: {}}},
     analyze: {skip: isUnrelated},
+    analyzeShardKey: {
+        command: {analyzeShardKey: "test.view", key: {skey: 1}},
+        skipStandalone: true,
+        expectFailure: true,
+        isAdminCommand: true,
+    },
     appendOplogNote: {skip: isUnrelated},
     applyOps: {
         command: {applyOps: [{op: "i", o: {_id: 1}, ns: "test.view"}]},
@@ -267,6 +273,12 @@ let viewsCommandTests = {
         skip: isUnrelated
     },  // TODO SERVER-62374: remove this once 5.3 becomes last continuos release
     configureCollectionBalancing: {skip: isUnrelated},
+    configureQueryAnalyzer: {
+        command: {configureQueryAnalyzer: "test.view", mode: "full", sampleRate: 1},
+        skipStandalone: true,
+        expectFailure: true,
+        isAdminCommand: true,
+    },
     connPoolStats: {skip: isUnrelated},
     connPoolSync: {skip: isUnrelated},
     connectionStatus: {skip: isUnrelated},
