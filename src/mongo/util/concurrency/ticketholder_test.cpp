@@ -333,6 +333,12 @@ TEST_F(TicketHolderTest, PriorityTwoQueuedOperations) {
         while (holder.queued() < 2) {
         }
 
+        // Waiting for a condition variable in MongoDB is not an atomic operation for the underlying
+        // mutex (release + wait the CV is not an atomic operation). To overcome this there is
+        // currently no other solution but to wait a bit until the threads are really waiting in the
+        // condition variable.
+        stdx::this_thread::sleep_for(stdx::chrono::milliseconds(50));
+
         ASSERT_EQ(stats["queueLength"], 2);
         ticket.reset();
 
@@ -403,6 +409,12 @@ TEST_F(TicketHolderTest, PriorityTwoNormalOneLowQueuedOperations) {
         while (holder.queued() < 2) {
         }
 
+        // Waiting for a condition variable in MongoDB is not an atomic operation for the underlying
+        // mutex (release + wait the CV is not an atomic operation). To overcome this there is
+        // currently no other solution but to wait a bit until the threads are really waiting in the
+        // condition variable.
+        stdx::this_thread::sleep_for(stdx::chrono::milliseconds(50));
+
         // Release the ticket.
         ticket.reset();
 
@@ -429,6 +441,12 @@ TEST_F(TicketHolderTest, PriorityTwoNormalOneLowQueuedOperations) {
         // Wait for the new thread on the queue.
         while (holder.queued() < 2) {
         }
+
+        // Waiting for a condition variable in MongoDB is not an atomic operation for the underlying
+        // mutex (release + wait the CV is not an atomic operation). To overcome this there is
+        // currently no other solution but to wait a bit until the threads are really waiting in the
+        // condition variable.
+        stdx::this_thread::sleep_for(stdx::chrono::milliseconds(50));
 
         // Release the ticket.
         ticketNormal1Priority.reset();

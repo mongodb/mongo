@@ -637,6 +637,9 @@ boost::optional<Ticket> SchedulingTicketHolder::_waitForTicketUntilImpl(Operatio
                                                                         WaitMode waitMode) {
     invariant(admCtx);
 
+    auto interruptible =
+        waitMode == WaitMode::kInterruptible ? opCtx : Interruptible::notInterruptible();
+
     auto& queue = _getQueueToUse(opCtx, admCtx);
 
     bool assigned;
@@ -644,7 +647,7 @@ boost::optional<Ticket> SchedulingTicketHolder::_waitForTicketUntilImpl(Operatio
         stdx::unique_lock lk(_queueMutex);
         _enqueuedElements.addAndFetch(1);
         ON_BLOCK_EXIT([&] { _enqueuedElements.subtractAndFetch(1); });
-        assigned = queue.enqueue(opCtx, lk, until, waitMode);
+        assigned = queue.enqueue(interruptible, lk, until);
     }
     if (assigned) {
         return Ticket{this, admCtx};
@@ -658,7 +661,7 @@ bool SchedulingTicketHolder::Queue::attemptToDequeue() {
     while (threadsToBeWoken < _queuedThreads) {
         auto canDequeue = _threadsToBeWoken.compareAndSwap(&threadsToBeWoken, threadsToBeWoken + 1);
         if (canDequeue) {
-            _cv.notify_one();
+            _queue.notify_one();
             return true;
         }
     }
@@ -675,34 +678,42 @@ void SchedulingTicketHolder::Queue::_signalThreadWoken() {
     }
 }
 
-bool SchedulingTicketHolder::Queue::enqueue(OperationContext* opCtx,
+bool SchedulingTicketHolder::Queue::enqueue(Interruptible* interruptible,
                                             EnqueuerLockGuard& queueLock,
-                                            const Date_t& until,
-                                            WaitMode waitMode) {
+                                            const Date_t& until) {
     _queuedThreads++;
     // Before exiting we remove ourselves from the count of queued threads, we are still holding the
     // lock here so this is safe.
     ON_BLOCK_EXIT([&] { _queuedThreads--; });
-
-    auto clockSource = opCtx->getServiceContext()->getPreciseClockSource();
-    auto baton = waitMode == WaitMode::kInterruptible ? opCtx->getBaton().get() : nullptr;
-
+    bool isFirstCheck = true;
     do {
-        // We normally would use the opCtx->waitForConditionOrInterruptUntil method for doing this
-        // check. The problem is that we must call a method that signals that the thread has been
-        // woken after the condition variable wait, not before which is where the predicate would
-        // go.
-        while (_holder->_ticketsAvailable.load() <= 0) {
-            // This method must be called after getting woken in all cases, so we use a ScopeGuard
-            // to handle exceptions as well as early returns.
-            ON_BLOCK_EXIT([&] { _signalThreadWoken(); });
-            auto waitResult = clockSource->waitForConditionUntil(_cv, queueLock, until, baton);
-            if (waitResult == stdx::cv_status::timeout)
-                return false;
-            // We check if the operation has been interrupted here.
-            if (waitMode == WaitMode::kInterruptible) {
-                opCtx->checkForInterrupt();
-            }
+        try {
+            interruptible->waitForConditionOrInterruptUntil(_queue, queueLock, until, [&] {
+                // As this block is executed when getting woken we must modify the woken count.
+                // Otherwise we are prone to deadlocking if we get woken and there are no tickets
+                // available, permanently signalling that a thread has been woken.
+                //
+                // We don't signal that a thread has been woken during the first predicate check as
+                // the underlying implementation does the following:
+                //
+                // while(!pred()) {
+                //     cv.wait(lk);
+                // }
+                //
+                // Thus the predicate will always be called once before waiting.
+                if (isFirstCheck) {
+                    isFirstCheck = false;
+                } else {
+                    _signalThreadWoken();
+                }
+                return _holder->_ticketsAvailable.load() > 0;
+            });
+        } catch (...) {
+            _signalThreadWoken();
+            throw;
+        }
+        if (Date_t::now() >= until) {
+            return false;
         }
     } while (!_holder->_tryAcquireTicket());
     return true;
