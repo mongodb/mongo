@@ -29,7 +29,7 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/db/auth/auth_types.idl"
     - "mongo/db/auth/address_restriction.idl"
     - "mongo/db/auth/user_management_commands_parser.idl"

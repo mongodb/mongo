@@ -41,7 +41,6 @@
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/write_concern_options.h"
-#include "mongo/idl/basic_types_gen.h"
 
 namespace mongo {
 

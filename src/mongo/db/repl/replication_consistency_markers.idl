@@ -32,7 +32,7 @@ global:
     cpp_namespace: "mongo::repl"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/db/repl/replication_types.idl"
 
 structs:

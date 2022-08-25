@@ -35,7 +35,7 @@ global:
         - "mongo/db/repl/optime.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/db/session/logical_session_id.idl"
     - "mongo/db/repl/replication_types.idl"
 

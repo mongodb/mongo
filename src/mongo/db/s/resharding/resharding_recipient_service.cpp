@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/s/resharding/resharding_recipient_service.h"
 
 #include <algorithm>
@@ -40,7 +39,6 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/persistent_task_store.h"
-#include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/read_concern_args.h"
@@ -69,7 +67,6 @@
 #include "mongo/util/future_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
-
 
 namespace mongo {
 

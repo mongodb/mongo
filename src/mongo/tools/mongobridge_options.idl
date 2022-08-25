@@ -34,7 +34,7 @@ global:
     - "mongo/tools/mongobridge_options.h"
 
 imports:
-  - "mongo/idl/basic_types.idl"
+  - "mongo/db/basic_types.idl"
 
 configs:
   help:

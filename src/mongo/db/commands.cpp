@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/commands.h"
 
 #include <string>
@@ -50,7 +49,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/read_write_concern_defaults.h"
-#include "mongo/idl/basic_types_gen.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
@@ -65,7 +63,6 @@
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 
 using namespace fmt::literals;
 

@@ -34,7 +34,7 @@ global:
 
 imports:
     - "mongo/db/write_concern_options.idl"
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/s/sharding_types.idl"
 
 enums:

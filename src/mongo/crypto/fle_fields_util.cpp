@@ -32,7 +32,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
-#include "mongo/idl/basic_types.h"
+#include "mongo/db/basic_types_gen.h"
 
 namespace mongo {
 void validateIDLFLE2EncryptionPlaceholder(const FLE2EncryptionPlaceholder* placeholder) {

@@ -34,7 +34,7 @@ global:
     - "mongo/db/repl/dbcheck_idl.h"
 
 imports:
-  - "mongo/idl/basic_types.idl"
+  - "mongo/db/basic_types.idl"
   - "mongo/db/write_concern_options.idl"
 
 server_parameters:

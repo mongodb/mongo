@@ -30,7 +30,7 @@ global:
   cpp_namespace: "mongo::rpc"
 
 imports:
-  - "mongo/idl/basic_types.idl"
+  - "mongo/db/basic_types.idl"
   - "mongo/db/auth/auth_types.idl"
 
 structs:

@@ -31,7 +31,7 @@ global:
       - "mongo/db/repl/tenant_migration_util.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
     TenantMigrationPEMPayload:

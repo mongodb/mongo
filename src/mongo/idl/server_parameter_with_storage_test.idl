@@ -32,7 +32,7 @@ global:
   - "mongo/idl/server_parameter_with_storage_test.h"
   
 imports:
-  - "mongo/idl/basic_types.idl"
+  - "mongo/db/basic_types.idl"
   - "mongo/idl/server_parameter_with_storage_test_structs.idl"
 
 server_parameters:

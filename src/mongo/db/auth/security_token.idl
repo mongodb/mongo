@@ -32,7 +32,7 @@ global:
 imports:
     - "mongo/db/auth/auth_types.idl"
     - "mongo/crypto/sha256_block.idl"
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
     SecurityToken:

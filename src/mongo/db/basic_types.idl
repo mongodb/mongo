@@ -30,10 +30,10 @@
 global:
     cpp_namespace: "mongo"
     cpp_includes:
+        - "mongo/db/basic_types.h"
         - "mongo/db/logical_time.h"
         - "mongo/db/namespace_string.h"
         - "mongo/db/tenant_id.h"
-        - "mongo/idl/basic_types.h"
         - "mongo/util/uuid.h"
 
 types:

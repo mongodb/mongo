@@ -35,7 +35,7 @@ global:
         - "mongo/s/catalog/type_collection.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/db/s/sharding_ddl_coordinator.idl"
 
 enums:

@@ -12,8 +12,7 @@ env.Library(
         "collator_interface.cpp",
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/idl/basic_types",
+        "$BUILD_DIR/mongo/db/server_base",
     ],
 )
 

@@ -29,7 +29,6 @@
 
 #include "mongo/idl/feature_flag.h"
 
-#include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/idl/server_parameter.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/version/releases.h"

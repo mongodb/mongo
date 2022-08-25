@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <stdexcept>
 #include <string>
 
 #include "mongo/db/commands/feature_compatibility_version_parser.h"

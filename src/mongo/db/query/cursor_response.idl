@@ -32,11 +32,10 @@ global:
   cpp_namespace: "mongo"
   cpp_includes:
     - "mongo/db/namespace_string.h"
-    - "mongo/idl/basic_types.h"
     - "mongo/db/query/cursor_idl_validator.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 enums:
     CursorType:

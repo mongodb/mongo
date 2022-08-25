@@ -32,7 +32,7 @@ global:
     - "mongo/db/ftdc/ftdc_server.h"
 
 imports:
-  - "mongo/idl/basic_types.idl"
+  - "mongo/db/basic_types.idl"
 
 server_parameters:
 

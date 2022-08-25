@@ -32,7 +32,7 @@ global:
     - "mongo/db/query/query_request_helper.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/db/query/cursor_response.idl"
     - "mongo/db/repl/replication_types.idl"
 

@@ -33,7 +33,7 @@ global:
 
 imports:
   - "mongo/db/serverless/shard_split_state_machine.idl"
-  - "mongo/idl/basic_types.idl"
+  - "mongo/db/basic_types.idl"
 
 structs:
     CommitShardSplitResponse:

@@ -16,10 +16,9 @@ env.Library(
         'write_concern_error.idl',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/idl/basic_types',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -62,18 +61,16 @@ env.Library(
         'reply_builder_interface.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/dbmessage',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/stats/counters',
-        '$BUILD_DIR/mongo/idl/basic_types',
         '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/util/net/network',
         'message',
         'metadata',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/db/server_base',
         'rewrite_state_change_errors',
     ],
 )

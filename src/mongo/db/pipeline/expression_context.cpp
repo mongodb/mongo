@@ -27,21 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <utility>
 
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
-#include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
-
-using boost::intrusive_ptr;
 
 ExpressionContext::ResolvedNamespace::ResolvedNamespace(NamespaceString ns,
                                                         std::vector<BSONObj> pipeline,
@@ -182,7 +177,7 @@ std::unique_ptr<ExpressionContext::CollatorStash> ExpressionContext::temporarily
     return std::unique_ptr<CollatorStash>(new CollatorStash(this, std::move(newCollator)));
 }
 
-intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
+boost::intrusive_ptr<ExpressionContext> ExpressionContext::copyWith(
     NamespaceString ns,
     boost::optional<UUID> uuid,
     boost::optional<std::unique_ptr<CollatorInterface>> updatedCollator) const {

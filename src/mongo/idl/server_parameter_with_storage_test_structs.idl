@@ -30,7 +30,7 @@ global:
   cpp_namespace: "mongo::test"
 
 imports:
-  - "mongo/idl/basic_types.idl"
+  - "mongo/db/basic_types.idl"
   - "mongo/idl/cluster_server_parameter.idl"
 
 structs:

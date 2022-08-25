@@ -32,7 +32,7 @@ global:
     - "mongo/db/catalog/collection_options_validation.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 enums:
     ValidationLevel:

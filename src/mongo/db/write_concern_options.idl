@@ -32,7 +32,7 @@ global:
 
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/db/read_write_concern_provenance_base.idl"
 
 types:

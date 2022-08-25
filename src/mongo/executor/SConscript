@@ -273,10 +273,10 @@ env.Library(
     target='task_executor_pool',
     source=[
         'task_executor_pool.cpp',
-        "task_executor_pool_parameters.idl",
+        'task_executor_pool_parameters.idl',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/util/processinfo',
         'task_executor_interface',
     ],

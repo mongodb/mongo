@@ -32,7 +32,7 @@ global:
     - "mongo/db/free_mon/free_mon_mongod.h"
 
 imports:
-  - "mongo/idl/basic_types.idl"
+  - "mongo/db/basic_types.idl"
 
 server_parameters:
 

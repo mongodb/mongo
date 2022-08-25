@@ -32,7 +32,7 @@ global:
     cpp_namespace: "mongo::repl"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/db/session/logical_session_id.idl"
     - "mongo/db/pipeline/value.idl"
     - "mongo/db/repl/optime_base.idl"

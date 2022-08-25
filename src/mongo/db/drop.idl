@@ -33,7 +33,7 @@ global:
 
 imports:
     - "mongo/db/auth/action_type.idl"
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
     DropReply:

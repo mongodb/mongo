@@ -31,7 +31,7 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 # Options for the getParameter command. Describes the object "options" when the command is run as 
 # {getParameter: <options>}

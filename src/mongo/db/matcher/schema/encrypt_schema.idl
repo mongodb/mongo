@@ -33,7 +33,7 @@ global:
         - "mongo/db/matcher/schema/encrypt_schema_types.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/crypto/encryption_fields.idl"
 
 types:

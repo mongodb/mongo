@@ -32,7 +32,7 @@ global:
     - "mongo/db/auth/umc_info_command_arg.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/db/auth/auth_types.idl"
 
 types:

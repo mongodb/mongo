@@ -1551,8 +1551,14 @@ def main():
     if error_coll.has_errors():
         sys.exit(1)
 
-    old_basic_types_path = os.path.join(args.old_idl_dir, "mongo/idl/basic_types.idl")
-    new_basic_types_path = os.path.join(args.new_idl_dir, "mongo/idl/basic_types.idl")
+    def locate_basic_types_idl(base_idl_dir):
+        path_under_idl = os.path.join(base_idl_dir, "mongo/idl/basic_types.idl")
+        if os.path.exists(path_under_idl):
+            return path_under_idl
+        return os.path.join(base_idl_dir, "mongo/db/basic_types.idl")
+
+    old_basic_types_path = locate_basic_types_idl(args.old_idl_dir)
+    new_basic_types_path = locate_basic_types_idl(args.new_idl_dir)
     error_reply_coll = check_error_reply(old_basic_types_path, new_basic_types_path,
                                          args.old_include, args.new_include)
     if error_reply_coll.has_errors():

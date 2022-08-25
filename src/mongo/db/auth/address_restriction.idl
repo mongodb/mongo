@@ -36,7 +36,7 @@ global:
     - "mongo/db/auth/address_restriction.h"
 
 imports:
-  - "mongo/idl/basic_types.idl"
+  - "mongo/db/basic_types.idl"
 
 structs:
 

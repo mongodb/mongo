@@ -32,7 +32,7 @@ global:
         - "mongo/s/catalog/types_validators.h" 
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/s/sharding_types.idl"
 
 structs:

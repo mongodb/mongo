@@ -30,7 +30,7 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/db/keypattern.idl"
     - "mongo/s/chunk_version.idl"
     - "mongo/s/resharding/type_collection_fields.idl"

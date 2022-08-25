@@ -32,7 +32,7 @@ global:
     cpp_namespace: "mongo::resharding"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 feature_flags:
     featureFlagResharding:

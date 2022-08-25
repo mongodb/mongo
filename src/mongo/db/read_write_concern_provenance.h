@@ -34,7 +34,6 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/read_write_concern_provenance_base_gen.h"
-#include "mongo/idl/basic_types_gen.h"
 
 namespace mongo {
 

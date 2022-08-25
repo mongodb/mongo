@@ -34,7 +34,7 @@ global:
 imports:
   - "mongo/crypto/sha256_block.idl"
   - "mongo/db/session/logical_session_id.idl"
-  - "mongo/idl/basic_types.idl"
+  - "mongo/db/basic_types.idl"
 
 structs:
 

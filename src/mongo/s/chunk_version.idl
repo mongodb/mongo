@@ -34,7 +34,7 @@ global:
         - "mongo/s/chunk_version.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
     CollectionGenerationBase:

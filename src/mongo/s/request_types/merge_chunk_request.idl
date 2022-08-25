@@ -35,7 +35,7 @@ global:
         - "mongo/util/uuid.h"
     
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/s/chunk_range.idl"
     - "mongo/s/chunk_version.idl"
     - "mongo/s/sharding_types.idl"

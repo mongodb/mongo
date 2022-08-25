@@ -35,7 +35,7 @@ global:
         - "mongo/idl/idl_test.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/idl/unittest_import.idl"
     - "mongo/db/auth/access_checks.idl"
     - "mongo/db/auth/action_type.idl"

@@ -33,7 +33,7 @@ imports:
     - "mongo/db/auth/auth_types.idl"
     - "mongo/db/repl/replication_types.idl"
     - "mongo/db/write_concern_options.idl"
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/rpc/metadata/client_metadata.idl"
     - "mongo/rpc/topology_version.idl"
 

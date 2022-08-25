@@ -36,7 +36,7 @@ global:
         - "mongo/util/string_map.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/util/net/hostandport.idl"
     - "mongo/db/repl/replication_types.idl"
     - "mongo/db/repl/member_config.idl"

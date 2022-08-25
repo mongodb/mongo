@@ -32,7 +32,7 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/db/s/resharding/donor_oplog_id.idl"
     - "mongo/s/resharding/common_types.idl"
     - "mongo/s/sharding_types.idl"

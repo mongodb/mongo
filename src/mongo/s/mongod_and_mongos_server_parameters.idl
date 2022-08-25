@@ -33,7 +33,7 @@ global:
     - "mongo/s/mongos_server_parameters.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 server_parameters:
   loadRoutingTableOnStartup:

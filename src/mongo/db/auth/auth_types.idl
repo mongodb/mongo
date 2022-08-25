@@ -35,7 +35,7 @@ global:
     - "mongo/db/auth/role_name_or_string.h"
 
 imports:
-  - "mongo/idl/basic_types.idl"
+  - "mongo/db/basic_types.idl"
 
 types:
   UserName:

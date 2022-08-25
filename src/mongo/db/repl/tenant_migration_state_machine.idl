@@ -37,7 +37,7 @@ imports:
     - "mongo/db/repl/replication_types.idl"
     - "mongo/db/repl/tenant_migration_pem_payload.idl"
     - "mongo/db/serverless/serverless_types.idl"
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 enums:
     TenantMigrationDonorState:

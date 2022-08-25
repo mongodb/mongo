@@ -11,16 +11,14 @@ env.Library(
         'shard_remote.cpp',
         'shard_remote.idl',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/fetcher',
         '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/executor/hedging_metrics',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
         '$BUILD_DIR/mongo/s/grid',
         'shard_interface',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )
 

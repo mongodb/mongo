@@ -32,7 +32,7 @@ global:
     - "mongo/db/pipeline/document_source_parsing_validators.h"
 
 imports:
-  - "mongo/idl/basic_types.idl"
+  - "mongo/db/basic_types.idl"
   - "mongo/db/pipeline/storage_stats_spec.idl"
 
 structs:

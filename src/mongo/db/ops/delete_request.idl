@@ -35,7 +35,7 @@ global:
 imports:
     - "mongo/db/session/logical_session_id.idl"
     - "mongo/db/pipeline/legacy_runtime_constants.idl"
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/db/query/hint.idl"
 
 server_parameters:

@@ -32,7 +32,7 @@ global:
 imports:
     - "mongo/db/auth/action_type.idl"
     - "mongo/db/catalog/commit_quorum.idl"
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
     CreateIndexesReply:

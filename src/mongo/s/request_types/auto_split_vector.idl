@@ -34,7 +34,7 @@ global:
     - "mongo/db/s/auto_split_vector.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 types:
     bson_vector:

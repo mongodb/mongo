@@ -33,7 +33,7 @@ global:
 imports:
     - "mongo/db/auth/action_type.idl"
     - "mongo/db/auth/access_checks.idl"
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/db/catalog/collection_options.idl"
     - "mongo/db/timeseries/timeseries.idl"
     - "mongo/db/pipeline/change_stream_pre_and_post_images_options.idl"

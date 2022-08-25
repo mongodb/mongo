@@ -34,7 +34,7 @@ global:
         - "mongo/db/query/max_time_ms_parser.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/crypto/fle_field_schema.idl"
     - "mongo/db/auth/action_type.idl"
     - "mongo/db/auth/access_checks.idl"

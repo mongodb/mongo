@@ -30,7 +30,7 @@ global:
 
 imports:
     - "mongo/db/coll_mod.idl"
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 commands:
     _configsvrCollMod:

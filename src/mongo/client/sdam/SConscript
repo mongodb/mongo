@@ -10,8 +10,8 @@ env.Library(
         'sdam_configuration_parameters.idl',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )
 

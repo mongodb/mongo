@@ -17,17 +17,6 @@ env.Library(
 )
 
 env.Library(
-    target='basic_types',
-    source=[
-        'basic_types.idl',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        'idl_parser',
-    ],
-)
-
-env.Library(
     target='server_parameter',
     source=[
         'server_parameter.cpp',
@@ -183,7 +172,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
-        'basic_types',
         'cluster_server_parameter',
         'feature_flag',
         'server_parameter',

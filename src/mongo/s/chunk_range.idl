@@ -34,7 +34,7 @@ global:
         - "mongo/s/catalog/type_chunk.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 types:
     # Note that in order to use this type for a non-optional field, you must add the IDL struct as a

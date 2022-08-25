@@ -31,7 +31,7 @@ global:
   cpp_includes: "mongo/db/commands/profile_common.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 types:
   ObjectOrUnset:

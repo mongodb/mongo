@@ -32,7 +32,7 @@ global:
 
 imports:
     - "mongo/db/s/config/configsvr_coordinator.idl"
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/s/request_types/sharded_ddl_commands.idl"
 
 enums:

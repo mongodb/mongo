@@ -32,7 +32,7 @@
 #include <string>
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/idl/basic_types_gen.h"
+#include "mongo/db/basic_types_gen.h"
 
 namespace mongo::CollationSpec {
 

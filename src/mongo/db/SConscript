@@ -59,6 +59,7 @@ env.SConscript(
 # the server codebase.
 env.Library(
     target='server_base', source=[
+        'basic_types.idl',
         'database_name.cpp',
         'index_names.cpp',
         'keypattern.cpp',
@@ -286,20 +287,19 @@ env.Library(
 )
 
 env.Library(
-    target="server_options",
+    target='server_options',
     source=[
-        "server_options_helpers.cpp",
+        'server_options_helpers.cpp',
         'server_options_helpers.idl',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
         'server_options_core',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        'server_base',
     ],
 )
 
@@ -404,17 +404,13 @@ env.Library(
 )
 
 env.Library(
-    target="read_write_concern_provenance",
+    target='read_write_concern_provenance',
     source=[
-        "read_write_concern_provenance.cpp",
+        'read_write_concern_provenance.cpp',
         'read_write_concern_provenance_base.idl',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/idl/basic_types',
-        '$BUILD_DIR/mongo/idl/idl_parser',
-    ],
     LIBDEPS_PRIVATE=[
+        'server_base',
         'server_options_core',
     ],
 )
@@ -426,11 +422,12 @@ env.Library(
         'write_concern_options.idl',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/util/bson_extract',
         'read_write_concern_provenance',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/server_options_core',  # For serverGlobalParams
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        'server_base',
+        'server_options_core',
     ],
 )
 
@@ -445,10 +442,11 @@ env.Library(
         'write_concern_options',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/repl/repl_server_parameters',
         '$BUILD_DIR/mongo/idl/feature_flag',
         '$BUILD_DIR/mongo/util/caching',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
-        'repl/repl_server_parameters',
+        'server_base',
         'server_options_core',
         'vector_clock',
     ],

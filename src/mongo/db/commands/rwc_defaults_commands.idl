@@ -30,7 +30,7 @@ global:
 
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/db/repl/read_concern_args.idl"
     - "mongo/db/read_write_concern_defaults.idl"
     - "mongo/db/write_concern_options.idl"

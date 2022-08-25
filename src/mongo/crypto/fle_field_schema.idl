@@ -31,7 +31,7 @@ global:
       - "mongo/crypto/fle_fields_util.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/crypto/encryption_fields.idl"
 
 enums:

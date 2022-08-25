@@ -30,7 +30,7 @@ global:
 
 imports:
   - "mongo/crypto/sha1_block.idl"
-  - "mongo/idl/basic_types.idl"
+  - "mongo/db/basic_types.idl"
 
 structs:
     keysCollectionDocumentBase:

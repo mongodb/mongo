@@ -33,7 +33,7 @@ global:
     cpp_namespace: "mongo"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/s/sharding_types.idl"
     - "mongo/db/session/logical_session_id.idl"
     - "mongo/s/chunk_range.idl"

@@ -183,10 +183,10 @@ env.Library(
 env.Library(
     target='auth_options',
     source=[
-        "auth_options.idl",
+        'auth_options.idl',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -310,18 +310,18 @@ env.Library(
         'authorization_manager_global.cpp',
         'authorization_manager_global_parameters.idl',
     ],
-    LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/client/authentication",
-        '$BUILD_DIR/mongo/idl/server_parameter',
-        "$BUILD_DIR/mongo/util/net/ssl_manager",
-        "$BUILD_DIR/mongo/util/net/ssl_parameters_auth",
-        'cluster_auth_mode',
-        'security_key',
-    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/service_context',
         'auth',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/client/authentication',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/util/net/ssl_manager',
+        '$BUILD_DIR/mongo/util/net/ssl_parameters_auth',
+        'cluster_auth_mode',
+        'security_key',
     ],
 )
 
@@ -406,9 +406,8 @@ env.Library(
         'sasl_options.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/stats/counters',
-        '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )
 
@@ -480,12 +479,9 @@ env.Library(
         'user_cache_invalidator_job.cpp',
         'user_cache_invalidator_job_parameters.idl',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/multitenancy',
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/s/coreshard',
         'authservercommon',
     ],

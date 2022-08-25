@@ -36,7 +36,7 @@ imports:
   - "mongo/client/read_preference_setting.idl"
   - "mongo/db/repl/tenant_migration_state_machine.idl"
   - "mongo/db/serverless/serverless_types.idl"
-  - "mongo/idl/basic_types.idl"
+  - "mongo/db/basic_types.idl"
   - "mongo/s/sharding_types.idl"
 
 structs:

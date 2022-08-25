@@ -31,7 +31,7 @@ global:
 imports:
     - "mongo/db/catalog/collection_options.idl"
     - "mongo/db/pipeline/storage_stats_spec.idl"
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
     DataSizeReply:

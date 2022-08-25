@@ -192,7 +192,7 @@ wtEnv.Library(
         'oplog_stone_parameters.idl',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 

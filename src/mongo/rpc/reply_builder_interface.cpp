@@ -27,16 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/rpc/reply_builder_interface.h"
 
 #include <utility>
 
 #include "mongo/base/status_with.h"
+#include "mongo/db/basic_types_gen.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/jsobj.h"
-#include "mongo/idl/basic_types_gen.h"
 
 namespace mongo {
 namespace rpc {

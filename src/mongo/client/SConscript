@@ -247,7 +247,7 @@ env.Library(
         'replica_set_monitor_server_parameters.idl',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 

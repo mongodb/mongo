@@ -32,7 +32,7 @@ global:
     - "mongo/db/commands/feature_compatibility_version_parser.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 enums:
     SetFCVPhase:

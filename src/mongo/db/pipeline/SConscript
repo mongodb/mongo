@@ -26,14 +26,12 @@ env.Library(
 )
 
 env.Library(
-    target="change_stream_preimage",
+    target='change_stream_preimage',
     source=[
-        "change_stream_preimage.idl",
+        'change_stream_preimage.idl',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/idl/idl_parser',
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -85,7 +83,7 @@ env.Library(
 env.Library(
     target='variable_validation',
     source=[
-        "variable_validation.cpp",
+        'variable_validation.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

@@ -37,7 +37,7 @@ imports:
   - "mongo/client/read_preference_setting.idl"
   - "mongo/db/repl/tenant_migration_pem_payload.idl"
   - "mongo/db/serverless/serverless_types.idl"
-  - "mongo/idl/basic_types.idl"
+  - "mongo/db/basic_types.idl"
   - "mongo/s/sharding_types.idl"
   - "mongo/db/repl/replication_types.idl"
   - "mongo/util/net/hostandport.idl"

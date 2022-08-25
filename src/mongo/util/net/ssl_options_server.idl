@@ -38,7 +38,7 @@ global:
     initializer: SSLServerOptionsIDL
 
 imports:
-  - "mongo/idl/basic_types.idl"
+  - "mongo/db/basic_types.idl"
 
 configs:
   "net.tls.tlsOnNormalPorts":

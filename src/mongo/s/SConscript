@@ -444,6 +444,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/startup_warnings_common',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/db/windows_options' if env.TargetOSIs('windows') else [],
+        '$BUILD_DIR/mongo/executor/hedging_metrics',
         '$BUILD_DIR/mongo/transport/message_compressor_options_server',
         '$BUILD_DIR/mongo/transport/service_entry_point',
         '$BUILD_DIR/mongo/transport/transport_layer_manager',

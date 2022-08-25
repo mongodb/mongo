@@ -32,7 +32,7 @@ global:
         - "mongo/util/uuid.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 structs:
     ErrorReplyElement:

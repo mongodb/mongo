@@ -33,7 +33,7 @@ global:
 
 imports:
     - "mongo/db/catalog/commit_quorum.idl"
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/util/net/hostandport.idl"
 
 structs:

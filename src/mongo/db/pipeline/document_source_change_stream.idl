@@ -34,7 +34,7 @@ global:
         - "mongo/db/pipeline/resume_token.h"
 
 imports:
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
 
 types:
     # A resume token is an opaque document we return to the user that contains all the information

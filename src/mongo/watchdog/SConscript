@@ -29,8 +29,8 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/idl/server_parameter',
         'watchdog',
         'watchdog_register',
     ],

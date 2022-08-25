@@ -5,9 +5,9 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target="cluster_query",
+    target='cluster_query',
     source=[
-        "cluster_find.cpp",
+        'cluster_find.cpp',
         'cluster_query_knobs.idl',
     ],
     LIBDEPS=[
@@ -16,13 +16,13 @@ env.Library(
         '$BUILD_DIR/mongo/db/curop_failpoint_helpers',
         '$BUILD_DIR/mongo/db/query/query_common',
         '$BUILD_DIR/mongo/s/sharding_router_api',
-        "cluster_client_cursor",
-        "cluster_cursor_cleanup_job",
-        "store_possible_cursor",
+        'cluster_client_cursor',
+        'cluster_cursor_cleanup_job',
+        'store_possible_cursor',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -49,18 +49,18 @@ env.Library(
 )
 
 env.Library(
-    target="cluster_client_cursor",
+    target='cluster_client_cursor',
     source=[
-        "cluster_client_cursor_impl.cpp",
+        'cluster_client_cursor_impl.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/shared_request_handling',
-        "router_exec_stage",
+        'router_exec_stage',
     ],
 )
 
 env.Library(
-    target="router_exec_stage",
+    target='router_exec_stage',
     source=[
         'document_source_merge_cursors.cpp',
         'router_stage_limit.cpp',
@@ -76,19 +76,19 @@ env.Library(
 )
 
 env.Library(
-    target="async_results_merger",
+    target='async_results_merger',
     source=[
-        "async_results_merger.cpp",
-        "blocking_results_merger.cpp",
-        "establish_cursors.cpp",
+        'async_results_merger.cpp',
+        'blocking_results_merger.cpp',
+        'establish_cursors.cpp',
         'async_results_merger_params.idl',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/db/query/command_request_response",
-        "$BUILD_DIR/mongo/db/query/query_common",
-        "$BUILD_DIR/mongo/executor/task_executor_interface",
-        "$BUILD_DIR/mongo/s/client/sharding_client",
-        "$BUILD_DIR/mongo/s/sharding_router_api",
+        '$BUILD_DIR/mongo/db/query/command_request_response',
+        '$BUILD_DIR/mongo/db/query/query_common',
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
+        '$BUILD_DIR/mongo/s/client/sharding_client',
+        '$BUILD_DIR/mongo/s/sharding_router_api',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',

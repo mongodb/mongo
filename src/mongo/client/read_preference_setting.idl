@@ -32,7 +32,7 @@ global:
     - "mongo/client/read_preference.h"
 
 imports:
-  - "mongo/idl/basic_types.idl"
+  - "mongo/db/basic_types.idl"
   - "mongo/client/read_preference.idl"
 
 types:

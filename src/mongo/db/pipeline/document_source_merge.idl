@@ -37,7 +37,7 @@ global:
 
 imports:
     - "mongo/db/pipeline/document_source_merge_modes.idl"
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/s/sharding_types.idl"
 types:
     MergeTargetNss:

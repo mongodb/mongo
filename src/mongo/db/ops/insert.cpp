@@ -26,7 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/platform/basic.h"
 
 #include "mongo/db/ops/insert.h"
 
@@ -34,7 +33,6 @@
 
 #include "mongo/bson/bson_depth.h"
 #include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/query/dbref.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -45,9 +43,6 @@
 #include "mongo/util/str.h"
 
 namespace mongo {
-
-using std::string;
-
 namespace {
 
 /**

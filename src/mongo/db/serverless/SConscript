@@ -9,9 +9,7 @@ env.Library(
         'serverless_types.idl',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/idl/basic_types',
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -21,10 +19,9 @@ env.Library(
         'shard_split_state_machine.idl',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/connection_string',
         '$BUILD_DIR/mongo/db/repl/tenant_migration_utils',
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -35,13 +32,12 @@ env.Library(
         'shard_split_commands.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/connection_string',
         '$BUILD_DIR/mongo/client/replica_set_monitor_server_parameters',
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/global_settings',
         '$BUILD_DIR/mongo/db/repl/tenant_migration_utils',
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/db/server_base',
         'shard_split_donor_service',
     ],
 )

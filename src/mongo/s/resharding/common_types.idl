@@ -33,7 +33,7 @@ global:
 
 imports:
     - "mongo/db/keypattern.idl"
-    - "mongo/idl/basic_types.idl"
+    - "mongo/db/basic_types.idl"
     - "mongo/s/sharding_types.idl"
 
 enums:

@@ -34,7 +34,7 @@ global:
   cpp_includes: "mongo/db/traffic_recorder_validators.h"
 
 imports:
-  - "mongo/idl/basic_types.idl"
+  - "mongo/db/basic_types.idl"
 
 
 structs:
