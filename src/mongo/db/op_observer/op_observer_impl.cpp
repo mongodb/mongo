@@ -705,7 +705,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
         auto bucketsColl =
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, nss);
-        uassert(ErrorCodes::NamespaceNotFound, "Could not find collection for write", bucketsColl);
+        tassert(6905201, "Could not find collection for write", bucketsColl);
         auto timeSeriesOptions = bucketsColl->getTimeseriesOptions();
         if (timeSeriesOptions.has_value()) {
             if (auto currentSetting = bucketsColl->getRequiresTimeseriesExtendedRangeSupport();
