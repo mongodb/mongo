@@ -331,7 +331,7 @@ sh.awaitCollectionBalance = function(coll, timeout, interval) {
         {'$group': {'_id': null, 'totalNumOrphanDocs': {'$sum': '$storageStats.numOrphanDocs'}}}
     ];
 
-    var oldDb = db;
+    var oldDb = (typeof (db) === 'undefined' ? undefined : db);
     try {
         db = coll.getDB();
 
