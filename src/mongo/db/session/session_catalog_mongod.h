@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/session/session_catalog.h"
+#include "mongo/db/session/session_catalog_mongod_transaction_interface.h"
 
 namespace mongo {
 
@@ -66,7 +67,7 @@ public:
      */
     static BSONObj getConfigTxnPartialIndexSpec();
 
-    MongoDSessionCatalog();
+    explicit MongoDSessionCatalog(std::unique_ptr<MongoDSessionCatalogTransactionInterface> ti);
 
     /**
      * Invoked when the node enters the primary state. Ensures that the transactions collection is
@@ -180,6 +181,9 @@ public:
     void checkInUnscopedSession(OperationContext* opCtx,
                                 OperationContextSession::CheckInReason reason);
     void checkOutUnscopedSession(OperationContext* opCtx);
+
+private:
+    std::unique_ptr<MongoDSessionCatalogTransactionInterface> _ti;
 };
 
 /**

@@ -46,6 +46,7 @@
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/transaction/server_transactions_metrics.h"
+#include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
 #include "mongo/db/txn_retry_counter_too_old_info.h"
@@ -271,7 +272,10 @@ protected:
         // Register a temporary storage interface for MongoDSessionCatalog::onStepUp() create the
         // config.transactions table.
         repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceImpl>());
-        MongoDSessionCatalog::set(service, std::make_unique<MongoDSessionCatalog>());
+        MongoDSessionCatalog::set(
+            service,
+            std::make_unique<MongoDSessionCatalog>(
+                std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
         mongoDSessionCatalog->onStepUp(opCtx());
 

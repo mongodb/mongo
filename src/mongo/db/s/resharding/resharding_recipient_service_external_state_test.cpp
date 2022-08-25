@@ -40,6 +40,7 @@
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/database_version.h"
@@ -84,7 +85,10 @@ public:
 
         repl::createOplog(operationContext());
 
-        MongoDSessionCatalog::set(getServiceContext(), std::make_unique<MongoDSessionCatalog>());
+        MongoDSessionCatalog::set(
+            getServiceContext(),
+            std::make_unique<MongoDSessionCatalog>(
+                std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(operationContext());
         mongoDSessionCatalog->onStepUp(operationContext());
     }

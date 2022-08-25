@@ -12,6 +12,7 @@ env.Library(
         'internal_transactions_reap_service.cpp',
         'retryable_writes_stats.cpp',
         'server_transactions_metrics.cpp',
+        'session_catalog_mongod_transaction_interface_impl.cpp',
         'transaction_history_iterator.cpp',
         'transaction_metrics_observer.cpp',
         'transaction_participant.cpp',

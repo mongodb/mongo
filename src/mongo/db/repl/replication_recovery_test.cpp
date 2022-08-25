@@ -50,6 +50,7 @@
 #include "mongo/db/storage/durable_history_pin.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/unittest/death_test.h"
@@ -204,8 +205,10 @@ private:
             ASSERT_OK(_storageInterface->createCollection(
                 getOperationContext(), testNs, generateOptionsWithUuid()));
 
-            MongoDSessionCatalog::set(_opCtx->getServiceContext(),
-                                      std::make_unique<MongoDSessionCatalog>());
+            MongoDSessionCatalog::set(
+                _opCtx->getServiceContext(),
+                std::make_unique<MongoDSessionCatalog>(
+                    std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
 
             auto mongoDSessionCatalog = MongoDSessionCatalog::get(_opCtx.get());
             mongoDSessionCatalog->onStepUp(_opCtx.get());

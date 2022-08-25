@@ -177,6 +177,7 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/system_index.h"
 #include "mongo/db/transaction/internal_transactions_reap_service.h"
+#include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/ttl.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
@@ -1102,7 +1103,10 @@ void setUpReplication(ServiceContext* serviceContext) {
 
     repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
 
-    MongoDSessionCatalog::set(serviceContext, std::make_unique<MongoDSessionCatalog>());
+    MongoDSessionCatalog::set(
+        serviceContext,
+        std::make_unique<MongoDSessionCatalog>(
+            std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
 
     IndexBuildsCoordinator::set(serviceContext, std::make_unique<IndexBuildsCoordinatorMongod>());
 

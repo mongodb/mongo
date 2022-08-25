@@ -49,6 +49,7 @@
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_manager.h"
@@ -81,7 +82,10 @@ public:
             auto storageImpl = std::make_unique<repl::StorageInterfaceImpl>();
             repl::StorageInterface::set(serviceContext, std::move(storageImpl));
 
-            MongoDSessionCatalog::set(serviceContext, std::make_unique<MongoDSessionCatalog>());
+            MongoDSessionCatalog::set(
+                serviceContext,
+                std::make_unique<MongoDSessionCatalog>(
+                    std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
             auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx.get());
             mongoDSessionCatalog->onStepUp(opCtx.get());
             LogicalSessionCache::set(serviceContext, std::make_unique<LogicalSessionCacheNoop>());

@@ -67,6 +67,7 @@
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -2688,8 +2689,10 @@ public:
         // secondary index creation does not. We use an UnreplicatedWritesBlock to avoid
         // timestamping any of the catalog setup.
         repl::UnreplicatedWritesBlock noRep(_opCtx.get());
-        MongoDSessionCatalog::set(_opCtx->getServiceContext(),
-                                  std::make_unique<MongoDSessionCatalog>());
+        MongoDSessionCatalog::set(
+            _opCtx->getServiceContext(),
+            std::make_unique<MongoDSessionCatalog>(
+                std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
 
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(_opCtx.get());
         mongoDSessionCatalog->onStepUp(_opCtx.get());

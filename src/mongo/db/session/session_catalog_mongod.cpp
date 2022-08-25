@@ -521,7 +521,9 @@ BSONObj MongoDSessionCatalog::getConfigTxnPartialIndexSpec() {
     return index.toBSON();
 }
 
-MongoDSessionCatalog::MongoDSessionCatalog() {}
+MongoDSessionCatalog::MongoDSessionCatalog(
+    std::unique_ptr<MongoDSessionCatalogTransactionInterface> ti)
+    : _ti(std::move(ti)) {}
 
 void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
     // Invalidate sessions that could have a retryable write on it, so that we can refresh from disk

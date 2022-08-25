@@ -46,6 +46,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/transaction/server_transactions_metrics.h"
+#include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/stdx/future.h"
@@ -186,7 +187,10 @@ protected:
         MockReplCoordServerFixture::setUp();
         const auto service = opCtx()->getServiceContext();
         repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceImpl>());
-        MongoDSessionCatalog::set(service, std::make_unique<MongoDSessionCatalog>());
+        MongoDSessionCatalog::set(
+            service,
+            std::make_unique<MongoDSessionCatalog>(
+                std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
         mongoDSessionCatalog->onStepUp(opCtx());
 

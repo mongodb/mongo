@@ -50,6 +50,7 @@
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/logv2/log.h"
@@ -153,7 +154,10 @@ public:
         _opCtx = cc().makeOperationContext();
         repl::createOplog(_opCtx.get());
 
-        MongoDSessionCatalog::set(service, std::make_unique<MongoDSessionCatalog>());
+        MongoDSessionCatalog::set(
+            service,
+            std::make_unique<MongoDSessionCatalog>(
+                std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
 
         // Ensure that we are primary.
         auto replCoord = ReplicationCoordinator::get(_opCtx.get());

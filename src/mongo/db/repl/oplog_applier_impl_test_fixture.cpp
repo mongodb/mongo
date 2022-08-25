@@ -47,6 +47,7 @@
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/db/vector_clock_mutable.h"
 
 namespace mongo {
@@ -160,7 +161,10 @@ void OplogApplierImplTest::setUp() {
 
     StorageInterface::set(serviceContext, std::make_unique<StorageInterfaceImpl>());
 
-    MongoDSessionCatalog::set(serviceContext, std::make_unique<MongoDSessionCatalog>());
+    MongoDSessionCatalog::set(
+        serviceContext,
+        std::make_unique<MongoDSessionCatalog>(
+            std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
 
     DropPendingCollectionReaper::set(
         serviceContext, std::make_unique<DropPendingCollectionReaper>(getStorageInterface()));

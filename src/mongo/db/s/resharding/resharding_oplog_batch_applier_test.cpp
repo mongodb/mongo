@@ -50,6 +50,7 @@
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -87,7 +88,10 @@ public:
             auto storageImpl = std::make_unique<repl::StorageInterfaceImpl>();
             repl::StorageInterface::set(serviceContext, std::move(storageImpl));
 
-            MongoDSessionCatalog::set(serviceContext, std::make_unique<MongoDSessionCatalog>());
+            MongoDSessionCatalog::set(
+                serviceContext,
+                std::make_unique<MongoDSessionCatalog>(
+                    std::make_unique<MongoDSessionCatalogTransactionInterfaceImpl>()));
             auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx.get());
             mongoDSessionCatalog->onStepUp(opCtx.get());
 
