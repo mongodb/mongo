@@ -51,11 +51,12 @@ function checkStandardFieldsOK(ops, {migrationId, reachedDecision, tenantIds}) {
 
     const res = assert.commandWorked(
         donorPrimary.adminCommand({currentOp: true, desc: "shard split operation"}));
+    print(`CURR_OP: ${tojson(res)}`);
 
     checkStandardFieldsOK(
         res.inprog,
         {migrationId: operation.migrationId, reachedDecision: false, tenantIds: kTenantIds});
-    assert(!res.inprog[0].blockTimestamp);
+    assert(!res.inprog[0].blockOpTime);
 
     fp.off();
 
@@ -88,7 +89,7 @@ function checkStandardFieldsOK(ops, {migrationId, reachedDecision, tenantIds}) {
     checkStandardFieldsOK(
         res.inprog,
         {migrationId: operation.migrationId, reachedDecision: false, tenantIds: kTenantIds});
-    assert(res.inprog[0].blockTimestamp instanceof Timestamp);
+    assert(res.inprog[0].blockOpTime.ts instanceof Timestamp);
 
     fp.off();
 
@@ -140,7 +141,7 @@ function checkStandardFieldsOK(ops, {migrationId, reachedDecision, tenantIds}) {
     checkStandardFieldsOK(
         res.inprog,
         {migrationId: operation.migrationId, reachedDecision: true, tenantIds: kTenantIds});
-    assert(res.inprog[0].blockTimestamp instanceof Timestamp);
+    assert(res.inprog[0].blockOpTime.ts instanceof Timestamp);
     assert(res.inprog[0].commitOrAbortOpTime.ts instanceof Timestamp);
     assert(res.inprog[0].commitOrAbortOpTime.t instanceof NumberLong);
     assert(!res.inprog[0].expireAt);
@@ -159,7 +160,7 @@ function checkStandardFieldsOK(ops, {migrationId, reachedDecision, tenantIds}) {
     checkStandardFieldsOK(
         res.inprog,
         {migrationId: operation.migrationId, reachedDecision: true, tenantIds: kTenantIds});
-    assert(res.inprog[0].blockTimestamp instanceof Timestamp);
+    assert(res.inprog[0].blockOpTime.ts instanceof Timestamp);
     assert(res.inprog[0].commitOrAbortOpTime.ts instanceof Timestamp);
     assert(res.inprog[0].commitOrAbortOpTime.t instanceof NumberLong);
     assert(res.inprog[0].expireAt instanceof Date);

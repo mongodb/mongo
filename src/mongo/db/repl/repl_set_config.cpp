@@ -791,6 +791,14 @@ bool ReplSetConfig::areWriteConcernModesTheSame(ReplSetConfig* otherConfig) cons
     return true;
 }
 
+boost::optional<OpTime> ReplSetConfig::getShardSplitBlockOpTime() const {
+    return getSettings()->getShardSplitBlockOpTime();
+}
+
+void MutableReplSetConfig::removeShardSplitBlockOpTime() {
+    getSettings()->setShardSplitBlockOpTime(boost::none);
+}
+
 MemberConfig* MutableReplSetConfig::_findMemberByID(MemberId id) {
     for (auto it = getMembers().begin(); it != getMembers().end(); ++it) {
         if (it->getId() == id) {

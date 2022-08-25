@@ -60,7 +60,8 @@ ConnectionString makeRecipientConnectionString(const repl::ReplSetConfig& config
  */
 repl::ReplSetConfig makeSplitConfig(const repl::ReplSetConfig& config,
                                     const std::string& recipientSetName,
-                                    const std::string& recipientTagName);
+                                    const std::string& recipientTagName,
+                                    const repl::OpTime& blockOpTime);
 
 /**
  * Inserts the shard split state document 'stateDoc' into

@@ -55,8 +55,8 @@ TEST(MakeSplitConfig, recipientConfigHasNewReplicaSetId) {
                                           << donorReplSetId)));
 
     const std::string recipientConfigSetName{"newSet"};
-    const ReplSetConfig splitConfigResult =
-        serverless::makeSplitConfig(configA, recipientConfigSetName, recipientTagName);
+    const ReplSetConfig splitConfigResult = serverless::makeSplitConfig(
+        configA, recipientConfigSetName, recipientTagName, repl::OpTime(Timestamp(100, 0), 1));
 
     ASSERT_EQ(splitConfigResult.getReplicaSetId(), donorReplSetId);
     ASSERT_NE(splitConfigResult.getReplicaSetId(),
@@ -90,8 +90,8 @@ TEST(MakeSplitConfig, toBSONRoundTripAbility) {
     ASSERT_TRUE(configA == configB);
 
     const std::string recipientConfigSetName{"newSet"};
-    const ReplSetConfig splitConfigResult =
-        serverless::makeSplitConfig(configA, recipientConfigSetName, recipientTagName);
+    const ReplSetConfig splitConfigResult = serverless::makeSplitConfig(
+        configA, recipientConfigSetName, recipientTagName, repl::OpTime(Timestamp(100, 0), 1));
 
     // here we will test that the result from the method `makeSplitConfig` matches the hardcoded
     // resultSplitConfigBSON. We will also check that the recipient from the splitConfig matches
@@ -155,8 +155,8 @@ TEST(MakeSplitConfig, ValidateSplitConfigIntegrityTest) {
                    << BSON("electionTimeoutMillis" << 1000 << "replicaSetId" << OID::gen())));
 
 
-    const ReplSetConfig splitConfig =
-        serverless::makeSplitConfig(config, recipientConfigSetName, recipientTagName);
+    const ReplSetConfig splitConfig = serverless::makeSplitConfig(
+        config, recipientConfigSetName, recipientTagName, repl::OpTime(Timestamp(100, 0), 1));
     ASSERT_OK(splitConfig.validate());
     ASSERT_EQ(splitConfig.getReplSetName(), donorConfigSetName);
     ASSERT_TRUE(splitConfig.toBSON().hasField("members"));
@@ -177,10 +177,12 @@ TEST(MakeSplitConfig, ValidateSplitConfigIntegrityTest) {
     ASSERT_TRUE(recipientConfigPtr->getRecipientConfig() == nullptr);
     ASSERT_EQ(recipientConfigPtr->getReplSetName(), recipientConfigSetName);
 
-    ASSERT_THROWS_CODE(
-        serverless::makeSplitConfig(splitConfig, recipientConfigSetName, recipientTagName),
-        AssertionException,
-        6201800 /*calling on a splitconfig*/);
+    ASSERT_THROWS_CODE(serverless::makeSplitConfig(splitConfig,
+                                                   recipientConfigSetName,
+                                                   recipientTagName,
+                                                   repl::OpTime(Timestamp(100, 0), 1)),
+                       AssertionException,
+                       6201800 /*calling on a splitconfig*/);
 }
 
 TEST(MakeSplitConfig, SplitConfigAssertionsTest) {
@@ -195,7 +197,8 @@ TEST(MakeSplitConfig, SplitConfigAssertionsTest) {
 
     ASSERT_THROWS_CODE(serverless::makeSplitConfig(ReplSetConfig::parse(baseConfigBSON),
                                                    recipientConfigSetName,
-                                                   recipientTagName),
+                                                   recipientTagName,
+                                                   repl::OpTime(Timestamp(100, 0), 1)),
                        AssertionException,
                        6201801 /*no recipient members created*/);
 
@@ -210,7 +213,8 @@ TEST(MakeSplitConfig, SplitConfigAssertionsTest) {
 
     ASSERT_THROWS_CODE(serverless::makeSplitConfig(ReplSetConfig::parse(baseConfigBSON),
                                                    recipientConfigSetName,
-                                                   recipientTagName),
+                                                   recipientTagName,
+                                                   repl::OpTime(Timestamp(100, 0), 1)),
                        AssertionException,
                        6201802 /*no donor members created*/);
 }

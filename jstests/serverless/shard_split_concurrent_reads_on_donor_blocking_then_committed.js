@@ -1,6 +1,6 @@
 /**
  * Tests that the donor
- * - rejects reads with atClusterTime/afterClusterTime >= blockTimestamp reads and linearizable
+ * - rejects reads with atClusterTime/afterClusterTime >= blockOpTime reads and linearizable
  *   reads after the split commits.
  *
  * @tags: [
@@ -82,12 +82,12 @@ function testRejectBlockedReadsAfterMigrationCommitted(testCase, dbName, collNam
 
     // Wait for the last oplog entry on the primary to be visible in the committed snapshot view of
     // the oplog on all secondaries to ensure that snapshot reads on the secondaries with
-    // unspecified atClusterTime have read timestamp >= blockTimestamp.
+    // unspecified atClusterTime have read timestamp >= blockOpTime.
     donorRst.awaitLastOpCommitted();
 
     const donorDoc = findSplitOperation(donorPrimary, operation.migrationId);
     const command = testCase.requiresReadTimestamp
-        ? testCase.command(collName, donorDoc.blockTimestamp)
+        ? testCase.command(collName, donorDoc.blockOpTime.ts)
         : testCase.command(collName);
 
     // The split should unpause and commit after the read is blocked. Verify that the read

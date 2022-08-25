@@ -664,10 +664,10 @@ void ReplicationCoordinatorImpl::_scheduleHeartbeatReconfig(WithLock lk,
         .status_with_transitional_ignore();
 }
 
-std::tuple<StatusWith<ReplSetConfig>, bool> ReplicationCoordinatorImpl::_resolveConfigToApply(
-    const ReplSetConfig& config) {
+std::tuple<StatusWith<ReplSetConfig>, boost::optional<OpTime>>
+ReplicationCoordinatorImpl::_resolveConfigToApply(const ReplSetConfig& config) {
     if (!_settings.isServerless() || !config.isSplitConfig()) {
-        return {config, false};
+        return {config, boost::none};
     }
 
     stdx::unique_lock<Latch> lk(_mutex);
@@ -684,12 +684,12 @@ std::tuple<StatusWith<ReplSetConfig>, bool> ReplicationCoordinatorImpl::_resolve
             });
 
         if (foundSelfInMembers) {
-            return {config, false};
+            return {config, boost::none};
         }
 
         return {Status(ErrorCodes::NotYetInitialized,
                        "Cannot apply a split config if the current config is uninitialized"),
-                false};
+                boost::none};
     }
 
     auto recipientConfig = config.getRecipientConfig();
@@ -697,23 +697,25 @@ std::tuple<StatusWith<ReplSetConfig>, bool> ReplicationCoordinatorImpl::_resolve
     if (recipientConfig->findMemberByHostAndPort(selfMember.getHostAndPort())) {
         if (selfMember.getNumVotes() > 0) {
             return {Status(ErrorCodes::BadValue, "Cannot apply recipient config to a voting node"),
-                    false};
+                    boost::none};
         }
 
         if (_rsConfig.getReplSetName() == recipientConfig->getReplSetName()) {
             return {Status(ErrorCodes::InvalidReplicaSetConfig,
                            "Cannot apply recipient config since current config and recipient "
                            "config have the same set name."),
-                    false};
+                    boost::none};
         }
 
+        invariant(recipientConfig->getShardSplitBlockOpTime());
+        auto shardSplitBlockOpTime = *recipientConfig->getShardSplitBlockOpTime();
         auto mutableConfig = recipientConfig->getMutable();
-        mutableConfig.setConfigVersion(1);
-        mutableConfig.setConfigTerm(1);
-        return {ReplSetConfig(std::move(mutableConfig)), true};
+        mutableConfig.removeShardSplitBlockOpTime();
+
+        return {ReplSetConfig(std::move(mutableConfig)), shardSplitBlockOpTime};
     }
 
-    return {config, false};
+    return {config, boost::none};
 }
 
 void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
@@ -729,7 +731,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
         return;
     }
 
-    const auto [swConfig, isRecipientConfig] = _resolveConfigToApply(newConfig);
+    const auto [swConfig, shardSplitBlockOpTime] = _resolveConfigToApply(newConfig);
     if (!swConfig.isOK()) {
         LOGV2_WARNING(6234600,
                       "Ignoring new configuration in heartbeat response because it is invalid",
@@ -742,7 +744,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
     }
 
     const auto configToApply = swConfig.getValue();
-    if (isRecipientConfig) {
+    if (shardSplitBlockOpTime) {
         LOGV2(6309200,
               "Applying a recipient config for a shard split operation.",
               "config"_attr = configToApply);
@@ -803,7 +805,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
 
         auto opCtx = cc().makeOperationContext();
         // Don't write the no-op for config learned via heartbeats.
-        auto status = [&, isRecipientConfig = isRecipientConfig]() {
+        auto status = [&, isRecipientConfig = shardSplitBlockOpTime.has_value()]() {
             if (isRecipientConfig) {
                 return _externalState->replaceLocalConfigDocument(opCtx.get(),
                                                                   configToApply.toBSON());
@@ -857,7 +859,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
             shouldStartDataReplication = true;
         }
 
-        if (isRecipientConfig) {
+        if (shardSplitBlockOpTime) {
             // Donor access blockers are removed from donor nodes via the shard split op observer.
             // Donor access blockers are removed from recipient nodes when the node applies the
             // recipient config. When the recipient primary steps up it will delete its state
@@ -877,7 +879,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigStore(
             "configToApplyVersionAndTerm"_attr = configToApply.getConfigVersionAndTerm());
     }
 
-    _heartbeatReconfigFinish(cbd, configToApply, myIndex, isRecipientConfig);
+    _heartbeatReconfigFinish(cbd, configToApply, myIndex, shardSplitBlockOpTime);
 
     // Start data replication after the config has been installed.
     if (shouldStartDataReplication) {
@@ -908,7 +910,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     const executor::TaskExecutor::CallbackArgs& cbData,
     const ReplSetConfig& newConfig,
     StatusWith<int> myIndex,
-    const bool isRecipientConfig) {
+    boost::optional<OpTime> shardSplitBlockOpTime) {
     if (cbData.status == ErrorCodes::CallbackCanceled) {
         return;
     }
@@ -922,7 +924,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
             ->scheduleWorkAt(_replExecutor->now() + Milliseconds{10},
                              [=](const executor::TaskExecutor::CallbackArgs& cbData) {
                                  _heartbeatReconfigFinish(
-                                     cbData, newConfig, myIndex, isRecipientConfig);
+                                     cbData, newConfig, myIndex, shardSplitBlockOpTime);
                              })
             .status_with_transitional_ignore();
         return;
@@ -947,7 +949,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
                 ->onEvent(electionFinishedEvent,
                           [=](const executor::TaskExecutor::CallbackArgs& cbData) {
                               _heartbeatReconfigFinish(
-                                  cbData, newConfig, myIndex, isRecipientConfig);
+                                  cbData, newConfig, myIndex, shardSplitBlockOpTime);
                           })
                 .status_with_transitional_ignore();
             return;
@@ -1000,7 +1002,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     invariant(_rsConfigState == kConfigHBReconfiguring);
     invariant(!_rsConfig.isInitialized() ||
               _rsConfig.getConfigVersionAndTerm() < newConfig.getConfigVersionAndTerm() ||
-              _selfIndex < 0 || isRecipientConfig);
+              _selfIndex < 0 || shardSplitBlockOpTime);
 
     if (!myIndex.isOK()) {
         switch (myIndex.getStatus().code()) {
@@ -1037,6 +1039,10 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
 
     const PostMemberStateUpdateAction action =
         _setCurrentRSConfig(lk, opCtx.get(), newConfig, myIndexValue);
+
+    if (shardSplitBlockOpTime) {
+        _topCoord->resetLastCommittedOpTime(*shardSplitBlockOpTime);
+    }
 
     lk.unlock();
     if (contentChanged) {

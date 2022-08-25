@@ -168,8 +168,8 @@ private:
     ExecutorFuture<void> _abortIndexBuildsAndEnterBlockingState(
         const ScopedTaskExecutorPtr& executor, const CancellationToken& abortToken);
 
-    ExecutorFuture<void> _waitForRecipientToReachBlockTimestamp(
-        const ScopedTaskExecutorPtr& executor, const CancellationToken& abortToken);
+    ExecutorFuture<void> _waitForRecipientToReachBlockOpTime(const ScopedTaskExecutorPtr& executor,
+                                                             const CancellationToken& abortToken);
 
     ExecutorFuture<void> _applySplitConfigToDonor(const ScopedTaskExecutorPtr& executor,
                                                   const CancellationToken& abortToken);

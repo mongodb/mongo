@@ -81,7 +81,7 @@ const kCollName = "testColl";
     const laggedSecondary = test.donor.getSecondary();
     const donorDoc = donorsColl.findOne({_id: operation.migrationId});
     assert.neq(null, donorDoc);
-    const readThread = startReadThread(laggedSecondary, dbName, kCollName, donorDoc.blockTimestamp);
+    const readThread = startReadThread(laggedSecondary, dbName, kCollName, donorDoc.blockOpTime.ts);
     assert.soon(() => BasicServerlessTest.getNumBlockedReads(laggedSecondary, tenantId) == 1);
 
     // Disable snapshotting on that secondary, and wait for the split to abort and be garbage
@@ -132,7 +132,7 @@ const kCollName = "testColl";
     const laggedSecondary = test.donor.getSecondary();
     const donorDoc = donorsColl.findOne({_id: operation.migrationId});
     assert.neq(null, donorDoc);
-    const readThread = startReadThread(laggedSecondary, dbName, kCollName, donorDoc.blockTimestamp);
+    const readThread = startReadThread(laggedSecondary, dbName, kCollName, donorDoc.blockOpTime.ts);
     assert.soon(() => BasicServerlessTest.getNumBlockedReads(laggedSecondary, tenantId) == 1);
 
     // Disable snapshotting on that secondary, and wait for the split to commit and be garbage
@@ -183,7 +183,7 @@ const kCollName = "testColl";
     // Run a read command and a write command against the primary, and wait for them to block.
     const donorDoc = donorsColl.findOne({_id: operation.migrationId});
     assert.neq(null, donorDoc);
-    const readThread = startReadThread(donorPrimary, dbName, kCollName, donorDoc.blockTimestamp);
+    const readThread = startReadThread(donorPrimary, dbName, kCollName, donorDoc.blockOpTime.ts);
     const writeThread = startWriteThread(donorPrimary, dbName, kCollName);
     assert.soon(() => BasicServerlessTest.getNumBlockedReads(donorPrimary, tenantId) == 1);
     assert.soon(() => BasicServerlessTest.getNumBlockedWrites(donorPrimary, tenantId) == 1);

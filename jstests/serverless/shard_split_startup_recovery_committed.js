@@ -1,6 +1,6 @@
 /**
  * Commits a shard split and shut down prior to marking the state document as garbage collectable.
- * Checks that we recover the tenant access blockers with `commitOpTime` and `blockTimestamp` set.
+ * Checks that we recover the tenant access blockers with `commitOpTime` and `blockOpTime` set.
  * @tags: [requires_fcv_52, featureFlagShardSplit]
  */
 

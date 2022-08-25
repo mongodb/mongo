@@ -1,6 +1,6 @@
 /**
  * Tests that the donor
- * - blocks reads with atClusterTime/afterClusterTime >= blockTimestamp that are executed while the
+ * - blocks reads with atClusterTime/afterClusterTime >= blockOpTime that are executed while the
  *   split is in the blocking state but does not block linearizable reads.
  *
  * @tags: [
@@ -31,14 +31,14 @@ const kMaxTimeMS = 1 * 1000;
 
 /**
  * Tests that in the blocking state, the donor blocks reads with atClusterTime/afterClusterTime >=
- * blockTimestamp but does not block linearizable reads.
+ * blockOpTime but does not block linearizable reads.
  */
 let countBlockedReadsPrimary = 0;
 let countBlockedReadsSecondaries = 0;
 function testBlockReadsAfterMigrationEnteredBlocking(testCase, primary, dbName, collName) {
     const donorDoc = findSplitOperation(primary, operation.migrationId);
     const command = testCase.requiresReadTimestamp
-        ? testCase.command(collName, donorDoc.blockTimestamp)
+        ? testCase.command(collName, donorDoc.blockOpTime.ts)
         : testCase.command(collName);
     const shouldBlock = !testCase.isLinearizableRead;
     if (shouldBlock) {
@@ -83,7 +83,7 @@ blockingFp.wait();
 
 // Wait for the last oplog entry on the primary to be visible in the committed snapshot view of
 // the oplog on all secondaries to ensure that snapshot reads on the secondaries with
-// unspecified atClusterTime have read timestamp >= blockTimestamp.
+// unspecified atClusterTime have read timestamp >= blockOpTime.
 donorRst.awaitLastOpCommitted();
 
 for (const [testCaseName, testCase] of Object.entries(testCases)) {

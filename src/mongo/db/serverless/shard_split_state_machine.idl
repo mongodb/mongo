@@ -76,10 +76,10 @@ structs:
                 type: ShardSplitDonorState
                 description: "The current state of the shard split operation."
                 default: kUninitialized
-            blockTimestamp:
-                type: timestamp
+            blockOpTime:
+                type: optime
                 description: >-
-                    The timestamp at which writes and causal reads against the databases
+                    The opTime at which writes and causal reads against the databases
                     being migrated should start blocking.
                 optional: true
             commitOrAbortOpTime:

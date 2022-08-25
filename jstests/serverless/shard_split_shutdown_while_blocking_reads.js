@@ -54,7 +54,7 @@ let readThread = new Thread((host, dbName, collName, afterClusterTime) => {
         readConcern: {afterClusterTime: Timestamp(afterClusterTime.t, afterClusterTime.i)}
     });
     assert.commandFailedWithCode(res, ErrorCodes.InterruptedAtShutdown);
-}, donorPrimary.host, kDbName, kCollName, donorDoc.blockTimestamp);
+}, donorPrimary.host, kDbName, kCollName, donorDoc.blockOpTime.ts);
 readThread.start();
 
 // Shut down the donor after the read starts blocking.

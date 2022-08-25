@@ -452,20 +452,20 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
                 case ShardSplitDonorStateEnum::kAbortingIndexBuilds:
                     break;
                 case ShardSplitDonorStateEnum::kBlocking:
-                    invariant(doc.getBlockTimestamp());
+                    invariant(doc.getBlockOpTime());
                     mtab->startBlockingWrites();
-                    mtab->startBlockingReadsAfter(doc.getBlockTimestamp().value());
+                    mtab->startBlockingReadsAfter(doc.getBlockOpTime()->getTimestamp());
                     break;
                 case ShardSplitDonorStateEnum::kCommitted:
-                    invariant(doc.getBlockTimestamp());
+                    invariant(doc.getBlockOpTime());
                     mtab->startBlockingWrites();
-                    mtab->startBlockingReadsAfter(doc.getBlockTimestamp().value());
+                    mtab->startBlockingReadsAfter(doc.getBlockOpTime()->getTimestamp());
                     mtab->setCommitOpTime(opCtx, doc.getCommitOrAbortOpTime().value());
                     break;
                 case ShardSplitDonorStateEnum::kAborted:
-                    if (doc.getBlockTimestamp()) {
+                    if (doc.getBlockOpTime()) {
                         mtab->startBlockingWrites();
-                        mtab->startBlockingReadsAfter(doc.getBlockTimestamp().value());
+                        mtab->startBlockingReadsAfter(doc.getBlockOpTime()->getTimestamp());
                     }
                     mtab->setAbortOpTime(opCtx, doc.getCommitOrAbortOpTime().value());
                     break;

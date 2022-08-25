@@ -425,7 +425,7 @@ class BasicServerlessTest {
     /*
      * Look up tenant access blockers for the given tenant ids and will check, based upon the
      * expected state the access blockers are expected to be, that the different fields are
-     * properly set such as `blockTimestamp`, `abortOpTime` or `commitOpTime`.
+     * properly set such as `blockOpTime`, `abortOpTime` or `commitOpTime`.
      * @param {migrationId} the current shard split id.
      * @param {tenantIds} tenant ids of the shard split.
      * @param {expectedState} expected state the tenant access blocker to be in.
@@ -438,9 +438,8 @@ class BasicServerlessTest {
                 BasicServerlessTest.getTenantMigrationAccessBlocker({node: donorPrimary, tenantId})
                     .donor;
             const tenantAccessBlockersBlockRW = donorMtab.state == expectedState;
-
             const tenantAccessBlockersBlockTimestamp =
-                bsonWoCompare(donorMtab.blockTimestamp, stateDoc.blockTimestamp) == 0;
+                bsonWoCompare(donorMtab.blockTimestamp, stateDoc.blockOpTime.ts) == 0;
 
             let tenantAccessBlockersAbortTimestamp = true;
             if (donorMtab.state > TenantMigrationTest.DonorAccessState.kBlockWritesAndReads) {
@@ -566,6 +565,16 @@ class BasicServerlessTest {
         const donorRst = createRst(donorRstArgs, true);
         return donorRst.getPrimary();
     }
+
+    /**
+     * @returns A new ReplSetTest fixture representing the recipient set.
+     */
+    getRecipient() {
+        const recipientRstArgs = createRstArgs(this.donor);
+        recipientRstArgs.nodeHosts = this.recipientNodes.map(node => node.host);
+        assert(recipientRstArgs.nodeHosts.length >= 3);
+        return createRst(recipientRstArgs, true);
+    }
 }
 
 BasicServerlessTest.kConfigSplitDonorsNS = "config.shardSplitDonors";
@@ -594,10 +603,10 @@ function assertMigrationState(primary, migrationId, state) {
         print(tojson(migrationDoc));
     }
 
-    // If transitioning to "blocking", prove that we wrote that fact at the blockTimestamp.
+    // If transitioning to "blocking", prove that we wrote that fact at the blockOpTime.
     if (state === "blocking") {
         const oplogEntry =
-            primary.getDB("local").oplog.rs.find({ts: migrationDoc.blockTimestamp}).next();
+            primary.getDB("local").oplog.rs.find({ts: migrationDoc.blockOpTime.ts}).next();
         assert.neq(null, oplogEntry.o, oplogEntry);
         assert.neq(null, oplogEntry.o.state, oplogEntry);
         assert.eq(oplogEntry.o.state, state, oplogEntry);

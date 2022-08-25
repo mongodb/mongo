@@ -63,10 +63,9 @@ ShardSplitDonorDocument parseAndValidateDonorDocument(const BSONObj& doc) {
     switch (donorStateDoc.getState()) {
         case ShardSplitDonorStateEnum::kUninitialized:
             uassert(ErrorCodes::BadValue,
-                    fmt::format(errmsg,
-                                "BlockTimeStamp should not be set in data sync state",
-                                doc.toString()),
-                    !donorStateDoc.getBlockTimestamp());
+                    fmt::format(
+                        errmsg, "blockOpTime should not be set in data sync state", doc.toString()),
+                    !donorStateDoc.getBlockOpTime());
             uassert(ErrorCodes::BadValue,
                     fmt::format(errmsg,
                                 "CommitOrAbortOpTime should not be set in data sync state",
@@ -81,15 +80,15 @@ ShardSplitDonorDocument parseAndValidateDonorDocument(const BSONObj& doc) {
         case ShardSplitDonorStateEnum::kAbortingIndexBuilds:
             uassert(ErrorCodes::BadValue,
                     errmsg,
-                    !donorStateDoc.getBlockTimestamp() && !donorStateDoc.getCommitOrAbortOpTime() &&
+                    !donorStateDoc.getBlockOpTime() && !donorStateDoc.getCommitOrAbortOpTime() &&
                         !donorStateDoc.getAbortReason());
             break;
         case ShardSplitDonorStateEnum::kBlocking:
             uassert(ErrorCodes::BadValue,
                     fmt::format(errmsg,
-                                "Missing blockTimeStamp while being in blocking state",
+                                "Missing blockOpTime while being in blocking state",
                                 doc.toString()),
-                    donorStateDoc.getBlockTimestamp());
+                    donorStateDoc.getBlockOpTime());
             uassert(
                 ErrorCodes::BadValue,
                 fmt::format(errmsg,
@@ -105,9 +104,9 @@ ShardSplitDonorDocument parseAndValidateDonorDocument(const BSONObj& doc) {
         case ShardSplitDonorStateEnum::kCommitted:
             uassert(ErrorCodes::BadValue,
                     fmt::format(errmsg,
-                                "Missing blockTimeStamp while being in committed state",
+                                "Missing blockOpTime while being in committed state",
                                 doc.toString()),
-                    donorStateDoc.getBlockTimestamp());
+                    donorStateDoc.getBlockOpTime());
             uassert(ErrorCodes::BadValue,
                     fmt::format(errmsg,
                                 "Missing CommitOrAbortOpTime while being in committed state",
@@ -172,7 +171,7 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
  */
 void onTransitionToBlocking(OperationContext* opCtx, const ShardSplitDonorDocument& donorStateDoc) {
     invariant(donorStateDoc.getState() == ShardSplitDonorStateEnum::kBlocking);
-    invariant(donorStateDoc.getBlockTimestamp());
+    invariant(donorStateDoc.getBlockOpTime());
     invariant(donorStateDoc.getTenantIds());
 
     auto tenantIds = *donorStateDoc.getTenantIds();
@@ -191,7 +190,7 @@ void onTransitionToBlocking(OperationContext* opCtx, const ShardSplitDonorDocume
         // Both primaries and secondaries call startBlockingReadsAfter in the op observer, since
         // startBlockingReadsAfter just needs to be called before the "start blocking" write's oplog
         // hole is filled.
-        mtab->startBlockingReadsAfter(donorStateDoc.getBlockTimestamp().value());
+        mtab->startBlockingReadsAfter(donorStateDoc.getBlockOpTime()->getTimestamp());
     }
 }
 

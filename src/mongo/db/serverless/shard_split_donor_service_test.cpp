@@ -1003,7 +1003,7 @@ public:
     ShardSplitDonorDocument initialStateDocument() override {
 
         auto stateDocument = defaultStateDocument();
-        stateDocument.setBlockTimestamp(Timestamp(1, 1));
+        stateDocument.setBlockOpTime(repl::OpTime(Timestamp(1, 1), 1));
         stateDocument.setState(ShardSplitDonorStateEnum::kBlocking);
         stateDocument.setRecipientConnectionString(ConnectionString::forLocal());
 
@@ -1070,7 +1070,7 @@ public:
         auto stateDocument = defaultStateDocument();
 
         stateDocument.setState(mongo::ShardSplitDonorStateEnum::kAborted);
-        stateDocument.setBlockTimestamp(Timestamp(1, 1));
+        stateDocument.setBlockOpTime(repl::OpTime(Timestamp(1, 1), 1));
         stateDocument.setCommitOrAbortOpTime(repl::OpTime(Timestamp(1, 1), 1));
 
         Status status(ErrorCodes::InternalError, abortReason);

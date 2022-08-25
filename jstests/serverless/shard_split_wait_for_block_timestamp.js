@@ -1,5 +1,5 @@
 /*
- * Test that the shard split operation waits for recipient nodes to reach the blockTimestamp by
+ * Test that the shard split operation waits for recipient nodes to reach the blockOpTime by
  * pausing replication and observing the operation time out, then reenabling replication and
  * observing a successful split.
  *

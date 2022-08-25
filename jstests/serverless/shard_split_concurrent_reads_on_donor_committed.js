@@ -1,6 +1,6 @@
 /**
  * Tests that the donor
- * - rejects reads with atClusterTime/afterClusterTime >= blockTimestamp reads and linearizable
+ * - rejects reads with atClusterTime/afterClusterTime >= blockOpTime reads and linearizable
  *   reads after the split commits.
  *
  * @tags: [
@@ -29,7 +29,7 @@ const kTenantDefinedDbName = "0";
 
 /**
  * Tests that after the split commits, the donor rejects linearizable reads and reads with
- * atClusterTime/afterClusterTime >= blockTimestamp.
+ * atClusterTime/afterClusterTime >= blockOpTime.
  */
 let countTenantMigrationCommittedErrorsPrimary = 0;
 let countTenantMigrationCommittedErrorsSecondaries = 0;
@@ -57,7 +57,7 @@ function testRejectReadsAfterMigrationCommitted(testCase, primary, dbName, collN
         const db = node.getDB(dbName);
         if (testCase.requiresReadTimestamp) {
             runCommandForConcurrentReadTest(db,
-                                            testCase.command(collName, donorDoc.blockTimestamp),
+                                            testCase.command(collName, donorDoc.blockOpTime.ts),
                                             ErrorCodes.TenantMigrationCommitted,
                                             testCase.isTransaction);
             runCommandForConcurrentReadTest(

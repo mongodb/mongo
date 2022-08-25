@@ -357,7 +357,7 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
                 auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
                 pauseShardSplitAfterBlocking.pauseWhileSet(opCtx.get());
 
-                return _waitForRecipientToReachBlockTimestamp(executor, abortToken);
+                return _waitForRecipientToReachBlockOpTime(executor, abortToken);
             })
             .then([this, executor, abortToken, criticalSectionWithoutCatchupTimer] {
                 criticalSectionWithoutCatchupTimer->reset();
@@ -500,8 +500,8 @@ boost::optional<BSONObj> ShardSplitDonorService::DonorStateMachine::reportForCur
     if (tenantIds) {
         bob.append("tenantIds", *tenantIds);
     }
-    if (_stateDoc.getBlockTimestamp()) {
-        bob.append("blockTimestamp", *_stateDoc.getBlockTimestamp());
+    if (_stateDoc.getBlockOpTime()) {
+        _stateDoc.getBlockOpTime()->append(&bob, "blockOpTime");
     }
     if (_stateDoc.getCommitOrAbortOpTime()) {
         _stateDoc.getCommitOrAbortOpTime()->append(&bob, "commitOrAbortOpTime");
@@ -673,8 +673,7 @@ ShardSplitDonorService::DonorStateMachine::_abortIndexBuildsAndEnterBlockingStat
         });
 }
 
-ExecutorFuture<void>
-ShardSplitDonorService::DonorStateMachine::_waitForRecipientToReachBlockTimestamp(
+ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_waitForRecipientToReachBlockOpTime(
     const ScopedTaskExecutorPtr& executor, const CancellationToken& abortToken) {
     checkForTokenInterrupt(abortToken);
 
@@ -686,9 +685,8 @@ ShardSplitDonorService::DonorStateMachine::_waitForRecipientToReachBlockTimestam
 
     auto replCoord = repl::ReplicationCoordinator::get(cc().getServiceContext());
 
-    invariant(_stateDoc.getBlockTimestamp());
-    auto blockTimestamp = *_stateDoc.getBlockTimestamp();
-    repl::OpTime blockOpTime = repl::OpTime(blockTimestamp, replCoord->getConfigTerm());
+    invariant(_stateDoc.getBlockOpTime());
+    auto blockOpTime = *_stateDoc.getBlockOpTime();
 
     invariant(_stateDoc.getRecipientTagName());
     auto recipientTagName = *_stateDoc.getRecipientTagName();
@@ -721,16 +719,18 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_applySplitConfi
 
     auto splitConfig = [&]() {
         stdx::lock_guard<Latch> lg(_mutex);
-        auto setName = _stateDoc.getRecipientSetName();
-        invariant(setName);
-        auto tagName = _stateDoc.getRecipientTagName();
-        invariant(tagName);
+        invariant(_stateDoc.getRecipientSetName());
+        auto recipientSetName = _stateDoc.getRecipientSetName()->toString();
+        invariant(_stateDoc.getRecipientTagName());
+        auto recipientTagName = _stateDoc.getRecipientTagName()->toString();
+        invariant(_stateDoc.getBlockOpTime());
+        auto blockOpTime = *_stateDoc.getBlockOpTime();
 
         auto replCoord = repl::ReplicationCoordinator::get(cc().getServiceContext());
         invariant(replCoord);
 
         return serverless::makeSplitConfig(
-            replCoord->getConfig(), setName->toString(), tagName->toString());
+            replCoord->getConfig(), recipientSetName, recipientTagName, blockOpTime);
     }();
 
     LOGV2(6309100,
@@ -916,7 +916,7 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
                                case ShardSplitDonorStateEnum::kAbortingIndexBuilds:
                                    break;
                                case ShardSplitDonorStateEnum::kBlocking:
-                                   _stateDoc.setBlockTimestamp(oplogSlot.getTimestamp());
+                                   _stateDoc.setBlockOpTime(oplogSlot);
                                    break;
                                case ShardSplitDonorStateEnum::kCommitted:
                                    _stateDoc.setCommitOrAbortOpTime(oplogSlot);

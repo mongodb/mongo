@@ -1,6 +1,6 @@
 /**
  * Commits a shard split and shuts down while being in a blocking state. Tests that we recover the
- * tenant access blockers in blocking state with `blockTimestamp` set.
+ * tenant access blockers in blocking state with `blockOpTime` set.
  * @tags: [requires_fcv_52, featureFlagShardSplit]
  */
 
