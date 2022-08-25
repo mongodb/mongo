@@ -509,7 +509,7 @@ commands:
                 description: "The statement number for this findAndModify operation."
                 type: int
                 optional: true
-                stability: stable
+                stability: internal
             bypassDocumentValidation:
                 description: "Enables the operation to bypass document validation. This lets you
                               write documents that do not meet the validation requirements."

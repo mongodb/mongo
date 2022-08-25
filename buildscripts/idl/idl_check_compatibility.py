@@ -223,6 +223,17 @@ IGNORE_STABLE_TO_UNSTABLE_LIST: List[str] = [
     # The 'needsMerge' and 'fromMongos' fields of aggregation are sent from mongos to shards for internal use.
     'aggregate-param-needsMerge',
     'aggregate-param-fromMongos',
+    # Bulk fixes for fields that are strictly internal all along and should thus be marked unstable.
+    'aggregate-param-$_generateV2ResumeTokens',
+    'endSessions-param-txnNumber',
+    'endSessions-param-txnUUID',
+    'findAndModify-param-stmtId',
+    'hello-reply-cwwc',
+    'hello-reply-isImplicitDefaultMajorityWC',
+    'hello-param-loadBalanced',
+    'hello-reply-serviceId',
+    'refreshSessions-param-txnNumber',
+    'refreshSessions-param-txnUUID',
 ]
 
 # Once a field is part of the stable API, either by direct addition or by changing it from unstable
@@ -296,7 +307,6 @@ ALLOWED_STABLE_FIELDS_LIST: List[str] = [
     'listIndexes-reply-clustered',
     'create-param-encryptedFields',
     'create-param-bucketRoundingSeconds',
-    'encryptedFields-param-encryptedFields',
     'endSessions-param-txnNumber',
     'endSessions-param-txnUUID',
     'refreshSessions-param-txnNumber',

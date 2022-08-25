@@ -148,7 +148,7 @@ structs:
             serviceId:
                 type: objectid
                 optional: true
-                stability: stable
+                stability: internal
             ##
             ## ReplicationInfo
             ##
@@ -248,12 +248,12 @@ structs:
                 # Only populated on shard server.
                 type: bool
                 optional: true
-                stability: stable
+                stability: internal
             cwwc:
                 # Only populated on shard server.
                 type: WriteConcern
                 optional: true
-                stability: stable
+                stability: internal
 
 commands:
     hello:
@@ -318,4 +318,4 @@ commands:
             loadBalanced:
                 type: bool
                 optional: true
-                stability: stable
+                stability: unstable

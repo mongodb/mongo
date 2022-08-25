@@ -266,7 +266,7 @@ commands:
                 description: "Internal parameter to signal whether v2 resume tokens should be generated."
                 type: optionalBool
                 cpp_name: generateV2ResumeTokens
-                stability: stable
+                stability: internal
             encryptionInformation:
                 description: "Encryption Information schema and other tokens for CRUD commands"
                 type: EncryptionInformation
