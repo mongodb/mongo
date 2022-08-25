@@ -398,14 +398,14 @@ public:
             child1;  // No need to apply multiplier here, would be applied in the children already.
     }
     double transport(NaryNode& node, double multiplier, std::vector<double> children) {
-        return std::accumulate(children.begin(), children.end(), 0);
+        return std::accumulate(children.begin(), children.end(), 0.0);
     }
     double transport(AtLeastBinaryNode& node,
                      double multiplier,
                      std::vector<double> children,
                      double child0,
                      double child1) {
-        return child0 + child1 + std::accumulate(children.begin(), children.end(), 0);
+        return child0 + child1 + std::accumulate(children.begin(), children.end(), 0.0);
     }
 };
 
@@ -502,14 +502,14 @@ public:
     }
     double transport(NaryNode& node, std::vector<double> children) {
         _depthMultiplier /= 10;
-        return std::accumulate(children.begin(), children.end(), 0);
+        return std::accumulate(children.begin(), children.end(), 0.0);
     }
     double transport(AtLeastBinaryNode& node,
                      std::vector<double> children,
                      double child0,
                      double child1) {
         _depthMultiplier /= 10;
-        return child0 + child1 + std::accumulate(children.begin(), children.end(), 0);
+        return child0 + child1 + std::accumulate(children.begin(), children.end(), 0.0);
     }
 };
 
