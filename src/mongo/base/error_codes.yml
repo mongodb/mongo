@@ -171,7 +171,7 @@ error_codes:
     #- {code: 131,name: RLPInitializationFailed} # Removed in 4.2
     - {code: 132,name: OBSOLETE_ConfigServersInconsistent}
     - {code: 133,name: FailedToSatisfyReadPreference}
-    - {code: 134,name: ReadConcernMajorityNotAvailableYet}
+    - {code: 134,name: ReadConcernMajorityNotAvailableYet, categories: [RetriableError]}
     - {code: 135,name: StaleTerm}
     - {code: 136,name: CappedPositionLost}
     - {code: 137,name: IncompatibleShardingConfigVersion}

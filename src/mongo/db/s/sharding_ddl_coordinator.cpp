@@ -68,8 +68,7 @@ bool isRetriableErrorForDDLCoordinator(const Status& status) {
         status.isA<ErrorCategory::ExceededTimeLimitError>() ||
         status.isA<ErrorCategory::WriteConcernError>() ||
         status == ErrorCodes::FailedToSatisfyReadPreference || status == ErrorCodes::Interrupted ||
-        status == ErrorCodes::LockBusy || status == ErrorCodes::CommandNotFound ||
-        status == ErrorCodes::ReadConcernMajorityNotAvailableYet;
+        status == ErrorCodes::LockBusy || status == ErrorCodes::CommandNotFound;
 }
 
 }  // namespace

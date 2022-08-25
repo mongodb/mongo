@@ -63,6 +63,8 @@ function testFailGetMoreAfterCursorCheckoutFailpoint({errorCode, expectedLabel})
 testFailGetMoreAfterCursorCheckoutFailpoint(
     {errorCode: ErrorCodes.ShutdownInProgress, expectedLabel: true});
 testFailGetMoreAfterCursorCheckoutFailpoint(
+    {errorCode: ErrorCodes.ReadConcernMajorityNotAvailableYet, expectedLabel: true});
+testFailGetMoreAfterCursorCheckoutFailpoint(
     {errorCode: ErrorCodes.FailedToParse, expectedLabel: false});
 
 rst.stopSet();
