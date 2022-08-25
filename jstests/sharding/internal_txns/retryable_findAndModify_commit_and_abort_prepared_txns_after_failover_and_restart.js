@@ -67,12 +67,6 @@ function runTest(st, stepDownShard0PrimaryFunc, testOpts = {
     const prepareTxnRes = assert.commandWorked(testDB.adminCommand(prepareCmdObj));
     commitCmdObj.commitTimestamp = prepareTxnRes.prepareTimestamp;
 
-    // It is possible that a secondary that steps up could use a stale majority-committed snapshot,
-    // so we want to wait until the prepareTransaction is visible in the majority-committed snapshot
-    // view for all nodes in the replica set. We do this because commitTransaction for a prepared
-    // transaction cannot be run before its prepare oplog entry has been majority committed
-    st.rs0.awaitLastOpCommitted();
-
     stepDownShard0PrimaryFunc();
 
     testDB = st.rs0.getPrimary().getDB(kDbName);
@@ -174,9 +168,9 @@ function runTest(st, stepDownShard0PrimaryFunc, testOpts = {
         st.rs0.stopSet(null /* signal */, true /*forRestart */);
         st.rs0.startSet({restart: true});
         st.rs0.getPrimary();
-        // Wait for replication since it is illegal to run commitTransaction before the prepare
-        // oplog entry has been majority committed.
-        st.rs0.awaitReplication();
+        // Wait for replication to recover the lastCommittedOpTime since it is illegal to run
+        // commitTransaction before the prepare oplog entry has been majority committed.
+        st.rs0.awaitLastOpCommitted();
     };
 
     // Test findAnModify without pre/post image.
