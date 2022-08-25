@@ -2310,7 +2310,14 @@ TEST(RangeTest, Double_Bounds) {
 #define ASSERT_EIB(x, z) ASSERT_EQ(getTypeInfoDouble((x), -1E100, 1E100).value, (z));
 
     // Larger numbers map to larger uint64
-    ASSERT_EIB(-1, 4607182418800017408ULL);
+    ASSERT_EIB(-1111, 4570770991734587392ULL);
+    ASSERT_EIB(-111, 4585860689314185216ULL);
+    ASSERT_EIB(-11, 4600989969312382976ULL);
+    ASSERT_EIB(-10, 4601552919265804288ULL);
+    ASSERT_EIB(-3, 4609434218613702656ULL);
+    ASSERT_EIB(-2, 4611686018427387904ULL);
+
+    ASSERT_EIB(-1, 4616189618054758400ULL);
     ASSERT_EIB(1, 13830554455654793216ULL);
     ASSERT_EIB(22, 13850257704024539136ULL);
     ASSERT_EIB(333, 13867937850999177216ULL);
@@ -2329,17 +2336,17 @@ TEST(RangeTest, Double_Bounds) {
     ASSERT_EIB(1E-58, 12962510038552207822ULL);
 
     // Smaller negative exponents map to smaller uint64
-    ASSERT_EIB(-1E-6, 4517329193108106637);
-    ASSERT_EIB(-1E-7, 4502148214488346440);
-    ASSERT_EIB(-1E-8, 4487126258331716666);
-    ASSERT_EIB(-1E-56, 3769339924178256082);
-    ASSERT_EIB(-1E-57, 3754062278231366209);
-    ASSERT_EIB(-1E-58, 3739138001697432014);
+    ASSERT_EIB(-1E-06, 4706042843746669171ULL);
+    ASSERT_EIB(-1E-07, 4721223822366429368ULL);
+    ASSERT_EIB(-1E-08, 4736245778523059142ULL);
+    ASSERT_EIB(-1E-56, 5454032112676519726ULL);
+    ASSERT_EIB(-1E-57, 5469309758623409599ULL);
+    ASSERT_EIB(-1E-58, 5484234035157343794ULL);
 
     // Larger exponents map to larger uint64
-    ASSERT_EIB(-33E56, 5467601615771058070);
-    ASSERT_EIB(-22E57, 5479765660206230010);
-    ASSERT_EIB(-11E58, 5490316916731687484);
+    ASSERT_EIB(-33E+56, 3755770421083717738ULL);
+    ASSERT_EIB(-22E+57, 3743606376648545798ULL);
+    ASSERT_EIB(-11E+58, 3733055120123088324ULL);
 
 #undef ASSERT_EIB
 }
@@ -2521,16 +2528,14 @@ TEST(MinCoverCalcTest, Int64_TestVectors) {
     }
 }
 
-// TODO SERVER-68959 uncomment and update vectors
-//
-// TEST(MinCoverCalcTest, Double_TestVectors) {
-//     MinCoverTestVector<double> testVectors[] = {
-// #include "test_vectors/mincover_double.cstruct"
-//     };
-//     for (const auto& testVector : testVectors) {
-//         ASSERT_TRUE(testVector.validate());
-//     }
-// }
+TEST(MinCoverCalcTest, Double_TestVectors) {
+    MinCoverTestVector<double> testVectors[] = {
+#include "test_vectors/mincover_double.cstruct"
+    };
+    for (const auto& testVector : testVectors) {
+        ASSERT_TRUE(testVector.validate(minCoverDouble));
+    }
+}
 
 #pragma clang optimize on
 

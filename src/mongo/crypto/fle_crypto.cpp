@@ -3304,9 +3304,16 @@ OSTType_Double getTypeInfoDouble(double value,
     // Therefore, since the order of bytes on each platform is consistent with itself, the
     // conversion below converts a double into correct 64-bit integer that produces the same
     // behavior across plaforms.
+    bool is_neg = value < 0;
+
     value *= -1;
     char* buf = reinterpret_cast<char*>(&value);
     uint64_t uv = DataView(buf).read<uint64_t>();
+
+    if (is_neg) {
+        dassert(uv < std::numeric_limits<uint64_t>::max());
+        uv = (1ULL << 63) - uv;
+    }
 
     return {uv, 0, std::numeric_limits<uint64_t>::max()};
 }
