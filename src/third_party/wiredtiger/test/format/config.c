@@ -1167,30 +1167,36 @@ config_transaction(void)
         config_single(NULL, "transaction.timestamps=on", false);
         config_off(NULL, "transaction.implicit");
         config_off(NULL, "ops.salvage");
-    } else if (GV(TRANSACTION_TIMESTAMPS) && config_explicit(NULL, "transaction.timestamps")) {
+    }
+    if (GV(TRANSACTION_TIMESTAMPS) && config_explicit(NULL, "transaction.timestamps")) {
         config_off(NULL, "transaction.implicit");
         config_off(NULL, "ops.salvage");
         config_off(NULL, "logging");
-    } else if (!GV(TRANSACTION_TIMESTAMPS) && config_explicit(NULL, "transaction.timestamps")) {
+    }
+    if (!GV(TRANSACTION_TIMESTAMPS) && config_explicit(NULL, "transaction.timestamps"))
         config_off(NULL, "ops.prepare");
-    } else if (GV(TRANSACTION_IMPLICIT) && config_explicit(NULL, "transaction.implicit")) {
+    if (GV(TRANSACTION_IMPLICIT) && config_explicit(NULL, "transaction.implicit")) {
         config_off(NULL, "transaction.timestamps");
         config_off(NULL, "ops.prepare");
-    } else if (GV(LOGGING) && config_explicit(NULL, "logging")) {
+    }
+    if (GV(LOGGING) && config_explicit(NULL, "logging"))
         config_off(NULL, "ops.prepare");
-    } else if (GV(OPS_SALVAGE) && config_explicit(NULL, "ops.salvage")) { /* FIXME WT-6431 */
+    if (GV(OPS_SALVAGE) && config_explicit(NULL, "ops.salvage")) { /* FIXME WT-6431 */
         config_off(NULL, "transaction.timestamps");
         config_off(NULL, "ops.prepare");
-    } else if (GV(OPS_PREPARE)) {
+    }
+    if (GV(OPS_PREPARE)) {
         config_off(NULL, "logging");
         config_single(NULL, "transaction.timestamps=on", false);
         config_off(NULL, "transaction.implicit");
         config_off(NULL, "ops.salvage");
-    } else if (GV(TRANSACTION_TIMESTAMPS)) {
+    }
+    if (GV(TRANSACTION_TIMESTAMPS)) {
         config_off(NULL, "transaction.implicit");
         config_off(NULL, "ops.salvage");
         config_off(NULL, "logging");
-    } else if (!GV(TRANSACTION_TIMESTAMPS))
+    }
+    if (!GV(TRANSACTION_TIMESTAMPS))
         config_off(NULL, "ops.prepare");
 
     g.transaction_timestamps_config = GV(TRANSACTION_TIMESTAMPS) != 0;
