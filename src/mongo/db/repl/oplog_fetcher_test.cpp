@@ -85,7 +85,6 @@ BSONObj concatenate(BSONObj a, const BSONObj& b) {
 BSONObj makeNoopOplogEntry(OpTime opTime) {
     auto oplogEntry =
         repl::DurableOplogEntry(opTime,                           // optime
-                                boost::none,                      // hash
                                 OpTypeEnum ::kNoop,               // opType
                                 NamespaceString("test.t"),        // namespace
                                 boost::none,                      // uuid

@@ -89,7 +89,6 @@ OplogEntry makeOplogEntry(OpTime opTime,
                           BSONObj o,
                           boost::optional<BSONObj> o2) {
     return {DurableOplogEntry(opTime,                     // optime
-                              boost::none,                // hash
                               opType,                     // opType
                               nss,                        // namespace
                               uuid,                       // uuid

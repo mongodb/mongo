@@ -183,12 +183,14 @@ Status _applyOps(OperationContext* opCtx,
                     nss.ns(),
                     [opCtx, nss, opObj, opType, alwaysUpsert, oplogApplicationMode, &info] {
                         BSONObjBuilder builder;
+                        // Remove 'hash' field if it is set. A bit slow as it rebuilds the object.
+                        if (opObj.hasField(OplogEntry::kHashFieldName)) {
+                            opObj.removeField(OplogEntry::kHashFieldName);
+                        }
+
                         builder.appendElements(opObj);
                         if (!builder.hasField(OplogEntry::kTimestampFieldName)) {
                             builder.append(OplogEntry::kTimestampFieldName, Timestamp());
-                        }
-                        if (!builder.hasField(OplogEntry::kHashFieldName)) {
-                            builder.append(OplogEntry::kHashFieldName, 0LL);
                         }
                         if (!builder.hasField(OplogEntry::kWallClockTimeFieldName)) {
                             builder.append(OplogEntry::kWallClockTimeFieldName, Date_t());

@@ -237,7 +237,6 @@ public:
                                const std::vector<StmtId>& statementIds) {
         ReshardingDonorOplogId id(opTime.getTimestamp(), opTime.getTimestamp());
         return {repl::DurableOplogEntry(opTime,
-                                        boost::none /* hash */,
                                         opType,
                                         kCrudNs,
                                         kCrudUUID,

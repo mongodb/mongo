@@ -265,7 +265,6 @@ OplogEntry makeOplogEntry(OpTypeEnum opType,
                           const BSONObj& oField,
                           const std::vector<StmtId>& stmtIds = {}) {
     return {DurableOplogEntry(OpTime(Timestamp(1, 1), 1),  // optime
-                              boost::none,                 // hash
                               opType,                      // op type
                               NamespaceString("a.a"),      // namespace
                               boost::none,                 // uuid

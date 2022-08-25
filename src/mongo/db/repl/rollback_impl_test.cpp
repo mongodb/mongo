@@ -1494,7 +1494,6 @@ RollbackImplTest::_setUpUnpreparedTransactionForCountTest(UUID collId) {
 
     auto partialApplyOpsObj = BSON("applyOps" << BSON_ARRAY(insertOp2Obj) << "partialTxn" << true);
     DurableOplogEntry partialApplyOpsOplogEntry(partialApplyOpsOpTime,      // opTime
-                                                1LL,                        // hash
                                                 OpTypeEnum::kCommand,       // opType
                                                 adminCmdNss,                // nss
                                                 boost::none,                // uuid
@@ -1529,7 +1528,6 @@ RollbackImplTest::_setUpUnpreparedTransactionForCountTest(UUID collId) {
     auto commitApplyOpsObj = BSON("applyOps" << BSON_ARRAY(insertOp3Obj) << "count" << 1);
     DurableOplogEntry commitApplyOpsOplogEntry(
         commitApplyOpsOpTime,       // opTime
-        1LL,                        // hash
         OpTypeEnum::kCommand,       // opType
         adminCmdNss,                // nss
         boost::none,                // uuid

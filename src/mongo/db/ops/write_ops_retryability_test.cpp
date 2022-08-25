@@ -68,7 +68,6 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 boost::optional<repl::OpTime> postImageOpTime = boost::none) {
     return {
         repl::DurableOplogEntry(opTime,                           // optime
-                                boost::none,                      // hash
                                 opType,                           // opType
                                 nss,                              // namespace
                                 boost::none,                      // uuid

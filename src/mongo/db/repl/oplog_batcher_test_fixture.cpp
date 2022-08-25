@@ -179,7 +179,6 @@ Status OplogBufferMock::seekToTimestamp(OperationContext* opCtx,
 OplogEntry makeInsertOplogEntry(int t, const NamespaceString& nss, boost::optional<UUID> uuid) {
     BSONObj oField = BSON("_id" << t << "a" << t);
     return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
-                              boost::none,                 // hash
                               OpTypeEnum::kInsert,         // op type
                               nss,                         // namespace
                               uuid,                        // uuid
@@ -211,7 +210,6 @@ OplogEntry makeUpdateOplogEntry(int t,
     BSONObj oField = BSON("_id" << t << "a" << t);
     BSONObj o2Field = BSON("_id" << t);
     return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
-                              boost::none,                 // hash
                               OpTypeEnum::kUpdate,         // op type
                               nss,                         // namespace
                               uuid,                        // uuid
@@ -234,7 +232,6 @@ OplogEntry makeUpdateOplogEntry(int t,
 OplogEntry makeNoopOplogEntry(int t, const StringData& msg) {
     BSONObj oField = BSON("msg" << msg << "count" << t);
     return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
-                              boost::none,                 // hash
                               OpTypeEnum::kNoop,           // op type
                               NamespaceString(""),         // namespace
                               boost::none,                 // uuid
@@ -269,7 +266,6 @@ OplogEntry makeApplyOpsOplogEntry(int t, bool prepare, const std::vector<OplogEn
         oField.append("prepare", true);
     }
     return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
-                              boost::none,                 // hash
                               OpTypeEnum::kCommand,        // op type
                               nss,                         // namespace
                               boost::none,                 // uuid
@@ -304,7 +300,6 @@ OplogEntry makeCommitTransactionOplogEntry(int t, StringData dbName, bool prepar
         oField = BSON("applyOps" << BSONArray() << "count" << count);
     }
     return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
-                              boost::none,                 // hash
                               OpTypeEnum::kCommand,        // op type
                               nss,                         // namespace
                               boost::none,                 // uuid
@@ -366,7 +361,6 @@ OplogEntry makeLargeTransactionOplogEntries(int t,
         oField = oFieldBuilder.obj();
     }
     return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
-                              boost::none,                 // hash
                               OpTypeEnum::kCommand,        // op type
                               nss,                         // namespace
                               boost::none,                 // uuid

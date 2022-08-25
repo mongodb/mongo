@@ -88,49 +88,42 @@ assert.commandFailed(db.adminCommand({applyOps: [{op: 'c', ns: ''}]}),
 assert.commandFailed(db.adminCommand({
     "applyOps": [{
         "ts": {"$timestamp": {"t": 1, "i": 100}},
-        "h": 0,
         "v": 2,
         "op": "c",
         "ns": "test.$cmd",
         "o": {
             "applyOps": [{
                 "ts": {"$timestamp": {"t": 1, "i": 100}},
-                "h": 0,
                 "v": 2,
                 "op": "c",
                 "ns": "test.$cmd",
                 "o": {
                     "applyOps": [{
                         "ts": {"$timestamp": {"t": 1, "i": 100}},
-                        "h": 0,
                         "v": 2,
                         "op": "c",
                         "ns": "test.$cmd",
                         "o": {
                             "applyOps": [{
                                 "ts": {"$timestamp": {"t": 1, "i": 100}},
-                                "h": 0,
                                 "v": 2,
                                 "op": "c",
                                 "ns": "test.$cmd",
                                 "o": {
                                     "applyOps": [{
                                         "ts": {"$timestamp": {"t": 1, "i": 100}},
-                                        "h": 0,
                                         "v": 2,
                                         "op": "c",
                                         "ns": "test.$cmd",
                                         "o": {
                                             "applyOps": [{
                                                 "ts": {"$timestamp": {"t": 1, "i": 100}},
-                                                "h": 0,
                                                 "v": 2,
                                                 "op": "c",
                                                 "ns": "test.$cmd",
                                                 "o": {
                                                     "applyOps": [{
                                                         "ts": {"$timestamp": {"t": 1, "i": 100}},
-                                                        "h": 0,
                                                         "v": 2,
                                                         "op": "c",
                                                         "ns": "test.$cmd",
@@ -139,7 +132,6 @@ assert.commandFailed(db.adminCommand({
                                                                 "ts": {
                                                                     "$timestamp": {"t": 1, "i": 100}
                                                                 },
-                                                                "h": 0,
                                                                 "v": 2,
                                                                 "op": "c",
                                                                 "ns": "test.$cmd",
@@ -149,7 +141,6 @@ assert.commandFailed(db.adminCommand({
                                                                             "$timestamp":
                                                                                 {"t": 1, "i": 100}
                                                                         },
-                                                                        "h": 0,
                                                                         "v": 2,
                                                                         "op": "c",
                                                                         "ns": "test.$cmd",
@@ -161,7 +152,6 @@ assert.commandFailed(db.adminCommand({
                                                                                         "i": 100
                                                                                     }
                                                                                 },
-                                                                                "h": 0,
                                                                                 "v": 2,
                                                                                 "op": "c",
                                                                                 "ns": "test.$cmd",
@@ -175,7 +165,6 @@ assert.commandFailed(db.adminCommand({
                                                                                                     100
                                                                                             }
                                                                                         },
-                                                                                        "h": 0,
                                                                                         "v": 2,
                                                                                         "op": "c",
                                                                                         "ns":

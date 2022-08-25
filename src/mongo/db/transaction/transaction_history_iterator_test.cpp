@@ -62,7 +62,6 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 boost::optional<repl::OpTime> prevWriteOpTimeInTransaction) {
     return {repl::DurableOplogEntry(
         opTime,                           // optime
-        0,                                // hash
         repl::OpTypeEnum::kInsert,        // opType
         NamespaceString("a.b"),           // namespace
         boost::none,                      // uuid

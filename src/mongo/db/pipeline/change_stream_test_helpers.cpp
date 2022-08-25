@@ -98,9 +98,7 @@ repl::OplogEntry makeOplogEntry(repl::OpTypeEnum opType,
                                 OperationSessionInfo sessionInfo,
                                 boost::optional<repl::OpTime> prevOpTime,
                                 boost::optional<repl::OpTime> preImageOpTime) {
-    long long hash = 1LL;
     return {repl::DurableOplogEntry(opTime ? *opTime : kDefaultOpTime,  // optime
-                                    hash,                               // hash
                                     opType,                             // opType
                                     nss,                                // namespace
                                     uuid,                               // uuid

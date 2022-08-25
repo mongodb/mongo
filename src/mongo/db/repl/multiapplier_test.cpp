@@ -67,7 +67,6 @@ void MultiApplierTest::setUp() {
  */
 OplogEntry makeOplogEntry(int ts) {
     return {DurableOplogEntry(OpTime(Timestamp(ts, 1), 1),  // optime
-                              boost::none,                  // hash
                               OpTypeEnum::kNoop,            // op type
                               NamespaceString("a.a"),       // namespace
                               boost::none,                  // uuid

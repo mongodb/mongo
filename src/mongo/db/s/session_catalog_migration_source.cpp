@@ -59,8 +59,6 @@
 namespace mongo {
 namespace {
 
-PseudoRandom hashGenerator(SecureRandom().nextInt64());
-
 struct LastTxnSession {
     LogicalSessionId sessionId;
     TxnNumber txnNumber;
@@ -142,7 +140,6 @@ boost::optional<repl::OplogEntry> fetchPrePostImageOplog(OperationContext* opCtx
  * Creates an OplogEntry using the given field values
  */
 repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
-                                long long hash,
                                 repl::OpTypeEnum opType,
                                 const BSONObj& oField,
                                 const boost::optional<BSONObj>& o2Field,
@@ -151,7 +148,6 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 const std::vector<StmtId>& statementIds) {
     return {
         repl::DurableOplogEntry(opTime,                           // optime
-                                hash,                             // hash
                                 opType,                           // op type
                                 {},                               // namespace
                                 boost::none,                      // uuid
@@ -182,7 +178,6 @@ repl::OplogEntry makeSentinelOplogEntry(const LogicalSessionId& lsid,
     sessionInfo.setTxnNumber(txnNumber);
 
     return makeOplogEntry({},                                        // optime
-                          hashGenerator.nextInt64(),                 // hash
                           repl::OpTypeEnum::kNoop,                   // op type
                           {},                                        // o
                           TransactionParticipant::kDeadEndSentinel,  // o2

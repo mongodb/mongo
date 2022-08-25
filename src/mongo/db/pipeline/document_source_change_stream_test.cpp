@@ -1637,7 +1637,6 @@ TEST_F(ChangeStreamStageTest, CommitCommandReturnsOperationsFromPreparedTransact
     sessionInfo.setSessionId(makeLogicalSessionIdForTest());
     auto oplogEntry =
         repl::DurableOplogEntry(kDefaultOpTime,                   // optime
-                                1LL,                              // hash
                                 OpTypeEnum::kCommand,             // opType
                                 nss.getCommandNS(),               // namespace
                                 boost::none,                      // uuid
@@ -2071,7 +2070,6 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionWithMultipleOplogEntries) {
     // Create an oplog entry representing the commit for the prepared transaction.
     auto commitEntry = repl::DurableOplogEntry(
         kDefaultOpTime,                   // optime
-        1LL,                              // hash
         OpTypeEnum::kCommand,             // opType
         nss.getCommandNS(),               // namespace
         boost::none,                      // uuid
@@ -2217,7 +2215,6 @@ TEST_F(ChangeStreamStageTest, PreparedTransactionEndingWithEmptyApplyOps) {
     // Create an oplog entry representing the commit for the prepared transaction.
     auto commitEntry = repl::DurableOplogEntry(
         kDefaultOpTime,                   // optime
-        1LL,                              // hash
         OpTypeEnum::kCommand,             // opType
         nss.getCommandNS(),               // namespace
         boost::none,                      // uuid

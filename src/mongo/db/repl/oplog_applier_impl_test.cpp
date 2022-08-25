@@ -2714,7 +2714,6 @@ public:
                                     Date_t wallClockTime) {
         return {repl::DurableOplogEntry(
             opTime,         // optime
-            boost::none,    // hash
             opType,         // opType
             ns,             // namespace
             boost::none,    // uuid
@@ -2746,7 +2745,6 @@ public:
                                               Date_t wallClockTime) {
         return {repl::DurableOplogEntry(
             opTime,         // optime
-            boost::none,    // hash
             opType,         // opType
             ns,             // namespace
             boost::none,    // uuid

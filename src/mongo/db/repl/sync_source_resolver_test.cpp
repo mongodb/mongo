@@ -312,7 +312,6 @@ void _scheduleFirstOplogEntryFetcherResponse(executor::NetworkInterfaceMock* net
  */
 BSONObj _makeOplogEntry(Timestamp ts, long long term) {
     return DurableOplogEntry(OpTime(ts, term),                 // optime
-                             boost::none,                      // hash
                              OpTypeEnum::kNoop,                // op type
                              NamespaceString("a.a"),           // namespace
                              boost::none,                      // uuid

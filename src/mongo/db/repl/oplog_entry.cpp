@@ -50,7 +50,6 @@ namespace {
  * Returns a document representing an oplog entry with the given fields.
  */
 BSONObj makeOplogEntryDoc(OpTime opTime,
-                          const boost::optional<int64_t> hash,
                           OpTypeEnum opType,
                           const NamespaceString& nss,
                           const boost::optional<UUID>& uuid,
@@ -83,9 +82,6 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
     }
     builder.append(OplogEntryBase::kNssFieldName, nss.toString());
     builder.append(OplogEntryBase::kWallClockTimeFieldName, wallClockTime);
-    if (hash) {
-        builder.append(OplogEntryBase::kHashFieldName, hash.value());
-    }
     if (uuid) {
         uuid->appendToBuilder(&builder, OplogEntryBase::kUuidFieldName);
     }
@@ -339,7 +335,6 @@ DurableOplogEntry::DurableOplogEntry(BSONObj rawInput) : _raw(std::move(rawInput
 }
 
 DurableOplogEntry::DurableOplogEntry(OpTime opTime,
-                                     const boost::optional<int64_t> hash,
                                      OpTypeEnum opType,
                                      const NamespaceString& nss,
                                      const boost::optional<UUID>& uuid,
@@ -358,7 +353,6 @@ DurableOplogEntry::DurableOplogEntry(OpTime opTime,
                                      const boost::optional<Value>& idField,
                                      const boost::optional<repl::RetryImageEnum>& needsRetryImage)
     : DurableOplogEntry(makeOplogEntryDoc(opTime,
-                                          hash,
                                           opType,
                                           nss,
                                           uuid,

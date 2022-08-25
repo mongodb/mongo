@@ -29,7 +29,6 @@ assert.commandWorked(backingColl.insert([{a: 0}, {a: 1}]));
 const ops = [{
     "ts": new Timestamp(1585942982, 2),
     "t": new NumberLong("1"),
-    "h": new NumberLong("0"),
     "v": new NumberInt("2"),
     "op": "i",
     "ns": db["system.views"].getFullName(),

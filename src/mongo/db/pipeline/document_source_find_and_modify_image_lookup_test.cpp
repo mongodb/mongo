@@ -70,7 +70,6 @@ repl::OplogEntry makeOplogEntry(
     boost::optional<repl::RetryImageEnum> needsRetryImage = boost::none) {
     return {
         repl::DurableOplogEntry(opTime,                           // optime
-                                boost::none,                      // hash
                                 opType,                           // opType
                                 nss,                              // namespace
                                 uuid,                             // uuid

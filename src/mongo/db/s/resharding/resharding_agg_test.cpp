@@ -233,7 +233,6 @@ repl::DurableOplogEntry makeApplyOpsOplog(std::vector<BSONObj> operations,
     }
 
     return {opTime,
-            boost::none /* hash */,
             repl::OpTypeEnum::kCommand,
             {},
             UUID::gen(),
@@ -1446,7 +1445,6 @@ TEST_F(ReshardingAggWithStorageTest, RetryableFindAndModifyWithImageLookup) {
     client.insert(NamespaceString::kConfigImagesNamespace.ns(), imageEntry.toBSON());
 
     repl::DurableOplogEntry oplog(opTime,
-                                  boost::none /* hash */,
                                   repl::OpTypeEnum::kUpdate,
                                   kCrudNs,
                                   kCrudUUID,

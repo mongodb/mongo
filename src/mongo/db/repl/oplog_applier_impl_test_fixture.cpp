@@ -423,7 +423,6 @@ OplogEntry makeOplogEntry(OpTime opTime,
                           boost::optional<BSONObj> o2,
                           boost::optional<bool> fromMigrate) {
     return {DurableOplogEntry(opTime,                     // optime
-                              boost::none,                // hash
                               opType,                     // opType
                               std::move(nss),             // namespace
                               uuid,                       // uuid

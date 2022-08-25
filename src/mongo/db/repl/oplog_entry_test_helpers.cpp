@@ -61,7 +61,6 @@ repl::OplogEntry makeOplogEntry(repl::OpTime opTime,
                                 boost::optional<UUID> uuid,
                                 boost::optional<OpTime> prevOpTime) {
     return {repl::DurableOplogEntry(opTime,                           // optime
-                                    boost::none,                      // hash
                                     opType,                           // opType
                                     nss,                              // namespace
                                     uuid,                             // uuid

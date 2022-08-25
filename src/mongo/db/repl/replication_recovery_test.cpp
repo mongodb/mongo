@@ -256,7 +256,6 @@ repl::OplogEntry _makeOplogEntry(repl::OpTime opTime,
                                  Date_t wallTime = Date_t()) {
     return {
         repl::DurableOplogEntry(opTime,                           // optime
-                                boost::none,                      // hash
                                 opType,                           // opType
                                 testNs,                           // namespace
                                 boost::none,                      // uuid
