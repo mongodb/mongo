@@ -242,6 +242,7 @@ public:
         std::shared_ptr<WriteBatch> batch;
         ClosedBuckets closedBuckets;
         boost::optional<OID> candidate;
+        uint64_t catalogEra = 0;
     };
 
     /**
@@ -254,6 +255,7 @@ public:
     struct BucketToReopen {
         BSONObj bucketDocument;
         BucketDocumentValidator validator;
+        uint64_t catalogEra = 0;
     };
 
     static BucketCatalog& get(ServiceContext* svcCtx);
@@ -527,34 +529,83 @@ protected:
      * A helper class to maintain global state about the catalog era used to support asynchronous
      * 'clear' operations. Provides thread-safety by taking the catalog '_mutex' for all operations.
      */
-    class EraManager {
+    class BucketStateManager {
     public:
-        EraManager(Mutex* m);
+        explicit BucketStateManager(Mutex* m);
+
         uint64_t getEra();
-        uint64_t incrementEra();
         uint64_t getEraAndIncrementCount();
         void decrementCountForEra(uint64_t value);
         uint64_t getCountForEra(uint64_t value);
 
-        // Records a clear operation in the clearRegistry. The key is the new era after the clear
-        // operation has occurred, and the value is a function which takes a namespace and returns
-        // whether this namespace should be cleared.
-        void insertToRegistry(uint64_t era,
-                              std::function<bool(const NamespaceString&)>&& shouldClear);
+        /**
+         * Marks a single bucket cleared. Returns the resulting state of the bucket i.e. kCleared
+         * or kPreparedAndCleared, or boost::none if the bucket isn't tracked in the catalog.
+         */
+        boost::optional<BucketState> clearSingleBucket(const OID& oid);
 
-        // Returns the number of clear operations currently stored in the clear registry.
+        /**
+         * Asynchronously clears all buckets belonging to namespaces satisfying the 'shouldClear'
+         * predicate.
+         */
+        void clearSetOfBuckets(std::function<bool(const NamespaceString&)>&& shouldClear);
+
+        /**
+         * Returns the number of clear operations currently stored in the clear registry.
+         */
         uint64_t getClearOperationsCount();
 
-        // Returns whether the Bucket has been marked as cleared by checking against the
-        // clearRegistry. Advances Bucket's era up to current global era if the bucket has not been
-        // cleared.
-        bool hasBeenCleared(WithLock catalogLock, Bucket* bucket);
+        /**
+         * Retrieves the bucket state if it is tracked in the catalog. Modifies the bucket state if
+         * the bucket is found to have been cleared.
+         */
+        boost::optional<BucketState> getBucketState(Bucket* bucket);
+
+        /**
+         * Initializes state for the given bucket to kNormal.
+         */
+        void initializeBucketState(const OID& id);
+
+        /**
+         * Remove state for the given bucket from the catalog.
+         */
+        void eraseBucketState(const OID& id);
+
+        /**
+         * Checks whether the bucket has been cleared before changing the bucket state to the target
+         * state. If the bucket has been cleared, it will set the state to kCleared instead and
+         * ignore the target state. The return value, if set, is the final state of the bucket with
+         * the given id.
+         */
+        boost::optional<BucketState> setBucketState(Bucket* bucket, BucketState target);
+
+        /**
+         * Changes the bucket state, taking into account the current state, the specified target
+         * state, and allowed state transitions. The return value, if set, is the final state of the
+         * bucket with the given id; if no such bucket exists, the return value will not be set.
+         *
+         * Ex. For a bucket with state kPrepared, and a target of kCleared, the return will be
+         * kPreparedAndCleared.
+         */
+        boost::optional<BucketState> setBucketState(const OID& id, BucketState target);
 
     protected:
         void _decrementEraCountHelper(uint64_t era);
         void _incrementEraCountHelper(uint64_t era);
+        boost::optional<BucketState> _setBucketStateHelper(WithLock withLock,
+                                                           const OID& id,
+                                                           BucketState target);
 
-        // Removes clear operations from the clear registry that no longer need to be tracked.
+        /**
+         * Returns whether the Bucket has been marked as cleared by checking against the
+         * clearRegistry. Advances Bucket's era up to current global era if the bucket has not been
+         * cleared.
+         */
+        bool _hasBeenCleared(WithLock catalogLock, Bucket* bucket);
+
+        /**
+         * Removes clear operations from the clear registry that no longer need to be tracked.
+         */
         void _cleanClearRegistry();
 
         // Pointer to 'BucketCatalog::_mutex'.
@@ -566,6 +617,9 @@ protected:
 
         // Mapping of era to counts of how many buckets are associated with that era.
         EraCountMap _countMap;
+
+        // Bucket state for synchronization with direct writes
+        stdx::unordered_map<OID, BucketState, OID::Hasher> _bucketStates;
 
         // Registry storing clear operations. Maps from era to a lambda function which takes in
         // information about a Bucket and returns whether the Bucket has been cleared.
@@ -582,7 +636,10 @@ protected:
     public:
         friend class BucketCatalog;
 
-        Bucket(const OID& id, StripeNumber stripe, BucketKey::Hash hash, EraManager* eraManager);
+        Bucket(const OID& id,
+               StripeNumber stripe,
+               BucketKey::Hash hash,
+               BucketStateManager* bucketStateManager);
 
         ~Bucket();
 
@@ -596,16 +653,18 @@ protected:
         const OID& id() const;
 
         /**
-         * Returns the number of the stripe that owns the bucket
+         * Returns the number of the stripe that owns the bucket.
          */
         StripeNumber stripe() const;
 
         /**
-         * Returns the pre-computed hash of the corresponding BucketKey
+         * Returns the pre-computed hash of the corresponding BucketKey.
          */
         BucketKey::Hash keyHash() const;
 
-        // Returns the time associated with the bucket (id)
+        /**
+         * Returns the time associated with the bucket (id).
+         */
         Date_t getTime() const;
 
         /**
@@ -663,7 +722,7 @@ protected:
         // The era number of the last log operation the bucket has caught up to
         uint64_t _lastCheckedEra;
 
-        EraManager* _eraManager;
+        BucketStateManager* _bucketStateManager;
 
     private:
         // The bucket ID for the underlying document
@@ -941,42 +1000,6 @@ protected:
     void _appendExecutionStatsToBuilder(const ExecutionStats* stats, BSONObjBuilder* builder) const;
 
     /**
-     * Retrieves the bucket state if it is tracked in the catalog. Modifies the bucket state if the
-     * bucket is found to have been cleared.
-     */
-    boost::optional<BucketState> _getBucketState(Bucket* bucket);
-
-    /**
-     * Initializes state for the given bucket to kNormal.
-     */
-    void _initializeBucketState(const OID& id);
-
-    /**
-     * Remove state for the given bucket from the catalog.
-     */
-    void _eraseBucketState(const OID& id);
-
-    /**
-     * Checks whether the bucket has been cleared before changing the bucket state to the target
-     * state. If the bucket has been cleared, it will set the state to kCleared instead and ignore
-     * the target state. The return value, if set, is the final state of the bucket
-     * with the given id.
-     */
-    boost::optional<BucketState> _setBucketState(Bucket* bucket, BucketState target);
-
-    /**
-     * Changes the bucket state, taking into account the current state, the specified target state,
-     * and allowed state transitions. The return value, if set, is the final state of the bucket
-     * with the given id; if no such bucket exists, the return value will not be set.
-     *
-     * Ex. For a bucket with state kPrepared, and a target of kCleared, the return will be
-     * kPreparedAndCleared.
-     */
-    boost::optional<BucketState> _setBucketState(WithLock withLock,
-                                                 const OID& id,
-                                                 BucketState target);
-
-    /**
      * Calculates the marginal memory usage for an archived bucket. The
      * 'onlyEntryForMatchingMetaHash' parameter indicates that the bucket will be (if inserting)
      * or was (if removing) the only bucket associated with it's meta hash value. If true, then
@@ -989,13 +1012,10 @@ protected:
     mutable Mutex _mutex =
         MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "BucketCatalog::_mutex");
 
-    EraManager _eraManager = {&_mutex};
+    BucketStateManager _bucketStateManager{&_mutex};
 
     static constexpr std::size_t kNumberOfStripes = 32;
     std::array<Stripe, kNumberOfStripes> _stripes;
-
-    // Bucket state for synchronization with direct writes, protected by '_mutex'
-    stdx::unordered_map<OID, BucketState, OID::Hasher> _bucketStates;
 
     // Per-namespace execution stats. This map is protected by '_mutex'. Once you complete your
     // lookup, you can keep the shared_ptr to an individual namespace's stats object and release the

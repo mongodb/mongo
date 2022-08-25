@@ -35,30 +35,25 @@
 namespace mongo {
 namespace {
 
-class BucketCatalogEraTest : public BucketCatalog, public unittest::Test {
+class BucketCatalogStateManagerTest : public BucketCatalog, public unittest::Test {
 public:
-    BucketCatalogEraTest() {}
+    BucketCatalogStateManagerTest() {}
+
+    bool hasBeenCleared(Bucket* bucket) {
+        auto state = _bucketStateManager.getBucketState(bucket);
+        return (state &&
+                (*state == BucketState::kCleared || *state == BucketState::kPreparedAndCleared));
+    }
+
     Bucket* createBucket(const CreationInfo& info) {
         auto ptr = _allocateBucket(&_stripes[info.stripe], withLock, info);
         ptr->setNamespace(info.key.ns);
-        ASSERT_FALSE(_eraManager.hasBeenCleared(withLock, ptr));
+        ASSERT_FALSE(hasBeenCleared(ptr));
         return ptr;
     }
 
-    void clearForTest(const NamespaceString& ns) {
-        clearForTest([&ns](const NamespaceString& bucketNs) { return bucketNs == ns; });
-    }
-
-    void clearForTest(std::function<bool(const NamespaceString&)>&& shouldClear) {
-        uint64_t era = _eraManager.incrementEra();
-        if (feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
-            _eraManager.insertToRegistry(era, std::move(shouldClear));
-        }
-    }
-
     bool cannotAccessBucket(Bucket* bucket) {
-        if (_eraManager.hasBeenCleared(withLock, bucket)) {
+        if (hasBeenCleared(bucket)) {
             _removeBucket(&_stripes[bucket->stripe()], withLock, bucket, false);
             return true;
         } else {
@@ -102,50 +97,54 @@ public:
 };
 
 
-TEST_F(BucketCatalogEraTest, EraAdvancesAsExpected) {
+TEST_F(BucketCatalogStateManagerTest, EraAdvancesAsExpected) {
 
     RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
                                                     true};
 
     // When allocating new buckets, we expect their era value to match the BucketCatalog's era.
-    ASSERT_EQ(_eraManager.getEra(), 0);
+    ASSERT_EQ(_bucketStateManager.getEra(), 0);
     auto bucket1 = createBucket(info1);
-    ASSERT_EQ(_eraManager.getEra(), 0);
+    ASSERT_EQ(_bucketStateManager.getEra(), 0);
     ASSERT_EQ(bucket1->getEra(), 0);
 
     // When clearing buckets, we expect the BucketCatalog's era value to increase while the cleared
     // bucket era values should remain unchanged.
     clear(ns1);
-    ASSERT_EQ(_eraManager.getEra(), 1);
+    ASSERT_EQ(_bucketStateManager.getEra(), 1);
     ASSERT_EQ(bucket1->getEra(), 0);
 
     // When clearing buckets of one namespace, we expect the era of buckets of any other namespace
     // to not change.
     auto bucket2 = createBucket(info1);
     auto bucket3 = createBucket(info2);
-    ASSERT_EQ(_eraManager.getEra(), 1);
+    ASSERT_EQ(_bucketStateManager.getEra(), 1);
     ASSERT_EQ(bucket2->getEra(), 1);
     ASSERT_EQ(bucket3->getEra(), 1);
     clear(ns1);
-    ASSERT_EQ(_eraManager.getEra(), 2);
+    ASSERT_EQ(_bucketStateManager.getEra(), 2);
     ASSERT_EQ(bucket3->getEra(), 1);
     ASSERT_EQ(bucket1->getEra(), 0);
     ASSERT_EQ(bucket2->getEra(), 1);
+
+    // Era also advances when clearing by OID
+    clear(OID());
+    ASSERT_EQ(_bucketStateManager.getEra(), 3);
 }
 
-TEST_F(BucketCatalogEraTest, EraCountMapUpdatedCorrectly) {
+TEST_F(BucketCatalogStateManagerTest, EraCountMapUpdatedCorrectly) {
     RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
                                                     true};
 
     // Creating a bucket in a new era should add a counter for that era to the map.
     auto bucket1 = createBucket(info1);
     ASSERT_EQ(bucket1->getEra(), 0);
-    ASSERT_EQ(_eraManager.getCountForEra(0), 1);
+    ASSERT_EQ(_bucketStateManager.getCountForEra(0), 1);
     clear(ns1);
     checkAndRemoveClearedBucket(bucket1, bucketKey1, withLock);
 
     // When the last bucket in an era is destructed, the counter in the map should be removed.
-    ASSERT_EQ(_eraManager.getCountForEra(0), 0);
+    ASSERT_EQ(_bucketStateManager.getCountForEra(0), 0);
 
     // If there are still buckets in the era, however, the counter should still exist in the
     // map.
@@ -153,23 +152,23 @@ TEST_F(BucketCatalogEraTest, EraCountMapUpdatedCorrectly) {
     auto bucket3 = createBucket(info2);
     ASSERT_EQ(bucket2->getEra(), 1);
     ASSERT_EQ(bucket3->getEra(), 1);
-    ASSERT_EQ(_eraManager.getCountForEra(1), 2);
+    ASSERT_EQ(_bucketStateManager.getCountForEra(1), 2);
     clear(ns2);
     checkAndRemoveClearedBucket(bucket3, bucketKey2, withLock);
-    ASSERT_EQ(_eraManager.getCountForEra(1), 1);
+    ASSERT_EQ(_bucketStateManager.getCountForEra(1), 1);
 
     // A bucket in one era being destroyed and the counter decrementing should not affect a
     // different era's counter.
     auto bucket4 = createBucket(info2);
     ASSERT_EQ(bucket4->getEra(), 2);
-    ASSERT_EQ(_eraManager.getCountForEra(2), 1);
+    ASSERT_EQ(_bucketStateManager.getCountForEra(2), 1);
     clear(ns2);
     checkAndRemoveClearedBucket(bucket4, bucketKey2, withLock);
-    ASSERT_EQ(_eraManager.getCountForEra(2), 0);
-    ASSERT_EQ(_eraManager.getCountForEra(1), 1);
+    ASSERT_EQ(_bucketStateManager.getCountForEra(2), 0);
+    ASSERT_EQ(_bucketStateManager.getCountForEra(1), 1);
 }
 
-TEST_F(BucketCatalogEraTest, HasBeenClearedFunctionReturnsAsExpected) {
+TEST_F(BucketCatalogStateManagerTest, HasBeenClearedFunctionReturnsAsExpected) {
     RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
                                                     true};
 
@@ -182,10 +181,10 @@ TEST_F(BucketCatalogEraTest, HasBeenClearedFunctionReturnsAsExpected) {
     // not. It also advances the bucket's era up to the most recent era.
     ASSERT_FALSE(cannotAccessBucket(bucket1));
     ASSERT_FALSE(cannotAccessBucket(bucket2));
-    ASSERT_EQ(_eraManager.getCountForEra(0), 2);
-    clearForTest(ns2);
+    ASSERT_EQ(_bucketStateManager.getCountForEra(0), 2);
+    clear(ns2);
     ASSERT_FALSE(cannotAccessBucket(bucket1));
-    ASSERT_EQ(_eraManager.getCountForEra(0), 1);
+    ASSERT_EQ(_bucketStateManager.getCountForEra(0), 1);
     ASSERT_EQ(bucket1->getEra(), 1);
     ASSERT(cannotAccessBucket(bucket2));
 
@@ -194,36 +193,36 @@ TEST_F(BucketCatalogEraTest, HasBeenClearedFunctionReturnsAsExpected) {
     auto bucket4 = createBucket(info2);
     ASSERT_EQ(bucket3->getEra(), 1);
     ASSERT_EQ(bucket4->getEra(), 1);
-    clearForTest(ns2);
+    clear(ns2);
     ASSERT(cannotAccessBucket(bucket3));
     ASSERT(cannotAccessBucket(bucket4));
     auto bucket5 = createBucket(info2);
     ASSERT_EQ(bucket5->getEra(), 2);
-    clearForTest(ns2);
+    clear(ns2);
     ASSERT(cannotAccessBucket(bucket5));
     // _hasBeenCleared should be able to advance a bucket by multiple eras.
     ASSERT_EQ(bucket1->getEra(), 1);
-    ASSERT_EQ(_eraManager.getCountForEra(1), 1);
-    ASSERT_EQ(_eraManager.getCountForEra(3), 0);
+    ASSERT_EQ(_bucketStateManager.getCountForEra(1), 1);
+    ASSERT_EQ(_bucketStateManager.getCountForEra(3), 0);
     ASSERT_FALSE(cannotAccessBucket(bucket1));
     ASSERT_EQ(bucket1->getEra(), 3);
-    ASSERT_EQ(_eraManager.getCountForEra(1), 0);
-    ASSERT_EQ(_eraManager.getCountForEra(3), 1);
+    ASSERT_EQ(_bucketStateManager.getCountForEra(1), 0);
+    ASSERT_EQ(_bucketStateManager.getCountForEra(3), 1);
 
     // _hasBeenCleared works even if the bucket wasn't cleared in the most recent clear.
-    clearForTest(ns1);
+    clear(ns1);
     auto bucket6 = createBucket(info2);
     ASSERT_EQ(bucket6->getEra(), 4);
-    clearForTest(ns2);
-    ASSERT_EQ(_eraManager.getCountForEra(3), 1);
-    ASSERT_EQ(_eraManager.getCountForEra(4), 1);
+    clear(ns2);
+    ASSERT_EQ(_bucketStateManager.getCountForEra(3), 1);
+    ASSERT_EQ(_bucketStateManager.getCountForEra(4), 1);
     ASSERT(cannotAccessBucket(bucket1));
     ASSERT(cannotAccessBucket(bucket6));
-    ASSERT_EQ(_eraManager.getCountForEra(3), 0);
-    ASSERT_EQ(_eraManager.getCountForEra(4), 0);
+    ASSERT_EQ(_bucketStateManager.getCountForEra(3), 0);
+    ASSERT_EQ(_bucketStateManager.getCountForEra(4), 0);
 }
 
-TEST_F(BucketCatalogEraTest, ClearRegistryGarbageCollection) {
+TEST_F(BucketCatalogStateManagerTest, ClearRegistryGarbageCollection) {
     RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
                                                     true};
 
@@ -231,16 +230,16 @@ TEST_F(BucketCatalogEraTest, ClearRegistryGarbageCollection) {
     auto bucket2 = createBucket(info2);
     ASSERT_EQ(bucket1->getEra(), 0);
     ASSERT_EQ(bucket2->getEra(), 0);
-    ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 0);
+    ASSERT_EQUALS(_bucketStateManager.getClearOperationsCount(), 0);
     clear(ns1);
     checkAndRemoveClearedBucket(bucket1, bucketKey1, withLock);
     // Era 0 still has non-zero count after this clear because bucket2 is still in era 0.
-    ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 1);
+    ASSERT_EQUALS(_bucketStateManager.getClearOperationsCount(), 1);
     clear(ns2);
     checkAndRemoveClearedBucket(bucket2, bucketKey2, withLock);
     // Bucket2 gets deleted, which makes era 0's count decrease to 0, then clear registry gets
     // cleaned.
-    ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 0);
+    ASSERT_EQUALS(_bucketStateManager.getClearOperationsCount(), 0);
 
     auto bucket3 = createBucket(info1);
     auto bucket4 = createBucket(info2);
@@ -249,7 +248,7 @@ TEST_F(BucketCatalogEraTest, ClearRegistryGarbageCollection) {
     clear(ns1);
     checkAndRemoveClearedBucket(bucket3, bucketKey1, withLock);
     // Era 2 still has bucket4 in it, so its count remains non-zero.
-    ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 1);
+    ASSERT_EQUALS(_bucketStateManager.getClearOperationsCount(), 1);
     auto bucket5 = createBucket(info1);
     auto bucket6 = createBucket(info2);
     ASSERT_EQ(bucket5->getEra(), 3);
@@ -258,13 +257,13 @@ TEST_F(BucketCatalogEraTest, ClearRegistryGarbageCollection) {
     checkAndRemoveClearedBucket(bucket5, bucketKey1, withLock);
     // Eras 2 and 3 still have bucket4 and bucket6 in them respectively, so their counts remain
     // non-zero.
-    ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 2);
+    ASSERT_EQUALS(_bucketStateManager.getClearOperationsCount(), 2);
     clear(ns2);
     checkAndRemoveClearedBucket(bucket4, bucketKey2, withLock);
     checkAndRemoveClearedBucket(bucket6, bucketKey2, withLock);
     // Eras 2 and 3 have their counts become 0 because bucket4 and bucket6 are cleared. The clear
     // registry is emptied.
-    ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 0);
+    ASSERT_EQUALS(_bucketStateManager.getClearOperationsCount(), 0);
 
     auto bucket7 = createBucket(info1);
     auto bucket8 = createBucket(info3);
@@ -273,27 +272,52 @@ TEST_F(BucketCatalogEraTest, ClearRegistryGarbageCollection) {
     clear(ns3);
     checkAndRemoveClearedBucket(bucket8, bucketKey3, withLock);
     // Era 5 still has bucket7 in it so its count remains non-zero.
-    ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 1);
+    ASSERT_EQUALS(_bucketStateManager.getClearOperationsCount(), 1);
     auto bucket9 = createBucket(info2);
     ASSERT_EQ(bucket9->getEra(), 6);
     clear(ns2);
     checkAndRemoveClearedBucket(bucket9, bucketKey2, withLock);
     // Era 6's count becomes 0. Since era 5 is the smallest era with non-zero count, no clear ops
     // are removed.
-    ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 2);
+    ASSERT_EQUALS(_bucketStateManager.getClearOperationsCount(), 2);
     auto bucket10 = createBucket(info3);
     ASSERT_EQ(bucket10->getEra(), 7);
     clear(ns3);
     checkAndRemoveClearedBucket(bucket10, bucketKey3, withLock);
     // Era 7's count becomes 0. Since era 5 is the smallest era with non-zero count, no clear ops
     // are removed.
-    ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 3);
+    ASSERT_EQUALS(_bucketStateManager.getClearOperationsCount(), 3);
     clear(ns1);
     checkAndRemoveClearedBucket(bucket7, bucketKey1, withLock);
     // Era 5's count becomes 0. No eras with non-zero counts remain, so all clear ops are removed.
-    ASSERT_EQUALS(_eraManager.getClearOperationsCount(), 0);
+    ASSERT_EQUALS(_bucketStateManager.getClearOperationsCount(), 0);
 }
 
+TEST_F(BucketCatalogStateManagerTest, HasBeenClearedToleratesGapsInRegistry) {
+    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
+                                                    true};
+
+    auto bucket1 = createBucket(info1);
+    ASSERT_EQ(bucket1->getEra(), 0);
+    clear(OID());
+    ASSERT_EQ(_bucketStateManager.getEra(), 1);
+    clear(ns1);
+    ASSERT_EQ(_bucketStateManager.getEra(), 2);
+    ASSERT_TRUE(hasBeenCleared(bucket1));
+
+    auto bucket2 = createBucket(info2);
+    ASSERT_EQ(bucket2->getEra(), 2);
+    clear(OID());
+    clear(OID());
+    clear(OID());
+    ASSERT_EQ(_bucketStateManager.getEra(), 5);
+    ASSERT_TRUE(hasBeenCleared(bucket1));
+    ASSERT_FALSE(hasBeenCleared(bucket2));
+    clear(ns2);
+    ASSERT_EQ(_bucketStateManager.getEra(), 6);
+    ASSERT_TRUE(hasBeenCleared(bucket1));
+    ASSERT_TRUE(hasBeenCleared(bucket2));
+}
 
 }  // namespace
 }  // namespace mongo

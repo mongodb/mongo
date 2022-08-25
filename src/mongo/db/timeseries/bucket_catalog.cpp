@@ -44,10 +44,12 @@
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_options.h"
-#include "mongo/logv2/redaction.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/fail_point.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
 namespace {
@@ -311,30 +313,25 @@ void BucketCatalog::ExecutionStatsController::incNumBucketsKeptOpenDueToLargeMea
     _globalStats->numBucketsKeptOpenDueToLargeMeasurements.fetchAndAddRelaxed(increment);
 }
 
-BucketCatalog::EraManager::EraManager(Mutex* m) : _mutex(m), _era(0) {}
+BucketCatalog::BucketStateManager::BucketStateManager(Mutex* m) : _mutex(m), _era(0) {}
 
-uint64_t BucketCatalog::EraManager::getEra() {
+uint64_t BucketCatalog::BucketStateManager::getEra() {
     stdx::lock_guard lk{*_mutex};
     return _era;
 }
 
-uint64_t BucketCatalog::EraManager::incrementEra() {
-    stdx::lock_guard lk{*_mutex};
-    return ++_era;
-}
-
-uint64_t BucketCatalog::EraManager::getEraAndIncrementCount() {
+uint64_t BucketCatalog::BucketStateManager::getEraAndIncrementCount() {
     stdx::lock_guard lk{*_mutex};
     _incrementEraCountHelper(_era);
     return _era;
 }
 
-void BucketCatalog::EraManager::decrementCountForEra(uint64_t value) {
+void BucketCatalog::BucketStateManager::decrementCountForEra(uint64_t value) {
     stdx::lock_guard lk{*_mutex};
     _decrementEraCountHelper(value);
 }
 
-uint64_t BucketCatalog::EraManager::getCountForEra(uint64_t value) {
+uint64_t BucketCatalog::BucketStateManager::getCountForEra(uint64_t value) {
     stdx::lock_guard lk{*_mutex};
     auto it = _countMap.find(value);
     if (it == _countMap.end()) {
@@ -344,16 +341,23 @@ uint64_t BucketCatalog::EraManager::getCountForEra(uint64_t value) {
     }
 }
 
-void BucketCatalog::EraManager::insertToRegistry(uint64_t era, ShouldClearFn&& shouldClear) {
-    stdx::lock_guard lk{*_mutex};
-    _clearRegistry[era] = std::move(shouldClear);
+boost::optional<BucketCatalog::BucketState> BucketCatalog::BucketStateManager::clearSingleBucket(
+    const OID& oid) {
+    stdx::lock_guard catalogLock{*_mutex};
+    ++_era;
+    return _setBucketStateHelper(catalogLock, oid, BucketState::kCleared);
 }
 
-uint64_t BucketCatalog::EraManager::getClearOperationsCount() {
+void BucketCatalog::BucketStateManager::clearSetOfBuckets(ShouldClearFn&& shouldClear) {
+    stdx::lock_guard lk{*_mutex};
+    _clearRegistry[++_era] = std::move(shouldClear);
+}
+
+uint64_t BucketCatalog::BucketStateManager::getClearOperationsCount() {
     return _clearRegistry.size();
 }
 
-void BucketCatalog::EraManager::_decrementEraCountHelper(uint64_t era) {
+void BucketCatalog::BucketStateManager::_decrementEraCountHelper(uint64_t era) {
     auto it = _countMap.find(era);
     invariant(it != _countMap.end());
     if (it->second == 1) {
@@ -364,7 +368,7 @@ void BucketCatalog::EraManager::_decrementEraCountHelper(uint64_t era) {
     }
 }
 
-void BucketCatalog::EraManager::_incrementEraCountHelper(uint64_t era) {
+void BucketCatalog::BucketStateManager::_incrementEraCountHelper(uint64_t era) {
     auto it = _countMap.find(era);
     if (it == _countMap.end()) {
         (_countMap)[era] = 1;
@@ -373,8 +377,9 @@ void BucketCatalog::EraManager::_incrementEraCountHelper(uint64_t era) {
     }
 }
 
-bool BucketCatalog::EraManager::hasBeenCleared(WithLock catalogLock, Bucket* bucket) {
-    for (auto it = _clearRegistry.find(bucket->getEra() + 1); it != _clearRegistry.end(); ++it) {
+bool BucketCatalog::BucketStateManager::_hasBeenCleared(WithLock catalogLock, Bucket* bucket) {
+    for (auto it = _clearRegistry.lower_bound(bucket->getEra() + 1); it != _clearRegistry.end();
+         ++it) {
         if (it->second(bucket->_ns)) {
             return true;
         }
@@ -388,7 +393,86 @@ bool BucketCatalog::EraManager::hasBeenCleared(WithLock catalogLock, Bucket* buc
     return false;
 }
 
-void BucketCatalog::EraManager::_cleanClearRegistry() {
+void BucketCatalog::BucketStateManager::initializeBucketState(const OID& id) {
+    stdx::lock_guard catalogLock{*_mutex};
+    _bucketStates.emplace(id, BucketState::kNormal);
+}
+
+void BucketCatalog::BucketStateManager::eraseBucketState(const OID& id) {
+    stdx::lock_guard catalogLock{*_mutex};
+    _bucketStates.erase(id);
+}
+
+boost::optional<BucketCatalog::BucketState> BucketCatalog::BucketStateManager::getBucketState(
+    Bucket* bucket) {
+    stdx::lock_guard catalogLock{*_mutex};
+    // If the bucket has been cleared, we will set the bucket state accordingly to reflect that
+    // (kPreparedAndCleared or kCleared).
+    if (_hasBeenCleared(catalogLock, bucket)) {
+        return _setBucketStateHelper(catalogLock, bucket->id(), BucketState::kCleared);
+    }
+    auto it = _bucketStates.find(bucket->id());
+    return it != _bucketStates.end() ? boost::make_optional(it->second) : boost::none;
+}
+
+boost::optional<BucketCatalog::BucketState> BucketCatalog::BucketStateManager::setBucketState(
+    Bucket* bucket, BucketState target) {
+    stdx::lock_guard catalogLock{*_mutex};
+    if (_hasBeenCleared(catalogLock, bucket)) {
+        return _setBucketStateHelper(catalogLock, bucket->id(), BucketState::kCleared);
+    }
+
+    return _setBucketStateHelper(catalogLock, bucket->id(), target);
+}
+
+boost::optional<BucketCatalog::BucketState> BucketCatalog::BucketStateManager::setBucketState(
+    const OID& id, BucketState target) {
+    stdx::lock_guard catalogLock{*_mutex};
+    return _setBucketStateHelper(catalogLock, id, target);
+}
+
+boost::optional<BucketCatalog::BucketState>
+BucketCatalog::BucketStateManager::_setBucketStateHelper(WithLock catalogLock,
+                                                         const OID& id,
+                                                         BucketState target) {
+    auto it = _bucketStates.find(id);
+    if (it == _bucketStates.end()) {
+        return boost::none;
+    }
+
+    auto& [_, state] = *it;
+    switch (target) {
+        case BucketState::kNormal: {
+            if (state == BucketState::kPrepared) {
+                state = BucketState::kNormal;
+            } else if (state == BucketState::kPreparedAndCleared) {
+                state = BucketState::kCleared;
+            }
+            break;
+        }
+        case BucketState::kPrepared: {
+            if (state == BucketState::kNormal) {
+                state = BucketState::kPrepared;
+            }
+            break;
+        }
+        case BucketState::kCleared: {
+            if (state == BucketState::kNormal) {
+                state = BucketState::kCleared;
+            } else if (state == BucketState::kPrepared) {
+                state = BucketState::kPreparedAndCleared;
+            }
+            break;
+        }
+        case BucketState::kPreparedAndCleared: {
+            invariant(target != BucketState::kPreparedAndCleared);
+        }
+    }
+
+    return state;
+}
+
+void BucketCatalog::BucketStateManager::_cleanClearRegistry() {
     // An edge case occurs when the count map is empty. In this case, we can clean the whole clear
     // registry.
     if (_countMap.begin() == _countMap.end()) {
@@ -408,15 +492,15 @@ void BucketCatalog::EraManager::_cleanClearRegistry() {
 BucketCatalog::Bucket::Bucket(const OID& id,
                               StripeNumber stripe,
                               BucketKey::Hash hash,
-                              EraManager* eraManager)
-    : _lastCheckedEra(eraManager->getEraAndIncrementCount()),
-      _eraManager(eraManager),
+                              BucketStateManager* bucketStateManager)
+    : _lastCheckedEra(bucketStateManager->getEraAndIncrementCount()),
+      _bucketStateManager(bucketStateManager),
       _id(id),
       _stripe(stripe),
       _keyHash(hash) {}
 
 BucketCatalog::Bucket::~Bucket() {
-    _eraManager->decrementCountForEra(getEra());
+    _bucketStateManager->decrementCountForEra(getEra());
 }
 
 uint64_t BucketCatalog::Bucket::getEra() const {
@@ -846,11 +930,7 @@ void BucketCatalog::abort(std::shared_ptr<WriteBatch> batch, const Status& statu
 }
 
 void BucketCatalog::clear(const OID& oid) {
-    boost::optional<BucketState> result;
-    {
-        stdx::lock_guard catalogLock{_mutex};
-        result = _setBucketState(catalogLock, oid, BucketState::kCleared);
-    }
+    auto result = _bucketStateManager.clearSingleBucket(oid);
     if (result && *result == BucketState::kPreparedAndCleared) {
         hangTimeseriesDirectModificationBeforeWriteConflict.pauseWhileSet();
         throwWriteConflictException("Prepared bucket can no longer be inserted into.");
@@ -860,8 +940,7 @@ void BucketCatalog::clear(const OID& oid) {
 void BucketCatalog::clear(ShouldClearFn&& shouldClear) {
     if (feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
             serverGlobalParams.featureCompatibility)) {
-        uint64_t era = _eraManager.incrementEra();
-        _eraManager.insertToRegistry(era, std::move(shouldClear));
+        _bucketStateManager.clearSetOfBuckets(std::move(shouldClear));
         return;
     }
     for (auto& stripe : _stripes) {
@@ -1026,7 +1105,7 @@ const BucketCatalog::Bucket* BucketCatalog::_findBucket(const Stripe& stripe,
             return it->second.get();
         }
 
-        auto state = _getBucketState(it->second.get());
+        auto state = _bucketStateManager.getBucketState(it->second.get());
         if (state && state != BucketState::kCleared && state != BucketState::kPreparedAndCleared) {
             return it->second.get();
         }
@@ -1047,7 +1126,7 @@ BucketCatalog::Bucket* BucketCatalog::_useBucketInState(Stripe* stripe,
                                                         BucketState targetState) {
     auto it = stripe->allBuckets.find(id);
     if (it != stripe->allBuckets.end()) {
-        auto state = _setBucketState(it->second.get(), targetState);
+        auto state = _bucketStateManager.setBucketState(it->second.get(), targetState);
         if (state && state != BucketState::kCleared && state != BucketState::kPreparedAndCleared) {
             return it->second.get();
         }
@@ -1068,7 +1147,7 @@ BucketCatalog::Bucket* BucketCatalog::_useBucket(Stripe* stripe,
 
     Bucket* bucket = it->second;
 
-    auto state = _getBucketState(bucket);
+    auto state = _bucketStateManager.getBucketState(bucket);
     if (state == BucketState::kNormal || state == BucketState::kPrepared) {
         _markBucketNotIdle(stripe, stripeLock, bucket);
         return bucket;
@@ -1097,7 +1176,10 @@ StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBuck
     }
     invariant(feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
         serverGlobalParams.featureCompatibility));
-    const auto& [bucketDoc, validator] = bucketToReopen.value();
+    const auto& [bucketDoc, validator, catalogEra] = bucketToReopen.value();
+    if (catalogEra < _bucketStateManager.getEra()) {
+        return {ErrorCodes::WriteConflict, "Bucket is from an earlier era, may be outdated"};
+    }
 
     BSONElement bucketIdElem = bucketDoc.getField(timeseries::kBucketIdFieldName);
     if (bucketIdElem.eoo() || bucketIdElem.type() != BSONType::jstOID) {
@@ -1128,7 +1210,7 @@ StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBuck
 
     auto bucketId = bucketIdElem.OID();
     std::unique_ptr<Bucket> bucket =
-        std::make_unique<Bucket>(bucketId, stripeNumber, key.hash, &_eraManager);
+        std::make_unique<Bucket>(bucketId, stripeNumber, key.hash, &_bucketStateManager);
 
     // Initialize the remaining member variables from the bucket document.
     bucket->setNamespace(ns);
@@ -1201,7 +1283,7 @@ BucketCatalog::Bucket* BucketCatalog::_reopenBucket(Stripe* stripe,
     }
 
     // We may need to initialize the bucket's state.
-    _initializeBucketState(bucket->id());
+    _bucketStateManager.initializeBucketState(bucket->id());
 
     // Pass ownership of the reopened bucket to the bucket catalog.
     auto [it, inserted] = stripe->allBuckets.try_emplace(bucket->id(), std::move(bucket));
@@ -1248,10 +1330,14 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::_insert(
     auto stripeNumber = _getStripeNumber(key);
 
     InsertResult result;
+    result.catalogEra = _bucketStateManager.getEra();
     CreationInfo info{key, stripeNumber, time, options, stats, &result.closedBuckets};
 
     auto rehydratedBucket =
         _rehydrateBucket(opCtx, ns, comparator, options, stats, bucketToReopen, key);
+    if (rehydratedBucket.getStatus().code() == ErrorCodes::WriteConflict) {
+        return rehydratedBucket.getStatus();
+    }
 
     auto& stripe = _stripes[stripeNumber];
     stdx::lock_guard stripeLock{stripe.mutex};
@@ -1399,7 +1485,7 @@ void BucketCatalog::_removeBucket(Stripe* stripe,
     // If we are cleaning up while archiving a bucket, then we want to preserve its state. Otherwise
     // we can remove the state from the catalog altogether.
     if (!archiving) {
-        _eraseBucketState(bucket->id());
+        _bucketStateManager.eraseBucketState(bucket->id());
     }
 
     stripe->allBuckets.erase(allIt);
@@ -1555,7 +1641,7 @@ void BucketCatalog::_expireIdleBuckets(Stripe* stripe,
         ClosedBucket closed{bucket.bucketId, bucket.timeField, bucket.numMeasurements, true};
 
         long long memory = _marginalMemoryUsageForArchivedBucket(bucket, archivedSet.size() == 1);
-        _eraseBucketState(bucket.bucketId);
+        _bucketStateManager.eraseBucketState(bucket.bucketId);
         if (archivedSet.size() == 1) {
             // If this is the only entry, erase the whole map so we don't leave it empty.
             stripe->archivedBuckets.erase(stripe->archivedBuckets.begin());
@@ -1579,11 +1665,12 @@ BucketCatalog::Bucket* BucketCatalog::_allocateBucket(Stripe* stripe,
     auto [bucketId, roundedTime] = generateBucketId(info.time, info.options);
 
     auto [it, inserted] = stripe->allBuckets.try_emplace(
-        bucketId, std::make_unique<Bucket>(bucketId, info.stripe, info.key.hash, &_eraManager));
+        bucketId,
+        std::make_unique<Bucket>(bucketId, info.stripe, info.key.hash, &_bucketStateManager));
     tassert(6130900, "Expected bucket to be inserted", inserted);
     Bucket* bucket = it->second.get();
     stripe->openBuckets[info.key] = bucket;
-    _initializeBucketState(bucketId);
+    _bucketStateManager.initializeBucketState(bucketId);
 
     if (info.openedDuetoMetadata) {
         info.stats.incNumBucketsOpenedDueToMetadata();
@@ -1718,77 +1805,6 @@ std::shared_ptr<BucketCatalog::ExecutionStats> BucketCatalog::_getExecutionStats
         return it->second;
     }
     return kEmptyStats;
-}
-
-void BucketCatalog::_initializeBucketState(const OID& id) {
-    stdx::lock_guard catalogLock{_mutex};
-    _bucketStates.emplace(id, BucketState::kNormal);
-}
-
-void BucketCatalog::_eraseBucketState(const OID& id) {
-    stdx::lock_guard catalogLock{_mutex};
-    _bucketStates.erase(id);
-}
-
-boost::optional<BucketCatalog::BucketState> BucketCatalog::_getBucketState(Bucket* bucket) {
-    stdx::lock_guard catalogLock{_mutex};
-    // If the bucket has been cleared, we will set the bucket state accordingly to reflect that
-    // (kPreparedAndCleared or kCleared).
-    if (_eraManager.hasBeenCleared(catalogLock, bucket)) {
-        return _setBucketState(catalogLock, bucket->id(), BucketState::kCleared);
-    }
-    auto it = _bucketStates.find(bucket->id());
-    return it != _bucketStates.end() ? boost::make_optional(it->second) : boost::none;
-}
-
-boost::optional<BucketCatalog::BucketState> BucketCatalog::_setBucketState(Bucket* bucket,
-                                                                           BucketState target) {
-    stdx::lock_guard catalogLock{_mutex};
-    if (_eraManager.hasBeenCleared(catalogLock, bucket)) {
-        return _setBucketState(catalogLock, bucket->id(), BucketState::kCleared);
-    }
-
-    return _setBucketState(catalogLock, bucket->id(), target);
-}
-
-boost::optional<BucketCatalog::BucketState> BucketCatalog::_setBucketState(WithLock catalogLock,
-                                                                           const OID& id,
-                                                                           BucketState target) {
-    auto it = _bucketStates.find(id);
-    if (it == _bucketStates.end()) {
-        return boost::none;
-    }
-
-    auto& [_, state] = *it;
-    switch (target) {
-        case BucketState::kNormal: {
-            if (state == BucketState::kPrepared) {
-                state = BucketState::kNormal;
-            } else if (state == BucketState::kPreparedAndCleared) {
-                state = BucketState::kCleared;
-            }
-            break;
-        }
-        case BucketState::kPrepared: {
-            if (state == BucketState::kNormal) {
-                state = BucketState::kPrepared;
-            }
-            break;
-        }
-        case BucketState::kCleared: {
-            if (state == BucketState::kNormal) {
-                state = BucketState::kCleared;
-            } else if (state == BucketState::kPrepared) {
-                state = BucketState::kPreparedAndCleared;
-            }
-            break;
-        }
-        case BucketState::kPreparedAndCleared: {
-            invariant(target != BucketState::kPreparedAndCleared);
-        }
-    }
-
-    return state;
 }
 
 long long BucketCatalog::_marginalMemoryUsageForArchivedBucket(const ArchivedBucket& bucket,

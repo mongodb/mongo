@@ -136,8 +136,8 @@ env.CppUnitTest(
     target='db_timeseries_test',
     source=[
         'bucket_catalog_helpers_test.cpp',
+        'bucket_catalog_state_manager_test.cpp',
         'bucket_catalog_test.cpp',
-        'bucket_catalog_era_test.cpp',
         'minmax_test.cpp',
         'timeseries_dotted_path_support_test.cpp',
         'timeseries_extended_range_test.cpp',

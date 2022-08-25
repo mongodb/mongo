@@ -1649,5 +1649,55 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
     ASSERT_EQ(result.getValue().candidate.value(), oldBucketId);
 }
 
+TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
+    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
+                                                    true};
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+
+    // Insert a document so we have a base bucket and we can test that we archive it when we reopen
+    // a conflicting bucket.
+    auto result = _bucketCatalog->insert(
+        _opCtx,
+        _ns1,
+        _getCollator(_ns1),
+        _getTimeseriesOptions(_ns1),
+        ::mongo::fromjson(R"({"time":{"$date":"2022-06-05T15:34:40.000Z"}})"),
+        BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
+    ASSERT_OK(result.getStatus());
+    auto batch = result.getValue().batch;
+    ASSERT(batch);
+    auto oldBucketId = batch->bucket().id;
+    ASSERT(batch->claimCommitRights());
+    ASSERT_OK(_bucketCatalog->prepareCommit(batch));
+    ASSERT_EQ(batch->measurements().size(), 1);
+    _bucketCatalog->finish(batch, {});
+
+    BSONObj bucketDoc = ::mongo::fromjson(
+        R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"}},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"}}},
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"}}}})");
+    ASSERT_NE(bucketDoc["_id"].OID(), oldBucketId);
+    auto validator = [&](OperationContext * opCtx, const BSONObj& bucketDoc) -> auto {
+        return autoColl->checkValidation(opCtx, bucketDoc);
+    };
+
+    // If we advance the catalog era, then we shouldn't use a bucket that was fetched during a
+    // previous era.
+    _bucketCatalog->clear(OID());
+
+    // We should get an WriteConflict back if we pass in an outdated bucket.
+    result = _bucketCatalog->insert(
+        _opCtx,
+        _ns1,
+        _getCollator(_ns1),
+        _getTimeseriesOptions(_ns1),
+        ::mongo::fromjson(R"({"time":{"$date":"2022-06-06T15:35:40.000Z"}})"),
+        BucketCatalog::CombineWithInsertsFromOtherClients::kAllow,
+        BucketCatalog::BucketToReopen{bucketDoc, validator, result.getValue().catalogEra});
+    ASSERT_NOT_OK(result.getStatus());
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::WriteConflict);
+}
+
 }  // namespace
 }  // namespace mongo
