@@ -206,6 +206,13 @@ var defragmentationUtil = (function() {
         assert.soon(function() {
             let balancerStatus =
                 assert.commandWorked(mongos.adminCommand({balancerCollectionStatus: ns}));
+
+            if (balancerStatus.balancerCompliant) {
+                // As we can't rely on `balancerCompliant` due to orphan counter non atomic update,
+                // we need to ensure the collection is balanced by some extra checks
+                sh.awaitCollectionBalance(mongos.getCollection(ns));
+            }
+
             return balancerStatus.balancerCompliant ||
                 balancerStatus.firstComplianceViolation !== 'defragmentingChunks';
         });
