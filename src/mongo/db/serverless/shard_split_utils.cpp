@@ -35,6 +35,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/ops/delete.h"
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/logv2/log_debug.h"
 
 namespace mongo {
 
@@ -295,27 +296,55 @@ RecipientAcceptSplitListener::RecipientAcceptSplitListener(
     : _numberOfRecipient(recipientConnectionString.getServers().size()),
       _recipientSetName(recipientConnectionString.getSetName()) {}
 
+const std::string kSetNameFieldName = "setName";
+const std::string kLastWriteFieldName = "lastWrite";
+const std::string kLastWriteOpTimeFieldName = "opTime";
 void RecipientAcceptSplitListener::onServerHeartbeatSucceededEvent(const HostAndPort& hostAndPort,
                                                                    const BSONObj reply) {
     stdx::lock_guard<Latch> lg(_mutex);
-    if (_fulfilled || !reply["setName"]) {
+    if (_fulfilled || !reply.hasField(kSetNameFieldName)) {
         return;
     }
 
-    _reportedSetNames[hostAndPort] = reply["setName"].str();
+    auto lastWriteOpTime = [&]() {
+        if (reply.hasField(kLastWriteFieldName)) {
+            auto lastWriteObj = reply[kLastWriteFieldName].Obj();
+            auto swLastWriteOpTime =
+                repl::OpTime::parseFromOplogEntry(lastWriteObj[kLastWriteOpTimeFieldName].Obj());
+            if (swLastWriteOpTime.isOK()) {
+                return swLastWriteOpTime.getValue();
+            }
+        }
 
-    auto allReportCorrectly =
-        std::all_of(_reportedSetNames.begin(),
-                    _reportedSetNames.end(),
-                    [&](const auto& entry) { return entry.second == _recipientSetName; }) &&
+        if (_reportedSetNames.contains(hostAndPort)) {
+            return _reportedSetNames[hostAndPort].opTime;
+        }
+
+        return repl::OpTime();
+    }();
+
+    _reportedSetNames[hostAndPort] =
+        repl::OpTimeWith<std::string>(reply["setName"].str(), lastWriteOpTime);
+    auto allReportCorrectly = std::all_of(_reportedSetNames.begin(),
+                                          _reportedSetNames.end(),
+                                          [&](const auto& entry) {
+                                              return !entry.second.opTime.isNull() &&
+                                                  entry.second.value == _recipientSetName;
+                                          }) &&
         _reportedSetNames.size() == _numberOfRecipient;
+
     if (allReportCorrectly) {
         _fulfilled = true;
-        _promise.emplaceValue();
+        auto highestLastApplied = std::max_element(
+            _reportedSetNames.begin(), _reportedSetNames.end(), [](const auto& p1, const auto& p2) {
+                return p1.second.opTime < p2.second.opTime;
+            });
+
+        _promise.emplaceValue(highestLastApplied->first);
     }
 }
 
-SharedSemiFuture<void> RecipientAcceptSplitListener::getFuture() const {
+SharedSemiFuture<HostAndPort> RecipientAcceptSplitListener::getSplitAcceptedFuture() const {
     return _promise.getFuture();
 }
 

@@ -111,7 +111,7 @@ const std::string kTTLIndexName = "ShardSplitDonorTTLIndex";
 
 namespace detail {
 
-SemiFuture<void> makeRecipientAcceptSplitFuture(
+SemiFuture<HostAndPort> makeRecipientAcceptSplitFuture(
     std::shared_ptr<executor::TaskExecutor> taskExecutor,
     const CancellationToken& abortToken,
     const ConnectionString& recipientConnectionString,
@@ -144,13 +144,13 @@ SemiFuture<void> makeRecipientAcceptSplitFuture(
         monitors.back()->init();
     }
 
-    return future_util::withCancellation(listener->getFuture(), abortToken)
+    return future_util::withCancellation(listener->getSplitAcceptedFuture(), abortToken)
         .thenRunOn(taskExecutor)
         // Preserve lifetime of listener and monitor until the future is fulfilled and remove the
         // listener.
         .onCompletion(
             [monitors = std::move(monitors), listener, eventsPublisher, taskExecutor, migrationId](
-                Status s) {
+                StatusWith<HostAndPort> s) {
                 eventsPublisher->close();
 
                 for (auto& monitor : monitors) {
@@ -363,13 +363,9 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
                 criticalSectionWithoutCatchupTimer->reset();
                 return _applySplitConfigToDonor(executor, abortToken);
             })
-            .then([this, executor, abortToken] {
-                return _waitForRecipientToAcceptSplit(executor, abortToken);
-            })
-            .then([this, executor, primaryToken] {
-                // only cancel operations on stepdown from here out
-                _cancelableOpCtxFactory.emplace(primaryToken, _markKilledExecutor);
-                return _triggerElectionAndEnterCommitedState(executor, primaryToken);
+            .then([this, executor, primaryToken, abortToken] {
+                return _waitForSplitAcceptanceAndEnterCommittedState(
+                    executor, primaryToken, abortToken);
             })
             // anchor ensures the instance will still exists even if the primary stepped down
             .onCompletion([this,
@@ -553,10 +549,10 @@ ConnectionString ShardSplitDonorService::DonorStateMachine::_setupAcceptanceMoni
     }();
 
     // Always start the replica set monitor if we haven't reached a decision yet
-    _splitAcceptancePromise.setWith([&]() -> Future<void> {
+    _splitAcceptancePromise.setWith([&]() {
         if (_stateDoc.getState() > ShardSplitDonorStateEnum::kBlocking ||
             MONGO_unlikely(skipShardSplitWaitForSplitAcceptance.shouldFail())) {
-            return SemiFuture<void>::makeReady().unsafeToInlineFuture();
+            return Future<HostAndPort>::makeReady(StatusWith<HostAndPort>(HostAndPort{}));
         }
 
         // Optionally select a task executor for unit testing
@@ -781,8 +777,11 @@ ExecutorFuture<void> sendStepUpToRecipient(const HostAndPort recipient,
         .on(executor, token);
 }
 
-ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_waitForRecipientToAcceptSplit(
-    const ScopedTaskExecutorPtr& executor, const CancellationToken& abortToken) {
+ExecutorFuture<void>
+ShardSplitDonorService::DonorStateMachine::_waitForSplitAcceptanceAndEnterCommittedState(
+    const ScopedTaskExecutorPtr& executor,
+    const CancellationToken& primaryToken,
+    const CancellationToken& abortToken) {
 
     checkForTokenInterrupt(abortToken);
     {
@@ -794,34 +793,12 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_waitForRecipien
 
     LOGV2(6142501, "Waiting for recipient to accept the split.", "id"_attr = _migrationId);
 
-    return ExecutorFuture(**executor).then([&]() { return _splitAcceptancePromise.getFuture(); });
-}
-
-ExecutorFuture<void>
-ShardSplitDonorService::DonorStateMachine::_triggerElectionAndEnterCommitedState(
-    const ScopedTaskExecutorPtr& executor, const CancellationToken& primaryToken) {
-    checkForTokenInterrupt(primaryToken);
-
-    std::vector<HostAndPort> recipients;
-    {
-        stdx::lock_guard<Latch> lg(_mutex);
-        if (_stateDoc.getState() > ShardSplitDonorStateEnum::kBlocking) {
-            return ExecutorFuture(**executor);
-        }
-
-        recipients = _stateDoc.getRecipientConnectionString()->getServers();
-    }
-
-    invariant(!recipients.empty());
-
-    auto rng = std::default_random_engine{};
-    std::shuffle(std::begin(recipients), std::end(recipients), rng);
-
-    auto remoteCommandExecutor =
-        _splitAcceptanceTaskExecutorForTest ? *_splitAcceptanceTaskExecutorForTest : **executor;
-
     return ExecutorFuture(**executor)
-        .then([this] {
+        .then([&]() { return _splitAcceptancePromise.getFuture(); })
+        .then([this, executor, primaryToken](const HostAndPort& primary) {
+            // only cancel operations on stepdown from here out
+            _cancelableOpCtxFactory.emplace(primaryToken, _markKilledExecutor);
+
             auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
             if (MONGO_unlikely(pauseShardSplitBeforeLeavingBlockingState.shouldFail())) {
                 pauseShardSplitBeforeLeavingBlockingState.execute([&](const BSONObj& data) {
@@ -840,27 +817,23 @@ ShardSplitDonorService::DonorStateMachine::_triggerElectionAndEnterCommitedState
             if (MONGO_unlikely(abortShardSplitBeforeLeavingBlockingState.shouldFail())) {
                 uasserted(ErrorCodes::InternalError, "simulate a shard split error");
             }
-        })
-        .then([this, recipients, primaryToken, remoteCommandExecutor] {
+
+            // If the split acceptance step was cancelled, its future will produce a default
+            // constructed HostAndPort. Skipping split acceptance implies skipping triggering an
+            // election.
+            if (primary.empty()) {
+                return ExecutorFuture(**executor);
+            }
+
             LOGV2(6493901,
                   "Triggering an election after recipient has accepted the split.",
                   "id"_attr = _migrationId);
 
-            // replSetStepUp on a random node will succeed as long as it's not the most out-of-date
-            // node (in that case at least another node will vote for it and the election will
-            // succeed). Selecting a random node has a 2/3 chance to succeed for replSetStepUp. If
-            // the first command fail, we know this node is the most out-of-date. Therefore we
-            // select the next node and we know the first node selected will vote for the second.
-            return sendStepUpToRecipient(recipients[0], remoteCommandExecutor, primaryToken)
-                .onCompletion(
-                    [this, recipients, remoteCommandExecutor, primaryToken](Status status) {
-                        if (status.isOK()) {
-                            return ExecutorFuture<void>(remoteCommandExecutor, status);
-                        }
+            auto remoteCommandExecutor = _splitAcceptanceTaskExecutorForTest
+                ? *_splitAcceptanceTaskExecutorForTest
+                : **executor;
 
-                        return sendStepUpToRecipient(
-                            recipients[1], remoteCommandExecutor, primaryToken);
-                    })
+            return sendStepUpToRecipient(primary, remoteCommandExecutor, primaryToken)
                 .onCompletion([this](Status replSetStepUpStatus) {
                     if (!replSetStepUpStatus.isOK()) {
                         LOGV2(6493904,
@@ -868,11 +841,7 @@ ShardSplitDonorService::DonorStateMachine::_triggerElectionAndEnterCommitedState
                               "status"_attr = replSetStepUpStatus);
                     }
 
-                    // Even if replSetStepUp failed, the recipient nodes have joined the
-                    // recipient set. Therefore they will eventually elect a primary and the
-                    // split will complete successfully, although slower than if the election
-                    // succeeded.
-                    return Status::OK();
+                    return replSetStepUpStatus;
                 });
         })
         .thenRunOn(**executor)

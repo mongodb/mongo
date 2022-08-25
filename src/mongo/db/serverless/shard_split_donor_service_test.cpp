@@ -322,7 +322,6 @@ void processHelloRequest(executor::NetworkInterfaceMock* net, MockReplicaSet* re
     auto noi = net->getNextReadyRequest();
     auto request = noi->getRequest();
 
-
     assertRemoteCommandNameEquals("isMaster", request);
     auto requestHost = request.target.toString();
     const auto node = replSet->getNode(requestHost);
@@ -447,24 +446,18 @@ protected:
     TaskExecutorPtr _executor;
 };
 
-void setUpCommandResult(MockReplicaSet* replSet,
-                        const HostAndPort& target,
-                        const std::string& command,
-                        BSONObj result) {
-    auto node = replSet->getNode(target.toString());
+auto makeHelloReply(const std::string& setName,
+                    const repl::OpTime& lastWriteOpTime = repl::OpTime(Timestamp(100, 1), 1)) {
+    BSONObjBuilder opTimeBuilder;
+    lastWriteOpTime.append(&opTimeBuilder, "opTime");
+    return BSON("setName" << setName << "lastWrite" << opTimeBuilder.obj());
+};
 
-    node->setCommandReply(command, result);
-}
-
-
-void setUpReplSetUpCommandResult(MockReplicaSet* replSet) {
-    // Due to use of std::shuffle to select the recipient to target, any of the node can receive the
-    // command.
-
+void setupRecipientCommandReplies(MockReplicaSet* replSet) {
     for (auto hostAndPort : replSet->getHosts()) {
         auto node = replSet->getNode(hostAndPort.toString());
-
         node->setCommandReply("replSetStepUp", BSON("ok" << 1));
+        node->setCommandReply("isMaster", makeHelloReply(replSet->getSetName()));
     }
 }
 
@@ -475,9 +468,9 @@ TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) 
         getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
     // Shard split service will send a stepUp request to the first node in the vector.
-    setUpReplSetUpCommandResult(&_recipientSet);
+    setupRecipientCommandReplies(&_recipientSet);
 
-    // We disable this failpoint to test complete functionality. waitForMonitorAndProcessHello()
+    // We reset this failpoint to test complete functionality. waitForMonitorAndProcessHello()
     // returns hello responses that makes split acceptance pass.
     _skipAcceptanceFP.reset();
 
@@ -503,73 +496,25 @@ TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) 
     ASSERT_TRUE(serviceInstance->isGarbageCollectable());
 }
 
-TEST_F(ShardSplitDonorServiceTest, ReplSetStepUpTryAgain) {
-    auto opCtx = makeOperationContext();
-    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
-    test::shard_split::reconfigToAddRecipientNodes(
-        getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
-
-    // Shard split service will send a stepUp request to the first node in the vector. When it fails
-    // it will send it to the next node.
-    setUpReplSetUpCommandResult(&_recipientSet);
-
-    // We disable this failpoint to test complete functionality. waitForMonitorAndProcessHello()
-    // returns hello responses that makes split acceptance pass.
-    _skipAcceptanceFP.reset();
-
-    // Create and start the instance.
-    auto serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
-        opCtx.get(), _service, defaultStateDocument().toBSON());
-    ASSERT(serviceInstance.get());
-    ASSERT_EQ(_uuid, serviceInstance->getId());
-
-    waitForMonitorAndProcessHello();
-
-    // We expect to get two replSetStepUp commands. The first will fail and the service will resend
-    // the command to the next node.
-    waitForReplSetStepUp(Status(ErrorCodes::OperationFailed, ""));
-    waitForReplSetStepUp(Status(ErrorCodes::OK, ""));
-
-    auto result = serviceInstance->decisionFuture().get();
-
-    ASSERT(!result.abortReason);
-
-    ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kCommitted);
-}
-
 TEST_F(ShardSplitDonorServiceTest, ReplSetStepUpFails) {
-    // Test that, even if both replSetStepUp fail, the split will succeed as long as all nodes have
-    // joined the recipient set.
-
     auto opCtx = makeOperationContext();
     test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
     test::shard_split::reconfigToAddRecipientNodes(
         getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
-
-    // Shard split service will send a stepUp request to the first node in the vector. When it fails
-    // it will send it to the next node.
-    setUpReplSetUpCommandResult(&_recipientSet);
-
-    // We disable this failpoint to test complete functionality. waitForMonitorAndProcessHello()
-    // returns hello responses that makes split acceptance pass.
+    setupRecipientCommandReplies(&_recipientSet);
     _skipAcceptanceFP.reset();
 
-    // Create and start the instance.
     auto serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
         opCtx.get(), _service, defaultStateDocument().toBSON());
     ASSERT(serviceInstance.get());
     ASSERT_EQ(_uuid, serviceInstance->getId());
 
     waitForMonitorAndProcessHello();
-
-    // Shard split will retry the command once. If both
-    waitForReplSetStepUp(Status(ErrorCodes::OperationFailed, ""));
     waitForReplSetStepUp(Status(ErrorCodes::OperationFailed, ""));
 
     auto result = serviceInstance->decisionFuture().get();
-
-    ASSERT(!result.abortReason);
-    ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kCommitted);
+    ASSERT(result.abortReason);
+    ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kAborted);
 }
 
 TEST_F(ShardSplitDonorServiceTest, ReplSetStepUpRetryable) {
@@ -580,7 +525,7 @@ TEST_F(ShardSplitDonorServiceTest, ReplSetStepUpRetryable) {
 
     // Shard split service will send a stepUp request to the first node in the vector. When it fails
     // it will send it to the next node.
-    setUpReplSetUpCommandResult(&_recipientSet);
+    setupRecipientCommandReplies(&_recipientSet);
 
     // We disable this failpoint to test complete functionality. waitForMonitorAndProcessHello()
     // returns hello responses that makes split acceptance pass.
@@ -647,7 +592,7 @@ TEST_F(ShardSplitDonorServiceTest, ReconfigToRemoveSplitConfig) {
         getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
     // Shard split service will send a stepUp request to the first node in the vector.
-    setUpReplSetUpCommandResult(&_recipientSet);
+    setupRecipientCommandReplies(&_recipientSet);
 
     _skipAcceptanceFP.reset();
 
@@ -689,6 +634,50 @@ TEST_F(ShardSplitDonorServiceTest, ReconfigToRemoveSplitConfig) {
     ASSERT_TRUE(finalConfigBson.hasField("replSetReconfig"));
     auto finalConfig = repl::ReplSetConfig::parse(finalConfigBson["replSetReconfig"].Obj());
     ASSERT(!finalConfig.isSplitConfig());
+}
+
+TEST_F(ShardSplitDonorServiceTest, SendReplSetStepUpToHighestLastApplied) {
+    // Proves that the node with the highest lastAppliedOpTime is chosen as the recipient primary,
+    // by replacing the default `hello` replies (set by the MockReplicaSet) with ones that report
+    // `lastWrite.opTime` values in a deterministic way.
+    auto opCtx = makeOperationContext();
+    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+    test::shard_split::reconfigToAddRecipientNodes(
+        getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
+
+    auto newerOpTime = mongo::repl::OpTime(Timestamp(200, 1), 24);
+    auto olderOpTime = mongo::repl::OpTime(Timestamp(100, 1), 24);
+
+    auto recipientPrimary = _recipientSet.getNode(_recipientSet.getHosts()[1].toString());
+    recipientPrimary->setCommandReply("isMaster", makeHelloReply(_recipientSetName, newerOpTime));
+    recipientPrimary->setCommandReply("replSetStepUp", BSON("ok" << 1));
+
+    for (auto&& recipientNodeHost : _recipientSet.getHosts()) {
+        if (recipientNodeHost == recipientPrimary->getServerHostAndPort()) {
+            continue;
+        }
+
+        auto recipientNode = _recipientSet.getNode(recipientNodeHost.toString());
+        recipientNode->setCommandReply("isMaster", makeHelloReply(_recipientSetName, olderOpTime));
+        recipientNode->setCommandReply("replSetStepUp", BSON("ok" << 0));
+    }
+
+    _skipAcceptanceFP.reset();
+    auto serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
+        opCtx.get(), _service, defaultStateDocument().toBSON());
+    ASSERT(serviceInstance.get());
+    ASSERT_EQ(_uuid, serviceInstance->getId());
+    auto splitAcceptanceFuture = serviceInstance->getSplitAcceptanceFuture_forTest();
+
+    waitForMonitorAndProcessHello();
+    waitForReplSetStepUp(Status::OK());
+
+    auto result = serviceInstance->decisionFuture().get();
+    ASSERT(!result.abortReason);
+    ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kCommitted);
+
+    auto acceptedRecipientPrimary = splitAcceptanceFuture.get(opCtx.get());
+    ASSERT_EQ(acceptedRecipientPrimary, recipientPrimary->getServerHostAndPort());
 }
 
 // Abort scenario : abortSplit called before startSplit.
@@ -859,11 +848,11 @@ TEST(RecipientAcceptSplitListenerTest, FutureReady) {
         mongo::serverless::RecipientAcceptSplitListener(donor.getURI().connectionString());
 
     for (const auto& host : donor.getHosts()) {
-        ASSERT_FALSE(listener.getFuture().isReady());
-        listener.onServerHeartbeatSucceededEvent(host, BSON("setName" << donor.getSetName()));
+        ASSERT_FALSE(listener.getSplitAcceptedFuture().isReady());
+        listener.onServerHeartbeatSucceededEvent(host, makeHelloReply(donor.getSetName()));
     }
 
-    ASSERT_TRUE(listener.getFuture().isReady());
+    ASSERT_TRUE(listener.getSplitAcceptedFuture().isReady());
 }
 
 TEST(RecipientAcceptSplitListenerTest, FutureReadyNameChange) {
@@ -872,18 +861,16 @@ TEST(RecipientAcceptSplitListenerTest, FutureReadyNameChange) {
         mongo::serverless::RecipientAcceptSplitListener(donor.getURI().connectionString());
 
     for (const auto& host : donor.getHosts()) {
-        listener.onServerHeartbeatSucceededEvent(host,
-                                                 BSON("setName"
-                                                      << "invalidSetName"));
+        listener.onServerHeartbeatSucceededEvent(host, makeHelloReply("invalidSetName"));
     }
 
-    ASSERT_FALSE(listener.getFuture().isReady());
+    ASSERT_FALSE(listener.getSplitAcceptedFuture().isReady());
 
     for (const auto& host : donor.getHosts()) {
-        listener.onServerHeartbeatSucceededEvent(host, BSON("setName" << donor.getSetName()));
+        listener.onServerHeartbeatSucceededEvent(host, makeHelloReply(donor.getSetName()));
     }
 
-    ASSERT_TRUE(listener.getFuture().isReady());
+    ASSERT_TRUE(listener.getSplitAcceptedFuture().isReady());
 }
 
 TEST(RecipientAcceptSplitListenerTest, FutureNotReadyMissingNodes) {
@@ -894,14 +881,14 @@ TEST(RecipientAcceptSplitListenerTest, FutureNotReadyMissingNodes) {
 
     for (size_t i = 0; i < donor.getHosts().size() - 1; ++i) {
         listener.onServerHeartbeatSucceededEvent(donor.getHosts()[i],
-                                                 BSON("setName" << donor.getSetName()));
+                                                 makeHelloReply(donor.getSetName()));
     }
 
-    ASSERT_FALSE(listener.getFuture().isReady());
+    ASSERT_FALSE(listener.getSplitAcceptedFuture().isReady());
     listener.onServerHeartbeatSucceededEvent(donor.getHosts()[donor.getHosts().size() - 1],
-                                             BSON("setName" << donor.getSetName()));
+                                             makeHelloReply(donor.getSetName()));
 
-    ASSERT_TRUE(listener.getFuture().isReady());
+    ASSERT_TRUE(listener.getSplitAcceptedFuture().isReady());
 }
 
 TEST(RecipientAcceptSplitListenerTest, FutureNotReadyNoSetName) {
@@ -913,7 +900,7 @@ TEST(RecipientAcceptSplitListenerTest, FutureNotReadyNoSetName) {
         listener.onServerHeartbeatSucceededEvent(donor.getHosts()[i], BSONObj());
     }
 
-    ASSERT_FALSE(listener.getFuture().isReady());
+    ASSERT_FALSE(listener.getSplitAcceptedFuture().isReady());
 }
 
 TEST(RecipientAcceptSplitListenerTest, FutureNotReadyWrongSet) {
@@ -922,12 +909,10 @@ TEST(RecipientAcceptSplitListenerTest, FutureNotReadyWrongSet) {
         mongo::serverless::RecipientAcceptSplitListener(donor.getURI().connectionString());
 
     for (const auto& host : donor.getHosts()) {
-        listener.onServerHeartbeatSucceededEvent(host,
-                                                 BSON("setName"
-                                                      << "wrongSetName"));
+        listener.onServerHeartbeatSucceededEvent(host, makeHelloReply("wrongSetName"));
     }
 
-    ASSERT_FALSE(listener.getFuture().isReady());
+    ASSERT_FALSE(listener.getSplitAcceptedFuture().isReady());
 }
 
 TEST_F(ShardSplitDonorServiceTest, ResumeAfterStepdownTest) {
@@ -935,8 +920,6 @@ TEST_F(ShardSplitDonorServiceTest, ResumeAfterStepdownTest) {
     test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
     test::shard_split::reconfigToAddRecipientNodes(
         getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
-
-    setUpReplSetUpCommandResult(&_recipientSet);
 
     auto firstSplitInstance = [&]() {
         FailPointEnableBlock fp("pauseShardSplitAfterBlocking");
@@ -968,10 +951,7 @@ TEST_F(ShardSplitDonorServiceTest, ResumeAfterStepdownTest) {
         return *serviceInstance;
     }();
 
-    waitForReplSetStepUp(Status(ErrorCodes::OK, ""));
-
     ASSERT_OK(secondSplitInstance->decisionFuture().getNoThrow().getStatus());
-
     secondSplitInstance->tryForget();
     ASSERT_OK(secondSplitInstance->completionFuture().getNoThrow());
     ASSERT_TRUE(secondSplitInstance->isGarbageCollectable());

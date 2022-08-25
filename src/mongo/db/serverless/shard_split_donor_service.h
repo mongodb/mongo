@@ -155,6 +155,10 @@ public:
         return _stateDoc.getState();
     }
 
+    SharedSemiFuture<HostAndPort> getSplitAcceptanceFuture_forTest() const {
+        return _splitAcceptancePromise.getFuture();
+    }
+
 private:
     // Tasks
     ExecutorFuture<void> _enterAbortIndexBuildsOrAbortedState(const ScopedTaskExecutorPtr& executor,
@@ -170,11 +174,10 @@ private:
     ExecutorFuture<void> _applySplitConfigToDonor(const ScopedTaskExecutorPtr& executor,
                                                   const CancellationToken& abortToken);
 
-    ExecutorFuture<void> _waitForRecipientToAcceptSplit(const ScopedTaskExecutorPtr& executor,
-                                                        const CancellationToken& primaryToken);
-
-    ExecutorFuture<void> _triggerElectionAndEnterCommitedState(
-        const ScopedTaskExecutorPtr& executor, const CancellationToken& primaryToken);
+    ExecutorFuture<void> _waitForSplitAcceptanceAndEnterCommittedState(
+        const ScopedTaskExecutorPtr& executor,
+        const CancellationToken& primaryToken,
+        const CancellationToken& abortToken);
 
     ExecutorFuture<void> _waitForForgetCmdThenMarkGarbageCollectable(
         const ScopedTaskExecutorPtr& executor, const CancellationToken& primaryToken);
@@ -242,7 +245,7 @@ private:
     SharedPromise<void> _garbageCollectablePromise;
 
     // A promise fulfilled when all recipient nodes have accepted the split.
-    SharedPromise<void> _splitAcceptancePromise;
+    SharedPromise<HostAndPort> _splitAcceptancePromise;
 
     // A promise fulfilled when tryForget is called.
     SharedPromise<void> _forgetShardSplitReceivedPromise;

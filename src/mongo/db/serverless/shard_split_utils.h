@@ -30,9 +30,9 @@
 #pragma once
 
 #include "mongo/client/sdam/topology_listener.h"
+#include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/serverless/shard_split_state_machine_gen.h"
-
 
 namespace mongo {
 namespace serverless {
@@ -121,7 +121,7 @@ public:
     void onServerHeartbeatSucceededEvent(const HostAndPort& hostAndPort, BSONObj reply) final;
 
     // Fulfilled when all nodes have accepted the split.
-    SharedSemiFuture<void> getFuture() const;
+    SharedSemiFuture<HostAndPort> getSplitAcceptedFuture() const;
 
 private:
     mutable Mutex _mutex =
@@ -130,8 +130,8 @@ private:
     bool _fulfilled{false};
     const size_t _numberOfRecipient;
     std::string _recipientSetName;
-    std::map<HostAndPort, std::string> _reportedSetNames;
-    SharedPromise<void> _promise;
+    stdx::unordered_map<HostAndPort, repl::OpTimeWith<std::string>> _reportedSetNames;
+    SharedPromise<HostAndPort> _promise;
 };
 
 }  // namespace serverless
