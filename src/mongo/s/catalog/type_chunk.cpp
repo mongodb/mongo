@@ -555,7 +555,7 @@ Status ChunkType::validate() const {
     while (minIt.more() && maxIt.more()) {
         BSONElement minElem = minIt.next();
         BSONElement maxElem = maxIt.next();
-        if (strcmp(minElem.fieldName(), maxElem.fieldName())) {
+        if (strcmp(minElem.fieldName(), maxElem.fieldName()) != 0) {
             return {ErrorCodes::BadValue,
                     str::stream() << "min and max don't have matching keys: " << *_min << ", "
                                   << *_max};

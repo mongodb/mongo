@@ -95,7 +95,7 @@ do_md5_test(void) {
         md5_finish(&state, digest);
         for (di = 0; di < 16; ++di)
             sprintf(hex_output + di * 2, "%02x", digest[di]);
-        if (strcmp(hex_output, test[i + 1])) {
+        if (strcmp(hex_output, test[i + 1]) != 0) {
             printf("MD5 (\"%s\") = ", test[i]);
             puts(hex_output);
             printf("**** ERROR, should be: %s\n", test[i + 1]);

@@ -119,7 +119,7 @@ Status TagsType::validate() const {
     while (minIt.more() && maxIt.more()) {
         BSONElement minElem = minIt.next();
         BSONElement maxElem = maxIt.next();
-        if (strcmp(minElem.fieldName(), maxElem.fieldName())) {
+        if (strcmp(minElem.fieldName(), maxElem.fieldName()) != 0) {
             return Status(ErrorCodes::BadValue, "min and max have different set of keys");
         }
     }

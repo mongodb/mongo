@@ -149,7 +149,7 @@ void processLoadSegment(const dl_phdr_info& info, const ElfW(Phdr) & phdr, BSONO
 
     const char* filename = info.dlpi_name;
 
-    if (memcmp(&eHeader.e_ident[EI_MAG0], ELFMAG, SELFMAG)) {
+    if (memcmp(&eHeader.e_ident[EI_MAG0], ELFMAG, SELFMAG) != 0) {
         LOGV2_WARNING(23842,
                       "Bad ELF magic number",
                       "filename"_attr = filename,
