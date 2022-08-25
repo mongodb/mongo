@@ -1936,11 +1936,11 @@ public:
 
         const Timestamp dropTime = _clock->tickClusterTime(1).asTimestamp();
         if (simulatePrimary) {
-            ASSERT_OK(dropDatabaseForApplyOps(_opCtx, nss.db().toString()));
+            ASSERT_OK(dropDatabaseForApplyOps(_opCtx, nss.dbName()));
         } else {
             repl::UnreplicatedWritesBlock uwb(_opCtx);
             TimestampBlock ts(_opCtx, dropTime);
-            ASSERT_OK(dropDatabaseForApplyOps(_opCtx, nss.db().toString()));
+            ASSERT_OK(dropDatabaseForApplyOps(_opCtx, nss.dbName()));
         }
 
         // Assert that the idents do not exist.

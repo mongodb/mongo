@@ -18,7 +18,10 @@ const kTenant = ObjectId();
 const kOtherTenant = ObjectId();
 const kDbName = 'test';
 const kCollName = 'myColl0';
+
 const tokenConn = new Mongo(mongod.host);
+const securityToken = _createSecurityToken({user: "userTenant1", db: '$external', tenant: kTenant});
+const tokenDB = tokenConn.getDB(kDbName);
 
 // In this jstest, the collection (defined by kCollName) and the document "{_id: 0, a: 1, b: 1}"
 // for the tenant (defined by kTenant) will be reused by all command tests. So, any test which
@@ -28,15 +31,15 @@ const tokenConn = new Mongo(mongod.host);
 {
     // Create a user for kTenant and then set the security token on the connection.
     assert.commandWorked(mongod.getDB('$external').runCommand({
-        createUser: "readWriteUserTenant1",
+        createUser: "userTenant1",
         '$tenant': kTenant,
-        roles: [{role: 'readWriteAnyDatabase', db: 'admin'}]
+        roles:
+            [{role: 'dbAdminAnyDatabase', db: 'admin'}, {role: 'readWriteAnyDatabase', db: 'admin'}]
     }));
-    tokenConn._setSecurityToken(
-        _createSecurityToken({user: "readWriteUserTenant1", db: '$external', tenant: kTenant}));
+
+    tokenConn._setSecurityToken(securityToken);
 
     // Create a collection for the tenant kTenant and then insert into it.
-    const tokenDB = tokenConn.getDB(kDbName);
     assert.commandWorked(tokenDB.createCollection(kCollName));
     assert.commandWorked(
         tokenDB.runCommand({insert: kCollName, documents: [{_id: 0, a: 1, b: 1}]}));
@@ -65,7 +68,8 @@ const tokenConn = new Mongo(mongod.host);
         assert.eq({_id: 0, a: 11, b: 1}, fad2.value);
     }
 
-    // Create a view on the collection.
+    // Create a view on the collection, and check that listCollections sees the original collection,
+    // the view, and the system.views collection.
     {
         assert.commandWorked(
             tokenDB.runCommand({"create": "view1", "viewOn": kCollName, pipeline: []}));
@@ -120,6 +124,19 @@ const tokenConn = new Mongo(mongod.host);
         assert.commandWorked(tokenDB.runCommand(
             {findAndModify: kCollName, query: {a: 11}, update: {$set: {a: 1, b: 1}}}));
     }
+
+    // Drop the database and check that listCollections no longer returns the 3 collections.
+    {
+        assert.commandWorked(tokenDB.runCommand({dropDatabase: 1}));
+        const collsAfterDrop =
+            assert.commandWorked(tokenDB.runCommand({listCollections: 1, nameOnly: true}));
+        assert.eq(
+            0, collsAfterDrop.cursor.firstBatch.length, tojson(collsAfterDrop.cursor.firstBatch));
+
+        // Reset the collection and document.
+        assert.commandWorked(
+            tokenDB.runCommand({insert: kCollName, documents: [{_id: 0, a: 1, b: 1}]}));
+    }
 }
 
 // Test commands using a security token for a different tenant and check that this tenant cannot
@@ -128,12 +145,14 @@ const tokenConn = new Mongo(mongod.host);
     // Create a user for a different tenant, and set the security token on the connection.
     // We reuse the same connection, but swap the token out.
     assert.commandWorked(mongod.getDB('$external').runCommand({
-        createUser: "readWriteUserTenant2",
+        createUser: "userTenant2",
         '$tenant': kOtherTenant,
-        roles: [{role: 'readWriteAnyDatabase', db: 'admin'}]
+        roles:
+            [{role: 'dbAdminAnyDatabase', db: 'admin'}, {role: 'readWriteAnyDatabase', db: 'admin'}]
     }));
-    tokenConn._setSecurityToken(_createSecurityToken(
-        {user: "readWriteUserTenant2", db: '$external', tenant: kOtherTenant}));
+    const securityTokenOtherTenant =
+        _createSecurityToken({user: "userTenant2", db: '$external', tenant: kOtherTenant});
+    tokenConn._setSecurityToken(securityTokenOtherTenant);
 
     const tokenDB2 = tokenConn.getDB(kDbName);
 
@@ -162,9 +181,20 @@ const tokenConn = new Mongo(mongod.host);
     assert.commandFailedWithCode(
         adminDb.runCommand({renameCollection: fromName, to: toName, dropTarget: true}),
         ErrorCodes.NamespaceNotFound);
+
+    // Attempt to drop the database, then check it was not dropped.
+    assert.commandWorked(tokenDB2.runCommand({dropDatabase: 1}));
+
+    // Run listCollections using the original user's security token to see the collection exists.
+    tokenConn._setSecurityToken(securityToken);
+    const collsAfterDropOtherTenant =
+        assert.commandWorked(tokenDB.runCommand({listCollections: 1, nameOnly: true}));
+    assert.eq(1,
+              collsAfterDropOtherTenant.cursor.firstBatch.length,
+              tojson(collsAfterDropOtherTenant.cursor.firstBatch));
 }
 
-// Test commands using a privleged user with ActionType::useTenant and check the user can run
+// Test commands using a privleged user with ActionType::useTenant and check the user can still run
 // commands on the doc when passing the correct tenant, but not when passing a different
 // tenant.
 {
@@ -172,7 +202,7 @@ const tokenConn = new Mongo(mongod.host);
     assert(privelegedConn.getDB('admin').auth('admin', 'pwd'));
     const privelegedDB = privelegedConn.getDB('test');
 
-    // Find and modify the document.
+    // Find and modify the document using $tenant.
     {
         const fadCorrectDollarTenant = assert.commandWorked(privelegedDB.runCommand({
             findAndModify: kCollName,
@@ -199,7 +229,7 @@ const tokenConn = new Mongo(mongod.host);
         }));
     }
 
-    // Rename the collection.
+    // Rename the collection using $tenant.
     {
         const fromName = kDbName + '.' + kCollName;
         const toName = fromName + "_renamed";

@@ -568,7 +568,7 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ClearReshardingFilteringMeta
         // Clear out the resharding donor/recipient metadata collections.
         for (auto const& nss : {NamespaceString::kDonorReshardingOperationsNamespace,
                                 NamespaceString::kRecipientReshardingOperationsNamespace}) {
-            dropDatabase(opCtx, nss.db().toString()).ignore();
+            dropDatabase(opCtx, nss.dbName()).ignore();
         }
 
         // Assert the prestate has no filtering metadata.

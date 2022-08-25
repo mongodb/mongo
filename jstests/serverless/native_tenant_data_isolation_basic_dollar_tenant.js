@@ -167,18 +167,28 @@ const testColl = testDb.getCollection(kCollName);
         adminDb.runCommand(
             {renameCollection: toName, to: fromName, dropTarget: true, '$tenant': kOtherTenant}),
         ErrorCodes.NamespaceNotFound);
+}
 
-    // Reset the collection name so other test cases can still access this collection with kCollName
+// Test the dropDatabase command.
+{
+    // Another tenant shouldn't be able to drop the database.
+    assert.commandWorked(testDb.runCommand({dropDatabase: 1, '$tenant': kOtherTenant}));
+    const collsAfterDropByOtherTenant = assert.commandWorked(
+        testDb.runCommand({listCollections: 1, nameOnly: true, '$tenant': kTenant}));
+    assert.eq(3,
+              collsAfterDropByOtherTenant.cursor.firstBatch.length,
+              tojson(collsAfterDropByOtherTenant.cursor.firstBatch));
+
+    // Now, drop the database using the original tenantId.
+    assert.commandWorked(testDb.runCommand({dropDatabase: 1, '$tenant': kTenant}));
+    const collsAfterDrop = assert.commandWorked(
+        testDb.runCommand({listCollections: 1, nameOnly: true, '$tenant': kTenant}));
+    assert.eq(0, collsAfterDrop.cursor.firstBatch.length, tojson(collsAfterDrop.cursor.firstBatch));
+
+    // Reset the collection so other test cases can still access this collection with kCollName
     // after this test.
-    assert.commandWorked(adminDb.runCommand(
-        {renameCollection: toName, to: fromName, dropTarget: true, '$tenant': kTenant}));
-    const fad2 = assert.commandWorked(testDb.runCommand({
-        findAndModify: kCollName,
-        query: {a: 11},
-        update: {$set: {a: 1, b: 1}},
-        '$tenant': kTenant
-    }));
-    assert.eq({_id: 0, a: 11, b: 1}, fad2.value);
+    assert.commandWorked(testDb.runCommand(
+        {insert: kCollName, documents: [{_id: 0, a: 1, b: 1}], '$tenant': kTenant}));
 }
 
 MongoRunner.stopMongod(mongod);

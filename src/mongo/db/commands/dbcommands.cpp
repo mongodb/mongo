@@ -123,6 +123,9 @@ public:
     bool collectsResourceConsumptionMetrics() const final {
         return true;
     }
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
     class Invocation final : public InvocationBaseGen {
     public:
         using InvocationBaseGen::InvocationBaseGen;
@@ -161,8 +164,7 @@ public:
                 uasserted(5255100, "Have to pass 1 as 'drop' parameter");
             }
 
-            // TODO SERVER-67549: pass the DatabaseName object directly.
-            Status status = dropDatabase(opCtx, dbName.toStringWithTenantId());
+            Status status = dropDatabase(opCtx, dbName);
             if (status != ErrorCodes::NamespaceNotFound) {
                 uassertStatusOK(status);
             }
