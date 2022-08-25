@@ -611,7 +611,8 @@ bool isEligibleCommon(const RequestType& request,
         while (indexIterator->more()) {
             const IndexDescriptor& descriptor = *indexIterator->next()->descriptor();
             if (descriptor.isPartial() || descriptor.hidden() || descriptor.isSparse() ||
-                descriptor.getIndexType() != IndexType::INDEX_BTREE) {
+                descriptor.getIndexType() != IndexType::INDEX_BTREE ||
+                !descriptor.collation().isEmpty()) {
                 return true;
             }
         }

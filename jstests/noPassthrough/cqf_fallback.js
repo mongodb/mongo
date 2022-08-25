@@ -146,6 +146,18 @@ assert.commandWorked(coll.createIndex({"$**": 1}));
 assertNotSupportedByBonsai({find: coll.getName(), filter: {}});
 assertNotSupportedByBonsai({aggregate: coll.getName(), pipeline: [], cursor: {}});
 
+// Unsupported index with non-simple collation.
+coll.drop();
+assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "fr_CA"}}));
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}});
+assertNotSupportedByBonsai({aggregate: coll.getName(), pipeline: [], cursor: {}});
+
+// A simple collation on an index should be eligible for CQF.
+coll.drop();
+assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "simple"}}));
+assertSupportedByBonsaiFully({find: coll.getName(), filter: {}});
+assertSupportedByBonsaiFully({aggregate: coll.getName(), pipeline: [], cursor: {}});
+
 // Test-only index type.
 coll.drop();
 assert.commandWorked(coll.insert({a: 1}));

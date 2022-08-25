@@ -11,8 +11,6 @@ selector:
   - jstests/core/nan.js
   # TODO SERVER-67506
   - jstests/core/arrayfind5.js
-  # TODO SERVER-68512
-  - jstests/core/collation_with_reverse_index.js
   # TODO SERVER-23229 on classic which is fixed by SERVER-67548 in CQF.
   - jstests/aggregation/bugs/groupMissing.js
   - jstests/core/null_query_semantics.js
