@@ -1039,6 +1039,8 @@ functions:
   - *f_expansions_write
   - *kill_processes
   - *cleanup_environment
+  - *get_version_expansions
+  - *apply_version_expansions
   - *fetch_venv
   - *adjust_venv
   - *f_expansions_write
@@ -6586,6 +6588,7 @@ tasks:
   commands:
   - command: manifest.load
   - func: "git get project and add git tag"
+  - func: "get and apply version expansions"
   - func: "f_expansions_write"
   - func: "kill processes"
   - func: "cleanup environment"
