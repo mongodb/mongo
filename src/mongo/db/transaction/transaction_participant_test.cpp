@@ -1087,14 +1087,22 @@ TEST_F(TxnParticipantTest, CleanOperationContextOnStepUp) {
     // onStepUp() relies on the storage interface to create the config.transactions table.
     repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceImpl>());
 
-    // onStepUp() must not leave aborted transactions' metadata attached to the operation context.
-    auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx());
-    mongoDSessionCatalog->onStepUp(opCtx());
+    // The test fixture set up sets an LSID on this opCtx, which we do not want here.
+    auto onStepUpFunc = [&](OperationContext* opCtx) {
+        // onStepUp() must not leave aborted transactions' metadata attached to the operation
+        // context.
+        auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
+        mongoDSessionCatalog->onStepUp(opCtx);
 
-    ASSERT_FALSE(opCtx()->inMultiDocumentTransaction());
-    ASSERT_FALSE(opCtx()->isStartingMultiDocumentTransaction());
-    ASSERT_FALSE(opCtx()->getLogicalSessionId());
-    ASSERT_FALSE(opCtx()->getTxnNumber());
+        // onStepUp() must not leave aborted transactions' metadata attached to the operation
+        // context.
+        ASSERT_FALSE(opCtx->inMultiDocumentTransaction());
+        ASSERT_FALSE(opCtx->isStartingMultiDocumentTransaction());
+        ASSERT_FALSE(opCtx->getLogicalSessionId());
+        ASSERT_FALSE(opCtx->getTxnNumber());
+    };
+
+    runFunctionFromDifferentOpCtx(onStepUpFunc);
 }
 
 TEST_F(TxnParticipantTest, StepDownDuringPreparedAbortFails) {

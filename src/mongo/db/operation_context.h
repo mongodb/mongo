@@ -532,6 +532,7 @@ public:
         _lsid = boost::none;
         _txnNumber = boost::none;
         _txnRetryCounter = boost::none;
+        _killOpsExempt = false;
     }
 
     /**
@@ -619,6 +620,23 @@ public:
      */
     bool isOpCompressed() const {
         return _opCompressed;
+    }
+
+    /**
+     * Returns whether or not a local killOps may kill this opCtx.
+     */
+    bool isKillOpsExempt() const {
+        return _killOpsExempt;
+    }
+
+    /**
+     * Set to prevent killOps from killing this opCtx even when an LSID is set.
+     * You may only call this method prior to setting an LSID on this opCtx.
+     * Calls to resetMultiDocumentTransactionState will reset _killOpsExempt to false.
+     */
+    void setKillOpsExempt() {
+        invariant(!_lsid);
+        _killOpsExempt = true;
     }
 
 private:
@@ -807,6 +825,14 @@ private:
 
     // Whether this operation was started by a compressed command.
     bool _opCompressed = false;
+
+    // Prevent this opCtx from being killed by killSessionsLocalKillOps if an LSID is attached.
+    // Normally, the presence of an LSID implies kill-eligibility as it uniquely identifies a
+    // session and can thus be passed into a killSessions command to target that session and its
+    // operations. However, there are some cases where we want the opCtx to have both an LSID and
+    // kill-immunity. Current examples include checking out sessions on replica set step up in order
+    // to refresh locks for prepared tranasctions or abort in-progress transactions.
+    bool _killOpsExempt = false;
 };
 
 // Gets a TimeZoneDatabase pointer from the ServiceContext.

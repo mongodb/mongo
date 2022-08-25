@@ -54,8 +54,9 @@ SessionKiller::Result killSessionsLocalKillOps(OperationContext* opCtx,
         OperationContext* opCtxToKill = client->getOperationContext();
         if (opCtxToKill) {
             const auto& lsid = opCtxToKill->getLogicalSessionId();
+            const auto exempt = opCtxToKill->isKillOpsExempt();
 
-            if (lsid) {
+            if (lsid && !exempt) {
                 if (const KillAllSessionsByPattern* pattern = matcher.match(*lsid)) {
                     ScopedKillAllSessionsByPatternImpersonator impersonator(opCtx, *pattern);
 

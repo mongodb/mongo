@@ -278,6 +278,10 @@ last-continuous:
       test_file: jstests/sharding/drop_index_fails_if_multikey_index_is_last_compatible.js
     - ticket: SERVER-68628
       test_file: jstests/sharding/resharding_temp_ns_routing_info_unsharded.js
+    - ticket: SERVER-66854
+      test_file: jstests/replsets/prepared_transaction_kill_during_step_up_refresh.js
+    - ticket: SERVER-66854
+      test_file: jstests/replsets/step_up_kill_abort_transactions.js
     - ticket: SERVER-68728
       test_file: jstests/sharding/move_chunk_interrupt_postimage.js
     - ticket: SERVER-64741
@@ -693,6 +697,10 @@ last-lts:
       test_file: jstests/sharding/drop_index_fails_if_multikey_index_is_last_compatible.js
     - ticket: SERVER-68628
       test_file: jstests/sharding/resharding_temp_ns_routing_info_unsharded.js
+    - ticket: SERVER-66854
+      test_file: jstests/replsets/prepared_transaction_kill_during_step_up_refresh.js
+    - ticket: SERVER-66854
+      test_file: jstests/replsets/step_up_kill_abort_transactions.js
     - ticket: SERVER-68728
       test_file: jstests/sharding/move_chunk_interrupt_postimage.js
     - ticket: SERVER-64741

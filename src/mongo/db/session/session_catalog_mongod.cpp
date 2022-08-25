@@ -52,6 +52,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
@@ -59,6 +60,9 @@
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangDuringStepUpPrepareRestoreLocks);
+MONGO_FAIL_POINT_DEFINE(hangDuringStepUpAbortInProgressTransactions);
 
 const auto getMongoDSessionCatalog =
     ServiceContext::declareDecoration<std::unique_ptr<MongoDSessionCatalog>>();
@@ -462,9 +466,17 @@ void abortInProgressTransactions(OperationContext* opCtx,
     while (cursor->more()) {
         auto txnRecord = SessionTxnRecord::parse(IDLParserContext("abort-in-progress-transactions"),
                                                  cursor->next());
-        opCtx->setLogicalSessionId(txnRecord.getSessionId());
+
+        // Synchronize with killOps to make this unkillable.
+        {
+            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            opCtx->setKillOpsExempt();
+            opCtx->setLogicalSessionId(txnRecord.getSessionId());
+        }
         opCtx->setTxnNumber(txnRecord.getTxnNum());
         opCtx->setInMultiDocumentTransaction();
+
+        hangDuringStepUpAbortInProgressTransactions.pauseWhileSet();
         auto ocs = mongoDSessionCatalog->checkOutSessionWithoutRefresh(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
         LOGV2_DEBUG(21978,
@@ -565,10 +577,18 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
         AlternativeClientRegion acr(newClient);
         for (const auto& sessionInfo : sessionsToReacquireLocks) {
             auto newOpCtx = cc().makeOperationContext();
-            newOpCtx->setLogicalSessionId(*sessionInfo.getSessionId());
+
+            // Synchronize with killOps to make this unkillable.
+            {
+                stdx::unique_lock<Client> lk(*newOpCtx->getClient());
+                newOpCtx->setKillOpsExempt();
+                newOpCtx->setLogicalSessionId(*sessionInfo.getSessionId());
+            }
             newOpCtx->setTxnNumber(*sessionInfo.getTxnNumber());
             newOpCtx->setTxnRetryCounter(*sessionInfo.getTxnRetryCounter());
             newOpCtx->setInMultiDocumentTransaction();
+
+            hangDuringStepUpPrepareRestoreLocks.pauseWhileSet();
 
             // Use MongoDOperationContextSessionWithoutRefresh to check out the session because:
             // - The in-memory state for this session has been kept in sync with the on-disk state
