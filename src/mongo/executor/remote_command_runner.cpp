@@ -64,11 +64,8 @@ ExecutorFuture<RemoteCommandInternalResponse> _doRequest(
             uassertStatusOK(getWriteConcernStatusFromCommandResult(r.data));
             uassertStatusOK(getFirstWriteErrorStatusFromCommandResult(r.data));
 
-            // TODO SERVER-67649: Teach IDL to accept generic reply fields when parsing a reply.
-            BSONObj newR = r.data.removeField("ok");
-
             struct RemoteCommandInternalResponse res = {
-                newR,            // response
+                r.data,          // response
                 r.target.get(),  // targetUsed
             };
             return res;

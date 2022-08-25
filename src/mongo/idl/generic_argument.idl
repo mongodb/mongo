@@ -133,3 +133,5 @@ generic_reply_field_lists:
                 forward_from_shards: false
             $oplogQueryData:
                 forward_from_shards: false
+            ok:
+                forward_from_shards: true 
