@@ -8,7 +8,7 @@ from requests.exceptions import HTTPError
 from evergreen import EvergreenApi
 
 import buildscripts.timeouts.timeout_service as under_test
-from buildscripts.task_generation.resmoke_proxy import ResmokeProxyService
+from buildscripts.resmoke_proxy.resmoke_proxy import ResmokeProxyService
 from buildscripts.util.teststats import HistoricTaskData
 
 # pylint: disable=missing-docstring,no-self-use,invalid-name,protected-access

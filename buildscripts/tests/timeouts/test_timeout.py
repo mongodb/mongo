@@ -63,3 +63,45 @@ class TestGenerateTimeoutCmd(unittest.TestCase):
         time_cmd = timeout.generate_timeout_cmd(is_patch=False, repeat_factor=1)
 
         self.assertGreater(time_cmd.exec_timeout, under_test.MAX_EXPECTED_TIMEOUT)
+
+
+class TestTimeoutInfo(unittest.TestCase):
+    def test_default_timeout(self):
+        timeout_info = under_test.TimeoutInfo.default_timeout()
+
+        self.assertIsNone(timeout_info.cmd)
+
+    def test_timeout_only_set(self):
+        timeout = 5
+        timeout_info = under_test.TimeoutInfo.overridden(timeout=timeout)
+
+        cmd = timeout_info.cmd.as_dict()
+
+        self.assertEqual("timeout.update", cmd["command"])
+        self.assertEqual(timeout, cmd["params"]["timeout_secs"])
+        self.assertNotIn("exec_timeout_secs", cmd["params"])
+
+    def test_exec_timeout_only_set(self):
+        exec_timeout = 5
+        timeout_info = under_test.TimeoutInfo.overridden(exec_timeout=exec_timeout)
+
+        cmd = timeout_info.cmd.as_dict()
+
+        self.assertEqual("timeout.update", cmd["command"])
+        self.assertEqual(exec_timeout, cmd["params"]["exec_timeout_secs"])
+        self.assertNotIn("timeout_secs", cmd["params"])
+
+    def test_both_timeouts_set(self):
+        timeout = 3
+        exec_timeout = 5
+        timeout_info = under_test.TimeoutInfo.overridden(exec_timeout=exec_timeout, timeout=timeout)
+
+        cmd = timeout_info.cmd.as_dict()
+
+        self.assertEqual("timeout.update", cmd["command"])
+        self.assertEqual(exec_timeout, cmd["params"]["exec_timeout_secs"])
+        self.assertEqual(timeout, cmd["params"]["timeout_secs"])
+
+    def test_override_with_no_values(self):
+        with self.assertRaises(ValueError):
+            under_test.TimeoutInfo.overridden()

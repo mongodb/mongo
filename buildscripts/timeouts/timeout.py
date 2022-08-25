@@ -1,11 +1,13 @@
 """Timeout information for generating tasks."""
+from __future__ import annotations
+
 import math
 from datetime import timedelta
 from inspect import currentframe, getframeinfo
 from typing import NamedTuple, Optional
 
 import structlog
-from buildscripts.patch_builds.task_generation import TimeoutInfo
+from shrub.v2.command import timeout_update
 
 LOGGER = structlog.getLogger(__name__)
 
@@ -119,3 +121,51 @@ class TimeoutEstimate(NamedTuple):
             raise ValueError("Failing due to expected runtime.")
 
         return TimeoutInfo.overridden(timeout=test_timeout, exec_timeout=task_timeout)
+
+
+class TimeoutInfo(object):
+    """Timeout information for a task."""
+
+    def __init__(self, use_defaults, exec_timeout=None, timeout=None):
+        """
+        Create timeout information.
+
+        :param use_defaults: Don't overwrite any timeouts.
+        :param exec_timeout: Exec timeout value to overwrite.
+        :param timeout: Timeout value to overwrite.
+        """
+        self.use_defaults = use_defaults
+        self.exec_timeout = exec_timeout
+        self.timeout = timeout
+
+    @classmethod
+    def default_timeout(cls):
+        """Create an instance of TimeoutInfo that uses default timeouts."""
+        return cls(True)
+
+    @classmethod
+    def overridden(cls, exec_timeout=None, timeout=None):
+        """
+        Create an instance of TimeoutInfo that overwrites timeouts.
+
+        :param exec_timeout: Exec timeout value to overwrite.
+        :param timeout: Timeout value to overwrite.
+        :return: TimeoutInfo that overwrites given timeouts.
+        """
+        if not exec_timeout and not timeout:
+            raise ValueError("Must override either 'exec_timeout' or 'timeout'")
+        return cls(False, exec_timeout=exec_timeout, timeout=timeout)
+
+    @property
+    def cmd(self):
+        """Create a command that sets timeouts as specified."""
+        if not self.use_defaults:
+            return timeout_update(exec_timeout_secs=self.exec_timeout, timeout_secs=self.timeout)
+
+        return None
+
+    def __repr__(self):
+        """Create a string representation for debugging."""
+        if self.use_defaults:
+            return "<No Timeout Override>"
+        return f"<exec_timeout={self.exec_timeout}, timeout={self.timeout}>"
