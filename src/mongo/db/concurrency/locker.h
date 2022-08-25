@@ -37,6 +37,7 @@
 #include "mongo/db/concurrency/lock_stats.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/concurrency/admission_context.h"
 
 namespace mongo {
 
@@ -514,16 +515,16 @@ public:
     void skipAcquireTicket() {
         // Should not hold or wait for the ticket.
         invariant(isNoop() || getClientState() == Locker::ClientState::kInactive);
-        _shouldAcquireTicket = false;
+        _admCtx.setPriority(AdmissionContext::AcquisitionPriority::kHigh);
     }
     void setAcquireTicket() {
         // Should hold or wait for the ticket.
         invariant(isNoop() || getClientState() == Locker::ClientState::kInactive);
-        _shouldAcquireTicket = true;
+        _admCtx.setPriority(AdmissionContext::AcquisitionPriority::kNormal);
     }
 
     bool shouldAcquireTicket() const {
-        return _shouldAcquireTicket;
+        return _admCtx.getPriority() != AdmissionContext::AcquisitionPriority::kHigh;
     }
 
     /**
@@ -571,11 +572,13 @@ protected:
      */
     unsigned _numResourcesToUnlockAtEndUnitOfWork = 0;
 
+    // Keeps state and statistics related to admission control.
+    AdmissionContext _admCtx;
+
 private:
     bool _shouldConflictWithSecondaryBatchApplication = true;
     bool _shouldConflictWithSetFeatureCompatibilityVersion = true;
     bool _shouldAllowLockAcquisitionOnTimestampedUnitOfWork = false;
-    bool _shouldAcquireTicket = true;
     std::string _debugInfo;  // Extra info about this locker for debugging purpose
 };
 

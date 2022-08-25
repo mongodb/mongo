@@ -36,7 +36,6 @@
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/spin_lock.h"
 #include "mongo/util/concurrency/ticketholder.h"
 
@@ -376,9 +375,6 @@ private:
 
     // A structure for accumulating time spent getting flow control tickets.
     FlowControlTicketholder::CurOp _flowControlStats;
-
-    // Keeps state and statistics related to admission control.
-    AdmissionContext _admCtx;
 
     // The global ticketholders of the service context.
     TicketHolder* _ticketHolder;
