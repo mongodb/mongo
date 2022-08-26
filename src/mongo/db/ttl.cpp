@@ -211,7 +211,11 @@ private:
                 // The collection was dropped.
                 auto nss = collectionCatalog->lookupNSSByUUID(opCtx, uuid);
                 if (!nss) {
-                    ttlCollectionCache.deregisterTTLInfo(uuid, info);
+                    if (info.isClustered()) {
+                        ttlCollectionCache.deregisterTTLClusteredIndex(uuid);
+                    } else {
+                        ttlCollectionCache.deregisterTTLIndexByName(uuid, info.getIndexName());
+                    }
                     continue;
                 }
 
@@ -328,15 +332,11 @@ private:
         ResourceConsumption::ScopedMetricsCollector scopedMetrics(opCtx, nss.db().toString());
 
         const auto& collection = coll.getCollection();
-        stdx::visit(
-            visit_helper::Overloaded{
-                [&](const TTLCollectionCache::ClusteredId&) {
-                    deleteExpiredWithCollscan(opCtx, ttlCollectionCache, collection);
-                },
-                [&](const TTLCollectionCache::IndexName& indexName) {
-                    deleteExpiredWithIndex(opCtx, ttlCollectionCache, collection, indexName);
-                }},
-            info);
+        if (info.isClustered()) {
+            deleteExpiredWithCollscan(opCtx, ttlCollectionCache, collection);
+        } else {
+            deleteExpiredWithIndex(opCtx, ttlCollectionCache, collection, info.getIndexName());
+        }
     }
 
     /**
@@ -369,13 +369,13 @@ private:
                                 const CollectionPtr& collection,
                                 std::string indexName) {
         if (!collection->isIndexPresent(indexName)) {
-            ttlCollectionCache->deregisterTTLInfo(collection->uuid(), indexName);
+            ttlCollectionCache->deregisterTTLIndexByName(collection->uuid(), indexName);
             return;
         }
 
         BSONObj spec = collection->getIndexSpec(indexName);
         if (!spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
-            ttlCollectionCache->deregisterTTLInfo(collection->uuid(), indexName);
+            ttlCollectionCache->deregisterTTLIndexByName(collection->uuid(), indexName);
             return;
         }
 
@@ -525,8 +525,7 @@ private:
 
         auto expireAfterSeconds = collOptions.expireAfterSeconds;
         if (!expireAfterSeconds) {
-            ttlCollectionCache->deregisterTTLInfo(collection->uuid(),
-                                                  TTLCollectionCache::ClusteredId{});
+            ttlCollectionCache->deregisterTTLClusteredIndex(collection->uuid());
             return;
         }
 
