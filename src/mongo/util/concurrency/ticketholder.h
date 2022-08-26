@@ -340,9 +340,10 @@ protected:
 
         bool attemptToDequeue();
 
-        bool enqueue(Interruptible* interruptible,
+        bool enqueue(OperationContext* interruptible,
                      EnqueuerLockGuard& queueLock,
-                     const Date_t& until);
+                     const Date_t& until,
+                     WaitMode waitMode);
 
         int queuedElems() const {
             return _queuedThreads;
@@ -353,7 +354,7 @@ protected:
 
         int _queuedThreads{0};
         AtomicWord<int> _threadsToBeWoken{0};
-        stdx::condition_variable _queue;
+        stdx::condition_variable _cv;
         SchedulingTicketHolder* _holder;
     };
 
