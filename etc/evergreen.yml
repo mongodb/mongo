@@ -1382,6 +1382,32 @@ buildvariants:
     <<: *enterprise-rhel-80-64-bit-dynamic-required-expansions
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --use-glibcxx-debug --dbg=on --allocator=system
 
+- name: ubuntu1804-ninja-build-profiles
+  display_name: "Ninja Build Profiles: Ubuntu 18.04"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
+  run_on:
+  - ubuntu1804-small
+  stepback: false
+  expansions:
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo)
+    repo_edition: enterprise
+    has_packages: false
+  tasks:
+  - name: compile_ninja_default_profile_TG
+    distros:
+    - ubuntu1804-xlarge
+  - name: compile_ninja_opt_profile_TG
+    distros:
+    - ubuntu1804-xlarge
+  - name: compile_ninja_san_profile_TG
+    distros:
+    - ubuntu1804-xlarge
+  - name: compile_ninja_fast_profile_TG
+    distros:
+    - ubuntu1804-xlarge
+
 - name: enterprise-rhel-80-64-bit-dynamic-required-ninja
   display_name: "Ninja Build: Enterprise RHEL 8.0"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.

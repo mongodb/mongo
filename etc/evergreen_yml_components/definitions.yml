@@ -1181,6 +1181,15 @@ functions:
       args:
       - "src/evergreen/scons_compile.sh"
 
+  "ninja compile":
+  - *f_expansions_write
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/ninja_compile.sh"
+
   "generate version expansions": &generate_version_expansions
     command: subprocess.exec
     params:
@@ -2305,11 +2314,93 @@ tasks:
       task_compile_flags: >-
         --ninja
   - *f_expansions_write
-  - command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/ninja_compile.sh"
+  - func: "ninja compile"
+    vars:
+      ninja_file: "build.ninja"
+
+- name: compile_ninja_default_profile
+  tags: []
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  - func: "scons compile"
+    vars:
+      generating_for_ninja: true
+      separate_debug: off
+      task_install_action:
+        default
+      task_compile_flags: >-
+        --build-profile=default
+        --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+        --ninja
+  - *f_expansions_write
+  - func: "ninja compile"
+    vars:
+      ninja_file: "build.ninja"
+
+- name: compile_ninja_opt_profile
+  tags: []
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  - func: "scons compile"
+    vars:
+      generating_for_ninja: true
+      separate_debug: off
+      task_install_action:
+        default
+      task_compile_flags: >-
+        --build-profile=opt
+        CCACHE=
+        ICECC=
+  - *f_expansions_write
+  - func: "ninja compile"
+    vars:
+      ninja_file: "opt.ninja"
+
+- name: compile_ninja_fast_profile
+  tags: []
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  - func: "scons compile"
+    vars:
+      generating_for_ninja: true
+      separate_debug: off
+      task_install_action:
+        default
+      task_compile_flags: >-
+        --build-profile=fast
+        CCACHE=
+        ICECC=
+  - *f_expansions_write
+  - func: "ninja compile"
+    vars:
+      ninja_file: "fast.ninja"
+
+- name: compile_ninja_san_profile
+  tags: []
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  - func: "scons compile"
+    vars:
+      generating_for_ninja: true
+      separate_debug: off
+      task_install_action:
+        default
+      task_compile_flags: >-
+        --build-profile=san
+        CCACHE=
+        ICECC=
+  - *f_expansions_write
+  - func: "ninja compile"
+    vars:
+      ninja_file: "san.ninja"
 
 - name: compile_ninja_next
   tags: []
@@ -2327,11 +2418,9 @@ tasks:
         --build-tools=next
         --ninja
   - *f_expansions_write
-  - command: subprocess.exec
-    params:
-      binary: bash
-      args:
-      - "./src/evergreen/ninja_compile.sh"
+  - func: "ninja compile"
+    vars:
+      ninja_file: "build.ninja"
 
 - name: compile_build_tools_next
   tags: []
@@ -7489,6 +7578,26 @@ task_groups:
       permissions: public-read
       content_type: text/plain
       display_name: build.ninja
+
+- <<: *compile_task_group_template
+  name: compile_ninja_default_profile_TG
+  tasks:
+  - compile_ninja_default_profile
+
+- <<: *compile_task_group_template
+  name: compile_ninja_opt_profile_TG
+  tasks:
+  - compile_ninja_opt_profile
+
+- <<: *compile_task_group_template
+  name: compile_ninja_san_profile_TG
+  tasks:
+  - compile_ninja_san_profile
+
+- <<: *compile_task_group_template
+  name: compile_ninja_fast_profile_TG
+  tasks:
+  - compile_ninja_fast_profile
 
 - <<: *compile_task_group_template
   name: server_discovery_and_monitoring_json_test_TG
