@@ -1178,6 +1178,15 @@ functions:
         args:
           - "src/evergreen/scons_compile.sh"
 
+  "ninja compile":
+  - *f_expansions_write
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/ninja_compile.sh"
+
   "generate compile expansions":
     - *f_expansions_write
     - command: subprocess.exec
@@ -2003,36 +2012,100 @@ tasks:
 
 - name: compile_ninja
   commands:
-    - func: "scons compile"
-      vars:
-        generating_for_ninja: true
-        task_install_action:
-          default
-        task_compile_flags: >-
-          --ninja
-    - *f_expansions_write
-    - command: subprocess.exec
-      params:
-        binary: bash
-        args:
-          - "./src/evergreen/ninja_compile.sh"
+  - func: "scons compile"
+    vars:
+      generating_for_ninja: true
+      task_install_action:
+        default
+      task_compile_flags: >-
+        --ninja
+  - *f_expansions_write
+  - func: "ninja compile"
+    vars:
+      ninja_file: "build.ninja"
+
+- name: compile_ninja_default_profile
+  tags: []
+  commands:
+  - func: "scons compile"
+    vars:
+      generating_for_ninja: true
+      task_install_action:
+        default
+      task_compile_flags: >-
+        --build-profile=default
+        --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+        --ninja
+  - *f_expansions_write
+  - func: "ninja compile"
+    vars:
+      ninja_file: "build.ninja"
+
+- name: compile_ninja_opt_profile
+  tags: []
+  commands:
+  - func: "scons compile"
+    vars:
+      generating_for_ninja: true
+      task_install_action:
+        default
+      task_compile_flags: >-
+        --build-profile=opt
+        CCACHE=
+        ICECC=
+  - *f_expansions_write
+  - func: "ninja compile"
+    vars:
+      ninja_file: "opt.ninja"
+
+- name: compile_ninja_fast_profile
+  tags: []
+  commands:
+  - func: "scons compile"
+    vars:
+      generating_for_ninja: true
+      task_install_action:
+        default
+      task_compile_flags: >-
+        --build-profile=fast
+        CCACHE=
+        ICECC=
+  - *f_expansions_write
+  - func: "ninja compile"
+    vars:
+      ninja_file: "fast.ninja"
+
+- name: compile_ninja_san_profile
+  tags: []
+  commands:
+  - func: "scons compile"
+    vars:
+      generating_for_ninja: true
+      task_install_action:
+        default
+      task_compile_flags: >-
+        --build-profile=san
+        CCACHE=
+        ICECC=
+  - *f_expansions_write
+  - func: "ninja compile"
+    vars:
+      ninja_file: "san.ninja"
 
 - name: compile_ninja_next
   commands:
-    - func: "scons compile"
-      vars:
-        generating_for_ninja: true
-        task_install_action:
-          default
-        task_compile_flags: >-
-          --build-tools=next
-          --ninja
-    - *f_expansions_write
-    - command: subprocess.exec
-      params:
-        binary: bash
-        args:
-          - "./src/evergreen/ninja_compile.sh"
+  - func: "scons compile"
+    vars:
+      generating_for_ninja: true
+      task_install_action:
+        default
+      task_compile_flags: >-
+        --build-tools=next
+        --ninja
+  - *f_expansions_write
+  - func: "ninja compile"
+    vars:
+      ninja_file: "build.ninja"
 
 - name: compile_build_tools_next
   commands:
@@ -6916,6 +6989,26 @@ task_groups:
         display_name: build.ninja
 
 - <<: *compile_task_group_template
+  name: compile_ninja_default_profile_TG
+  tasks:
+  - compile_ninja_default_profile
+
+- <<: *compile_task_group_template
+  name: compile_ninja_opt_profile_TG
+  tasks:
+  - compile_ninja_opt_profile
+
+- <<: *compile_task_group_template
+  name: compile_ninja_san_profile_TG
+  tasks:
+  - compile_ninja_san_profile
+
+- <<: *compile_task_group_template
+  name: compile_ninja_fast_profile_TG
+  tasks:
+  - compile_ninja_fast_profile
+
+- <<: *compile_task_group_template
   name: server_discovery_and_monitoring_json_test_TG
   tasks:
   - server_discovery_and_monitoring_json_test
@@ -9755,6 +9848,32 @@ buildvariants:
     distros:
     - rhel80-small
   - name: generate_buildid_to_debug_symbols_mapping
+
+- name: ubuntu1804-ninja-build-profiles
+  display_name: "Ninja Build Profiles: Ubuntu 18.04"
+  cron: "0 4 * * 0" # Run once a week to ensure no failures introduced to build profiles
+  modules:
+  - enterprise
+  run_on:
+  - ubuntu1804-small
+  stepback: false
+  expansions:
+    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo)
+    repo_edition: enterprise
+    has_packages: false
+  tasks:
+  - name: compile_ninja_default_profile_TG
+    distros:
+    - ubuntu1804-xlarge
+  - name: compile_ninja_opt_profile_TG
+    distros:
+    - ubuntu1804-xlarge
+  - name: compile_ninja_san_profile_TG
+    distros:
+    - ubuntu1804-xlarge
+  - name: compile_ninja_fast_profile_TG
+    distros:
+    - ubuntu1804-xlarge
 
 # This variant compiles on RHEL 7.0 and runs tests on RHEL 7.6
 - name: rhel76_compile_rhel70
