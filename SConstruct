@@ -3,6 +3,7 @@
 import atexit
 import copy
 import errno
+import functools
 import json
 import os
 import re
@@ -3242,7 +3243,7 @@ def doConfigure(myenv):
 
         conf.Finish()
 
-    def AddFlagIfSupported(env, tool, extension, flag, link, **mutation):
+    def CheckFlag(env, flag, tool, extension, link, **mutation):
         def CheckFlagTest(context, tool, extension, flag):
             if link:
                 if tool == 'C':
@@ -3318,34 +3319,33 @@ def doConfigure(myenv):
         )
         available = conf.CheckFlag()
         conf.Finish()
+        return available
+
+    def AddFlagIfSupported(env, flag, tool, extension, link, **mutation):
+
+        available = CheckFlag(env, flag, tool, extension, link, **mutation)
+
         if available:
             env.Append(**mutation)
         return available
 
-    def AddToCFLAGSIfSupported(env, flag):
-        return AddFlagIfSupported(env, 'C', '.c', flag, False, CFLAGS=[flag])
+    conf_check_vars = {
+        'CFLAGS': {'tool': 'C', 'extension': '.c', 'link': False},
+        'CCFLAGS': {'tool': 'C', 'extension': '.c', 'link': False},
+        'CXXFLAGS': {'tool': 'C++', 'extension': '.cpp', 'link': False},
+        'LINKFLAGS': {'tool': 'C', 'extension': '.c', 'link': True},
+        'SHLINKFLAGS': {'tool': 'C', 'extension': '.c', 'link': True},
+    }
 
-    env.AddMethod(AddToCFLAGSIfSupported)
+    def var_func(env, flag, var, func):
+        kwargs = dict({var: [flag]}, **conf_check_vars[var])
+        return func(env, flag, **kwargs)
 
-    def AddToCCFLAGSIfSupported(env, flag):
-        return AddFlagIfSupported(env, 'C', '.c', flag, False, CCFLAGS=[flag])
-
-    env.AddMethod(AddToCCFLAGSIfSupported)
-
-    def AddToCXXFLAGSIfSupported(env, flag):
-        return AddFlagIfSupported(env, 'C++', '.cpp', flag, False, CXXFLAGS=[flag])
-
-    env.AddMethod(AddToCXXFLAGSIfSupported)
-
-    def AddToLINKFLAGSIfSupported(env, flag):
-        return AddFlagIfSupported(env, 'C', '.c', flag, True, LINKFLAGS=[flag])
-
-    env.AddMethod(AddToLINKFLAGSIfSupported)
-
-    def AddToSHLINKFLAGSIfSupported(env, flag):
-        return AddFlagIfSupported(env, 'C', '.c', flag, True, SHLINKFLAGS=[flag])
-
-    env.AddMethod(AddToSHLINKFLAGSIfSupported)
+    for var in conf_check_vars:
+        myenv.AddMethod(
+            functools.partial(var_func, var=var, func=AddFlagIfSupported), f"AddTo{var}IfSupported")
+        myenv.AddMethod(
+            functools.partial(var_func, var=var, func=CheckFlag), f"Check{var}Supported")
 
     if myenv.ToolchainIs('gcc', 'clang'):
         # This tells clang/gcc to use the gold linker if it is available - we prefer the gold linker
@@ -3369,20 +3369,20 @@ def doConfigure(myenv):
             #
             # We should revisit all of these issues the next time we upgrade our clang minimum.
             if get_option('separate-debug') == 'off' and get_option('link-model') != 'dynamic':
-                if not AddToLINKFLAGSIfSupported(myenv, '-fuse-ld=lld'):
-                    AddToLINKFLAGSIfSupported(myenv, '-fuse-ld=gold')
+                if not myenv.AddToLINKFLAGSIfSupported('-fuse-ld=lld'):
+                    myenv.AddToLINKFLAGSIfSupported('-fuse-ld=gold')
             else:
-                AddToLINKFLAGSIfSupported(myenv, '-fuse-ld=gold')
+                myenv.AddToLINKFLAGSIfSupported('-fuse-ld=gold')
         elif link_model.startswith("dynamic") and linker_ld == 'bfd':
             # BFD is not supported due to issues with it causing warnings from some of
             # the third party libraries that mongodb is linked with:
             # https://jira.mongodb.org/browse/SERVER-49465
             myenv.FatalError(f"Linker {linker_ld} is not supported with dynamic link model builds.")
         else:
-            if not AddToLINKFLAGSIfSupported(myenv, f'-fuse-ld={linker_ld}'):
+            if not myenv.AddToLINKFLAGSIfSupported(f'-fuse-ld={linker_ld}'):
                 myenv.FatalError(f"Linker {linker_ld} could not be configured.")
 
-        if has_option('gcov') and AddToCCFLAGSIfSupported(myenv, '-fprofile-update=single'):
+        if has_option('gcov') and myenv.AddToCCFLAGSIfSupported('-fprofile-update=single'):
             myenv.AppendUnique(LINKFLAGS=['-fprofile-update=single'])
 
     detectCompiler = Configure(
@@ -3415,11 +3415,11 @@ def doConfigure(myenv):
 
     if myenv.ToolchainIs('clang', 'gcc'):
         # This warning was added in g++-4.8.
-        AddToCCFLAGSIfSupported(myenv, '-Wno-unused-local-typedefs')
+        myenv.AddToCCFLAGSIfSupported('-Wno-unused-local-typedefs')
 
         # Clang likes to warn about unused functions, which seems a tad aggressive and breaks
         # -Werror, which we want to be able to use.
-        AddToCCFLAGSIfSupported(myenv, '-Wno-unused-function')
+        myenv.AddToCCFLAGSIfSupported('-Wno-unused-function')
 
         # TODO: Note that the following two flags are added to CCFLAGS even though they are
         # really C++ specific. We need to do this because SCons passes CXXFLAGS *before*
@@ -3429,79 +3429,79 @@ def doConfigure(myenv):
         #
         # Clang likes to warn about unused private fields, but some of our third_party
         # libraries have such things.
-        AddToCCFLAGSIfSupported(myenv, '-Wno-unused-private-field')
+        myenv.AddToCCFLAGSIfSupported('-Wno-unused-private-field')
 
         # Prevents warning about using deprecated features (such as auto_ptr in c++11)
         # Using -Wno-error=deprecated-declarations does not seem to work on some compilers,
         # including at least g++-4.6.
-        AddToCCFLAGSIfSupported(myenv, "-Wno-deprecated-declarations")
+        myenv.AddToCCFLAGSIfSupported("-Wno-deprecated-declarations")
 
         # As of clang-3.4, this warning appears in v8, and gets escalated to an error.
-        AddToCCFLAGSIfSupported(myenv, "-Wno-tautological-constant-out-of-range-compare")
+        myenv.AddToCCFLAGSIfSupported("-Wno-tautological-constant-out-of-range-compare")
 
         # As of clang in Android NDK 17, these warnings appears in boost and/or ICU, and get escalated to errors
-        AddToCCFLAGSIfSupported(myenv, "-Wno-tautological-constant-compare")
-        AddToCCFLAGSIfSupported(myenv, "-Wno-tautological-unsigned-zero-compare")
-        AddToCCFLAGSIfSupported(myenv, "-Wno-tautological-unsigned-enum-zero-compare")
+        myenv.AddToCCFLAGSIfSupported("-Wno-tautological-constant-compare")
+        myenv.AddToCCFLAGSIfSupported("-Wno-tautological-unsigned-zero-compare")
+        myenv.AddToCCFLAGSIfSupported("-Wno-tautological-unsigned-enum-zero-compare")
 
         # New in clang-3.4, trips up things mostly in third_party, but in a few places in the
         # primary mongo sources as well.
-        AddToCCFLAGSIfSupported(myenv, "-Wno-unused-const-variable")
+        myenv.AddToCCFLAGSIfSupported("-Wno-unused-const-variable")
 
         # Prevents warning about unused but set variables found in boost version 1.49
         # in boost/date_time/format_date_parser.hpp which does not work for compilers
         # GCC >= 4.6. Error explained in https://svn.boost.org/trac/boost/ticket/6136 .
-        AddToCCFLAGSIfSupported(myenv, "-Wno-unused-but-set-variable")
+        myenv.AddToCCFLAGSIfSupported("-Wno-unused-but-set-variable")
 
         # This has been suppressed in gcc 4.8, due to false positives, but not in clang.  So
         # we explicitly disable it here.
-        AddToCCFLAGSIfSupported(myenv, "-Wno-missing-braces")
+        myenv.AddToCCFLAGSIfSupported("-Wno-missing-braces")
 
         # Suppress warnings about not consistently using override everywhere in a class. It seems
         # very pedantic, and we have a fair number of instances.
-        AddToCCFLAGSIfSupported(myenv, "-Wno-inconsistent-missing-override")
+        myenv.AddToCCFLAGSIfSupported("-Wno-inconsistent-missing-override")
 
         # Don't issue warnings about potentially evaluated expressions
-        AddToCCFLAGSIfSupported(myenv, "-Wno-potentially-evaluated-expression")
+        myenv.AddToCCFLAGSIfSupported("-Wno-potentially-evaluated-expression")
 
         # Warn about moves of prvalues, which can inhibit copy elision.
-        AddToCXXFLAGSIfSupported(myenv, "-Wpessimizing-move")
+        myenv.AddToCXXFLAGSIfSupported("-Wpessimizing-move")
 
         # Disable warning about variables that may not be initialized
         # Failures are triggered in the case of boost::optional in GCC 4.8.x
         # TODO: re-evaluate when we move to GCC 5.3
         # see: http://stackoverflow.com/questions/21755206/how-to-get-around-gcc-void-b-4-may-be-used-uninitialized-in-this-funct
-        AddToCXXFLAGSIfSupported(myenv, "-Wno-maybe-uninitialized")
+        myenv.AddToCXXFLAGSIfSupported("-Wno-maybe-uninitialized")
 
         # Disable warning about templates that can't be implicitly instantiated. It is an attempt to
         # make a link error into an easier-to-debug compiler failure, but it triggers false
         # positives if explicit instantiation is used in a TU that can see the full definition. This
         # is a problem at least for the S2 headers.
-        AddToCXXFLAGSIfSupported(myenv, "-Wno-undefined-var-template")
+        myenv.AddToCXXFLAGSIfSupported("-Wno-undefined-var-template")
 
         # This warning was added in clang-4.0, but it warns about code that is required on some
         # platforms. Since the warning just states that 'explicit instantiation of [a template] that
         # occurs after an explicit specialization has no effect', it is harmless on platforms where
         # it isn't required
-        AddToCXXFLAGSIfSupported(myenv, "-Wno-instantiation-after-specialization")
+        myenv.AddToCXXFLAGSIfSupported("-Wno-instantiation-after-specialization")
 
         # This warning was added in clang-5 and flags many of our lambdas. Since it isn't actively
         # harmful to capture unused variables we are suppressing for now with a plan to fix later.
-        AddToCCFLAGSIfSupported(myenv, "-Wno-unused-lambda-capture")
+        myenv.AddToCCFLAGSIfSupported("-Wno-unused-lambda-capture")
 
         # Enable sized deallocation support.
-        AddToCXXFLAGSIfSupported(myenv, '-fsized-deallocation')
+        myenv.AddToCXXFLAGSIfSupported('-fsized-deallocation')
 
         # This warning was added in Apple clang version 11 and flags many explicitly defaulted move
         # constructors and assignment operators for being implicitly deleted, which is not useful.
-        AddToCXXFLAGSIfSupported(myenv, "-Wno-defaulted-function-deleted")
+        myenv.AddToCXXFLAGSIfSupported("-Wno-defaulted-function-deleted")
 
         # SERVER-44856: Our windows builds complain about unused
         # exception parameters, but GCC and clang don't seem to do
         # that for us automatically. In the interest of making it more
         # likely to catch these errors early, add the (currently clang
         # only) flag that turns it on.
-        AddToCXXFLAGSIfSupported(myenv, "-Wunused-exception-parameter")
+        myenv.AddToCXXFLAGSIfSupported("-Wunused-exception-parameter")
 
         # TODO(SERVER-60151): Avoid the dilemma identified in
         # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100493. Unfortunately,
@@ -3513,7 +3513,7 @@ def doConfigure(myenv):
         # TODO(SERVER-60175): In fact we will want to explicitly opt
         # in to -Wdeprecated, since clang doesn't include it in -Wall.
         if get_option('cxx-std') == "20":
-            AddToCXXFLAGSIfSupported(myenv, '-Wno-deprecated')
+            myenv.AddToCXXFLAGSIfSupported('-Wno-deprecated')
 
         # Check if we can set "-Wnon-virtual-dtor" when "-Werror" is set. The only time we can't set it is on
         # clang 3.4, where a class with virtual function(s) and a non-virtual destructor throws a warning when
@@ -3559,18 +3559,18 @@ def doConfigure(myenv):
         # by -Wall), in order to enforce that -mXXX-version-min=YYY
         # will enforce that you don't use APIs from ZZZ.
         if env.TargetOSIs('darwin'):
-            AddToCCFLAGSIfSupported(env, '-Wunguarded-availability')
+            env.AddToCCFLAGSIfSupported('-Wunguarded-availability')
 
     if get_option('runtime-hardening') == "on":
         # Enable 'strong' stack protection preferentially, but fall back to 'all' if it is not
         # available. Note that we need to add these to the LINKFLAGS as well, since otherwise we
         # might not link libssp when we need to (see SERVER-12456).
         if myenv.ToolchainIs('gcc', 'clang'):
-            if AddToCCFLAGSIfSupported(myenv, '-fstack-protector-strong'):
+            if myenv.AddToCCFLAGSIfSupported('-fstack-protector-strong'):
                 myenv.Append(LINKFLAGS=[
                     '-fstack-protector-strong',
                 ], )
-            elif AddToCCFLAGSIfSupported(myenv, '-fstack-protector-all'):
+            elif myenv.AddToCCFLAGSIfSupported('-fstack-protector-all'):
                 myenv.Append(LINKFLAGS=[
                     '-fstack-protector-all',
                 ], )
@@ -3581,10 +3581,10 @@ def doConfigure(myenv):
                 ], )
 
             if 'stackclash' in selected_experimental_runtime_hardenings:
-                AddToCCFLAGSIfSupported(myenv, "-fstack-clash-protection")
+                myenv.AddToCCFLAGSIfSupported("-fstack-clash-protection")
 
             if 'controlflow' in selected_experimental_runtime_hardenings:
-                AddToCCFLAGSIfSupported(myenv, "-fcf-protection=full")
+                myenv.AddToCCFLAGSIfSupported("-fcf-protection=full")
 
         if myenv.ToolchainIs('clang'):
             # TODO: There are several interesting things to try here, but they each have
@@ -3627,7 +3627,7 @@ def doConfigure(myenv):
     if has_option('libc++'):
         if not myenv.ToolchainIs('clang'):
             myenv.FatalError('libc++ is currently only supported for clang')
-        if AddToCXXFLAGSIfSupported(myenv, '-stdlib=libc++'):
+        if myenv.AddToCXXFLAGSIfSupported('-stdlib=libc++'):
             myenv.Append(LINKFLAGS=['-stdlib=libc++'])
         else:
             myenv.ConfError('libc++ requested, but compiler does not support -stdlib=libc++')
@@ -3664,13 +3664,13 @@ def doConfigure(myenv):
             myenv.AppendUnique(CCFLAGS=['/std:c++20'])
     else:
         if get_option('cxx-std') == "17":
-            if not AddToCXXFLAGSIfSupported(myenv, '-std=c++17'):
+            if not myenv.AddToCXXFLAGSIfSupported('-std=c++17'):
                 myenv.ConfError('Compiler does not honor -std=c++17')
         elif get_option('cxx-std') == "20":
-            if not AddToCXXFLAGSIfSupported(myenv, '-std=c++20'):
+            if not myenv.AddToCXXFLAGSIfSupported('-std=c++20'):
                 myenv.ConfError('Compiler does not honor -std=c++20')
 
-        if not AddToCFLAGSIfSupported(myenv, '-std=c11'):
+        if not myenv.AddToCFLAGSIfSupported('-std=c11'):
             myenv.ConfError("C++17 mode selected for C++ files, but can't enable C11 for C files")
 
     if using_system_version_of_cxx_libraries():
@@ -3993,7 +3993,7 @@ def doConfigure(myenv):
 
         sanitizer_option = '-fsanitize=' + ','.join(sanitizer_list)
 
-        if AddToCCFLAGSIfSupported(myenv, sanitizer_option):
+        if myenv.AddToCCFLAGSIfSupported(sanitizer_option):
             myenv.Append(LINKFLAGS=[sanitizer_option])
             myenv.Append(CCFLAGS=['-fno-omit-frame-pointer'])
         else:
@@ -4004,7 +4004,7 @@ def doConfigure(myenv):
         if has_option('sanitize-coverage') and using_fsan:
             sanitize_coverage_list = get_option('sanitize-coverage')
             sanitize_coverage_option = '-fsanitize-coverage=' + sanitize_coverage_list
-            if AddToCCFLAGSIfSupported(myenv, sanitize_coverage_option):
+            if myenv.AddToCCFLAGSIfSupported(sanitize_coverage_option):
                 myenv.Append(LINKFLAGS=[sanitize_coverage_option])
             else:
                 myenv.ConfError('Failed to enable -fsanitize-coverage with flag: {0}',
@@ -4027,7 +4027,7 @@ def doConfigure(myenv):
         supportedDenyfiles = []
         denyfilesTestEnv = myenv.Clone()
         for denyfile in denyfiles:
-            if AddToCCFLAGSIfSupported(denyfilesTestEnv, f"-fsanitize-blacklist={denyfile}"):
+            if denyfilesTestEnv.AddToCCFLAGSIfSupported(f"-fsanitize-blacklist={denyfile}"):
                 supportedDenyfiles.append(denyfile)
         denyfilesTestEnv = None
         supportedDenyfiles = sorted(supportedDenyfiles)
@@ -4210,8 +4210,8 @@ def doConfigure(myenv):
             # have renamed the flag.
             # However, this flag cannot be included when using the fuzzer sanitizer
             # if we want to suppress errors to uncover new ones.
-            if not using_fsan and not AddToCCFLAGSIfSupported(myenv, "-fno-sanitize-recover"):
-                AddToCCFLAGSIfSupported(myenv, "-fno-sanitize-recover=undefined")
+            if not using_fsan and not myenv.AddToCCFLAGSIfSupported("-fno-sanitize-recover"):
+                myenv.AddToCCFLAGSIfSupported("-fno-sanitize-recover=undefined")
             myenv.AppendUnique(CPPDEFINES=['UNDEFINED_BEHAVIOR_SANITIZER'])
 
             # If anything is changed, added, or removed in ubsan_options, be
@@ -4233,7 +4233,7 @@ def doConfigure(myenv):
             # same as the correct link graph for a regular dynamic
             # build.
             if link_model == "dynamic":
-                if AddToCCFLAGSIfSupported(myenv, "-fno-sanitize=vptr"):
+                if myenv.AddToCCFLAGSIfSupported("-fno-sanitize=vptr"):
                     myenv.AppendUnique(LINKFLAGS=["-fno-sanitize=vptr"])
 
     if myenv.ToolchainIs('msvc') and optBuild != "off":
@@ -4250,21 +4250,28 @@ def doConfigure(myenv):
         # Usually, --gdb-index is too expensive in big static binaries, but for dynamic
         # builds it works well.
         if link_model.startswith("dynamic"):
-            AddToLINKFLAGSIfSupported(myenv, '-Wl,--gdb-index')
+            myenv.AddToLINKFLAGSIfSupported('-Wl,--gdb-index')
+
+        if link_model != 'dynamic':
+            # This will create an extra section where debug types can be referred from,
+            # reducing other section sizes. This helps most with big static links as there
+            # will be lots of duplicate debug type info.
+            myenv.AddToCCFLAGSIfSupported('-fdebug-types-section')
+            myenv.AddToLINKFLAGSIfSupported('-fdebug-types-section')
 
         # Our build is already parallel.
-        AddToLINKFLAGSIfSupported(myenv, '-Wl,--no-threads')
+        myenv.AddToLINKFLAGSIfSupported('-Wl,--no-threads')
 
         # Explicitly enable GNU build id's if the linker supports it.
-        AddToLINKFLAGSIfSupported(myenv, '-Wl,--build-id')
+        myenv.AddToLINKFLAGSIfSupported('-Wl,--build-id')
 
         # Explicitly use the new gnu hash section if the linker offers
         # it, except on android since older runtimes seem to not
         # support it. For that platform, use 'both'.
         if env.TargetOSIs('android'):
-            AddToLINKFLAGSIfSupported(myenv, '-Wl,--hash-style=both')
+            myenv.AddToLINKFLAGSIfSupported('-Wl,--hash-style=both')
         else:
-            AddToLINKFLAGSIfSupported(myenv, '-Wl,--hash-style=gnu')
+            myenv.AddToLINKFLAGSIfSupported('-Wl,--hash-style=gnu')
 
         # Try to have the linker tell us about ODR violations. Don't
         # use it when using clang with libstdc++, as libstdc++ was
@@ -4279,17 +4286,17 @@ def doConfigure(myenv):
                 env.FatalError(
                     'The --detect-odr-violations flag is expected to only be reliable with --opt=off'
                 )
-            AddToLINKFLAGSIfSupported(myenv, '-Wl,--detect-odr-violations')
+            myenv.AddToLINKFLAGSIfSupported('-Wl,--detect-odr-violations')
 
         # Disallow an executable stack. Also, issue a warning if any files are found that would
         # cause the stack to become executable if the noexecstack flag was not in play, so that we
         # can find them and fix them. We do this here after we check for ld.gold because the
         # --warn-execstack is currently only offered with gold.
-        AddToLINKFLAGSIfSupported(myenv, "-Wl,-z,noexecstack")
-        AddToLINKFLAGSIfSupported(myenv, "-Wl,--warn-execstack")
+        myenv.AddToLINKFLAGSIfSupported("-Wl,-z,noexecstack")
+        myenv.AddToLINKFLAGSIfSupported("-Wl,--warn-execstack")
 
         # If possible with the current linker, mark relocations as read-only.
-        AddToLINKFLAGSIfSupported(myenv, "-Wl,-z,relro")
+        myenv.AddToLINKFLAGSIfSupported("-Wl,-z,relro")
 
         # As far as we know these flags only apply on posix-y systems,
         # and not on Darwin.
@@ -4322,11 +4329,9 @@ def doConfigure(myenv):
             compress_type = "zlib-gabi"
             compress_flag = "compress-debug-sections"
 
-            AddToCCFLAGSIfSupported(
-                myenv,
+            myenv.AddToCCFLAGSIfSupported(
                 f"-Wa,--{compress_flag}={compress_type}"
-                if "as" in debug_compress else f"-Wa,--no{compress_flag}",
-            )
+                if "as" in debug_compress else f"-Wa,--no{compress_flag}", )
 
             # We shouldn't enable debug compression in the linker
             # (meaning our final binaries contain compressed debug
@@ -4362,22 +4367,16 @@ def doConfigure(myenv):
             conf.Finish()
 
             if have_shf_compressed and 'ld' in debug_compress:
-                AddToLINKFLAGSIfSupported(
-                    myenv,
-                    f"-Wl,--{compress_flag}={compress_type}",
-                )
+                myenv.AddToLINKFLAGSIfSupported(f"-Wl,--{compress_flag}={compress_type}", )
             else:
-                AddToLINKFLAGSIfSupported(
-                    myenv,
-                    f"-Wl,--{compress_flag}=none",
-                )
+                myenv.AddToLINKFLAGSIfSupported(f"-Wl,--{compress_flag}=none", )
 
         if "fnsi" in selected_experimental_optimizations:
-            AddToCCFLAGSIfSupported(myenv, "-fno-semantic-interposition")
+            myenv.AddToCCFLAGSIfSupported("-fno-semantic-interposition")
 
     # Avoid deduping symbols on OS X debug builds, as it takes a long time.
     if optBuild == "off" and myenv.ToolchainIs('clang') and env.TargetOSIs('darwin'):
-        AddToLINKFLAGSIfSupported(myenv, "-Wl,-no_deduplicate")
+        myenv.AddToLINKFLAGSIfSupported("-Wl,-no_deduplicate")
 
     # Apply any link time optimization settings as selected by the 'lto' option.
     if has_option('lto'):
@@ -4394,13 +4393,13 @@ def doConfigure(myenv):
         elif myenv.ToolchainIs('gcc', 'clang'):
             # For GCC and clang, the flag is -flto, and we need to pass it both on the compile
             # and link lines.
-            if not AddToCCFLAGSIfSupported(myenv, '-flto') or \
-                    not AddToLINKFLAGSIfSupported(myenv, '-flto'):
+            if not myenv.AddToCCFLAGSIfSupported('-flto') or \
+                    not myenv.AddToLINKFLAGSIfSupported('-flto'):
                 myenv.ConfError("Link time optimization requested, "
                                 "but selected compiler does not honor -flto")
 
             if myenv.TargetOSIs('darwin'):
-                AddToLINKFLAGSIfSupported(myenv, '-Wl,-object_path_lto,${TARGET}.lto')
+                myenv.AddToLINKFLAGSIfSupported('-Wl,-object_path_lto,${TARGET}.lto')
 
         else:
             myenv.ConfError("Don't know how to enable --lto on current toolchain")
@@ -4516,7 +4515,7 @@ def doConfigure(myenv):
     # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=43052
     if myenv.ToolchainIs('gcc') and (env['TARGET_ARCH'] in ['i386', 'x86_64']):
         if not 'builtin-memcmp' in selected_experimental_optimizations:
-            AddToCCFLAGSIfSupported(myenv, '-fno-builtin-memcmp')
+            myenv.AddToCCFLAGSIfSupported('-fno-builtin-memcmp')
 
     # pthread_setname_np was added in GLIBC 2.12, and Solaris 11.3
     if posix_system:
@@ -5170,7 +5169,7 @@ def doConfigure(myenv):
     myenv = conf.Finish()
 
     if env['TARGET_ARCH'] == "aarch64":
-        AddToCCFLAGSIfSupported(myenv, "-moutline-atomics")
+        myenv.AddToCCFLAGSIfSupported("-moutline-atomics")
 
     conf = Configure(myenv)
     usdt_enabled = get_option('enable-usdt-probes')
@@ -5530,10 +5529,11 @@ if get_option('separate-debug') == "on" or env.TargetOSIs("windows"):
         )
     separate_debug(env)
 
-# TODO: SERVER-68475
-# temp fix for BF-25986, should be removed when better solution is found
 if env['SPLIT_DWARF'] == "auto":
-    env['SPLIT_DWARF'] = env.ToolchainIs('gcc') and not link_model == "dynamic"
+    # For static builds, splitting out the dwarf info reduces memory requirments, link time
+    # and binary size significantly. It's affect is less prominent in dynamic builds. The downside
+    # is .dwo files use absolute paths in the debug info, so it's not relocatable.
+    env['SPLIT_DWARF'] = not link_model == "dynamic" and env.CheckCCFLAGSSupported('-gsplit-dwarf')
 
 if env['SPLIT_DWARF']:
     if env.ToolchainIs('gcc', 'clang'):

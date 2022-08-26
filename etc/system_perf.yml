@@ -366,10 +366,7 @@ functions:
           set -o errexit
           set -o verbose
           source "${workdir}/compile_venv/bin/activate"
-          # TODO: SERVER-68475
-          # remove this when a better solution is found
-          extra_args="SPLIT_DWARF_DWP_FILES=1"
-          python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} $extra_args install-core install-jstestshell MONGO_VERSION=${version} DESTDIR=$(pwd)/mongodb ${patch_compile_flags|}
+          python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} $extra_args install-core install-jstestshell SPLIT_DWARF=0 MONGO_VERSION=${version} DESTDIR=$(pwd)/mongodb ${patch_compile_flags|}
           mkdir -p mongodb/jstests/hooks
           if [ -d jstests/hooks ]
           then
