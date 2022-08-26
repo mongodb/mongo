@@ -64,9 +64,11 @@ bool isQuerySbeCompatible(const CollectionPtr* collection,
 
     const bool doesNotHaveElemMatchProject = !cq->getProj() || !cq->getProj()->containsElemMatch();
 
+    const bool isNotInnerSideOfLookup = !(expCtx && expCtx->inLookup);
+
     return allExpressionsSupported && isNotCount && doesNotContainMetadataRequirements &&
         isQueryNotAgainstTimeseriesCollection && isQueryNotAgainstClusteredCollection &&
         doesNotSortOnMetaOrPathWithNumericComponents && isNotOplog && doesNotRequireMatchDetails &&
-        doesNotHaveElemMatchProject && isNotChangeCollection;
+        doesNotHaveElemMatchProject && isNotChangeCollection && isNotInnerSideOfLookup;
 }
 }  // namespace mongo::sbe
