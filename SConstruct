@@ -846,16 +846,11 @@ env_vars.Add('CXXFLAGS',
     help='Sets flags for the C++ compiler',
     converter=variable_shlex_converter)
 
-default_destdir = '$BUILD_ROOT/install'
-if get_option('ninja') != 'disabled':
-    # Workaround for SERVER-53952 where issues wih different
-    # ninja files building to the same install dir. Different
-    # ninja files need to build to different install dirs.
-    default_destdir = '$BUILD_DIR/install'
-
-env_vars.Add('DESTDIR',
+env_vars.Add(
+    'DESTDIR',
     help='Where builds will install files',
-    default=default_destdir)
+    default='$BUILD_ROOT/install',
+)
 
 env_vars.Add('DSYMUTIL',
     help='Path to the dsymutil utility',
@@ -988,7 +983,7 @@ env_vars.Add('MSVC_VERSION',
 
 env_vars.Add('NINJA_BUILDDIR',
     help="Location for shared Ninja state",
-    default="$BUILD_DIR/ninja",
+    default="$BUILD_ROOT/ninja",
 )
 
 env_vars.Add(
