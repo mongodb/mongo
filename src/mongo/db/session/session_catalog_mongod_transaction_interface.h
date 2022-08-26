@@ -31,6 +31,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session/session_catalog.h"              // for ScanSessionsCallbackFn
+#include "mongo/db/session/session_txn_record_gen.h"       // for SessionTxnRecord
 #include "mongo/db/transaction/transaction_participant.h"  // for SessionToKill
 
 namespace mongo {
@@ -45,6 +46,11 @@ public:
     using ScanSessionsCallbackFn = SessionCatalog::ScanSessionsCallbackFn;
 
     virtual ~MongoDSessionCatalogTransactionInterface() = default;
+
+    /**
+     * Aborts the transaction, releasing transaction resources.
+     */
+    virtual void abortTransaction(OperationContext* opCtx, const SessionTxnRecord& txnRecord) = 0;
 
     /**
      * Marks the session as requiring refresh. Used when the session state has been modified

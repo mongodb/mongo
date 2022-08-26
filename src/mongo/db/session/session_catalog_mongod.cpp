@@ -409,7 +409,8 @@ void createRetryableFindAndModifyTable(OperationContext* opCtx) {
 
 
 void abortInProgressTransactions(OperationContext* opCtx,
-                                 MongoDSessionCatalog* mongoDSessionCatalog) {
+                                 MongoDSessionCatalog* mongoDSessionCatalog,
+                                 MongoDSessionCatalogTransactionInterface* ti) {
     DBDirectClient client(opCtx);
     FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
     findRequest.setFilter(BSON(SessionTxnRecord::kStateFieldName
@@ -434,15 +435,7 @@ void abortInProgressTransactions(OperationContext* opCtx,
 
         hangDuringStepUpAbortInProgressTransactions.pauseWhileSet();
         auto ocs = mongoDSessionCatalog->checkOutSessionWithoutRefresh(opCtx);
-        auto txnParticipant = TransactionParticipant::get(opCtx);
-        LOGV2_DEBUG(21978,
-                    3,
-                    "Aborting transaction sessionId: {sessionId} txnNumber {txnNumber}",
-                    "Aborting transaction",
-                    "sessionId"_attr = txnRecord.getSessionId().toBSON(),
-                    "txnNumber"_attr = txnRecord.getTxnNum());
-        txnParticipant.abortTransaction(opCtx);
-        opCtx->resetMultiDocumentTransactionState();
+        ti->abortTransaction(opCtx, txnRecord);
     }
 }
 
@@ -571,7 +564,7 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
         }
     }
 
-    abortInProgressTransactions(opCtx, this);
+    abortInProgressTransactions(opCtx, this, _ti.get());
 
     createTransactionTable(opCtx);
     if (repl::feature_flags::gFeatureFlagRetryableFindAndModify.isEnabledAndIgnoreFCV()) {

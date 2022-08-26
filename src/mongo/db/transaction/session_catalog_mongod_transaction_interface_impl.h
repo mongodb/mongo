@@ -47,6 +47,8 @@ public:
     MongoDSessionCatalogTransactionInterfaceImpl() = default;
     virtual ~MongoDSessionCatalogTransactionInterfaceImpl() = default;
 
+    void abortTransaction(OperationContext* opCtx, const SessionTxnRecord& txnRecord) override;
+
     void invalidateSessionToKill(OperationContext* opCtx, const SessionToKill& session) override;
 
     ScanSessionsCallbackFn makeParentSessionWorkerFnForReap(

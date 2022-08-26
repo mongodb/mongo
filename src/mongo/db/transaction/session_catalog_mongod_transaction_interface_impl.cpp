@@ -37,6 +37,19 @@
 
 namespace mongo {
 
+void MongoDSessionCatalogTransactionInterfaceImpl::abortTransaction(
+    OperationContext* opCtx, const SessionTxnRecord& txnRecord) {
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    LOGV2_DEBUG(21978,
+                3,
+                "Aborting transaction sessionId: {sessionId} txnNumber {txnNumber}",
+                "Aborting transaction",
+                "sessionId"_attr = txnRecord.getSessionId().toBSON(),
+                "txnNumber"_attr = txnRecord.getTxnNum());
+    txnParticipant.abortTransaction(opCtx);
+    opCtx->resetMultiDocumentTransactionState();
+}
+
 void MongoDSessionCatalogTransactionInterfaceImpl::invalidateSessionToKill(
     OperationContext* opCtx, const SessionToKill& session) {
     auto participant = TransactionParticipant::get(session);
