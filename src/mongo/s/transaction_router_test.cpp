@@ -114,7 +114,7 @@ protected:
     const NamespaceString kViewNss = NamespaceString("test.foo");
 
     const Status kStaleConfigStatus = {
-        StaleConfigInfo(kViewNss, ChunkVersion::UNSHARDED(), boost::none, shard1),
+        StaleConfigInfo(kViewNss, ShardVersion::UNSHARDED(), boost::none, shard1),
         "The metadata for the collection is not loaded"};
 
     void setUp() override {

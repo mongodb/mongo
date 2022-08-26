@@ -133,7 +133,7 @@ public:
             auto const optMetadata =
                 CollectionShardingRuntime::get(opCtx, nss)->getCurrentMetadataIfKnown();
             uassert(StaleConfigInfo(nss,
-                                    ChunkVersion::IGNORED() /* receivedVersion */,
+                                    ShardVersion::IGNORED() /* receivedVersion */,
                                     boost::none /* wantedVersion */,
                                     shardId,
                                     boost::none),

@@ -298,20 +298,20 @@ AutoGetCollection::AutoGetCollection(
 
         uassert(StaleConfigInfo(_resolvedNss,
                                 *receivedShardVersion,
-                                ChunkVersion::UNSHARDED() /* wantedVersion */,
+                                ShardVersion::UNSHARDED() /* wantedVersion */,
                                 ShardingState::get(opCtx)->shardId()),
                 str::stream() << "Namespace " << _resolvedNss << " is a view therefore the shard "
                               << "version attached to the request must be unset or UNSHARDED",
-                !receivedShardVersion || *receivedShardVersion == ChunkVersion::UNSHARDED());
+                !receivedShardVersion || *receivedShardVersion == ShardVersion::UNSHARDED());
 
         return;
     }
 
     // There is neither a collection nor a view for the namespace, so if we reached to this point
     // there are the following possibilities depending on the received shard version:
-    //   1. ChunkVersion::UNSHARDED: The request comes from a router and the operation entails the
+    //   1. ShardVersion::UNSHARDED: The request comes from a router and the operation entails the
     //      implicit creation of an unsharded collection. We can continue.
-    //   2. ChunkVersion::IGNORED: The request comes from a router that broadcasted the same to all
+    //   2. ShardVersion::IGNORED: The request comes from a router that broadcasted the same to all
     //      shards, but this shard doesn't own any chunks for the collection. We can continue.
     //   3. boost::none: The request comes from client directly connected to the shard. We can
     //      continue.
@@ -325,8 +325,8 @@ AutoGetCollection::AutoGetCollection(
                             ShardingState::get(opCtx)->shardId()),
             str::stream() << "No metadata for namespace " << _resolvedNss << " therefore the shard "
                           << "version attached to the request must be unset, UNSHARDED or IGNORED",
-            !receivedShardVersion || *receivedShardVersion == ChunkVersion::UNSHARDED() ||
-                *receivedShardVersion == ChunkVersion::IGNORED());
+            !receivedShardVersion || *receivedShardVersion == ShardVersion::UNSHARDED() ||
+                *receivedShardVersion == ShardVersion::IGNORED());
 }
 
 Collection* AutoGetCollection::getWritableCollection(OperationContext* opCtx) {

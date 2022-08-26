@@ -228,8 +228,8 @@ TEST_F(WriteOpTest, TargetMultiAllShardsAndErrorSingleChildOp) {
     write_ops::WriteError retryableError(
         0,
         {StaleConfigInfo(kNss,
-                         ChunkVersion({OID(), Timestamp(1, 1)}, {10, 0}),
-                         ChunkVersion({OID(), Timestamp(1, 1)}, {11, 0}),
+                         ShardVersion(ChunkVersion({OID(), Timestamp(1, 1)}, {10, 0})),
+                         ShardVersion(ChunkVersion({OID(), Timestamp(1, 1)}, {11, 0})),
                          ShardId("shardA")),
          "simulate ssv error for test"});
     writeOp.noteWriteError(*targeted[0], retryableError);
@@ -329,7 +329,7 @@ TEST_F(WriteOpTest, RetrySingleOp) {
     // Stale exception
     write_ops::WriteError error(
         0,
-        {StaleConfigInfo(kNss, ChunkVersion::IGNORED(), boost::none, ShardId("shard")),
+        {StaleConfigInfo(kNss, ShardVersion::IGNORED(), boost::none, ShardId("shard")),
          "some message"});
     writeOp.noteWriteError(*targeted.front(), error);
 
@@ -422,8 +422,8 @@ TEST_F(WriteOpTransactionTest, TargetMultiAllShardsAndErrorSingleChildOp) {
     write_ops::WriteError retryableError(
         0,
         {StaleConfigInfo(kNss,
-                         ChunkVersion({OID(), Timestamp(1, 1)}, {10, 0}),
-                         ChunkVersion({OID(), Timestamp(1, 1)}, {11, 0}),
+                         ShardVersion(ChunkVersion({OID(), Timestamp(1, 1)}, {10, 0})),
+                         ShardVersion(ChunkVersion({OID(), Timestamp(1, 1)}, {11, 0})),
                          ShardId("shardA")),
          "simulate ssv error for test"});
     writeOp.noteWriteError(*targeted[0], retryableError);

@@ -31,8 +31,8 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/shard_id.h"
-#include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
+#include "mongo/s/shard_version.h"
 #include "mongo/util/concurrency/notification.h"
 
 namespace mongo {
@@ -43,8 +43,8 @@ public:
     enum class OperationType { kRead, kWrite };
 
     StaleConfigInfo(NamespaceString nss,
-                    ChunkVersion received,
-                    boost::optional<ChunkVersion> wanted,
+                    ShardVersion received,
+                    boost::optional<ShardVersion> wanted,
                     ShardId shardId,
                     boost::optional<SharedSemiFuture<void>> criticalSectionSignal = boost::none,
                     boost::optional<OperationType> duringOperationType = boost::none)
@@ -84,8 +84,8 @@ public:
 
 protected:
     NamespaceString _nss;
-    ChunkVersion _received;
-    boost::optional<ChunkVersion> _wanted;
+    ShardVersion _received;
+    boost::optional<ShardVersion> _wanted;
     ShardId _shardId;
 
     // The following fields are not serialized and therefore do not get propagated to the router.

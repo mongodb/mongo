@@ -144,8 +144,7 @@ ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
     const auto receivedShardVersion{oss.getShardVersion(_nss)};
     uassert(
         StaleConfigInfo(_nss,
-                        receivedShardVersion ? (ChunkVersion)*receivedShardVersion
-                                             : ChunkVersion::IGNORED(),
+                        receivedShardVersion ? *receivedShardVersion : ShardVersion::IGNORED(),
                         boost::none /* wantedVersion */,
                         ShardingState::get(_serviceContext)->shardId()),
         str::stream() << "sharding status of collection " << _nss.ns()
@@ -355,7 +354,7 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
 
     // Assume that the received shard version was IGNORED if the current operation wasn't versioned
     const auto& receivedShardVersion =
-        optReceivedShardVersion ? (ChunkVersion)*optReceivedShardVersion : ChunkVersion::IGNORED();
+        optReceivedShardVersion ? *optReceivedShardVersion : ShardVersion::IGNORED();
 
     auto csrLock = CSRLock::lockShared(opCtx, this);
 
@@ -388,10 +387,12 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
 
     const auto& currentMetadata = optCurrentMetadata->get();
 
-    auto wantedShardVersion = currentMetadata.getShardVersion();
+    const auto wantedPlacementVersion = currentMetadata.getShardVersion();
+    const auto wantedShardVersion = ShardVersion(wantedPlacementVersion);
+    const ChunkVersion receivedPlacementVersion = receivedShardVersion;
 
     if (wantedShardVersion.isWriteCompatibleWith(receivedShardVersion) ||
-        ChunkVersion::isIgnoredVersion(receivedShardVersion))
+        receivedShardVersion == ShardVersion::IGNORED())
         return optCurrentMetadata;
 
     StaleConfigInfo sci(
@@ -401,13 +402,13 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
             str::stream() << "timestamp mismatch detected for " << _nss.ns(),
             wantedShardVersion.isSameCollection(receivedShardVersion));
 
-    if (!wantedShardVersion.isSet() && receivedShardVersion.isSet()) {
+    if (!wantedPlacementVersion.isSet() && receivedPlacementVersion.isSet()) {
         uasserted(std::move(sci),
                   str::stream() << "this shard no longer contains chunks for " << _nss.ns() << ", "
                                 << "the collection may have been dropped");
     }
 
-    if (wantedShardVersion.isSet() && !receivedShardVersion.isSet()) {
+    if (wantedPlacementVersion.isSet() && !receivedPlacementVersion.isSet()) {
         uasserted(std::move(sci),
                   str::stream() << "this shard contains chunks for " << _nss.ns() << ", "
                                 << "but the client expects unsharded collection");

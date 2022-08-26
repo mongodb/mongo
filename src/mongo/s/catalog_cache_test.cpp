@@ -259,7 +259,8 @@ TEST_F(CatalogCacheTest, OnStaleDatabaseVersionNoVersion) {
 
 TEST_F(CatalogCacheTest, OnStaleShardVersionWithSameVersion) {
     const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
-    const auto cachedCollVersion = ChunkVersion({OID::gen(), Timestamp(1, 1)}, {1, 0});
+    const auto cachedCollVersion =
+        ShardVersion(ChunkVersion({OID::gen(), Timestamp(1, 1)}, {1, 0}));
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], dbVersion)});
     loadCollection(cachedCollVersion);
@@ -284,8 +285,8 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithNoVersion) {
 TEST_F(CatalogCacheTest, OnStaleShardVersionWithGraterVersion) {
     const auto dbVersion = DatabaseVersion(UUID::gen(), Timestamp(1, 1));
     const auto cachedCollVersion = ChunkVersion({OID::gen(), Timestamp(1, 1)}, {1, 0});
-    const auto wantedCollVersion =
-        ChunkVersion({cachedCollVersion.epoch(), cachedCollVersion.getTimestamp()}, {2, 0});
+    const auto wantedCollVersion = ShardVersion(
+        ChunkVersion({cachedCollVersion.epoch(), cachedCollVersion.getTimestamp()}, {2, 0}));
 
     loadDatabases({DatabaseType(kNss.db().toString(), kShards[0], dbVersion)});
     loadCollection(cachedCollVersion);

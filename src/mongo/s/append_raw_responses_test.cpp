@@ -192,16 +192,16 @@ protected:
 
     const std::vector<ShardId> kShardIdList{kShard1, kShard2, kShard3, kShard4, kShard5};
 
-    const Status kStaleConfigErrorStatus{[] {
-                                             OID epoch{OID::gen()};
-                                             Timestamp timestamp{1, 0};
-                                             return StaleConfigInfo(
-                                                 NamespaceString("Foo.Bar"),
-                                                 ChunkVersion({epoch, timestamp}, {1, 0}),
-                                                 boost::none,
-                                                 ShardId{"dummy"});
-                                         }(),
-                                         "dummy"};
+    const Status kStaleConfigErrorStatus{
+        [] {
+            OID epoch{OID::gen()};
+            Timestamp timestamp{1, 0};
+            return StaleConfigInfo(NamespaceString("Foo.Bar"),
+                                   ShardVersion(ChunkVersion({epoch, timestamp}, {1, 0})),
+                                   boost::none,
+                                   ShardId{"dummy"});
+        }(),
+        "dummy"};
 
 private:
     static void _assertShardIdsMatch(const std::set<ShardId>& expectedShardIds,

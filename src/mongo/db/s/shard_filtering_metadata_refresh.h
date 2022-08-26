@@ -32,6 +32,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/collection_metadata.h"
 #include "mongo/s/database_version.h"
+#include "mongo/s/shard_version.h"
 
 namespace mongo {
 
@@ -56,11 +57,11 @@ class OperationContext;
  */
 Status onShardVersionMismatchNoExcept(OperationContext* opCtx,
                                       const NamespaceString& nss,
-                                      boost::optional<ChunkVersion> shardVersionReceived) noexcept;
+                                      boost::optional<ShardVersion> shardVersionReceived) noexcept;
 
 void onShardVersionMismatch(OperationContext* opCtx,
                             const NamespaceString& nss,
-                            boost::optional<ChunkVersion> shardVersionReceived);
+                            boost::optional<ShardVersion> shardVersionReceived);
 
 /**
  * Unconditionally get the shard's filtering metadata from the config server on the calling thread.

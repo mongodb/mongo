@@ -217,9 +217,9 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
                 writeToOrphan = true;
             }
         } catch (const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
-            if (ex->getVersionReceived() == ChunkVersion::IGNORED() &&
+            if (ex->getVersionReceived() == ShardVersion::IGNORED() &&
                 ex->getCriticalSectionSignal()) {
-                // If ChunkVersion is IGNORED and we encountered a critical section, then yield,
+                // If ShardVersion is IGNORED and we encountered a critical section, then yield,
                 // wait for the critical section to finish and then we'll resume the write from the
                 // point we had left. We do this to prevent large multi-writes from repeatedly
                 // failing due to StaleConfig and exhausting the mongos retry attempts.
@@ -289,9 +289,9 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
                 return ret;
             }
         } catch (const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
-            if (ex->getVersionReceived() == ChunkVersion::IGNORED() &&
+            if (ex->getVersionReceived() == ShardVersion::IGNORED() &&
                 ex->getCriticalSectionSignal()) {
-                // If ChunkVersion is IGNORED and we encountered a critical section, then yield,
+                // If ShardVersion is IGNORED and we encountered a critical section, then yield,
                 // wait for the critical section to finish and then we'll resume the write from the
                 // point we had left. We do this to prevent large multi-writes from repeatedly
                 // failing due to StaleConfig and exhausting the mongos retry attempts.

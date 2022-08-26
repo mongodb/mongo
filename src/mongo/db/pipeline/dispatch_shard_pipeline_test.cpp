@@ -174,11 +174,12 @@ TEST_F(DispatchShardPipelineTest, DispatchShardPipelineDoesNotRetryOnStaleConfig
     onCommand([&](const executor::RemoteCommandRequest& request) {
         OID epoch{OID::gen()};
         Timestamp timestamp{1, 0};
-        return createErrorCursorResponse({StaleConfigInfo(kTestAggregateNss,
-                                                          ChunkVersion({epoch, timestamp}, {1, 0}),
-                                                          boost::none,
-                                                          ShardId{"0"}),
-                                          "Mock error: shard version mismatch"});
+        return createErrorCursorResponse(
+            {StaleConfigInfo(kTestAggregateNss,
+                             ShardVersion(ChunkVersion({epoch, timestamp}, {1, 0})),
+                             boost::none,
+                             ShardId{"0"}),
+             "Mock error: shard version mismatch"});
     });
     future.default_timed_get();
 }
@@ -217,11 +218,12 @@ TEST_F(DispatchShardPipelineTest, WrappedDispatchDoesRetryOnStaleConfigError) {
     // Mock out one error response, then expect a refresh of the sharding catalog for that
     // namespace, then mock out a successful response.
     onCommand([&](const executor::RemoteCommandRequest& request) {
-        return createErrorCursorResponse({StaleConfigInfo(kTestAggregateNss,
-                                                          ChunkVersion({epoch, timestamp}, {2, 0}),
-                                                          boost::none,
-                                                          ShardId{"0"}),
-                                          "Mock error: shard version mismatch"});
+        return createErrorCursorResponse(
+            {StaleConfigInfo(kTestAggregateNss,
+                             ShardVersion(ChunkVersion({epoch, timestamp}, {2, 0})),
+                             boost::none,
+                             ShardId{"0"}),
+             "Mock error: shard version mismatch"});
     });
 
     // Mock the expected config server queries.

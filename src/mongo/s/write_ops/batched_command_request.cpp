@@ -47,7 +47,7 @@ BatchedCommandRequest constructBatchedCommandRequest(const OpMsgRequest& request
     auto shardVersionField = request.body[ShardVersion::kShardVersionField];
     if (!shardVersionField.eoo()) {
         auto shardVersion = ShardVersion::parse(shardVersionField);
-        if (shardVersion == ChunkVersion::UNSHARDED()) {
+        if (shardVersion == ShardVersion::UNSHARDED()) {
             batchRequest.setDbVersion(DatabaseVersion(request.body));
         }
         batchRequest.setShardVersion(shardVersion);

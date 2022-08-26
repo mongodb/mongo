@@ -242,7 +242,7 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
 
 void onShardVersionMismatch(OperationContext* opCtx,
                             const NamespaceString& nss,
-                            boost::optional<ChunkVersion> shardVersionReceived) {
+                            boost::optional<ShardVersion> shardVersionReceived) {
     invariant(!opCtx->lockState()->isLocked());
     invariant(!opCtx->getClient()->isInDirectClient());
     invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
@@ -326,7 +326,7 @@ void onShardVersionMismatch(OperationContext* opCtx,
 
 Status onShardVersionMismatchNoExcept(OperationContext* opCtx,
                                       const NamespaceString& nss,
-                                      boost::optional<ChunkVersion> shardVersionReceived) noexcept {
+                                      boost::optional<ShardVersion> shardVersionReceived) noexcept {
     try {
         onShardVersionMismatch(opCtx, nss, shardVersionReceived);
         return Status::OK();

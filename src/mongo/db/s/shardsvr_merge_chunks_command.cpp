@@ -106,10 +106,16 @@ void mergeChunks(OperationContext* opCtx,
     auto cmdResponse = commitMergeOnConfigServer(
         opCtx, nss, expectedEpoch, expectedTimestamp, chunkRange, metadataBeforeMerge);
 
-    auto shardVersionReceived = [&]() -> boost::optional<ChunkVersion> {
+    auto shardVersionReceived = [&]() -> boost::optional<ShardVersion> {
         // Old versions might not have the shardVersion field
         if (cmdResponse.response[ChunkVersion::kChunkVersionField]) {
-            return ChunkVersion::parse(cmdResponse.response[ChunkVersion::kChunkVersionField]);
+            ChunkVersion placementVersion =
+                ChunkVersion::parse(cmdResponse.response[ChunkVersion::kChunkVersionField]);
+            return ShardVersion(
+                placementVersion,
+                CollectionIndexes{
+                    CollectionGeneration{placementVersion.epoch(), placementVersion.getTimestamp()},
+                    boost::none});
         }
         return boost::none;
     }();

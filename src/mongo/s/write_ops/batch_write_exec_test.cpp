@@ -89,13 +89,13 @@ BSONObj expectInsertsReturnStaleVersionErrorsBase(const NamespaceString& nss,
     // Report a stale version error for each write in the batch.
     int i = 0;
     for (itInserted = inserted.begin(); itInserted != inserted.end(); ++itInserted) {
-        staleResponse.addToErrDetails(
-            write_ops::WriteError(i,
-                                  Status(StaleConfigInfo(nss,
-                                                         ChunkVersion({epoch, timestamp}, {1, 0}),
-                                                         ChunkVersion({epoch, timestamp}, {2, 0}),
-                                                         ShardId(kShardName1)),
-                                         "Stale error")));
+        staleResponse.addToErrDetails(write_ops::WriteError(
+            i,
+            Status(StaleConfigInfo(nss,
+                                   ShardVersion(ChunkVersion({epoch, timestamp}, {1, 0})),
+                                   ShardVersion(ChunkVersion({epoch, timestamp}, {2, 0})),
+                                   ShardId(kShardName1)),
+                   "Stale error")));
         ++i;
     }
 
@@ -731,8 +731,8 @@ TEST_F(BatchWriteExecTest, StaleShardVersionReturnedFromBatchWithSingleMultiWrit
         response.addToErrDetails(write_ops::WriteError(
             0,
             Status(StaleConfigInfo(nss,
-                                   ChunkVersion({epoch, timestamp}, {101, 200}),
-                                   ChunkVersion({epoch, timestamp}, {105, 200}),
+                                   ShardVersion(ChunkVersion({epoch, timestamp}, {101, 200})),
+                                   ShardVersion(ChunkVersion({epoch, timestamp}, {105, 200})),
                                    ShardId(kShardName2)),
                    "Stale error")));
         return response.toBSON();
@@ -831,15 +831,15 @@ TEST_F(BatchWriteExecTest,
         response.addToErrDetails(write_ops::WriteError(
             0,
             Status(StaleConfigInfo(nss,
-                                   ChunkVersion({epoch, timestamp}, {101, 200}),
-                                   ChunkVersion({epoch, timestamp}, {105, 200}),
+                                   ShardVersion(ChunkVersion({epoch, timestamp}, {101, 200})),
+                                   ShardVersion(ChunkVersion({epoch, timestamp}, {105, 200})),
                                    ShardId(kShardName2)),
                    "Stale error")));
         response.addToErrDetails(write_ops::WriteError(
             1,
             Status(StaleConfigInfo(nss,
-                                   ChunkVersion({epoch, timestamp}, {101, 200}),
-                                   ChunkVersion({epoch, timestamp}, {105, 200}),
+                                   ShardVersion(ChunkVersion({epoch, timestamp}, {101, 200})),
+                                   ShardVersion(ChunkVersion({epoch, timestamp}, {105, 200})),
                                    ShardId(kShardName2)),
                    "Stale error")));
         return response.toBSON();
@@ -927,8 +927,8 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1Firs) {
         response.addToErrDetails(write_ops::WriteError(
             1,
             Status(StaleConfigInfo(nss,
-                                   ChunkVersion({epoch, timestamp}, {101, 200}),
-                                   ChunkVersion({epoch, timestamp}, {105, 200}),
+                                   ShardVersion(ChunkVersion({epoch, timestamp}, {101, 200})),
+                                   ShardVersion(ChunkVersion({epoch, timestamp}, {105, 200})),
                                    ShardId(kShardName2)),
                    "Stale error")));
         return response.toBSON();
@@ -943,8 +943,8 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1Firs) {
         response.addToErrDetails(write_ops::WriteError(
             0,
             Status(StaleConfigInfo(nss,
-                                   ChunkVersion({epoch, timestamp}, {101, 200}),
-                                   ChunkVersion({epoch, timestamp}, {105, 200}),
+                                   ShardVersion(ChunkVersion({epoch, timestamp}, {101, 200})),
+                                   ShardVersion(ChunkVersion({epoch, timestamp}, {105, 200})),
                                    ShardId(kShardName2)),
                    "Stale error")));
         return response.toBSON();
@@ -1043,8 +1043,8 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1FirstOK
         response.addToErrDetails(write_ops::WriteError(
             1,
             Status(StaleConfigInfo(nss,
-                                   ChunkVersion({epoch, timestamp}, {101, 200}),
-                                   ChunkVersion({epoch, timestamp}, {105, 200}),
+                                   ShardVersion(ChunkVersion({epoch, timestamp}, {101, 200})),
+                                   ShardVersion(ChunkVersion({epoch, timestamp}, {105, 200})),
                                    ShardId(kShardName2)),
                    "Stale error")));
         return response.toBSON();
@@ -1059,8 +1059,8 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromMultiWriteWithShard1FirstOK
         response.addToErrDetails(write_ops::WriteError(
             1,
             Status(StaleConfigInfo(nss,
-                                   ChunkVersion({epoch, timestamp}, {101, 200}),
-                                   ChunkVersion({epoch, timestamp}, {105, 200}),
+                                   ShardVersion(ChunkVersion({epoch, timestamp}, {101, 200})),
+                                   ShardVersion(ChunkVersion({epoch, timestamp}, {105, 200})),
                                    ShardId(kShardName2)),
                    "Stale error")));
         return response.toBSON();
@@ -1162,8 +1162,8 @@ TEST_F(BatchWriteExecTest, RetryableErrorReturnedFromWriteWithShard1SSVShard2OK)
         response.addToErrDetails(write_ops::WriteError(
             0,
             Status(StaleConfigInfo(nss,
-                                   ChunkVersion({epoch, timestamp}, {101, 200}),
-                                   ChunkVersion({epoch, timestamp}, {105, 200}),
+                                   ShardVersion(ChunkVersion({epoch, timestamp}, {101, 200})),
+                                   ShardVersion(ChunkVersion({epoch, timestamp}, {105, 200})),
                                    ShardId(kShardName2)),
                    "Stale error")));
 

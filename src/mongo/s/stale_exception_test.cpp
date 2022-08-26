@@ -38,7 +38,7 @@ const NamespaceString kNss("test.nss");
 TEST(StaleExceptionTest, StaleConfigInfoSerializationTest) {
     const ShardId kShardId("SHARD_ID");
 
-    StaleConfigInfo info(kNss, ChunkVersion::UNSHARDED(), ChunkVersion::UNSHARDED(), kShardId);
+    StaleConfigInfo info(kNss, ShardVersion::UNSHARDED(), ShardVersion::UNSHARDED(), kShardId);
 
     // Serialize
     BSONObjBuilder bob;
@@ -49,8 +49,8 @@ TEST(StaleExceptionTest, StaleConfigInfoSerializationTest) {
         std::static_pointer_cast<const StaleConfigInfo>(StaleConfigInfo::parse(bob.obj()));
 
     ASSERT_EQUALS(deserializedInfo->getNss(), kNss);
-    ASSERT_EQUALS(deserializedInfo->getVersionReceived(), ChunkVersion::UNSHARDED());
-    ASSERT_EQUALS(*deserializedInfo->getVersionWanted(), ChunkVersion::UNSHARDED());
+    ASSERT_EQUALS(deserializedInfo->getVersionReceived(), ShardVersion::UNSHARDED());
+    ASSERT_EQUALS(*deserializedInfo->getVersionWanted(), ShardVersion::UNSHARDED());
     ASSERT_EQUALS(deserializedInfo->getShardId(), kShardId);
 }
 

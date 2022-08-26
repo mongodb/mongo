@@ -71,8 +71,8 @@ TEST(BatchedCommandResponseTest, StaleConfigInfo) {
     OID epoch = OID::gen();
 
     StaleConfigInfo staleInfo(NamespaceString("TestDB.TestColl"),
-                              ChunkVersion({epoch, Timestamp(100, 0)}, {1, 0}),
-                              ChunkVersion({epoch, Timestamp(100, 0)}, {2, 0}),
+                              ShardVersion(ChunkVersion({epoch, Timestamp(100, 0)}, {1, 0})),
+                              ShardVersion(ChunkVersion({epoch, Timestamp(100, 0)}, {2, 0})),
                               ShardId("TestShard"));
     BSONObjBuilder builder(BSON("index" << 0 << "code" << ErrorCodes::StaleConfig << "errmsg"
                                         << "StaleConfig error"));

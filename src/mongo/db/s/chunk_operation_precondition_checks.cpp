@@ -45,7 +45,7 @@ CollectionMetadata checkCollectionIdentity(OperationContext* opCtx,
     auto optMetadata = csr->getCurrentMetadataIfKnown();
 
     uassert(StaleConfigInfo(nss,
-                            ChunkVersion::IGNORED() /* receivedVersion */,
+                            ShardVersion::IGNORED() /* receivedVersion */,
                             boost::none /* wantedVersion */,
                             shardId),
             str::stream() << "Collection " << nss.ns() << " needs to be recovered",
@@ -54,8 +54,8 @@ CollectionMetadata checkCollectionIdentity(OperationContext* opCtx,
     auto metadata = *optMetadata;
 
     uassert(StaleConfigInfo(nss,
-                            ChunkVersion::IGNORED() /* receivedVersion */,
-                            ChunkVersion::UNSHARDED() /* wantedVersion */,
+                            ShardVersion::IGNORED() /* receivedVersion */,
+                            ShardVersion::UNSHARDED() /* wantedVersion */,
                             shardId),
             str::stream() << "Collection " << nss.ns() << " is not sharded",
             metadata.isSharded());
@@ -67,8 +67,8 @@ CollectionMetadata checkCollectionIdentity(OperationContext* opCtx,
     const auto shardVersion = metadata.getShardVersion();
 
     uassert(StaleConfigInfo(nss,
-                            ChunkVersion::IGNORED() /* receivedVersion */,
-                            shardVersion /* wantedVersion */,
+                            ShardVersion::IGNORED() /* receivedVersion */,
+                            ShardVersion(shardVersion) /* wantedVersion */,
                             shardId),
             str::stream() << "Collection " << nss.ns()
                           << " has changed since operation was sent (sent epoch: " << expectedEpoch
@@ -77,8 +77,8 @@ CollectionMetadata checkCollectionIdentity(OperationContext* opCtx,
                 (!expectedTimestamp || expectedTimestamp == shardVersion.getTimestamp()));
 
     uassert(StaleConfigInfo(nss,
-                            ChunkVersion::IGNORED() /* receivedVersion */,
-                            shardVersion /* wantedVersion */,
+                            ShardVersion::IGNORED() /* receivedVersion */,
+                            ShardVersion(shardVersion) /* wantedVersion */,
                             shardId),
             str::stream() << "Shard does not contain any chunks for collection.",
             shardVersion.majorVersion() > 0);
@@ -95,8 +95,8 @@ void checkShardKeyPattern(OperationContext* opCtx,
     const auto shardVersion = metadata.getShardVersion();
 
     uassert(StaleConfigInfo(nss,
-                            ChunkVersion::IGNORED() /* receivedVersion */,
-                            shardVersion /* wantedVersion */,
+                            ShardVersion::IGNORED() /* receivedVersion */,
+                            ShardVersion(shardVersion) /* wantedVersion */,
                             shardId),
             str::stream() << "The range " << chunkRange.toString()
                           << " is not valid for collection " << nss.ns() << " with key pattern "
@@ -113,8 +113,8 @@ void checkChunkMatchesRange(OperationContext* opCtx,
 
     ChunkType existingChunk;
     uassert(StaleConfigInfo(nss,
-                            ChunkVersion::IGNORED() /* receivedVersion */,
-                            shardVersion /* wantedVersion */,
+                            ShardVersion::IGNORED() /* receivedVersion */,
+                            ShardVersion(shardVersion) /* wantedVersion */,
                             shardId),
             str::stream() << "Range with bounds " << chunkRange.toString()
                           << " is not owned by this shard.",
@@ -122,8 +122,8 @@ void checkChunkMatchesRange(OperationContext* opCtx,
                 existingChunk.getMin().woCompare(chunkRange.getMin()) == 0);
 
     uassert(StaleConfigInfo(nss,
-                            ChunkVersion::IGNORED() /* receivedVersion */,
-                            shardVersion /* wantedVersion */,
+                            ShardVersion::IGNORED() /* receivedVersion */,
+                            ShardVersion(shardVersion) /* wantedVersion */,
                             shardId),
             str::stream() << "Chunk bounds " << chunkRange.toString() << " do not exist.",
             existingChunk.getRange() == chunkRange);
@@ -138,8 +138,8 @@ void checkRangeWithinChunk(OperationContext* opCtx,
 
     ChunkType existingChunk;
     uassert(StaleConfigInfo(nss,
-                            ChunkVersion::IGNORED() /* receivedVersion */,
-                            shardVersion /* wantedVersion */,
+                            ShardVersion::IGNORED() /* receivedVersion */,
+                            ShardVersion(shardVersion) /* wantedVersion */,
                             shardId),
             str::stream() << "Range with bounds " << chunkRange.toString()
                           << " is not contained within a chunk owned by this shard.",
@@ -158,8 +158,8 @@ void checkRangeOwnership(OperationContext* opCtx,
     BSONObj minKey = chunkRange.getMin();
     do {
         uassert(StaleConfigInfo(nss,
-                                ChunkVersion::IGNORED() /* receivedVersion */,
-                                shardVersion /* wantedVersion */,
+                                ShardVersion::IGNORED() /* receivedVersion */,
+                                ShardVersion(shardVersion) /* wantedVersion */,
                                 shardId),
                 str::stream() << "Range with bounds " << chunkRange.toString()
                               << " is not owned by this shard.",
@@ -169,8 +169,8 @@ void checkRangeOwnership(OperationContext* opCtx,
     } while (existingChunk.getMax().woCompare(chunkRange.getMax()) < 0);
     uassert(
         StaleConfigInfo(nss,
-                        ChunkVersion::IGNORED() /* receivedVersion */,
-                        shardVersion /* wantedVersion */,
+                        ShardVersion::IGNORED() /* receivedVersion */,
+                        ShardVersion(shardVersion) /* wantedVersion */,
                         shardId),
         str::stream() << "Shard does not contain a sequence of chunks that exactly fills the range "
                       << chunkRange.toString(),

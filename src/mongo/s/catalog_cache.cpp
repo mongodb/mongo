@@ -452,7 +452,7 @@ void CatalogCache::setOperationShouldBlockBehindCatalogCacheRefresh(OperationCon
 
 void CatalogCache::invalidateShardOrEntireCollectionEntryForShardedCollection(
     const NamespaceString& nss,
-    const boost::optional<ChunkVersion>& wantedVersion,
+    const boost::optional<ShardVersion>& wantedVersion,
     const ShardId& shardId) {
     _stats.countStaleConfigErrors.addAndFetch(1);
 

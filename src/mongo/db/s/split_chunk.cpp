@@ -109,21 +109,21 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
     ShardId shardId = ShardingState::get(opCtx)->shardId();
 
     uassert(StaleConfigInfo(nss,
-                            ChunkVersion::IGNORED() /* receivedVersion */,
+                            ShardVersion::IGNORED() /* receivedVersion */,
                             boost::none /* wantedVersion */,
                             shardId),
             str::stream() << "Collection " << nss.ns() << " needs to be recovered",
             metadataAfterSplit);
     uassert(StaleConfigInfo(nss,
-                            ChunkVersion::IGNORED() /* receivedVersion */,
-                            ChunkVersion::UNSHARDED() /* wantedVersion */,
+                            ShardVersion::IGNORED() /* receivedVersion */,
+                            ShardVersion::UNSHARDED() /* wantedVersion */,
                             shardId),
             str::stream() << "Collection " << nss.ns() << " is not sharded",
             metadataAfterSplit->isSharded());
     const auto epoch = metadataAfterSplit->getShardVersion().epoch();
     uassert(StaleConfigInfo(nss,
-                            ChunkVersion::IGNORED() /* receivedVersion */,
-                            metadataAfterSplit->getShardVersion() /* wantedVersion */,
+                            ShardVersion::IGNORED() /* receivedVersion */,
+                            ShardVersion(metadataAfterSplit->getShardVersion()) /* wantedVersion */,
                             shardId),
             str::stream() << "Collection " << nss.ns() << " changed since split start",
             epoch == expectedEpoch &&
@@ -252,10 +252,16 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(
 
     const Shard::CommandResponse& cmdResponse = cmdResponseStatus.getValue();
 
-    boost::optional<ChunkVersion> shardVersionReceived = [&]() -> boost::optional<ChunkVersion> {
+    boost::optional<ShardVersion> shardVersionReceived = [&]() -> boost::optional<ShardVersion> {
         // old versions might not have the shardVersion field
         if (cmdResponse.response[ChunkVersion::kChunkVersionField]) {
-            return ChunkVersion::parse(cmdResponse.response[ChunkVersion::kChunkVersionField]);
+            ChunkVersion placementVersion =
+                ChunkVersion::parse(cmdResponse.response[ChunkVersion::kChunkVersionField]);
+            return ShardVersion(
+                placementVersion,
+                CollectionIndexes{
+                    CollectionGeneration{placementVersion.epoch(), placementVersion.getTimestamp()},
+                    boost::none});
         }
         return boost::none;
     }();

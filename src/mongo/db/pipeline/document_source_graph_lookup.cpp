@@ -494,7 +494,7 @@ void DocumentSourceGraphLookUp::performSearch() {
         // throw a custom exception.
         if (auto staleInfo = ex.extraInfo<StaleConfigInfo>(); staleInfo &&
             staleInfo->getVersionWanted() &&
-            staleInfo->getVersionWanted() != ChunkVersion::UNSHARDED()) {
+            staleInfo->getVersionWanted() != ShardVersion::UNSHARDED()) {
             uassert(3904801,
                     "Cannot run $graphLookup with a sharded foreign collection in a transaction",
                     foreignShardedGraphLookupAllowed());
