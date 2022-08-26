@@ -316,23 +316,32 @@ bool processReplSetStepUpRequest(executor::NetworkInterfaceMock* net,
     return commandName == cmdObj.firstElementFieldName();
 }
 
-void processHelloRequest(executor::NetworkInterfaceMock* net, MockReplicaSet* replSet) {
+
+using IncomingRequestValidator = std::function<void(executor::RemoteCommandRequest)>;
+void processIncomingRequest(executor::NetworkInterfaceMock* net,
+                            MockReplicaSet* replSet,
+                            const std::string& commandName,
+                            IncomingRequestValidator validator = nullptr) {
     ASSERT(net->hasReadyRequests());
     net->runReadyNetworkOperations();
     auto noi = net->getNextReadyRequest();
     auto request = noi->getRequest();
 
-    assertRemoteCommandNameEquals("isMaster", request);
+    assertRemoteCommandNameEquals(commandName, request);
+    if (validator) {
+        validator(request);
+    }
+
     auto requestHost = request.target.toString();
     const auto node = replSet->getNode(requestHost);
-    if (node->isRunning()) {
-        const auto opmsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
-        const auto reply = node->runCommand(request.id, opmsg)->getCommandReply();
-        net->scheduleSuccessfulResponse(noi,
-                                        executor::RemoteCommandResponse(reply, Milliseconds(0)));
-    } else {
+    if (!node->isRunning()) {
         net->scheduleErrorResponse(noi, Status(ErrorCodes::HostUnreachable, ""));
+        return;
     }
+
+    const auto opmsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
+    const auto reply = node->runCommand(request.id, opmsg)->getCommandReply();
+    net->scheduleSuccessfulResponse(noi, executor::RemoteCommandResponse(reply, Milliseconds(0)));
 }
 
 void waitForReadyRequest(executor::NetworkInterfaceMock* net) {
@@ -340,6 +349,7 @@ void waitForReadyRequest(executor::NetworkInterfaceMock* net) {
         net->advanceTime(net->now() + Milliseconds{1});
     }
 }
+
 class ShardSplitDonorServiceTest : public repl::PrimaryOnlyServiceMongoDTest {
 public:
     void setUp() override {
@@ -409,17 +419,33 @@ protected:
         _net->exitNetwork();
     }
 
+    void waitForRecipientPrimaryMajorityWrite() {
+        _net->enterNetwork();
+        waitForReadyRequest(_net);
+        processIncomingRequest(
+            _net,
+            &_recipientSet,
+            "appendOplogNote",
+            [](const executor::RemoteCommandRequest& request) {
+                ASSERT_TRUE(request.cmdObj.hasField(WriteConcernOptions::kWriteConcernField));
+                ASSERT_BSONOBJ_EQ(request.cmdObj[WriteConcernOptions::kWriteConcernField].Obj(),
+                                  BSON("w" << WriteConcernOptions::kMajority));
+            });
+        _net->runReadyNetworkOperations();
+        _net->exitNetwork();
+    }
+
     /**
      * Wait for monitors to start, and enqueue successfull hello responses
      */
     void waitForMonitorAndProcessHello() {
         _net->enterNetwork();
         waitForReadyRequest(_net);
-        processHelloRequest(_net, &_recipientSet);
+        processIncomingRequest(_net, &_recipientSet, "isMaster");
         waitForReadyRequest(_net);
-        processHelloRequest(_net, &_recipientSet);
+        processIncomingRequest(_net, &_recipientSet, "isMaster");
         waitForReadyRequest(_net);
-        processHelloRequest(_net, &_recipientSet);
+        processIncomingRequest(_net, &_recipientSet, "isMaster");
         _net->runReadyNetworkOperations();
         _net->exitNetwork();
     }
@@ -453,10 +479,11 @@ auto makeHelloReply(const std::string& setName,
     return BSON("setName" << setName << "lastWrite" << opTimeBuilder.obj());
 };
 
-void setupRecipientCommandReplies(MockReplicaSet* replSet) {
+void mockCommandReplies(MockReplicaSet* replSet) {
     for (auto hostAndPort : replSet->getHosts()) {
         auto node = replSet->getNode(hostAndPort.toString());
         node->setCommandReply("replSetStepUp", BSON("ok" << 1));
+        node->setCommandReply("appendOplogNote", BSON("ok" << 1));
         node->setCommandReply("isMaster", makeHelloReply(replSet->getSetName()));
     }
 }
@@ -468,7 +495,7 @@ TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) 
         getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
     // Shard split service will send a stepUp request to the first node in the vector.
-    setupRecipientCommandReplies(&_recipientSet);
+    mockCommandReplies(&_recipientSet);
 
     // We reset this failpoint to test complete functionality. waitForMonitorAndProcessHello()
     // returns hello responses that makes split acceptance pass.
@@ -482,6 +509,7 @@ TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) 
 
     waitForMonitorAndProcessHello();
     waitForReplSetStepUp(Status(ErrorCodes::OK, ""));
+    waitForRecipientPrimaryMajorityWrite();
 
     auto result = serviceInstance->decisionFuture().get();
     ASSERT_TRUE(hasActiveSplitForTenants(opCtx.get(), _tenantIds));
@@ -501,7 +529,7 @@ TEST_F(ShardSplitDonorServiceTest, ReplSetStepUpFails) {
     test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
     test::shard_split::reconfigToAddRecipientNodes(
         getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
-    setupRecipientCommandReplies(&_recipientSet);
+    mockCommandReplies(&_recipientSet);
     _skipAcceptanceFP.reset();
 
     auto serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
@@ -511,6 +539,7 @@ TEST_F(ShardSplitDonorServiceTest, ReplSetStepUpFails) {
 
     waitForMonitorAndProcessHello();
     waitForReplSetStepUp(Status(ErrorCodes::OperationFailed, ""));
+    // No need to wait for recipient majority no-op write, since the stepup failed.
 
     auto result = serviceInstance->decisionFuture().get();
     ASSERT(result.abortReason);
@@ -525,7 +554,7 @@ TEST_F(ShardSplitDonorServiceTest, ReplSetStepUpRetryable) {
 
     // Shard split service will send a stepUp request to the first node in the vector. When it fails
     // it will send it to the next node.
-    setupRecipientCommandReplies(&_recipientSet);
+    mockCommandReplies(&_recipientSet);
 
     // We disable this failpoint to test complete functionality. waitForMonitorAndProcessHello()
     // returns hello responses that makes split acceptance pass.
@@ -546,6 +575,7 @@ TEST_F(ShardSplitDonorServiceTest, ReplSetStepUpRetryable) {
         Status(ErrorCodes::ConnectionPoolExpired, "test-generated retryable error"));
     waitForReplSetStepUp(Status(ErrorCodes::ExceededTimeLimit, "test-generated retryable error"));
     waitForReplSetStepUp(Status(ErrorCodes::OK, "test-generated retryable error"));
+    waitForRecipientPrimaryMajorityWrite();
 
     auto result = serviceInstance->decisionFuture().get();
 
@@ -592,7 +622,7 @@ TEST_F(ShardSplitDonorServiceTest, ReconfigToRemoveSplitConfig) {
         getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
 
     // Shard split service will send a stepUp request to the first node in the vector.
-    setupRecipientCommandReplies(&_recipientSet);
+    mockCommandReplies(&_recipientSet);
 
     _skipAcceptanceFP.reset();
 
@@ -606,8 +636,8 @@ TEST_F(ShardSplitDonorServiceTest, ReconfigToRemoveSplitConfig) {
     ASSERT_EQ(_uuid, serviceInstance->getId());
 
     waitForMonitorAndProcessHello();
-
     waitForReplSetStepUp(Status::OK());
+    waitForRecipientPrimaryMajorityWrite();
 
     auto result = serviceInstance->decisionFuture().get();
     ASSERT(!result.abortReason);
@@ -648,9 +678,9 @@ TEST_F(ShardSplitDonorServiceTest, SendReplSetStepUpToHighestLastApplied) {
     auto newerOpTime = mongo::repl::OpTime(Timestamp(200, 1), 24);
     auto olderOpTime = mongo::repl::OpTime(Timestamp(100, 1), 24);
 
+    mockCommandReplies(&_recipientSet);
     auto recipientPrimary = _recipientSet.getNode(_recipientSet.getHosts()[1].toString());
     recipientPrimary->setCommandReply("isMaster", makeHelloReply(_recipientSetName, newerOpTime));
-    recipientPrimary->setCommandReply("replSetStepUp", BSON("ok" << 1));
 
     for (auto&& recipientNodeHost : _recipientSet.getHosts()) {
         if (recipientNodeHost == recipientPrimary->getServerHostAndPort()) {
@@ -659,7 +689,6 @@ TEST_F(ShardSplitDonorServiceTest, SendReplSetStepUpToHighestLastApplied) {
 
         auto recipientNode = _recipientSet.getNode(recipientNodeHost.toString());
         recipientNode->setCommandReply("isMaster", makeHelloReply(_recipientSetName, olderOpTime));
-        recipientNode->setCommandReply("replSetStepUp", BSON("ok" << 0));
     }
 
     _skipAcceptanceFP.reset();
@@ -671,6 +700,7 @@ TEST_F(ShardSplitDonorServiceTest, SendReplSetStepUpToHighestLastApplied) {
 
     waitForMonitorAndProcessHello();
     waitForReplSetStepUp(Status::OK());
+    waitForRecipientPrimaryMajorityWrite();
 
     auto result = serviceInstance->decisionFuture().get();
     ASSERT(!result.abortReason);

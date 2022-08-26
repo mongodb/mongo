@@ -756,16 +756,22 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_applySplitConfi
         .on(**executor, abortToken);
 }
 
-ExecutorFuture<void> sendStepUpToRecipient(const HostAndPort recipient,
-                                           TaskExecutorPtr executor,
-                                           const CancellationToken& token) {
-    return AsyncTry([executor, recipient, token] {
-               executor::RemoteCommandRequest request(
-                   recipient, "admin", BSON("replSetStepUp" << 1 << "skipDryRun" << true), nullptr);
-               pauseShardSplitBeforeSendingStepUpToRecipients.pauseWhileSet();
+ExecutorFuture<void> remoteAdminCommand(TaskExecutorPtr executor,
+                                        const CancellationToken& token,
+                                        const HostAndPort remoteNode,
+                                        const BSONObj& command) {
+    return AsyncTry([executor, token, remoteNode, command] {
+               executor::RemoteCommandRequest request(remoteNode, "admin", command, nullptr);
+               auto hasWriteConcern = command.hasField(WriteConcernOptions::kWriteConcernField);
+
                return executor->scheduleRemoteCommand(request, token)
-                   .then([](const auto& response) {
-                       return getStatusFromCommandResult(response.data);
+                   .then([hasWriteConcern](const auto& response) {
+                       auto status = getStatusFromCommandResult(response.data);
+                       if (status.isOK() && hasWriteConcern) {
+                           return getWriteConcernStatusFromCommandResult(response.data);
+                       }
+
+                       return status;
                    });
            })
         .until([](Status status) {
@@ -775,6 +781,26 @@ ExecutorFuture<void> sendStepUpToRecipient(const HostAndPort recipient,
         })
         .withBackoffBetweenIterations(kExponentialBackoff)
         .on(executor, token);
+}
+
+ExecutorFuture<void> sendStepUpToRecipient(TaskExecutorPtr executor,
+                                           const CancellationToken& token,
+                                           const HostAndPort recipientPrimary) {
+    return remoteAdminCommand(
+        executor, token, recipientPrimary, BSON("replSetStepUp" << 1 << "skipDryRun" << true));
+}
+
+ExecutorFuture<void> waitForMajorityWriteOnRecipient(TaskExecutorPtr executor,
+                                                     const CancellationToken& token,
+                                                     const HostAndPort recipientPrimary) {
+    return remoteAdminCommand(
+        executor,
+        token,
+        recipientPrimary,
+        BSON("appendOplogNote" << 1 << "data"
+                               << BSON("noop write for shard split recipient primary election" << 1)
+                               << WriteConcernOptions::kWriteConcernField
+                               << BSON("w" << WriteConcernOptions::kMajority)));
 }
 
 ExecutorFuture<void>
@@ -795,7 +821,7 @@ ShardSplitDonorService::DonorStateMachine::_waitForSplitAcceptanceAndEnterCommit
 
     return ExecutorFuture(**executor)
         .then([&]() { return _splitAcceptancePromise.getFuture(); })
-        .then([this, executor, primaryToken](const HostAndPort& primary) {
+        .then([this, executor, primaryToken](const HostAndPort& recipientPrimary) {
             // only cancel operations on stepdown from here out
             _cancelableOpCtxFactory.emplace(primaryToken, _markKilledExecutor);
 
@@ -821,7 +847,7 @@ ShardSplitDonorService::DonorStateMachine::_waitForSplitAcceptanceAndEnterCommit
             // If the split acceptance step was cancelled, its future will produce a default
             // constructed HostAndPort. Skipping split acceptance implies skipping triggering an
             // election.
-            if (primary.empty()) {
+            if (recipientPrimary.empty()) {
                 return ExecutorFuture(**executor);
             }
 
@@ -833,15 +859,15 @@ ShardSplitDonorService::DonorStateMachine::_waitForSplitAcceptanceAndEnterCommit
                 ? *_splitAcceptanceTaskExecutorForTest
                 : **executor;
 
-            return sendStepUpToRecipient(primary, remoteCommandExecutor, primaryToken)
-                .onCompletion([this](Status replSetStepUpStatus) {
-                    if (!replSetStepUpStatus.isOK()) {
-                        LOGV2(6493904,
-                              "Failed to trigger an election on the recipient replica set.",
-                              "status"_attr = replSetStepUpStatus);
-                    }
+            pauseShardSplitBeforeSendingStepUpToRecipients.pauseWhileSet();
+            return sendStepUpToRecipient(remoteCommandExecutor, primaryToken, recipientPrimary)
+                .then([this, remoteCommandExecutor, primaryToken, recipientPrimary]() {
+                    LOGV2(8423365,
+                          "Waiting for majority commit on recipient primary",
+                          "id"_attr = _migrationId);
 
-                    return replSetStepUpStatus;
+                    return waitForMajorityWriteOnRecipient(
+                        remoteCommandExecutor, primaryToken, recipientPrimary);
                 });
         })
         .thenRunOn(**executor)
