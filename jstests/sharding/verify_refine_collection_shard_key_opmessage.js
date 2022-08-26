@@ -1,7 +1,7 @@
 /**
  * Test that a special {op: 'n'} oplog event is created during refineCollectionShardKey command.
  *
- * @tags: [requires_fcv_60, __TEMPORARILY_DISABLED__]
+ * @tags: [requires_fcv_61]
  */
 (function() {
 "use strict";
