@@ -1071,8 +1071,9 @@ void AuthorizationSessionImpl::_updateInternalAuthorizationState() {
     }
 
     // Update cached _mayBypassWriteBlockingMode to reflect current state.
-    _mayBypassWriteBlockingMode =
-        _isAuthorizedForPrivilege(kBypassWriteBlockingModeOnClusterPrivilege);
+    _mayBypassWriteBlockingMode = getAuthorizationManager().isAuthEnabled()
+        ? _isAuthorizedForPrivilege(kBypassWriteBlockingModeOnClusterPrivilege)
+        : true;
 }
 
 bool AuthorizationSessionImpl::mayBypassWriteBlockingMode() const {
