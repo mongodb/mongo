@@ -249,6 +249,18 @@ repos:
     repos:
       - apt/ubuntu/dists/focal/mongodb-org
 
+  - name: ubuntu2204
+    type: deb
+    code_name: "jammy"
+    edition: org
+    bucket: repo.mongodb.org
+    component: multiverse
+    architectures:
+      - amd64
+      - arm64
+    repos:
+      - apt/ubuntu/dists/jammy/mongodb-org
+
 ####################
 #
 # Enterprise Repos:
@@ -479,3 +491,15 @@ repos:
       - arm64
     repos:
       - apt/ubuntu/dists/focal/mongodb-enterprise
+
+  - name: ubuntu2204
+    type: deb
+    code_name: "jammy"
+    edition: enterprise
+    bucket: repo.mongodb.com
+    component: multiverse
+    architectures:
+      - amd64
+      - arm64
+    repos:
+      - apt/ubuntu/dists/jammy/mongodb-enterprise

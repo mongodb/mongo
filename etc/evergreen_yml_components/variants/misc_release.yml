@@ -1397,6 +1397,58 @@ buildvariants:
     - ubuntu1804-test
   - name: generate_buildid_to_debug_symbols_mapping
 
+- name: ubuntu2204
+  display_name: Ubuntu 22.04
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  run_on:
+  - ubuntu2204-small
+  expansions:
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: x86_64-ubuntu2204
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    multiversion_platform: ubuntu2204
+    multiversion_edition: targeted
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: ubuntu2204
+    repo_edition: org
+    scons_cache_scope: shared
+    large_distro_name: ubuntu2204-large
+  tasks:
+  - name: compile_test_and_package_serial_no_unittests_TG
+    distros:
+    - ubuntu2204-large
+  - name: .aggfuzzer .common !.multiversion !.feature_flag_guarded
+  - name: aggregation !.feature_flag_guarded
+  - name: .auth !.audit !.multiversion
+  - name: .misc_js
+  - name: .concurrency .common
+  - name: concurrency_replication_causal_consistency_gen
+  - name: disk_wiredtiger
+  - name: free_monitoring
+  - name: .jscore .common
+  - name: .jstestfuzz .common
+  - name: libunwind_tests
+  - name: .logical_session_cache .one_sec
+  # - name: multiversion_gen
+  - name: replica_sets_gen
+  - name: replica_sets_jscore_passthrough
+  - name: .sharding .txns
+  - name: sharding_gen
+  - name: sharding_jscore_passthrough
+  - name: .ssl
+  - name: .stitch
+  - name: test_packages
+    distros:
+    - ubuntu2204-package
+  - name: .publish
+    distros:
+    - ubuntu2204-small
+  - name: generate_buildid_to_debug_symbols_mapping
+
 - name: ubuntu2004
   display_name: Ubuntu 20.04
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
@@ -1504,6 +1556,63 @@ buildvariants:
   - name: .publish
     distros:
     - ubuntu2004-small
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: enterprise-ubuntu2204-64
+  display_name: Enterprise Ubuntu 22.04
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
+  run_on:
+  - ubuntu2204-small
+  stepback: false
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: x86_64-enterprise-ubuntu2204
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    multiversion_platform: ubuntu2204
+    multiversion_edition: enterprise
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: x86_64
+    packager_distro: ubuntu2204
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    large_distro_name: ubuntu2204-large
+    # TODO SERVER-64479 remove external_auth_jobs_max once resolved
+    external_auth_jobs_max: 1
+  tasks:
+  - name: compile_test_and_package_serial_no_unittests_TG
+    distros:
+    - ubuntu2204-large
+  - name: .crypt
+  - name: .publish_crypt
+  - name: .aggfuzzer .common !.multiversion !.feature_flag_guarded
+  - name: audit
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
+  - name: external_auth
+  - name: external_auth_aws
+  - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
+  - name: jsCore_auth
+  - name: .jstestfuzz .common
+  - name: libunwind_tests
+  - name: .logical_session_cache .one_sec
+  - name: .ocsp
+  - name: replica_sets_auth_gen
+  - name: replica_sets_jscore_passthrough
+  - name: sasl
+  - name: sharding_auth_gen
+  - name: test_packages
+    distros:
+    - ubuntu2204-package
+  - name: .publish
+    distros:
+    - ubuntu2204-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-ubuntu2004-arm64
