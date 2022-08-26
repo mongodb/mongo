@@ -46,6 +46,7 @@
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/record_id_helpers.h"
+#include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -183,6 +184,41 @@ const IndexDescriptor* getValidTTLIndex(OperationContext* opCtx,
         return nullptr;
     }
     return desc;
+}
+
+/**
+ * Runs on primaries and secondaries. Forwards replica set events to the TTLMonitor.
+ */
+class TTLMonitorService : public ReplicaSetAwareService<TTLMonitorService> {
+public:
+    static TTLMonitorService* get(ServiceContext* serviceContext);
+    TTLMonitorService() = default;
+
+private:
+    void onStartup(OperationContext* opCtx) override {}
+    void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) override {}
+    void onShutdown() override {}
+    void onStepUpBegin(OperationContext* opCtx, long long term) override {}
+    void onStepUpComplete(OperationContext* opCtx, long long term) override {
+        auto ttlMonitor = TTLMonitor::get(opCtx->getServiceContext());
+        if (!ttlMonitor) {
+            // Some test fixtures might not install the TTLMonitor.
+            return;
+        }
+        ttlMonitor->onStepUp(opCtx);
+    }
+    void onStepDown() override {}
+    void onBecomeArbiter() override {}
+};
+
+const auto _ttlMonitorService = ServiceContext::declareDecoration<TTLMonitorService>();
+
+const ReplicaSetAwareServiceRegistry::Registerer<TTLMonitorService> _ttlMonitorServiceRegisterer(
+    "TTLMonitorService");
+
+// static
+TTLMonitorService* TTLMonitorService::get(ServiceContext* serviceContext) {
+    return &_ttlMonitorService(serviceContext);
 }
 
 }  // namespace
@@ -647,6 +683,8 @@ void shutdownTTLMonitor(ServiceContext* serviceContext) {
         ttlMonitor->shutdown();
     }
 }
+
+void TTLMonitor::onStepUp(OperationContext* opCtx) {}
 
 long long TTLMonitor::getTTLPasses_forTest() {
     return ttlPasses.get();
