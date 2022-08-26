@@ -1,8 +1,6 @@
 /**
  * Test that variable-type fields are found correctly in upgraded timeseries collections with dirty
  * data.
- *
- * @tags: [disabled_for_fcv_6_1_upgrade]
  */
 
 (function() {
@@ -12,6 +10,9 @@ load('jstests/multiVersion/libs/multi_rs.js');
 
 const timeFieldName = "time";
 
+// Note that this list will need to be kept up to date as versions are added/dropped.
+const upgradeVersions = [{binVersion: "6.0", fcv: "6.0"}, {binVersion: "latest"}];
+
 /*
  * Creates a collection, populates it with `docs`, runs the `query` and ensures that the result set
  * is equal to `results`. Also checks that the bounds at `path` formed by the min & max of the
@@ -19,7 +20,7 @@ const timeFieldName = "time";
  * one bucket was created.
  */
 function runTest(docs, query, results, path, bounds) {
-    const oldVersion = "last-lts";
+    const oldVersion = "5.0";
     const nodes = {
         n1: {binVersion: oldVersion},
         n2: {binVersion: oldVersion},
@@ -49,20 +50,32 @@ function runTest(docs, query, results, path, bounds) {
     // Populate the collection with documents.
     docs.forEach(d => tsColl.insert(Object.assign({[timeFieldName]: new Date("2021-01-01")}, d)));
 
-    rst.upgradeSet({binVersion: "latest"});
-    db = rst.getPrimary().getDB("test");
-    tsColl = db.getCollection(jsTestName());
-    bucketColl = db.getCollection('system.buckets.' + tsColl.getName());
+    // We may need to upgrade through several versions to reach the latest. This ensures that each
+    // subsequent upgrade preserves the mixed-schema data upon upgrading.
+    for (const {binVersion, fcv} of upgradeVersions) {
+        rst.upgradeSet({binVersion});
+        db = rst.getPrimary().getDB("test");
 
-    // Confirm expected results.
-    assert.docEq(tsColl.aggregate(pipeline).toArray(), results);
-    const buckets = bucketColl.aggregate(controlPipeline).toArray();
+        // Set the fcv if needed.
+        if (fcv) {
+            assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: fcv}));
+            rst.awaitReplication();
+        }
 
-    // Check that we only have one bucket.
-    assert.eq(buckets.length, 1);
+        tsColl = db.getCollection(jsTestName());
+        bucketColl = db.getCollection('system.buckets.' + tsColl.getName());
 
-    // Check that the bounds are what we expect.
-    assert.docEq(buckets[0].value, bounds);
+        // Confirm expected results.
+        assert.docEq(tsColl.aggregate(pipeline).toArray(), results);
+        const buckets = bucketColl.aggregate(controlPipeline).toArray();
+
+        // Check that we only have one bucket.
+        assert.eq(buckets.length, 1);
+
+        // Check that the bounds are what we expect.
+        assert.docEq(buckets[0].value, bounds);
+    }
+
     rst.stopSet();
 }
 
