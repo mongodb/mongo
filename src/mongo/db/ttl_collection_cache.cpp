@@ -65,17 +65,59 @@ void TTLCollectionCache::registerTTLInfo(UUID uuid, const Info& info) {
     }
 }
 
-void TTLCollectionCache::deregisterTTLInfo(UUID uuid, const Info& info) {
+void TTLCollectionCache::_deregisterTTLInfo(UUID uuid, const Info& info) {
     stdx::lock_guard<Latch> lock(_ttlInfosLock);
     auto infoIt = _ttlInfos.find(uuid);
     fassert(5400705, infoIt != _ttlInfos.end());
     auto& [_, infoVec] = *infoIt;
 
-    auto iter = std::find(infoVec.begin(), infoVec.end(), info);
+    auto iter = infoVec.begin();
+    if (info.isClustered()) {
+        // For clustered collections, we cannot have more than one clustered info per UUID.
+        // All we have to do here is ensure that the 'info' to search for is also 'clustered'.
+        iter = std::find_if(infoVec.begin(), infoVec.end(), [](const auto& infoVecItem) {
+            return infoVecItem.isClustered();
+        });
+    } else {
+        // For TTL indexes, we search non-clustered TTL info items on the index name only.
+        auto indexName = info.getIndexName();
+        iter = std::find_if(infoVec.begin(), infoVec.end(), [&indexName](const auto& infoVecItem) {
+            if (infoVecItem.isClustered()) {
+                return false;
+            }
+            return indexName == infoVecItem.getIndexName();
+        });
+    }
+
     fassert(40220, iter != infoVec.end());
     infoVec.erase(iter);
     if (infoVec.empty()) {
         _ttlInfos.erase(infoIt);
+    }
+}
+
+void TTLCollectionCache::deregisterTTLIndexByName(UUID uuid, const IndexName& indexName) {
+    _deregisterTTLInfo(std::move(uuid), TTLCollectionCache::Info{indexName, /*unusedSpec=*/{}});
+}
+
+void TTLCollectionCache::deregisterTTLClusteredIndex(UUID uuid) {
+    _deregisterTTLInfo(std::move(uuid),
+                       TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}});
+}
+
+void TTLCollectionCache::unsetTTLIndexExpireAfterSecondsNaN(UUID uuid, const IndexName& indexName) {
+    stdx::lock_guard<Latch> lock(_ttlInfosLock);
+    auto infoIt = _ttlInfos.find(uuid);
+    if (infoIt == _ttlInfos.end()) {
+        return;
+    }
+
+    auto&& infoVec = infoIt->second;
+    for (auto&& info : infoVec) {
+        if (!info.isClustered() && info.getIndexName() == indexName) {
+            info.unsetExpireAfterSecondsNaN();
+            break;
+        }
     }
 }
 

@@ -278,7 +278,10 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
             // Note that TTL deletion is supported on capped clustered collections via bounded
             // collection scan, which does not use an index.
             if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName) && !coll->isCapped()) {
-                TTLCollectionCache::get(svcCtx).registerTTLInfo(coll->uuid(), indexName);
+                TTLCollectionCache::get(svcCtx).registerTTLInfo(
+                    coll->uuid(),
+                    TTLCollectionCache::Info{
+                        indexName, spec[IndexDescriptor::kExpireAfterSecondsFieldName].isNaN()});
             }
         });
 }

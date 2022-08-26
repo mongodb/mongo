@@ -143,7 +143,7 @@ const IndexDescriptor* getValidTTLIndex(OperationContext* opCtx,
                                         const BSONObj& spec,
                                         std::string indexName) {
     if (!spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
-        ttlCollectionCache->deregisterTTLInfo(collection->uuid(), indexName);
+        ttlCollectionCache->deregisterTTLIndexByName(collection->uuid(), indexName);
         return nullptr;
     }
 
@@ -354,7 +354,11 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
     // The collection was dropped.
     auto nss = collectionCatalog->lookupNSSByUUID(opCtx, uuid);
     if (!nss) {
-        ttlCollectionCache->deregisterTTLInfo(uuid, info);
+        if (info.isClustered()) {
+            ttlCollectionCache->deregisterTTLClusteredIndex(uuid);
+        } else {
+            ttlCollectionCache->deregisterTTLIndexByName(uuid, info.getIndexName());
+        }
         return false;
     }
 
@@ -407,17 +411,12 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
         ResourceConsumption::ScopedMetricsCollector scopedMetrics(opCtx, nss->db().toString());
 
         const auto& collection = coll.getCollection();
-        return stdx::visit(OverloadedVisitor{[&](const TTLCollectionCache::ClusteredId&) {
-                                                 return _deleteExpiredWithCollscan(
-                                                     opCtx, ttlCollectionCache, collection);
-                                             },
-                                             [&](const TTLCollectionCache::IndexName& indexName) {
-                                                 return _deleteExpiredWithIndex(opCtx,
-                                                                                ttlCollectionCache,
-                                                                                collection,
-                                                                                indexName);
-                                             }},
-                           info);
+        if (info.isClustered()) {
+            return _deleteExpiredWithCollscan(opCtx, ttlCollectionCache, collection);
+        } else {
+            return _deleteExpiredWithIndex(
+                opCtx, ttlCollectionCache, collection, info.getIndexName());
+        }
     } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
         // The exception is relevant to the entire TTL monitoring process, not just the specific TTL
         // index. Let the exception escape so it can be addressed at the higher monitoring layer.
@@ -468,7 +467,7 @@ bool TTLMonitor::_deleteExpiredWithIndex(OperationContext* opCtx,
                                          const CollectionPtr& collection,
                                          std::string indexName) {
     if (!collection->isIndexPresent(indexName)) {
-        ttlCollectionCache->deregisterTTLInfo(collection->uuid(), indexName);
+        ttlCollectionCache->deregisterTTLIndexByName(collection->uuid(), indexName);
         return false;
     }
 
@@ -572,8 +571,7 @@ bool TTLMonitor::_deleteExpiredWithCollscan(OperationContext* opCtx,
 
     auto expireAfterSeconds = collOptions.expireAfterSeconds;
     if (!expireAfterSeconds) {
-        ttlCollectionCache->deregisterTTLInfo(collection->uuid(),
-                                              TTLCollectionCache::ClusteredId{});
+        ttlCollectionCache->deregisterTTLClusteredIndex(collection->uuid());
         return false;
     }
 

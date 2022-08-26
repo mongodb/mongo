@@ -211,7 +211,10 @@ Status IndexCatalogImpl::init(OperationContext* opCtx, Collection* collection) {
         if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName) &&
             !collection->isCapped()) {
             TTLCollectionCache::get(opCtx->getServiceContext())
-                .registerTTLInfo(collection->uuid(), indexName);
+                .registerTTLInfo(
+                    collection->uuid(),
+                    TTLCollectionCache::Info{
+                        indexName, spec[IndexDescriptor::kExpireAfterSecondsFieldName].isNaN()});
         }
 
         bool ready = collection->isIndexReady(indexName);

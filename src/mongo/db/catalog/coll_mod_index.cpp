@@ -69,13 +69,38 @@ void _processCollModIndexRequestExpireAfterSeconds(OperationContext* opCtx,
         // Do not refer to 'idx' within this commit handler as it may be be invalidated by
         // IndexCatalog::refreshEntry().
         opCtx->recoveryUnit()->onCommit(
-            [ttlCache, uuid = coll->uuid(), indexName = idx->indexName()](auto _) {
-                ttlCache->registerTTLInfo(uuid, indexName);
+            [ttlCache, uuid = coll->uuid(), indexName = idx->indexName(), indexExpireAfterSeconds](
+                auto _) {
+                ttlCache->registerTTLInfo(
+                    uuid, TTLCollectionCache::Info{indexName, /*isExpireAfterSecondsNaN=*/false});
             });
 
         // Change the value of "expireAfterSeconds" on disk.
         autoColl->getWritableCollection(opCtx)->updateTTLSetting(
             opCtx, idx->indexName(), indexExpireAfterSeconds);
+        return;
+    }
+
+    // If the current `expireAfterSeconds` is NaN, it can never be equal to
+    // 'indexExpireAfterSeconds'.
+    if (oldExpireSecsElement.isNaN()) {
+        // Setting *oldExpireSecs is mostly for informational purposes.
+        // We could also use index_key_validate::kExpireAfterSecondsForInactiveTTLIndex but
+        // 0 is more consistent with the previous safeNumberLong() behavior and avoids potential
+        // showing the same value for the new and old values in the collMod response.
+        *oldExpireSecs = 0;
+
+        // Change the value of "expireAfterSeconds" on disk.
+        autoColl->getWritableCollection(opCtx)->updateTTLSetting(
+            opCtx, idx->indexName(), indexExpireAfterSeconds);
+
+        // Keep the TTL information maintained by the TTLCollectionCache in sync so that we don't
+        // try to fix up the TTL index during the next step-up.
+        auto ttlCache = &TTLCollectionCache::get(opCtx->getServiceContext());
+        const auto& coll = autoColl->getCollection();
+        opCtx->recoveryUnit()->onCommit(
+            [ttlCache, uuid = coll->uuid(), indexName = idx->indexName(), indexExpireAfterSeconds](
+                auto _) { ttlCache->unsetTTLIndexExpireAfterSecondsNaN(uuid, indexName); });
         return;
     }
 
