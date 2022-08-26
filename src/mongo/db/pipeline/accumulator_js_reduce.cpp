@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/accumulator_js_reduce.h"
 #include "mongo/db/pipeline/make_js_function.h"
+#include "mongo/db/pipeline/map_reduce_options_gen.h"
 
 namespace mongo {
 
@@ -119,6 +120,10 @@ void AccumulatorInternalJsReduce::processInternal(const Value& input, bool mergi
 Value AccumulatorInternalJsReduce::getValue(bool toBeMerged) {
     if (_values.size() < 1) {
         return Value{};
+    } else if (mrSingleReduceOptimizationEnabled && _values.size() == 1) {
+        // This optimization existed in the old Pre-4.4 MapReduce implementation. If the flag is
+        // set, then we should replicate the optimization. See SERVER-68766 for more details.
+        return _values[0];
     }
 
     const auto keySize = _key.getApproximateSize();
