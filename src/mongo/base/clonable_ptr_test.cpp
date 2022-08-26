@@ -286,13 +286,12 @@ void construction() {
     }
 
     // Test non-conversion pointer construction
-    { static_assert(!std::is_convertible<Clonable*, mongo::clonable_ptr<Clonable>>::value, ""); }
+    { static_assert(!std::is_convertible<Clonable*, mongo::clonable_ptr<Clonable>>::value); }
 
     // Test conversion unique pointer construction
     {
         static_assert(
-            std::is_convertible<std::unique_ptr<Clonable>, mongo::clonable_ptr<Clonable>>::value,
-            "");
+            std::is_convertible<std::unique_ptr<Clonable>, mongo::clonable_ptr<Clonable>>::value);
     }
 }
 
@@ -302,7 +301,7 @@ void augmentedConstruction() {
     // Test default construction
     {
         static_assert(
-            !std::is_default_constructible<mongo::clonable_ptr<Clonable, CloneFactory>>::value, "");
+            !std::is_default_constructible<mongo::clonable_ptr<Clonable, CloneFactory>>::value);
     }
 
     // Test Clone Factory construction
@@ -313,8 +312,7 @@ void augmentedConstruction() {
     // Test non-construction from a nullptr
     {
         static_assert(!std::is_constructible<mongo::clonable_ptr<Clonable, CloneFactory>,
-                                             std::nullptr_t>::value,
-                      "");
+                                             std::nullptr_t>::value);
     }
 #endif
 
@@ -326,8 +324,7 @@ void augmentedConstruction() {
     // Test construction from a raw Clonable pointer.
     {
         static_assert(
-            !std::is_constructible<mongo::clonable_ptr<Clonable, CloneFactory>, Clonable*>::value,
-            "");
+            !std::is_constructible<mongo::clonable_ptr<Clonable, CloneFactory>, Clonable*>::value);
     }
 #endif
 
@@ -386,22 +383,19 @@ void augmentedConstruction() {
     // Test non-conversion pointer construction
     {
         static_assert(
-            !std::is_convertible<mongo::clonable_ptr<Clonable, CloneFactory>, Clonable*>::value,
-            "");
+            !std::is_convertible<mongo::clonable_ptr<Clonable, CloneFactory>, Clonable*>::value);
     }
 
     // Test non-conversion from factory
     {
         static_assert(
-            !std::is_convertible<mongo::clonable_ptr<Clonable, CloneFactory>, CloneFactory>::value,
-            "");
+            !std::is_convertible<mongo::clonable_ptr<Clonable, CloneFactory>, CloneFactory>::value);
     }
 
     // Test conversion unique pointer construction
     {
         static_assert(!std::is_convertible<std::unique_ptr<Clonable>,
-                                           mongo::clonable_ptr<Clonable, CloneFactory>>::value,
-                      "");
+                                           mongo::clonable_ptr<Clonable, CloneFactory>>::value);
     }
 }
 

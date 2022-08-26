@@ -195,7 +195,7 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
 
 std::vector<BSONObj> makeKeys(int nChunks) {
     constexpr int nFinds = 200000;
-    static_assert(nFinds % 2 == 0, "");
+    static_assert(nFinds % 2 == 0);
 
     PseudoRandom rand(12345);
     std::vector<BSONObj> keys;
