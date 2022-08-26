@@ -315,8 +315,6 @@ public:
 
     static void notifyStartupComplete();
 
-    static void resetTableLoggingInfo();
-
     static bool useTableLogging(const NamespaceString& nss);
 
     static Status setTableLogging(OperationContext* opCtx, const std::string& uri, bool on);
@@ -341,20 +339,6 @@ private:
      */
     template <typename T>
     static T _castStatisticsValue(uint64_t statisticsValue, T maximumResultType);
-
-    static Status _setTableLogging(WiredTigerSessionCache* sessionCache,
-                                   const std::string& uri,
-                                   bool on);
-
-    // Used to keep track of the table logging setting modifications during start up. The mutex must
-    // be held prior to accessing any of the member variables in the struct.
-    static Mutex _tableLoggingInfoMutex;
-    static struct TableLoggingInfo {
-        bool isInitializing = true;
-        bool isFirstTable = true;
-        bool changeTableLogging = false;
-        bool hasPreviouslyIncompleteTableChecks = false;
-    } _tableLoggingInfo;
 };
 
 class WiredTigerConfigParser {

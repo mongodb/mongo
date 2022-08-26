@@ -8,6 +8,43 @@
 
 load('jstests/disk/libs/wt_file_helper.js');
 
+function checkTableLogSettings(conn, enabled) {
+    conn.getDBNames().forEach(function(d) {
+        let collNames =
+            conn.getDB(d)
+                .runCommand({listCollections: 1, nameOnly: true, filter: {type: "collection"}})
+                .cursor.firstBatch;
+
+        collNames.forEach(function(c) {
+            let stats = conn.getDB(d).runCommand({collStats: c.name});
+
+            let logStr = "log=(enabled=" + (enabled ? "true" : "false") + ")";
+            if (d == "local") {
+                if (c.name == "replset.minvalid" && !enabled) {
+                    // This collection is never logged in a replica set.
+                    logStr = "log=(enabled=false)";
+                } else {
+                    // All other collections and indexes in the 'local' database have table
+                    // logging enabled always.
+                    logStr = "log=(enabled=true)";
+                }
+            }
+
+            assert.eq(true, stats.wiredTiger.creationString.includes(logStr));
+            Object.keys(stats.indexDetails).forEach(function(i) {
+                assert.eq(true, stats.indexDetails[i].creationString.includes(logStr));
+            });
+        });
+    });
+}
+
+function checkTableChecksFileRemoved(dbpath) {
+    let files = listFiles(dbpath);
+    for (file of files) {
+        assert.eq(false, file.name.includes("_wt_table_checks"));
+    }
+}
+
 // Create a bunch of collections under various database names.
 let conn = MongoRunner.runMongod({});
 const dbpath = conn.dbpath;
@@ -16,112 +53,75 @@ for (let i = 0; i < 10; i++) {
     assert.commandWorked(conn.getDB(i.toString()).createCollection(i.toString()));
 }
 
+checkTableLogSettings(conn, /*enabled=*/true);
 MongoRunner.stopMongod(conn);
 
 /**
- * Test 1. The regular case, where no table logging setting modifications are needed.
+ * Test 1. Change into a single node replica set, which requires all of the table logging settings
+ * to be updated. Write the '_wt_table_checks' file and check that it gets removed.
  */
 jsTest.log("Test 1.");
 
-conn = startMongodOnExistingPath(dbpath, {});
-checkLog.containsJson(conn, 4366408, {loggingEnabled: true});
+writeFile(dbpath + "/_wt_table_checks", "");
+conn = startMongodOnExistingPath(
+    dbpath, {replSet: "mySet", setParameter: {logComponentVerbosity: tojson({verbosity: 1})}});
+checkTableChecksFileRemoved(dbpath);
+
+// Changing table logging settings.
+checkLog.containsJson(conn, 22432);
 MongoRunner.stopMongod(conn);
 
 /**
- * Test 2. Repair checks all of the table logging settings.
+ * Test 2. Restart in standalone mode with wiredTigerSkipTableLoggingChecksOnStartup. No table log
+ * settings are updated.  Write the '_wt_table_checks' file and check that it gets removed.
  */
 jsTest.log("Test 2.");
-
-assertRepairSucceeds(dbpath, conn.port, {});
-
-// Cannot use checkLog here as the server is no longer running.
-let logContents = rawMongoProgramOutput();
-assert(logContents.indexOf(
-           "Modifying the table logging settings for all existing WiredTiger tables") > 0);
-
-/**
- * Test 3. Explicitly create the '_wt_table_checks' file to force all of the table logging setting
- * modifications to be made.
- */
-jsTest.log("Test 3.");
-
-let files = listFiles(dbpath);
-for (f in files) {
-    assert(!files[f].name.includes("_wt_table_checks"));
-}
-
 writeFile(dbpath + "/_wt_table_checks", "");
-
-// Cannot skip table logging checks on startup when there are previously incomplete table checks.
-assert.throws(() => startMongodOnExistingPath(
-                  dbpath, {setParameter: "wiredTigerSkipTableLoggingChecksOnStartup=true"}));
-
-conn = startMongodOnExistingPath(dbpath, {});
-checkLog.containsJson(
-    conn, 4366405, {loggingEnabled: true, repair: false, hasPreviouslyIncompleteTableChecks: true});
-MongoRunner.stopMongod(conn);
-
-/**
- * Test 4. Change into a single replica set, which requires all of the table logging settings to be
- * updated. But simulate an interruption/crash while starting up during the table logging check
- * phase.
- *
- * The next start up will detect an unclean shutdown causing all of the table logging settings to be
- * updated.
- */
-jsTest.log("Test 4.");
-
-assert.throws(() => startMongodOnExistingPath(dbpath, {
-                  replSet: "mySet",
-                  setParameter: "failpoint.crashAfterUpdatingFirstTableLoggingSettings=" +
-                      tojson({"mode": "alwaysOn"})
-              }));
-
-// Cannot use checkLog here as the server is no longer running.
-logContents = rawMongoProgramOutput();
-assert(logContents.indexOf(
-           "Crashing due to 'crashAfterUpdatingFirstTableLoggingSettings' fail point") > 0);
-
-// The '_wt_table_checks' still exists, so all table logging settings should be modified.
-conn = startMongodOnExistingPath(dbpath, {});
-checkLog.containsJson(
-    conn, 4366405, {loggingEnabled: true, repair: false, hasPreviouslyIncompleteTableChecks: true});
-MongoRunner.stopMongod(conn);
-
-/**
- * Test 5. Change into a single node replica set, which requires all of the table logging settings
- * to be updated as the node was successfully started up as a standalone the last time.
- */
-jsTest.log("Test 5.");
-
-conn = startMongodOnExistingPath(dbpath, {replSet: "mySet"});
-checkLog.containsJson(conn, 4366406, {loggingEnabled: false});
-MongoRunner.stopMongod(conn);
-
-/**
- * Test 6. Restart as a standalone and skip table logging checks on startup. Verify that restarting
- * as a replica set again does not require any table logging modifications.
- */
-jsTest.log("Test 6.");
-
 conn = startMongodOnExistingPath(dbpath, {
     setParameter: {
         wiredTigerSkipTableLoggingChecksOnStartup: true,
         logComponentVerbosity: tojson({verbosity: 1})
     }
 });
+checkTableChecksFileRemoved(dbpath);
 
-// Skipping table logging checks for all existing tables.
-checkLog.containsJson(conn, 5548301, {wiredTigerSkipTableLoggingChecksOnStartup: true});
-
-// Log level 1 prints each individual table it skips table logging checks for.
+// Skipping table logging checks.
 checkLog.containsJson(conn, 5548302);
 
+// Changing table logging settings.
+assert(checkLog.checkContainsWithCountJson(conn, 22432, undefined, 0));
+checkTableLogSettings(conn, /*enabled=*/false);
 MongoRunner.stopMongod(conn);
 
-conn = startMongodOnExistingPath(dbpath, {replSet: "mySet"});
+/**
+ * Test 3. Change into a single node replica set again. Table log settings are checked but none are
+ * changed.  Write the '_wt_table_checks' file and check that it gets removed.
+ */
+jsTestLog("Test 3.");
+writeFile(dbpath + "/_wt_table_checks", "");
+conn = startMongodOnExistingPath(
+    dbpath, {replSet: "mySet", setParameter: {logComponentVerbosity: tojson({verbosity: 1})}});
+checkTableChecksFileRemoved(dbpath);
 
-// No table logging settings modifications are required.
-checkLog.containsJson(conn, 4366408);
+// Changing table logging settings.
+assert(checkLog.checkContainsWithCountJson(conn, 22432, undefined, 0));
+MongoRunner.stopMongod(conn);
+
+/**
+ * Test 4. Back to standalone. Check that the table log settings are enabled. Write the
+ * '_wt_table_checks' file and check that it gets removed.
+ */
+jsTest.log("Test 4.");
+writeFile(dbpath + "/_wt_table_checks", "");
+conn = startMongodOnExistingPath(dbpath,
+                                 {setParameter: {logComponentVerbosity: tojson({verbosity: 1})}});
+checkTableChecksFileRemoved(dbpath);
+
+// Changing table logging settings.
+checkLog.containsJson(conn, 22432);
+
+// Skipping table logging checks.
+assert(checkLog.checkContainsWithCountJson(conn, 5548302, undefined, 0));
+checkTableLogSettings(conn, /*enabled=*/true);
 MongoRunner.stopMongod(conn);
 }());
