@@ -29,4 +29,14 @@
 
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 
-namespace mongo {}  // namespace mongo
+#include "mongo/db/transaction/transaction_participant.h"
+
+namespace mongo {
+
+void MongoDSessionCatalogTransactionInterfaceImpl::invalidateSessionToKill(
+    OperationContext* opCtx, const SessionToKill& session) {
+    auto participant = TransactionParticipant::get(session);
+    participant.invalidate(opCtx);
+}
+
+}  // namespace mongo

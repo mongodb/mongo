@@ -99,12 +99,14 @@ auto getThreadPool(OperationContext* opCtx) {
  * set of kill tokens.
  */
 void killSessionTokens(OperationContext* opCtx,
+                       MongoDSessionCatalogTransactionInterface* ti,
                        std::vector<SessionCatalog::KillToken> sessionKillTokens) {
     if (sessionKillTokens.empty())
         return;
 
     getThreadPool(opCtx)->schedule(
         [service = opCtx->getServiceContext(),
+         ti,
          sessionKillTokens = std::move(sessionKillTokens)](auto status) mutable {
             invariant(status);
 
@@ -115,8 +117,7 @@ void killSessionTokens(OperationContext* opCtx,
 
             for (auto& sessionKillToken : sessionKillTokens) {
                 auto session = catalog->checkOutSessionForKill(opCtx, std::move(sessionKillToken));
-                auto participant = TransactionParticipant::get(session);
-                participant.invalidate(opCtx);
+                ti->invalidateSessionToKill(opCtx, session);
             }
         });
 }
@@ -569,7 +570,7 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
             sessionsToReacquireLocks.emplace_back(sessionInfo);
         }
     });
-    killSessionTokens(opCtx, std::move(sessionKillTokens));
+    killSessionTokens(opCtx, _ti.get(), std::move(sessionKillTokens));
 
     {
         // Create a new opCtx because we need an empty locker to refresh the locks.
@@ -640,8 +641,9 @@ void MongoDSessionCatalog::observeDirectWriteToConfigTransactions(OperationConte
     class KillSessionTokenOnCommit : public RecoveryUnit::Change {
     public:
         KillSessionTokenOnCommit(OperationContext* opCtx,
+                                 MongoDSessionCatalogTransactionInterface* ti,
                                  SessionCatalog::KillToken sessionKillToken)
-            : _opCtx(opCtx), _sessionKillToken(std::move(sessionKillToken)) {}
+            : _opCtx(opCtx), _ti(ti), _sessionKillToken(std::move(sessionKillToken)) {}
 
         void commit(boost::optional<Timestamp>) override {
             rollback();
@@ -650,11 +652,12 @@ void MongoDSessionCatalog::observeDirectWriteToConfigTransactions(OperationConte
         void rollback() override {
             std::vector<SessionCatalog::KillToken> sessionKillTokenVec;
             sessionKillTokenVec.emplace_back(std::move(_sessionKillToken));
-            killSessionTokens(_opCtx, std::move(sessionKillTokenVec));
+            killSessionTokens(_opCtx, _ti, std::move(sessionKillTokenVec));
         }
 
     private:
         OperationContext* _opCtx;
+        MongoDSessionCatalogTransactionInterface* _ti;
         SessionCatalog::KillToken _sessionKillToken;
     };
 
@@ -662,7 +665,7 @@ void MongoDSessionCatalog::observeDirectWriteToConfigTransactions(OperationConte
 
     const auto lsid =
         LogicalSessionId::parse(IDLParserContext("lsid"), singleSessionDoc["_id"].Obj());
-    catalog->scanSession(lsid, [&](const ObservableSession& session) {
+    catalog->scanSession(lsid, [&, ti = _ti.get()](const ObservableSession& session) {
         const auto participant = TransactionParticipant::get(session);
         uassert(ErrorCodes::PreparedTransactionInProgress,
                 str::stream() << "Cannot modify the entry for session "
@@ -671,7 +674,7 @@ void MongoDSessionCatalog::observeDirectWriteToConfigTransactions(OperationConte
                 !participant.transactionIsPrepared());
 
         opCtx->recoveryUnit()->registerChange(
-            std::make_unique<KillSessionTokenOnCommit>(opCtx, session.kill()));
+            std::make_unique<KillSessionTokenOnCommit>(opCtx, ti, session.kill()));
     });
 }
 
@@ -688,7 +691,7 @@ void MongoDSessionCatalog::invalidateAllSessions(OperationContext* opCtx) {
         sessionKillTokens.emplace_back(session.kill());
     });
 
-    killSessionTokens(opCtx, std::move(sessionKillTokens));
+    killSessionTokens(opCtx, _ti.get(), std::move(sessionKillTokens));
 }
 
 int MongoDSessionCatalog::reapSessionsOlderThan(OperationContext* opCtx,

@@ -46,6 +46,8 @@ class MongoDSessionCatalogTransactionInterfaceImpl
 public:
     MongoDSessionCatalogTransactionInterfaceImpl() = default;
     virtual ~MongoDSessionCatalogTransactionInterfaceImpl() = default;
+
+    void invalidateSessionToKill(OperationContext* opCtx, const SessionToKill& session) override;
 };
 
 }  // namespace mongo

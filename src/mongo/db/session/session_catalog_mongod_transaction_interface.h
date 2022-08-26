@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include "mongo/db/operation_context.h"
+#include "mongo/db/transaction/transaction_participant.h"  // for SessionToKill
+
 namespace mongo {
 
 /**
@@ -39,6 +42,12 @@ namespace mongo {
 class MongoDSessionCatalogTransactionInterface {
 public:
     virtual ~MongoDSessionCatalogTransactionInterface() = default;
+
+    /**
+     * Marks the session as requiring refresh. Used when the session state has been modified
+     * externally, such as through a direct write to the transactions table.
+     */
+    virtual void invalidateSessionToKill(OperationContext* opCtx, const SessionToKill& session) = 0;
 };
 
 }  // namespace mongo
