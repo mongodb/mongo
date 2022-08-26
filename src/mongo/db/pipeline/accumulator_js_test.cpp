@@ -197,6 +197,41 @@ TEST_F(MapReduceFixture, InternalJsReduceFailsWhenEvalContainsInvalidJavascript)
     }
 }
 
+TEST_F(
+    MapReduceFixture,
+    InternalJsReduceFailsDependentOnDocumentCountWhenEvalIsInvalidJavascriptWithSingleReduceOpt) {
+    std::string optionName = "mrEnableSingleReduceOptimization";
+    auto param = ServerParameterSet::getGlobal()->get(optionName);
+    uassertStatusOK(param->set(BSON(optionName << true).firstElement()));
+    std::string eval("INVALID_JAVASCRIPT");
+    // Multiple source documents should evaluate the passed in function and return an error with
+    // invalid javascript.
+    {
+        auto accum = AccumulatorInternalJsReduce::create(getExpCtx(), "INVALID_JAVASCRIPT");
+        auto input = Value(DOC("k" << Value(1) << "v" << Value(2)));
+        accum->process(input, false);
+        accum->process(input, false);
+
+        ASSERT_THROWS_CODE(accum->getValue(false), DBException, ErrorCodes::JSInterpreterFailure);
+    }
+
+    // Single source document. With the reduce optimization, we simply return this document rather
+    // than executing the JS engine at all, so no error is thrown.
+    {
+        auto accum = AccumulatorInternalJsReduce::create(getExpCtx(), "INVALID_JAVASCRIPT");
+
+        auto input = Value(DOC("k" << Value(1) << "v" << Value(2)));
+        auto expectedResult = Value(2);
+
+        accum->process(input, false);
+        Value result = accum->getValue(false);
+
+        ASSERT_VALUE_EQ(expectedResult, result);
+        ASSERT_EQUALS(expectedResult.getType(), result.getType());
+    }
+    uassertStatusOK(param->set(BSON(optionName << false).firstElement()));
+}
+
 TEST_F(MapReduceFixture, InternalJsReduceFailsIfArgumentNotDocument) {
     auto argument = Value(2);
     assertProcessFailsWithCode<AccumulatorInternalJsReduce>(

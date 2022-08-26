@@ -131,7 +131,8 @@ env.Library(
         'accumulator_push.cpp',
         'accumulator_std_dev.cpp',
         'accumulator_sum.cpp',
-        ],
+        'map_reduce_options.idl',
+    ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/db/query/query_knobs',
@@ -139,7 +140,10 @@ env.Library(
         '$BUILD_DIR/mongo/util/summation',
         'expression',
         'field_path',
-    ]
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
 )
 
 env.Library(
