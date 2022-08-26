@@ -48,6 +48,12 @@ public:
     virtual ~MongoDSessionCatalogTransactionInterfaceImpl() = default;
 
     void invalidateSessionToKill(OperationContext* opCtx, const SessionToKill& session) override;
+
+    ScanSessionsCallbackFn makeParentSessionWorkerFnForReap(
+        TxnNumber* parentSessionActiveTxnNumber) override;
+
+    ScanSessionsCallbackFn makeChildSessionWorkerFnForReap(
+        const TxnNumber& parentSessionActiveTxnNumber) override;
 };
 
 }  // namespace mongo

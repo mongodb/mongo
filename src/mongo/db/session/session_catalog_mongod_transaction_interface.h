@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/session/session_catalog.h"              // for ScanSessionsCallbackFn
 #include "mongo/db/transaction/transaction_participant.h"  // for SessionToKill
 
 namespace mongo {
@@ -41,6 +42,8 @@ namespace mongo {
  */
 class MongoDSessionCatalogTransactionInterface {
 public:
+    using ScanSessionsCallbackFn = SessionCatalog::ScanSessionsCallbackFn;
+
     virtual ~MongoDSessionCatalogTransactionInterface() = default;
 
     /**
@@ -48,6 +51,23 @@ public:
      * externally, such as through a direct write to the transactions table.
      */
     virtual void invalidateSessionToKill(OperationContext* opCtx, const SessionToKill& session) = 0;
+
+    /**
+     * Returns a 'parentSessionWorkerFn' that can be passed to
+     * SessionCatalog::scanSessionsForReap().
+     *
+     * Accepts an output parameter for the parent session's TxnNumber.
+     */
+    virtual ScanSessionsCallbackFn makeParentSessionWorkerFnForReap(
+        TxnNumber* parentSessionActiveTxnNumber) = 0;
+
+    /**
+     * Returns a 'childSessionWorkerFn' that can be passed to SessionCatalog::scanSessionsForReap().
+     *
+     * Accepts a reference to the parent session's TxnNumber.
+     */
+    virtual ScanSessionsCallbackFn makeChildSessionWorkerFnForReap(
+        const TxnNumber& parentSessionActiveTxnNumber) = 0;
 };
 
 }  // namespace mongo

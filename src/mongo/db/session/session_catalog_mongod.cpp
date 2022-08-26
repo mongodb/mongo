@@ -49,7 +49,6 @@
 #include "mongo/db/session/sessions_collection.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/fail_point.h"
@@ -140,7 +139,10 @@ void disallowDirectWritesUnderSession(OperationContext* opCtx) {
  * not removed because they were in use.
  */
 LogicalSessionIdSet removeExpiredTransactionSessionsNotInUseFromMemory(
-    OperationContext* opCtx, SessionsCollection& sessionsCollection, Date_t possiblyExpired) {
+    OperationContext* opCtx,
+    MongoDSessionCatalogTransactionInterface* ti,
+    SessionsCollection& sessionsCollection,
+    Date_t possiblyExpired) {
     const auto catalog = SessionCatalog::get(opCtx);
 
     // Find the possibly expired logical session ids in the in-memory catalog.
@@ -170,55 +172,8 @@ LogicalSessionIdSet removeExpiredTransactionSessionsNotInUseFromMemory(
         TxnNumber parentSessionActiveTxnNumber;
         const auto transactionSessionIdsNotReaped = catalog->scanSessionsForReap(
             expiredLogicalSessionId,
-            [&](ObservableSession& parentSession) {
-                const auto transactionSessionId = parentSession.getSessionId();
-                const auto txnParticipant = TransactionParticipant::get(parentSession);
-                const auto txnRouter = TransactionRouter::get(parentSession);
-
-                parentSessionActiveTxnNumber =
-                    txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnNumber();
-                if (txnParticipant.canBeReaped() && txnRouter.canBeReaped()) {
-                    LOGV2_DEBUG(6753702,
-                                5,
-                                "Marking parent transaction session for reap",
-                                "lsid"_attr = transactionSessionId);
-                    // This is an external session so it can be reaped if and only if all of its
-                    // internal sessions can be reaped.
-                    parentSession.markForReap(ObservableSession::ReapMode::kNonExclusive);
-                }
-            },
-            [&](ObservableSession& childSession) {
-                const auto transactionSessionId = childSession.getSessionId();
-                const auto txnParticipant = TransactionParticipant::get(childSession);
-                const auto txnRouter = TransactionRouter::get(childSession);
-
-                if (txnParticipant.canBeReaped() && txnRouter.canBeReaped()) {
-                    if (isInternalSessionForNonRetryableWrite(transactionSessionId)) {
-                        LOGV2_DEBUG(6753703,
-                                    5,
-                                    "Marking child transaction session for reap",
-                                    "lsid"_attr = transactionSessionId);
-                        // This is an internal session for a non-retryable write so it can be reaped
-                        // independently of the external session that write ran in.
-                        childSession.markForReap(ObservableSession::ReapMode::kExclusive);
-                    } else if (isInternalSessionForRetryableWrite(transactionSessionId)) {
-                        LOGV2_DEBUG(6753704,
-                                    5,
-                                    "Marking child transaction session for reap",
-                                    "lsid"_attr = transactionSessionId);
-                        // This is an internal session for a retryable write so it must be reaped
-                        // atomically with the external session and internal sessions for that
-                        // retryable write, unless the write is no longer active (i.e. there is
-                        // already a retryable write or transaction with a higher txnNumber).
-                        childSession.markForReap(*transactionSessionId.getTxnNumber() <
-                                                         parentSessionActiveTxnNumber
-                                                     ? ObservableSession::ReapMode::kExclusive
-                                                     : ObservableSession::ReapMode::kNonExclusive);
-                    } else {
-                        MONGO_UNREACHABLE;
-                    }
-                }
-            });
+            ti->makeParentSessionWorkerFnForReap(&parentSessionActiveTxnNumber),
+            ti->makeChildSessionWorkerFnForReap(parentSessionActiveTxnNumber));
         expiredTransactionSessionIdsStillInUse.insert(transactionSessionIdsNotReaped.begin(),
                                                       transactionSessionIdsNotReaped.end());
     }
@@ -699,7 +654,7 @@ int MongoDSessionCatalog::reapSessionsOlderThan(OperationContext* opCtx,
                                                 Date_t possiblyExpired) {
     const auto expiredTransactionSessionIdsStillInUse =
         removeExpiredTransactionSessionsNotInUseFromMemory(
-            opCtx, sessionsCollection, possiblyExpired);
+            opCtx, _ti.get(), sessionsCollection, possiblyExpired);
 
     // The "unsafe" check for primary below is a best-effort attempt to ensure that the on-disk
     // state reaping code doesn't run if the node is secondary and cause log spam. It is a work
