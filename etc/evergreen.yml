@@ -1377,7 +1377,7 @@ buildvariants:
 - <<: *enterprise-rhel-80-64-bit-dynamic-required-template
   name: enterprise-rhel-80-64-bit-dynamic-debug-mode
   display_name: "Shared Library Enterprise RHEL 8.0 Debug Mode"
-  cron: "0 4 */3 * *" # Run once every three days
+  cron: "0 0 1 1 *" # Run once every year to temporarily disable
   expansions:
     <<: *enterprise-rhel-80-64-bit-dynamic-required-expansions
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --use-glibcxx-debug --dbg=on --allocator=system
