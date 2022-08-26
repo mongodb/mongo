@@ -458,7 +458,11 @@ public:
         /**
          * Read from the timestamp provided to setTimestampReadSource.
          */
-        kProvided
+        kProvided,
+        /**
+         * Read from the latest checkpoint.
+         */
+        kCheckpoint
     };
 
     static std::string toString(ReadSource rs) {
@@ -475,6 +479,8 @@ public:
                 return "kAllDurableSnapshot";
             case ReadSource::kProvided:
                 return "kProvided";
+            case ReadSource::kCheckpoint:
+                return "kCheckpoint";
         }
         MONGO_UNREACHABLE;
     }

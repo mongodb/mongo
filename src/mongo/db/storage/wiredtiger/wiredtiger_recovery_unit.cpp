@@ -545,6 +545,7 @@ boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp(
     // read timestamps.
     switch (_timestampReadSource) {
         case ReadSource::kNoTimestamp:
+        case ReadSource::kCheckpoint:
             return boost::none;
         case ReadSource::kProvided:
             // The read timestamp is set by the user and does not require a transaction to be open.
@@ -587,6 +588,7 @@ boost::optional<Timestamp> WiredTigerRecoveryUnit::getPointInTimeReadTimestamp(
         // The follow ReadSources returned values in the first switch block.
         case ReadSource::kNoTimestamp:
         case ReadSource::kProvided:
+        case ReadSource::kCheckpoint:
             MONGO_UNREACHABLE;
     }
     MONGO_UNREACHABLE;
@@ -610,6 +612,15 @@ void WiredTigerRecoveryUnit::_txnOpen() {
             if (_isOplogReader) {
                 _oplogVisibleTs = static_cast<std::int64_t>(_oplogManager->getOplogReadTimestamp());
             }
+            WiredTigerBeginTxnBlock(session,
+                                    _prepareConflictBehavior,
+                                    _roundUpPreparedTimestamps,
+                                    RoundUpReadTimestamp::kNoRoundError,
+                                    _untimestampedWriteAssertion)
+                .done();
+            break;
+        }
+        case ReadSource::kCheckpoint: {
             WiredTigerBeginTxnBlock(session,
                                     _prepareConflictBehavior,
                                     _roundUpPreparedTimestamps,

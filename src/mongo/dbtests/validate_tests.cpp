@@ -120,8 +120,8 @@ public:
 
 protected:
     ValidateResults runValidate() {
-        // Callers continue to do operations after running validate, so we must reset the read
-        // source back to normal before returning.
+        // validate() will set a kCheckpoint read source. Callers continue to do operations after
+        // running validate, so we must reset the read source back to normal before returning.
         auto originalReadSource = _opCtx.recoveryUnit()->getTimestampReadSource();
         ON_BLOCK_EXIT([&] {
             _opCtx.recoveryUnit()->abandonSnapshot();

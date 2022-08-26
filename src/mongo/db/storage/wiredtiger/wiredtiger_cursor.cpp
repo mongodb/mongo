@@ -48,11 +48,23 @@ WiredTigerCursor::WiredTigerCursor(const std::string& uri,
     _tableID = tableID;
     _ru = WiredTigerRecoveryUnit::get(opCtx);
     _session = _ru->getSession();
+    _isCheckpoint =
+        (_ru->getTimestampReadSource() == WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
 
     // Construct a new cursor with the provided options.
     str::stream builder;
     if (_ru->getReadOnce()) {
         builder << "read_once=true,";
+    }
+    if (_isCheckpoint) {
+        // Type can be "lsm" or "file".
+        std::string type, sourceURI;
+        WiredTigerUtil::fetchTypeAndSourceURI(opCtx, uri, &type, &sourceURI);
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "LSM does not support opening cursors by checkpoint",
+                type != "lsm");
+
+        builder << "checkpoint=WiredTigerCheckpoint,";
     }
     // Add this option last to avoid needing a trailing comma. This enables an optimization in
     // WiredTiger to skip parsing the config string. See SERVER-43232 for details.
@@ -71,7 +83,12 @@ WiredTigerCursor::WiredTigerCursor(const std::string& uri,
     try {
         _cursor = _session->getNewCursor(uri, _config.c_str());
     } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
-        LOGV2_FATAL_NOTRACE(50883, "{ex}", "Cursor not found", "error"_attr = ex);
+        // A WiredTiger table will not be available in the latest checkpoint if the checkpoint
+        // thread hasn't run after the initial WiredTiger table was created.
+        if (!_isCheckpoint) {
+            LOGV2_FATAL_NOTRACE(50883, "{ex}", "Cursor not found", "error"_attr = ex);
+        }
+        throw;
     }
 }
 

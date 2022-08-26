@@ -78,6 +78,7 @@ protected:
     WiredTigerRecoveryUnit* _ru;
     WiredTigerSession* _session;
     std::string _config;
+    bool _isCheckpoint;
 
     WT_CURSOR* _cursor = nullptr;  // Owned
 };
