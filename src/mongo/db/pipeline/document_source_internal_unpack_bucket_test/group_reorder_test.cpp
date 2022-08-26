@@ -94,22 +94,6 @@ TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadata) {
     ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
 }
 
-TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetafield) {
-    auto unpackSpecObj = fromjson(
-        "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], metaField: 'meta1', timeField: 't', "
-        "bucketMaxSpanSeconds: 3600}}");
-    auto groupSpecObj = fromjson("{$group: {_id: '$meta1.a.b', accmin: {$sum: '$meta1.f1'}}}");
-
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj, groupSpecObj), getExpCtx());
-    pipeline->optimizePipeline();
-
-    auto serialized = pipeline->serializeToBson();
-    ASSERT_EQ(1, serialized.size());
-
-    auto optimized = fromjson("{$group: {_id: '$meta.a.b', accmin: {$sum: '$meta.f1'}}}");
-    ASSERT_BSONOBJ_EQ(optimized, serialized[0]);
-}
-
 TEST_F(InternalUnpackBucketGroupReorder, MinMaxGroupOnMetadataNegative) {
     auto unpackSpecObj = fromjson(
         "{$_internalUnpackBucket: { include: ['a', 'b', 'c'], timeField: 't', metaField: 'meta', "
