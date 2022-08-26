@@ -202,6 +202,20 @@ Status IndexCatalogImpl::init(OperationContext* opCtx, Collection* collection) {
 
         auto descriptor = std::make_unique<IndexDescriptor>(_getAccessMethodName(keyPattern), spec);
 
+        // TTL indexes with NaN 'expireAfterSeconds' cause problems in multiversion settings.
+        if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
+            if (spec[IndexDescriptor::kExpireAfterSecondsFieldName].isNaN()) {
+                LOGV2_OPTIONS(6852200,
+                              {logv2::LogTag::kStartupWarnings},
+                              "Found an existing TTL index with NaN 'expireAfterSeconds' in the "
+                              "catalog.",
+                              "ns"_attr = collection->ns(),
+                              "uuid"_attr = collection->uuid(),
+                              "index"_attr = indexName,
+                              "spec"_attr = spec);
+            }
+        }
+
         // TTL indexes are not compatible with capped collections.
         // Note that TTL deletion is supported on capped clustered collections via bounded
         // collection scan, which does not use an index.
