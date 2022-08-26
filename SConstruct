@@ -5543,6 +5543,8 @@ if env['SPLIT_DWARF'] == "auto":
     env['SPLIT_DWARF'] = env.ToolchainIs('gcc') and not link_model == "dynamic"
 
 if env['SPLIT_DWARF']:
+    if env.ToolchainIs('gcc', 'clang'):
+        env.AddToLINKFLAGSIfSupported('-Wl,--gdb-index')
     env.Tool('split_dwarf')
 
 env["AUTO_ARCHIVE_TARBALL_SUFFIX"] = "tgz"
