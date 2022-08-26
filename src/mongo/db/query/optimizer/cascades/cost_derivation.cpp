@@ -168,9 +168,9 @@ public:
         double evalCost = childResult._cost;
         if (!isTrivialExpr<EvalPath>(node.getProjection())) {
             // Non-trivial projection.
-            evalCost += kStartupCost + kEvalIncrementalCost * childResult._ce;
+            evalCost += kStartupCost + kEvalIncrementalCost * _cardinalityEstimate;
         }
-        return {evalCost, childResult._ce};
+        return {evalCost, _cardinalityEstimate};
     }
 
     CostAndCEInternal operator()(const ABT& /*n*/, const BinaryJoinNode& node) {

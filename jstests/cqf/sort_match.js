@@ -27,7 +27,7 @@ let res = t.explain("executionStats").aggregate([{$sort: {b: 1}}, {$match: {a: {
 assert.eq(1, res.executionStats.nReturned);
 
 // Index on "a" is preferred.
-const indexNode = res.queryPlanner.winningPlan.optimizerPlan.child.child.leftChild;
-assert.eq("IndexScan", indexNode.nodeType);
-assert.eq("a_1", indexNode.indexDefName);
+const indexNode = navigateToPlanPath(res, "child.child.leftChild");
+assertValueOnPath("IndexScan", indexNode, "nodeType");
+assertValueOnPath("a_1", indexNode, "indexDefName");
 }());

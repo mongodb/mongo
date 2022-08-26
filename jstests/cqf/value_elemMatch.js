@@ -32,21 +32,19 @@ assert.commandWorked(t.createIndex({a: 1}));
     const res =
         t.explain("executionStats").aggregate([{$match: {a: {$elemMatch: {$gte: 5, $lte: 6}}}}]);
     assert.eq(2, res.executionStats.nReturned);
-    assert.eq("IndexScan",
-              res.queryPlanner.winningPlan.optimizerPlan.child.child.leftChild.child.nodeType);
+    assertValueOnPlanPath("IndexScan", res, "child.child.leftChild.child.nodeType");
 }
 {
     const res =
         t.explain("executionStats").aggregate([{$match: {a: {$elemMatch: {$lt: 11, $gt: 9}}}}]);
     assert.eq(1, res.executionStats.nReturned);
-    assert.eq("IndexScan",
-              res.queryPlanner.winningPlan.optimizerPlan.child.child.leftChild.child.nodeType);
+    assertValueOnPlanPath("IndexScan", res, "child.child.leftChild.child.nodeType");
 }
 {
     // Contradiction.
     const res =
         t.explain("executionStats").aggregate([{$match: {a: {$elemMatch: {$lt: 5, $gt: 6}}}}]);
     assert.eq(0, res.executionStats.nReturned);
-    assert.eq("CoScan", res.queryPlanner.winningPlan.optimizerPlan.child.child.child.nodeType);
+    assertValueOnPlanPath("CoScan", res, "child.child.child.nodeType");
 }
 }());

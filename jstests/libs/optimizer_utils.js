@@ -76,3 +76,40 @@ function getPlanSkeleton(node) {
                                       .map(key => [key, getPlanSkeleton(node[key])]));
     }
 }
+
+function navigateToPath(doc, path) {
+    try {
+        let result = doc;
+        for (const field of path.split(".")) {
+            assert(result.hasOwnProperty(field));
+            result = result[field];
+        }
+        return result;
+    } catch (e) {
+        jsTestLog("Error navigating to path '" + path + "'");
+        printjson(doc);
+        throw e;
+    }
+}
+
+function navigateToPlanPath(doc, path) {
+    return navigateToPath(doc, "queryPlanner.winningPlan.optimizerPlan." + path);
+}
+
+function assertValueOnPathFn(value, doc, path, fn) {
+    try {
+        assert.eq(value, fn(doc, path));
+    } catch (e) {
+        jsTestLog("Assertion error.");
+        printjson(doc);
+        throw e;
+    }
+}
+
+function assertValueOnPath(value, doc, path) {
+    assertValueOnPathFn(value, doc, path, navigateToPath);
+}
+
+function assertValueOnPlanPath(value, doc, path) {
+    assertValueOnPathFn(value, doc, path, navigateToPlanPath);
+}

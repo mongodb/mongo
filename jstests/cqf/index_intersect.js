@@ -31,17 +31,17 @@ let res = t.explain("executionStats").aggregate([{$match: {'a': 3, 'b': 3}}]);
 assert.eq(nMatches, res.executionStats.nReturned);
 
 // Verify we can place a MergeJoin
-let joinNode = res.queryPlanner.winningPlan.optimizerPlan.child.leftChild;
-assert.eq("MergeJoin", joinNode.nodeType);
-assert.eq("IndexScan", joinNode.leftChild.nodeType);
-assert.eq("IndexScan", joinNode.rightChild.children[0].child.nodeType);
+let joinNode = navigateToPlanPath(res, "child.leftChild");
+assertValueOnPath("MergeJoin", joinNode, "nodeType");
+assertValueOnPath("IndexScan", joinNode, "leftChild.nodeType");
+assertValueOnPath("IndexScan", joinNode, "rightChild.children.0.child.nodeType");
 
 // One side is not equality, and we use a HashJoin.
 res = t.explain("executionStats").aggregate([{$match: {'a': {$lte: 3}, 'b': 3}}]);
 assert.eq(nMatches, res.executionStats.nReturned);
 
-joinNode = res.queryPlanner.winningPlan.optimizerPlan.child.leftChild;
-assert.eq("HashJoin", joinNode.nodeType);
-assert.eq("IndexScan", joinNode.leftChild.nodeType);
-assert.eq("IndexScan", joinNode.rightChild.children[0].child.nodeType);
+joinNode = navigateToPlanPath(res, "child.leftChild");
+assertValueOnPath("HashJoin", joinNode, "nodeType");
+assertValueOnPath("IndexScan", joinNode, "leftChild.nodeType");
+assertValueOnPath("IndexScan", joinNode, "rightChild.children.0.child.nodeType");
 }());

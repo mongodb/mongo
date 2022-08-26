@@ -35,7 +35,7 @@ const res = coll.explain("executionStats")
                 .finish();
 assert.eq(numResults, res.executionStats.nReturned);
 
-const indexScanNode = res.queryPlanner.winningPlan.optimizerPlan.child.child.child.leftChild.child;
-assert.eq("IndexScan", indexScanNode.nodeType);
-assert.eq(5, indexScanNode.interval[0].highBound.bound.value);
+const indexScanNode = navigateToPlanPath(res, "child.child.child.leftChild.child.child");
+assertValueOnPath("IndexScan", indexScanNode, "nodeType");
+assertValueOnPath(5, indexScanNode, "interval.0.highBound.bound.value");
 }());

@@ -21,7 +21,7 @@ const variants = [1, 2, 3, 4, 5, 6, 7, 8];
 const results = [1, 2, 3, 4, 5, 6, 7, 8];
 const winColor = [true, false, null];
 
-const nbGames = 1000;  // 1000 * 1000;
+const nbGames = 10000;
 
 function intRandom(max) {
     return Random.randInt(max);
@@ -100,8 +100,17 @@ const res = coll.explain("executionStats").aggregate([
 
 // TODO: verify expected results.
 
-// Verify we are using the index on "minutes".
-const indexNode = res.queryPlanner.winningPlan.optimizerPlan.child.child.leftChild;
-assert.eq("IndexScan", indexNode.nodeType);
-assert.eq("minutes_1", indexNode.indexDefName);
+// Verify we are getting an intersection between "minutes" and either "turns" or "avgRating".
+// The plan is currently not stable due to sampling.
+{
+    const indexNode = navigateToPlanPath(res, "child.child.leftChild.leftChild");
+    assertValueOnPath("IndexScan", indexNode, "nodeType");
+    assertValueOnPath("minutes_1", indexNode, "indexDefName");
+}
+{
+    const indexNode = navigateToPlanPath(res, "child.child.leftChild.rightChild.children.0.child");
+    assertValueOnPath("IndexScan", indexNode, "nodeType");
+    const indexName = navigateToPath(indexNode, "indexDefName");
+    assert(indexName === "turns_1" || indexName === "avgRating_1");
+}
 }());

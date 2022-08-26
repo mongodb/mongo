@@ -60,7 +60,29 @@ double CETester::getCE(const std::string& query, size_t optimizationLevel) const
 }
 
 double CETester::getCE(ABT& abt, size_t optimizationLevel) const {
-    OptPhaseManager phaseManager = getPhaseManager(optimizationLevel);
+    // Needs to outlive the phase manager.
+    PrefixId prefixId;
+
+    // Mock metadata.
+    ScanDefinition sd({}, {}, {DistributionType::Centralized}, true, _collCard);
+    Metadata metadata({{_collName, sd}});
+
+    std::vector<OptPhaseManager::OptPhase> optPhaseChoices{
+        OptPhaseManager::OptPhase::MemoSubstitutionPhase,
+        OptPhaseManager::OptPhase::MemoExplorationPhase};
+    optimizationLevel = std::min(optimizationLevel, optPhaseChoices.size());
+    OptPhaseManager::PhaseSet optPhases;
+    for (size_t i = 0; i < optimizationLevel; ++i) {
+        optPhases.insert(optPhaseChoices[i]);
+    }
+
+    optimizer::OptPhaseManager phaseManager(optPhases,
+                                            prefixId,
+                                            true /*requireRID*/,
+                                            metadata,
+                                            std::make_unique<HeuristicCE>(),
+                                            std::make_unique<DefaultCosting>(),
+                                            DebugInfo::kDefaultForTests);
 
     // Optimize.
     ASSERT_TRUE(phaseManager.optimize(abt));
@@ -75,31 +97,6 @@ double CETester::getCE(ABT& abt, size_t optimizationLevel) const {
 #endif
 
     return ce;
-}
-
-optimizer::OptPhaseManager CETester::getPhaseManager(size_t optimizationLevel) const {
-    // Mock memo.
-    ScanDefinition sd({}, {}, {DistributionType::Centralized}, true, _collCard);
-    Metadata metadata({{_collName, sd}});
-
-    std::vector<OptPhaseManager::OptPhase> optPhaseChoices{
-        OptPhaseManager::OptPhase::MemoSubstitutionPhase,
-        OptPhaseManager::OptPhase::MemoExplorationPhase};
-    optimizationLevel = std::min(optimizationLevel, optPhaseChoices.size());
-    OptPhaseManager::PhaseSet optPhases;
-    for (size_t i = 0; i < optimizationLevel; ++i) {
-        optPhases.insert(optPhaseChoices[i]);
-    }
-
-    // Construct placeholder PhaseManager. Notice that it also creates a Memo internally.
-    PrefixId prefixId;
-    return {optPhases,
-            prefixId,
-            true /*requireRID*/,
-            metadata,
-            std::make_unique<HeuristicCE>(),
-            std::make_unique<DefaultCosting>(),
-            DebugInfo::kDefaultForTests};
 }
 
 }  // namespace mongo::ce

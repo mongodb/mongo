@@ -104,7 +104,7 @@ ProjectionNameSet extractReferencedColumns(const properties::PhysProps& properti
 /**
  * Returns true if all components of the compound interval are equalities.
  */
-bool areMultiKeyIntervalsEqualities(const MultiKeyIntervalRequirement& intervals);
+bool areCompoundIntervalsEqualities(const CompoundIntervalRequirement& intervals);
 
 struct CollationSplitResult {
     bool _validSplit = false;
@@ -211,19 +211,26 @@ std::string encodeIndexKeyName(size_t indexField);
 size_t decodeIndexKeyName(const std::string& fieldName);
 
 /**
- * Compute a mapping [indexName -> CandidateIndexEntry] that describes intervals that could be
+ * Compute a list of candidate indexes. A CandidateIndexEntry describes intervals that could be
  * used for accessing each of the indexes in the map. The intervals themselves are derived from
  * 'reqMap'.
  * If the intersection of any of the interval requirements in 'reqMap' results in an empty
- * interval, return an empty mappting and set 'hasEmptyInterval' to true.
+ * interval, return an empty mapping and set 'hasEmptyInterval' to true.
  * Otherwise return the computed mapping, and set 'hasEmptyInterval' to false.
  */
-CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
-                                           const ProjectionName& scanProjectionName,
-                                           const PartialSchemaRequirements& reqMap,
-                                           const ScanDefinition& scanDef,
-                                           bool fastNullHandling,
-                                           bool& hasEmptyInterval);
+CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
+                                         const ProjectionName& scanProjectionName,
+                                         const PartialSchemaRequirements& reqMap,
+                                         const ScanDefinition& scanDef,
+                                         bool fastNullHandling,
+                                         bool& hasEmptyInterval);
+
+/**
+ * Computes a set of residual predicates which will be applied on top of a Scan.
+ */
+boost::optional<ScanParams> computeScanParams(PrefixId& prefixId,
+                                              const PartialSchemaRequirements& reqMap,
+                                              const ProjectionName& rootProj);
 
 /**
  * Checks if we have an interval tree which has at least one atomic interval which may include Null
@@ -241,27 +248,22 @@ void lowerPartialSchemaRequirement(const PartialSchemaKey& key,
                                    const std::function<void(const ABT& node)>& visitor =
                                        [](const ABT&) {});
 
-void lowerPartialSchemaRequirements(CEType baseCE,
-                                    CEType scanGroupCE,
-                                    ResidualRequirements& requirements,
+void lowerPartialSchemaRequirements(CEType scanGroupCE,
+                                    std::vector<SelectivityType> indexPredSels,
+                                    ResidualRequirementsWithCE& requirements,
                                     ABT& physNode,
                                     NodeCEMap& nodeCEMap);
 
-void computePhysicalScanParams(PrefixId& prefixId,
-                               const PartialSchemaRequirements& reqMap,
-                               const PartialSchemaKeyCE& partialSchemaKeyCEMap,
-                               const ProjectionNameOrderPreservingSet& requiredProjections,
-                               ResidualRequirements& residualRequirements,
-                               ProjectionRenames& projectionRenames,
-                               FieldProjectionMap& fieldProjectionMap,
-                               bool& requiresRootProjection);
-
-void sortResidualRequirements(ResidualRequirements& residualReq);
+void sortResidualRequirements(ResidualRequirementsWithCE& residualReq);
 
 void applyProjectionRenames(ProjectionRenames projectionRenames,
                             ABT& node,
                             const std::function<void(const ABT& node)>& visitor = [](const ABT&) {
                             });
+
+void removeRedundantResidualPredicates(const ProjectionNameOrderPreservingSet& requiredProjections,
+                                       ResidualRequirements& residualReqs,
+                                       FieldProjectionMap& fieldProjectionMap);
 
 /**
  * Implements an RID Intersect node using Union and GroupBy.
@@ -311,7 +313,7 @@ ABT lowerIntervals(PrefixId& prefixId,
                    FieldProjectionMap indexProjectionMap,
                    const std::string& scanDefName,
                    const std::string& indexDefName,
-                   const MultiKeyIntervalReqExpr::Node& intervals,
+                   const CompoundIntervalReqExpr::Node& intervals,
                    bool reverseOrder,
                    CEType indexCE,
                    CEType scanGroupCE,

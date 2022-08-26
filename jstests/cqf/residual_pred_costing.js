@@ -35,9 +35,9 @@ try {
     assert.eq(nDocs * 0.1, res.executionStats.nReturned);
 
     // Demonstrate we can pick the indexing covering most fields.
-    const indexNode = res.queryPlanner.winningPlan.optimizerPlan.child.leftChild;
-    assert.eq("IndexScan", indexNode.nodeType);
-    assert.eq("a_1_b_1_c_1_d_1", indexNode.indexDefName);
+    const indexNode = navigateToPlanPath(res, "child.leftChild");
+    assertValueOnPath("IndexScan", indexNode, "nodeType");
+    assertValueOnPath("a_1_b_1_c_1_d_1", indexNode, "indexDefName");
 } finally {
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalCascadesOptimizerFastIndexNullHandling: false}));

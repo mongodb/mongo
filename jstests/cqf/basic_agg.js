@@ -22,21 +22,21 @@ assert.commandWorked(coll.createIndex({'a.b': 1}));
 
 let res = coll.explain("executionStats").aggregate([{$match: {'a.b': 2}}]);
 assert.eq(1, res.executionStats.nReturned);
-assert.eq("IndexScan", res.queryPlanner.winningPlan.optimizerPlan.child.leftChild.nodeType);
+assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
 
 res = coll.explain("executionStats").aggregate([{$match: {'a.b': {$gt: 2}}}]);
 assert.eq(3 + extraDocCount, res.executionStats.nReturned);
-assert.eq("PhysicalScan", res.queryPlanner.winningPlan.optimizerPlan.child.child.nodeType);
+assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
 
 res = coll.explain("executionStats").aggregate([{$match: {'a.b': {$gte: 2}}}]);
 assert.eq(4 + extraDocCount, res.executionStats.nReturned);
-assert.eq("PhysicalScan", res.queryPlanner.winningPlan.optimizerPlan.child.child.nodeType);
+assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
 
 res = coll.explain("executionStats").aggregate([{$match: {'a.b': {$lt: 2}}}]);
 assert.eq(1, res.executionStats.nReturned);
-assert.eq("IndexScan", res.queryPlanner.winningPlan.optimizerPlan.child.leftChild.nodeType);
+assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
 
 res = coll.explain("executionStats").aggregate([{$match: {'a.b': {$lte: 2}}}]);
 assert.eq(2, res.executionStats.nReturned);
-assert.eq("IndexScan", res.queryPlanner.winningPlan.optimizerPlan.child.leftChild.nodeType);
+assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
 }());

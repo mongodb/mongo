@@ -22,6 +22,6 @@ assert.commandWorked(coll.insert([
 const res = coll.explain("executionStats").aggregate([
     {$group: {_id: {a: '$a', b: '$b'}, sum: {$sum: '$c'}, avg: {$avg: '$c'}}}
 ]);
-assert.eq("GroupBy", res.queryPlanner.winningPlan.optimizerPlan.child.child.nodeType);
+assertValueOnPlanPath("GroupBy", res, "child.child.nodeType");
 assert.eq(4, res.executionStats.nReturned);
 }());

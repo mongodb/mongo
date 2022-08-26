@@ -38,7 +38,7 @@ try {
             {'$project': {_id: 0, f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}}
         ]);
         assert.eq(nDocs, res.executionStats.nReturned);
-        assert.eq("IndexScan", res.queryPlanner.winningPlan.optimizerPlan.child.child.nodeType);
+        assertValueOnPlanPath("IndexScan", res, "child.child.nodeType");
     }
 
     {
@@ -47,9 +47,8 @@ try {
             {'$sort': {f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}}
         ]);
         assert.eq(nDocs, res.executionStats.nReturned);
-        assert.eq("Seek",
-                  res.queryPlanner.winningPlan.optimizerPlan.child.rightChild.child.nodeType);
-        assert.eq("IndexScan", res.queryPlanner.winningPlan.optimizerPlan.child.leftChild.nodeType);
+        assertValueOnPlanPath("Seek", res, "child.rightChild.child.nodeType");
+        assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
     }
 
     {
@@ -59,7 +58,7 @@ try {
             {'$sort': {f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}}
         ]);
         assert.eq(nDocs, res.executionStats.nReturned);
-        assert.eq("IndexScan", res.queryPlanner.winningPlan.optimizerPlan.child.child.nodeType);
+        assertValueOnPlanPath("IndexScan", res, "child.child.nodeType");
     }
 
     {
@@ -69,7 +68,7 @@ try {
             {'$project': {_id: 0, f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}}
         ]);
         assert.eq(nDocs, res.executionStats.nReturned);
-        assert.eq("IndexScan", res.queryPlanner.winningPlan.optimizerPlan.child.child.nodeType);
+        assertValueOnPlanPath("IndexScan", res, "child.child.nodeType");
     }
 } finally {
     assert.commandWorked(

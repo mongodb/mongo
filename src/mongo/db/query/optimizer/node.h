@@ -427,7 +427,8 @@ class SargableNode final : public Operator<SargableNode, 3>, public Node, public
 
 public:
     SargableNode(PartialSchemaRequirements reqMap,
-                 CandidateIndexMap candidateIndexMap,
+                 CandidateIndexes candidateIndexes,
+                 boost::optional<ScanParams> scanParams,
                  IndexReqTarget target,
                  ABT child);
 
@@ -447,14 +448,16 @@ public:
     }
 
     const PartialSchemaRequirements& getReqMap() const;
-    const CandidateIndexMap& getCandidateIndexMap() const;
+    const CandidateIndexes& getCandidateIndexes() const;
+    const boost::optional<ScanParams>& getScanParams() const;
 
     IndexReqTarget getTarget() const;
 
 private:
     const PartialSchemaRequirements _reqMap;
 
-    CandidateIndexMap _candidateIndexMap;
+    CandidateIndexes _candidateIndexes;
+    boost::optional<ScanParams> _scanParams;
 
     // Performance optimization to limit number of groups.
     // Under what indexing requirements can this node be implemented.

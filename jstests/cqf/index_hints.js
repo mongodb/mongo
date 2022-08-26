@@ -21,22 +21,22 @@ assert.commandWorked(t.createIndex({a: 1}));
 // There are too few documents, and an index is not preferable.
 {
     let res = t.explain("executionStats").find({a: 2}).finish();
-    assert.eq("PhysicalScan", res.queryPlanner.winningPlan.optimizerPlan.child.child.nodeType);
+    assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
 }
 
 {
     let res = t.explain("executionStats").find({a: 2}).hint({a: 1}).finish();
-    assert.eq("IndexScan", res.queryPlanner.winningPlan.optimizerPlan.child.leftChild.nodeType);
+    assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
 }
 
 {
     let res = t.explain("executionStats").find({a: 2}).hint("a_1").finish();
-    assert.eq("IndexScan", res.queryPlanner.winningPlan.optimizerPlan.child.leftChild.nodeType);
+    assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
 }
 
 {
     let res = t.explain("executionStats").find({a: 2}).hint({$natural: 1}).finish();
-    assert.eq("PhysicalScan", res.queryPlanner.winningPlan.optimizerPlan.child.child.nodeType);
+    assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
 }
 
 // Generate enough documents for index to be preferable.
@@ -46,20 +46,20 @@ for (let i = 0; i < 100; i++) {
 
 {
     let res = t.explain("executionStats").find({a: 2}).finish();
-    assert.eq("IndexScan", res.queryPlanner.winningPlan.optimizerPlan.child.leftChild.nodeType);
+    assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
 }
 
 {
     let res = t.explain("executionStats").find({a: 2}).hint({a: 1}).finish();
-    assert.eq("IndexScan", res.queryPlanner.winningPlan.optimizerPlan.child.leftChild.nodeType);
+    assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
 }
 
 {
     let res = t.explain("executionStats").find({a: 2}).hint("a_1").finish();
-    assert.eq("IndexScan", res.queryPlanner.winningPlan.optimizerPlan.child.leftChild.nodeType);
+    assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
 }
 {
     let res = t.explain("executionStats").find({a: 2}).hint({$natural: 1}).finish();
-    assert.eq("PhysicalScan", res.queryPlanner.winningPlan.optimizerPlan.child.child.nodeType);
+    assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
 }
 }());

@@ -121,7 +121,7 @@ ProjectionNameSet extractReferencedColumns(const properties::PhysProps& properti
     return PropertiesAffectedColumnsExtractor::extract(properties);
 }
 
-bool areMultiKeyIntervalsEqualities(const MultiKeyIntervalRequirement& intervals) {
+bool areCompoundIntervalsEqualities(const CompoundIntervalRequirement& intervals) {
     for (const auto& interval : intervals) {
         if (!interval.isEquality()) {
             return false;
@@ -718,29 +718,61 @@ bool checkPathContainsTraverse(const ABT& path) {
 }
 
 /**
- * Erases Traverse elements from an index path.
+ * Fuses an index path and a query path to determine a residual path to apply over the index
+ * results. Checks if one index path is a prefix of another. Considers only Get, Traverse, and Id.
+ * Return the suffix that doesn't match.
  */
-class PathTraverseEraser {
+class IndexPathFusor {
 public:
-    PathTraverseEraser() {}
+    struct ResultType {
+        boost::optional<ABT::reference_type> _prefix;
+        size_t _numTraversesSkipped = 0;
+    };
 
-    void transport(ABT& n, const PathTraverse& /*node*/, ABT& childResult) {
-        n = std::move(childResult);
-        _erased = true;
+    /**
+     * 'n' - The complete index path being compared to, can be modified if needed.
+     * 'node' - Same as 'n' but cast to a specific type by the caller in order to invoke the
+     *   correct operator.
+     * 'other' - The query that is checked if it is a prefix of the index.
+     */
+    ResultType operator()(const ABT& n, const PathGet& node, const ABT& other) {
+        if (auto otherGet = other.cast<PathGet>();
+            otherGet != nullptr && otherGet->name() == node.name()) {
+            if (auto otherChildTraverse = otherGet->getPath().cast<PathTraverse>();
+                otherChildTraverse != nullptr && !node.getPath().is<PathTraverse>()) {
+                // If a query path has a Traverse, but the index path doesn't, the query can
+                // still be evaluated by this index. Skip the Traverse node, and continue matching.
+                auto result = node.getPath().visit(*this, otherChildTraverse->getPath());
+                result._numTraversesSkipped++;
+                return result;
+            } else {
+                return node.getPath().visit(*this, otherGet->getPath());
+            }
+        }
+        return {};
+    }
+
+    ResultType operator()(const ABT& n, const PathTraverse& node, const ABT& other) {
+        if (auto otherTraverse = other.cast<PathTraverse>();
+            otherTraverse != nullptr && otherTraverse->getMaxDepth() == node.getMaxDepth()) {
+            return node.getPath().visit(*this, otherTraverse->getPath());
+        }
+        return {};
+    }
+
+    ResultType operator()(const ABT& n, const PathIdentity& node, const ABT& other) {
+        return {other.ref()};
     }
 
     template <typename T, typename... Ts>
-    void transport(const ABT& /*n*/, const T& /*node*/, Ts&&...) {
-        // Noop.
+    ResultType operator()(const ABT& /*n*/, const T& /*node*/, Ts&&...) {
+        uasserted(6624152, "Unexpected node type");
     }
 
-    bool eraseTraverse(ABT& path) {
-        algebra::transport<true>(path, *this);
-        return _erased;
+    static ResultType fuse(const ABT& node, const ABT& candidatePrefix) {
+        IndexPathFusor instance;
+        return candidatePrefix.visit(instance, node);
     }
-
-private:
-    bool _erased = false;
 };
 
 boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(
@@ -757,7 +789,7 @@ boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(
     }
 
     for (const auto& [key, req] : reqMap) {
-        if (key.emptyPath() && isIntervalReqFullyOpenDNF(req.getIntervals())) {
+        if (key._path.is<PathIdentity>() && isIntervalReqFullyOpenDNF(req.getIntervals())) {
             // We need to determine either path or interval (or both).
             return {};
         }
@@ -787,13 +819,24 @@ bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
         PartialSchemaKey newKey = key;
         bool updateToNonMultiKey = false;
 
-        if (key._projectionName == scanProjName) {
-            ABT pathNoTraverse = newKey._path;
-            const bool erasedTraverse = PathTraverseEraser{}.eraseTraverse(pathNoTraverse);
-            if (erasedTraverse &&
-                nonMultiKeyPaths.find(pathNoTraverse) != nonMultiKeyPaths.cend()) {
+        if (key._projectionName == scanProjName && checkPathContainsTraverse(newKey._path)) {
+            ABT bestPath = make<Blackhole>();
+            size_t maxTraversesSkipped = 0;
+            for (const ABT& nonMultiKeyPath : nonMultiKeyPaths) {
+                // Attempt to fuse with each non-multikey path and observe how many traverses we can
+                // erase.
+                // TODO: we probably need a more efficient way to do this instead of iterating.
+                if (const auto fused = IndexPathFusor::fuse(newKey._path, nonMultiKeyPath);
+                    fused._prefix && fused._numTraversesSkipped > maxTraversesSkipped) {
+                    maxTraversesSkipped = fused._numTraversesSkipped;
+                    bestPath = nonMultiKeyPath;
+                    PathAppender appender(std::move(*fused._prefix));
+                    appender.append(bestPath);
+                }
+            }
+            if (maxTraversesSkipped > 0) {
                 updateToNonMultiKey = true;
-                newKey._path = std::move(pathNoTraverse);
+                newKey._path = std::move(bestPath);
             }
         }
 
@@ -964,65 +1007,33 @@ size_t decodeIndexKeyName(const std::string& fieldName) {
     return key;
 }
 
-/**
- * Fuses an index path and a query path to determine a residual path to apply over the index
- * results. Checks if one index path is a prefix of another. Considers only Get, Traverse, and Id.
- * Return the suffix that doesn't match.
- */
-class IndexPathFusor {
-public:
-    using ResultType = boost::optional<ABT::reference_type>;
-
-    /**
-     * 'n' - The complete index path being compared to, can be modified if needed.
-     * 'node' - Same as 'n' but cast to a specific type by the caller in order to invoke the
-     *   correct operator.
-     * 'other' - The query that is checked if it is a prefix of the index.
-     */
-    ResultType operator()(const ABT& n, const PathGet& node, const ABT& other) {
-        if (auto otherGet = other.cast<PathGet>();
-            otherGet != nullptr && otherGet->name() == node.name()) {
-            return node.getPath().visit(*this, otherGet->getPath());
-        }
-        return {};
+const ProjectionName& getExistingOrTempProjForFieldName(PrefixId& prefixId,
+                                                        const FieldNameType& fieldName,
+                                                        FieldProjectionMap& fieldProjMap) {
+    auto it = fieldProjMap._fieldProjections.find(fieldName);
+    if (it != fieldProjMap._fieldProjections.cend()) {
+        return it->second;
     }
 
-    ResultType operator()(const ABT& n, const PathTraverse& node, const ABT& other) {
-        if (auto otherTraverse = other.cast<PathTraverse>();
-            otherTraverse != nullptr && otherTraverse->getMaxDepth() == node.getMaxDepth()) {
-            return node.getPath().visit(*this, otherTraverse->getPath());
-        }
-        return {};
-    }
+    ProjectionName tempProjName = prefixId.getNextId("evalTemp");
+    const auto result = fieldProjMap._fieldProjections.emplace(fieldName, std::move(tempProjName));
+    invariant(result.second);
+    return result.first->second;
+}
 
-    ResultType operator()(const ABT& n, const PathIdentity& node, const ABT& other) {
-        return {other.ref()};
-    }
-
-    template <typename T, typename... Ts>
-    ResultType operator()(const ABT& /*n*/, const T& /*node*/, Ts&&...) {
-        uasserted(6624152, "Unexpected node type");
-    }
-
-    static ResultType fuse(const ABT& node, const ABT& candidatePrefix) {
-        IndexPathFusor instance;
-        return candidatePrefix.visit(instance, node);
-    }
-};
-
-CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
-                                           const ProjectionName& scanProjectionName,
-                                           const PartialSchemaRequirements& reqMap,
-                                           const ScanDefinition& scanDef,
-                                           const bool fastNullHandling,
-                                           bool& hasEmptyInterval) {
-    CandidateIndexMap result;
-    hasEmptyInterval = false;
-
+CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
+                                         const ProjectionName& scanProjectionName,
+                                         const PartialSchemaRequirements& reqMap,
+                                         const ScanDefinition& scanDef,
+                                         const bool fastNullHandling,
+                                         bool& hasEmptyInterval) {
     // Contains one instance for each unmatched key.
     PartialSchemaKeySet unsatisfiedKeysInitial;
     for (const auto& [key, req] : reqMap) {
-        unsatisfiedKeysInitial.insert(key);
+        if (!unsatisfiedKeysInitial.insert(key).second) {
+            // We cannot satisfy two or more non-multikey path instances using an index.
+            return {};
+        }
 
         if (!fastNullHandling && req.hasBoundProjectionName() &&
             checkMaybeHasNull(req.getIntervals())) {
@@ -1032,140 +1043,150 @@ CandidateIndexMap computeCandidateIndexMap(PrefixId& prefixId,
         }
     }
 
-    for (const auto& [indexDefName, indexDef] : scanDef.getIndexDefs()) {
-        FieldProjectionMap indexProjectionMap;
-        auto intervals = MultiKeyIntervalReqExpr::makeSingularDNF();  // Singular empty interval.
-        PartialSchemaRequirements residualRequirements;
-        ProjectionNameSet residualRequirementsTempProjections;
-        ResidualKeyMap residualKeyMap;
-        opt::unordered_set<size_t> fieldsToCollate;
-        size_t intervalPrefixSize = 0;
-        PartialSchemaKeySet unsatisfiedKeys = unsatisfiedKeysInitial;
+    CandidateIndexes result;
+    hasEmptyInterval = false;
 
-        // True if the paths from partial schema requirements form a strict prefix of the index
-        // collation.
-        bool isPrefix = true;
-        // If we formed bounds using at least one requirement (as opposed to having only residual
-        // requirements).
-        bool hasExactMatch = false;
+    for (const auto& [indexDefName, indexDef] : scanDef.getIndexDefs()) {
+        PartialSchemaKeySet unsatisfiedKeys = unsatisfiedKeysInitial;
+        CandidateIndexEntry entry(indexDefName);
 
         const IndexCollationSpec& indexCollationSpec = indexDef.getCollationSpec();
         for (size_t indexField = 0; indexField < indexCollationSpec.size(); indexField++) {
             const auto& indexCollationEntry = indexCollationSpec.at(indexField);
-            PartialSchemaKey indexKey{scanProjectionName, indexCollationEntry._path};
             const bool reverse = indexCollationEntry._op == CollationOp::Descending;
-            if (reqMap.count(indexKey) == 1 && isPrefix) {
-                hasExactMatch = true;
 
-                unsatisfiedKeys.erase(indexKey);
-                const PartialSchemaRequirement& req = reqMap.find(indexKey)->second;
-                const auto& requiredInterval = req.getIntervals();
+            PartialSchemaKey indexKey{scanProjectionName, indexCollationEntry._path};
+            auto indexKeyIt = reqMap.find(indexKey);
+            if (indexKeyIt == reqMap.cend()) {
+                break;
+            }
 
-                if (combineMultiKeyIntervalsDNF(intervals, requiredInterval, reverse)) {
-                    intervalPrefixSize++;
-                } else {
-                    if (!combineMultiKeyIntervalsDNF(
-                            intervals, IntervalReqExpr::makeSingularDNF(), reverse)) {
-                        uasserted(6624155, "Cannot combine with an open interval");
-                    }
+            const PartialSchemaRequirement& req = indexKeyIt->second;
+            const auto& requiredInterval = req.getIntervals();
+            if (!combineCompoundIntervalsDNF(entry._intervals, requiredInterval, reverse)) {
+                break;
+            }
 
-                    // Move interval into residual requirements.
-                    if (req.hasBoundProjectionName()) {
-                        PartialSchemaKey residualKey{req.getBoundProjectionName(),
-                                                     make<PathIdentity>()};
-                        residualRequirements.emplace(
-                            residualKey, PartialSchemaRequirement{"", req.getIntervals()});
-                        residualKeyMap.emplace(std::move(residualKey), indexKey);
-                        residualRequirementsTempProjections.insert(req.getBoundProjectionName());
-                    } else {
-                        ProjectionName tempProj = prefixId.getNextId("evalTemp");
-                        PartialSchemaKey residualKey{tempProj, make<PathIdentity>()};
-                        residualRequirements.emplace(residualKey, req);
-                        residualKeyMap.emplace(std::move(residualKey), indexKey);
-                        residualRequirementsTempProjections.insert(tempProj);
+            unsatisfiedKeys.erase(indexKey);
+            entry._intervalPrefixSize++;
 
-                        // Include bounds projection into index spec.
-                        if (!indexProjectionMap._fieldProjections
-                                 .emplace(encodeIndexKeyName(indexField), std::move(tempProj))
-                                 .second) {
-                            uasserted(6624156, "Duplicate field name");
-                        }
-                    }
-                }
-
+            if (req.hasBoundProjectionName()) {
                 // Include bounds projection into index spec.
-                if (req.hasBoundProjectionName() &&
-                    !indexProjectionMap._fieldProjections
-                         .emplace(encodeIndexKeyName(indexField), req.getBoundProjectionName())
-                         .second) {
-                    uasserted(6624157, "Duplicate field name");
-                }
+                const bool inserted =
+                    entry._fieldProjectionMap._fieldProjections
+                        .emplace(encodeIndexKeyName(indexField), req.getBoundProjectionName())
+                        .second;
+                invariant(inserted);
+            }
 
-                if (auto singularInterval = IntervalReqExpr::getSingularDNF(requiredInterval);
-                    !singularInterval || !singularInterval->isEquality()) {
-                    // We only care about collation of for non-equality intervals.
-                    // Equivalently, it is sufficient for singular intervals to be clustered.
-                    fieldsToCollate.insert(indexField);
-                }
-            } else {
-                bool foundPathPrefix = false;
-                for (const auto& queryKey : unsatisfiedKeys) {
-                    const auto fusedPath =
-                        IndexPathFusor::fuse(queryKey._path, indexCollationEntry._path);
-                    if (fusedPath) {
-                        ProjectionName tempProj = prefixId.getNextId("evalTemp");
-                        PartialSchemaKey residualKey{tempProj, fusedPath.get()};
-
-                        {
-                            auto range = reqMap.equal_range(queryKey);
-                            for (auto it = range.first; it != range.second; it++) {
-                                residualRequirements.emplace(residualKey, it->second);
-                            }
-                        }
-                        residualKeyMap.emplace(std::move(residualKey), queryKey);
-                        residualRequirementsTempProjections.insert(tempProj);
-
-                        // Include bounds projection into index spec.
-                        if (!indexProjectionMap._fieldProjections
-                                 .emplace(encodeIndexKeyName(indexField), std::move(tempProj))
-                                 .second) {
-                            uasserted(6624158, "Duplicate field name");
-                        }
-                        if (!combineMultiKeyIntervalsDNF(
-                                intervals, IntervalReqExpr::makeSingularDNF(), reverse)) {
-                            uasserted(6624159, "Cannot combine with an open interval");
-                        }
-
-                        foundPathPrefix = true;
-                        unsatisfiedKeys.erase(queryKey);
-                        break;
-                    }
-                }
-
-                if (!foundPathPrefix) {
-                    isPrefix = false;
-                    if (!combineMultiKeyIntervalsDNF(
-                            intervals, IntervalReqExpr::makeSingularDNF(), reverse)) {
-                        uasserted(6624160, "Cannot combine with an open interval");
-                    }
-                }
+            if (auto singularInterval = IntervalReqExpr::getSingularDNF(requiredInterval);
+                !singularInterval || !singularInterval->isEquality()) {
+                // We only care about collation of for non-equality intervals.
+                // Equivalently, it is sufficient for singular intervals to be clustered.
+                entry._fieldsToCollate.insert(indexField);
             }
         }
-        if (!hasExactMatch) {
-            continue;
+
+        for (auto queryKeyIt = unsatisfiedKeys.begin(); queryKeyIt != unsatisfiedKeys.end();) {
+            const auto& queryKey = *queryKeyIt;
+            bool satisfied = false;
+
+            for (size_t indexField = 0; indexField < indexCollationSpec.size(); indexField++) {
+                const auto& indexCollationEntry = indexCollationSpec.at(indexField);
+                const auto fusedPath =
+                    IndexPathFusor::fuse(queryKey._path, indexCollationEntry._path);
+                if (!fusedPath._prefix) {
+                    continue;
+                }
+
+                auto it = reqMap.find(queryKey);
+                tassert(
+                    6624158, "QueryKey must exist in the requirements map", it != reqMap.cend());
+
+                const ProjectionName& tempProjName = getExistingOrTempProjForFieldName(
+                    prefixId, encodeIndexKeyName(indexField), entry._fieldProjectionMap);
+                entry._residualRequirements.emplace_back(
+                    PartialSchemaKey{tempProjName, std::move(*fusedPath._prefix)},
+                    it->second,
+                    std::distance(reqMap.cbegin(), it));
+
+                satisfied = true;
+                break;
+            }
+
+            if (satisfied) {
+                unsatisfiedKeys.erase(queryKeyIt++);
+            } else {
+                queryKeyIt++;
+            }
         }
         if (!unsatisfiedKeys.empty()) {
             continue;
         }
 
-        result.emplace(indexDefName,
-                       CandidateIndexEntry{std::move(indexProjectionMap),
-                                           std::move(intervals),
-                                           std::move(residualRequirements),
-                                           std::move(residualRequirementsTempProjections),
-                                           std::move(residualKeyMap),
-                                           std::move(fieldsToCollate),
-                                           intervalPrefixSize});
+        for (size_t indexField = entry._intervalPrefixSize; indexField < indexCollationSpec.size();
+             indexField++) {
+            // Pad the remaining index fields with [MinKey, MaxKey] intervals.
+            const bool reverse = indexCollationSpec.at(indexField)._op == CollationOp::Descending;
+            if (!combineCompoundIntervalsDNF(
+                    entry._intervals, IntervalReqExpr::makeSingularDNF(), reverse)) {
+                uasserted(6624159, "Cannot combine with an open interval");
+            }
+        }
+
+        result.push_back(std::move(entry));
+    }
+
+    return result;
+}
+
+boost::optional<ScanParams> computeScanParams(PrefixId& prefixId,
+                                              const PartialSchemaRequirements& reqMap,
+                                              const ProjectionName& rootProj) {
+    ScanParams result;
+
+    size_t entryIndex = 0;
+    for (const auto& [key, req] : reqMap) {
+        if (key._projectionName != rootProj) {
+            // We are not sitting right above a ScanNode.
+            return {};
+        }
+
+        if (auto pathGet = key._path.cast<PathGet>(); pathGet != nullptr) {
+            const FieldNameType& fieldName = pathGet->name();
+
+            // Extract a new requirements path with removed simple paths.
+            // For example if we have a key Get "a" Traverse Compare = 0 we leave only
+            // Traverse Compare 0.
+            if (pathGet->getPath().is<PathIdentity>() && req.hasBoundProjectionName()) {
+                const auto [it, insertedInFPM] =
+                    result._fieldProjectionMap._fieldProjections.emplace(
+                        fieldName, req.getBoundProjectionName());
+
+                if (!insertedInFPM) {
+                    result._residualRequirements.emplace_back(
+                        PartialSchemaKey{it->second, make<PathIdentity>()},
+                        PartialSchemaRequirement{req.getBoundProjectionName(), req.getIntervals()},
+                        entryIndex);
+                } else if (!isIntervalReqFullyOpenDNF(req.getIntervals())) {
+                    result._residualRequirements.emplace_back(
+                        PartialSchemaKey{req.getBoundProjectionName(), make<PathIdentity>()},
+                        PartialSchemaRequirement{"", req.getIntervals()},
+                        entryIndex);
+                }
+            } else {
+                const ProjectionName& tempProjName = getExistingOrTempProjForFieldName(
+                    prefixId, fieldName, result._fieldProjectionMap);
+                result._residualRequirements.emplace_back(
+                    PartialSchemaKey{tempProjName, pathGet->getPath()}, req, entryIndex);
+            }
+        } else {
+            // Move other conditions into the residual map.
+            result._fieldProjectionMap._rootProjection = rootProj;
+            result._residualRequirements.emplace_back(key, req, entryIndex);
+        }
+
+        entryIndex++;
     }
 
     return result;
@@ -1327,24 +1348,23 @@ void lowerPartialSchemaRequirement(const PartialSchemaKey& key,
     }
 }
 
-void lowerPartialSchemaRequirements(const CEType baseCE,
-                                    const CEType scanGroupCE,
-                                    ResidualRequirements& requirements,
+void lowerPartialSchemaRequirements(const CEType scanGroupCE,
+                                    std::vector<SelectivityType> indexPredSels,
+                                    ResidualRequirementsWithCE& requirements,
                                     ABT& physNode,
                                     NodeCEMap& nodeCEMap) {
     sortResidualRequirements(requirements);
 
-    std::vector<SelectivityType> residualSelectivities;
     for (const auto& [residualKey, residualReq, ce] : requirements) {
-        CEType residualCE = baseCE;
-        if (!residualSelectivities.empty()) {
+        CEType residualCE = scanGroupCE;
+        if (!indexPredSels.empty()) {
             // We are intentionally making a copy of the vector here, we are adding elements to it
             // below.
-            residualCE *= ce::conjExponentialBackoff(residualSelectivities);
+            residualCE *= ce::conjExponentialBackoff(indexPredSels);
         }
         if (scanGroupCE > 0.0) {
             // Compute the selectivity after we assign CE, which is the "input" to the cost.
-            residualSelectivities.push_back(ce / scanGroupCE);
+            indexPredSels.push_back(ce / scanGroupCE);
         }
 
         lowerPartialSchemaRequirement(residualKey, residualReq, physNode, [&](const ABT& node) {
@@ -1353,70 +1373,32 @@ void lowerPartialSchemaRequirements(const CEType baseCE,
     }
 }
 
-void computePhysicalScanParams(PrefixId& prefixId,
-                               const PartialSchemaRequirements& reqMap,
-                               const PartialSchemaKeyCE& partialSchemaKeyCEMap,
-                               const ProjectionNameOrderPreservingSet& requiredProjections,
-                               ResidualRequirements& residualRequirements,
-                               ProjectionRenames& projectionRenames,
-                               FieldProjectionMap& fieldProjectionMap,
-                               bool& requiresRootProjection) {
-    for (const auto& [key, req] : reqMap) {
-        bool hasBoundProjection = req.hasBoundProjectionName();
-        if (hasBoundProjection && !requiredProjections.find(req.getBoundProjectionName()).second) {
-            // Bound projection is not required, pretend we don't bind.
-            hasBoundProjection = false;
+void sortResidualRequirements(ResidualRequirementsWithCE& residualReq) {
+    // Sort residual requirements by estimated cost.
+    // Assume it is more expensive to deliver a bound projection than to just filter.
+
+    std::vector<std::pair<double, size_t>> costs;
+    for (size_t index = 0; index < residualReq.size(); index++) {
+        const auto& entry = residualReq.at(index);
+
+        size_t multiplier = 0;
+        if (entry._req.hasBoundProjectionName()) {
+            multiplier++;
         }
-        if (!hasBoundProjection && isIntervalReqFullyOpenDNF(req.getIntervals())) {
-            // Redundant requirement.
-            continue;
+        if (!isIntervalReqFullyOpenDNF(entry._req.getIntervals())) {
+            multiplier++;
         }
 
-        const CEType keyCE = partialSchemaKeyCEMap.at(key);
-        if (auto pathGet = key._path.cast<PathGet>(); pathGet != nullptr) {
-            // Extract a new requirements path with removed simple paths.
-            // For example if we have a key Get "a" Traverse Compare = 0 we leave only
-            // Traverse Compare 0.
-            if (pathGet->getPath().is<PathIdentity>() && hasBoundProjection) {
-                const auto [it, inserted] = fieldProjectionMap._fieldProjections.emplace(
-                    pathGet->name(), req.getBoundProjectionName());
-                if (!inserted) {
-                    projectionRenames.emplace(req.getBoundProjectionName(), it->second);
-                }
+        costs.emplace_back(entry._ce * multiplier, index);
+    }
 
-                if (!isIntervalReqFullyOpenDNF(req.getIntervals())) {
-                    residualRequirements.emplace_back(
-                        PartialSchemaKey{req.getBoundProjectionName(), make<PathIdentity>()},
-                        PartialSchemaRequirement{"", req.getIntervals()},
-                        keyCE);
-                }
-            } else {
-                ProjectionName tempProjName;
-                auto it = fieldProjectionMap._fieldProjections.find(pathGet->name());
-                if (it == fieldProjectionMap._fieldProjections.cend()) {
-                    tempProjName = prefixId.getNextId("evalTemp");
-                    fieldProjectionMap._fieldProjections.emplace(pathGet->name(), tempProjName);
-                } else {
-                    tempProjName = it->second;
-                }
-
-                residualRequirements.emplace_back(
-                    PartialSchemaKey{std::move(tempProjName), pathGet->getPath()}, req, keyCE);
-            }
-        } else {
-            // Move other conditions into the residual map.
-            requiresRootProjection = true;
-            residualRequirements.emplace_back(key, req, keyCE);
+    std::sort(costs.begin(), costs.end());
+    for (size_t index = 0; index < residualReq.size(); index++) {
+        const size_t targetIndex = costs.at(index).second;
+        if (index < targetIndex) {
+            std::swap(residualReq.at(index), residualReq.at(targetIndex));
         }
     }
-}
-
-void sortResidualRequirements(ResidualRequirements& residualReq) {
-    // Sort residual requirements by estimated CE.
-    std::sort(
-        residualReq.begin(),
-        residualReq.end(),
-        [](const ResidualRequirement& x, const ResidualRequirement& y) { return x._ce < y._ce; });
 }
 
 void applyProjectionRenames(ProjectionRenames projectionRenames,
@@ -1426,6 +1408,42 @@ void applyProjectionRenames(ProjectionRenames projectionRenames,
         node = make<EvaluationNode>(
             std::move(targetProjName), make<Variable>(std::move(sourceProjName)), std::move(node));
         visitor(node);
+    }
+}
+
+void removeRedundantResidualPredicates(const ProjectionNameOrderPreservingSet& requiredProjections,
+                                       ResidualRequirements& residualReqs,
+                                       FieldProjectionMap& fieldProjectionMap) {
+    ProjectionNameSet residualTempProjections;
+
+    // Remove unused residual requirements.
+    for (auto it = residualReqs.begin(); it != residualReqs.end();) {
+        auto& [key, req, ce] = *it;
+
+        if (req.hasBoundProjectionName() &&
+            !requiredProjections.find(req.getBoundProjectionName()).second) {
+            if (isIntervalReqFullyOpenDNF(req.getIntervals())) {
+                residualReqs.erase(it++);
+                continue;
+            } else {
+                req.setBoundProjectionName("");
+            }
+        }
+
+        residualTempProjections.insert(key._projectionName);
+        it++;
+    }
+
+    // Remove unused projections from the field projection map.
+    auto& fieldProjMap = fieldProjectionMap._fieldProjections;
+    for (auto it = fieldProjMap.begin(); it != fieldProjMap.end();) {
+        const ProjectionName& projName = it->second;
+        if (!requiredProjections.find(projName).second &&
+            residualTempProjections.count(projName) == 0) {
+            fieldProjMap.erase(it++);
+        } else {
+            it++;
+        }
     }
 }
 
@@ -1635,7 +1653,7 @@ public:
         _fpmStack.push_back(std::move(indexProjectionMap));
     };
 
-    ABT transport(const MultiKeyIntervalReqExpr::Atom& node) {
+    ABT transport(const CompoundIntervalReqExpr::Atom& node) {
         ABT physicalIndexScan = make<IndexScanNode>(
             _fpmStack.back(),
             IndexSpecification{_scanDefName, _indexDefName, node.getExpr(), _reverseOrder});
@@ -1670,7 +1688,7 @@ public:
         _fpmStack.push_back(std::move(childMap));
     }
 
-    void prepare(const MultiKeyIntervalReqExpr::Conjunction& node) {
+    void prepare(const CompoundIntervalReqExpr::Conjunction& node) {
         prepare<true /*isConjunction*/>(node.nodes().size());
     }
 
@@ -1745,19 +1763,19 @@ public:
         return result;
     }
 
-    ABT transport(const MultiKeyIntervalReqExpr::Conjunction& node, ABTVector childResults) {
+    ABT transport(const CompoundIntervalReqExpr::Conjunction& node, ABTVector childResults) {
         return implement<true /*isIntersect*/>(std::move(childResults));
     }
 
-    void prepare(const MultiKeyIntervalReqExpr::Disjunction& node) {
+    void prepare(const CompoundIntervalReqExpr::Disjunction& node) {
         prepare<false /*isConjunction*/>(node.nodes().size());
     }
 
-    ABT transport(const MultiKeyIntervalReqExpr::Disjunction& node, ABTVector childResults) {
+    ABT transport(const CompoundIntervalReqExpr::Disjunction& node, ABTVector childResults) {
         return implement<false /*isIntersect*/>(std::move(childResults));
     }
 
-    ABT lower(const MultiKeyIntervalReqExpr::Node& intervals) {
+    ABT lower(const CompoundIntervalReqExpr::Node& intervals) {
         return algebra::transport<false>(intervals, *this);
     }
 
@@ -1779,7 +1797,7 @@ ABT lowerIntervals(PrefixId& prefixId,
                    FieldProjectionMap indexProjectionMap,
                    const std::string& scanDefName,
                    const std::string& indexDefName,
-                   const MultiKeyIntervalReqExpr::Node& intervals,
+                   const CompoundIntervalReqExpr::Node& intervals,
                    const bool reverseOrder,
                    const CEType indexCE,
                    const CEType scanGroupCE,

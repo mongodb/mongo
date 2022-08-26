@@ -19,8 +19,7 @@ assert.commandWorked(t.insert({a: [{b: [1, 2], c: [3, 4]}]}));
     // Object elemMatch. Currently we do not support index here.
     const res = t.explain("executionStats").aggregate([{$match: {a: {$elemMatch: {a: 2, b: 1}}}}]);
     assert.eq(1, res.executionStats.nReturned);
-    assert.eq("PhysicalScan",
-              res.queryPlanner.winningPlan.optimizerPlan.child.child.child.nodeType);
+    assertValueOnPlanPath("PhysicalScan", res, "child.child.child.nodeType");
 }
 
 {

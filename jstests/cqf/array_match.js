@@ -22,7 +22,7 @@ assert.commandWorked(t.createIndex({a: 1}));
 {
     const res = t.explain("executionStats").aggregate([{$match: {a: {$eq: [2]}}}]);
     assert.eq(20, res.executionStats.nReturned);
-    assert.eq("PhysicalScan", res.queryPlanner.winningPlan.optimizerPlan.child.child.nodeType);
+    assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
 }
 
 {
@@ -43,13 +43,12 @@ assert.commandWorked(bulk.execute());
     const res = t.explain("executionStats").aggregate([{$match: {a: {$eq: [2]}}}]);
     assert.eq(20, res.executionStats.nReturned);
 
-    const indexUnionNode =
-        res.queryPlanner.winningPlan.optimizerPlan.child.child.leftChild.child.child;
-    assert.eq("Union", indexUnionNode.nodeType);
-    assert.eq("IndexScan", indexUnionNode.children[0].nodeType);
-    assert.eq([2], indexUnionNode.children[0].interval[0].lowBound.bound.value);
-    assert.eq("IndexScan", indexUnionNode.children[1].nodeType);
-    assert.eq(2, indexUnionNode.children[1].interval[0].lowBound.bound.value);
+    const indexUnionNode = navigateToPlanPath(res, "child.child.leftChild.child.child");
+    assertValueOnPath("Union", indexUnionNode, "nodeType");
+    assertValueOnPath("IndexScan", indexUnionNode, "children.0.nodeType");
+    assertValueOnPath([2], indexUnionNode, "children.0.interval.0.lowBound.bound.value");
+    assertValueOnPath("IndexScan", indexUnionNode, "children.1.nodeType");
+    assertValueOnPath(2, indexUnionNode, "children.1.interval.0.lowBound.bound.value");
 }
 
 assert.commandWorked(t.dropIndex({a: 1}));
@@ -60,12 +59,11 @@ assert.commandWorked(t.createIndex({b: 1, a: 1}));
     assert.eq(20, res.executionStats.nReturned);
 
     // Verify we still get index scan even if the field appears as second index field.
-    const indexUnionNode =
-        res.queryPlanner.winningPlan.optimizerPlan.child.child.leftChild.child.child;
-    assert.eq("Union", indexUnionNode.nodeType);
-    assert.eq("IndexScan", indexUnionNode.children[0].nodeType);
-    assert.eq([2], indexUnionNode.children[0].interval[1].lowBound.bound.value);
-    assert.eq("IndexScan", indexUnionNode.children[1].nodeType);
-    assert.eq(2, indexUnionNode.children[1].interval[1].lowBound.bound.value);
+    const indexUnionNode = navigateToPlanPath(res, "child.child.leftChild.child.child");
+    assertValueOnPath("Union", indexUnionNode, "nodeType");
+    assertValueOnPath("IndexScan", indexUnionNode, "children.0.nodeType");
+    assertValueOnPath([2], indexUnionNode, "children.0.interval.1.lowBound.bound.value");
+    assertValueOnPath("IndexScan", indexUnionNode, "children.1.nodeType");
+    assertValueOnPath(2, indexUnionNode, "children.1.interval.1.lowBound.bound.value");
 }
 }());

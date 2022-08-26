@@ -327,14 +327,16 @@ static ProjectionNameVector createSargableReferences(const PartialSchemaRequirem
 }
 
 SargableNode::SargableNode(PartialSchemaRequirements reqMap,
-                           CandidateIndexMap candidateIndexMap,
+                           CandidateIndexes candidateIndexes,
+                           boost::optional<ScanParams> scanParams,
                            const IndexReqTarget target,
                            ABT child)
     : Base(std::move(child),
            buildSimpleBinder(createSargableBindings(reqMap)),
            make<References>(createSargableReferences(reqMap))),
       _reqMap(std::move(reqMap)),
-      _candidateIndexMap(std::move(candidateIndexMap)),
+      _candidateIndexes(std::move(candidateIndexes)),
+      _scanParams(std::move(scanParams)),
       _target(target) {
     assertNodeSort(getChild());
     uassert(6624085, "Empty requirements map", !_reqMap.empty());
@@ -360,16 +362,21 @@ SargableNode::SargableNode(PartialSchemaRequirements reqMap,
 }
 
 bool SargableNode::operator==(const SargableNode& other) const {
-    return _reqMap == other._reqMap && _candidateIndexMap == other._candidateIndexMap &&
-        _target == other._target && getChild() == other.getChild();
+    // Specifically not comparing the candidate indexes and ScanParams. Those are derivative of the
+    // requirements, and can have temp projection names.
+    return _reqMap == other._reqMap && _target == other._target && getChild() == other.getChild();
 }
 
 const PartialSchemaRequirements& SargableNode::getReqMap() const {
     return _reqMap;
 }
 
-const CandidateIndexMap& SargableNode::getCandidateIndexMap() const {
-    return _candidateIndexMap;
+const CandidateIndexes& SargableNode::getCandidateIndexes() const {
+    return _candidateIndexes;
+}
+
+const boost::optional<ScanParams>& SargableNode::getScanParams() const {
+    return _scanParams;
 }
 
 IndexReqTarget SargableNode::getTarget() const {

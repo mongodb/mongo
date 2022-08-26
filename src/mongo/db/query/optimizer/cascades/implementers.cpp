@@ -348,7 +348,7 @@ public:
         // via a physical scan even in the absence of indexes.
 
         const IndexingRequirement& requirements = getPropertyConst<IndexingRequirement>(_physProps);
-        const CandidateIndexMap& candidateIndexMap = node.getCandidateIndexMap();
+        const CandidateIndexes& candidateIndexes = node.getCandidateIndexes();
         const IndexReqTarget indexReqTarget = requirements.getIndexReqTarget();
         switch (indexReqTarget) {
             case IndexReqTarget::Complete:
@@ -358,7 +358,7 @@ public:
                 break;
 
             case IndexReqTarget::Index:
-                if (candidateIndexMap.empty()) {
+                if (candidateIndexes.empty()) {
                     return;
                 }
                 [[fallthrough]];
@@ -372,10 +372,6 @@ public:
             default:
                 MONGO_UNREACHABLE;
         }
-        const auto& satisfiedPartialIndexes =
-            getPropertyConst<IndexingAvailability>(
-                _memo.getGroup(requirements.getSatisfiedPartialIndexesGroupId())._logicalProperties)
-                .getSatisfiedPartialIndexes();
 
         const auto& requiredProjections =
             getPropertyConst<ProjectionRequirement>(_physProps).getProjections();
@@ -398,10 +394,6 @@ public:
         }
 
         for (const auto& [key, req] : reqMap) {
-            if (key.emptyPath()) {
-                // We cannot satisfy without a field.
-                return;
-            }
             if (key._projectionName != scanProjectionName) {
                 // We can only satisfy partial schema requirements using our root projection.
                 return;
@@ -434,7 +426,7 @@ public:
 
         const auto& ceProperty = getPropertyConst<CardinalityEstimate>(_logicalProps);
         const CEType currentGroupCE = ceProperty.getEstimate();
-        const PartialSchemaKeyCE& partialSchemaKeyCEMap = ceProperty.getPartialSchemaKeyCEMap();
+        const PartialSchemaKeyCE& partialSchemaKeyCE = ceProperty.getPartialSchemaKeyCE();
 
         if (indexReqTarget == IndexReqTarget::Index) {
             ProjectionCollationSpec requiredCollation;
@@ -443,10 +435,18 @@ public:
                     getPropertyConst<CollationRequirement>(_physProps).getCollationSpec();
             }
 
+            const auto& satisfiedPartialIndexes =
+                getPropertyConst<IndexingAvailability>(
+                    _memo.getGroup(requirements.getSatisfiedPartialIndexesGroupId())
+                        ._logicalProperties)
+                    .getSatisfiedPartialIndexes();
+
             // Consider all candidate indexes, and check if they satisfy the collation and
             // distribution requirements.
-            for (const auto& [indexDefName, candidateIndexEntry] : candidateIndexMap) {
+            for (const auto& candidateIndexEntry : node.getCandidateIndexes()) {
+                const auto& indexDefName = candidateIndexEntry._indexDefName;
                 const auto& indexDef = scanDef.getIndexDefs().at(indexDefName);
+
                 if (!indexDef.getPartialReqMap().empty() &&
                     (_hints._disableIndexes == DisableIndexOptions::DisablePartialOnly ||
                      satisfiedPartialIndexes.count(indexDefName) == 0)) {
@@ -481,45 +481,35 @@ public:
                         availableDirections._forward || availableDirections._backward);
 
                 auto indexProjectionMap = candidateIndexEntry._fieldProjectionMap;
-                {
-                    // Remove unused projections from the field projection map.
-                    auto& fieldProjMap = indexProjectionMap._fieldProjections;
-                    for (auto it = fieldProjMap.begin(); it != fieldProjMap.end();) {
-                        const ProjectionName& projName = it->second;
-                        if (!requiredProjections.find(projName).second &&
-                            candidateIndexEntry._residualRequirementsTempProjections.count(
-                                projName) == 0) {
-                            fieldProjMap.erase(it++);
-                        } else {
-                            it++;
-                        }
-                    }
-                }
+                auto residualReqs = candidateIndexEntry._residualRequirements;
+                removeRedundantResidualPredicates(
+                    requiredProjections, residualReqs, indexProjectionMap);
 
                 CEType indexCE = currentGroupCE;
-                ResidualRequirements residualRequirements;
-                if (!candidateIndexEntry._residualRequirements.empty()) {
+                ResidualRequirementsWithCE residualReqsWithCE;
+                std::vector<SelectivityType> indexPredSels;
+                if (!residualReqs.empty()) {
                     PartialSchemaKeySet residualQueryKeySet;
-                    for (const auto& [residualKey, residualReq] :
-                         candidateIndexEntry._residualRequirements) {
-                        const auto& queryKey = candidateIndexEntry._residualKeyMap.at(residualKey);
-                        residualQueryKeySet.emplace(queryKey);
-                        const CEType ce = partialSchemaKeyCEMap.at(queryKey);
-                        residualRequirements.emplace_back(residualKey, residualReq, ce);
+                    for (const auto& [residualKey, residualReq, entryIndex] : residualReqs) {
+                        auto entryIt = reqMap.cbegin();
+                        std::advance(entryIt, entryIndex);
+                        residualQueryKeySet.emplace(entryIt->first);
+                        residualReqsWithCE.emplace_back(
+                            residualKey, residualReq, partialSchemaKeyCE.at(entryIndex).second);
                     }
 
                     if (scanGroupCE > 0.0) {
-                        std::vector<SelectivityType> indexPredSelectivities;
+                        size_t entryIndex = 0;
                         for (const auto& [key, req] : reqMap) {
                             if (residualQueryKeySet.count(key) == 0) {
-                                const CEType ce = partialSchemaKeyCEMap.at(key);
-                                indexPredSelectivities.push_back(ce / scanGroupCE);
+                                indexPredSels.push_back(partialSchemaKeyCE.at(entryIndex).second /
+                                                        scanGroupCE);
                             }
+                            entryIndex++;
                         }
 
-                        if (!indexPredSelectivities.empty()) {
-                            indexCE = scanGroupCE *
-                                ce::conjExponentialBackoff(std::move(indexPredSelectivities));
+                        if (!indexPredSels.empty()) {
+                            indexCE = scanGroupCE * ce::conjExponentialBackoff(indexPredSels);
                         }
                     }
                 }
@@ -529,9 +519,9 @@ public:
                 NodeCEMap nodeCEMap;
 
                 // TODO: consider pre-computing as part of the candidateIndexes structure.
-                const auto singularInterval = MultiKeyIntervalReqExpr::getSingularDNF(intervals);
+                const auto singularInterval = CompoundIntervalReqExpr::getSingularDNF(intervals);
                 const bool needsUniqueStage =
-                    (!singularInterval || !areMultiKeyIntervalsEqualities(*singularInterval)) &&
+                    (!singularInterval || !areCompoundIntervalsEqualities(*singularInterval)) &&
                     indexDef.isMultiKey() && requirements.getDedupRID();
 
                 indexProjectionMap._ridProjection =
@@ -558,7 +548,7 @@ public:
                 }
 
                 lowerPartialSchemaRequirements(
-                    indexCE, scanGroupCE, residualRequirements, physNode, nodeCEMap);
+                    scanGroupCE, std::move(indexPredSels), residualReqsWithCE, physNode, nodeCEMap);
 
                 if (needsUniqueStage) {
                     // Insert unique stage if we need to, after the residual requirements.
@@ -571,6 +561,9 @@ public:
                     _queue, kDefaultPriority, std::move(physNode), {}, std::move(nodeCEMap));
             }
         } else {
+            const auto& scanParams = node.getScanParams();
+            tassert(6624102, "Empty scan params", scanParams);
+
             bool canUseParallelScan = false;
             if (!distributionsCompatible(indexReqTarget,
                                          scanDef.getDistributionAndPaths(),
@@ -581,21 +574,14 @@ public:
                 return;
             }
 
-            FieldProjectionMap fieldProjectionMap;
+            FieldProjectionMap fieldProjectionMap = scanParams->_fieldProjectionMap;
+            ResidualRequirements residualReqs = scanParams->_residualRequirements;
+            removeRedundantResidualPredicates(
+                requiredProjections, residualReqs, fieldProjectionMap);
+
             if (indexReqTarget == IndexReqTarget::Complete && needsRID) {
                 fieldProjectionMap._ridProjection = ridProjName;
             }
-
-            ProjectionRenames projectionRenames;
-            ResidualRequirements residualRequirements;
-            computePhysicalScanParams(_prefixId,
-                                      reqMap,
-                                      partialSchemaKeyCEMap,
-                                      requiredProjections,
-                                      residualRequirements,
-                                      projectionRenames,
-                                      fieldProjectionMap,
-                                      requiresRootProjection);
             if (requiresRootProjection) {
                 fieldProjectionMap._rootProjection = scanProjectionName;
             }
@@ -622,12 +608,14 @@ public:
                 nodeCEMap.emplace(physNode.cast<Node>(), baseCE);
             }
 
-            applyProjectionRenames(std::move(projectionRenames), physNode, [&](const ABT& node) {
-                nodeCEMap.emplace(node.cast<Node>(), baseCE);
-            });
+            ResidualRequirementsWithCE residualReqsWithCE;
+            for (const auto& [residualKey, residualReq, entryIndex] : residualReqs) {
+                residualReqsWithCE.emplace_back(
+                    residualKey, residualReq, partialSchemaKeyCE.at(entryIndex).second);
+            }
 
             lowerPartialSchemaRequirements(
-                baseCE, scanGroupCE, residualRequirements, physNode, nodeCEMap);
+                baseCE, {} /*indexPredSels*/, residualReqsWithCE, physNode, nodeCEMap);
             optimizeChildrenNoAssert(
                 _queue, kDefaultPriority, std::move(physNode), {}, std::move(nodeCEMap));
         }

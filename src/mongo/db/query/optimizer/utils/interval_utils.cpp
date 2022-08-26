@@ -280,25 +280,25 @@ boost::optional<IntervalReqExpr::Node> intersectDNFIntervals(
     return IntervalReqExpr::make<IntervalReqExpr::Disjunction>(std::move(disjuncts));
 }
 
-bool combineMultiKeyIntervalsDNF(MultiKeyIntervalReqExpr::Node& targetIntervals,
+bool combineCompoundIntervalsDNF(CompoundIntervalReqExpr::Node& targetIntervals,
                                  const IntervalReqExpr::Node& sourceIntervals,
-                                 const bool reverseSource) {
-    MultiKeyIntervalReqExpr::NodeVector newDisjunction;
+                                 bool reverseSource) {
+    CompoundIntervalReqExpr::NodeVector newDisjunction;
 
     for (const auto& sourceConjunction :
          sourceIntervals.cast<IntervalReqExpr::Disjunction>()->nodes()) {
         for (const auto& targetConjunction :
-             targetIntervals.cast<MultiKeyIntervalReqExpr::Disjunction>()->nodes()) {
-            MultiKeyIntervalReqExpr::NodeVector newConjunction;
+             targetIntervals.cast<CompoundIntervalReqExpr::Disjunction>()->nodes()) {
+            CompoundIntervalReqExpr::NodeVector newConjunction;
 
             for (const auto& sourceConjunct :
                  sourceConjunction.cast<IntervalReqExpr::Conjunction>()->nodes()) {
                 const auto& sourceInterval =
                     sourceConjunct.cast<IntervalReqExpr::Atom>()->getExpr();
                 for (const auto& targetConjunct :
-                     targetConjunction.cast<MultiKeyIntervalReqExpr::Conjunction>()->nodes()) {
+                     targetConjunction.cast<CompoundIntervalReqExpr::Conjunction>()->nodes()) {
                     const auto& targetInterval =
-                        targetConjunct.cast<MultiKeyIntervalReqExpr::Atom>()->getExpr();
+                        targetConjunct.cast<CompoundIntervalReqExpr::Atom>()->getExpr();
                     if (!targetInterval.empty() && !targetInterval.back().isEquality() &&
                         !sourceInterval.isFullyOpen()) {
                         // We do not have an equality prefix. Reject.
@@ -314,18 +314,18 @@ bool combineMultiKeyIntervalsDNF(MultiKeyIntervalReqExpr::Node& targetIntervals,
                         newInterval.push_back(sourceInterval);
                     }
                     newConjunction.emplace_back(
-                        MultiKeyIntervalReqExpr::make<MultiKeyIntervalReqExpr::Atom>(
+                        CompoundIntervalReqExpr::make<CompoundIntervalReqExpr::Atom>(
                             std::move(newInterval)));
                 }
             }
 
             newDisjunction.emplace_back(
-                MultiKeyIntervalReqExpr::make<MultiKeyIntervalReqExpr::Conjunction>(
+                CompoundIntervalReqExpr::make<CompoundIntervalReqExpr::Conjunction>(
                     std::move(newConjunction)));
         }
     }
 
-    targetIntervals = MultiKeyIntervalReqExpr::make<MultiKeyIntervalReqExpr::Disjunction>(
+    targetIntervals = CompoundIntervalReqExpr::make<CompoundIntervalReqExpr::Disjunction>(
         std::move(newDisjunction));
     return true;
 }

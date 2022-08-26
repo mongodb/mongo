@@ -20,6 +20,5 @@ assert.commandWorked(coll.createIndex({a: 1}));
 
 let res = coll.explain("executionStats").aggregate([{$match: {a: {$lt: 10}}}]);
 assert.eq(10, res.executionStats.nReturned);
-assert.eq("IndexScan",
-          res.queryPlanner.winningPlan.optimizerPlan.child.child.leftChild.child.nodeType);
+assertValueOnPlanPath("IndexScan", res, "child.child.leftChild.child.nodeType");
 }());

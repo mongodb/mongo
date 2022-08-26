@@ -37,16 +37,16 @@ assert.commandWorked(collB.insert({a: 7, b: 7}));
         {$lookup: {from: "collB", localField: "a.a1", foreignField: "b.b1", as: "out"}}
     ]);
 
-    const binaryJoinNode = res.queryPlanner.winningPlan.optimizerPlan.child.child.child;
-    assert.eq("BinaryJoin", binaryJoinNode.nodeType);
+    const binaryJoinNode = navigateToPlanPath(res, "child.child.child");
+    assertValueOnPath("BinaryJoin", binaryJoinNode, "nodeType");
 
     const leftScan = binaryJoinNode.leftChild.child;
-    assert.eq("PhysicalScan", leftScan.nodeType);
+    assertValueOnPath("PhysicalScan", leftScan, "nodeType");
     assert(leftScan.fieldProjectionMap.hasOwnProperty("_id"));
     assert(leftScan.fieldProjectionMap.hasOwnProperty("a"));
 
     const rightScan = binaryJoinNode.rightChild;
-    assert.eq("PhysicalScan", rightScan.nodeType);
+    assertValueOnPath("PhysicalScan", rightScan, "nodeType");
     assert(rightScan.fieldProjectionMap.hasOwnProperty("b"));
 }
 

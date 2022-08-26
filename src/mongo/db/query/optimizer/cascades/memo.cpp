@@ -658,43 +658,17 @@ void Memo::estimateCE(const GroupIdType groupId, const bool useHeuristicCE) {
     auto ceProp = properties::CardinalityEstimate(estimate);
 
     if (auto sargablePtr = nodeRef.cast<SargableNode>(); sargablePtr != nullptr) {
-        auto& partialSchemaKeyCEMap = ceProp.getPartialSchemaKeyCEMap();
-        invariant(partialSchemaKeyCEMap.empty());
-
-        struct CEEntry {
-            PartialSchemaKey _key;
-            CEType _ce;
-            size_t _count = 1;
-        };
-        boost::optional<CEEntry> prevEntry;
-
-        const auto addEntryFn = [&]() {
-            // We take a geometric average of the entries with the same key.
-            partialSchemaKeyCEMap.emplace(prevEntry->_key,
-                                          std::pow(prevEntry->_ce, 1.0 / prevEntry->_count));
-        };
+        auto& partialSchemaKeyCE = ceProp.getPartialSchemaKeyCE();
+        invariant(partialSchemaKeyCE.empty());
 
         for (const auto& [key, req] : sargablePtr->getReqMap()) {
             ABT singularReq = make<SargableNode>(PartialSchemaRequirements{{key, req}},
-                                                 CandidateIndexMap{},
+                                                 CandidateIndexes{},
+                                                 ScanParams{},
                                                  sargablePtr->getTarget(),
                                                  sargablePtr->getChild());
             const CEType singularEst = ceEstimator->deriveCE(*this, props, singularReq.ref());
-
-            if (prevEntry) {
-                if (prevEntry->_key == key) {
-                    prevEntry->_ce *= singularEst;
-                    prevEntry->_count++;
-                } else {
-                    addEntryFn();
-                    prevEntry = {{key, singularEst}};
-                };
-            } else {
-                prevEntry = {{key, singularEst}};
-            }
-        }
-        if (prevEntry) {
-            addEntryFn();
+            partialSchemaKeyCE.emplace_back(key, singularEst);
         }
     }
 

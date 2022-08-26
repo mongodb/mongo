@@ -26,5 +26,5 @@ assert.commandWorked(t.createIndex({a: 1}));
 const res = t.explain("executionStats").aggregate([{$match: {a: {$gte: 0}}}]);
 assert.eq(nDocs, res.executionStats.nReturned);
 
-assert.eq("PhysicalScan", res.queryPlanner.winningPlan.optimizerPlan.child.child.nodeType);
+assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
 }());

@@ -85,7 +85,7 @@ public:
         return 17;
     }
 
-    size_t computeHash(const MultiKeyIntervalRequirement& req) {
+    size_t computeHash(const CompoundIntervalRequirement& req) {
         size_t result = 19;
         for (const auto& interval : req) {
             updateHash(result, computeHash(interval));
@@ -128,28 +128,6 @@ static size_t computePartialSchemaReqHash(const PartialSchemaRequirements& reqMa
         updateHash(result, std::hash<ProjectionName>()(req.getBoundProjectionName()));
         updateHash(result, intervalHasher.compute(req.getIntervals()));
     }
-    return result;
-}
-
-static size_t computeCandidateIndexMapHash(const CandidateIndexMap& map) {
-    size_t result = 17;
-
-    IntervalHasher<MultiKeyIntervalReqExpr> intervalHasher;
-    for (const auto& [indexDefName, candidateIndexEntry] : map) {
-        updateHash(result, std::hash<std::string>()(indexDefName));
-
-        {
-            const auto& fieldProjectionMap = candidateIndexEntry._fieldProjectionMap;
-            updateHash(result, std::hash<ProjectionName>()(fieldProjectionMap._ridProjection));
-            updateHash(result, std::hash<ProjectionName>()(fieldProjectionMap._rootProjection));
-            for (const auto& fieldProjectionMapEntry : fieldProjectionMap._fieldProjections) {
-                updateHash(result, std::hash<FieldNameType>()(fieldProjectionMapEntry.first));
-                updateHash(result, std::hash<ProjectionName>()(fieldProjectionMapEntry.second));
-            }
-        }
-        updateHash(result, intervalHasher.compute(candidateIndexEntry._intervals));
-    }
-
     return result;
 }
 
@@ -202,8 +180,9 @@ public:
                      size_t childResult,
                      size_t /*bindResult*/,
                      size_t /*refResult*/) {
+        // Specifically not hashing the candidate indexes and ScanParams. Those are derivative of
+        // the requirements, and can have temp projection names.
         return computeHashSeq<44>(computePartialSchemaReqHash(node.getReqMap()),
-                                  computeCandidateIndexMapHash(node.getCandidateIndexMap()),
                                   std::hash<IndexReqTarget>()(node.getTarget()),
                                   childResult);
     }

@@ -22,7 +22,7 @@ for (let i = 0; i < 100; i++) {
 {
     const res = t.explain("executionStats").aggregate([{$match: {'a.b': null}}]);
     assert.eq(3, res.executionStats.nReturned);
-    assert.eq("PhysicalScan", res.queryPlanner.winningPlan.optimizerPlan.child.child.nodeType);
+    assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
 }
 
 assert.commandWorked(t.createIndex({'a.b': 1}));
@@ -30,6 +30,6 @@ assert.commandWorked(t.createIndex({'a.b': 1}));
 {
     const res = t.explain("executionStats").aggregate([{$match: {'a.b': null}}]);
     assert.eq(3, res.executionStats.nReturned);
-    assert.eq("IndexScan", res.queryPlanner.winningPlan.optimizerPlan.child.leftChild.nodeType);
+    assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
 }
 }());

@@ -89,26 +89,28 @@ using PhysProperty = algebra::PolyValue<CollationRequirement,
 using LogicalProps = opt::unordered_map<LogicalProperty::key_type, LogicalProperty>;
 using PhysProps = opt::unordered_map<PhysProperty::key_type, PhysProperty>;
 
-template <typename T, typename... Args>
+template <typename T,
+          std::enable_if_t<std::is_base_of_v<LogicalPropertyTag, T>, bool> = true,
+          typename... Args>
 inline auto makeProperty(Args&&... args) {
-    if constexpr (std::is_base_of_v<LogicalPropertyTag, T>) {
-        return LogicalProperty::make<T>(std::forward<Args>(args)...);
-    } else if constexpr (std::is_base_of_v<PhysPropertyTag, T>) {
-        return PhysProperty::make<T>(std::forward<Args>(args)...);
-    } else {
-        static_assert("Unknown property type");
-    }
+    return LogicalProperty::make<T>(std::forward<Args>(args)...);
 }
 
-template <class P>
+template <typename T,
+          std::enable_if_t<std::is_base_of_v<PhysPropertyTag, T>, bool> = true,
+          typename... Args>
+inline auto makeProperty(Args&&... args) {
+    return PhysProperty::make<T>(std::forward<Args>(args)...);
+}
+
+template <class P, std::enable_if_t<std::is_base_of_v<LogicalPropertyTag, P>, bool> = true>
 static constexpr auto getPropertyKey() {
-    if constexpr (std::is_base_of_v<LogicalPropertyTag, P>) {
-        return LogicalProperty::template tagOf<P>();
-    } else if constexpr (std::is_base_of_v<PhysPropertyTag, P>) {
-        return PhysProperty::template tagOf<P>();
-    } else {
-        static_assert("Unknown property type");
-    }
+    return LogicalProperty::template tagOf<P>();
+}
+
+template <class P, std::enable_if_t<std::is_base_of_v<PhysPropertyTag, P>, bool> = true>
+static constexpr auto getPropertyKey() {
+    return PhysProperty::template tagOf<P>();
 }
 
 template <class P, class C>
@@ -376,14 +378,14 @@ public:
     CEType getEstimate() const;
     CEType& getEstimate();
 
-    const PartialSchemaKeyCE& getPartialSchemaKeyCEMap() const;
-    PartialSchemaKeyCE& getPartialSchemaKeyCEMap();
+    const PartialSchemaKeyCE& getPartialSchemaKeyCE() const;
+    PartialSchemaKeyCE& getPartialSchemaKeyCE();
 
 private:
     CEType _estimate;
 
     // Used for SargableNodes. Provide additional per partial schema key CE.
-    PartialSchemaKeyCE _partialSchemaKeyCEMap;
+    PartialSchemaKeyCE _partialSchemaKeyCE;
 };
 
 /**

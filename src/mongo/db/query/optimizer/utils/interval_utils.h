@@ -57,14 +57,14 @@ boost::optional<IntervalReqExpr::Node> intersectDNFIntervals(
  * Combines a source interval over a single path with a target multi-component interval. The
  * multi-component interval is extended to contain an extra field. The resulting multi-component
  * interval defined the boundaries over the index component used by the index access execution
- * operator. If we fail to combine, the target multi-key interval is left unchanged.
+ * operator. If we fail to combine, the target compound interval is left unchanged.
  * Currently we only support a single "equality prefix": 0+ equalities followed by at most
  * inequality, and trailing open intervals.
  * reverseSource flag indicates the sourceInterval corresponds to a descending index, so the bounds
  * are flipped before combining with the target.
  * TODO: support Recursive Index Navigation.
  */
-bool combineMultiKeyIntervalsDNF(MultiKeyIntervalReqExpr::Node& targetIntervals,
+bool combineCompoundIntervalsDNF(CompoundIntervalReqExpr::Node& targetIntervals,
                                  const IntervalReqExpr::Node& sourceIntervals,
                                  bool reverseSource = false);
 

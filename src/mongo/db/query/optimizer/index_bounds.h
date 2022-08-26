@@ -85,8 +85,6 @@ struct PartialSchemaKey {
 
     bool operator==(const PartialSchemaKey& other) const;
 
-    bool emptyPath() const;
-
     // Referred, or input projection name.
     ProjectionName _projectionName;
 
@@ -141,64 +139,83 @@ using PartialSchemaRequirements =
     std::multimap<PartialSchemaKey, PartialSchemaRequirement, PartialSchemaKeyLessComparator>;
 
 /**
- * Used to track cardinality estimates per predicate inside a PartialSchemaRequirement.
- * We currently have a single estimate per PartialSchemaKey for all matching entries in the primary
- * map.
- * TODO: SERVER-68092 Relax constraint described above.
+ * Used to track cardinality estimates per predicate inside a PartialSchemaRequirement. The order of
+ * estimates is the same as the order in the primary PartialSchemaRequirements map.
  */
-using PartialSchemaKeyCE = std::map<PartialSchemaKey, CEType, PartialSchemaKeyLessComparator>;
-using ResidualKeyMap = std::map<PartialSchemaKey, PartialSchemaKey, PartialSchemaKeyLessComparator>;
+using PartialSchemaKeyCE = std::vector<std::pair<PartialSchemaKey, CEType>>;
 
 using PartialSchemaKeySet = std::set<PartialSchemaKey, PartialSchemaKeyLessComparator>;
 
 // Requirements which are not satisfied directly by an IndexScan, PhysicalScan or Seek (e.g. using
-// an index field, or scan field). They are intended to be sorted in their containing vector from
-// most to least selective.
+// an index field, or scan field). The index refers to the underlying entry in the
+// PartialSchemaRequirement map.
 struct ResidualRequirement {
-    ResidualRequirement(PartialSchemaKey key, PartialSchemaRequirement req, CEType ce);
+    ResidualRequirement(PartialSchemaKey key, PartialSchemaRequirement req, size_t entryIndex);
+
+    bool operator==(const ResidualRequirement& other) const;
+
+    PartialSchemaKey _key;
+    PartialSchemaRequirement _req;
+    size_t _entryIndex;
+};
+using ResidualRequirements = std::vector<ResidualRequirement>;
+
+struct ResidualRequirementWithCE {
+    ResidualRequirementWithCE(PartialSchemaKey key, PartialSchemaRequirement req, CEType ce);
 
     PartialSchemaKey _key;
     PartialSchemaRequirement _req;
     CEType _ce;
 };
-using ResidualRequirements = std::vector<ResidualRequirement>;
+using ResidualRequirementsWithCE = std::vector<ResidualRequirementWithCE>;
+
 
 // A sequence of intervals corresponding, one for each index key.
-using MultiKeyIntervalRequirement = std::vector<IntervalRequirement>;
+using CompoundIntervalRequirement = std::vector<IntervalRequirement>;
 
-// Multi-key intervals represent unions and conjunctions of individual multi-key intervals.
-using MultiKeyIntervalReqExpr = BoolExpr<MultiKeyIntervalRequirement>;
+// Unions and conjunctions of individual compound intervals.
+using CompoundIntervalReqExpr = BoolExpr<CompoundIntervalRequirement>;
 
 // Used to pre-compute candidate indexes for SargableNodes.
 struct CandidateIndexEntry {
+    CandidateIndexEntry(std::string indexDefName);
+
     bool operator==(const CandidateIndexEntry& other) const;
 
+    std::string _indexDefName;
+
     FieldProjectionMap _fieldProjectionMap;
-    MultiKeyIntervalReqExpr::Node _intervals;
+    CompoundIntervalReqExpr::Node _intervals;
 
-    PartialSchemaRequirements _residualRequirements;
-    // Projections needed to evaluate residual requirements.
-    ProjectionNameSet _residualRequirementsTempProjections;
-
-    // Used for CE. Mapping for residual requirement key to query key.
-    ResidualKeyMap _residualKeyMap;
+    // Requirements which are not satisfied directly by the IndexScan. They are intended to be
+    // sorted in their containing vector from most to least selective.
+    ResidualRequirements _residualRequirements;
 
     // We have equalities on those index fields, and thus do not consider for collation
     // requirements.
-    // TODO: consider a bitset.
     opt::unordered_set<size_t> _fieldsToCollate;
 
     // Length of prefix of fields with applied intervals.
     size_t _intervalPrefixSize;
 };
 
-using CandidateIndexMap = std::map<std::string /*index name*/, CandidateIndexEntry>;
+struct ScanParams {
+    bool operator==(const ScanParams& other) const;
+
+    FieldProjectionMap _fieldProjectionMap;
+
+    // Requirements which are not satisfied directly by a PhysicalScan or Seek. They are intended to
+    // be sorted in their containing vector from most to least selective.
+    ResidualRequirements _residualRequirements;
+};
+
+using CandidateIndexes = std::vector<CandidateIndexEntry>;
 
 class IndexSpecification {
 public:
     IndexSpecification(std::string scanDefName,
                        std::string indexDefName,
-                       MultiKeyIntervalRequirement interval,
+                       CompoundIntervalRequirement interval,
                        bool reverseOrder);
 
     bool operator==(const IndexSpecification& other) const;
@@ -206,7 +223,7 @@ public:
     const std::string& getScanDefName() const;
     const std::string& getIndexDefName() const;
 
-    const MultiKeyIntervalRequirement& getInterval() const;
+    const CompoundIntervalRequirement& getInterval() const;
 
     bool isReverseOrder() const;
 
@@ -218,7 +235,7 @@ private:
     const std::string _indexDefName;
 
     // The index interval.
-    MultiKeyIntervalRequirement _interval;
+    CompoundIntervalRequirement _interval;
 
     // Do we reverse the index order.
     const bool _reverseOrder;

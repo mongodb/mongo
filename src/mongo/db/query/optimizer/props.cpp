@@ -256,10 +256,10 @@ const ProjectionNameSet& ProjectionAvailability::getProjections() const {
 }
 
 CardinalityEstimate::CardinalityEstimate(const CEType estimate)
-    : _estimate(estimate), _partialSchemaKeyCEMap() {}
+    : _estimate(estimate), _partialSchemaKeyCE() {}
 
 bool CardinalityEstimate::operator==(const CardinalityEstimate& other) const {
-    return _estimate == other._estimate && _partialSchemaKeyCEMap == other._partialSchemaKeyCEMap;
+    return _estimate == other._estimate && _partialSchemaKeyCE == other._partialSchemaKeyCE;
 }
 
 CEType CardinalityEstimate::getEstimate() const {
@@ -270,12 +270,12 @@ CEType& CardinalityEstimate::getEstimate() {
     return _estimate;
 }
 
-const PartialSchemaKeyCE& CardinalityEstimate::getPartialSchemaKeyCEMap() const {
-    return _partialSchemaKeyCEMap;
+const PartialSchemaKeyCE& CardinalityEstimate::getPartialSchemaKeyCE() const {
+    return _partialSchemaKeyCE;
 }
 
-PartialSchemaKeyCE& CardinalityEstimate::getPartialSchemaKeyCEMap() {
-    return _partialSchemaKeyCEMap;
+PartialSchemaKeyCE& CardinalityEstimate::getPartialSchemaKeyCE() {
+    return _partialSchemaKeyCE;
 }
 
 IndexingAvailability::IndexingAvailability(GroupIdType scanGroupId,

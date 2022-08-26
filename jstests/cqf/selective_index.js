@@ -28,7 +28,7 @@ const res = t.explain("executionStats").aggregate([{$match: {a: {$eq: 0}, b: {$e
 assert.eq(1, res.executionStats.nReturned);
 
 // Demonstrate we can pick index on "b".
-const indexNode = res.queryPlanner.winningPlan.optimizerPlan.child.leftChild;
-assert.eq("IndexScan", indexNode.nodeType);
-assert.eq("b_1", indexNode.indexDefName);
+const indexNode = navigateToPlanPath(res, "child.leftChild");
+assertValueOnPath("IndexScan", indexNode, "nodeType");
+assertValueOnPath("b_1", indexNode, "indexDefName");
 }());

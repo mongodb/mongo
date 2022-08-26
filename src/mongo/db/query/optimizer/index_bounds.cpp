@@ -117,10 +117,6 @@ bool PartialSchemaKey::operator==(const PartialSchemaKey& other) const {
     return _projectionName == other._projectionName && _path == other._path;
 }
 
-bool PartialSchemaKey::emptyPath() const {
-    return _path.is<PathIdentity>();
-}
-
 bool isIntervalReqFullyOpenDNF(const IntervalReqExpr::Node& n) {
     if (auto singular = IntervalReqExpr::getSingularDNF(n); singular && singular->isFullyOpen()) {
         return true;
@@ -218,19 +214,42 @@ bool PartialSchemaKeyLessComparator::operator()(const PartialSchemaKey& k1,
 
 ResidualRequirement::ResidualRequirement(PartialSchemaKey key,
                                          PartialSchemaRequirement req,
-                                         CEType ce)
+                                         size_t entryIndex)
+    : _key(std::move(key)), _req(std::move(req)), _entryIndex(entryIndex) {}
+
+bool ResidualRequirement::operator==(const ResidualRequirement& other) const {
+    return _key == other._key && _req == other._req && _entryIndex == other._entryIndex;
+}
+
+ResidualRequirementWithCE::ResidualRequirementWithCE(PartialSchemaKey key,
+                                                     PartialSchemaRequirement req,
+                                                     CEType ce)
     : _key(std::move(key)), _req(std::move(req)), _ce(ce) {}
 
+CandidateIndexEntry::CandidateIndexEntry(std::string indexDefName)
+    : _indexDefName(std::move(indexDefName)),
+      _fieldProjectionMap(),
+      _intervals(CompoundIntervalReqExpr::makeSingularDNF()),
+      _residualRequirements(),
+      _fieldsToCollate(),
+      _intervalPrefixSize(0) {}
+
 bool CandidateIndexEntry::operator==(const CandidateIndexEntry& other) const {
-    return _fieldProjectionMap == other._fieldProjectionMap && _intervals == other._intervals &&
+    return _indexDefName == other._indexDefName &&
+        _fieldProjectionMap == other._fieldProjectionMap && _intervals == other._intervals &&
         _residualRequirements == other._residualRequirements &&
         _fieldsToCollate == other._fieldsToCollate &&
         _intervalPrefixSize == other._intervalPrefixSize;
 }
 
+bool ScanParams::operator==(const ScanParams& other) const {
+    return _fieldProjectionMap == other._fieldProjectionMap &&
+        _residualRequirements == other._residualRequirements;
+}
+
 IndexSpecification::IndexSpecification(std::string scanDefName,
                                        std::string indexDefName,
-                                       MultiKeyIntervalRequirement interval,
+                                       CompoundIntervalRequirement interval,
                                        bool reverseOrder)
     : _scanDefName(std::move(scanDefName)),
       _indexDefName(std::move(indexDefName)),
@@ -250,7 +269,7 @@ const std::string& IndexSpecification::getIndexDefName() const {
     return _indexDefName;
 }
 
-const MultiKeyIntervalRequirement& IndexSpecification::getInterval() const {
+const CompoundIntervalRequirement& IndexSpecification::getInterval() const {
     return _interval;
 }
 

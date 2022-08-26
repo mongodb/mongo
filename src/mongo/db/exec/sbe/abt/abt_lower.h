@@ -185,7 +185,7 @@ private:
         const sbe::value::SlotVector& toExclude = {});
 
     std::unique_ptr<sbe::EExpression> convertBoundsToExpr(
-        bool isLower, const IndexDefinition& indexDef, const MultiKeyIntervalRequirement& interval);
+        bool isLower, const IndexDefinition& indexDef, const CompoundIntervalRequirement& interval);
 
     std::unique_ptr<sbe::PlanStage> generateInternal(const ABT& n);
 

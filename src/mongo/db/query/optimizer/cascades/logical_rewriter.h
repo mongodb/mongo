@@ -106,7 +106,6 @@ private:
     template <class Type, template <class> class R>
     void bindSingleNode(MemoLogicalNodeId nodeMemoId);
 
-    void registerRewrite(LogicalRewriteType rewriteType, RewriteFn fn);
     void initializeRewrites();
 
     static RewriteSet _explorationSet;

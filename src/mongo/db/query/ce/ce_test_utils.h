@@ -109,9 +109,6 @@ protected:
 
     // The number of records in the collection we are testing.
     double _collCard;
-
-private:
-    optimizer::OptPhaseManager getPhaseManager(size_t optimizationLevel) const;
 };
 
 }  // namespace ce

@@ -25,11 +25,11 @@ assert.commandWorked(t.createIndex({'a': 1}));
 
 let res = t.explain("executionStats").aggregate([{$match: {'a': {$gt: 60, $lt: 100}}}]);
 assert.eq(2, res.executionStats.nReturned);
-assert.eq("IndexScan", res.queryPlanner.winningPlan.optimizerPlan.child.leftChild.nodeType);
+assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
 
 // Should get a covered plan.
 res = t.explain("executionStats")
           .aggregate([{$project: {'_id': 0, 'a': 1}}, {$match: {'a': {$gt: 60, $lt: 100}}}]);
 assert.eq(2, res.executionStats.nReturned);
-assert.eq("IndexScan", res.queryPlanner.winningPlan.optimizerPlan.child.child.nodeType);
+assertValueOnPlanPath("IndexScan", res, "child.child.nodeType");
 }());

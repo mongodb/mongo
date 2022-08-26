@@ -573,18 +573,20 @@ static boost::optional<ABT> mergeSargableNodes(
 
     const ScanDefinition& scanDef =
         ctx.getMetadata()._scanDefs.at(indexingAvailability.getScanDefName());
-    auto candidateIndexMap = computeCandidateIndexMap(ctx.getPrefixId(),
-                                                      scanProjName,
-                                                      mergedReqs,
-                                                      scanDef,
-                                                      ctx.getHints()._fastIndexNullHandling,
-                                                      hasEmptyInterval);
+    auto candidateIndexes = computeCandidateIndexes(ctx.getPrefixId(),
+                                                    scanProjName,
+                                                    mergedReqs,
+                                                    scanDef,
+                                                    ctx.getHints()._fastIndexNullHandling,
+                                                    hasEmptyInterval);
     if (hasEmptyInterval) {
         return createEmptyValueScanNode(ctx);
     }
 
+    auto scanParams = computeScanParams(ctx.getPrefixId(), mergedReqs, scanProjName);
     ABT result = make<SargableNode>(std::move(mergedReqs),
-                                    std::move(candidateIndexMap),
+                                    std::move(candidateIndexes),
+                                    std::move(scanParams),
                                     IndexReqTarget::Complete,
                                     belowNode.getChild());
     applyProjectionRenames(std::move(projectionRenames), result);
@@ -710,46 +712,49 @@ static void convertFilterToSargableNode(ABT::reference_type node,
         return;
     }
 
-    auto candidateIndexMap = computeCandidateIndexMap(ctx.getPrefixId(),
-                                                      scanProjName,
-                                                      conversion->_reqMap,
-                                                      scanDef,
-                                                      ctx.getHints()._fastIndexNullHandling,
-                                                      hasEmptyInterval);
+    auto candidateIndexes = computeCandidateIndexes(ctx.getPrefixId(),
+                                                    scanProjName,
+                                                    conversion->_reqMap,
+                                                    scanDef,
+                                                    ctx.getHints()._fastIndexNullHandling,
+                                                    hasEmptyInterval);
 
     if (hasEmptyInterval) {
         addEmptyValueScanNode(ctx);
-    } else {
-        ABT sargableNode = make<SargableNode>(std::move(conversion->_reqMap),
-                                              std::move(candidateIndexMap),
-                                              IndexReqTarget::Complete,
-                                              filterNode.getChild());
+        return;
+    }
 
-        if (conversion->_retainPredicate) {
-            const GroupIdType childGroupId =
-                filterNode.getChild().cast<MemoLogicalDelegatorNode>()->getGroupId();
-            if (childGroupId == indexingAvailability.getScanGroupId()) {
-                // Add node directly.
-                addSargableChildNode(node, std::move(sargableNode), ctx);
-            } else {
-                // Look at the child group to find SargableNodes and attempt to combine.
-                const auto& logicalNodes = ctx.getMemo().getGroup(childGroupId)._logicalNodes;
-                for (const ABT& childNode : logicalNodes.getVector()) {
-                    if (auto childSargableNode = childNode.cast<SargableNode>();
-                        childSargableNode != nullptr) {
-                        const auto& result = mergeSargableNodes(indexingAvailability,
-                                                                scanDef.getNonMultiKeyPathSet(),
-                                                                *sargableNode.cast<SargableNode>(),
-                                                                *childSargableNode,
-                                                                ctx);
-                        if (result) {
-                            addSargableChildNode(node, std::move(*result), ctx);
-                        }
-                    }
+    auto scanParams = computeScanParams(ctx.getPrefixId(), conversion->_reqMap, scanProjName);
+    ABT sargableNode = make<SargableNode>(std::move(conversion->_reqMap),
+                                          std::move(candidateIndexes),
+                                          std::move(scanParams),
+                                          IndexReqTarget::Complete,
+                                          filterNode.getChild());
+    if (!conversion->_retainPredicate) {
+        ctx.addNode(sargableNode, isSubstitution);
+        return;
+    }
+
+    const GroupIdType childGroupId =
+        filterNode.getChild().cast<MemoLogicalDelegatorNode>()->getGroupId();
+    if (childGroupId == indexingAvailability.getScanGroupId()) {
+        // Add node directly.
+        addSargableChildNode(node, std::move(sargableNode), ctx);
+    } else {
+        // Look at the child group to find SargableNodes and attempt to combine.
+        const auto& logicalNodes = ctx.getMemo().getGroup(childGroupId)._logicalNodes;
+        for (const ABT& childNode : logicalNodes.getVector()) {
+            if (auto childSargableNode = childNode.cast<SargableNode>();
+                childSargableNode != nullptr) {
+                const auto& result = mergeSargableNodes(indexingAvailability,
+                                                        scanDef.getNonMultiKeyPathSet(),
+                                                        *sargableNode.cast<SargableNode>(),
+                                                        *childSargableNode,
+                                                        ctx);
+                if (result) {
+                    addSargableChildNode(node, std::move(*result), ctx);
                 }
             }
-        } else {
-            ctx.addNode(sargableNode, isSubstitution);
         }
     }
 }
@@ -895,22 +900,25 @@ struct SubstituteConvert<EvaluationNode> {
         }
 
         bool hasEmptyInterval = false;
-        auto candidateIndexMap = computeCandidateIndexMap(ctx.getPrefixId(),
-                                                          scanProjName,
-                                                          conversion->_reqMap,
-                                                          scanDef,
-                                                          ctx.getHints()._fastIndexNullHandling,
-                                                          hasEmptyInterval);
+        auto candidateIndexes = computeCandidateIndexes(ctx.getPrefixId(),
+                                                        scanProjName,
+                                                        conversion->_reqMap,
+                                                        scanDef,
+                                                        ctx.getHints()._fastIndexNullHandling,
+                                                        hasEmptyInterval);
 
         if (hasEmptyInterval) {
             addEmptyValueScanNode(ctx);
-        } else {
-            ABT newNode = make<SargableNode>(std::move(conversion->_reqMap),
-                                             std::move(candidateIndexMap),
-                                             IndexReqTarget::Complete,
-                                             evalNode.getChild());
-            ctx.addNode(newNode, true /*substitute*/);
+            return;
         }
+
+        auto scanParams = computeScanParams(ctx.getPrefixId(), conversion->_reqMap, scanProjName);
+        ABT newNode = make<SargableNode>(std::move(conversion->_reqMap),
+                                         std::move(candidateIndexes),
+                                         std::move(scanParams),
+                                         IndexReqTarget::Complete,
+                                         evalNode.getChild());
+        ctx.addNode(newNode, true /*substitute*/);
     }
 };
 
@@ -1076,25 +1084,25 @@ struct ExploreConvert<SargableNode> {
             }
 
             bool hasEmptyLeftInterval = false;
-            auto leftCandidateIndexMap = computeCandidateIndexMap(ctx.getPrefixId(),
-                                                                  scanProjectionName,
-                                                                  leftReqs,
-                                                                  scanDef,
-                                                                  fastIndexNullHandling,
-                                                                  hasEmptyLeftInterval);
-            if (isIndex && leftCandidateIndexMap.empty()) {
+            auto leftCandidateIndexes = computeCandidateIndexes(ctx.getPrefixId(),
+                                                                scanProjectionName,
+                                                                leftReqs,
+                                                                scanDef,
+                                                                fastIndexNullHandling,
+                                                                hasEmptyLeftInterval);
+            if (isIndex && leftCandidateIndexes.empty()) {
                 // Reject rewrite.
                 continue;
             }
 
             bool hasEmptyRightInterval = false;
-            auto rightCandidateIndexMap = computeCandidateIndexMap(ctx.getPrefixId(),
-                                                                   scanProjectionName,
-                                                                   rightReqs,
-                                                                   scanDef,
-                                                                   fastIndexNullHandling,
-                                                                   hasEmptyRightInterval);
-            if (isIndex && rightCandidateIndexMap.empty()) {
+            auto rightCandidateIndexes = computeCandidateIndexes(ctx.getPrefixId(),
+                                                                 scanProjectionName,
+                                                                 rightReqs,
+                                                                 scanDef,
+                                                                 fastIndexNullHandling,
+                                                                 hasEmptyRightInterval);
+            if (isIndex && rightCandidateIndexes.empty()) {
                 // With empty candidate map, reject only if we cannot implement as Seek.
                 continue;
             }
@@ -1104,13 +1112,18 @@ struct ExploreConvert<SargableNode> {
 
             ABT scanDelegator = make<MemoLogicalDelegatorNode>(scanGroupId);
             ABT leftChild = make<SargableNode>(std::move(leftReqs),
-                                               std::move(leftCandidateIndexMap),
+                                               std::move(leftCandidateIndexes),
+                                               boost::none,
                                                IndexReqTarget::Index,
                                                scanDelegator);
+
+            auto rightScanParams =
+                computeScanParams(ctx.getPrefixId(), rightReqs, scanProjectionName);
             ABT rightChild = rightReqs.empty()
                 ? scanDelegator
                 : make<SargableNode>(std::move(rightReqs),
-                                     std::move(rightCandidateIndexMap),
+                                     std::move(rightCandidateIndexes),
+                                     std::move(rightScanParams),
                                      isIndex ? IndexReqTarget::Index : IndexReqTarget::Seek,
                                      scanDelegator);
 
@@ -1249,13 +1262,13 @@ struct ExploreReorder<EvaluationNode, RIDIntersectNode> {
     }
 };
 
-void LogicalRewriter::registerRewrite(const LogicalRewriteType rewriteType, RewriteFn fn) {
-    if (_activeRewriteSet.find(rewriteType) != _activeRewriteSet.cend()) {
-        _rewriteMap.emplace(rewriteType, fn);
-    }
-}
-
 void LogicalRewriter::initializeRewrites() {
+    const auto registerRewrite = [& rewriteMap = _rewriteMap](const LogicalRewriteType rewriteType,
+                                                              RewriteFn fn) {
+        const bool inserted = rewriteMap.emplace(rewriteType, fn).second;
+        invariant(inserted);
+    };
+
     registerRewrite(
         LogicalRewriteType::FilterEvaluationReorder,
         &LogicalRewriter::bindAboveBelow<FilterNode, EvaluationNode, SubstituteReorder>);

@@ -10,6 +10,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/optimizer_utils.js");
+
 const coll = db.cqf_range_descending;
 
 /*
@@ -27,12 +29,14 @@ const coll = db.cqf_range_descending;
 
     const query = {a: {$gte: 0, $lte: 2}};
 
-    const res = coll.find(query).hint(indexKey).toArray();
-    assert.eq(res.length, 1);
-
-    const explain = coll.explain("executionStats").find(query).hint(indexKey).finish();
-    printjson(explain);
-    assert.eq("IndexScan", explain.queryPlanner.winningPlan.optimizerPlan.child.leftChild.nodeType);
+    {
+        const res = coll.find(query).hint(indexKey).toArray();
+        assert.eq(res.length, 1);
+    }
+    {
+        const res = coll.explain("executionStats").find(query).hint(indexKey).finish();
+        assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
+    }
 }
 
 /*
@@ -54,13 +58,14 @@ const coll = db.cqf_range_descending;
 
     const query = {a: {$gte: 10, $lte: 20}, b: {$gt: 1}};
 
-    const res = coll.find(query).hint(indexKey).toArray();
-    assert.eq(res.length, 4);
-
-    const explain = coll.explain("executionStats").find(query).hint(indexKey).finish();
-    printjson(explain);
-    assert.eq("IndexScan",
-              explain.queryPlanner.winningPlan.optimizerPlan.child.leftChild.child.nodeType);
+    {
+        const res = coll.find(query).hint(indexKey).toArray();
+        assert.eq(res.length, 4);
+    }
+    {
+        const res = coll.explain("executionStats").find(query).hint(indexKey).finish();
+        assertValueOnPlanPath("IndexScan", res, "child.leftChild.child.nodeType");
+    }
 }
 
 /*
@@ -77,12 +82,13 @@ const coll = db.cqf_range_descending;
 
     const query = [{a: 1}, {_id: 0, a: 1, b: 1}];
 
-    const res = coll.find(...query).hint(indexKey).toArray();
-    assert.eq(res.length, 1);
-
-    const explain = coll.explain("executionStats").find(...query).hint(indexKey).finish();
-    printjson(explain);
-    assert.eq("IndexScan",
-              explain.queryPlanner.winningPlan.optimizerPlan.child.child.leftChild.nodeType);
+    {
+        const res = coll.find(...query).hint(indexKey).toArray();
+        assert.eq(res.length, 1);
+    }
+    {
+        const res = coll.explain("executionStats").find(...query).hint(indexKey).finish();
+        assertValueOnPlanPath("IndexScan", res, "child.child.leftChild.nodeType");
+    }
 }
 }());

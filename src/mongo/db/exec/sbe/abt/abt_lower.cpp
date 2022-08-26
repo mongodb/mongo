@@ -930,7 +930,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const CoScanNode& n) {
 std::unique_ptr<sbe::EExpression> SBENodeLowering::convertBoundsToExpr(
     const bool isLower,
     const IndexDefinition& indexDef,
-    const MultiKeyIntervalRequirement& interval) {
+    const CompoundIntervalRequirement& interval) {
     std::vector<std::unique_ptr<sbe::EExpression>> ksFnArgs;
     ksFnArgs.emplace_back(
         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt64,

@@ -29,10 +29,8 @@ t.createIndex({c: 1});
     assert.eq(1, res.executionStats.nReturned);
 
     // Verify the query **is not covered** by the index.
-    assert.eq("Seek",
-              res.queryPlanner.winningPlan.optimizerPlan.child.child.rightChild.child.nodeType);
-    assert.eq("IndexScan",
-              res.queryPlanner.winningPlan.optimizerPlan.child.child.leftChild.nodeType);
+    assertValueOnPlanPath("Seek", res, "child.child.rightChild.child.nodeType");
+    assertValueOnPlanPath("IndexScan", res, "child.child.leftChild.nodeType");
 }
 
 {
@@ -45,6 +43,6 @@ t.createIndex({c: 1});
     assert.eq(1, res.executionStats.nReturned);
 
     // Verify the query **is covered** by the index.
-    assert.eq("IndexScan", res.queryPlanner.winningPlan.optimizerPlan.child.child.nodeType);
+    assertValueOnPlanPath("IndexScan", res, "child.child.nodeType");
 }
 }());
