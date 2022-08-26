@@ -268,7 +268,10 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
             // Add the index to the TTLCollectionCache upon successfully committing the index build.
             // TTL indexes are not compatible with capped collections.
             if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName) && !coll->isCapped()) {
-                TTLCollectionCache::get(svcCtx).registerTTLInfo(coll->uuid(), indexName);
+                TTLCollectionCache::get(svcCtx).registerTTLInfo(
+                    coll->uuid(),
+                    TTLCollectionCache::Info{
+                        indexName, spec[IndexDescriptor::kExpireAfterSecondsFieldName].isNaN()});
             }
         });
 }

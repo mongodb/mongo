@@ -430,7 +430,8 @@ void _setClusteredExpireAfterSeconds(OperationContext* opCtx,
     if (!oldExpireAfterSeconds) {
         auto ttlCache = &TTLCollectionCache::get(opCtx->getServiceContext());
         opCtx->recoveryUnit()->onCommit([ttlCache, uuid = coll->uuid()](auto _) {
-            ttlCache->registerTTLInfo(uuid, TTLCollectionCache::ClusteredId());
+            ttlCache->registerTTLInfo(uuid,
+                                      TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}});
         });
     }
 
@@ -577,12 +578,39 @@ Status _collModInternal(OperationContext* opCtx,
                 // If this collection was not previously TTL, inform the TTL monitor when we commit.
                 if (oldExpireSecs.eoo()) {
                     auto ttlCache = &TTLCollectionCache::get(opCtx->getServiceContext());
-                    opCtx->recoveryUnit()->onCommit([ttlCache, uuid = coll->uuid(), &idx](auto _) {
-                        ttlCache->registerTTLInfo(uuid, idx->indexName());
-                    });
+                    opCtx->recoveryUnit()->onCommit(
+                        [ttlCache, uuid = coll->uuid(), indexName = idx->indexName()](auto _) {
+                            ttlCache->registerTTLInfo(
+                                uuid,
+                                TTLCollectionCache::Info{indexName,
+                                                         /*isExpireAfterSecondsNaN=*/false});
+                        });
                 }
-                if (SimpleBSONElementComparator::kInstance.evaluate(oldExpireSecs !=
-                                                                    newExpireSecs)) {
+
+                // If the current `expireAfterSeconds` is NaN, it can never be equal to
+                // 'indexExpireAfterSeconds'.
+                if (oldExpireSecs.isNaN()) {
+                    // Setting *oldExpireSecs is mostly for informational purposes.
+                    // In 5.0, we leave `oldExpireSecs` unchanged.
+                    // Unlike 6.0+ where 'oldExpireSecs' is declared as an optional long long,
+                    // 'oldExpireSecs' is a BSONElement. It should be fine to keep `oldExpireSecs`
+                    // as NaN in the command result. For the oplog entry, we already use
+                    // BSONElement::safeNumberLong() to coerce the NaN into zero. See the
+                    // IndexCollModInfo struct.
+
+                    // Change the value of "expireAfterSeconds" on disk.
+                    coll.getWritableCollection()->updateTTLSetting(
+                        opCtx, idx->indexName(), newExpireSecs.safeNumberLong());
+
+                    // Keep the TTL information maintained by the TTLCollectionCache in sync so that
+                    // we don't try to fix up the TTL index during the next step-up.
+                    auto ttlCache = &TTLCollectionCache::get(opCtx->getServiceContext());
+                    opCtx->recoveryUnit()->onCommit(
+                        [ttlCache, uuid = coll->uuid(), indexName = idx->indexName()](auto _) {
+                            ttlCache->unsetTTLIndexExpireAfterSecondsNaN(uuid, indexName);
+                        });
+                } else if (SimpleBSONElementComparator::kInstance.evaluate(oldExpireSecs !=
+                                                                           newExpireSecs)) {
                     // Change the value of "expireAfterSeconds" on disk.
                     coll.getWritableCollection()->updateTTLSetting(
                         opCtx, idx->indexName(), newExpireSecs.safeNumberLong());
