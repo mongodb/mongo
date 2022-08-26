@@ -38,9 +38,11 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/tenant_migration_shared_data.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_import.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo::repl::shard_merge_utils {
 
@@ -104,7 +106,11 @@ struct MetadataInfo {
 /**
  * Copy a file from the donor.
  */
-void cloneFile(OperationContext* opCtx, const BSONObj& metadataDoc);
+void cloneFile(OperationContext* opCtx,
+               DBClientConnection* clientConnection,
+               ThreadPool* writerPool,
+               TenantMigrationSharedData* sharedData,
+               const BSONObj& metadataDoc);
 
 /**
  * Import a donor collection after its files have been cloned to a temp dir.

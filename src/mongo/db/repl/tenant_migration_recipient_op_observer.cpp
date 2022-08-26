@@ -104,8 +104,7 @@ void handleShardMergeStateChange(OperationContext* opCtx,
         case TenantMigrationRecipientStateEnum::kUninitialized:
             break;
         case TenantMigrationRecipientStateEnum::kStarted:
-            fileImporter->startMigration(recipientStateDoc.getId(),
-                                         recipientStateDoc.getDonorConnectionString());
+            fileImporter->startMigration(recipientStateDoc.getId());
             break;
         case TenantMigrationRecipientStateEnum::kLearnedFilenames:
             fileImporter->learnedAllFilenames(recipientStateDoc.getId());
