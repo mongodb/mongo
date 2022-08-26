@@ -66,6 +66,11 @@ public:
      */
     void shutdown();
 
+    /**
+     * Invoked when the node enters the primary state.
+     */
+    void onStepUp(OperationContext* opCtx);
+
     long long getTTLPasses_forTest();
     long long getTTLSubPasses_forTest();
 
