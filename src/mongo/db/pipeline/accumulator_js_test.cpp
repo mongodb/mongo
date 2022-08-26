@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/process_interface/standalone_process_interface.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/dbtests/dbtests.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/scripting/engine.h"
 
 namespace mongo {
@@ -194,6 +195,38 @@ TEST_F(MapReduceFixture, InternalJsReduceFailsWhenEvalContainsInvalidJavascript)
         accum->process(input, false);
 
         ASSERT_THROWS_CODE(accum->getValue(false), DBException, ErrorCodes::JSInterpreterFailure);
+    }
+}
+
+TEST_F(
+    MapReduceFixture,
+    InternalJsReduceFailsDependentOnDocumentCountWhenEvalIsInvalidJavascriptWithSingleReduceOpt) {
+    RAIIServerParameterControllerForTest flag("mrEnableSingleReduceOptimization", true);
+    std::string eval("INVALID_JAVASCRIPT");
+    // Multiple source documents should evaluate the passed in function and return an error with
+    // invalid javascript.
+    {
+        auto accum = AccumulatorInternalJsReduce::create(getExpCtx(), "INVALID_JAVASCRIPT");
+        auto input = Value(DOC("k" << Value(1) << "v" << Value(2)));
+        accum->process(input, false);
+        accum->process(input, false);
+
+        ASSERT_THROWS_CODE(accum->getValue(false), DBException, ErrorCodes::JSInterpreterFailure);
+    }
+
+    // Single source document. With the reduce optimization, we simply return this document rather
+    // than executing the JS engine at all, so no error is thrown.
+    {
+        auto accum = AccumulatorInternalJsReduce::create(getExpCtx(), "INVALID_JAVASCRIPT");
+
+        auto input = Value(DOC("k" << Value(1) << "v" << Value(2)));
+        auto expectedResult = Value(2);
+
+        accum->process(input, false);
+        Value result = accum->getValue(false);
+
+        ASSERT_VALUE_EQ(expectedResult, result);
+        ASSERT_EQUALS(expectedResult.getType(), result.getType());
     }
 }
 

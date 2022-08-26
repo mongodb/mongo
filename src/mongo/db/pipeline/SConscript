@@ -121,6 +121,7 @@ env.Library(
         'accumulator_rank.cpp',
         'accumulator_std_dev.cpp',
         'accumulator_sum.cpp',
+        'map_reduce_options.idl',
         'window_function/window_bounds.cpp',
         'window_function/window_function_covariance.cpp',
         'window_function/window_function_count.cpp',
@@ -140,6 +141,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/exec/sort_executor',
         '$BUILD_DIR/mongo/db/index/key_generator',
+        '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
 
