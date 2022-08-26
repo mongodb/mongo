@@ -945,7 +945,6 @@ void WiredTigerKVEngine::_openWiredTiger(const std::string& path, const std::str
 
 void WiredTigerKVEngine::cleanShutdown() {
     log() << "WiredTigerKVEngine shutting down";
-    WiredTigerUtil::resetTableLoggingInfo();
 
     if (!_readOnly)
         syncSizeInfo(true);
