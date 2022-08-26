@@ -51,6 +51,73 @@
 
 namespace mongo::transport {
 
+/**
+ * Generic wrapper for making an ASIO socket get_option or set_option call
+ * having a payload of type `T`, which is usually just `int` so it's the default.
+ * Can be value-initializd with a `T`. A reference to the payload is available
+ * using the dereferencing operators.
+ *
+ * Models Asio GettableSocketOption and SettableSocketOption.
+ * https://www.boost.org/doc/libs/1_80_0/doc/html/boost_asio/reference/GettableSocketOption.html
+ * https://www.boost.org/doc/libs/1_80_0/doc/html/boost_asio/reference/SettableSocketOption.html
+ *
+ * The Asio-required accessors must accept a `Protocol` argument, which we ignore.
+ * The kinds of options we use don't need it.
+ * https://www.boost.org/doc/libs/1_80_0/doc/html/boost_asio/reference/Protocol.html
+ *
+ * Example:
+ *     using TcpInfoOption = SocketOption<IPPROTO_TCP, TCP_INFO, tcp_info>;
+ *     ...
+ *     TcpInfoOption tcpiOption;
+ *     socket.get_option(tcpiOption);
+ *     tcp_info& infoOut = *tcpiOption;
+ */
+template <int optLevel, int optName, typename T = int>
+class SocketOption {
+public:
+    SocketOption() = default;
+    explicit SocketOption(T d) : _data{std::move(d)} {}
+    template <typename Protocol>
+    int level(const Protocol&) const {
+        return optLevel;
+    }
+    template <typename Protocol>
+    int name(const Protocol&) const {
+        return optName;
+    }
+    template <typename Protocol>
+    T* data(const Protocol&) {
+        return &**this;
+    }
+    template <typename Protocol>
+    const T* data(const Protocol&) const {
+        return &**this;
+    }
+    template <typename Protocol>
+    size_t size(const Protocol&) const {
+        return sizeof(_data);
+    }
+    template <typename Protocol>
+    void resize(const Protocol&, size_t) const {}
+
+    T& operator*() {
+        return _data;
+    }
+    const T& operator*() const {
+        return _data;
+    }
+
+    T* operator->() {
+        return &**this;
+    }
+    const T* operator->() const {
+        return &**this;
+    }
+
+private:
+    T _data{};
+};
+
 inline SockAddr endpointToSockAddr(const asio::generic::stream_protocol::endpoint& endPoint) {
     SockAddr wrappedAddr(endPoint.data(), endPoint.size());
     return wrappedAddr;
