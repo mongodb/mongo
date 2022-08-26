@@ -161,6 +161,29 @@ assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "simple"}}));
 assertSupportedByBonsaiFully({find: coll.getName(), filter: {}});
 assertSupportedByBonsaiFully({aggregate: coll.getName(), pipeline: [], cursor: {}});
 
+// A query against a collection with a hidden index should be eligible for CQF.
+coll.drop();
+assert.commandWorked(coll.createIndex({a: 1}, {hidden: true}));
+assertSupportedByBonsaiFully({find: coll.getName(), filter: {}});
+assertSupportedByBonsaiFully({aggregate: coll.getName(), pipeline: [], cursor: {}});
+
+// Unhiding the supported index means the query is still eligible for CQF.
+coll.unhideIndex({a: 1});
+assertSupportedByBonsaiFully({find: coll.getName(), filter: {}});
+assertSupportedByBonsaiFully({aggregate: coll.getName(), pipeline: [], cursor: {}});
+
+// A query against a collection with a hidden index should be eligible for CQF even if the
+// underlying index is not supported.
+coll.drop();
+assert.commandWorked(coll.createIndex({a: 1}, {hidden: true, sparse: true}));
+assertSupportedByBonsaiFully({find: coll.getName(), filter: {}});
+assertSupportedByBonsaiFully({aggregate: coll.getName(), pipeline: [], cursor: {}});
+
+// Unhiding the unsupported index means the query is not eligible for CQF.
+coll.unhideIndex({a: 1});
+assertNotSupportedByBonsai({find: coll.getName(), filter: {}});
+assertNotSupportedByBonsai({aggregate: coll.getName(), pipeline: [], cursor: {}});
+
 // Test-only index type.
 coll.drop();
 assert.commandWorked(coll.insert({a: 1}));

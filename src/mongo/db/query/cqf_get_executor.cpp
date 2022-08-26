@@ -96,10 +96,14 @@ static opt::unordered_map<std::string, optimizer::IndexDefinition> buildIndexSpe
 
     while (indexIterator->more()) {
         const IndexCatalogEntry& catalogEntry = *indexIterator->next();
-
         const IndexDescriptor& descriptor = *catalogEntry.descriptor();
-        if (descriptor.hidden() || descriptor.isSparse() ||
-            descriptor.getIndexType() != IndexType::INDEX_BTREE ||
+
+        if (descriptor.hidden()) {
+            // Index is hidden; don't consider it.
+            continue;
+        }
+
+        if (descriptor.isSparse() || descriptor.getIndexType() != IndexType::INDEX_BTREE ||
             !descriptor.collation().isEmpty()) {
             uasserted(ErrorCodes::InternalErrorNotSupported, "Unsupported index type");
         }

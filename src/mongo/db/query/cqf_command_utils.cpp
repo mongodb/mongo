@@ -610,7 +610,13 @@ bool isEligibleCommon(const RequestType& request,
 
         while (indexIterator->more()) {
             const IndexDescriptor& descriptor = *indexIterator->next()->descriptor();
-            if (descriptor.isPartial() || descriptor.hidden() || descriptor.isSparse() ||
+            if (descriptor.hidden()) {
+                // An index that is hidden will not be considered by the optimizer, so we don't need
+                // to check its eligibility further.
+                continue;
+            }
+
+            if (descriptor.isPartial() || descriptor.isSparse() ||
                 descriptor.getIndexType() != IndexType::INDEX_BTREE ||
                 !descriptor.collation().isEmpty()) {
                 return true;
