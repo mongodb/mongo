@@ -409,11 +409,11 @@ void CollectionImpl::init(OperationContext* opCtx) {
             if (opCtx->lockState()->inAWriteUnitOfWork()) {
                 opCtx->recoveryUnit()->onCommit([svcCtx, uuid](auto ts) {
                     TTLCollectionCache::get(svcCtx).registerTTLInfo(
-                        uuid, TTLCollectionCache::ClusteredId{});
+                        uuid, TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}});
                 });
             } else {
-                TTLCollectionCache::get(svcCtx).registerTTLInfo(uuid,
-                                                                TTLCollectionCache::ClusteredId{});
+                TTLCollectionCache::get(svcCtx).registerTTLInfo(
+                    uuid, TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}});
             }
         }
     }

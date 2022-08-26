@@ -593,7 +593,8 @@ void _setClusteredExpireAfterSeconds(
                 if (!oldExpireAfterSeconds) {
                     auto ttlCache = &TTLCollectionCache::get(opCtx->getServiceContext());
                     opCtx->recoveryUnit()->onCommit([ttlCache, uuid = coll->uuid()](auto _) {
-                        ttlCache->registerTTLInfo(uuid, TTLCollectionCache::ClusteredId());
+                        ttlCache->registerTTLInfo(
+                            uuid, TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}});
                     });
                 }
 

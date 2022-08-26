@@ -54,16 +54,52 @@ public:
     using IndexName = std::string;
 
     // Specifies how a collection should expire data with TTL.
-    using Info = stdx::variant<ClusteredId, IndexName>;
+    class Info {
+    public:
+        explicit Info(ClusteredId) : _isClustered(true), _isExpireAfterSecondsNaN(false) {}
+        Info(IndexName indexName, bool isExpireAfterSecondsNaN)
+            : _isClustered(false),
+              _indexName(std::move(indexName)),
+              _isExpireAfterSecondsNaN(isExpireAfterSecondsNaN) {}
+        bool isClustered() const {
+            return _isClustered;
+        }
+        IndexName getIndexName() const {
+            return _indexName;
+        }
+        bool isExpireAfterSecondsNaN() const {
+            return _isExpireAfterSecondsNaN;
+        }
+        void unsetExpireAfterSecondsNaN() {
+            _isExpireAfterSecondsNaN = false;
+        }
+
+    private:
+        bool _isClustered;
+        IndexName _indexName;
+        bool _isExpireAfterSecondsNaN;
+    };
 
     // Caller is responsible for ensuring no duplicates are registered.
     void registerTTLInfo(UUID uuid, const Info& info);
-    void deregisterTTLInfo(UUID uuid, const Info& info);
+    void deregisterTTLIndexByName(UUID uuid, const IndexName& indexName);
+    void deregisterTTLClusteredIndex(UUID uuid);
+
+    /**
+     * Resets expireAfterSeconds flag on TTL index.
+     * For idempotency, this has no effect if index is not found.
+     */
+    void unsetTTLIndexExpireAfterSecondsNaN(UUID uuid, const IndexName& indexName);
 
     using InfoMap = stdx::unordered_map<UUID, std::vector<Info>, UUID::Hash>;
     InfoMap getTTLInfos();
 
 private:
+    /**
+     * Shared implementation for deregistering TTL infos.
+     */
+    void _deregisterTTLInfo(UUID uuid, const Info& info);
+
     Mutex _ttlInfosLock = MONGO_MAKE_LATCH("TTLCollectionCache::_ttlInfosLock");
     InfoMap _ttlInfos;
 };

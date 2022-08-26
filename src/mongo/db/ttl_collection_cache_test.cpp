@@ -39,9 +39,9 @@ TEST(TTLCollectionCacheTest, Basic) {
 
     auto uuidCollA = UUID::gen();
     auto uuidCollB = UUID::gen();
-    auto infoIndexA1 = TTLCollectionCache::Info{"collA_ttl_1"};
+    auto infoIndexA1 = TTLCollectionCache::Info{"collA_ttl_1", /*isExpireAfterSecondsNaN=*/false};
     auto infoClusteredA = TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}};
-    auto infoIndexB1 = TTLCollectionCache::Info("collB_ttl_1");
+    auto infoIndexB1 = TTLCollectionCache::Info("collB_ttl_1", /*isExpireAfterSecondsNaN=*/true);
 
     // Confirm registerTTLInfo() behavior using getTTLInfo().
     cache.registerTTLInfo(uuidCollA, infoIndexA1);
@@ -52,36 +52,45 @@ TEST(TTLCollectionCacheTest, Basic) {
     ASSERT_EQ(infos.size(), 2U);
     ASSERT_EQ(infos.count(uuidCollA), 1U);
     ASSERT_EQ(infos[uuidCollA].size(), 2U);
-    auto indexNameA = stdx::get_if<TTLCollectionCache::IndexName>(&infos[uuidCollA][0]);
-    ASSERT(indexNameA);
-    ASSERT_EQ(*indexNameA, "collA_ttl_1");
-    ASSERT(stdx::get_if<TTLCollectionCache::ClusteredId>(&infos[uuidCollA][1]));
+    ASSERT_FALSE(infos[uuidCollA][0].isClustered());
+    ASSERT_EQ(infos[uuidCollA][0].getIndexName(), "collA_ttl_1");
+    ASSERT_FALSE(infos[uuidCollA][0].isExpireAfterSecondsNaN());
+    ASSERT(infos[uuidCollA][1].isClustered());
 
     ASSERT_EQ(infos.count(uuidCollB), 1U);
     ASSERT_EQ(infos[uuidCollB].size(), 1U);
 
-    auto indexNameB = stdx::get_if<TTLCollectionCache::IndexName>(&infos[uuidCollB][0]);
-    ASSERT(indexNameB);
-    ASSERT_EQ(*indexNameB, "collB_ttl_1");
+    ASSERT_FALSE(infos[uuidCollB][0].isClustered());
+    ASSERT_EQ(infos[uuidCollB][0].getIndexName(), "collB_ttl_1");
+    ASSERT(infos[uuidCollB][0].isExpireAfterSecondsNaN());
+
+    // Check that we can reset '_isExpireAfterSecondsNaN()' on the TTL index.
+    cache.unsetTTLIndexExpireAfterSecondsNaN(uuidCollB, infoIndexB1.getIndexName());
+    infos = cache.getTTLInfos();
+    ASSERT_EQ(infos.size(), 2U);
+    ASSERT_EQ(infos.count(uuidCollB), 1U);
+    ASSERT_EQ(infos[uuidCollB].size(), 1U);
+    ASSERT_EQ(infos[uuidCollB][0].getIndexName(), "collB_ttl_1");
+    ASSERT_FALSE(infos[uuidCollB][0].isExpireAfterSecondsNaN());
 
     // Check deregisterTTLInfo(). TTLCollectionCache should clean up
     // UUIDs that no longer have any TTL infos registered.
-    cache.deregisterTTLInfo(uuidCollB, infoIndexB1);
+    cache.deregisterTTLIndexByName(uuidCollB, infoIndexB1.getIndexName());
     infos = cache.getTTLInfos();
     ASSERT_EQ(infos.size(), 1U);
     ASSERT_EQ(infos.count(uuidCollA), 1U);
     ASSERT_EQ(infos[uuidCollA].size(), 2U);
 
     // Remove info for TTL index on collection A.
-    cache.deregisterTTLInfo(uuidCollA, infoIndexA1);
+    cache.deregisterTTLIndexByName(uuidCollA, infoIndexA1.getIndexName());
     infos = cache.getTTLInfos();
     ASSERT_EQ(infos.size(), 1U);
     ASSERT_EQ(infos.count(uuidCollA), 1U);
     ASSERT_EQ(infos[uuidCollA].size(), 1U);
-    ASSERT(stdx::get_if<TTLCollectionCache::ClusteredId>(&infos[uuidCollA][0]));
+    ASSERT(infos[uuidCollA][0].isClustered());
 
     // Remove clustered info for collection A.
-    cache.deregisterTTLInfo(uuidCollA, infoClusteredA);
+    cache.deregisterTTLClusteredIndex(uuidCollA);
     infos = cache.getTTLInfos();
     ASSERT_EQ(infos.size(), 0U);
 }
