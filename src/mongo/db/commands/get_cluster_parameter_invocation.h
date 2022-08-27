@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
-#include "mongo/idl/server_parameter.h"
+#include "mongo/db/server_parameter.h"
 
 namespace mongo {
 

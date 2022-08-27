@@ -72,7 +72,7 @@ env.Library(
 env.Library(
     target='auth_op_observer',
     source=[
-        "auth_op_observer.cpp",
+        'auth_op_observer.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',

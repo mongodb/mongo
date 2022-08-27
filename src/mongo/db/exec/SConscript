@@ -41,15 +41,15 @@ env.Library(
 )
 
 env.Library(
-    target="js_function",
+    target='js_function',
     source=[
-        "js_function.cpp",
+        'js_function.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/query/query_knobs',
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/scripting/scripting_server',
+        '$BUILD_DIR/mongo/scripting/scripting_common',
     ],
 )
 

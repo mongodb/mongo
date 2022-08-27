@@ -6,9 +6,9 @@ env = env.Clone()
 
 env.SConscript(
     dirs=[
-        "ce",
-        "collation",
-        "datetime",
+        'ce',
+        'collation',
+        'datetime',
         'optimizer',
     ],
     exports=[
@@ -19,20 +19,20 @@ env.SConscript(
 env.Library(
     target='canonical_query',
     source=[
-        "canonical_query.cpp",
-        "canonical_query_encoder.cpp",
+        'canonical_query.cpp',
+        'canonical_query_encoder.cpp',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/crypto/encrypted_field_config",
-        "$BUILD_DIR/mongo/db/cst/cst",
-        "$BUILD_DIR/mongo/db/query_expressions",
-        "collation/collator_factory_interface",
-        "collation/collator_interface",
-        "projection_ast",
-        "sort_pattern",
+        '$BUILD_DIR/mongo/crypto/encrypted_field_config',
+        '$BUILD_DIR/mongo/db/cst/cst',
+        '$BUILD_DIR/mongo/db/query_expressions',
+        'collation/collator_factory_interface',
+        'collation/collator_interface',
+        'projection_ast',
+        'sort_pattern',
     ],
     LIBDEPS_PRIVATE=[
-        "common_query_enums_and_helpers",
+        'common_query_enums_and_helpers',
     ],
 )
 
@@ -59,7 +59,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
         '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_plan_stats',
         '$BUILD_DIR/mongo/db/index/expression_params',
-        "$BUILD_DIR/mongo/db/query_expressions",
+        '$BUILD_DIR/mongo/db/query_expressions',
         'canonical_query',
         'query_index_bounds',
         'query_knobs',
@@ -70,7 +70,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/index/key_generator',
         '$BUILD_DIR/mongo/db/record_id_helpers',
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/idl/server_parameter',
         'query_plan_cache',
     ],
 )
@@ -107,29 +106,29 @@ env.Library(
 env.Library(
     target='sbe_stage_builder_helpers',
     source=[
-        "sbe_stage_builder_helpers.cpp",
+        'sbe_stage_builder_helpers.cpp',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/exec/sbe/query_sbe',
         '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_stages',
         '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_storage',
-        "$BUILD_DIR/mongo/db/index/index_access_method",
-        "$BUILD_DIR/mongo/db/query_expressions",
-        "$BUILD_DIR/mongo/db/storage/execution_context",
+        '$BUILD_DIR/mongo/db/index/index_access_method',
+        '$BUILD_DIR/mongo/db/query_expressions',
+        '$BUILD_DIR/mongo/db/storage/execution_context',
     ],
 )
 
 env.Library(
     target='projection_ast',
     source=[
-        "projection.cpp",
-        "projection_ast_util.cpp",
-        "projection_parser.cpp",
+        'projection.cpp',
+        'projection_ast_util.cpp',
+        'projection_parser.cpp',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/query_expressions",
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/query_expressions',
     ],
 )
 
@@ -213,7 +212,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
         '$BUILD_DIR/mongo/db/query/hint_parser',
         '$BUILD_DIR/mongo/db/repl/optime',
-        '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/rpc/rpc',
         'query_request',
@@ -236,7 +234,6 @@ env.Library(
         'tailable_mode.idl',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/crypto/fle_fields',
         '$BUILD_DIR/mongo/db/api_parameters',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
@@ -253,7 +250,7 @@ env.Library(
 )
 
 env.Library(
-    target="query_knobs",
+    target='query_knobs',
     source=[
         'ce_mode_parameter.cpp',
         'framework_control.cpp',
@@ -263,9 +260,9 @@ env.Library(
         'sbe_plan_cache_on_parameter_change.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/service_context",
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/idl/feature_flag',
-        '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/mongo/util/pcre_wrapper',
     ],
 )
@@ -307,9 +304,9 @@ env.Library(
 )
 
 env.Library(
-    target="hint_parser",
+    target='hint_parser',
     source=[
-        "hint_parser.cpp",
+        'hint_parser.cpp',
         'hint.idl',
     ],
     LIBDEPS=[
@@ -318,9 +315,9 @@ env.Library(
 )
 
 env.Library(
-    target="sort_pattern",
+    target='sort_pattern',
     source=[
-        "sort_pattern.cpp",
+        'sort_pattern.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -330,9 +327,9 @@ env.Library(
 )
 
 env.Library(
-    target="plan_yield_policy",
+    target='plan_yield_policy',
     source=[
-        "plan_yield_policy.cpp",
+        'plan_yield_policy.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

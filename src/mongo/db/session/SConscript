@@ -26,11 +26,9 @@ env.Library(
         'logical_session_id.idl',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/crypto/sha256_block',
         '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
-        '$BUILD_DIR/mongo/idl/idl_parser',
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -114,11 +112,11 @@ env.Library(
         'logical_session_cache.idl',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context',
         'logical_session_id',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/service_context',
     ],
 )
 

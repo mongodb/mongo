@@ -18,20 +18,18 @@ env.Library(
         'utils.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/shell/mongojs',
         '$BUILD_DIR/mongo/util/md5',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        'bson_template_evaluator',
     ],
 )
 
 env.Library(
     target='bson_template_evaluator',
     source=[
-        "bson_template_evaluator.cpp",
+        'bson_template_evaluator.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -45,9 +43,6 @@ env.Library(
     ],
     LIBDEPS=[
         'scripting_common',
-    ],
-    LBDEPS_PRIVATE=[
-        'bson_template_evaluator',
     ],
 )
 
@@ -120,14 +115,11 @@ if jsEngine:
             'mozjs/scripting_util.idl',
         ],
         LIBDEPS=[
-            '$BUILD_DIR/mongo/db/service_context',
-            '$BUILD_DIR/mongo/shell/mongojs',
-            'bson_template_evaluator',
             'scripting_common',
         ],
         LIBDEPS_PRIVATE=[
             '$BUILD_DIR/mongo/client/clientdriver_network',
-            '$BUILD_DIR/mongo/idl/server_parameter',
+            '$BUILD_DIR/mongo/db/service_context',
             '$BUILD_DIR/third_party/mozjs/mozjs',
         ],
     )
@@ -138,6 +130,9 @@ else:
             'scripting_none.cpp',
         ],
         LIBDEPS=[
+            'scripting_common',
+        ],
+        LIBDEPS_PRIVATE=[
             'scripting_none',
         ],
     )
@@ -159,7 +154,6 @@ env.CppUnitTest(
         'deadline_monitor_test.cpp',
     ],
     LIBDEPS=[
-        'bson_template_evaluator',
         'scripting_common',
     ],
 )

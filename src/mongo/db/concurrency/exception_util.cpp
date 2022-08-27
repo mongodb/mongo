@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/concurrency/exception_util.h"
 
 #include "mongo/db/commands/server_status_metric.h"
@@ -38,7 +37,6 @@
 #include "mongo/util/log_and_backoff.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
-
 
 namespace mongo {
 

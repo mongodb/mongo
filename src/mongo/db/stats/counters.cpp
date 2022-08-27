@@ -27,25 +27,20 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/stats/counters.h"
 
 #include <fmt/format.h>
 
 #include "mongo/client/authenticate.h"
+#include "mongo/db/commands/server_status.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-
 namespace mongo {
 
-namespace {
 using namespace fmt::literals;
-}
 
 void OpCounters::_checkWrap(CacheExclusive<AtomicWord<long long>> OpCounters::*counter, int n) {
     static constexpr auto maxCount = 1LL << 60;
@@ -310,6 +305,15 @@ void AuthCounter::append(BSONObjBuilder* b) {
     }
 
     mechsBuilder.done();
+}
+
+OpCounterServerStatusSection::OpCounterServerStatusSection(const std::string& sectionName,
+                                                           OpCounters* counters)
+    : ServerStatusSection(sectionName), _counters(counters) {}
+
+BSONObj OpCounterServerStatusSection::generateSection(OperationContext* opCtx,
+                                                      const BSONElement& configElement) const {
+    return _counters->getObj();
 }
 
 OpCounters globalOpCounters;

@@ -51,10 +51,10 @@ env.Library(
 env.Library(
     target='document_validation',
     source=[
-        "document_validation.cpp",
+        'document_validation.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        "$BUILD_DIR/mongo/db/service_context",
+        '$BUILD_DIR/mongo/db/service_context',
     ],
 )
 
@@ -65,9 +65,8 @@ env.Library(
         'commit_quorum_options.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/util/bson_extract',
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -77,7 +76,7 @@ env.Library(
         'validate.idl',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -87,7 +86,7 @@ env.Library(
         'index_build_entry.idl',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/util/net/network',
         'commit_quorum_options',
     ],
@@ -103,7 +102,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/concurrency/deferred_writer',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/idl/idl_parser',
         'collection_options',
     ],
 )
@@ -270,11 +268,11 @@ env.Library(
         '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/resumable_index_builds_idl',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
-        '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/log_and_backoff',
         '$BUILD_DIR/mongo/util/progress_meter',
@@ -306,7 +304,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/snapshot_helper',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/views/views',
-        '$BUILD_DIR/mongo/idl/server_parameter',
         'collection',
     ],
 )
@@ -436,7 +433,7 @@ env.Library(
         'catalog_stats.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/views/views',
@@ -588,7 +585,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
 

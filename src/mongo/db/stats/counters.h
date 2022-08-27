@@ -31,7 +31,6 @@
 
 #include <map>
 
-#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_word.h"

@@ -9,9 +9,8 @@ env.Library(
     source=[
         'timer_stats.cpp',
     ],
-    LIBDEPS=[
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/concurrency/spin_lock',
     ],
 )
 
@@ -32,10 +31,8 @@ env.Library(
     source=[
         'api_version_metrics.cpp',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/shared_request_handling',
         '$BUILD_DIR/mongo/rpc/client_metadata',
     ],
@@ -47,8 +44,10 @@ env.Library(
         'counters.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/util/concurrency/spin_lock',
     ],
 )
@@ -62,14 +61,12 @@ env.Library(
         'server_write_concern_metrics.idl',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
         '$BUILD_DIR/mongo/db/write_concern_options',
-        '$BUILD_DIR/mongo/idl/idl_parser',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -79,26 +76,22 @@ env.Library(
         'resource_consumption_metrics.cpp',
         'operation_resource_consumption.idl',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/idl/idl_parser',
-    ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/idl/feature_flag',
-        '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )
 
 env.Library(
-    target="transaction_stats",
+    target='transaction_stats',
     source=[
-        "single_transaction_stats.cpp",
+        'single_transaction_stats.cpp',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/repl/read_concern_args',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -124,7 +117,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/catalog/index_catalog',
-        '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/db/pipeline/document_sources_idl',

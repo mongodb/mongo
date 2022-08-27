@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/idl/server_parameter.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/idl/server_parameter_with_storage_test_structs_gen.h"
 
 namespace mongo {

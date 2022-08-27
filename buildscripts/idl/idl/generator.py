@@ -1017,8 +1017,8 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         if spec.server_parameters:
             if [param for param in spec.server_parameters if param.feature_flag]:
                 header_list.append('mongo/idl/feature_flag.h')
-            header_list.append('mongo/idl/server_parameter.h')
-            header_list.append('mongo/idl/server_parameter_with_storage.h')
+            header_list.append('mongo/db/server_parameter.h')
+            header_list.append('mongo/db/server_parameter_with_storage.h')
 
         # Include this for TypedCommand only if a base class will be generated for a command in this
         # file.
@@ -2668,8 +2668,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         ]
 
         if spec.server_parameters:
-            header_list.append('mongo/idl/server_parameter.h')
-            header_list.append('mongo/idl/server_parameter_with_storage.h')
+            header_list.append('mongo/db/server_parameter.h')
+            header_list.append('mongo/db/server_parameter_with_storage.h')
 
         if spec.configs:
             header_list.append('mongo/util/options_parser/option_section.h')

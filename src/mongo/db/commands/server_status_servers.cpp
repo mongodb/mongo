@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/config.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/transport/message_compressor_registry.h"
@@ -41,12 +39,6 @@
 #include "mongo/util/net/ssl_manager.h"
 
 namespace mongo {
-
-using std::endl;
-using std::map;
-using std::string;
-using std::stringstream;
-
 namespace {
 
 // some universal sections
@@ -187,6 +179,6 @@ public:
         }
     }
 } advisoryHostFQDNs;
-}  // namespace
 
+}  // namespace
 }  // namespace mongo

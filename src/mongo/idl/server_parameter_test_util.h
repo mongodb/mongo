@@ -31,7 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/idl/server_parameter.h"
+#include "mongo/db/server_parameter.h"
 
 namespace mongo {
 

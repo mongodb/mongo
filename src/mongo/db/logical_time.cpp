@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/logical_time.h"
 
 #include "mongo/base/data_type_endian.h"

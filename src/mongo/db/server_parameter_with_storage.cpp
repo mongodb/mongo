@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/idl/server_parameter_with_storage.h"
+#include "mongo/db/server_parameter_with_storage.h"
 
 namespace mongo {
 namespace idl_server_parameter_detail {

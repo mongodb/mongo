@@ -27,18 +27,13 @@
  *    it in the license file.
  */
 
-
-#include "mongo/db/jsobj.h"
-
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-
 namespace mongo {
-
-using std::string;
 
 template <class Derived, class B>
 Derived& BSONObjBuilderBase<Derived, B>::appendMinForType(StringData fieldName, int t) {

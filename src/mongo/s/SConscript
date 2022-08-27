@@ -92,10 +92,10 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/executor/async_multicaster',
         '$BUILD_DIR/mongo/executor/connection_pool_executor',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
-        '$BUILD_DIR/mongo/idl/server_parameter',
         'catalog/sharding_catalog_client_impl',
         'coreshard',
         'sharding_task_executor',
@@ -120,7 +120,7 @@ env.Library(
 )
 
 env.Library(
-    target="load_balancer_support",
+    target='load_balancer_support',
     source=[
         'load_balancer_support.cpp',
     ],
@@ -368,7 +368,7 @@ env.Library(
         'mongos_server_parameters.idl',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -425,7 +425,6 @@ env.Library(
         # please add that library here, as a private library dependency.
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/auth/authmongos',
-        '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/commands/server_status_servers',
         '$BUILD_DIR/mongo/db/curop',

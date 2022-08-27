@@ -43,8 +43,8 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter.h"
 #include "mongo/platform/atomic_proxy.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/str.h"
@@ -61,10 +61,10 @@ using HasClusterServerParameter = decltype(std::declval<T>().getClusterServerPar
 template <typename T>
 constexpr bool hasClusterServerParameter = stdx::is_detected_v<HasClusterServerParameter, T>;
 
+namespace idl_server_parameter_detail {
+
 template <typename U>
 using TenantIdMap = std::map<boost::optional<TenantId>, U>;
-
-namespace idl_server_parameter_detail {
 
 // Predicate rules for bounds conditions
 
@@ -211,7 +211,6 @@ private:
     // Copy of original value to be read from during resets.
     U _defaultValue;
 };
-
 
 template <typename U>
 struct storage_wrapper<TenantIdMap<U>> {

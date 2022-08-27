@@ -195,15 +195,14 @@ env.Library(
 )
 
 env.Library(
-    target="fail_point",
+    target='fail_point',
     source=[
-        "fail_point.cpp",
+        'fail_point.cpp',
         'fail_point_server_parameter.idl',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/bson/util/bson_extract",
-        "$BUILD_DIR/mongo/idl/server_parameter",
+        '$BUILD_DIR/mongo/bson/util/bson_extract',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -223,9 +222,8 @@ env.Library(
         "testing_options.cpp",
         'testing_options.idl',
     ],
-    LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/idl/server_parameter",
+    LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/server_base",
     ],
 )
 
@@ -343,10 +341,9 @@ if env['MONGO_ALLOCATOR'] in ['tcmalloc', 'tcmalloc-experimental']:
             'tcmalloc_parameters.idl',
             'heap_profiler.cpp',
         ],
-        LIBDEPS=[],
         LIBDEPS_PRIVATE=[
-            '$BUILD_DIR/mongo/db/commands/server_status',
-            '$BUILD_DIR/mongo/idl/server_parameter',
+            '$BUILD_DIR/mongo/db/commands/server_status_core',
+            '$BUILD_DIR/mongo/db/server_base',
             '$BUILD_DIR/mongo/transport/service_executor',
             'processinfo',
         ],
@@ -406,12 +403,10 @@ if get_option('use-diagnostic-latches') == 'on':
         source=[
             'latch_analyzer.cpp',
         ],
-        LIBDEPS=[
-            '$BUILD_DIR/mongo/base',
-            '$BUILD_DIR/mongo/db/service_context',
-        ],
         LIBDEPS_PRIVATE=[
-            '$BUILD_DIR/mongo/db/commands/server_status',
+            '$BUILD_DIR/mongo/base',
+            '$BUILD_DIR/mongo/db/commands/server_status_core',
+            '$BUILD_DIR/mongo/db/service_context',
         ],
     )
 
@@ -497,11 +492,8 @@ env.Library(
         'password.cpp',
         'password_params.idl',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 

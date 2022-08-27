@@ -12,22 +12,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/commands/server_status_core',
-    ],
-)
-
-env.Library(
-    target='server_parameter',
-    source=[
-        'server_parameter.cpp',
-        'server_parameter.idl',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/logical_time',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/util/options_parser/options_parser',
     ],
 )
 
@@ -35,7 +19,6 @@ env.Library(
     target='cluster_server_parameter',
     source=[
         'cluster_server_parameter.idl',
-        'server_parameter_with_storage.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
@@ -48,13 +31,11 @@ env.Library(
     source=[
         'cluster_server_parameter_initializer.cpp',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -63,12 +44,10 @@ env.Library(
     source=[
         'cluster_server_parameter_op_observer.cpp',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/op_observer/op_observer',
+        '$BUILD_DIR/mongo/db/server_base',
         'cluster_server_parameter_initializer',
     ],
 )
@@ -79,11 +58,9 @@ env.Library(
         'cluster_server_parameter_refresher.cpp',
         'cluster_server_parameter_refresher.idl',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/audit',
-    ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/audit',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/s/grid',
         'cluster_server_parameter',
     ],
@@ -138,13 +115,9 @@ env.Library(
         'feature_flag.cpp',
         'feature_flag_test.idl',
     ],
-    LIBDEPS=[
-        'server_parameter',
-    ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/commands/feature_compatibility_parsers',
-        '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -174,6 +147,5 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         'cluster_server_parameter',
         'feature_flag',
-        'server_parameter',
     ],
 )

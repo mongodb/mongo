@@ -145,4 +145,5 @@ public:
 private:
     const OpCounters* _counters;
 };
+
 }  // namespace mongo

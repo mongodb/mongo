@@ -30,7 +30,6 @@
 
 #pragma once
 
-#include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/repl/initial_syncer.h"

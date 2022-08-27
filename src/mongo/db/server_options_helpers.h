@@ -33,7 +33,7 @@
 #include <string>
 
 #include "mongo/base/status.h"
-#include "mongo/idl/server_parameter.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 

@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-
-#include "mongo/idl/server_parameter.h"
+#include "mongo/db/server_parameter.h"
 
 #include <fmt/format.h>
 
@@ -37,8 +36,8 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
-
 namespace mongo {
+
 using namespace fmt::literals;
 using SPT = ServerParameterType;
 

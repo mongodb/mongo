@@ -183,12 +183,9 @@ env.Library(
         'storage_options.cpp',
         'storage_parameters.idl',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/idl/feature_flag',
-    ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/idl/feature_flag',
     ],
 )
 
@@ -200,10 +197,9 @@ env.Library(
         'storage_engine_parameters.idl',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/idl/feature_flag',
-        '$BUILD_DIR/mongo/idl/server_parameter',
         '$BUILD_DIR/mongo/util/concurrency/ticketholder',
     ],
 )
@@ -346,16 +342,14 @@ env.Library(
 )
 
 env.Library(
-    target="storage_init_d",
+    target='storage_init_d',
     source=[
-        "storage_init.cpp",
-    ],
-    LIBDEPS=[
-        "storage_options",
+        'storage_init.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
         'backup_cursor_hooks',
+        'storage_options',
     ],
 )
 
@@ -458,8 +452,8 @@ env.Library(
     source=[
         'flow_control_parameters.idl',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
@@ -468,11 +462,9 @@ env.Library(
     source=[
         'flow_control.cpp',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/commands/server_status',
-    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/concurrency/flow_control_ticketholder',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/server_options_core',
@@ -586,7 +578,7 @@ env.Library(
         'two_phase_index_build_knobs.idl',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 

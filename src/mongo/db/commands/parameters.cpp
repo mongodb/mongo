@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include <set>
 
 #include "mongo/bson/bsontypes.h"
@@ -41,22 +38,18 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/parameters_gen.h"
 #include "mongo/db/commands/parse_log_component_settings.h"
+#include "mongo/db/server_parameter_gen.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/idl/command_generic_argument.h"
-#include "mongo/idl/server_parameter_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-
-using std::string;
-using std::stringstream;
-
 namespace mongo {
-
 namespace {
+
 using logv2::LogComponent;
 using logv2::LogSeverity;
 
@@ -93,7 +86,7 @@ static mutablebson::Element getParentForLogComponent(mutablebson::Document& doc,
  * The "default" log component is an implementation detail. Don't expose this to users.
  */
 void getLogComponentVerbosity(BSONObj* output) {
-    static const string defaultLogComponentName =
+    static const std::string defaultLogComponentName =
         LogComponent(LogComponent::kDefault).getShortName();
 
     mutablebson::Document doc;
@@ -189,7 +182,6 @@ Status setLogComponentVerbosity(const BSONObj& bsonSettings) {
 
     return Status::OK();
 }
-
 
 GetParameterOptions parseGetParameterOptions(BSONElement elem) {
     if (elem.type() == BSONType::Object) {

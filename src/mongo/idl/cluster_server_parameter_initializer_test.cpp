@@ -31,10 +31,10 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/idl/cluster_server_parameter_initializer.h"
 #include "mongo/idl/cluster_server_parameter_test_util.h"
-#include "mongo/idl/server_parameter.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 

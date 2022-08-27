@@ -23,11 +23,13 @@ sorterEnv.CppUnitTest(
     ],
 )
 
-sorterEnv.Library(target='sorter_stats', source=[
-    'sorter_stats.cpp',
-], LIBDEPS_PRIVATE=[
-    '$BUILD_DIR/mongo/db/commands/server_status_core',
-])
+sorterEnv.Library(
+    target='sorter_stats', source=[
+        'sorter_stats.cpp',
+    ], LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
+    ])
 
 env.Library(
     target='sorter_idl',
@@ -35,8 +37,8 @@ env.Library(
         'sorter.idl',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        '$BUILD_DIR/mongo/db/sorter/sorter_stats',
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/idl/idl_parser',
+        'sorter_stats',
     ],
 )

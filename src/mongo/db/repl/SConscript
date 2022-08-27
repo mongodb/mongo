@@ -12,8 +12,8 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/read_preference',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/idl/feature_flag',
-        '$BUILD_DIR/mongo/idl/server_parameter',
     ],
 )
 
@@ -185,11 +185,8 @@ env.Library(
     source=[
         'repl_settings.cpp',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/idl/server_parameter',
-    ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
         'repl_server_parameters',
     ],
 )
@@ -546,9 +543,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/ops/write_ops',
         '$BUILD_DIR/mongo/db/repl/tenant_migration_access_blocker',
         '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/session/kill_sessions_local',
         '$BUILD_DIR/mongo/db/storage/historical_ident_tracker',
-        '$BUILD_DIR/mongo/idl/server_parameter',
         'drop_pending_collection_reaper',
     ],
 )
@@ -709,7 +706,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/db/server_base',
         'repl_server_parameters',
     ],
 )
@@ -757,9 +754,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/session/session_catalog',
         '$BUILD_DIR/mongo/db/storage/journal_flusher',
-        '$BUILD_DIR/mongo/idl/server_parameter',
         'delayable_timeout_callback',
         'repl_server_parameters',
         'replica_set_aware_service',
@@ -890,7 +887,6 @@ env.Library(
         '$BUILD_DIR/mongo/client/connection_string',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/idl/feature_flag',
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/rpc/metadata',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
@@ -899,7 +895,8 @@ env.Library(
         'read_concern_args',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/server_parameter',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/idl/feature_flag',
         'repl_server_parameters',
         'split_horizon',
     ],
@@ -987,6 +984,7 @@ env.Library(
         'reporter.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/executor/remote_command',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
@@ -1284,9 +1282,9 @@ env.Library(
 )
 
 env.Library(
-    target="replication_info",
+    target='replication_info',
     source=[
-        "replication_info.cpp",
+        'replication_info.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -1296,14 +1294,13 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/query_exec',
-        "$BUILD_DIR/mongo/util/fail_point",
+        '$BUILD_DIR/mongo/util/fail_point',
         'oplog',
         'repl_coordinator_interface',
         'repl_settings',
         'replica_set_messages',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/server_status',
         '$BUILD_DIR/mongo/db/read_write_concern_defaults',
         '$BUILD_DIR/mongo/db/s/sharding_api_d',
         '$BUILD_DIR/mongo/db/stats/counters',
@@ -1440,7 +1437,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/client/remote_command_targeter',
         '$BUILD_DIR/mongo/db/catalog_raii',
-        '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/commands/tenant_migration_cmds_request',
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/rw_concern_d',
@@ -1564,14 +1561,14 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        'primary_only_service',
+        'wait_for_majority_service',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/op_observer/op_observer_impl',
         '$BUILD_DIR/mongo/db/op_observer/oplog_writer_impl',
-        'primary_only_service',
         'repl_coordinator_interface',
         'replmocks',
-        'wait_for_majority_service',
     ],
 )
 
@@ -1755,7 +1752,6 @@ if wiredtiger:
             'oplog_interface_mock',
             'oplog_interface_remote',
             'optime',
-            'primary_only_service',
             'primary_only_service_test_fixture',
             'repl_coordinator_impl',
             'repl_server_parameters',
@@ -1783,7 +1779,6 @@ if wiredtiger:
             'tenant_migration_utils',
             'tenant_oplog_processing',
             'timestamp_block',
-            'wait_for_majority_service',
         ],
     )
 
@@ -1885,7 +1880,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/service_context',
         'election_reason_counter',
         'election_reason_counter_parser',

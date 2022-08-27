@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/latch_analyzer.h"
 
 #include <boost/iterator/transform_iterator.hpp>
@@ -37,19 +34,17 @@
 
 #include <fmt/format.h>
 
-#include "mongo/util/hierarchical_acquisition.h"
-
 #include "mongo/base/init.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/latch_analyzer.h"
 #include "mongo/util/testing_proctor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
 
 namespace mongo {
 

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "engine.h"
+#include "mongo/scripting/engine.h"
 
 namespace mongo {
 void ScriptEngine::setup(bool disableLoadStored) {

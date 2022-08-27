@@ -30,7 +30,6 @@
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/sasl_options_gen.h"
 #include "mongo/db/stats/counters.h"
-
 #include "mongo/util/text.h"
 
 namespace mongo {

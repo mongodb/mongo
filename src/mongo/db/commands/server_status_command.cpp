@@ -184,15 +184,6 @@ MONGO_INITIALIZER(CreateCmdServerStatus)(InitializerContext* context) {
 
 }  // namespace
 
-OpCounterServerStatusSection::OpCounterServerStatusSection(const std::string& sectionName,
-                                                           OpCounters* counters)
-    : ServerStatusSection(sectionName), _counters(counters) {}
-
-BSONObj OpCounterServerStatusSection::generateSection(OperationContext* opCtx,
-                                                      const BSONElement& configElement) const {
-    return _counters->getObj();
-}
-
 OpCounterServerStatusSection globalOpCounterServerStatusSection("opcounters", &globalOpCounters);
 
 namespace {
