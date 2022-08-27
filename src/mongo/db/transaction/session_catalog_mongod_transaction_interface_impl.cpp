@@ -37,6 +37,18 @@
 
 namespace mongo {
 
+void MongoDSessionCatalogTransactionInterfaceImpl::refreshTransactionFromStorageIfNeeded(
+    OperationContext* opCtx) {
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    txnParticipant.refreshFromStorageIfNeeded(opCtx);
+}
+
+void MongoDSessionCatalogTransactionInterfaceImpl::
+    refreshTransactionFromStorageIfNeededNoOplogEntryFetch(OperationContext* opCtx) {
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    txnParticipant.refreshFromStorageIfNeededNoOplogEntryFetch(opCtx);
+}
+
 void MongoDSessionCatalogTransactionInterfaceImpl::abortTransaction(
     OperationContext* opCtx, const SessionTxnRecord& txnRecord) {
     auto txnParticipant = TransactionParticipant::get(opCtx);

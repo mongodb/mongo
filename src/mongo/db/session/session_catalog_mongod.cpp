@@ -444,10 +444,10 @@ void _checkInUnscopedSession(OperationContext* opCtx,
     OperationContextSession::checkIn(opCtx, reason);
 }
 
-void _checkOutUnscopedSession(OperationContext* opCtx) {
+void _checkOutUnscopedSession(OperationContext* opCtx,
+                              MongoDSessionCatalogTransactionInterface* ti) {
     OperationContextSession::checkOut(opCtx);
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-    txnParticipant.refreshFromStorageIfNeeded(opCtx);
+    ti->refreshTransactionFromStorageIfNeeded(opCtx);
 }
 
 }  // namespace
@@ -679,7 +679,7 @@ int MongoDSessionCatalog::removeSessionsTransactionRecords(
 
 std::unique_ptr<MongoDSessionCatalog::Session> MongoDSessionCatalog::checkOutSession(
     OperationContext* opCtx) {
-    return std::make_unique<MongoDOperationContextSession>(opCtx, CheckoutTag());
+    return std::make_unique<MongoDOperationContextSession>(opCtx, _ti.get());
 }
 
 std::unique_ptr<MongoDSessionCatalog::Session> MongoDSessionCatalog::checkOutSessionWithoutRefresh(
@@ -689,7 +689,7 @@ std::unique_ptr<MongoDSessionCatalog::Session> MongoDSessionCatalog::checkOutSes
 
 std::unique_ptr<MongoDSessionCatalog::Session>
 MongoDSessionCatalog::checkOutSessionWithoutOplogRead(OperationContext* opCtx) {
-    return std::make_unique<MongoDOperationContextSessionWithoutOplogRead>(opCtx, CheckoutTag());
+    return std::make_unique<MongoDOperationContextSessionWithoutOplogRead>(opCtx, _ti.get());
 }
 
 void MongoDSessionCatalog::checkInUnscopedSession(OperationContext* opCtx,
@@ -698,16 +698,15 @@ void MongoDSessionCatalog::checkInUnscopedSession(OperationContext* opCtx,
 }
 
 void MongoDSessionCatalog::checkOutUnscopedSession(OperationContext* opCtx) {
-    _checkOutUnscopedSession(opCtx);
+    _checkOutUnscopedSession(opCtx, _ti.get());
 }
 
-MongoDOperationContextSession::MongoDOperationContextSession(OperationContext* opCtx,
-                                                             MongoDSessionCatalog::CheckoutTag tag)
-    : _operationContextSession(opCtx) {
+MongoDOperationContextSession::MongoDOperationContextSession(
+    OperationContext* opCtx, MongoDSessionCatalogTransactionInterface* ti)
+    : _operationContextSession(opCtx), _ti(ti) {
     invariant(!opCtx->getClient()->isInDirectClient());
 
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-    txnParticipant.refreshFromStorageIfNeeded(opCtx);
+    _ti->refreshTransactionFromStorageIfNeeded(opCtx);
 }
 
 MongoDOperationContextSession::~MongoDOperationContextSession() = default;
@@ -718,7 +717,7 @@ void MongoDOperationContextSession::checkIn(OperationContext* opCtx,
 }
 
 void MongoDOperationContextSession::checkOut(OperationContext* opCtx) {
-    _checkOutUnscopedSession(opCtx);
+    _checkOutUnscopedSession(opCtx, _ti);
 }
 
 MongoDOperationContextSessionWithoutRefresh::MongoDOperationContextSessionWithoutRefresh(
@@ -741,12 +740,11 @@ MongoDOperationContextSessionWithoutRefresh::~MongoDOperationContextSessionWitho
 }
 
 MongoDOperationContextSessionWithoutOplogRead::MongoDOperationContextSessionWithoutOplogRead(
-    OperationContext* opCtx, MongoDSessionCatalog::CheckoutTag tag)
+    OperationContext* opCtx, MongoDSessionCatalogTransactionInterface* ti)
     : _operationContextSession(opCtx), _opCtx(opCtx) {
     invariant(!opCtx->getClient()->isInDirectClient());
 
-    auto txnParticipant = TransactionParticipant::get(opCtx);
-    txnParticipant.refreshFromStorageIfNeededNoOplogEntryFetch(opCtx);
+    ti->refreshTransactionFromStorageIfNeededNoOplogEntryFetch(opCtx);
 }
 
 MongoDOperationContextSessionWithoutOplogRead::~MongoDOperationContextSessionWithoutOplogRead() =

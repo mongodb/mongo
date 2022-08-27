@@ -196,7 +196,8 @@ class MongoDOperationContextSession : public MongoDSessionCatalog::Session {
     MongoDOperationContextSession& operator=(const MongoDOperationContextSession&) = delete;
 
 public:
-    MongoDOperationContextSession(OperationContext* opCtx, MongoDSessionCatalog::CheckoutTag tag);
+    MongoDOperationContextSession(OperationContext* opCtx,
+                                  MongoDSessionCatalogTransactionInterface* ti);
     ~MongoDOperationContextSession();
 
     /**
@@ -214,6 +215,7 @@ public:
 
 private:
     OperationContextSession _operationContextSession;
+    MongoDSessionCatalogTransactionInterface* _ti;
 };
 
 /**
@@ -262,7 +264,7 @@ class MongoDOperationContextSessionWithoutOplogRead : public MongoDSessionCatalo
 
 public:
     MongoDOperationContextSessionWithoutOplogRead(OperationContext* opCtx,
-                                                  MongoDSessionCatalog::CheckoutTag tag);
+                                                  MongoDSessionCatalogTransactionInterface* ti);
     ~MongoDOperationContextSessionWithoutOplogRead();
 
     void checkIn(OperationContext* opCtx, OperationContextSession::CheckInReason reason) override {

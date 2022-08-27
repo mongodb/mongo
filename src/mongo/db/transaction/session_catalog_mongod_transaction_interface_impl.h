@@ -47,6 +47,10 @@ public:
     MongoDSessionCatalogTransactionInterfaceImpl() = default;
     virtual ~MongoDSessionCatalogTransactionInterfaceImpl() = default;
 
+    void refreshTransactionFromStorageIfNeeded(OperationContext* opCtx) override;
+
+    void refreshTransactionFromStorageIfNeededNoOplogEntryFetch(OperationContext* opCtx) override;
+
     void abortTransaction(OperationContext* opCtx, const SessionTxnRecord& txnRecord) override;
 
     void invalidateSessionToKill(OperationContext* opCtx, const SessionToKill& session) override;

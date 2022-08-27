@@ -48,6 +48,19 @@ public:
     virtual ~MongoDSessionCatalogTransactionInterface() = default;
 
     /**
+     * Blocking method, which loads the transaction state from storage if it has been marked as
+     * needing refresh.
+     */
+    virtual void refreshTransactionFromStorageIfNeeded(OperationContext* opCtx) = 0;
+
+    /**
+     * Same as above, but does not retrieve full transaction history and should be called
+     * only when oplog reads are not possible.
+     */
+    virtual void refreshTransactionFromStorageIfNeededNoOplogEntryFetch(
+        OperationContext* opCtx) = 0;
+
+    /**
      * Aborts the transaction, releasing transaction resources.
      */
     virtual void abortTransaction(OperationContext* opCtx, const SessionTxnRecord& txnRecord) = 0;
