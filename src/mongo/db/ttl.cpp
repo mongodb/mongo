@@ -175,12 +175,15 @@ const IndexDescriptor* getValidTTLIndex(OperationContext* opCtx,
     }
 
     BSONElement secondsExpireElt = spec[IndexDescriptor::kExpireAfterSecondsFieldName];
-    if (!secondsExpireElt.isNumber()) {
-        LOGV2_ERROR(22542,
-                    "TTL indexes require the expire field to be numeric, skipping TTL job",
-                    "field"_attr = IndexDescriptor::kExpireAfterSecondsFieldName,
-                    "type"_attr = typeName(secondsExpireElt.type()),
-                    "index"_attr = spec);
+    if (!secondsExpireElt.isNumber() || secondsExpireElt.isNaN()) {
+        LOGV2_ERROR(
+            22542,
+            "TTL indexes require the expire field to be numeric and not a NaN, skipping TTL job",
+            "ns"_attr = collection->ns(),
+            "uuid"_attr = collection->uuid(),
+            "field"_attr = IndexDescriptor::kExpireAfterSecondsFieldName,
+            "type"_attr = typeName(secondsExpireElt.type()),
+            "index"_attr = spec);
         return nullptr;
     }
     return desc;
