@@ -96,11 +96,19 @@ public:
     BSONObj generateSection(OperationContext* opCtx, const BSONElement& configElement) const final {
         BSONObjBuilder builder;
         builder.append("count", count.loadRelaxed());
+        builder.append("filesOpenedForExternalSort", sorterFileStats.opened.loadRelaxed());
+        builder.append("filesClosedForExternalSort", sorterFileStats.closed.loadRelaxed());
         return builder.obj();
     }
 
     // Number of instances of the bulk builder created.
     AtomicWord<long long> count;
+
+    // Number of times the external sorter opened/closed a file handle to spill data to disk.
+    // This pair of counters in aggregate indicate the number of open file handles used by
+    // the external sorter and may be useful in diagnosing situations where the process is
+    // close to exhausting this finite resource.
+    SorterFileStats sorterFileStats;
 } indexBulkBuilderSSS;
 
 /**
@@ -630,6 +638,7 @@ AbstractIndexAccessMethod::BulkBuilderImpl::BulkBuilderImpl(const IndexAccessMet
           SortOptions()
               .TempDir(storageGlobalParams.dbpath + "/_tmp")
               .ExtSortAllowed()
+              .FileStats(&indexBulkBuilderSSS.sorterFileStats)
               .MaxMemoryUsageBytes(maxMemoryUsageBytes),
           BtreeExternalSortComparison(descriptor->keyPattern(), descriptor->version()))),
       _real(index) {
