@@ -269,8 +269,8 @@ BSONObj removeUnknownFields(const NamespaceString& ns, const BSONObj& indexSpec)
 BSONObj repairIndexSpec(const NamespaceString& ns,
                         const BSONObj& indexSpec,
                         const std::set<StringData>& allowedFieldNames) {
-    auto fixBoolIndexSpecFn = [&indexSpec, &ns](const BSONElement& indexSpecElem,
-                                                BSONObjBuilder* builder) {
+    auto fixIndexSpecFn = [&indexSpec, &ns](const BSONElement& indexSpecElem,
+                                            BSONObjBuilder* builder) {
         StringData fieldName = indexSpecElem.fieldNameStringData();
         if ((IndexDescriptor::kBackgroundFieldName == fieldName ||
              IndexDescriptor::kUniqueFieldName == fieldName ||
@@ -285,11 +285,21 @@ BSONObj repairIndexSpec(const NamespaceString& ns,
                           "fieldName"_attr = redact(fieldName),
                           "indexSpec"_attr = redact(indexSpec));
             builder->appendBool(fieldName, true);
+        } else if (IndexDescriptor::kExpireAfterSecondsFieldName == fieldName &&
+                   !(indexSpecElem.isNumber() && !indexSpecElem.isNaN())) {
+            LOGV2_WARNING(6835900,
+                          "Fixing expire field from TTL index spec",
+                          "namespace"_attr = redact(ns.toString()),
+                          "fieldName"_attr = redact(fieldName),
+                          "indexSpec"_attr = redact(indexSpec));
+            builder->appendNumber(fieldName,
+                                  durationCount<Seconds>(kExpireAfterSecondsForInactiveTTLIndex));
         } else {
             builder->append(indexSpecElem);
         }
     };
-    return buildRepairedIndexSpec(ns, indexSpec, allowedFieldNames, fixBoolIndexSpecFn);
+
+    return buildRepairedIndexSpec(ns, indexSpec, allowedFieldNames, fixIndexSpecFn);
 }
 
 StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& indexSpec) {

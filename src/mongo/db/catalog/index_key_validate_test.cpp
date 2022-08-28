@@ -426,6 +426,20 @@ TEST(IndexKeyValidateTest, RepairIndexSpecs) {
                    NamespaceString("coll"),
                    fromjson("{key: {a: 1}, name: 'index', sparse: 'true', background: '1', safe: "
                             "true, force: true}"))));
+
+    ASSERT(BSON("key" << BSON("a" << 1) << "name"
+                      << "index"
+                      << "expireAfterSeconds" << std::numeric_limits<int32_t>::max())
+               .binaryEqual(index_key_validate::repairIndexSpec(
+                   NamespaceString("coll"),
+                   fromjson("{key: {a: 1}, name: 'index', expireAfterSeconds: NaN}"))));
+
+    ASSERT(BSON("key" << BSON("a" << 1) << "name"
+                      << "index"
+                      << "expireAfterSeconds" << std::numeric_limits<int32_t>::max())
+               .binaryEqual(index_key_validate::repairIndexSpec(
+                   NamespaceString("coll"),
+                   fromjson("{key: {a: 1}, name: 'index', expireAfterSeconds: '123'}"))));
 }
 
 TEST(IndexKeyValidateTest, GeoIndexSpecs) {
