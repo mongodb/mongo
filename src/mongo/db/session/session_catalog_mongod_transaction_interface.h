@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/session/session_catalog.h"              // for ScanSessionsCallbackFn
+#include "mongo/db/session/session_catalog.h"  // for ObservableSession and ScanSessionsCallbackFn
 #include "mongo/db/session/session_txn_record_gen.h"       // for SessionTxnRecord
 #include "mongo/db/transaction/transaction_participant.h"  // for SessionToKill
 
@@ -46,6 +46,20 @@ public:
     using ScanSessionsCallbackFn = SessionCatalog::ScanSessionsCallbackFn;
 
     virtual ~MongoDSessionCatalogTransactionInterface() = default;
+
+    /**
+     * Returns true if this session contains a prepared transaction.
+     *
+     * Accepts an observable session because this is called inside a session worker function.
+     */
+    virtual bool isTransactionPrepared(const ObservableSession& session) = 0;
+
+    /**
+     * Returns true if we have a transaction that is in-progress.
+     *
+     * See TransactionParticipant::TransactionState.
+     */
+    virtual bool isTransactionInProgress(OperationContext* opCtx) = 0;
 
     /**
      * Blocking method, which loads the transaction state from storage if it has been marked as

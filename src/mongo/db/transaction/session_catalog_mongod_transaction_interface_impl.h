@@ -47,6 +47,10 @@ public:
     MongoDSessionCatalogTransactionInterfaceImpl() = default;
     virtual ~MongoDSessionCatalogTransactionInterfaceImpl() = default;
 
+    bool isTransactionPrepared(const ObservableSession& session) override;
+
+    bool isTransactionInProgress(OperationContext* opCtx) override;
+
     void refreshTransactionFromStorageIfNeeded(OperationContext* opCtx) override;
 
     void refreshTransactionFromStorageIfNeededNoOplogEntryFetch(OperationContext* opCtx) override;

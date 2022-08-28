@@ -37,6 +37,18 @@
 
 namespace mongo {
 
+bool MongoDSessionCatalogTransactionInterfaceImpl::isTransactionPrepared(
+    const ObservableSession& session) {
+    const auto participant = TransactionParticipant::get(session);
+    return participant.transactionIsPrepared();
+}
+
+bool MongoDSessionCatalogTransactionInterfaceImpl::isTransactionInProgress(
+    OperationContext* opCtx) {
+    const auto txnParticipant = TransactionParticipant::get(opCtx);
+    return txnParticipant.transactionIsInProgress();
+}
+
 void MongoDSessionCatalogTransactionInterfaceImpl::refreshTransactionFromStorageIfNeeded(
     OperationContext* opCtx) {
     auto txnParticipant = TransactionParticipant::get(opCtx);

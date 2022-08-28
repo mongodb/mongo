@@ -233,7 +233,7 @@ class MongoDOperationContextSessionWithoutRefresh : public MongoDSessionCatalog:
 
 public:
     MongoDOperationContextSessionWithoutRefresh(OperationContext* opCtx,
-                                                MongoDSessionCatalog::CheckoutTag tag);
+                                                MongoDSessionCatalogTransactionInterface* ti);
     ~MongoDOperationContextSessionWithoutRefresh();
 
     void checkIn(OperationContext* opCtx, OperationContextSession::CheckInReason reason) override {
@@ -247,6 +247,7 @@ public:
 private:
     OperationContextSession _operationContextSession;
     OperationContext* const _opCtx;
+    MongoDSessionCatalogTransactionInterface* _ti;
 };
 
 /**

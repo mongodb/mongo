@@ -614,12 +614,11 @@ void MongoDSessionCatalog::observeDirectWriteToConfigTransactions(OperationConte
     const auto lsid =
         LogicalSessionId::parse(IDLParserContext("lsid"), singleSessionDoc["_id"].Obj());
     catalog->scanSession(lsid, [&, ti = _ti.get()](const ObservableSession& session) {
-        const auto participant = TransactionParticipant::get(session);
         uassert(ErrorCodes::PreparedTransactionInProgress,
                 str::stream() << "Cannot modify the entry for session "
                               << session.getSessionId().getId()
                               << " because it is in the prepared state",
-                !participant.transactionIsPrepared());
+                !ti->isTransactionPrepared(session));
 
         opCtx->recoveryUnit()->registerChange(
             std::make_unique<KillSessionTokenOnCommit>(opCtx, ti, session.kill()));
@@ -684,7 +683,7 @@ std::unique_ptr<MongoDSessionCatalog::Session> MongoDSessionCatalog::checkOutSes
 
 std::unique_ptr<MongoDSessionCatalog::Session> MongoDSessionCatalog::checkOutSessionWithoutRefresh(
     OperationContext* opCtx) {
-    return std::make_unique<MongoDOperationContextSessionWithoutRefresh>(opCtx, CheckoutTag());
+    return std::make_unique<MongoDOperationContextSessionWithoutRefresh>(opCtx, _ti.get());
 }
 
 std::unique_ptr<MongoDSessionCatalog::Session>
@@ -721,8 +720,8 @@ void MongoDOperationContextSession::checkOut(OperationContext* opCtx) {
 }
 
 MongoDOperationContextSessionWithoutRefresh::MongoDOperationContextSessionWithoutRefresh(
-    OperationContext* opCtx, MongoDSessionCatalog::CheckoutTag tag)
-    : _operationContextSession(opCtx), _opCtx(opCtx) {
+    OperationContext* opCtx, MongoDSessionCatalogTransactionInterface* ti)
+    : _operationContextSession(opCtx), _opCtx(opCtx), _ti(ti) {
     invariant(!opCtx->getClient()->isInDirectClient());
     const auto clientTxnNumber = *opCtx->getTxnNumber();
     const auto clientTxnRetryCounter = *opCtx->getTxnRetryCounter();
@@ -733,10 +732,9 @@ MongoDOperationContextSessionWithoutRefresh::MongoDOperationContextSessionWithou
 }
 
 MongoDOperationContextSessionWithoutRefresh::~MongoDOperationContextSessionWithoutRefresh() {
-    const auto txnParticipant = TransactionParticipant::get(_opCtx);
     // A session on secondaries should never be checked back in with a TransactionParticipant that
     // isn't prepared, aborted, or committed.
-    invariant(!txnParticipant.transactionIsInProgress());
+    invariant(!_ti->isTransactionInProgress(_opCtx));
 }
 
 MongoDOperationContextSessionWithoutOplogRead::MongoDOperationContextSessionWithoutOplogRead(
