@@ -327,11 +327,10 @@ __tiered_create_object(WT_SESSION_IMPL *session, WT_TIERED *tiered)
 {
     WT_DECL_RET;
     const char *cfg[4] = {NULL, NULL, NULL, NULL};
-    const char *config, *name, *orig_name;
+    const char *config, *name;
 
     config = name = NULL;
-    config = name = orig_name = NULL;
-    orig_name = tiered->tiers[WT_TIERED_INDEX_LOCAL].name;
+    config = name = NULL;
     /*
      * Create the name and metadata of the new shared object of the current local object. The data
      * structure keeps this id so that we don't have to parse and manipulate strings.
