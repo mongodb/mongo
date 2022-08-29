@@ -11,6 +11,7 @@
 (function() {
 'use strict';
 
+load("jstests/libs/fail_point_util.js");
 load('jstests/noPassthrough/libs/index_build.js');
 
 const rst = new ReplSetTest({
@@ -26,7 +27,16 @@ let primary = rst.getPrimary();
 const db = primary.getDB('test');
 const coll = db.t;
 
-assert.commandWorked(coll.createIndex({t: 1}, {expireAfterSeconds: NaN}));
+// The test cases here revolve around having a TTL index in the catalog with a NaN
+// 'expireAfterSeconds'. The current createIndexes behavior will overwrite NaN with int32::max
+// unless we use a fail point.
+const fp = configureFailPoint(primary, 'skipTTLIndexNaNExpireAfterSecondsValidation');
+try {
+    assert.commandWorked(coll.createIndex({t: 1}, {expireAfterSeconds: NaN}));
+} finally {
+    fp.off();
+}
+
 assert.commandWorked(coll.insert({_id: 0, t: ISODate()}));
 
 // Wait for "TTL indexes require the expire field to be numeric, skipping TTL job" log message.
@@ -88,6 +98,23 @@ assert.eq(collModOplogEntries.length,
           1,
           'TTL index with NaN expireAfterSeconds was not fixed using collMod during step-up: ' +
               tojson(rst.findOplog(primary, {op: {$ne: 'n'}}, /*limit=*/10).toArray()));
+
+// Confirm that createIndexes will overwrite a NaN 'expireAfterSeconds' in a TTL index before saving
+// it to the catalog and replicating it downstream.
+const coll2 = db.w;
+assert.commandWorked(coll2.createIndex({t: 1}, {expireAfterSeconds: NaN}));
+assert.commandWorked(coll2.insert({_id: 0, t: ISODate()}));
+
+// TTL index should be replicated to the secondary with a non-NaN 'expireAfterSeconds'.
+checkLog.containsJson(secondary, 20384, {
+    namespace: coll2.getFullName(),
+    properties: (spec) => {
+        jsTestLog('TTL index on secondary (with overwritten NaN expireAfterSeconds): ' +
+                  tojson(spec));
+        return spec.hasOwnProperty('expireAfterSeconds') && !isNaN(spec.expireAfterSeconds) &&
+            spec.expireAfterSeconds === newNodeSpec.expireAfterSeconds;
+    }
+});
 
 rst.stopSet();
 })();
