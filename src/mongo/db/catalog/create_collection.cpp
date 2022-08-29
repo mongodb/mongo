@@ -117,7 +117,9 @@ Status validateClusteredIndexSpec(OperationContext* opCtx,
 
     if (expireAfterSeconds) {
         // Not included in the indexSpec itself.
-        auto status = index_key_validate::validateExpireAfterSeconds(*expireAfterSeconds);
+        auto status = index_key_validate::validateExpireAfterSeconds(
+            *expireAfterSeconds,
+            index_key_validate::ValidateExpireAfterSecondsMode::kClusteredTTLIndex);
         if (!status.isOK()) {
             return status;
         }
@@ -321,8 +323,9 @@ Status _createTimeseries(OperationContext* opCtx,
             // Cluster time-series buckets collections by _id.
             auto expireAfterSeconds = options.expireAfterSeconds;
             if (expireAfterSeconds) {
-                uassertStatusOK(
-                    index_key_validate::validateExpireAfterSeconds(*expireAfterSeconds));
+                uassertStatusOK(index_key_validate::validateExpireAfterSeconds(
+                    *expireAfterSeconds,
+                    index_key_validate::ValidateExpireAfterSecondsMode::kClusteredTTLIndex));
                 bucketsOptions.expireAfterSeconds = expireAfterSeconds;
             }
 

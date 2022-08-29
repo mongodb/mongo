@@ -39,13 +39,6 @@ assert.commandFailedWithCode(
     db.runCommand({"collMod": collName, "index": {"keyPattern": {a: 1}, "expireAfterSeconds": -1}}),
     ErrorCodes.InvalidOptions);
 
-// Tries to modify with an 'expireAfterSeconds' value too large.
-assert.commandFailedWithCode(db.runCommand({
-    "collMod": collName,
-    "index": {"keyPattern": {a: 1}, "expireAfterSeconds": 10000000000000}
-}),
-                             ErrorCodes.InvalidOptions);
-
 // Successfully converts to a TTL index.
 assert.commandWorked(db.runCommand(
     {"collMod": collName, "index": {"keyPattern": {a: 1}, "expireAfterSeconds": 100}}));
