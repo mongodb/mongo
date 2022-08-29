@@ -501,23 +501,8 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
 
     SessionKiller::Matcher matcher(
         KillAllSessionsByPatternSet{makeKillAllSessionsByPattern(opCtx)});
-    catalog->scanSessions(matcher, [&](const ObservableSession& session) {
-        const auto txnParticipant = TransactionParticipant::get(session);
-        if (!txnParticipant.transactionIsOpen()) {
-            sessionKillTokens.emplace_back(session.kill());
-        }
-
-        if (txnParticipant.transactionIsPrepared()) {
-            const auto txnNumberAndRetryCounter =
-                txnParticipant.getActiveTxnNumberAndRetryCounter();
-
-            OperationSessionInfo sessionInfo;
-            sessionInfo.setSessionId(session.getSessionId());
-            sessionInfo.setTxnNumber(txnNumberAndRetryCounter.getTxnNumber());
-            sessionInfo.setTxnRetryCounter(txnNumberAndRetryCounter.getTxnRetryCounter());
-            sessionsToReacquireLocks.emplace_back(sessionInfo);
-        }
-    });
+    catalog->scanSessions(
+        matcher, _ti->makeSessionWorkerFnForStepUp(&sessionKillTokens, &sessionsToReacquireLocks));
     killSessionTokens(opCtx, _ti.get(), std::move(sessionKillTokens));
 
     {

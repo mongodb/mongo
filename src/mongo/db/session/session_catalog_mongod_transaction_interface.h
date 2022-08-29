@@ -117,6 +117,17 @@ public:
      */
     virtual ScanSessionsCallbackFn makeChildSessionWorkerFnForReap(
         const TxnNumber& parentSessionActiveTxnNumber) = 0;
+
+    /**
+     * Returns a 'sessionWorkerFn' that can be passed to SessionCatalog::scanSessions() on step-up.
+     *
+     * Returns sessions to kill in output parameter 'sessionKillTokens'.
+     * Also returns a list of prepared transactions in 'sessionsToReacquireLocks' that we will
+     * need to reacquire locks for.
+     */
+    virtual ScanSessionsCallbackFn makeSessionWorkerFnForStepUp(
+        std::vector<SessionCatalog::KillToken>* sessionKillTokens,
+        std::vector<OperationSessionInfo>* sessionsToReacquireLocks) = 0;
 };
 
 }  // namespace mongo

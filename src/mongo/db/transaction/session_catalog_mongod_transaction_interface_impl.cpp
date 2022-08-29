@@ -160,4 +160,27 @@ MongoDSessionCatalogTransactionInterfaceImpl::makeChildSessionWorkerFnForReap(
     };
 }
 
+MongoDSessionCatalogTransactionInterface::ScanSessionsCallbackFn
+MongoDSessionCatalogTransactionInterfaceImpl::makeSessionWorkerFnForStepUp(
+    std::vector<SessionCatalog::KillToken>* sessionKillTokens,
+    std::vector<OperationSessionInfo>* sessionsToReacquireLocks) {
+    return [sessionKillTokens, sessionsToReacquireLocks](ObservableSession& session) {
+        const auto txnParticipant = TransactionParticipant::get(session);
+        if (!txnParticipant.transactionIsOpen()) {
+            sessionKillTokens->emplace_back(session.kill());
+        }
+
+        if (txnParticipant.transactionIsPrepared()) {
+            const auto txnNumberAndRetryCounter =
+                txnParticipant.getActiveTxnNumberAndRetryCounter();
+
+            OperationSessionInfo sessionInfo;
+            sessionInfo.setSessionId(session.getSessionId());
+            sessionInfo.setTxnNumber(txnNumberAndRetryCounter.getTxnNumber());
+            sessionInfo.setTxnRetryCounter(txnNumberAndRetryCounter.getTxnRetryCounter());
+            sessionsToReacquireLocks->emplace_back(sessionInfo);
+        }
+    };
+}
+
 }  // namespace mongo

@@ -70,6 +70,10 @@ public:
 
     ScanSessionsCallbackFn makeChildSessionWorkerFnForReap(
         const TxnNumber& parentSessionActiveTxnNumber) override;
+
+    ScanSessionsCallbackFn makeSessionWorkerFnForStepUp(
+        std::vector<SessionCatalog::KillToken>* sessionKillTokens,
+        std::vector<OperationSessionInfo>* sessionsToReacquireLocks) override;
 };
 
 }  // namespace mongo
