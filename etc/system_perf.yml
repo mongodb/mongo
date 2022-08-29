@@ -95,8 +95,7 @@ modules:
   - name: tsbs
     repo: git@github.com:gregorynoma/tsbs.git
     prefix: ${workdir}/src
-    branch: master
-    ref: 225e713010463582712dca30ffcfc70c7d661663
+    branch: production
   - name: mongo-perf
     repo: git@github.com:mongodb/mongo-perf.git
     prefix: ${workdir}/src
