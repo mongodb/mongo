@@ -257,8 +257,9 @@ Status _createTimeseries(OperationContext* opCtx,
             auto expireAfterSeconds = options.expireAfterSeconds;
             if (useClusteredIdIndex) {
                 if (expireAfterSeconds) {
-                    uassertStatusOK(
-                        index_key_validate::validateExpireAfterSeconds(*expireAfterSeconds));
+                    uassertStatusOK(index_key_validate::validateExpireAfterSeconds(
+                        *expireAfterSeconds,
+                        index_key_validate::ValidateExpireAfterSecondsMode::kClusteredTTLIndex));
                     bucketsOptions.expireAfterSeconds = expireAfterSeconds;
                 }
                 bucketsOptions.clusteredIndex = true;

@@ -229,6 +229,9 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
                                       "existing expireAfterSeconds field is not a number");
                     }
                 }
+
+                // No additional validation is required on 'expireAfterSeconds' because this option
+                // is defined as a safeInt in the IDL (coll_mod.idl).
             }
 
             if (cmr.indexHidden) {
@@ -329,7 +332,9 @@ StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
             } else {
                 invariant(e.type() == mongo::NumberLong);
                 const int64_t elemNum = e.safeNumberLong();
-                uassertStatusOK(index_key_validate::validateExpireAfterSeconds(elemNum));
+                uassertStatusOK(index_key_validate::validateExpireAfterSeconds(
+                    elemNum,
+                    index_key_validate::ValidateExpireAfterSecondsMode::kClusteredTTLIndex));
             }
 
             cmr.clusteredIndexExpireAfterSeconds = e;
