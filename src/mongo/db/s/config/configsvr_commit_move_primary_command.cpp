@@ -49,8 +49,11 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << request().kCommandName << " can only be run on config servers",
+                    str::stream() << Request::kCommandName << " can only be run on config servers",
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+
+            CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
+                                                          opCtx->getWriteConcern());
 
             // Set the operation context read concern level to local for reads into the config
             // database.

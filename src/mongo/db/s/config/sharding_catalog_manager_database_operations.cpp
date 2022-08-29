@@ -289,13 +289,6 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
     DBDirectClient dbClient(opCtx);
     const auto commandResponse = dbClient.runCommand(updateOp.serialize({}));
     uassertStatusOK(getStatusFromWriteCommandReply(commandResponse->getCommandReply()));
-
-    WriteConcernResult writeConcernResult;
-    const auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-    uassertStatusOK(waitForWriteConcern(opCtx,
-                                        latestOpTime,
-                                        WriteConcerns::kMajorityWriteConcernShardingTimeout,
-                                        &writeConcernResult));
 }
 
 }  // namespace mongo
