@@ -99,8 +99,8 @@ function testUnblockBlockedReadsAfterMigrationAborted(testCase, dbName, collName
     const db = donorPrimary.getDB(dbName);
     runCommandForConcurrentReadTest(db, command, null, testCase.isTransaction);
     if (testCase.isSupportedOnSecondaries) {
-        const primaryPort = String(donorPrimary).split(":")[1];
-        const secondaries = donorRst.nodes.filter(node => node.port != primaryPort);
+        const secondaries =
+            test.getDonorNodes().filter(node => node.adminCommand({hello: 1}).secondary);
         secondaries.forEach(node => {
             const db = node.getDB(dbName);
             runCommandForConcurrentReadTest(db, command, null, testCase.isTransaction);

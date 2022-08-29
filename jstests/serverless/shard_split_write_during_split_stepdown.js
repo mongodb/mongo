@@ -52,14 +52,11 @@ assert.commandWorked(donorPrimary.adminCommand({replSetStepDown: 360, force: tru
 
 blockingFP.off();
 
-splitThread.join();
-const result = splitThread.returnData();
-assert.eq(result.ok, 0);
-assert.eq(result.code, ErrorCodes.InterruptedDueToReplStateChange);
+assert.commandFailedWithCode(splitThread.returnData(), ErrorCodes.InterruptedDueToReplStateChange);
 
-writeThread.join();
 const writeResults = writeThread.returnData();
 writeResults.forEach(res => {
+    jsTestLog(`result: ${res}`);
     assert.eq(res, ErrorCodes.TenantMigrationCommitted);
 });
 

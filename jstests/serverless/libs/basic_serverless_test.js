@@ -575,6 +575,20 @@ class BasicServerlessTest {
         assert(recipientRstArgs.nodeHosts.length >= 3);
         return createRst(recipientRstArgs, true);
     }
+
+    /**
+     * @returns An array of recipient nodes.
+     */
+    getRecipientNodes() {
+        return this.recipientNodes;
+    }
+
+    /**
+     * @returns An array of donor nodes.
+     */
+    getDonorNodes() {
+        return this.donor.nodes.filter(node => !this.recipientNodes.includes(node));
+    }
 }
 
 BasicServerlessTest.kConfigSplitDonorsNS = "config.shardSplitDonors";

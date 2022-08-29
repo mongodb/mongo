@@ -31,10 +31,6 @@ assert.eq(status.shardSplits.totalAborted, 0);
 assert.gt(status.shardSplits.totalCommittedDurationMillis, 0);
 assert.gt(status.shardSplits.totalCommittedDurationWithoutCatchupMillis, 0);
 
-const recipientPrimary = test.getRecipient().getPrimary();
-const recipientConfig = recipientPrimary.adminCommand({replSetGetConfig: 1}).config;
-assert(!recipientConfig.settings.shardSplitBlockOpTime);
-
 test.cleanupSuccesfulCommitted(operation.migrationId, tenantIds);
 test.stop();
 })();

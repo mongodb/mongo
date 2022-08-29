@@ -81,8 +81,7 @@ ConnectionString makeRecipientConnectionString(const repl::ReplSetConfig& config
 
 repl::ReplSetConfig makeSplitConfig(const repl::ReplSetConfig& config,
                                     const std::string& recipientSetName,
-                                    const std::string& recipientTagName,
-                                    const repl::OpTime& blockOpTime) {
+                                    const std::string& recipientTagName) {
     dassert(!recipientSetName.empty() && recipientSetName != config.getReplSetName());
     uassert(6201800,
             "We can not make a split config of an existing split config.",
@@ -132,11 +131,10 @@ repl::ReplSetConfig makeSplitConfig(const repl::ReplSetConfig& config,
             configNoMembersBson.getField("settings").isABSONObj()) {
             BSONObj settings = configNoMembersBson.getField("settings").Obj();
             return settings.removeField("replicaSetId")
-                .addFields(
-                    BSON("replicaSetId" << OID::gen() << "shardSplitBlockOpTime" << blockOpTime));
+                .addFields(BSON("replicaSetId" << OID::gen()));
         }
 
-        return BSON("shardSplitBlockOpTime" << blockOpTime);
+        return BSON("replicaSetId" << OID::gen());
     }());
 
     BSONObjBuilder splitConfigBob(configNoMembersBson);

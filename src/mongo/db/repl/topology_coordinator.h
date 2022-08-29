@@ -322,11 +322,6 @@ public:
                                                bool forInitiate = false);
 
     /**
-     * Resets the commit point to the provided opTime, with a wall time of now.
-     */
-    void resetLastCommittedOpTime(const OpTime& lastCommittedOpTime);
-
-    /**
      * Returns the OpTime of the latest majority-committed op known to this server.
      */
     OpTime getLastCommittedOpTime() const;

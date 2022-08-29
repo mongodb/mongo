@@ -378,12 +378,6 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
                 // only cancel operations on stepdown from here out
                 _cancelableOpCtxFactory.emplace(primaryToken, _markKilledExecutor);
 
-                LOGV2(6236700,
-                      "Shard split decision reached",
-                      "id"_attr = _migrationId,
-                      "state"_attr = ShardSplitDonorState_serializer(_stateDoc.getState()),
-                      "status"_attr = status);
-
                 {
                     stdx::lock_guard<Latch> lg(_mutex);
                     if (!_stateDoc.getExpireAt()) {
@@ -403,6 +397,11 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
                         status, executor, primaryToken, abortToken);
                 }
 
+                LOGV2(6236700,
+                      "Shard split decision reached",
+                      "id"_attr = _migrationId,
+                      "state"_attr = ShardSplitDonorState_serializer(_stateDoc.getState()));
+
                 return ExecutorFuture(**executor, DurableState{_stateDoc.getState(), _abortReason});
             })
             .unsafeToInlineFuture();
@@ -417,15 +416,12 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
 
         return ExecutorFuture(**executor)
             .then([&] { return _decisionPromise.getFuture().semi().ignoreValue(); })
-            .onCompletion([this, executor, primaryToken](Status status) {
-                // Always remove the split config, whether the operation was aborted or
-                // committed.
+            .then([this, executor, primaryToken]() {
+                // Always remove the split config after the split decision
                 auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
                 pauseShardSplitBeforeSplitConfigRemoval.pauseWhileSetAndNotCanceled(opCtx.get(),
                                                                                     primaryToken);
-                return _removeSplitConfigFromDonor(executor, primaryToken).then([status]() {
-                    return status;
-                });
+                return _removeSplitConfigFromDonor(executor, primaryToken);
             })
             .then([this, executor, primaryToken] {
                 auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
@@ -461,21 +457,16 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
 
         return ExecutorFuture(**executor)
             .then([&] { return _garbageCollectablePromise.getFuture().semi().ignoreValue(); })
-            .then([this, executor, primaryToken, anchor = shared_from_this()] {
+            .then([this, executor, primaryToken] {
                 return _waitForGarbageCollectionTimeoutThenDeleteStateDoc(executor, primaryToken);
             })
-            .onCompletion(
-                [this, executor, primaryToken, anchor = shared_from_this()](Status status) {
-                    stdx::lock_guard<Latch> lg(_mutex);
-
-                    LOGV2(8423356,
-                          "Shard split completed.",
-                          "id"_attr = _stateDoc.getId(),
-                          "status"_attr = status,
-                          "abortReason"_attr = _abortReason);
-
-                    return status;
-                })
+            .then([this, executor, primaryToken, anchor = shared_from_this()] {
+                stdx::lock_guard<Latch> lg(_mutex);
+                LOGV2(8423356,
+                      "Shard split completed.",
+                      "id"_attr = _stateDoc.getId(),
+                      "abortReason"_attr = _abortReason);
+            })
             .unsafeToInlineFuture();
     });
 
@@ -685,8 +676,13 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_waitForRecipien
 
     auto replCoord = repl::ReplicationCoordinator::get(cc().getServiceContext());
 
+    // It's possible that there has been an election since the blockOpTime was recorded, so we use
+    // the blockOpTime's timestamp and the current configTerm when waiting for recipient nodes to
+    // reach the blockTimestamp. This is okay because these timestamps are cluster times, and so are
+    // guaranteed to increase even across terms.
     invariant(_stateDoc.getBlockOpTime());
-    auto blockOpTime = *_stateDoc.getBlockOpTime();
+    auto blockOpTime =
+        repl::OpTime(_stateDoc.getBlockOpTime()->getTimestamp(), replCoord->getConfigTerm());
 
     invariant(_stateDoc.getRecipientTagName());
     auto recipientTagName = *_stateDoc.getRecipientTagName();
@@ -723,14 +719,12 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_applySplitConfi
         auto recipientSetName = _stateDoc.getRecipientSetName()->toString();
         invariant(_stateDoc.getRecipientTagName());
         auto recipientTagName = _stateDoc.getRecipientTagName()->toString();
-        invariant(_stateDoc.getBlockOpTime());
-        auto blockOpTime = *_stateDoc.getBlockOpTime();
 
         auto replCoord = repl::ReplicationCoordinator::get(cc().getServiceContext());
         invariant(replCoord);
 
         return serverless::makeSplitConfig(
-            replCoord->getConfig(), recipientSetName, recipientTagName, blockOpTime);
+            replCoord->getConfig(), recipientSetName, recipientTagName);
     }();
 
     LOGV2(6309100,
@@ -759,7 +753,8 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_applySplitConfi
 ExecutorFuture<void> remoteAdminCommand(TaskExecutorPtr executor,
                                         const CancellationToken& token,
                                         const HostAndPort remoteNode,
-                                        const BSONObj& command) {
+                                        const BSONObj& command,
+                                        std::function<bool(Status)> untilCondition = nullptr) {
     return AsyncTry([executor, token, remoteNode, command] {
                executor::RemoteCommandRequest request(remoteNode, "admin", command, nullptr);
                auto hasWriteConcern = command.hasField(WriteConcernOptions::kWriteConcernField);
@@ -774,7 +769,11 @@ ExecutorFuture<void> remoteAdminCommand(TaskExecutorPtr executor,
                        return status;
                    });
            })
-        .until([](Status status) {
+        .until([untilCondition](Status status) {
+            if (untilCondition) {
+                return untilCondition(status);
+            }
+
             return status.isOK() ||
                 (!ErrorCodes::isRetriableError(status) &&
                  !ErrorCodes::isNetworkTimeoutError(status));
@@ -786,8 +785,11 @@ ExecutorFuture<void> remoteAdminCommand(TaskExecutorPtr executor,
 ExecutorFuture<void> sendStepUpToRecipient(TaskExecutorPtr executor,
                                            const CancellationToken& token,
                                            const HostAndPort recipientPrimary) {
-    return remoteAdminCommand(
-        executor, token, recipientPrimary, BSON("replSetStepUp" << 1 << "skipDryRun" << true));
+    return remoteAdminCommand(executor,
+                              token,
+                              recipientPrimary,
+                              BSON("replSetStepUp" << 1 << "skipDryRun" << true),
+                              [](Status status) { return status.isOK(); });
 }
 
 ExecutorFuture<void> waitForMajorityWriteOnRecipient(TaskExecutorPtr executor,

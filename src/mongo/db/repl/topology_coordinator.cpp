@@ -2965,11 +2965,6 @@ bool TopologyCoordinator::advanceLastCommittedOpTimeAndWallTime(OpTimeAndWallTim
     return true;
 }
 
-void TopologyCoordinator::resetLastCommittedOpTime(const OpTime& lastCommittedOpTime) {
-    LOGV2(8423364, "Resetting commit point", "lastCommittedOpTime"_attr = lastCommittedOpTime);
-    _lastCommittedOpTimeAndWallTime = OpTimeAndWallTime(lastCommittedOpTime, Date_t::now());
-}
-
 OpTime TopologyCoordinator::getLastCommittedOpTime() const {
     return _lastCommittedOpTimeAndWallTime.opTime;
 }

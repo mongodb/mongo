@@ -42,10 +42,8 @@ assert.commandWorked(bulk.execute());
 
 jsTestLog("Running commitShardSplit command");
 const firstOperation = test.createSplitOperation(tenantIds);
-assert.isnull(findSplitOperation(donorPrimary, firstOperation.migrationId));
-const res = firstOperation.commit({retryOnRetryableErrors: false});
-assert.commandFailed(res);
-assert.eq(res.code, ErrorCodes.TenantMigrationAborted);
+assert.commandFailedWithCode(firstOperation.commit({retryOnRetryableErrors: false}),
+                             ErrorCodes.TenantMigrationAborted);
 
 firstOperation.forget();
 test.cleanupSuccesfulAborted(firstOperation.migrationId, tenantIds);

@@ -139,11 +139,6 @@ public:
      */
     void setSecondaryDelaySecsFieldDefault(MemberId memberId);
 
-    /**
-     * Removes the opTime field stored for an in-progress shard split operation.
-     */
-    void removeShardSplitBlockOpTime();
-
 protected:
     MutableReplSetConfig() = default;
 
@@ -564,12 +559,6 @@ public:
      * identical.
      */
     bool areWriteConcernModesTheSame(ReplSetConfig* otherConfig) const;
-
-    /**
-     * Returns the opTime when an in-progress split operation started blocking requests, if one is
-     * currently running.
-     */
-    boost::optional<OpTime> getShardSplitBlockOpTime() const;
 
 private:
     /**

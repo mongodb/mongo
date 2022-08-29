@@ -129,9 +129,6 @@ structs:
                 type: objectid
                 optional: true
                 validator: { callback: "validateReplicaSetIdNotNull"}
-            shardSplitBlockOpTime:
-                type: optime
-                optional: true
 
     ReplSetConfigBase:
         description: "The complete configuration for the replica set"

@@ -705,8 +705,7 @@ public:
 
         // Add the raw config object.
         auto conf = ReplSetConfig::parse(makeConfigObj(configVersion, termVersion));
-        auto splitConf = serverless::makeSplitConfig(
-            conf, _recipientSetName, _recipientTag, repl::OpTime(Timestamp(12345, 1), termVersion));
+        auto splitConf = serverless::makeSplitConfig(conf, _recipientSetName, _recipientTag);
 
         // makeSplitConf increment the config version. We don't want that here as it makes the unit
         // test case harder to follow.
@@ -820,10 +819,10 @@ TEST_F(ReplCoordHBV1SplitConfigTest, RecipientNodeApplyConfig) {
     getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(responseObj));
     getNet()->runReadyNetworkOperations();
 
-    // The recipient's lastCommittedOpTime is reset to the blockOpTime on applying the recipient
-    // config.
-    ASSERT_EQ(getReplCoord()->getLastCommittedOpTime(),
-              repl::OpTime(Timestamp(12345, 1), getReplCoord()->getConfigTerm()));
+    // The recipient's lastCommittedOpTime and currentCommittedSnapshotOpTime are cleared on
+    // applying the recipient config.
+    ASSERT(getReplCoord()->getLastCommittedOpTime().isNull());
+    ASSERT(getReplCoord()->getCurrentCommittedSnapshotOpTime().isNull());
 
     // Applying the recipient config will increase the configVersion by 1.
     validateNextRequest(

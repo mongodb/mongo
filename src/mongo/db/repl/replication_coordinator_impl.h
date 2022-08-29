@@ -1360,10 +1360,11 @@ private:
     void _scheduleHeartbeatReconfig(WithLock lk, const ReplSetConfig& newConfig);
 
     /**
-     * Determines if the provided config is a split config, and validates it for installation.
+     * Accepts a ReplSetConfig and resolves it either to itself, or the embedded shard split
+     * recipient config if it's present and self is a shard split recipient. Returns a tuple of the
+     * resolved config and a boolean indicating whether a recipient config was found.
      */
-    std::tuple<StatusWith<ReplSetConfig>, boost::optional<OpTime>> _resolveConfigToApply(
-        const ReplSetConfig& config);
+    std::tuple<StatusWith<ReplSetConfig>, bool> _resolveConfigToApply(const ReplSetConfig& config);
 
     /**
      * Method to write a configuration transmitted via heartbeat message to stable storage.
@@ -1377,7 +1378,7 @@ private:
     void _heartbeatReconfigFinish(const executor::TaskExecutor::CallbackArgs& cbData,
                                   const ReplSetConfig& newConfig,
                                   StatusWith<int> myIndex,
-                                  boost::optional<OpTime> shardSplitBlockOpTime);
+                                  bool isSplitRecipientConfig);
 
     /**
      * Calculates the time (in millis) left in quiesce mode and converts the value to int64.

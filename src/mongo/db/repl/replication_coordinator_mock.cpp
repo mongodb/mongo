@@ -171,7 +171,9 @@ void ReplicationCoordinatorMock::setAwaitReplicationReturnValueFunction(
 
 SharedSemiFuture<void> ReplicationCoordinatorMock::awaitReplicationAsyncNoWTimeout(
     const OpTime& opTime, const WriteConcernOptions& writeConcern) {
-    MONGO_UNREACHABLE;
+    auto opCtx = cc().makeOperationContext();
+    auto result = _awaitReplicationReturnValueFunction(opCtx.get(), opTime);
+    return Future<ReplicationCoordinator::StatusAndDuration>::makeReady(result).ignoreValue();
 }
 
 void ReplicationCoordinatorMock::stepDown(OperationContext* opCtx,

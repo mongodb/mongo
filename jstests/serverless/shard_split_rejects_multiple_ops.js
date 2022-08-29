@@ -22,8 +22,8 @@ function commitShardSplitConcurrently() {
 
     const donorPrimary = test.donor.getPrimary();
 
-    let fp = configureFailPoint(donorPrimary.getDB("admin"), "pauseShardSplitAfterBlocking");
-    let fpAfterDecision =
+    const fp = configureFailPoint(donorPrimary.getDB("admin"), "pauseShardSplitAfterBlocking");
+    const fpAfterDecision =
         configureFailPoint(donorPrimary.getDB("admin"), "pauseShardSplitAfterDecision");
 
     const operation = test.createSplitOperation(tenantIds);
@@ -45,7 +45,7 @@ function commitShardSplitConcurrently() {
 
     // blocks before processing any `forgetShardSplit` command.
     fpAfterDecision.wait();
-    let forgetThread = operation.forgetAsync();
+    const forgetThread = operation.forgetAsync();
 
     // fails because the commitShardSplit hasn't be garbage collected yet.
     assert.commandFailedWithCode(donorPrimary.adminCommand({
@@ -58,7 +58,7 @@ function commitShardSplitConcurrently() {
                                  117);  // ConflictingOperationInProgress
     fpAfterDecision.off();
     assert.commandWorked(splitThread.returnData());
-    forgetThread.join();
+    assert.commandWorked(forgetThread.returnData());
 
     test.cleanupSuccesfulCommitted(operation.migrationId, tenantIds);
 

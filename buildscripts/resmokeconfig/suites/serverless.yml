@@ -4,6 +4,9 @@ selector:
   roots:
   - jstests/serverless/*.js
   - jstests/serverless/change_streams/**/*.js
+  exclude_files:
+  # TODO(SERVER-69227): Unexclude this test when we resolve the performance issues with split.
+  - jstests/serverless/shard_split_performance_test.js
 
 executor:
   config:

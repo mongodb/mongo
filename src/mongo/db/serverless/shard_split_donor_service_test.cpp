@@ -524,27 +524,28 @@ TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) 
     ASSERT_TRUE(serviceInstance->isGarbageCollectable());
 }
 
-TEST_F(ShardSplitDonorServiceTest, ReplSetStepUpFails) {
-    auto opCtx = makeOperationContext();
-    test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
-    test::shard_split::reconfigToAddRecipientNodes(
-        getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
-    mockCommandReplies(&_recipientSet);
-    _skipAcceptanceFP.reset();
+// TODO(SERVER-69227): Re-enable this test when we are no longer retrying replSetStepUp.
+// TEST_F(ShardSplitDonorServiceTest, ReplSetStepUpFails) {
+//     auto opCtx = makeOperationContext();
+//     test::shard_split::ScopedTenantAccessBlocker scopedTenants(_tenantIds, opCtx.get());
+//     test::shard_split::reconfigToAddRecipientNodes(
+//         getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
+//     mockCommandReplies(&_recipientSet);
+//     _skipAcceptanceFP.reset();
 
-    auto serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
-        opCtx.get(), _service, defaultStateDocument().toBSON());
-    ASSERT(serviceInstance.get());
-    ASSERT_EQ(_uuid, serviceInstance->getId());
+//     auto serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
+//         opCtx.get(), _service, defaultStateDocument().toBSON());
+//     ASSERT(serviceInstance.get());
+//     ASSERT_EQ(_uuid, serviceInstance->getId());
 
-    waitForMonitorAndProcessHello();
-    waitForReplSetStepUp(Status(ErrorCodes::OperationFailed, ""));
-    // No need to wait for recipient majority no-op write, since the stepup failed.
+//     waitForMonitorAndProcessHello();
+//     waitForReplSetStepUp(Status(ErrorCodes::OperationFailed, ""));
+//     // No need to wait for recipient majority no-op write, since the stepup failed.
 
-    auto result = serviceInstance->decisionFuture().get();
-    ASSERT(result.abortReason);
-    ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kAborted);
-}
+//     auto result = serviceInstance->decisionFuture().get();
+//     ASSERT(result.abortReason);
+//     ASSERT_EQ(result.state, mongo::ShardSplitDonorStateEnum::kAborted);
+// }
 
 TEST_F(ShardSplitDonorServiceTest, ReplSetStepUpRetryable) {
     auto opCtx = makeOperationContext();

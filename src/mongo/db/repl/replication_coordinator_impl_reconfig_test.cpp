@@ -1391,10 +1391,8 @@ TEST_F(ReplCoordReconfigTest, MustSendHeartbeatToSplitConfigRecipients) {
     BSONObjBuilder result;
     const auto opCtx = makeOperationContext();
 
-    auto newConfig = mongo::serverless::makeSplitConfig(ReplSetConfig::parse(oldConfigObj),
-                                                        "recipientSet",
-                                                        recipientTagName,
-                                                        repl::OpTime(Timestamp(100, 0), 1));
+    auto newConfig = mongo::serverless::makeSplitConfig(
+        ReplSetConfig::parse(oldConfigObj), "recipientSet", recipientTagName);
     Status status(ErrorCodes::InternalError, "Not Set");
 
     stdx::thread reconfigThread;
