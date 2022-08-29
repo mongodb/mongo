@@ -81,6 +81,21 @@ inline void maybeComposePath(ABT& composition, ABT child) {
 }
 
 /**
+ * Creates a balanced tree of composition elements over the input vector which it modifies in place.
+ * In the end at most one element remains in the vector.
+ */
+template <class Element = PathComposeM>
+inline void maybeComposePaths(ABTVector& paths) {
+    while (paths.size() > 1) {
+        const size_t half = paths.size() / 2;
+        for (size_t i = 0; i < half; i++) {
+            maybeComposePath<Element>(paths.at(i), std::move(paths.at(paths.size() - i - 1)));
+        }
+        paths.resize(paths.size() - half, make<Blackhole>());
+    }
+}
+
+/**
  * Used to vend out fresh ids for projection names.
  */
 class PrefixId {

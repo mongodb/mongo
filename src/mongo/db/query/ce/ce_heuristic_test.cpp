@@ -159,9 +159,9 @@ TEST(CEHeuristicTest, CEWithoutOptimizationNestedConjAndDisj3) {
         "]}"
         "]}";
     ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 0.0, 0.0);
-    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 3.48545, 9.0);
-    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 9.96732, 99.0);
-    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 25.3708, 1000.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 3.01561, 9.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 9.37173, 99.0);
+    ASSERT_MATCH_CE_CARD_NO_OPT(ht, query, 19.3064, 1000.0);
 }
 
 TEST(CEHeuristicTest, CEWithoutOptimizationNestedConjAndDisj4) {

@@ -715,11 +715,14 @@ private:
             return;
         }
 
-        ABT node = _ctx.pop();
-        for (size_t i = 0; i < childCount - 1; i++) {
-            node = make<Composition>(_ctx.pop(), std::move(node));
+        ABTVector nodes;
+        for (size_t i = 0; i < childCount; i++) {
+            nodes.push_back(_ctx.pop());
         }
-        _ctx.push(std::move(node));
+
+        // Construct a balanced composition tree.
+        maybeComposePaths<Composition>(nodes);
+        _ctx.push(std::move(nodes.front()));
     }
 
     void unsupportedExpression(const MatchExpression* expr) const {
