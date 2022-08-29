@@ -35,6 +35,10 @@
 #include <fmt/format.h>
 #include <fstream>
 
+#ifdef __linux__
+#include <netinet/tcp.h>
+#endif
+
 #include <asio.hpp>
 #include <asio/system_timer.hpp>
 #include <boost/algorithm/string.hpp>
@@ -81,8 +85,20 @@ namespace mongo {
 namespace transport {
 
 namespace {
+
+using TcpKeepaliveOption = SocketOption<SOL_SOCKET, SO_KEEPALIVE>;
+#ifdef __linux__
+using TcpInfoOption = SocketOption<IPPROTO_TCP, TCP_INFO, tcp_info>;
+using TcpKeepaliveCountOption = SocketOption<IPPROTO_TCP, TCP_KEEPCNT>;
+using TcpKeepaliveIdleSecsOption = SocketOption<IPPROTO_TCP, TCP_KEEPIDLE>;
+using TcpKeepaliveIntervalSecsOption = SocketOption<IPPROTO_TCP, TCP_KEEPINTVL>;
+#ifdef TCP_USER_TIMEOUT
+using TcpUserTimeoutMillisOption = SocketOption<IPPROTO_TCP, TCP_USER_TIMEOUT, unsigned>;
+#endif
+#endif  // __linux__
+
 #ifdef TCP_FASTOPEN
-using TCPFastOpen = asio::detail::socket_option::integer<IPPROTO_TCP, TCP_FASTOPEN>;
+using TcpFastOpenOption = SocketOption<IPPROTO_TCP, TCP_FASTOPEN>;
 #endif
 /**
  * On systems with TCP_FASTOPEN_CONNECT (linux >= 4.11),
@@ -92,7 +108,7 @@ using TCPFastOpen = asio::detail::socket_option::integer<IPPROTO_TCP, TCP_FASTOP
  * https://github.com/torvalds/linux/commit/19f6d3f3c8422d65b5e3d2162e30ef07c6e21ea2
  */
 #ifdef TCP_FASTOPEN_CONNECT
-using TCPFastOpenConnect = asio::detail::socket_option::boolean<IPPROTO_TCP, TCP_FASTOPEN_CONNECT>;
+using TcpFastOpenConnectOption = SocketOption<IPPROTO_TCP, TCP_FASTOPEN_CONNECT>;
 #endif
 
 /**
@@ -682,7 +698,7 @@ StatusWith<TransportLayerASIO::ASIOSessionHandle> TransportLayerASIO::_doSyncCon
     const auto family = protocol.family();
     if ((family == AF_INET) || (family == AF_INET6)) {
         setSocketOption(sock,
-                        TCPFastOpenConnect(gTCPFastOpenClient),
+                        TcpFastOpenConnectOption(gTCPFastOpenClient),
                         "connect (sync) TCP fast open",
                         logv2::LogSeverity::Info(),
                         ec);
@@ -868,7 +884,7 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(
 #ifdef TCP_FASTOPEN_CONNECT
             std::error_code ec;
             setSocketOption(connector->socket,
-                            TCPFastOpenConnect(gTCPFastOpenClient),
+                            TcpFastOpenConnectOption(gTCPFastOpenClient),
                             "connect (async) TCP fast open",
                             logv2::LogSeverity::Info(),
                             ec);
@@ -1208,7 +1224,7 @@ Status TransportLayerASIO::setup() {
 #ifdef TCP_FASTOPEN
         if (gTCPFastOpenServer && ((addr.family() == AF_INET) || (addr.family() == AF_INET6))) {
             setSocketOption(acceptor,
-                            TCPFastOpen(gTCPFastOpenQueueSize),
+                            TcpFastOpenOption(gTCPFastOpenQueueSize),
                             "acceptor TCP fast open",
                             logv2::LogSeverity::Info(),
                             ec);
@@ -1433,11 +1449,12 @@ void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
         }
 
 #ifdef TCPI_OPT_SYN_DATA
-        struct tcp_info info;
-        socklen_t info_len = sizeof(info);
-        if (!getsockopt(peerSocket.native_handle(), IPPROTO_TCP, TCP_INFO, &info, &info_len) &&
-            (info.tcpi_options & TCPI_OPT_SYN_DATA)) {
-            networkCounter.acceptedTFOIngress();
+        try {
+            TcpInfoOption tcpi{};
+            peerSocket.get_option(tcpi);
+            if (tcpi->tcpi_options & TCPI_OPT_SYN_DATA)
+                networkCounter.acceptedTFOIngress();
+        } catch (const asio::system_error&) {
         }
 #endif
 
