@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/timeseries/bucket_catalog.h"
@@ -429,6 +431,17 @@ boost::optional<BucketCatalog::BucketState> BucketCatalog::BucketStateManager::s
     const OID& id, BucketState target) {
     stdx::lock_guard catalogLock{*_mutex};
     return _setBucketStateHelper(catalogLock, id, target);
+}
+
+void BucketCatalog::BucketStateManager::appendStats(BSONObjBuilder* base) const {
+    stdx::lock_guard catalogLock{*_mutex};
+
+    BSONObjBuilder builder{base->subobjStart("stateManagement")};
+
+    builder.appendNumber("bucketsManaged", static_cast<long long>(_bucketStates.size()));
+    builder.appendNumber("currentEra", static_cast<long long>(_era));
+    builder.appendNumber("erasWithRemainingBuckets", static_cast<long long>(_countMap.size()));
+    builder.appendNumber("trackedClearOperations", static_cast<long long>(_clearRegistry.size()));
 }
 
 boost::optional<BucketCatalog::BucketState>
@@ -1025,6 +1038,10 @@ void BucketCatalog::appendExecutionStats(const NamespaceString& ns, BSONObjBuild
 
 void BucketCatalog::appendGlobalExecutionStats(BSONObjBuilder* builder) const {
     _appendExecutionStatsToBuilder(&_globalExecutionStats, builder);
+}
+
+void BucketCatalog::appendStateManagementStats(BSONObjBuilder* builder) const {
+    _bucketStateManager.appendStats(builder);
 }
 
 BucketCatalog::BucketMetadata::BucketMetadata(BSONElement elem,
@@ -1864,6 +1881,9 @@ public:
 
         // Append the global execution stats for all namespaces.
         bucketCatalog.appendGlobalExecutionStats(&builder);
+
+        // Append the global state management stats for all namespaces.
+        bucketCatalog.appendStateManagementStats(&builder);
 
         return builder.obj();
     }

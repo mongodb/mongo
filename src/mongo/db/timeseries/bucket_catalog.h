@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include <boost/container/small_vector.hpp>
 #include <boost/container/static_vector.hpp>
 #include <queue>
@@ -377,6 +378,11 @@ public:
      */
     void appendGlobalExecutionStats(BSONObjBuilder* builder) const;
 
+    /**
+     * Appends the global bucket state management stats for all namespaces to the builder.
+     */
+    void appendStateManagementStats(BSONObjBuilder* builder) const;
+
 protected:
     enum class BucketState {
         // Bucket can be inserted into, and does not have an outstanding prepared commit
@@ -588,6 +594,11 @@ protected:
          * kPreparedAndCleared.
          */
         boost::optional<BucketState> setBucketState(const OID& id, BucketState target);
+
+        /**
+         * Appends statistics for observability.
+         */
+        void appendStats(BSONObjBuilder* builder) const;
 
     protected:
         void _decrementEraCountHelper(uint64_t era);
