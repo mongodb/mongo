@@ -246,7 +246,8 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
                         "TTL indexes are not supported for capped collections."};
             }
             if (auto status = index_key_validate::validateExpireAfterSeconds(
-                    *cmdIndex.getExpireAfterSeconds());
+                    *cmdIndex.getExpireAfterSeconds(),
+                    index_key_validate::ValidateExpireAfterSecondsMode::kSecondaryTTLIndex);
                 !status.isOK()) {
                 return {ErrorCodes::InvalidOptions, status.reason()};
             }
@@ -530,7 +531,9 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
                 },
                 [&oplogEntryBuilder](std::int64_t value) {
                     oplogEntryBuilder.append(CollMod::kExpireAfterSecondsFieldName, value);
-                    return index_key_validate::validateExpireAfterSeconds(value);
+                    return index_key_validate::validateExpireAfterSeconds(
+                        value,
+                        index_key_validate::ValidateExpireAfterSecondsMode::kClusteredTTLIndex);
                 },
             },
             *expireAfterSeconds);

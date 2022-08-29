@@ -128,9 +128,14 @@ StatusWith<BSONObj> validateIndexSpecCollation(OperationContext* opCtx,
                                                const CollatorInterface* defaultCollator);
 
 /**
- * Validates the the 'expireAfterSeconds' value for a TTL index..
+ * Validates the the 'expireAfterSeconds' value for a TTL index or clustered collection.
  */
-Status validateExpireAfterSeconds(std::int64_t expireAfterSeconds);
+enum class ValidateExpireAfterSecondsMode {
+    kSecondaryTTLIndex,
+    kClusteredTTLIndex,
+};
+Status validateExpireAfterSeconds(std::int64_t expireAfterSeconds,
+                                  ValidateExpireAfterSecondsMode mode);
 
 /**
  * Returns true if 'indexSpec' refers to a TTL index.
