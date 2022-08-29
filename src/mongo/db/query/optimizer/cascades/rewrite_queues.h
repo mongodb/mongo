@@ -31,8 +31,9 @@
 
 #include <queue>
 
-#include "mongo/db/query/optimizer/cascades/logical_rewriter_rules.h"
+#include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
 #include "mongo/db/query/optimizer/node_defs.h"
+#include "mongo/db/query/optimizer/utils/rewriter_utils.h"
 
 namespace mongo::optimizer::cascades {
 
@@ -72,7 +73,11 @@ static constexpr double kDefaultPriority = 10.0;
  * Keeps track of candidate physical rewrites.
  */
 struct PhysRewriteEntry {
-    PhysRewriteEntry(double priority, ABT node, ChildPropsType childProps, NodeCEMap nodeCEMap);
+    PhysRewriteEntry(double priority,
+                     PhysicalRewriteType rule,
+                     ABT node,
+                     ChildPropsType childProps,
+                     NodeCEMap nodeCEMap);
 
     PhysRewriteEntry() = delete;
     PhysRewriteEntry(const PhysRewriteEntry& other) = delete;
@@ -80,6 +85,8 @@ struct PhysRewriteEntry {
 
     // Numerically lower priority gets applied first.
     double _priority;
+    // Rewrite rule that triggered this entry.
+    PhysicalRewriteType _rule;
 
     ABT _node;
     ChildPropsType _childProps;
@@ -98,40 +105,46 @@ using PhysRewriteQueue = std::priority_queue<std::unique_ptr<PhysRewriteEntry>,
 
 void optimizeChildrenNoAssert(PhysRewriteQueue& queue,
                               double priority,
+                              PhysicalRewriteType rule,
                               ABT node,
                               ChildPropsType childProps,
-                              NodeCEMap nodeCEMap = {});
+                              NodeCEMap nodeCEMap);
 
-template <class T>
+template <class T, PhysicalRewriteType rule>
 static void optimizeChildren(PhysRewriteQueue& queue,
                              double priority,
                              ABT node,
                              ChildPropsType childProps) {
     static_assert(canBePhysicalNode<T>(), "Can only optimize a physical node.");
-    optimizeChildrenNoAssert(queue, priority, std::move(node), std::move(childProps));
+    optimizeChildrenNoAssert(queue, priority, rule, std::move(node), std::move(childProps), {});
 }
 
-template <class T>
+template <class T, PhysicalRewriteType rule>
 static void optimizeChild(PhysRewriteQueue& queue,
                           double priority,
                           ABT node,
                           properties::PhysProps childProps) {
     ABT& childRef = node.cast<T>()->getChild();
-    optimizeChildren<T>(
+    optimizeChildren<T, rule>(
         queue, priority, std::move(node), ChildPropsType{{&childRef, std::move(childProps)}});
 }
 
-template <class T>
+template <class T, PhysicalRewriteType rule>
 static void optimizeChild(PhysRewriteQueue& queue, const double priority, ABT node) {
-    optimizeChildren<T>(queue, priority, std::move(node), {});
+    optimizeChildren<T, rule>(queue, priority, std::move(node), {});
 }
 
-void optimizeUnderNewProperties(PhysRewriteQueue& queue,
-                                double priority,
-                                ABT child,
-                                properties::PhysProps props);
 
-template <class T>
+template <PhysicalRewriteType rule>
+void optimizeUnderNewProperties(cascades::PhysRewriteQueue& queue,
+                                const double priority,
+                                ABT child,
+                                properties::PhysProps props) {
+    optimizeChild<FilterNode, rule>(
+        queue, priority, wrapConstFilter(std::move(child)), std::move(props));
+}
+
+template <class T, PhysicalRewriteType rule>
 static void optimizeChildren(PhysRewriteQueue& queue,
                              double priority,
                              ABT node,
@@ -139,7 +152,7 @@ static void optimizeChildren(PhysRewriteQueue& queue,
                              properties::PhysProps rightProps) {
     ABT& leftChildRef = node.cast<T>()->getLeftChild();
     ABT& rightChildRef = node.cast<T>()->getRightChild();
-    optimizeChildren<T>(
+    optimizeChildren<T, rule>(
         queue,
         priority,
         std::move(node),

@@ -34,6 +34,7 @@
 namespace mongo::optimizer::cascades {
 
 #define LOGICALREWRITER_NAMES(F)                                  \
+    F(Root)                                                       \
     /* "Linear" reordering rewrites. */                           \
     F(FilterEvaluationReorder)                                    \
     F(FilterCollationReorder)                                     \
@@ -86,5 +87,41 @@ MAKE_PRINTABLE_ENUM_STRING_ARRAY(LogicalRewriterTypeEnum,
                                  LogicalRewriterType,
                                  LOGICALREWRITER_NAMES);
 #undef LOGICALREWRITER_NAMES
+
+#define PHYSICALREWRITER_NAMES(F) \
+    F(Root)                       \
+    F(Uninitialized)              \
+    F(EnforceCollation)           \
+    F(EnforceLimitSkip)           \
+    F(EnforceDistribution)        \
+    F(AttemptCoveringQuery)       \
+    F(Seek)                       \
+    F(PhysicalScan)               \
+    F(ValueScan)                  \
+    F(Evaluation)                 \
+    F(Union)                      \
+    F(LimitSkip)                  \
+    F(HashGroup)                  \
+    F(Unwind)                     \
+    F(Collation)                  \
+    F(Exchange)                   \
+    F(NLJ)                        \
+    F(Filter)                     \
+    F(RenameProjection)           \
+    F(EvaluationPassthrough)      \
+    F(SargableIxScanConvert)      \
+    F(SargableToIndex)            \
+    F(SargableToPhysicalScan)     \
+    F(SargableToSeek)             \
+    F(RIDIntersectMergeJoin)      \
+    F(RIDIntersectHashJoin)       \
+    F(RIDIntersectGroupBy)        \
+    F(RIDIntersectNLJ)
+
+MAKE_PRINTABLE_ENUM(PhysicalRewriteType, PHYSICALREWRITER_NAMES);
+MAKE_PRINTABLE_ENUM_STRING_ARRAY(PhysicalRewriterTypeEnum,
+                                 PhysicalRewriterType,
+                                 PHYSICALREWRITER_NAMES);
+#undef PHYSICALREWRITER_NAMES
 
 }  // namespace mongo::optimizer::cascades

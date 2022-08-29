@@ -31,6 +31,8 @@
 
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/query/optimizer/cascades/memo.h"
+#include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
+#include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/node.h"
 #include "mongo/util/assert_util.h"
 
@@ -2203,7 +2205,11 @@ public:
                 const ABTVector& logicalNodes = group._logicalNodes.getVector();
                 for (size_t i = 0; i < logicalNodes.size(); i++) {
                     ExplainPrinter local;
-                    local.fieldName("logicalNodeId").print(i);
+                    local.fieldName("logicalNodeId").print(i).separator(", ");
+                    const auto rule = group._rules.at(i);
+                    local.fieldName("rule").print(
+                        cascades::LogicalRewriterTypeEnum::toString[static_cast<int>(rule)]);
+
                     ExplainPrinter nodePrinter = generate(logicalNodes.at(i));
                     local.fieldName("node", ExplainVersion::V3).print(nodePrinter);
 
@@ -2228,6 +2234,12 @@ public:
                         local.print(physOptResult->_costLimit.toString());
                     } else {
                         local.print(physOptResult->_costLimit.getCost());
+                    }
+
+                    if (physOptResult->_nodeInfo) {
+                        const cascades::PhysicalRewriteType rule = physOptResult->_nodeInfo->_rule;
+                        local.separator(", ").fieldName("rule").print(
+                            cascades::PhysicalRewriterTypeEnum::toString[static_cast<int>(rule)]);
                     }
 
                     ExplainPrinter propPrinter =

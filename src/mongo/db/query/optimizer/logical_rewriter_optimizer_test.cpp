@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/cascades/logical_props_derivation.h"
+#include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
@@ -138,7 +139,7 @@ TEST(LogicalRewriter, Memo) {
         "    |   |           distribution: \n"
         "    |   |               type: Centralized\n"
         "    |   logicalNodes: \n"
-        "    |       logicalNodeId: 0\n"
+        "    |       logicalNodeId: 0, rule: Root\n"
         "    |           Scan [test]\n"
         "    |               BindBlock:\n"
         "    |                   [ptest]\n"
@@ -158,7 +159,7 @@ TEST(LogicalRewriter, Memo) {
         "    |   |           distribution: \n"
         "    |   |               type: Centralized\n"
         "    |   logicalNodes: \n"
-        "    |       logicalNodeId: 0\n"
+        "    |       logicalNodeId: 0, rule: Root\n"
         "    |           Filter []\n"
         "    |           |   EvalFilter []\n"
         "    |           |   |   Variable [ptest]\n"
@@ -182,7 +183,7 @@ TEST(LogicalRewriter, Memo) {
         "    |   |           distribution: \n"
         "    |   |               type: Centralized\n"
         "    |   logicalNodes: \n"
-        "    |       logicalNodeId: 0\n"
+        "    |       logicalNodeId: 0, rule: Root\n"
         "    |           Evaluation []\n"
         "    |           |   BindBlock:\n"
         "    |           |       [P1]\n"
@@ -1234,7 +1235,7 @@ TEST(LogicalRewriter, UnionPreservesCommonLogicalProps) {
         "    |   |           distribution: \n"
         "    |   |               type: UnknownPartitioning\n"
         "    |   logicalNodes: \n"
-        "    |       logicalNodeId: 0\n"
+        "    |       logicalNodeId: 0, rule: Root\n"
         "    |           Scan [test1]\n"
         "    |               BindBlock:\n"
         "    |                   [ptest1]\n"
@@ -1266,7 +1267,7 @@ TEST(LogicalRewriter, UnionPreservesCommonLogicalProps) {
         "    |   |           distribution: \n"
         "    |   |               type: UnknownPartitioning\n"
         "    |   logicalNodes: \n"
-        "    |       logicalNodeId: 0\n"
+        "    |       logicalNodeId: 0, rule: Root\n"
         "    |           Sargable [Complete]\n"
         "    |           |   |   |   |   |   requirementsMap: \n"
         "    |           |   |   |   |   |       refProjection: ptest1, path: 'PathGet [a] "
@@ -1296,7 +1297,7 @@ TEST(LogicalRewriter, UnionPreservesCommonLogicalProps) {
         "    |   |           distribution: \n"
         "    |   |               type: UnknownPartitioning\n"
         "    |   logicalNodes: \n"
-        "    |       logicalNodeId: 0\n"
+        "    |       logicalNodeId: 0, rule: Root\n"
         "    |           Scan [test2]\n"
         "    |               BindBlock:\n"
         "    |                   [ptest2]\n"
@@ -1328,7 +1329,7 @@ TEST(LogicalRewriter, UnionPreservesCommonLogicalProps) {
         "    |   |           distribution: \n"
         "    |   |               type: UnknownPartitioning\n"
         "    |   logicalNodes: \n"
-        "    |       logicalNodeId: 0\n"
+        "    |       logicalNodeId: 0, rule: Root\n"
         "    |           Sargable [Complete]\n"
         "    |           |   |   |   |   |   requirementsMap: \n"
         "    |           |   |   |   |   |       refProjection: ptest2, path: 'PathGet [a] "
@@ -1364,7 +1365,7 @@ TEST(LogicalRewriter, UnionPreservesCommonLogicalProps) {
         "    |   |           distribution: \n"
         "    |   |               type: UnknownPartitioning\n"
         "    |   logicalNodes: \n"
-        "    |       logicalNodeId: 0\n"
+        "    |       logicalNodeId: 0, rule: Root\n"
         "    |           Union []\n"
         "    |           |   |   BindBlock:\n"
         "    |           |   |       [a]\n"
@@ -1393,7 +1394,7 @@ TEST(LogicalRewriter, UnionPreservesCommonLogicalProps) {
         "    |   |           distribution: \n"
         "    |   |               type: UnknownPartitioning\n"
         "    |   logicalNodes: \n"
-        "    |       logicalNodeId: 0\n"
+        "    |       logicalNodeId: 0, rule: Root\n"
         "    |           Root []\n"
         "    |           |   |   projections: \n"
         "    |           |   |       a\n"
@@ -1404,10 +1405,7 @@ TEST(LogicalRewriter, UnionPreservesCommonLogicalProps) {
         phaseManager.getMemo());
 }
 
-TEST(LogicalRewriter, SargableCE) {
-    using namespace properties;
-    PrefixId prefixId;
-
+ABT sargableCETestSetup() {
     ABT scanNode = make<ScanNode>("ptest", "test");
 
     ABT filterANode = make<FilterNode>(
@@ -1419,9 +1417,15 @@ TEST(LogicalRewriter, SargableCE) {
                          make<Variable>("ptest")),
         std::move(filterANode));
 
-    ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"ptest"}},
-                                  std::move(filterBNode));
+    return make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"ptest"}},
+                          std::move(filterBNode));
+}
 
+TEST(LogicalRewriter, SargableCE) {
+    using namespace properties;
+
+    PrefixId prefixId;
+    ABT rootNode = sargableCETestSetup();
     OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase,
                                   OptPhaseManager::OptPhase::MemoExplorationPhase},
                                  prefixId,
@@ -1447,7 +1451,7 @@ TEST(LogicalRewriter, SargableCE) {
         "    |   |           distribution: \n"
         "    |   |               type: Centralized\n"
         "    |   logicalNodes: \n"
-        "    |       logicalNodeId: 0\n"
+        "    |       logicalNodeId: 0, rule: Root\n"
         "    |           Scan [test]\n"
         "    |               BindBlock:\n"
         "    |                   [ptest]\n"
@@ -1472,7 +1476,7 @@ TEST(LogicalRewriter, SargableCE) {
         "    |   |           distribution: \n"
         "    |   |               type: Centralized\n"
         "    |   logicalNodes: \n"
-        "    |       logicalNodeId: 0\n"
+        "    |       logicalNodeId: 0, rule: Root\n"
         "    |           Sargable [Complete]\n"
         "    |           |   |   |   |   |   requirementsMap: \n"
         "    |           |   |   |   |   |       refProjection: ptest, path: 'PathGet [a] "
@@ -1506,7 +1510,7 @@ TEST(LogicalRewriter, SargableCE) {
         "    |   |           distribution: \n"
         "    |   |               type: Centralized\n"
         "    |   logicalNodes: \n"
-        "    |       logicalNodeId: 0\n"
+        "    |       logicalNodeId: 0, rule: Root\n"
         "    |           Root []\n"
         "    |           |   |   projections: \n"
         "    |           |   |       ptest\n"

@@ -27,9 +27,11 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/optimizer/cascades/memo.h"
+
 #include <set>
 
-#include "mongo/db/query/optimizer/cascades/memo.h"
+#include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/utils/abt_hash.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
@@ -86,10 +88,12 @@ const ABTVector& OrderPreservingABTSet::getVector() const {
 }
 
 PhysRewriteEntry::PhysRewriteEntry(const double priority,
+                                   PhysicalRewriteType rule,
                                    ABT node,
                                    std::vector<std::pair<ABT*, properties::PhysProps>> childProps,
                                    NodeCEMap nodeCEMap)
     : _priority(priority),
+      _rule(rule),
       _node(std::move(node)),
       _childProps(std::move(childProps)),
       _nodeCEMap(std::move(nodeCEMap)) {}
@@ -192,11 +196,13 @@ public:
     explicit MemoIntegrator(Memo& memo,
                             Memo::NodeTargetGroupMap targetGroupMap,
                             NodeIdSet& insertedNodeIds,
+                            const LogicalRewriteType rule,
                             const bool addExistingNodeWithNewChild,
                             const bool useHeuristicCE)
         : _memo(memo),
           _insertedNodeIds(insertedNodeIds),
           _targetGroupMap(std::move(targetGroupMap)),
+          _rule(rule),
           _addExistingNodeWithNewChild(addExistingNodeWithNewChild),
           _useHeuristicCE(useHeuristicCE) {}
 
@@ -421,6 +427,7 @@ private:
                                           targetGroupId,
                                           _insertedNodeIds,
                                           std::move(forMemo),
+                                          _rule,
                                           _useHeuristicCE);
         return result._groupId;
     }
@@ -560,6 +567,9 @@ private:
      */
     Memo::NodeTargetGroupMap _targetGroupMap;
 
+    // Rewrite rule that triggered this node to be created.
+    const LogicalRewriteType _rule;
+
     // If set we enable modification of target group based on existing nodes. In practical terms, we
     // would not assume that if F(x) = F(y) then x = y. This is currently used in conjunction with
     // $elemMatch rewrite (PathTraverse over PathCompose).
@@ -614,14 +624,21 @@ GroupIdType Memo::addGroup(ProjectionNameSet projections) {
     return _groups.size() - 1;
 }
 
-std::pair<MemoLogicalNodeId, bool> Memo::addNode(GroupIdType groupId, ABT n) {
+std::pair<MemoLogicalNodeId, bool> Memo::addNode(GroupIdType groupId,
+                                                 ABT n,
+                                                 LogicalRewriteType rule) {
     uassert(6624052, "Attempting to insert a physical node", !n.is<PhysicalNode>());
     uassert(6624053,
             "Attempting to insert a logical delegator node",
             !n.is<MemoLogicalDelegatorNode>());
 
-    OrderPreservingABTSet& nodes = _groups.at(groupId)->_logicalNodes;
+    Group& group = *_groups.at(groupId);
+    OrderPreservingABTSet& nodes = group._logicalNodes;
+
     auto [index, inserted] = nodes.emplace_back(std::move(n));
+    if (inserted) {
+        group._rules.push_back(rule);
+    }
     return {{groupId, index}, inserted};
 }
 
@@ -684,6 +701,7 @@ MemoLogicalNodeId Memo::addNode(GroupIdVector groupVector,
                                 const GroupIdType targetGroupId,
                                 NodeIdSet& insertedNodeIds,
                                 ABT n,
+                                const LogicalRewriteType rule,
                                 const bool useHeuristicCE) {
     for (const GroupIdType groupId : groupVector) {
         // Invalid tree: node is its own child.
@@ -708,7 +726,7 @@ MemoLogicalNodeId Memo::addNode(GroupIdVector groupVector,
 
     // Current node is not in the memo. Insert unchanged.
     const GroupIdType groupId = noTargetGroup ? addGroup(std::move(projections)) : targetGroupId;
-    auto [newId, inserted] = addNode(groupId, std::move(n));
+    auto [newId, inserted] = addNode(groupId, std::move(n), rule);
     if (inserted || noTargetGroup) {
         insertedNodeIds.insert(newId);
         _inputGroupsToNodeIdMap[groupVector].insert(newId);
@@ -735,12 +753,14 @@ MemoLogicalNodeId Memo::addNode(GroupIdVector groupVector,
 GroupIdType Memo::integrate(const ABT& node,
                             NodeTargetGroupMap targetGroupMap,
                             NodeIdSet& insertedNodeIds,
+                            const LogicalRewriteType rule,
                             const bool addExistingNodeWithNewChild,
                             const bool useHeuristicCE) {
     _stats._numIntegrations++;
     MemoIntegrator integrator(*this,
                               std::move(targetGroupMap),
                               insertedNodeIds,
+                              rule,
                               addExistingNodeWithNewChild,
                               useHeuristicCE);
     return integrator.integrate(node);
@@ -763,6 +783,7 @@ void Memo::clearLogicalNodes(const GroupIdType groupId) {
 
     logicalNodes.clear();
     group._logicalRewriteQueue = {};
+    group._rules.clear();
 }
 
 const Memo::InputGroupsToNodeIdMap& Memo::getInputGroupsToNodeIdMap() const {

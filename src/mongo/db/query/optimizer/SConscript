@@ -42,6 +42,7 @@ env.Library(
         'utils/ce_math.cpp',
         "utils/interval_utils.cpp",
         "utils/memo_utils.cpp",
+        "utils/rewriter_utils.cpp",
         "utils/utils.cpp",
     ],
     LIBDEPS=[

@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/optimizer/cascades/logical_rewriter.h"
 
+#include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
 
 namespace mongo::optimizer::cascades {
 
@@ -104,11 +105,12 @@ LogicalRewriter::LogicalRewriter(Memo& memo,
 }
 
 GroupIdType LogicalRewriter::addRootNode(const ABT& node) {
-    return addNode(node, -1, false /*addExistingNodeWithNewChild*/).first;
+    return addNode(node, -1, LogicalRewriteType::Root, false /*addExistingNodeWithNewChild*/).first;
 }
 
 std::pair<GroupIdType, NodeIdSet> LogicalRewriter::addNode(const ABT& node,
                                                            const GroupIdType targetGroupId,
+                                                           const LogicalRewriteType rule,
                                                            const bool addExistingNodeWithNewChild) {
     NodeIdSet insertNodeIds;
 
@@ -120,6 +122,7 @@ std::pair<GroupIdType, NodeIdSet> LogicalRewriter::addNode(const ABT& node,
     const GroupIdType resultGroupId = _memo.integrate(node,
                                                       std::move(targetGroupMap),
                                                       insertNodeIds,
+                                                      rule,
                                                       addExistingNodeWithNewChild,
                                                       _useHeuristicCE);
 
@@ -150,12 +153,15 @@ void LogicalRewriter::clearGroup(const GroupIdType groupId) {
 class RewriteContext {
 public:
     RewriteContext(LogicalRewriter& rewriter,
+                   const LogicalRewriteType rule,
                    const MemoLogicalNodeId aboveNodeId,
                    const MemoLogicalNodeId belowNodeId)
-        : RewriteContext(rewriter, aboveNodeId, true /*hasBelowNodeId*/, belowNodeId){};
+        : RewriteContext(rewriter, rule, aboveNodeId, true /*hasBelowNodeId*/, belowNodeId){};
 
-    RewriteContext(LogicalRewriter& rewriter, const MemoLogicalNodeId aboveNodeId)
-        : RewriteContext(rewriter, aboveNodeId, false /*hasBelowNodeId*/, {}){};
+    RewriteContext(LogicalRewriter& rewriter,
+                   const LogicalRewriteType rule,
+                   const MemoLogicalNodeId aboveNodeId)
+        : RewriteContext(rewriter, rule, aboveNodeId, false /*hasBelowNodeId*/, {}){};
 
     std::pair<GroupIdType, NodeIdSet> addNode(const ABT& node,
                                               const bool substitute,
@@ -169,7 +175,7 @@ public:
                 _rewriter.clearGroup(_belowNodeId._groupId);
             }
         }
-        return _rewriter.addNode(node, _aboveNodeId._groupId, addExistingNodeWithNewChild);
+        return _rewriter.addNode(node, _aboveNodeId._groupId, _rule, addExistingNodeWithNewChild);
     }
 
     Memo& getMemo() const {
@@ -210,6 +216,7 @@ public:
 
 private:
     RewriteContext(LogicalRewriter& rewriter,
+                   const LogicalRewriteType rule,
                    const MemoLogicalNodeId aboveNodeId,
                    const bool hasBelowNodeId,
                    const MemoLogicalNodeId belowNodeId)
@@ -217,7 +224,8 @@ private:
           _hasBelowNodeId(hasBelowNodeId),
           _belowNodeId(belowNodeId),
           _rewriter(rewriter),
-          _hasSubstituted(false){};
+          _hasSubstituted(false),
+          _rule(rule){};
 
     const MemoLogicalNodeId _aboveNodeId;
     const bool _hasBelowNodeId;
@@ -227,6 +235,8 @@ private:
     LogicalRewriter& _rewriter;
 
     bool _hasSubstituted;
+
+    const LogicalRewriteType _rule;
 };
 
 struct ReorderDependencies {
@@ -1382,12 +1392,13 @@ void LogicalRewriter::rewriteGroup(const GroupIdType groupId) {
         // TODO: check if rewriteEntry is different than previous (remove duplicates).
         queue.pop();
 
-        _rewriteMap.at(rewriteEntry._type)(this, rewriteEntry._nodeId);
+        _rewriteMap.at(rewriteEntry._type)(this, rewriteEntry._nodeId, rewriteEntry._type);
     }
 }
 
 template <class AboveType, class BelowType, template <class, class> class R>
-void LogicalRewriter::bindAboveBelow(const MemoLogicalNodeId nodeMemoId) {
+void LogicalRewriter::bindAboveBelow(const MemoLogicalNodeId nodeMemoId,
+                                     const LogicalRewriteType rule) {
     // Get a reference to the node instead of the node itself.
     // Rewrites insert into the memo and can move it.
     ABT::reference_type node = _memo.getNode(nodeMemoId);
@@ -1404,7 +1415,7 @@ void LogicalRewriter::bindAboveBelow(const MemoLogicalNodeId nodeMemoId) {
             const MemoLogicalNodeId targetNodeId{targetGroupId, i};
             auto targetNode = _memo.getNode(targetNodeId);
             if (targetNode.is<BelowType>()) {
-                RewriteContext ctx(*this, nodeMemoId, targetNodeId);
+                RewriteContext ctx(*this, rule, nodeMemoId, targetNodeId);
                 R<AboveType, BelowType>()(node, targetNode, ctx);
                 if (ctx.hasSubstituted()) {
                     return;
@@ -1434,7 +1445,7 @@ void LogicalRewriter::bindAboveBelow(const MemoLogicalNodeId nodeMemoId) {
                                 .template cast<MemoLogicalDelegatorNode>()
                                 ->getGroupId() == currentGroupId);
 
-                RewriteContext ctx(*this, parentNodeId, nodeMemoId);
+                RewriteContext ctx(*this, rule, parentNodeId, nodeMemoId);
                 R<AboveType, BelowType>()(targetNode, node, ctx);
                 if (ctx.hasSubstituted()) {
                     return;
@@ -1445,12 +1456,13 @@ void LogicalRewriter::bindAboveBelow(const MemoLogicalNodeId nodeMemoId) {
 }
 
 template <class Type, template <class> class R>
-void LogicalRewriter::bindSingleNode(const MemoLogicalNodeId nodeMemoId) {
+void LogicalRewriter::bindSingleNode(const MemoLogicalNodeId nodeMemoId,
+                                     const LogicalRewriteType rule) {
     // Get a reference to the node instead of the node itself.
     // Rewrites insert into the memo and can move it.
     ABT::reference_type node = _memo.getNode(nodeMemoId);
     if (node.is<Type>()) {
-        RewriteContext ctx(*this, nodeMemoId);
+        RewriteContext ctx(*this, rule, nodeMemoId);
         R<Type>()(node, ctx);
     }
 }

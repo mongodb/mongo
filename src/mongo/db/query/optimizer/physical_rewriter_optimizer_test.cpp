@@ -30,6 +30,7 @@
 #include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/cascades/ce_hinted.h"
 #include "mongo/db/query/optimizer/cascades/cost_derivation.h"
+#include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/node.h"
@@ -1060,6 +1061,45 @@ TEST(PhysRewriter, FilterIndexing2NonSarg) {
         "        [rid_0]\n"
         "            Source []\n",
         optimized);
+
+    LogicalRewriteType logicalRules[] = {LogicalRewriteType::Root,
+                                         LogicalRewriteType::Root,
+                                         LogicalRewriteType::SargableSplit,
+                                         LogicalRewriteType::SargableSplit,
+                                         LogicalRewriteType::EvaluationRIDIntersectReorder,
+                                         LogicalRewriteType::Root,
+                                         LogicalRewriteType::FilterRIDIntersectReorder,
+                                         LogicalRewriteType::Root,
+                                         LogicalRewriteType::SargableSplit,
+                                         LogicalRewriteType::EvaluationRIDIntersectReorder,
+                                         LogicalRewriteType::FilterRIDIntersectReorder};
+    PhysicalRewriteType physicalRules[] = {PhysicalRewriteType::Seek,
+                                           PhysicalRewriteType::Seek,
+                                           PhysicalRewriteType::RIDIntersectNLJ,
+                                           PhysicalRewriteType::Evaluation,
+                                           PhysicalRewriteType::RIDIntersectNLJ,
+                                           PhysicalRewriteType::Root,
+                                           PhysicalRewriteType::SargableToIndex,
+                                           PhysicalRewriteType::SargableToIndex,
+                                           PhysicalRewriteType::Evaluation,
+                                           PhysicalRewriteType::Evaluation,
+                                           PhysicalRewriteType::Filter};
+
+    int logicalRuleIndex = 0;
+    int physicalRuleIndex = 0;
+    const Memo& memo = phaseManager.getMemo();
+    for (size_t groupId = 0; groupId < memo.getGroupCount(); groupId++) {
+        const Group& group = memo.getGroup(groupId);
+        for (const auto rule : group._rules) {
+            ASSERT(rule == logicalRules[logicalRuleIndex]);
+            logicalRuleIndex++;
+        }
+        for (const auto& physOptResult : group._physicalNodes.getNodes()) {
+            const auto rule = physOptResult->_nodeInfo->_rule;
+            ASSERT(rule == physicalRules[physicalRuleIndex]);
+            physicalRuleIndex++;
+        }
+    }
 }
 
 TEST(PhysRewriter, FilterIndexing3) {

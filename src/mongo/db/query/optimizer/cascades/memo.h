@@ -37,6 +37,8 @@
 #include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/cascades/interfaces.h"
 #include "mongo/db/query/optimizer/cascades/rewrite_queues.h"
+#include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
+#include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
 
 namespace mongo::optimizer::cascades {
@@ -81,6 +83,9 @@ struct PhysNodeInfo {
     // For display purposes, adjusted cardinality based on physical properties (e.g. Repetition and
     // Limit-Skip).
     CEType _adjustedCE;
+
+    // Rule that triggered the creation of this node.
+    PhysicalRewriteType _rule;
 };
 
 struct PhysOptimizationResult {
@@ -141,6 +146,8 @@ struct Group {
 
     // Associated logical nodes.
     OrderPreservingABTSet _logicalNodes;
+    // Rule that triggered each logical node.
+    std::vector<LogicalRewriteType> _rules;
     // Group logical properties.
     properties::LogicalProps _logicalProperties;
     ABT _binder;
@@ -208,11 +215,13 @@ public:
                               GroupIdType targetGroupId,
                               NodeIdSet& insertedNodeIds,
                               ABT n,
+                              LogicalRewriteType rule,
                               bool useHeuristicCE = false);
 
     GroupIdType integrate(const ABT& node,
                           NodeTargetGroupMap targetGroupMap,
                           NodeIdSet& insertedNodeIds,
+                          LogicalRewriteType rule = LogicalRewriteType::Root,
                           bool addExistingNodeWithNewChild = false,
                           bool useHeuristicCE = false);
 
@@ -234,7 +243,7 @@ public:
 private:
     GroupIdType addGroup(ProjectionNameSet projections);
 
-    std::pair<MemoLogicalNodeId, bool> addNode(GroupIdType groupId, ABT n);
+    std::pair<MemoLogicalNodeId, bool> addNode(GroupIdType groupId, ABT n, LogicalRewriteType rule);
 
     std::pair<MemoLogicalNodeId, bool> findNode(const GroupIdVector& groups, const ABT& node);
 

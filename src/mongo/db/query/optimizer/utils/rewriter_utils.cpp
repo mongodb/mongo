@@ -27,46 +27,21 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/query/optimizer/cascades/memo.h"
-#include "mongo/db/query/optimizer/metadata.h"
-#include "mongo/db/query/optimizer/node_defs.h"
-#include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/db/query/optimizer/utils/rewriter_utils.h"
 
 
 namespace mongo::optimizer {
 
-template <class ToAddType, class ToRemoveType>
-static void addRemoveProjectionsToProperties(properties::PhysProps& properties,
-                                             const ToAddType& toAdd,
-                                             const ToRemoveType& toRemove) {
-    ProjectionNameOrderPreservingSet& projections =
-        properties::getProperty<properties::ProjectionRequirement>(properties).getProjections();
-    for (const auto& varName : toRemove) {
-        projections.erase(varName);
-    }
-    for (const auto& varName : toAdd) {
-        projections.emplace_back(varName);
-    }
+ABT wrapConstFilter(ABT node) {
+    return make<FilterNode>(Constant::boolean(true), std::move(node));
 }
 
-template <class ToAddType>
-static void addProjectionsToProperties(properties::PhysProps& properties, const ToAddType& toAdd) {
-    addRemoveProjectionsToProperties(properties, toAdd, ToAddType{});
+ABT unwrapConstFilter(ABT node) {
+    if (auto nodePtr = node.cast<FilterNode>();
+        nodePtr != nullptr && nodePtr->getFilter() == Constant::boolean(true)) {
+        return nodePtr->getChild();
+    }
+    return node;
 }
-
-/**
- * Extracts the "latest" logical plan. Starting from the root group, we follow the last logical
- * nodes.
- */
-ABT extractLatestPlan(const cascades::Memo& memo, GroupIdType rootGroupId);
-
-/**
- * Extracts a complete physical plan by inlining references to MemoPhysicalPlanNode.
- */
-std::pair<ABT, NodeToGroupPropsMap> extractPhysicalPlan(MemoPhysicalNodeId id,
-                                                        const Metadata& metadata,
-                                                        const cascades::Memo& memo);
 
 }  // namespace mongo::optimizer

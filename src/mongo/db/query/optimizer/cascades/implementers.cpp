@@ -29,6 +29,8 @@
 
 #include "mongo/db/query/optimizer/cascades/implementers.h"
 
+#include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
+#include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/utils/ce_math.h"
 #include "mongo/db/query/optimizer/utils/memo_utils.h"
 
@@ -138,15 +140,20 @@ public:
                 make<LimitSkipNode>(LimitSkipRequirement{1, 0}, std::move(physicalSeek));
             nodeCEMap.emplace(limitSkip.cast<Node>(), 1.0);
 
-            optimizeChildrenNoAssert(
-                _queue, kDefaultPriority, std::move(limitSkip), {}, std::move(nodeCEMap));
+            optimizeChildrenNoAssert(_queue,
+                                     kDefaultPriority,
+                                     PhysicalRewriteType::Seek,
+                                     std::move(limitSkip),
+                                     {},
+                                     std::move(nodeCEMap));
         } else {
             if (needsRID) {
                 fieldProjectionMap._ridProjection = ridProjName;
             }
             ABT physicalScan = make<PhysicalScanNode>(
                 std::move(fieldProjectionMap), node.getScanDefName(), canUseParallelScan);
-            optimizeChild<PhysicalScanNode>(_queue, kDefaultPriority, std::move(physicalScan));
+            optimizeChild<PhysicalScanNode, PhysicalRewriteType::PhysicalScan>(
+                _queue, kDefaultPriority, std::move(physicalScan));
         }
     }
 
@@ -216,8 +223,12 @@ public:
             }
         }
 
-        optimizeChildrenNoAssert(
-            _queue, kDefaultPriority, std::move(physNode), {}, std::move(nodeCEMap));
+        optimizeChildrenNoAssert(_queue,
+                                 kDefaultPriority,
+                                 PhysicalRewriteType::ValueScan,
+                                 std::move(physNode),
+                                 {},
+                                 std::move(nodeCEMap));
     }
 
     void operator()(const ABT& /*n*/, const MemoLogicalDelegatorNode& /*node*/) {
@@ -244,7 +255,7 @@ public:
         getProperty<DistributionRequirement>(newProps).setDisableExchanges(true);
 
         ABT physicalFilter = n;
-        optimizeChild<FilterNode>(
+        optimizeChild<FilterNode, PhysicalRewriteType::Filter>(
             _queue, kDefaultPriority, std::move(physicalFilter), std::move(newProps));
     }
 
@@ -285,7 +296,7 @@ public:
             }
 
             ABT physicalEval = n;
-            optimizeChild<EvaluationNode>(
+            optimizeChild<EvaluationNode, PhysicalRewriteType::RenameProjection>(
                 _queue, kDefaultPriority, std::move(physicalEval), std::move(newProps));
             return;
         }
@@ -302,7 +313,8 @@ public:
         if (!propertyAffectsProjection<ProjectionRequirement>(_physProps, projectionName)) {
             // We do not require the projection. Do not place a physical evaluation node and
             // continue optimizing the child.
-            optimizeUnderNewProperties(_queue, kDefaultPriority, node.getChild(), _physProps);
+            optimizeUnderNewProperties<PhysicalRewriteType::EvaluationPassthrough>(
+                _queue, kDefaultPriority, node.getChild(), _physProps);
             return;
         }
 
@@ -322,7 +334,7 @@ public:
         getProperty<DistributionRequirement>(newProps).setDisableExchanges(true);
 
         ABT physicalEval = n;
-        optimizeChild<EvaluationNode>(
+        optimizeChild<EvaluationNode, PhysicalRewriteType::Evaluation>(
             _queue, kDefaultPriority, std::move(physicalEval), std::move(newProps));
     }
 
@@ -557,8 +569,12 @@ public:
                     nodeCEMap.emplace(physNode.cast<Node>(), currentGroupCE);
                 }
 
-                optimizeChildrenNoAssert(
-                    _queue, kDefaultPriority, std::move(physNode), {}, std::move(nodeCEMap));
+                optimizeChildrenNoAssert(_queue,
+                                         kDefaultPriority,
+                                         PhysicalRewriteType::SargableToIndex,
+                                         std::move(physNode),
+                                         {},
+                                         std::move(nodeCEMap));
             }
         } else {
             const auto& scanParams = node.getScanParams();
@@ -590,6 +606,7 @@ public:
             ABT physNode = make<Blackhole>();
             CEType baseCE = 0.0;
 
+            PhysicalRewriteType rule = PhysicalRewriteType::Uninitialized;
             if (indexReqTarget == IndexReqTarget::Complete) {
                 baseCE = scanGroupCE;
 
@@ -597,6 +614,7 @@ public:
                 physNode = make<PhysicalScanNode>(
                     std::move(fieldProjectionMap), scanDefName, canUseParallelScan);
                 nodeCEMap.emplace(physNode.cast<Node>(), baseCE);
+                rule = PhysicalRewriteType::SargableToPhysicalScan;
             } else {
                 baseCE = 1.0;
 
@@ -606,6 +624,7 @@ public:
 
                 physNode = make<LimitSkipNode>(LimitSkipRequirement{1, 0}, std::move(physNode));
                 nodeCEMap.emplace(physNode.cast<Node>(), baseCE);
+                rule = PhysicalRewriteType::SargableToSeek;
             }
 
             ResidualRequirementsWithCE residualReqsWithCE;
@@ -617,7 +636,7 @@ public:
             lowerPartialSchemaRequirements(
                 baseCE, {} /*indexPredSels*/, residualReqsWithCE, physNode, nodeCEMap);
             optimizeChildrenNoAssert(
-                _queue, kDefaultPriority, std::move(physNode), {}, std::move(nodeCEMap));
+                _queue, kDefaultPriority, rule, std::move(physNode), {}, std::move(nodeCEMap));
         }
     }
 
@@ -898,7 +917,7 @@ public:
         ABT physicalJoin = n;
         BinaryJoinNode& newNode = *physicalJoin.cast<BinaryJoinNode>();
 
-        optimizeChildren<BinaryJoinNode>(
+        optimizeChildren<BinaryJoinNode, PhysicalRewriteType::NLJ>(
             _queue,
             kDefaultPriority,
             std::move(physicalJoin),
@@ -929,7 +948,7 @@ public:
             childProps.emplace_back(&child, std::move(newProps));
         }
 
-        optimizeChildren<UnionNode>(
+        optimizeChildren<UnionNode, PhysicalRewriteType::Union>(
             _queue, kDefaultPriority, std::move(physicalUnion), std::move(childProps));
     }
 
@@ -1039,7 +1058,7 @@ public:
                                                 std::move(aggregationProjections),
                                                 node.getType(),
                                                 node.getChild());
-        optimizeChild<GroupByNode>(
+        optimizeChild<GroupByNode, PhysicalRewriteType::HashGroup>(
             _queue, kDefaultPriority, std::move(physicalGroupBy), std::move(newProps));
     }
 
@@ -1072,7 +1091,7 @@ public:
         getProperty<DistributionRequirement>(newProps).setDisableExchanges(false);
 
         ABT physicalUnwind = n;
-        optimizeChild<UnwindNode>(
+        optimizeChild<UnwindNode, PhysicalRewriteType::Unwind>(
             _queue, kDefaultPriority, std::move(physicalUnwind), std::move(newProps));
     }
 
@@ -1085,7 +1104,9 @@ public:
             return;
         }
 
-        optimizeSimplePropertyNode<CollationNode, CollationRequirement>(node);
+        optimizeSimplePropertyNode<CollationNode,
+                                   CollationRequirement,
+                                   PhysicalRewriteType::Collation>(node);
     }
 
     void operator()(const ABT& /*n*/, const LimitSkipNode& node) {
@@ -1110,11 +1131,14 @@ public:
         setPropertyOverwrite<LimitSkipRequirement>(newProps, std::move(newProp));
         getProperty<DistributionRequirement>(newProps).setDisableExchanges(false);
 
-        optimizeUnderNewProperties(_queue, kDefaultPriority, node.getChild(), std::move(newProps));
+        optimizeUnderNewProperties<PhysicalRewriteType::LimitSkip>(
+            _queue, kDefaultPriority, node.getChild(), std::move(newProps));
     }
 
     void operator()(const ABT& /*n*/, const ExchangeNode& node) {
-        optimizeSimplePropertyNode<ExchangeNode, DistributionRequirement>(node);
+        optimizeSimplePropertyNode<ExchangeNode,
+                                   DistributionRequirement,
+                                   PhysicalRewriteType::Exchange>(node);
     }
 
     void operator()(const ABT& n, const RootNode& node) {
@@ -1132,7 +1156,8 @@ public:
         getProperty<DistributionRequirement>(newProps).setDisableExchanges(false);
 
         ABT rootNode = n;
-        optimizeChild<RootNode>(_queue, kDefaultPriority, std::move(rootNode), std::move(newProps));
+        optimizeChild<RootNode, PhysicalRewriteType::Root>(
+            _queue, kDefaultPriority, std::move(rootNode), std::move(newProps));
     }
 
     template <typename T>
@@ -1156,14 +1181,15 @@ public:
           _logicalProps(logicalProps) {}
 
 private:
-    template <class NodeType, class PropType>
+    template <class NodeType, class PropType, PhysicalRewriteType rule>
     void optimizeSimplePropertyNode(const NodeType& node) {
         const PropType& nodeProp = node.getProperty();
         PhysProps newProps = _physProps;
         setPropertyOverwrite<PropType>(newProps, nodeProp);
 
         getProperty<DistributionRequirement>(newProps).setDisableExchanges(false);
-        optimizeUnderNewProperties(_queue, kDefaultPriority, node.getChild(), std::move(newProps));
+        optimizeUnderNewProperties<rule>(
+            _queue, kDefaultPriority, node.getChild(), std::move(newProps));
     }
 
     struct IndexAvailableDirections {
@@ -1441,6 +1467,7 @@ private:
                                                           childProps);
                 optimizeChildrenNoAssert(_queue,
                                          kDefaultPriority,
+                                         PhysicalRewriteType::RIDIntersectMergeJoin,
                                          std::move(physNode),
                                          std::move(childProps),
                                          std::move(nodeCEMap));
@@ -1476,6 +1503,7 @@ private:
                                                              childProps);
                     optimizeChildrenNoAssert(_queue,
                                              kDefaultPriority,
+                                             PhysicalRewriteType::RIDIntersectHashJoin,
                                              std::move(physNode),
                                              std::move(childProps),
                                              std::move(nodeCEMap));
@@ -1510,6 +1538,7 @@ private:
                                                             childProps);
                     optimizeChildrenNoAssert(_queue,
                                              kDefaultPriority,
+                                             PhysicalRewriteType::RIDIntersectGroupBy,
                                              std::move(physNode),
                                              std::move(childProps),
                                              std::move(nodeCEMap));
@@ -1527,11 +1556,12 @@ private:
             setCollationForRIDIntersect(
                 collationLeftRightSplit, leftPhysPropsLocal, rightPhysPropsLocal);
 
-            optimizeChildren<BinaryJoinNode>(_queue,
-                                             kDefaultPriority,
-                                             std::move(physicalJoin),
-                                             std::move(leftPhysPropsLocal),
-                                             std::move(rightPhysPropsLocal));
+            optimizeChildren<BinaryJoinNode, PhysicalRewriteType::RIDIntersectNLJ>(
+                _queue,
+                kDefaultPriority,
+                std::move(physicalJoin),
+                std::move(leftPhysPropsLocal),
+                std::move(rightPhysPropsLocal));
         }
     }
 

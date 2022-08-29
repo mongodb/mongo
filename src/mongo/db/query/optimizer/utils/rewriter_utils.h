@@ -29,44 +29,12 @@
 
 #pragma once
 
-#include "mongo/db/query/optimizer/cascades/memo.h"
-#include "mongo/db/query/optimizer/metadata.h"
-#include "mongo/db/query/optimizer/node_defs.h"
-#include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/db/query/optimizer/node.h"
 
 
 namespace mongo::optimizer {
 
-template <class ToAddType, class ToRemoveType>
-static void addRemoveProjectionsToProperties(properties::PhysProps& properties,
-                                             const ToAddType& toAdd,
-                                             const ToRemoveType& toRemove) {
-    ProjectionNameOrderPreservingSet& projections =
-        properties::getProperty<properties::ProjectionRequirement>(properties).getProjections();
-    for (const auto& varName : toRemove) {
-        projections.erase(varName);
-    }
-    for (const auto& varName : toAdd) {
-        projections.emplace_back(varName);
-    }
-}
-
-template <class ToAddType>
-static void addProjectionsToProperties(properties::PhysProps& properties, const ToAddType& toAdd) {
-    addRemoveProjectionsToProperties(properties, toAdd, ToAddType{});
-}
-
-/**
- * Extracts the "latest" logical plan. Starting from the root group, we follow the last logical
- * nodes.
- */
-ABT extractLatestPlan(const cascades::Memo& memo, GroupIdType rootGroupId);
-
-/**
- * Extracts a complete physical plan by inlining references to MemoPhysicalPlanNode.
- */
-std::pair<ABT, NodeToGroupPropsMap> extractPhysicalPlan(MemoPhysicalNodeId id,
-                                                        const Metadata& metadata,
-                                                        const cascades::Memo& memo);
+ABT wrapConstFilter(ABT node);
+ABT unwrapConstFilter(ABT node);
 
 }  // namespace mongo::optimizer

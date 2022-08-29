@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/optimizer/cascades/enforcers.h"
 
+#include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
 #include "mongo/db/query/optimizer/utils/memo_utils.h"
 
 namespace mongo::optimizer::cascades {
@@ -107,7 +108,7 @@ public:
         }
 
         ABT enforcer = make<CollationNode>(prop, make<MemoLogicalDelegatorNode>(_groupId));
-        optimizeChild<CollationNode>(
+        optimizeChild<CollationNode, PhysicalRewriteType::EnforceCollation>(
             _queue, kDefaultPriority, std::move(enforcer), std::move(childProps));
     }
 
@@ -127,7 +128,7 @@ public:
             childProps, LimitEstimate{static_cast<CEType>(prop.getAbsoluteLimit())});
 
         ABT enforcer = make<LimitSkipNode>(prop, make<MemoLogicalDelegatorNode>(_groupId));
-        optimizeChild<LimitSkipNode>(
+        optimizeChild<LimitSkipNode, PhysicalRewriteType::EnforceLimitSkip>(
             _queue, kDefaultPriority, std::move(enforcer), std::move(childProps));
     }
 
@@ -181,7 +182,7 @@ public:
             getProperty<DistributionRequirement>(childProps).setDisableExchanges(true);
 
             ABT enforcer = make<ExchangeNode>(prop, make<MemoLogicalDelegatorNode>(_groupId));
-            optimizeChild<ExchangeNode>(
+            optimizeChild<ExchangeNode, PhysicalRewriteType::EnforceDistribution>(
                 _queue, kDefaultPriority, std::move(enforcer), std::move(childProps));
         }
     }
@@ -237,10 +238,11 @@ public:
                                                        prop.getDedupRID(),
                                                        prop.getSatisfiedPartialIndexesGroupId()});
 
-            optimizeUnderNewProperties(_queue,
-                                       kDefaultPriority,
-                                       make<MemoLogicalDelegatorNode>(_groupId),
-                                       std::move(newProps));
+            optimizeUnderNewProperties<PhysicalRewriteType::AttemptCoveringQuery>(
+                _queue,
+                kDefaultPriority,
+                make<MemoLogicalDelegatorNode>(_groupId),
+                std::move(newProps));
         }
     }
 

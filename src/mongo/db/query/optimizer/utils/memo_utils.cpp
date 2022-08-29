@@ -34,18 +34,6 @@
 
 namespace mongo::optimizer {
 
-ABT wrapConstFilter(ABT node) {
-    return make<FilterNode>(Constant::boolean(true), std::move(node));
-}
-
-ABT unwrapConstFilter(ABT node) {
-    if (auto nodePtr = node.cast<FilterNode>();
-        nodePtr != nullptr && nodePtr->getFilter() == Constant::boolean(true)) {
-        return nodePtr->getChild();
-    }
-    return node;
-}
-
 class MemoLatestPlanExtractor {
 public:
     explicit MemoLatestPlanExtractor(const cascades::Memo& memo) : _memo(memo) {}

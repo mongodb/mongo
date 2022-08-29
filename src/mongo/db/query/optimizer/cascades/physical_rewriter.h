@@ -72,6 +72,7 @@ private:
     void costAndRetainBestNode(ABT node,
                                ChildPropsType childProps,
                                NodeCEMap nodeCEMap,
+                               PhysicalRewriteType rule,
                                GroupIdType groupId,
                                PrefixId& prefixId,
                                PhysOptimizationResult& bestResult);
