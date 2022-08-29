@@ -81,6 +81,20 @@ void MongoDSessionCatalogTransactionInterfaceImpl::abortTransaction(
     opCtx->resetMultiDocumentTransactionState();
 }
 
+void MongoDSessionCatalogTransactionInterfaceImpl::refreshLocksForPreparedTransaction(
+    OperationContext* opCtx, const OperationSessionInfo& sessionInfo) {
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    LOGV2_DEBUG(21979,
+                3,
+                "Restoring locks of prepared transaction. SessionId: {sessionId} "
+                "TxnNumberAndRetryCounter: {txnNumberAndRetryCounter}",
+                "Restoring locks of prepared transaction",
+                "sessionId"_attr = sessionInfo.getSessionId()->getId(),
+                "txnNumberAndRetryCounter"_attr =
+                    txnParticipant.getActiveTxnNumberAndRetryCounter());
+    txnParticipant.refreshLocksForPreparedTransaction(opCtx, /*yieldLocks=*/false);
+}
+
 void MongoDSessionCatalogTransactionInterfaceImpl::invalidateSessionToKill(
     OperationContext* opCtx, const SessionToKill& session) {
     auto participant = TransactionParticipant::get(session);

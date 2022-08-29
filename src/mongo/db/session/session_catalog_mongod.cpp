@@ -551,16 +551,7 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
             //   lock in the IS mode prior to reading the config.transactions collection but it
             //   cannot do that while the RSTL lock is being held by 'opCtx'.
             auto ocs = checkOutSessionWithoutRefresh(newOpCtx.get());
-            auto txnParticipant = TransactionParticipant::get(newOpCtx.get());
-            LOGV2_DEBUG(21979,
-                        3,
-                        "Restoring locks of prepared transaction. SessionId: {sessionId} "
-                        "TxnNumberAndRetryCounter: {txnNumberAndRetryCounter}",
-                        "Restoring locks of prepared transaction",
-                        "sessionId"_attr = sessionInfo.getSessionId()->getId(),
-                        "txnNumberAndRetryCounter"_attr =
-                            txnParticipant.getActiveTxnNumberAndRetryCounter());
-            txnParticipant.refreshLocksForPreparedTransaction(newOpCtx.get(), false);
+            _ti->refreshLocksForPreparedTransaction(newOpCtx.get(), sessionInfo);
         }
     }
 

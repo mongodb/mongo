@@ -30,7 +30,8 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/session/logical_session_id.h"  // for TxnNumberAndRetryCounter
+#include "mongo/db/session/logical_session_id.h"      // for TxnNumberAndRetryCounter
+#include "mongo/db/session/logical_session_id_gen.h"  // for OperationSessionInfo
 #include "mongo/db/session/session_catalog.h"  // for ObservableSession and ScanSessionsCallbackFn
 #include "mongo/db/session/session_txn_record_gen.h"       // for SessionTxnRecord
 #include "mongo/db/transaction/transaction_participant.h"  // for SessionToKill
@@ -87,6 +88,12 @@ public:
      * Aborts the transaction, releasing transaction resources.
      */
     virtual void abortTransaction(OperationContext* opCtx, const SessionTxnRecord& txnRecord) = 0;
+
+    /**
+     * Yield or reacquire locks for prepared transactions, used on replication state transition.
+     */
+    virtual void refreshLocksForPreparedTransaction(OperationContext* opCtx,
+                                                    const OperationSessionInfo& sessionInfo) = 0;
 
     /**
      * Marks the session as requiring refresh. Used when the session state has been modified

@@ -60,6 +60,9 @@ public:
 
     void abortTransaction(OperationContext* opCtx, const SessionTxnRecord& txnRecord) override;
 
+    void refreshLocksForPreparedTransaction(OperationContext* opCtx,
+                                            const OperationSessionInfo& sessionInfo) override;
+
     void invalidateSessionToKill(OperationContext* opCtx, const SessionToKill& session) override;
 
     ScanSessionsCallbackFn makeParentSessionWorkerFnForReap(
