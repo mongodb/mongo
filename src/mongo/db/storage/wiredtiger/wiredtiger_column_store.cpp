@@ -173,7 +173,7 @@ void WiredTigerColumnStore::WriteCursor::insert(PathView path, RowId rid, CellVi
     int ret = WT_OP_CHECK(wiredTigerCursorInsert(_opCtx, c()));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-    metricsCollector.incrementOneIdxEntryWritten(std::string(c()->uri), keyItem.size);
+    metricsCollector.incrementOneIdxEntryWritten(c()->uri, keyItem.size);
 
     // TODO: SERVER-65978, we may have to specially handle WT_DUPLICATE_KEY error here.
     if (ret) {
@@ -197,7 +197,7 @@ void WiredTigerColumnStore::WriteCursor::remove(PathView path, RowId rid) {
     invariantWTOK(ret, c()->session);
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-    metricsCollector.incrementOneIdxEntryWritten(std::string(c()->uri), keyItem.size);
+    metricsCollector.incrementOneIdxEntryWritten(c()->uri, keyItem.size);
 }
 void WiredTigerColumnStore::update(OperationContext* opCtx,
                                    PathView path,
@@ -217,7 +217,7 @@ void WiredTigerColumnStore::WriteCursor::update(PathView path, RowId rid, CellVi
     int ret = WT_OP_CHECK(wiredTigerCursorUpdate(_opCtx, c()));
 
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-    metricsCollector.incrementOneIdxEntryWritten(std::string(c()->uri), keyItem.size);
+    metricsCollector.incrementOneIdxEntryWritten(c()->uri, keyItem.size);
 
     // TODO: SERVER-65978, may want to handle WT_NOTFOUND specially.
     if (ret != 0)
@@ -321,7 +321,7 @@ private:
         invariantWTOK(ret, c->session);
 
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-        metricsCollector.incrementOneCursorSeek(std::string(c->uri));
+        metricsCollector.incrementOneCursorSeek(c->uri);
 
         _eof = false;
 
@@ -398,7 +398,7 @@ public:
         invariantWTOK(wiredTigerCursorInsert(_opCtx, _cursor.get()), _cursor->session);
 
         ResourceConsumption::MetricsCollector::get(_opCtx).incrementOneIdxEntryWritten(
-            std::string(_cursor->uri), keyItem.size);
+            _cursor->uri, keyItem.size);
     }
 
 private:

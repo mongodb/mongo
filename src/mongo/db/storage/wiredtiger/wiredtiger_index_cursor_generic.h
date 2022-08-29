@@ -90,7 +90,7 @@ protected:
         invariantWTOK(cursor->get_key(cursor, key), cursor->session);
 
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
-        metricsCollector.incrementOneIdxEntryRead(std::string(cursor->internal_uri), key->size);
+        metricsCollector.incrementOneIdxEntryRead(cursor->internal_uri, key->size);
     }
 
     OperationContext* _opCtx;
