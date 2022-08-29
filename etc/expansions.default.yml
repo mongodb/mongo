@@ -37,5 +37,4 @@ install_directory: /data/mongo-install-directory
 num_scons_link_jobs_available: "0.25"
 scons_cache_mode: nolinked
 show_scons_timings: "true"
-task_install_action: hardlink
 separate_debug: "on"
