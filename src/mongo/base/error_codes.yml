@@ -489,6 +489,8 @@ error_codes:
     - {code: 377, name: FLEMaxTagLimitExceeded }
     - {code: 378, name: NonConformantBSON, categories: [ValidationError]}
 
+    - {code: 379, name: DatabaseMetadataRefreshCanceled, categories: [InternalOnly]}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

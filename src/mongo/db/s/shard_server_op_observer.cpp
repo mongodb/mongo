@@ -414,8 +414,13 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
             // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can
             // block.
             AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
+
             AutoGetDb autoDb(opCtx, DatabaseName(boost::none, db), MODE_X);
             DatabaseHolder::get(opCtx)->clearDbInfo(opCtx, DatabaseName(boost::none, db));
+
+            auto* dss = DatabaseShardingState::get(opCtx, db);
+            const auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
+            dss->cancelDbMetadataRefresh(dssLock);
         }
     }
 
@@ -526,8 +531,13 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
 
         // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can block.
         AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
+
         AutoGetDb autoDb(opCtx, DatabaseName(boost::none, deletedDatabase), MODE_X);
         DatabaseHolder::get(opCtx)->clearDbInfo(opCtx, DatabaseName(boost::none, deletedDatabase));
+
+        auto* dss = DatabaseShardingState::get(opCtx, deletedDatabase);
+        const auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
+        dss->cancelDbMetadataRefresh(dssLock);
     }
 
     if (nss == NamespaceString::kServerConfigurationNamespace) {

@@ -330,7 +330,7 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
 
 Status MovePrimarySourceManager::_commitOnConfig(OperationContext* opCtx,
                                                  const DatabaseVersion& expectedDbVersion) {
-    LOGV2_DEBUG(6697200,
+    LOGV2_DEBUG(6854100,
                 3,
                 "Committing movePrimary",
                 "db"_attr = _dbname,
@@ -355,7 +355,7 @@ Status MovePrimarySourceManager::_commitOnConfig(OperationContext* opCtx,
             return status;
         }
 
-        LOGV2(6697201,
+        LOGV2(6854101,
               "_configsvrCommitMovePrimary command not found on config server, so try to update "
               "the metadata document directly",
               "db"_attr = _dbname);
@@ -366,7 +366,7 @@ Status MovePrimarySourceManager::_commitOnConfig(OperationContext* opCtx,
     }();
 
     if (!commitStatus.isOK()) {
-        LOGV2(6697202,
+        LOGV2(6854102,
               "Error committing movePrimary",
               "db"_attr = _dbname,
               "error"_attr = redact(commitStatus));
@@ -398,7 +398,7 @@ Status MovePrimarySourceManager::_commitOnConfig(OperationContext* opCtx,
             "Error committing movePrimary: update of config.databases failed",
             updatedDbType.getPrimary() != _fromShard);
 
-    LOGV2_DEBUG(6697203,
+    LOGV2_DEBUG(6854103,
                 3,
                 "Commited movePrimary",
                 "db"_attr = _dbname,

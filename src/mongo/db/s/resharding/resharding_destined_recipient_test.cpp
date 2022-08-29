@@ -237,7 +237,7 @@ protected:
             createChunks(env.version.epoch(), env.sourceUuid, env.version.getTimestamp(), "y"),
             boost::none);
 
-        forceDatabaseRefresh(opCtx, kNss.db());
+        ASSERT_OK(onDbVersionMismatchNoExcept(opCtx, kNss.db(), boost::none));
         forceShardFilteringMetadataRefresh(opCtx, kNss);
 
         if (refreshTempNss)

@@ -172,6 +172,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/query/cluster_aggregate',
         '$BUILD_DIR/mongo/s/sharding_api',
         '$BUILD_DIR/mongo/s/sharding_initialization',
+        'forwardable_operation_metadata',
         'sharding_api_d',
         'sharding_catalog_manager',
         'transaction_coordinator',
