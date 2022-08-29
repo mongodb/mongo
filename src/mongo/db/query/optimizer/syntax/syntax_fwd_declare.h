@@ -98,4 +98,7 @@ class RootNode;
  */
 class References;
 class ExpressionBinder;
+
+class PathSyntaxSort;
+class ExpressionSyntaxSort;
 }  // namespace mongo::optimizer

@@ -107,7 +107,7 @@ public:
     // The default noop transport.
     template <typename T, typename... Ts>
     std::unique_ptr<sbe::PlanStage> walk(const T&, Ts&&...) {
-        if constexpr (std::is_base_of_v<LogicalNode, T>) {
+        if constexpr (std::is_base_of_v<ExclusivelyLogicalNode, T>) {
             uasserted(6624238, "A physical plan should not contain exclusively logical nodes.");
         }
         return nullptr;

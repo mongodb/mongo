@@ -47,6 +47,10 @@ static ABT buildSimpleBinder(const ProjectionNameVector& names) {
     return make<ExpressionBinder>(names, std::move(sources));
 }
 
+/**
+ * Builds References from the provided projection names. Equality of References is sensitive
+ * to order, so the projections are sorted first.
+ */
 static ABT buildReferences(const ProjectionNameSet& projections) {
     ABTVector variables;
     ProjectionNameOrderedSet ordered = convertToOrderedSet(projections);
@@ -123,19 +127,24 @@ ValueScanNode::ValueScanNode(ProjectionNameVector projections)
 ValueScanNode::ValueScanNode(ProjectionNameVector projections, ABT valueArray)
     : Base(buildSimpleBinder(std::move(projections))), _valueArray(std::move(valueArray)) {
     const auto constPtr = _valueArray.cast<Constant>();
-    uassert(6624081, "Expected a constant", constPtr != nullptr);
+    tassert(6624081, "ValueScan must be intialized with a constant", constPtr != nullptr);
 
     const auto [tag, val] = constPtr->get();
-    uassert(6624082, "Expected an array constant.", tag == sbe::value::TypeTags::Array);
+    tassert(
+        6624082, "ValueScan must be intialized with an array", tag == sbe::value::TypeTags::Array);
 
     const auto arr = sbe::value::getArrayView(val);
     _arraySize = arr->size();
     const size_t projectionCount = binder().names().size();
     for (size_t i = 0; i < _arraySize; i++) {
         const auto [tag1, val1] = arr->getAt(i);
-        uassert(6624083, "Expected an array element.", tag1 == sbe::value::TypeTags::Array);
+        tassert(6624083,
+                "ValueScan must be intialized with an array",
+                tag1 == sbe::value::TypeTags::Array);
         const size_t innerSize = sbe::value::getArrayView(val1)->size();
-        uassert(6624084, "Invalid array size.", innerSize == projectionCount);
+        tassert(6624084,
+                "Element of array must have one entry per projection",
+                innerSize == projectionCount);
     }
 }
 
@@ -339,25 +348,30 @@ SargableNode::SargableNode(PartialSchemaRequirements reqMap,
       _scanParams(std::move(scanParams)),
       _target(target) {
     assertNodeSort(getChild());
-    uassert(6624085, "Empty requirements map", !_reqMap.empty());
-    // We currently use a 64-bit mask when splitting into left and right requirements.
-    uassert(6624086, "Requirements map too large", _reqMap.size() < 64);
+    tassert(6624085, "SargableNode requires at least one predicate", !_reqMap.empty());
+    tassert(6624086,
+            str::stream() << "SargableNode has too many predicates: " << _reqMap.size(),
+            _reqMap.size() < kMaxPartialSchemaRequirements);
 
     // Assert merged map does not contain duplicate bound projections.
     ProjectionNameSet boundsProjectionNameSet;
     for (const auto& entry : _reqMap) {
-        if (entry.second.hasBoundProjectionName() &&
-            !boundsProjectionNameSet.insert(entry.second.getBoundProjectionName()).second) {
-            uasserted(6624087, "Duplicate bound projection");
+        if (entry.second.hasBoundProjectionName()) {
+            const bool inserted =
+                boundsProjectionNameSet.insert(entry.second.getBoundProjectionName()).second;
+            tassert(6624087,
+                    str::stream() << "SargableNode has duplicate bound projection: "
+                                  << entry.second.getBoundProjectionName(),
+                    inserted);
         }
     }
 
     // Assert there are no references to internally bound projections.
     for (const auto& entry : _reqMap) {
-        if (boundsProjectionNameSet.find(entry.first._projectionName) !=
-            boundsProjectionNameSet.cend()) {
-            uasserted(6624088, "We are binding to an internal projection");
-        }
+        tassert(6624088,
+                "SargableNode cannot reference an internally bound projection",
+                boundsProjectionNameSet.find(entry.first._projectionName) ==
+                    boundsProjectionNameSet.cend());
     }
 }
 
@@ -454,8 +468,9 @@ HashJoinNode::HashJoinNode(JoinType joinType,
       _joinType(joinType),
       _leftKeys(std::move(leftKeys)),
       _rightKeys(std::move(rightKeys)) {
-    uassert(
-        6624089, "Invalid key sizes", !_leftKeys.empty() && _leftKeys.size() == _rightKeys.size());
+    tassert(6624089,
+            "Mismatched number of left and right join keys",
+            !_leftKeys.empty() && _leftKeys.size() == _rightKeys.size());
     assertNodeSort(getLeftChild());
     assertNodeSort(getRightChild());
 }
@@ -505,9 +520,11 @@ MergeJoinNode::MergeJoinNode(ProjectionNameVector leftKeys,
       _collation(std::move(collation)),
       _leftKeys(std::move(leftKeys)),
       _rightKeys(std::move(rightKeys)) {
-    uassert(
-        6624090, "Invalid key sizes", !_leftKeys.empty() && _leftKeys.size() == _rightKeys.size());
-    uassert(6624091, "Invalid collation size", _collation.size() == _leftKeys.size());
+    tassert(6624090,
+            "Mismatched number of left and right join keys",
+            !_leftKeys.empty() && _leftKeys.size() == _rightKeys.size());
+    tassert(
+        6624091, "Mismatched collation and join key size", _collation.size() == _leftKeys.size());
     assertNodeSort(getLeftChild());
     assertNodeSort(getRightChild());
 }
@@ -567,7 +584,8 @@ UnionNode::UnionNode(ProjectionNameVector unionProjectionNames, ABTVector childr
     : Base(std::move(children),
            buildSimpleBinder(unionProjectionNames),
            buildUnionReferences(unionProjectionNames, children.size())) {
-    uassert(6624007, "Empty union", !unionProjectionNames.empty());
+    tassert(
+        6624007, "UnionNode must have a non-empty projection list", !unionProjectionNames.empty());
 
     for (auto& n : nodes()) {
         assertNodeSort(n);
@@ -600,8 +618,8 @@ GroupByNode::GroupByNode(ProjectionNameVector groupByProjectionNames,
            make<References>(groupByProjectionNames)),
       _type(type) {
     assertNodeSort(getChild());
-    uassert(6624300,
-            "Mismatched number of agg expressions and names",
+    tassert(6624300,
+            "Mismatched number of agg expressions and projection names",
             getAggregationExpressions().size() == getAggregationProjectionNames().size());
 }
 
@@ -660,7 +678,7 @@ UniqueNode::UniqueNode(ProjectionNameVector projections, ABT child)
     : Base(std::move(child), make<References>(ProjectionNameVector{projections})),
       _projections(std::move(projections)) {
     assertNodeSort(getChild());
-    uassert(6624092, "Empty projections", !_projections.empty());
+    tassert(6624092, "UniqueNode must have a non-empty projection list", !_projections.empty());
 }
 
 bool UniqueNode::operator==(const UniqueNode& other) const {
@@ -731,7 +749,7 @@ ExchangeNode::ExchangeNode(const properties::DistributionRequirement distributio
     : Base(std::move(child), buildReferences(distribution.getAffectedProjectionNames())),
       _distribution(std::move(distribution)) {
     assertNodeSort(getChild());
-    uassert(6624008,
+    tassert(6624008,
             "Cannot exchange towards an unknown distribution",
             distribution.getDistributionAndProjections()._type !=
                 DistributionType::UnknownPartitioning);

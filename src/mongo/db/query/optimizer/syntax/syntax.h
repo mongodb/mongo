@@ -92,14 +92,13 @@ using ABT = algebra::PolyValue<Blackhole,
                                References,  // utilities
                                ExpressionBinder>;
 
-template <typename Derived, size_t Arity>
+template <size_t Arity>
 using Operator = algebra::OpSpecificArity<ABT, Arity>;
 
-template <typename Derived, size_t Arity>
+template <size_t Arity>
 using OperatorDynamic = algebra::OpSpecificDynamicArity<ABT, Arity>;
 
-template <typename Derived>
-using OperatorDynamicHomogenous = OperatorDynamic<Derived, 0>;
+using OperatorDynamicHomogenous = OperatorDynamic<0>;
 
 using ABTVector = std::vector<ABT>;
 
@@ -115,20 +114,12 @@ inline auto makeSeq(Args&&... args) {
     return seq;
 }
 
-class ExpressionSyntaxSort {};
-
-class PathSyntaxSort {};
-
 inline void assertExprSort(const ABT& e) {
-    if (!e.is<ExpressionSyntaxSort>()) {
-        uasserted(6624058, "expression syntax sort expected");
-    }
+    tassert(6624058, "expression syntax sort expected", e.is<ExpressionSyntaxSort>());
 }
 
 inline void assertPathSort(const ABT& e) {
-    if (!e.is<PathSyntaxSort>()) {
-        uasserted(6624059, "path syntax sort expected");
-    }
+    tassert(6624059, "path syntax sort expected", e.is<PathSyntaxSort>());
 }
 
 inline bool operator!=(const ABT& left, const ABT& right) {
@@ -172,6 +163,22 @@ inline constexpr bool isBinaryOp(Operations op) {
     return !isUnaryOp(op);
 }
 
+inline constexpr bool isComparisonOp(Operations op) {
+    switch (op) {
+        case Operations::Eq:
+        case Operations::EqMember:
+        case Operations::Neq:
+        case Operations::Gt:
+        case Operations::Gte:
+        case Operations::Lt:
+        case Operations::Lte:
+        case Operations::Cmp3w:
+            return true;
+        default:
+            return false;
+    }
+}
+
 inline constexpr Operations reverseComparisonOp(Operations op) {
     switch (op) {
         case Operations::Eq:
@@ -196,7 +203,7 @@ inline constexpr Operations reverseComparisonOp(Operations op) {
  * This is a special inert ABT node. It is used by rewriters to preserve structural properties of
  * nodes during in-place rewriting.
  */
-class Blackhole final : public Operator<Blackhole, 0> {
+class Blackhole final : public Operator<0> {
 public:
     bool operator==(const Blackhole& other) const {
         return true;
@@ -214,11 +221,11 @@ public:
  * the optimizer developers.
  * On the other hand using Variables everywhere makes writing code more verbose, hence this helper.
  */
-class References final : public OperatorDynamicHomogenous<References> {
-    using Base = OperatorDynamicHomogenous<References>;
+class References final : public OperatorDynamicHomogenous {
+    using Base = OperatorDynamicHomogenous;
 
 public:
-    /*
+    /**
      * Construct Variable objects out of provided vector of strings.
      */
     References(const std::vector<std::string>& names) : Base(ABTVector{}) {
@@ -228,7 +235,7 @@ public:
         }
     }
 
-    /*
+    /**
      * Alternatively, construct references out of provided ABTs. This may be useful when the
      * internal references are more complex then a simple string. We may consider e.g. GROUP BY
      * (a+b).
@@ -245,12 +252,12 @@ public:
 };
 
 /**
- * This class represents a unified way of binding identifiers to expressions. Every ABT node that
- * introduces a new identifier must use this binder (i.e. all relational nodes adding new
- * projections and expression nodes adding new local variables).
+ * This class represents a unified way of binding identifiers (strings) to expressions. Every ABT
+ * node that introduces a new identifier must use this binder (i.e. all relational nodes adding new
+ * projections).
  */
-class ExpressionBinder : public OperatorDynamicHomogenous<ExpressionBinder> {
-    using Base = OperatorDynamicHomogenous<ExpressionBinder>;
+class ExpressionBinder : public OperatorDynamicHomogenous {
+    using Base = OperatorDynamicHomogenous;
     std::vector<std::string> _names;
 
 public:

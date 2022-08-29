@@ -627,7 +627,7 @@ GroupIdType Memo::addGroup(ProjectionNameSet projections) {
 std::pair<MemoLogicalNodeId, bool> Memo::addNode(GroupIdType groupId,
                                                  ABT n,
                                                  LogicalRewriteType rule) {
-    uassert(6624052, "Attempting to insert a physical node", !n.is<PhysicalNode>());
+    uassert(6624052, "Attempting to insert a physical node", !n.is<ExclusivelyPhysicalNode>());
     uassert(6624053,
             "Attempting to insert a logical delegator node",
             !n.is<MemoLogicalDelegatorNode>());

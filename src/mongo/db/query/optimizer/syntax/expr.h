@@ -37,7 +37,15 @@
 
 namespace mongo::optimizer {
 
-class Constant final : public Operator<Constant, 0>, public ExpressionSyntaxSort {
+/**
+ * Marker class for expressions. Mutually exclusive with paths and nodes.
+ */
+class ExpressionSyntaxSort {};
+
+/**
+ * Holds a constant SBE value with corresponding type tag.
+ */
+class Constant final : public Operator<0>, public ExpressionSyntaxSort {
 public:
     Constant(sbe::value::TypeTags tag, sbe::value::Value val);
 
@@ -113,7 +121,12 @@ private:
     sbe::value::Value _val;
 };
 
-class Variable final : public Operator<Variable, 0>, public ExpressionSyntaxSort {
+/**
+ * Represents a reference to a binding. The binding is specified by identifier (string). The logic
+ * for checking that the reference is valid (e.g., that the referenced binding is in scope) happens
+ * elsewhere.
+ */
+class Variable final : public Operator<0>, public ExpressionSyntaxSort {
     std::string _name;
 
 public:
@@ -128,12 +141,16 @@ public:
     }
 };
 
-class UnaryOp final : public Operator<UnaryOp, 1>, public ExpressionSyntaxSort {
-    using Base = Operator<UnaryOp, 1>;
+/**
+ * Models arithmetic and other operations that accept a single argument, for instance negate.
+ */
+class UnaryOp final : public Operator<1>, public ExpressionSyntaxSort {
+    using Base = Operator<1>;
     Operations _op;
 
 public:
     UnaryOp(Operations inOp, ABT inExpr) : Base(std::move(inExpr)), _op(inOp) {
+        tassert(6684501, "Binary op expected", isUnaryOp(_op));
         assertExprSort(getChild());
     }
 
@@ -150,13 +167,18 @@ public:
     }
 };
 
-class BinaryOp final : public Operator<BinaryOp, 2>, public ExpressionSyntaxSort {
-    using Base = Operator<BinaryOp, 2>;
+/**
+ * Models arithmetic, comparison, or logical operations that take two arguments, for instance add or
+ * subtract.
+ */
+class BinaryOp final : public Operator<2>, public ExpressionSyntaxSort {
+    using Base = Operator<2>;
     Operations _op;
 
 public:
     BinaryOp(Operations inOp, ABT inLhs, ABT inRhs)
         : Base(std::move(inLhs), std::move(inRhs)), _op(inOp) {
+        tassert(6684502, "Binary op expected", isBinaryOp(_op));
         assertExprSort(getLeftChild());
         assertExprSort(getRightChild());
     }
@@ -179,8 +201,11 @@ public:
     }
 };
 
-class If final : public Operator<If, 3>, public ExpressionSyntaxSort {
-    using Base = Operator<If, 3>;
+/**
+ * Branching operator with a condition expression, "then" expression, and an "else" expression.
+ */
+class If final : public Operator<3>, public ExpressionSyntaxSort {
+    using Base = Operator<3>;
 
 public:
     If(ABT inCond, ABT inThen, ABT inElse)
@@ -208,8 +233,12 @@ public:
     }
 };
 
-class Let final : public Operator<Let, 2>, public ExpressionSyntaxSort {
-    using Base = Operator<Let, 2>;
+/**
+ * Defines a variable from one expression and a specified name which is available to be referenced
+ * in a second expression.
+ */
+class Let final : public Operator<2>, public ExpressionSyntaxSort {
+    using Base = Operator<2>;
 
     std::string _varName;
 
@@ -237,8 +266,13 @@ public:
     }
 };
 
-class LambdaAbstraction final : public Operator<LambdaAbstraction, 1>, public ExpressionSyntaxSort {
-    using Base = Operator<LambdaAbstraction, 1>;
+/**
+ * Represents a single argument lambda. Defines a local variable (representing the argument) which
+ * can be referenced within the lambda. The variable takes on the value to which LambdaAbstraction
+ * is applied by its parent.
+ */
+class LambdaAbstraction final : public Operator<1>, public ExpressionSyntaxSort {
+    using Base = Operator<1>;
 
     std::string _varName;
 
@@ -265,8 +299,12 @@ public:
     }
 };
 
-class LambdaApplication final : public Operator<LambdaApplication, 2>, public ExpressionSyntaxSort {
-    using Base = Operator<LambdaApplication, 2>;
+/**
+ * Evaluates an expression representing a function over an expression representing the argument to
+ * the function.
+ */
+class LambdaApplication final : public Operator<2>, public ExpressionSyntaxSort {
+    using Base = Operator<2>;
 
 public:
     LambdaApplication(ABT inLambda, ABT inArgument)
@@ -288,9 +326,12 @@ public:
     }
 };
 
-class FunctionCall final : public OperatorDynamicHomogenous<FunctionCall>,
-                           public ExpressionSyntaxSort {
-    using Base = OperatorDynamicHomogenous<FunctionCall>;
+/**
+ * Dynamic arity operator which passes its children as arguments to a function specified by SBE
+ * function expression name.
+ */
+class FunctionCall final : public OperatorDynamicHomogenous, public ExpressionSyntaxSort {
+    using Base = OperatorDynamicHomogenous;
     std::string _name;
 
 public:
@@ -310,8 +351,16 @@ public:
     }
 };
 
-class EvalPath final : public Operator<EvalPath, 2>, public ExpressionSyntaxSort {
-    using Base = Operator<EvalPath, 2>;
+/**
+ * EvalPath defines one context for path behavior used for manipulation and replacement. Some path
+ * elements have special behavior under this conext.
+ *
+ * EvalPath evaluates its path child according to its context over the result of its expression
+ * child. That is, the expression is evaluated first, and it is used as an input value to the root
+ * path element, which can then continue the computation recursively.
+ */
+class EvalPath final : public Operator<2>, public ExpressionSyntaxSort {
+    using Base = Operator<2>;
 
 public:
     EvalPath(ABT inPath, ABT inInput) : Base(std::move(inPath), std::move(inInput)) {
@@ -336,8 +385,15 @@ public:
     }
 };
 
-class EvalFilter final : public Operator<EvalFilter, 2>, public ExpressionSyntaxSort {
-    using Base = Operator<EvalFilter, 2>;
+/**
+ * EvalFilter defines a context for path behavior used to evaluate boolean conditions for the
+ * purposes of filtering. Some path elements have special behavior under this context.
+ *
+ * EvalFilter evaluates its path child over the result of its expression child. If the result of
+ * the path application is false, the value is filtered out, otherwise it's returned up the tree.
+ */
+class EvalFilter final : public Operator<2>, public ExpressionSyntaxSort {
+    using Base = Operator<2>;
 
 public:
     EvalFilter(ABT inPath, ABT inInput) : Base(std::move(inPath), std::move(inInput)) {
@@ -363,9 +419,9 @@ public:
 };
 
 /**
- * This class represents a source of values originating from relational nodes.
+ * Represents a source of values typically from a collection.
  */
-class Source final : public Operator<Source, 0>, public ExpressionSyntaxSort {
+class Source final : public Operator<0>, public ExpressionSyntaxSort {
 public:
     bool operator==(const Source& other) const {
         return true;
