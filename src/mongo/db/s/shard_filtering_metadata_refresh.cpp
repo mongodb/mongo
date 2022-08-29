@@ -65,6 +65,10 @@ void onDbVersionMismatch(OperationContext* opCtx,
     invariant(!opCtx->getClient()->isInDirectClient());
     invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
+    tassert(ErrorCodes::IllegalOperation,
+            "Can't check version of {} database"_format(dbName),
+            dbName != NamespaceString::kAdminDb && dbName != NamespaceString::kConfigDb);
+
     Timer t{};
     ScopeGuard finishTiming([&] {
         CurOp::get(opCtx)->debug().databaseVersionRefreshMillis += Milliseconds(t.millis());
