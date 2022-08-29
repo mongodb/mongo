@@ -74,6 +74,11 @@ public:
                     (serverGlobalParams.clusterRole == ClusterRole::None));
 
             FixedFCVRegion fcvRegion(opCtx);
+            uassert(ErrorCodes::UnknownFeatureCompatibilityVersion,
+                    "FCV is not yet initialized, retry the command after FCV initialization has "
+                    "completed",
+                    serverGlobalParams.featureCompatibility.isVersionInitialized());
+
             uassert(
                 ErrorCodes::IllegalOperation,
                 "Cannot set cluster parameter, gFeatureFlagClusterWideConfig is not enabled",

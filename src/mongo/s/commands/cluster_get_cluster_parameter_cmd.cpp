@@ -66,6 +66,11 @@ public:
         using InvocationBase::InvocationBase;
 
         Reply typedRun(OperationContext* opCtx) {
+            uassert(ErrorCodes::UnknownFeatureCompatibilityVersion,
+                    "FCV is not yet initialized, retry the command after FCV initialization has "
+                    "completed",
+                    serverGlobalParams.featureCompatibility.isVersionInitialized());
+
             uassert(
                 ErrorCodes::IllegalOperation,
                 "featureFlagClusterWideConfig not enabled",
