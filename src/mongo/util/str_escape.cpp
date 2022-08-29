@@ -39,6 +39,10 @@ namespace mongo::str {
 namespace {
 constexpr char kHexChar[] = "0123456789abcdef";
 
+struct NoopBuffer {
+    void append(const char* begin, const char* end) {}
+};
+
 // Appends the bytes in the range [begin, end) to the output buffer,
 // which can either be a fmt::memory_buffer, or a std::string.
 template <typename Buffer, typename Iterator>
@@ -499,9 +503,9 @@ std::string escapeForJSON(StringData str, size_t maxLength, size_t* wouldWrite) 
     return buffer;
 }
 
-void checkInvalidUTF8(StringData str, size_t maxLength, size_t* wouldWrite) {
+bool validUTF8(StringData str) {
     // No-op buffer and handlers, defined to re-use escape method logic.
-    std::string buffer;
+    NoopBuffer buffer;
     auto singleByteHandler = [](const auto& writer, uint8_t unescaped) {};
     auto twoByteEscaper = [](const auto& writer, uint8_t first, uint8_t second) {};
 
@@ -510,12 +514,17 @@ void checkInvalidUTF8(StringData str, size_t maxLength, size_t* wouldWrite) {
         uasserted(ErrorCodes::BadValue, "Invalid UTF-8 Character");
     };
 
-    escape(buffer,
-           str,
-           std::move(singleByteHandler),
-           std::move(invalidByteHandler),
-           std::move(twoByteEscaper),
-           maxLength,
-           wouldWrite);
+    try {
+        escape(buffer,
+               str,
+               std::move(singleByteHandler),
+               std::move(invalidByteHandler),
+               std::move(twoByteEscaper),
+               std::string::npos,
+               nullptr);
+        return true;
+    } catch (const ExceptionFor<ErrorCodes::BadValue>&) {
+        return false;
+    }
 }
 }  // namespace mongo::str

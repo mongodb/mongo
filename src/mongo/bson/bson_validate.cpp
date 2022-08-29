@@ -223,8 +223,6 @@ public:
     void checkNonConformantElem(const char* ptr, uint32_t offsetToValue, uint8_t type) {
         registerFieldName(ptr + 1);
         ExtendedValidator::checkNonConformantElem(ptr, offsetToValue, type);
-        // Check the field name is UTF-8 encoded.
-        checkUTF8Char(ptr + 1);
         switch (type) {
             case BSONType::Array: {
                 objFrames.push_back({std::vector<std::string>(), false});
@@ -285,19 +283,18 @@ private:
     std::vector<std::pair<std::vector<std::string>, bool>> objFrames = {
         {std::vector<std::string>(), true}};
 
-    void registerFieldName(std::string str) {
+    void registerFieldName(const char* ptr) {
+        // Check the field name is UTF-8 encoded.
+        checkUTF8Char(ptr);
         if (objFrames.back().second) {
-            objFrames.back().first.emplace_back(str);
+            objFrames.back().first.emplace_back(ptr);
         };
     }
 
-private:
     void checkUTF8Char(const char* ptr) {
-        try {
-            str::checkInvalidUTF8(ptr);
-        } catch (const ExceptionFor<ErrorCodes::BadValue>&) {
-            uasserted(NonConformantBSON, "Found string that doesn't follow UTF-8 encoding.");
-        }
+        uassert(NonConformantBSON,
+                "Found string that doesn't follow UTF-8 encoding.",
+                str::validUTF8(ptr));
     }
 };
 

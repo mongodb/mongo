@@ -107,8 +107,8 @@ std::string escapeForJSON(StringData str,
                           size_t maxLength = std::string::npos,
                           size_t* wouldWrite = nullptr);
 
-
-void checkInvalidUTF8(StringData str,
-                      size_t maxLength = std::string::npos,
-                      size_t* wouldWrite = nullptr);
+/**
+ * Returns whether a string consists with valid UTF-8 encoded characters.
+ */
+bool validUTF8(StringData str);
 }  // namespace mongo::str
