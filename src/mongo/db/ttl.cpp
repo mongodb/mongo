@@ -32,10 +32,12 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fsync_locked.h"
 #include "mongo/db/commands/server_status_metric.h"
@@ -687,7 +689,81 @@ void shutdownTTLMonitor(ServiceContext* serviceContext) {
     }
 }
 
-void TTLMonitor::onStepUp(OperationContext* opCtx) {}
+void TTLMonitor::onStepUp(OperationContext* opCtx) {
+    auto&& ttlCollectionCache = TTLCollectionCache::get(opCtx->getServiceContext());
+    auto ttlInfos = ttlCollectionCache.getTTLInfos();
+    for (const auto& [uuid, infos] : ttlInfos) {
+        auto collectionCatalog = CollectionCatalog::get(opCtx);
+        if (collectionCatalog->isCollectionAwaitingVisibility(uuid)) {
+            continue;
+        }
+
+        // The collection was dropped.
+        auto nss = collectionCatalog->lookupNSSByUUID(opCtx, uuid);
+        if (!nss) {
+            continue;
+        }
+
+        if (nss->isTemporaryReshardingCollection() || nss->isDropPendingNamespace()) {
+            continue;
+        }
+
+        try {
+            uassertStatusOK(userAllowedWriteNS(opCtx, *nss));
+
+            for (const auto& info : infos) {
+                // Skip clustered indexes with TTL. This includes time-series collections.
+                if (info.isClustered()) {
+                    continue;
+                }
+                if (!info.isExpireAfterSecondsNaN()) {
+                    continue;
+                }
+
+                auto indexName = info.getIndexName();
+                LOGV2(6847700,
+                      "Running collMod to fix TTL index with NaN 'expireAfterSeconds'.",
+                      "ns"_attr = *nss,
+                      "uuid"_attr = uuid,
+                      "name"_attr = indexName,
+                      "expireAfterSecondsNew"_attr =
+                          index_key_validate::kExpireAfterSecondsForInactiveTTLIndex);
+
+                // Compose collMod command to amend 'expireAfterSeconds' to same value that
+                // would be used by listIndexes() to convert the NaN value in the catalog.
+                CollModIndex collModIndex;
+                collModIndex.setName(StringData{indexName});
+                collModIndex.setExpireAfterSeconds(mongo::durationCount<Seconds>(
+                    index_key_validate::kExpireAfterSecondsForInactiveTTLIndex));
+                CollMod collModCmd{*nss};
+                collModCmd.getCollModRequest().setIndex(collModIndex);
+
+                // processCollModCommand() will acquire MODE_X access to the collection.
+                BSONObjBuilder builder;
+                uassertStatusOK(
+                    processCollModCommand(opCtx, {nss->db(), uuid}, collModCmd, &builder));
+                auto result = builder.obj();
+                LOGV2(6847701,
+                      "Successfully fixed TTL index with NaN 'expireAfterSeconds' using collMod",
+                      "ns"_attr = *nss,
+                      "uuid"_attr = uuid,
+                      "name"_attr = indexName,
+                      "result"_attr = result);
+            }
+        } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
+            // The exception is relevant to the entire TTL monitoring process, not just the specific
+            // TTL index. Let the exception escape so it can be addressed at the higher monitoring
+            // layer.
+            throw;
+        } catch (const DBException& ex) {
+            LOGV2_ERROR(6835901,
+                        "Error checking TTL job on collection during step up",
+                        logAttrs(*nss),
+                        "error"_attr = ex);
+            continue;
+        }
+    }
+}
 
 long long TTLMonitor::getTTLPasses_forTest() {
     return ttlPasses.get();
