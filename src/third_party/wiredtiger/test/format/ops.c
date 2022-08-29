@@ -1544,14 +1544,15 @@ row_truncate(TINFO *tinfo)
     /* The code assumes we're never truncating the entire object, assert that fact. */
     testutil_assert(tinfo->keyno != 0 || tinfo->last != 0);
 
+    trace_op(tinfo, "truncate %" PRIu64 "-%" PRIu64 " start", tinfo->keyno, tinfo->last);
     if (tinfo->keyno == 0) {
         key_gen(tinfo->table, tinfo->key, tinfo->last);
         cursor->set_key(cursor, tinfo->key);
-        WT_RET(session->truncate(session, NULL, NULL, cursor, NULL));
+        WT_ERR(session->truncate(session, NULL, NULL, cursor, NULL));
     } else if (tinfo->last == 0) {
         key_gen(tinfo->table, tinfo->key, tinfo->keyno);
         cursor->set_key(cursor, tinfo->key);
-        WT_RET(session->truncate(session, NULL, cursor, NULL, NULL));
+        WT_ERR(session->truncate(session, NULL, cursor, NULL, NULL));
     } else {
         key_gen(tinfo->table, tinfo->key, tinfo->keyno);
         cursor->set_key(cursor, tinfo->key);
@@ -1562,12 +1563,13 @@ row_truncate(TINFO *tinfo)
 
         ret = session->truncate(session, NULL, cursor, c2, NULL);
         testutil_check(c2->close(c2));
-        WT_RET(ret);
+        WT_ERR(ret);
     }
 
-    trace_op(tinfo, "truncate %" PRIu64 "-%" PRIu64, tinfo->keyno, tinfo->last);
+err:
+    trace_op(tinfo, "truncate %" PRIu64 "-%" PRIu64 " stop ret %d", tinfo->keyno, tinfo->last, ret);
 
-    return (0);
+    return (ret);
 }
 
 /*
