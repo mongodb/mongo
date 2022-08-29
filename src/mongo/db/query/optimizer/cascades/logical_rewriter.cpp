@@ -1272,13 +1272,14 @@ struct ExploreReorder<EvaluationNode, RIDIntersectNode> {
     }
 };
 
-void LogicalRewriter::initializeRewrites() {
-    const auto registerRewrite = [& rewriteMap = _rewriteMap](const LogicalRewriteType rewriteType,
-                                                              RewriteFn fn) {
-        const bool inserted = rewriteMap.emplace(rewriteType, fn).second;
+void LogicalRewriter::registerRewrite(const LogicalRewriteType rewriteType, RewriteFn fn) {
+    if (_activeRewriteSet.find(rewriteType) != _activeRewriteSet.cend()) {
+        const bool inserted = _rewriteMap.emplace(rewriteType, fn).second;
         invariant(inserted);
-    };
+    }
+}
 
+void LogicalRewriter::initializeRewrites() {
     registerRewrite(
         LogicalRewriteType::FilterEvaluationReorder,
         &LogicalRewriter::bindAboveBelow<FilterNode, EvaluationNode, SubstituteReorder>);
