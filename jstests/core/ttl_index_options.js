@@ -1,7 +1,10 @@
 /**
  * Ensures that the options passed in for TTL indexes are validated during index creation.
  *
- * @tags: [requires_ttl_index]
+ * @tags: [
+ *     requires_fcv_61,
+ *     requires_ttl_index,
+ * ]
  */
 (function() {
 'use strict';
@@ -16,11 +19,10 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(coll.createIndexes([{x: 1}], {expireAfterSeconds: 9999999999999999}),
                              ErrorCodes.CannotCreateIndex);
 
-// Ensure that we cannot provide a time that is larger than the current epoch time.
+// Ensure that we can provide a time that is larger than the current epoch time.
 let secondsSinceEpoch = Date.now() / 1000;
-assert.commandFailedWithCode(
-    coll.createIndexes([{x: 1}], {expireAfterSeconds: secondsSinceEpoch + 1000}),
-    ErrorCodes.CannotCreateIndex);
+assert.commandWorked(
+    coll.createIndexes([{x_before_epoch: 1}], {expireAfterSeconds: secondsSinceEpoch + 1000}));
 
 // 'expireAfterSeconds' cannot be less than 0.
 assert.commandFailedWithCode(coll.createIndexes([{x: 1}], {expireAfterSeconds: -1}),

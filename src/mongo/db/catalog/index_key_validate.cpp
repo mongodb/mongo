@@ -795,7 +795,8 @@ StatusWith<BSONObj> validateIndexSpecCollation(OperationContext* opCtx,
     return indexSpec;
 }
 
-Status validateExpireAfterSeconds(std::int64_t expireAfterSeconds) {
+Status validateExpireAfterSeconds(std::int64_t expireAfterSeconds,
+                                  ValidateExpireAfterSecondsMode mode) {
     if (expireAfterSeconds < 0) {
         return {ErrorCodes::InvalidOptions,
                 str::stream() << "TTL index '" << IndexDescriptor::kExpireAfterSecondsFieldName
@@ -806,16 +807,31 @@ Status validateExpireAfterSeconds(std::int64_t expireAfterSeconds) {
         << "TTL index '" << IndexDescriptor::kExpireAfterSecondsFieldName
         << "' option must be within an acceptable range, try a lower number";
 
-    // There are two cases where we can encounter an issue here.
-    // The first case is when we try to cast to millseconds from seconds, which could cause an
-    // overflow. The second case is where 'expireAfterSeconds' is larger than the current epoch
-    // time.
-    if (expireAfterSeconds > std::numeric_limits<std::int64_t>::max() / 1000) {
-        return {ErrorCodes::InvalidOptions, tooLargeErr};
-    }
-    auto expireAfterMillis = duration_cast<Milliseconds>(Seconds(expireAfterSeconds));
-    if (expireAfterMillis > Date_t::now().toDurationSinceEpoch()) {
-        return {ErrorCodes::InvalidOptions, tooLargeErr};
+    if (mode == ValidateExpireAfterSecondsMode::kSecondaryTTLIndex) {
+        // Relax epoch restriction on TTL indexes. This allows us to export and import existing
+        // TTL indexes with large values or NaN for the 'expireAfterSeconds' field.
+        // Additionally, the 'expireAfterSeconds' for TTL indexes is defined as safeInt (int32_t)
+        // in the IDL for listIndexes and collMod. See list_indexes.idl and coll_mod.idl.
+        if (expireAfterSeconds > std::numeric_limits<std::int32_t>::max()) {
+            return {ErrorCodes::InvalidOptions, tooLargeErr};
+        }
+    } else {
+        // Clustered collections with TTL.
+        // Note that 'expireAfterSeconds' is defined as safeInt64 in the IDL for the create and
+        // collMod commands. See create.idl and coll_mod.idl.
+        // There are two cases where we can encounter an issue here.
+        // The first case is when we try to cast to millseconds from seconds, which could cause an
+        // overflow. The second case is where 'expireAfterSeconds' is larger than the current epoch
+        // time. This isn't necessarily problematic for the general case, but for the specific case
+        // of time series collections, we cluster the collection by an OID value, where the
+        // timestamp portion is only a 32-bit unsigned integer offset of seconds since the epoch.
+        if (expireAfterSeconds > std::numeric_limits<std::int64_t>::max() / 1000) {
+            return {ErrorCodes::InvalidOptions, tooLargeErr};
+        }
+        auto expireAfterMillis = duration_cast<Milliseconds>(Seconds(expireAfterSeconds));
+        if (expireAfterMillis > Date_t::now().toDurationSinceEpoch()) {
+            return {ErrorCodes::InvalidOptions, tooLargeErr};
+        }
     }
     return Status::OK();
 }
@@ -839,7 +855,9 @@ Status validateIndexSpecTTL(const BSONObj& indexSpec) {
                               << "'. Index spec: " << indexSpec};
     }
 
-    if (auto status = validateExpireAfterSeconds(expireAfterSecondsElt.safeNumberLong());
+    if (auto status =
+            validateExpireAfterSeconds(expireAfterSecondsElt.safeNumberLong(),
+                                       ValidateExpireAfterSecondsMode::kSecondaryTTLIndex);
         !status.isOK()) {
         return {ErrorCodes::CannotCreateIndex,
                 str::stream() << status.reason() << ". Index spec: " << indexSpec};
