@@ -36,6 +36,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/server_options.h"
@@ -243,6 +244,58 @@ DatabaseType ShardingCatalogManager::createDatabase(
     uassertStatusOK(cmdResponse.commandStatus);
 
     return database;
+}
+
+void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
+                                               const DatabaseName& dbName,
+                                               const DatabaseVersion& expectedDbVersion,
+                                               const ShardId& toShard) {
+    // Hold the shard lock until the entire commit finishes to serialize with removeShard.
+    Lock::SharedLock shardLock(opCtx->lockState(), _kShardMembershipLock);
+
+    const auto updateOp = [&] {
+        const auto query = [&] {
+            BSONObjBuilder queryBuilder;
+            queryBuilder.append(DatabaseType::kNameFieldName, dbName.db());
+            // Include the version in the update filter to be resilient to potential network retries
+            // and delayed messages.
+            for (const auto [fieldName, fieldValue] : expectedDbVersion.toBSON()) {
+                const auto dottedFieldName = DatabaseType::kVersionFieldName + "." + fieldName;
+                queryBuilder.appendAs(fieldValue, dottedFieldName);
+            }
+            return queryBuilder.obj();
+        }();
+
+        const auto update = [&] {
+            const auto newDbVersion = expectedDbVersion.makeUpdated();
+
+            BSONObjBuilder updateBuilder;
+            updateBuilder.append(DatabaseType::kPrimaryFieldName, toShard);
+            updateBuilder.append(DatabaseType::kVersionFieldName, newDbVersion.toBSON());
+            return updateBuilder.obj();
+        }();
+
+        write_ops::UpdateCommandRequest updateOp(NamespaceString::kConfigDatabasesNamespace);
+        updateOp.setUpdates({[&] {
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(query);
+            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(update));
+            return entry;
+        }()});
+
+        return updateOp;
+    }();
+
+    DBDirectClient dbClient(opCtx);
+    const auto commandResponse = dbClient.runCommand(updateOp.serialize({}));
+    uassertStatusOK(getStatusFromWriteCommandReply(commandResponse->getCommandReply()));
+
+    WriteConcernResult writeConcernResult;
+    const auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+    uassertStatusOK(waitForWriteConcern(opCtx,
+                                        latestOpTime,
+                                        WriteConcerns::kMajorityWriteConcernShardingTimeout,
+                                        &writeConcernResult));
 }
 
 }  // namespace mongo

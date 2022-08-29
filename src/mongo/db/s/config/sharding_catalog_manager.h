@@ -393,6 +393,15 @@ public:
                                 StringData dbName,
                                 const boost::optional<ShardId>& optPrimaryShard);
 
+    /**
+     * Updates the metadata in config.databases collection with the new primary shard for the given
+     * database. This also advances the database's lastmod.
+     */
+    void commitMovePrimary(OperationContext* opCtx,
+                           const DatabaseName& dbName,
+                           const DatabaseVersion& expectedDbVersion,
+                           const ShardId& toShard);
+
     //
     // Collection Operations
     //

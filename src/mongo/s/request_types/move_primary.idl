@@ -33,6 +33,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
+    - "mongo/s/sharding_types.idl"
 
 structs:
     movePrimary:
@@ -62,3 +63,20 @@ structs:
             to:
                 type: string
                 description: "The shard serving as the destination for un-sharded collections."
+
+commands:
+    _configsvrCommitMovePrimary:
+        command_name: _configsvrCommitMovePrimary
+        description: Reassign a new primary shard for the given database on the config server
+        cpp_name: ConfigsvrCommitMovePrimary
+        namespace: type
+        type: database_name
+        api_version:
+        strict: false
+        fields:
+            expectedDatabaseVersion:
+                type: database_version
+                description: Database version known by the current primary shard
+            to:
+                type: shard_id
+                description: Shard serving as the destination for un-sharded collections

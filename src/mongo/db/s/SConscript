@@ -383,6 +383,7 @@ env.Library(
         'config/configsvr_collmod_command.cpp',
         'config/configsvr_commit_chunk_migration_command.cpp',
         'config/configsvr_commit_index_command.cpp',
+        'config/configsvr_commit_move_primary_command.cpp',
         'config/configsvr_commit_reshard_collection_command.cpp',
         'config/configsvr_configure_collection_balancing.cpp',
         'config/configsvr_control_balancer_command.cpp',
