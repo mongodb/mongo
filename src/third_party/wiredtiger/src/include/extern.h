@@ -661,8 +661,8 @@ extern int __wt_decrypt(WT_SESSION_IMPL *session, WT_ENCRYPTOR *encryptor, size_
   WT_ITEM *out) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_delete_page(WT_SESSION_IMPL *session, WT_REF *ref, bool *skipp)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref,
-  WT_PAGE_DELETED *page_del) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+extern int __wt_delete_page_instantiate(WT_SESSION_IMPL *session, WT_REF *ref)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_delete_page_rollback(WT_SESSION_IMPL *session, WT_REF *ref)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_delete_redo_window_cleanup(WT_SESSION_IMPL *session)
@@ -1986,12 +1986,12 @@ static inline bool __wt_op_timer_fired(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline bool __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-static inline bool __wt_page_del_active(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
-  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline bool __wt_page_del_committed(WT_PAGE_DELETED *page_del)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline bool __wt_page_del_visible(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del,
-  bool visible_all) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+  bool hide_prepared) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static inline bool __wt_page_del_visible_all(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del,
+  bool hide_prepared) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline bool __wt_page_evict_clean(WT_PAGE *page)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline bool __wt_page_evict_retry(WT_SESSION_IMPL *session, WT_PAGE *page)

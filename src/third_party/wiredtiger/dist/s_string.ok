@@ -231,6 +231,7 @@ ITEMs
 ITER
 InitializeCriticalSectionAndSpinCount
 Inline
+Instantiation
 Intra
 Ippokratis
 Iu
@@ -445,6 +446,7 @@ TIMESTAMPS
 TMP
 TODO
 TORTIOUS
+TRYLOCK
 TSO
 TW
 TXN

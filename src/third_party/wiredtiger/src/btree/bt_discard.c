@@ -215,7 +215,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
     __wt_ovfl_discard_free(session, page);
 
     __wt_free(session, page->modify->ovfl_track);
-    __wt_free(session, page->modify->page_del);
+    __wt_free(session, page->modify->inst_updates);
     __wt_spin_destroy(session, &page->modify->page_lock);
 
     __wt_free(session, page->modify);
@@ -295,7 +295,7 @@ __wt_free_ref(WT_SESSION_IMPL *session, WT_REF *ref, int page_type, bool free_pa
     __wt_ref_addr_free(session, ref);
 
     /* Free any backing fast-truncate memory. */
-    __wt_free(session, ref->ft_info.del);
+    __wt_free(session, ref->page_del);
 
     __wt_overwrite_and_free_len(session, ref, WT_REF_CLEAR_SIZE);
 }

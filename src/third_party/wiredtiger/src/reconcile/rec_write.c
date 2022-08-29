@@ -2397,12 +2397,14 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_PAGE *page)
     WT_REF *ref;
     WT_TIME_AGGREGATE ta;
     uint32_t i;
+    uint8_t previous_ref_state;
 
     btree = S2BT(session);
     bm = btree->bm;
     mod = page->modify;
     ref = r->ref;
     WT_TIME_AGGREGATE_INIT(&ta);
+    previous_ref_state = 0;
 
     /*
      * If using the history store table eviction path and we found updates that weren't globally
@@ -2558,10 +2560,42 @@ split:
         break;
     }
 
-    /* If the page has post-instantiation delete information, we don't need it any more. */
+    /*
+     * If the page has post-instantiation delete information, we don't need it any more. Note: this
+     * is the only place in the system that potentially touches ref->page_del without locking the
+     * ref. There are two other pieces of code it can interact with: transaction rollback and parent
+     * internal page reconciliation. We use __wt_free_page_del here and in transaction rollback to
+     * make the deletion atomic. Reconciliation of the parent is locked out for the following
+     * reasons: first, if we are evicting the leaf here, eviction has the ref locked, and the parent
+     * will wait for it; and if we are checkpointing the leaf, we can't simultaneously be
+     * checkpointing the parent, and we can't be evicting the parent either because internal pages
+     * can't be evicted while they have in-memory children.
+     */
     if (mod->instantiated) {
-        mod->instantiated = false;
-        __wt_free(session, mod->page_del);
+        /*
+         * Unfortunately, it seems we need to lock the ref at this point. Ultimately the page_del
+         * structure and the instantiated flag need to both be cleared simultaneously (otherwise
+         * instantiated == false and page_del not NULL violates the intended invariant and other
+         * code can assert) and there are several other places that can still be interacting with
+         * the page_del structure at this point (even though the page has been instantiated) and we
+         * need to wait for those to finish before discarding it.
+         *
+         * Note: if we're in eviction, the ref is already locked.
+         */
+        if (!F_ISSET(r, WT_REC_EVICT)) {
+            WT_REF_LOCK(session, ref, &previous_ref_state);
+            WT_ASSERT(session, previous_ref_state == WT_REF_MEM);
+        } else
+            WT_ASSERT(session, ref->state == WT_REF_LOCKED);
+
+        /* Check the instantiated flag again in case it got cleared while we waited. */
+        if (mod->instantiated) {
+            mod->instantiated = false;
+            __wt_free(session, ref->page_del);
+        }
+
+        if (!F_ISSET(r, WT_REC_EVICT))
+            WT_REF_UNLOCK(ref, previous_ref_state);
     }
 
     return (0);
