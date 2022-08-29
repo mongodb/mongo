@@ -2312,8 +2312,6 @@ tasks:
     vars:
       generating_for_ninja: true
       separate_debug: off
-      task_install_action:
-        default
       task_compile_flags: >-
         --ninja
   - *f_expansions_write
@@ -2331,8 +2329,6 @@ tasks:
     vars:
       generating_for_ninja: true
       separate_debug: off
-      task_install_action:
-        default
       task_compile_flags: >-
         --build-profile=default
         --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
@@ -2352,8 +2348,6 @@ tasks:
     vars:
       generating_for_ninja: true
       separate_debug: off
-      task_install_action:
-        default
       task_compile_flags: >-
         --build-profile=opt
         CCACHE=
@@ -2373,8 +2367,6 @@ tasks:
     vars:
       generating_for_ninja: true
       separate_debug: off
-      task_install_action:
-        default
       task_compile_flags: >-
         --build-profile=fast
         CCACHE=
@@ -2394,8 +2386,6 @@ tasks:
     vars:
       generating_for_ninja: true
       separate_debug: off
-      task_install_action:
-        default
       task_compile_flags: >-
         --build-profile=san
         CCACHE=
@@ -2415,8 +2405,6 @@ tasks:
     vars:
       generating_for_ninja: true
       separate_debug: off
-      task_install_action:
-        default
       task_compile_flags: >-
         --build-tools=next
         --ninja
@@ -3062,8 +3050,6 @@ tasks:
     vars:
       targets: archive-mongo-crypt-shlib-test
       compiling_for_test: true
-      task_install_action:
-        default
       task_compile_flags: >-
         --allocator=system
         --enable-free-mon=off

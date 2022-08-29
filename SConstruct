@@ -5326,11 +5326,20 @@ if get_option('ninja') != 'disabled':
         return dependencies
 
     env['NINJA_REGENERATE_DEPS'] = ninja_generate_deps
+
+    if env.TargetOSIs('windows'):
+        # The /b option here will make sure that windows updates the mtime
+        # when copying the file. This allows to not need to use restat for windows
+        # copy commands.
+        copy_install_cmd = "cmd.exe /c copy /b $in $out 1>NUL"
+    else:
+        copy_install_cmd = "install $in $out"
+
     if env.GetOption('install-action') == 'hardlink':
         if env.TargetOSIs('windows'):
-            install_cmd = "cmd.exe /c mklink /h $out $in 1>nul"
+            install_cmd = f"cmd.exe /c mklink /h $out $in 1>nul || {copy_install_cmd}"
         else:
-            install_cmd = "ln $in $out"
+            install_cmd = f"ln $in $out || {copy_install_cmd}"
 
     elif env.GetOption('install-action') == 'symlink':
 
@@ -5362,13 +5371,7 @@ if get_option('ninja') != 'disabled':
             install_cmd = "ln -s $relpath $out"
 
     else:
-        if env.TargetOSIs('windows'):
-            # The /b option here will make sure that windows updates the mtime
-            # when copying the file. This allows to not need to use restat for windows
-            # copy commands.
-            install_cmd = "cmd.exe /c copy /b $in $out 1>NUL"
-        else:
-            install_cmd = "install $in $out"
+        install_cmd = copy_install_cmd
 
     env.NinjaRule("INSTALL", install_cmd, description="Installed $out", pool="install_pool")
 
