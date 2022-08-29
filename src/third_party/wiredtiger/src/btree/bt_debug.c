@@ -1584,7 +1584,7 @@ __debug_update(WT_DBG *ds, WT_UPDATE *upd, bool hexbyte)
         if (prepare_state != NULL)
             WT_RET(ds->f(ds, ", prepare %s", prepare_state));
 
-        WT_RET(ds->f(ds, "\n"));
+        WT_RET(ds->f(ds, ", flags 0x%" PRIx8 "\n", upd->flags));
     }
     return (0);
 }
