@@ -70,7 +70,7 @@ assert.gte(indexBulkBuilderSection.filesClosedForExternalSort, 4, tojson(indexBu
 // The numbers here will be different from those reported for 4.4 because 4.4 contains the external
 // sorter improvements in SERVER-54761.
 assert.commandWorked(coll.createIndexes([{c: 1}, {d: 1}, {e: 1, a: 1}]));
-IndexBuildTest.assertIndexes(newNodeColl, 5, ['_id_', 'a_1', 'c_1', 'd_1', 'e_1_a_1']);
+IndexBuildTest.assertIndexes(coll, 5, ['_id_', 'a_1', 'c_1', 'd_1', 'e_1_a_1']);
 indexBulkBuilderSection = testDB.serverStatus().indexBulkBuilder;
 jsTestLog('server status after building multiple indexes: ' + tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.count, 4, tojson(indexBulkBuilderSection));
