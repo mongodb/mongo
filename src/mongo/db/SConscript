@@ -1282,6 +1282,7 @@ env.Library(
         'ttl_collection_cache',
     ],
     LIBDEPS_PRIVATE=[
+        'catalog/catalog_helpers',
         'catalog/database_holder',
         'commands/fsync_locked',
         'commands/server_status_core',

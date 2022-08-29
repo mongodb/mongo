@@ -65,5 +65,29 @@ assert.gt(newNodeSpec.expireAfterSeconds,
 // during the NaN 'expireAfterSeconds' conversion.
 checkLog.containsJson(primary, 6835900, {namespace: coll.getFullName()});
 
+// Confirm that a node with an existing TTL index with NaN 'expireAfterSeconds' will convert the
+// duration on the TTL index from NaN to a large positive value when it becomes the primary node.
+// When stepping down the primary, we use 'force' because there's no other electable node.
+// Subsequently, we wait for the stepped down node to become primary again.
+// To confirm that the TTL index has been fixed, we check the oplog for a collMod operation on the
+// TTL index that changes the `expireAfterSeconds` field from NaN to a large positive value.
+assert.commandWorked(primary.adminCommand({replSetStepDown: 5, force: true}));
+primary = rst.waitForPrimary();
+const collModOplogEntries =
+    rst.findOplog(primary,
+                  {
+                      op: 'c',
+                      ns: coll.getDB().getCollection('$cmd').getFullName(),
+                      'o.collMod': coll.getName(),
+                      'o.index.name': 't_1',
+                      'o.index.expireAfterSeconds': newNodeSpec.expireAfterSeconds
+                  },
+                  /*limit=*/1)
+        .toArray();
+assert.eq(collModOplogEntries.length,
+          1,
+          'TTL index with NaN expireAfterSeconds was not fixed using collMod during step-up: ' +
+              tojson(rst.findOplog(primary, {op: {$ne: 'n'}}, /*limit=*/10).toArray()));
+
 rst.stopSet();
 })();
