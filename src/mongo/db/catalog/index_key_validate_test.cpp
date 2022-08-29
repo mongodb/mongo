@@ -400,6 +400,15 @@ TEST(IndexKeyValidateTest, RemoveUnkownFieldsFromIndexSpecs) {
                    fromjson("{key: {a: 1}, name: 'index', safe: true, force: true}"))));
 }
 
+TEST(IndexKeyValidateTest, UpdateTTLIndexNaNExpireAfterSeconds) {
+    ASSERT(BSON("key" << BSON("a" << 1) << "name"
+                      << "index"
+                      << "expireAfterSeconds" << std::numeric_limits<int32_t>::max()
+                      << IndexDescriptor::kIndexVersionFieldName << IndexVersion::kV2)
+               .binaryEqual(unittest::assertGet(index_key_validate::validateIndexSpec(
+                   nullptr, fromjson("{key: {a: 1}, name: 'index', expireAfterSeconds: NaN}")))));
+}
+
 TEST(IndexKeyValidateTest, RepairIndexSpecs) {
     ASSERT(fromjson("{key: {a: 1}, name: 'index'}")
                .binaryEqual(index_key_validate::repairIndexSpec(
