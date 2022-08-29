@@ -61,6 +61,13 @@ void MongoDSessionCatalogTransactionInterfaceImpl::
     txnParticipant.refreshFromStorageIfNeededNoOplogEntryFetch(opCtx);
 }
 
+void MongoDSessionCatalogTransactionInterfaceImpl::beginOrContinueTransactionUnconditionally(
+    OperationContext* opCtx, TxnNumberAndRetryCounter txnNumberAndRetryCounter) {
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    txnParticipant.beginOrContinueTransactionUnconditionally(opCtx,
+                                                             std::move(txnNumberAndRetryCounter));
+}
+
 void MongoDSessionCatalogTransactionInterfaceImpl::abortTransaction(
     OperationContext* opCtx, const SessionTxnRecord& txnRecord) {
     auto txnParticipant = TransactionParticipant::get(opCtx);

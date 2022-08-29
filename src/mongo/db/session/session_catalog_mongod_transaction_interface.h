@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/session/logical_session_id.h"  // for TxnNumberAndRetryCounter
 #include "mongo/db/session/session_catalog.h"  // for ObservableSession and ScanSessionsCallbackFn
 #include "mongo/db/session/session_txn_record_gen.h"       // for SessionTxnRecord
 #include "mongo/db/transaction/transaction_participant.h"  // for SessionToKill
@@ -73,6 +74,14 @@ public:
      */
     virtual void refreshTransactionFromStorageIfNeededNoOplogEntryFetch(
         OperationContext* opCtx) = 0;
+
+    /**
+     * Used only by the secondary oplog application logic.
+     * Similar to 'TransactionParticipant::beginOrContinue' without performing any checks for
+     * whether the new txnNumber will start a transaction number in the past.
+     */
+    virtual void beginOrContinueTransactionUnconditionally(
+        OperationContext* opCtx, TxnNumberAndRetryCounter txnNumberAndRetryCounter) = 0;
 
     /**
      * Aborts the transaction, releasing transaction resources.

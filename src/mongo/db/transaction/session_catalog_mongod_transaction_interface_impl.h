@@ -55,6 +55,9 @@ public:
 
     void refreshTransactionFromStorageIfNeededNoOplogEntryFetch(OperationContext* opCtx) override;
 
+    void beginOrContinueTransactionUnconditionally(
+        OperationContext* opCtx, TxnNumberAndRetryCounter txnNumberAndRetryCounter) override;
+
     void abortTransaction(OperationContext* opCtx, const SessionTxnRecord& txnRecord) override;
 
     void invalidateSessionToKill(OperationContext* opCtx, const SessionToKill& session) override;
