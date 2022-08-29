@@ -71,6 +71,10 @@ namespace {
 // specification.
 MONGO_FAIL_POINT_DEFINE(skipIndexCreateFieldNameValidation);
 
+// When the skipTTLIndexNaNExpireAfterSecondsValidation failpoint is enabled, validation for
+// TTL index 'expireAfterSeconds' will be disabled.
+MONGO_FAIL_POINT_DEFINE(skipTTLIndexNaNExpireAfterSecondsValidation);
+
 static const std::set<StringData> allowedIdIndexFieldNames = {
     IndexDescriptor::kCollationFieldName,
     IndexDescriptor::kIndexNameFieldName,
@@ -306,6 +310,7 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
     bool hasKeyPatternField = false;
     bool hasIndexNameField = false;
     bool hasNamespaceField = false;
+    bool isTTLIndexWithNaNExpireAfterSeconds = false;
     bool hasVersionField = false;
     bool hasCollationField = false;
     bool hasWeightsField = false;
@@ -564,6 +569,8 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
                     str::stream() << "The field '" << indexSpecElemFieldName
                                   << "' must be a number, but got "
                                   << typeName(indexSpecElem.type())};
+        } else if (IndexDescriptor::kExpireAfterSecondsFieldName == indexSpecElemFieldName) {
+            isTTLIndexWithNaNExpireAfterSeconds = indexSpecElem.isNaN();
         } else {
             // We can assume field name is valid at this point. Validation of fieldname is handled
             // prior to this in validateIndexSpecFieldNames().
@@ -633,6 +640,19 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
     // require the field to be present.
     if (hasNamespaceField && !storageGlobalParams.repair) {
         modifiedSpec = modifiedSpec.removeField(IndexDescriptor::kNamespaceFieldName);
+    }
+
+    if (isTTLIndexWithNaNExpireAfterSeconds &&
+        !skipTTLIndexNaNExpireAfterSecondsValidation.shouldFail()) {
+        // We create a new index specification with the 'expireAfterSeconds' field set as
+        // kExpireAfterSecondsForInactiveTTLIndex if the current value is NaN. A similar
+        // treatment is done in repairIndexSpec(). This rewrites the 'expireAfterSeconds'
+        // value to be compliant with the 'safeInt' IDL type for the listIndexes response.
+        BSONObjBuilder builder;
+        builder.appendNumber(IndexDescriptor::kExpireAfterSecondsFieldName,
+                             durationCount<Seconds>(kExpireAfterSecondsForInactiveTTLIndex));
+        auto obj = builder.obj();
+        modifiedSpec = modifiedSpec.addField(obj.firstElement());
     }
 
     if (!hasVersionField) {
