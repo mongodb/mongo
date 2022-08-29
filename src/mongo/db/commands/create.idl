@@ -168,12 +168,6 @@ commands:
                 type: Collation
                 optional: true
                 stability: stable
-            recordPreImages:
-                description: "Sets whether updates/deletes should store the pre-image of the
-                              document in the oplog"
-                type: safeBool
-                optional: true
-                stability: unstable
             changeStreamPreAndPostImages:
                 description: "The options for point-in-time pre- and post-images in change streams opened on this collection."
                 type: ChangeStreamPreAndPostImagesOptions

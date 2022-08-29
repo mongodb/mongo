@@ -454,9 +454,9 @@ CollectionOptions createOplogCollectionOptions() {
     return options;
 }
 
-CollectionOptions createRecordPreImageCollectionOptions() {
+CollectionOptions createRecordChangeStreamPreAndPostImagesCollectionOptions() {
     CollectionOptions options;
-    options.recordPreImages = true;
+    options.changeStreamPreAndPostImagesOptions.setEnabled(true);
     return options;
 }
 

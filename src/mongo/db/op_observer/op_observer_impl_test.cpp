@@ -2250,9 +2250,6 @@ const auto kNonFaM = StoreDocOption::None;
 const auto kFaMPre = StoreDocOption::PreImage;
 const auto kFaMPost = StoreDocOption::PostImage;
 
-const bool kRecordPreImages = true;
-const bool kDoNotRecordPreImages = false;
-
 const bool kChangeStreamImagesEnabled = true;
 const bool kChangeStreamImagesDisabled = false;
 
@@ -2264,7 +2261,6 @@ const std::vector<bool> kInMultiDocumentTransactionCases{false, true};
 
 struct UpdateTestCase {
     StoreDocOption imageType;
-    bool alwaysRecordPreImages;
     bool changeStreamImagesEnabled;
     RetryableFindAndModifyLocation retryableOptions;
 
@@ -2307,7 +2303,6 @@ protected:
         LOGV2(5739902,
               "UpdateTestCase",
               "ImageType"_attr = testCase.getImageTypeStr(),
-              "PreImageRecording"_attr = testCase.alwaysRecordPreImages,
               "ChangeStreamPreAndPostImagesEnabled"_attr = testCase.changeStreamImagesEnabled,
               "RetryableFindAndModifyLocation"_attr =
                   testCase.getRetryableFindAndModifyLocationStr(),
@@ -2317,7 +2312,6 @@ protected:
     void initializeOplogUpdateEntryArgs(OperationContext* opCtx,
                                         const UpdateTestCase& testCase,
                                         OplogUpdateEntryArgs* update) {
-        update->updateArgs->preImageRecordingEnabledForCollection = testCase.alwaysRecordPreImages;
         update->updateArgs->changeStreamPreAndPostImagesEnabledForCollection =
             testCase.changeStreamImagesEnabled;
 
@@ -2338,8 +2332,7 @@ protected:
                 break;
         }
         update->updateArgs->preImageDoc = boost::none;
-        if (testCase.imageType == StoreDocOption::PreImage || testCase.alwaysRecordPreImages ||
-            testCase.changeStreamImagesEnabled) {
+        if (testCase.imageType == StoreDocOption::PreImage || testCase.changeStreamImagesEnabled) {
             update->updateArgs->preImageDoc = BSON("_id" << 0 << "preImage" << true);
         }
         update->updateArgs->updatedDoc = BSON("_id" << 0 << "postImage" << true);
@@ -2358,13 +2351,6 @@ protected:
         const boost::optional<OplogEntry>& applyOpsOplogEntry = boost::none) {
         bool checkSideCollection =
             testCase.isFindAndModify() && testCase.retryableOptions == kRecordInSideCollection;
-        if (checkSideCollection && testCase.alwaysRecordPreImages &&
-            testCase.imageType == StoreDocOption::PreImage) {
-            // When `alwaysRecordPreImages` is enabled for a collection, we always store an
-            // image in the oplog. To avoid unnecessary writes, we won't also store an image
-            // in the side collection.
-            checkSideCollection = false;
-        }
         if (checkSideCollection) {
             repl::ImageEntry imageEntry =
                 getImageEntryFromSideCollection(opCtx, *updateOplogEntry.getSessionId());
@@ -2415,25 +2401,19 @@ protected:
 
     std::vector<UpdateTestCase> _cases = {
         // Regular updates.
-        {kNonFaM, kDoNotRecordPreImages, kChangeStreamImagesDisabled, kNotRetryable, 1},
-        {kNonFaM, kDoNotRecordPreImages, kChangeStreamImagesEnabled, kNotRetryable, 1},
-        {kNonFaM, kDoNotRecordPreImages, kChangeStreamImagesEnabled, kRecordInSideCollection, 1},
-        {kNonFaM, kRecordPreImages, kChangeStreamImagesDisabled, kNotRetryable, 2},
-        {kNonFaM, kRecordPreImages, kChangeStreamImagesDisabled, kRecordInSideCollection, 2},
+        {kNonFaM, kChangeStreamImagesDisabled, kNotRetryable, 1},
+        {kNonFaM, kChangeStreamImagesEnabled, kNotRetryable, 1},
+        {kNonFaM, kChangeStreamImagesEnabled, kRecordInSideCollection, 1},
         // FindAndModify asking for a preImage.
-        {kFaMPre, kDoNotRecordPreImages, kChangeStreamImagesDisabled, kNotRetryable, 1},
-        {kFaMPre, kDoNotRecordPreImages, kChangeStreamImagesDisabled, kRecordInSideCollection, 1},
-        {kFaMPre, kDoNotRecordPreImages, kChangeStreamImagesEnabled, kNotRetryable, 1},
-        {kFaMPre, kDoNotRecordPreImages, kChangeStreamImagesEnabled, kRecordInSideCollection, 1},
-        {kFaMPre, kRecordPreImages, kChangeStreamImagesDisabled, kNotRetryable, 2},
-        {kFaMPre, kRecordPreImages, kChangeStreamImagesDisabled, kRecordInSideCollection, 2},
+        {kFaMPre, kChangeStreamImagesDisabled, kNotRetryable, 1},
+        {kFaMPre, kChangeStreamImagesDisabled, kRecordInSideCollection, 1},
+        {kFaMPre, kChangeStreamImagesEnabled, kNotRetryable, 1},
+        {kFaMPre, kChangeStreamImagesEnabled, kRecordInSideCollection, 1},
         // FindAndModify asking for a postImage.
-        {kFaMPost, kDoNotRecordPreImages, kChangeStreamImagesDisabled, kNotRetryable, 1},
-        {kFaMPost, kDoNotRecordPreImages, kChangeStreamImagesDisabled, kRecordInSideCollection, 1},
-        {kFaMPost, kDoNotRecordPreImages, kChangeStreamImagesEnabled, kNotRetryable, 1},
-        {kFaMPost, kDoNotRecordPreImages, kChangeStreamImagesEnabled, kRecordInSideCollection, 1},
-        {kFaMPost, kRecordPreImages, kChangeStreamImagesDisabled, kNotRetryable, 2},
-        {kFaMPost, kRecordPreImages, kChangeStreamImagesDisabled, kRecordInSideCollection, 2}};
+        {kFaMPost, kChangeStreamImagesDisabled, kNotRetryable, 1},
+        {kFaMPost, kChangeStreamImagesDisabled, kRecordInSideCollection, 1},
+        {kFaMPost, kChangeStreamImagesEnabled, kNotRetryable, 1},
+        {kFaMPost, kChangeStreamImagesEnabled, kRecordInSideCollection, 1}};
 
     const NamespaceString _nss{boost::none, "test", "coll"};
     const UUID _uuid = UUID::gen();
@@ -2528,39 +2508,6 @@ TEST_F(OnUpdateOutputsTest, TestFundamentalTransactionOnUpdateOutputs) {
             opCtx, testCase, updateEntryArgs, oplogs, updateOplogEntry, applyOpsOplogEntry);
         checkChangeStreamImagesIfNeeded(opCtx, testCase, updateEntryArgs, updateOplogEntry);
     }
-}
-
-TEST_F(OnUpdateOutputsTest,
-       RetryableInternalTransactionUpdateWithPreImageRecordingEnabledOnShardServerThrows) {
-    // Create a registry that only registers the Impl. It can be challenging to call methods on
-    // the Impl directly. It falls into cases where `ReservedTimes` is expected to be
-    // instantiated. Due to strong encapsulation, we use the registry that managers the
-    // `ReservedTimes` on our behalf.
-    OpObserverRegistry opObserver;
-    opObserver.addObserver(std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
-
-    auto opCtxRaii = cc().makeOperationContext();
-    OperationContext* opCtx = opCtxRaii.get();
-
-    resetOplogAndTransactions(opCtx);
-
-    std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
-    beginRetryableInternalTransactionWithTxnNumber(opCtx, 0, contextSession);
-
-    CollectionUpdateArgs updateArgs;
-    updateArgs.preImageRecordingEnabledForCollection = true;
-    updateArgs.preImageDoc = BSON("_id" << 0 << "preImage" << true);
-    updateArgs.updatedDoc = BSON("_id" << 0 << "postImage" << true);
-    updateArgs.update =
-        BSON("$set" << BSON("postImage" << true) << "$unset" << BSON("preImage" << 1));
-    updateArgs.criteria = BSON("_id" << 0);
-    OplogUpdateEntryArgs updateEntryArgs(&updateArgs, _nss, _uuid);
-    serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-    ON_BLOCK_EXIT([] { serverGlobalParams.clusterRole = ClusterRole::None; });
-
-    WriteUnitOfWork wuow(opCtx);
-    AutoGetCollection locks(opCtx, _nss, MODE_IX);
-    ASSERT_THROWS_CODE(opObserver.onUpdate(opCtx, updateEntryArgs), DBException, 6462400);
 }
 
 struct InsertTestCase {
@@ -2660,7 +2607,6 @@ TEST_F(OpObserverTest, TestFundamentalOnInsertsOutputs) {
 }
 
 struct DeleteTestCase {
-    bool alwaysRecordPreImages;
     bool changeStreamImagesEnabled;
     RetryableFindAndModifyLocation retryableOptions;
 
@@ -2726,22 +2672,6 @@ DEATH_TEST_REGEX_F(BatchedWriteOutputsTest,
     auto entry = repl::MutableOplogEntry::makeDeleteOperation(_nss, UUID::gen(), BSON("_id" << 0));
     entry.setChangeStreamPreImageRecordingMode(
         repl::ReplOperation::ChangeStreamPreImageRecordingMode::kPreImagesCollection);
-    bwc.addBatchedOperation(opCtx, entry);
-}
-
-DEATH_TEST_REGEX_F(BatchedWriteOutputsTest,
-                   TestDoesNotSupportPreImagesInOplog,
-                   "Invariant "
-                   "failure.*getChangeStreamPreImageRecordingMode.*repl::ReplOperation::"
-                   "ChangeStreamPreImageRecordingMode::kOff") {
-    auto opCtxRaii = cc().makeOperationContext();
-    OperationContext* opCtx = opCtxRaii.get();
-    WriteUnitOfWork wuow(opCtx, true /* groupOplogEntries */);
-
-    auto& bwc = BatchedWriteContext::get(opCtx);
-    auto entry = repl::MutableOplogEntry::makeDeleteOperation(_nss, UUID::gen(), BSON("_id" << 0));
-    entry.setChangeStreamPreImageRecordingMode(
-        repl::ReplOperation::ChangeStreamPreImageRecordingMode::kOplog);
     bwc.addBatchedOperation(opCtx, entry);
 }
 
@@ -3284,7 +3214,6 @@ protected:
     void logTestCase(const DeleteTestCase& testCase) {
         LOGV2(5739905,
               "DeleteTestCase",
-              "PreImageRecording"_attr = testCase.alwaysRecordPreImages,
               "ChangeStreamPreAndPostImagesEnabled"_attr = testCase.changeStreamImagesEnabled,
               "RetryableFindAndModifyLocation"_attr =
                   testCase.getRetryableFindAndModifyLocationStr(),
@@ -3294,7 +3223,6 @@ protected:
     void initializeOplogDeleteEntryArgs(OperationContext* opCtx,
                                         const DeleteTestCase& testCase,
                                         OplogDeleteEntryArgs* deleteArgs) {
-        deleteArgs->preImageRecordingEnabledForCollection = testCase.alwaysRecordPreImages;
         deleteArgs->changeStreamPreAndPostImagesEnabledForCollection =
             testCase.changeStreamImagesEnabled;
 
@@ -3306,8 +3234,7 @@ protected:
                 deleteArgs->retryableFindAndModifyLocation = kRecordInSideCollection;
                 break;
         }
-        if (testCase.isRetryable() || testCase.alwaysRecordPreImages ||
-            testCase.changeStreamImagesEnabled) {
+        if (testCase.isRetryable() || testCase.changeStreamImagesEnabled) {
             deleteArgs->deletedDoc = &_deletedDoc;
         }
     }
@@ -3320,8 +3247,7 @@ protected:
         const OplogEntry& deleteOplogEntry,
         const boost::optional<OplogEntry> applyOpsOplogEntry = boost::none) {
         bool didWriteInSideCollection =
-            deleteArgs.retryableFindAndModifyLocation == kRecordInSideCollection &&
-            !deleteArgs.preImageRecordingEnabledForCollection;
+            deleteArgs.retryableFindAndModifyLocation == kRecordInSideCollection;
         if (didWriteInSideCollection) {
             repl::ImageEntry imageEntry =
                 getImageEntryFromSideCollection(opCtx, *deleteOplogEntry.getSessionId());
@@ -3364,13 +3290,10 @@ protected:
         }
     }
 
-    std::vector<DeleteTestCase> _cases{
-        {kDoNotRecordPreImages, kChangeStreamImagesDisabled, kNotRetryable, 1},
-        {kDoNotRecordPreImages, kChangeStreamImagesDisabled, kRecordInSideCollection, 1},
-        {kDoNotRecordPreImages, kChangeStreamImagesEnabled, kNotRetryable, 1},
-        {kDoNotRecordPreImages, kChangeStreamImagesEnabled, kRecordInSideCollection, 1},
-        {kRecordPreImages, kChangeStreamImagesDisabled, kNotRetryable, 2},
-        {kRecordPreImages, kChangeStreamImagesDisabled, kRecordInSideCollection, 2}};
+    std::vector<DeleteTestCase> _cases{{kChangeStreamImagesDisabled, kNotRetryable, 1},
+                                       {kChangeStreamImagesDisabled, kRecordInSideCollection, 1},
+                                       {kChangeStreamImagesEnabled, kNotRetryable, 1},
+                                       {kChangeStreamImagesEnabled, kRecordInSideCollection, 1}};
 
     const NamespaceString _nss{boost::none, "test", "coll"};
     const UUID _uuid = UUID::gen();
@@ -3475,39 +3398,6 @@ TEST_F(OnDeleteOutputsTest, TestTransactionFundamentalOnDeleteOutputs) {
             opCtx, testCase, deleteEntryArgs, oplogs, deleteOplogEntry, applyOpsOplogEntry);
         checkChangeStreamImagesIfNeeded(opCtx, testCase, deleteEntryArgs, deleteOplogEntry);
     }
-}
-
-TEST_F(OnDeleteOutputsTest,
-       RetryableInternalTransactionDeleteWithPreImageRecordingEnabledOnShardServerThrows) {
-    // Create a registry that only registers the Impl. It can be challenging to call methods on
-    // the Impl directly. It falls into cases where `ReservedTimes` is expected to be
-    // instantiated. Due to strong encapsulation, we use the registry that managers the
-    // `ReservedTimes` on our behalf.
-    OpObserverRegistry opObserver;
-    opObserver.addObserver(std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
-
-    auto opCtxRaii = cc().makeOperationContext();
-    OperationContext* opCtx = opCtxRaii.get();
-
-    resetOplogAndTransactions(opCtx);
-
-    std::unique_ptr<MongoDSessionCatalog::Session> contextSession;
-    beginRetryableInternalTransactionWithTxnNumber(opCtx, 0, contextSession);
-
-    OplogDeleteEntryArgs deleteEntryArgs;
-    deleteEntryArgs.preImageRecordingEnabledForCollection = true;
-    serverGlobalParams.clusterRole = ClusterRole::ShardServer;
-    ON_BLOCK_EXIT([] { serverGlobalParams.clusterRole = ClusterRole::None; });
-
-    WriteUnitOfWork wuow(opCtx);
-    AutoGetCollection locks(opCtx, _nss, MODE_IX);
-    // This test does not call `OpObserver::aboutToDelete`. That method has the side-effect
-    // of setting of `documentKey` on the delete for sharding purposes.
-    // `OpObserverImpl::onDelete` asserts its existence.
-    repl::documentKeyDecoration(opCtx).emplace(_deletedDoc["_id"].wrap(), boost::none);
-    ASSERT_THROWS_CODE(opObserver.onDelete(opCtx, _nss, _uuid, 1 /* stmtId */, deleteEntryArgs),
-                       DBException,
-                       6462401);
 }
 
 class OpObserverMultiEntryTransactionTest : public OpObserverTransactionTest {
@@ -3682,159 +3572,6 @@ TEST_F(OpObserverMultiEntryTransactionTest, TransactionalUpdateTest) {
                                            << "o2" << BSON("_id" << 1)))
                         << "count" << 2);
     ASSERT_BSONOBJ_EQ(oExpected, oplogEntries[1].getObject());
-}
-
-TEST_F(OpObserverMultiEntryTransactionTest, TransactionPreImageTest) {
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-    txnParticipant.unstashTransactionResources(opCtx(), "txntest");
-
-    CollectionUpdateArgs updateArgs1;
-    const auto updateSpec = BSON("$set" << BSON("data"
-                                                << "x"));
-    const auto updatePreImage = BSON("_id" << 0 << "data"
-                                           << "y");
-    const auto updatePostImage = BSON("_id" << 0 << "data"
-                                            << "x");
-    const auto updateFilter = BSON("_id" << 0);
-
-    updateArgs1.stmtIds = {0};
-    updateArgs1.updatedDoc = updatePostImage;
-    updateArgs1.update = updateSpec;
-    updateArgs1.preImageDoc = updatePreImage;
-    updateArgs1.preImageRecordingEnabledForCollection = true;
-    updateArgs1.criteria = updateFilter;
-    OplogUpdateEntryArgs update1(&updateArgs1, nss1, uuid1);
-
-    WriteUnitOfWork wuow(opCtx());
-    AutoGetCollection autoColl1(opCtx(), nss1, MODE_IX);
-    opObserver().onUpdate(opCtx(), update1);
-
-    const auto deletedDoc = BSON("_id" << 1 << "data"
-                                       << "z");
-    OplogDeleteEntryArgs args;
-    args.deletedDoc = &deletedDoc;
-    args.preImageRecordingEnabledForCollection = true;
-    opObserver().aboutToDelete(opCtx(), nss1, uuid1, deletedDoc);
-    opObserver().onDelete(opCtx(), nss1, uuid1, 0, args);
-
-    auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
-    opObserver().onUnpreparedTransactionCommit(opCtx(), txnOps, 2);
-
-    auto oplogEntryObjs = getNOplogEntries(opCtx(), 4);
-    std::vector<OplogEntry> oplogEntries;
-    mongo::repl::OpTime expectedPrevWriteOpTime;
-    for (const auto& oplogEntryObj : oplogEntryObjs) {
-        oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
-        const auto& oplogEntry = oplogEntries.back();
-        if (oplogEntry.getOpType() == repl::OpTypeEnum::kNoop) {
-            continue;
-        }
-        checkSessionAndTransactionFields(oplogEntryObj);
-        ASSERT(!oplogEntry.shouldPrepare());
-        ASSERT_TRUE(oplogEntry.getPrevWriteOpTimeInTransaction());
-        ASSERT_EQ(expectedPrevWriteOpTime, *oplogEntry.getPrevWriteOpTimeInTransaction());
-        ASSERT_LT(expectedPrevWriteOpTime.getTimestamp(), oplogEntry.getTimestamp());
-        expectedPrevWriteOpTime = repl::OpTime{oplogEntry.getTimestamp(), *oplogEntry.getTerm()};
-    }
-
-    ASSERT(oplogEntries[0].getOpType() == repl::OpTypeEnum::kNoop);
-    ASSERT_BSONOBJ_EQ(updatePreImage, oplogEntries[0].getObject());
-    ASSERT(oplogEntries[1].getOpType() == repl::OpTypeEnum::kNoop);
-    ASSERT_BSONOBJ_EQ(deletedDoc, oplogEntries[1].getObject());
-    ASSERT_BSONOBJ_EQ(BSON("applyOps"
-                           << BSON_ARRAY(BSON("op"
-                                              << "u"
-                                              << "ns" << nss1.toString() << "ui" << uuid1 << "o"
-                                              << updateSpec << "o2" << BSON("_id" << 0)
-                                              << "preImageOpTime" << oplogEntries[0].getOpTime()))
-                           << "partialTxn" << true),
-                      oplogEntries[2].getObject());
-    ASSERT_BSONOBJ_EQ(BSON("applyOps"
-                           << BSON_ARRAY(BSON("op"
-                                              << "d"
-                                              << "ns" << nss1.toString() << "ui" << uuid1 << "o"
-                                              << BSON("_id" << 1) << "preImageOpTime"
-                                              << oplogEntries[1].getOpTime()))
-                           << "count" << 2),
-                      oplogEntries[3].getObject());
-}
-
-TEST_F(OpObserverMultiEntryTransactionTest, PreparedTransactionPreImageTest) {
-    auto txnParticipant = TransactionParticipant::get(opCtx());
-    txnParticipant.unstashTransactionResources(opCtx(), "txntest");
-
-    CollectionUpdateArgs updateArgs1;
-    const auto updateSpec = BSON("$set" << BSON("data"
-                                                << "x"));
-    const auto updatePreImage = BSON("_id" << 0 << "data"
-                                           << "y");
-    const auto updatePostImage = BSON("_id" << 0 << "data"
-                                            << "x");
-    const auto updateFilter = BSON("_id" << 0);
-
-    updateArgs1.stmtIds = {0};
-    updateArgs1.updatedDoc = updatePostImage;
-    updateArgs1.update = updateSpec;
-    updateArgs1.preImageDoc = updatePreImage;
-    updateArgs1.preImageRecordingEnabledForCollection = true;
-    updateArgs1.criteria = updateFilter;
-    OplogUpdateEntryArgs update1(&updateArgs1, nss1, uuid1);
-
-    AutoGetCollection autoColl1(opCtx(), nss1, MODE_IX);
-    opObserver().onUpdate(opCtx(), update1);
-
-    const auto deletedDoc = BSON("_id" << 1 << "data"
-                                       << "z");
-    OplogDeleteEntryArgs args;
-    args.deletedDoc = &deletedDoc;
-    args.preImageRecordingEnabledForCollection = true;
-    opObserver().aboutToDelete(opCtx(), nss1, uuid1, deletedDoc);
-    opObserver().onDelete(opCtx(), nss1, uuid1, 0, args);
-
-    auto reservedSlots = reserveOpTimesInSideTransaction(opCtx(), 4);
-    auto prepareOpTime = reservedSlots.back();
-    txnParticipant.transitionToPreparedforTest(opCtx(), prepareOpTime);
-    prepareTransaction(reservedSlots, prepareOpTime, 2);
-
-    txnParticipant.stashTransactionResources(opCtx());
-    auto oplogEntryObjs = getNOplogEntries(opCtx(), 4);
-    std::vector<OplogEntry> oplogEntries;
-    mongo::repl::OpTime expectedPrevWriteOpTime;
-    for (const auto& oplogEntryObj : oplogEntryObjs) {
-        oplogEntries.push_back(assertGet(OplogEntry::parse(oplogEntryObj)));
-        const auto& oplogEntry = oplogEntries.back();
-        if (oplogEntry.getOpType() == repl::OpTypeEnum::kNoop) {
-            continue;
-        }
-        checkSessionAndTransactionFields(oplogEntryObj);
-        ASSERT_TRUE(oplogEntry.getPrevWriteOpTimeInTransaction());
-        ASSERT_EQ(expectedPrevWriteOpTime, *oplogEntry.getPrevWriteOpTimeInTransaction());
-        ASSERT_LT(expectedPrevWriteOpTime.getTimestamp(), oplogEntry.getTimestamp());
-        expectedPrevWriteOpTime = repl::OpTime{oplogEntry.getTimestamp(), *oplogEntry.getTerm()};
-    }
-
-    ASSERT(oplogEntries[0].getOpType() == repl::OpTypeEnum::kNoop);
-    ASSERT_BSONOBJ_EQ(updatePreImage, oplogEntries[0].getObject());
-    ASSERT(oplogEntries[1].getOpType() == repl::OpTypeEnum::kNoop);
-    ASSERT_BSONOBJ_EQ(deletedDoc, oplogEntries[1].getObject());
-    ASSERT_BSONOBJ_EQ(BSON("applyOps"
-                           << BSON_ARRAY(BSON("op"
-                                              << "u"
-                                              << "ns" << nss1.toString() << "ui" << uuid1 << "o"
-                                              << updateSpec << "o2" << BSON("_id" << 0)
-                                              << "preImageOpTime" << oplogEntries[0].getOpTime()))
-                           << "partialTxn" << true),
-                      oplogEntries[2].getObject());
-    ASSERT_BSONOBJ_EQ(BSON("applyOps"
-                           << BSON_ARRAY(BSON("op"
-                                              << "d"
-                                              << "ns" << nss1.toString() << "ui" << uuid1 << "o"
-                                              << BSON("_id" << 1) << "preImageOpTime"
-                                              << oplogEntries[1].getOpTime()))
-                           << "prepare" << true << "count" << 2),
-                      oplogEntries[3].getObject());
-
-    txnParticipant.unstashTransactionResources(opCtx(), "abortTransaction");
 }
 
 TEST_F(OpObserverMultiEntryTransactionTest, TransactionalDeleteTest) {

@@ -275,8 +275,12 @@ TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
 }
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentCollectionAndDocExist) {
+    // Setup the pre-images collection.
+    ChangeStreamPreImagesCollectionManager::createPreImagesCollection(_opCtx.get(),
+                                                                      boost::none /* tenantId */);
     const NamespaceString nss("test.t");
-    createCollection(_opCtx.get(), nss, createRecordPreImageCollectionOptions());
+    createCollection(
+        _opCtx.get(), nss, createRecordChangeStreamPreAndPostImagesCollectionOptions());
     ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {BSON("_id" << 0)}, 0));
     auto op = makeOplogEntry(OpTypeEnum::kDelete, nss, {});
     _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, true);
@@ -391,8 +395,11 @@ TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
 }
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentCollectionLockedByUUID) {
+    // Setup the pre-images collection.
+    ChangeStreamPreImagesCollectionManager::createPreImagesCollection(_opCtx.get(),
+                                                                      boost::none /* tenantId */);
     const NamespaceString nss("test.t");
-    CollectionOptions options = createRecordPreImageCollectionOptions();
+    CollectionOptions options = createRecordChangeStreamPreAndPostImagesCollectionOptions();
     options.uuid = kUuid;
     createCollection(_opCtx.get(), nss, options);
 
@@ -742,6 +749,9 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentIncorr
 }
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentIncludesTenantId) {
+    // Setup the pre-images collection.
+    ChangeStreamPreImagesCollectionManager::createPreImagesCollection(_opCtx.get(),
+                                                                      boost::none /* tenantId */);
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     const TenantId tid(OID::gen());
@@ -750,7 +760,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentInclud
 
     // this allows us to set deleteArgs.deletedDoc needed by the onDeleteFn validation function in
     // _testApplyOplogEntryOrGroupedInsertsCrudOperation below
-    CollectionOptions options = createRecordPreImageCollectionOptions();
+    CollectionOptions options = createRecordChangeStreamPreAndPostImagesCollectionOptions();
 
     repl::createCollection(_opCtx.get(), nss, options);
     ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {doc}, 0));

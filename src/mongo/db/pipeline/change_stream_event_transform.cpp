@@ -144,7 +144,6 @@ std::set<std::string> ChangeStreamDefaultEventTransformation::getFieldNameDepend
                                             repl::OplogEntry::kWallClockTimeFieldName.toString()};
 
     if (_preImageRequested || _postImageRequested) {
-        accessedFields.insert(repl::OplogEntry::kPreImageOpTimeFieldName.toString());
         accessedFields.insert(DocumentSourceChangeStream::kApplyOpsIndexField.toString());
         accessedFields.insert(DocumentSourceChangeStream::kApplyOpsTsField.toString());
     }
@@ -458,20 +457,13 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
     static const std::set<StringData> postImageOps = {DocumentSourceChangeStream::kUpdateOpType};
     if ((_preImageRequested && preImageOps.count(operationType)) ||
         (_postImageRequested && postImageOps.count(operationType))) {
-        auto preImageOpTime = input[repl::OplogEntry::kPreImageOpTimeFieldName];
-        if (!preImageOpTime.missing()) {
-            // Set 'kPreImageIdField' to the pre-image optime. The DSCSAddPreImage stage will use
-            // this optime in order to fetch the pre-image from the oplog.
-            doc.addField(DocumentSourceChangeStream::kPreImageIdField, std::move(preImageOpTime));
-        } else {
-            // Set 'kPreImageIdField' to the 'ChangeStreamPreImageId'. The DSCSAddPreImage stage
-            // will use the id in order to fetch the pre-image from the pre-images collection.
-            const auto preImageId = ChangeStreamPreImageId(
-                uuid.getUuid(),
-                applyOpsEntryTs.missing() ? ts.getTimestamp() : applyOpsEntryTs.getTimestamp(),
-                applyOpsIndex.missing() ? 0 : applyOpsIndex.getLong());
-            doc.addField(DocumentSourceChangeStream::kPreImageIdField, Value(preImageId.toBSON()));
-        }
+        // Set 'kPreImageIdField' to the 'ChangeStreamPreImageId'. The DSCSAddPreImage stage
+        // will use the id in order to fetch the pre-image from the pre-images collection.
+        const auto preImageId = ChangeStreamPreImageId(
+            uuid.getUuid(),
+            applyOpsEntryTs.missing() ? ts.getTimestamp() : applyOpsEntryTs.getTimestamp(),
+            applyOpsIndex.missing() ? 0 : applyOpsIndex.getLong());
+        doc.addField(DocumentSourceChangeStream::kPreImageIdField, Value(preImageId.toBSON()));
     }
 
     // Add the 'ns' field to the change stream document, based on the final value of 'nss'.

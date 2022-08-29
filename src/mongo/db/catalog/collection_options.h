@@ -123,11 +123,10 @@ struct CollectionOptions {
     } autoIndexId = DEFAULT;
 
     bool temp = false;
-    bool recordPreImages = false;
 
     // Change stream options define whether or not to store the pre-images of the documents affected
     // by update and delete operations in a dedicated collection, that will be used for reading data
-    // via changeStreams. Can not be enabled together with 'recordPreImages' (mutually exclusive).
+    // via changeStreams.
     ChangeStreamPreAndPostImagesOptions changeStreamPreAndPostImagesOptions{false};
 
     // Storage engine collection options. Always owned or empty.

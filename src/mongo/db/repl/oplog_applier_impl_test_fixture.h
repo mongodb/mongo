@@ -299,10 +299,10 @@ OplogEntry makeOplogEntry(OpTypeEnum opType, NamespaceString nss, boost::optiona
  */
 CollectionOptions createOplogCollectionOptions();
 
-/*
- * Creates collection options for recording pre-images for testing deletes.
+/**
+ * Creates collection options for recording change stream pre-images for testing deletes.
  */
-CollectionOptions createRecordPreImageCollectionOptions();
+CollectionOptions createRecordChangeStreamPreAndPostImagesCollectionOptions();
 
 /**
  * Create test collection.

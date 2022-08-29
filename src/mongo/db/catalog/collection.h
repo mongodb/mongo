@@ -83,7 +83,6 @@ struct CollectionUpdateArgs {
     OperationSource source = OperationSource::kStandard;
 
     StoreDocOption storeDocOption = StoreDocOption::None;
-    bool preImageRecordingEnabledForCollection = false;
     bool changeStreamPreAndPostImagesEnabledForCollection = false;
 
     // Set if OpTimes were reserved for the update ahead of time.
@@ -416,9 +415,6 @@ public:
                                    boost::optional<ValidationActionEnum> newAction) = 0;
 
     virtual Status checkValidatorAPIVersionCompatability(OperationContext* opCtx) const = 0;
-
-    virtual bool getRecordPreImages() const = 0;
-    virtual void setRecordPreImages(OperationContext* opCtx, bool val) = 0;
 
     virtual bool isChangeStreamPreAndPostImagesEnabled() const = 0;
     virtual void setChangeStreamPreAndPostImages(OperationContext* opCtx,

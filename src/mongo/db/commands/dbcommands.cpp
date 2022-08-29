@@ -533,15 +533,6 @@ public:
             "collMod on a time-series collection's underlying buckets collection is not supported.",
             !cmd->getNamespace().isTimeseriesBucketsCollection());
 
-        const auto isChangeStreamPreAndPostImagesEnabled =
-            (cmd->getChangeStreamPreAndPostImages() &&
-             cmd->getChangeStreamPreAndPostImages()->getEnabled());
-        const auto isRecordPreImagesEnabled = cmd->getRecordPreImages().get_value_or(false);
-        uassert(ErrorCodes::InvalidOptions,
-                "'recordPreImages' and 'changeStreamPreAndPostImages.enabled' can not be set "
-                "to true simultaneously",
-                !(isChangeStreamPreAndPostImagesEnabled && isRecordPreImagesEnabled));
-
         // Updating granularity on sharded time-series collections is not allowed.
         if (Grid::get(opCtx)->catalogClient() && cmd->getTimeseries() &&
             cmd->getTimeseries()->getGranularity()) {

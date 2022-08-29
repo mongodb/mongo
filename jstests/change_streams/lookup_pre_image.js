@@ -122,7 +122,7 @@ latestChange.fullDocumentBeforeChange = null;
 assert.docEq(latestChange, cst.getOneChange(csPreImageWhenAvailableCursor));
 // ... but the "required" cursor throws an exception.
 assert.throwsWithCode(() => cst.getOneChange(csPreImageRequiredCursor),
-                      [ErrorCodes.NoMatchingDocument, 51770]);
+                      ErrorCodes.NoMatchingDocument);
 
 // Test pre-image lookup for an op-style update operation.
 assert.commandWorked(coll.update({_id: "y"}, {$set: {foo: "baz"}}));

@@ -263,14 +263,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    bool getRecordPreImages() const {
-        MONGO_UNREACHABLE;
-    }
-
-    void setRecordPreImages(OperationContext* opCtx, bool val) {
-        MONGO_UNREACHABLE;
-    }
-
     bool isChangeStreamPreAndPostImagesEnabled() const {
         MONGO_UNREACHABLE;
     }

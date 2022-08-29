@@ -24,11 +24,6 @@ function testDeleteInMultiDocTxn({collName, deleteCommand, expectedChanges}) {
     // Initialize the collection.
     const coll = assertDropAndRecreateCollection(db, collName);
 
-    // Enable the 'recordPreImages' flag on the collection. This allows us to verify that the full
-    // document is not written to the 'documentKey' field even when we know it is available to the
-    // oplog writer during the delete operation.
-    assert.commandWorked(db.runCommand({collMod: collName, recordPreImages: true}));
-
     assert.commandWorked(coll.insertMany([
         {_id: 1, a: 0, fullDoc: "It's a full document!"},
         {_id: 2, a: 0},

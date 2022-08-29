@@ -1,6 +1,6 @@
 /**
- * Test that nodes are able to startup with 'recordPreImages' and 'changeStreamPreAndPostImages'
- * options set in collection metadata and no pre-images are recorded while being in standalone mode.
+ * Test that nodes are able to startup with 'changeStreamPreAndPostImages' options set in collection
+ * metadata and no pre-images are recorded while being in standalone mode.
  *
  * @tags: [
  *   # Servers are restarted in this test and the data must be retained.
@@ -137,22 +137,6 @@ function testStandaloneMode({
 
     rst.stopSet();
 }
-
-// Run the test for 'recordPreImages' option.
-testStandaloneMode({
-    collectionOptions: {recordPreImages: true},
-    assertPreImagesRecordingEnabledFunc: (db, collName) => {
-        assert.eq(findCollectionInfo(db, collName).options.recordPreImages, true);
-    },
-    assertPreImagesRecordedFunc: (db, writerOps) => {
-        const writtenOplogEntries = oplogEntriesForOps(db, writerOps);
-        assert.gt(writtenOplogEntries.length, 0, writtenOplogEntries);
-    },
-    assertNoPreImagesRecordedFunc: (db, writerOps) => {
-        const writtenOplogEntries = oplogEntriesForOps(db, writerOps);
-        assert.eq(writtenOplogEntries.length, 0, writtenOplogEntries);
-    }
-});
 
 // Run the test for 'changeStreamPreAndPostImages' option.
 testStandaloneMode({

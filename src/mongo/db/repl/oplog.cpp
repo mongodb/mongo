@@ -622,12 +622,6 @@ void appendOplogEntryChainInfo(OperationContext* opCtx,
                                const std::vector<StmtId>& stmtIds) {
     invariant(!stmtIds.empty());
 
-    // We sometimes have a pre-image no-op entry even for normal non-retryable writes
-    // if recordPreImages is enabled on the collection.
-    if (!oplogLink->preImageOpTime.isNull()) {
-        oplogEntry->setPreImageOpTime(oplogLink->preImageOpTime);
-    }
-
     // Not a retryable write.
     if (stmtIds.front() == kUninitializedStmtId) {
         // If the statement id is uninitialized, it must be the only one. There cannot also be
@@ -645,9 +639,6 @@ void appendOplogEntryChainInfo(OperationContext* opCtx,
         oplogLink->prevOpTime = txnParticipant.getLastWriteOpTime();
     }
     oplogEntry->setPrevWriteOpTimeInTransaction(oplogLink->prevOpTime);
-    if (!oplogLink->postImageOpTime.isNull()) {
-        oplogEntry->setPostImageOpTime(oplogLink->postImageOpTime);
-    }
 }
 
 namespace {

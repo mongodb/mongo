@@ -49,43 +49,6 @@
 namespace mongo {
 namespace change_stream_legacy {
 
-// TODO SERVER-60919 remove 'legacyLookupPreImage' function.
-boost::optional<Document> legacyLookupPreImage(boost::intrusive_ptr<ExpressionContext> pExpCtx,
-                                               const Document& preImageId) {
-    // We need the oplog's UUID for lookup, so obtain the collection info via MongoProcessInterface.
-    auto localOplogInfo = pExpCtx->mongoProcessInterface->getCollectionOptions(
-        pExpCtx->opCtx, NamespaceString::kRsOplogNamespace);
-
-    // Extract the UUID from the collection information. We should always have a valid uuid here.
-    auto oplogUUID = invariantStatusOK(UUID::parse(localOplogInfo["uuid"]));
-
-    // Look up the pre-image oplog entry using the opTime as the query filter.
-    const auto opTime = repl::OpTime::parse(preImageId.toBson());
-    auto lookedUpDoc =
-        pExpCtx->mongoProcessInterface->lookupSingleDocument(pExpCtx,
-                                                             NamespaceString::kRsOplogNamespace,
-                                                             oplogUUID,
-                                                             Document{opTime.asQuery()},
-                                                             boost::none);
-
-    // Return boost::none to signify that we failed to find the pre-image.
-    if (!lookedUpDoc) {
-        return boost::none;
-    }
-
-    // If we had an optime to look up, and we found an oplog entry with that timestamp, then we
-    // should always have a valid no-op entry containing a valid, non-empty pre-image document.
-    auto opLogEntry = uassertStatusOK(repl::OplogEntry::parse(lookedUpDoc->toBson()));
-    tassert(5868901,
-            "Oplog entry type must be a no-op",
-            opLogEntry.getOpType() == repl::OpTypeEnum::kNoop);
-    tassert(5868902,
-            "Oplog entry must contait a non-empty pre-image document",
-            !opLogEntry.getObject().isEmpty());
-
-    return Document{opLogEntry.getObject().getOwned()};
-}
-
 // TODO SERVER-66138: This function can be removed after we branch for 7.0.
 void populateInternalOperationFilter(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                      BSONArrayBuilder* orBuilder) {

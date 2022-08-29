@@ -74,7 +74,6 @@ std::unique_ptr<CollMod> makeTimeseriesBucketsCollModCommand(OperationContext* o
     request.setValidationAction(origCmd.getValidationAction());
     request.setViewOn(origCmd.getViewOn());
     request.setPipeline(origCmd.getPipeline());
-    request.setRecordPreImages(origCmd.getRecordPreImages());
     request.setChangeStreamPreAndPostImages(origCmd.getChangeStreamPreAndPostImages());
     request.setExpireAfterSeconds(origCmd.getExpireAfterSeconds());
     request.setTimeseries(origCmd.getTimeseries());

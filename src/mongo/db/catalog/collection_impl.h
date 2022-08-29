@@ -265,9 +265,6 @@ public:
      */
     Status checkValidatorAPIVersionCompatability(OperationContext* opCtx) const final;
 
-    bool getRecordPreImages() const final;
-    void setRecordPreImages(OperationContext* opCtx, bool val) final;
-
     bool isChangeStreamPreAndPostImagesEnabled() const final;
     void setChangeStreamPreAndPostImages(OperationContext* opCtx,
                                          ChangeStreamPreAndPostImagesOptions val) final;

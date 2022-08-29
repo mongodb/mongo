@@ -90,19 +90,8 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamAddPreImage::doGetNext()
         return input;
     }
 
-    // If a pre-image is available, the transform stage will have populated it in the event's
-    // 'fullDocumentBeforeChange' field. If this field is missing and the pre-imaging mode is
-    // 'required', we throw an exception. Otherwise, we pass along the document unmodified.
     auto preImageId = input.getDocument()[kPreImageIdFieldName];
-    if (preImageId.missing()) {
-        uassert(51770,
-                str::stream()
-                    << "Change stream was configured to require a pre-image for all update, delete "
-                       "and replace events, but pre-image id was not available for event: "
-                    << makePreImageNotFoundErrorMsg(input.getDocument()),
-                _fullDocumentBeforeChangeMode != FullDocumentBeforeChangeModeEnum::kRequired);
-        return input;
-    }
+    tassert(6091900, "Pre-image id field is missing", !preImageId.missing());
     tassert(5868900,
             "Expected pre-image id field to be a document",
             preImageId.getType() == BSONType::Object);
@@ -130,12 +119,6 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamAddPreImage::doGetNext()
 
 boost::optional<Document> DocumentSourceChangeStreamAddPreImage::lookupPreImage(
     boost::intrusive_ptr<ExpressionContext> pExpCtx, const Document& preImageId) {
-    // If the pre-image id does not contain the nsUUID field, then it is in legacy format. Look
-    // up the pre-image in the oplog.
-    if (preImageId[ChangeStreamPreImageId::kNsUUIDFieldName].missing()) {
-        return change_stream_legacy::legacyLookupPreImage(pExpCtx, preImageId);
-    }
-
     // Look up the pre-image document on the local node by id.
     auto lookedUpDoc = pExpCtx->mongoProcessInterface->lookupSingleDocumentLocally(
         pExpCtx,

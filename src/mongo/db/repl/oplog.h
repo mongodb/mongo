@@ -84,20 +84,14 @@ struct OplogLink {
     OplogLink() = default;
 
     OpTime prevOpTime;
-    OpTime preImageOpTime;
-    OpTime postImageOpTime;
 };
 
 /**
- * Set the "lsid", "txnNumber", "stmtId", "prevOpTime", "preImageOpTime" and "postImageOpTime"
- * fields of the oplogEntry based on the given oplogLink for retryable writes (i.e. when
- * stmtIds.front() != kUninitializedStmtId).
+ * Set the "lsid", "txnNumber", "stmtId", "prevOpTime" fields of the oplogEntry based on the given
+ * oplogLink for retryable writes (i.e. when stmtIds.front() != kUninitializedStmtId).
  *
  * If the given oplogLink.prevOpTime is a null OpTime, both the oplogLink.prevOpTime and the
  * "prevOpTime" field of the oplogEntry will be set to the TransactionParticipant's lastWriteOpTime.
- * The "preImageOpTime" field will only be set if the given oplogLink.preImageOpTime is not null.
- * Similarly, the "postImageOpTime" field will only be set if the given oplogLink.postImageOpTime is
- * not null.
  */
 void appendOplogEntryChainInfo(OperationContext* opCtx,
                                MutableOplogEntry* oplogEntry,

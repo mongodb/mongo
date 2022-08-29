@@ -176,8 +176,6 @@ StatusWith<CollectionOptions> CollectionOptions::parse(const BSONObj& options, P
             continue;
         } else if (fieldName == "temp") {
             collectionOptions.temp = e.trueValue();
-        } else if (fieldName == "recordPreImages") {
-            collectionOptions.recordPreImages = e.trueValue();
         } else if (fieldName == "changeStreamPreAndPostImages") {
             if (e.type() != mongo::Object) {
                 return {ErrorCodes::InvalidOptions,
@@ -368,9 +366,6 @@ CollectionOptions CollectionOptions::fromCreateCommand(const CreateCommand& cmd)
     if (auto collation = cmd.getCollation()) {
         options.collation = collation->toBSON();
     }
-    if (auto recordPreImages = cmd.getRecordPreImages()) {
-        options.recordPreImages = *recordPreImages;
-    }
     if (auto changeStreamPreAndPostImagesOptions = cmd.getChangeStreamPreAndPostImages()) {
         options.changeStreamPreAndPostImagesOptions = *changeStreamPreAndPostImagesOptions;
     }
@@ -439,10 +434,6 @@ void CollectionOptions::appendBSON(BSONObjBuilder* builder,
 
     if (temp && shouldAppend(CreateCommand::kTempFieldName))
         builder->appendBool(CreateCommand::kTempFieldName, true);
-
-    if (recordPreImages && shouldAppend(CreateCommand::kRecordPreImagesFieldName)) {
-        builder->appendBool(CreateCommand::kRecordPreImagesFieldName, true);
-    }
 
     if (changeStreamPreAndPostImagesOptions.getEnabled() &&
         shouldAppend(CreateCommand::kChangeStreamPreAndPostImagesFieldName)) {
@@ -527,10 +518,6 @@ bool CollectionOptions::matchesStorageOptions(const CollectionOptions& other,
     }
 
     if (autoIndexId != other.autoIndexId) {
-        return false;
-    }
-
-    if (recordPreImages != other.recordPreImages) {
         return false;
     }
 

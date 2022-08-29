@@ -323,15 +323,6 @@ public:
                 cmd.setIdIndex(idIndexSpec);
             }
 
-            const auto isChangeStreamPreAndPostImagesEnabled =
-                (cmd.getChangeStreamPreAndPostImages() &&
-                 cmd.getChangeStreamPreAndPostImages()->getEnabled());
-            const auto isRecordPreImagesEnabled = cmd.getRecordPreImages().get_value_or(false);
-            uassert(ErrorCodes::InvalidOptions,
-                    "'recordPreImages' and 'changeStreamPreAndPostImages.enabled' can not be "
-                    "set to true simultaneously",
-                    !(isChangeStreamPreAndPostImagesEnabled && isRecordPreImagesEnabled));
-
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
                 unsafeCreateCollection(opCtx);
             uassertStatusOK(createCollection(opCtx, cmd));

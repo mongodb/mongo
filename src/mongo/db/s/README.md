@@ -964,24 +964,16 @@ to assign to the forged no-op oplog entry as result of the "downconvert", we mus
 extra oplog slot when writing the original retryable findAndModify oplog entry with
 `needsRetryImage: true`.
 
-The server also supports [collection-level pre-images](https://docs.mongodb.com/realm/mongodb/trigger-preimages/#overview), a feature used by MongoDB Realm. This feature continues to store document pre-images in
-the oplog, and is expected to work with the new retryable findAndModify behavior described above.
-With this, it's possible that for a particular update operation, we must store a pre-image
-(for collection-level pre-images) in the oplog while storing the post-image
-(for retryable findAndModify) in `config.image_collection`. In order to avoid certain WiredTiger
-constraints surrounding setting multiple timestamps in a single storage transaction, we must reserve
+In order to avoid certain WiredTiger constraints surrounding setting multiple timestamps in a single storage transaction, we must reserve
 oplog slots before entering the OpObserver, which is where we would normally create an oplog entry
 and assign it the next available timestamp. Here, we have a table that describes the different
 scenarios, along with the timestamps that are reserved and the oplog entries assigned to each of
 those timestamps:
-| Parameters | NumSlotsReserved | TS - 2 | TS - 1 | TS | Oplog fields for entry with timestamp: TS |
-| --- | --- | --- | --- | --- | --- |
-| Update, NeedsRetryImage=postImage, preImageRecordingEnabled = True | 3 | No-op oplog entry storing the pre-image|Reserved for forged no-op entry eventually used by tenant migrations/resharding | Update oplog entry | NeedsRetryImage: postImage, preImageOpTime: \{TS - 2} |
-| Update, NeedsRetryImage=preImage, preImageRecordingEnabled=True | 3 |No-op oplog entry storing the pre-image | Reserved but will not be used|Update Oplog entry | preImageOpTime: \{TS - 2} |
-| Update, NeedsRetryImage=preImage, preImageRecordingEnabled=False | 2 | N/A | Reserved for forged no-op entry eventually used by tenant migrations/resharding|Update oplog entry|NeedsRetryImage: preImage |
-| Update, NeedsRetryImage=postImage, preImageRecordingEnabled=False | 2 | N/A | Reserved for forged no-op entry eventually used by tenant migrations/resharding|Update oplog entry | NeedsRetryImage: postImage |
-| Delete, NeedsRetryImage=preImage, preImageRecordingEnabled = True | 0. Note that the OpObserver will still create a no-op entry along with the delete oplog entry, assigning them the next two available timestamps (TS - 1 and TS respectively). | N/A | No-op oplog entry storing the pre-image|Delete oplog entry | preImageOpTime: \{TS - 1} |
-|Delete, NeedsRetryImage=preImage, preImageRecordingEnabled = False|2|N/A|Reserved for forged no-op entry eventually used by tenant migrations/resharding|Delete oplog entry|NeedsRetryImage: preImage|
+| Parameters | NumSlotsReserved | TS - 1 | TS | Oplog fields for entry with timestamp: TS |
+| --- | --- | --- | --- | --- |
+| Update, NeedsRetryImage=preImage | 2 | Reserved for forged no-op entry eventually used by tenant migrations/resharding|Update oplog entry|NeedsRetryImage: preImage |
+| Update, NeedsRetryImage=postImage | 2 | Reserved for forged no-op entry eventually used by tenant migrations/resharding|Update oplog entry | NeedsRetryImage: postImage |
+|Delete, NeedsRetryImage=preImage |2|Reserved for forged no-op entry eventually used by tenant migrations/resharding|Delete oplog entry|NeedsRetryImage: preImage|
 
 #### Code references
 * [**TransactionParticipant class**](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/transaction_participant.h)

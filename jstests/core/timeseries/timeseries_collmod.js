@@ -47,10 +47,6 @@ assert.commandFailedWithCode(db.runCommand({"collMod": collName, "validationActi
 assert.commandFailedWithCode(db.runCommand({"collMod": collName, "viewOn": "foo", "pipeline": []}),
                              ErrorCodes.InvalidOptions);
 
-// Tries to set 'recordPreImages' for a time-series collection.
-assert.commandFailedWithCode(db.runCommand({"collMod": collName, "recordPreImages": true}),
-                             ErrorCodes.InvalidOptions);
-
 // Successfully sets 'expireAfterSeconds' for a time-series collection.
 assert.commandWorked(db.runCommand({"collMod": collName, "expireAfterSeconds": 60}));
 

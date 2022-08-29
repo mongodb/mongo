@@ -102,7 +102,6 @@ struct ParsedCollModRequest {
     boost::optional<Collection::Validator> collValidator;
     boost::optional<ValidationActionEnum> collValidationAction;
     boost::optional<ValidationLevelEnum> collValidationLevel;
-    bool recordPreImages = false;
     boost::optional<ChangeStreamPreAndPostImagesOptions> changeStreamPreAndPostImagesOptions;
     int numModifications = 0;
     bool dryRun = false;
@@ -468,18 +467,6 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
         oplogEntryBuilder.append(CollMod::kViewOnFieldName, *viewOn);
     }
 
-    if (const auto& recordPreImages = cmr.getRecordPreImages()) {
-        if (isView) {
-            return getNotSupportedOnViewError(CollMod::kRecordPreImagesFieldName);
-        }
-        if (isTimeseries) {
-            return getNotSupportedOnTimeseriesError(CollMod::kRecordPreImagesFieldName);
-        }
-        parsed.numModifications++;
-        parsed.recordPreImages = *recordPreImages;
-        oplogEntryBuilder.append(CollMod::kRecordPreImagesFieldName, *recordPreImages);
-    }
-
     if (auto& changeStreamPreAndPostImages = cmr.getChangeStreamPreAndPostImages()) {
         if (isView) {
             return getNotSupportedOnViewError(CollMod::kChangeStreamPreAndPostImagesFieldName);
@@ -823,17 +810,6 @@ Status _collModInternal(OperationContext* opCtx,
 
         const CollectionOptions& oldCollOptions = coll->getCollectionOptions();
 
-        // If 'changeStreamPreAndPostImagesOptions' are enabled, 'recordPreImages' must be set
-        // to false. If 'recordPreImages' is set to true, 'changeStreamPreAndPostImagesOptions'
-        // must be disabled.
-        if (cmrNew.changeStreamPreAndPostImagesOptions &&
-            cmrNew.changeStreamPreAndPostImagesOptions->getEnabled()) {
-            cmrNew.recordPreImages = false;
-        }
-
-        if (cmrNew.recordPreImages) {
-            cmrNew.changeStreamPreAndPostImagesOptions = ChangeStreamPreAndPostImagesOptions(false);
-        }
         if (cmrNew.cappedSize || cmrNew.cappedMax) {
             // If the current capped collection size exceeds the newly set limits, future document
             // inserts will prompt document deletion.
@@ -866,10 +842,6 @@ Status _collModInternal(OperationContext* opCtx,
             uassertStatusOKWithContext(coll.getWritableCollection(opCtx)->setValidationLevel(
                                            opCtx, *cmrNew.collValidationLevel),
                                        "Failed to set validationLevel");
-        }
-
-        if (cmrNew.recordPreImages != oldCollOptions.recordPreImages) {
-            coll.getWritableCollection(opCtx)->setRecordPreImages(opCtx, cmrNew.recordPreImages);
         }
 
         if (cmrNew.changeStreamPreAndPostImagesOptions.has_value() &&

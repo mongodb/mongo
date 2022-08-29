@@ -78,9 +78,6 @@ public:
 
         // The pre-image is recorded in the change stream pre-images collection.
         kPreImagesCollection,
-
-        // The pre-image is recorded in the oplog as a separate entry.
-        kOplog,
     };
 
     static ReplOperation parse(const IDLParserContext& ctxt, const BSONObj& bsonObject) {
@@ -135,15 +132,6 @@ public:
      */
     void setChangeStreamPreImageRecordingMode(ChangeStreamPreImageRecordingMode value) {
         _preImageRecordingMode = value;
-    }
-
-    /**
-     * Returns true if the change stream pre-image is recorded in a dedicated oplog entry for this
-     * operation.
-     */
-    bool isChangeStreamPreImageRecordedInOplog() const {
-        return ReplOperation::ChangeStreamPreImageRecordingMode::kOplog ==
-            getChangeStreamPreImageRecordingMode();
     }
 
     /**
