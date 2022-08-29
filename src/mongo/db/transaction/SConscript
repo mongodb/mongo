@@ -7,8 +7,6 @@ env = env.Clone()
 env.Library(
     target='transaction',
     source=[
-        '$BUILD_DIR/mongo/db/session/session_catalog_mongod.cpp',
-        '$BUILD_DIR/mongo/db/session/session_txn_record.idl',
         'internal_transactions_reap_service.cpp',
         'retryable_writes_stats.cpp',
         'server_transactions_metrics.cpp',
@@ -45,6 +43,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/session/session_catalog',
+        '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
         '$BUILD_DIR/mongo/db/stats/fill_locker_info',
         '$BUILD_DIR/mongo/db/stats/top',
         '$BUILD_DIR/mongo/db/stats/transaction_stats',

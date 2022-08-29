@@ -80,6 +80,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/s/sharding_api_d',
         '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/db/session/session_catalog',
+        '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
         '$BUILD_DIR/mongo/db/timeseries/bucket_catalog',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_extended_range',
         '$BUILD_DIR/mongo/db/transaction/transaction',

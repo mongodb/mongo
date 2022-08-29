@@ -175,3 +175,30 @@ env.Library(
         'session_catalog',
     ],
 )
+
+env.Library(
+    target='session_catalog_mongod',
+    source=[
+        'session_catalog_mongod.cpp',
+        'session_txn_record.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/collection',
+        '$BUILD_DIR/mongo/db/catalog_raii',
+        '$BUILD_DIR/mongo/db/dbdirectclient',
+        '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
+        '$BUILD_DIR/mongo/db/index_commands_idl',
+        '$BUILD_DIR/mongo/db/internal_transactions_feature_flag',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/repl/repl_server_parameters',
+        '$BUILD_DIR/mongo/db/repl/storage_interface',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        'kill_sessions',
+        'logical_session_id',
+        'logical_session_id_helpers',
+        'session_catalog',
+    ],
+)
