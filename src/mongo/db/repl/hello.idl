@@ -148,7 +148,7 @@ structs:
             serviceId:
                 type: objectid
                 optional: true
-                stability: internal
+                stability: stable
             ##
             ## ReplicationInfo
             ##
@@ -318,4 +318,4 @@ commands:
             loadBalanced:
                 type: bool
                 optional: true
-                stability: unstable
+                stability: stable
