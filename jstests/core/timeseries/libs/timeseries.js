@@ -190,7 +190,7 @@ var TimeseriesTest = class {
 
     static ensureDataIsDistributedIfSharded(coll, splitPointDate) {
         const db = coll.getDB();
-        const buckets = db["system.buckets." + coll.getName()];
+        const buckets = db[this.getBucketsCollName(coll.getName())];
         if (FixtureHelpers.isSharded(buckets)) {
             const timeFieldName =
                 db.getCollectionInfos({name: coll.getName()})[0].options.timeseries.timeField;
@@ -238,5 +238,9 @@ var TimeseriesTest = class {
                 assert.eq(updatedShards.length, currentShards.length + 1);
             }
         }
+    }
+
+    static getBucketsCollName(collName) {
+        return `system.buckets.${collName}`;
     }
 };

@@ -286,6 +286,10 @@ last-continuous:
       test_file: jstests/sharding/move_chunk_interrupt_postimage.js
     - ticket: SERVER-64741
       test_file: jstests/sharding/append_oplog_note_mongos.js
+    - ticket: SERVER-68556
+      test_file: jstests/core/txns/txn_ops_allowed_on_buckets_coll.js
+    - ticket: SERVER-68556
+      test_file: jstests/core/txns/no_writes_to_system_collections_in_txn.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -705,6 +709,11 @@ last-lts:
       test_file: jstests/sharding/move_chunk_interrupt_postimage.js
     - ticket: SERVER-64741
       test_file: jstests/sharding/append_oplog_note_mongos.js
+    - ticket: SERVER-68556
+      test_file: jstests/core/txns/txn_ops_allowed_on_buckets_coll.js
+    - ticket: SERVER-68556
+      test_file: jstests/core/txns/no_writes_to_system_collections_in_txn.js
+
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

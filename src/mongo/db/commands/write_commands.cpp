@@ -76,6 +76,7 @@
 #include "mongo/db/timeseries/timeseries_stats.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction_validation.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/redaction.h"
@@ -478,20 +479,6 @@ void populateReply(OperationContext* opCtx,
         hooks->postProcessHandler();
 }
 
-void transactionChecks(OperationContext* opCtx, const NamespaceString& ns) {
-    if (!opCtx->inMultiDocumentTransaction())
-        return;
-    uassert(50791,
-            str::stream() << "Cannot write to system collection " << ns.toString()
-                          << " within a transaction.",
-            !ns.isSystem() || ns.isPrivilegeCollection() || ns.isTimeseriesBucketsCollection());
-    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    uassert(50790,
-            str::stream() << "Cannot write to unreplicated collection " << ns.toString()
-                          << " within a transaction.",
-            !replCoord->isOplogDisabledFor(opCtx, ns));
-}
-
 class CmdInsert final : public write_ops::InsertCmdVersion1Gen<CmdInsert> {
 public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
@@ -547,7 +534,7 @@ public:
         }
 
         write_ops::InsertCommandReply typedRun(OperationContext* opCtx) final try {
-            transactionChecks(opCtx, ns());
+            doTransactionValidationForWrites(opCtx, ns());
 
             if (request().getEncryptionInformation().has_value() &&
                 !request().getEncryptionInformation()->getCrudProcessed()) {
@@ -1489,7 +1476,7 @@ public:
         }
 
         write_ops::UpdateCommandReply typedRun(OperationContext* opCtx) final try {
-            transactionChecks(opCtx, ns());
+            doTransactionValidationForWrites(opCtx, ns());
             write_ops::UpdateCommandReply updateReply;
             OperationSource source = OperationSource::kStandard;
 
@@ -1689,7 +1676,7 @@ public:
         }
 
         write_ops::DeleteCommandReply typedRun(OperationContext* opCtx) final try {
-            transactionChecks(opCtx, ns());
+            doTransactionValidationForWrites(opCtx, ns());
             write_ops::DeleteCommandReply deleteReply;
             OperationSource source = OperationSource::kStandard;
 

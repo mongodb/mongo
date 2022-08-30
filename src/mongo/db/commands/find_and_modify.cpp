@@ -72,6 +72,7 @@
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction_validation.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/log_and_backoff.h"
@@ -662,18 +663,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     DisableSafeContentValidationIfTrue safeContentValidationDisabler(
         opCtx, disableDocumentValidation, fleCrudProcessed);
 
-    const auto inTransaction = opCtx->inMultiDocumentTransaction();
-    uassert(50781,
-            str::stream() << "Cannot write to system collection " << nsString.ns()
-                          << " within a transaction.",
-            !(inTransaction && nsString.isSystem()));
-
-    const auto replCoord = repl::ReplicationCoordinator::get(opCtx->getServiceContext());
-    uassert(50777,
-            str::stream() << "Cannot write to unreplicated collection " << nsString.ns()
-                          << " within a transaction.",
-            !(inTransaction && replCoord->isOplogDisabledFor(opCtx, nsString)));
-
+    doTransactionValidationForWrites(opCtx, ns());
 
     const auto stmtId = req.getStmtId().value_or(0);
     if (opCtx->isRetryableWrite()) {
@@ -699,6 +689,8 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
             return findAndModifyReply;
         }
     }
+
+    const bool inTransaction = opCtx->inMultiDocumentTransaction();
 
     // Although usually the PlanExecutor handles WCE internally, it will throw WCEs when it
     // is executing a findAndModify. This is done to ensure that we can always match,

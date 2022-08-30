@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/write_concern_options.h"
 
@@ -63,5 +64,12 @@ void validateSessionOptions(const OperationSessionInfoFromClient& sessionOptions
                             StringData cmdName,
                             const NamespaceString& nss,
                             bool allowTransactionsOnConfigDatabase);
+
+/**
+ * Throws if the specified namespace refers to a systems collection that is not
+ * allowed to be modified via a transaction, or if the specified namespace
+ * refers to a collection that is unreplicated.
+ */
+void doTransactionValidationForWrites(OperationContext* opCtx, const NamespaceString& ns);
 
 }  // namespace mongo

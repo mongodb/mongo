@@ -33,12 +33,12 @@ assert.commandWorked(systemColl.insert({name: 0}, {writeConcern: {w: "majority"}
 
 session.startTransaction({readConcern: {level: "snapshot"}});
 let error = assert.throws(() => systemColl.findAndModify({query: {}, update: {}}));
-assert.commandFailedWithCode(error, 50781);
+assert.commandFailedWithCode(error, 50791);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 session.startTransaction({readConcern: {level: "snapshot"}});
 error = assert.throws(() => systemColl.findAndModify({query: {}, remove: true}));
-assert.commandFailedWithCode(error, 50781);
+assert.commandFailedWithCode(error, 50791);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 
 session.startTransaction({readConcern: {level: "snapshot"}});
