@@ -362,5 +362,30 @@ TEST(CEHistogramTest, AssertOneBoundIntRangeHistogram) {
     ASSERT_MATCH_CE(t, "{intRange: {$gt: 0}, intRange: {$lte: 5}}", 0.0);
 }
 
+TEST(CEHistogramTest, TestHistogramOnNestedPaths) {
+    const auto collName = "test";
+    const auto collCardinality = 50;
+
+    CollectionStatistics collStats(collCardinality);
+
+    // Create a histogram with a single bucket that contains exactly one int (42) with a frequency
+    // of 50 (equal to the collection cardinality).
+    collStats.addHistogram("path",
+                           getHistogramFromData({
+                               {Value(42), collCardinality /* frequency */},
+                           }));
+    collStats.addHistogram("a.histogram.path",
+                           getHistogramFromData({
+                               {Value(42), collCardinality /* frequency */},
+                           }));
+
+    CEHistogramTester t(collName, collCardinality, collStats);
+
+    ASSERT_MATCH_CE(t, "{\"not.a.histogram.path\": {$eq: 42}}", 7.071 /* heuristic */);
+    ASSERT_MATCH_CE(t, "{\"a.histogram.path\": {$eq: 42}}", collCardinality);
+    ASSERT_MATCH_CE(
+        t, "{\"a.histogram.path.with.no.histogram\": {$eq: 42}}", 7.071 /* heuristic */);
+}
+
 }  // namespace
 }  // namespace mongo::ce

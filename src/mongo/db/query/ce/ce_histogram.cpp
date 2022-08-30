@@ -42,6 +42,41 @@ namespace mongo::optimizer::cascades {
 
 using namespace properties;
 
+namespace {
+// This transport combines chains of PathGets and PathTraverses into an MQL-like string path.
+class PathDescribeTransport {
+public:
+    std::string transport(const optimizer::PathTraverse& /*node*/, std::string childResult) {
+        return childResult;
+    }
+
+    std::string transport(const optimizer::PathGet& node, std::string childResult) {
+        return str::stream() << node.name() << (childResult.length() > 0 ? "." : "") << childResult;
+    }
+
+    std::string transport(const optimizer::EvalFilter& node,
+                          std::string pathResult,
+                          std::string inputResult) {
+        return pathResult;
+    }
+
+    std::string transport(const optimizer::PathIdentity& node) {
+        return "";
+    }
+
+    template <typename T, typename... Ts>
+    std::string transport(const T& node, Ts&&... /* args */) {
+        uasserted(6903900, "Unexpected node in path serialization.");
+    }
+};
+
+std::string serializePath(const optimizer::ABT& path) {
+    PathDescribeTransport pdt;
+    auto str = optimizer::algebra::transport<false>(path, pdt);
+    return str;
+}
+}  // namespace
+
 class CEHistogramTransportImpl {
 public:
     CEHistogramTransportImpl(const ce::CollectionStatistics& stats)
@@ -72,7 +107,7 @@ public:
         std::vector<double> topLevelSelectivities;
         for (const auto& [key, req] : node.getReqMap()) {
             std::vector<double> disjSelectivities;
-            auto path = key._path.cast<PathGet>()->name();
+            auto path = serializePath(key._path.ref());
 
             // Fallback to heuristic if no histogram.
             auto histogram = _stats.getHistogram(path);
