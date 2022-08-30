@@ -568,8 +568,11 @@ public:
      *
      * When a node steps down during catchup mode, the states remain the same (producer: Running,
      * applier: Running).
+     *
+     * DrainingForShardSplit follows the same state diagram as Draining, it only exists to hint the
+     * signalDrainModeComplete method that it should not follow the primary step-up logic.
      */
-    enum class ApplierState { Running, Draining, Stopped };
+    enum class ApplierState { Running, Draining, DrainingForShardSplit, Stopped };
 
     /**
      * In normal cases: Running -> Draining -> Stopped -> Running.

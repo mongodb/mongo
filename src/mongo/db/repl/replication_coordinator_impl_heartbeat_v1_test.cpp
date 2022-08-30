@@ -269,29 +269,46 @@ TEST_F(ReplCoordHBV1Test,
     ASSERT_TRUE(getExternalState()->threadsStarted());
 }
 
-TEST_F(ReplCoordHBV1Test, RejectSplitConfigWhenNotInServerlessMode) {
+TEST_F(ReplCoordHBV1Test, RejectRecipientConfigWhenNotInServerlessMode) {
     auto severityGuard = unittest::MinimumLoggedSeverityGuard{logv2::LogComponent::kDefault,
                                                               logv2::LogSeverity::Debug(3)};
 
-    // Start up with three nodes, and assume the role of "node2" as a secondary. Notably, the local
-    // node is NOT started in serverless mode. "node2" is configured as having no votes, no
+    auto rsConfig =
+        assertMakeRSConfig(BSON("_id"
+                                << "mySet"
+                                << "protocolVersion" << 1 << "version" << 2 << "members"
+                                << BSON_ARRAY(
+                                       BSON("_id" << 1 << "host"
+                                                  << "node1:12345")
+                                       << BSON("_id" << 2 << "host"
+                                                     << "node2:12345")
+                                       << BSON("_id" << 3 << "host"
+                                                     << "node3:12345")
+                                       << BSON("_id" << 4 << "host"
+                                                     << "node4:12345"
+                                                     << "votes" << 0 << "priority" << 0 << "tags"
+                                                     << BSON("recipientTagName"
+                                                             << "tag2"))
+                                       << BSON("_id" << 5 << "host"
+                                                     << "node5:12345"
+                                                     << "votes" << 0 << "priority" << 0 << "tags"
+                                                     << BSON("recipientTagName"
+                                                             << "tag2"))
+                                       << BSON("_id" << 6 << "host"
+                                                     << "node6:12345"
+                                                     << "votes" << 0 << "priority" << 0 << "tags"
+                                                     << BSON("recipientTagName"
+                                                             << "tag2")))));
+
+    // Start up with three nodes, and assume the role of "node5" as a secondary. Notably, the local
+    // node is NOT started in serverless mode. "node5" is configured as having no votes, no
     // priority, so that we can pass validation for accepting a split config.
-    assertStartSuccess(BSON("_id"
-                            << "mySet"
-                            << "protocolVersion" << 1 << "version" << 2 << "members"
-                            << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                     << "node1:12345")
-                                          << BSON("_id" << 2 << "host"
-                                                        << "node2:12345"
-                                                        << "votes" << 0 << "priority" << 0)
-                                          << BSON("_id" << 3 << "host"
-                                                        << "node3:12345"))),
-                       HostAndPort("node2", 12345));
+    assertStartSuccess(rsConfig.toBSON(), HostAndPort("node5", 12345));
     ASSERT_OK(getReplCoord()->setFollowerMode(MemberState::RS_SECONDARY));
     getReplCoord()->updateTerm_forTest(1, nullptr);
     ASSERT_EQ(getReplCoord()->getTerm(), 1);
     // respond to initial heartbeat requests
-    for (int j = 0; j < 2; ++j) {
+    for (int j = 0; j < 5; ++j) {
         replyToReceivedHeartbeatV1();
     }
 
@@ -303,27 +320,8 @@ TEST_F(ReplCoordHBV1Test, RejectSplitConfigWhenNotInServerlessMode) {
         ASSERT_FALSE(getNet()->hasReadyRequests());
     }
 
-    ReplSetConfig splitConfig =
-        assertMakeRSConfig(BSON("_id"
-                                << "mySet"
-                                << "version" << 3 << "term" << 1 << "protocolVersion" << 1
-                                << "members"
-                                << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                         << "node1:12345")
-                                              << BSON("_id" << 2 << "host"
-                                                            << "node2:12345")
-                                              << BSON("_id" << 3 << "host"
-                                                            << "node3:12345"))
-                                << "recipientConfig"
-                                << BSON("_id"
-                                        << "recipientSet"
-                                        << "version" << 1 << "term" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "node1:12345")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "node2:12345")
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "node3:12345")))));
+    auto splitConfig =
+        serverless::makeSplitConfig(rsConfig, "recipientSetName", "recipientTagName");
 
     // Accept a heartbeat from `node1` which has a split config. The split config lists this node
     // ("node2") in the recipient member list, but a node started not in serverless mode should not
@@ -333,43 +331,41 @@ TEST_F(ReplCoordHBV1Test, RejectSplitConfigWhenNotInServerlessMode) {
     {
         InNetworkGuard guard(getNet());
         processResponseFromPrimary(splitConfig, 2, 1, HostAndPort{"node1", 12345});
-        assertMemberState(MemberState::RS_SECONDARY);
-        OperationContextNoop opCtx;
-        auto storedConfig = ReplSetConfig::parse(
-            unittest::assertGet(getExternalState()->loadLocalConfigDocument(&opCtx)));
-        ASSERT_OK(storedConfig.validate());
-
-        // Verify that the recipient config was not accepted. A successfully applied splitConfig
-        // will install at version and term {1, 1}.
-        ASSERT_EQUALS(ConfigVersionAndTerm(3, 1), storedConfig.getConfigVersionAndTerm());
-        ASSERT_EQUALS("mySet", storedConfig.getReplSetName());
+        assertMemberState(MemberState::RS_REMOVED);
     }
-
-    ASSERT_TRUE(getExternalState()->threadsStarted());
 }
 
 TEST_F(ReplCoordHBV1Test, NodeRejectsSplitConfigWhenNotInitialized) {
-    ReplSetConfig rsConfig =
+    auto rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "mySet"
-                                << "version" << 3 << "term" << 1 << "protocolVersion" << 1
-                                << "members"
-                                << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                         << "h1:1")
-                                              << BSON("_id" << 2 << "host"
-                                                            << "h2:1")
-                                              << BSON("_id" << 3 << "host"
-                                                            << "h3:1"))
-                                << "recipientConfig"
-                                << BSON("_id"
-                                        << "recipientSet"
-                                        << "version" << 1 << "term" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h4:1")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h5:1")
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h6:1")))));
+                                << "protocolVersion" << 1 << "version" << 2 << "members"
+                                << BSON_ARRAY(
+                                       BSON("_id" << 1 << "host"
+                                                  << "h1:1")
+                                       << BSON("_id" << 2 << "host"
+                                                     << "h2:1"
+                                                     << "votes" << 0 << "priority" << 0)
+                                       << BSON("_id" << 3 << "host"
+                                                     << "h3:1")
+                                       << BSON("_id" << 4 << "host"
+                                                     << "h4:1"
+                                                     << "votes" << 0 << "priority" << 0 << "tags"
+                                                     << BSON("recipientTagName"
+                                                             << "tag2"))
+                                       << BSON("_id" << 5 << "host"
+                                                     << "h5:1"
+                                                     << "votes" << 0 << "priority" << 0 << "tags"
+                                                     << BSON("recipientTagName"
+                                                             << "tag2"))
+                                       << BSON("_id" << 6 << "host"
+                                                     << "h6:1"
+                                                     << "votes" << 0 << "priority" << 0 << "tags"
+                                                     << BSON("recipientTagName"
+                                                             << "tag2")))));
+
+    auto splitConfig =
+        serverless::makeSplitConfig(rsConfig, "recipientSetName", "recipientTagName");
 
     ReplSettings settings;
     settings.setServerlessMode();
@@ -383,36 +379,45 @@ TEST_F(ReplCoordHBV1Test, NodeRejectsSplitConfigWhenNotInitialized) {
     ASSERT_FALSE(getNet()->hasReadyRequests());
     exitNetwork();
 
-    receiveHeartbeatFrom(rsConfig, 1, HostAndPort("h1", 1));
+    receiveHeartbeatFrom(splitConfig, 1, HostAndPort("h1", 1));
 
     enterNetwork();
-    processResponseFromPrimary(rsConfig);
+    processResponseFromPrimary(splitConfig);
     assertMemberState(MemberState::RS_STARTUP);
     exitNetwork();
 }
 
 TEST_F(ReplCoordHBV1Test, UninitializedDonorNodeAcceptsSplitConfigOnFirstHeartbeat) {
-    ReplSetConfig rsConfig =
+    auto rsConfig =
         assertMakeRSConfig(BSON("_id"
                                 << "mySet"
-                                << "version" << 3 << "term" << 1 << "protocolVersion" << 1
-                                << "members"
-                                << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                         << "h1:1")
-                                              << BSON("_id" << 2 << "host"
-                                                            << "h2:1")
-                                              << BSON("_id" << 3 << "host"
-                                                            << "h3:1"))
-                                << "recipientConfig"
-                                << BSON("_id"
-                                        << "recipientSet"
-                                        << "version" << 1 << "term" << 1 << "members"
-                                        << BSON_ARRAY(BSON("_id" << 1 << "host"
-                                                                 << "h4:1")
-                                                      << BSON("_id" << 2 << "host"
-                                                                    << "h5:1")
-                                                      << BSON("_id" << 3 << "host"
-                                                                    << "h6:1")))));
+                                << "protocolVersion" << 1 << "version" << 2 << "members"
+                                << BSON_ARRAY(
+                                       BSON("_id" << 1 << "host"
+                                                  << "h1:1")
+                                       << BSON("_id" << 2 << "host"
+                                                     << "h2:1"
+                                                     << "votes" << 0 << "priority" << 0)
+                                       << BSON("_id" << 3 << "host"
+                                                     << "h3:1")
+                                       << BSON("_id" << 4 << "host"
+                                                     << "h4:1"
+                                                     << "votes" << 0 << "priority" << 0 << "tags"
+                                                     << BSON("recipientTagName"
+                                                             << "tag2"))
+                                       << BSON("_id" << 5 << "host"
+                                                     << "h5:1"
+                                                     << "votes" << 0 << "priority" << 0 << "tags"
+                                                     << BSON("recipientTagName"
+                                                             << "tag2"))
+                                       << BSON("_id" << 6 << "host"
+                                                     << "h6:1"
+                                                     << "votes" << 0 << "priority" << 0 << "tags"
+                                                     << BSON("recipientTagName"
+                                                             << "tag2")))));
+
+    auto splitConfig =
+        serverless::makeSplitConfig(rsConfig, "recipientSetName", "recipientTagName");
 
     ReplSettings settings;
     settings.setServerlessMode();
@@ -424,11 +429,12 @@ TEST_F(ReplCoordHBV1Test, UninitializedDonorNodeAcceptsSplitConfigOnFirstHeartbe
     ASSERT_FALSE(getNet()->hasReadyRequests());
     exitNetwork();
 
-    receiveHeartbeatFrom(rsConfig, 1, HostAndPort("h1", 1));
+    receiveHeartbeatFrom(splitConfig, 1, HostAndPort("h1", 1));
 
     enterNetwork();
-    processResponseFromPrimary(rsConfig);
+    processResponseFromPrimary(splitConfig);
     performSyncToFinishReconfigHeartbeat();
+
     assertMemberState(MemberState::RS_STARTUP2);
     OperationContextNoop opCtx;
     auto storedConfig = ReplSetConfig::parse(
@@ -687,9 +693,7 @@ public:
         return noi;
     }
 
-    BSONObj constructResponse(const ReplSetConfig& config,
-                              const int configVersion,
-                              const int termVersion) {
+    BSONObj makeHeartbeatResponseWithConfig(const ReplSetConfig& config) {
         ReplSetHeartbeatResponse hbResp;
         hbResp.setSetName(_donorSetName);
         hbResp.setState(MemberState::RS_PRIMARY);
@@ -699,20 +703,11 @@ public:
         OpTime opTime(Timestamp(1, 1), 0);
         hbResp.setAppliedOpTimeAndWallTime({opTime, Date_t() + Seconds{1}});
         hbResp.setDurableOpTimeAndWallTime({opTime, Date_t() + Seconds{1}});
+
         BSONObjBuilder responseBuilder;
         responseBuilder << "ok" << 1;
         hbResp.addToBSON(&responseBuilder);
-
-        // Add the raw config object.
-        auto conf = ReplSetConfig::parse(makeConfigObj(configVersion, termVersion));
-        auto splitConf = serverless::makeSplitConfig(conf, _recipientSetName, _recipientTag);
-
-        // makeSplitConf increment the config version. We don't want that here as it makes the unit
-        // test case harder to follow.
-        BSONObjBuilder splitBuilder(splitConf.toBSON().removeField("version"));
-        splitBuilder.append("version", configVersion);
-
-        responseBuilder << "config" << splitBuilder.obj();
+        responseBuilder.append("config", config.toBSON());
         return responseBuilder.obj();
     }
 
@@ -769,64 +764,73 @@ protected:
     const std::string _recipientSecondaryNode{"h4:1"};
 };
 
-TEST_F(ReplCoordHBV1SplitConfigTest, DonorNodeDontApplyConfig) {
+TEST_F(ReplCoordHBV1SplitConfigTest, DonorNodeDoesNotApplyRecipientConfig) {
     startUp(_donorSecondaryNode);
+    auto splitConfig =
+        serverless::makeSplitConfig(makeRSConfigWithVersionAndTerm(_configVersion, _configTerm),
+                                    _recipientSetName,
+                                    _recipientTag);
 
-    // Config with newer version and same term.
-    ReplSetConfig rsConfig = makeRSConfigWithVersionAndTerm(_configVersion + 1, _configTerm);
+    // Receive a heartbeat request that informs us about a newer config, prompting a heartbeat
+    // request to fetch the new config.
+    receiveHeartbeatFrom(splitConfig, 1, HostAndPort("h1", 1));
 
-    // Receive a heartbeat request that tells us about a newer config.
-    receiveHeartbeatFrom(rsConfig, 1, HostAndPort("h1", 1));
-
-    getNet()->enterNetwork();
+    InNetworkGuard guard(getNet());
     auto noi = validateNextRequest("h1", _donorSetName, _configVersion, _configTerm);
 
-    _configVersion += 1;
-
-    // Construct the heartbeat response containing the newer config.
-    auto responseObj = constructResponse(rsConfig, _configVersion, _configTerm);
-
-    // Schedule and deliver the heartbeat response.
-    getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(responseObj));
+    // Construct the heartbeat response containing the split config, and schedule it.
+    auto response = makeHeartbeatResponseWithConfig(splitConfig);
+    getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(response));
     getNet()->runReadyNetworkOperations();
 
-    auto installedConfig = getReplCoord()->getConfig();
-    ASSERT_EQ(installedConfig.getReplSetName(), _donorSetName);
-
-    // The node has updated its config and term to the new values.
-    ASSERT_EQ(getReplCoord()->getConfigVersion(), _configVersion);
-    ASSERT_EQ(getReplCoord()->getConfigTerm(), _configTerm);
-
-    validateNextRequest("", _donorSetName, _configVersion, _configTerm);
+    // Validate that the donor node has accepted the split config, but not applied the recipient
+    // config.
+    ASSERT_EQ(getReplCoord()->getConfig().getReplSetName(), _donorSetName);
+    ASSERT_EQ(getReplCoord()->getConfigVersion(), splitConfig.getConfigVersion());
+    ASSERT_EQ(getReplCoord()->getConfigTerm(), splitConfig.getConfigTerm());
+    validateNextRequest(
+        "", _donorSetName, splitConfig.getConfigVersion(), splitConfig.getConfigTerm());
 }
 
-TEST_F(ReplCoordHBV1SplitConfigTest, RecipientNodeApplyConfig) {
+TEST_F(ReplCoordHBV1SplitConfigTest, RecipientNodeAppliesRecipientConfig) {
     startUp(_recipientSecondaryNode);
+    auto splitConfig =
+        serverless::makeSplitConfig(makeRSConfigWithVersionAndTerm(_configVersion, _configTerm),
+                                    _recipientSetName,
+                                    _recipientTag);
 
-    // Config with newer version and same term.
-    ReplSetConfig rsConfig = makeRSConfigWithVersionAndTerm((_configVersion + 1), _configTerm);
+    // Receive a heartbeat request that informs us about a newer config, prompting a heartbeat
+    // request to fetch the new config.
+    receiveHeartbeatFrom(splitConfig, 1, HostAndPort("h1", 1));
 
-    // Receive a heartbeat request that tells us about a newer config.
-    receiveHeartbeatFrom(rsConfig, 1, HostAndPort("h1", 1));
+    {
+        InNetworkGuard guard(getNet());
+        auto noi = validateNextRequest("h1", _donorSetName, _configVersion, _configTerm);
 
-    getNet()->enterNetwork();
-    auto noi = validateNextRequest("h1", _donorSetName, _configVersion, _configTerm);
+        // Construct the heartbeat response containing the split config, and schedule it.
+        auto response = makeHeartbeatResponseWithConfig(splitConfig);
+        getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(response));
+        getNet()->runReadyNetworkOperations();
+    }
 
-    // Construct the heartbeat response containing the newer config.
-    auto responseObj = constructResponse(rsConfig, _configVersion + 1, _configTerm);
+    auto opCtx = makeOperationContext();
+    getReplCoord()->signalDrainComplete(opCtx.get(), _configTerm);
+    while (getReplCoord()->getConfigVersionAndTerm() < splitConfig.getConfigVersionAndTerm()) {
+        sleepFor(Milliseconds(10));
+    }
 
-    // Schedule and deliver the heartbeat response.
-    getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(responseObj));
-    getNet()->runReadyNetworkOperations();
-
-    // The recipient's lastCommittedOpTime and currentCommittedSnapshotOpTime are cleared on
-    // applying the recipient config.
+    // Validate that the recipient node has accepted the recipient config, and changed its set name
+    // to the recipientSetName. Also, confirm that the recipient's lastCommittedOpTime and
+    // currentCommittedSnapshotOpTime are cleared on applying the recipient config.
+    ASSERT_EQ(getReplCoord()->getConfig().getReplSetName(), _recipientSetName);
     ASSERT(getReplCoord()->getLastCommittedOpTime().isNull());
     ASSERT(getReplCoord()->getCurrentCommittedSnapshotOpTime().isNull());
 
-    // Applying the recipient config will increase the configVersion by 1.
-    validateNextRequest(
-        "", _recipientSetName, (_configVersion + 2), getReplCoord()->getConfigTerm());
+    {
+        InNetworkGuard guard(getNet());
+        validateNextRequest(
+            "", _recipientSetName, splitConfig.getConfigVersion(), splitConfig.getConfigTerm());
+    }
 }
 
 TEST_F(ReplCoordHBV1SplitConfigTest, RejectMismatchedSetNameInHeartbeatResponse) {
@@ -884,17 +888,19 @@ TEST_F(ReplCoordHBV1SplitConfigTest, RecipientNodeNonZeroVotes) {
                                                 << "tag2")));
     startUp(_recipientSecondaryNode);
 
-    // Config with newer version and same term.
-    ReplSetConfig rsConfig = makeRSConfigWithVersionAndTerm((_configVersion + 1), _configTerm);
+    auto splitConfig =
+        serverless::makeSplitConfig(makeRSConfigWithVersionAndTerm(_configVersion, _configTerm),
+                                    _recipientSetName,
+                                    _recipientTag);
 
-    // Receive a heartbeat request that tells us about a newer config.
-    receiveHeartbeatFrom(rsConfig, 1, HostAndPort("h1", 1));
+    // Receive a heartbeat request that tells us about a split config.
+    receiveHeartbeatFrom(splitConfig, 1, HostAndPort("h1", 1));
 
     getNet()->enterNetwork();
     auto noi = validateNextRequest("h1", _donorSetName, _configVersion, _configTerm);
 
-    // Construct the heartbeat response containing the newer config.
-    auto responseObj = constructResponse(rsConfig, _configVersion + 1, _configTerm);
+    // Construct the heartbeat response containing the split config.
+    auto responseObj = makeHeartbeatResponseWithConfig(splitConfig);
 
     // Schedule and deliver the heartbeat response.
     getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(responseObj));

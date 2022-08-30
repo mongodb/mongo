@@ -1370,7 +1370,8 @@ private:
      * Method to write a configuration transmitted via heartbeat message to stable storage.
      */
     void _heartbeatReconfigStore(const executor::TaskExecutor::CallbackArgs& cbd,
-                                 const ReplSetConfig& newConfig);
+                                 const ReplSetConfig& newConfig,
+                                 bool isSplitRecipientConfig = false);
 
     /**
      * Conclusion actions of a heartbeat-triggered reconfiguration.
@@ -1565,6 +1566,12 @@ private:
      * Finish catch-up mode and start drain mode.
      */
     void _enterDrainMode_inlock();
+
+    /**
+     * Enter drain mode which does not result in a primary stepup. Returns a future which becomes
+     * ready when the oplog buffers have completed draining.
+     */
+    Future<void> _drainForShardSplit();
 
     /**
      * Waits for the config state to leave kConfigStartingUp, which indicates that start() has
@@ -1846,6 +1853,9 @@ private:
     // Construct used to synchronize default write concern changes with config write concern
     // changes.
     WriteConcernTagChangesImpl _writeConcernTagChanges;
+
+    // An optional promise created when entering drain mode for shard split.
+    boost::optional<Promise<void>> _finishedDrainingPromise;  // (M)
 };
 
 }  // namespace repl
