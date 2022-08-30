@@ -8,32 +8,32 @@
 (function() {
 "use strict";
 
-var local = db.local;
-var foreign = db.foreign;
+let local = db.local;
+let foreign = db.foreign;
 
 local.drop();
 foreign.drop();
 
-var bulk = foreign.initializeUnorderedBulkOp();
-for (var i = 0; i < 100; i++) {
+let bulk = foreign.initializeUnorderedBulkOp();
+for (let i = 0; i < 100; i++) {
     bulk.insert({_id: i, neighbors: [i - 1, i + 1]});
 }
 assert.commandWorked(bulk.execute());
-assert.commandWorked(local.insert({starting: 0}));
+assert.commandWorked(local.insert([{starting: 0, foo: 1}, {starting: 1, foo: 2}]));
 
 // Assert that the graphLookup only retrieves ten documents, with _id from 0 to 9.
-var res = local
-                  .aggregate({
-                      $graphLookup: {
-                          from: "foreign",
-                          startWith: "$starting",
-                          connectFromField: "neighbors",
-                          connectToField: "_id",
-                          as: "integers",
-                          restrictSearchWithMatch: {_id: {$lt: 10}}
-                      }
-                  })
-                  .toArray()[0];
+let res = local
+                .aggregate({
+                    $graphLookup: {
+                        from: "foreign",
+                        startWith: "$starting",
+                        connectFromField: "neighbors",
+                        connectToField: "_id",
+                        as: "integers",
+                        restrictSearchWithMatch: {_id: {$lt: 10}}
+                    }
+                })
+                .toArray()[0];
 
 assert.eq(res.integers.length, 10);
 
@@ -62,7 +62,7 @@ assert.commandWorked(foreign.insert({from: 2, to: 3, shouldBeIncluded: true}));
 // Assert that the $graphLookup stops exploring when it finds a document that doesn't match the
 // filter.
 res = local
-              .aggregate({
+              .aggregate([{
                   $graphLookup: {
                       from: "foreign",
                       startWith: "$starting",
@@ -71,14 +71,14 @@ res = local
                       as: "results",
                       restrictSearchWithMatch: {shouldBeIncluded: true}
                   }
-              })
-              .toArray()[0];
+              }, {$match: {starting: 0}}])
+              .toArray();
 
-assert.eq(res.results.length, 1);
+assert.eq(res[0].results.length, 1, tojson(res));
 
 // $expr is allowed inside the 'restrictSearchWithMatch' match expression.
 res = local
-              .aggregate({
+              .aggregate([{
                   $graphLookup: {
                       from: "foreign",
                       startWith: "$starting",
@@ -87,14 +87,14 @@ res = local
                       as: "results",
                       restrictSearchWithMatch: {$expr: {$eq: ["$shouldBeIncluded", true]}}
                   }
-              })
-              .toArray()[0];
+              }, {$match: {starting: 0}}])
+              .toArray();
 
-assert.eq(res.results.length, 1);
+assert.eq(res[0].results.length, 1, tojson(res));
 
 // $expr within `restrictSearchWithMatch` has access to variables declared at a higher level.
 res = local
-                .aggregate([{
+                .aggregate([{$sort: {starting: 1}}, {
                     $lookup: {
                         from: "local",
                         let : {foo: true},
@@ -108,11 +108,36 @@ res = local
                                 restrictSearchWithMatch:
                                     {$expr: {$eq: ["$shouldBeIncluded", "$$foo"]}}
                             }
-                        }],
+                        }, {$sort: {starting: 1}}],
                         as: "array"
                     }
-                }])
-                .toArray()[0];
+                }, {$match: {starting: 0}}])
+                .toArray();
 
-assert.eq(res.array[0].results.length, 1);
+assert.eq(res[0].array[0].results.length, 1, tojson(res));
+
+// $graphLookup which references a let variable defined by $lookup should be treated as correlated.
+res = local.aggregate([{
+    $lookup: {
+        from: "local",
+        let : {foo: "$foo"},
+        pipeline: [{
+            $graphLookup: {
+                from: "foreign",
+                startWith: "$starting",
+                connectFromField: "to",
+                connectToField: "from",
+                as: "results",
+                restrictSearchWithMatch:
+                    {$expr: {$eq: ["$from", "$$foo"]}}
+            }
+        }],
+        as: "array"
+    }
+}, {$sort: {starting: 1}}]).toArray();
+assert.eq(2, res.length);
+assert.eq(1, res[1].starting, tojson(res));
+assert.eq(2, res[1].array.length, tojson(res));
+assert.eq(0, res[1].array[0].results.length, tojson(res));
+assert.eq(0, res[1].array[1].results.length, tojson(res));
 })();
