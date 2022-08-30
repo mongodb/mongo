@@ -112,6 +112,7 @@ let testCases = {
         behavior: "versioned"
     },
     analyze: {skip: "primary only"},
+    analyzeShardKey: {skip: "does not return user data"},
     appendOplogNote: {skip: "primary only"},
     applyOps: {skip: "primary only"},
     authenticate: {skip: "does not return user data"},
@@ -148,6 +149,7 @@ let testCases = {
     },  // TODO SERVER-62374: remove this once 5.3 becomes last continuos release
     configureCollectionBalancing: {skip: "does not return user data"},
     configureFailPoint: {skip: "does not return user data"},
+    configureQueryAnalyzer: {skip: "does not return user data"},
     connPoolStats: {skip: "does not return user data"},
     connPoolSync: {skip: "does not return user data"},
     connectionStatus: {skip: "does not return user data"},

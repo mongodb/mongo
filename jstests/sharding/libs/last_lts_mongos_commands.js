@@ -16,11 +16,13 @@ const commandsRemovedFromMongosSinceLastLTS = [
 const commandsAddedToMongosSinceLastLTS = [
     "abortReshardCollection",
     "analyze",
+    "analyzeShardKey",  // TODO (SERVER-68977): Remove upgrade/downgrade for PM-1858.
     "appendOplogNote",
     "cleanupReshardCollection",
     "commitReshardCollection",
     "compactStructuredEncryptionData",
     "configureCollectionBalancing",
+    "configureQueryAnalyzer",  // TODO (SERVER-68977): Remove upgrade/downgrade for PM-1858.
     "coordinateCommitTransaction",
     "getClusterParameter",
     "moveRange",

@@ -271,6 +271,16 @@ let testCases = {
     analyze: {
         skip: "unimplemented. Serves only as a stub."
     },  // TODO SERVER-68055: Extend test to work with analyze
+    analyzeShardKey: {
+        run: {
+            runsAgainstAdminDb: true,
+            sendsDbVersion: true,
+            explicitlyCreateCollection: true,
+            command: function(dbName, collName) {
+                return {analyzeShardKey: dbName + "." + collName, key: {_id: 1}};
+            },
+        }
+    },
     appendOplogNote: {skip: "unversioned and executes on all shards"},
     authenticate: {skip: "does not forward command to primary shard"},
     balancerCollectionStatus: {skip: "does not forward command to primary shard"},
@@ -305,6 +315,7 @@ let testCases = {
     compactStructuredEncryptionData: {skip: "requires encrypted collections"},
     configureCollectionBalancing: {skip: "always targets the config server"},
     configureFailPoint: {skip: "executes locally on mongos (not sent to any remote node)"},
+    configureQueryAnalyzer: {skip: "always targets the config server"},
     connPoolStats: {skip: "executes locally on mongos (not sent to any remote node)"},
     connPoolSync: {skip: "executes locally on mongos (not sent to any remote node)"},
     connectionStatus: {skip: "executes locally on mongos (not sent to any remote node)"},

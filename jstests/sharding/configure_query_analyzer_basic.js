@@ -74,13 +74,14 @@ function runTestNonExistingNs(conn, ns) {
     const unshardedNs = dbName + "." + unshardedCollName;
     assert.commandWorked(st.s.getDB(dbName).createCollection(unshardedCollName));
 
-    // Verify that the command is supported on configsvr primary mongod.
+    // Verify that the command is supported on mongos and configsvr primary mongod.
     function runTestSupported(conn) {
         runTestExistingNs(conn, unshardedNs);
         runTestExistingNs(conn, shardedNs);
         runTestNonExistingNs(conn, nonExistingNs);
     }
 
+    runTestSupported(st.s);
     runTestSupported(configPrimary);
 
     // Verify that the command is not supported on configsvr secondary mongods or any shardvr
