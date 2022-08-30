@@ -151,13 +151,15 @@ class CollectionTemplate:
 
     name: str
     fields: Sequence[FieldTemplate]
+    compound_indexes: Sequence[Sequence[str]]
 
     @staticmethod
     def create(json_config: dict[str, any]) -> CollectionTemplate:
         """Create new template object from JSON."""
         name = json_config['name']
         fields = [FieldTemplate.create(jc) for jc in json_config['fields']]
-        return CollectionTemplate(name=name, fields=fields)
+        compound_indexes = json_config.get('compoundIndexes', [])
+        return CollectionTemplate(name=name, fields=fields, compound_indexes=compound_indexes)
 
 
 @dataclass
@@ -167,6 +169,7 @@ class FieldTemplate:
     name: str
     data_type: DataType
     distribution: str
+    indexed: bool
 
     @staticmethod
     def create(json_config: dict[str, any]) -> FieldTemplate:
@@ -174,7 +177,9 @@ class FieldTemplate:
         name = json_config['name']
         data_type = DataType.parse(json_config['type'], 'type')
         distribution = json_config['distribution']
-        return FieldTemplate(name=name, data_type=data_type, distribution=distribution)
+        indexed = json_config.get('indexed', False)
+        return FieldTemplate(name=name, data_type=data_type, distribution=distribution,
+                             indexed=indexed)
 
 
 class DataType(Enum):

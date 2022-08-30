@@ -31,12 +31,14 @@
                     {
                         "name": "choice1",
                         "type": "str",
-                        "distribution": "string_choice"
+                        "distribution": "string_choice",
+                        "indexed": true
                     },
                     {
                         "name": "mixed1",
                         "type": "str",
-                        "distribution": "string_mixed"
+                        "distribution": "string_mixed",
+                        "indexed": true
                     },
                     {
                         "name": "uniform1",
@@ -53,6 +55,16 @@
                         "type": "str",
                         "distribution": "string_mixed"
                     }
+                ],
+                "compoundIndexes": [
+                    [
+                        "choice1",
+                        "mixed1"
+                    ],
+                    [
+                        "uniform1",
+                        "mixed2"
+                    ]
                 ]
             },
             {
@@ -61,7 +73,8 @@
                     {
                         "name": "choice1",
                         "type": "str",
-                        "distribution": "string_choice"
+                        "distribution": "string_choice",
+                        "indexed": true
                     },
                     {
                         "name": "mixed1",
@@ -76,7 +89,8 @@
                     {
                         "name": "choice2",
                         "type": "str",
-                        "distribution": "string_choice"
+                        "distribution": "string_choice",
+                        "indexed": true
                     },
                     {
                         "name": "mixed2",
@@ -91,7 +105,8 @@
                     {
                         "name": "choice3",
                         "type": "str",
-                        "distribution": "string_choice"
+                        "distribution": "string_choice",
+                        "indexed": true
                     },
                     {
                         "name": "mixed3",
@@ -106,7 +121,8 @@
                     {
                         "name": "choice4",
                         "type": "str",
-                        "distribution": "string_choice"
+                        "distribution": "string_choice",
+                        "indexed": true
                     }
                 ]
             }

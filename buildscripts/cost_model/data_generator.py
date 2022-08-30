@@ -52,6 +52,7 @@ class FieldInfo:
     name: str
     type: DataType
     distribution: RandomDistribution
+    indexed: bool
 
 
 @dataclass
@@ -61,6 +62,7 @@ class CollectionInfo:
     name: str
     fields: Sequence[FieldInfo]
     documents_count: int
+    compound_indexes: Sequence[Sequence[str]]
 
 
 class DataGenerator:
@@ -95,7 +97,7 @@ class DataGenerator:
             coll.drop()
             self._populate_collection(coll, coll_info)
             create_single_field_indexes(coll, coll_info.fields)
-            create_compound_index(coll, coll_info.fields)
+            create_compound_indexes(coll, coll_info)
 
         t1 = time.time()
         print(f'\npopulate Collections took {t1-t0} s.')
@@ -104,12 +106,13 @@ class DataGenerator:
         for coll_template in self.config.collection_templates:
             fields = [
                 FieldInfo(name=ft.name, type=ft.data_type,
-                          distribution=distributions[ft.distribution])
+                          distribution=distributions[ft.distribution], indexed=ft.indexed)
                 for ft in coll_template.fields
             ]
             for doc_count in self.config.collection_cardinalities:
                 name = f'{coll_template.name}_{doc_count}'
-                yield CollectionInfo(name=name, fields=fields, documents_count=doc_count)
+                yield CollectionInfo(name=name, fields=fields, documents_count=doc_count,
+                                     compound_indexes=coll_template.compound_indexes)
 
     @timer_decorator
     def _populate_collection(self, coll: Collection, coll_info: CollectionInfo) -> None:
@@ -143,25 +146,25 @@ def create_single_field_indexes(coll: Collection, fields: Sequence[FieldInfo]) -
 
     t0 = time.time()
 
-    indexes = [IndexModel([(field.name, pymongo.ASCENDING)]) for field in fields]
-    coll.create_indexes(indexes)
+    indexes = [IndexModel([(field.name, pymongo.ASCENDING)]) for field in fields if field.indexed]
+    if len(indexes) > 0:
+        coll.create_indexes(indexes)
 
     t1 = time.time()
     print(f'createSingleFieldIndexes took {t1 - t0} s.')
 
 
-def create_compound_index(coll: Collection, fields: Sequence[FieldInfo]) -> None:
-    """Create a coumpound index on the given collection."""
-
-    field_names = [fi.name for fi in fields if fi.type != DataType.ARRAY]
-    if len(field_names) < 2:
-        print(f'Collection: {coll.name} not suitable for compound index')
-        return
+def create_compound_indexes(coll: Collection, coll_info: CollectionInfo) -> None:
+    """Create a coumpound indexes on the given collection."""
 
     t0 = time.time()
 
-    index_spec = [(field, pymongo.ASCENDING) for field in field_names]
-    coll.create_index(index_spec)
+    indexes_spec = []
+    for compound_index in coll_info.compound_indexes:
+        index_spec = IndexModel([(field, pymongo.ASCENDING) for field in compound_index])
+        indexes_spec.append(index_spec)
+    if len(indexes_spec) > 0:
+        coll.create_indexes(indexes_spec)
 
     t1 = time.time()
     print(f'createCompoundIndex took {t1 - t0} s.')
