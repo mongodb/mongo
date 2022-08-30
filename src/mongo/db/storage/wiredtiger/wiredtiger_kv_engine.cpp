@@ -2013,6 +2013,7 @@ void WiredTigerKVEngine::_checkpoint(WT_SESSION* session) {
         // Third, stableTimestamp >= initialDataTimestamp: Take stable checkpoint. Steady state
         // case.
         if (initialDataTimestamp.asULL() <= 1) {
+            clearIndividuallyCheckpointedIndexes();
             invariantWTOK(session->checkpoint(session, "use_timestamp=false"), session);
             LOGV2_FOR_RECOVERY(5576602,
                                2,
@@ -2034,7 +2035,10 @@ void WiredTigerKVEngine::_checkpoint(WT_SESSION* session) {
                                "stableTimestamp"_attr = stableTimestamp,
                                "oplogNeededForRollback"_attr = toString(oplogNeededForRollback));
 
-            invariantWTOK(session->checkpoint(session, "use_timestamp=true"), session);
+            {
+                clearIndividuallyCheckpointedIndexes();
+                invariantWTOK(session->checkpoint(session, "use_timestamp=true"), session);
+            }
 
             if (oplogNeededForRollback.isOK()) {
                 // Now that the checkpoint is durable, publish the oplog needed to recover from it.

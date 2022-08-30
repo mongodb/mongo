@@ -239,6 +239,28 @@ public:
                       "The current storage engine doesn't support backup mode");
     }
 
+    virtual void addIndividuallyCheckpointedIndex(const std::string& ident) {
+        uasserted(ErrorCodes::CommandNotSupported,
+                  "The current storage engine does not support checkpoints");
+    }
+
+    virtual void clearIndividuallyCheckpointedIndexes() {
+        uasserted(ErrorCodes::CommandNotSupported,
+                  "The current storage engine does not support checkpoints");
+    }
+
+    virtual bool isInIndividuallyCheckpointedIndexes(const std::string& ident) const {
+        uasserted(ErrorCodes::CommandNotSupported,
+                  "The current storage engine does not support checkpoints");
+    }
+
+    /**
+     * Returns whether the KVEngine supports checkpoints.
+     */
+    virtual bool supportsCheckpoints() const {
+        return false;
+    }
+
     virtual void checkpoint() {}
 
     /**

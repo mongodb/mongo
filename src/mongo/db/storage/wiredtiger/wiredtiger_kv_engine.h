@@ -119,6 +119,13 @@ public:
 
     bool supportsDirectoryPerDB() const override;
 
+    /**
+     * WiredTiger supports checkpoints when it isn't running in memory.
+     */
+    bool supportsCheckpoints() const override {
+        return !isEphemeral();
+    }
+
     void checkpoint() override;
 
     bool isEphemeral() const override {
@@ -371,6 +378,18 @@ public:
         return _clockSource;
     }
 
+    void addIndividuallyCheckpointedIndex(const std::string& ident) override {
+        _checkpointedIndexes.insert(ident);
+    }
+
+    void clearIndividuallyCheckpointedIndexes() override {
+        _checkpointedIndexes.clear();
+    }
+
+    bool isInIndividuallyCheckpointedIndexes(const std::string& ident) const override {
+        return _checkpointedIndexes.find(ident) != _checkpointedIndexes.end();
+    }
+
     StatusWith<Timestamp> pinOldestTimestamp(OperationContext* opCtx,
                                              const std::string& requestingServiceName,
                                              Timestamp requestedTimestamp,
@@ -513,6 +532,15 @@ private:
     // Timestamp of data at startup. Used internally to advise checkpointing and recovery to a
     // timestamp. Provided by replication layer because WT does not persist timestamps.
     AtomicWord<std::uint64_t> _initialDataTimestamp;
+
+    // Required for taking a checkpoint; and can be used to ensure multiple checkpoint cursors
+    // target the same checkpoint.
+    Lock::ResourceMutex _checkpointCursorMutex = Lock::ResourceMutex("checkpointCursorMutex");
+
+    // A set of indexes that were individually checkpoint'ed and are not consistent with the rest
+    // of the checkpoint's PIT view of the storage data. This set is reset when a storage-wide WT
+    // checkpoint is taken that makes the PIT view consistent again.
+    std::set<std::string> _checkpointedIndexes;
 
     AtomicWord<std::uint64_t> _oplogNeededForCrashRecovery;
 

@@ -49,6 +49,7 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
+#include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/write_unit_of_work.h"
@@ -981,6 +982,25 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
         const auto& bulkBuilder = _indexes[i].bulk;
         if (bulkBuilder->isMultikey()) {
             indexCatalogEntry->setMultikey(opCtx, collection, {}, bulkBuilder->getMultikeyPaths());
+        }
+
+        if (opCtx->getServiceContext()->getStorageEngine()->supportsCheckpoints()) {
+            // Add the new index ident to a list so that the validate cmd with {background:true}
+            // can ignore the new index until it is regularly checkpoint'ed with the rest of the
+            // storage data.
+            //
+            // Index builds use the bulk loader, which can provoke a checkpoint of just that index.
+            // This makes the checkpoint's PIT view of the collection and indexes inconsistent until
+            // the next storage-wide checkpoint is taken, at which point the list will be reset.
+            //
+            // Note that it is okay if the index commit fails: background validation will never try
+            // to look at the index and the list will be reset by the next periodic storage-wide
+            // checkpoint.
+            auto indexIdent =
+                opCtx->getServiceContext()->getStorageEngine()->getCatalog()->getIndexIdent(
+                    opCtx, collection->getCatalogId(), _indexes[i].block->getIndexName());
+            opCtx->getServiceContext()->getStorageEngine()->addIndividuallyCheckpointedIndex(
+                indexIdent);
         }
     }
 

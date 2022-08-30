@@ -959,6 +959,10 @@ StatusWith<std::deque<std::string>> StorageEngineImpl::extendBackupCursor(Operat
     return _engine->extendBackupCursor(opCtx);
 }
 
+bool StorageEngineImpl::supportsCheckpoints() const {
+    return _engine->supportsCheckpoints();
+}
+
 bool StorageEngineImpl::isEphemeral() const {
     return _engine->isEphemeral();
 }

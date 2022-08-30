@@ -96,6 +96,9 @@ public:
         auto coll = db->createCollection(&_opCtx, _nss, options, createIdIndex);
         ASSERT_TRUE(coll) << _nss;
         wuow.commit();
+
+        _engineSupportsCheckpoints =
+            _opCtx.getServiceContext()->getStorageEngine()->supportsCheckpoints();
     }
 
     explicit ValidateBase(bool full, bool background)
@@ -204,6 +207,7 @@ protected:
     const NamespaceString _nss;
     std::unique_ptr<AutoGetDb> _autoDb;
     Database* _db;
+    bool _engineSupportsCheckpoints;
 };
 
 template <bool full, bool background>
@@ -212,7 +216,9 @@ public:
     ValidateIdIndexCount() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background) {
+        // Cannot run validate with {background:true} if the storage engine does not support
+        // checkpoints.
+        if (_background && !_engineSupportsCheckpoints) {
             return;
         }
 
@@ -270,7 +276,9 @@ class ValidateSecondaryIndexCount : public ValidateBase {
 public:
     ValidateSecondaryIndexCount() : ValidateBase(full, background) {}
     void run() {
-        if (_background) {
+        // Cannot run validate with {background:true} if the storage engine does not support
+        // checkpoints.
+        if (_background && !_engineSupportsCheckpoints) {
             return;
         }
 
@@ -336,7 +344,9 @@ class ValidateSecondaryIndex : public ValidateBase {
 public:
     ValidateSecondaryIndex() : ValidateBase(full, background) {}
     void run() {
-        if (_background) {
+        // Cannot run validate with {background:true} if the storage engine does not support
+        // checkpoints.
+        if (_background && !_engineSupportsCheckpoints) {
             return;
         }
 
@@ -394,7 +404,9 @@ public:
     ValidateIdIndex() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background) {
+        // Cannot run validate with {background:true} if the storage engine does not support
+        // checkpoints.
+        if (_background && !_engineSupportsCheckpoints) {
             return;
         }
 
@@ -469,7 +481,9 @@ public:
     ValidateMultiKeyIndex() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background) {
+        // Cannot run validate with {background:true} if the storage engine does not support
+        // checkpoints.
+        if (_background && !_engineSupportsCheckpoints) {
             return;
         }
 
@@ -553,7 +567,9 @@ public:
     ValidateSparseIndex() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background) {
+        // Cannot run validate with {background:true} if the storage engine does not support
+        // checkpoints.
+        if (_background && !_engineSupportsCheckpoints) {
             return;
         }
 
@@ -612,7 +628,9 @@ public:
     ValidatePartialIndex() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background) {
+        // Cannot run validate with {background:true} if the storage engine does not support
+        // checkpoints.
+        if (_background && !_engineSupportsCheckpoints) {
             return;
         }
 
@@ -678,7 +696,9 @@ public:
     ValidatePartialIndexOnCollectionWithNonIndexableFields() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background) {
+        // Cannot run validate with {background:true} if the storage engine does not support
+        // checkpoints.
+        if (_background && !_engineSupportsCheckpoints) {
             return;
         }
 
@@ -738,7 +758,9 @@ public:
     ValidateCompoundIndex() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background) {
+        // Cannot run validate with {background:true} if the storage engine does not support
+        // checkpoints.
+        if (_background && !_engineSupportsCheckpoints) {
             return;
         }
 
@@ -819,7 +841,9 @@ public:
     ValidateIndexEntry() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background) {
+        // Cannot run validate with {background:true} if the storage engine does not support
+        // checkpoints.
+        if (_background && !_engineSupportsCheckpoints) {
             return;
         }
 
@@ -938,7 +962,9 @@ public:
     ValidateWildCardIndex() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background) {
+        // Cannot run validate with {background:true} if the storage engine does not support
+        // checkpoints.
+        if (_background && !_engineSupportsCheckpoints) {
             return;
         }
 
@@ -1062,7 +1088,9 @@ public:
     ValidateWildCardIndexWithProjection() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background) {
+        // Cannot run validate with {background:true} if the storage engine does not support
+        // checkpoints.
+        if (_background && !_engineSupportsCheckpoints) {
             return;
         }
 
@@ -1162,7 +1190,9 @@ public:
     ValidateMissingAndExtraIndexEntryResults() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background) {
+        // Cannot run validate with {background:true} if the storage engine does not support
+        // checkpoints.
+        if (_background && !_engineSupportsCheckpoints) {
             return;
         }
 
@@ -1253,7 +1283,9 @@ public:
     ValidateMissingIndexEntryResults() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background) {
+        // Cannot run validate with {background:true} if the storage engine does not support
+        // checkpoints.
+        if (_background && !_engineSupportsCheckpoints) {
             return;
         }
 
@@ -1371,7 +1403,9 @@ public:
     ValidateExtraIndexEntryResults() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background) {
+        // Cannot run validate with {background:true} if the storage engine does not support
+        // checkpoints.
+        if (_background && !_engineSupportsCheckpoints) {
             return;
         }
 
@@ -3094,7 +3128,9 @@ public:
     ValidateDuplicateKeysUniqueIndex() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background) {
+        // Cannot run validate with {background:true} if the storage engine does not support
+        // checkpoints.
+        if (_background && !_engineSupportsCheckpoints) {
             return;
         }
 
@@ -3283,7 +3319,9 @@ public:
     ValidateInvalidBSONResults() : ValidateBase(full, background) {}
 
     void run() {
-        if (_background) {
+        // Cannot run validate with {background:true} if the storage engine does not support
+        // checkpoints.
+        if (_background && !_engineSupportsCheckpoints) {
             return;
         }
 
@@ -4092,7 +4130,9 @@ public:
         : ValidateBase(/*full=*/false, background, /*clustered=*/true) {}
 
     void run() {
-        if (_background) {
+        // Cannot run validate with {background:true} if the storage engine does not support
+        // checkpoints.
+        if (_background && !_engineSupportsCheckpoints) {
             return;
         }
 
@@ -4152,7 +4192,9 @@ public:
         : ValidateBase(/*full=*/false, background, /*clustered=*/true) {}
 
     void run() {
-        if (_background) {
+        // Cannot run validate with {background:true} if the storage engine does not support
+        // checkpoints.
+        if (_background && !_engineSupportsCheckpoints) {
             return;
         }
 
@@ -4252,7 +4294,9 @@ public:
         : ValidateBase(/*full=*/false, /*background=*/false, /*clustered=*/true) {}
 
     void run() {
-        if (_background) {
+        // Cannot run validate with {background:true} if the storage engine does not support
+        // checkpoints.
+        if (_background && !_engineSupportsCheckpoints) {
             return;
         }
 
@@ -4394,7 +4438,9 @@ public:
           _withSecondaryIndex(withSecondaryIndex) {}
 
     void run() {
-        if (_background) {
+        // Cannot run validate with {background:true} if the storage engine does not support
+        // checkpoints.
+        if (_background && !_engineSupportsCheckpoints) {
             return;
         }
 

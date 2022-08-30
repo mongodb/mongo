@@ -47,7 +47,9 @@ public:
     bool supportsCappedCollections() const final {
         return true;
     }
-
+    bool supportsCheckpoints() const final {
+        return false;
+    }
     bool isEphemeral() const final {
         return true;
     }
@@ -193,6 +195,11 @@ public:
     }
     const DurableCatalog* getCatalog() const final {
         return nullptr;
+    }
+    void addIndividuallyCheckpointedIndex(const std::string& ident) final {}
+    void clearIndividuallyCheckpointedIndexes() final {}
+    bool isInIndividuallyCheckpointedIndexes(const std::string& ident) const final {
+        return false;
     }
 
     StatusWith<Timestamp> pinOldestTimestamp(OperationContext* opCtx,

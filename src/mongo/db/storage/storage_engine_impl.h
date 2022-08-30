@@ -101,6 +101,8 @@ public:
     virtual StatusWith<std::deque<std::string>> extendBackupCursor(
         OperationContext* opCtx) override;
 
+    virtual bool supportsCheckpoints() const override;
+
     virtual bool isEphemeral() const override;
 
     virtual Status repairRecordStore(OperationContext* opCtx,
@@ -328,6 +330,18 @@ public:
     DurableCatalog* getCatalog() override;
 
     const DurableCatalog* getCatalog() const override;
+
+    void addIndividuallyCheckpointedIndex(const std::string& ident) override {
+        return _engine->addIndividuallyCheckpointedIndex(ident);
+    }
+
+    void clearIndividuallyCheckpointedIndexes() override {
+        return _engine->clearIndividuallyCheckpointedIndexes();
+    }
+
+    bool isInIndividuallyCheckpointedIndexes(const std::string& ident) const override {
+        return _engine->isInIndividuallyCheckpointedIndexes(ident);
+    }
 
     /**
      * When loading after an unclean shutdown, this performs cleanup on the DurableCatalogImpl.
