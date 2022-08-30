@@ -43,7 +43,7 @@ The source for the tools is now available at
 Python Prerequisites
 ---------------
 
-In order to build MongoDB, Python 3.7+ is required, and several Python
+To build MongoDB, Python 3.7+ is required, and several Python
 modules must be installed. Python 3 is included in macOS 10.15 and later.
 For earlier macOS versions, Python 3 can be installed using Homebrew or
 MacPorts or similar.
@@ -117,7 +117,7 @@ Where to find Binaries
 ----------------------
 
 The build system will produce an installation tree into
-`$DESTDIR/$PREFIX`. `DESTDIR` by default is `build/install` while
+`$DESTDIR/$PREFIX`. `DESTDIR` by default is `built/installed` while
 `PREFIX` is by default empty. This means that with all of the listed
 targets all built binaries will be in `build/install/bin` by default.
 
