@@ -42,6 +42,7 @@ constexpr auto kActive = "active";
 constexpr auto kOldestActive = "oldestActive";
 constexpr auto kLatencies = "latencies";
 constexpr auto kCurrentInSteps = "currentInSteps";
+constexpr auto kEstimateNotAvailable = -1;
 
 struct Metrics {
     ReshardingCumulativeMetrics _resharding;
@@ -53,7 +54,6 @@ const auto getMetrics = ServiceContext::declareDecoration<MetricsPtr>();
 const auto metricsRegisterer = ServiceContext::ConstructorActionRegisterer{
     "ShardingDataTransformMetrics",
     [](ServiceContext* ctx) { getMetrics(ctx) = std::make_unique<Metrics>(); }};
-
 }  // namespace
 
 ShardingDataTransformCumulativeMetrics* ShardingDataTransformCumulativeMetrics::getForResharding(
@@ -86,18 +86,35 @@ ShardingDataTransformCumulativeMetrics::registerInstanceMetrics(const InstanceOb
 
 int64_t ShardingDataTransformCumulativeMetrics::getOldestOperationHighEstimateRemainingTimeMillis(
     Role role) const {
-
-    stdx::unique_lock guard(_mutex);
-    auto op = getOldestOperation(guard, role);
-    return op ? op->getHighEstimateRemainingTimeMillis() : 0;
+    return getOldestOperationEstimateRemainingTimeMillis(role, EstimateType::kHigh);
 }
 
 int64_t ShardingDataTransformCumulativeMetrics::getOldestOperationLowEstimateRemainingTimeMillis(
     Role role) const {
+    return getOldestOperationEstimateRemainingTimeMillis(role, EstimateType::kLow);
+}
+
+int64_t ShardingDataTransformCumulativeMetrics::getOldestOperationEstimateRemainingTimeMillis(
+    Role role, EstimateType type) const {
 
     stdx::unique_lock guard(_mutex);
     auto op = getOldestOperation(guard, role);
-    return op ? op->getLowEstimateRemainingTimeMillis() : 0;
+    if (!op) {
+        return kEstimateNotAvailable;
+    }
+    auto estimate = getEstimate(op, type);
+    return estimate ? estimate->count() : kEstimateNotAvailable;
+}
+
+boost::optional<Milliseconds> ShardingDataTransformCumulativeMetrics::getEstimate(
+    const InstanceObserver* op, EstimateType type) const {
+    switch (type) {
+        case kHigh:
+            return op->getHighEstimateRemainingTimeMillis();
+        case kLow:
+            return op->getLowEstimateRemainingTimeMillis();
+    }
+    MONGO_UNREACHABLE;
 }
 
 size_t ShardingDataTransformCumulativeMetrics::getObservedMetricsCount() const {

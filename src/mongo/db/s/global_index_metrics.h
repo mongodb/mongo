@@ -212,7 +212,6 @@ public:
                                                             bool unique,
                                                             ServiceContext* serviceContext);
 
-    Milliseconds getRecipientHighEstimateRemainingTimeMillis() const;
     template <typename T>
     static auto initializeFrom(const T& document, ServiceContext* serviceContext) {
         static_assert(isStateDocument<T>);
@@ -239,6 +238,9 @@ public:
     void onStateTransition(T before, T after) {
         _stateHolder.onStateTransition(before, after);
     }
+
+protected:
+    boost::optional<Milliseconds> getRecipientHighEstimateRemainingTimeMillis() const override;
 
 private:
     GlobalIndexCumulativeMetrics* getGlobalIndexCumulativeMetrics();

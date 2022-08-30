@@ -36,8 +36,8 @@ namespace mongo {
 class ShardingDataTransformMetricsObserverInterface {
 public:
     virtual ~ShardingDataTransformMetricsObserverInterface() = default;
-    virtual int64_t getHighEstimateRemainingTimeMillis() const = 0;
-    virtual int64_t getLowEstimateRemainingTimeMillis() const = 0;
+    virtual boost::optional<Milliseconds> getHighEstimateRemainingTimeMillis() const = 0;
+    virtual boost::optional<Milliseconds> getLowEstimateRemainingTimeMillis() const = 0;
     virtual Date_t getStartTimestamp() const = 0;
     virtual const UUID& getUuid() const = 0;
     virtual ShardingDataTransformMetrics::Role getRole() const = 0;

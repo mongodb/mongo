@@ -80,6 +80,20 @@ public:
         CoordinatorStateEnum _enumVal;
     };
 
+    struct ExternallyTrackedRecipientFields {
+    public:
+        void accumulateFrom(const ReshardingOplogApplierProgress& progressDoc);
+
+        boost::optional<int64_t> documentCountCopied;
+        boost::optional<int64_t> documentBytesCopied;
+        boost::optional<int64_t> oplogEntriesFetched;
+        boost::optional<int64_t> oplogEntriesApplied;
+        boost::optional<int64_t> insertsApplied;
+        boost::optional<int64_t> updatesApplied;
+        boost::optional<int64_t> deletesApplied;
+        boost::optional<int64_t> writesToStashCollections;
+    };
+
     ReshardingMetrics(const CommonReshardingMetadata& metadata,
                       Role role,
                       ClockSource* clockSource,
@@ -151,28 +165,43 @@ public:
     void onStateTransition(T before, T after) {
         _stateHolder.onStateTransition(before, after);
     }
-    void accumulateFrom(const ReshardingOplogApplierProgress& progressDoc);
+
+    template <typename StateOrStateVariant>
+    static bool mustRestoreExternallyTrackedRecipientFields(StateOrStateVariant stateOrVariant) {
+        if constexpr (std::is_same_v<StateOrStateVariant, State>) {
+            return stdx::visit(
+                [](auto v) { return mustRestoreExternallyTrackedRecipientFieldsImpl(v); },
+                stateOrVariant);
+        } else {
+            return mustRestoreExternallyTrackedRecipientFieldsImpl(stateOrVariant);
+        }
+    }
+
     BSONObj reportForCurrentOp() const noexcept override;
 
     void onUpdateApplied();
     void onInsertApplied();
     void onDeleteApplied();
     void onOplogEntriesFetched(int64_t numEntries, Milliseconds elapsed);
-    void restoreOplogEntriesFetched(int64_t numEntries);
     void onOplogEntriesApplied(int64_t numEntries);
-    void restoreOplogEntriesApplied(int64_t numEntries);
     void onApplyingBegin();
     void onApplyingEnd();
     void onLocalInsertDuringOplogFetching(Milliseconds elapsed);
     void onBatchRetrievedDuringOplogApplying(Milliseconds elapsed);
     void onOplogLocalBatchApplied(Milliseconds elapsed);
+    void restoreExternallyTrackedRecipientFields(const ExternallyTrackedRecipientFields& values);
 
     Seconds getApplyingElapsedTimeSecs() const;
     Date_t getApplyingBegin() const;
     Date_t getApplyingEnd() const;
-    Milliseconds getRecipientHighEstimateRemainingTimeMillis() const;
 
 protected:
+    boost::optional<Milliseconds> getRecipientHighEstimateRemainingTimeMillis() const override;
+    void restoreOplogEntriesFetched(int64_t numEntries);
+    void restoreOplogEntriesApplied(int64_t numEntries);
+    void restoreUpdatesApplied(int64_t count);
+    void restoreInsertsApplied(int64_t count);
+    void restoreDeletesApplied(int64_t count);
     virtual StringData getStateString() const noexcept override;
     void restoreApplyingBegin(Date_t date);
     void restoreApplyingEnd(Date_t date);
@@ -192,6 +221,16 @@ private:
         if constexpr (std::is_same_v<T, ReshardingCoordinatorDocument>) {
             restoreCoordinatorSpecificFields(document);
             return;
+        }
+    }
+
+    template <typename T>
+    static bool mustRestoreExternallyTrackedRecipientFieldsImpl(T state) {
+        static_assert(resharding_metrics::isState<T>);
+        if constexpr (std::is_same_v<T, RecipientStateEnum>) {
+            return state > RecipientStateEnum::kAwaitingFetchTimestamp;
+        } else {
+            return false;
         }
     }
 
@@ -226,6 +265,15 @@ private:
         }
     }
 
+    template <typename MemberFn, typename... T>
+    void invokeIfAllSet(MemberFn&& fn, const boost::optional<T>&... args) {
+        if (!(args && ...)) {
+            return;
+        }
+        std::invoke(fn, this, *args...);
+    }
+
+    AtomicWord<bool> _ableToEstimateRemainingRecipientTime;
     AtomicWord<int64_t> _deletesApplied;
     AtomicWord<int64_t> _insertsApplied;
     AtomicWord<int64_t> _updatesApplied;
