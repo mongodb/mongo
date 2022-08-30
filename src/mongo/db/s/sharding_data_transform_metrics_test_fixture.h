@@ -63,11 +63,11 @@ public:
         return _uuid;
     }
 
-    virtual int64_t getHighEstimateRemainingTimeMillis() const override {
+    virtual boost::optional<Milliseconds> getHighEstimateRemainingTimeMillis() const override {
         return _timeRemainingHigh;
     }
 
-    virtual int64_t getLowEstimateRemainingTimeMillis() const override {
+    virtual boost::optional<Milliseconds> getLowEstimateRemainingTimeMillis() const override {
         return _timeRemainingLow;
     }
 
@@ -82,8 +82,8 @@ public:
 private:
     UUID _uuid;
     Date_t _startTime;
-    int64_t _timeRemainingHigh;
-    int64_t _timeRemainingLow;
+    Milliseconds _timeRemainingHigh;
+    Milliseconds _timeRemainingLow;
     ShardingDataTransformMetrics::Role _role;
 };
 
@@ -184,6 +184,10 @@ protected:
     ClockSourceMock* getClockSource() {
         static StaticImmortal<ClockSourceMock> clock;
         return &clock.value();
+    }
+
+    ShardingDataTransformCumulativeMetrics* getCumulativeMetrics() {
+        return _cumulativeMetrics.get();
     }
 
     using SpecialIndexBehaviorMap = stdx::unordered_map<int, std::function<void()>>;

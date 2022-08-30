@@ -105,8 +105,8 @@ public:
                                                std::move(observer)},
           _scopedObserver(registerInstanceMetrics()) {}
 
-    Milliseconds getRecipientHighEstimateRemainingTimeMillis() const {
-        return Milliseconds{0};
+    boost::optional<Milliseconds> getRecipientHighEstimateRemainingTimeMillis() const {
+        return boost::none;
     }
 
 private:
@@ -325,25 +325,41 @@ TEST_F(ShardingDataTransformInstanceMetricsTest, OnWriteToStasheddShouldIncremen
 TEST_F(ShardingDataTransformInstanceMetricsTest,
        SetLowestOperationTimeShouldBeReflectedInCurrentOp) {
     auto metrics = createInstanceMetrics(UUID::gen(), Role::kCoordinator);
-
-    auto report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("allShardsLowestRemainingOperationTimeEstimatedSecs"), 0);
     metrics->setCoordinatorLowEstimateRemainingTimeMillis(Milliseconds(2000));
-
-    report = metrics->reportForCurrentOp();
+    auto report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("allShardsLowestRemainingOperationTimeEstimatedSecs"), 2);
 }
 
 TEST_F(ShardingDataTransformInstanceMetricsTest,
        SetHighestOperationTimeShouldBeReflectedInCurrentOp) {
     auto metrics = createInstanceMetrics(UUID::gen(), Role::kCoordinator);
-
-    auto report = metrics->reportForCurrentOp();
-    ASSERT_EQ(report.getIntField("allShardsHighestRemainingOperationTimeEstimatedSecs"), 0);
     metrics->setCoordinatorHighEstimateRemainingTimeMillis(Milliseconds(12000));
-
-    report = metrics->reportForCurrentOp();
+    auto report = metrics->reportForCurrentOp();
     ASSERT_EQ(report.getIntField("allShardsHighestRemainingOperationTimeEstimatedSecs"), 12);
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest, CoordinatorHighEstimateNoneIfNotSet) {
+    auto metrics = createInstanceMetrics(UUID::gen(), Role::kCoordinator);
+    ASSERT_EQ(metrics->getHighEstimateRemainingTimeMillis(), boost::none);
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest, CoordinatorLowEstimateNoneIfNotSet) {
+    auto metrics = createInstanceMetrics(UUID::gen(), Role::kCoordinator);
+    ASSERT_EQ(metrics->getLowEstimateRemainingTimeMillis(), boost::none);
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest,
+       CurrentOpDoesNotReportCoordinatorHighEstimateIfNotSet) {
+    auto metrics = createInstanceMetrics(UUID::gen(), Role::kCoordinator);
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_FALSE(report.hasField("allShardsHighestRemainingOperationTimeEstimatedSecs"));
+}
+
+TEST_F(ShardingDataTransformInstanceMetricsTest,
+       CurrentOpDoesNotReportCoordinatorLowEstimateIfNotSet) {
+    auto metrics = createInstanceMetrics(UUID::gen(), Role::kCoordinator);
+    auto report = metrics->reportForCurrentOp();
+    ASSERT_FALSE(report.hasField("allShardsLowestRemainingOperationTimeEstimatedSecs"));
 }
 
 }  // namespace

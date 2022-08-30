@@ -94,8 +94,6 @@ reshardingTest.withReshardingInBackground(
             assert(curOpSection.hasOwnProperty('recipientState'), tojson(curOpSection));
             assert(curOpSection.hasOwnProperty('documentsCopied'), tojson(curOpSection));
             assert(curOpSection.hasOwnProperty('oplogEntriesApplied'), tojson(curOpSection));
-            assert(curOpSection.hasOwnProperty('remainingOperationTimeEstimatedSecs'),
-                   tojson(curOpSection));
         });
 
         const curOpSection =

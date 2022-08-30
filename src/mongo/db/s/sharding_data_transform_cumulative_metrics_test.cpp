@@ -108,11 +108,11 @@ TEST_F(ShardingDataTransformMetricsTestFixture, NoServerStatusWhenNeverUsed) {
     ASSERT_BSONOBJ_EQ(report, BSONObj());
 }
 
-TEST_F(ShardingDataTransformMetricsTestFixture, RemainingTimeReports0WhenEmpty) {
+TEST_F(ShardingDataTransformMetricsTestFixture, RemainingTimeReportsMinusOneWhenEmpty) {
     ASSERT_EQ(_cumulativeMetrics->getObservedMetricsCount(), 0);
     ASSERT_EQ(_cumulativeMetrics->getOldestOperationHighEstimateRemainingTimeMillis(
                   ObserverMock::kDefaultRole),
-              0);
+              -1);
 }
 
 TEST_F(ShardingDataTransformMetricsTestFixture, UpdatesOldestWhenOldestIsRemoved) {

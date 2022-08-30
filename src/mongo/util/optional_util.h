@@ -139,4 +139,15 @@ template <typename T, std::enable_if_t<canStreamWithExtension<T>, int> = 0>
 Extension(const T& t)->Extension<T>;
 
 }  // namespace optional_io
+
+namespace optional_util {
+template <typename T, typename U>
+void setOrAdd(boost::optional<T>& counter, U value) {
+    if (!counter) {
+        counter = value;
+        return;
+    }
+    counter = *counter + value;
+}
+}  // namespace optional_util
 }  // namespace mongo

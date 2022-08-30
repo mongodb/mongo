@@ -41,10 +41,14 @@ namespace resharding_metrics {
 
 template <class T>
 inline constexpr bool isStateDocument =
-    std::disjunction<std::is_same<T, ReshardingRecipientDocument>,
-                     std::is_same<T, ReshardingCoordinatorDocument>,
-                     std::is_same<T, ReshardingDonorDocument>>::value;
+    std::disjunction_v<std::is_same<T, ReshardingRecipientDocument>,
+                       std::is_same<T, ReshardingCoordinatorDocument>,
+                       std::is_same<T, ReshardingDonorDocument>>;
 
+template <typename T>
+inline constexpr bool isState = std::disjunction_v<std::is_same<T, RecipientStateEnum>,
+                                                   std::is_same<T, CoordinatorStateEnum>,
+                                                   std::is_same<T, DonorStateEnum>>;
 
 template <typename T>
 inline constexpr auto getState(const T& document) {

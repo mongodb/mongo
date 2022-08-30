@@ -119,9 +119,13 @@ protected:
     virtual void reportCurrentInSteps(BSONObjBuilder* bob) const;
 
 private:
+    enum EstimateType { kHigh, kLow };
+
     MetricsSet& getMetricsSetForRole(Role role);
     const MetricsSet& getMetricsSetForRole(Role role) const;
     const InstanceObserver* getOldestOperation(WithLock, Role role) const;
+    int64_t getOldestOperationEstimateRemainingTimeMillis(Role role, EstimateType type) const;
+    boost::optional<Milliseconds> getEstimate(const InstanceObserver* op, EstimateType type) const;
 
     MetricsSet::iterator insertMetrics(const InstanceObserver* metrics, MetricsSet& set);
     void deregisterMetrics(const Role& role, const MetricsSet::iterator& metrics);

@@ -33,6 +33,29 @@
 
 namespace mongo {
 
+namespace {
+constexpr auto kNoEstimate = Milliseconds{-1};
+
+boost::optional<Milliseconds> readCoordinatorEstimate(const AtomicWord<Milliseconds>& field) {
+    auto estimate = field.load();
+    if (estimate == kNoEstimate) {
+        return boost::none;
+    }
+    return estimate;
+}
+
+template <typename T>
+void appendOptionalMillisecondsFieldAs(BSONObjBuilder& builder,
+                                       const StringData& fieldName,
+                                       const boost::optional<Milliseconds> value) {
+    if (!value) {
+        return;
+    }
+    builder.append(fieldName, durationCount<T>(*value));
+}
+
+}  // namespace
+
 ShardingDataTransformInstanceMetrics::ShardingDataTransformInstanceMetrics(
     UUID instanceId,
     BSONObj originalCommand,
@@ -78,30 +101,32 @@ ShardingDataTransformInstanceMetrics::ShardingDataTransformInstanceMetrics(
       _documentsProcessed{0},
       _approxBytesToScan{0},
       _bytesWritten{0},
-      _coordinatorHighEstimateRemainingTimeMillis{Milliseconds{0}},
-      _coordinatorLowEstimateRemainingTimeMillis{Milliseconds{0}},
+      _coordinatorHighEstimateRemainingTimeMillis{kNoEstimate},
+      _coordinatorLowEstimateRemainingTimeMillis{kNoEstimate},
       _criticalSectionStartTime{kNoDate},
       _criticalSectionEndTime{kNoDate},
       _writesDuringCriticalSection{0} {}
 
-Milliseconds ShardingDataTransformInstanceMetrics::getHighEstimateRemainingTimeMillis() const {
+boost::optional<Milliseconds>
+ShardingDataTransformInstanceMetrics::getHighEstimateRemainingTimeMillis() const {
     switch (_role) {
         case Role::kRecipient:
             return getRecipientHighEstimateRemainingTimeMillis();
         case Role::kCoordinator:
-            return Milliseconds{_coordinatorHighEstimateRemainingTimeMillis.load()};
+            return readCoordinatorEstimate(_coordinatorHighEstimateRemainingTimeMillis);
         case Role::kDonor:
             break;
     }
     MONGO_UNREACHABLE;
 }
 
-Milliseconds ShardingDataTransformInstanceMetrics::getLowEstimateRemainingTimeMillis() const {
+boost::optional<Milliseconds>
+ShardingDataTransformInstanceMetrics::getLowEstimateRemainingTimeMillis() const {
     switch (_role) {
         case Role::kRecipient:
             return getHighEstimateRemainingTimeMillis();
         case Role::kCoordinator:
-            return _coordinatorLowEstimateRemainingTimeMillis.load();
+            return readCoordinatorEstimate(_coordinatorLowEstimateRemainingTimeMillis);
         case Role::kDonor:
             break;
     }
@@ -141,10 +166,14 @@ BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcep
     builder.append(_fieldNames->getForOpTimeElapsed(), getOperationRunningTimeSecs().count());
     switch (_role) {
         case Role::kCoordinator:
-            builder.append(_fieldNames->getForAllShardsHighestRemainingOperationTimeEstimatedSecs(),
-                           durationCount<Seconds>(getHighEstimateRemainingTimeMillis()));
-            builder.append(_fieldNames->getForAllShardsLowestRemainingOperationTimeEstimatedSecs(),
-                           durationCount<Seconds>(getLowEstimateRemainingTimeMillis()));
+            appendOptionalMillisecondsFieldAs<Seconds>(
+                builder,
+                _fieldNames->getForAllShardsHighestRemainingOperationTimeEstimatedSecs(),
+                getHighEstimateRemainingTimeMillis());
+            appendOptionalMillisecondsFieldAs<Seconds>(
+                builder,
+                _fieldNames->getForAllShardsLowestRemainingOperationTimeEstimatedSecs(),
+                getLowEstimateRemainingTimeMillis());
             builder.append(_fieldNames->getForCoordinatorState(), getStateString());
             builder.append(_fieldNames->getForCopyTimeElapsed(),
                            getCopyingElapsedTimeSecs().count());
@@ -164,8 +193,10 @@ BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcep
             builder.append(_fieldNames->getForRecipientState(), getStateString());
             builder.append(_fieldNames->getForCopyTimeElapsed(),
                            getCopyingElapsedTimeSecs().count());
-            builder.append(_fieldNames->getForRemainingOpTimeEstimated(),
-                           durationCount<Seconds>(getHighEstimateRemainingTimeMillis()));
+            appendOptionalMillisecondsFieldAs<Seconds>(
+                builder,
+                _fieldNames->getForRemainingOpTimeEstimated(),
+                getHighEstimateRemainingTimeMillis());
             builder.append(_fieldNames->getForApproxDocumentsToProcess(),
                            _approxDocumentsToProcess.load());
             builder.append(_fieldNames->getForApproxBytesToScan(), _approxBytesToScan.load());
@@ -231,6 +262,11 @@ void ShardingDataTransformInstanceMetrics::restoreDocumentsProcessed(
     _bytesWritten.store(totalDocumentsSizeBytes);
 }
 
+void ShardingDataTransformInstanceMetrics::restoreWritesToStashCollections(
+    int64_t writesToStashCollections) {
+    _writesToStashCollections.store(writesToStashCollections);
+}
+
 void ShardingDataTransformInstanceMetrics::setDocumentsToProcessCounts(
     int64_t documentCount, int64_t totalDocumentsSizeBytes) {
     _approxDocumentsToProcess.store(documentCount);
@@ -280,11 +316,6 @@ void ShardingDataTransformInstanceMetrics::onWriteToStashedCollections() {
 void ShardingDataTransformInstanceMetrics::onReadDuringCriticalSection() {
     _readsDuringCriticalSection.fetchAndAdd(1);
     _cumulativeMetrics->onWriteDuringCriticalSection();
-}
-
-void ShardingDataTransformInstanceMetrics::accumulateWritesToStashCollections(
-    int64_t writesToStashCollections) {
-    _writesToStashCollections.fetchAndAdd(writesToStashCollections);
 }
 
 void ShardingDataTransformInstanceMetrics::onCloningTotalRemoteBatchRetrieval(

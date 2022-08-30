@@ -229,8 +229,9 @@ GlobalIndexCumulativeMetrics* GlobalIndexMetrics::getGlobalIndexCumulativeMetric
 }
 
 
-Milliseconds GlobalIndexMetrics::getRecipientHighEstimateRemainingTimeMillis() const {
-    return Milliseconds{0};
+boost::optional<Milliseconds> GlobalIndexMetrics::getRecipientHighEstimateRemainingTimeMillis()
+    const {
+    return boost::none;
 }
 
 }  // namespace mongo

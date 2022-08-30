@@ -67,9 +67,8 @@ public:
 
     virtual BSONObj reportForCurrentOp() const noexcept;
 
-    Milliseconds getHighEstimateRemainingTimeMillis() const;
-    Milliseconds getLowEstimateRemainingTimeMillis() const;
-    virtual Milliseconds getRecipientHighEstimateRemainingTimeMillis() const = 0;
+    boost::optional<Milliseconds> getHighEstimateRemainingTimeMillis() const;
+    boost::optional<Milliseconds> getLowEstimateRemainingTimeMillis() const;
     Date_t getStartTimestamp() const;
     const UUID& getInstanceId() const;
 
@@ -90,7 +89,6 @@ public:
     int64_t getDocumentsProcessedCount() const;
     int64_t getBytesWrittenCount() const;
     int64_t getApproxBytesToScanCount() const;
-    void restoreDocumentsProcessed(int64_t documentCount, int64_t totalDocumentsSizeBytes);
     void setDocumentsToProcessCounts(int64_t documentCount, int64_t totalDocumentsSizeBytes);
     void setCoordinatorHighEstimateRemainingTimeMillis(Milliseconds milliseconds);
     void setCoordinatorLowEstimateRemainingTimeMillis(Milliseconds milliseconds);
@@ -130,9 +128,11 @@ protected:
     }
     void restoreCopyingBegin(Date_t date);
     void restoreCopyingEnd(Date_t date);
+    void restoreDocumentsProcessed(int64_t documentCount, int64_t totalDocumentsSizeBytes);
+    void restoreWritesToStashCollections(int64_t writesToStashCollections);
     virtual std::string createOperationDescription() const noexcept;
     virtual StringData getStateString() const noexcept;
-    void accumulateWritesToStashCollections(int64_t writesToStashCollections);
+    virtual boost::optional<Milliseconds> getRecipientHighEstimateRemainingTimeMillis() const = 0;
 
     ShardingDataTransformCumulativeMetrics* getCumulativeMetrics();
     ClockSource* getClockSource() const;
