@@ -132,6 +132,10 @@ public:
 
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
         _startWith->addDependencies(deps);
+        if (_additionalFilter) {
+            uassertStatusOK(MatchExpressionParser::parse(*_additionalFilter, _fromExpCtx))
+                ->addDependencies(deps);
+        }
         return DepsTracker::State::SEE_NEXT;
     };
 
