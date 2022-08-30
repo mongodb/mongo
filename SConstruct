@@ -110,9 +110,9 @@ add_option(
     choices=list(BUILD_PROFILES.keys()),
     default='default',
     type='choice',
-    help='''Short hand for common build options. These profiles are well supported by SDP and are
-    kept up to date. Unless you need something specific, it is recommended that you only build with
-    these. san is the recommeneded profile since it exposes bugs before they are found in patch
+    help='''Short hand for common build options. These profiles are well supported by SDP and are 
+    kept up to date. Unless you need something specific, it is recommended that you only build with 
+    these. san is the recommeneded profile since it exposes bugs before they are found in patch 
     builds. Check out site_scons/mongo/build_profiles.py to see each profile.''',
 )
 
@@ -3751,13 +3751,6 @@ def doConfigure(myenv):
         # builds it works well.
         if link_model.startswith("dynamic"):
             AddToLINKFLAGSIfSupported(myenv, '-Wl,--gdb-index')
-
-        if link_model != 'dynamic':
-            # This will create an extra section where debug types can be referred from,
-            # reducing other section sizes. This helps most with big static links as there
-            # will be lots of duplicate debug type info.
-            myenv.AddToCCFLAGSIfSupported('-fdebug-types-section')
-            myenv.AddToLINKFLAGSIfSupported('-fdebug-types-section')
 
         # Our build is already parallel.
         AddToLINKFLAGSIfSupported(myenv, '-Wl,--no-threads')
