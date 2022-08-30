@@ -154,6 +154,7 @@ let testCases = {
     _shardsvrCompactStructuredEncryptionData: {skip: "internal command"},
     _shardsvrCreateCollection: {skip: "internal command"},
     _shardsvrCreateCollectionParticipant: {skip: "internal command"},
+    _shardsvrCreateGlobalIndex: {skip: "internal command"},
     _shardsvrDropCollection: {skip: "internal command"},
     _shardsvrDropCollectionIfUUIDNotMatching: {skip: "internal command"},
     _shardsvrDropCollectionParticipant: {skip: "internal command"},

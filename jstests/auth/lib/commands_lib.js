@@ -209,6 +209,21 @@ var authCommandsLib = {
 
     tests: [
         {
+          testname: "_shardsvrCreateGlobalIndex",
+          command: {_shardsvrCreateGlobalIndex: UUID()},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                expectFail: true
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
           testname: "abortReshardCollection",
           command: {abortReshardCollection: "test.x"},
           skipUnlessSharded: true,
@@ -3083,7 +3098,7 @@ var authCommandsLib = {
                       t: new Timestamp(1655722668, 22),
                       v: new Timestamp(1, 0)
                   },
-                  min: {_id: MinKey}, 
+                  min: {_id: MinKey},
                   max: {_id: -4611686018427387902}
               },
               fromShardCollectionVersion: {
@@ -5781,7 +5796,7 @@ var authCommandsLib = {
               }
           ]
         },
-        { 
+        {
           testname: "setClusterParameter",
           command: {setClusterParameter: {testIntClusterParameter: {intData: 17}}},
           skipTest: (conn) => {

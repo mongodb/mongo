@@ -369,6 +369,40 @@ bool shouldTimestampIndexBuildSinglePhase(OperationContext* opCtx, const Namespa
 OpObserverImpl::OpObserverImpl(std::unique_ptr<OplogWriter> oplogWriter)
     : _oplogWriter(std::move(oplogWriter)) {}
 
+void OpObserverImpl::onCreateGlobalIndex(OperationContext* opCtx,
+                                         const NamespaceString& globalIndexNss,
+                                         const UUID& globalIndexUUID) {
+    invariant(!opCtx->inMultiDocumentTransaction());
+
+    BSONObjBuilder builder;
+    // The rollback implementation requires the collection name to list affected namespaces.
+    builder.append("createGlobalIndex", globalIndexNss.coll());
+
+    MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+    oplogEntry.setObject(builder.done());
+    oplogEntry.setNss(globalIndexNss.getCommandNS());
+    oplogEntry.setUuid(globalIndexUUID);
+
+    constexpr StmtId stmtId = 0;
+    if (TransactionParticipant::get(opCtx)) {
+        // This is a retryable write: populate the lsid, txnNumber and stmtId fields.
+        // The oplog link to previous statement is empty and the stmtId is zero because this is a
+        // single-statement command replicating as a single createGlobalIndex oplog entry.
+        repl::OplogLink oplogLink;
+        _oplogWriter->appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, {stmtId});
+    }
+
+    auto writeOpTime =
+        logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
+
+    // Register the retryable write to in-memory transactions table.
+    SessionTxnRecord sessionTxnRecord;
+    sessionTxnRecord.setLastWriteOpTime(writeOpTime);
+    sessionTxnRecord.setLastWriteDate(oplogEntry.getWallClockTime());
+    onWriteOpCompleted(opCtx, {stmtId}, sessionTxnRecord);
+}
+
 void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const UUID& uuid,

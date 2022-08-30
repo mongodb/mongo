@@ -148,6 +148,11 @@ public:
 
     // Noop operations (don't perform any check).
 
+    // Unchecked because global indexes are created from internal commands.
+    void onCreateGlobalIndex(OperationContext* opCtx,
+                             const NamespaceString& globalIndexNss,
+                             const UUID& globalIndexUUID) final{};
+
     // Index builds committing can be left unchecked since we kill any active index builds before
     // enabling write blocking. This means any index build which gets to the commit phase while
     // write blocking is active was started and hit the onStartIndexBuild hook with write blocking

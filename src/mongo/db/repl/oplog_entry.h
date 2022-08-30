@@ -458,6 +458,7 @@ public:
         kCommitTransaction,
         kAbortTransaction,
         kImportCollection,
+        kCreateGlobalIndex,
     };
 
     // Get the in-memory size in bytes of a ReplOperation.

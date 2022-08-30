@@ -280,6 +280,16 @@ commands:
                 type: object
                 description: "Id index."
 
+    _shardsvrCreateGlobalIndex:
+        description: "Internal command sent to participant shards to create a global index container with a given UUID."
+        command_name: _shardsvrCreateGlobalIndex
+        cpp_name: CreateGlobalIndex
+        strict: true
+        type: uuid
+        namespace: type
+        api_version: ""
+        reply_type: OkReply
+
     _shardsvrDropDatabase:
         description: "Internal command sent to the primary shard of a database to drop it."
         command_name: _shardsvrDropDatabase

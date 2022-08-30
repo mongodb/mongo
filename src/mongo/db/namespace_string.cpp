@@ -336,6 +336,12 @@ NamespaceString NamespaceString::makeChangeCollectionNSS(
     return NamespaceString{NamespaceString::kConfigDb, NamespaceString::kChangeCollectionName};
 }
 
+NamespaceString NamespaceString::makeGlobalIndexNSS(const UUID& id) {
+    return NamespaceString(
+        kSystemDb,
+        fmt::format("{}{}", NamespaceString::kGlobalIndexCollectionPrefix, id.toString()));
+}
+
 NamespaceString NamespaceString::makePreImageCollectionNSS(
     const boost::optional<TenantId>& tenantId) {
     return tenantId ? NamespaceString(tenantId, kConfigDb, "system.preimages")

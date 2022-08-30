@@ -46,6 +46,10 @@ public:
     TenantMigrationRecipientOpObserver() = default;
     ~TenantMigrationRecipientOpObserver() = default;
 
+    void onCreateGlobalIndex(OperationContext* opCtx,
+                             const NamespaceString& globalIndexNss,
+                             const UUID& globalIndexUUID) final{};
+
     void onCreateIndex(OperationContext* opCtx,
                        const NamespaceString& nss,
                        const UUID& uuid,

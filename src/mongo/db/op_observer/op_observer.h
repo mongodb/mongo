@@ -123,6 +123,10 @@ public:
 
     virtual ~OpObserver() = default;
 
+    virtual void onCreateGlobalIndex(OperationContext* opCtx,
+                                     const NamespaceString& globalIndexNss,
+                                     const UUID& globalIndexUUID) = 0;
+
     virtual void onCreateIndex(OperationContext* opCtx,
                                const NamespaceString& nss,
                                const UUID& uuid,

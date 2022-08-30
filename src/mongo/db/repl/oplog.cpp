@@ -65,6 +65,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/write_stage_common.h"
+#include "mongo/db/global_index.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
@@ -1102,6 +1103,12 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
     {"abortTransaction",
      {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
          return applyAbortTransaction(opCtx, entry, mode);
+     }}},
+    {"createGlobalIndex",
+     {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
+         const auto& globalIndexUUID = entry.getUuid().get();
+         global_index::createContainer(opCtx, globalIndexUUID);
+         return Status::OK();
      }}},
 };
 

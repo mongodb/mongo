@@ -104,6 +104,23 @@ env.Library(
 )
 
 env.Library(
+    target='global_index',
+    source=[
+        'global_index.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
+        '$BUILD_DIR/mongo/db/catalog_raii',
+        '$BUILD_DIR/mongo/db/concurrency/exception_util',
+        '$BUILD_DIR/mongo/db/curop',
+        '$BUILD_DIR/mongo/db/session/logical_session_id_helpers',
+        '$BUILD_DIR/mongo/db/transaction/transaction',
+        "index_builds_coordinator_interface",
+    ],
+)
+
+env.Library(
     target='multitenancy',
     source=[
         'multitenancy.cpp',

@@ -163,6 +163,8 @@ DurableOplogEntry::CommandType parseCommandType(const BSONObj& objectField) {
         return DurableOplogEntry::CommandType::kAbortTransaction;
     } else if (commandString == "importCollection") {
         return DurableOplogEntry::CommandType::kImportCollection;
+    } else if (commandString == "createGlobalIndex") {
+        return DurableOplogEntry::CommandType::kCreateGlobalIndex;
     } else {
         uasserted(ErrorCodes::BadValue,
                   str::stream() << "Unknown oplog entry command type: " << commandString

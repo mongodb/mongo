@@ -58,6 +58,14 @@ public:
         _observers.push_back(std::move(observer));
     }
 
+    void onCreateGlobalIndex(OperationContext* opCtx,
+                             const NamespaceString& globalIndexNss,
+                             const UUID& globalIndexUUID) final {
+        ReservedTimes times{opCtx};
+        for (auto& o : _observers)
+            o->onCreateGlobalIndex(opCtx, globalIndexNss, globalIndexUUID);
+    };
+
     void onCreateIndex(OperationContext* const opCtx,
                        const NamespaceString& nss,
                        const UUID& uuid,

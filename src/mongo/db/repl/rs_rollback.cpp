@@ -336,6 +336,8 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
         BSONElement first = obj.firstElement();
 
         switch (oplogEntry.getCommandType()) {
+            case OplogEntry::CommandType::kCreateGlobalIndex:
+                // Drop the collection created for global index.
             case OplogEntry::CommandType::kCreate: {
                 // Example create collection oplog entry
                 // {
