@@ -40,6 +40,7 @@
 #include "mongo/db/s/chunk_operation_precondition_checks.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/split_chunk.h"
 #include "mongo/logv2/log.h"
@@ -159,6 +160,7 @@ public:
         // Check that the preconditions for split chunk are met and throw StaleShardVersion
         // otherwise.
         {
+            onShardVersionMismatch(opCtx, nss, boost::none);
             OperationShardingState::
                 unsetShardRoleForLegacyDDLOperationsSentWithShardVersionIfNeeded(opCtx, nss);
             const auto metadata = checkCollectionIdentity(

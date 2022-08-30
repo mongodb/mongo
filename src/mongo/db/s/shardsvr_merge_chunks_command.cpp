@@ -95,6 +95,7 @@ void mergeChunks(OperationContext* opCtx,
 
     // Check that the preconditions for merge chunks are met and throw StaleShardVersion otherwise.
     const auto metadataBeforeMerge = [&]() {
+        onShardVersionMismatch(opCtx, nss, boost::none);
         OperationShardingState::unsetShardRoleForLegacyDDLOperationsSentWithShardVersionIfNeeded(
             opCtx, nss);
         const auto metadata = checkCollectionIdentity(opCtx, nss, expectedEpoch, expectedTimestamp);
