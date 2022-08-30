@@ -38,20 +38,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target="stats_serialization",
-    source=[
-        'stats.idl',
-        'stats_serialization_utils.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_values',
-        '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/service_context',
-    ],
-)
-
 env.CppUnitTest(
     target="ce_histogram_test",
     source=[
@@ -108,7 +94,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/util/fail_point',
         '$BUILD_DIR/mongo/util/pcre_wrapper',
         'query_ce',
-        'stats_serialization',
     ],
 )
 env.CppUnitTest(
@@ -122,18 +107,5 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context',
         'ce_test_utils',
         'query_ce',
-    ],
-)
-env.CppUnitTest(
-    target="stats_path_test",
-    source=[
-        "stats_path_test.cpp",
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/service_context',
-        'ce_test_utils',
-        'query_ce',
-        'stats_serialization',
     ],
 )
