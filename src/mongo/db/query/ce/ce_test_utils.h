@@ -48,34 +48,41 @@ class CEInterface;
 
 namespace ce {
 
+using namespace optimizer;
+
 // Enable this flag to log all estimates, and let all tests pass.
-// #define CE_TEST_LOG_MODE 1
+constexpr bool kCETestLogOnly = false;
 
 const double kMaxCEError = 0.01;
+const CEType kInvalidCardinality = -1.0;
+
+const OptPhaseManager::PhaseSet kDefaultCETestPhaseSet{
+    OptPhaseManager::OptPhase::MemoSubstitutionPhase,
+    OptPhaseManager::OptPhase::MemoExplorationPhase,
+    OptPhaseManager::OptPhase::MemoImplementationPhase};
+
+const OptPhaseManager::PhaseSet kOnlySubPhaseSet{OptPhaseManager::OptPhase::MemoSubstitutionPhase};
+
+const OptPhaseManager::PhaseSet kNoOptPhaseSet{};
 
 /**
  * Helpful macros for asserting that the CE of a $match predicate is approximately what we were
  * expecting.
  */
 
-#ifndef CE_TEST_LOG_MODE
-#define _ASSERT_MATCH_CE(ce, predicate, expectedCE, optLevel) \
-    ASSERT_APPROX_EQUAL(expectedCE, ce.getCE(predicate, optLevel), kMaxCEError)
-#else
-#define _ASSERT_MATCH_CE(ce, predicate, expectedCE, optLevel) \
-    ce.getCE(predicate, optLevel);                            \
-    ASSERT_APPROX_EQUAL(1.0, 1.0, kMaxCEError)
-#endif
+#define _ASSERT_MATCH_CE(ce, predicate, expectedCE)                        \
+    if constexpr (kCETestLogOnly) {                                        \
+        ce.getCE(predicate);                                               \
+        ASSERT_APPROX_EQUAL(1.0, 1.0, kMaxCEError);                        \
+    } else {                                                               \
+        ASSERT_APPROX_EQUAL(expectedCE, ce.getCE(predicate), kMaxCEError); \
+    }
 
-#define ASSERT_MATCH_CE(ce, predicate, expectedCE) _ASSERT_MATCH_CE(ce, predicate, expectedCE, 1)
+#define ASSERT_MATCH_CE(ce, predicate, expectedCE) _ASSERT_MATCH_CE(ce, predicate, expectedCE)
 
 #define ASSERT_MATCH_CE_CARD(ce, predicate, expectedCE, collCard) \
     ce.setCollCard(collCard);                                     \
     ASSERT_MATCH_CE(ce, predicate, expectedCE)
-
-#define ASSERT_MATCH_CE_CARD_NO_OPT(ce, predicate, expectedCE, collCard) \
-    ce.setCollCard(collCard);                                            \
-    _ASSERT_MATCH_CE(ce, predicate, expectedCE, 0)
 
 /**
  * A test utility class for helping verify the cardinality of CE transports on a given $match
@@ -83,17 +90,19 @@ const double kMaxCEError = 0.01;
  */
 class CETester {
 public:
-    CETester(std::string collName, double numRecords);
+    CETester(std::string collName,
+             double numRecords,
+             const OptPhaseManager::PhaseSet& optPhases = kDefaultCETestPhaseSet);
 
     /**
      * Returns the estimated cardinality of a given 'matchPredicate'.
      */
-    double getCE(const std::string& matchPredicate, size_t optimizationLevel = 1) const;
+    CEType getCE(const std::string& matchPredicate) const;
 
     /**
      * Returns the estimated cardinality of a given 'abt'.
      */
-    double getCE(optimizer::ABT& abt, size_t optimizationLevel) const;
+    CEType getCE(ABT& abt) const;
 
     void setCollCard(double card) {
         _collCard = card;
@@ -103,12 +112,20 @@ protected:
     /**
      * Subclasses need to override this method to initialize the transports they are testing.
      */
-    virtual std::unique_ptr<optimizer::cascades::CEInterface> getCETransport() const = 0;
+    virtual std::unique_ptr<cascades::CEInterface> getCETransport() const = 0;
+
+private:
+    // Construct placeholder PhaseManager. Notice that it also creates a Memo internally.
+    OptPhaseManager getPhaseManager() const;
 
     std::string _collName;
 
     // The number of records in the collection we are testing.
     double _collCard;
+
+    // Phases to use when optimizing an input query.
+    const OptPhaseManager::PhaseSet& _optPhases;
+    mutable PrefixId _prefixId;
 };
 
 }  // namespace ce

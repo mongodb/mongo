@@ -44,59 +44,94 @@ namespace mongo::ce {
 using namespace optimizer;
 using namespace cascades;
 
-CETester::CETester(std::string collName, double collCard)
-    : _collName(std::move(collName)), _collCard(collCard) {}
+CETester::CETester(std::string collName,
+                   double collCard,
+                   const optimizer::OptPhaseManager::PhaseSet& optPhases)
+    : _collName(std::move(collName)), _collCard(collCard), _optPhases(optPhases) {}
 
-double CETester::getCE(const std::string& query, size_t optimizationLevel) const {
-#ifdef CE_TEST_LOG_MODE
-    std::cout << "Query: " << query << "\n";
-#endif
+optimizer::CEType CETester::getCE(const std::string& query) const {
+    if constexpr (kCETestLogOnly) {
+        std::cout << "Query: " << query << "\n";
+    }
 
     // Construct ABT from pipeline and optimize.
     ABT abt = translatePipeline("[{$match: " + query + "}]", _collName);
 
     // Get cardinality estimate.
-    return getCE(abt, optimizationLevel);
+    return getCE(abt);
 }
 
-double CETester::getCE(ABT& abt, size_t optimizationLevel) const {
-    // Needs to outlive the phase manager.
-    PrefixId prefixId;
-
-    // Mock metadata.
-    ScanDefinition sd({}, {}, {DistributionType::Centralized}, true, _collCard);
-    Metadata metadata({{_collName, sd}});
-
-    std::vector<OptPhaseManager::OptPhase> optPhaseChoices{
-        OptPhaseManager::OptPhase::MemoSubstitutionPhase,
-        OptPhaseManager::OptPhase::MemoExplorationPhase};
-    optimizationLevel = std::min(optimizationLevel, optPhaseChoices.size());
-    OptPhaseManager::PhaseSet optPhases;
-    for (size_t i = 0; i < optimizationLevel; ++i) {
-        optPhases.insert(optPhaseChoices[i]);
+optimizer::CEType CETester::getCE(ABT& abt) const {
+    if constexpr (kCETestLogOnly) {
+        std::cout << ExplainGenerator::explainV2(abt) << std::endl;
     }
 
-    optimizer::OptPhaseManager phaseManager(optPhases,
-                                            prefixId,
-                                            true /*requireRID*/,
-                                            metadata,
-                                            std::make_unique<HeuristicCE>(),
-                                            std::make_unique<DefaultCosting>(),
-                                            DebugInfo::kDefaultForTests);
-
-    // Optimize.
+    // Optimize ABT.
+    OptPhaseManager phaseManager = getPhaseManager();
     ASSERT_TRUE(phaseManager.optimize(abt));
 
-    // Get cardinality estimate.
+    const auto& memo = phaseManager.getMemo();
+    if constexpr (kCETestLogOnly) {
+        std::cout << ExplainGenerator::explainMemo(memo) << std::endl;
+    }
+
     auto cht = getCETransport();
-    auto ce = cht->deriveCE(phaseManager.getMemo(), {}, abt.ref());
 
-#ifdef CE_TEST_LOG_MODE
-    std::cout << "ABT: " << ExplainGenerator::explainV2(abt) << "\n";
-    std::cout << "Card: " << _collCard << ", Estimated: " << ce << std::endl;
-#endif
+    // If we are running no optimization phases, we are ensuring that we get the correct estimate on
+    // the original ABT (usually testing the CE for FilterNodes). The memo won't have any groups for
+    // us to estimate directly yet.
+    if (_optPhases.empty()) {
+        auto card = cht->deriveCE(memo, {}, abt.ref());
+        return card;
+    }
 
-    return ce;
+    CEType outCard = kInvalidCardinality;
+    for (size_t i = 0; i < memo.getGroupCount(); i++) {
+        const auto& group = memo.getGroup(i);
+
+        // If the 'optPhases' either ends with the MemoSubstitutionPhase or the
+        // MemoImplementationPhase, we should have exactly one logical node per group.
+        ASSERT_EQUALS(group._logicalNodes.size(), 1);
+        const auto& node = group._logicalNodes.at(0);
+
+        // This gets the cardinality estimate actually produced during optimization.
+        auto memoCE =
+            properties::getPropertyConst<properties::CardinalityEstimate>(group._logicalProperties)
+                .getEstimate();
+
+        // Conversely, here we call deriveCE() on the ABT produced by the optimization phases, which
+        // has all its delegators dereferenced.
+        auto card = cht->deriveCE(memo, group._logicalProperties, node);
+
+        if constexpr (!kCETestLogOnly) {
+            // Ensure that the CE stored for the logical nodes of each group is what we would expect
+            // when estimating that node directly. Note that this check will fail if we are testing
+            // histogram estimation and only using the MemoSubstitutionPhase because the memo always
+            // uses heuristic estimation in this case.
+            ASSERT_APPROX_EQUAL(card, memoCE, kMaxCEError);
+        }
+
+        if (node.is<optimizer::RootNode>()) {
+            // We want to return the cardinality for the entire ABT.
+            outCard = memoCE;
+        }
+    }
+
+    ASSERT_NOT_EQUALS(outCard, kInvalidCardinality);
+
+    return outCard;
+}
+
+optimizer::OptPhaseManager CETester::getPhaseManager() const {
+    ScanDefinition sd({}, {}, {DistributionType::Centralized}, true, _collCard);
+    Metadata metadata({{_collName, sd}});
+    return {_optPhases,
+            _prefixId,
+            true /*requireRID*/,
+            metadata,
+            getCETransport(),
+            std::make_unique<DefaultCosting>(),
+            DebugInfo::kDefaultForTests};
 }
 
 }  // namespace mongo::ce
