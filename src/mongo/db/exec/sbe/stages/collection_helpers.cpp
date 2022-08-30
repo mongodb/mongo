@@ -44,8 +44,9 @@ std::tuple<CollectionPtr, NamespaceString, uint64_t> acquireCollection(Operation
     CollectionPtr collPtr = CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, collUuid);
     tassert(5071000, str::stream() << "Collection uuid " << collUuid << " does not exist", collPtr);
 
+    auto nss = collPtr->ns();
     return std::make_tuple(
-        std::move(collPtr), collPtr->ns(), CollectionCatalog::get(opCtx)->getEpoch());
+        std::move(collPtr), std::move(nss), CollectionCatalog::get(opCtx)->getEpoch());
 }
 
 CollectionPtr restoreCollection(OperationContext* opCtx,
