@@ -41,13 +41,14 @@ import physical_tree
 __all__ = ['extract_parameters']
 
 
-def extract_parameters(config: AbtCalibratorConfig, database: DatabaseInstance,
-                       abt_types: Sequence[str]) -> Mapping[str, Sequence[ModelParameters]]:
+async def extract_parameters(config: AbtCalibratorConfig, database: DatabaseInstance,
+                             abt_types: Sequence[str]) -> Mapping[str, Sequence[ModelParameters]]:
     """Read measurements from database and extract cost model parameters for the given ABT types."""
 
     stats = defaultdict(list)
 
-    for result in database.get_all_documents(config.input_collection_name):
+    docs = await database.get_all_documents(config.input_collection_name)
+    for result in docs:
         explain = json.loads(result['explain'])
         query_parameters = QueryParameters.from_json(result['query_parameters'])
         res = parse_explain(explain, abt_types)

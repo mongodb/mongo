@@ -37,14 +37,15 @@ from parameters_extractor import extract_parameters
 __all__ = ['calibrate']
 
 
-def calibrate(config: AbtCalibratorConfig, database: DatabaseInstance, abt_types: Sequence[str]):
+async def calibrate(config: AbtCalibratorConfig, database: DatabaseInstance,
+                    abt_types: Sequence[str]):
     """Main entry-point for ABT calibration."""
 
     if not config.enabled:
         return {}
 
     result = {}
-    stats = extract_parameters(config, database, abt_types)
+    stats = await extract_parameters(config, database, abt_types)
     for abt, abt_stats in stats.items():
         result[abt] = estimate(abt_stats, config.test_size, config.trace)
     return result
