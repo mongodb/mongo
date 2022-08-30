@@ -92,7 +92,7 @@ public:
     }
 
     /**
-     * If any request recieved a non-retriable error response and partial results are not allowed,
+     * If any request received a non-retriable error response and partial results are not allowed,
      * cancel any requests that may have succeeded and throw the first such error encountered.
      */
     void checkForFailedRequests();

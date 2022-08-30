@@ -255,7 +255,7 @@ inline void walk(Stage<T>* stage,
  *
  * The arguments to propagator will be actualized with the following:
  * 'T&' - In general, the contents from the previous stage, initial stages of the main pipeline and
- * $lookup pipelines recieve an element off the queue 'initialStageContents'. $facet receives a copy
+ * $lookup pipelines receive an element off the queue 'initialStageContents'. $facet receives a copy
  * of its parent's contents.
  * 'std::vector<T>&' - Completed contents from sub-pipelines. $facet's additional children and
  * expressive $lookup's final contents will be manifested in here. Note that these will be

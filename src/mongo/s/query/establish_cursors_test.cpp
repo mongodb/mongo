@@ -185,7 +185,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteInterruptedWhileCommandInFlight) {
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
 
-        // Now that our "remote" has recieved the request, interrupt the opCtx which the cursor is
+        // Now that our "remote" has received the request, interrupt the opCtx which the cursor is
         // running under.
         {
             stdx::lock_guard<Client> lk(*operationContext()->getClient());

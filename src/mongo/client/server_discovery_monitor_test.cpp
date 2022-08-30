@@ -492,7 +492,7 @@ TEST_F(ServerDiscoveryMonitorTestFixture,
 
     // It's been less than SdamConfiguration::kMinHeartbeatFrequency since the last isMaster was
     // received. The next isMaster should be sent SdamConfiguration::kMinHeartbeatFrequency since
-    // the last isMaster was recieved rather than immediately.
+    // the last isMaster was received rather than immediately.
     auto timeRequestImmediateSent = elapsed();
     isMasterMonitor->requestImmediateCheck();
     waitForNextIsMaster(minHeartbeatFrequency);

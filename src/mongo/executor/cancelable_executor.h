@@ -78,7 +78,7 @@ public:
 
     /*
      * This is the preferred way to get a CancelableExecutor, since the ExecutorFuture interface
-     * expects shared_ptrs to executors it recieves in its constructor or .thenRunOn.
+     * expects shared_ptrs to executors it receives in its constructor or .thenRunOn.
      */
     static std::shared_ptr<CancelableExecutor> make(ExecutorPtr exec, CancellationToken token) {
         return std::make_shared<CancelableExecutor>(std::move(exec), std::move(token));

@@ -785,7 +785,7 @@ side writes. When a quorum is reached, the current primary, under a collection X
 all index constraints. If there are errors, it will replicate an `abortIndexBuild` oplog entry. If
 the index build is successful, it will replicate a `commitIndexBuild` oplog entry.
 
-Secondaries that were not included in the commit quorum and recieve a `commitIndexBuild` oplog entry
+Secondaries that were not included in the commit quorum and receive a `commitIndexBuild` oplog entry
 will block replication until their index build is complete.
 
 The `commitQuorum` for a running index build may be changed by the user via the

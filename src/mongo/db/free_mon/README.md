@@ -23,7 +23,7 @@ which collect data periodically. It also owns a
 [`FreeMonProcessor`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/free_mon/free_mon_processor.h#L304)
 which under the hood contains a multi-producer priority queue, and a
 [`FreeMonNetworkInterface`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/free_mon/free_mon_network.h#L40)
-which is a way for the subsystem to send and recieve packets to the cloud endpoint.
+which is a way for the subsystem to send and receive packets to the cloud endpoint.
 
 When the server first starts, if Free Monitoring is enabled (using a command line parameter
 `enableFreeMonitoring`), the FreeMonController is initialized on server startup through the mongod

@@ -169,7 +169,7 @@ the storage mechanism is listed as a sub-bullet below.
       on the database. See [authorization](#authorization) for more information.
   - **With Native LDAP**
     - When the PLAIN mechanism uses `Native LDAP`, the credential information is sent to and
-      recieved from LDAP when creating and authorizing a user. The mongo server sends user
+      received from LDAP when creating and authorizing a user. The mongo server sends user
       credentials over the wire to the LDAP server and the LDAP server requests a password. The
       mongo server sends the password in plain text and LDAP responds with whether the password is
       correct. Here the communication with the driver and the mongod is the same, but the storage

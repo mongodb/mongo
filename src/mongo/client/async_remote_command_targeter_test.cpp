@@ -100,7 +100,7 @@ TEST_F(AsyncRemoteCommandTargeterTest, OnRemoteErrorUpdatesTopology) {
 
 /**
  * When onRemoteCommandError is called, the targeter updates its view of the underlying topology
- * correctly and the resolver recieves those changes.
+ * correctly and the resolver receives those changes.
  */
 TEST_F(AsyncRemoteCommandTargeterTest, OnRemoteErrorUpdatesTopologyAndResolver) {
     ReadPreferenceSetting readPref;

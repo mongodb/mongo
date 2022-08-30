@@ -532,7 +532,7 @@ runCommentParamTest({
 //
 
 // For aggregate command with a $unionWith stage, where a sharded collection unions with a sharded
-// collection, each shard recieves an aggregate operation for the outer pipeline (with the stages
+// collection, each shard receives an aggregate operation for the outer pipeline (with the stages
 // prior to the $unionWith stage) and the inner pipeline. Each aggregate operation is followed up by
 // a getMore to exhaust the cursor. So there should be 8 profiler entries which has the 'comment'
 // field. In addition there is an aggregate operation which does merge cursors.
@@ -551,7 +551,7 @@ runCommentParamTest({
 });
 
 // For aggregate command with a $unionWith stage, where a sharded collection unions with an
-// unsharded collection, each shard recieves an aggregate & getMore operation (with the stages prior
+// unsharded collection, each shard receives an aggregate & getMore operation (with the stages prior
 // to the $unionWith stage) for the outer pipeline and 1 aggregate operation for the inner pipeline
 // on unsharded collection. So there should be 5 profiler entries which has the 'comment' field. In
 // addition there is an aggregate operation which does merge cursors.
@@ -572,7 +572,7 @@ runCommentParamTest({
 });
 
 // For aggregate command with a $unionWith stage, where an unsharded collection unions with a
-// sharded collection, each shard recieves an aggregate & getMore operation for the inner pipeline.
+// sharded collection, each shard receives an aggregate & getMore operation for the inner pipeline.
 // So there should be 4 profiler entries which has the 'comment' field. In addition there is an
 // aggregate operation which does merge cursors.
 runCommentParamTest({

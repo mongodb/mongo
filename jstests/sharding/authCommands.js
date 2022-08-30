@@ -13,7 +13,7 @@ load("jstests/sharding/libs/find_chunks_util.js");
 // Replica set nodes started with --shardsvr do not enable key generation until they are added
 // to a sharded cluster and reject commands with gossiped clusterTime from users without the
 // advanceClusterTime privilege. This causes ShardingTest setup to fail because the shell
-// briefly authenticates as __system and recieves clusterTime metadata then will fail trying to
+// briefly authenticates as __system and receives clusterTime metadata then will fail trying to
 // gossip that time later in setup.
 //
 

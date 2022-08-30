@@ -59,7 +59,7 @@ public:
     /*
      * Informs the RemoteHostTargeter that an error happened when trying to run a command on a
      * HostAndPort. Allows the targeter to update its view of the cluster's topology if network
-     * or shutdown errors are recieved.
+     * or shutdown errors are received.
      */
     virtual SemiFuture<void> onRemoteCommandError(HostAndPort h, Status s) = 0;
 };

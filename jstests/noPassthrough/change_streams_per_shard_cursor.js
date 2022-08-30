@@ -140,7 +140,7 @@ assert(!explainOut.hasOwnProperty("splitPipeline"));
 assert.hasOwnProperty(explainOut, "stages");
 
 // If we getMore an invalidated cursor the cursor should have been closed on mongos and we should
-// get CursorNotFound, even if the invalidate event was never recieved by mongos.
+// get CursorNotFound, even if the invalidate event was never received by mongos.
 [[], [{$match: {f: "filter out invalidate event"}}]].forEach((pipeline) => {
     assert.commandWorked(st.s.adminCommand({shardCollection: dbName + ".toDrop", key: {_id: 1}}));
     let c = pscWatch(sdb, "toDrop", shardId, {pipeline});

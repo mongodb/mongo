@@ -294,14 +294,14 @@ ExpressionN<WindowFunctionN, AccumulatorNType>::buildAccumulatorOnly() const {
     if constexpr (!needsSortBy<WindowFunctionN>::value) {
         tassert(5788606,
                 str::stream() << AccumulatorNType::getName()
-                              << " should not have recieved a 'sortBy' but did!",
+                              << " should not have received a 'sortBy' but did!",
                 !sortPattern);
 
         acc = AccumulatorNType::create(_expCtx);
     } else {
         tassert(5788601,
                 str::stream() << AccumulatorNType::getName()
-                              << " should have recieved a 'sortBy' but did not!",
+                              << " should have received a 'sortBy' but did not!",
                 sortPattern);
         acc = AccumulatorNType::create(_expCtx, *sortPattern);
     }
@@ -320,7 +320,7 @@ ExpressionN<WindowFunctionN, AccumulatorNType>::buildRemovable() const {
     if constexpr (needsSortBy<WindowFunctionN>::value) {
         tassert(5788602,
                 str::stream() << AccumulatorNType::getName()
-                              << " should have recieved a 'sortBy' but did not!",
+                              << " should have received a 'sortBy' but did not!",
                 sortPattern);
         return WindowFunctionN::create(
             _expCtx,

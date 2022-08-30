@@ -68,7 +68,7 @@ public:
     /**
      * Called when a ServerHeartBeatSucceededEvent is published - A heartbeat sent to the server at
      * hostAndPort succeeded. duration is the execution time of the event, including the time it
-     * took to send the message and recieve the reply from the server.
+     * took to send the message and receive the reply from the server.
      */
     virtual void onServerHeartbeatSucceededEvent(const HostAndPort& hostAndPort,
                                                  const BSONObj reply){};

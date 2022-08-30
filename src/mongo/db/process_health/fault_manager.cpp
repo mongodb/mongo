@@ -360,7 +360,7 @@ boost::optional<FaultState> FaultManager::handleActiveFault(const OptionalMessag
 void FaultManager::logMessageReceived(FaultState state, const HealthCheckStatus& status) {
     LOGV2_DEBUG(5936504,
                 1,
-                "Fault manager recieved health check result",
+                "Fault manager received health check result",
                 "state"_attr = (str::stream() << state),
                 "observer_type"_attr = (str::stream() << status.getType()),
                 "result"_attr = status,

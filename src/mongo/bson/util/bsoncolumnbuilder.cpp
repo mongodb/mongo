@@ -1197,7 +1197,7 @@ bool BSONColumnBuilder::_appendSubElements(const BSONObj& obj) {
         return false;
     }
 
-    // We should have recieved one callback for every sub-element in reference object. This should
+    // We should have received one callback for every sub-element in reference object. This should
     // match number of encoding states setup previously.
     invariant(_flattenedAppendedObj.size() == _subobjStates.size());
     auto statesIt = _subobjStates.begin();
