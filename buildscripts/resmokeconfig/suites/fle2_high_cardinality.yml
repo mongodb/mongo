@@ -16,6 +16,7 @@ executor:
   config:
     shell_options:
       eval: "testingReplication = true; testingFLESharding = false;"
+      setShellParameter: featureFlagFLE2Range=true
   hooks:
   # We don't execute dbHash or oplog consistency checks since there is only a single replica set
   # node.
@@ -27,6 +28,7 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        featureFlagFLE2Range: true
         internalQueryFLEAlwaysUseEncryptedCollScanMode: 1
     # Use a 2-node replica set.
     num_nodes: 2

@@ -33,6 +33,7 @@
 #include <cmath>
 #include <cstdint>
 #include <functional>
+#include <iomanip>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -698,30 +699,71 @@ std::vector<std::string> getMinCover(const FLE2RangeSpec& spec, uint8_t sparsity
     return edges;
 }
 
-// Note: Does not return the leaf node
-std::vector<std::string> getEdges(BSONElement element,
-                                  BSONElement lowerBound,
-                                  BSONElement upperBound,
-                                  uint8_t sparsity) {
-    // TODO SERVER-69013
-    return {"1", "01", "001"};
+std::unique_ptr<Edges> getEdges(BSONElement element,
+                                BSONElement lowerBound,
+                                BSONElement upperBound,
+                                int sparsity) {
+    switch (element.type()) {
+        case BSONType::NumberInt:
+            uassert(
+                6775501, "lower bound must be integer", lowerBound.type() == BSONType::NumberInt);
+            uassert(
+                6775502, "upper bound must be integer", upperBound.type() == BSONType::NumberInt);
+            return getEdgesInt32(element.Int(), lowerBound.Int(), upperBound.Int(), sparsity);
+
+        case BSONType::NumberLong:
+            uassert(
+                6775503, "lower bound must be long int", lowerBound.type() == BSONType::NumberLong);
+            uassert(
+                6775504, "upper bound must be long int", upperBound.type() == BSONType::NumberLong);
+            return getEdgesInt64(element.Long(), lowerBound.Long(), upperBound.Long(), sparsity);
+
+        case BSONType::Date:
+            uassert(6775505, "lower bound must be date", lowerBound.type() == BSONType::Date);
+            uassert(6775506, "upper bound must be date", upperBound.type() == BSONType::Date);
+            return getEdgesInt64(element.Date().asInt64(),
+                                 lowerBound.Date().asInt64(),
+                                 upperBound.Date().asInt64(),
+                                 sparsity);
+
+        case BSONType::NumberDouble:
+            uassert(
+                6775507, "lower bound must be double", lowerBound.type() == BSONType::NumberDouble);
+            uassert(
+                6775508, "upper bound must be double", upperBound.type() == BSONType::NumberDouble);
+            return getEdgesDouble(
+                element.Double(), lowerBound.Double(), upperBound.Double(), sparsity);
+
+        case BSONType::NumberDecimal:
+            uassert(6775509,
+                    "lower bound must be decimal",
+                    lowerBound.type() == BSONType::NumberDecimal);
+            uassert(6775510,
+                    "upper bound must be decimal",
+                    upperBound.type() == BSONType::NumberDecimal);
+            uasserted(ErrorCodes::BadValue, "decimal not supported atm");
+
+        default:
+            uassert(6775500, "must use supported FLE2 range type", false);
+    }
 }
 
 std::vector<EdgeTokenSet> getEdgeTokenSet(BSONElement element,
                                           BSONElement lowerBound,
                                           BSONElement upperBound,
-                                          uint8_t sparsity,
+                                          int sparsity,
                                           uint64_t contentionFactor,
                                           const EDCToken& edcToken,
                                           const ESCToken& escToken,
                                           const ECCToken& eccToken,
                                           const ECOCToken& ecocToken) {
-    auto edges = getEdges(element, lowerBound, upperBound, sparsity);
+    const auto edges = getEdges(element, lowerBound, upperBound, sparsity);
+    const auto edgesList = edges->get();
 
     std::vector<EdgeTokenSet> tokens;
 
-    for (const auto& edge : edges) {
-        ConstDataRange cdr(edge.data(), edge.size());
+    for (const auto& edge : edgesList) {
+        ConstDataRange cdr(edge.rawData(), edge.size());
 
         EDCDerivedFromDataToken edcDatakey =
             FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken, cdr);
@@ -1190,7 +1232,6 @@ void convertServerPayload(ConstDataRange cdr,
                           ConstVectorIteratorPair<EDCServerPayloadInfo>& it,
                           BSONObjBuilder* builder,
                           StringData fieldPath) {
-
     auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
     if (encryptedTypeBinding == EncryptedBinDataType::kFLE2FindEqualityPayload ||
         encryptedTypeBinding == EncryptedBinDataType::kFLE2FindRangePayload) {
@@ -1203,11 +1244,11 @@ void convertServerPayload(ConstDataRange cdr,
         }
 
         uassert(6373505, "Unexpected end of iterator", it.it != it.end);
-        auto payload = *(it.it);
+        const auto payload = it.it;
 
         // TODO - validate field is actually indexed in the schema?
-        if (payload.payload.getEdgeTokenSet().has_value()) {
-            FLE2IndexedRangeEncryptedValue sp(payload.payload, payload.counts);
+        if (payload->payload.getEdgeTokenSet().has_value()) {
+            FLE2IndexedRangeEncryptedValue sp(payload->payload, payload->counts);
 
             uassert(6775311,
                     str::stream() << "Type '" << typeName(sp.bsonType)
@@ -1216,7 +1257,7 @@ void convertServerPayload(ConstDataRange cdr,
 
             auto swEncrypted =
                 sp.serialize(FLETokenFromCDR<FLETokenType::ServerDataEncryptionLevel1Token>(
-                    payload.payload.getServerEncryptionToken()));
+                    payload->payload.getServerEncryptionToken()));
             uassertStatusOK(swEncrypted);
             toEncryptedBinData(fieldPath,
                                EncryptedBinDataType::kFLE2RangeIndexedValue,
@@ -1228,28 +1269,28 @@ void convertServerPayload(ConstDataRange cdr,
                 pTags->push_back({tag});
             }
 
-            return;
+        } else {
+            dassert(payload->counts.size() == 1);
+
+            FLE2IndexedEqualityEncryptedValue sp(payload->payload, payload->counts[0]);
+
+            uassert(6373506,
+                    str::stream() << "Type '" << typeName(sp.bsonType)
+                                  << "' is not a valid type for Queryable Encryption Equality",
+                    isFLE2EqualityIndexedSupportedType(sp.bsonType));
+
+            auto swEncrypted =
+                sp.serialize(FLETokenFromCDR<FLETokenType::ServerDataEncryptionLevel1Token>(
+                    payload->payload.getServerEncryptionToken()));
+            uassertStatusOK(swEncrypted);
+            toEncryptedBinData(fieldPath,
+                               EncryptedBinDataType::kFLE2EqualityIndexedValue,
+                               ConstDataRange(swEncrypted.getValue()),
+                               builder);
+
+            pTags->push_back({EDCServerCollection::generateTag(*payload)});
         }
 
-        dassert(payload.counts.size() == 1);
-
-        FLE2IndexedEqualityEncryptedValue sp(payload.payload, payload.counts[0]);
-
-        uassert(6373506,
-                str::stream() << "Type '" << typeName(sp.bsonType)
-                              << "' is not a valid type for Queryable Encryption Equality",
-                isFLE2EqualityIndexedSupportedType(sp.bsonType));
-
-        auto swEncrypted =
-            sp.serialize(FLETokenFromCDR<FLETokenType::ServerDataEncryptionLevel1Token>(
-                payload.payload.getServerEncryptionToken()));
-        uassertStatusOK(swEncrypted);
-        toEncryptedBinData(fieldPath,
-                           EncryptedBinDataType::kFLE2EqualityIndexedValue,
-                           ConstDataRange(swEncrypted.getValue()),
-                           builder);
-
-        pTags->push_back({EDCServerCollection::generateTag(payload)});
     } else if (encryptedTypeBinding == EncryptedBinDataType::kFLE2UnindexedEncryptedValue) {
         builder->appendBinData(fieldPath, cdr.length(), BinDataType::Encrypt, cdr.data());
         return;
@@ -2353,29 +2394,21 @@ std::pair<BSONType, std::vector<uint8_t>> FLE2UnindexedEncryptedValue::deseriali
 }
 
 std::vector<FLEEdgeToken> toFLEEdgeTokenSet(const FLE2InsertUpdatePayload& payload) {
+    const auto ets = payload.getEdgeTokenSet().get();
     std::vector<FLEEdgeToken> tokens;
-    tokens.reserve(payload.getEdgeTokenSet().get().size() + 1);
+    tokens.reserve(ets.size());
 
-    FLEEdgeToken leaf;
-    leaf.edc = FLETokenFromCDR<FLETokenType::EDCDerivedFromDataTokenAndContentionFactorToken>(
-        payload.getEdcDerivedToken());
-    leaf.esc = FLETokenFromCDR<FLETokenType::ESCDerivedFromDataTokenAndContentionFactorToken>(
-        payload.getEscDerivedToken());
-    leaf.ecc = FLETokenFromCDR<FLETokenType::ECCDerivedFromDataTokenAndContentionFactorToken>(
-        payload.getEccDerivedToken());
-    tokens.push_back(leaf);
-
-    for (const auto& ets : payload.getEdgeTokenSet().get()) {
+    for (const auto& et : ets) {
         FLEEdgeToken edgeToken;
         edgeToken.edc =
             FLETokenFromCDR<FLETokenType::EDCDerivedFromDataTokenAndContentionFactorToken>(
-                ets.getEdcDerivedToken());
+                et.getEdcDerivedToken());
         edgeToken.esc =
             FLETokenFromCDR<FLETokenType::ESCDerivedFromDataTokenAndContentionFactorToken>(
-                ets.getEscDerivedToken());
+                et.getEscDerivedToken());
         edgeToken.ecc =
             FLETokenFromCDR<FLETokenType::ECCDerivedFromDataTokenAndContentionFactorToken>(
-                ets.getEccDerivedToken());
+                et.getEccDerivedToken());
 
         tokens.push_back(edgeToken);
     }
@@ -2571,9 +2604,9 @@ StatusWith<std::vector<uint8_t>> FLE2IndexedRangeEncryptedValue::serialize(
 }
 
 
-ESCDerivedFromDataTokenAndContentionFactorToken EDCServerPayloadInfo::getESCToken() const {
-    return FLETokenFromCDR<FLETokenType::ESCDerivedFromDataTokenAndContentionFactorToken>(
-        payload.getEscDerivedToken());
+ESCDerivedFromDataTokenAndContentionFactorToken EDCServerPayloadInfo::getESCToken(
+    ConstDataRange cdr) {
+    return FLETokenFromCDR<FLETokenType::ESCDerivedFromDataTokenAndContentionFactorToken>(cdr);
 }
 
 void EDCServerCollection::validateEncryptedFieldInfo(BSONObj& obj,

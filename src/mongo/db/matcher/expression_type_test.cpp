@@ -386,6 +386,7 @@ TEST(InternalSchemaBinDataFLE2EncryptedTypeTest, MatchesOnlyFLE2ServerSubtypes) 
             reinterpret_cast<const void*>(&blob), sizeof(FleBlobHeader), BinDataType::Encrypt);
 
         if (i == static_cast<uint8_t>(EncryptedBinDataType::kFLE2EqualityIndexedValue) ||
+            i == static_cast<uint8_t>(EncryptedBinDataType::kFLE2RangeIndexedValue) ||
             i == static_cast<uint8_t>(EncryptedBinDataType::kFLE2UnindexedEncryptedValue)) {
             ASSERT_TRUE(expr.matchesBSON(BSON("a" << binData)));
         } else {

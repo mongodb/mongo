@@ -411,6 +411,7 @@ public:
         EncryptedBinDataType subTypeByte = static_cast<EncryptedBinDataType>(binData[0]);
         switch (subTypeByte) {
             case EncryptedBinDataType::kFLE2EqualityIndexedValue:
+            case EncryptedBinDataType::kFLE2RangeIndexedValue:
             case EncryptedBinDataType::kFLE2UnindexedEncryptedValue: {
                 // Verify the type of the encrypted data.
                 if (typeSet().isEmpty()) {

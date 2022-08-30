@@ -356,15 +356,40 @@ function isFLE2ReplicationEnabled() {
 }
 
 /**
- * Assert a field is an indexed encrypted field
+ * Assert a field is an indexed encrypted field. That includes both
+ * equality and range
  *
  * @param {BinData} value bindata value
  */
 function assertIsIndexedEncryptedField(value) {
     assert(value instanceof BinData, "Expected BinData, found: " + value);
     assert.eq(value.subtype(), 6, "Expected Encrypted bindata: " + value);
+    assert(value.hex().startsWith("07") || value.hex().startsWith("09"),
+           "Expected subtype 7 or 9 but found the wrong type: " + value.hex());
+}
+
+/**
+ * Assert a field is an equality indexed encrypted field
+ *
+ * @param {BinData} value bindata value
+ */
+function assertIsEqualityIndexedEncryptedField(value) {
+    assert(value instanceof BinData, "Expected BinData, found: " + value);
+    assert.eq(value.subtype(), 6, "Expected Encrypted bindata: " + value);
     assert(value.hex().startsWith("07"),
            "Expected subtype 7 but found the wrong type: " + value.hex());
+}
+
+/**
+ * Assert a field is a range indexed encrypted field
+ *
+ * @param {BinData} value bindata value
+ */
+function assertIsRangeIndexedEncryptedField(value) {
+    assert(value instanceof BinData, "Expected BinData, found: " + value);
+    assert.eq(value.subtype(), 6, "Expected Encrypted bindata: " + value);
+    assert(value.hex().startsWith("09"),
+           "Expected subtype 9 but found the wrong type: " + value.hex());
 }
 
 /**

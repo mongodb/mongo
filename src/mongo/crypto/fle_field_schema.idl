@@ -166,7 +166,7 @@ structs:
             type: int
             cpp_name: sparsity
             optional: true
-            validator: { gte: 0, lte: 3 }
+            validator: { gte: 1, lte: 4 }
 
     EdgeTokenSet:
         description: "Payload of an indexed field to insert or update"

@@ -91,7 +91,7 @@ structs:
                 type: exactInt64
                 optional: true
                 stability: unstable
-                validator: { gte: 0, lte: 3 }
+                validator: { gte: 1, lte: 4 }
 
     EncryptedField:
         description: "Information about encrypted fields"

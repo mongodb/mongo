@@ -65,10 +65,12 @@ void validateIDLFLE2RangeSpec(const FLE2RangeSpec* placeholder) {
     auto min = placeholder->getMin().getElement();
     auto max = placeholder->getMax().getElement();
     uassert(6833400,
-            str::stream() << "Minimum element in a range must be numeric, not: " << min.type(),
-            min.isNumber() || min.type() == BSONType::MinKey);
+            str::stream() << "Minimum element in a range must be numeric or date, not: "
+                          << min.type(),
+            min.isNumber() || min.type() == BSONType::MinKey || min.type() == BSONType::Date);
     uassert(6833401,
-            str::stream() << "Maximum element in a range must be numeric, not: " << max.type(),
-            max.isNumber() || max.type() == BSONType::MaxKey);
+            str::stream() << "Maximum element in a range must be numeric or date, not: "
+                          << max.type(),
+            max.isNumber() || max.type() == BSONType::MaxKey || min.type() == BSONType::Date);
 }
 }  // namespace mongo

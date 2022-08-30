@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/base/error_codes.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/crypto/fle_crypto.h"
@@ -717,10 +718,38 @@ std::vector<char> generatePlaceholder(
 
     FLE2RangeInsertSpec insertSpec;
     // Set a default lower and upper bound
-    auto lowerDoc = BSON("lb" << 0);
+    BSONObj lowerDoc, upperDoc;
+    switch (value.type()) {
+        case BSONType::NumberInt:
+            lowerDoc = BSON("lb" << 0);
+            upperDoc = BSON("ub" << 1234567);
+            break;
+        case BSONType::NumberLong:
+            lowerDoc = BSON("lb" << 0LL);
+            upperDoc = BSON("ub" << 1234567890123456789LL);
+            break;
+        case BSONType::NumberDouble:
+            lowerDoc = BSON("lb" << 0.0);
+            upperDoc = BSON("ub" << 1234567890123456789.0);
+            break;
+        case BSONType::Date:
+            lowerDoc = BSON("lb" << Date_t::fromMillisSinceEpoch(0));
+            upperDoc = BSON("ub" << Date_t::fromMillisSinceEpoch(1234567890123456789LL));
+            break;
+        case BSONType::NumberDecimal:
+            lowerDoc = BSON("lb" << Decimal128(0));
+            upperDoc = BSON("ub" << Decimal128(1234567890123456789LL));
+            break;
+        default:
+            LOGV2_WARNING(6775520,
+                          "Invalid type for range algo",
+                          "algo"_attr = algorithm,
+                          "type"_attr = value.type());
+            lowerDoc = BSON("lb" << 0);
+            upperDoc = BSON("ub" << 1234567);
+            break;
+    }
     insertSpec.setLowerBound(lowerDoc.firstElement());
-    auto upperDoc = BSON("ub" << 1234567890123456789LL);
-
     insertSpec.setUpperBound(upperDoc.firstElement());
     insertSpec.setValue(value);
     auto specDoc = BSON("s" << insertSpec.toBSON());
@@ -738,7 +767,7 @@ std::vector<char> generatePlaceholder(
         } else if (operation == Operation::kInsert) {
             ep.setValue(IDLAnyType(specDoc.firstElement()));
         }
-        ep.setSparsity(0);
+        ep.setSparsity(1);
     } else {
         ep.setValue(value);
     }
@@ -771,9 +800,9 @@ BSONObj encryptDocument(BSONObj obj,
             for (size_t i = 0; i < payload.payload.getEdgeTokenSet()->size(); i++) {
                 payload.counts.push_back(1);
             }
+        } else {
+            payload.counts.push_back(1);
         }
-
-        payload.counts.push_back(1);
     }
 
     // Finalize document for insert
@@ -975,7 +1004,8 @@ TEST(FLE_EDC, Range_Allowed_Types) {
 
     const std::vector<std::pair<BSONObj, BSONType>> rangeAllowedObjects{
         {BSON("sample" << 123.456), NumberDouble},
-        {BSON("sample" << Decimal128()), NumberDecimal},
+        // TODO SERVER-68542 remove the commented line
+        // {BSON("sample" << Decimal128()), NumberDecimal},
         {BSON("sample" << 123456), NumberInt},
         {BSON("sample" << 12345678901234567LL), NumberLong},
         {BSON("sample" << Date_t::fromMillisSinceEpoch(12345)), Date},
@@ -1333,7 +1363,7 @@ TEST(FLE_EDC, ServerSide_Range_Payloads) {
 
     iupayload.setEdgeTokenSet(tokens);
 
-    FLE2IndexedRangeEncryptedValue serverPayload(iupayload, {123456, 123456, 123456});
+    FLE2IndexedRangeEncryptedValue serverPayload(iupayload, {123456, 123456});
 
     auto swBuf = serverPayload.serialize(serverEncryptToken);
     ASSERT_OK(swBuf.getStatus());
@@ -1343,7 +1373,7 @@ TEST(FLE_EDC, ServerSide_Range_Payloads) {
 
     ASSERT_OK(swServerPayload.getStatus());
     auto sp = swServerPayload.getValue();
-    ASSERT_EQ(sp.tokens.size(), 3);
+    ASSERT_EQ(sp.tokens.size(), 2);
     for (size_t i = 0; i < sp.tokens.size(); i++) {
         auto ets = sp.tokens[i];
         auto rhs = serverPayload.tokens[i];
@@ -1747,12 +1777,13 @@ TEST(EDC, ValidateDocument) {
         auto buf = generatePlaceholder(element, Operation::kInsert);
         builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
     }
+
+    BSONObjBuilder sub(builder.subobjStart("nested"));
     {
         auto doc = BSON("a"
                         << "top secret");
         auto element = doc.firstElement();
 
-        BSONObjBuilder sub(builder.subobjStart("nested"));
         auto buf = generatePlaceholder(
             element, Operation::kInsert, Fle2AlgorithmInt::kEquality, indexKey2Id);
         builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
@@ -1762,12 +1793,13 @@ TEST(EDC, ValidateDocument) {
                         << "bottom secret");
         auto element = doc.firstElement();
 
-        BSONObjBuilder sub(builder.subobjStart("nested"));
         auto buf = generatePlaceholder(element, Operation::kInsert, Fle2AlgorithmInt::kUnindexed);
         builder.appendBinData("notindexed", buf.size(), BinDataType::Encrypt, buf.data());
     }
+    sub.done();
 
-    auto finalDoc = encryptDocument(builder.obj(), &keyVault, &efc);
+    auto doc1 = builder.obj();
+    auto finalDoc = encryptDocument(doc1, &keyVault, &efc);
 
     // Positive - Encrypted Doc
     FLEClientCrypto::validateDocument(finalDoc, efc, &keyVault);

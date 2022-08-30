@@ -143,8 +143,8 @@ EncryptedFieldConfig processAndValidateEncryptedFields(EncryptedFieldConfig conf
                             query.getMax().has_value());
 
                     uassert(6775214,
-                            "The field 'sparsity' must be between 0 and 3",
-                            query.getSparsity().value() >= 1 && query.getSparsity().value() <= 3);
+                            "The field 'sparsity' must be between 1 and 4",
+                            query.getSparsity().value() >= 1 && query.getSparsity().value() <= 4);
 
                     // Check type compatibility
                     switch (type) {

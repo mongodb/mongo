@@ -1033,9 +1033,8 @@ struct FLE2IndexedRangeEncryptedValue {
     std::vector<uint8_t> clientEncryptedValue;
 };
 
-
 struct EDCServerPayloadInfo {
-    ESCDerivedFromDataTokenAndContentionFactorToken getESCToken() const;
+    static ESCDerivedFromDataTokenAndContentionFactorToken getESCToken(ConstDataRange cdr);
 
     FLE2InsertUpdatePayload payload;
     std::string fieldPathName;

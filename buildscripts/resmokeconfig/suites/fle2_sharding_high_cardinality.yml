@@ -17,6 +17,7 @@ executor:
   config:
     shell_options:
       eval: "testingReplication = false; testingFLESharding = true;"
+      setShellParameter: featureFlagFLE2Range=true
   hooks:
   - class: CheckReplDBHash
   - class: ValidateCollections
@@ -32,6 +33,7 @@ executor:
       set_parameters:
         enableTestCommands: 1
         internalQueryFLEAlwaysUseEncryptedCollScanMode: 1
+        featureFlagFLE2Range: true
     num_rs_nodes_per_shard: 2
     enable_sharding:
     - test
