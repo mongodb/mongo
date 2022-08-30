@@ -31,9 +31,9 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/s/analyze_shard_key_feature_flag_gen.h"
-#include "mongo/db/s/configure_query_analyzer_cmd_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/analyze_shard_key_feature_flag_gen.h"
+#include "mongo/s/configure_query_analyzer_cmd_gen.h"
 #include "mongo/s/grid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand

@@ -135,6 +135,8 @@ env.Library(
 env.Library(
     target='common_s',
     source=[
+        'analyze_shard_key_cmd.idl',
+        'analyze_shard_key_feature_flag.idl',
         'cannot_implicitly_create_collection_info.cpp',
         'catalog/mongo_version_range.cpp',
         'catalog/type_changelog.cpp',
@@ -151,6 +153,7 @@ env.Library(
         'catalog/type_tags.cpp',
         'chunk_version.cpp',
         'chunk_version.idl',
+        'configure_query_analyzer_cmd.idl',
         'database_version.cpp',
         'database_version.idl',
         'index_version.cpp',
@@ -207,7 +210,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/index_commands_idl',
         '$BUILD_DIR/mongo/db/query/query_request',
         '$BUILD_DIR/mongo/db/repl/optime',
-        '$BUILD_DIR/mongo/db/s/analyze_shard_key',
         '$BUILD_DIR/mongo/db/server_options',
     ],
     LIBDEPS_PRIVATE=[

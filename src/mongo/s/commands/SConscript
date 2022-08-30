@@ -226,7 +226,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/saslauth',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/commands/servers',
-        '$BUILD_DIR/mongo/db/s/analyze_shard_key',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/rpc/client_metadata',
         '$BUILD_DIR/mongo/rpc/rewrite_state_change_errors',
