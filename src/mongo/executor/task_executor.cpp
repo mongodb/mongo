@@ -222,8 +222,6 @@ ExecutorFuture<void> TaskExecutor::sleepUntil(Date_t when, const CancellationTok
         alarmState->signal(scheduleStatus);
     }
 
-    // TODO (SERVER-51285): Optimize to avoid an additional call to schedule to run the callback
-    // chained by the caller of sleepUntil.
     return std::move(future).thenRunOn(shared_from_this());
 }
 
