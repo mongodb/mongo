@@ -108,7 +108,7 @@ ClientMetadata::ClientMetadata(BSONObj doc) {
 
     uassert(ErrorCodes::ClientMetadataDocumentTooLarge,
             str::stream() << "The client metadata document must be less then or equal to "
-                          << maxLength << "bytes",
+                          << maxLength << " bytes",
             static_cast<uint32_t>(doc.objsize()) <= maxLength);
 
     const auto isobj = [](StringData name, const BSONElement& e) {
