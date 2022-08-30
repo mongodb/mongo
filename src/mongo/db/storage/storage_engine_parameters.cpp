@@ -34,12 +34,14 @@ namespace mongo {
 QueueingPolicyEnum gTicketQueueingPolicy{QueueingPolicyEnum::FifoQueue};
 
 void TicketQueueingPolicy::append(OperationContext*,
-                                  BSONObjBuilder& builder,
-                                  const std::string& name) {
-    builder.append(name, QueueingPolicy_serializer(gTicketQueueingPolicy));
+                                  BSONObjBuilder* builder,
+                                  StringData name,
+                                  const boost::optional<TenantId>&) {
+    builder->append(name, QueueingPolicy_serializer(gTicketQueueingPolicy));
 }
 
-Status TicketQueueingPolicy::setFromString(const std::string& protocolStr) {
+Status TicketQueueingPolicy::setFromString(StringData protocolStr,
+                                           const boost::optional<TenantId>&) {
     if (protocolStr == QueueingPolicy_serializer(QueueingPolicyEnum::Semaphore)) {
         gTicketQueueingPolicy = QueueingPolicyEnum::Semaphore;
     } else if (protocolStr == QueueingPolicy_serializer(QueueingPolicyEnum::FifoQueue)) {

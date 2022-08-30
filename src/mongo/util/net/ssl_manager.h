@@ -34,6 +34,7 @@
 #include <string>
 
 #include "mongo/config.h"
+#include "mongo/db/tenant_id.h"
 
 #ifdef MONGO_CONFIG_SSL
 
@@ -67,12 +68,12 @@ const std::string getSSLVersion(const std::string& prefix, const std::string& su
 /**
  * Validation callback for setParameter 'opensslCipherConfig'.
  */
-Status validateOpensslCipherConfig(const std::string&);
+Status validateOpensslCipherConfig(const std::string&, const boost::optional<TenantId>&);
 
 /**
  * Validation callback for setParameter 'disableNonTLSConnectionLogging'.
  */
-Status validateDisableNonTLSConnectionLogging(const bool&);
+Status validateDisableNonTLSConnectionLogging(const bool&, const boost::optional<TenantId>&);
 }  // namespace mongo
 
 #ifdef MONGO_CONFIG_SSL

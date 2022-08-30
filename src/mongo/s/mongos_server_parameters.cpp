@@ -44,12 +44,14 @@ std::string toReadHedgingModeString(ReadHedgingMode readHedgingMode) {
 AtomicWord<ReadHedgingMode> gReadHedgingMode{ReadHedgingMode::kOn};
 
 void HedgingModeServerParameter::append(OperationContext*,
-                                        BSONObjBuilder& builder,
-                                        const std::string& name) {
-    builder.append(name, toReadHedgingModeString(gReadHedgingMode.load()));
+                                        BSONObjBuilder* builder,
+                                        StringData name,
+                                        const boost::optional<TenantId>&) {
+    builder->append(name, toReadHedgingModeString(gReadHedgingMode.load()));
 }
 
-Status HedgingModeServerParameter::setFromString(const std::string& modeStr) {
+Status HedgingModeServerParameter::setFromString(StringData modeStr,
+                                                 const boost::optional<TenantId>&) {
     if (modeStr == "on") {
         gReadHedgingMode.store(ReadHedgingMode::kOn);
     } else if (modeStr == "off") {

@@ -867,11 +867,14 @@ public:
         TestServerParameter(StringData name, ServerParameterType spt, int x)
             : ServerParameter(name, spt), val{x} {}
 
-        void append(OperationContext*, BSONObjBuilder& bob, const std::string& name) final {
-            bob.append(name, val);
+        void append(OperationContext*,
+                    BSONObjBuilder* bob,
+                    StringData name,
+                    const boost::optional<TenantId>&) final {
+            bob->append(name, val);
         }
 
-        Status setFromString(const std::string& str) final {
+        Status setFromString(StringData str, const boost::optional<TenantId>&) final {
             int value;
             Status status = NumberParser{}(str, &value);
             if (!status.isOK())

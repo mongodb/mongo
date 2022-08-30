@@ -143,9 +143,9 @@ Status ClusterServerParameterRefresher::refreshParameters(OperationContext* opCt
         ServerParameter* sp = clusterParameterCache->get(clusterParameterName);
 
         BSONObjBuilder oldClusterParameterBob;
-        sp->append(opCtx, oldClusterParameterBob, clusterParameterName);
+        sp->append(opCtx, &oldClusterParameterBob, clusterParameterName, boost::none);
 
-        setStatus = sp->set(clusterParameterDoc);
+        setStatus = sp->set(clusterParameterDoc, boost::none);
         if (!setStatus.isOK()) {
             LOGV2_WARNING(6226402,
                           "Could not set in-memory cluster server parameter",
@@ -155,7 +155,7 @@ Status ClusterServerParameterRefresher::refreshParameters(OperationContext* opCt
         }
 
         BSONObjBuilder updatedClusterParameterBob;
-        sp->append(opCtx, updatedClusterParameterBob, clusterParameterName);
+        sp->append(opCtx, &updatedClusterParameterBob, clusterParameterName, boost::none);
         BSONObj updatedClusterParameterBSON = updatedClusterParameterBob.obj().getOwned();
 
         audit::logUpdateCachedClusterParameter(opCtx->getClient(),

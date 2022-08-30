@@ -102,14 +102,18 @@ public:
      * Typically invoked by {getParameter:...} to produce a dictionary
      * of ServerParameter settings.
      */
-    void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) final;
+    void append(OperationContext* opCtx,
+                BSONObjBuilder* b,
+                StringData name,
+                const boost::optional<TenantId>&) final;
 
     /**
      * Encode the feature flag value into a BSON object, discarding the version.
      */
     void appendSupportingRoundtrip(OperationContext* opCtx,
-                                   BSONObjBuilder& b,
-                                   const std::string& name) override;
+                                   BSONObjBuilder* b,
+                                   StringData name,
+                                   const boost::optional<TenantId>&) override;
 
     /**
      * Update the underlying value using a BSONElement
@@ -117,14 +121,14 @@ public:
      * Allows setting non-basic values (e.g. vector<string>)
      * via the {setParameter: ...} call.
      */
-    Status set(const BSONElement& newValueElement) final;
+    Status set(const BSONElement& newValueElement, const boost::optional<TenantId>&) final;
 
     /**
      * Update the underlying value from a string.
      *
      * Typically invoked from commandline --setParameter usage.
      */
-    Status setFromString(const std::string& str) final;
+    Status setFromString(StringData str, const boost::optional<TenantId>&) final;
 
 private:
     FeatureFlag& _storage;

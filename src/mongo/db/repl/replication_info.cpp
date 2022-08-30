@@ -498,7 +498,7 @@ public:
 
         if (auto param = ServerParameterSet::getNodeParameterSet()->getIfExists(
                 kAutomationServiceDescriptorFieldName)) {
-            param->append(opCtx, result, kAutomationServiceDescriptorFieldName);
+            param->append(opCtx, &result, kAutomationServiceDescriptorFieldName, boost::none);
         }
 
         if (opCtx->getClient()->session()) {

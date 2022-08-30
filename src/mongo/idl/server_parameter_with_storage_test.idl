@@ -42,7 +42,7 @@ server_parameters:
     cpp_varname: gStdIntPreallocated
     default: 11
     validator:
-      callback: "validateOdd"
+      callback: "validateOddSP"
       gt: 0
     on_update: "onUpdateStdIntPreallocated"
 

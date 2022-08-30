@@ -29,10 +29,12 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <string>
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/db/tenant_id.h"
 
 namespace mongo {
 
@@ -50,6 +52,7 @@ void stopMongoDFTDC();
 /**
  * Validation callback for setParameter
  */
-Status validateCollectionStatsNamespaces(std::vector<std::string> value);
+Status validateCollectionStatsNamespaces(std::vector<std::string> value,
+                                         const boost::optional<TenantId>& tenantId);
 
 }  // namespace mongo

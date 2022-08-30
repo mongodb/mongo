@@ -42,12 +42,14 @@ namespace mongo {
 using std::string;
 
 void WiredTigerEngineRuntimeConfigParameter::append(OperationContext* opCtx,
-                                                    BSONObjBuilder& b,
-                                                    const std::string& name) {
-    b << name << _data.first;
+                                                    BSONObjBuilder* b,
+                                                    StringData name,
+                                                    const boost::optional<TenantId>&) {
+    *b << name << _data.first;
 }
 
-Status WiredTigerEngineRuntimeConfigParameter::setFromString(const std::string& str) {
+Status WiredTigerEngineRuntimeConfigParameter::setFromString(StringData str,
+                                                             const boost::optional<TenantId>&) {
     size_t pos = str.find('\0');
     if (pos != std::string::npos) {
         return Status(ErrorCodes::BadValue,
@@ -63,7 +65,7 @@ Status WiredTigerEngineRuntimeConfigParameter::setFromString(const std::string& 
           "config"_attr = str);
 
     invariant(_data.second);
-    int ret = _data.second->reconfigure(str.c_str());
+    int ret = _data.second->reconfigure(str.toString().c_str());
     if (ret != 0) {
         const char* errorStr = wiredtiger_strerror(ret);
         string result = (str::stream() << "WiredTiger reconfiguration failed with error code ("
@@ -76,18 +78,20 @@ Status WiredTigerEngineRuntimeConfigParameter::setFromString(const std::string& 
         return Status(ErrorCodes::BadValue, result);
     }
 
-    _data.first = str;
+    _data.first = str.toString();
     return Status::OK();
 }
 
-Status WiredTigerDirectoryForIndexesParameter::setFromString(const std::string&) {
+Status WiredTigerDirectoryForIndexesParameter::setFromString(StringData,
+                                                             const boost::optional<TenantId>&) {
     return {ErrorCodes::IllegalOperation,
             str::stream() << name() << " cannot be set via setParameter"};
 };
 void WiredTigerDirectoryForIndexesParameter::append(OperationContext* opCtx,
-                                                    BSONObjBuilder& builder,
-                                                    const std::string& name) {
-    builder.append(name, wiredTigerGlobalOptions.directoryForIndexes);
+                                                    BSONObjBuilder* builder,
+                                                    StringData name,
+                                                    const boost::optional<TenantId>&) {
+    builder->append(name, wiredTigerGlobalOptions.directoryForIndexes);
 }
 
 }  // namespace mongo

@@ -31,7 +31,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 
 namespace mongo::ce {
-Status validateCEMode(const std::string& value) {
+Status validateCEMode(const std::string& value, const boost::optional<TenantId>&) {
     if (value == kHeuristic || value == kHistogram || value == kSampling) {
         return Status::OK();
     }

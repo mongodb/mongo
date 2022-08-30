@@ -243,14 +243,14 @@ public:
             if (all || cmdObj.hasElement(i->first.c_str())) {
                 if (options.getShowDetails()) {
                     BSONObjBuilder detailBob(result.subobjStart(i->second->name()));
-                    i->second->append(opCtx, detailBob, "value");
+                    i->second->append(opCtx, &detailBob, "value", boost::none);
                     detailBob.appendBool("settableAtRuntime",
                                          i->second->allowedToChangeAtRuntime());
                     detailBob.appendBool("settableAtStartup",
                                          i->second->allowedToChangeAtStartup());
                     detailBob.doneFast();
                 } else {
-                    i->second->append(opCtx, result, i->second->name());
+                    i->second->append(opCtx, &result, i->second->name(), boost::none);
                 }
             }
         }
@@ -367,7 +367,7 @@ public:
             auto oldValueObj = ([&] {
                 BSONObjBuilder bb;
                 if (numSet == 0) {
-                    foundParameter->second->append(opCtx, bb, "was");
+                    foundParameter->second->append(opCtx, &bb, "was", boost::none);
                 }
                 return bb.obj();
             })();
@@ -378,7 +378,7 @@ public:
             }
 
             try {
-                uassertStatusOK(foundParameter->second->set(parameter));
+                uassertStatusOK(foundParameter->second->set(parameter, boost::none));
             } catch (const DBException& ex) {
                 LOGV2(20496,
                       "Error setting parameter {parameterName} to {newValue} errMsg: {error}",
@@ -426,16 +426,18 @@ public:
 } cmdSet;
 
 void LogLevelServerParameter::append(OperationContext*,
-                                     BSONObjBuilder& builder,
-                                     const std::string& name) {
-    builder.append(name,
-                   logv2::LogManager::global()
-                       .getGlobalSettings()
-                       .getMinimumLogSeverity(mongo::logv2::LogComponent::kDefault)
-                       .toInt());
+                                     BSONObjBuilder* builder,
+                                     StringData name,
+                                     const boost::optional<TenantId>&) {
+    builder->append(name,
+                    logv2::LogManager::global()
+                        .getGlobalSettings()
+                        .getMinimumLogSeverity(mongo::logv2::LogComponent::kDefault)
+                        .toInt());
 }
 
-Status LogLevelServerParameter::set(const BSONElement& newValueElement) {
+Status LogLevelServerParameter::set(const BSONElement& newValueElement,
+                                    const boost::optional<TenantId>&) {
     int newValue;
     if (!newValueElement.coerce(&newValue) || newValue < 0)
         return Status(ErrorCodes::BadValue,
@@ -447,7 +449,8 @@ Status LogLevelServerParameter::set(const BSONElement& newValueElement) {
     return Status::OK();
 }
 
-Status LogLevelServerParameter::setFromString(const std::string& strLevel) {
+Status LogLevelServerParameter::setFromString(StringData strLevel,
+                                              const boost::optional<TenantId>&) {
     int newValue;
     Status status = NumberParser{}(strLevel, &newValue);
     if (!status.isOK())
@@ -463,14 +466,16 @@ Status LogLevelServerParameter::setFromString(const std::string& strLevel) {
 }
 
 void LogComponentVerbosityServerParameter::append(OperationContext*,
-                                                  BSONObjBuilder& builder,
-                                                  const std::string& name) {
+                                                  BSONObjBuilder* builder,
+                                                  StringData name,
+                                                  const boost::optional<TenantId>&) {
     BSONObj currentSettings;
     getLogComponentVerbosity(&currentSettings);
-    builder.append(name, currentSettings);
+    builder->append(name, currentSettings);
 }
 
-Status LogComponentVerbosityServerParameter::set(const BSONElement& newValueElement) {
+Status LogComponentVerbosityServerParameter::set(const BSONElement& newValueElement,
+                                                 const boost::optional<TenantId>&) {
     if (!newValueElement.isABSONObj()) {
         return Status(ErrorCodes::TypeMismatch,
                       str::stream()
@@ -479,30 +484,34 @@ Status LogComponentVerbosityServerParameter::set(const BSONElement& newValueElem
     return setLogComponentVerbosity(newValueElement.Obj());
 }
 
-Status LogComponentVerbosityServerParameter::setFromString(const std::string& str) try {
+Status LogComponentVerbosityServerParameter::setFromString(StringData str,
+                                                           const boost::optional<TenantId>&) try {
     return setLogComponentVerbosity(fromjson(str));
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
 
 void AutomationServiceDescriptorServerParameter::append(OperationContext*,
-                                                        BSONObjBuilder& builder,
-                                                        const std::string& name) {
+                                                        BSONObjBuilder* builder,
+                                                        StringData name,
+                                                        const boost::optional<TenantId>&) {
     const stdx::lock_guard<Latch> lock(autoServiceDescriptorMutex);
     if (!autoServiceDescriptorValue.empty()) {
-        builder.append(name, autoServiceDescriptorValue);
+        builder->append(name, autoServiceDescriptorValue);
     }
 }
 
-Status AutomationServiceDescriptorServerParameter::set(const BSONElement& newValueElement) {
+Status AutomationServiceDescriptorServerParameter::set(const BSONElement& newValueElement,
+                                                       const boost::optional<TenantId>&) {
     if (newValueElement.type() != String) {
         return {ErrorCodes::TypeMismatch,
                 "Value for parameter automationServiceDescriptor must be of type 'string'"};
     }
-    return setFromString(newValueElement.String());
+    return setFromString(newValueElement.String(), boost::none);
 }
 
-Status AutomationServiceDescriptorServerParameter::setFromString(const std::string& str) {
+Status AutomationServiceDescriptorServerParameter::setFromString(StringData str,
+                                                                 const boost::optional<TenantId>&) {
     auto kMaxSize = 64U;
     if (str.size() > kMaxSize)
         return {ErrorCodes::Overflow,
@@ -511,7 +520,7 @@ Status AutomationServiceDescriptorServerParameter::setFromString(const std::stri
 
     {
         const stdx::lock_guard<Latch> lock(autoServiceDescriptorMutex);
-        autoServiceDescriptorValue = str;
+        autoServiceDescriptorValue = str.toString();
     }
 
     return Status::OK();

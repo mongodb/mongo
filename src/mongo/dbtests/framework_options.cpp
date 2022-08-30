@@ -155,7 +155,7 @@ Status storeTestFrameworkOptions(const moe::Environment& params,
                         str::stream() << "Cannot use --setParameter to set \"" << it.first
                                       << "\" at startup"};
             }
-            Status status = parameter->setFromString(it.second);
+            Status status = parameter->setFromString(it.second, boost::none);
             if (!status.isOK()) {
                 return {ErrorCodes::BadValue,
                         str::stream() << "Bad value for parameter \"" << it.first

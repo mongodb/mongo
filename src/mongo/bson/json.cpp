@@ -1476,8 +1476,8 @@ BSONObj fromjson(const char* jsonString, int* len) {
     return builder.obj();
 }
 
-BSONObj fromjson(const std::string& str) {
-    return fromjson(str.c_str());
+BSONObj fromjson(StringData str) {
+    return fromjson(str.toString().c_str());
 }
 
 std::string tojson(const BSONObj& obj, JsonStringFormat format, bool pretty) {

@@ -69,17 +69,19 @@ StatusWith<ChangeStreamOptions> ChangeStreamOptionsManager::setOptions(
 }
 
 void ChangeStreamOptionsParameter::append(OperationContext* opCtx,
-                                          BSONObjBuilder& bob,
-                                          const std::string& name) {
+                                          BSONObjBuilder* bob,
+                                          StringData name,
+                                          const boost::optional<TenantId>& tenantId) {
     ChangeStreamOptionsManager& changeStreamOptionsManager =
         ChangeStreamOptionsManager::get(getGlobalServiceContext());
-    bob.append("_id"_sd, name);
-    bob.appendElementsUnique(changeStreamOptionsManager.getOptions(opCtx).toBSON());
+    bob->append("_id"_sd, name);
+    bob->appendElementsUnique(changeStreamOptionsManager.getOptions(opCtx).toBSON());
 }
 
-Status ChangeStreamOptionsParameter::set(const BSONElement& newValueElement) {
+Status ChangeStreamOptionsParameter::set(const BSONElement& newValueElement,
+                                         const boost::optional<TenantId>& tenantId) {
     try {
-        Status validateStatus = validate(newValueElement);
+        Status validateStatus = validate(newValueElement, tenantId);
         if (!validateStatus.isOK()) {
             return validateStatus;
         }
@@ -97,7 +99,8 @@ Status ChangeStreamOptionsParameter::set(const BSONElement& newValueElement) {
     }
 }
 
-Status ChangeStreamOptionsParameter::validate(const BSONElement& newValueElement) const {
+Status ChangeStreamOptionsParameter::validate(const BSONElement& newValueElement,
+                                              const boost::optional<TenantId>& tenantId) const {
     try {
         BSONObj changeStreamOptionsObj = newValueElement.Obj();
         Status validateStatus = Status::OK();
@@ -144,7 +147,7 @@ Status ChangeStreamOptionsParameter::validate(const BSONElement& newValueElement
     }
 }
 
-Status ChangeStreamOptionsParameter::reset() {
+Status ChangeStreamOptionsParameter::reset(const boost::optional<TenantId>& tenantId) {
     // Replace the current changeStreamOptions with a default-constructed one, which should
     // automatically set preAndPostImages.expirationSeconds to 'off' by default.
     ChangeStreamOptionsManager& changeStreamOptionsManager =
@@ -154,7 +157,8 @@ Status ChangeStreamOptionsParameter::reset() {
         .getStatus();
 }
 
-LogicalTime ChangeStreamOptionsParameter::getClusterParameterTime() const {
+LogicalTime ChangeStreamOptionsParameter::getClusterParameterTime(
+    const boost::optional<TenantId>& tenantId) const {
     ChangeStreamOptionsManager& changeStreamOptionsManager =
         ChangeStreamOptionsManager::get(getGlobalServiceContext());
     return changeStreamOptionsManager.getClusterParameterTime();

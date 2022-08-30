@@ -49,8 +49,9 @@ MONGO_INITIALIZER_GROUP(EndServerParameterRegistration,
 ServerParameter::ServerParameter(StringData name, ServerParameterType spt)
     : _name{name}, _type(spt) {}
 
-Status ServerParameter::set(const BSONElement& newValueElement) {
-    auto validateStatus = validate(newValueElement);
+Status ServerParameter::set(const BSONElement& newValueElement,
+                            const boost::optional<TenantId>& tenantId) {
+    auto validateStatus = validate(newValueElement, tenantId);
     if (!validateStatus.isOK()) {
         return validateStatus;
     }
@@ -58,7 +59,7 @@ Status ServerParameter::set(const BSONElement& newValueElement) {
     auto swValue = _coerceToString(newValueElement);
     if (!swValue.isOK())
         return swValue.getStatus();
-    return setFromString(swValue.getValue());
+    return setFromString(swValue.getValue(), boost::none);
 }
 
 ServerParameterSet* ServerParameterSet::getNodeParameterSet() {
@@ -134,45 +135,48 @@ IDLServerParameterDeprecatedAlias::IDLServerParameterDeprecatedAlias(StringData 
 }
 
 void IDLServerParameterDeprecatedAlias::append(OperationContext* opCtx,
-                                               BSONObjBuilder& b,
-                                               const std::string& fieldName) {
+                                               BSONObjBuilder* b,
+                                               StringData fieldName,
+                                               const boost::optional<TenantId>& tenantId) {
     std::call_once(_warnOnce, [&] {
         LOGV2_WARNING(636300,
                       "Use of deprecated server parameter name",
                       "deprecatedName"_attr = name(),
                       "canonicalName"_attr = _sp->name());
     });
-    _sp->append(opCtx, b, fieldName);
+    _sp->append(opCtx, b, fieldName, tenantId);
 }
 
-Status IDLServerParameterDeprecatedAlias::reset() {
+Status IDLServerParameterDeprecatedAlias::reset(const boost::optional<TenantId>& tenantId) {
     std::call_once(_warnOnce, [&] {
         LOGV2_WARNING(636301,
                       "Use of deprecated server parameter name",
                       "deprecatedName"_attr = name(),
                       "canonicalName"_attr = _sp->name());
     });
-    return _sp->reset();
+    return _sp->reset(tenantId);
 }
 
-Status IDLServerParameterDeprecatedAlias::set(const BSONElement& newValueElement) {
+Status IDLServerParameterDeprecatedAlias::set(const BSONElement& newValueElement,
+                                              const boost::optional<TenantId>& tenantId) {
     std::call_once(_warnOnce, [&] {
         LOGV2_WARNING(636302,
                       "Use of deprecated server parameter name",
                       "deprecatedName"_attr = name(),
                       "canonicalName"_attr = _sp->name());
     });
-    return _sp->set(newValueElement);
+    return _sp->set(newValueElement, tenantId);
 }
 
-Status IDLServerParameterDeprecatedAlias::setFromString(const std::string& str) {
+Status IDLServerParameterDeprecatedAlias::setFromString(StringData str,
+                                                        const boost::optional<TenantId>& tenantId) {
     std::call_once(_warnOnce, [&] {
         LOGV2_WARNING(636303,
                       "Use of deprecated server parameter name",
                       "deprecatedName"_attr = name(),
                       "canonicalName"_attr = _sp->name());
     });
-    return _sp->setFromString(str);
+    return _sp->setFromString(str, tenantId);
 }
 
 namespace {
@@ -181,24 +185,28 @@ public:
     explicit DisabledTestParameter(ServerParameter* sp)
         : ServerParameter(sp->name(), sp->getServerParameterType()), _sp(sp) {}
 
-    void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) final {}
+    void append(OperationContext* opCtx,
+                BSONObjBuilder* b,
+                StringData name,
+                const boost::optional<TenantId>&) final {}
 
-    Status validate(const BSONElement& newValueElement) const final {
+    Status validate(const BSONElement& newValueElement,
+                    const boost::optional<TenantId>& tenantId) const final {
         return {ErrorCodes::BadValue,
                 str::stream() << "Server parameter: '" << name() << "' is currently disabled"};
     }
 
-    Status setFromString(const std::string&) final {
+    Status setFromString(StringData, const boost::optional<TenantId>&) final {
         return {ErrorCodes::BadValue,
                 str::stream() << "Server parameter: '" << name() << "' is currently disabled"};
     }
 
-    Status set(const BSONElement& newValueElement) final {
-        return setFromString("");
+    Status set(const BSONElement& newValueElement, const boost::optional<TenantId>&) final {
+        return setFromString("", boost::none);
     }
 
-    Status reset() final {
-        return setFromString("");
+    Status reset(const boost::optional<TenantId>&) final {
+        return setFromString("", boost::none);
     }
 
     bool isEnabled() const override {

@@ -115,12 +115,13 @@ public:
      * Validate that hostTimeoutMS is greater than the sum of pendingTimeoutMS and
      * toRefreshTimeoutMS
      */
-    static Status validateHostTimeout(const int& hostTimeoutMS);
+    static Status validateHostTimeout(const int& hostTimeoutMS, const boost::optional<TenantId>&);
 
     /**
      * Validate that pendingTimeoutMS is less than toRefreshTimeoutMS
      */
-    static Status validatePendingTimeout(const int& pendingTimeoutMS);
+    static Status validatePendingTimeout(const int& pendingTimeoutMS,
+                                         const boost::optional<TenantId>&);
 
     /**
      *  Matches the matching strategy string against a set of literals

@@ -62,15 +62,16 @@ void StorageGlobalParams::reset() {
 
 StorageGlobalParams storageGlobalParams;
 
-Status StorageDirectoryPerDbParameter::setFromString(const std::string&) {
+Status StorageDirectoryPerDbParameter::setFromString(StringData, const boost::optional<TenantId>&) {
     return {ErrorCodes::IllegalOperation,
             str::stream() << name() << " cannot be set via setParameter"};
 };
 
 void StorageDirectoryPerDbParameter::append(OperationContext* opCtx,
-                                            BSONObjBuilder& builder,
-                                            const std::string& name) {
-    builder.append(name, storageGlobalParams.directoryperdb);
+                                            BSONObjBuilder* builder,
+                                            StringData name,
+                                            const boost::optional<TenantId>&) {
+    builder->append(name, storageGlobalParams.directoryperdb);
 }
 
 

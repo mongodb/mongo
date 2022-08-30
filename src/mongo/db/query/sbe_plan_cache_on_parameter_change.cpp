@@ -72,7 +72,7 @@ Status onPlanCacheSizeUpdate(const std::string& str) {
     return Status::OK();
 }
 
-Status validatePlanCacheSize(const std::string& str) {
+Status validatePlanCacheSize(const std::string& str, const boost::optional<TenantId>&) {
     return PlanCacheSizeParameter::parse(str).getStatus();
 }
 

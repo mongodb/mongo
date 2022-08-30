@@ -88,7 +88,8 @@ public:
                                                    BSONObj cmdParamObj,
                                                    const boost::optional<Timestamp>& paramTime,
                                                    ServerParameter* sp,
-                                                   StringData parameterName);
+                                                   StringData parameterName,
+                                                   const boost::optional<TenantId>& tenantId);
 
 private:
     std::unique_ptr<ServerParameterService> _sps;

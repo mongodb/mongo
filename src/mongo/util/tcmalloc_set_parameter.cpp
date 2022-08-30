@@ -93,28 +93,30 @@ StatusWith<size_t> validateTCMallocValue(StringData name, const BSONElement& new
 
 }  // namespace
 
-#define TCMALLOC_SP_METHODS(cls)                                                     \
-    void TCMalloc##cls##ServerParameter::append(                                     \
-        OperationContext*, BSONObjBuilder& b, const std::string& name) {             \
-        auto swValue = getProperty(k##cls##PropertyName);                            \
-        if (swValue.isOK()) {                                                        \
-            b.appendNumber(name, static_cast<long long>(swValue.getValue()));        \
-        }                                                                            \
-    }                                                                                \
-    Status TCMalloc##cls##ServerParameter::set(const BSONElement& newValueElement) { \
-        auto swValue = validateTCMallocValue(name(), newValueElement);               \
-        if (!swValue.isOK()) {                                                       \
-            return swValue.getStatus();                                              \
-        }                                                                            \
-        return setProperty(k##cls##PropertyName, swValue.getValue());                \
-    }                                                                                \
-    Status TCMalloc##cls##ServerParameter::setFromString(const std::string& str) {   \
-        size_t value;                                                                \
-        Status status = NumberParser{}(str, &value);                                 \
-        if (!status.isOK()) {                                                        \
-            return status;                                                           \
-        }                                                                            \
-        return setProperty(k##cls##PropertyName, value);                             \
+#define TCMALLOC_SP_METHODS(cls)                                                                   \
+    void TCMalloc##cls##ServerParameter::append(                                                   \
+        OperationContext*, BSONObjBuilder* b, StringData name, const boost::optional<TenantId>&) { \
+        auto swValue = getProperty(k##cls##PropertyName);                                          \
+        if (swValue.isOK()) {                                                                      \
+            b->appendNumber(name, static_cast<long long>(swValue.getValue()));                     \
+        }                                                                                          \
+    }                                                                                              \
+    Status TCMalloc##cls##ServerParameter::set(const BSONElement& newValueElement,                 \
+                                               const boost::optional<TenantId>&) {                 \
+        auto swValue = validateTCMallocValue(name(), newValueElement);                             \
+        if (!swValue.isOK()) {                                                                     \
+            return swValue.getStatus();                                                            \
+        }                                                                                          \
+        return setProperty(k##cls##PropertyName, swValue.getValue());                              \
+    }                                                                                              \
+    Status TCMalloc##cls##ServerParameter::setFromString(StringData str,                           \
+                                                         const boost::optional<TenantId>&) {       \
+        size_t value;                                                                              \
+        Status status = NumberParser{}(str, &value);                                               \
+        if (!status.isOK()) {                                                                      \
+            return status;                                                                         \
+        }                                                                                          \
+        return setProperty(k##cls##PropertyName, value);                                           \
     }
 
 TCMALLOC_SP_METHODS(MaxTotalThreadCacheBytes)
@@ -145,13 +147,15 @@ MONGO_INITIALIZER_GENERAL(TcmallocConfigurationDefaults, (), ("BeginStartupOptio
 
 // setParameter for tcmalloc_release_rate
 void TCMallocReleaseRateServerParameter::append(OperationContext*,
-                                                BSONObjBuilder& builder,
-                                                const std::string& fieldName) {
+                                                BSONObjBuilder* builder,
+                                                StringData fieldName,
+                                                const boost::optional<TenantId>&) {
     auto value = MallocExtension::instance()->GetMemoryReleaseRate();
-    builder.append(fieldName, value);
+    builder->append(fieldName, value);
 }
 
-Status TCMallocReleaseRateServerParameter::setFromString(const std::string& tcmalloc_release_rate) {
+Status TCMallocReleaseRateServerParameter::setFromString(StringData tcmalloc_release_rate,
+                                                         const boost::optional<TenantId>&) {
     double value;
     Status status = NumberParser{}(tcmalloc_release_rate, &value);
     if (!status.isOK()) {

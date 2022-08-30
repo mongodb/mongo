@@ -468,7 +468,8 @@ MONGO_INITIALIZER_GENERAL(MungeUmask, ("EndStartupOptionHandling"), ("ServerLogR
 #endif
 
 // --setParameter honorSystemUmask
-Status HonorSystemUMaskServerParameter::setFromString(const std::string& value) {
+Status HonorSystemUMaskServerParameter::setFromString(StringData value,
+                                                      const boost::optional<TenantId>&) {
 #ifndef _WIN32
     if ((value == "0") || (value == "false")) {
         // false may be specified with processUmask
@@ -494,15 +495,17 @@ Status HonorSystemUMaskServerParameter::setFromString(const std::string& value) 
 }
 
 void HonorSystemUMaskServerParameter::append(OperationContext*,
-                                             BSONObjBuilder& b,
-                                             const std::string& name) {
+                                             BSONObjBuilder* b,
+                                             StringData name,
+                                             const boost::optional<TenantId>&) {
 #ifndef _WIN32
-    b << name << honorSystemUmask;
+    *b << name << honorSystemUmask;
 #endif
 }
 
 // --setParameter processUmask
-Status ProcessUMaskServerParameter::setFromString(const std::string& value) {
+Status ProcessUMaskServerParameter::setFromString(StringData value,
+                                                  const boost::optional<TenantId>&) {
 #ifndef _WIN32
     if (honorSystemUmask) {
         return {ErrorCodes::BadValue,
@@ -510,7 +513,8 @@ Status ProcessUMaskServerParameter::setFromString(const std::string& value) {
     }
 
     // Convert base from octal
-    const char* val = value.c_str();
+    auto vstr = value.toString();
+    const char* val = vstr.c_str();
     char* end = nullptr;
 
     auto mask = std::strtoul(val, &end, 8);
@@ -532,10 +536,11 @@ Status ProcessUMaskServerParameter::setFromString(const std::string& value) {
 }
 
 void ProcessUMaskServerParameter::append(OperationContext*,
-                                         BSONObjBuilder& b,
-                                         const std::string& name) {
+                                         BSONObjBuilder* b,
+                                         StringData name,
+                                         const boost::optional<TenantId>&) {
 #ifndef _WIN32
-    b << name << static_cast<int>(getUmaskOverride());
+    *b << name << static_cast<int>(getUmaskOverride());
 #endif
 }
 

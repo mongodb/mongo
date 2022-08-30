@@ -72,8 +72,12 @@ public:
 
                 SetClusterParameterInvocation invocation{std::move(sps), dbService};
 
-                invocation.normalizeParameter(
-                    opCtx, cmdParamObj, boost::none, serverParameter, parameterName);
+                invocation.normalizeParameter(opCtx,
+                                              cmdParamObj,
+                                              boost::none,
+                                              serverParameter,
+                                              parameterName,
+                                              request().getDbName().tenantId());
 
                 SetClusterParameterCoordinatorDocument coordinatorDoc;
                 coordinatorDoc.setConfigsvrCoordinatorMetadata(

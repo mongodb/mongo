@@ -76,7 +76,7 @@ WatchdogMonitor* getGlobalWatchdogMonitor() {
 
 }  // namespace
 
-Status validateWatchdogPeriodSeconds(const int& value) {
+Status validateWatchdogPeriodSeconds(const int& value, const boost::optional<TenantId>&) {
     if (value < 60 && value != -1) {
 
         return {ErrorCodes::BadValue, "watchdogPeriodSeconds must be greater than or equal to 60s"};

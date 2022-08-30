@@ -95,26 +95,26 @@ void ClusterServerParameterInitializer::updateParameter(OperationContext* opCtx,
     }
 
     BSONObjBuilder oldValueBob;
-    sp->append(opCtx, oldValueBob, name.toString());
+    sp->append(opCtx, &oldValueBob, name.toString(), boost::none);
     audit::logUpdateCachedClusterParameter(opCtx->getClient(), oldValueBob.obj(), doc);
 
-    uassertStatusOK(sp->set(doc));
+    uassertStatusOK(sp->set(doc, boost::none));
 }
 
 void ClusterServerParameterInitializer::clearParameter(OperationContext* opCtx,
                                                        ServerParameter* sp) {
-    if (sp->getClusterParameterTime() == LogicalTime::kUninitialized) {
+    if (sp->getClusterParameterTime(boost::none) == LogicalTime::kUninitialized) {
         // Nothing to clear.
         return;
     }
 
     BSONObjBuilder oldValueBob;
-    sp->append(opCtx, oldValueBob, sp->name());
+    sp->append(opCtx, &oldValueBob, sp->name(), boost::none);
 
-    uassertStatusOK(sp->reset());
+    uassertStatusOK(sp->reset(boost::none));
 
     BSONObjBuilder newValueBob;
-    sp->append(opCtx, newValueBob, sp->name());
+    sp->append(opCtx, &newValueBob, sp->name(), boost::none);
 
     audit::logUpdateCachedClusterParameter(
         opCtx->getClient(), oldValueBob.obj(), newValueBob.obj());

@@ -50,10 +50,12 @@ namespace mongo {
 
 // TODO: Remove these implementations and the associated IDL definition in 4.3.
 void TCMallocEnableMarkThreadTemporarilyIdle::append(OperationContext*,
-                                                     BSONObjBuilder&,
-                                                     const std::string&) {}
+                                                     BSONObjBuilder*,
+                                                     StringData,
+                                                     const boost::optional<TenantId>&) {}
 
-Status TCMallocEnableMarkThreadTemporarilyIdle::setFromString(const std::string&) {
+Status TCMallocEnableMarkThreadTemporarilyIdle::setFromString(StringData,
+                                                              const boost::optional<TenantId>&) {
     return Status(ErrorCodes::BadValue,
                   "tcmallocEnableMarkThreadTemporarilyIdle has been removed. Setting this "
                   "parameter has no effect and it will be removed in a future version of "

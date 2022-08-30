@@ -249,13 +249,15 @@ auto parseMirroredReadsParameters(const BSONObj& obj) {
 }  // namespace
 
 void MirroredReadsServerParameter::append(OperationContext*,
-                                          BSONObjBuilder& bob,
-                                          const std::string& name) {
-    auto subBob = BSONObjBuilder(bob.subobjStart(name));
+                                          BSONObjBuilder* bob,
+                                          StringData name,
+                                          const boost::optional<TenantId>&) {
+    auto subBob = BSONObjBuilder(bob->subobjStart(name));
     _data->serialize(&subBob);
 }
 
-Status MirroredReadsServerParameter::set(const BSONElement& value) try {
+Status MirroredReadsServerParameter::set(const BSONElement& value,
+                                         const boost::optional<TenantId>&) try {
     auto obj = value.Obj();
 
     _data = parseMirroredReadsParameters(obj);
@@ -265,7 +267,8 @@ Status MirroredReadsServerParameter::set(const BSONElement& value) try {
     return e.toStatus();
 }
 
-Status MirroredReadsServerParameter::setFromString(const std::string& str) try {
+Status MirroredReadsServerParameter::setFromString(StringData str,
+                                                   const boost::optional<TenantId>&) try {
     auto obj = fromjson(str);
 
     _data = parseMirroredReadsParameters(obj);

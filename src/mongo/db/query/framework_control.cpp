@@ -33,11 +33,14 @@
 
 namespace mongo {
 
-void QueryFrameworkControl::append(OperationContext*, BSONObjBuilder& b, const std::string& name) {
-    b << name << QueryFrameworkControl_serializer(_data.get());
+void QueryFrameworkControl::append(OperationContext*,
+                                   BSONObjBuilder* b,
+                                   StringData name,
+                                   const boost::optional<TenantId>&) {
+    *b << name << QueryFrameworkControl_serializer(_data.get());
 }
 
-Status QueryFrameworkControl::setFromString(const std::string& value) {
+Status QueryFrameworkControl::setFromString(StringData value, const boost::optional<TenantId>&) {
     _data = QueryFrameworkControl_parse(IDLParserContext("internalQueryFrameworkControl"), value);
     return Status::OK();
 }

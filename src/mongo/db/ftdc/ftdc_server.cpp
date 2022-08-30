@@ -73,24 +73,24 @@ synchronized_value<boost::filesystem::path> ftdcDirectoryPathParameter;
 
 FTDCStartupParams ftdcStartupParams;
 
-void DiagnosticDataCollectionDirectoryPathServerParameter::append(OperationContext* opCtx,
-                                                                  BSONObjBuilder& b,
-                                                                  const std::string& name) {
-    b.append(name, ftdcDirectoryPathParameter->generic_string());
+void DiagnosticDataCollectionDirectoryPathServerParameter::append(
+    OperationContext* opCtx, BSONObjBuilder* b, StringData name, const boost::optional<TenantId>&) {
+    b->append(name, ftdcDirectoryPathParameter->generic_string());
 }
 
-Status DiagnosticDataCollectionDirectoryPathServerParameter::setFromString(const std::string& str) {
+Status DiagnosticDataCollectionDirectoryPathServerParameter::setFromString(
+    StringData str, const boost::optional<TenantId>&) {
     if (hasGlobalServiceContext()) {
         FTDCController* controller = FTDCController::get(getGlobalServiceContext());
         if (controller) {
-            Status s = controller->setDirectory(str);
+            Status s = controller->setDirectory(str.toString());
             if (!s.isOK()) {
                 return s;
             }
         }
     }
 
-    ftdcDirectoryPathParameter = str;
+    ftdcDirectoryPathParameter = str.toString();
 
     return Status::OK();
 }

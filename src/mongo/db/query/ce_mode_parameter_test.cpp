@@ -34,14 +34,14 @@
 namespace mongo::ce {
 
 TEST(CEModeParameterTest, ValidatesValidCEModes) {
-    ASSERT_OK(validateCEMode("heuristic"));
-    ASSERT_OK(validateCEMode("histogram"));
-    ASSERT_OK(validateCEMode("sampling"));
+    ASSERT_OK(validateCEMode("heuristic", boost::none));
+    ASSERT_OK(validateCEMode("histogram", boost::none));
+    ASSERT_OK(validateCEMode("sampling", boost::none));
 }
 
 TEST(CEModeParameterTest, RejectsInvalidCEModes) {
-    ASSERT_NOT_OK(validateCEMode("notamode"));
-    ASSERT_NOT_OK(validateCEMode(""));
+    ASSERT_NOT_OK(validateCEMode("notamode", boost::none));
+    ASSERT_NOT_OK(validateCEMode("", boost::none));
 }
 
 }  // namespace mongo::ce

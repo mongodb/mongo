@@ -75,25 +75,27 @@ std::once_flag warnForSSLMode;
 }  // namespace
 
 void SSLModeServerParameter::append(OperationContext*,
-                                    BSONObjBuilder& builder,
-                                    const std::string& fieldName) {
+                                    BSONObjBuilder* builder,
+                                    StringData fieldName,
+                                    const boost::optional<TenantId>&) {
     std::call_once(warnForSSLMode, [] {
         LOGV2_WARNING(
             23803, "Use of deprecated server parameter 'sslMode', please use 'tlsMode' instead.");
     });
 
-    builder.append(fieldName, SSLParams::sslModeFormat(sslGlobalParams.sslMode.load()));
+    builder->append(fieldName, SSLParams::sslModeFormat(sslGlobalParams.sslMode.load()));
 }
 
 void TLSModeServerParameter::append(OperationContext*,
-                                    BSONObjBuilder& builder,
-                                    const std::string& fieldName) {
-    builder.append(
+                                    BSONObjBuilder* builder,
+                                    StringData fieldName,
+                                    const boost::optional<TenantId>&) {
+    builder->append(
         fieldName,
         SSLParams::tlsModeFormat(static_cast<SSLParams::SSLModes>(sslGlobalParams.sslMode.load())));
 }
 
-Status SSLModeServerParameter::setFromString(const std::string& strMode) {
+Status SSLModeServerParameter::setFromString(StringData strMode, const boost::optional<TenantId>&) {
     std::call_once(warnForSSLMode, [] {
         LOGV2_WARNING(
             23804, "Use of deprecated server parameter 'sslMode', please use 'tlsMode' instead.");
@@ -108,7 +110,7 @@ Status SSLModeServerParameter::setFromString(const std::string& strMode) {
     return Status::OK();
 }
 
-Status TLSModeServerParameter::setFromString(const std::string& strMode) {
+Status TLSModeServerParameter::setFromString(StringData strMode, const boost::optional<TenantId>&) {
     auto swNewMode = checkTLSModeTransition(
         SSLParams::tlsModeFormat, SSLParams::tlsModeParse, "tlsMode", strMode);
     if (!swNewMode.isOK()) {
@@ -119,10 +121,11 @@ Status TLSModeServerParameter::setFromString(const std::string& strMode) {
 }
 
 void TLSCATrustsSetParameter::append(OperationContext*,
-                                     BSONObjBuilder& b,
-                                     const std::string& name) {
+                                     BSONObjBuilder* b,
+                                     StringData name,
+                                     const boost::optional<TenantId>&) {
     if (!sslGlobalParams.tlsCATrusts) {
-        b.appendNull(name);
+        b->appendNull(name);
         return;
     }
 
@@ -145,7 +148,7 @@ void TLSCATrustsSetParameter::append(OperationContext*,
         trusts.append(ca.obj());
     }
 
-    b.append(name, trusts.arr());
+    b->append(name, trusts.arr());
 }
 
 /**
@@ -174,7 +177,8 @@ void TLSCATrustsSetParameter::append(OperationContext*,
  *   { role: "read", db: "" }      // May grant 'read' role on any DB.
  *   { role: "", db: "" }          // May grant any role on any DB.
  */
-Status TLSCATrustsSetParameter::set(const BSONElement& element) try {
+Status TLSCATrustsSetParameter::set(const BSONElement& element,
+                                    const boost::optional<TenantId>&) try {
     if ((element.type() != Object) || !element.Obj().couldBeArray()) {
         return {ErrorCodes::BadValue, "Value must be an array"};
     }
@@ -203,15 +207,17 @@ Status TLSCATrustsSetParameter::set(const BSONElement& element) try {
     return exceptionToStatus();
 }
 
-Status TLSCATrustsSetParameter::setFromString(const std::string& json) try {
-    return set(BSON("" << fromjson(json)).firstElement());
+Status TLSCATrustsSetParameter::setFromString(StringData json,
+                                              const boost::optional<TenantId>&) try {
+    return set(BSON("" << fromjson(json)).firstElement(), boost::none);
 } catch (...) {
     return exceptionToStatus();
 }
 
 }  // namespace mongo
 
-mongo::Status mongo::validateOpensslCipherConfig(const std::string&) {
+mongo::Status mongo::validateOpensslCipherConfig(const std::string&,
+                                                 const boost::optional<TenantId>&) {
     if (sslGlobalParams.sslCipherConfig != kSSLCipherConfigDefault) {
         return {ErrorCodes::BadValue,
                 "opensslCipherConfig setParameter is incompatible with net.tls.tlsCipherConfig"};
@@ -226,7 +232,8 @@ mongo::Status mongo::validateOpensslCipherConfig(const std::string&) {
     return Status::OK();
 }
 
-mongo::Status mongo::validateDisableNonTLSConnectionLogging(const bool&) {
+mongo::Status mongo::validateDisableNonTLSConnectionLogging(const bool&,
+                                                            const boost::optional<TenantId>&) {
     if (sslGlobalParams.disableNonSSLConnectionLoggingSet) {
         return {ErrorCodes::BadValue,
                 "Error parsing command line: Multiple occurrences of option "

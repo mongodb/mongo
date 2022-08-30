@@ -43,6 +43,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/tenant_id.h"
 
 #define MONGO_SERVER_PARAMETER_REGISTER(name) \
     MONGO_INITIALIZER_GENERAL(                \
@@ -130,25 +131,31 @@ public:
         return (_type != ServerParameterType::kClusterWide);
     }
 
-    virtual void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) = 0;
+    virtual void append(OperationContext* opCtx,
+                        BSONObjBuilder* b,
+                        StringData name,
+                        const boost::optional<TenantId>& tenantId) = 0;
 
     virtual void appendSupportingRoundtrip(OperationContext* opCtx,
-                                           BSONObjBuilder& b,
-                                           const std::string& name) {
-        append(opCtx, b, name);
+                                           BSONObjBuilder* b,
+                                           StringData name,
+                                           const boost::optional<TenantId>& tenantId) {
+        append(opCtx, b, name, tenantId);
     }
 
-    virtual Status validate(const BSONElement& newValueElement) const {
+    virtual Status validate(const BSONElement& newValueElement,
+                            const boost::optional<TenantId>& tenantId) const {
         return Status::OK();
     }
 
-    Status validate(const BSONObj& newValueObj) const {
-        return validate(BSON("" << newValueObj).firstElement());
+    Status validate(const BSONObj& newValueObj, const boost::optional<TenantId>& tenantId) const {
+        return validate(BSON("" << newValueObj).firstElement(), tenantId);
     }
 
     // This base implementation calls `setFromString(coerceToString(newValueElement))`.
     // Derived classes may customize the behavior by specifying `override_set` in IDL.
-    virtual Status set(const BSONElement& newValueElement);
+    virtual Status set(const BSONElement& newValueElement,
+                       const boost::optional<TenantId>& tenantId);
 
     /**
      * This method will reset the server parameter's value back to its default. This is currently
@@ -162,7 +169,7 @@ public:
      * method. If it is called without being implemented, it will return an error via the inherited
      * method below.
      */
-    virtual Status reset() {
+    virtual Status reset(const boost::optional<TenantId>& tenantId) {
         return Status{ErrorCodes::OperationFailed,
                       str::stream()
                           << "Parameter reset not implemented for server parameter: " << name()};
@@ -172,11 +179,11 @@ public:
      * Overload of set() that accepts BSONObjs instead of BSONElements. This is currently only used
      * for cluster server parameters but can be used for node-only server parameters.
      */
-    Status set(const BSONObj& newValueObj) {
-        return set(BSON("" << newValueObj).firstElement());
+    Status set(const BSONObj& newValueObj, const boost::optional<TenantId>& tenantId) {
+        return set(BSON("" << newValueObj).firstElement(), tenantId);
     }
 
-    virtual Status setFromString(const std::string& str) = 0;
+    virtual Status setFromString(StringData str, const boost::optional<TenantId>& tenantId) = 0;
 
     /**
      * Simply returns the uninitialized/default-constructed LogicalTime by default.
@@ -186,8 +193,8 @@ public:
      * implement a mechanism for atomically setting the clusterParameterTime in the set() method and
      * retrieving it via this method.
      */
-    virtual LogicalTime getClusterParameterTime() const {
-        return LogicalTime::kUninitialized;
+    virtual LogicalTime getClusterParameterTime(const boost::optional<TenantId>& tenantId) const {
+        MONGO_UNREACHABLE;
     }
 
     bool isTestOnly() const {
@@ -293,10 +300,13 @@ class IDLServerParameterDeprecatedAlias : public ServerParameter {
 public:
     IDLServerParameterDeprecatedAlias(StringData name, ServerParameter* sp);
 
-    void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) final;
-    Status reset() final;
-    Status set(const BSONElement& newValueElement) final;
-    Status setFromString(const std::string& str) final;
+    void append(OperationContext* opCtx,
+                BSONObjBuilder* b,
+                StringData name,
+                const boost::optional<TenantId>& tenantId) final;
+    Status reset(const boost::optional<TenantId>& tenantId) final;
+    Status set(const BSONElement& newValueElement, const boost::optional<TenantId>& tenantId) final;
+    Status setFromString(StringData str, const boost::optional<TenantId>& tenantId) final;
 
 private:
     std::once_flag _warnOnce;

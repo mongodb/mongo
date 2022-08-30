@@ -32,6 +32,7 @@
 #include <string>
 
 #include "mongo/base/status.h"
+#include "mongo/db/tenant_id.h"
 
 namespace mongo::ce {
 
@@ -42,6 +43,6 @@ const std::string kHeuristic = "heuristic";
 const std::string kHistogram = "histogram";
 const std::string kSampling = "sampling";
 
-Status validateCEMode(const std::string& value);
+Status validateCEMode(const std::string& value, const boost::optional<TenantId>&);
 
 }  // namespace mongo::ce

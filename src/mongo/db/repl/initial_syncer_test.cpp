@@ -4401,7 +4401,7 @@ TEST_F(InitialSyncerTest, TestRemainingInitialSyncEstimatedMillisMetric) {
     auto opCtx = makeOpCtx();
     ASSERT_OK(ServerParameterSet::getNodeParameterSet()
                   ->get("collectionClonerBatchSize")
-                  ->setFromString("1"));
+                  ->setFromString("1", boost::none));
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 27017));
 
@@ -4561,7 +4561,7 @@ TEST_F(InitialSyncerTest, GetInitialSyncProgressReturnsCorrectProgress) {
     auto opCtx = makeOpCtx();
     ASSERT_OK(ServerParameterSet::getNodeParameterSet()
                   ->get("collectionClonerBatchSize")
-                  ->setFromString("1"));
+                  ->setFromString("1", boost::none));
 
     _syncSourceSelector->setChooseNewSyncSourceResult_forTest(HostAndPort("localhost", 27017));
     ASSERT_OK(initialSyncer->startup(opCtx.get(), 2U));

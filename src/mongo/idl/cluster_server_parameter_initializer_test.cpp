@@ -93,7 +93,7 @@ TEST_F(ClusterServerParameterInitializerTest, OnInitialSync) {
                    ->get<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
                                                        ClusterServerParameterTest>>(kCSPTest);
     ASSERT(sp != nullptr);
-    ClusterServerParameterTest cspTest = sp->getValue();
+    ClusterServerParameterTest cspTest = sp->getValue(boost::none);
     ASSERT_EQ(cspTest.getIntValue(), kDefaultIntValue);
     ASSERT_EQ(cspTest.getStrValue(), kDefaultStrValue);
 
@@ -104,7 +104,7 @@ TEST_F(ClusterServerParameterInitializerTest, OnInitialSync) {
              ->get<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
                                                  ClusterServerParameterTest>>(kCSPTest);
     ASSERT(sp != nullptr);
-    cspTest = sp->getValue();
+    cspTest = sp->getValue(boost::none);
     ASSERT_EQ(cspTest.getIntValue(), kInitialIntValue);
     ASSERT_EQ(cspTest.getStrValue(), kInitialStrValue);
 }
@@ -115,7 +115,7 @@ TEST_F(ClusterServerParameterInitializerTest, OnStartupRecovery) {
                    ->get<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
                                                        ClusterServerParameterTest>>(kCSPTest);
     ASSERT(sp != nullptr);
-    ClusterServerParameterTest cspTest = sp->getValue();
+    ClusterServerParameterTest cspTest = sp->getValue(boost::none);
     ASSERT_EQ(cspTest.getIntValue(), kDefaultIntValue);
     ASSERT_EQ(cspTest.getStrValue(), kDefaultStrValue);
 
@@ -126,7 +126,7 @@ TEST_F(ClusterServerParameterInitializerTest, OnStartupRecovery) {
              ->get<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
                                                  ClusterServerParameterTest>>(kCSPTest);
     ASSERT(sp != nullptr);
-    cspTest = sp->getValue();
+    cspTest = sp->getValue(boost::none);
     ASSERT_EQ(cspTest.getIntValue(), kInitialIntValue);
     ASSERT_EQ(cspTest.getStrValue(), kInitialStrValue);
 }

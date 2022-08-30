@@ -545,13 +545,14 @@ void FeatureCompatibilityVersion::clearLastFCVUpdateTimestamp() {
 
 
 void FeatureCompatibilityVersionParameter::append(OperationContext* opCtx,
-                                                  BSONObjBuilder& b,
-                                                  const std::string& name) {
+                                                  BSONObjBuilder* b,
+                                                  StringData name,
+                                                  const boost::optional<TenantId>&) {
     uassert(ErrorCodes::UnknownFeatureCompatibilityVersion,
             str::stream() << name << " is not yet known.",
             serverGlobalParams.featureCompatibility.isVersionInitialized());
 
-    BSONObjBuilder featureCompatibilityVersionBuilder(b.subobjStart(name));
+    BSONObjBuilder featureCompatibilityVersionBuilder(b->subobjStart(name));
     auto version = serverGlobalParams.featureCompatibility.getVersion();
     FeatureCompatibilityVersionDocument fcvDoc = fcvTransitions.getFCVDocument(version);
     featureCompatibilityVersionBuilder.appendElements(fcvDoc.toBSON().removeField("_id"));
@@ -582,7 +583,8 @@ void FeatureCompatibilityVersionParameter::append(OperationContext* opCtx,
     }
 }
 
-Status FeatureCompatibilityVersionParameter::setFromString(const std::string&) {
+Status FeatureCompatibilityVersionParameter::setFromString(StringData,
+                                                           const boost::optional<TenantId>&) {
     return {ErrorCodes::IllegalOperation,
             str::stream() << name() << " cannot be set via setParameter. See "
                           << feature_compatibility_version_documentation::kCompatibilityLink

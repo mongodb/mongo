@@ -45,7 +45,7 @@ Status onPlanCacheSizeUpdate(const std::string& str);
 /**
  * Callback called on validation of planCacheSize parameter.
  */
-Status validatePlanCacheSize(const std::string& str);
+Status validatePlanCacheSize(const std::string& str, const boost::optional<TenantId>&);
 
 /**
  * Clears the SBE plan cache. Used to implement 'clearSbeCacheOnParameterChange()' below.

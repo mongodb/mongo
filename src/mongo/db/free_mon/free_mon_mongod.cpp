@@ -248,7 +248,7 @@ private:
 
 }  // namespace
 
-Status onValidateFreeMonEndpointURL(StringData str) {
+Status onValidateFreeMonEndpointURL(StringData str, const boost::optional<TenantId>&) {
     // Check for http, not https here because testEnabled may not be set yet
     if (!str.startsWith("http"_sd) != 0) {
         return Status(ErrorCodes::BadValue,

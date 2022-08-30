@@ -37,7 +37,8 @@
 namespace mongo {
 
 Status validateChangeStreamsClusterParameter(
-    const ChangeStreamsClusterParameterStorage& clusterParameter) {
+    const ChangeStreamsClusterParameterStorage& clusterParameter,
+    const boost::optional<TenantId>& tenantId) {
     if (clusterParameter.getExpireAfterSeconds() <= 0) {
         return Status(ErrorCodes::BadValue,
                       "Expected a positive integer for 'expireAfterSeconds' field");

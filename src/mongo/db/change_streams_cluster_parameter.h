@@ -29,7 +29,11 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/base/status.h"
+#include "mongo/db/tenant_id.h"
+
 namespace mongo {
 
 class ChangeStreamsClusterParameterStorage;
@@ -38,5 +42,6 @@ class ChangeStreamsClusterParameterStorage;
  * Validates 'changeStreams' cluster-wide parameter.
  */
 Status validateChangeStreamsClusterParameter(
-    const ChangeStreamsClusterParameterStorage& clusterParameter);
+    const ChangeStreamsClusterParameterStorage& clusterParameter,
+    const boost::optional<TenantId>& tenantId);
 }  // namespace mongo

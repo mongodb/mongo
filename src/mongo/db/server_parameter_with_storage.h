@@ -319,9 +319,10 @@ public:
     IDLServerParameterWithStorage(StringData name, T& storage)
         : ServerParameter(name, paramType), _storage(storage) {}
 
-    Status validateValue(const element_type& newValue) const {
+    Status validateValue(const element_type& newValue,
+                         const boost::optional<TenantId>& tenantId) const {
         for (const auto& validator : _validators) {
-            const auto status = validator(newValue);
+            const auto status = validator(newValue, tenantId);
             if (!status.isOK()) {
                 return status;
             }
@@ -332,12 +333,12 @@ public:
     /**
      * Convenience wrapper for storing a value.
      */
-    Status setValue(const element_type& newValue) {
-        if (auto status = validateValue(newValue); !status.isOK()) {
+    Status setValue(const element_type& newValue, const boost::optional<TenantId>& tenantId) {
+        if (auto status = validateValue(newValue, tenantId); !status.isOK()) {
             return status;
         }
 
-        _storage.store(newValue, boost::none);
+        _storage.store(newValue, tenantId);
 
         if (_onUpdate) {
             return _onUpdate(newValue);
@@ -349,8 +350,8 @@ public:
     /**
      * Convenience wrapper for fetching value from storage.
      */
-    element_type getValue() const {
-        return _storage.load(boost::none);
+    element_type getValue(const boost::optional<TenantId>& tenantId) const {
+        return _storage.load(tenantId);
     }
 
     /**
@@ -367,7 +368,7 @@ public:
 
             // Update the actual storage, performing validation and any post-update functions as
             // necessary.
-            status = reset();
+            status = reset(boost::none);
         });
         return status;
     }
@@ -378,14 +379,17 @@ public:
      * Typically invoked by {getParameter:...} or {getClusterParameter:...} to produce a dictionary
      * of SCP settings.
      */
-    void append(OperationContext* opCtx, BSONObjBuilder& b, const std::string& name) final {
+    void append(OperationContext* opCtx,
+                BSONObjBuilder* b,
+                StringData name,
+                const boost::optional<TenantId>& tenantId) final {
         if (isRedact()) {
-            b.append(name, "###");
+            b->append(name, "###");
         } else if constexpr (paramType == SPT::kClusterWide) {
-            b.append("_id"_sd, name);
-            b.appendElementsUnique(getValue().toBSON());
+            b->append("_id"_sd, name);
+            b->appendElementsUnique(getValue(tenantId).toBSON());
         } else {
-            b.append(name, getValue());
+            b->append(name, getValue(tenantId));
         }
     }
 
@@ -409,13 +413,14 @@ public:
         return newValue;
     }
 
-    Status validate(const BSONElement& newValueElement) const final {
+    Status validate(const BSONElement& newValueElement,
+                    const boost::optional<TenantId>& tenantId) const final {
         StatusWith<element_type> swNewValue = parseElement(newValueElement);
         if (!swNewValue.isOK()) {
             return swNewValue.getStatus();
         }
 
-        return validateValue(swNewValue.getValue());
+        return validateValue(swNewValue.getValue(), tenantId);
     }
 
     /**
@@ -424,22 +429,23 @@ public:
      * Allows setting non-basic values (e.g. vector<string>)
      * via the {setParameter: ...} call or {setClusterParameter: ...} call.
      */
-    Status set(const BSONElement& newValueElement) final {
+    Status set(const BSONElement& newValueElement,
+               const boost::optional<TenantId>& tenantId) final {
         StatusWith<element_type> swNewValue = parseElement(newValueElement);
         if (!swNewValue.isOK()) {
             return swNewValue.getStatus();
         }
 
-        return setValue(swNewValue.getValue());
+        return setValue(swNewValue.getValue(), tenantId);
     }
 
     /**
      * Resets the current storage value in storage_wrapper with the default value.
      */
-    Status reset() final {
-        _storage.reset(boost::none);
+    Status reset(const boost::optional<TenantId>& tenantId) final {
+        _storage.reset(tenantId);
         if (_onUpdate) {
-            return _onUpdate(_storage.load(boost::none));
+            return _onUpdate(_storage.load(tenantId));
         }
 
         return Status::OK();
@@ -451,7 +457,7 @@ public:
      * Typically invoked from commandline --setParameter usage. Prohibited for cluster server
      * parameters.
      */
-    Status setFromString(const std::string& str) final {
+    Status setFromString(StringData str, const boost::optional<TenantId>& tenantId) final {
         if constexpr (paramType == SPT::kClusterWide) {
             return {ErrorCodes::BadValue,
                     "Unable to set a cluster-wide server parameter from the command line or config "
@@ -462,7 +468,7 @@ public:
                 return swNewValue.getStatus();
             }
 
-            return setValue(swNewValue.getValue());
+            return setValue(swNewValue.getValue(), tenantId);
         }
     }
 
@@ -470,9 +476,9 @@ public:
      * Retrieves the cluster parameter time from the chained ClusterServerParameter struct in
      * storage. All other server parameters simply return the uninitialized LogicalTime.
      */
-    LogicalTime getClusterParameterTime() const final {
+    LogicalTime getClusterParameterTime(const boost::optional<TenantId>& tenantId) const final {
         if constexpr (hasClusterServerParameter<element_type>) {
-            return getValue().getClusterParameterTime();
+            return getValue(tenantId).getClusterParameterTime();
         }
 
         return LogicalTime::kUninitialized;
@@ -493,7 +499,7 @@ public:
      *
      * Callback should return Status::OK() or ErrorCodes::BadValue.
      */
-    using validator_t = Status(const element_type&);
+    using validator_t = Status(const element_type&, const boost::optional<TenantId>& tenantId);
     void addValidator(std::function<validator_t> validator) {
         _validators.push_back(std::move(validator));
     }
@@ -503,15 +509,16 @@ public:
      */
     template <class predicate>
     void addBound(const element_type& bound) {
-        addValidator([bound, spname = name()](const element_type& value) {
-            if (!predicate::evaluate(value, bound)) {
-                return Status(ErrorCodes::BadValue,
-                              str::stream()
-                                  << "Invalid value for parameter " << spname << ": " << value
-                                  << " is not " << predicate::description << " " << bound);
-            }
-            return Status::OK();
-        });
+        addValidator(
+            [bound, spname = name()](const element_type& value, const boost::optional<TenantId>&) {
+                if (!predicate::evaluate(value, bound)) {
+                    return Status(ErrorCodes::BadValue,
+                                  str::stream()
+                                      << "Invalid value for parameter " << spname << ": " << value
+                                      << " is not " << predicate::description << " " << bound);
+                }
+                return Status::OK();
+            });
     }
 
 private:

@@ -402,15 +402,16 @@ SSLManagerCoordinator::SSLManagerCoordinator()
 }
 
 void ClusterMemberDNOverride::append(OperationContext* opCtx,
-                                     BSONObjBuilder& b,
-                                     const std::string& name) {
+                                     BSONObjBuilder* b,
+                                     StringData name,
+                                     const boost::optional<TenantId>&) {
     auto value = clusterMemberOverride.get();
     if (value) {
-        b.append(name, value->fullDN.toString());
+        b->append(name, value->fullDN.toString());
     }
 }
 
-Status ClusterMemberDNOverride::setFromString(const std::string& str) {
+Status ClusterMemberDNOverride::setFromString(StringData str, const boost::optional<TenantId>&) {
     if (str.empty()) {
         *clusterMemberOverride = boost::none;
         return Status::OK();

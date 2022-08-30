@@ -218,7 +218,7 @@ public:
 
         if (auto sp = ServerParameterSet::getNodeParameterSet()->getIfExists(
                 kAutomationServiceDescriptorFieldName)) {
-            sp->append(opCtx, result, kAutomationServiceDescriptorFieldName);
+            sp->append(opCtx, &result, kAutomationServiceDescriptorFieldName, boost::none);
         }
 
         MessageCompressorManager::forSession(opCtx->getClient()->session())

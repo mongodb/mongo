@@ -54,11 +54,11 @@ bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
     StringData parameterName = cmdParamObj.firstElement().fieldName();
     ServerParameter* serverParameter = _sps->get(parameterName);
 
-    auto [query, update] =
-        normalizeParameter(opCtx, cmdParamObj, paramTime, serverParameter, parameterName);
+    auto [query, update] = normalizeParameter(
+        opCtx, cmdParamObj, paramTime, serverParameter, parameterName, cmd.getDbName().tenantId());
 
     BSONObjBuilder oldValueBob;
-    serverParameter->append(opCtx, oldValueBob, parameterName.toString());
+    serverParameter->append(opCtx, &oldValueBob, parameterName.toString(), boost::none);
     audit::logSetClusterParameter(opCtx->getClient(), oldValueBob.obj(), update);
 
     LOGV2_DEBUG(
@@ -73,7 +73,8 @@ std::pair<BSONObj, BSONObj> SetClusterParameterInvocation::normalizeParameter(
     BSONObj cmdParamObj,
     const boost::optional<Timestamp>& paramTime,
     ServerParameter* sp,
-    StringData parameterName) {
+    StringData parameterName,
+    const boost::optional<TenantId>& tenantId) {
     BSONElement commandElement = cmdParamObj.firstElement();
     uassert(ErrorCodes::IllegalOperation,
             "Cluster parameter value must be an object",
@@ -88,7 +89,7 @@ std::pair<BSONObj, BSONObj> SetClusterParameterInvocation::normalizeParameter(
     BSONObj query = BSON("_id" << parameterName);
     BSONObj update = updateBuilder.obj();
 
-    uassertStatusOK(sp->validate(update));
+    uassertStatusOK(sp->validate(update, tenantId));
 
     return {query, update};
 }
@@ -115,7 +116,7 @@ StatusWith<bool> ClusterParameterDBClientService::updateParameterOnDisk(
 
     try {
         _dbClient.runCommand(
-            NamespaceString::kConfigDb.toString(),
+            NamespaceString::makeClusterParametersNSS(tenantId).dbName().toStringWithTenantId(),
             [&] {
                 write_ops::UpdateCommandRequest updateOp(
                     NamespaceString::makeClusterParametersNSS(tenantId));

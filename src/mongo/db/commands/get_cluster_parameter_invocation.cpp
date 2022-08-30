@@ -54,7 +54,7 @@ GetClusterParameterInvocation::retrieveRequestedParameters(OperationContext* opC
         // Skip any disabled cluster parameters.
         if (requestedParameter->isEnabled()) {
             BSONObjBuilder bob;
-            requestedParameter->append(opCtx, bob, requestedParameter->name());
+            requestedParameter->append(opCtx, &bob, requestedParameter->name(), boost::none);
             parameterValues.push_back(bob.obj().getOwned());
             parameterNames.push_back(requestedParameter->name());
         }
@@ -182,7 +182,7 @@ GetClusterParameterInvocation::Reply GetClusterParameterInvocation::getDurablePa
         for (const auto& defaultParameterName : defaultParameterNames) {
             auto defaultParameter = clusterParameters->get(defaultParameterName);
             BSONObjBuilder bob;
-            defaultParameter->append(opCtx, bob, defaultParameterName);
+            defaultParameter->append(opCtx, &bob, defaultParameterName, boost::none);
             retrievedParameters.push_back(bob.obj());
         }
     }

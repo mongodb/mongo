@@ -168,9 +168,9 @@ public:
         }
     }
 
-    Status setFromString(const std::string& str) {
+    Status setFromString(StringData str) {
         std::vector<std::string> strList;
-        str::splitStringDelim(str, &strList, ',');
+        str::splitStringDelim(str.toString(), &strList, ',');
 
         std::vector<UserName> out;
         for (const auto& nameStr : strList) {
@@ -355,16 +355,19 @@ void handleWaitForUserCacheInvalidation(OperationContext* opCtx, const UserHandl
 int authorizationManagerCacheSize;
 
 void AuthorizationManagerPinnedUsersServerParameter::append(OperationContext* opCtx,
-                                                            BSONObjBuilder& out,
-                                                            const std::string& name) {
-    return authorizationManagerPinnedUsers.append(out, name);
+                                                            BSONObjBuilder* out,
+                                                            StringData name,
+                                                            const boost::optional<TenantId>&) {
+    return authorizationManagerPinnedUsers.append(*out, name.toString());
 }
 
-Status AuthorizationManagerPinnedUsersServerParameter::set(const BSONElement& newValue) {
+Status AuthorizationManagerPinnedUsersServerParameter::set(const BSONElement& newValue,
+                                                           const boost::optional<TenantId>&) {
     return authorizationManagerPinnedUsers.set(newValue);
 }
 
-Status AuthorizationManagerPinnedUsersServerParameter::setFromString(const std::string& str) {
+Status AuthorizationManagerPinnedUsersServerParameter::setFromString(
+    StringData str, const boost::optional<TenantId>&) {
     return authorizationManagerPinnedUsers.setFromString(str);
 }
 

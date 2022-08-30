@@ -49,11 +49,11 @@ public:
         : _serverParam(ServerParameterSet::getNodeParameterSet()->get(name)) {
         // Save the old value
         BSONObjBuilder bob;
-        _serverParam->appendSupportingRoundtrip(nullptr, bob, name);
+        _serverParam->appendSupportingRoundtrip(nullptr, &bob, name, boost::none);
         _oldValue = bob.obj();
 
         // Set to the new value
-        uassertStatusOK(_serverParam->set(BSON(name << value).firstElement()));
+        uassertStatusOK(_serverParam->set(BSON(name << value).firstElement(), boost::none));
     }
 
     /**
@@ -62,7 +62,7 @@ public:
     ~RAIIServerParameterControllerForTest() {
         // Reset to the old value
         auto elem = _oldValue.firstElement();
-        uassertStatusOK(_serverParam->set(elem));
+        uassertStatusOK(_serverParam->set(elem, boost::none));
     }
 
 private:
