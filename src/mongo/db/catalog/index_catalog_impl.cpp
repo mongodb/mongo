@@ -1793,7 +1793,11 @@ void IndexCatalogImpl::indexBuildSuccess(OperationContext* opCtx,
     invariant(releasedEntry.get() == index);
     _readyIndexes.add(std::move(releasedEntry));
 
-    index->setIndexBuildInterceptor(nullptr);
+    // Wait to unset the interceptor until the index actually commits. If a write conflict is
+    // encountered and the index commit process is restated, the multikey information from the
+    // interceptor may still be needed.
+    opCtx->recoveryUnit()->onCommit(
+        [index](boost::optional<Timestamp>) { index->setIndexBuildInterceptor(nullptr); });
     index->setIsReady(true);
 }
 
