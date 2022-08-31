@@ -51,10 +51,6 @@ struct CompressionInfrastructure {
     MessageCompressorManager manager;
 };
 
-void validateBSON(const BSONObj& obj) {
-    validateBSON(obj.objdata(), obj.objsize()).ignore();
-}
-
 void doFuzzing(ConstDataRangeCursor fuzzedData) try {
     if (fuzzedData.length() < sizeof(MSGHEADER::Layout)) {
         return;
@@ -79,10 +75,10 @@ void doFuzzing(ConstDataRangeCursor fuzzedData) try {
     switch (msg.operation()) {
         case dbMsg: {
             auto request = OpMsgRequest::parseOwned(msg);
-            validateBSON(request.body);
+            validateBSON(request.body).ignore();
             for (const auto& docSeq : request.sequences) {
                 for (const auto& doc : docSeq.objs) {
-                    validateBSON(doc);
+                    validateBSON(doc).ignore();
                 }
             }
         } break;

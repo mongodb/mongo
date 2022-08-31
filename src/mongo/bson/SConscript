@@ -52,6 +52,7 @@ env.CppLibfuzzerTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/bson/bson_validate',
     ],
 )
 
