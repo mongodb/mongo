@@ -156,7 +156,7 @@ TEST(BatchedCommandResponseTest, TooManyBigErrors) {
 }
 
 TEST(BatchedCommandResponseTest, CompatibilityFromWriteErrorToBatchCommandResponse) {
-    ChunkVersion versionReceived({OID::gen(), Timestamp(2, 0)}, {1, 0});
+    ShardVersion versionReceived(ChunkVersion({OID::gen(), Timestamp(2, 0)}, {1, 0}));
 
     write_ops::UpdateCommandReply reply;
     reply.getWriteCommandReplyBase().setN(1);
