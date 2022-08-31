@@ -73,6 +73,9 @@ public:
     SharedCollectionDecorations* getSharedDecorations() const final;
 
     void init(OperationContext* opCtx) final;
+    void initFromExisting(OperationContext* opCtx,
+                          std::shared_ptr<Collection> collection,
+                          Timestamp readTimestamp) final;
     bool isInitialized() const final;
     bool isCommitted() const final;
     void setCommitted(bool val) final;
@@ -443,6 +446,11 @@ private:
      */
     template <typename Func>
     void _writeMetadata(OperationContext* opCtx, Func func);
+
+    /**
+     * Helper for init() and initFromExisting() to initialize common state.
+     */
+    void _initCommon(OperationContext* opCtx);
 
     /**
      * Holder of shared state between CollectionImpl clones

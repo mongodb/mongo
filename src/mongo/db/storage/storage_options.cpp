@@ -58,6 +58,7 @@ void StorageGlobalParams::reset() {
     allowOplogTruncation = true;
     disableLockFreeReads = false;
     checkpointDelaySecs = 0;
+    forceDisableTableLogging = false;
 }
 
 StorageGlobalParams storageGlobalParams;

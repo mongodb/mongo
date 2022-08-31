@@ -217,6 +217,17 @@ public:
     // Must be called before used.
     virtual Status init(OperationContext* opCtx, Collection* collection) = 0;
 
+    /**
+     * Must be called before used.
+     *
+     * When initializing an index that exists in 'preexistingIndexes', the IndexCatalogEntry will be
+     * taken from there instead of initializing a new IndexCatalogEntry.
+     */
+    virtual Status initFromExisting(OperationContext* opCtx,
+                                    Collection* collection,
+                                    const IndexCatalogEntryContainer& preexistingIndexes,
+                                    boost::optional<Timestamp> readTimestamp) = 0;
+
     // ---- accessors -----
 
     virtual bool haveAnyIndexes() const = 0;

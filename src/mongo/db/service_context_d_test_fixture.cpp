@@ -65,6 +65,10 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
     : _journalListener(std::move(options._journalListener)),
       _tempDir("service_context_d_test_fixture") {
 
+    if (options._forceDisableTableLogging) {
+        storageGlobalParams.forceDisableTableLogging = true;
+    }
+
     if (options._useReplSettings) {
         repl::ReplSettings replSettings;
         replSettings.setOplogSizeBytes(10 * 1024 * 1024);
@@ -174,6 +178,8 @@ ServiceContextMongoDTest::~ServiceContextMongoDTest() {
     std::swap(storageGlobalParams.repair, _stashedStorageParams.repair);
     std::swap(serverGlobalParams.enableMajorityReadConcern,
               _stashedServerParams.enableMajorityReadConcern);
+
+    storageGlobalParams.reset();
 }
 
 void ServiceContextMongoDTest::tearDown() {

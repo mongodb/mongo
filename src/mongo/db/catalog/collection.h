@@ -218,6 +218,14 @@ public:
 
     virtual void init(OperationContext* opCtx) {}
 
+    /**
+     * Initializes a collection representative at the provided read timestamp using the shared state
+     * from an already existing, later collection.
+     */
+    virtual void initFromExisting(OperationContext* opCtx,
+                                  std::shared_ptr<Collection> collection,
+                                  Timestamp readTimestamp) {}
+
     virtual bool isCommitted() const {
         return true;
     }

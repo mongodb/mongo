@@ -132,6 +132,9 @@ struct StorageGlobalParams {
     // Delay in seconds between triggering the next checkpoint after the completion of the previous
     // one. A value of 0 indicates that checkpointing will be skipped.
     size_t checkpointDelaySecs;
+
+    // Test-only option. Disables table logging.
+    bool forceDisableTableLogging = false;
 };
 
 extern StorageGlobalParams storageGlobalParams;

@@ -38,6 +38,7 @@
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot_helper.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -60,6 +61,22 @@ std::shared_ptr<CollectionCatalog> batchedCatalogWriteInstance;
 
 const OperationContext::Decoration<std::shared_ptr<const CollectionCatalog>> stashedCatalog =
     OperationContext::declareDecoration<std::shared_ptr<const CollectionCatalog>>();
+
+/**
+ * Returns true if the collection is compatible with the read timestamp.
+ */
+bool isCollectionCompatible(std::shared_ptr<Collection> coll, Timestamp readTimestamp) {
+    if (!coll) {
+        return false;
+    }
+
+    boost::optional<Timestamp> minValidSnapshot = coll->getMinimumValidSnapshot();
+    if (!minValidSnapshot) {
+        // Collection is valid in all snapshots.
+        return true;
+    }
+    return readTimestamp >= *minValidSnapshot;
+}
 
 }  // namespace
 
@@ -657,6 +674,91 @@ Status CollectionCatalog::reloadViews(OperationContext* opCtx, const DatabaseNam
     });
 
     return status;
+}
+
+std::shared_ptr<Collection> CollectionCatalog::openCollection(OperationContext* opCtx,
+                                                              const DurableCatalog::Entry& entry,
+                                                              Timestamp readTimestamp) const {
+    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+        return nullptr;
+    }
+
+    auto metadata = DurableCatalog::get(opCtx)->getMetaData(opCtx, entry.catalogId);
+    if (!metadata) {
+        // Treat the collection as non-existent at a point-in-time the same as not-existent at
+        // latest.
+        return nullptr;
+    }
+
+    const auto& collectionOptions = metadata->options;
+
+    // Check if the collection already exists in the catalog and if it's compatible with the read
+    // timestamp.
+    std::shared_ptr<Collection> latestColl = _lookupCollectionByUUID(*collectionOptions.uuid);
+    if (isCollectionCompatible(latestColl, readTimestamp)) {
+        return latestColl;
+    }
+
+    // Check if the collection is drop pending, not expired, and compatible with the read timestamp.
+    std::shared_ptr<Collection> dropPendingColl = [&]() -> std::shared_ptr<Collection> {
+        auto dropPendingIt = _dropPendingCollection.find(entry.ident);
+        if (dropPendingIt == _dropPendingCollection.end()) {
+            return nullptr;
+        }
+
+        return dropPendingIt->second.lock();
+    }();
+
+    if (isCollectionCompatible(dropPendingColl, readTimestamp)) {
+        return dropPendingColl;
+    }
+
+    // Neither the latest collection or drop pending collection exist, or were compatible with the
+    // read timestamp. We'll need to instantiate a new Collection instance.
+    if (latestColl || dropPendingColl) {
+        // If the latest or drop pending collection exists, instantiate a new collection using
+        // their shared state.
+        LOGV2_DEBUG(6825400,
+                    1,
+                    "Instantiating a collection using shared state",
+                    logAttrs(entry.nss),
+                    "ident"_attr = entry.ident,
+                    "md"_attr = metadata->toBSON(),
+                    "timestamp"_attr = readTimestamp);
+
+        std::shared_ptr<Collection> collToReturn = Collection::Factory::get(opCtx)->make(
+            opCtx, entry.nss, entry.catalogId, metadata, /*rs=*/nullptr);
+        collToReturn->initFromExisting(
+            opCtx, latestColl ? latestColl : dropPendingColl, readTimestamp);
+        return collToReturn;
+    }
+
+    // Instantiate a new collection without any shared state.
+    LOGV2_DEBUG(6825401,
+                1,
+                "Instantiating a new collection",
+                logAttrs(entry.nss),
+                "ident"_attr = entry.ident,
+                "md"_attr = metadata->toBSON(),
+                "timestamp"_attr = readTimestamp);
+
+    std::unique_ptr<RecordStore> rs =
+        opCtx->getServiceContext()->getStorageEngine()->getEngine()->getRecordStore(
+            opCtx, entry.nss, entry.ident, collectionOptions);
+    std::shared_ptr<Collection> collToReturn = Collection::Factory::get(opCtx)->make(
+        opCtx, entry.nss, entry.catalogId, metadata, std::move(rs));
+    collToReturn->init(opCtx);
+    return collToReturn;
+}
+
+std::shared_ptr<IndexCatalogEntry> CollectionCatalog::findDropPendingIndex(
+    const std::string& ident) const {
+    auto it = _dropPendingIndex.find(ident);
+    if (it == _dropPendingIndex.end()) {
+        return nullptr;
+    }
+
+    return it->second.lock();
 }
 
 void CollectionCatalog::onCreateCollection(OperationContext* opCtx,

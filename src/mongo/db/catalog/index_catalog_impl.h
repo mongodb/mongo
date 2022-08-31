@@ -67,6 +67,17 @@ public:
     // must be called before used
     Status init(OperationContext* opCtx, Collection* collection) override;
 
+    /**
+     * Must be called before used.
+     *
+     * When initializing an index that exists in 'preexistingIndexes', the IndexCatalogEntry will be
+     * taken from there instead of initializing a new IndexCatalogEntry.
+     */
+    Status initFromExisting(OperationContext* opCtx,
+                            Collection* collection,
+                            const IndexCatalogEntryContainer& preexistingIndexes,
+                            boost::optional<Timestamp> readTimestamp) override;
+
     // ---- accessors -----
 
     bool haveAnyIndexes() const override;
@@ -298,6 +309,17 @@ public:
 
 private:
     static const BSONObj _idObj;  // { _id : 1 }
+
+    /**
+     * Helper for init() and initFromExisting().
+     *
+     * Passing boost::none for 'preexistingIndexes' indicates that the IndexCatalog is not being
+     * initialized at an earlier point-in-time.
+     */
+    Status _init(OperationContext* opCtx,
+                 Collection* collection,
+                 const IndexCatalogEntryContainer& preexistingIndexes,
+                 boost::optional<Timestamp> readTimestamp);
 
     /**
      * In addition to IndexNames::findPluginName, validates that it is a known index type.

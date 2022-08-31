@@ -795,6 +795,12 @@ void WiredTigerUtil::notifyStartupComplete() {
 }
 
 bool WiredTigerUtil::useTableLogging(const NamespaceString& nss) {
+    if (storageGlobalParams.forceDisableTableLogging) {
+        invariant(TestingProctor::instance().isEnabled());
+        LOGV2(6825405, "Table logging disabled", logAttrs(nss));
+        return false;
+    }
+
     // We only turn off logging in the case of:
     // 1) Replication is enabled (the typical deployment), or
     // 2) We're running as a standalone with recoverFromOplogAsStandalone=true

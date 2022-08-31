@@ -87,6 +87,11 @@ protected:
             return std::move(*this);
         }
 
+        Options forceDisableTableLogging() {
+            _forceDisableTableLogging = true;
+            return std::move(*this);
+        }
+
     private:
         std::string _engine = "wiredTiger";
         // We use ephemeral instances by default to advise Storage Engines (in particular
@@ -99,6 +104,7 @@ protected:
         Milliseconds _autoAdvancingMockClockIncrement{0};
         std::unique_ptr<TickSource> _mockTickSource;
         std::unique_ptr<JournalListener> _journalListener;
+        bool _forceDisableTableLogging = false;
 
         friend class ServiceContextMongoDTest;
     };

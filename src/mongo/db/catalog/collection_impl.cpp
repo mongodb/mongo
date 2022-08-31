@@ -366,10 +366,107 @@ void CollectionImpl::init(OperationContext* opCtx) {
     const auto& collectionOptions = _metadata->options;
 
     _shared->_collator = parseCollation(opCtx, _ns, collectionOptions.collation);
+
+    _initCommon(opCtx);
+
+    if (collectionOptions.clusteredIndex) {
+        if (collectionOptions.expireAfterSeconds) {
+            // If this collection has been newly created, we need to register with the TTL cache at
+            // commit time, otherwise it is startup and we can register immediately.
+            auto svcCtx = opCtx->getClient()->getServiceContext();
+            auto uuid = *collectionOptions.uuid;
+            if (opCtx->lockState()->inAWriteUnitOfWork()) {
+                opCtx->recoveryUnit()->onCommit([svcCtx, uuid](auto ts) {
+                    TTLCollectionCache::get(svcCtx).registerTTLInfo(
+                        uuid, TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}});
+                });
+            } else {
+                TTLCollectionCache::get(svcCtx).registerTTLInfo(
+                    uuid, TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}});
+            }
+        }
+    }
+
+    uassertStatusOK(getIndexCatalog()->init(opCtx, this));
+    _initialized = true;
+}
+
+void CollectionImpl::initFromExisting(OperationContext* opCtx,
+                                      std::shared_ptr<Collection> collection,
+                                      Timestamp readTimestamp) {
+    LOGV2_DEBUG(
+        6825402, 1, "Initializing collection using shared state", logAttrs(collection->ns()));
+
+    // We are per definition committed if we initialize from an existing collection.
+    _cachedCommitted = true;
+
+    // Use the shared state from the existing collection.
+    _shared = static_cast<CollectionImpl*>(collection.get())->_shared;
+
+    // When initializing a collection from an earlier point-in-time, we don't know when the last DDL
+    // operation took place at that point-in-time. We conservatively set the minimum valid snapshot
+    // to the read point-in-time.
+    _minVisibleSnapshot = readTimestamp;
+    _minValidSnapshot = readTimestamp;
+
+    _initCommon(opCtx);
+
+    // Determine which indexes from the existing collection can be shared with this newly
+    // initialized collection. The remaining indexes will be initialized by the IndexCatalog.
+    IndexCatalogEntryContainer preexistingIndexes;
+    for (const auto& index : _metadata->indexes) {
+        // First check the index catalog of the existing collection for the index entry.
+        std::shared_ptr<IndexCatalogEntry> entry = [&]() -> std::shared_ptr<IndexCatalogEntry> {
+            auto desc =
+                collection->getIndexCatalog()->findIndexByName(opCtx, index.nameStringData());
+            if (!desc)
+                return nullptr;
+
+            auto entry = collection->getIndexCatalog()->getEntryShared(desc);
+            if (!entry->getMinimumVisibleSnapshot())
+                // Index is valid in all snapshots.
+                return entry;
+            return readTimestamp < *entry->getMinimumVisibleSnapshot() ? nullptr : entry;
+        }();
+
+        if (entry) {
+            preexistingIndexes.add(std::move(entry));
+            continue;
+        }
+
+        // Next check the CollectionCatalog for a compatible drop pending index.
+        entry = [&]() -> std::shared_ptr<IndexCatalogEntry> {
+            const std::string ident = DurableCatalog::get(opCtx)->getIndexIdent(
+                opCtx, _catalogId, index.nameStringData());
+            auto entry = CollectionCatalog::get(opCtx)->findDropPendingIndex(ident);
+            if (!entry)
+                return nullptr;
+
+            if (!entry->getMinimumVisibleSnapshot())
+                // Index is valid in all snapshots.
+                return entry;
+            return readTimestamp < *entry->getMinimumVisibleSnapshot() ? nullptr : entry;
+        }();
+
+        if (entry) {
+            preexistingIndexes.add(std::move(entry));
+            continue;
+        }
+    }
+
+    uassertStatusOK(
+        getIndexCatalog()->initFromExisting(opCtx, this, preexistingIndexes, readTimestamp));
+    _initialized = true;
+}
+
+void CollectionImpl::_initCommon(OperationContext* opCtx) {
+    invariant(!_initialized);
+
+    const auto& collectionOptions = _metadata->options;
     auto validatorDoc = collectionOptions.validator.getOwned();
 
     // Enforce that the validator can be used on this namespace.
-    uassertStatusOK(checkValidatorCanBeUsedOnNs(validatorDoc, ns(), _uuid));
+    uassertStatusOK(checkValidatorCanBeUsedOnNs(validatorDoc, _ns, _uuid));
 
     // Make sure validationAction and validationLevel are allowed on this collection
     uassertStatusOK(checkValidationOptionsCanBeUsed(
@@ -399,27 +496,6 @@ void CollectionImpl::init(OperationContext* opCtx) {
                               logAttrs(_ns),
                               "validatorStatus"_attr = _validator.getStatus());
     }
-
-    if (collectionOptions.clusteredIndex) {
-        if (collectionOptions.expireAfterSeconds) {
-            // If this collection has been newly created, we need to register with the TTL cache at
-            // commit time, otherwise it is startup and we can register immediately.
-            auto svcCtx = opCtx->getClient()->getServiceContext();
-            auto uuid = *collectionOptions.uuid;
-            if (opCtx->lockState()->inAWriteUnitOfWork()) {
-                opCtx->recoveryUnit()->onCommit([svcCtx, uuid](auto ts) {
-                    TTLCollectionCache::get(svcCtx).registerTTLInfo(
-                        uuid, TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}});
-                });
-            } else {
-                TTLCollectionCache::get(svcCtx).registerTTLInfo(
-                    uuid, TTLCollectionCache::Info{TTLCollectionCache::ClusteredId{}});
-            }
-        }
-    }
-
-    getIndexCatalog()->init(opCtx, this).transitional_ignore();
-    _initialized = true;
 }
 
 bool CollectionImpl::isInitialized() const {

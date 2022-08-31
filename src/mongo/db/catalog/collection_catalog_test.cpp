@@ -34,8 +34,11 @@
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/collection_mock.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -855,6 +858,515 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDbWithPredicate) {
 
         ASSERT_EQUALS(numCollectionsTraversed, 1);
     }
+}
+
+/**
+ * RAII type for operating at a timestamp. Will remove any timestamping when the object destructs.
+ */
+class OneOffRead {
+public:
+    OneOffRead(OperationContext* opCtx, const Timestamp& ts) : _opCtx(opCtx) {
+        _opCtx->recoveryUnit()->abandonSnapshot();
+        if (ts.isNull()) {
+            _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+        } else {
+            _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, ts);
+        }
+    }
+
+    ~OneOffRead() {
+        _opCtx->recoveryUnit()->abandonSnapshot();
+        _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+    }
+
+private:
+    OperationContext* _opCtx;
+};
+
+class CollectionCatalogTimestampTest : public ServiceContextMongoDTest {
+public:
+    // Disable table logging. When table logging is enabled, timestamps are discarded by WiredTiger.
+    CollectionCatalogTimestampTest()
+        : ServiceContextMongoDTest(Options{}.forceDisableTableLogging()) {}
+
+    void setUp() override {
+        ServiceContextMongoDTest::setUp();
+        opCtx = makeOperationContext();
+    }
+
+    void createCollection(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          Timestamp timestamp) {
+        opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+        opCtx->recoveryUnit()->abandonSnapshot();
+
+        if (!opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
+            opCtx->recoveryUnit()->clearCommitTimestamp();
+        }
+        opCtx->recoveryUnit()->setCommitTimestamp(timestamp);
+
+        AutoGetDb databaseWriteGuard(opCtx, nss.dbName(), MODE_IX);
+        auto db = databaseWriteGuard.ensureDbExists(opCtx);
+        ASSERT(db);
+
+        Lock::CollectionLock lk(opCtx, nss, MODE_IX);
+
+        WriteUnitOfWork wuow(opCtx);
+        CollectionOptions options;
+        options.uuid.emplace(UUID::gen());
+
+        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        std::pair<RecordId, std::unique_ptr<RecordStore>> catalogIdRecordStorePair =
+            uassertStatusOK(storageEngine->getCatalog()->createCollection(
+                opCtx, nss, options, /*allocateDefaultSpace=*/true));
+        auto& catalogId = catalogIdRecordStorePair.first;
+        std::shared_ptr<Collection> ownedCollection = Collection::Factory::get(opCtx)->make(
+            opCtx, nss, catalogId, options, std::move(catalogIdRecordStorePair.second));
+        ownedCollection->init(opCtx);
+        ownedCollection->setCommitted(false);
+
+        CollectionCatalog::get(opCtx)->onCreateCollection(opCtx, std::move(ownedCollection));
+
+        wuow.commit();
+    }
+
+    void dropCollection(OperationContext* opCtx, const NamespaceString& nss, Timestamp timestamp) {
+        opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+        opCtx->recoveryUnit()->abandonSnapshot();
+
+        if (!opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
+            opCtx->recoveryUnit()->clearCommitTimestamp();
+        }
+        opCtx->recoveryUnit()->setCommitTimestamp(timestamp);
+
+        Lock::DBLock dbLk(opCtx, nss.db(), MODE_IX);
+        Lock::CollectionLock collLk(opCtx, nss, MODE_X);
+        CollectionWriter collection(opCtx, nss);
+
+        WriteUnitOfWork wuow(opCtx);
+        CollectionCatalog::get(opCtx)->dropCollection(
+            opCtx, collection.getWritableCollection(opCtx), /*isDropPending=*/true);
+        wuow.commit();
+    }
+
+    void createIndex(OperationContext* opCtx,
+                     const NamespaceString& nss,
+                     BSONObj indexSpec,
+                     Timestamp timestamp) {
+        opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+        opCtx->recoveryUnit()->abandonSnapshot();
+
+        if (!opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
+            opCtx->recoveryUnit()->clearCommitTimestamp();
+        }
+        opCtx->recoveryUnit()->setCommitTimestamp(timestamp);
+
+        AutoGetCollection autoColl(opCtx, nss, MODE_X);
+
+        WriteUnitOfWork wuow(opCtx);
+        CollectionWriter collection(opCtx, nss);
+
+        IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
+            opCtx, collection, {indexSpec}, /*fromMigrate=*/false);
+
+        wuow.commit();
+    }
+
+    void dropIndex(OperationContext* opCtx,
+                   const NamespaceString& nss,
+                   const std::string& indexName,
+                   Timestamp timestamp) {
+        opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
+        opCtx->recoveryUnit()->abandonSnapshot();
+
+        if (!opCtx->recoveryUnit()->getCommitTimestamp().isNull()) {
+            opCtx->recoveryUnit()->clearCommitTimestamp();
+        }
+        opCtx->recoveryUnit()->setCommitTimestamp(timestamp);
+
+        AutoGetCollection autoColl(opCtx, nss, MODE_X);
+
+        WriteUnitOfWork wuow(opCtx);
+        CollectionWriter collection(opCtx, nss);
+
+        Collection* writableCollection = collection.getWritableCollection(opCtx);
+
+        IndexCatalog* indexCatalog = writableCollection->getIndexCatalog();
+        auto indexDescriptor =
+            indexCatalog->findIndexByName(opCtx, indexName, IndexCatalog::InclusionPolicy::kReady);
+        ASSERT_OK(indexCatalog->dropIndex(opCtx, writableCollection, indexDescriptor));
+
+        wuow.commit();
+    }
+
+    DurableCatalog::Entry getEntry(OperationContext* opCtx, const NamespaceString& nss) {
+        AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_IS);
+        auto durableCatalog = DurableCatalog::get(opCtx);
+        return durableCatalog->getEntry(autoColl->getCatalogId());
+    }
+
+    std::shared_ptr<Collection> openCollection(OperationContext* opCtx,
+                                               const DurableCatalog::Entry& entry,
+                                               Timestamp readTimestamp) {
+        Lock::GlobalLock globalLock(opCtx, MODE_IS);
+        auto coll = CollectionCatalog::get(opCtx)->openCollection(opCtx, entry, readTimestamp);
+        ASSERT(coll);
+        return coll;
+    }
+
+protected:
+    ServiceContext::UniqueOperationContext opCtx;
+};
+
+TEST_F(CollectionCatalogTimestampTest, MinimumValidSnapshot) {
+    const NamespaceString nss("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createXIndexTs = Timestamp(20, 20);
+    const Timestamp createYIndexTs = Timestamp(30, 30);
+    const Timestamp dropIndexTs = Timestamp(40, 40);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createXIndexTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "y_1"
+                         << "key" << BSON("y" << 1)),
+                createYIndexTs);
+
+    auto coll = CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss);
+    ASSERT(coll);
+    ASSERT_EQ(coll->getMinimumVisibleSnapshot(), createCollectionTs);
+    ASSERT_EQ(coll->getMinimumValidSnapshot(), createYIndexTs);
+
+    const IndexDescriptor* desc = coll->getIndexCatalog()->findIndexByName(opCtx.get(), "x_1");
+    const IndexCatalogEntry* entry = coll->getIndexCatalog()->getEntry(desc);
+    ASSERT_EQ(entry->getMinimumVisibleSnapshot(), createXIndexTs);
+
+    desc = coll->getIndexCatalog()->findIndexByName(opCtx.get(), "y_1");
+    entry = coll->getIndexCatalog()->getEntry(desc);
+    ASSERT_EQ(entry->getMinimumVisibleSnapshot(), createYIndexTs);
+
+    dropIndex(opCtx.get(), nss, "x_1", dropIndexTs);
+    dropIndex(opCtx.get(), nss, "y_1", dropIndexTs);
+
+    // Fetch the latest collection instance without the indexes.
+    coll = CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss);
+    ASSERT(coll);
+    ASSERT_EQ(coll->getMinimumVisibleSnapshot(), createCollectionTs);
+    ASSERT_EQ(coll->getMinimumValidSnapshot(), dropIndexTs);
+}
+
+TEST_F(CollectionCatalogTimestampTest, OpenCollectionBeforeCreateTimestamp) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString nss("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    DurableCatalog::Entry entry = getEntry(opCtx.get(), nss);
+
+    // Try to open the collection before it was created.
+    const Timestamp readTimestamp(5, 5);
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+    OneOffRead oor(opCtx.get(), readTimestamp);
+    auto coll =
+        CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), entry, readTimestamp);
+    ASSERT(!coll);
+}
+
+TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollection) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString nss("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createIndexTs = Timestamp(20, 20);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createIndexTs);
+
+    DurableCatalog::Entry entry = getEntry(opCtx.get(), nss);
+
+    // Open an instance of the collection before the index was created.
+    const Timestamp readTimestamp(15, 15);
+    OneOffRead oor(opCtx.get(), readTimestamp);
+    std::shared_ptr<Collection> coll = openCollection(opCtx.get(), entry, readTimestamp);
+    ASSERT(coll);
+    ASSERT_EQ(0, coll->getIndexCatalog()->numIndexesTotal(opCtx.get()));
+
+    // Verify that the CollectionCatalog returns the latest collection with the index present.
+    auto latestColl = CollectionCatalog::get(opCtx.get())
+                          ->lookupCollectionByNamespaceForRead(opCtx.get(), entry.nss);
+    ASSERT(latestColl);
+    ASSERT_EQ(1, latestColl->getIndexCatalog()->numIndexesTotal(opCtx.get()));
+
+    // Ensure the idents are shared between the collection instances.
+    ASSERT_NE(coll, latestColl);
+    ASSERT_EQ(coll->getSharedIdent(), latestColl->getSharedIdent());
+}
+
+TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollectionWithIndex) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString nss("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createXIndexTs = Timestamp(20, 20);
+    const Timestamp createYIndexTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createXIndexTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "y_1"
+                         << "key" << BSON("y" << 1)),
+                createYIndexTs);
+
+    DurableCatalog::Entry entry = getEntry(opCtx.get(), nss);
+
+    // Open an instance of the collection when only one of the two indexes were present.
+    const Timestamp readTimestamp(25, 25);
+    OneOffRead oor(opCtx.get(), readTimestamp);
+    std::shared_ptr<Collection> coll = openCollection(opCtx.get(), entry, readTimestamp);
+    ASSERT(coll);
+    ASSERT_EQ(1, coll->getIndexCatalog()->numIndexesTotal(opCtx.get()));
+
+    // Verify that the CollectionCatalog returns the latest collection.
+    auto latestColl = CollectionCatalog::get(opCtx.get())
+                          ->lookupCollectionByNamespaceForRead(opCtx.get(), entry.nss);
+    ASSERT(latestColl);
+    ASSERT_EQ(2, latestColl->getIndexCatalog()->numIndexesTotal(opCtx.get()));
+
+    // Ensure the idents are shared between the collection and index instances.
+    ASSERT_NE(coll, latestColl);
+    ASSERT_EQ(coll->getSharedIdent(), latestColl->getSharedIdent());
+
+    auto indexDescPast = coll->getIndexCatalog()->findIndexByName(opCtx.get(), "x_1");
+    auto indexDescLatest = latestColl->getIndexCatalog()->findIndexByName(opCtx.get(), "x_1");
+    ASSERT_BSONOBJ_EQ(indexDescPast->infoObj(), indexDescLatest->infoObj());
+    ASSERT_EQ(coll->getIndexCatalog()->getEntryShared(indexDescPast),
+              latestColl->getIndexCatalog()->getEntryShared(indexDescLatest));
+}
+
+TEST_F(CollectionCatalogTimestampTest, OpenLatestCollectionWithIndex) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString nss("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createXIndexTs = Timestamp(20, 20);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createXIndexTs);
+
+    DurableCatalog::Entry entry = getEntry(opCtx.get(), nss);
+
+    // Setting the read timestamp to the last DDL operation on the collection returns the latest
+    // collection.
+    const Timestamp readTimestamp(20, 20);
+    OneOffRead oor(opCtx.get(), readTimestamp);
+    std::shared_ptr<Collection> coll = openCollection(opCtx.get(), entry, readTimestamp);
+    ASSERT(coll);
+
+    // Verify that the CollectionCatalog returns the latest collection.
+    auto currentColl = CollectionCatalog::get(opCtx.get())
+                           ->lookupCollectionByNamespaceForRead(opCtx.get(), entry.nss);
+    ASSERT_EQ(coll, currentColl);
+
+    // Ensure the idents are shared between the collection and index instances.
+    ASSERT_EQ(coll->getSharedIdent(), currentColl->getSharedIdent());
+
+    auto indexDesc = coll->getIndexCatalog()->findIndexByName(opCtx.get(), "x_1");
+    auto indexDescCurrent = currentColl->getIndexCatalog()->findIndexByName(opCtx.get(), "x_1");
+    ASSERT_BSONOBJ_EQ(indexDesc->infoObj(), indexDescCurrent->infoObj());
+    ASSERT_EQ(coll->getIndexCatalog()->getEntryShared(indexDesc),
+              currentColl->getIndexCatalog()->getEntryShared(indexDescCurrent));
+}
+
+TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollectionWithDropPendingIndex) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString nss("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createIndexTs = Timestamp(20, 20);
+    const Timestamp dropIndexTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createIndexTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "y_1"
+                         << "key" << BSON("y" << 1)),
+                createIndexTs);
+
+    DurableCatalog::Entry entry = getEntry(opCtx.get(), nss);
+
+    // Maintain a shared_ptr to "x_1", so it's not expired in drop pending map, but not for "y_1".
+    std::shared_ptr<const IndexCatalogEntry> index;
+    {
+        auto latestColl = CollectionCatalog::get(opCtx.get())
+                              ->lookupCollectionByNamespaceForRead(opCtx.get(), entry.nss);
+        auto desc = latestColl->getIndexCatalog()->findIndexByName(opCtx.get(), "x_1");
+        index = latestColl->getIndexCatalog()->getEntryShared(desc);
+    }
+
+    dropIndex(opCtx.get(), nss, "x_1", dropIndexTs);
+    dropIndex(opCtx.get(), nss, "y_1", dropIndexTs);
+
+    // Open the collection while both indexes were present.
+    const Timestamp readTimestamp(20, 20);
+    OneOffRead oor(opCtx.get(), readTimestamp);
+    std::shared_ptr<Collection> coll = openCollection(opCtx.get(), entry, readTimestamp);
+    ASSERT(coll);
+
+    // Collection is not shared from the latest instance.
+    auto latestColl = CollectionCatalog::get(opCtx.get())
+                          ->lookupCollectionByNamespaceForRead(opCtx.get(), entry.nss);
+    ASSERT_NE(coll, latestColl);
+
+    auto indexDescX = coll->getIndexCatalog()->findIndexByName(opCtx.get(), "x_1");
+    auto indexDescY = coll->getIndexCatalog()->findIndexByName(opCtx.get(), "y_1");
+
+    auto indexEntryX = coll->getIndexCatalog()->getEntryShared(indexDescX);
+    auto indexEntryY = coll->getIndexCatalog()->getEntryShared(indexDescY);
+
+    // Check use_count(). 2 in the unit test, 1 in the opened collection.
+    ASSERT_EQ(3, indexEntryX.use_count());
+
+    // Check use_count(). 1 in the unit test, 1 in the opened collection.
+    ASSERT_EQ(2, indexEntryY.use_count());
+
+    // Verify that "x_1" was retrieved from the drop pending map for the opened collection.
+    ASSERT_EQ(index, indexEntryX);
+}
+
+TEST_F(CollectionCatalogTimestampTest, OpenEarlierAlreadyDropPendingCollection) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString firstNss("a.b");
+    const NamespaceString secondNss("c.d");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp dropCollectionTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), firstNss, createCollectionTs);
+    createCollection(opCtx.get(), secondNss, createCollectionTs);
+
+    DurableCatalog::Entry firstEntry = getEntry(opCtx.get(), firstNss);
+    DurableCatalog::Entry secondEntry = getEntry(opCtx.get(), secondNss);
+
+    // Maintain a shared_ptr to "a.b" so that it isn't expired in the drop pending map after we drop
+    // the collections.
+    std::shared_ptr<const Collection> coll =
+        CollectionCatalog::get(opCtx.get())
+            ->lookupCollectionByNamespaceForRead(opCtx.get(), firstNss);
+    ASSERT(coll);
+
+    // Make the collections drop pending.
+    dropCollection(opCtx.get(), firstNss, dropCollectionTs);
+    dropCollection(opCtx.get(), secondNss, dropCollectionTs);
+
+    // Set the read timestamp to be before the drop timestamp.
+    const Timestamp readTimestamp(20, 20);
+    OneOffRead oor(opCtx.get(), readTimestamp);
+
+    {
+        // Open "a.b", which is not expired in the drop pending map.
+        std::shared_ptr<Collection> openedColl =
+            openCollection(opCtx.get(), firstEntry, readTimestamp);
+        ASSERT(openedColl);
+        ASSERT_EQ(coll, openedColl);
+
+        // Check use_count(). 2 in the unit test.
+        ASSERT_EQ(2, openedColl.use_count());
+    }
+
+    {
+        // Open "c.d" which is expired in the drop pending map.
+        std::shared_ptr<Collection> openedColl =
+            openCollection(opCtx.get(), secondEntry, readTimestamp);
+        ASSERT(openedColl);
+        ASSERT_NE(coll, openedColl);
+
+        // Check use_count(). 1 in the unit test.
+        ASSERT_EQ(1, openedColl.use_count());
+    }
+}
+
+TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionUsingDropPendingCollectionSharedState) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString nss("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createIndexTs = Timestamp(20, 20);
+    const Timestamp dropCollectionTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createIndexTs);
+
+    DurableCatalog::Entry entry = getEntry(opCtx.get(), nss);
+
+    // Maintain a shared_ptr to "a.b" so that it isn't expired in the drop pending map after we drop
+    // it.
+    std::shared_ptr<const Collection> coll =
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespaceForRead(opCtx.get(), nss);
+    ASSERT(coll);
+    ASSERT_EQ(*coll->getMinimumValidSnapshot(), createIndexTs);
+
+    // Make the collection drop pending.
+    dropCollection(opCtx.get(), nss, dropCollectionTs);
+
+    // Open the collection before the index was created. The drop pending collection is incompatible
+    // as it has an index entry. But we can still use the drop pending collections shared state to
+    // instantiate a new collection.
+    const Timestamp readTimestamp(10, 10);
+    OneOffRead oor(opCtx.get(), readTimestamp);
+
+    std::shared_ptr<Collection> openedColl = openCollection(opCtx.get(), entry, readTimestamp);
+    ASSERT(openedColl);
+    ASSERT_NE(coll, openedColl);
+
+    // Check use_count(). 1 in the unit test.
+    ASSERT_EQ(1, openedColl.use_count());
+
+    // Ensure the idents are shared between the opened collection and the drop pending collection.
+    ASSERT_EQ(coll->getSharedIdent(), openedColl->getSharedIdent());
 }
 
 }  // namespace
