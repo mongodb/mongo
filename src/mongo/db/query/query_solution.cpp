@@ -630,8 +630,8 @@ std::unique_ptr<QuerySolutionNode> FetchNode::clone() const {
 // IndexScanNode
 //
 
-IndexScanNode::IndexScanNode(IndexEntry index)
-    : index(std::move(index)),
+IndexScanNode::IndexScanNode(IndexEntry indexEntry)
+    : index(std::move(indexEntry)),
       direction(1),
       addKeyMetadata(false),
       shouldDedup(index.multikey),
