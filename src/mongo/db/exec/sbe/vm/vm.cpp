@@ -3839,11 +3839,28 @@ std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexCompile(Ar
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexMatch(ArityType arity) {
     invariant(arity == 2);
-    auto [ownedPcreRegex, typeTagPcreRegex, valuePcreRegex] = getFromStack(0);
-    auto [ownedInputStr, typeTagInputStr, valueInputStr] = getFromStack(1);
+    auto [ownedPcreRegex, tagPcreRegex, valPcreRegex] = getFromStack(0);
+    auto [ownedInputStr, tagInputStr, valInputStr] = getFromStack(1);
 
-    return genericPcreRegexSingleMatch(
-        typeTagPcreRegex, valuePcreRegex, typeTagInputStr, valueInputStr, true);
+    if (value::isArray(tagPcreRegex)) {
+        for (value::ArrayEnumerator ae(tagPcreRegex, valPcreRegex); !ae.atEnd(); ae.advance()) {
+            auto [elemTag, elemVal] = ae.getViewOfValue();
+            auto [ownedResult, tagResult, valResult] =
+                genericPcreRegexSingleMatch(elemTag, elemVal, tagInputStr, valInputStr, true);
+
+            if (tagResult == value::TypeTags::Boolean && value::bitcastTo<bool>(valResult)) {
+                return {ownedResult, tagResult, valResult};
+            }
+
+            if (ownedResult) {
+                value::releaseValue(tagResult, valResult);
+            }
+        }
+
+        return {false, value::TypeTags::Boolean, value::bitcastFrom<bool>(false)};
+    }
+
+    return genericPcreRegexSingleMatch(tagPcreRegex, valPcreRegex, tagInputStr, valInputStr, true);
 }
 
 std::tuple<bool, value::TypeTags, value::Value> ByteCode::builtinRegexFind(ArityType arity) {

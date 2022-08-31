@@ -1383,37 +1383,32 @@ public:
     void visit(const GeoNearMatchExpression* expr) final {}
 
     void visit(const InMatchExpression* expr) final {
-        // If there's an "inputParamId" in this expr meaning this expr got parameterized, we can
-        // register a SlotId for it and use the slot directly. Note that we don't auto-parameterize
-        // $in if it contains null, regexes, or nested arrays.
-        if (auto inputParam = expr->getInputParamId()) {
-            auto inputParamSlotId =
-                _context->state.registerInputParamSlot(*expr->getInputParamId());
-            auto makePredicateExpr =
-                [&](const sbe::EVariable& var) -> std::unique_ptr<sbe::EExpression> {
-                return makeIsMember(
-                    var.clone(), makeVariable(inputParamSlotId), _context->state.data->env);
-            };
+        bool exprIsParameterized = static_cast<bool>(expr->getInputParamId());
 
-            generatePredicateExpr(_context,
-                                  expr->fieldRef(),
-                                  makePredicateExpr,
-                                  LeafTraversalMode::kArrayElementsOnly);
-            return;
-        }
+        auto [equalities, hasArray, hasNull] = [&] {
+            // If there's an "inputParamId" in this expr meaning this expr got parameterized, we can
+            // register a SlotId for it and use the slot directly. Note we don't auto-parameterize
+            // $in if it contains null, regexes, or nested arrays.
+            if (exprIsParameterized) {
+                auto equalities =
+                    makeVariable(_context->state.registerInputParamSlot(*expr->getInputParamId()));
+                return std::make_tuple(std::move(equalities), false, false);
+            }
 
-        auto&& [arrSetTag, arrSetVal, hasArray, hasNull] = convertInExpressionEqualities(expr);
-        sbe::value::ValueGuard arrSetGuard{arrSetTag, arrSetVal};
+            auto&& [arrSetTag, arrSetVal, hasArray, hasNull] = convertInExpressionEqualities(expr);
+            sbe::value::ValueGuard arrSetGuard{arrSetTag, arrSetVal};
+            auto equalities = sbe::makeE<sbe::EConstant>(arrSetTag, arrSetVal);
+            arrSetGuard.reset();
+            return std::make_tuple(std::move(equalities), hasArray, hasNull);
+        }();
+
+        auto equalitiesExpr = std::move(equalities);
 
         const auto traversalMode = hasArray ? LeafTraversalMode::kArrayAndItsElements
                                             : LeafTraversalMode::kArrayElementsOnly;
 
-        // If the InMatchExpression doesn't carry any regex patterns, we can just check if the value
-        // in bound to the inputSlot is a member of the equalities set.
-        if (expr->getRegexes().size() == 0) {
-            auto makePredicateExpr =
-                [&, arrSetTag = arrSetTag, arrSetVal = arrSetVal, hasNull = hasNull](
-                    const sbe::EVariable& var) -> std::unique_ptr<sbe::EExpression> {
+        if (exprIsParameterized || expr->getRegexes().size() == 0) {
+            auto makePredicateExpr = [&, hasNull = hasNull](const sbe::EVariable& var) {
                 // We have to match nulls and undefined if a 'null' is present in
                 // equalities.
                 auto inputExpr = !hasNull
@@ -1422,145 +1417,78 @@ public:
                                            makeConstant(sbe::value::TypeTags::Null, 0),
                                            var.clone());
 
-                arrSetGuard.reset();
-                return makeIsMember(std::move(inputExpr),
-                                    sbe::makeE<sbe::EConstant>(arrSetTag, arrSetVal),
-                                    _context->state.data->env);
+                return makeIsMember(
+                    std::move(inputExpr), std::move(equalitiesExpr), _context->state.data->env);
             };
 
             generatePredicateExpr(
                 _context, expr->fieldRef(), makePredicateExpr, traversalMode, true, hasNull);
             return;
-        } else {
-            // If the InMatchExpression contains regex patterns, then we need to handle a regex-only
-            // case and a case where both equalities and regexes are present. The regex-only case is
-            // handled by building a traversal stage to traverse the array of regexes and call the
-            // 'regexMatch' built-in to check if the field being traversed has a value that matches
-            // a regex. We also call 'isMember' to determine whether any of the values are equal
-            // to any of the regexes. The combined case uses a short-circuiting limit-1/union OR
-            // stage to first exhaust the equalities 'isMember' check, and then if no match is found
-            // it executes the regex-only traversal stage.
-            auto& regexes = expr->getRegexes();
-            auto& equalities = expr->getEqualities();
+        }
 
-            auto [pcreArrTag, pcreArrVal] = sbe::value::makeNewArray();
-            sbe::value::ValueGuard pcreArrGuard{pcreArrTag, pcreArrVal};
-            auto pcreArr = sbe::value::getArrayView(pcreArrVal);
+        // If the InMatchExpression contains regex patterns, then we need to handle the regex-only
+        // case, and we also must handle the case where both equalities and regexes are present. For
+        // the regex-only case, we call regexMatch() to see if any of the values match against any
+        // of the regexes, and we also call isMember() to see if any of the values are of type
+        // 'bsonRegex' and are considered equal to any of the regexes. For the case where both
+        // regexes and equalities are present, we use the "logicOr" operator to combine the logic
+        // for equalities with the logic for regexes.
+        auto [pcreArrTag, pcreArrVal] = sbe::value::makeNewArray();
+        sbe::value::ValueGuard pcreArrGuard{pcreArrTag, pcreArrVal};
+        auto pcreArr = sbe::value::getArrayView(pcreArrVal);
 
-            auto [bsonRegexArrSetTag, bsonRegexArrSetVal] = sbe::value::makeNewArraySet();
-            sbe::value::ValueGuard bsonRegexArrSetGuard{bsonRegexArrSetTag, bsonRegexArrSetVal};
-            auto bsonRegexArrSet = sbe::value::getArraySetView(bsonRegexArrSetVal);
+        auto [regexSetTag, regexSetVal] = sbe::value::makeNewArraySet();
+        sbe::value::ValueGuard regexArrSetGuard{regexSetTag, regexSetVal};
+        auto regexArrSet = sbe::value::getArraySetView(regexSetVal);
 
-            if (regexes.size()) {
-                pcreArr->reserve(regexes.size());
+        if (auto& regexes = expr->getRegexes(); regexes.size() > 0) {
+            pcreArr->reserve(regexes.size());
 
-                for (auto&& r : regexes) {
-                    auto [pcreRegexTag, pcreRegexVal] =
-                        sbe::value::makeNewPcreRegex(r->getString(), r->getFlags());
-                    pcreArr->push_back(pcreRegexTag, pcreRegexVal);
+            for (auto&& r : regexes) {
+                auto [pcreRegexTag, pcreRegexVal] =
+                    sbe::value::makeNewPcreRegex(r->getString(), r->getFlags());
+                pcreArr->push_back(pcreRegexTag, pcreRegexVal);
 
-                    auto [bsonRegexTag, bsonRegexVal] =
-                        sbe::value::makeNewBsonRegex(r->getString(), r->getFlags());
-                    bsonRegexArrSet->push_back(bsonRegexTag, bsonRegexVal);
-                }
+                auto [regexSetTag, regexSetVal] =
+                    sbe::value::makeNewBsonRegex(r->getString(), r->getFlags());
+                regexArrSet->push_back(regexSetTag, regexSetVal);
+            }
+        }
+
+        auto pcreRegexesConstant = sbe::makeE<sbe::EConstant>(pcreArrTag, pcreArrVal);
+        pcreArrGuard.reset();
+
+        auto regexSetConstant = sbe::makeE<sbe::EConstant>(regexSetTag, regexSetVal);
+        regexArrSetGuard.reset();
+
+        auto makePredicateExpr = [&, hasNull = hasNull](const sbe::EVariable& var) {
+            auto resultExpr = makeBinaryOp(
+                sbe::EPrimBinary::logicOr,
+                makeFillEmptyFalse(
+                    makeFunction("isMember", var.clone(), std::move(regexSetConstant))),
+                makeFillEmptyFalse(
+                    makeFunction("regexMatch", std::move(pcreRegexesConstant), var.clone())));
+
+            if (expr->getEqualities().size() > 0) {
+                // We have to match nulls and undefined if a 'null' is present in equalities.
+                auto inputExpr = !hasNull
+                    ? var.clone()
+                    : sbe::makeE<sbe::EIf>(generateNullOrMissing(var),
+                                           makeConstant(sbe::value::TypeTags::Null, 0),
+                                           var.clone());
+
+                resultExpr = makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                          makeIsMember(std::move(inputExpr),
+                                                       std::move(equalitiesExpr),
+                                                       _context->state.data->env),
+                                          std::move(resultExpr));
             }
 
-            auto makePredicate = [&,
-                                  arrSetTag = arrSetTag,
-                                  arrSetVal = arrSetVal,
-                                  pcreRegexArrTag = pcreArrTag,
-                                  pcreRegexArrVal = pcreArrVal,
-                                  regexArrTag = bsonRegexArrSetTag,
-                                  regexArrVal = bsonRegexArrSetVal,
-                                  hasNull = hasNull](sbe::value::SlotId inputSlot,
-                                                     EvalStage inputStage) -> EvalExprStagePair {
-                auto regexArraySlot{_context->state.slotId()};
-                auto bsonRegexArraySetSlot{_context->state.slotId()};
-                auto regexInputSlot{_context->state.slotId()};
-                auto regexOutputSlot{_context->state.slotId()};
+            return resultExpr;
+        };
 
-                // Build a traverse stage that traverses the query regex pattern array. Here the
-                // FROM branch binds an array constant carrying the regex patterns to a slot. Then
-                // the inner branch executes 'regexMatch' once per regex.
-                auto [regexTag, regexVal] = sbe::value::copyValue(pcreRegexArrTag, pcreRegexArrVal);
-                auto [bsonRegexTag, bsonRegexVal] = sbe::value::copyValue(regexArrTag, regexArrVal);
-
-                auto regexFromStage =
-                    makeProject(equalities.size() > 0 ? EvalStage{} : std::move(inputStage),
-                                _context->planNodeId,
-                                regexArraySlot,
-                                sbe::makeE<sbe::EConstant>(regexTag, regexVal),
-                                bsonRegexArraySetSlot,
-                                sbe::makeE<sbe::EConstant>(bsonRegexTag, bsonRegexVal));
-
-                auto regexInnerStage = makeProject(
-                    EvalStage{},
-                    _context->planNodeId,
-                    regexInputSlot,
-                    makeBinaryOp(
-                        sbe::EPrimBinary::logicOr,
-                        makeFillEmptyFalse(sbe::makeE<sbe::EFunction>(
-                            "regexMatch",
-                            sbe::makeEs(sbe::makeE<sbe::EVariable>(regexArraySlot),
-                                        sbe::makeE<sbe::EVariable>(inputSlot)))),
-                        makeFillEmptyFalse(sbe::makeE<sbe::EFunction>(
-                            "isMember",
-                            sbe::makeEs(sbe::makeE<sbe::EVariable>(inputSlot),
-                                        sbe::makeE<sbe::EVariable>(bsonRegexArraySetSlot))))));
-
-                auto regexStage =
-                    makeTraverse(std::move(regexFromStage),
-                                 std::move(regexInnerStage),
-                                 regexArraySlot,
-                                 regexOutputSlot,
-                                 regexInputSlot,
-                                 makeBinaryOp(sbe::EPrimBinary::logicOr,
-                                              sbe::makeE<sbe::EVariable>(regexOutputSlot),
-                                              sbe::makeE<sbe::EVariable>(regexInputSlot)),
-                                 sbe::makeE<sbe::EVariable>(regexOutputSlot),
-                                 _context->planNodeId,
-                                 0);
-
-                // If equalities are present in addition to regexes, build a limit-1/union
-                // short-circuiting OR between a filter stage that checks membership of the field
-                // being traversed in the equalities and the regex traverse stage
-                if (equalities.size() > 0) {
-                    std::vector<EvalExprStagePair> branches;
-
-                    // We have to match nulls and undefined if a 'null' is present in equalities.
-                    auto inputExpr = !hasNull
-                        ? makeVariable(inputSlot)
-                        : sbe::makeE<sbe::EIf>(generateNullOrMissing(sbe::EVariable(inputSlot)),
-                                               makeConstant(sbe::value::TypeTags::Null, 0),
-                                               makeVariable(inputSlot));
-
-                    arrSetGuard.reset();
-                    branches.emplace_back(
-                        makeIsMember(std::move(inputExpr),
-                                     sbe::makeE<sbe::EConstant>(arrSetTag, arrSetVal),
-                                     _context->state.data->env),
-                        EvalStage{});
-                    branches.emplace_back(regexOutputSlot, std::move(regexStage));
-
-                    auto [shortCircuitingExpr, shortCircuitingStage] =
-                        generateShortCircuitingLogicalOp(sbe::EPrimBinary::logicOr,
-                                                         std::move(branches),
-                                                         _context->planNodeId,
-                                                         _context->state.slotIdGenerator,
-                                                         BooleanStateHelper{});
-
-                    inputStage =
-                        makeLoopJoin(std::move(inputStage),  // NOLINT(bugprone-use-after-move)
-                                     std::move(shortCircuitingStage),
-                                     _context->planNodeId);
-
-                    return {std::move(shortCircuitingExpr), std::move(inputStage)};
-                }
-
-                return {regexOutputSlot, std::move(regexStage)};
-            };
-            generatePredicate(_context, expr->fieldRef(), makePredicate, traversalMode);
-        }
+        generatePredicateExpr(
+            _context, expr->fieldRef(), makePredicateExpr, traversalMode, true, hasNull);
     }
     // The following are no-ops. The internal expr comparison match expression are produced
     // internally by rewriting an $expr expression to an AND($expr, $_internalExpr[OP]), which can
