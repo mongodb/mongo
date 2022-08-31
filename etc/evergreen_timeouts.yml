@@ -35,6 +35,8 @@ overrides:
   enterprise-rhel-80-64-bit-dynamic-required:
   - task: replica_sets_large_txns_format
     exec_timeout: 120  # 2 hours.
+  - task: config_fuzzer_replica_sets_jscore_passthrough
+    exec_timeout: 150  # 2.5 hours.
 
   enterprise-rhel80-debug-tsan:
   - task: run_unittests
