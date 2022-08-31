@@ -39,16 +39,6 @@ var CollInfos = class {
         return infos.map(info => info.name);
     }
 
-    /**
-     * Get collInfo for non-capped collections.
-     *
-     * Don't call isCapped(), which calls listCollections.
-     */
-    getNonCappedCollNames() {
-        const infos = this.collInfosRes.filter(info => !info.options.capped);
-        return infos.map(info => info.name);
-    }
-
     hostAndNS(collName) {
         return `${this.conn.host}--${this.ns(collName)}`;
     }
@@ -330,25 +320,21 @@ var {DataConsistencyChecker} = (function() {
                 success = false;
             }
 
-            const nonCappedCollNames = sourceCollInfos.getNonCappedCollNames();
             let didIgnoreFailure = false;
-            // Only compare the dbhashes of non-capped collections because capped
-            // collections are not necessarily truncated at the same points between the source and
-            // syncing nodes.
-            nonCappedCollNames.forEach(collName => {
-                if (sourceDBHash.collections[collName] !== syncingDBHash.collections[collName]) {
+            sourceCollInfos.collInfosRes.forEach(coll => {
+                if (sourceDBHash.collections[coll.name] !== syncingDBHash.collections[coll.name]) {
                     prettyPrint(`the two nodes have a different hash for the collection ${dbName}.${
-                        collName}: ${dbHashesMsg}`);
+                        coll.name}: ${dbHashesMsg}`);
                     // Although rare, the 'config.image_collection' table can be inconsistent after
                     // an initial sync or after a restart (see SERVER-60048). Dump the collection
                     // diff anyways for more visibility as a sanity check.
                     this.dumpCollectionDiff(
-                        collectionPrinted, sourceCollInfos, syncingCollInfos, collName);
+                        collectionPrinted, sourceCollInfos, syncingCollInfos, coll.name);
                     const shouldIgnoreFailure =
-                        this.canIgnoreCollectionDiff(sourceCollInfos, syncingCollInfos, collName);
+                        this.canIgnoreCollectionDiff(sourceCollInfos, syncingCollInfos, coll.name);
                     if (shouldIgnoreFailure) {
                         prettyPrint(
-                            `Collection diff in ${dbName}.${collName} can be ignored: ${dbHashesMsg}
+                            `Collection diff in ${dbName}.${coll.name} can be ignored: ${dbHashesMsg}
                             . Inconsistencies in the image collection can be expected in certain
                             restart scenarios.`);
                     }
@@ -507,23 +493,19 @@ var {DataConsistencyChecker} = (function() {
                 success = false;
             });
 
-            if (nonCappedCollNames.length === sourceCollections.length) {
-                // If the two nodes have the same hashes for all the
-                // collections in the database and there aren't any capped collections,
-                // then the hashes for the whole database should match.
-                if (sourceDBHash.md5 !== syncingDBHash.md5) {
-                    prettyPrint(`the two nodes have a different hash for the ${dbName} database: ${
-                        dbHashesMsg}`);
-                    if (didIgnoreFailure) {
-                        // We only expect database hash mismatches on the config db, where
-                        // config.image_collection is expected to have inconsistencies in certain
-                        // scenarios.
-                        prettyPrint(`Ignoring hash mismatch for the ${dbName} database since
-                            inconsistencies in 'config.image_collection' can be expected`);
-                        return success;
-                    }
-                    success = false;
+            // The hashes for the whole database should match.
+            if (sourceDBHash.md5 !== syncingDBHash.md5) {
+                prettyPrint(`the two nodes have a different hash for the ${dbName} database: ${
+                    dbHashesMsg}`);
+                if (didIgnoreFailure) {
+                    // We only expect database hash mismatches on the config db, where
+                    // config.image_collection is expected to have inconsistencies in certain
+                    // scenarios.
+                    prettyPrint(`Ignoring hash mismatch for the ${dbName} database since
+                        inconsistencies in 'config.image_collection' can be expected`);
+                    return success;
                 }
+                success = false;
             }
 
             return success;
