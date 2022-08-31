@@ -36,7 +36,7 @@ bool fieldsMatch(const BSONObj& lhs, const BSONObj& rhs) {
     BSONObjIterator r(rhs);
 
     while (l.more() && r.more()) {
-        if (strcmp(l.next().fieldName(), r.next().fieldName())) {
+        if (strcmp(l.next().fieldName(), r.next().fieldName()) != 0) {
             return false;
         }
     }
