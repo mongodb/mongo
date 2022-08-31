@@ -1003,14 +1003,29 @@ Future<OCSPFetchResponse> dispatchOCSPRequests(SSL_CTX* context,
                                                        std::move(pf.promise),
                                                        std::move(intermediateCerts),
                                                        std::move(ocspContext));
-
+    auto startTimer = std::make_shared<Timer>();
     for (size_t i = 0; i < futureResponses.size(); i++) {
         auto futureResponse = std::move(futureResponses[i]);
         auto requestedCertIDs = requestedCertIDSets[i];
 
         std::move(futureResponse)
-            .getAsync([context, ca, state, requestedCertIDs](
+            .getAsync([context, ca, state, requestedCertIDs, startTimer, purpose](
                           StatusWith<UniqueOCSPResponse> swResponse) mutable {
+                auto requestLatency = startTimer->millis();
+                // We use a scope guard because we only want to log the metrics once we have come to
+                // a resolution on the status of the connection. This happens on the event of:
+                // 1. The first OCSP response that we get that indicates the certificate is valid or
+                //    has been revoked.
+                // 2. The last OCSP response returns and the status of the certificate is still
+                //    unknown.
+                ScopeGuard logLatencyGuard([requestLatency, purpose]() {
+                    if (purpose != OCSPPurpose::kClientVerify) {
+                        return;
+                    }
+                    LOGV2_INFO(6840101,
+                               "Completed client-side verification of OCSP request",
+                               "verificationTimeMillis"_attr = requestLatency);
+                });
                 if (!swResponse.isOK()) {
                     if (state->finishLine.arriveWeakly()) {
                         state->promise.setError(
@@ -1056,6 +1071,9 @@ Future<OCSPFetchResponse> dispatchOCSPRequests(SSL_CTX* context,
                         return;
                     }
                 }
+                // Don't log any metrics if we haven't come to a decision on the validity of the
+                // certificate yet.
+                logLatencyGuard.dismiss();
             });
     }
 
