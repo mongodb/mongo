@@ -73,6 +73,8 @@ let connDelayFailPoint = configureFailPoint(
     st.s, 'transportLayerASIOdelayConnection', {millis: kConnectionEstablishmentDelayMillis});
 assert.commandWorked(st.s.adminCommand(
     {setParameter: 1, slowConnectionThresholdMillis: kConnectionEstablishmentDelayMillis}));
+assert.commandWorked(
+    st.s.adminCommand({dropConnections: 1, hostAndPort: [st.rs0.getPrimary().host]}));
 
 jsTestLog("Running the query.");
 
