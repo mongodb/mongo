@@ -7,10 +7,7 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/serverless/libs/basic_serverless_test.js");
 
-const failpoints = [
-    "pauseShardSplitBeforeSendingStepUpToRecipients",
-    "pauseShardSplitAfterUpdatingToCommittedState"
-];
+const failpoints = ["pauseShardSplitAfterUpdatingToCommittedState"];
 
 function testAbortAfterSplitIsAppliedStillsCommits(failpoint) {
     "use strict";
