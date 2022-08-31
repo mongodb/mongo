@@ -30,7 +30,13 @@ assert.eq(100, testColl.find().itcount());
 
 assert.commandWorked(testColl.runCommand({collMod: "foo", validator: {name: {$type: "int"}}}));
 
-let failpoint = configureFailPoint(st.shard1, "migrateThreadHangAtStep4");
+let failPointName = "migrateThreadHangAtStep4";
+if (MongoRunner.areBinVersionsTheSame("4.2", st.shard1.rs.getPrimary().fullOptions.binVersion)) {
+    // Due to the absence of the "rangeDeletionTaskScheduled" migration step in version 4.2
+    failPointName = "migrateThreadHangAtStep3";
+}
+
+let failpoint = configureFailPoint(st.shard1, failPointName);
 
 const awaitResult = startParallelShell(
     funWithArgs(function(ns, toShardName) {
