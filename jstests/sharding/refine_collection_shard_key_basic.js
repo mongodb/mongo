@@ -1,6 +1,8 @@
 //
 // Basic tests for refineCollectionShardKey.
 //
+// Disabled in multiversion, see SERVER-69290 for more details.
+// @tags: [multiversion_incompatible]
 
 (function() {
 'use strict';
