@@ -53,5 +53,5 @@ EvalExprStagePair generateExpression(StageBuilderState& state,
  * can be of any type to a Boolean value based on MQL's definition of truth for the branch of any
  * logical expression.
  */
-std::unique_ptr<sbe::EExpression> generateCoerceToBoolExpression(sbe::EVariable branchRef);
+std::unique_ptr<sbe::EExpression> generateCoerceToBoolExpression(const sbe::EVariable& branchRef);
 }  // namespace mongo::stage_builder

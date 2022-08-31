@@ -850,40 +850,27 @@ public:
         visitMultiBranchLogicExpression(expr, sbe::EPrimBinary::logicAnd);
     }
     void visit(const ExpressionAnyElementTrue* expr) final {
-        auto [inputSlot, stage] = projectEvalExpr(_context->popEvalExpr(),
-                                                  _context->extractCurrentEvalStage(),
-                                                  _context->planNodeId,
-                                                  _context->state.slotIdGenerator);
+        auto frameId = _context->state.frameId();
+        auto binds = sbe::makeEs(_context->popExpr());
+        sbe::EVariable inputRef(frameId, 0);
 
-        auto fromBranch = makeFilter<false>(
-            std::move(stage),
+        auto lambdaFrame = _context->state.frameId();
+        sbe::EVariable lambdaParam(lambdaFrame, 0);
+        auto lambdaExpr =
+            sbe::makeE<sbe::ELocalLambda>(lambdaFrame, generateCoerceToBoolExpression(lambdaParam));
+
+        auto resultExpr = makeBinaryOp(
+            sbe::EPrimBinary::logicAnd,
             makeBinaryOp(sbe::EPrimBinary::logicOr,
-                         makeFillEmptyFalse(makeFunction("isArray", makeVariable(inputSlot))),
+                         makeFillEmptyFalse(makeFunction("isArray", inputRef.clone())),
                          makeFail(5159200, "$anyElementTrue's argument must be an array")),
-            _context->planNodeId);
+            makeFunction("traverseF",
+                         inputRef.clone(),
+                         std::move(lambdaExpr),
+                         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Boolean, false)));
 
-        auto innerOutputSlot = _context->state.slotId();
-        auto innerBranch = makeProject(makeLimitCoScanStage(_context->planNodeId),
-                                       _context->planNodeId,
-                                       innerOutputSlot,
-                                       generateCoerceToBoolExpression(inputSlot));
-
-        auto traverseSlot = _context->state.slotId();
-        auto traverseStage = makeTraverse(std::move(fromBranch),
-                                          std::move(innerBranch),
-                                          inputSlot,
-                                          traverseSlot,
-                                          innerOutputSlot,
-                                          makeBinaryOp(sbe::EPrimBinary::logicOr,
-                                                       makeVariable(traverseSlot),
-                                                       makeVariable(innerOutputSlot)),
-                                          makeVariable(traverseSlot),
-                                          _context->planNodeId,
-                                          1,
-                                          _context->getLexicalEnvironment());
-
-        _context->pushExpr(makeFillEmptyFalse(makeVariable(traverseSlot)),
-                           std::move(traverseStage));
+        _context->pushExpr(
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(resultExpr)));
     }
     void visit(const ExpressionArray* expr) final {
         unsupportedExpression(expr->getOpName());
@@ -3917,7 +3904,7 @@ private:
 };
 }  // namespace
 
-std::unique_ptr<sbe::EExpression> generateCoerceToBoolExpression(sbe::EVariable branchRef) {
+std::unique_ptr<sbe::EExpression> generateCoerceToBoolExpression(const sbe::EVariable& branchRef) {
     auto makeNotNullOrUndefinedCheck = [&branchRef]() {
         return makeNot(makeFunction(
             "typeMatch",
