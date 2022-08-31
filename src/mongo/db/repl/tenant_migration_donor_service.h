@@ -59,6 +59,7 @@ public:
     ThreadPool::Limits getThreadPoolLimits() const override {
         ThreadPool::Limits limits;
         limits.maxThreads = repl::maxTenantMigrationDonorServiceThreadPoolSize;
+        limits.minThreads = repl::minTenantMigrationDonorServiceThreadPoolSize;
         return limits;
     }
 

@@ -483,6 +483,16 @@ server_parameters:
         validator:
             gte: 1
 
+    minTenantMigrationRecipientThreadPoolSize:
+        description: >-
+            The minimum number of threads in the tenant migration recipient's thread pool.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: minTenantMigrationRecipientThreadPoolSize
+        default: 0
+        validator:
+            gte: 1
+
     maxTenantMigrationDonorServiceThreadPoolSize:
         description: >-
             The maximum number of threads in the tenant migration donor service's thread pool.
@@ -492,6 +502,37 @@ server_parameters:
         default: 8
         validator:
             gte: 1
+    
+    minTenantMigrationDonorServiceThreadPoolSize:
+        description: >-
+            The minimum number of threads in the tenant migration donor service's thread pool.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: minTenantMigrationDonorServiceThreadPoolSize
+        default: 0
+        validator:
+            gte: 1
+
+    maxShardSplitDonorServiceThreadPoolSize:
+        description: >-
+            The maximum number of threads in the shard split donor service's thread pool.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: maxShardSplitDonorServiceThreadPoolSize
+        default: 8
+        validator:
+            gte: 1
+    
+    minShardSplitDonorServiceThreadPoolSize:
+        description: >-
+            The minimum number of threads in the shard split donor service's thread pool.
+        set_at: startup
+        cpp_vartype: int
+        cpp_varname: minShardSplitDonorServiceThreadPoolSize
+        default: 0
+        validator:
+            gte: 1
+
 
     shardSplitTimeoutMS:
         description: >-

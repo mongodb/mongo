@@ -164,7 +164,10 @@ SemiFuture<HostAndPort> makeRecipientAcceptSplitFuture(
 }  // namespace detail
 
 ThreadPool::Limits ShardSplitDonorService::getThreadPoolLimits() const {
-    return ThreadPool::Limits();
+    ThreadPool::Limits limits;
+    limits.maxThreads = repl::maxShardSplitDonorServiceThreadPoolSize;
+    limits.minThreads = repl::minShardSplitDonorServiceThreadPoolSize;
+    return limits;
 }
 
 void ShardSplitDonorService::checkIfConflictsWithOtherInstances(

@@ -281,6 +281,7 @@ NamespaceString TenantMigrationRecipientService::getStateDocumentsNS() const {
 ThreadPool::Limits TenantMigrationRecipientService::getThreadPoolLimits() const {
     ThreadPool::Limits limits;
     limits.maxThreads = maxTenantMigrationRecipientThreadPoolSize;
+    limits.minThreads = minTenantMigrationRecipientThreadPoolSize;
     return limits;
 }
 
