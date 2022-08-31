@@ -567,9 +567,7 @@ public:
 
             // If the executor supports it, find operations will maintain the storage engine state
             // across commands.
-            if (gMaintainValidCursorsAcrossReadCommands && !opCtx->inMultiDocumentTransaction() &&
-                repl::ReadConcernArgs::get(opCtx).getLevel() !=
-                    repl::ReadConcernLevel::kSnapshotReadConcern) {
+            if (gMaintainValidCursorsAcrossReadCommands && !opCtx->inMultiDocumentTransaction()) {
                 exec->enableSaveRecoveryUnitAcrossCommandsIfSupported();
             }
 
