@@ -147,10 +147,12 @@ std::unique_ptr<CatalogCacheMock> createCatalogCacheMock(OperationContext* opCtx
         opCtx->getServiceContext(),
         std::make_unique<CollectionShardingStateFactoryShard>(opCtx->getServiceContext()));
 
+    const ChunkVersion placementVersion = chunkManager.getVersion(originatorShard);
     OperationShardingState::setShardRole(
         opCtx,
         kNss,
-        ShardVersion(chunkManager.getVersion(originatorShard)) /* shardVersion */,
+        ShardVersion(placementVersion,
+                     CollectionIndexes(placementVersion, boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */);
 
     // Configuring the filtering metadata such that calls to getCollectionDescription return what we

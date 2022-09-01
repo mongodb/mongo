@@ -555,7 +555,9 @@ Value DocumentSourceMerge::serialize(boost::optional<ExplainOptions::Verbosity> 
         return mergeOnFields;
     }());
     spec.setTargetCollectionVersion(
-        _targetCollectionVersion ? boost::make_optional(ShardVersion(*_targetCollectionVersion))
+        _targetCollectionVersion ? boost::make_optional(ShardVersion(
+                                       *_targetCollectionVersion,
+                                       CollectionIndexes(*_targetCollectionVersion, boost::none)))
                                  : boost::none);
     return Value(Document{{getSourceName(), spec.toBSON()}});
 }

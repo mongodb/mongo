@@ -79,9 +79,12 @@ public:
 
             auto cmdObj = CommandHelpers::filterCommandRequestForPassthrough(request().toBSON({}));
             if (cm.isSharded()) {
-                cmdObj = appendShardVersion(cmdObj, cm.getVersion(shardId));
+                cmdObj = appendShardVersion(
+                    cmdObj,
+                    ShardVersion(cm.getVersion(shardId),
+                                 CollectionIndexes(cm.getVersion(shardId), boost::none)));
             } else {
-                cmdObj = appendShardVersion(cmdObj, ChunkVersion::UNSHARDED());
+                cmdObj = appendShardVersion(cmdObj, ShardVersion::UNSHARDED());
                 cmdObj = appendDbVersionIfPresent(cmdObj, dbInfo->getVersion());
             }
 

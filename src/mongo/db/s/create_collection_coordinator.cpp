@@ -840,7 +840,9 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx) {
           "numInitialChunks"_attr = _initialChunks->chunks.size(),
           "initialCollectionVersion"_attr = _initialChunks->collVersion());
 
-    auto result = CreateCollectionResponse(_initialChunks->chunks.back().getVersion());
+    const auto placementVersion = _initialChunks->chunks.back().getVersion();
+    auto result = CreateCollectionResponse(
+        {placementVersion, CollectionIndexes(placementVersion, boost::none)});
     result.setCollectionUUID(_collectionUUID);
     _result = std::move(result);
 

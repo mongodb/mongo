@@ -120,15 +120,17 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
                             shardId),
             str::stream() << "Collection " << nss.ns() << " is not sharded",
             metadataAfterSplit->isSharded());
-    const auto epoch = metadataAfterSplit->getShardVersion().epoch();
-    uassert(StaleConfigInfo(nss,
-                            ShardVersion::IGNORED() /* receivedVersion */,
-                            ShardVersion(metadataAfterSplit->getShardVersion()) /* wantedVersion */,
-                            shardId),
+    const auto placementVersion = metadataAfterSplit->getShardVersion();
+    const auto epoch = placementVersion.epoch();
+    uassert(StaleConfigInfo(
+                nss,
+                ShardVersion::IGNORED() /* receivedVersion */,
+                ShardVersion(placementVersion,
+                             CollectionIndexes(placementVersion, boost::none)) /* wantedVersion */,
+                shardId),
             str::stream() << "Collection " << nss.ns() << " changed since split start",
             epoch == expectedEpoch &&
-                (!expectedTimestamp ||
-                 metadataAfterSplit->getShardVersion().getTimestamp() == expectedTimestamp));
+                (!expectedTimestamp || placementVersion.getTimestamp() == expectedTimestamp));
 
     ChunkType nextChunk;
     for (auto it = splitPoints.begin(); it != splitPoints.end(); ++it) {

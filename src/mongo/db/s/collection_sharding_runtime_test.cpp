@@ -90,10 +90,12 @@ TEST_F(CollectionShardingRuntimeTest,
     CollectionShardingRuntime csr(getServiceContext(), kTestNss, executor());
     ASSERT_FALSE(csr.getCollectionDescription(opCtx).isSharded());
     auto metadata = makeShardedMetadata(opCtx);
-    ScopedSetShardRole scopedSetShardRole{opCtx,
-                                          kTestNss,
-                                          ShardVersion(metadata.getShardVersion()),
-                                          boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{
+        opCtx,
+        kTestNss,
+        ShardVersion(metadata.getShardVersion(),
+                     CollectionIndexes(metadata.getShardVersion(), boost::none)),
+        boost::none /* databaseVersion */};
     ASSERT_THROWS_CODE(csr.getCollectionDescription(opCtx), DBException, ErrorCodes::StaleConfig);
 }
 
@@ -111,10 +113,12 @@ TEST_F(CollectionShardingRuntimeTest,
     OperationContext* opCtx = operationContext();
     auto metadata = makeShardedMetadata(opCtx);
     csr.setFilteringMetadata(opCtx, metadata);
-    ScopedSetShardRole scopedSetShardRole{opCtx,
-                                          kTestNss,
-                                          ShardVersion(metadata.getShardVersion()),
-                                          boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{
+        opCtx,
+        kTestNss,
+        ShardVersion(metadata.getShardVersion(),
+                     CollectionIndexes(metadata.getShardVersion(), boost::none)),
+        boost::none /* databaseVersion */};
     ASSERT_TRUE(csr.getCollectionDescription(opCtx).isSharded());
 }
 
@@ -177,10 +181,12 @@ TEST_F(CollectionShardingRuntimeTest,
     OperationContext* opCtx = operationContext();
     auto metadata = makeShardedMetadata(opCtx);
     csr.setFilteringMetadata(opCtx, metadata);
-    ScopedSetShardRole scopedSetShardRole{opCtx,
-                                          kTestNss,
-                                          ShardVersion(metadata.getShardVersion()),
-                                          boost::none /* databaseVersion */};
+    ScopedSetShardRole scopedSetShardRole{
+        opCtx,
+        kTestNss,
+        ShardVersion(metadata.getShardVersion(),
+                     CollectionIndexes(metadata.getShardVersion(), boost::none)),
+        boost::none /* databaseVersion */};
     ASSERT_EQ(csr.getNumMetadataManagerChanges_forTest(), 1);
 
     // Set it again with a different metadata object (UUID is generated randomly in
@@ -220,11 +226,13 @@ TEST_F(CollectionShardingRuntimeTest, ReturnUnshardedMetadataInServerlessMode) {
     ASSERT_FALSE(csr.getCollectionDescription(opCtx).isSharded());
 
     // Enable sharding state and set shard version on the OSS for logical session nss.
+    CollectionGeneration gen{OID::gen(), Timestamp(1, 1)};
     ScopedSetShardRole scopedSetShardRole2{
         opCtx,
         NamespaceString::kLogicalSessionsNamespace,
-        ShardVersion(ChunkVersion({OID::gen(), Timestamp(1, 1)}, {1, 0})), /* shardVersion */
-        boost::none                                                        /* databaseVersion */
+        ShardVersion(ChunkVersion(gen, {1, 0}),
+                     CollectionIndexes(gen, boost::none)), /* shardVersion */
+        boost::none                                        /* databaseVersion */
     };
 
     CollectionShardingRuntime csrLogicalSession(

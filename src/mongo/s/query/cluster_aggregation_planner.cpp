@@ -154,7 +154,7 @@ BSONObj createCommandForMergingShard(Document serializedCommand,
 
     // Attach the IGNORED chunk version to the command. On the shard, this will skip the actual
     // version check but will nonetheless mark the operation as versioned.
-    auto mergeCmdObj = appendShardVersion(mergeCmd.freeze().toBson(), ChunkVersion::IGNORED());
+    auto mergeCmdObj = appendShardVersion(mergeCmd.freeze().toBson(), ShardVersion::IGNORED());
 
     // Attach the read and write concerns if needed, and return the final command object.
     return applyReadWriteConcern(mergeCtx->opCtx,
@@ -801,7 +801,7 @@ Status runPipelineOnSpecificShardOnly(const boost::intrusive_ptr<ExpressionConte
                                                                            overrideBatchSize);
 
     if (!forPerShardCursor && shardId != ShardId::kConfigServerId) {
-        cmdObj = appendShardVersion(std::move(cmdObj), ChunkVersion::UNSHARDED());
+        cmdObj = appendShardVersion(std::move(cmdObj), ShardVersion::UNSHARDED());
     }
     if (!forPerShardCursor) {
         // Unless this is a per shard cursor, we need to send shard version info.

@@ -388,7 +388,8 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     const auto& currentMetadata = optCurrentMetadata->get();
 
     const auto wantedPlacementVersion = currentMetadata.getShardVersion();
-    const auto wantedShardVersion = ShardVersion(wantedPlacementVersion);
+    const auto wantedShardVersion = ShardVersion(
+        wantedPlacementVersion, CollectionIndexes(wantedPlacementVersion, boost::none));
     const ChunkVersion receivedPlacementVersion = receivedShardVersion;
 
     if (wantedShardVersion.isWriteCompatibleWith(receivedShardVersion) ||

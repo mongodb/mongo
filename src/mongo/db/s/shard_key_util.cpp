@@ -321,11 +321,14 @@ ValidationBehaviorsRefineShardKey::ValidationBehaviorsRefineShardKey(OperationCo
 
 std::vector<BSONObj> ValidationBehaviorsRefineShardKey::loadIndexes(
     const NamespaceString& nss) const {
+    ChunkVersion placementVersion = _cm.getVersion(_indexShard->getId());
     auto indexesRes = _indexShard->runExhaustiveCursorCommand(
         _opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         nss.db().toString(),
-        appendShardVersion(BSON("listIndexes" << nss.coll()), _cm.getVersion(_indexShard->getId())),
+        appendShardVersion(
+            BSON("listIndexes" << nss.coll()),
+            ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none))),
         Milliseconds(-1));
     if (indexesRes.getStatus().code() != ErrorCodes::NamespaceNotFound) {
         return uassertStatusOK(indexesRes).docs;
@@ -335,13 +338,14 @@ std::vector<BSONObj> ValidationBehaviorsRefineShardKey::loadIndexes(
 
 void ValidationBehaviorsRefineShardKey::verifyUsefulNonMultiKeyIndex(
     const NamespaceString& nss, const BSONObj& proposedKey) const {
+    ChunkVersion placementVersion = _cm.getVersion(_indexShard->getId());
     auto checkShardingIndexRes = uassertStatusOK(_indexShard->runCommand(
         _opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         "admin",
         appendShardVersion(
             BSON(kCheckShardingIndexCmdName << nss.ns() << kKeyPatternField << proposedKey),
-            _cm.getVersion(_indexShard->getId())),
+            ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none))),
         Shard::RetryPolicy::kIdempotent));
     if (checkShardingIndexRes.commandStatus == ErrorCodes::UnknownError) {
         // CheckShardingIndex returns UnknownError if a compatible shard key index cannot be found,

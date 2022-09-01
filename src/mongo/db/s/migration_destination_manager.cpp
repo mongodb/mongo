@@ -786,7 +786,9 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
     auto cmd = nssOrUUID.nss() ? BSON("listIndexes" << nssOrUUID.nss()->coll())
                                : BSON("listIndexes" << *nssOrUUID.uuid());
     if (cm) {
-        cmd = appendShardVersion(cmd, cm->getVersion(fromShardId));
+        ChunkVersion placementVersion = cm->getVersion(fromShardId);
+        cmd = appendShardVersion(
+            cmd, ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none)));
     }
     if (afterClusterTime) {
         cmd = cmd.addFields(makeLocalReadConcernWithAfterClusterTime(*afterClusterTime));

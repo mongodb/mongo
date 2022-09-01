@@ -88,7 +88,7 @@ public:
         BSONObj filteredCmdObj(applyReadWriteConcern(
             opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)));
         BSONObj filteredCmdObjWithVersion(
-            appendShardVersion(filteredCmdObj, ChunkVersion::UNSHARDED()));
+            appendShardVersion(filteredCmdObj, ShardVersion::UNSHARDED()));
 
         auto shard =
             uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cm.dbPrimary()));

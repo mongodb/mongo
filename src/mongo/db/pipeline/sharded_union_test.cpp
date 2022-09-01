@@ -163,7 +163,8 @@ TEST_F(ShardedUnionTest, RetriesSubPipelineOnStaleConfigError) {
         Timestamp timestamp{1, 0};
         return createErrorCursorResponse(
             Status{StaleConfigInfo(kTestAggregateNss,
-                                   ShardVersion(ChunkVersion({epoch, timestamp}, {1, 0})),
+                                   ShardVersion(ChunkVersion({epoch, timestamp}, {1, 0}),
+                                                CollectionIndexes({epoch, timestamp}, boost::none)),
                                    boost::none,
                                    ShardId{"0"}),
                    "Mock error: shard version mismatch"});
@@ -248,7 +249,8 @@ TEST_F(ShardedUnionTest, CorrectlySplitsSubPipelineIfRefreshedDistributionRequir
         Timestamp timestamp{1, 0};
         return createErrorCursorResponse(
             Status{StaleConfigInfo(kTestAggregateNss,
-                                   ShardVersion(ChunkVersion({epoch, timestamp}, {1, 0})),
+                                   ShardVersion(ChunkVersion({epoch, timestamp}, {1, 0}),
+                                                CollectionIndexes({epoch, timestamp}, boost::none)),
                                    boost::none,
                                    ShardId{"0"}),
                    "Mock error: shard version mismatch"});
@@ -341,7 +343,8 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
     onCommand([&](const executor::RemoteCommandRequest& request) {
         return createErrorCursorResponse(
             Status{StaleConfigInfo(kTestAggregateNss,
-                                   ShardVersion(ChunkVersion({epoch, timestamp}, {1, 0})),
+                                   ShardVersion(ChunkVersion({epoch, timestamp}, {1, 0}),
+                                                CollectionIndexes({epoch, timestamp}, boost::none)),
                                    boost::none,
                                    ShardId{"0"}),
                    "Mock error: shard version mismatch"});
@@ -349,7 +352,8 @@ TEST_F(ShardedUnionTest, AvoidsSplittingSubPipelineIfRefreshedDistributionDoesNo
     onCommand([&](const executor::RemoteCommandRequest& request) {
         return createErrorCursorResponse(
             Status{StaleConfigInfo(kTestAggregateNss,
-                                   ShardVersion(ChunkVersion({epoch, timestamp}, {1, 0})),
+                                   ShardVersion(ChunkVersion({epoch, timestamp}, {1, 0}),
+                                                CollectionIndexes({epoch, timestamp}, boost::none)),
                                    boost::none,
                                    ShardId{"0"}),
                    "Mock error: shard version mismatch"});

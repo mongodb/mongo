@@ -930,15 +930,15 @@ bool ComparableChunkVersion::operator<(const ComparableChunkVersion& other) cons
 }
 
 ShardEndpoint::ShardEndpoint(const ShardId& shardName,
-                             boost::optional<ChunkVersion> shardVersion,
+                             boost::optional<ShardVersion> shardVersion,
                              boost::optional<DatabaseVersion> dbVersion)
     : shardName(shardName),
       shardVersion(std::move(shardVersion)),
       databaseVersion(std::move(dbVersion)) {
     if (databaseVersion)
-        invariant(shardVersion && *shardVersion == ChunkVersion::UNSHARDED());
+        invariant(shardVersion && *shardVersion == ShardVersion::UNSHARDED());
     else if (shardVersion)
-        invariant(*shardVersion != ChunkVersion::UNSHARDED());
+        invariant(*shardVersion != ShardVersion::UNSHARDED());
     else
         invariant(shardName == ShardId::kConfigServerId);
 }

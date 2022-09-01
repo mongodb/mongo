@@ -362,7 +362,7 @@ ShardEndpoint ChunkManagerTargeter::targetInsert(OperationContext* opCtx,
     // in commands
     return ShardEndpoint(
         _cm.dbPrimary(),
-        _nss.isOnInternalDb() ? boost::optional<ChunkVersion>() : ChunkVersion::UNSHARDED(),
+        _nss.isOnInternalDb() ? boost::optional<ShardVersion>() : ShardVersion::UNSHARDED(),
         _nss.isOnInternalDb() ? boost::optional<DatabaseVersion>() : _cm.dbVersion());
 }
 
@@ -390,7 +390,7 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetUpdate(OperationContext* 
         // shardVersion in commands
         return std::vector{ShardEndpoint(
             _cm.dbPrimary(),
-            _nss.isOnInternalDb() ? boost::optional<ChunkVersion>() : ChunkVersion::UNSHARDED(),
+            _nss.isOnInternalDb() ? boost::optional<ShardVersion>() : ShardVersion::UNSHARDED(),
             _nss.isOnInternalDb() ? boost::optional<DatabaseVersion>() : _cm.dbVersion())};
     }
 
@@ -581,7 +581,7 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::_targetQuery(
         // shardVersion in commands
         return std::vector{ShardEndpoint(
             _cm.dbPrimary(),
-            _nss.isOnInternalDb() ? boost::optional<ChunkVersion>() : ChunkVersion::UNSHARDED(),
+            _nss.isOnInternalDb() ? boost::optional<ShardVersion>() : ShardVersion::UNSHARDED(),
             _nss.isOnInternalDb() ? boost::optional<DatabaseVersion>() : _cm.dbVersion())};
     }
 
@@ -594,7 +594,11 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::_targetQuery(
 
     std::vector<ShardEndpoint> endpoints;
     for (auto&& shardId : shardIds) {
-        endpoints.emplace_back(std::move(shardId), _cm.getVersion(shardId), boost::none);
+        const auto placementVersion = _cm.getVersion(shardId);
+        endpoints.emplace_back(
+            std::move(shardId),
+            ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none)),
+            boost::none);
     }
 
     return endpoints;
@@ -604,7 +608,11 @@ StatusWith<ShardEndpoint> ChunkManagerTargeter::_targetShardKey(const BSONObj& s
                                                                 const BSONObj& collation) const {
     try {
         auto chunk = _cm.findIntersectingChunk(shardKey, collation);
-        return ShardEndpoint(chunk.getShardId(), _cm.getVersion(chunk.getShardId()), boost::none);
+        const auto placementVersion = _cm.getVersion(chunk.getShardId());
+        return ShardEndpoint(
+            chunk.getShardId(),
+            ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none)),
+            boost::none);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -620,7 +628,11 @@ std::vector<ShardEndpoint> ChunkManagerTargeter::targetAllShards(OperationContex
 
     std::vector<ShardEndpoint> endpoints;
     for (auto&& shardId : shardIds) {
-        endpoints.emplace_back(std::move(shardId), _cm.getVersion(shardId), boost::none);
+        const auto placementVersion = _cm.getVersion(shardId);
+        endpoints.emplace_back(
+            std::move(shardId),
+            ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none)),
+            boost::none);
     }
 
     return endpoints;

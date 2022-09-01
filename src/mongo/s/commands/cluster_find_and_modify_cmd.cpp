@@ -419,17 +419,19 @@ public:
         BSONObjBuilder bob;
 
         if (cm.isSharded()) {
-            _runCommand(opCtx,
-                        shard->getId(),
-                        cm.getVersion(shard->getId()),
-                        boost::none,
-                        nss,
-                        applyReadWriteConcern(opCtx, false, false, explainCmd),
-                        &bob);
+            ChunkVersion placementVersion = cm.getVersion(shard->getId());
+            _runCommand(
+                opCtx,
+                shard->getId(),
+                ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none)),
+                boost::none,
+                nss,
+                applyReadWriteConcern(opCtx, false, false, explainCmd),
+                &bob);
         } else {
             _runCommand(opCtx,
                         shard->getId(),
-                        boost::make_optional(!cm.dbVersion().isFixed(), ChunkVersion::UNSHARDED()),
+                        boost::make_optional(!cm.dbVersion().isFixed(), ShardVersion::UNSHARDED()),
                         cm.dbVersion(),
                         nss,
                         applyReadWriteConcern(opCtx, false, false, explainCmd),
@@ -496,18 +498,19 @@ public:
             // This means that we always assume that a findAndModify request using _id is targetable
             // to a single shard.
             auto chunk = cm.findIntersectingChunk(shardKey, collation, true);
-
-            _runCommand(opCtx,
-                        chunk.getShardId(),
-                        cm.getVersion(chunk.getShardId()),
-                        boost::none,
-                        nss,
-                        applyReadWriteConcern(opCtx, this, cmdObjForShard),
-                        &result);
+            ChunkVersion placementVersion = cm.getVersion(chunk.getShardId());
+            _runCommand(
+                opCtx,
+                chunk.getShardId(),
+                ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none)),
+                boost::none,
+                nss,
+                applyReadWriteConcern(opCtx, this, cmdObjForShard),
+                &result);
         } else {
             _runCommand(opCtx,
                         cm.dbPrimary(),
-                        boost::make_optional(!cm.dbVersion().isFixed(), ChunkVersion::UNSHARDED()),
+                        boost::make_optional(!cm.dbVersion().isFixed(), ShardVersion::UNSHARDED()),
                         cm.dbVersion(),
                         nss,
                         applyReadWriteConcern(opCtx, this, cmdObjForShard),
@@ -531,7 +534,7 @@ private:
 
     static void _runCommand(OperationContext* opCtx,
                             const ShardId& shardId,
-                            const boost::optional<ChunkVersion>& shardVersion,
+                            const boost::optional<ShardVersion>& shardVersion,
                             const boost::optional<DatabaseVersion>& dbVersion,
                             const NamespaceString& nss,
                             const BSONObj& cmdObj,
@@ -640,7 +643,7 @@ private:
     static void _handleWouldChangeOwningShardErrorRetryableWriteLegacy(
         OperationContext* opCtx,
         const ShardId& shardId,
-        const boost::optional<ChunkVersion>& shardVersion,
+        const boost::optional<ShardVersion>& shardVersion,
         const boost::optional<DatabaseVersion>& dbVersion,
         const NamespaceString& nss,
         const BSONObj& cmdObj,

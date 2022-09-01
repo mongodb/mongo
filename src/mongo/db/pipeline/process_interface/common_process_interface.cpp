@@ -198,7 +198,9 @@ boost::optional<ShardVersion> CommonProcessInterface::refreshAndGetCollectionVer
                                         ->catalogCache()
                                         ->getCollectionRoutingInfoWithRefresh(expCtx->opCtx, nss));
 
-    return cm.isSharded() ? boost::make_optional(ShardVersion(cm.getVersion())) : boost::none;
+    return cm.isSharded() ? boost::make_optional(ShardVersion(
+                                cm.getVersion(), CollectionIndexes(cm.getVersion(), boost::none)))
+                          : boost::none;
 }
 
 std::vector<FieldPath> CommonProcessInterface::_shardKeyToDocumentKeyFields(

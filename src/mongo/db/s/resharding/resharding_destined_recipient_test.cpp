@@ -197,7 +197,8 @@ protected:
 
         ReshardingEnv env(CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, kNss).value());
         env.destShard = kShardList[1].getName();
-        env.version = ShardVersion(ChunkVersion({OID::gen(), Timestamp(1, 1)}, {1, 0}));
+        CollectionGeneration gen(OID::gen(), Timestamp(1, 1));
+        env.version = ShardVersion(ChunkVersion(gen, {1, 0}), CollectionIndexes(gen, boost::none));
         env.tempNss =
             NamespaceString(kNss.db(),
                             fmt::format("{}{}",

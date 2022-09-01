@@ -141,7 +141,7 @@ public:
                 // parallel.
                 // If the DB primary is hosted by the config server, apply the original metadata.
                 if (dbInfo->getPrimary() != ShardId::kConfigServerId) {
-                    cmdToSend = appendShardVersion(cmdToSend, ChunkVersion::UNSHARDED());
+                    cmdToSend = appendShardVersion(cmdToSend, ShardVersion::UNSHARDED());
                 }
                 cmdToSend = appendDbVersionIfPresent(cmdToSend, dbInfo);
 

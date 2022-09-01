@@ -301,13 +301,14 @@ TEST_F(BalancerCommandsSchedulerTest, SuccessfulRequestChunkDataSizeCommand) {
     _scheduler.start(operationContext(), getMigrationRecoveryDefaultValues());
     ChunkType chunk = makeChunk(0, kShardId0);
 
-    auto futureResponse = _scheduler.requestDataSize(operationContext(),
-                                                     kNss,
-                                                     chunk.getShard(),
-                                                     chunk.getRange(),
-                                                     chunk.getVersion(),
-                                                     KeyPattern(BSON("x" << 1)),
-                                                     false /* issuedByRemoteUser */);
+    auto futureResponse = _scheduler.requestDataSize(
+        operationContext(),
+        kNss,
+        chunk.getShard(),
+        chunk.getRange(),
+        ShardVersion(chunk.getVersion(), CollectionIndexes(chunk.getVersion(), boost::none)),
+        KeyPattern(BSON("x" << 1)),
+        false /* issuedByRemoteUser */);
     auto swReceivedDataSize = futureResponse.getNoThrow();
     ASSERT_OK(swReceivedDataSize.getStatus());
     auto receivedDataSize = swReceivedDataSize.getValue();

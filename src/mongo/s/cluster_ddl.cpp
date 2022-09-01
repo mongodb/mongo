@@ -45,7 +45,7 @@ namespace {
 std::vector<AsyncRequestsSender::Request> buildUnshardedRequestsForAllShards(
     OperationContext* opCtx, std::vector<ShardId> shardIds, const BSONObj& cmdObj) {
     auto cmdToSend = cmdObj;
-    appendShardVersion(cmdToSend, ChunkVersion::UNSHARDED());
+    appendShardVersion(cmdToSend, ShardVersion::UNSHARDED());
 
     std::vector<AsyncRequestsSender::Request> requests;
     for (auto&& shardId : shardIds)

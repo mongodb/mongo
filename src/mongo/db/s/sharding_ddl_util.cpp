@@ -522,7 +522,8 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadySharded(
                 SimpleBSONObjComparator::kInstance.evaluate(defaultCollator == collation) &&
                 cm.isUnique() == unique);
 
-    CreateCollectionResponse response(cm.getVersion());
+    CreateCollectionResponse response(
+        {cm.getVersion(), CollectionIndexes(cm.getVersion(), boost::none)});
     response.setCollectionUUID(cm.getUUID());
     return response;
 }

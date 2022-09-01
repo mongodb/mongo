@@ -109,7 +109,8 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithoutIdInShardKey) {
     ScopedSetShardRole scopedSetShardRole{
         operationContext(),
         kTestNss,
-        ShardVersion(metadata.getShardVersion()) /* shardVersion */,
+        ShardVersion(metadata.getShardVersion(),
+                     CollectionIndexes(metadata.getShardVersion(), boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
 
     // The order of fields in `doc` deliberately does not match the shard key
@@ -137,7 +138,8 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdInShardKey) {
     ScopedSetShardRole scopedSetShardRole{
         operationContext(),
         kTestNss,
-        ShardVersion(metadata.getShardVersion()) /* shardVersion */,
+        ShardVersion(metadata.getShardVersion(),
+                     CollectionIndexes(metadata.getShardVersion(), boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
 
     // The order of fields in `doc` deliberately does not match the shard key
@@ -165,7 +167,8 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdHashInShardKey) {
     ScopedSetShardRole scopedSetShardRole{
         operationContext(),
         kTestNss,
-        ShardVersion(metadata.getShardVersion()) /* shardVersion */,
+        ShardVersion(metadata.getShardVersion(),
+                     CollectionIndexes(metadata.getShardVersion(), boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
 
     auto doc = BSON("key2" << true << "_id"

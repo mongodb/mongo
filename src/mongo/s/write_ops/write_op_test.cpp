@@ -91,7 +91,7 @@ TEST_F(WriteOpTest, BasicError) {
 }
 
 TEST_F(WriteOpTest, TargetSingle) {
-    ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED(), boost::none);
+    ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
 
     BatchedCommandRequest request([&] {
         write_ops::InsertCommandRequest insertOp(kNss);
@@ -118,12 +118,19 @@ TEST_F(WriteOpTest, TargetSingle) {
 
 // Multi-write targeting test where our query goes to one shard
 TEST_F(WriteOpTest, TargetMultiOneShard) {
+    CollectionGeneration gen(OID(), Timestamp(1, 1));
     ShardEndpoint endpointA(
-        ShardId("shardA"), ChunkVersion({OID(), Timestamp(1, 1)}, {10, 0}), boost::none);
+        ShardId("shardA"),
+        ShardVersion(ChunkVersion(gen, {10, 0}), CollectionIndexes(gen, boost::none)),
+        boost::none);
     ShardEndpoint endpointB(
-        ShardId("shardB"), ChunkVersion({OID(), Timestamp(1, 1)}, {20, 0}), boost::none);
+        ShardId("shardB"),
+        ShardVersion(ChunkVersion(gen, {20, 0}), CollectionIndexes(gen, boost::none)),
+        boost::none);
     ShardEndpoint endpointC(
-        ShardId("shardB"), ChunkVersion({OID(), Timestamp(1, 1)}, {20, 0}), boost::none);
+        ShardId("shardB"),
+        ShardVersion(ChunkVersion(gen, {20, 0}), CollectionIndexes(gen, boost::none)),
+        boost::none);
 
     BatchedCommandRequest request([&] {
         write_ops::DeleteCommandRequest deleteOp(kNss);
@@ -153,12 +160,19 @@ TEST_F(WriteOpTest, TargetMultiOneShard) {
 
 // Multi-write targeting test where our write goes to more than one shard
 TEST_F(WriteOpTest, TargetMultiAllShards) {
+    CollectionGeneration gen(OID(), Timestamp(1, 1));
     ShardEndpoint endpointA(
-        ShardId("shardA"), ChunkVersion({OID(), Timestamp(1, 1)}, {10, 0}), boost::none);
+        ShardId("shardA"),
+        ShardVersion(ChunkVersion(gen, {10, 0}), CollectionIndexes(gen, boost::none)),
+        boost::none);
     ShardEndpoint endpointB(
-        ShardId("shardB"), ChunkVersion({OID(), Timestamp(1, 1)}, {20, 0}), boost::none);
+        ShardId("shardB"),
+        ShardVersion(ChunkVersion(gen, {20, 0}), CollectionIndexes(gen, boost::none)),
+        boost::none);
     ShardEndpoint endpointC(
-        ShardId("shardB"), ChunkVersion({OID(), Timestamp(1, 1)}, {20, 0}), boost::none);
+        ShardId("shardB"),
+        ShardVersion(ChunkVersion(gen, {20, 0}), CollectionIndexes(gen, boost::none)),
+        boost::none);
 
     BatchedCommandRequest request([&] {
         write_ops::DeleteCommandRequest deleteOp(kNss);
@@ -195,10 +209,15 @@ TEST_F(WriteOpTest, TargetMultiAllShards) {
 }
 
 TEST_F(WriteOpTest, TargetMultiAllShardsAndErrorSingleChildOp) {
+    CollectionGeneration gen(OID(), Timestamp(1, 1));
     ShardEndpoint endpointA(
-        ShardId("shardA"), ChunkVersion({OID(), Timestamp(1, 1)}, {10, 0}), boost::none);
+        ShardId("shardA"),
+        ShardVersion(ChunkVersion(gen, {10, 0}), CollectionIndexes(gen, boost::none)),
+        boost::none);
     ShardEndpoint endpointB(
-        ShardId("shardB"), ChunkVersion({OID(), Timestamp(1, 1)}, {20, 0}), boost::none);
+        ShardId("shardB"),
+        ShardVersion(ChunkVersion(gen, {20, 0}), CollectionIndexes(gen, boost::none)),
+        boost::none);
 
     BatchedCommandRequest request([&] {
         write_ops::DeleteCommandRequest deleteOp(kNss);
@@ -227,10 +246,11 @@ TEST_F(WriteOpTest, TargetMultiAllShardsAndErrorSingleChildOp) {
     // Simulate retryable error.
     write_ops::WriteError retryableError(
         0,
-        {StaleConfigInfo(kNss,
-                         ShardVersion(ChunkVersion({OID(), Timestamp(1, 1)}, {10, 0})),
-                         ShardVersion(ChunkVersion({OID(), Timestamp(1, 1)}, {11, 0})),
-                         ShardId("shardA")),
+        {StaleConfigInfo(
+             kNss,
+             ShardVersion(ChunkVersion(gen, {10, 0}), CollectionIndexes(gen, boost::none)),
+             ShardVersion(ChunkVersion(gen, {11, 0}), CollectionIndexes(gen, boost::none)),
+             ShardId("shardA")),
          "simulate ssv error for test"});
     writeOp.noteWriteError(*targeted[0], retryableError);
 
@@ -245,7 +265,7 @@ TEST_F(WriteOpTest, TargetMultiAllShardsAndErrorSingleChildOp) {
 
 // Single error after targeting test
 TEST_F(WriteOpTest, ErrorSingle) {
-    ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED(), boost::none);
+    ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
 
     BatchedCommandRequest request([&] {
         write_ops::InsertCommandRequest insertOp(kNss);
@@ -274,7 +294,7 @@ TEST_F(WriteOpTest, ErrorSingle) {
 
 // Cancel single targeting test
 TEST_F(WriteOpTest, CancelSingle) {
-    ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED(), boost::none);
+    ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
 
     BatchedCommandRequest request([&] {
         write_ops::InsertCommandRequest insertOp(kNss);
@@ -305,7 +325,7 @@ TEST_F(WriteOpTest, CancelSingle) {
 
 // Retry single targeting test
 TEST_F(WriteOpTest, RetrySingleOp) {
-    ShardEndpoint endpoint(ShardId("shard"), ChunkVersion::IGNORED(), boost::none);
+    ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
 
     BatchedCommandRequest request([&] {
         write_ops::InsertCommandRequest insertOp(kNss);
@@ -345,12 +365,19 @@ private:
 };
 
 TEST_F(WriteOpTransactionTest, TargetMultiDoesNotTargetAllShards) {
+    CollectionGeneration gen(OID(), Timestamp(1, 1));
     ShardEndpoint endpointA(
-        ShardId("shardA"), ChunkVersion({OID(), Timestamp(1, 1)}, {10, 0}), boost::none);
+        ShardId("shardA"),
+        ShardVersion(ChunkVersion(gen, {10, 0}), CollectionIndexes(gen, boost::none)),
+        boost::none);
     ShardEndpoint endpointB(
-        ShardId("shardB"), ChunkVersion({OID(), Timestamp(1, 1)}, {20, 0}), boost::none);
+        ShardId("shardB"),
+        ShardVersion(ChunkVersion(gen, {20, 0}), CollectionIndexes(gen, boost::none)),
+        boost::none);
     ShardEndpoint endpointC(
-        ShardId("shardB"), ChunkVersion({OID(), Timestamp(1, 1)}, {20, 0}), boost::none);
+        ShardId("shardB"),
+        ShardVersion(ChunkVersion(gen, {20, 0}), CollectionIndexes(gen, boost::none)),
+        boost::none);
 
     BatchedCommandRequest request([&] {
         write_ops::DeleteCommandRequest deleteOp(kNss);
@@ -385,10 +412,15 @@ TEST_F(WriteOpTransactionTest, TargetMultiDoesNotTargetAllShards) {
 }
 
 TEST_F(WriteOpTransactionTest, TargetMultiAllShardsAndErrorSingleChildOp) {
+    CollectionGeneration gen(OID(), Timestamp(1, 1));
     ShardEndpoint endpointA(
-        ShardId("shardA"), ChunkVersion({OID(), Timestamp(1, 1)}, {10, 0}), boost::none);
+        ShardId("shardA"),
+        ShardVersion(ChunkVersion(gen, {10, 0}), CollectionIndexes(gen, boost::none)),
+        boost::none);
     ShardEndpoint endpointB(
-        ShardId("shardB"), ChunkVersion({OID(), Timestamp(1, 1)}, {20, 0}), boost::none);
+        ShardId("shardB"),
+        ShardVersion(ChunkVersion(gen, {20, 0}), CollectionIndexes(gen, boost::none)),
+        boost::none);
 
     BatchedCommandRequest request([&] {
         write_ops::DeleteCommandRequest deleteOp(kNss);
@@ -421,10 +453,11 @@ TEST_F(WriteOpTransactionTest, TargetMultiAllShardsAndErrorSingleChildOp) {
     // Simulate retryable error.
     write_ops::WriteError retryableError(
         0,
-        {StaleConfigInfo(kNss,
-                         ShardVersion(ChunkVersion({OID(), Timestamp(1, 1)}, {10, 0})),
-                         ShardVersion(ChunkVersion({OID(), Timestamp(1, 1)}, {11, 0})),
-                         ShardId("shardA")),
+        {StaleConfigInfo(
+             kNss,
+             ShardVersion(ChunkVersion(gen, {10, 0}), CollectionIndexes(gen, boost::none)),
+             ShardVersion(ChunkVersion(gen, {11, 0}), CollectionIndexes(gen, boost::none)),
+             ShardId("shardA")),
          "simulate ssv error for test"});
     writeOp.noteWriteError(*targeted[0], retryableError);
 

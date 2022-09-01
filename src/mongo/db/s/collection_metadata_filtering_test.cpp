@@ -151,7 +151,8 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInTheFuture) {
     ScopedSetShardRole scopedSetShardRole{
         operationContext(),
         kNss,
-        ShardVersion(metadata.getShardVersion()) /* shardVersion */,
+        ShardVersion(metadata.getShardVersion(),
+                     CollectionIndexes(metadata.getShardVersion(), boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
     auto* const css = CollectionShardingState::get(operationContext(), kNss);
     testFilterFn(css->getOwnershipFilter(
@@ -180,7 +181,8 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsInThePast) {
     ScopedSetShardRole scopedSetShardRole{
         operationContext(),
         kNss,
-        ShardVersion(metadata.getShardVersion()) /* shardVersion */,
+        ShardVersion(metadata.getShardVersion(),
+                     CollectionIndexes(metadata.getShardVersion(), boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
     auto* const css = CollectionShardingState::get(operationContext(), kNss);
     testFilterFn(css->getOwnershipFilter(
@@ -217,7 +219,8 @@ TEST_F(CollectionMetadataFilteringTest, FilterDocumentsTooFarInThePastThrowsStal
     ScopedSetShardRole scopedSetShardRole{
         operationContext(),
         kNss,
-        ShardVersion(metadata.getShardVersion()) /* shardVersion */,
+        ShardVersion(metadata.getShardVersion(),
+                     CollectionIndexes(metadata.getShardVersion(), boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
     auto* const css = CollectionShardingState::get(operationContext(), kNss);
     testFilterFn(css->getOwnershipFilter(

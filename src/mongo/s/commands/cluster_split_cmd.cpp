@@ -249,14 +249,16 @@ public:
         // specified in the split command through the "middle" parameter, choose "middle" as the
         // splitPoint. Otherwise use the splitVector command with 'force' to ask the shard for the
         // middle of the chunk.
+        const auto placementVersion = cm.getVersion(chunk->getShardId());
         const BSONObj splitPoint = !middle.isEmpty()
             ? middle
-            : selectMedianKey(opCtx,
-                              chunk->getShardId(),
-                              nss,
-                              cm.getShardKeyPattern(),
-                              cm.getVersion(chunk->getShardId()),
-                              ChunkRange(chunk->getMin(), chunk->getMax()));
+            : selectMedianKey(
+                  opCtx,
+                  chunk->getShardId(),
+                  nss,
+                  cm.getShardKeyPattern(),
+                  ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none)),
+                  ChunkRange(chunk->getMin(), chunk->getMax()));
 
         LOGV2(22758,
               "Splitting chunk {chunkRange} in {namespace} on shard {shardId} at key {splitPoint}",

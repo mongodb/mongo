@@ -127,7 +127,7 @@ void WriteOp::targetWrites(OperationContext* opCtx,
         // Outside of a transaction, multiple endpoints currently imply no versioning, since we
         // can't retry half a regular multi-write.
         if (endpoints.size() > 1u && !inTransaction) {
-            endpoint.shardVersion = ChunkVersion::IGNORED();
+            endpoint.shardVersion = ShardVersion::IGNORED();
         }
 
         targetedWrites->push_back(std::make_unique<TargetedWrite>(std::move(endpoint), ref));

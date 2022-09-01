@@ -176,7 +176,8 @@ TEST_F(DispatchShardPipelineTest, DispatchShardPipelineDoesNotRetryOnStaleConfig
         Timestamp timestamp{1, 0};
         return createErrorCursorResponse(
             {StaleConfigInfo(kTestAggregateNss,
-                             ShardVersion(ChunkVersion({epoch, timestamp}, {1, 0})),
+                             ShardVersion(ChunkVersion({epoch, timestamp}, {1, 0}),
+                                          CollectionIndexes({epoch, timestamp}, boost::none)),
                              boost::none,
                              ShardId{"0"}),
              "Mock error: shard version mismatch"});
@@ -220,7 +221,8 @@ TEST_F(DispatchShardPipelineTest, WrappedDispatchDoesRetryOnStaleConfigError) {
     onCommand([&](const executor::RemoteCommandRequest& request) {
         return createErrorCursorResponse(
             {StaleConfigInfo(kTestAggregateNss,
-                             ShardVersion(ChunkVersion({epoch, timestamp}, {2, 0})),
+                             ShardVersion(ChunkVersion({epoch, timestamp}, {2, 0}),
+                                          CollectionIndexes({epoch, timestamp}, boost::none)),
                              boost::none,
                              ShardId{"0"}),
              "Mock error: shard version mismatch"});

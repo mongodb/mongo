@@ -112,7 +112,7 @@ public:
 
     bool isVerboseWC() const;
 
-    void setShardVersion(ChunkVersion shardVersion) {
+    void setShardVersion(ShardVersion shardVersion) {
         _shardVersion = std::move(shardVersion);
     }
 
@@ -120,7 +120,7 @@ public:
         return _shardVersion.is_initialized();
     }
 
-    const ChunkVersion& getShardVersion() const {
+    const ShardVersion& getShardVersion() const {
         invariant(_shardVersion);
         return *_shardVersion;
     }
@@ -226,7 +226,7 @@ private:
     std::unique_ptr<write_ops::UpdateCommandRequest> _updateReq;
     std::unique_ptr<write_ops::DeleteCommandRequest> _deleteReq;
 
-    boost::optional<ChunkVersion> _shardVersion;
+    boost::optional<ShardVersion> _shardVersion;
     boost::optional<DatabaseVersion> _dbVersion;
 
     boost::optional<BSONObj> _writeConcern;

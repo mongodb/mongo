@@ -380,29 +380,31 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 sharding_ddl_util::sendAuthenticatedCommandToShards(
                     opCtx, fromNss.db(), cmdObj.addFields(osi.toBSON()), participants, **executor);
             }))
-        .then(_executePhase(Phase::kSetResponse,
-                            [this, anchor = shared_from_this()] {
-                                auto opCtxHolder = cc().makeOperationContext();
-                                auto* opCtx = opCtxHolder.get();
-                                getForwardableOpMetadata().setOn(opCtx);
+        .then(_executePhase(
+            Phase::kSetResponse,
+            [this, anchor = shared_from_this()] {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+                getForwardableOpMetadata().setOn(opCtx);
 
-                                // Retrieve the new collection version
-                                const auto catalog = Grid::get(opCtx)->catalogCache();
-                                const auto cm =
-                                    uassertStatusOK(catalog->getCollectionRoutingInfoWithRefresh(
-                                        opCtx, _request.getTo()));
-                                _response = RenameCollectionResponse(
-                                    cm.isSharded() ? cm.getVersion() : ChunkVersion::UNSHARDED());
+                // Retrieve the new collection version
+                const auto catalog = Grid::get(opCtx)->catalogCache();
+                const auto cm = uassertStatusOK(
+                    catalog->getCollectionRoutingInfoWithRefresh(opCtx, _request.getTo()));
+                _response = RenameCollectionResponse(
+                    cm.isSharded() ? ShardVersion(cm.getVersion(),
+                                                  CollectionIndexes(cm.getVersion(), boost::none))
+                                   : ShardVersion::UNSHARDED());
 
-                                ShardingLogging::get(opCtx)->logChange(
-                                    opCtx,
-                                    "renameCollection.end",
-                                    nss().ns(),
-                                    BSON("source" << nss().toString() << "destination"
-                                                  << _request.getTo().toString()),
-                                    ShardingCatalogClient::kMajorityWriteConcern);
-                                LOGV2(5460504, "Collection renamed", "namespace"_attr = nss());
-                            }))
+                ShardingLogging::get(opCtx)->logChange(
+                    opCtx,
+                    "renameCollection.end",
+                    nss().ns(),
+                    BSON("source" << nss().toString() << "destination"
+                                  << _request.getTo().toString()),
+                    ShardingCatalogClient::kMajorityWriteConcern);
+                LOGV2(5460504, "Collection renamed", "namespace"_attr = nss());
+            }))
         .onError([this, anchor = shared_from_this()](const Status& status) {
             if (!status.isA<ErrorCategory::NotPrimaryError>() &&
                 !status.isA<ErrorCategory::ShutdownError>()) {

@@ -115,7 +115,8 @@ void CollectionRouter::appendCRUDRoutingTokenToCommand(const ShardId& shardId,
             dbVersion.serialize(&dbvBuilder);
         }
     }
-    ShardVersion(chunkVersion).serialize(ShardVersion::kShardVersionField, builder);
+    ShardVersion(chunkVersion, CollectionIndexes(chunkVersion, boost::none))
+        .serialize(ShardVersion::kShardVersionField, builder);
 }
 
 ChunkManager CollectionRouter::_getRoutingInfo(OperationContext* opCtx) const {

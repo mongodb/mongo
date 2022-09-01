@@ -50,11 +50,6 @@ public:
 
     ShardVersion(ChunkVersion chunkVersion, CollectionIndexes indexVersion);
 
-    ShardVersion(ChunkVersion chunkVersion)
-        : CollectionGeneration(chunkVersion.epoch(), chunkVersion.getTimestamp()),
-          ChunkVersion(chunkVersion),
-          CollectionIndexes({chunkVersion.epoch(), chunkVersion.getTimestamp()}, boost::none) {}
-
     ShardVersion() : ShardVersion(ChunkVersion(), CollectionIndexes()) {}
 
     static ShardVersion IGNORED() {

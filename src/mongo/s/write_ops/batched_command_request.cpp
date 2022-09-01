@@ -200,7 +200,7 @@ void BatchedCommandRequest::setWriteCommandRequestBase(
 void BatchedCommandRequest::serialize(BSONObjBuilder* builder) const {
     _visit([&](auto&& op) { op.serialize({}, builder); });
     if (_shardVersion) {
-        ShardVersion(*_shardVersion).serialize(ShardVersion::kShardVersionField, builder);
+        _shardVersion->serialize(ShardVersion::kShardVersionField, builder);
     }
 
     if (_dbVersion) {

@@ -72,7 +72,9 @@ TEST(BatchedCommandRequest, InsertWithShardVersion) {
 
         ASSERT_EQ("TestDB.test", insertRequest.getInsertRequest().getNamespace().ns());
         ASSERT(insertRequest.hasShardVersion());
-        ASSERT_EQ(ChunkVersion({epoch, timestamp}, {1, 2}).toString(),
+        ASSERT_EQ(ShardVersion(ChunkVersion({epoch, timestamp}, {1, 2}),
+                               CollectionIndexes({epoch, timestamp}, boost::none))
+                      .toString(),
                   insertRequest.getShardVersion().toString());
     }
 }

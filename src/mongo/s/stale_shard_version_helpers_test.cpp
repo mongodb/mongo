@@ -93,11 +93,14 @@ TEST_F(AsyncShardVersionRetry, LimitedStaleErrorsShouldReturnCorrectValue) {
     auto future = shardVersionRetry(
         service(), nss(), catalogCache, desc(), getExecutor(), token, [&](OperationContext*) {
             if (++tries < 5) {
-                uassert(StaleConfigInfo(
-                            nss(),
-                            ShardVersion(ChunkVersion({OID::gen(), Timestamp(1, 0)}, {5, 23})),
-                            ShardVersion(ChunkVersion({OID::gen(), Timestamp(1, 0)}, {6, 99})),
-                            ShardId("sB")),
+                const CollectionGeneration gen1(OID::gen(), Timestamp(1, 0));
+                const CollectionGeneration gen2(OID::gen(), Timestamp(1, 0));
+                uassert(StaleConfigInfo(nss(),
+                                        ShardVersion(ChunkVersion(gen1, {5, 23}),
+                                                     CollectionIndexes(gen1, boost::none)),
+                                        ShardVersion(ChunkVersion(gen2, {6, 99}),
+                                                     CollectionIndexes(gen2, boost::none)),
+                                        ShardId("sB")),
                         "testX",
                         false);
             }

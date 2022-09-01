@@ -40,6 +40,7 @@
 #include "mongo/s/database_version.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/shard_version.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/ticketholder.h"
@@ -471,12 +472,12 @@ using RoutingTableHistoryValueHandle = RoutingTableHistoryCache::ValueHandle;
  */
 struct ShardEndpoint {
     ShardEndpoint(const ShardId& shardName,
-                  boost::optional<ChunkVersion> shardVersion,
+                  boost::optional<ShardVersion> shardVersion,
                   boost::optional<DatabaseVersion> dbVersion);
 
     ShardId shardName;
 
-    boost::optional<ChunkVersion> shardVersion;
+    boost::optional<ShardVersion> shardVersion;
     boost::optional<DatabaseVersion> databaseVersion;
 };
 

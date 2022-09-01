@@ -154,7 +154,7 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
 
         // Attach shardVersion "UNSHARDED", unless targeting the config server.
         const auto cmdObjWithShardVersion = (primaryShardId != ShardId::kConfigServerId)
-            ? appendShardVersion(cmdToSend, ChunkVersion::UNSHARDED())
+            ? appendShardVersion(cmdToSend, ShardVersion::UNSHARDED())
             : cmdToSend;
 
         return std::vector<AsyncRequestsSender::Request>{AsyncRequestsSender::Request(
@@ -177,7 +177,12 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
 
     for (const ShardId& shardId : shardIds) {
         if (shardsToSkip.find(shardId) == shardsToSkip.end()) {
-            requests.emplace_back(shardId, appendShardVersion(cmdToSend, cm.getVersion(shardId)));
+            ChunkVersion placementVersion = cm.getVersion(shardId);
+            requests.emplace_back(
+                shardId,
+                appendShardVersion(cmdToSend,
+                                   ShardVersion(placementVersion,
+                                                CollectionIndexes(placementVersion, boost::none))));
         }
     }
 
@@ -438,7 +443,7 @@ AsyncRequestsSender::Response executeCommandAgainstDatabasePrimary(
     Shard::RetryPolicy retryPolicy) {
     // Attach shardVersion "UNSHARDED", unless targeting the config server.
     const auto cmdObjWithShardVersion = (dbInfo->getPrimary() != ShardId::kConfigServerId)
-        ? appendShardVersion(cmdObj, ChunkVersion::UNSHARDED())
+        ? appendShardVersion(cmdObj, ShardVersion::UNSHARDED())
         : cmdObj;
 
     auto responses =
@@ -699,14 +704,17 @@ StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationCont
             // For a sharded collection we must load indexes from a shard with chunks. For
             // consistency with cluster listIndexes, load from the shard that owns the minKey chunk.
             const auto minKeyShardId = cm.getMinKeyShardIdWithSimpleCollation();
+            ChunkVersion placementVersion = cm.getVersion(minKeyShardId);
             return {
                 uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, minKeyShardId)),
-                appendShardVersion(cmdNoVersion, cm.getVersion(minKeyShardId))};
+                appendShardVersion(cmdNoVersion,
+                                   ShardVersion(placementVersion,
+                                                CollectionIndexes(placementVersion, boost::none)))};
         } else {
             // For an unsharded collection, the primary shard will have correct indexes. We attach
             // unsharded shard version to detect if the collection has become sharded.
             const auto cmdObjWithShardVersion = (cm.dbPrimary() != ShardId::kConfigServerId)
-                ? appendShardVersion(cmdNoVersion, ChunkVersion::UNSHARDED())
+                ? appendShardVersion(cmdNoVersion, ShardVersion::UNSHARDED())
                 : cmdNoVersion;
             return {
                 uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, cm.dbPrimary())),

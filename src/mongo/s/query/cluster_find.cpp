@@ -186,7 +186,8 @@ std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
         findCommandToForward->serialize(BSONObj(), &cmdBuilder);
 
         if (cm.isSharded()) {
-            ShardVersion(cm.getVersion(shardId))
+            const auto placementVersion = cm.getVersion(shardId);
+            ShardVersion(placementVersion, CollectionIndexes(placementVersion, boost::none))
                 .serialize(ShardVersion::kShardVersionField, &cmdBuilder);
         } else if (!query.nss().isOnInternalDb()) {
             ShardVersion::UNSHARDED().serialize(ShardVersion::kShardVersionField, &cmdBuilder);
