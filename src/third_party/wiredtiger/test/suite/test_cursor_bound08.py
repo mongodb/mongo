@@ -165,7 +165,7 @@ class test_cursor_bound08(bound_base):
 
         self.set_bounds(cursor, 30, "lower")
         cursor.set_key(self.gen_key(20))
-        self.assertEqual(cursor.search_near(), 0)
+        self.assertEqual(cursor.search_near(), 1)
         self.assertEqual(cursor.get_key(), self.check_key(30))
         self.assertEqual(cursor.reset(), 0)
         self.assertEqual(self.get_stat(stat.conn.cursor_bounds_search_near_repositioned_cursor), 1)
@@ -174,14 +174,14 @@ class test_cursor_bound08(bound_base):
         # This can only happen when the search key is out of the bound range.
         self.set_bounds(cursor, 30, "lower")
         cursor.set_key(self.gen_key(20))
-        self.assertEqual(cursor.search_near(), 0)
+        self.assertEqual(cursor.search_near(), 1)
         self.assertEqual(cursor.get_key(), self.check_key(30))
         self.assertEqual(cursor.reset(), 0)
         self.assertEqual(self.get_stat(stat.conn.cursor_bounds_search_near_repositioned_cursor), 2)
 
         self.set_bounds(cursor, 40, "upper")
         cursor.set_key(self.gen_key(60))
-        self.assertEqual(cursor.search_near(), 0)
+        self.assertEqual(cursor.search_near(), -1)
         self.assertEqual(cursor.get_key(), self.check_key(40))
         self.assertEqual(cursor.reset(), 0)
         self.assertEqual(self.get_stat(stat.conn.cursor_bounds_search_near_repositioned_cursor), 3)
