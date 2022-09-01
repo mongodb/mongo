@@ -1734,12 +1734,16 @@ TEST_F(OpObserverTransactionTest, TransactionalInsertTestIncludesTenantId) {
     WriteUnitOfWork wuow(opCtx());
     opObserver().onInserts(opCtx(), *autoColl1, inserts1.begin(), inserts1.end(), false);
     opObserver().onInserts(opCtx(), *autoColl2, inserts2.begin(), inserts2.end(), false);
+
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
     opObserver().onUnpreparedTransactionCommit(opCtx(), &txnOps, 0);
+
     auto oplogEntryObj = getSingleOplogEntry(opCtx());
     checkCommonFields(oplogEntryObj);
     OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
     auto o = oplogEntry.getObject();
+
+    // TODO SERVER-69288: disallow more than one tenant on a single transaction
     auto oExpected =
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "i"
@@ -1770,6 +1774,9 @@ TEST_F(OpObserverTransactionTest, TransactionalInsertTestIncludesTenantId) {
                                                             << "w")
                                               << "o2" << BSON("_id" << 3))));
     ASSERT_BSONOBJ_EQ(oExpected, o);
+
+    // This test assumes that the top level tenantId matches the tenantId in the first entry
+    ASSERT_EQ(oplogEntry.getTid(), nss1.tenantId());
     ASSERT(!oplogEntry.shouldPrepare());
     ASSERT_FALSE(oplogEntryObj.hasField("prepare"));
 }
@@ -1854,11 +1861,16 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTestIncludesTenantId) {
     AutoGetCollection autoColl2(opCtx(), nss2, MODE_IX);
     opObserver().onUpdate(opCtx(), update1);
     opObserver().onUpdate(opCtx(), update2);
+
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
     opObserver().onUnpreparedTransactionCommit(opCtx(), &txnOps, 0);
-    auto oplogEntry = getSingleOplogEntry(opCtx());
-    checkCommonFields(oplogEntry);
-    auto o = oplogEntry.getObjectField("o");
+
+    auto oplogEntryObj = getSingleOplogEntry(opCtx());
+    checkCommonFields(oplogEntryObj);
+    OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
+    auto o = oplogEntry.getObject();
+
+    // TODO SERVER-69288: disallow more than one tenant on a single transaction
     auto oExpected =
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "u"
@@ -1875,8 +1887,11 @@ TEST_F(OpObserverTransactionTest, TransactionalUpdateTestIncludesTenantId) {
                                                                      << "y"))
                                               << "o2" << BSON("_id" << 1))));
     ASSERT_BSONOBJ_EQ(oExpected, o);
-    ASSERT_FALSE(oplogEntry.hasField("prepare"));
-    ASSERT_FALSE(oplogEntry.getBoolField("prepare"));
+
+    // This test assumes that the top level tenantId matches the tenantId in the first entry
+    ASSERT_EQ(oplogEntry.getTid(), nss1.tenantId());
+    ASSERT_FALSE(oplogEntryObj.hasField("prepare"));
+    ASSERT_FALSE(oplogEntryObj.getBoolField("prepare"));
 }
 
 TEST_F(OpObserverTransactionTest, TransactionalDeleteTest) {
@@ -1938,11 +1953,16 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTestIncludesTenantId) {
                                BSON("_id" << 1 << "data"
                                           << "y"));
     opObserver().onDelete(opCtx(), nss2, uuid2, 0, {});
+
     auto txnOps = txnParticipant.retrieveCompletedTransactionOperations(opCtx());
     opObserver().onUnpreparedTransactionCommit(opCtx(), &txnOps, 0);
-    auto oplogEntry = getSingleOplogEntry(opCtx());
-    checkCommonFields(oplogEntry);
-    auto o = oplogEntry.getObjectField("o");
+
+    auto oplogEntryObj = getSingleOplogEntry(opCtx());
+    checkCommonFields(oplogEntryObj);
+    OplogEntry oplogEntry = assertGet(OplogEntry::parse(oplogEntryObj));
+    auto o = oplogEntry.getObject();
+
+    // TODO SERVER-69288: disallow more than one tenant on a single transaction
     auto oExpected = BSON("applyOps" << BSON_ARRAY(
                               BSON("op"
                                    << "d"
@@ -1953,8 +1973,11 @@ TEST_F(OpObserverTransactionTest, TransactionalDeleteTestIncludesTenantId) {
                                       << "tid" << nss2.tenantId().value() << "ns" << nss2.toString()
                                       << "ui" << uuid2 << "o" << BSON("_id" << 1))));
     ASSERT_BSONOBJ_EQ(oExpected, o);
-    ASSERT_FALSE(oplogEntry.hasField("prepare"));
-    ASSERT_FALSE(oplogEntry.getBoolField("prepare"));
+
+    // This test assumes that the top level tenantId matches the tenantId in the first entry
+    ASSERT_EQ(oplogEntry.getTid(), nss1.tenantId());
+    ASSERT_FALSE(oplogEntryObj.hasField("prepare"));
+    ASSERT_FALSE(oplogEntryObj.getBoolField("prepare"));
 }
 
 TEST_F(OpObserverTransactionTest,

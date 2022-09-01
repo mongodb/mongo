@@ -1839,7 +1839,6 @@ OpTimeBundle logApplyOps(OperationContext* opCtx,
     invariant(bool(txnRetryCounter) == bool(TransactionParticipant::get(opCtx)));
 
     oplogEntry->setOpType(repl::OpTypeEnum::kCommand);
-    oplogEntry->setTid(TenantId::kSystemTenantId);
     oplogEntry->setNss({"admin", "$cmd"});
     // Batched writes (that is, WUOWs with 'groupOplogEntries') are not associated with a txnNumber,
     // so do not emit an lsid either.
@@ -2066,6 +2065,13 @@ int logOplogEntries(
         }
         oplogEntry.setWallClockTime(wallClockTime);
         oplogEntry.setObject(applyOpsBuilder.done());
+
+        // TODO SERVER-69286: replace this temporary fix to set the top-level tenantId to the
+        // tenantId on the first op in the list
+        auto& ops = applyOpsEntry.operations;
+        if (!ops.empty() && !ops[0][repl::OplogEntry::kTidFieldName].eoo())
+            oplogEntry.setTid(TenantId::parseFromBSON(ops[0][repl::OplogEntry::kTidFieldName]));
+
         auto txnState = isPartialTxn
             ? DurableTxnStateEnum::kInProgress
             : (implicitPrepare ? DurableTxnStateEnum::kPrepared : DurableTxnStateEnum::kCommitted);
@@ -2378,6 +2384,9 @@ void OpObserverImpl::onTransactionPrepare(
                     oplogEntry.setPrevWriteOpTimeInTransaction(repl::OpTime());
                     oplogEntry.setObject(applyOpsBuilder.done());
                     oplogEntry.setWallClockTime(wallClockTime);
+
+                    // TODO SERVER-69286: set the top-level tenantId here
+
                     logApplyOps(opCtx,
                                 &oplogEntry,
                                 DurableTxnStateEnum::kPrepared,
