@@ -1717,6 +1717,10 @@ buildvariants:
       - name: schedule_variant_auto_tasks
       - name: change_streams_preimage_throughput
       - name: change_streams_preimage_latency
+      - name: tsbs_query_sharded
+      - name: tsbs_query_finance_sharded
+      - name: tsbs_query_sharded_balancer
+      - name: tsbs_query_finance_sharded_balancer
 
   - name: linux-shard-single
     display_name: Linux Shard Single
@@ -1846,11 +1850,10 @@ buildvariants:
       # - name: tpch_10_denormalized
       - name: linkbench
       - name: linkbench2
-      # Time-series collections are available since v5.0.
-      # - name: tsbs_load
-      # - name: tsbs_query
-      # - name: tsbs_query_finance
-      # - name: tsbs_query_manual_bucketing
+      - name: tsbs_load
+      - name: tsbs_query
+      - name: tsbs_query_finance
+      - name: tsbs_query_manual_bucketing
       - name: sb_large_scale
       - name: sb_timeseries
 
@@ -1904,11 +1907,10 @@ buildvariants:
       # - name: tpch_10_denormalized
       - name: linkbench
       - name: linkbench2
-      # Time-series collections are available since v5.0.
-      # - name: tsbs_load
-      # - name: tsbs_query
-      # - name: tsbs_query_finance
-      # - name: tsbs_query_manual_bucketing
+      - name: tsbs_load
+      - name: tsbs_query
+      - name: tsbs_query_finance
+      - name: tsbs_query_manual_bucketing
       - name: sb_large_scale
       - name: sb_timeseries
 
@@ -1966,11 +1968,10 @@ buildvariants:
       # - name: tpch_10_denormalized
       - name: linkbench
       - name: linkbench2
-      # Time-series collections are available since v5.0.
-      # - name: tsbs_load
-      # - name: tsbs_query
-      # - name: tsbs_query_finance
-      # - name: tsbs_query_manual_bucketing
+      - name: tsbs_load
+      - name: tsbs_query
+      - name: tsbs_query_finance
+      - name: tsbs_query_manual_bucketing
       - name: sb_large_scale
       - name: sb_timeseries
 
