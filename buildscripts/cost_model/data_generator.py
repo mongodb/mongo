@@ -29,9 +29,7 @@
 
 from __future__ import annotations
 from dataclasses import dataclass
-from importlib.metadata import distribution
 import time
-import random
 from typing import Sequence
 import asyncio
 import pymongo
@@ -41,7 +39,6 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from random_generator import RandomDistribution
 from config import DataGeneratorConfig, DataType
 from database_instance import DatabaseInstance
-from random_generator_config import distributions
 
 __all__ = ['DataGenerator']
 
@@ -110,9 +107,8 @@ class DataGenerator:
     def _generate_collection_infos(self):
         for coll_template in self.config.collection_templates:
             fields = [
-                FieldInfo(name=ft.name, type=ft.data_type,
-                          distribution=distributions[ft.distribution], indexed=ft.indexed)
-                for ft in coll_template.fields
+                FieldInfo(name=ft.name, type=ft.data_type, distribution=ft.distribution,
+                          indexed=ft.indexed) for ft in coll_template.fields
             ]
             for doc_count in self.config.collection_cardinalities:
                 name = f'{coll_template.name}_{doc_count}'

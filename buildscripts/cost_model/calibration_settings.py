@@ -25,17 +25,14 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 #
-"""
-Configuration of distributions used to generate collections from templates.
+"""Calibration configuration."""
 
-They used in collection templates defined in json.config.
-"""
-
-from importlib.metadata import distributions
+import config
 from random_generator import RangeGenerator, DataType, RandomDistribution
 
-__ALL__ = ['distributions']
+__all__ = ['main_config', 'distributions']
 
+# Data distributions settings.
 distributions = {}
 
 string_choice_values = [
@@ -69,3 +66,47 @@ distributions['string_mixed'] = RandomDistribution.mixed(
 
 distributions['string_uniform'] = RandomDistribution.uniform(
     RangeGenerator(DataType.STRING, "helloworldaa", "helloworldd_"))
+
+# Database settings
+database = config.DatabaseConfig(connection_string='mongodb://localhost',
+                                 database_name='abt_calibration', dump_path='~/data/dump',
+                                 restore_from_dump=config.RestoreMode.NEVER, dump_on_exit=False)
+
+# Collection template seetings
+c_str_01 = config.CollectionTemplate(
+    name="c_str_01", fields=[
+        config.FieldTemplate(name="choice1", data_type=config.DataType.STRING,
+                             distribution=distributions['string_choice'], indexed=True)
+    ], compound_indexes=[])
+
+c_str_05 = config.CollectionTemplate(
+    name="c_str_05", fields=[
+        config.FieldTemplate(name="choice1", data_type=config.DataType.STRING,
+                             distribution=distributions["string_choice"], indexed=True),
+        config.FieldTemplate(name="mixed1", data_type=config.DataType.STRING,
+                             distribution=distributions["string_mixed"], indexed=True),
+        config.FieldTemplate(name="uniform1", data_type=config.DataType.STRING,
+                             distribution=distributions["string_uniform"], indexed=True),
+        config.FieldTemplate(name="choice2", data_type=config.DataType.STRING,
+                             distribution=distributions["string_choice"], indexed=True),
+        config.FieldTemplate(name="mixed2", data_type=config.DataType.STRING,
+                             distribution=distributions["string_mixed"], indexed=True),
+    ], compound_indexes=[["choice1", "mixed1"]])
+
+# Data Generator settings
+data_generator = config.DataGeneratorConfig(enabled=True, collection_cardinalities=[100, 200, 500],
+                                            batch_size=10000,
+                                            collection_templates=[c_str_01, c_str_05])
+
+# Workload Execution settings
+workload_execution = config.WorkloadExecutionConfig(
+    enabled=True, output_collection_name='calibrationData', write_mode=config.WriteMode.REPLACE,
+    warmup_runs=1, runs=5)
+
+# Calibrator settings
+abt_calibrator = config.AbtCalibratorConfig(
+    enabled=True, test_size=0.2, input_collection_name=workload_execution.output_collection_name,
+    trace=False)
+
+main_config = config.Config(database=database, data_generator=data_generator,
+                            abt_calibrator=abt_calibrator, workload_execution=workload_execution)
