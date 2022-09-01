@@ -56,7 +56,8 @@ private:
 public:
     UnencodedCellView toUnencodedCellView(const SplitCellView& view) {
         // Fill builder with bson-encoded elements from view.
-        auto cursor = view.subcellValuesGenerator(ValueEncoder{&builder});
+        ValueEncoder encoder{&builder};
+        auto cursor = view.subcellValuesGenerator(&encoder);
         while (cursor.nextValue()) {
             // Work done in ValueEncoder::operator() rather than here.
         }

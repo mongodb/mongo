@@ -391,7 +391,7 @@ struct SplitCellView {
                 return Out();
 
             invariant(elemPtr < end);
-            return decodeAndAdvance(elemPtr, encoder);
+            return decodeAndAdvance(elemPtr, *encoder);
         }
         bool hasNext() const {
             return elemPtr != end;
@@ -399,14 +399,19 @@ struct SplitCellView {
 
         const char* elemPtr;
         const char* end;
-        ValueEncoder encoder;
+        ValueEncoder* encoder;  // Unowned
     };
 
-
+    /**
+     * Construct a cursor that can iterate the values in a column store cell. Requires a
+     * 'ValueEncoder' that understands the binary format of cell data.
+     *
+     * Note: the 'ValueEncoder' is stored as an unowned pointer. The referenced encoder must stay
+     * valid for the lifetime of the returned cursor.
+     */
     template <class ValueEncoder>
-    auto subcellValuesGenerator(ValueEncoder&& valEncoder) const {
-        return Cursor<ValueEncoder>{
-            firstValuePtr, arrInfo.rawData(), std::forward<ValueEncoder>(valEncoder)};
+    auto subcellValuesGenerator(ValueEncoder* valEncoder) const {
+        return Cursor<ValueEncoder>{firstValuePtr, arrInfo.rawData(), valEncoder};
     }
 
     static SplitCellView parse(CellView cell) {

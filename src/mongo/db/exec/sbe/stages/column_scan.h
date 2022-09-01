@@ -34,6 +34,8 @@
 #include "mongo/db/exec/sbe/stages/collection_helpers.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/values/column_store_encoder.h"
+#include "mongo/db/exec/sbe/values/columnar.h"
 #include "mongo/db/storage/column_store.h"
 
 namespace mongo {
@@ -202,6 +204,8 @@ private:
         ColumnScanStats::CursorStats& _stats;
     };
 
+    TranslatedCell translateCell(PathView path, const SplitCellView& splitCellView);
+
     void readParentsIntoObj(StringData path, value::Object* out, StringDataSet* pathsReadSetOut);
 
     bool checkFilter(CellView cell, size_t filterIndex, const PathValue& path);
@@ -218,6 +222,8 @@ private:
 
     // Move cursors to the next record to be processed.
     RowId advanceCursors();
+
+    value::ColumnStoreEncoder _encoder{};
 
     // The columnar index this stage is scanning and the associated row store collection.
     const UUID _collUuid;

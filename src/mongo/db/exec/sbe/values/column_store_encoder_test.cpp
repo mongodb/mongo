@@ -61,7 +61,7 @@ TEST(SBEColumnStoreEncoder, EncodeTest) {
         StringData{columnStoreCell.buf(), static_cast<size_t>(columnStoreCell.len())});
 
     value::ColumnStoreEncoder encoder;
-    auto cellCursor = cellView.subcellValuesGenerator(encoder);
+    auto cellCursor = cellView.subcellValuesGenerator(&encoder);
 
     {
         auto cellValue = cellCursor.nextValue();
@@ -205,7 +205,7 @@ TEST(SBEColumnStoreEncoder, RoundTripConversionThroughSplitCellView) {
         SplitCellView::parse(StringData{cellBuffer.buf(), static_cast<size_t>(cellBuffer.len())});
 
     value::ColumnStoreEncoder encoder;
-    auto cellCursor = cellView.subcellValuesGenerator(encoder);
+    auto cellCursor = cellView.subcellValuesGenerator(&encoder);
 
     auto referenceIt = referenceBson.begin();
     while (auto&& cursorResult = cellCursor.nextValue()) {
@@ -366,7 +366,7 @@ TEST(SBEColumnStoreEncoder, ColumnsWithEmbeddedBSONElements) {
     // validating the translated outputs their respective comparison functions.
     //
     value::ColumnStoreEncoder encoder;
-    auto cellCursor = cellView.subcellValuesGenerator(encoder);
+    auto cellCursor = cellView.subcellValuesGenerator(&encoder);
 
     for (auto comparison : testComparisons) {
         auto cellValue = cellCursor.nextValue();

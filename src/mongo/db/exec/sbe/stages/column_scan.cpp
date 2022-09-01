@@ -32,23 +32,10 @@
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
-#include "mongo/db/exec/sbe/values/column_store_encoder.h"
-#include "mongo/db/exec/sbe/values/columnar.h"
 #include "mongo/db/index/columns_access_method.h"
 
 namespace mongo {
 namespace sbe {
-namespace {
-TranslatedCell translateCell(PathView path, const SplitCellView& splitCellView) {
-    value::ColumnStoreEncoder encoder{};
-    SplitCellView::Cursor<value::ColumnStoreEncoder> cellCursor =
-        splitCellView.subcellValuesGenerator<value::ColumnStoreEncoder>(std::move(encoder));
-    return TranslatedCell{splitCellView.arrInfo, path, std::move(cellCursor)};
-}
-
-
-}  // namespace
-
 ColumnScanStage::ColumnScanStage(UUID collectionUuid,
                                  StringData columnIndexName,
                                  std::vector<std::string> paths,
@@ -305,6 +292,12 @@ void ColumnScanStage::open(bool reOpen) {
     }
     _rowId = ColumnStore::kNullRowId;
     _open = true;
+}
+
+TranslatedCell ColumnScanStage::translateCell(PathView path, const SplitCellView& splitCellView) {
+    SplitCellView::Cursor<value::ColumnStoreEncoder> cellCursor =
+        splitCellView.subcellValuesGenerator<value::ColumnStoreEncoder>(&_encoder);
+    return TranslatedCell{splitCellView.arrInfo, path, std::move(cellCursor)};
 }
 
 void ColumnScanStage::readParentsIntoObj(StringData path,
