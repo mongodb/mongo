@@ -2241,6 +2241,7 @@ env.Library(
         'session/sessions_collection_rs',
         'session/sessions_collection_standalone',
         'startup_warnings_mongod',
+        'stats/change_collection_server_status',
         'stats/counters',
         'stats/serveronly_stats',
         'stats/top',

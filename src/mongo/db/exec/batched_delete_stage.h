@@ -137,6 +137,7 @@ private:
     long long _commitBatch(WorkingSetID* out,
                            std::set<WorkingSetID>* recordsToSkip,
                            unsigned int* docsDeleted,
+                           unsigned int* bytesDeleted,
                            unsigned int* bufferOffset);
 
     // Attempts to stage a new delete in the _stagedDeletesBuffer. Returns the PlanStage::StageState

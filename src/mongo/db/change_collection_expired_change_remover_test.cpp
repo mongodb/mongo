@@ -114,9 +114,26 @@ protected:
 
     void dropAndRecreateChangeCollection(OperationContext* opCtx,
                                          boost::optional<TenantId> tenantId) {
-        auto changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx);
+        auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx);
         changeCollectionManager.dropChangeCollection(opCtx, tenantId);
         changeCollectionManager.createChangeCollection(opCtx, tenantId);
+    }
+
+    size_t removeExpiredChangeCollectionsDocuments(OperationContext* opCtx,
+                                                   boost::optional<TenantId> tenantId,
+                                                   const Date_t& expirationTime) {
+        // Acquire intent-exclusive lock on the change collection. Early exit if the collection
+        // doesn't exist.
+        const auto changeCollection =
+            AutoGetChangeCollection{opCtx, AutoGetChangeCollection::AccessMode::kWrite, tenantId};
+
+        // Get the 'maxRecordIdBound' and perform the removal of the expired documents.
+        const auto maxRecordIdBound =
+            ChangeStreamChangeCollectionManager::getChangeCollectionPurgingJobMetadata(
+                opCtx, &*changeCollection, expirationTime)
+                ->maxRecordIdBound;
+        return ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocuments(
+            opCtx, &*changeCollection, maxRecordIdBound);
     }
 
     const boost::optional<TenantId> _tenantId;
@@ -151,9 +168,10 @@ TEST_F(ChangeCollectionExpiredChangeRemoverTest, VerifyLastExpiredDocument) {
     auto changeCollection =
         AutoGetChangeCollection{opCtx, AutoGetChangeCollection::AccessMode::kRead, _tenantId};
 
-    const auto maxExpiredRecordId =
-        ChangeStreamChangeCollectionManager::getChangeCollectionMaxExpiredRecordId(
-            opCtx, &*changeCollection, expirationTime);
+    auto maxExpiredRecordId =
+        ChangeStreamChangeCollectionManager::getChangeCollectionPurgingJobMetadata(
+            opCtx, &*changeCollection, expirationTime)
+            ->maxRecordIdBound;
 
     // Get the document found at 'maxExpiredRecordId' and test it against 'lastExpiredDocument'.
     auto scanExecutor =
@@ -192,9 +210,7 @@ TEST_F(ChangeCollectionExpiredChangeRemoverTest, ShouldRemoveOnlyExpiredDocument
     insertDocumentToChangeCollection(opCtx, _tenantId, notExpired);
 
     // Verify that only the required documents are removed.
-    ASSERT_EQ(ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocuments(
-                  opCtx, _tenantId, expirationTime),
-              2);
+    ASSERT_EQ(removeExpiredChangeCollectionsDocuments(opCtx, _tenantId, expirationTime), 2);
 
     // Only the 'notExpired' document is left in the change collection.
     const auto changeCollectionEntries = readChangeCollection(opCtx, _tenantId);
@@ -213,9 +229,7 @@ TEST_F(ChangeCollectionExpiredChangeRemoverTest, ShouldLeaveAtLeastOneDocument) 
     }
 
     // Verify that all but the last document is removed.
-    ASSERT_EQ(ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocuments(
-                  opCtx, _tenantId, now()),
-              99);
+    ASSERT_EQ(removeExpiredChangeCollectionsDocuments(opCtx, _tenantId, now()), 99);
 
     // Only the last document is left in the change collection.
     const auto changeCollectionEntries = readChangeCollection(opCtx, _tenantId);

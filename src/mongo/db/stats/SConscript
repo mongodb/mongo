@@ -85,6 +85,17 @@ env.Library(
 )
 
 env.Library(
+    target='change_collection_server_status',
+    source=['change_collection_server_status.cpp'],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/change_stream_change_collection_manager',
+        '$BUILD_DIR/mongo/db/commands/server_status_core',
+        '$BUILD_DIR/mongo/db/server_base',
+    ],
+)
+
+env.Library(
     target='transaction_stats',
     source=[
         'single_transaction_stats.cpp',

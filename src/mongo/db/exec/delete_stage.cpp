@@ -304,6 +304,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
         }
     }
     _specificStats.docsDeleted += _params->numStatsForDoc ? _params->numStatsForDoc(bsonObjDoc) : 1;
+    _specificStats.bytesDeleted += bsonObjDoc.objsize();
 
     if (_params->returnDeleted) {
         // After deleting the document, the RecordId associated with this member is invalid.

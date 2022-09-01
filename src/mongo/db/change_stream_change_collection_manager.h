@@ -37,10 +37,62 @@
 namespace mongo {
 
 /**
+ * Metadata associated with a particular change collection that is used by the purging job.
+ */
+struct ChangeCollectionPurgingJobMetadata {
+    // The wall time in milliseconds of the first document of the change collection.
+    long long firstDocWallTimeMillis;
+
+    // The maximum record id beyond which the change collection documents will be not deleted.
+    RecordIdBound maxRecordIdBound;
+};
+
+/**
  * Manages the creation, deletion and insertion lifecycle of the change collection.
  */
 class ChangeStreamChangeCollectionManager {
 public:
+    /**
+     * Statistics of the change collection purging job.
+     */
+    struct PurgingJobStats {
+        /**
+         * Total number of deletion passes completed by the purging job.
+         */
+        AtomicWord<long long> totalPass;
+
+        /**
+         * Cumulative number of change collections documents deleted by the purging job.
+         */
+        AtomicWord<long long> docsDeleted;
+
+        /**
+         * Cumulative size in bytes of all deleted documents from all change collections by the
+         * purging job.
+         */
+        AtomicWord<long long> bytesDeleted;
+
+        /**
+         * Cumulative number of change collections scanned by the purging job.
+         */
+        AtomicWord<long long> scannedCollections;
+
+        /**
+         * Cumulative number of milliseconds elapsed since the first pass by the purging job.
+         */
+        AtomicWord<long long> timeElapsedMillis;
+
+        /**
+         * Maximum wall time in milliseconds from the first document of each change collection.
+         */
+        AtomicWord<long long> maxStartWallTimeMillis;
+
+        /**
+         * Serializes the purging job statistics to the BSON object.
+         */
+        BSONObj toBSON() const;
+    };
+
     explicit ChangeStreamChangeCollectionManager(ServiceContext* service) {}
 
     ~ChangeStreamChangeCollectionManager() = default;
@@ -122,23 +174,39 @@ public:
         bool isGlobalIXLockAcquired,
         OpDebug* opDebug);
 
+    PurgingJobStats& getPurgingJobStats() {
+        return _purgingJobStats;
+    }
+
     /**
-     * Forward-scans the given change collection to return the recordId of the last, non-terminal
-     * document having the wall time less than the 'expirationTime'. Returns 'boost::none' if the
+     * Forward-scans the given change collection to return the wall time of the first document as
+     * well as recordId of the last, non-terminal document having the wall time less than the
+     * 'expirationTime'. Returns 'boost::none' if the collection is empty, or there are no expired
+     * documents, or the collection contains a single expired document.
+     */
+
+    /**
+     * Forward scans the provided change collection and returns its metadata that will be used by
+     * the purging job to perform deletion on it. The method returns 'boost::none' if either the
      * collection is empty, or there are no expired documents, or the collection contains a single
      * expired document.
      */
-    static boost::optional<RecordIdBound> getChangeCollectionMaxExpiredRecordId(
-        OperationContext* opCtx,
-        const CollectionPtr* changeCollection,
-        const Date_t& expirationTime);
+    static boost::optional<ChangeCollectionPurgingJobMetadata>
+    getChangeCollectionPurgingJobMetadata(OperationContext* opCtx,
+                                          const CollectionPtr* changeCollection,
+                                          const Date_t& expirationTime);
 
     /**
      * Removes expired documents from the change collection for the provided 'tenantId'. A document
      * whose retention time is less than the 'expirationTime' is deleted.
+     * Returns wall time of the first document as well as number of documents deleted.
      */
     static size_t removeExpiredChangeCollectionsDocuments(OperationContext* opCtx,
-                                                          boost::optional<TenantId> tenantId,
-                                                          const Date_t& expirationTime);
+                                                          const CollectionPtr* changeCollection,
+                                                          const RecordIdBound& maxRecordIdBound);
+
+private:
+    // Change collections purging job stats.
+    PurgingJobStats _purgingJobStats;
 };
 }  // namespace mongo

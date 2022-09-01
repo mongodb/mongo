@@ -411,6 +411,7 @@ struct DeleteStats : public SpecificStats {
     }
 
     size_t docsDeleted = 0u;
+    size_t bytesDeleted = 0u;
 };
 
 struct BatchedDeleteStats : public DeleteStats {

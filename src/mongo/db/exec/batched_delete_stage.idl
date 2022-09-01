@@ -41,6 +41,7 @@ server_parameters:
     default: 2097152 # 2MB
     validator:
       gte: 0
+      lte: 2147483647
   batchedDeletesTargetBatchDocs:
     description: "Threshold of documents at which a batch of document deletions is committed. A value of zero means unlimited"
     set_at: [startup, runtime]
