@@ -275,6 +275,10 @@ __curfile_reset(WT_CURSOR *cursor)
 
     ret = __wt_btcur_reset(cbt);
 
+    /* If a user calls cursor reset also reset the bounds. */
+    if (API_USER_ENTRY(session))
+        __wt_cursor_bound_reset(cursor);
+
     /* Reset maintains no position, key or value. */
     WT_ASSERT(session,
       !F_ISSET(cbt, WT_CBT_ACTIVE) && F_MASK(cursor, WT_CURSTD_KEY_SET) == 0 &&
