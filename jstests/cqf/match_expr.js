@@ -20,20 +20,30 @@ for (let va = 0; va < 5; va++) {
 }
 assert.commandWorked(bulk.execute());
 
+const expr = {
+    $expr: {
+        $or: [
+            {$and: [{$eq: ["$a", 1]}, {$eq: ["$b", 2]}]},
+            {$eq: ["$c", 3]},
+        ]
+    }
+};
+
+const numExpected = 1 * 5 * 5 + 4 * 1 * 1;
+
 {
-    const res = t.explain("executionStats").aggregate([{
-        $match: {
-            $expr: {
-                $or: [
-                    {$and: [{$eq: ["$a", 1]}, {$eq: ["$b", 2]}]},
-                    {$eq: ["$c", 3]},
-                ]
-            }
-        }
-    }]);
+    const res = t.explain("executionStats").aggregate([{$match: expr}]);
+    assert.eq(numExpected, res.executionStats.nReturned);
 
-    assert.eq(1 * 5 * 5 + 4 * 1 * 1, res.executionStats.nReturned);
+    assertValueOnPlanPath("Filter", res, "child.nodeType");
+    assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
+}
 
-    // TODO: verify translated plan.
+{
+    const res = t.explain("executionStats").find(expr).finish();
+    assert.eq(numExpected, res.executionStats.nReturned);
+
+    assertValueOnPlanPath("Filter", res, "child.nodeType");
+    assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
 }
 }());

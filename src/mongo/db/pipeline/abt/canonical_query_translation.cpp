@@ -41,8 +41,10 @@ ABT translateCanonicalQueryToABT(const Metadata& metadata,
                                  ProjectionName scanProjName,
                                  ABT initialNode,
                                  PrefixId& prefixId) {
-    auto abt = generateMatchExpression(
-        canonicalQuery.root(), false /* allowAggExpression */, scanProjName, "match");
+    auto abt = generateMatchExpression(canonicalQuery.root(),
+                                       true /* allowAggExpression */,
+                                       scanProjName,
+                                       prefixId.getNextId("match"));
 
     abt = make<FilterNode>(make<EvalFilter>(std::move(abt), make<Variable>(scanProjName)),
                            std::move(initialNode));
