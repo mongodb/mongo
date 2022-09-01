@@ -109,7 +109,7 @@ jsTestLog('Command should still verify index even if implicitlyCreateIndex is fa
 assert.commandFailedWithCode(
     mongos.adminCommand(
         {shardCollection: kDbName + '.foo', key: {x: 1}, implicitlyCreateIndex: false}),
-    6373200);
+    [6373200, 6373201]);
 
 //
 // Test shardCollection's idempotency
