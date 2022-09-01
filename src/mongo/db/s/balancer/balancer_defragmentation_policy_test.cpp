@@ -142,11 +142,9 @@ protected:
 
     ShardStatistics buildShardStats(ShardId id,
                                     uint64_t currentSizeBytes,
-                                    bool maxed = false,
                                     bool draining = false,
                                     std::set<std::string>&& zones = {}) {
-        return ShardStatistics(
-            id, maxed ? currentSizeBytes : 0, currentSizeBytes, draining, zones, "");
+        return ShardStatistics(id, currentSizeBytes, draining, zones, "");
     }
 
     void setDefaultClusterStats() {

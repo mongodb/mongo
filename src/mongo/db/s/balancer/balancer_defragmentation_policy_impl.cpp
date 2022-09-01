@@ -384,9 +384,7 @@ public:
         stdx::unordered_map<ShardId, ShardInfo> shardInfos;
         for (const auto& shardStats : collectionShardStats) {
             shardInfos.emplace(shardStats.shardId,
-                               ShardInfo(shardStats.currSizeBytes,
-                                         shardStats.maxSizeBytes,
-                                         shardStats.isDraining));
+                               ShardInfo(shardStats.currSizeBytes, shardStats.isDraining));
         }
 
         auto collectionChunks = getCollectionChunks(opCtx, coll);
@@ -664,19 +662,14 @@ private:
     };
 
     struct ShardInfo {
-        ShardInfo(uint64_t currentSizeBytes, uint64_t maxSizeBytes, bool draining)
-            : currentSizeBytes(currentSizeBytes), maxSizeBytes(maxSizeBytes), draining(draining) {}
+        ShardInfo(uint64_t currentSizeBytes, bool draining)
+            : currentSizeBytes(currentSizeBytes), draining(draining) {}
 
         bool isDraining() const {
             return draining;
         }
 
-        bool hasCapacityFor(uint64_t newDataSize) const {
-            return (maxSizeBytes == 0 || currentSizeBytes + newDataSize < maxSizeBytes);
-        }
-
         uint64_t currentSizeBytes;
-        const uint64_t maxSizeBytes;
         const bool draining;
     };
 
@@ -970,8 +963,7 @@ private:
 
     uint32_t _rankMergeableSibling(const ChunkRangeInfo& chunkTobeMovedAndMerged,
                                    const ChunkRangeInfo& mergeableSibling) {
-        static constexpr uint32_t kNoMoveRequired = 1 << 4;
-        static constexpr uint32_t kDestinationNotMaxedOut = 1 << 3;
+        static constexpr uint32_t kNoMoveRequired = 1 << 3;
         static constexpr uint32_t kConvenientMove = 1 << 2;
         static constexpr uint32_t kMergeSolvesTwoPendingChunks = 1 << 1;
         static constexpr uint32_t kMergeSolvesOnePendingChunk = 1;
@@ -989,11 +981,7 @@ private:
                 ? kMergeSolvesTwoPendingChunks
                 : kMergeSolvesOnePendingChunk;
         }
-        if (chunkTobeMovedAndMerged.shard == mergeableSibling.shard ||
-            _shardInfos.at(mergeableSibling.shard)
-                .hasCapacityFor(chunkTobeMovedAndMerged.estimatedSizeBytes)) {
-            ranking += kDestinationNotMaxedOut;
-        }
+
         return ranking;
     }
 

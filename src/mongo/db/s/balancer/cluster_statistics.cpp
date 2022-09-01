@@ -50,39 +50,27 @@ ClusterStatistics::ClusterStatistics() = default;
 ClusterStatistics::~ClusterStatistics() = default;
 
 ClusterStatistics::ShardStatistics::ShardStatistics(ShardId inShardId,
-                                                    uint64_t inMaxSizeBytes,
                                                     uint64_t inCurrSizeBytes,
                                                     bool inIsDraining,
                                                     std::set<std::string> inShardZones,
                                                     std::string inMongoVersion,
                                                     use_bytes_t t)
     : shardId(std::move(inShardId)),
-      maxSizeBytes(inMaxSizeBytes),
       currSizeBytes(inCurrSizeBytes),
       isDraining(inIsDraining),
       shardZones(std::move(inShardZones)),
       mongoVersion(std::move(inMongoVersion)) {}
 
 ClusterStatistics::ShardStatistics::ShardStatistics(ShardId inShardId,
-                                                    uint64_t inMaxSizeMB,
                                                     uint64_t inCurrSizeMB,
                                                     bool inIsDraining,
                                                     std::set<std::string> inShardZones,
                                                     std::string inMongoVersion)
     : ShardStatistics(inShardId,
-                      convertMBToBytes(inMaxSizeMB),
                       convertMBToBytes(inCurrSizeMB),
                       inIsDraining,
                       std::move(inShardZones),
                       std::move(inMongoVersion),
                       use_bytes_t{}) {}
-
-bool ClusterStatistics::ShardStatistics::isSizeMaxed() const {
-    if (!maxSizeBytes || !currSizeBytes) {
-        return false;
-    }
-
-    return currSizeBytes >= maxSizeBytes;
-}
 
 }  // namespace mongo

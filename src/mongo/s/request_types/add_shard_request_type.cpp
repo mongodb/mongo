@@ -107,15 +107,10 @@ StatusWith<AddShardRequest> AddShardRequest::parseInternalFields(const BSONObj& 
             return status;
         }
     }
-    {
-        long long requestMaxSizeMB;
-        Status status = bsonExtractIntegerField(obj, maxSizeMB.name(), &requestMaxSizeMB);
-        if (status.isOK()) {
-            request._maxSizeMB = std::move(requestMaxSizeMB);
-        } else if (status != ErrorCodes::NoSuchKey) {
-            return status;
-        }
-    }
+
+    uassert(ErrorCodes::InvalidOptions,
+            "addShard no longer supports maxSize field",
+            !obj.hasField(maxSizeMB.name()));
 
     return request;
 }
@@ -123,9 +118,6 @@ StatusWith<AddShardRequest> AddShardRequest::parseInternalFields(const BSONObj& 
 BSONObj AddShardRequest::toCommandForConfig() {
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append(configsvrAddShard.name(), _connString.toString());
-    if (hasMaxSize()) {
-        cmdBuilder.append(maxSizeMB.name(), *_maxSizeMB);
-    }
     if (hasName()) {
         cmdBuilder.append(shardName.name(), *_name);
     }
@@ -154,8 +146,6 @@ string AddShardRequest::toString() const {
     ss << "AddShardRequest shard: " << _connString.toString();
     if (hasName())
         ss << ", name: " << *_name;
-    if (hasMaxSize())
-        ss << ", maxSize: " << *_maxSizeMB;
     return ss;
 }
 
