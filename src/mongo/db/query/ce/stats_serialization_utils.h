@@ -27,52 +27,40 @@
  *    it in the license file.
  */
 
+#pragma once
 
-#include "mongo/platform/basic.h"
+#include <list>
+#include <string>
 
-#include "mongo/db/query/ce/stats_cache_loader_impl.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/sbe/values/value.h"
 
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/query/ce/collection_statistics.h"
-#include "mongo/logv2/log.h"
-#include "mongo/stdx/thread.h"
+namespace mongo::stats_serialization_utils {
 
-namespace mongo {
+using TypeCount = std::list<std::pair<std::string, long long>>;
+using TypeValuePair = std::pair<sbe::value::TypeTags, sbe::value::Value>;
 
+/**
+ * Returns owned BSON Object representing data matching mongo::StatsBucket IDL.
+ */
+BSONObj makeStatsBucket(TypeValuePair typeValue,
+                        long long boundaryCount,
+                        long long rangeCount,
+                        long long rangeDistincts,
+                        long long cumulativeCount,
+                        long long cumulativeDistincts);
+/**
+ * Returns owned BSON Object representing data matching mongo::StatsPath IDL.
+ */
+BSONObj makeStatsPath(StringData path,
+                      long long documents,
+                      boost::optional<long long> documentsSampled,
+                      boost::optional<double> samplingRate,
+                      boost::optional<long long> samplesRequested,
+                      boost::optional<std::pair<long long, long long>> boolCount,
+                      boost::optional<TypeCount> typeCount,
+                      boost::optional<std::list<BSONObj>> scalarHistogram,
+                      boost::optional<BSONObj> arrayHistogram);
 
-SemiFuture<CollectionStatistics> StatsCacheLoaderImpl::getStats(OperationContext* opCtx,
-                                                                const NamespaceString& nss) {
-
-    std::string statsColl(kStatsPrefix + "." + nss.ns());
-
-    NamespaceString statsNss(kStatsDb, statsColl);
-    DBDirectClient client(opCtx);
-    FindCommandRequest findRequest{statsNss};
-    BSONObj result;
-
-    try {
-        auto cursor = client.find(findRequest);
-
-        if (!cursor) {
-            uasserted(ErrorCodes::OperationFailed,
-                      str::stream() << "Failed to establish a cursor for reading " << nss.ns()
-                                    << " from local storage");
-        }
-
-        std::vector<BSONObj> histograms;
-        while (cursor->more()) {
-            BSONObj document = cursor->nextSafe().getOwned();
-            histograms.push_back(std::move(document));
-        }
-
-        // TODO: SERVER-69238, parse histograms BSONs.
-        CollectionStatistics stats{0};
-        return makeReadyFutureWith([this, stats] { return stats; }).semi();
-    } catch (const DBException& ex) {
-        uassertStatusOK(ex.toStatus());
-    }
-    MONGO_UNREACHABLE
-}
-
-}  // namespace mongo
+}  // namespace mongo::stats_serialization_utils

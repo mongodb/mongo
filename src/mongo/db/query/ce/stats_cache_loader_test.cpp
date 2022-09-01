@@ -67,14 +67,14 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoad) {
     const CollectionPtr& coll = autoColl.getCollection();
     {
         WriteUnitOfWork wuow(operationContext());
-        // TODO: SERVER-68745, insert histogram.
+        // TODO: SERVER-69238, insert histogram.
         BSONObj doc = BSON("_id" << 1);
         ASSERT_OK(collection_internal::insertDocument(
             operationContext(), coll, InsertStatement(doc), nullptr));
         wuow.commit();
     }
     auto newStats = _statsCacheLoader.getStats(operationContext(), nss).get();
-    // TODO: SERVER-68745, verify histogram.
+    // TODO: SERVER-69238, verify histogram.
 }
 
 }  // namespace
