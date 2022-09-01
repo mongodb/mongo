@@ -915,6 +915,8 @@ public:
  *   uint8_t[32] esc;  // ESCDerivedFromDataTokenAndContentionFactorToken
  *   uint8_t[32] ecc;  // ECCDerivedFromDataTokenAndContentionFactorToken
  *}
+ *
+ * The specification needs to be in sync with the validation in 'bson_validate.cpp'.
  */
 struct FLE2IndexedEqualityEncryptedValue {
     FLE2IndexedEqualityEncryptedValue(FLE2InsertUpdatePayload payload, uint64_t counter);
@@ -958,6 +960,7 @@ struct FLE2IndexedEqualityEncryptedValue {
  *   ciphertext[ciphertext_length];
  * } blob;
  *
+ * The specification needs to be in sync with the validation in 'bson_validate.cpp'.
  */
 struct FLE2UnindexedEncryptedValue {
     static std::vector<uint8_t> serialize(const FLEUserKeyAndId& userKey,
@@ -1000,6 +1003,8 @@ struct FLEEdgeToken {
  *      uint8_t[32] ecc;  // ECCDerivedFromDataTokenAndContentionFactorToken
  *   } edges[edgeCount];
  *}
+ *
+ * The specification needs to be in sync with the validation in 'bson_validate.cpp'.
  */
 struct FLE2IndexedRangeEncryptedValue {
     FLE2IndexedRangeEncryptedValue(FLE2InsertUpdatePayload payload,

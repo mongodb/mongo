@@ -36,6 +36,8 @@
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/util/bsoncolumn.h"
+#include "mongo/crypto/encryption_fields_util.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/str_escape.h"
 
@@ -150,6 +152,10 @@ public:
                                 md5Size == md5Length);
                         break;
                     }
+                    case BinDataType::Encrypt: {
+                        _checkEncryptedBSONValue(ptr);
+                        break;
+                    }
                 }
                 break;
             }
@@ -210,6 +216,54 @@ private:
                                 "Found {} instead.",
                                 options),
                     &option == options || option > *(&option - 1));
+        }
+    }
+
+    void _checkEncryptedBSONValue(const char* ptr) {
+        constexpr uint32_t UUIDLength = 16;
+        constexpr uint32_t minLength = sizeof(uint8_t) + UUIDLength + sizeof(uint8_t);
+
+        auto len = ConstDataView(ptr).read<LittleEndian<uint32_t>>();
+        // Make sure we can read the subtype byte of the Encrypted BSON Value.
+        uassert(ErrorCodes::NonConformantBSON,
+                fmt::format("Invalid Encrypted BSON Value length {}", len),
+                len);
+
+        // Skip the size bytes and BinData subtype byte to the actual encrypted data.
+        ptr += sizeof(uint32_t) + sizeof(uint8_t);
+        auto encryptedBinDataType = static_cast<EncryptedBinDataType>(
+            (uint8_t)ConstDataView(ptr).read<LittleEndian<uint8_t>>());
+        // Only subtype 1, 2, 6, 7, and 9 can exist in MongoDB collections.
+        switch (encryptedBinDataType) {
+            case EncryptedBinDataType::kDeterministic:
+            case EncryptedBinDataType::kRandom: {
+                uassert(ErrorCodes::NonConformantBSON,
+                        fmt::format("Invalid Encrypted BSON Value length {}", len),
+                        len > minLength);
+                break;
+            }
+            case EncryptedBinDataType::kFLE2UnindexedEncryptedValue:
+            case EncryptedBinDataType::kFLE2EqualityIndexedValue:
+            case EncryptedBinDataType::kFLE2RangeIndexedValue: {
+                uassert(ErrorCodes::NonConformantBSON,
+                        fmt::format("Invalid Encrypted BSON Value length {}", len),
+                        len >= minLength);
+                auto originalBsonType =
+                    static_cast<BSONType>((int8_t)ConstDataView(ptr + sizeof(uint8_t) + UUIDLength)
+                                              .read<LittleEndian<uint8_t>>());
+                uassert(ErrorCodes::NonConformantBSON,
+                        fmt::format(
+                            "BSON type '{}' is not supported for Encrypted BSON Value subtype {}",
+                            typeName(originalBsonType),
+                            encryptedBinDataType),
+                        isFLE2SupportedType(encryptedBinDataType, originalBsonType));
+                break;
+            }
+            default: {
+                uasserted(ErrorCodes::NonConformantBSON,
+                          fmt::format("Unsupported Encrypted BSON Value type {} in the collection",
+                                      encryptedBinDataType));
+            }
         }
     }
 
