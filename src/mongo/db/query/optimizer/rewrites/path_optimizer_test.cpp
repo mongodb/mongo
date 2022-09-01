@@ -564,6 +564,96 @@ TEST(Path, Fuse6) {
         tree);
 }
 
+TEST(Path, Fuse7) {
+    auto scanNode = make<ScanNode>("root", "test");
+
+    auto project1 = make<EvaluationNode>(
+        "px",
+        make<EvalPath>(make<PathGet>("x", make<PathIdentity>()), make<Variable>("root")),
+        std::move(scanNode));
+
+    auto project2 = make<EvaluationNode>(
+        "py",
+        make<EvalPath>(
+            make<PathComposeM>(
+                make<PathComposeM>(make<PathKeep>(PathKeep::NameSet{"a"}),
+                                   make<PathField>("a", make<PathConstant>(make<Variable>("px")))),
+                make<PathDefault>(Constant::emptyObject())),
+            make<Variable>("root")),
+        std::move(project1));
+
+    auto tree = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"py"}},
+                               std::move(project2));
+
+    ASSERT_EXPLAIN(
+        "Root []\n"
+        "  projections: \n"
+        "    py\n"
+        "  RefBlock: \n"
+        "    Variable [py]\n"
+        "  Evaluation []\n"
+        "    BindBlock:\n"
+        "      [py]\n"
+        "        EvalPath []\n"
+        "          PathComposeM []\n"
+        "            PathComposeM []\n"
+        "              PathKeep [a]\n"
+        "              PathField [a]\n"
+        "                PathConstant []\n"
+        "                  Variable [px]\n"
+        "            PathDefault []\n"
+        "              Const [{}]\n"
+        "          Variable [root]\n"
+        "    Evaluation []\n"
+        "      BindBlock:\n"
+        "        [px]\n"
+        "          EvalPath []\n"
+        "            PathGet [x]\n"
+        "              PathIdentity []\n"
+        "            Variable [root]\n"
+        "      Scan [test]\n"
+        "        BindBlock:\n"
+        "          [root]\n"
+        "            Source []\n",
+        tree);
+
+    auto env = VariableEnvironment::build(tree);
+    bool changed = false;
+    do {
+        changed = false;
+        if (PathFusion{env}.optimize(tree)) {
+            changed = true;
+        }
+        if (ConstEval{env}.optimize(tree)) {
+            changed = true;
+        }
+    } while (changed);
+
+    // Obtain "x" and directly assign at "a".
+    ASSERT_EXPLAIN(
+        "Root []\n"
+        "  projections: \n"
+        "    py\n"
+        "  RefBlock: \n"
+        "    Variable [py]\n"
+        "  Evaluation []\n"
+        "    BindBlock:\n"
+        "      [py]\n"
+        "        EvalPath []\n"
+        "          PathField [a]\n"
+        "            PathConstant []\n"
+        "              EvalPath []\n"
+        "                PathGet [x]\n"
+        "                  PathIdentity []\n"
+        "                Variable [root]\n"
+        "          Const [{}]\n"
+        "    Scan [test]\n"
+        "      BindBlock:\n"
+        "        [root]\n"
+        "          Source []\n",
+        tree);
+}
+
 TEST(Path, Lower1) {
     PrefixId prefixId;
 

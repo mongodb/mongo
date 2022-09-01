@@ -32,6 +32,10 @@
 #include "mongo/db/query/optimizer/reference_tracker.h"
 
 namespace mongo::optimizer {
+
+/**
+ * Performs fusion rewrites over paths. Those attempt to simplify complex paths.
+ */
 class PathFusion {
     enum class Type { unknown, nothing, object, array, boolean, any };
     enum class Kind { project, filter };
@@ -83,7 +87,10 @@ private:
     }
     bool fuse(ABT& lhs, const ABT& rhs);
 
-    void tryFuseComposition(ABT& n, const ABT& input);
+    /**
+     * Attempt to eliminate a chain of Fields with constant children.
+     */
+    void tryFuseComposition(ABT& n, ABT& input);
 
     VariableEnvironment& _env;
     opt::unordered_map<const PathSyntaxSort*, CollectedInfo> _info;

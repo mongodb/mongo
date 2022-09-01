@@ -44,13 +44,8 @@ ABT::reference_type PathFusion::follow(ABT::reference_type n) {
 
 bool PathFusion::fuse(ABT& lhs, const ABT& rhs) {
     if (auto rhsComposeM = rhs.cast<PathComposeM>(); rhsComposeM != nullptr) {
-        // Try to fuse first with right path, then left.
-        if (_info[rhsComposeM->getPath2().cast<PathSyntaxSort>()]._isConst) {
-            if (fuse(lhs, rhsComposeM->getPath2())) {
-                return true;
-            }
-            if (_info[rhsComposeM->getPath1().cast<PathSyntaxSort>()]._isConst &&
-                fuse(lhs, rhsComposeM->getPath1())) {
+        for (const auto& branch : collectComposed(rhs)) {
+            if (_info[branch.cast<PathSyntaxSort>()]._isConst && fuse(lhs, branch)) {
                 return true;
             }
         }
@@ -307,7 +302,7 @@ void PathFusion::transport(ABT& n, const PathComposeM& path, ABT& p1, ABT& p2) {
     }
 }
 
-void PathFusion::tryFuseComposition(ABT& n, const ABT& input) {
+void PathFusion::tryFuseComposition(ABT& n, ABT& input) {
     // Check to see if our flattened composition consists of constant branches containing only
     // Field and Keep elements. If we have duplicate Field branches then retain only the
     // latest one. For example:
@@ -327,6 +322,7 @@ void PathFusion::tryFuseComposition(ABT& n, const ABT& input) {
     }
 
     bool updated = false;
+    bool hasDefault = false;
     for (const auto& branch : collectComposed(n)) {
         auto info = _info.find(branch.cast<PathSyntaxSort>());
         if (info == _info.cend()) {
@@ -369,17 +365,41 @@ void PathFusion::tryFuseComposition(ABT& n, const ABT& input) {
                 }
             }
             toKeep = std::move(newKeepSet);
-        } else if (auto defaultPtr = branch.cast<PathDefault>(); defaultPtr != nullptr &&
-                   defaultPtr->getDefault().is<Constant>() &&
-                   defaultPtr->getDefault().cast<Constant>()->isObject() &&
-                   inputType == Type::object) {
-            // Skip over PathDefault with an empty object since our input is already an object.
-            updated = true;
+        } else if (auto defaultPtr = branch.cast<PathDefault>(); defaultPtr != nullptr) {
+            if (auto constPtr = defaultPtr->getDefault().cast<Constant>();
+                constPtr != nullptr && constPtr->isObject() && inputType == Type::object) {
+                // Skip over PathDefault with an empty object since our input is already an object.
+                updated = true;
+            } else {
+                // Skip over other PathDefaults but remember we had one.
+                hasDefault = true;
+            }
         } else {
             return;
-        };
+        }
+    }
+
+    if (toKeep && input != Constant::emptyObject()) {
+        // Check if we assign to every field we keep. If so, drop dependence on input.
+        bool assignToAllKeptFields = true;
+        for (const auto& fieldName : *toKeep) {
+            if (fieldMap.count(fieldName) == 0) {
+                assignToAllKeptFields = false;
+                break;
+            }
+        }
+        if (assignToAllKeptFields) {
+            // Do not need the input, do not keep fields, and ignore defaults.
+            input = Constant::emptyObject();
+            toKeep = boost::none;
+            updated = true;
+            hasDefault = false;
+        }
     }
     if (!updated) {
+        return;
+    }
+    if (hasDefault) {
         return;
     }
 
