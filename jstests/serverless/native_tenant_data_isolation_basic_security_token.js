@@ -58,6 +58,13 @@ const tokenDB = tokenConn.getDB(kDbName);
             tokenDB.runCommand({getMore: findRes.cursor.id, collection: kCollName}));
     }
 
+    // Test the aggregate command.
+    {
+        const aggRes = assert.commandWorked(
+            tokenDB.runCommand({aggregate: kCollName, pipeline: [{$match: {a: 1}}], cursor: {}}));
+        assert(arrayEq([{_id: 0, a: 1, b: 1}], aggRes.cursor.firstBatch), tojson(aggRes));
+    }
+
     // Find and modify the document.
     {
         const fad1 = assert.commandWorked(

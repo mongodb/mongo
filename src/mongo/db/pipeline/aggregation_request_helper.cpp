@@ -107,10 +107,10 @@ AggregateCommandRequest parseFromBSON(OperationContext* opCtx,
         cmdObjChanged = true;
     }
 
-    // TODO SERVER-68721: pass in tenantId from nss to IDLParserContext
     AggregateCommandRequest request(nss);
-    request = AggregateCommandRequest::parse(IDLParserContext("aggregate", apiStrict),
-                                             cmdObjChanged ? cmdObjBob.obj() : cmdObj);
+    request =
+        AggregateCommandRequest::parse(IDLParserContext("aggregate", apiStrict, nss.tenantId()),
+                                       cmdObjChanged ? cmdObjBob.obj() : cmdObj);
 
     if (explainVerbosity) {
         uassert(ErrorCodes::FailedToParse,

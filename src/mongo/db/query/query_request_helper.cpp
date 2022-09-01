@@ -152,9 +152,9 @@ void refreshNSS(const NamespaceString& nss, FindCommandRequest* findCommand) {
 std::unique_ptr<FindCommandRequest> makeFromFindCommand(const BSONObj& cmdObj,
                                                         boost::optional<NamespaceString> nss,
                                                         bool apiStrict) {
-    // TODO SERVER-68721: Pass tenantId from nss to the IDLParserContext
-    auto findCommand = std::make_unique<FindCommandRequest>(
-        FindCommandRequest::parse(IDLParserContext("FindCommandRequest", apiStrict), cmdObj));
+    auto findCommand = std::make_unique<FindCommandRequest>(FindCommandRequest::parse(
+        IDLParserContext("FindCommandRequest", apiStrict, nss ? nss->tenantId() : boost::none),
+        cmdObj));
 
     // If there is an explicit namespace specified overwite it.
     if (nss) {

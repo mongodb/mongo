@@ -49,7 +49,7 @@ const testColl = testDb.getCollection(kCollName);
     assert.eq(0, collsWithDiffTenant.cursor.firstBatch.length);
 }
 
-// Test insert, find, getMore, and explain commands.
+// Test insert, agg, find, getMore, and explain commands.
 {
     const kTenantDocs = [{w: 0}, {x: 1}, {y: 2}, {z: 3}];
     const kOtherTenantDocs = [{i: 1}, {j: 2}, {k: 3}];
@@ -88,6 +88,26 @@ const testColl = testDb.getCollection(kCollName);
             {getMore: cmdRes2.cursor.id, collection: kCollName, '$tenant': kOtherTenant}),
         ErrorCodes.Unauthorized);
 
+    // Test that aggregate only finds a tenant's own document.
+    const aggRes = assert.commandWorked(testDb.runCommand({
+        aggregate: kCollName,
+        pipeline: [{$match: {w: 0}}, {$project: {_id: 0}}],
+        cursor: {},
+        '$tenant': kTenant
+    }));
+    assert.eq(1, aggRes.cursor.firstBatch.length, tojson(aggRes.cursor.firstBatch));
+    assert.eq(kTenantDocs[0], aggRes.cursor.firstBatch[0]);
+
+    const aggRes2 = assert.commandWorked(testDb.runCommand({
+        aggregate: kCollName,
+        pipeline: [{$match: {i: 1}}, {$project: {_id: 0}}],
+        cursor: {},
+        '$tenant': kOtherTenant
+    }));
+    assert.eq(1, aggRes2.cursor.firstBatch.length, tojson(aggRes2.cursor.firstBatch));
+    assert.eq(kOtherTenantDocs[0], aggRes2.cursor.firstBatch[0]);
+
+    // Test that explain works correctly.
     const kTenantExplainRes = assert.commandWorked(testDb.runCommand(
         {explain: {find: kCollName}, verbosity: 'executionStats', '$tenant': kTenant}));
     assert.eq(
