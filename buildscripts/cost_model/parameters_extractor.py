@@ -38,7 +38,7 @@ from cost_estimator import ModelParameters, ExecutionStats
 import execution_tree
 import physical_tree
 
-__all__ = ['extract_parameters']
+__all__ = ['extract_parameters', 'extract_execution_stats']
 
 
 async def extract_parameters(config: AbtCalibratorConfig, database: DatabaseInstance,
@@ -112,7 +112,6 @@ def get_excution_stats(root: execution_tree.Node, node_id: int) -> ExecutionStat
 def parse_explain(explain: Mapping[str, any], abt_types: Sequence[str]):
     """Extract ExecutionStats from the given explain for the given ABT types."""
 
-    result: Mapping[str, ExecutionStats] = {}
     try:
         et = execution_tree.build_execution_tree(explain['executionStats'])
         pt = physical_tree.build(explain['queryPlanner']['winningPlan']['optimizerPlan'])
@@ -121,9 +120,17 @@ def parse_explain(explain: Mapping[str, any], abt_types: Sequence[str]):
         print(explain)
         raise exception
 
+    return extract_execution_stats(et, pt, abt_types)
+
+
+def extract_execution_stats(et: execution_tree.Node, pt: physical_tree.Node,
+                            abt_types: Sequence[str]) -> Mapping[str, ExecutionStats]:
+    """Extract ExecutionStats from the given SBE and ABT trees for the given ABT types."""
+
     if len(abt_types) == 0:
         abt_types = get_abt_types(pt)
 
+    result: Mapping[str, ExecutionStats] = {}
     for abt_type in abt_types:
         abt_node = find_abt_node_by_type(pt, abt_type)
         if abt_node is not None:
