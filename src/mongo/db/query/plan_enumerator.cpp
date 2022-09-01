@@ -494,7 +494,7 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
         NodeAssignment* assign;
         allocateAssignment(node, &assign, &myMemoID);
 
-        assign->arrayAssignment.reset(aa.release());
+        assign->arrayAssignment = std::move(aa);
         return true;
     } else if (Indexability::nodeCanUseIndexOnOwnField(node) ||
                Indexability::isBoundsGeneratingNot(node) ||
