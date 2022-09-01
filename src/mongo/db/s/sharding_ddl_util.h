@@ -32,7 +32,8 @@
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/executor/task_executor.h"
+#include "mongo/executor/scoped_task_executor.h"
+#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
@@ -48,11 +49,12 @@ void linearizeCSRSReads(OperationContext* opCtx);
 /**
  * Generic utility to send a command to a list of shards. Throws if one of the commands fails.
  */
-void sendAuthenticatedCommandToShards(OperationContext* opCtx,
-                                      StringData dbName,
-                                      const BSONObj& command,
-                                      const std::vector<ShardId>& shardIds,
-                                      const std::shared_ptr<executor::TaskExecutor>& executor);
+std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandToShards(
+    OperationContext* opCtx,
+    StringData dbName,
+    const BSONObj& command,
+    const std::vector<ShardId>& shardIds,
+    const std::shared_ptr<executor::TaskExecutor>& executor);
 
 /**
  * Erase tags metadata from config server for the given namespace, using the _configsvrRemoveTags
@@ -100,6 +102,17 @@ void shardedRenameMetadata(OperationContext* opCtx,
                            CollectionType& fromCollType,
                            const NamespaceString& toNss,
                            const WriteConcernOptions& writeConcern);
+
+/**
+ * Ensure source collection uuid is consistent on every shard
+ * Ensure target collection is not present on any shard when `dropTarget` is false
+ */
+void checkCatalogConsistencyAcrossShardsForRename(
+    OperationContext* opCtx,
+    const NamespaceString& fromNss,
+    const NamespaceString& toNss,
+    bool dropTarget,
+    std::shared_ptr<executor::ScopedTaskExecutor> executor);
 
 /**
  * Ensures rename preconditions for collections are met:

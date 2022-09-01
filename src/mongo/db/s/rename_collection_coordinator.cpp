@@ -182,7 +182,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
     return ExecutorFuture<void>(**executor)
         .then(_executePhase(
             Phase::kCheckPreconditions,
-            [this, anchor = shared_from_this()] {
+            [this, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
@@ -266,6 +266,9 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                     sharding_ddl_util::checkRenamePreconditions(
                         opCtx, sourceIsSharded, toNss, _doc.getDropTarget());
+
+                    sharding_ddl_util::checkCatalogConsistencyAcrossShardsForRename(
+                        opCtx, fromNss, toNss, _doc.getDropTarget(), executor);
 
                 } catch (const DBException&) {
                     auto criticalSection = RecoverableCriticalSectionService::get(opCtx);
