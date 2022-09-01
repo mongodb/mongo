@@ -330,7 +330,7 @@ structs:
             stability: unstable
 
     ecocDocument:
-        description: "foo"
+        description: "This represents a document stored in an encrypted compaction collection."
         strict: true
         fields:
           _id:
