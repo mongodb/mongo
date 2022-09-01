@@ -306,5 +306,10 @@ assert.sameMembers(results, [
     }];
     err = assert.throws(() => coll.explain().aggregate(pipeline));
     assert.eq(err.code, ErrorCodes.BadValue, err);
+
+    // $geoWithin doesn't support multiple shapes.
+    pipeline = [{$match: {loc: {$geoWithin: {$centerSphere: [[0, 80], 1], $center: [[0, 0], 5]}}}}];
+    err = assert.throws(() => coll.explain().aggregate(pipeline));
+    assert.eq(err.code, ErrorCodes.BadValue, err);
 }
 }());

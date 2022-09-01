@@ -79,6 +79,12 @@ Status GeoExpression::parseQuery(const BSONObj& obj) {
 
     while (geoIt.more()) {
         BSONElement elt = geoIt.next();
+        // $geoWithin doesn't accept multiple shapes.
+        if (geoContainer && queryElt.fieldNameStringData() == "$geoWithin"_sd) {
+            return Status(ErrorCodes::BadValue,
+                          str::stream() << "$geoWithin doesn't accept multiple shapes "
+                                        << queryElt.toString());
+        }
         if (elt.fieldNameStringData() == "$uniqueDocs") {
             // Deprecated "$uniqueDocs" field
             LOGV2_WARNING(23847, "Deprecated $uniqueDocs option", "query"_attr = redact(obj));

@@ -41,10 +41,11 @@ assert.eq(2, t.find({locs: {$within: {$box: [[0, 0], [9, 9]], $uniqueDocs: false
 
 assert.eq(2, t.find({locs: {$within: {$center: [[5, 5], 7], $uniqueDocs: true}}}).itcount());
 assert.eq(2, t.find({locs: {$within: {$center: [[5, 5], 7], $uniqueDocs: false}}}).itcount());
+assert.eq(2, t.find({locs: {$within: {$uniqueDocs: false, $center: [[5, 5], 7]}}}).itcount());
 
 assert.eq(2, t.find({locs: {$within: {$centerSphere: [[5, 5], 1], $uniqueDocs: true}}}).itcount());
 assert.eq(2, t.find({locs: {$within: {$centerSphere: [[5, 5], 1], $uniqueDocs: false}}}).itcount());
-
+assert.eq(2, t.find({locs: {$within: {$uniqueDocs: true, $centerSphere: [[5, 5], 1]}}}).itcount());
 assert.eq(
     2,
     t.find({locs: {$within: {$polygon: [[0, 0], [0, 9], [9, 9]], $uniqueDocs: true}}}).itcount());
