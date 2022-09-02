@@ -20,7 +20,7 @@
     "@material-ui/core": "5.0.0-alpha.22",
     "@material-ui/icons": "5.0.0-alpha.22",
     "@material-ui/lab": "5.0.0-alpha.22",
-    "bezier-js": "4.0.3",
+    "bezier-js": "4.1.1",
     "canvas": "^2.5.0",
     "date-fns": "^2.16.1",
     "dayjs": "^1.9.7",
