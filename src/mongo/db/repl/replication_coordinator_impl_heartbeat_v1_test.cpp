@@ -1275,6 +1275,33 @@ TEST_F(ReplCoordHBV1ReconfigTest, ScheduleImmediateHeartbeatToSpeedUpConfigCommi
     }
 }
 
+TEST_F(ReplCoordHBV1ReconfigTest, FindOwnHostForHeartbeatReconfigQuick) {
+    // Prepare a config which is newer than the installed config
+    ReplSetConfig newConfig = [&]() {
+        auto mutableConfig =
+            makeRSConfigWithVersionAndTerm(initConfigVersion + 1, initConfigTerm + 1).getMutable();
+        ReplSetConfigSettings settings;
+        settings.setHeartbeatIntervalMillis(10000);
+        mutableConfig.setSettings(settings);
+        return ReplSetConfig(std::move(mutableConfig));
+    }();
+
+    // Receive the newer config from the primary
+    receiveHeartbeatFrom(newConfig, 1, HostAndPort("h2", 1));
+    {
+        InNetworkGuard guard(getNet());
+        auto noi = getNet()->getNextReadyRequest();
+        auto response = makePrimaryHeartbeatResponseFrom(newConfig);
+        getNet()->scheduleResponse(noi, getNet()->now(), makeResponseStatus(response));
+
+        startCapturingLogMessages();
+        getNet()->runReadyNetworkOperations();
+        stopCapturingLogMessages();
+        ASSERT_EQUALS(
+            1, countTextFormatLogLinesContaining("Was able to quickly find new index in config"));
+    }
+}
+
 TEST_F(ReplCoordHBV1Test, RejectHeartbeatReconfigDuringElection) {
     auto severityGuard = unittest::MinimumLoggedSeverityGuard{
         logv2::LogComponent::kReplicationHeartbeats, logv2::LogSeverity::Debug(1)};

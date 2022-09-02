@@ -3177,7 +3177,6 @@ int ReplicationCoordinatorImpl::getMyId() const {
 
 HostAndPort ReplicationCoordinatorImpl::getMyHostAndPort() const {
     stdx::unique_lock<Latch> lk(_mutex);
-
     if (_selfIndex == -1) {
         return HostAndPort();
     }
@@ -3868,8 +3867,31 @@ Status ReplicationCoordinatorImpl::_doReplSetReconfig(OperationContext* opCtx,
 
     // Make sure we can find ourselves in the config. If the config contents have not changed, then
     // we bypass the check for finding ourselves in the config, since we know it should already be
-    // satisfied.
-    if (!sameConfigContents(oldConfig, newConfig)) {
+    // satisfied. There is also one further optimization here: if we have a valid _selfIndex, we can
+    // do a quick and cheap pass first to see if host and port exist in the new config. This is safe
+    // as we are not allowed to have the same HostAndPort in the config twice. Matching HostandPort
+    // implies matching isSelf, and it is actually preferrable to avoid checking the latter as it is
+    // succeptible to transient DNS errors.
+    auto quickIndex =
+        _selfIndex >= 0 ? findOwnHostInConfigQuick(newConfig, getMyHostAndPort()) : -1;
+    if (quickIndex >= 0) {
+        if (!force) {
+            auto electableStatus = checkElectable(newConfig, quickIndex);
+            if (!electableStatus.isOK()) {
+                LOGV2_ERROR(6475002,
+                            "Not electable in new config and force=false, rejecting",
+                            "error"_attr = electableStatus,
+                            "newConfig"_attr = newConfigObj);
+                return electableStatus;
+            }
+        }
+        LOGV2(6475000,
+              "Was able to quickly find new index in config. Skipping full checks.",
+              "index"_attr = quickIndex,
+              "force"_attr = force);
+        myIndex = quickIndex;
+    } else {
+        // Either our HostAndPort changed in the config or we didn't have a _selfIndex.
         if (skipSafetyChecks) {
             LOGV2_ERROR(5986700,
                         "Configuration changed substantially in a config change that should have "
