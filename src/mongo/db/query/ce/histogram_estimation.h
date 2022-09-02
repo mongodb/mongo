@@ -59,7 +59,8 @@ struct EstimationResult {
 EstimationResult getTotals(const ScalarHistogram& h);
 
 /**
- * Estimates the cardinality of a predicate of the given type against the histogram.
+ * Compute an estimate for a given value and estimation type. Use linear interpolation for values
+ * that fall inside of histogram buckets.
  */
 EstimationResult estimate(const ScalarHistogram& h,
                           sbe::value::TypeTags tag,
@@ -73,5 +74,27 @@ EstimationResult estimate(const ScalarHistogram& h,
 double estimateIntervalCardinality(const ArrayHistogram& estimator,
                                    const optimizer::IntervalRequirement& interval,
                                    optimizer::CEType inputCardinality);
+
+/**
+ * Estimates the cardinality of an equality predicate given an ArrayHistogram and an SBE value and
+ * type tag pair.
+ */
+double estimateCardEq(const ArrayHistogram& ah, sbe::value::TypeTags tag, sbe::value::Value val);
+
+/**
+ * Estimates the cardinality of a range predicate given an ArrayHistogram and a range predicate.
+ * Set 'includeScalar' to true to indicate whether or not the provided range should include no-array
+ * values. The other fields define the range of the estimation.
+ */
+double estimateCardRange(const ArrayHistogram& ah,
+                         bool includeScalar,
+                         /* Define lower bound. */
+                         bool lowInclusive,
+                         sbe::value::TypeTags tagLow,
+                         sbe::value::Value valLow,
+                         /* Define upper bound. */
+                         bool highInclusive,
+                         sbe::value::TypeTags tagHigh,
+                         sbe::value::Value valHigh);
 
 }  // namespace mongo::ce

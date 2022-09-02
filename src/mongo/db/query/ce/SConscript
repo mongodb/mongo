@@ -63,6 +63,16 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target="ce_interpolation_test",
+    source=[
+        "ce_interpolation_test.cpp",
+    ],
+    LIBDEPS=[
+        'ce_test_utils',
+    ],
+)
+
+env.CppUnitTest(
     target="ce_heuristic_test",
     source=[
         "ce_heuristic_test.cpp",

@@ -47,7 +47,7 @@ using namespace cascades;
 CETester::CETester(std::string collName,
                    double collCard,
                    const optimizer::OptPhaseManager::PhaseSet& optPhases)
-    : _collName(std::move(collName)), _collCard(collCard), _optPhases(optPhases) {}
+    : _collName(std::move(collName)), _collCard(collCard), _optPhases(optPhases), _indexes() {}
 
 optimizer::CEType CETester::getCE(const std::string& query) const {
     if constexpr (kCETestLogOnly) {
@@ -90,8 +90,12 @@ optimizer::CEType CETester::getCE(ABT& abt) const {
         const auto& group = memo.getGroup(i);
 
         // If the 'optPhases' either ends with the MemoSubstitutionPhase or the
-        // MemoImplementationPhase, we should have exactly one logical node per group.
-        ASSERT_EQUALS(group._logicalNodes.size(), 1);
+        // MemoImplementationPhase, we should have exactly one logical node per group. However, if
+        // we have indexes, we may have multiple logical nodes as a result of interval
+        // simplification. In this case, we still want to pick the first Sargable node.
+        if (_indexes.empty()) {
+            ASSERT_EQUALS(group._logicalNodes.size(), 1);
+        }
         const auto& node = group._logicalNodes.at(0);
 
         // This gets the cardinality estimate actually produced during optimization.
@@ -123,7 +127,7 @@ optimizer::CEType CETester::getCE(ABT& abt) const {
 }
 
 optimizer::OptPhaseManager CETester::getPhaseManager() const {
-    ScanDefinition sd({}, {}, {DistributionType::Centralized}, true, _collCard);
+    ScanDefinition sd({}, _indexes, {DistributionType::Centralized}, true, _collCard);
     Metadata metadata({{_collName, sd}});
     return {_optPhases,
             _prefixId,

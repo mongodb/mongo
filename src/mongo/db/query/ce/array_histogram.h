@@ -36,21 +36,23 @@
 
 namespace mongo::ce {
 
+using TypeCounts = std::map<sbe::value::TypeTags, size_t>;
+
 class ArrayHistogram {
 public:
     // Constructs an empty scalar histogram.
     ArrayHistogram();
 
     // Constructor for scalar field histograms.
-    ArrayHistogram(ScalarHistogram scalar, std::map<sbe::value::TypeTags, size_t> typeCounts);
+    ArrayHistogram(ScalarHistogram scalar, TypeCounts typeCounts);
 
     // Constructor for array field histograms. We have to initialize all array fields in this case.
     ArrayHistogram(ScalarHistogram scalar,
-                   std::map<sbe::value::TypeTags, size_t> typeCounts,
+                   TypeCounts typeCounts,
                    ScalarHistogram arrayUnique,
                    ScalarHistogram arrayMin,
                    ScalarHistogram arrayMax,
-                   std::map<sbe::value::TypeTags, size_t> arrayTypeCounts);
+                   TypeCounts arrayTypeCounts);
 
     // ArrayHistogram is neither copy-constructible nor copy-assignable.
     ArrayHistogram(const ArrayHistogram&) = delete;
@@ -69,15 +71,15 @@ public:
     const ScalarHistogram& getArrayUnique() const;
     const ScalarHistogram& getArrayMin() const;
     const ScalarHistogram& getArrayMax() const;
-    const std::map<sbe::value::TypeTags, size_t>& getTypeCounts() const;
-    const std::map<sbe::value::TypeTags, size_t>& getArrayTypeCounts() const;
+    const TypeCounts& getTypeCounts() const;
+    const TypeCounts& getArrayTypeCounts() const;
 
 private:
     /* ScalarHistogram fields for all paths. */
 
     // Contains values which appeared originally as scalars on the path.
     ScalarHistogram _scalar;
-    std::map<sbe::value::TypeTags, size_t> _typeCounts;
+    TypeCounts _typeCounts;
 
     /* ScalarHistogram fields for array paths (only initialized if arrays are present). */
 
@@ -87,7 +89,7 @@ private:
     boost::optional<ScalarHistogram> _arrayMin;
     // Contains maximum values originating from arrays **per class**.
     boost::optional<ScalarHistogram> _arrayMax;
-    boost::optional<std::map<sbe::value::TypeTags, size_t>> _arrayTypeCounts;
+    boost::optional<TypeCounts> _arrayTypeCounts;
 };
 
 

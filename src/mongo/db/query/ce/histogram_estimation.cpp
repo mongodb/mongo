@@ -34,6 +34,36 @@
 namespace mongo::ce {
 using namespace sbe;
 namespace {
+
+bool sameTypeBracket(value::TypeTags tag1, value::TypeTags tag2) {
+    if (tag1 == tag2) {
+        return true;
+    }
+    return ((value::isNumber(tag1) && value::isNumber(tag2)) ||
+            (value::isString(tag1) && value::isString(tag2)));
+}
+
+double valueToDouble(value::TypeTags tag, value::Value val) {
+    double result = 0;
+    if (value::isNumber(tag)) {
+        result = value::numericCast<double>(tag, val);
+    } else if (value::isString(tag)) {
+        const StringData sd = value::getStringView(tag, val);
+
+        // Convert a prefix of the string to a double.
+        const size_t maxPrecision = std::min(sd.size(), sizeof(double));
+        for (size_t i = 0; i < maxPrecision; ++i) {
+            const char ch = sd[i];
+            const double charToDbl = ch / std::pow(2, i * 8);
+            result += charToDbl;
+        }
+    } else {
+        uassert(6844500, "Unexpected value type", false);
+    }
+
+    return result;
+}
+
 int32_t compareValues3w(value::TypeTags tag1,
                         value::Value val1,
                         value::TypeTags tag2,
@@ -51,6 +81,70 @@ EstimationResult getTotals(const ScalarHistogram& h) {
 
     const Bucket& last = h.getBuckets().back();
     return {last._cumulativeFreq, last._cumulativeNDV};
+}
+
+/**
+ * Helper function that uses linear interpolation to estimate the cardinality and NDV for a value
+ * that falls inside of a histogram bucket.
+ */
+EstimationResult interpolateEstimateInBucket(const ScalarHistogram& h,
+                                             value::TypeTags tag,
+                                             value::Value val,
+                                             EstimationType type,
+                                             size_t bucketIndex) {
+
+    const Bucket& bucket = h.getBuckets().at(bucketIndex);
+    const auto [boundTag, boundVal] = h.getBounds().getAt(bucketIndex);
+
+    double resultCard = bucket._cumulativeFreq - bucket._equalFreq - bucket._rangeFreq;
+    double resultNDV = bucket._cumulativeNDV - bucket._ndv - 1.0;
+
+    // Check if the estimate is at the point of type brackets switch. If the current bucket is the
+    // first bucket of a new type bracket and the value is of another type, estimate cardinality
+    // from the current bucket as 0.
+    //
+    // For example, let bound 1 = 1000, bound 2 = "abc". The value 100000000 falls in bucket 2, the
+    // first bucket for strings, but should not get cardinality/ ndv fraction from it.
+    if (!sameTypeBracket(tag, boundTag)) {
+        if (type == EstimationType::kEqual) {
+            return {0.0, 0.0};
+        } else {
+            return {resultCard, resultNDV};
+        }
+    }
+
+    // Estimate for equality frequency inside of the bucket.
+    const double innerEqFreq = (bucket._ndv == 0.0) ? 0.0 : bucket._rangeFreq / bucket._ndv;
+
+    if (type == EstimationType::kEqual) {
+        return {innerEqFreq, 1.0};
+    }
+
+    // For $lt and $lte operations use linear interpolation to take a fraction of the bucket
+    // cardinality and NDV if there is a preceeding bucket with bound of the same type. Use half of
+    // the bucket estimates otherwise.
+    double ratio = 0.5;
+    if (bucketIndex > 0) {
+        const auto [lowBoundTag, lowBoundVal] = h.getBounds().getAt(bucketIndex - 1);
+        if (sameTypeBracket(lowBoundTag, boundTag)) {
+            double doubleLowBound = valueToDouble(lowBoundTag, lowBoundVal);
+            double doubleUpperBound = valueToDouble(boundTag, boundVal);
+            double doubleVal = valueToDouble(tag, val);
+            ratio = (doubleVal - doubleLowBound) / (doubleUpperBound - doubleLowBound);
+        }
+    }
+
+    resultCard += bucket._rangeFreq * ratio;
+    resultNDV += bucket._ndv * ratio;
+
+    if (type == EstimationType::kLess) {
+        // Subtract from the estimate the cardinality and ndv corresponding to the equality
+        // operation.
+        const double innerEqNdv = (bucket._ndv * ratio <= 1.0) ? 0.0 : 1.0;
+        resultCard -= innerEqFreq;
+        resultNDV -= innerEqNdv;
+    }
+    return {resultCard, resultNDV};
 }
 
 EstimationResult estimate(const ScalarHistogram& h,
@@ -103,47 +197,32 @@ EstimationResult estimate(const ScalarHistogram& h,
     const auto [boundTag, boundVal] = h.getBounds().getAt(bucketIndex);
     const bool isEndpoint = compareValues3w(boundTag, boundVal, tag, val) == 0;
 
-    switch (type) {
-        case EstimationType::kEqual: {
-            if (isEndpoint) {
+    if (isEndpoint) {
+        switch (type) {
+            case EstimationType::kEqual: {
                 return {bucket._equalFreq, 1.0};
             }
-            return {(bucket._ndv == 0.0) ? 0.0 : bucket._rangeFreq / bucket._ndv, 1.0};
-        }
 
-        case EstimationType::kLess: {
-            double resultCard = bucket._cumulativeFreq - bucket._equalFreq;
-            double resultNDV = bucket._cumulativeNDV - 1.0;
-
-            if (!isEndpoint) {
-                // TODO: consider value interpolation instead of assigning 50% of the weight.
-                resultCard -= bucket._rangeFreq / 2.0;
-                resultNDV -= bucket._ndv / 2.0;
+            case EstimationType::kLess: {
+                double resultCard = bucket._cumulativeFreq - bucket._equalFreq;
+                double resultNDV = bucket._cumulativeNDV - 1.0;
+                return {resultCard, resultNDV};
             }
-            return {resultCard, resultNDV};
-        }
 
-        case EstimationType::kLessOrEqual: {
-            double resultCard = bucket._cumulativeFreq;
-            double resultNDV = bucket._cumulativeNDV;
-
-            if (!isEndpoint) {
-                // TODO: consider value interpolation instead of assigning 50% of the weight.
-                resultCard -= bucket._equalFreq + bucket._rangeFreq / 2.0;
-                resultNDV -= 1.0 + bucket._ndv / 2.0;
+            case EstimationType::kLessOrEqual: {
+                double resultCard = bucket._cumulativeFreq;
+                double resultNDV = bucket._cumulativeNDV;
+                return {resultCard, resultNDV};
             }
-            return {resultCard, resultNDV};
-        }
 
-        default:
-            MONGO_UNREACHABLE;
+            default:
+                MONGO_UNREACHABLE;
+        }
+    } else {
+        return interpolateEstimateInBucket(h, tag, val, type, bucketIndex);
     }
 }
 
-/**
- * Estimates the cardinality of an equality predicate given an ArrayHistogram and an SBE value and
- * type tag pair.
- */
 double estimateCardEq(const ArrayHistogram& ah, value::TypeTags tag, value::Value val) {
     if (tag != value::TypeTags::Null) {
         double card = estimate(ah.getScalar(), tag, val, EstimationType::kEqual).card;
@@ -187,11 +266,6 @@ static EstimationResult estimateRange(const ScalarHistogram& histogram,
     return highEstimate - lowEstimate;
 }
 
-/**
- * Estimates the cardinality of a range predicate given an ArrayHistogram and a range predicate.
- * Set 'includeScalar' to true to indicate whether or not the provided range should include no-array
- * values. The other fields define the range of the estimation.
- */
 double estimateCardRange(const ArrayHistogram& ah,
                          bool includeScalar,
                          /* Define lower bound. */

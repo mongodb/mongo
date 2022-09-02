@@ -30,6 +30,7 @@
 #include "mongo/db/query/ce/ce_histogram.h"
 #include "mongo/db/query/ce/ce_test_utils.h"
 #include "mongo/db/query/ce/histogram_estimation.h"
+#include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/unittest/unittest.h"
 
@@ -63,7 +64,7 @@ struct TestBucket {
 std::unique_ptr<ArrayHistogram> getHistogramFromData(std::vector<TestBucket> testBuckets) {
     sbe::value::Array bounds;
     std::vector<Bucket> buckets;
-    std::map<sbe::value::TypeTags, size_t> typeCounts;
+    TypeCounts typeCounts;
 
     int cumulativeFreq = 0;
     int cumulativeNDV = 0;
@@ -306,24 +307,18 @@ TEST(CEHistogramTest, AssertOneBoundIntRangeHistogram) {
     ASSERT_MATCH_CE(t, "{intRange: {$eq: 20}}", 1.0);
     ASSERT_MATCH_CE(t, "{intRange: {$gte: 20}}", 1.0);
     ASSERT_MATCH_CE(t, "{intRange: {$gt: 10}}", 46.0);
-    ASSERT_MATCH_CE(t, "{intRange: {$gte: 15}}", 23.5);
+    ASSERT_MATCH_CE(t, "{intRange: {$gte: 15}}", 28.5);
     ASSERT_MATCH_CE(t, "{intRange: {$gt: 15}}", 23.5);
-    ASSERT_MATCH_CE(t, "{intRange: {$gte: 11}, intRange: {$lte: 20}}", 23.5);
-    ASSERT_MATCH_CE(t, "{intRange: {$gt: 11}, intRange: {$lte: 20}}", 23.5);
-    ASSERT_MATCH_CE(t, "{intRange: {$gte: 11}, intRange: {$lt: 20}}", 23.27);
-    ASSERT_MATCH_CE(t, "{intRange: {$gt: 11}, intRange: {$lt: 20}}", 23.27);
-    ASSERT_MATCH_CE(t, "{intRange: {$gt: 12}, intRange: {$lt: 15}}", 17.25);
-    ASSERT_MATCH_CE(t, "{intRange: {$gte: 12}, intRange: {$lt: 15}}", 17.25);
-    ASSERT_MATCH_CE(t, "{intRange: {$gt: 12}, intRange: {$lte: 15}}", 17.25);
-    ASSERT_MATCH_CE(t, "{intRange: {$gte: 12}, intRange: {$lte: 15}}", 17.25);
+    ASSERT_MATCH_CE(t, "{intRange: {$gte: 11}, intRange: {$lte: 20}}", 46.5);
+    ASSERT_MATCH_CE(t, "{intRange: {$gt: 11}, intRange: {$lte: 20}}", 41.5);
 
     // Test ranges that partially overlap with the entire histogram.
-    ASSERT_MATCH_CE(t, "{intRange: {$lt: 11}}", 27.5);
-    ASSERT_MATCH_CE(t, "{intRange: {$lt: 15}}", 27.5);
+    ASSERT_MATCH_CE(t, "{intRange: {$lt: 11}}", 4.5);
+    ASSERT_MATCH_CE(t, "{intRange: {$lt: 15}}", 22.5);
     ASSERT_MATCH_CE(t, "{intRange: {$lte: 15}}", 27.5);
     ASSERT_MATCH_CE(t, "{intRange: {$gte: 8}, intRange: {$lte: 15}}", 27.5);
     ASSERT_MATCH_CE(t, "{intRange: {$gt: 8}, intRange: {$lte: 15}}", 27.5);
-    ASSERT_MATCH_CE(t, "{intRange: {$gt: 8}, intRange: {$lt: 15}}", 27.5);
+    ASSERT_MATCH_CE(t, "{intRange: {$gt: 8}, intRange: {$lt: 15}}", 22.5);
     ASSERT_MATCH_CE(t, "{intRange: {$gte: 8}, intRange: {$lte: 15}}", 27.5);
 
     // Test ranges that include all values in the histogram.
@@ -341,7 +336,6 @@ TEST(CEHistogramTest, AssertOneBoundIntRangeHistogram) {
     ASSERT_MATCH_CE(t, "{intRange: {$eq: 10.5}}", 5.0);
     ASSERT_MATCH_CE(t, "{intRange: {$eq: 12.5}}", 5.0);
     ASSERT_MATCH_CE(t, "{intRange: {$eq: 19.36}}", 5.0);
-    ASSERT_MATCH_CE(t, "{intRange: {$lt: 19}, intRange: {$gt: 11}}", 17.26);
 
     // Test ranges that don't overlap with the histogram.
     ASSERT_MATCH_CE(t, "{intRange: {$lt: 10}}", 0.0);
@@ -360,6 +354,32 @@ TEST(CEHistogramTest, AssertOneBoundIntRangeHistogram) {
     ASSERT_MATCH_CE(t, "{intRange: {$gt: 0}, intRange: {$lt: 5}}", 0.0);
     ASSERT_MATCH_CE(t, "{intRange: {$gte: 0}, intRange: {$lt: 5}}", 0.0);
     ASSERT_MATCH_CE(t, "{intRange: {$gt: 0}, intRange: {$lte: 5}}", 0.0);
+
+    // Because we don't specify any indexes here, these intervals do not go through simplification.
+    // This means that instead of having one key in the requirements map of the generated sargable
+    // node corresponding to the path "intRange", we have two keys and two ranges, both
+    // corresponding to the same path. As a consequence, we combine the estimates for the intervals
+    // using exponential backoff, which results in an overestimate.
+    ASSERT_MATCH_CE(t, "{intRange: {$gte: 11}, intRange: {$lt: 20}}", 46.04);
+    ASSERT_MATCH_CE(t, "{intRange: {$gt: 11}, intRange: {$lt: 20}}", 41.09);
+    ASSERT_MATCH_CE(t, "{intRange: {$gt: 12}, intRange: {$lt: 15}}", 19.16);
+    ASSERT_MATCH_CE(t, "{intRange: {$gte: 12}, intRange: {$lt: 15}}", 20.42);
+    ASSERT_MATCH_CE(t, "{intRange: {$gt: 12}, intRange: {$lte: 15}}", 23.42);
+    ASSERT_MATCH_CE(t, "{intRange: {$gte: 12}, intRange: {$lte: 15}}", 24.96);
+    ASSERT_MATCH_CE(t, "{intRange: {$lt: 19}, intRange: {$gt: 11}}", 36.53);
+
+    // When we specify that there is a non-multikey index on 'intRange', we expect to see interval
+    // simplification occurring, which should provide a better estimate for the following ranges.
+    t.setIndexes(
+        {{"intRangeIndex",
+          makeIndexDefinition("intRange", CollationOp::Ascending, /* isMultiKey */ false)}});
+    ASSERT_MATCH_CE(t, "{intRange: {$gte: 11}, intRange: {$lt: 20}}", 45.5);
+    ASSERT_MATCH_CE(t, "{intRange: {$gt: 11}, intRange: {$lt: 20}}", 40.5);
+    ASSERT_MATCH_CE(t, "{intRange: {$gt: 12}, intRange: {$lt: 15}}", 8.5);
+    ASSERT_MATCH_CE(t, "{intRange: {$gte: 12}, intRange: {$lt: 15}}", 13.5);
+    ASSERT_MATCH_CE(t, "{intRange: {$gt: 12}, intRange: {$lte: 15}}", 13.5);
+    ASSERT_MATCH_CE(t, "{intRange: {$gte: 12}, intRange: {$lte: 15}}", 18.5);
+    ASSERT_MATCH_CE(t, "{intRange: {$lt: 19}, intRange: {$gt: 11}}", 31.0);
 }
 
 TEST(CEHistogramTest, TestHistogramOnNestedPaths) {

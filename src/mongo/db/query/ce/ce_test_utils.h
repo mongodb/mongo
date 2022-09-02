@@ -108,6 +108,10 @@ public:
         _collCard = card;
     }
 
+    void setIndexes(opt::unordered_map<std::string, IndexDefinition>&& indexes) {
+        _indexes = std::move(indexes);
+    }
+
 protected:
     /**
      * Subclasses need to override this method to initialize the transports they are testing.
@@ -119,12 +123,11 @@ private:
     OptPhaseManager getPhaseManager() const;
 
     std::string _collName;
-
     // The number of records in the collection we are testing.
     double _collCard;
-
     // Phases to use when optimizing an input query.
     const OptPhaseManager::PhaseSet& _optPhases;
+    opt::unordered_map<std::string, IndexDefinition> _indexes;
     mutable PrefixId _prefixId;
 };
 

@@ -35,11 +35,11 @@ using namespace sbe;
 ArrayHistogram::ArrayHistogram() : ArrayHistogram(ScalarHistogram(), {}) {}
 
 ArrayHistogram::ArrayHistogram(ScalarHistogram scalar,
-                               std::map<value::TypeTags, size_t> typeCounts,
+                               TypeCounts typeCounts,
                                ScalarHistogram arrayUnique,
                                ScalarHistogram arrayMin,
                                ScalarHistogram arrayMax,
-                               std::map<value::TypeTags, size_t> arrayTypeCounts)
+                               TypeCounts arrayTypeCounts)
     : _scalar(std::move(scalar)),
       _typeCounts(std::move(typeCounts)),
       _arrayUnique(std::move(arrayUnique)),
@@ -49,7 +49,7 @@ ArrayHistogram::ArrayHistogram(ScalarHistogram scalar,
     invariant(isArray());
 }
 
-ArrayHistogram::ArrayHistogram(ScalarHistogram scalar, std::map<value::TypeTags, size_t> typeCounts)
+ArrayHistogram::ArrayHistogram(ScalarHistogram scalar, TypeCounts typeCounts)
     : _scalar(std::move(scalar)),
       _typeCounts(std::move(typeCounts)),
       _arrayUnique(boost::none),
@@ -63,7 +63,7 @@ bool ArrayHistogram::isArray() const {
     return _arrayUnique && _arrayMin && _arrayMax && _arrayTypeCounts;
 }
 
-std::string typeCountsToString(const std::map<value::TypeTags, size_t>& typeCounts) {
+std::string typeCountsToString(const TypeCounts& typeCounts) {
     std::ostringstream os;
     os << "{";
     bool first = true;
@@ -111,11 +111,11 @@ const ScalarHistogram& ArrayHistogram::getArrayMax() const {
     return *_arrayMax;
 }
 
-const std::map<value::TypeTags, size_t>& ArrayHistogram::getTypeCounts() const {
+const TypeCounts& ArrayHistogram::getTypeCounts() const {
     return _typeCounts;
 }
 
-const std::map<value::TypeTags, size_t>& ArrayHistogram::getArrayTypeCounts() const {
+const TypeCounts& ArrayHistogram::getArrayTypeCounts() const {
     invariant(isArray());
     return *_arrayTypeCounts;
 }
