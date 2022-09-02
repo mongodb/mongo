@@ -51,11 +51,11 @@ GlobalUserWriteBlockState* GlobalUserWriteBlockState::get(OperationContext* opCt
 }
 
 void GlobalUserWriteBlockState::enableUserWriteBlocking(OperationContext* opCtx) {
-    _globalUserWritesBlocked = true;
+    _globalUserWritesBlocked.store(true);
 }
 
 void GlobalUserWriteBlockState::disableUserWriteBlocking(OperationContext* opCtx) {
-    _globalUserWritesBlocked = false;
+    _globalUserWritesBlocked.store(false);
 }
 
 void GlobalUserWriteBlockState::checkUserWritesAllowed(OperationContext* opCtx,
@@ -63,14 +63,14 @@ void GlobalUserWriteBlockState::checkUserWritesAllowed(OperationContext* opCtx,
     invariant(opCtx->lockState()->isLocked());
     uassert(ErrorCodes::UserWritesBlocked,
             "User writes blocked",
-            !_globalUserWritesBlocked || WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled() ||
-                nss.isOnInternalDb() || nss.isTemporaryReshardingCollection() ||
-                nss.isSystemDotProfile());
+            !_globalUserWritesBlocked.load() ||
+                WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled() || nss.isOnInternalDb() ||
+                nss.isTemporaryReshardingCollection() || nss.isSystemDotProfile());
 }
 
 bool GlobalUserWriteBlockState::isUserWriteBlockingEnabled(OperationContext* opCtx) const {
     invariant(opCtx->lockState()->isLocked());
-    return _globalUserWritesBlocked;
+    return _globalUserWritesBlocked.load();
 }
 
 void GlobalUserWriteBlockState::enableUserShardedDDLBlocking(OperationContext* opCtx) {

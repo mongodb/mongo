@@ -86,7 +86,7 @@ public:
 
 
 private:
-    bool _globalUserWritesBlocked{false};
+    AtomicWord<bool> _globalUserWritesBlocked{false};
     AtomicWord<bool> _userShardedDDLBlocked{false};
     AtomicWord<bool> _userIndexBuildsBlocked{false};
 };
