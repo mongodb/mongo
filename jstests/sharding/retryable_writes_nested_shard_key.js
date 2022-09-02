@@ -1,6 +1,10 @@
 /**
  * Tests retryable insert, update and delete operations on a sharded collection with a nested shard
  * key to ensure that each operation is not re-executed when run after chunk migration.
+ *
+ * The update operation uses transaction numbers, which require a storage engine that supports
+ * document-level locking.
+ * @tags: [requires_document_locking]
  */
 
 (function() {
