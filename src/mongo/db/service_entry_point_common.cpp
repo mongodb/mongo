@@ -1828,8 +1828,8 @@ Future<void> ExecCommandDatabase::_commandExec() {
                 serverGlobalParams.clusterRole != ClusterRole::ConfigServer &&
                 !_refreshedCollection) {
                 if (auto sce = s.extraInfo<StaleConfigInfo>()) {
-                    bool stableLocalVersion =
-                        !sce->getCriticalSectionSignal() && sce->getVersionWanted();
+                    bool inCriticalSection = sce->getCriticalSectionSignal().has_value();
+                    bool stableLocalVersion = !inCriticalSection && sce->getVersionWanted();
 
                     if (stableLocalVersion &&
                         ChunkVersion::isIgnoredVersion(sce->getVersionReceived())) {
@@ -1845,7 +1845,7 @@ Future<void> ExecCommandDatabase::_commandExec() {
                         return s;
                     }
 
-                    if (sce->getCriticalSectionSignal()) {
+                    if (inCriticalSection) {
                         _execContext->behaviors->handleReshardingCriticalSectionMetrics(opCtx,
                                                                                         *sce);
                     }
@@ -1853,8 +1853,7 @@ Future<void> ExecCommandDatabase::_commandExec() {
                     const auto refreshed = _execContext->behaviors->refreshCollection(opCtx, *sce);
                     if (refreshed) {
                         _refreshedCollection = true;
-                        if (!opCtx->isContinuingMultiDocumentTransaction() &&
-                            !sce->getCriticalSectionSignal()) {
+                        if (!opCtx->isContinuingMultiDocumentTransaction() && !inCriticalSection) {
                             _resetLockerStateAfterShardingUpdate(opCtx);
                             return _commandExec();
                         }

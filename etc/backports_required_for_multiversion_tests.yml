@@ -298,7 +298,8 @@ last-continuous:
       test_file: jstests/replsets/tenant_migration_concurrent_writes_on_donor_util.js
     - ticket: SERVER-69348
       test_file: jstests/sharding/read_write_concern_defaults_application.js
-
+    - ticket: SERVER-68932
+      test_file: jstests/sharding/resharding_critical_section_metrics.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:

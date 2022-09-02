@@ -41,26 +41,44 @@ namespace mongo {
 namespace resharding_metrics {
 
 namespace {
+
+boost::optional<UUID> tryGetReshardingUUID(OperationContext* opCtx, const NamespaceString& nss) {
+    // We intentionally use AutoGetDb and acquire the collection lock manually here instead of using
+    // AutoGetCollection. AutoGetCollection will call checkShardVersionOrThrow() to verify that the
+    // shard version on the opCtx is compatible with the shard version on the collection, however
+    // this verification will throw if the critical section is held. Since the critical section is
+    // always held on this code path by definition, this check must be bypassed. As a consequence,
+    // if the metadata is not known (because this is a secondary that stepped up during the critical
+    // section), the metrics will not be incremented. The resharding metrics already do not attempt
+    // to restore the number of reads/writes done on a previous primary during a critical section,
+    // so this is considered acceptable.
+    AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IS);
+    Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
+    auto csr = CollectionShardingRuntime::get(opCtx, nss);
+    auto metadata = csr->getCurrentMetadataIfKnown();
+    if (!metadata || !metadata->isSharded()) {
+        return boost::none;
+    }
+    const auto& reshardingFields = metadata->getReshardingFields();
+    if (!reshardingFields) {
+        return boost::none;
+    }
+    return reshardingFields->getReshardingUUID();
+}
+
 void onCriticalSectionErrorThrows(OperationContext* opCtx, const StaleConfigInfo& info) {
     const auto& operationType = info.getDuringOperationType();
     if (!operationType) {
         return;
     }
-    AutoGetCollection autoColl(opCtx, info.getNss(), MODE_IS);
-    auto csr = CollectionShardingRuntime::get(opCtx, info.getNss());
-    auto metadata = csr->getCurrentMetadataIfKnown();
-    if (!metadata || !metadata->isSharded()) {
-        return;
-    }
-    const auto& reshardingFields = metadata->getReshardingFields();
-    if (!reshardingFields) {
+    auto reshardingId = tryGetReshardingUUID(opCtx, info.getNss());
+    if (!reshardingId) {
         return;
     }
     auto stateMachine =
         resharding::tryGetReshardingStateMachine<ReshardingDonorService,
                                                  ReshardingDonorService::DonorStateMachine,
-                                                 ReshardingDonorDocument>(
-            opCtx, reshardingFields->getReshardingUUID());
+                                                 ReshardingDonorDocument>(opCtx, *reshardingId);
     if (!stateMachine) {
         return;
     }
