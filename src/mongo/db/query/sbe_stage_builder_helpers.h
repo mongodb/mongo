@@ -35,6 +35,7 @@
 #include <utility>
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/match_path.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
 #include "mongo/db/exec/sbe/stages/makeobj.h"
 #include "mongo/db/exec/sbe/stages/project.h"
@@ -315,7 +316,7 @@ std::unique_ptr<sbe::EExpression> makeNewObjFunction(FieldPair field, Ts... fiel
  *       if (isArray (l2.0), NOTHING, fillEmpty (l2.0, null)))
  */
 std::unique_ptr<sbe::EExpression> generateShardKeyBinding(
-    const FieldRef& keyPatternField,
+    const sbe::MatchPath& keyPatternField,
     sbe::value::FrameIdGenerator& frameIdGenerator,
     std::unique_ptr<sbe::EExpression> inputExpr,
     int level);
@@ -973,7 +974,7 @@ struct IndexKeyPatternTreeNode {
      * nullptr for field path "a". On the other hand, this method will return corresponding node for
      * field path "a.b".
      */
-    IndexKeyPatternTreeNode* findLeafNode(const FieldRef& fieldRef, size_t currentIndex = 0) {
+    IndexKeyPatternTreeNode* findLeafNode(const sbe::MatchPath& fieldRef, size_t currentIndex = 0) {
         if (currentIndex == fieldRef.numParts()) {
             if (children.empty()) {
                 return this;

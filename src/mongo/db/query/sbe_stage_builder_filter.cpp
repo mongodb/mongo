@@ -33,6 +33,7 @@
 
 #include <functional>
 
+#include "mongo/db/exec/sbe/match_path.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
@@ -216,7 +217,10 @@ struct MatchExpressionVisitorContext {
         // that we've got at least one EvalFrame. Hence, the 'inputSlot' is declared optional.
         boost::optional<sbe::value::SlotId> inputSlot;
 
-        FrameData(boost::optional<sbe::value::SlotId> inputSlot) : inputSlot{inputSlot} {}
+        bool childOfElemMatchValue = false;
+
+        FrameData(boost::optional<sbe::value::SlotId> inputSlot, bool childOfElemMatchValue = false)
+            : inputSlot(inputSlot), childOfElemMatchValue(childOfElemMatchValue) {}
     };
 
     StageBuilderState& state;
@@ -260,7 +264,7 @@ enum class LeafTraversalMode {
     // Don't generate a TraverseStage for the leaf.
     kDoNotTraverseLeaf = 0,
 
-    // Traverse the leaf, ard for arrays visit both the array's elements _and_ the array itself.
+    // Traverse the leaf, and for arrays visit both the array's elements _and_ the array itself.
     kArrayAndItsElements = 1,
 
     // Traverse the leaf, and for arrays visit the array's elements but not the array itself.
@@ -268,13 +272,19 @@ enum class LeafTraversalMode {
 };
 
 std::unique_ptr<sbe::EExpression> generateTraverseF(const sbe::EVariable& inputVar,
-                                                    const FieldRef& fp,
+                                                    const sbe::MatchPath& fp,
                                                     FieldIndex level,
                                                     sbe::value::FrameIdGenerator* frameIdGenerator,
                                                     const MakePredicateExprFn& makePredicateExpr,
                                                     bool matchesNothing,
                                                     LeafTraversalMode mode) {
-    const bool isLeafField = (level == fp.numParts() - 1u);
+    // If 'level' is currently pointing to the second last part of the field path AND the last
+    // part of the field path is "", then 'childIsLeafWithEmptyName' will be true. Otherwise it
+    // will be false.
+    const bool childIsLeafWithEmptyName =
+        (level == fp.numParts() - 2u) && fp.isPathComponentEmpty(level + 1);
+
+    const bool isLeafField = (level == fp.numParts() - 1u) || childIsLeafWithEmptyName;
     const bool needsArrayCheck = isLeafField && mode == LeafTraversalMode::kArrayAndItsElements;
     const bool needsNothingCheck = !isLeafField && matchesNothing;
 
@@ -282,6 +292,18 @@ std::unique_ptr<sbe::EExpression> generateTraverseF(const sbe::EVariable& inputV
     auto lambdaParam = sbe::EVariable{lambdaFrameId, 0};
 
     auto fieldExpr = makeFunction("getField", inputVar.clone(), makeConstant(fp.getPart(level)));
+
+    if (childIsLeafWithEmptyName) {
+        auto frameId = frameIdGenerator->generate();
+        sbe::EVariable getFieldValue(frameId, 0);
+        auto expr = sbe::makeE<sbe::EIf>(
+            makeFunction("isArray", getFieldValue.clone()),
+            getFieldValue.clone(),
+            makeFunction("getField", getFieldValue.clone(), makeConstant(""_sd)));
+
+        fieldExpr = sbe::makeE<sbe::ELocalBind>(
+            frameId, sbe::makeEs(std::move(fieldExpr)), std::move(expr));
+    }
 
     auto resultExpr = isLeafField ? makePredicateExpr(lambdaParam)
                                   : generateTraverseF(lambdaParam,
@@ -397,7 +419,7 @@ std::unique_ptr<sbe::EExpression> generateTraverseF(const sbe::EVariable& inputV
  */
 EvalExprStagePair generatePathTraversal(EvalStage inputStage,
                                         sbe::value::SlotId inputDocumentSlot,
-                                        const FieldRef& fp,
+                                        const sbe::MatchPath& fp,
                                         FieldIndex level,
                                         PlanNodeId planNodeId,
                                         sbe::value::SlotIdGenerator* slotIdGenerator,
@@ -409,18 +431,37 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
 
     invariant(level < fp.numParts());
 
-    const bool isLeafField = (level == fp.numParts() - 1u);
+    // If 'level' is currently pointing to the second last part of the field path AND the last
+    // part of the field path is "", then 'childIsLeafWithEmptyName' will be true. Otherwise it
+    // will be false.
+    const bool childIsLeafWithEmptyName =
+        (level == fp.numParts() - 2u) && fp.isPathComponentEmpty(level + 1);
+
+    const bool isLeafField = (level == fp.numParts() - 1u) || childIsLeafWithEmptyName;
     const bool needsArrayCheck = isLeafField && mode == LeafTraversalMode::kArrayAndItsElements;
 
     // Generate the projection stage to read a sub-field at the current nested level and bind it
     // to 'inputSlot'.
     auto fieldName = fp.getPart(level);
     auto inputSlot = slotIdGenerator->generate();
-    auto fromBranch = makeProject(
-        std::move(inputStage),
-        planNodeId,
-        inputSlot,
-        makeFunction("getField", makeVariable(inputDocumentSlot), makeConstant(fieldName)));
+
+    auto fromExpr =
+        makeFunction("getField", makeVariable(inputDocumentSlot), makeConstant(fieldName));
+
+    if (childIsLeafWithEmptyName) {
+        auto frameId = frameIdGenerator->generate();
+        sbe::EVariable getFieldValue(frameId, 0);
+        auto expr = sbe::makeE<sbe::EIf>(
+            makeFunction("isArray", getFieldValue.clone()),
+            getFieldValue.clone(),
+            makeFunction("getField", getFieldValue.clone(), makeConstant(""_sd)));
+
+        fromExpr =
+            sbe::makeE<sbe::ELocalBind>(frameId, sbe::makeEs(std::move(fromExpr)), std::move(expr));
+    }
+
+    auto fromBranch =
+        makeProject(std::move(inputStage), planNodeId, inputSlot, std::move(fromExpr));
 
     if (isLeafField && mode == LeafTraversalMode::kDoNotTraverseLeaf) {
         // 'makePredicate' in this mode must return valid state, not just plain boolean value. So
@@ -651,7 +692,7 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
  * evaluating the predicate on a single value.
  */
 void generatePredicateImpl(MatchExpressionVisitorContext* context,
-                           const FieldRef* path,
+                           const sbe::MatchPath& path,
                            const MakePredicateExprFn& makePredicateExpr,
                            const MakePredicateFn& makePredicate,
                            LeafTraversalMode mode,
@@ -661,46 +702,44 @@ void generatePredicateImpl(MatchExpressionVisitorContext* context,
 
     auto&& [expr, stage] = [&]() {
         if (frame.data().inputSlot) {
-            if (path && !path->empty()) {
-                // Using traverseF() and lambdas performs better than using TraverseStage, so we
-                // we prefer to use traverseF()/lambdas where possible. We currently we support
-                // traverseF()/lambdas when the caller provides a non-null 'makePredicateExpr',
-                // and when 'stateHelper' does not contain a value.
-                if (makePredicateExpr != nullptr && !context->stateHelper.stateContainsValue()) {
-                    auto inputStage = frame.extractStage();
-                    auto result = generateTraverseF(sbe::EVariable{*frame.data().inputSlot},
-                                                    *path,
-                                                    0,
-                                                    context->state.frameIdGenerator,
-                                                    makePredicateExpr,
-                                                    matchesNothing,
-                                                    mode);
-
-                    return EvalExprStagePair{std::move(result), std::move(inputStage)};
-                }
-
-                return generatePathTraversal(frame.extractStage(),
-                                             *frame.data().inputSlot,
-                                             *path,
-                                             0,
-                                             context->planNodeId,
-                                             context->state.slotIdGenerator,
-                                             context->state.frameIdGenerator,
-                                             makePredicate,
-                                             mode,
-                                             context->stateHelper);
-            } else {
-                // If matchExpr's parent is a ElemMatchValueMatchExpression, then
-                // matchExpr()->fieldRef() will be nullptr. In this case, 'inputSlot' will be a
-                // "correlated slot" that holds the value of the ElemMatchValueMatchExpression's
-                // field path, and we should apply the predicate directly on 'inputSlot' without
-                // array traversal.
+            if (frame.data().childOfElemMatchValue) {
+                // If matchExpr's parent is a ElemMatchValueMatchExpression, then we should just
+                // apply the predicate directly on 'inputSlot'. 'inputSlot' will be a "correlated
+                // slot" that holds the value of the ElemMatchValueMatchExpression's field path.
                 auto result = makePredicate(*frame.data().inputSlot, frame.extractStage());
                 if (useCombinator) {
                     return context->stateHelper.makePredicateCombinator(std::move(result));
                 }
                 return result;
             }
+
+            // Using traverseF() and lambdas performs better than using TraverseStage, so we prefer
+            // to use traverseF()/lambdas where possible. We currently support traverseF()/lambdas
+            // when the caller provides a non-null 'makePredicateExpr' and when 'stateHelper' does
+            // not contain a value.
+            if (makePredicateExpr != nullptr && !context->stateHelper.stateContainsValue()) {
+                auto inputStage = frame.extractStage();
+                auto result = generateTraverseF(sbe::EVariable{*frame.data().inputSlot},
+                                                path,
+                                                0,
+                                                context->state.frameIdGenerator,
+                                                makePredicateExpr,
+                                                matchesNothing,
+                                                mode);
+
+                return EvalExprStagePair{std::move(result), std::move(inputStage)};
+            }
+
+            return generatePathTraversal(frame.extractStage(),
+                                         *frame.data().inputSlot,
+                                         path,
+                                         0,
+                                         context->planNodeId,
+                                         context->state.slotIdGenerator,
+                                         context->state.frameIdGenerator,
+                                         makePredicate,
+                                         mode,
+                                         context->stateHelper);
         } else {
             // If an input slot for the current frame is not defined, then we must generating a
             // filter predicate for an index scan. In this case we don't need to perform any complex
@@ -708,11 +747,11 @@ void generatePredicateImpl(MatchExpressionVisitorContext* context,
             // current field path - the index scan will extract the value for this field path and
             // will store it in a corresponding slot in the 'indexKeySlots' map.
 
-            tassert(5273402, "Field path cannot be empty for an index filter", path);
+            tassert(5273402, "Field path cannot be empty for an index filter", !path.empty());
 
-            auto it = context->indexKeySlots.find(path->dottedField());
+            auto it = context->indexKeySlots.find(path.dottedField());
             tassert(5273403,
-                    str::stream() << "Unknown field path in index filter: " << path->dottedField(),
+                    str::stream() << "Unknown field path in index filter: " << path.dottedField(),
                     it != context->indexKeySlots.end());
 
             auto result = makePredicate(it->second, frame.extractStage());
@@ -728,7 +767,7 @@ void generatePredicateImpl(MatchExpressionVisitorContext* context,
 }
 
 void generatePredicate(MatchExpressionVisitorContext* context,
-                       const FieldRef* path,
+                       const sbe::MatchPath& path,
                        const MakePredicateFn& makePredicate,
                        LeafTraversalMode mode,
                        bool useCombinator = true,
@@ -738,7 +777,7 @@ void generatePredicate(MatchExpressionVisitorContext* context,
 }
 
 void generatePredicateExpr(MatchExpressionVisitorContext* context,
-                           const FieldRef* path,
+                           const sbe::MatchPath& path,
                            const MakePredicateExprFn& makePredicateExpr,
                            LeafTraversalMode mode,
                            bool useCombinator = true,
@@ -790,7 +829,7 @@ void generateArraySize(MatchExpressionVisitorContext* context,
     };
 
     generatePredicateExpr(
-        context, matchExpr->fieldRef(), makePredicateExpr, LeafTraversalMode::kDoNotTraverseLeaf);
+        context, *matchExpr->fieldRef(), makePredicateExpr, LeafTraversalMode::kDoNotTraverseLeaf);
 }
 
 /**
@@ -830,7 +869,7 @@ void generateComparison(MatchExpressionVisitorContext* context,
     }
 
     generatePredicateExpr(
-        context, expr->fieldRef(), makePredicateExpr, traversalMode, true, matchesNothing);
+        context, *expr->fieldRef(), makePredicateExpr, traversalMode, true, matchesNothing);
 }
 
 /**
@@ -847,7 +886,7 @@ void generateBitTest(MatchExpressionVisitorContext* context,
     };
 
     generatePredicateExpr(
-        context, expr->fieldRef(), makePredicateExpr, LeafTraversalMode::kArrayElementsOnly);
+        context, *expr->fieldRef(), makePredicateExpr, LeafTraversalMode::kArrayElementsOnly);
 }
 
 // Each logical expression child is evaluated in a separate EvalFrame. Set up a new EvalFrame with a
@@ -1018,7 +1057,8 @@ public:
         // to 'childInputSlot'. childInputSlot is a "correlated slot" that will be set up later in
         // the post-visitor (childInputSlot will be the correlated parameter of a TraverseStage).
         auto childInputSlot = _context->state.slotId();
-        _context->evalStack.emplaceFrame(EvalStage{}, childInputSlot);
+        bool childOfElemMatchValue = true;
+        _context->evalStack.emplaceFrame(EvalStage{}, childInputSlot, childOfElemMatchValue);
     }
 
     void visit(const EqualityMatchExpression* expr) final {}
@@ -1252,7 +1292,7 @@ public:
         // 'makePredicate' defined above returns a state instead of plain boolean value, so there is
         // no need to use combinator for it.
         generatePredicate(_context,
-                          matchExpr->fieldRef(),
+                          *matchExpr->fieldRef(),
                           makePredicate,
                           LeafTraversalMode::kDoNotTraverseLeaf,
                           false /* useCombinator */);
@@ -1304,7 +1344,7 @@ public:
         // 'makePredicate' defined above returns a state instead of plain boolean value, so there is
         // no need to use combinator for it.
         generatePredicate(_context,
-                          matchExpr->fieldRef(),
+                          *matchExpr->fieldRef(),
                           makePredicate,
                           LeafTraversalMode::kDoNotTraverseLeaf,
                           false /* useCombinator */);
@@ -1326,15 +1366,14 @@ public:
             // generatePredicateExpr() does not convert the predicate value to state when generating
             // traversal for leaf nodes of field path. For this reason, we need to perform this
             // conversion manually.
-            if (expr->fieldRef() && !expr->fieldRef()->empty() &&
-                context->evalStack.topFrame().data().inputSlot) {
+            if (!expr->fieldRef()->empty() && context->evalStack.topFrame().data().inputSlot) {
                 resultExpr = context->stateHelper.makeState(std::move(resultExpr));
             }
 
             return resultExpr;
         };
 
-        generatePredicateExpr(_context, expr->fieldRef(), makePredicateExpr, traversalMode);
+        generatePredicateExpr(_context, *expr->fieldRef(), makePredicateExpr, traversalMode);
     }
 
     void visit(const ExprMatchExpression* matchExpr) final {
@@ -1418,7 +1457,7 @@ public:
             };
 
             generatePredicateExpr(
-                _context, expr->fieldRef(), makePredicateExpr, traversalMode, true, hasNull);
+                _context, *expr->fieldRef(), makePredicateExpr, traversalMode, true, hasNull);
             return;
         }
 
@@ -1484,7 +1523,7 @@ public:
         };
 
         generatePredicateExpr(
-            _context, expr->fieldRef(), makePredicateExpr, traversalMode, true, hasNull);
+            _context, *expr->fieldRef(), makePredicateExpr, traversalMode, true, hasNull);
     }
     // The following are no-ops. The internal expr comparison match expression are produced
     // internally by rewriting an $expr expression to an AND($expr, $_internalExpr[OP]), which can
@@ -1548,7 +1587,7 @@ public:
         };
 
         generatePredicateExpr(
-            _context, expr->fieldRef(), makePredicateExpr, LeafTraversalMode::kArrayElementsOnly);
+            _context, *expr->fieldRef(), makePredicateExpr, LeafTraversalMode::kArrayElementsOnly);
     }
 
     void visit(const NorMatchExpression* expr) final {
@@ -1588,7 +1627,7 @@ public:
         };
 
         generatePredicateExpr(
-            _context, expr->fieldRef(), makePredicateExpr, LeafTraversalMode::kArrayElementsOnly);
+            _context, *expr->fieldRef(), makePredicateExpr, LeafTraversalMode::kArrayElementsOnly);
     }
 
     void visit(const SizeMatchExpression* expr) final {
@@ -1612,7 +1651,7 @@ public:
             };
 
             generatePredicateExpr(_context,
-                                  expr->fieldRef(),
+                                  *expr->fieldRef(),
                                   makePredicateExpr,
                                   LeafTraversalMode::kArrayElementsOnly);
 
@@ -1637,8 +1676,7 @@ public:
             // generatePredicateExpr() does not convert the predicate value to state when generating
             // traversal for leaf nodes of field path. For this reason, we need to perform this
             // conversion manually.
-            if (expr->fieldRef() && !expr->fieldRef()->empty() &&
-                context->evalStack.topFrame().data().inputSlot &&
+            if (!expr->fieldRef()->empty() && context->evalStack.topFrame().data().inputSlot &&
                 traversalMode == LeafTraversalMode::kDoNotTraverseLeaf) {
                 resultExpr = context->stateHelper.makeState(std::move(resultExpr));
             }
@@ -1646,18 +1684,14 @@ public:
             return resultExpr;
         };
 
-        generatePredicateExpr(_context, expr->fieldRef(), makePredicateExpr, traversalMode);
+        generatePredicateExpr(_context, *expr->fieldRef(), makePredicateExpr, traversalMode);
     }
 
     void visit(const WhereMatchExpression* expr) final {
-        auto makePredicateExpr =
-            [context = _context,
-             expr](const sbe::EVariable& var) -> std::unique_ptr<sbe::EExpression> {
-            return generateWhereExpr(context->state, expr, var).extractExpr();
-        };
-
-        generatePredicateExpr(
-            _context, expr->fieldRef(), makePredicateExpr, LeafTraversalMode::kDoNotTraverseLeaf);
+        auto& frame = _context->evalStack.topFrame();
+        auto resultExpr =
+            generateWhereExpr(_context->state, expr, sbe::EVariable{*frame.data().inputSlot});
+        frame.pushExpr(_context->stateHelper.makeState(resultExpr.extractExpr()));
     }
 
     void visit(const WhereNoOpMatchExpression* expr) final {}
@@ -1712,7 +1746,9 @@ public:
         // the children. Set up a new EvalFrame for the next child with a null tree and with the
         // 'inputSlot' field set to 'childInputSlot'. childInputSlot is a "correlated slot" that
         // will be set up later (handled in the post-visitor).
-        _context->evalStack.emplaceFrame(EvalStage{}, frame.data().inputSlot);
+        auto inputSlot = frame.data().inputSlot;
+        bool childOfElemMatchValue = true;
+        _context->evalStack.emplaceFrame(EvalStage{}, inputSlot, childOfElemMatchValue);
     }
 
     void visit(const EqualityMatchExpression* expr) final {}

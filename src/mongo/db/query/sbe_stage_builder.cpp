@@ -36,6 +36,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
+#include "mongo/db/exec/sbe/match_path.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/column_scan.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
@@ -1785,7 +1786,7 @@ SlotBasedStageBuilder::buildProjectionDefault(const QuerySolutionNode* root,
         size_t i = 0;
         sbe::IndexKeysInclusionSet patternBitSet;
         for (const auto& element : indexKeyPattern) {
-            FieldRef fieldRef{element.fieldNameStringData()};
+            sbe::MatchPath fieldRef{element.fieldNameStringData()};
             // Projection field paths are always leaf nodes. In other words, projection like
             // {a: 1, 'a.b': 1} would produce a path collision error.
             if (auto node = patternRoot->findLeafNode(fieldRef); node) {
@@ -2955,7 +2956,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     std::unique_ptr<sbe::EExpression> bindShardKeyPart;
 
     for (auto&& keyPatternElem : shardKeyPattern) {
-        auto fieldRef = FieldRef{keyPatternElem.fieldNameStringData()};
+        auto fieldRef = sbe::MatchPath{keyPatternElem.fieldNameStringData()};
         fieldSlots.push_back(_slotIdGenerator.generate());
         projectFields.push_back(fieldRef.dottedField().toString());
 

@@ -277,7 +277,7 @@ std::unique_ptr<sbe::EExpression> makeNothingArrayCheck(
 }
 
 std::unique_ptr<sbe::EExpression> generateShardKeyBinding(
-    const FieldRef& keyPatternField,
+    const sbe::MatchPath& keyPatternField,
     sbe::value::FrameIdGenerator& frameIdGenerator,
     std::unique_ptr<sbe::EExpression> inputExpr,
     int level) {
@@ -1027,7 +1027,7 @@ std::unique_ptr<IndexKeyPatternTreeNode> buildKeyPatternTree(const BSONObj& keyP
         auto* node = root.get();
         bool skipElem = false;
 
-        FieldRef fr(elem.fieldNameStringData());
+        sbe::MatchPath fr(elem.fieldNameStringData());
         for (FieldIndex j = 0; j < fr.numParts(); ++j) {
             const auto part = fr.getPart(j);
             if (auto it = node->children.find(part); it != node->children.end()) {

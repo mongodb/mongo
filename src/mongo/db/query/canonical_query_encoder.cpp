@@ -841,6 +841,7 @@ public:
     void visit(const AlwaysFalseMatchExpression* expr) final {}
     void visit(const AlwaysTrueMatchExpression* expr) final {}
     void visit(const AndMatchExpression* expr) final {}
+    void visit(const ElemMatchValueMatchExpression* matchExpr) final {}
     void visit(const ElemMatchObjectMatchExpression* matchExpr) final {}
     void visit(const NorMatchExpression* expr) final {}
     void visit(const NotMatchExpression* expr) final {}
@@ -856,9 +857,6 @@ public:
     /**
      * These node types are not yet supported in SBE.
      */
-    void visit(const ElemMatchValueMatchExpression* matchExpr) final {
-        MONGO_UNREACHABLE_TASSERT(6142110);
-    }
     void visit(const GeoMatchExpression* expr) final {
         MONGO_UNREACHABLE_TASSERT(6142111);
     }

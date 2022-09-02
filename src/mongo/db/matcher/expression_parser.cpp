@@ -100,7 +100,7 @@ bool hasNode(const MatchExpression* root, MatchExpression::MatchType type) {
 void disableSBEForUnsupportedExpressions(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          const MatchExpression* node) {
     auto fieldRef = node->fieldRef();
-    if (fieldRef && (fieldRef->empty() || fieldRef->hasNumericPathComponents())) {
+    if (fieldRef && fieldRef->hasNumericPathComponents()) {
         expCtx->sbeCompatible = false;
         return;
     }

@@ -17,7 +17,13 @@ assert.commandWorked(coll.insertMany([
     {_id: 1, "": {"": 1}},
     {_id: 2, "": {"": {"": 1}}},
     {_id: 3, "": {"": {"": {"": 1}}}},
-    {_id: 4, "": 1, a: 1}
+    {_id: 4, "": 1, a: 1},
+    {_id: 5, x: 3},
+    {_id: 6, x: [3]},
+    {_id: 7, x: {"": 3}},
+    {_id: 8, x: {"": [3]}},
+    {_id: 9, x: [{"": 3}]},
+    {_id: 10, x: [{"": [3]}]}
 ]));
 
 function runTest({filter, expected} = {}) {
@@ -31,4 +37,8 @@ runTest({filter: {"...": 1}, expected: [{_id: 3, "": {"": {"": {"": 1}}}}]});
 runTest({filter: {"": 1}, expected: [{_id: 0, "": 1}, {_id: 4, "": 1, a: 1}]});
 runTest({filter: {"": 1, a: 1}, expected: [{_id: 4, "": 1, a: 1}]});
 runTest({filter: {"": 1, a: 2}, expected: []});
+runTest({
+    filter: {'x.': 3},
+    expected: [{_id: 6, x: [3]}, {_id: 7, x: {"": 3}}, {_id: 8, x: {"": [3]}}]
+});
 })();

@@ -30,6 +30,7 @@
 
 #include "mongo/db/query/sbe_utils.h"
 
+#include "mongo/db/exec/sbe/match_path.h"
 #include "mongo/db/query/query_planner_params.h"
 
 namespace mongo::sbe {
@@ -48,7 +49,7 @@ bool isQuerySbeCompatible(const CollectionPtr* collection,
     const bool doesNotSortOnMetaOrPathWithNumericComponents =
         !sortPattern || std::all_of(sortPattern->begin(), sortPattern->end(), [](auto&& part) {
             return part.fieldPath &&
-                !FieldRef(part.fieldPath->fullPath()).hasNumericPathComponents();
+                !MatchPath(part.fieldPath->fullPath()).hasNumericPathComponents();
         });
 
     // Queries against a time-series collection are not currently supported by SBE.
