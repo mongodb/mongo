@@ -751,7 +751,7 @@ ExchangeNode::ExchangeNode(const properties::DistributionRequirement distributio
     assertNodeSort(getChild());
     tassert(6624008,
             "Cannot exchange towards an unknown distribution",
-            distribution.getDistributionAndProjections()._type !=
+            _distribution.getDistributionAndProjections()._type !=
                 DistributionType::UnknownPartitioning);
 }
 
