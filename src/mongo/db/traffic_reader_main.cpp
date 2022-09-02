@@ -105,6 +105,11 @@ int main(int argc, char* argv[]) {
 #else
             inputFd = open(inputFile.c_str(), O_RDONLY);
 #endif
+
+            if (inputFd < 0) {
+                std::cerr << "Error opening file: " << strerror(errno) << std::endl;
+                return static_cast<int>(ExitCode::fail);
+            }
         }
 
         // User must specify a --output param and it does not need to point to a valid file
