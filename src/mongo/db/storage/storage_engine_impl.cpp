@@ -177,7 +177,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, LastShutdownState l
                            kCatalogLogLevel.toInt(),
                            "Catalog entries at the oldest timestamp",
                            "oldestTimestamp"_attr = _engine->getOldestTimestamp());
-        for (auto entry : entriesAtOldest) {
+        for (const auto& entry : entriesAtOldest) {
             existedAtOldestTs.insert(entry.catalogId);
             LOGV2_FOR_RECOVERY(5380109,
                                kCatalogLogLevel.toInt(),
