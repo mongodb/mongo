@@ -7,7 +7,6 @@ set -o errexit
 set -o verbose
 
 activate_venv
-python -m pip install ninja
 if [ "Windows_NT" = "$OS" ]; then
   vcvars="$(vswhere -latest -property installationPath | tr '\\' '/' | dos2unix.exe)/VC/Auxiliary/Build/"
   echo "call \"$vcvars/vcvarsall.bat\" amd64" > msvc.bat
@@ -17,5 +16,5 @@ if [ "Windows_NT" = "$OS" ]; then
   echo "ninja -f ${ninja_file} install-core" >> msvc.bat
   cmd /C msvc.bat
 else
-  eval ${compile_env} ninja -f ${ninja_file} install-core
+  eval ${compile_env} ninja -f ${ninja_file} install-core compiledb
 fi

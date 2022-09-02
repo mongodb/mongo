@@ -4,3 +4,4 @@ packaging <= 21.3
 regex <= 2021.11.10
 requirements_parser <= 0.3.1
 setuptools
+ninja>=1.10.0
