@@ -41,8 +41,8 @@
 namespace mongo {
 
 std::pair<std::vector<std::string>, std::vector<BSONObj>>
-GetClusterParameterInvocation::retrieveRequestedParameters(OperationContext* opCtx,
-                                                           const CmdBody& cmdBody) {
+GetClusterParameterInvocation::retrieveRequestedParameters(
+    OperationContext* opCtx, const CmdBody& cmdBody, const boost::optional<TenantId>& tenantId) {
     ServerParameterSet* clusterParameters = ServerParameterSet::getClusterParameterSet();
     std::vector<std::string> parameterNames;
     std::vector<BSONObj> parameterValues;
@@ -54,7 +54,7 @@ GetClusterParameterInvocation::retrieveRequestedParameters(OperationContext* opC
         // Skip any disabled cluster parameters.
         if (requestedParameter->isEnabled()) {
             BSONObjBuilder bob;
-            requestedParameter->append(opCtx, &bob, requestedParameter->name(), boost::none);
+            requestedParameter->append(opCtx, &bob, requestedParameter->name(), tenantId);
             parameterValues.push_back(bob.obj().getOwned());
             parameterNames.push_back(requestedParameter->name());
         }
@@ -109,12 +109,14 @@ GetClusterParameterInvocation::Reply GetClusterParameterInvocation::getCachedPar
     OperationContext* opCtx, const GetClusterParameter& request) {
     const CmdBody& cmdBody = request.getCommandParameter();
 
-    auto [parameterNames, parameterValues] = retrieveRequestedParameters(opCtx, cmdBody);
+    auto [parameterNames, parameterValues] =
+        retrieveRequestedParameters(opCtx, cmdBody, request.getDbName().tenantId());
 
     LOGV2_DEBUG(6226100,
                 2,
                 "Retrieved parameter values for cluster server parameters",
-                "parameterNames"_attr = parameterNames);
+                "parameterNames"_attr = parameterNames,
+                "tenantId"_attr = request.getDbName().tenantId());
 
     return Reply(parameterValues);
 }
@@ -132,7 +134,8 @@ GetClusterParameterInvocation::Reply GetClusterParameterInvocation::getDurablePa
     BSONObjBuilder inObjBuilder = queryDocBuilder.subobjStart("_id"_sd);
     BSONArrayBuilder parameterNameBuilder = inObjBuilder.subarrayStart("$in"_sd);
 
-    auto [requestedParameterNames, parameterValues] = retrieveRequestedParameters(opCtx, cmdBody);
+    auto [requestedParameterNames, parameterValues] =
+        retrieveRequestedParameters(opCtx, cmdBody, request.getDbName().tenantId());
 
     for (const auto& parameterValue : parameterValues) {
         parameterNameBuilder.append(parameterValue["_id"_sd].String());
@@ -182,7 +185,8 @@ GetClusterParameterInvocation::Reply GetClusterParameterInvocation::getDurablePa
         for (const auto& defaultParameterName : defaultParameterNames) {
             auto defaultParameter = clusterParameters->get(defaultParameterName);
             BSONObjBuilder bob;
-            defaultParameter->append(opCtx, &bob, defaultParameterName, boost::none);
+            defaultParameter->append(
+                opCtx, &bob, defaultParameterName, request.getDbName().tenantId());
             retrievedParameters.push_back(bob.obj());
         }
     }

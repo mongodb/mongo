@@ -42,14 +42,15 @@ constexpr auto kIdField = "_id"_sd;
 constexpr auto kOplog = "oplog"_sd;
 
 /**
- * Per-operation scratch space indicating the document being deleted.
- * This is used in the aboutToDelte/onDelete handlers since the document
- * is not necessarily available in the latter.
+ * Per-operation scratch space indicating the document being deleted and the tenantId of the tenant
+ * associated. This is used in the aboutToDelte/onDelete handlers since the document is not
+ * necessarily available in the latter.
  */
 const auto aboutToDeleteDoc = OperationContext::declareDecoration<std::string>();
+const auto tenantIdToDelete = OperationContext::declareDecoration<boost::optional<TenantId>>();
 
 bool isConfigNamespace(const NamespaceString& nss) {
-    return nss == NamespaceString::kClusterParametersNamespace;
+    return nss == NamespaceString::makeClusterParametersNSS(nss.dbName().tenantId());
 }
 
 }  // namespace
@@ -85,6 +86,8 @@ void ClusterServerParameterOpObserver::aboutToDelete(OperationContext* opCtx,
     std::string docBeingDeleted;
 
     if (isConfigNamespace(nss)) {
+        // Store the tenantId associated with the doc to be deleted.
+        tenantIdToDelete(opCtx) = nss.dbName().tenantId();
         auto elem = doc[kIdField];
         if (elem.type() == String) {
             docBeingDeleted = elem.str();
@@ -180,7 +183,10 @@ void ClusterServerParameterOpObserver::onImportCollection(OperationContext* opCt
 
 void ClusterServerParameterOpObserver::_onReplicationRollback(OperationContext* opCtx,
                                                               const RollbackObserverInfo& rbInfo) {
-    if (rbInfo.rollbackNamespaces.count(NamespaceString::kClusterParametersNamespace)) {
+    if (rbInfo.rollbackNamespaces.end() !=
+        std::find_if(rbInfo.rollbackNamespaces.begin(),
+                     rbInfo.rollbackNamespaces.end(),
+                     isConfigNamespace)) {
         // Some kind of rollback happend in the settings collection.
         // Just reload from disk to be safe.
         ClusterServerParameterInitializer::get(opCtx)->resynchronizeAllParametersFromDisk(opCtx);
