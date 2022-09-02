@@ -17,6 +17,8 @@ overrides:
     exec_timeout: 60
 
   enterprise-macos-arm64:
+  - task: replica_sets_jscore_passthrough
+    exec_timeout: 150  # 2.5 hours
   - task: run_unittests
     exec_timeout: 60
 
