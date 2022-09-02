@@ -24,7 +24,7 @@
     "canvas": "^2.5.0",
     "date-fns": "^2.16.1",
     "dayjs": "^1.9.7",
-    "force-graph": "1.40.0",
+    "force-graph": "1.42.11",
     "http-proxy-middleware": "^2.0.6",
     "http-server": "^0.12.3",
     "luxon": "^1.25.0",
