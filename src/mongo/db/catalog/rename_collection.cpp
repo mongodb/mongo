@@ -206,10 +206,6 @@ Status renameCollectionDirectly(OperationContext* opCtx,
                 return status;
         }
 
-        // Rename is not resilient to interruption when the onRenameCollection OpObserver
-        // takes an oplog collection lock.
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-
         // We have to override the provided 'dropTarget' setting for idempotency reasons to
         // avoid unintentionally removing a collection on a secondary with the same name as
         // the target.

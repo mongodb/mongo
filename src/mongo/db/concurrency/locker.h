@@ -52,6 +52,7 @@ class Locker {
     Locker& operator=(const Locker&) = delete;
 
     friend class UninterruptibleLockGuard;
+    friend class InterruptibleLockGuard;
 
 public:
     virtual ~Locker() {}
@@ -567,6 +568,13 @@ protected:
     int _uninterruptibleLocksRequested = 0;
 
     /**
+     * The number of callers that are guarding against uninterruptible lock requests. An int,
+     * instead of a boolean, to support multiple simultaneous requests. When > 0, ensures that
+     * _uninterruptibleLocksRequested above is _not_ used.
+     */
+    int _keepInterruptibleRequests = 0;
+
+    /**
      * The number of LockRequests to unlock at the end of this WUOW. This is used for locks
      * participating in two-phase locking.
      */
@@ -601,6 +609,7 @@ public:
      */
     explicit UninterruptibleLockGuard(Locker* locker) : _locker(locker) {
         invariant(_locker);
+        invariant(_locker->_keepInterruptibleRequests == 0);
         invariant(_locker->_uninterruptibleLocksRequested >= 0);
         invariant(_locker->_uninterruptibleLocksRequested < std::numeric_limits<int>::max());
         _locker->_uninterruptibleLocksRequested += 1;
@@ -609,6 +618,38 @@ public:
     ~UninterruptibleLockGuard() {
         invariant(_locker->_uninterruptibleLocksRequested > 0);
         _locker->_uninterruptibleLocksRequested -= 1;
+    }
+
+private:
+    Locker* const _locker;
+};
+
+/**
+ * This RAII type ensures that there are no uninterruptible lock acquisitions while in scope. If an
+ * UninterruptibleLockGuard is held at a higher level, or taken at a lower level, an invariant will
+ * occur. This protects against UninterruptibleLockGuard uses on code paths that must be
+ * interruptible. Safe to nest InterruptibleLockGuard instances.
+ */
+class InterruptibleLockGuard {
+    InterruptibleLockGuard(const InterruptibleLockGuard& other) = delete;
+    InterruptibleLockGuard(InterruptibleLockGuard&& other) = delete;
+
+public:
+    /*
+     * Accepts a Locker, and increments the Locker's _keepInterruptibleRequests counter. Decrements
+     * the counter when destroyed.
+     */
+    explicit InterruptibleLockGuard(Locker* locker) : _locker(locker) {
+        invariant(_locker);
+        invariant(_locker->_uninterruptibleLocksRequested == 0);
+        invariant(_locker->_keepInterruptibleRequests >= 0);
+        invariant(_locker->_keepInterruptibleRequests < std::numeric_limits<int>::max());
+        _locker->_keepInterruptibleRequests += 1;
+    }
+
+    ~InterruptibleLockGuard() {
+        invariant(_locker->_keepInterruptibleRequests > 0);
+        _locker->_keepInterruptibleRequests -= 1;
     }
 
 private:

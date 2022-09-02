@@ -533,34 +533,12 @@ public:
                     opCtx, nss, true));
             }
 
-            // If the 'waitAfterPinningCursorBeforeGetMoreBatch' fail point is enabled, set the
-            // 'msg' field of this operation's CurOp to signal that we've hit this point and then
-            // repeatedly release and re-acquire the collection readLock at regular intervals until
-            // the failpoint is released. This is done in order to avoid deadlocks caused by the
-            // pinned-cursor failpoints in this file (see SERVER-21997).
-            std::function<void()> dropAndReacquireReadLockIfLocked =
-                [&readLock, opCtx, &cursorPin]() {
-                    if (!readLock) {
-                        // This function is a no-op if 'readLock' is not held in the first place.
-                        return;
-                    }
-
-                    // Make sure an interrupted operation does not prevent us from reacquiring the
-                    // lock.
-                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
-                    readLock.reset();
-                    readLock.emplace(opCtx,
-                                     cursorPin->getExecutor()->nss(),
-                                     AutoGetCollectionViewMode::kViewsForbidden,
-                                     Date_t::max(),
-                                     cursorPin->getExecutor()->getSecondaryNamespaces());
-                };
             if (MONGO_unlikely(waitAfterPinningCursorBeforeGetMoreBatch.shouldFail())) {
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &waitAfterPinningCursorBeforeGetMoreBatch,
                     opCtx,
                     "waitAfterPinningCursorBeforeGetMoreBatch",
-                    dropAndReacquireReadLockIfLocked,
+                    []() {}, /*empty function*/
                     nss);
             }
 
@@ -641,25 +619,12 @@ public:
                 awaitDataState(opCtx).shouldWaitForInserts = true;
             }
 
-            // We're about to begin running the PlanExecutor in order to fill the getMore batch. If
-            // the 'waitWithPinnedCursorDuringGetMoreBatch' failpoint is active, set the 'msg' field
-            // of this operation's CurOp to signal that we've hit this point and then spin until the
-            // failpoint is released.
-            std::function<void()> saveAndRestoreStateWithReadLockReacquisition =
-                [exec, dropAndReacquireReadLockIfLocked, &readLock]() {
-                    exec->saveState();
-                    dropAndReacquireReadLockIfLocked();
-                    exec->restoreState(readLock ? &readLock->getCollection() : nullptr);
-                };
-
             waitWithPinnedCursorDuringGetMoreBatch.execute([&](const BSONObj& data) {
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &waitWithPinnedCursorDuringGetMoreBatch,
                     opCtx,
                     "waitWithPinnedCursorDuringGetMoreBatch",
-                    data["shouldNotdropLock"].booleanSafe()
-                        ? []() {} /*empty function*/
-                        : saveAndRestoreStateWithReadLockReacquisition,
+                    []() {}, /*empty function*/
                     nss);
             });
 

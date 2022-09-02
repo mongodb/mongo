@@ -76,7 +76,7 @@ void setWaitWithPinnedCursorDuringGetMoreBatchFailpoint(DBClientBase* conn, bool
     auto cmdObj = BSON("configureFailPoint"
                        << "waitWithPinnedCursorDuringGetMoreBatch"
                        << "mode" << (enable ? "alwaysOn" : "off") << "data"
-                       << BSON("shouldNotdropLock" << true << "shouldContinueOnInterrupt" << true));
+                       << BSON("shouldContinueOnInterrupt" << true));
     auto reply = conn->runCommand(OpMsgRequest::fromDBAndBody("admin", cmdObj));
     ASSERT_OK(getStatusFromCommandResult(reply->getCommandReply()));
 }

@@ -164,7 +164,10 @@ GenericCursor ClientCursor::toGenericCursor() const {
 ClientCursorPin::ClientCursorPin(OperationContext* opCtx,
                                  ClientCursor* cursor,
                                  CursorManager* cursorManager)
-    : _opCtx(opCtx), _cursor(cursor), _cursorManager(cursorManager) {
+    : _opCtx(opCtx),
+      _cursor(cursor),
+      _cursorManager(cursorManager),
+      _interruptibleLockGuard(std::make_unique<InterruptibleLockGuard>(opCtx->lockState())) {
     invariant(_cursor);
     invariant(_cursor->_operationUsingCursor);
     invariant(!_cursor->_disposed);
@@ -181,6 +184,7 @@ ClientCursorPin::ClientCursorPin(ClientCursorPin&& other)
     : _opCtx(other._opCtx),
       _cursor(other._cursor),
       _cursorManager(other._cursorManager),
+      _interruptibleLockGuard(std::move(other._interruptibleLockGuard)),
       _shouldSaveRecoveryUnit(other._shouldSaveRecoveryUnit) {
     // The pinned cursor is being transferred to us from another pin. The 'other' pin must have a
     // pinned cursor.
@@ -216,6 +220,8 @@ ClientCursorPin& ClientCursorPin::operator=(ClientCursorPin&& other) {
 
     _cursorManager = other._cursorManager;
     other._cursorManager = nullptr;
+
+    _interruptibleLockGuard = std::move(other._interruptibleLockGuard);
 
     _shouldSaveRecoveryUnit = other._shouldSaveRecoveryUnit;
     other._shouldSaveRecoveryUnit = false;

@@ -541,6 +541,20 @@ private:
     OperationContext* _opCtx = nullptr;
     ClientCursor* _cursor = nullptr;
     CursorManager* _cursorManager = nullptr;
+
+    // A pinned cursor takes ownership of storage resources (storage-level cursors owned by the
+    // PlanExecutor) without lock-manager locks. Such an operation must ensure interruptibility when
+    // later acquiring a lock in order to avoid deadlocking with replication rollback at the storage
+    // engine level. Rollback signals interrupt to active readers, acquires a global X lock and then
+    // waits for all storage cursors to be closed in order to proceed; while a pinned cursor
+    // operation holds storage-level cursors and then may try to acquire a lock.
+    //
+    // An operation holding a pinned cursor must never have an UninterruptibleLockGuard on the stack
+    // that causes lock acquisition to hang without checking for interrupt. This
+    // InterruptibleLockGuard ensures that operations holding a ClientCursorPin will eventually
+    // observe and obey interrupt signals in the locking layer.
+    std::unique_ptr<InterruptibleLockGuard> _interruptibleLockGuard;
+
     bool _shouldSaveRecoveryUnit = false;
 };
 

@@ -48,7 +48,7 @@ function setupTest({
     jsTestLog("Enabling failpoint '" + failPoint + "' on primary (sync source).");
     assert.commandWorked(primary.adminCommand({
         configureFailPoint: failPoint,
-        data: {nss: nss + nssSuffix, shouldCheckForInterrupt: true, shouldNotdropLock: true},
+        data: {nss: nss + nssSuffix, shouldCheckForInterrupt: true},
         mode: "alwaysOn"
     }));
 
@@ -164,7 +164,7 @@ assert.commandWorked(primaryColl.insert([{_id: 3}, {_id: 4}]));
 // such that it doesn't drop locks when getmore cmd waits inside the fail point block.
 assert.commandWorked(primary.adminCommand({
     configureFailPoint: "waitWithPinnedCursorDuringGetMoreBatch",
-    data: {nss: oplogNss, shouldCheckForInterrupt: true, shouldNotdropLock: true},
+    data: {nss: oplogNss, shouldCheckForInterrupt: true},
     mode: "alwaysOn"
 }));
 
