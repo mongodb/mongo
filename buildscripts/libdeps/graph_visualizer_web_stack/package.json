@@ -33,7 +33,7 @@
     "react": "^16.8",
     "react-dom": "^16.0.0",
     "react-force-graph-2d": "1.18.1",
-    "react-force-graph-3d": "1.18.8",
+    "react-force-graph-3d": "1.21.12",
     "react-indiana-drag-scroll": "^1.8.0",
     "react-redux": "^7.2.2",
     "react-resize-aware": "^3.1.0",
