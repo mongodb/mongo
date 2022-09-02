@@ -26,8 +26,6 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/exec/sbe/stages/column_scan.h"
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
@@ -377,8 +375,10 @@ bool ColumnScanStage::checkFilter(CellView cell, size_t filterIndex, const PathV
     } else {
         ArrInfoReader arrInfoReader{translatedCell.arrInfo};
         int depth = 0;
-        // (TODO SERVER-68792) Would using a non-heap allocated structure here improve perf?
-        std::stack<bool> inArray;
+
+        // Avoid allocating memory for this stack except in the rare case of deeply nested
+        // documents.
+        std::stack<bool, absl::InlinedVector<bool, 64>> inArray;
         while (arrInfoReader.moreExplicitComponents()) {
             switch (arrInfoReader.takeNextChar()) {
                 case '{': {
