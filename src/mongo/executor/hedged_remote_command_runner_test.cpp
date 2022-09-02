@@ -47,8 +47,8 @@
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/remote_command_runner.h"
+#include "mongo/executor/remote_command_runner_test_fixture.h"
 #include "mongo/executor/remote_command_targeter.h"
-#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/s/mongos_server_parameters_gen.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -66,20 +66,11 @@ namespace executor {
 using namespace remote_command_runner;
 namespace {
 
-class HedgedCommandRunnerTest : public ThreadPoolExecutorTest {
+class HedgedCommandRunnerTest : public RemoteCommandRunnerTestFixture {
 public:
-    const std::vector<HostAndPort> kTwoHosts{HostAndPort("FakeHost1", 12345),
-                                             HostAndPort("FakeHost2", 12345)};
-    const std::vector<HostAndPort> kThreeHosts{HostAndPort("FakeHost1", 12345),
-                                               HostAndPort("FakeHost2", 12345),
-                                               HostAndPort("FakeHost3", 12345)};
-
     void setUp() {
+        RemoteCommandRunnerTestFixture::setUp();
         ReadPreferenceSetting readPref;
-        TaskExecutorTest::setUp();
-        TaskExecutorTest::launchExecutorThread();
-
-        _networkTestEnv = std::make_shared<NetworkTestEnv>(getExecutorPtr().get(), getNet());
 
         auto factory = RemoteCommandTargeterFactoryMock();
         _targeter_two_hosts = factory.create(ConnectionString::forStandalones(kTwoHosts));
@@ -96,17 +87,9 @@ public:
         emptyTargeterMock->setFindHostsReturnValue(std::vector<HostAndPort>{});
     }
 
-    void tearDown() {
-        TaskExecutorTest::tearDown();
-        _networkTestEnv.reset();
-    }
-
-    void onCommand(NetworkTestEnv::OnCommandFunction func) {
-        _networkTestEnv->onCommand(func);
-    }
-
-    executor::NetworkInterfaceMock* getNetworkInterfaceMock() {
-        return getNet();
+    NetworkInterface::Counters getNetworkInterfaceCounters() {
+        auto counters = getNetworkInterfaceMock()->getCounters();
+        return counters;
     }
 
     std::shared_ptr<RemoteCommandTargeter> getTwoHostsTargeter() {
@@ -121,27 +104,13 @@ public:
         return _emptyTargeter;
     }
 
-    /**
-     * Initialize an IDL command with the necessary fields (dbName) to avoid an invariant failure.
-     */
-    template <typename CommandType>
-    void initializeCommand(CommandType& c) {
-        c.setDbName(DatabaseName("testdb"));
-    }
-
-    /**
-     * Mocks an error response from a remote with the given 'status'.
-     */
-    BSONObj createErrorResponse(Status status) {
-        invariant(!status.isOK());
-        BSONObjBuilder result;
-        status.serializeErrorToBSON(&result);
-        result.appendBool("ok", false);
-        return result.obj();
-    }
+    const std::vector<HostAndPort> kTwoHosts{HostAndPort("FakeHost1", 12345),
+                                             HostAndPort("FakeHost2", 12345)};
+    const std::vector<HostAndPort> kThreeHosts{HostAndPort("FakeHost1", 12345),
+                                               HostAndPort("FakeHost2", 12345),
+                                               HostAndPort("FakeHost3", 12345)};
 
 private:
-    std::shared_ptr<NetworkTestEnv> _networkTestEnv;
     std::shared_ptr<RemoteCommandTargeter> _targeter_two_hosts;
     std::shared_ptr<RemoteCommandTargeter> _targeter_three_hosts;
     std::shared_ptr<RemoteCommandTargeter> _emptyTargeter;
@@ -160,8 +129,9 @@ TEST_F(HedgedCommandRunnerTest, FindHedgeRequestTwoHosts) {
         std::make_unique<mongo::remote_command_runner::AsyncRemoteCommandTargeter>(readPref, t);
     FindCommandRequest findCmd(NamespaceString("testdb", "testcoll"));
 
+    auto h = makeOperationContext();
     auto resultFuture = doHedgedRequest(
-        findCmd, nullptr, std::move(targeter), getExecutorPtr(), CancellationToken::uncancelable());
+        findCmd, h.get(), std::move(targeter), getExecutorPtr(), CancellationToken::uncancelable());
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["find"]);
@@ -171,11 +141,7 @@ TEST_F(HedgedCommandRunnerTest, FindHedgeRequestTwoHosts) {
 
     RemoteCommandRunnerResponse<CursorInitialReply> res = resultFuture.get();
 
-    auto network = getNetworkInterfaceMock();
-    network->enterNetwork();
-    auto counters = network->getCounters();
-    network->exitNetwork();
-
+    auto counters = getNetworkInterfaceCounters();
     ASSERT_EQ(counters.succeeded, 1);
     ASSERT_EQ(counters.canceled, 1);
 
@@ -190,8 +156,12 @@ TEST_F(HedgedCommandRunnerTest, FindHedgeRequestThreeHosts) {
         std::make_unique<mongo::remote_command_runner::AsyncRemoteCommandTargeter>(readPref, t);
     FindCommandRequest findCmd(NamespaceString("testdb", "testcoll"));
 
-    auto resultFuture = doHedgedRequest(
-        findCmd, nullptr, std::move(targeter), getExecutorPtr(), CancellationToken::uncancelable());
+    auto opCtxHolder = makeOperationContext();
+    auto resultFuture = doHedgedRequest(findCmd,
+                                        opCtxHolder.get(),
+                                        std::move(targeter),
+                                        getExecutorPtr(),
+                                        CancellationToken::uncancelable());
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["find"]);
@@ -201,11 +171,7 @@ TEST_F(HedgedCommandRunnerTest, FindHedgeRequestThreeHosts) {
 
     RemoteCommandRunnerResponse<CursorInitialReply> res = resultFuture.get();
 
-    auto network = getNetworkInterfaceMock();
-    network->enterNetwork();
-    auto counters = network->getCounters();
-    network->exitNetwork();
-
+    auto counters = getNetworkInterfaceCounters();
     ASSERT_EQ(counters.succeeded, 1);
     ASSERT_EQ(counters.canceled, 2);
 
@@ -227,9 +193,9 @@ TEST_F(HedgedCommandRunnerTest, HelloHedgeRequest) {
     std::unique_ptr<RemoteCommandHostTargeter> targeter =
         std::make_unique<mongo::remote_command_runner::AsyncRemoteCommandTargeter>(readPref, t);
 
-
+    auto opCtxHolder = makeOperationContext();
     auto resultFuture = doHedgedRequest(helloCmd,
-                                        nullptr,
+                                        opCtxHolder.get(),
                                         std::move(targeter),
                                         getExecutorPtr(),
                                         CancellationToken::uncancelable());
@@ -239,11 +205,7 @@ TEST_F(HedgedCommandRunnerTest, HelloHedgeRequest) {
         return helloReply.toBSON();
     });
 
-    auto network = getNetworkInterfaceMock();
-    network->enterNetwork();
-    auto counters = network->getCounters();
-    network->exitNetwork();
-
+    auto counters = getNetworkInterfaceCounters();
     ASSERT_EQ(counters.succeeded, 1);
     ASSERT_EQ(counters.canceled, 0);
 
@@ -266,8 +228,9 @@ TEST_F(HedgedCommandRunnerTest, NoShardsFound) {
         std::make_unique<mongo::remote_command_runner::AsyncRemoteCommandTargeter>(readPref, t);
 
 
+    auto opCtxHolder = makeOperationContext();
     auto resultFuture = doHedgedRequest(helloCmd,
-                                        nullptr,
+                                        opCtxHolder.get(),
                                         std::move(targeter),
                                         getExecutorPtr(),
                                         CancellationToken::uncancelable());
@@ -288,19 +251,19 @@ TEST_F(HedgedCommandRunnerTest, FirstCommandFailsWithSignificantError) {
         std::make_unique<mongo::remote_command_runner::AsyncRemoteCommandTargeter>(readPref, t);
 
 
-    auto resultFuture = doHedgedRequest(
-        findCmd, nullptr, std::move(targeter), getExecutorPtr(), CancellationToken::uncancelable());
+    auto opCtxHolder = makeOperationContext();
+    auto resultFuture = doHedgedRequest(findCmd,
+                                        opCtxHolder.get(),
+                                        std::move(targeter),
+                                        getExecutorPtr(),
+                                        CancellationToken::uncancelable());
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["find"]);
         return Status(ErrorCodes::NetworkTimeout, "mock");
     });
 
-    auto network = getNetworkInterfaceMock();
-    network->enterNetwork();
-    auto counters = network->getCounters();
-    network->exitNetwork();
-
+    auto counters = getNetworkInterfaceCounters();
     ASSERT_EQ(counters.failed, 1);
     ASSERT_EQ(counters.canceled, 1);
 
@@ -320,8 +283,12 @@ TEST_F(HedgedCommandRunnerTest, BothCommandsFailWithSkippableError) {
         std::make_unique<mongo::remote_command_runner::AsyncRemoteCommandTargeter>(readPref, t);
 
 
-    auto resultFuture = doHedgedRequest(
-        findCmd, nullptr, std::move(targeter), getExecutorPtr(), CancellationToken::uncancelable());
+    auto opCtxHolder = makeOperationContext();
+    auto resultFuture = doHedgedRequest(findCmd,
+                                        opCtxHolder.get(),
+                                        std::move(targeter),
+                                        getExecutorPtr(),
+                                        CancellationToken::uncancelable());
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["find"]);
@@ -333,11 +300,7 @@ TEST_F(HedgedCommandRunnerTest, BothCommandsFailWithSkippableError) {
         return Status(ErrorCodes::MaxTimeMSExpired, "mock");
     });
 
-    auto network = getNetworkInterfaceMock();
-    network->enterNetwork();
-    auto counters = network->getCounters();
-    network->exitNetwork();
-
+    auto counters = getNetworkInterfaceCounters();
     ASSERT_EQ(counters.failed, 2);
     ASSERT_EQ(counters.canceled, 0);
 
@@ -353,8 +316,12 @@ TEST_F(HedgedCommandRunnerTest, AllCommandsFailWithSkippableError) {
         std::make_unique<mongo::remote_command_runner::AsyncRemoteCommandTargeter>(readPref, t);
 
 
-    auto resultFuture = doHedgedRequest(
-        findCmd, nullptr, std::move(targeter), getExecutorPtr(), CancellationToken::uncancelable());
+    auto opCtxHolder = makeOperationContext();
+    auto resultFuture = doHedgedRequest(findCmd,
+                                        opCtxHolder.get(),
+                                        std::move(targeter),
+                                        getExecutorPtr(),
+                                        CancellationToken::uncancelable());
 
     auto network = getNetworkInterfaceMock();
     auto now = getNetworkInterfaceMock()->now();
@@ -412,8 +379,12 @@ TEST_F(HedgedCommandRunnerTest, FirstCommandFailsWithSkippableErrorNextSucceeds)
     std::unique_ptr<RemoteCommandHostTargeter> targeter =
         std::make_unique<mongo::remote_command_runner::AsyncRemoteCommandTargeter>(readPref, t);
 
-    auto resultFuture = doHedgedRequest(
-        findCmd, nullptr, std::move(targeter), getExecutorPtr(), CancellationToken::uncancelable());
+    auto opCtxHolder = makeOperationContext();
+    auto resultFuture = doHedgedRequest(findCmd,
+                                        opCtxHolder.get(),
+                                        std::move(targeter),
+                                        getExecutorPtr(),
+                                        CancellationToken::uncancelable());
 
     auto network = getNetworkInterfaceMock();
     auto now = getNetworkInterfaceMock()->now();

@@ -41,11 +41,7 @@
 #include "mongo/util/net/hostandport.h"
 #include <memory>
 
-namespace mongo {
-namespace executor {
-namespace remote_command_runner {
-
-
+namespace mongo::executor::remote_command_runner {
 namespace detail {
 struct RemoteCommandInternalResponse {
     BSONObj response;
@@ -53,17 +49,31 @@ struct RemoteCommandInternalResponse {
 };
 
 /**
- * Executes the BSON command asynchronously on the given target.
+ * The RemoteCommandRunner class stores the implementation details used by the free function
+ * remote_command_runner::doRequest defined below. It is a decoration on the service context,
+ * and appropriate static getters/setters are provided to access/set the decoration. It has
+ * a single virtual function, which takes a command specified as BSON and runs it on the
+ * provided HostAndPort/database name asynchronously, using the given executor. It keeps
+ * the executor alive for the duration of the command's execution; to cancel the command's
+ * execution, use the provided cancellation token.
  *
- * Do not call directly - this is not part of the public API.
+ * This is *not* part of the public API, and is deliberately in the detail namespace.
+ * Use the remote_command_runner::doRequest free-function/public API below instead,
+ * which contains additional functionality and type checking.
  */
-ExecutorFuture<RemoteCommandInternalResponse> _doRequest(
-    StringData dbName,
-    BSONObj cmdBSON,
-    std::unique_ptr<RemoteCommandHostTargeter> targeter,
-    OperationContext* opCtx,
-    std::shared_ptr<executor::TaskExecutor> exec,
-    CancellationToken token);
+class RemoteCommandRunner {
+public:
+    virtual ~RemoteCommandRunner() = default;
+    virtual ExecutorFuture<RemoteCommandInternalResponse> _doRequest(
+        StringData dbName,
+        BSONObj cmdBSON,
+        std::unique_ptr<RemoteCommandHostTargeter> targeter,
+        OperationContext* opCtx,
+        std::shared_ptr<TaskExecutor> exec,
+        CancellationToken token) = 0;
+    static RemoteCommandRunner* get(ServiceContext* serviceContext);
+    static void set(ServiceContext* serviceContext, std::unique_ptr<RemoteCommandRunner> theRunner);
+};
 }  // namespace detail
 
 template <typename CommandReplyType>
@@ -87,8 +97,10 @@ SemiFuture<RemoteCommandRunnerResponse<typename CommandType::Reply>> doRequest(
      * function allows us to seperate the CommandType parsing logic from the implementation details
      * of executing the remote command asynchronously.
      */
-    auto resFuture = detail::_doRequest(
-        cmd.getDbName().db(), cmd.toBSON({}), std::move(targeter), opCtx, exec, token);
+    auto resFuture =
+        detail::RemoteCommandRunner::get(opCtx->getServiceContext())
+            ->_doRequest(
+                cmd.getDbName().db(), cmd.toBSON({}), std::move(targeter), opCtx, exec, token);
 
     return std::move(resFuture)
         .then([](detail::RemoteCommandInternalResponse r) {
@@ -104,7 +116,4 @@ SemiFuture<RemoteCommandRunnerResponse<typename CommandType::Reply>> doRequest(
         })
         .semi();
 }
-
-}  // namespace remote_command_runner
-}  // namespace executor
-}  // namespace mongo
+}  // namespace mongo::executor::remote_command_runner

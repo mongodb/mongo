@@ -30,6 +30,7 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/remote_command_retry_policy.h"
 #include "mongo/executor/remote_command_runner.h"
+#include "mongo/executor/remote_command_runner_test_fixture.h"
 #include "mongo/executor/remote_command_targeter.h"
 
 #include "mongo/bson/oid.h"
@@ -51,53 +52,6 @@ namespace mongo {
 namespace executor {
 namespace remote_command_runner {
 namespace {
-
-using executor::NetworkTestEnv;
-
-class RemoteCommandRunnerTestFixture : public ThreadPoolExecutorTest {
-public:
-    void setUp() {
-        TaskExecutorTest::setUp();
-        launchExecutorThread();
-
-        _networkTestEnv = std::make_shared<NetworkTestEnv>(getExecutorPtr().get(), getNet());
-    }
-
-    void tearDown() {
-        TaskExecutorTest::tearDown();
-        _networkTestEnv.reset();
-    }
-
-    void onCommand(NetworkTestEnv::OnCommandFunction func) {
-        _networkTestEnv->onCommand(func);
-    }
-
-    /**
-     * Initialize an IDL command with the necessary fields (dbName) to avoid an invariant failure.
-     */
-    template <typename CommandType>
-    void initializeCommand(CommandType& c) {
-        c.setDbName(DatabaseName(boost::none, "testdb"));
-    }
-
-    /**
-     * Mocks an error response from a remote with the given 'status'.
-     */
-    BSONObj createErrorResponse(Status status) {
-        invariant(!status.isOK());
-        BSONObjBuilder result;
-        status.serializeErrorToBSON(&result);
-        result.appendBool("ok", false);
-        return result.obj();
-    }
-
-protected:
-    CancellationToken _cancellationToken{CancellationToken::uncancelable()};
-
-private:
-    std::shared_ptr<NetworkTestEnv> _networkTestEnv;
-};
-
 /*
  * Mock a successful network response to hello command.
  */
@@ -108,8 +62,9 @@ TEST_F(RemoteCommandRunnerTestFixture, SuccessfulHello) {
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
 
-    SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> resultFuture =
-        doRequest(helloCmd, nullptr, std::move(targeter), getExecutorPtr(), _cancellationToken);
+    auto opCtxHolder = makeOperationContext();
+    SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> resultFuture = doRequest(
+        helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
@@ -132,8 +87,9 @@ TEST_F(RemoteCommandRunnerTestFixture, LocalError) {
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
 
-    SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> resultFuture =
-        doRequest(helloCmd, nullptr, std::move(targeter), getExecutorPtr(), _cancellationToken);
+    auto opCtxHolder = makeOperationContext();
+    auto resultFuture = doRequest(
+        helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
@@ -153,8 +109,9 @@ TEST_F(RemoteCommandRunnerTestFixture, RemoteError) {
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
 
-    SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> resultFuture =
-        doRequest(helloCmd, nullptr, std::move(targeter), getExecutorPtr(), _cancellationToken);
+    auto opCtxHolder = makeOperationContext();
+    auto resultFuture = doRequest(
+        helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
@@ -179,8 +136,9 @@ TEST_F(RemoteCommandRunnerTestFixture, WriteConcernError) {
     const BSONObj resWithWriteConcernError =
         BSON("ok" << 1 << "writeConcernError" << writeConcernError);
 
-    SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> resultFuture =
-        doRequest(helloCmd, nullptr, std::move(targeter), getExecutorPtr(), _cancellationToken);
+    auto opCtxHolder = makeOperationContext();
+    SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> resultFuture = doRequest(
+        helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
@@ -205,8 +163,9 @@ TEST_F(RemoteCommandRunnerTestFixture, WriteError) {
                                            << writeErrorExtraInfo << "errmsg"
                                            << "Document failed validation");
     const BSONObj resWithWriteError = BSON("ok" << 1 << "writeErrors" << BSON_ARRAY(writeError));
-    SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> resultFuture =
-        doRequest(helloCmd, nullptr, std::move(targeter), getExecutorPtr(), _cancellationToken);
+    auto opCtxHolder = makeOperationContext();
+    SemiFuture<RemoteCommandRunnerResponse<HelloCommandReply>> resultFuture = doRequest(
+        helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);

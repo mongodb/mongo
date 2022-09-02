@@ -35,43 +35,60 @@
 #include "mongo/util/net/hostandport.h"
 #include <vector>
 
-namespace mongo {
-namespace executor {
-namespace remote_command_runner {
+namespace mongo::executor::remote_command_runner {
 namespace detail {
-ExecutorFuture<RemoteCommandInternalResponse> _doRequest(
-    StringData dbName,
-    BSONObj cmdBSON,
-    std::unique_ptr<RemoteCommandHostTargeter> targeter,
-    OperationContext* opCtx,
-    std::shared_ptr<executor::TaskExecutor> exec,
-    CancellationToken token) {
+namespace {
+const auto getRCRImpl = ServiceContext::declareDecoration<std::unique_ptr<RemoteCommandRunner>>();
+}  // namespace
 
-    return targeter->resolve(token)
-        .thenRunOn(exec)
-        .then([dbName, cmdBSON, opCtx, exec = std::move(exec), token](
-                  std::vector<HostAndPort> targets) {
-            uassert(ErrorCodes::HostNotFound, "No hosts availables", targets.size() != 0);
+class RemoteCommandRunnerImpl : public RemoteCommandRunner {
+public:
+    /**
+     * Executes the BSON command asynchronously on the given target.
+     *
+     * Do not call directly - this is not part of the public API.
+     */
+    ExecutorFuture<RemoteCommandInternalResponse> _doRequest(
+        StringData dbName,
+        BSONObj cmdBSON,
+        std::unique_ptr<RemoteCommandHostTargeter> targeter,
+        OperationContext* opCtx,
+        std::shared_ptr<TaskExecutor> exec,
+        CancellationToken token) final {
+        return targeter->resolve(token)
+            .thenRunOn(exec)
+            .then([dbName, cmdBSON, opCtx, exec = std::move(exec), token](
+                      std::vector<HostAndPort> targets) {
+                uassert(ErrorCodes::HostNotFound, "No hosts availables", targets.size() != 0);
 
-            executor::RemoteCommandRequestOnAny executorRequest(
-                targets, dbName.toString(), cmdBSON, rpc::makeEmptyMetadata(), opCtx);
+                RemoteCommandRequestOnAny executorRequest(
+                    targets, dbName.toString(), cmdBSON, rpc::makeEmptyMetadata(), opCtx);
+                return exec->scheduleRemoteCommandOnAny(executorRequest, token);
+            })
+            .then([&, exec = std::move(exec)](RemoteCommandOnAnyResponse r) {
+                // Ensure the command didn't have a local error, or any remote errors, preferring
+                // to propogate ok: 0 errors over writeConcern errors over write errors.
+                iassert(r.status);
+                iassert(getStatusFromCommandResult(r.data));
+                iassert(getWriteConcernStatusFromCommandResult(r.data));
+                iassert(getFirstWriteErrorStatusFromCommandResult(r.data));
 
-            return exec->scheduleRemoteCommandOnAny(executorRequest, token);
-        })
-        .then([](TaskExecutor::ResponseOnAnyStatus r) {
-            uassertStatusOK(r.status);
-            uassertStatusOK(getStatusFromCommandResult(r.data));
-            uassertStatusOK(getWriteConcernStatusFromCommandResult(r.data));
-            uassertStatusOK(getFirstWriteErrorStatusFromCommandResult(r.data));
+                return RemoteCommandInternalResponse{r.data, r.target.get()};
+            });
+    }
+};
 
-            struct RemoteCommandInternalResponse res = {
-                r.data,          // response
-                r.target.get(),  // targetUsed
-            };
-            return res;
-        });
+const auto implRegisterer = ServiceContext::ConstructorActionRegisterer{
+    "RemoteCommmandRunner",
+    [](ServiceContext* ctx) { getRCRImpl(ctx) = std::make_unique<RemoteCommandRunnerImpl>(); }};
+
+RemoteCommandRunner* RemoteCommandRunner::get(ServiceContext* svcCtx) {
+    return getRCRImpl(svcCtx).get();
+}
+
+void RemoteCommandRunner::set(ServiceContext* svcCtx,
+                              std::unique_ptr<RemoteCommandRunner> theRunner) {
+    getRCRImpl(svcCtx) = std::move(theRunner);
 }
 }  // namespace detail
-}  // namespace remote_command_runner
-}  // namespace executor
-}  // namespace mongo
+}  // namespace mongo::executor::remote_command_runner

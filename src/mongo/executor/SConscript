@@ -252,6 +252,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/rpc/command_status',
         'remote_command',
         'task_executor_interface',
@@ -314,6 +315,7 @@ env.CppUnitTest(
         'connection_pool_test_fixture.cpp',
         'hedged_remote_command_runner_test.cpp',
         'mock_network_fixture_test.cpp',
+        'mock_remote_command_runner_test.cpp',
         'network_interface_mock_test.cpp',
         'network_interface_mock_test_fixture.cpp',
         'remote_command_runner_test.cpp',
