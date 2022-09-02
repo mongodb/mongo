@@ -154,6 +154,14 @@ private:
                     if (auto dropFieldElem = objectFieldElem["drop"_sd]) {
                         return dropFieldElem.String() != NamespaceString::kChangeCollectionName;
                     }
+
+                    // Do not write the change collection's own 'create' oplog entry. This is
+                    // because the secondaries will not be able to capture this oplog entry and as
+                    // such, will result in inconsistent state of the change collection in the
+                    // primary and the secondary.
+                    if (auto createFieldElem = objectFieldElem["create"_sd]) {
+                        return createFieldElem.String() != NamespaceString::kChangeCollectionName;
+                    }
                 }
             }
 

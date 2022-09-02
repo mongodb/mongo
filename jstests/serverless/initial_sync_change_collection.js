@@ -96,5 +96,8 @@ const endOplogTimestamp = oplogDocs.at(-1).ts;
 // the 'startOplogTimestamp' to the 'endOplogTimestamp' must be exactly the same.
 verifyChangeCollectionEntries(secondary, startOplogTimestamp, endOplogTimestamp);
 
-replSetTest.stopSet();
+// The state of the change collection after the initial sync is not consistent with the primary.
+// This is because the change collection's data is never cloned to the secondary, only it's creation
+// is cloned. As such, we will skip the db hash check on the change collection.
+replSetTest.stopSet(undefined /* signal */, undefined /* forRestart */, {skipCheckDBHashes: true});
 })();
