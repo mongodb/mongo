@@ -86,6 +86,7 @@ const allCommands = {
     _shardsvrCommitIndexParticipant: {skip: isPrimaryOnly},
     _shardsvrCommitReshardCollection: {skip: isPrimaryOnly},
     _shardsvrCreateGlobalIndex: {skip: isAnInternalCommand},
+    _shardsvrDropGlobalIndex: {skip: isAnInternalCommand},
     _shardsvrDropCollection: {skip: isPrimaryOnly},
     _shardsvrCreateCollection: {skip: isPrimaryOnly},
     _shardsvrDropCollectionIfUUIDNotMatching: {skip: isNotAUserDataRead},

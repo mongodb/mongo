@@ -45,6 +45,12 @@ namespace mongo::global_index {
 void createContainer(OperationContext* opCtx, const UUID& indexUUID);
 
 /**
+ * Drops the internal collection acting as the global index container with the given UUID on the
+ * shard. Replicates as a 'dropGlobalIndex' command.
+ */
+void dropContainer(OperationContext* opCtx, const UUID& indexUUID);
+
+/**
  * Inserts a key into the global index container identified by UUID. Replicates as an 'xi' command.
  * - 'key' is the unique index key.
  * - 'docKey' is the document key of the index entry.

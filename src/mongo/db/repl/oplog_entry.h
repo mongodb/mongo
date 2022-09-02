@@ -464,6 +464,7 @@ public:
         kAbortTransaction,
         kImportCollection,
         kCreateGlobalIndex,
+        kDropGlobalIndex,
         kInsertGlobalIndexKey,
     };
 

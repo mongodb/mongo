@@ -48,21 +48,31 @@
 
 namespace mongo::global_index {
 
-
-void createContainer(OperationContext* opCtx, const UUID& indexUUID) {
-    // StmtId will always be 0, as the command only replicates a createGlobalIndex oplog entry.
+namespace {  // Anonymous namespace for private functions.
+bool checkRetryableDDLStatementExecuted(OperationContext* opCtx) {
+    // StmtId will always be 0, as the ddl commands only replicate a
+    // createGlobalIndex/dropGlobalIndex oplog entry.
     constexpr StmtId stmtId = 0;
     if (opCtx->isRetryableWrite()) {
         const auto txnParticipant = TransactionParticipant::get(opCtx);
         if (txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
             RetryableWritesStats::get(opCtx)->incrementRetriedCommandsCount();
             RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
-            LOGV2_DEBUG(6789203,
-                        1,
-                        "_shardsvrCreateGlobalIndex retried statement already executed",
-                        "indexUUID"_attr = indexUUID);
-            return;
+            return true;
         }
+    }
+    return false;
+}
+}  // namespace
+
+
+void createContainer(OperationContext* opCtx, const UUID& indexUUID) {
+    if (checkRetryableDDLStatementExecuted(opCtx)) {
+        LOGV2_DEBUG(6789203,
+                    1,
+                    "_shardsvrCreateGlobalIndex retried statement already executed",
+                    "indexUUID"_attr = indexUUID);
+        return;
     }
 
     const auto nss = NamespaceString::makeGlobalIndexNSS(indexUUID);
@@ -118,6 +128,40 @@ void createContainer(OperationContext* opCtx, const UUID& indexUUID) {
                     autoColl->uuid() == indexUUID);
             LOGV2(6789201, "Global index container already exists", "indexUUID"_attr = indexUUID);
         }
+        return;
+    });
+}
+
+void dropContainer(OperationContext* opCtx, const UUID& indexUUID) {
+    if (checkRetryableDDLStatementExecuted(opCtx)) {
+        LOGV2_DEBUG(6789303,
+                    1,
+                    "_shardsvrDropGlobalIndex retried statement already executed",
+                    "indexUUID"_attr = indexUUID);
+        return;
+    }
+
+    const auto nss = NamespaceString::makeGlobalIndexNSS(indexUUID);
+    LOGV2(6789300, "Drop global index container", "indexUUID"_attr = indexUUID);
+
+    // Drop the container.
+    return writeConflictRetry(opCtx, "dropGlobalIndexContainer", nss.ns(), [&]() {
+        AutoGetCollection autoColl(opCtx, nss, MODE_X);
+        if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
+            // Idempotent command, return OK if the collection is non-existing.
+            return;
+        }
+
+        WriteUnitOfWork wuow(opCtx);
+        {
+            repl::UnreplicatedWritesBlock unreplicatedWrites(opCtx);
+            uassertStatusOK(autoColl.getDb()->dropCollection(opCtx, nss));
+        }
+
+        auto opObserver = opCtx->getServiceContext()->getOpObserver();
+        opObserver->onDropGlobalIndex(opCtx, nss, indexUUID);
+
+        wuow.commit();
         return;
     });
 }

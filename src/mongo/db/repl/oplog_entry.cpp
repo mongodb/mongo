@@ -165,6 +165,8 @@ DurableOplogEntry::CommandType parseCommandType(const BSONObj& objectField) {
         return DurableOplogEntry::CommandType::kImportCollection;
     } else if (commandString == "createGlobalIndex") {
         return DurableOplogEntry::CommandType::kCreateGlobalIndex;
+    } else if (commandString == "dropGlobalIndex") {
+        return DurableOplogEntry::CommandType::kDropGlobalIndex;
     } else if (commandString == "xi") {
         return DurableOplogEntry::CommandType::kInsertGlobalIndexKey;
     } else {

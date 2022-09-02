@@ -1111,6 +1111,12 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
          global_index::createContainer(opCtx, globalIndexUUID);
          return Status::OK();
      }}},
+    {"dropGlobalIndex",
+     {[](OperationContext* opCtx, const OplogEntry& entry, OplogApplication::Mode mode) -> Status {
+         const auto& globalIndexUUID = entry.getUuid().get();
+         global_index::dropContainer(opCtx, globalIndexUUID);
+         return Status::OK();
+     }}},
 };
 
 // Writes a change stream pre-image 'preImage' associated with oplog entry 'oplogEntry' and a write

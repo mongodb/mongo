@@ -355,6 +355,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                 fixUpInfo.collectionsToDrop.insert(*uuid);
                 return Status::OK();
             }
+            case OplogEntry::CommandType::kDropGlobalIndex:
             case OplogEntry::CommandType::kDrop: {
                 // Example drop collection oplog entry
                 // {

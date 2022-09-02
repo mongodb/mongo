@@ -2766,6 +2766,21 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "_shardsvrDropGlobalIndex",
+          command: {_shardsvrDropGlobalIndex: UUID()},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                expectFail: true
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
           testname: "_shardsvrInsertGlobalIndexKey",
           command: {_shardsvrInsertGlobalIndexKey: UUID(), key: {a: 1}, docKey: {shk: 1, _id: 1}},
           skipSharded: true,

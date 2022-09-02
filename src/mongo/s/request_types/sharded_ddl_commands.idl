@@ -290,6 +290,16 @@ commands:
         api_version: ""
         reply_type: OkReply
 
+    _shardsvrDropGlobalIndex:
+        description: "Internal command sent to participant shards to drop a global index container with a given UUID."
+        command_name: _shardsvrDropGlobalIndex
+        cpp_name: DropGlobalIndex
+        strict: true
+        type: uuid
+        namespace: type
+        api_version: ""
+        reply_type: OkReply
+
     _shardsvrDropDatabase:
         description: "Internal command sent to the primary shard of a database to drop it."
         command_name: _shardsvrDropDatabase
