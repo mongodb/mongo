@@ -4028,6 +4028,13 @@ tasks:
       resmoke_args: --suites=change_streams_multi_stmt_txn_sharded_collections_passthrough --storageEngine=wiredTiger
 
 - <<: *task_template
+  name: change_streams_per_shard_cursor_passthrough
+  tags: ["change_streams"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *task_template
   name: disk_wiredtiger
   commands:
   - func: "do setup"

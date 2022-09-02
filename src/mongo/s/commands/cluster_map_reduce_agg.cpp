@@ -187,8 +187,9 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                                                                pipelineBuilder,
                                                                cm,
                                                                involvedNamespaces,
-                                                               false,  // hasChangeStream
-                                                               true);  // allowedToPassthrough
+                                                               false,   // hasChangeStream
+                                                               true,    // allowedToPassthrough
+                                                               false);  // perShardCursor
     try {
         switch (targeter.policy) {
             case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::kPassthrough: {
@@ -210,8 +211,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
             case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::
                 kMongosRequired: {
                 // Pipelines generated from mapReduce should never be required to run on mongos.
-                uasserted(31291, "Internal error during mapReduce translation");
-                break;
+                MONGO_UNREACHABLE_TASSERT(31291);
             }
 
             case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::kAnyShard: {
@@ -233,6 +233,12 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                     &tempResults,
                     false));  // hasChangeStream
                 break;
+            }
+
+            case cluster_aggregation_planner::AggregationTargeter::TargetingPolicy::
+                kSpecificShardOnly: {
+                // It should not be possible to pass $_passthroughToShard to a map reduce command.
+                MONGO_UNREACHABLE_TASSERT(6273803);
             }
         }
     } catch (DBException& e) {

@@ -77,7 +77,8 @@ PlanExecutor::ExecState PlanExecutorPipeline::getNext(BSONObj* objOut, RecordId*
     auto execState = getNextDocument(&docOut, nullptr);
     if (execState == PlanExecutor::ADVANCED) {
         // Include metadata if the output will be consumed by a merging node.
-        *objOut = _expCtx->needsMerge ? docOut.toBsonWithMetaData() : docOut.toBson();
+        *objOut = _expCtx->needsMerge || _expCtx->forPerShardCursor ? docOut.toBsonWithMetaData()
+                                                                    : docOut.toBson();
     }
     return execState;
 }

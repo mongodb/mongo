@@ -131,7 +131,8 @@ BSONObj createPassthroughCommandForShard(
     Document serializedCommand,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
     Pipeline* pipeline,
-    BSONObj collationObj);
+    BSONObj collationObj,
+    boost::optional<int> overrideBatchSize);
 
 BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                        Document serializedCommand,

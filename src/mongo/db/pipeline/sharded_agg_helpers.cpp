@@ -858,11 +858,22 @@ BSONObj createPassthroughCommandForShard(
     Document serializedCommand,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
     Pipeline* pipeline,
-    BSONObj collationObj) {
+    BSONObj collationObj,
+    boost::optional<int> overrideBatchSize) {
     // Create the command for the shards.
     MutableDocument targetedCmd(serializedCommand);
     if (pipeline) {
         targetedCmd[AggregateCommandRequest::kPipelineFieldName] = Value(pipeline->serialize());
+    }
+
+    if (overrideBatchSize.has_value()) {
+        if (serializedCommand[AggregateCommandRequest::kCursorFieldName].missing()) {
+            targetedCmd[AggregateCommandRequest::kCursorFieldName] =
+                Value(DOC(SimpleCursorOptions::kBatchSizeFieldName << Value(*overrideBatchSize)));
+        } else {
+            targetedCmd[AggregateCommandRequest::kCursorFieldName]
+                       [SimpleCursorOptions::kBatchSizeFieldName] = Value(*overrideBatchSize);
+        }
     }
 
     auto shardCommand =
@@ -1007,8 +1018,12 @@ DispatchShardPipelineResults dispatchShardPipeline(
         (splitPipelines
              ? createCommandForTargetedShards(
                    expCtx, serializedCommand, *splitPipelines, exchangeSpec, true /* needsMerge */)
-             : createPassthroughCommandForShard(
-                   expCtx, serializedCommand, expCtx->explain, pipeline.get(), collationObj));
+             : createPassthroughCommandForShard(expCtx,
+                                                serializedCommand,
+                                                expCtx->explain,
+                                                pipeline.get(),
+                                                collationObj,
+                                                boost::none));
 
     // A $changeStream pipeline must run on all shards, and will also open an extra cursor on the
     // config server in order to monitor for new shards. To guarantee that we do not miss any

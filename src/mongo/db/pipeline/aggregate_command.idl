@@ -62,6 +62,15 @@ types:
         serializer: ::mongo::serializeExplainToBSON
         deserializer: ::mongo::parseExplainModeFromBSON
 
+structs:
+    PassthroughToShardOptions:
+        description: "options for commands requesting a per shard cursor"
+        fields:
+            shard:
+                description: "id of the shard to passthrough to"
+                type: string
+                unstable: true
+
 commands:
     aggregate:
         description: "Represents the user-supplied options to the aggregate command."
@@ -229,4 +238,10 @@ commands:
                 description: "A flag to indicate wether or not to use new upsert option."
                 type: bool
                 ignore: true
+                unstable: true
+            $_passthroughToShard:
+                description: "An optional internal parameter for this request. If a shard key is specified, then that specific shard will be targeted."
+                type: PassthroughToShardOptions
+                cpp_name: passthroughToShard
+                optional: true
                 unstable: true

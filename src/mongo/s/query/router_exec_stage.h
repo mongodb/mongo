@@ -134,7 +134,7 @@ public:
      * Returns the postBatchResumeToken if this RouterExecStage tree is executing a $changeStream;
      * otherwise, returns an empty BSONObj. Default implementation forwards to the stage's child.
      */
-    virtual BSONObj getPostBatchResumeToken() const {
+    virtual BSONObj getPostBatchResumeToken() {
         return _child ? _child->getPostBatchResumeToken() : BSONObj();
     }
 
