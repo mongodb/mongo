@@ -967,7 +967,10 @@ makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
     using namespace std::placeholders;
     sbe::ScanCallbacks callbacks(
         indexKeyCorruptionCheckCallback,
-        std::bind(indexKeyConsistencyCheckCallback, _1, std::move(iamMap), _2, _3, _4, _5, _6));
+        [=](auto&& arg1, auto&& arg2, auto&& arg3, auto&& arg4, auto&& arg5, auto&& arg6) {
+            return indexKeyConsistencyCheckCallback(
+                arg1, std::move(iamMap), arg2, arg3, arg4, arg5, arg6);
+        });
 
     // Scan the collection in the range [seekKeySlot, Inf).
     auto scanStage = sbe::makeS<sbe::ScanStage>(collToFetch->uuid(),
