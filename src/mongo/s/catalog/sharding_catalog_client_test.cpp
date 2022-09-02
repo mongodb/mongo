@@ -283,6 +283,7 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsValid) {
     s1.setName("shard0000");
     s1.setHost("ShardHost");
     s1.setDraining(false);
+    s1.setMaxSizeMB(50);
     s1.setTags({"tag1", "tag2", "tag3"});
 
     ShardType s2;
@@ -292,6 +293,7 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsValid) {
     ShardType s3;
     s3.setName("shard0002");
     s3.setHost("ShardHost");
+    s3.setMaxSizeMB(65);
 
     const vector<ShardType> expectedShardsList = {s1, s2, s3};
 

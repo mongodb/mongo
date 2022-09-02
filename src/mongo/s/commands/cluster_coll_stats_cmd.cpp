@@ -294,6 +294,9 @@ public:
                     const auto shardAvgObjSize = e.numberLong();
                     uassert(5688300, "'avgObjSize' provided but not 'count'", !countField.eoo());
                     unscaledCollSize += shardAvgObjSize * shardObjCount;
+                } else if (fieldName == "maxSize") {
+                    const auto shardMaxSize = e.numberLong();
+                    maxSize = std::max(maxSize, shardMaxSize);
                 } else if (fieldName == "indexSizes") {
                     BSONObjIterator k(e.Obj());
                     while (k.more()) {

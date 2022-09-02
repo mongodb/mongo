@@ -22,18 +22,13 @@ var configDB = s.s.getDB('config');
 assert.eq(null, configDB.databases.findOne({_id: 'testDB'}));
 
 var newShard = "myShard";
-assert.commandWorked(s.admin.runCommand({addShard: rs1.getURL(), name: newShard}));
+assert.commandWorked(s.admin.runCommand({addShard: rs1.getURL(), name: newShard, maxSize: 1024}));
 
 assert.neq(null, configDB.databases.findOne({_id: 'testDB'}));
 
 var newShardDoc = configDB.shards.findOne({_id: newShard});
+assert.eq(1024, newShardDoc.maxSize);
 assert(newShardDoc.topologyTime instanceof Timestamp);
-
-// maxSize field is no longer supported
-var newShardMaxSize = "myShardMaxSize";
-assert.commandFailedWithCode(
-    s.admin.runCommand({addShard: rs1.getURL(), name: newShardMaxSize, maxSize: 1024}),
-    ErrorCodes.InvalidOptions);
 
 // a mongod with an existing database name should not be allowed to become a shard
 var rs2 = new ReplSetTest({name: "addshard1-2", nodes: 1});

@@ -333,4 +333,64 @@ for (var i = 0; i < singleNodeTests.length; i++) {
 }
 
 st.stop();
+
+// maxSize test
+// To set maxSize, must manually add the shards
+st = shardSetup({
+    name: "maxSize",
+    shards: 2,
+    chunkSize: 1,
+    other: {manualAddShard: true, enableAutoSplit: true}
+},
+                dbName,
+                collName);
+db = st.getDB(dbName);
+coll = db[collName];
+configDB = st.s.getDB('config');
+
+var maxSizeTests = [
+    {
+        // Test auto-split on the "low" top chunk with maxSize on destination shard
+        name: "maxSize - low top chunk",
+        lowOrHigh: lowChunk,
+        movedToShard: st.rs0.name,
+        shards: [
+            {name: st.rs0.name, range: lowChunkRange, chunks: 10},
+            {name: st.rs1.name, range: highChunkRange, chunks: 1}
+        ],
+        inserts: lowChunkInserts
+    },
+    {
+        // Test auto-split on the "high" top chunk with maxSize on destination shard
+        name: "maxSize - high top chunk",
+        lowOrHigh: highChunk,
+        movedToShard: st.rs0.name,
+        shards: [
+            {name: st.rs0.name, range: highChunkRange, chunks: 10},
+            {name: st.rs1.name, range: lowChunkRange, chunks: 1}
+        ],
+        inserts: highChunkInserts
+    },
+];
+
+// maxSize on st.rs0.name - 5MB, on st.rs1.name - 1MB
+assert.commandWorked(db.adminCommand({addshard: st.getConnNames()[0], maxSize: 5}));
+assert.commandWorked(db.adminCommand({addshard: st.getConnNames()[1], maxSize: 1}));
+
+// SERVER-17070 Auto split moves to shard node running WiredTiger, if exceeding maxSize
+var unsupported = ["wiredTiger", "rocksdb", "inMemory"];
+if (unsupported.indexOf(st.rs0.getPrimary().adminCommand({serverStatus: 1}).storageEngine.name) ==
+        -1 &&
+    unsupported.indexOf(st.rs1.getPrimary().adminCommand({serverStatus: 1}).storageEngine.name) ==
+        -1) {
+    assert.commandWorked(db.adminCommand({enableSharding: dbName}));
+    st.ensurePrimaryShard(dbName, st.rs0.name);
+
+    // Execute all test objects
+    for (var i = 0; i < maxSizeTests.length; i++) {
+        runTest(maxSizeTests[i]);
+    }
+}
+
+st.stop();
 })();

@@ -229,7 +229,7 @@ void logEnableSharding(Client* client, StringData dbname) {
     invariant(client);
 }
 
-void logAddShard(Client* client, StringData name, const std::string& servers) {
+void logAddShard(Client* client, StringData name, const std::string& servers, long long maxSize) {
     invariant(client);
 }
 

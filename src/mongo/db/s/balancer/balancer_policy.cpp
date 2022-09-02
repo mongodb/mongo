@@ -224,6 +224,11 @@ StatusWith<ZoneInfo> ZoneInfo::getZonesForCollection(OperationContext* opCtx,
 
 Status BalancerPolicy::isShardSuitableReceiver(const ClusterStatistics::ShardStatistics& stat,
                                                const string& chunkZone) {
+    if (stat.isSizeMaxed()) {
+        return {ErrorCodes::IllegalOperation,
+                str::stream() << stat.shardId << " has reached its maximum storage size."};
+    }
+
     if (stat.isDraining) {
         return {ErrorCodes::IllegalOperation,
                 str::stream() << stat.shardId << " is currently draining."};

@@ -52,6 +52,8 @@
 namespace mongo {
 namespace {
 
+const long long kMaxSizeMBDefault = 0;
+
 /**
  * Internal sharding command run on config servers to add a shard to the cluster.
  */
@@ -115,12 +117,15 @@ public:
 
         audit::logAddShard(Client::getCurrent(),
                            parsedRequest.hasName() ? parsedRequest.getName() : "",
-                           parsedRequest.getConnString().toString());
+                           parsedRequest.getConnString().toString(),
+                           parsedRequest.hasMaxSize() ? parsedRequest.getMaxSize()
+                                                      : kMaxSizeMBDefault);
 
         StatusWith<std::string> addShardResult = ShardingCatalogManager::get(opCtx)->addShard(
             opCtx,
             parsedRequest.hasName() ? &parsedRequest.getName() : nullptr,
-            parsedRequest.getConnString());
+            parsedRequest.getConnString(),
+            parsedRequest.hasMaxSize() ? parsedRequest.getMaxSize() : kMaxSizeMBDefault);
 
         if (!addShardResult.isOK()) {
             LOGV2(21920,
