@@ -1962,6 +1962,47 @@ buildvariants:
   - name: generate_buildid_to_debug_symbols_mapping
 
 
+- name: enterprise-rhel-80-64-bit-build-metrics
+  display_name: "~ Build Metrics Enterprise RHEL 8.0 "
+  cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
+  stepback: false
+  modules:
+  - enterprise
+  run_on:
+  - rhel80-build
+  expansions:
+    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo)
+    repo_edition: enterprise
+    large_distro_name: rhel80-large
+  tasks:
+  - name: build_metrics_gen_TG
+
+- name: macos-enterprise-build-metrics
+  display_name: "~ Build Metrics Enterprise MacOS"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  stepback: false
+  modules:
+  - enterprise
+  run_on:
+  - macos-1100
+  expansions:
+    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
+    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
+  tasks:
+  - name: build_metrics_gen_TG
+
+- name: enterprise-windows-build-metrics
+  display_name: "~ Build Metrics Enterprise Windows"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  stepback: false
+  run_on:
+  - windows-vsCurrent-small
+  expansions:
+    compile_flags: CPPPATH="c:/sasl/include" LIBPATH="c:/sasl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
+    python: '/cygdrive/c/python/python37/python.exe'
+  tasks:
+  - name: build_metrics_gen_TG
+
 # This variant is to intentionally test uncommon features nightly
 #- <<: *enterprise-rhel-70-64-bit-template
 #  name: enterprise-rhel-70-64-bit-kitchen-sink

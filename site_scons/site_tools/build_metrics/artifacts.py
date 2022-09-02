@@ -171,7 +171,7 @@ class CollectArtifacts(BuildMetricsCollector):
             self._artifacts += list(map(lambda x: os.path.join(root, x), files))
 
     def finalize(self):
-        self.walk(self._env.Dir(self._env.subst(self._build_dir)).abspath)
+        self.walk(self._env.Dir(self._env.subst(self._build_dir)).path)
 
         for artifact in self._artifacts:
             artifact_dict = self._identify_artifact(artifact)
