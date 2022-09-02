@@ -32,6 +32,7 @@
 
 #include "mongo/db/curop.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/resharding/resharding_metrics_helpers.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
@@ -72,8 +73,8 @@ ScopedOperationCompletionShardingActions::~ScopedOperationCompletionShardingActi
 
     if (auto staleInfo = status->extraInfo<StaleConfigInfo>()) {
         ShardingStatistics::get(_opCtx).countStaleConfigErrors.addAndFetch(1);
-        bool stableLocalVersion =
-            !staleInfo->getCriticalSectionSignal() && staleInfo->getVersionWanted();
+        bool inCriticalSection = staleInfo->getCriticalSectionSignal().has_value();
+        bool stableLocalVersion = !inCriticalSection && staleInfo->getVersionWanted();
 
         if (stableLocalVersion && ChunkVersion::isIgnoredVersion(staleInfo->getVersionReceived())) {
             // Shard is recovered, but the router didn't sent a shard version, therefore we just
@@ -85,6 +86,10 @@ ScopedOperationCompletionShardingActions::~ScopedOperationCompletionShardingActi
             staleInfo->getVersionReceived().isOlderThan(*staleInfo->getVersionWanted())) {
             // Shard is recovered and the router is staler than the shard
             return;
+        }
+
+        if (inCriticalSection) {
+            resharding_metrics::onCriticalSectionError(_opCtx, *staleInfo);
         }
 
         auto handleMismatchStatus = onShardVersionMismatchNoExcept(

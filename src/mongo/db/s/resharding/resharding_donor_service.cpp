@@ -67,6 +67,7 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(reshardingPauseDonorBeforeCatalogCacheRefresh);
+MONGO_FAIL_POINT_DEFINE(reshardingPauseDonorAfterBlockingReads);
 MONGO_FAIL_POINT_DEFINE(reshardingDonorFailsAfterTransitionToDonatingOplogEntries);
 MONGO_FAIL_POINT_DEFINE(removeDonorDocFailpoint);
 
@@ -803,6 +804,7 @@ void ReshardingDonorService::DonorStateMachine::_dropOriginalCollectionThenTrans
                 _metadata.getSourceNss(),
                 _critSecReason,
                 ShardingCatalogClient::kLocalWriteConcern);
+        reshardingPauseDonorAfterBlockingReads.pauseWhileSet(opCtx.get());
     }
 
     {
