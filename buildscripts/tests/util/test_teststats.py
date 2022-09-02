@@ -7,8 +7,6 @@ from mock import Mock
 
 import buildscripts.util.teststats as under_test
 
-# pylint: disable=missing-docstring
-
 _DATE = datetime.datetime(2018, 7, 15)
 
 

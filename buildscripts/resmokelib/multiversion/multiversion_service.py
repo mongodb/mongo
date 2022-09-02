@@ -163,15 +163,15 @@ class MongoReleases(BaseModel):
 
     def get_fcv_versions(self) -> List[Version]:
         """Get the Version representation of all fcv versions."""
-        return [Version(fcv) for fcv in self.feature_compatibility_versions]
+        return [Version(fcv) for fcv in self.feature_compatibility_versions]  # pylint: disable=not-an-iterable
 
     def get_lts_versions(self) -> List[Version]:
         """Get the Version representation of the lts versions."""
-        return [Version(lts) for lts in self.long_term_support_releases]
+        return [Version(lts) for lts in self.long_term_support_releases]  # pylint: disable=not-an-iterable
 
     def get_eol_versions(self) -> List[Version]:
         """Get the Version representation of the EOL versions."""
-        return [Version(eol) for eol in self.eol_versions]
+        return [Version(eol) for eol in self.eol_versions]  # pylint: disable=not-an-iterable
 
 
 class MultiversionService:

@@ -28,7 +28,7 @@ class GenerateFCVConstants(Subcommand):
         # This will cause multiversion constants to be generated.
         self._setup_logging()
 
-        import buildscripts.resmokelib.multiversionconstants  # pylint: disable=unused-import
+        import buildscripts.resmokelib.multiversionconstants
         buildscripts.resmokelib.multiversionconstants.log_constants(self._exec_logger)
 
 

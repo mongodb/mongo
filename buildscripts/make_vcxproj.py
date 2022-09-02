@@ -145,7 +145,7 @@ def _replace_vcxproj(file_name, restore_elements):
         file_handle.write(str_value)
 
 
-class ProjFileGenerator(object):  # pylint: disable=too-many-instance-attributes
+class ProjFileGenerator(object):
     """Generate a .vcxproj and .vcxprof.filters file."""
 
     def __init__(self, target, vs_version):
@@ -274,7 +274,7 @@ class ProjFileGenerator(object):  # pylint: disable=too-many-instance-attributes
             return True
         return False
 
-    def __write_filters(self):  # pylint: disable=too-many-branches
+    def __write_filters(self):
         """Generate the vcxproj.filters file."""
         # 1. get a list of directories for all the files
         # 2. get all the C++ files in each of these dirs

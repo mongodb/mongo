@@ -8,8 +8,6 @@ import buildscripts.validate_commit_message as under_test
 from buildscripts.client.jiraclient import JiraClient, SecurityLevel
 from evergreen import EvergreenApi
 
-# pylint: disable=missing-docstring,no-self-use
-
 INVALID_MESSAGES = [
     "",  # You must provide a message
     "RevertEVG-1",  # revert and ticket must be formatted

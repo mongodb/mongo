@@ -18,7 +18,7 @@ from buildscripts.ciconfig.evergreen import parse_evergreen_file, VariantTask
 import buildscripts.resmokelib.parser as _parser
 _parser.set_run_options()
 
-# pylint: disable=missing-docstring,protected-access,too-many-lines,no-self-use
+# pylint: disable=protected-access
 
 
 def create_tests_by_task_mock(n_tasks, n_tests):

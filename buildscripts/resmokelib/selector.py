@@ -339,10 +339,9 @@ def _make_expression_list(configs):
 class _SelectorConfig(object):
     """Base object to represent the configuration for test selection."""
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self, root=None, roots=None, include_files=None, exclude_files=None, include_tags=None,
-            exclude_tags=None, include_with_any_tags=None, exclude_with_any_tags=None,
-            tag_file=None):
+    def __init__(self, root=None, roots=None, include_files=None, exclude_files=None,
+                 include_tags=None, exclude_tags=None, include_with_any_tags=None,
+                 exclude_with_any_tags=None, tag_file=None):
         """Initialize the _SelectorConfig from the configuration elements.
 
         Args:
@@ -472,9 +471,9 @@ class _Selector(object):
 class _JSTestSelectorConfig(_SelectorConfig):
     """_SelectorConfig subclass for JavaScript tests."""
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self, roots=None, include_files=None, exclude_files=None, include_with_any_tags=None,
-            exclude_with_any_tags=None, include_tags=None, exclude_tags=None, tag_file=None):
+    def __init__(self, roots=None, include_files=None, exclude_files=None,
+                 include_with_any_tags=None, exclude_with_any_tags=None, include_tags=None,
+                 exclude_tags=None, tag_file=None):
         _SelectorConfig.__init__(
             self, roots=roots, include_files=include_files, exclude_files=exclude_files,
             include_with_any_tags=include_with_any_tags,

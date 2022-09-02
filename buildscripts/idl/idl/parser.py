@@ -25,7 +25,6 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 #
-# pylint: disable=too-many-lines
 """
 IDL Parser.
 
@@ -91,7 +90,6 @@ def _generic_parser(
         syntax_node,  # type: Any
         mapping_rules  # type: Dict[str, _RuleDesc]
 ):  # type: (...) -> None
-    # pylint: disable=too-many-branches
     field_name_set = set()  # type: Set[str]
 
     for [first_node, second_node] in node.value:
@@ -810,8 +808,6 @@ def _parse_command(ctxt, spec, name, node):
     # type: (errors.ParserContext, syntax.IDLSpec, str, Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode]) -> None
     """Parse a command section in the IDL file."""
 
-    # pylint: disable=too-many-branches
-
     if not ctxt.is_mapping_node(node, "command"):
         return
 
@@ -1034,7 +1030,6 @@ def _parse(stream, error_file_name):
     stream: is a io.Stream.
     error_file_name: just a file name for error messages to use.
     """
-    # pylint: disable=too-many-branches
 
     # This will raise an exception if the YAML parse fails
     root_node = yaml.compose(stream)
@@ -1128,7 +1123,6 @@ def parse(stream, input_file_name, resolver):
     stream: is a io.Stream.
     input_file_name: a file name for error messages to use, and to help resolve imported files.
     """
-    # pylint: disable=too-many-locals
 
     root_doc = _parse(stream, input_file_name)
 

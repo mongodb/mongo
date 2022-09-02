@@ -83,7 +83,6 @@ class MethodInfo(object):
     def __init__(self, class_name, method_name, args, return_type=None, static=False, const=False,
                  explicit=False):
         # type: (str, str, List[str], str, bool, bool, bool) -> None
-        # pylint: disable=too-many-arguments
         """Create a MethodInfo instance."""
         self.class_name = class_name
         self.method_name = method_name
@@ -193,21 +192,18 @@ class StructTypeInfoBase(object, metaclass=ABCMeta):
     def get_op_msg_request_serializer_method(self):
         # type: () -> Optional[MethodInfo]
         """Get the OpMsg serializer method for a struct."""
-        # pylint: disable=invalid-name
         pass
 
     @abstractmethod
     def get_op_msg_request_deserializer_static_method(self):
         # type: () -> Optional[MethodInfo]
         """Get the public static OpMsg deserializer method for a struct."""
-        # pylint: disable=invalid-name
         pass
 
     @abstractmethod
     def get_op_msg_request_deserializer_method(self):
         # type: () -> Optional[MethodInfo]
         """Get the protected OpMsg deserializer method for a struct."""
-        # pylint: disable=invalid-name
         pass
 
     @abstractmethod

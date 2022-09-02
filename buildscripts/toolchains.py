@@ -627,7 +627,6 @@ class DictChoiceAction(argparse._StoreAction):
             parser.print_help()
             parser.exit()
 
-    # pylint: disable=too-many-arguments
     def __init__(self, option_strings: List[str], dest: str, nargs: Optional[int] = None,
                  const: Optional[Any] = None, default: Optional[Any] = None,
                  type: Optional[type] = None, choices: Optional[Dict[str, str]] = None,
@@ -652,7 +651,6 @@ class DictChoiceAction(argparse._StoreAction):
 class NicerArgumentParser(argparse.ArgumentParser):
     """An argument parser with nicer help output."""
 
-    # pylint: disable=too-many-arguments
     def __init__(self, prog: Optional[str] = None, usage: Optional[str] = None,
                  description: Optional[str] = None, epilog: Optional[str] = None,
                  parents: Optional[List[argparse.ArgumentParser]] = None, prefix_chars: str = '-',

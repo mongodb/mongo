@@ -62,8 +62,7 @@ class Hook(object, metaclass=registry.make_registry_metaclass(_HOOKS)):  # pylin
 class DynamicTestCase(testcase.TestCase):  # pylint: disable=abstract-method
     """DynamicTestCase class."""
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self, logger, test_name, description, base_test_name, hook):
+    def __init__(self, logger, test_name, description, base_test_name, hook):
         """Initialize DynamicTestCase."""
         testcase.TestCase.__init__(self, logger, "Hook", test_name, dynamic=True)
         self.description = description

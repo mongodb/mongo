@@ -4,8 +4,6 @@ import unittest
 
 import buildscripts.util.testname as testname_utils
 
-# pylint: disable=missing-docstring
-
 
 class IsResmokeHookTest(unittest.TestCase):
     def test_is_a_test_hook_true(self):

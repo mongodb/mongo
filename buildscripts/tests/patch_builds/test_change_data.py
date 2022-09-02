@@ -8,8 +8,6 @@ from mock import patch, MagicMock
 
 import buildscripts.patch_builds.change_data as under_test
 
-# pylint: disable=missing-docstring
-
 NS = "buildscripts.patch_builds.change_data"
 
 

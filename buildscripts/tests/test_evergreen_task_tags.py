@@ -8,8 +8,6 @@ from mock import MagicMock
 
 from buildscripts import evergreen_task_tags as ett
 
-# pylint: disable=missing-docstring,no-self-use
-
 
 def gen_tag_set(prefix, size):
     return {prefix + " " + str(index) for index in range(size)}

@@ -1,5 +1,5 @@
 """Unit tests for feature_flag_tags_check.py."""
-# pylint: disable=missing-docstring
+
 import unittest
 from unittest.mock import patch
 

@@ -192,7 +192,6 @@ class Distro(object):
         Power and x86 have different names for apt/yum (ppc64le/ppc64el
         and x86_64/amd64).
         """
-        # pylint: disable=too-many-return-statements
         if re.search("^(debian|ubuntu)", self.dname):
             if arch == "ppc64le":
                 return "ppc64el"
@@ -217,7 +216,6 @@ class Distro(object):
             return "x86_64"
         else:
             raise Exception("BUG: unsupported platform?")
-        # pylint: enable=too-many-return-statements
 
     def repodir(self, arch, build_os, spec):  # noqa: D406,D407,D412,D413
         """Return the directory where we'll place the package files for (distro, distro_version).
@@ -276,13 +274,13 @@ class Distro(object):
         else:
             raise Exception("unsupported distro: %s" % self.dname)
 
-    def repo_os_version(self, build_os):  # pylint: disable=too-many-branches
+    def repo_os_version(self, build_os):
         """Return an OS version suitable for package repo directory naming.
 
         Example, 5, 6 or 7 for redhat/centos, "precise," "wheezy," etc.
         for Ubuntu/Debian, 11 for suse, "2013.03" for amazon.
         """
-        # pylint: disable=too-many-return-statements
+
         if self.dname == 'suse':
             return re.sub(r'^suse(\d+)$', r'\1', build_os)
         if self.dname == 'redhat':
@@ -319,7 +317,6 @@ class Distro(object):
                 raise Exception("unsupported build_os: %s" % build_os)
         else:
             raise Exception("unsupported distro: %s" % self.dname)
-        # pylint: enable=too-many-return-statements
 
     def make_pkg(self, build_os, arch, spec, srcdir):
         """Return the package."""
@@ -668,7 +665,7 @@ Description: MongoDB packages
         os.chdir(oldpwd)
 
 
-def move_repos_into_place(src, dst):  # pylint: disable=too-many-branches
+def move_repos_into_place(src, dst):
     """Move the repos into place."""
     # Find all the stuff in src/*, move it to a freshly-created
     # directory beside dst, then play some games with symlinks so that
@@ -758,7 +755,7 @@ def write_debian_changelog(path, spec, srcdir):
         fh.write(sb)
 
 
-def make_rpm(distro, build_os, arch, spec, srcdir):  # pylint: disable=too-many-locals
+def make_rpm(distro, build_os, arch, spec, srcdir):
     """Create the RPM specfile."""
     suffix = spec.suffix()
     sdir = setupdir(distro, build_os, arch, spec)

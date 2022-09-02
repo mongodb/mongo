@@ -5,8 +5,6 @@ import unittest
 
 from buildscripts.resmokelib.utils import scheduler as _scheduler
 
-# pylint: disable=missing-docstring
-
 
 def noop():
     pass

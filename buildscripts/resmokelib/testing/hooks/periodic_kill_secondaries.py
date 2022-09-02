@@ -126,8 +126,7 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
     INTERRUPTED_DUE_TO_REPL_STATE_CHANGE = 11602
     INTERRUPTED_DUE_TO_STORAGE_CHANGE = 355
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self, logger, test_name, description, base_test_name, hook, test_report):
+    def __init__(self, logger, test_name, description, base_test_name, hook, test_report):
         """Initialize PeriodicKillSecondariesTestCase."""
         interface.DynamicTestCase.__init__(self, logger, test_name, description, base_test_name,
                                            hook)
@@ -262,8 +261,7 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
         self.logger.info(fixture.create_fixture_table(self.fixture))
         self.fixture.await_ready()
 
-    def _check_invariants_as_standalone(self, secondary):  # pylint: disable=too-many-locals
-        # pylint: disable=too-many-branches,too-many-statements
+    def _check_invariants_as_standalone(self, secondary):
         # We remove the --replSet option in order to start the node as a standalone.
         replset_name = secondary.mongod_options.pop("replSet")
         self.logger.info(

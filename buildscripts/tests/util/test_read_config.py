@@ -5,8 +5,6 @@ import mock
 
 from buildscripts.util import read_config
 
-# pylint: disable=missing-docstring,protected-access
-
 
 class TestGetConfigValue(unittest.TestCase):
     def test_undefined_values_return_none(self):

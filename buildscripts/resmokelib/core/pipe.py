@@ -13,7 +13,7 @@ from typing import List
 MAX_LOG_LINE = int(3.5 * 1024 * 1024)
 
 
-class LoggerPipe(threading.Thread):  # pylint: disable=too-many-instance-attributes
+class LoggerPipe(threading.Thread):
     """Asynchronously reads the output of a subprocess and sends it to a logger."""
 
     # The start() and join() methods are not intended to be called directly on the LoggerPipe

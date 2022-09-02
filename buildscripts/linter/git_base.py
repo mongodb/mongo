@@ -6,7 +6,7 @@ import subprocess
 LOGGER = logging.getLogger(__name__)
 
 
-class Repository(object):  # pylint: disable=too-many-public-methods
+class Repository(object):
     """Represent a local git repository."""
 
     def __init__(self, directory):
@@ -239,8 +239,8 @@ class GitException(Exception):
 
     """
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self, message, returncode=None, cmd=None, process_args=None, stdout=None, stderr=None):
+    def __init__(self, message, returncode=None, cmd=None, process_args=None, stdout=None,
+                 stderr=None):
         """Initialize GitException."""
         Exception.__init__(self, message)
         self.returncode = returncode
@@ -262,8 +262,7 @@ class GitCommandResult(object):
 
     """
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self, cmd, process_args, returncode, stdout=None, stderr=None):
+    def __init__(self, cmd, process_args, returncode, stdout=None, stderr=None):
         """Initialize GitCommandResult."""
         self.cmd = cmd
         self.process_args = process_args

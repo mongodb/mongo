@@ -6,8 +6,6 @@ import psutil
 
 from buildscripts import evergreen_resmoke_job_count as under_test
 
-# pylint: disable=missing-docstring,no-self-use
-
 
 class DetermineJobsTest(unittest.TestCase):
     cpu_count = psutil.cpu_count()

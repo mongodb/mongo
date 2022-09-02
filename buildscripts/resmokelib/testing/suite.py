@@ -59,7 +59,7 @@ def synchronized(method):
     return synced
 
 
-class Suite(object):  # pylint: disable=too-many-instance-attributes,too-many-public-methods
+class Suite(object):
     """A suite of tests of a particular kind (e.g. C++ unit tests, dbtests, jstests)."""
 
     def __init__(self, suite_name, suite_config, suite_options=_config.SuiteOptions.ALL_INHERITED):

@@ -23,7 +23,7 @@ def name_generated_task(parent_name, task_index=None, total_tasks=0, variant=Non
     if task_index is None:
         return f"{parent_name}_misc{suffix}"
     else:
-        index_width = int(math.ceil(math.log10(total_tasks)))
+        index_width = int(math.ceil(math.log10(total_tasks)))  # pylint: disable=c-extension-no-member
         return f"{parent_name}_{str(task_index).zfill(index_width)}{suffix}"
 
 

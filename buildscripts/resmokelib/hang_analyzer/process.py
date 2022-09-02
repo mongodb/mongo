@@ -6,7 +6,7 @@ import signal
 import subprocess
 import sys
 import time
-from distutils import spawn  # pylint: disable=no-name-in-module
+from distutils import spawn
 from datetime import datetime
 
 import psutil

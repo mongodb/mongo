@@ -23,13 +23,13 @@ def _teardown_and_clean_node(node):
     shutil.rmtree(node.get_dbpath_prefix(), ignore_errors=False)
 
 
-class ShardSplitFixture(interface.MultiClusterFixture):  # pylint: disable=too-many-instance-attributes
+class ShardSplitFixture(interface.MultiClusterFixture):
     """Fixture which provides JSTests with a replica set and recipient nodes to run splits against."""
 
     AWAIT_REPL_TIMEOUT_MINS = 5
     AWAIT_REPL_TIMEOUT_FOREVER_MINS = 24 * 60
 
-    def __init__(  # pylint: disable=too-many-arguments,too-many-locals
+    def __init__(
             self,
             logger,
             job_num,

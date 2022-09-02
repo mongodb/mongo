@@ -218,9 +218,8 @@ class _BaseBuildloggerHandler(handlers.BufferedHandler):
 class BuildloggerTestHandler(_BaseBuildloggerHandler):
     """Buildlogger handler for the test logs."""
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self, build_config, build_id, test_id, capacity=_SEND_AFTER_LINES,
-            interval_secs=_SEND_AFTER_SECS):
+    def __init__(self, build_config, build_id, test_id, capacity=_SEND_AFTER_LINES,
+                 interval_secs=_SEND_AFTER_SECS):
         """Initialize the buildlogger handler with the credentials, build id, and test id."""
         endpoint = APPEND_TEST_LOGS_ENDPOINT % {
             "build_id": build_id,

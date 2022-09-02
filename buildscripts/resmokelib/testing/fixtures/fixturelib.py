@@ -15,8 +15,6 @@ from buildscripts.resmokelib.testing.fixtures import _builder
 class FixtureLib:
     """Class that exposes the resmokelib API that fixtures can use."""
 
-    # pylint: disable=no-self-use
-
     #################
     # Logger tools #
     #################
@@ -45,7 +43,7 @@ class FixtureLib:
         """Build fixtures by calling builder API."""
         return _builder.make_fixture(class_name, logger, job_num, *args, **kwargs)
 
-    def mongod_program(self, logger, job_num, executable, process_kwargs, mongod_options):  # pylint: disable=too-many-arguments
+    def mongod_program(self, logger, job_num, executable, process_kwargs, mongod_options):
         """
         Return a Process instance that starts mongod arguments constructed from 'mongod_options'.
 
@@ -58,12 +56,12 @@ class FixtureLib:
                                             mongod_options)
 
     def mongos_program(self, logger, job_num, executable=None, process_kwargs=None,
-                       mongos_options=None):  # pylint: disable=too-many-arguments
+                       mongos_options=None):
         """Return a Process instance that starts a mongos with arguments constructed from 'kwargs'."""
         return core.programs.mongos_program(logger, job_num, executable, process_kwargs,
                                             mongos_options)
 
-    def generic_program(self, logger, args, process_kwargs=None, **kwargs):  # pylint: disable=too-many-arguments
+    def generic_program(self, logger, args, process_kwargs=None, **kwargs):
         """Return a Process instance that starts an arbitrary executable.
 
         The executable arguments are constructed from 'kwargs'.
@@ -112,7 +110,7 @@ class FixtureLib:
         return original
 
 
-class _FixtureConfig(object):  # pylint: disable=too-many-instance-attributes
+class _FixtureConfig(object):
     """Class that stores fixture configuration info."""
 
     def __init__(self):

@@ -652,7 +652,6 @@ class _BinDataBsonCppTypeBase(BsonCppTypeBase):
 def get_bson_cpp_type(ast_type):
     # type: (ast.Type) -> Optional[BsonCppTypeBase]
     """Get a class that provides custom serialization for the given BSON type."""
-    # pylint: disable=too-many-return-statements
 
     # Does not support list of types
     if len(ast_type.bson_serialization_type) > 1:

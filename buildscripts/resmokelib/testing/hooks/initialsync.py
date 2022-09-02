@@ -63,8 +63,7 @@ class BackgroundInitialSyncTestCase(jsfile.DynamicJSTestCase):
     INTERRUPTED_DUE_TO_REPL_STATE_CHANGE = 11602
     INTERRUPTED_DUE_TO_STORAGE_CHANGE = 355
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self, logger, test_name, description, base_test_name, hook, shell_options=None):
+    def __init__(self, logger, test_name, description, base_test_name, hook, shell_options=None):
         """Initialize BackgroundInitialSyncTestCase."""
         jsfile.DynamicJSTestCase.__init__(self, logger, test_name, description, base_test_name,
                                           hook, self.JS_FILENAME, shell_options)
@@ -198,8 +197,7 @@ class IntermediateInitialSyncTestCase(jsfile.DynamicJSTestCase):
 
     JS_FILENAME = os.path.join("jstests", "hooks", "run_initial_sync_node_validation.js")
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self, logger, test_name, description, base_test_name, hook):
+    def __init__(self, logger, test_name, description, base_test_name, hook):
         """Initialize IntermediateInitialSyncTestCase."""
         jsfile.DynamicJSTestCase.__init__(self, logger, test_name, description, base_test_name,
                                           hook, self.JS_FILENAME)

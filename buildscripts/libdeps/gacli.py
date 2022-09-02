@@ -225,7 +225,6 @@ def load_graph_data(graph_file, output_format):
 
 
 def main():
-    # pylint: disable=too-many-branches
     """Perform graph analysis based on input args."""
 
     args = setup_args_parser()

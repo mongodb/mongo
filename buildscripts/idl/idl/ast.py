@@ -54,8 +54,6 @@ class IDLBoundSpec(object):
 class IDLAST(object):
     """The in-memory representation of an IDL file."""
 
-    # pylint: disable=too-many-instance-attributes
-
     def __init__(self):
         # type: () -> None
         """Construct an IDLAST."""
@@ -94,8 +92,6 @@ class Type(common.SourceLocation):
     The type of a struct field or command field, for the sake of C++ code generation.
     """
 
-    # pylint: disable=too-many-instance-attributes
-
     def __init__(self, file_name, line, column):
         # type: (str, int, int) -> None
         """Construct a Type."""
@@ -127,8 +123,6 @@ class Struct(common.SourceLocation):
     has a struct type (or a field is an array of structs or a variant that can be a struct), we
     represent that struct type using ast.Type with is_struct=True.
     """
-
-    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, file_name, line, column):
         # type: (str, int, int) -> None
@@ -170,8 +164,6 @@ class Validator(common.SourceLocation):
     If more than one is included, they must ALL evaluate to true.
     """
 
-    # pylint: disable=too-many-instance-attributes
-
     def __init__(self, file_name, line, column):
         # type: (str, int, int) -> None
         """Construct a Validator."""
@@ -193,8 +185,6 @@ class Field(common.SourceLocation):
     Name is always populated.
     Not all fields are set, it depends on the input document.
     """
-
-    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, file_name, line, column):
         # type: (str, int, int) -> None
@@ -260,8 +250,6 @@ class Command(Struct):
 
     All fields are either required or have a non-None default.
     """
-
-    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, file_name, line, column):
         # type: (str, int, int) -> None
@@ -402,8 +390,6 @@ class ServerParameterClass(common.SourceLocation):
 class ServerParameter(common.SourceLocation):
     """IDL ServerParameter setting."""
 
-    # pylint: disable=too-many-instance-attributes
-
     def __init__(self, file_name, line, column):
         # type: (str, int, int) -> None
         """Construct a ServerParameter."""
@@ -456,8 +442,6 @@ class ConfigGlobal(common.SourceLocation):
 
 class ConfigOption(common.SourceLocation):
     """IDL ConfigOption setting."""
-
-    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, file_name, line, column):
         # type: (str, int, int) -> None

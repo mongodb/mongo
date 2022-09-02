@@ -28,7 +28,6 @@
 # it in the license file.
 #
 """Test cases for IDL parser."""
-# pylint: disable=too-many-lines
 
 import textwrap
 import unittest
@@ -46,7 +45,6 @@ else:
 
 
 class TestParser(testcase.IDLTestcase):
-    # pylint: disable=too-many-public-methods
     """Test the IDL parser only."""
 
     def test_empty(self):
@@ -1386,7 +1384,6 @@ class TestParser(testcase.IDLTestcase):
     def test_command_doc_sequence_positive(self):
         # type: () -> None
         """Positive supports_doc_sequence test cases."""
-        # pylint: disable=invalid-name
 
         # supports_doc_sequence can be false
         self.assert_parse(
@@ -1421,7 +1418,6 @@ class TestParser(testcase.IDLTestcase):
     def test_command_doc_sequence_negative(self):
         # type: () -> None
         """Negative supports_doc_sequence test cases."""
-        # pylint: disable=invalid-name
 
         # supports_doc_sequence must be a bool
         self.assert_parse_fail(

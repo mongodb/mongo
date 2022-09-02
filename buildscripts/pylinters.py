@@ -176,7 +176,7 @@ def _fix_files(linters, config_dict, file_names):
 
     for linter in linter_instances:
         run_linter = lambda param1: lint_runner.run(linter.cmd_path + linter.linter.  # pylint: disable=cell-var-from-loop
-                                                    get_fix_cmd_args(param1))  # pylint: disable=cell-var-from-loop
+                                                    get_fix_cmd_args(param1))
 
         lint_clean = parallel.parallel_process([os.path.abspath(f) for f in file_names], run_linter)
 

@@ -1,5 +1,4 @@
 """Command line utility for executing MongoDB tests of all kinds."""
-# pylint: disable=too-many-lines
 
 import argparse
 import collections
@@ -40,7 +39,7 @@ _EVERGREEN_ARGUMENT_TITLE = "Evergreen options"
 _CEDAR_ARGUMENT_TITLE = "Cedar options"
 
 
-class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
+class TestRunner(Subcommand):
     """The main class to run tests with resmoke."""
 
     def __init__(self, command, start_time=time.time()):
@@ -285,7 +284,6 @@ class TestRunner(Subcommand):  # pylint: disable=too-many-instance-attributes
                 fh.write(f"{resmoke_env_options} {local_resmoke_invocation}")
 
     def _check_for_mongo_processes(self):
-        # pylint: disable=too-many-branches,
         """Check for existing mongo processes as they could interfere with running the tests."""
 
         if config.AUTO_KILL == 'off' or config.SHELL_CONN_STRING is not None:
@@ -599,7 +597,6 @@ class TestRunnerEvg(TestRunner):
 class RunPlugin(PluginInterface):
     """Interface to parsing."""
 
-    # pylint: disable=missing-docstring
     def add_subcommand(self, subparsers):
         """
         Add subcommand parser.
@@ -632,7 +629,7 @@ class RunPlugin(PluginInterface):
         return None
 
     @classmethod
-    def _add_run(cls, subparsers):  # pylint: disable=too-many-statements
+    def _add_run(cls, subparsers):
         """Create and add the parser for the Run subcommand."""
         parser = subparsers.add_parser("run", help="Runs the specified tests.")
 
@@ -1166,7 +1163,7 @@ class RunPlugin(PluginInterface):
                             help="Where to output the generated tags.")
 
 
-def to_local_args(input_args=None):  # pylint: disable=too-many-branches,too-many-locals
+def to_local_args(input_args=None):
     """
     Return a command line invocation for resmoke.py suitable for being run outside of Evergreen.
 

@@ -1,5 +1,4 @@
 """Unit tests for buildscripts/resmokelib/run/generate_multiversion_exclude_tags.py."""
-# pylint: disable=missing-docstring
 import os
 import unittest
 from tempfile import TemporaryDirectory

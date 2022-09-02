@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 from buildscripts.resmokelib.logging import loggers
 from buildscripts.resmokelib import config
 
-# pylint: disable=missing-docstring,protected-access
+# pylint: disable=protected-access
 
 
 class TestLoggers(unittest.TestCase):

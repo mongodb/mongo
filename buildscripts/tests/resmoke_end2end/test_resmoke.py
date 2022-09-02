@@ -13,8 +13,6 @@ import yaml
 
 from buildscripts.resmokelib import core
 
-# pylint: disable=missing-docstring,protected-access
-
 
 class _ResmokeSelftest(unittest.TestCase):
     @classmethod

@@ -6,7 +6,7 @@ import threading
 from buildscripts.resmokelib.testing.hooks import jsfile
 
 
-class _BackgroundJob(threading.Thread):  # pylint: disable=too-many-instance-attributes
+class _BackgroundJob(threading.Thread):
     """A thread for running a JS file while a test is running."""
 
     def __init__(self, thread_name):

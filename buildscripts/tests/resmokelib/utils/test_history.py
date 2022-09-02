@@ -5,8 +5,6 @@ import unittest
 
 from buildscripts.resmokelib.utils.history import HistoryDict, make_historic
 
-# pylint: disable=missing-docstring
-
 
 class TestHistory(unittest.TestCase):
     """Unit tests for the HistoryDict class."""

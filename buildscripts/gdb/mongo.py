@@ -233,7 +233,7 @@ class DumpGlobalServiceContext(gdb.Command):
         """Initialize DumpGlobalServiceContext."""
         RegisterMongoCommand.register(self, "mongodb-service-context", gdb.COMMAND_DATA)
 
-    def invoke(self, arg, _from_tty):  # pylint: disable=no-self-use,unused-argument
+    def invoke(self, arg, _from_tty):  # pylint: disable=unused-argument
         """Invoke GDB command to print the Global Service Context."""
         gdb.execute("print *('mongo::(anonymous namespace)::globalServiceContext')")
 
@@ -255,7 +255,7 @@ class GetMongoDecoration(gdb.Command):
         """Initialize GetMongoDecoration."""
         RegisterMongoCommand.register(self, "mongo-decoration", gdb.COMMAND_DATA)
 
-    def invoke(self, args, _from_tty):  # pylint: disable=unused-argument,no-self-use
+    def invoke(self, args, _from_tty):  # pylint: disable=unused-argument
         """Invoke GetMongoDecoration."""
         argarr = args.split(" ")
         if len(argarr) < 2:
@@ -293,7 +293,7 @@ class DumpMongoDSessionCatalog(gdb.Command):
         """Initialize DumpMongoDSessionCatalog."""
         RegisterMongoCommand.register(self, "mongod-dump-sessions", gdb.COMMAND_DATA)
 
-    def invoke(self, args, _from_tty):  # pylint: disable=unused-argument,no-self-use,too-many-locals,too-many-branches,too-many-statements
+    def invoke(self, args, _from_tty):  # pylint: disable=unused-argument
         """Invoke DumpMongoDSessionCatalog."""
         # See if a particular session id was specified.
         argarr = args.split(" ")
@@ -425,7 +425,7 @@ class DumpMongoDBMutexes(gdb.Command):
         """Initialize DumpMongoDBMutexs."""
         RegisterMongoCommand.register(self, "mongodb-dump-mutexes", gdb.COMMAND_DATA)
 
-    def invoke(self, args, _from_tty):  # pylint: disable=unused-argument,no-self-use,too-many-locals,too-many-branches,too-many-statements
+    def invoke(self, args, _from_tty):  # pylint: disable=unused-argument
         """Invoke DumpMongoDBMutexes."""
 
         print("Dumping mutex info for all Clients")
@@ -520,7 +520,7 @@ class MongoDBDumpRecoveryUnits(gdb.Command):
             print("Not invoking mongod recovery unit dump for: %s" % (main_binary_name))
 
     @staticmethod
-    def dump_recovery_units(recovery_unit_impl_type):  # pylint: disable=too-many-locals
+    def dump_recovery_units(recovery_unit_impl_type):
         """GDB in-process python supplement."""
 
         # Temporarily disable printing static members to make the output more readable
@@ -653,7 +653,7 @@ class BtIfActive(gdb.Command):
         """Initialize BtIfActive."""
         RegisterMongoCommand.register(self, "mongodb-bt-if-active", gdb.COMMAND_DATA)
 
-    def invoke(self, arg, _from_tty):  # pylint: disable=no-self-use,unused-argument
+    def invoke(self, arg, _from_tty):  # pylint: disable=unused-argument
         """Invoke GDB to print stack trace."""
         try:
             idle_location = gdb.parse_and_eval("mongo::for_debuggers::idleThreadLocation")
@@ -862,7 +862,7 @@ class MongoDBPPrintBsonAtPointer(gdb.Command):
         """Init."""
         RegisterMongoCommand.register(self, "mongodb-pprint-bson", gdb.COMMAND_STATUS)
 
-    def invoke(self, args, _from_tty):  # pylint: disable=no-self-use
+    def invoke(self, args, _from_tty):
         """Invoke."""
         args = args.split(' ')
         if len(args) == 0 or (len(args) == 1 and len(args[0]) == 0):
@@ -892,7 +892,7 @@ class MongoDBHelp(gdb.Command):
         """Initialize MongoDBHelp."""
         gdb.Command.__init__(self, "mongodb-help", gdb.COMMAND_SUPPORT)
 
-    def invoke(self, arg, _from_tty):  # pylint: disable=no-self-use,unused-argument
+    def invoke(self, arg, _from_tty):  # pylint: disable=unused-argument
         """Register the mongo print commands."""
         RegisterMongoCommand.print_commands()
 

@@ -65,7 +65,7 @@ class ObjectCountsMetric(NamedTuple):
         )
 
 
-class SconsMetrics:  # pylint: disable=too-many-instance-attributes
+class SconsMetrics:
     """Class representing SCons metrics."""
 
     memory_before_reading_sconscript_files: Optional[int] = None

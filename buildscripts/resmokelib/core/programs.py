@@ -76,7 +76,7 @@ def mongod_program(logger, job_num, executable, process_kwargs, mongod_options):
     return make_process(logger, args, **process_kwargs), mongod_options["port"]
 
 
-def mongos_program(logger, job_num, executable=None, process_kwargs=None, mongos_options=None):  # pylint: disable=too-many-arguments
+def mongos_program(logger, job_num, executable=None, process_kwargs=None, mongos_options=None):
     """Return a Process instance that starts a mongos with arguments constructed from 'kwargs'."""
     args = [executable]
 
@@ -97,9 +97,8 @@ def mongos_program(logger, job_num, executable=None, process_kwargs=None, mongos
     return make_process(logger, args, **process_kwargs), mongos_options["port"]
 
 
-def mongo_shell_program(  # pylint: disable=too-many-arguments,too-many-branches,too-many-locals,too-many-statements
-        logger, executable=None, connection_string=None, filename=None, test_filename=None,
-        process_kwargs=None, **kwargs):
+def mongo_shell_program(logger, executable=None, connection_string=None, filename=None,
+                        test_filename=None, process_kwargs=None, **kwargs):
     """Return a Process instance that starts a mongo shell.
 
     The shell is started with the given connection string and arguments constructed from 'kwargs'.

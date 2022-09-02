@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Utility script to run Black Duck scans and query Black Duck database."""
-#pylint: disable=too-many-lines
 
 import argparse
 import functools
@@ -19,13 +18,13 @@ from abc import ABCMeta, abstractmethod
 from typing import Dict, List, Optional
 
 import urllib3.util.retry as urllib3_retry
-import requests
 import yaml
 
 from blackduck.HubRestApi import HubInstance
 
+import requests
 try:
-    import requests.packages.urllib3.exceptions as urllib3_exceptions  #pylint: disable=ungrouped-imports
+    import requests.packages.urllib3.exceptions as urllib3_exceptions
 except ImportError:
     # Versions of the requests package prior to 1.2.0 did not vendor the urllib3 package.
     urllib3_exceptions = None
@@ -176,7 +175,6 @@ class HTTPHandler(object):
 
 # Derived from buildscripts/resmokelib/logging/buildlogger.py
 class BuildloggerServer(object):
-    # pylint: disable=too-many-instance-attributes
     """
     A remote server to which build logs can be sent.
 
@@ -185,7 +183,6 @@ class BuildloggerServer(object):
     """
 
     def __init__(self, username, password, task_id, builder, build_num, build_phase, url):
-        # pylint: disable=too-many-arguments
         """Initialize BuildloggerServer."""
         self.username = username
         self.password = password
@@ -245,7 +242,7 @@ class BuildloggerServer(object):
             raise ValueError("Encountered an HTTP error: %s" % (err))
         except requests.RequestException as err:
             raise ValueError("Encountered a network error: %s" % (err))
-        except:  # pylint: disable=bare-except
+        except:
             raise ValueError("Encountered an error.")
 
         return self.handler.make_url(endpoint)
@@ -451,7 +448,6 @@ class Component:
 
     def __init__(self, name, version, licenses, policy_status, security_risk, newest_release,
                  is_manually_added):
-        # pylint: disable=too-many-arguments
         """Initialize Black Duck component."""
         self.name = name
         self.version = version
@@ -463,7 +459,6 @@ class Component:
 
     @staticmethod
     def parse(hub, component):
-        # pylint: disable=too-many-locals
         """Parse a Black Duck component from a dictionary."""
         name = component["componentName"]
         cversion = component.get("componentVersionName", "unknown_version")
@@ -621,7 +616,6 @@ class TestResultEncoder(json.JSONEncoder):
 
     def default(self, o):
         """Serialize objects by default as a dictionary."""
-        # pylint: disable=method-hidden
         return o.__dict__
 
 

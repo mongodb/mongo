@@ -65,7 +65,6 @@ def _find_linter(linter, config_dict):
     Return a LinterInstance with the location of the linter binary if a linter binary with the
     matching version is found. None otherwise.
     """
-    # pylint: disable=too-many-branches,too-many-return-statements
 
     if linter.cmd_name in config_dict and config_dict[linter.cmd_name] is not None:
         cmd = [config_dict[linter.cmd_name]]
@@ -172,7 +171,6 @@ class LintRunner(object):
     def run_lint(self, linter, file_name):
         # type: (base.LinterInstance, str) -> bool
         """Run the specified linter for the file."""
-        # pylint: disable=too-many-locals
 
         linter_args = linter.linter.get_lint_cmd_args(file_name)
         if not linter_args:

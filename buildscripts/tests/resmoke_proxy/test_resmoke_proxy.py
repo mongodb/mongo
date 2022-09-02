@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 from buildscripts.resmoke_proxy import resmoke_proxy as under_test
 
-# pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access
+# pylint: disable=protected-access
 
 
 class TestResmokeProxy(unittest.TestCase):

@@ -33,7 +33,7 @@ from buildscripts.resmokelib.symbolizer import Symbolizer
 class HangAnalyzer(Subcommand):
     """Main class for the hang analyzer subcommand."""
 
-    def __init__(self, options, task_id=None, logger=None, **_kwargs):  # pylint: disable=unused-argument
+    def __init__(self, options, task_id=None, logger=None, **_kwargs):
         """
         Configure processe lists based on options.
 
@@ -68,7 +68,7 @@ class HangAnalyzer(Subcommand):
         self._configure_processes()
         self._setup_logging(logger)
 
-    def execute(self):  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
+    def execute(self):
         """
         Execute hang analysis.
 

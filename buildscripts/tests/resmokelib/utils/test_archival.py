@@ -9,7 +9,7 @@ import unittest
 
 from buildscripts.resmokelib.utils import archival
 
-# pylint: disable=missing-docstring,protected-access
+# pylint: disable=protected-access
 
 _BUCKET = "mongodatafiles"
 

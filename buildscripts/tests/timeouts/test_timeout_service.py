@@ -11,7 +11,7 @@ import buildscripts.timeouts.timeout_service as under_test
 from buildscripts.resmoke_proxy.resmoke_proxy import ResmokeProxyService
 from buildscripts.util.teststats import HistoricTaskData
 
-# pylint: disable=missing-docstring,no-self-use,invalid-name,protected-access
+# pylint: disable=invalid-name,protected-access
 
 
 def build_mock_service(evg_api=None, resmoke_proxy=None):

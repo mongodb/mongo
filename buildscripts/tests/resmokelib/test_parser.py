@@ -5,8 +5,6 @@ import unittest
 from buildscripts.resmokelib.parser import parse, parse_command_line
 from buildscripts.resmokelib.run import to_local_args
 
-# pylint: disable=missing-docstring
-
 
 class TestLocalCommandLine(unittest.TestCase):
     """Unit tests for the to_local_args() function."""

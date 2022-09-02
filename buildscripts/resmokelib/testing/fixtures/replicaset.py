@@ -37,17 +37,16 @@ def compare_optime(optime1, optime2):
         return compare_timestamp(optime1["ts"], optime2["ts"])
 
 
-class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-instance-attributes, too-many-public-methods
+class ReplicaSetFixture(interface.ReplFixture):
     """Fixture which provides JSTests with a replica set to run against."""
 
-    def __init__(  # pylint: disable=too-many-arguments, too-many-locals
-            self, logger, job_num, fixturelib, mongod_executable=None, mongod_options=None,
-            dbpath_prefix=None, preserve_dbpath=False, num_nodes=2, start_initial_sync_node=False,
-            write_concern_majority_journal_default=None, auth_options=None,
-            replset_config_options=None, voting_secondaries=True, all_nodes_electable=False,
-            use_replica_set_connection_string=None, linear_chain=False, default_read_concern=None,
-            default_write_concern=None, shard_logging_prefix=None, replicaset_logging_prefix=None,
-            replset_name=None):
+    def __init__(self, logger, job_num, fixturelib, mongod_executable=None, mongod_options=None,
+                 dbpath_prefix=None, preserve_dbpath=False, num_nodes=2,
+                 start_initial_sync_node=False, write_concern_majority_journal_default=None,
+                 auth_options=None, replset_config_options=None, voting_secondaries=True,
+                 all_nodes_electable=False, use_replica_set_connection_string=None,
+                 linear_chain=False, default_read_concern=None, default_write_concern=None,
+                 shard_logging_prefix=None, replicaset_logging_prefix=None, replset_name=None):
         """Initialize ReplicaSetFixture."""
 
         interface.ReplFixture.__init__(self, logger, job_num, fixturelib,
@@ -110,7 +109,7 @@ class ReplicaSetFixture(interface.ReplFixture):  # pylint: disable=too-many-inst
         self.initial_sync_node = None
         self.initial_sync_node_idx = -1
 
-    def setup(self):  # pylint: disable=too-many-branches,too-many-statements,too-many-locals
+    def setup(self):
         """Set up the replica set."""
 
         # Version-agnostic options for mongod/s can be set here.

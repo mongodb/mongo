@@ -5,8 +5,6 @@ import mock
 
 from buildscripts.resmokelib.testing import queue_element
 
-# pylint: disable=missing-docstring,protected-access
-
 
 class TestQueueElemFactory(unittest.TestCase):
     def test_without_time(self):

@@ -287,7 +287,6 @@ class SConsToNinjaTranslator:
 
         self.loaded_custom = False
 
-    # pylint: disable=too-many-return-statements
     def action_to_ninja_build(self, node, action=None):
         """Generate build arguments dictionary for node."""
         if not self.loaded_custom:
@@ -369,7 +368,6 @@ class SConsToNinjaTranslator:
                         " you can write your own ninja build generator for"
                         " this function using NinjaRegisterFunctionHandler".format(name))
 
-    # pylint: disable=too-many-branches
     def handle_list_action(self, node, action):
         """TODO write this comment"""
         results = [
@@ -443,7 +441,6 @@ class SConsToNinjaTranslator:
         raise Exception("Unhandled list action with rule: " + results[0]["rule"])
 
 
-# pylint: disable=too-many-instance-attributes
 class NinjaState:
     """Maintains state of Ninja build system as it's translated from SCons."""
 
@@ -653,7 +650,6 @@ class NinjaState:
                 return True
         return False
 
-    # pylint: disable=too-many-branches,too-many-locals
     def generate(self, ninja_file):
         """
         Generate the build.ninja.
@@ -1210,7 +1206,7 @@ def get_generic_shell_command(env, node, action, targets, sources, executor=None
     )
 
 
-def get_command(env, node, action):  # pylint: disable=too-many-branches
+def get_command(env, node, action):
     """Get the command to execute for node."""
     if node.env:
         sub_env = node.env

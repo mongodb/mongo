@@ -31,8 +31,6 @@ class BufferedHandler(logging.Handler):
     should be flushed. If it should, then flush() is expected to do what's needed.
     """
 
-    # pylint: disable=too-many-instance-attributes
-
     def __init__(self, capacity, interval_secs):
         """Initialize the handler with the buffer size and timeout.
 
@@ -84,7 +82,7 @@ class BufferedHandler(logging.Handler):
         """Release."""
         pass
 
-    def process_record(self, record):  # pylint: disable=no-self-use
+    def process_record(self, record):
         """Apply a transformation to the record before it gets added to the buffer.
 
         The default implementation returns 'record' unmodified.

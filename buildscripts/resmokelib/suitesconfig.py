@@ -230,9 +230,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         base_suite = ExplicitSuiteConfig.get_config_obj(base_suite_name)
 
         if base_suite is None:
-            # pylint: disable=too-many-format-args
-            raise ValueError("Unknown base suite %s for matrix suite %s".format(
-                base_suite_name, suite_name))
+            raise ValueError(f"Unknown base suite {base_suite_name} for matrix suite {suite_name}")
 
         res = base_suite.copy()
 
@@ -265,7 +263,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         all_matrix_suites = cls.get_all_mappings(suites_dir)
 
         if suite_name in all_matrix_suites.keys():
-            return all_matrix_suites[suite_name]  # pylint: disable=unsubscriptable-object
+            return all_matrix_suites[suite_name]
         return None
 
     @classmethod

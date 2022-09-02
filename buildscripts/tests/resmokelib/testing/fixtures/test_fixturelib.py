@@ -3,7 +3,6 @@
 import copy
 import unittest
 
-# pylint: disable=missing-docstring,protected-access
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 
 
@@ -11,7 +10,7 @@ class TestMergeMongoOptionDicts(unittest.TestCase):
     def setUp(self) -> None:
         self.under_test = FixtureLib()
 
-    def test_merge_empty(self):  # pylint: disable=no-self-use
+    def test_merge_empty(self):
         original = {
             "dbpath": "value0", self.under_test.SET_PARAMETERS_KEY: {
                 "param1": "value1",
@@ -24,7 +23,7 @@ class TestMergeMongoOptionDicts(unittest.TestCase):
 
         self.assertDictEqual(merged, original)
 
-    def test_merge_non_params(self):  # pylint: disable=no-self-use
+    def test_merge_non_params(self):
         non_param1_key = "non_param1"
         non_param2_key = "non_param2"
         original = {
@@ -45,7 +44,7 @@ class TestMergeMongoOptionDicts(unittest.TestCase):
         }
         self.assertEqual(original, expected)
 
-    def test_merge_params(self):  # pylint: disable=no-self-use
+    def test_merge_params(self):
         original = {
             "dbpath": "value", self.under_test.SET_PARAMETERS_KEY: {
                 "param1": "value",

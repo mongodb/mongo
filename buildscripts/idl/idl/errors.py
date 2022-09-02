@@ -25,7 +25,6 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 #
-# pylint: disable=too-many-lines
 """
 Common error handling code for IDL compiler.
 
@@ -153,7 +152,6 @@ class ParserError(common.SourceLocation):
     def __init__(self, error_id, msg, file_name, line, column):
         # type: (str, str, str, int, int) -> None
         """Construct a parser error with source location information."""
-        # pylint: disable=too-many-arguments
         self.error_id = error_id
         self.msg = msg
         super(ParserError, self).__init__(file_name, line, column)
@@ -226,8 +224,6 @@ class ParserContext(object):
     - keeping track of current file while parsing imported documents.
     - single class responsible for producing actual error messages.
     """
-
-    # pylint: disable=too-many-public-methods
 
     def __init__(self, file_name, errors):
         # type: (str, ParserErrorCollection) -> None
@@ -321,7 +317,6 @@ class ParserContext(object):
 
     def is_scalar_sequence_or_scalar_node(self, node, node_name):
         # type: (Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode], str) -> bool
-        # pylint: disable=invalid-name
         """Return True if the YAML node is a Scalar or Sequence."""
         if not node.id == "scalar" and not node.id == "sequence":
             self._add_node_error(
@@ -337,7 +332,6 @@ class ParserContext(object):
 
     def is_scalar_or_mapping_node(self, node, node_name):
         # type: (Union[yaml.nodes.MappingNode, yaml.nodes.ScalarNode, yaml.nodes.SequenceNode], str) -> bool
-        # pylint: disable=invalid-name
         """Return True if the YAML node is a Scalar or Mapping."""
         if not node.id == "scalar" and not node.id == "mapping":
             self._add_node_error(
@@ -389,7 +383,6 @@ class ParserContext(object):
     def add_missing_required_field_error(self, node, node_parent, node_name):
         # type: (yaml.nodes.Node, str, str) -> None
         """Add an error about a YAML node missing a required child."""
-        # pylint: disable=invalid-name
         self._add_node_error(
             node, ERROR_ID_MISSING_REQUIRED_FIELD,
             "IDL node '%s' is missing required scalar '%s'" % (node_parent, node_name))
@@ -397,7 +390,6 @@ class ParserContext(object):
     def add_missing_ast_required_field_error(self, location, ast_type, ast_parent, ast_name):
         # type: (common.SourceLocation, str, str, str) -> None
         """Add an error about a AST node missing a required child."""
-        # pylint: disable=invalid-name
         self._add_error(
             location, ERROR_ID_MISSING_AST_REQUIRED_FIELD,
             "%s '%s' is missing required scalar '%s'" % (ast_type, ast_parent, ast_name))
@@ -426,7 +418,6 @@ class ParserContext(object):
     def add_bad_bson_bindata_subtype_error(self, location, ast_type, ast_parent, bson_type_name):
         # type: (common.SourceLocation, str, str, str) -> None
         """Add an error about a bindata_subtype associated with a type that is not bindata."""
-        # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_BAD_BSON_BINDATA_SUBTYPE_TYPE,
                         ("The bindata_subtype field for %s '%s' is not valid for bson type '%s'") %
                         (ast_type, ast_parent, bson_type_name))
@@ -434,7 +425,6 @@ class ParserContext(object):
     def add_bad_bson_bindata_subtype_value_error(self, location, ast_type, ast_parent, value):
         # type: (common.SourceLocation, str, str, str) -> None
         """Add an error about a bad value for bindata_subtype."""
-        # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_BAD_BSON_BINDATA_SUBTYPE_VALUE,
                         ("The bindata_subtype field's value '%s' for %s '%s' is not valid") %
                         (value, ast_type, ast_parent))
@@ -442,7 +432,6 @@ class ParserContext(object):
     def add_bad_setat_specifier(self, location, specifier):
         # type: (common.SourceLocation, str) -> None
         """Add an error about a bad set_at specifier."""
-        # pylint: disable=invalid-name
         self._add_error(
             location, ERROR_ID_BAD_SETAT_SPECIFIER,
             ("Unexpected set_at specifier: '%s', expected 'startup' or 'runtime'") % (specifier))
@@ -457,7 +446,6 @@ class ParserContext(object):
     def add_ignored_field_must_be_empty_error(self, location, name, field_name):
         # type: (common.SourceLocation, str, str) -> None
         """Add an error about field must be empty for ignored fields."""
-        # pylint: disable=invalid-name
         self._add_error(
             location, ERROR_ID_FIELD_MUST_BE_EMPTY_FOR_IGNORED,
             ("Field '%s' cannot contain a value for property '%s' when a field is marked as ignored"
@@ -466,15 +454,13 @@ class ParserContext(object):
     def add_struct_default_must_be_true_or_empty_error(self, location, name):
         # type: (common.SourceLocation, str) -> None
         """Add an error about default must be True or empty for fields of type struct."""
-        # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_DEFAULT_MUST_BE_TRUE_OR_EMPTY_FOR_STRUCT, (
             "Field '%s' can only contain value 'true' for property 'default' when a field's type is a struct"
         ) % (name))
 
-    def add_not_custom_scalar_serialization_not_supported_error(self, location, ast_type,
-                                                                ast_parent, bson_type_name):
+    def add_not_custom_scalar_serialization_not_supported_error(  # pylint: disable=invalid-name
+            self, location, ast_type, ast_parent, bson_type_name):
         # type: (common.SourceLocation, str, str, str) -> None
-        # pylint: disable=invalid-name
         """Add an error about field must be empty for fields of type struct."""
         self._add_error(
             location, ERROR_ID_CUSTOM_SCALAR_SERIALIZATION_NOT_SUPPORTED,
@@ -484,7 +470,6 @@ class ParserContext(object):
 
     def add_bad_any_type_use_error(self, location, bson_type, ast_type, ast_parent):
         # type: (common.SourceLocation, str, str, str) -> None
-        # pylint: disable=invalid-name
         """Add an error about any being used in a list of bson types."""
         self._add_error(
             location, ERROR_ID_BAD_ANY_TYPE_USE,
@@ -493,7 +478,6 @@ class ParserContext(object):
 
     def add_bad_cpp_numeric_type_use_error(self, location, ast_type, ast_parent, cpp_type):
         # type: (common.SourceLocation, str, str, str) -> None
-        # pylint: disable=invalid-name
         """Add an error about any being used in a list of bson types."""
         self._add_error(
             location, ERROR_ID_BAD_NUMERIC_CPP_TYPE,
@@ -524,21 +508,18 @@ class ParserContext(object):
 
     def add_bindata_no_default(self, location, ast_type, ast_parent):
         # type: (common.SourceLocation, str, str) -> None
-        # pylint: disable=invalid-name
         """Add an error about a bindata type with a default value."""
         self._add_error(location, ERROR_ID_BAD_BINDATA_DEFAULT,
                         ("Default values are not allowed for %s '%s'") % (ast_type, ast_parent))
 
     def add_chained_type_not_found_error(self, location, type_name):
         # type: (common.SourceLocation, str) -> None
-        # pylint: disable=invalid-name
         """Add an error about a chained_type not found."""
         self._add_error(location, ERROR_ID_CHAINED_TYPE_NOT_FOUND,
                         ("Type '%s' is not a valid chained type") % (type_name))
 
     def add_chained_type_wrong_type_error(self, location, type_name, bson_type_name):
         # type: (common.SourceLocation, str, str) -> None
-        # pylint: disable=invalid-name
         """Add an error about a chained_type being the wrong type."""
         self._add_error(location, ERROR_ID_CHAINED_TYPE_WRONG_BSON_TYPE,
                         ("Chained Type '%s' has the wrong bson serialization type '%s', only" +
@@ -554,7 +535,6 @@ class ParserContext(object):
 
     def add_chained_type_no_strict_error(self, location, struct_name):
         # type: (common.SourceLocation, str) -> None
-        # pylint: disable=invalid-name
         """Add an error about strict parser validate and chained types."""
         self._add_error(location, ERROR_ID_CHAINED_NO_TYPE_STRICT,
                         ("Strict IDL parser validation is not supported with chained types for " +
@@ -562,14 +542,12 @@ class ParserContext(object):
 
     def add_chained_struct_not_found_error(self, location, struct_name):
         # type: (common.SourceLocation, str) -> None
-        # pylint: disable=invalid-name
         """Add an error about a chained_struct not found."""
         self._add_error(location, ERROR_ID_CHAINED_STRUCT_NOT_FOUND,
                         ("Type '%s' is not a valid chained struct") % (struct_name))
 
     def add_chained_nested_struct_no_strict_error(self, location, struct_name, nested_struct_name):
         # type: (common.SourceLocation, str, str) -> None
-        # pylint: disable=invalid-name
         """Add an error about strict parser validate and chained types."""
         self._add_error(location, ERROR_ID_CHAINED_NO_NESTED_STRUCT_STRICT,
                         ("Strict IDL parser validation is not supported for a chained struct '%s'" +
@@ -578,7 +556,6 @@ class ParserContext(object):
 
     def add_chained_nested_struct_no_nested_error(self, location, struct_name, chained_name):
         # type: (common.SourceLocation, str, str) -> None
-        # pylint: disable=invalid-name
         """Add an error about struct's chaining being a struct with nested chaining."""
         self._add_error(location, ERROR_ID_CHAINED_NO_NESTED_CHAINED,
                         ("Struct '%s' is not allowed to nest struct '%s' since it has chained" +
@@ -620,7 +597,6 @@ class ParserContext(object):
     def add_enum_non_continuous_range_error(self, location, enum_name):
         # type: (common.SourceLocation, str) -> None
         """Add an error for an enum having duplicate values."""
-        # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_ENUM_NON_CONTINUOUS_RANGE,
                         ("Enum '%s' has non-continuous integer variables, enums must have a " +
                          "continuous range of integer variables.") % (enum_name))
@@ -650,7 +626,6 @@ class ParserContext(object):
     def add_bad_field_default_and_optional(self, location, field_name):
         # type: (common.SourceLocation, str) -> None
         """Add an error about a field being optional and having a default value."""
-        # pylint: disable=invalid-name
         self._add_error(
             location, ERROR_ID_ILLEGAL_FIELD_DEFAULT_AND_OPTIONAL,
             ("Field '%s' can only be marked as optional or have a default value," + " not both.") %
@@ -659,7 +634,6 @@ class ParserContext(object):
     def add_bad_struct_field_as_doc_sequence_error(self, location, struct_name, field_name):
         # type: (common.SourceLocation, str, str) -> None
         """Add an error about using a field in a struct being marked with supports_doc_sequence."""
-        # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_STRUCT_NO_DOC_SEQUENCE,
                         ("Field '%s' in struct '%s' cannot be used as a Command Document Sequence"
                          " type. They are only supported in commands.") % (field_name, struct_name))
@@ -667,7 +641,6 @@ class ParserContext(object):
     def add_bad_non_array_as_doc_sequence_error(self, location, struct_name, field_name):
         # type: (common.SourceLocation, str, str) -> None
         """Add an error about using a non-array type field being marked with supports_doc_sequence."""
-        # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_NO_DOC_SEQUENCE_FOR_NON_ARRAY,
                         ("Field '%s' in command '%s' cannot be used as a Command Document Sequence"
                          " type since it is not an array.") % (field_name, struct_name))
@@ -675,7 +648,6 @@ class ParserContext(object):
     def add_bad_non_object_as_doc_sequence_error(self, location, field_name):
         # type: (common.SourceLocation, str) -> None
         """Add an error about using a non-struct or BSON object for a doc sequence."""
-        # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_NO_DOC_SEQUENCE_FOR_NON_OBJECT,
                         ("Field '%s' cannot be used as a Command Document Sequence"
                          " type since it is not a BSON object or struct.") % (field_name))
@@ -683,15 +655,13 @@ class ParserContext(object):
     def add_bad_command_name_duplicates_field(self, location, command_name):
         # type: (common.SourceLocation, str) -> None
         """Add an error about a command and field having the same name."""
-        # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_COMMAND_DUPLICATES_FIELD,
                         ("Command '%s' cannot have the same name as a field.") % (command_name))
 
-    def add_bad_field_non_const_getter_in_immutable_struct_error(self, location, struct_name,
-                                                                 field_name):
+    def add_bad_field_non_const_getter_in_immutable_struct_error(  # pylint: disable=invalid-name
+            self, location, struct_name, field_name):
         # type: (common.SourceLocation, str, str) -> None
         """Add an error about marking a field with non_const_getter in an immutable struct."""
-        # pylint: disable=invalid-name
         self._add_error(
             location, ERROR_ID_NON_CONST_GETTER_IN_IMMUTABLE_STRUCT,
             ("Cannot generate a non-const getter for field '%s' in struct '%s' since"
@@ -765,7 +735,6 @@ class ParserContext(object):
     def add_duplicate_comparison_order_field_error(self, location, struct_name, comparison_order):
         # type: (common.SourceLocation, str, int) -> None
         """Add an error about fields having duplicate comparison_orders."""
-        # pylint: disable=invalid-name
         self._add_error(
             location, ERROR_ID_IS_DUPLICATE_COMPARISON_ORDER,
             ("Struct '%s' cannot have two fields with the same comparison_order value '%d'.") %
@@ -774,7 +743,6 @@ class ParserContext(object):
     def add_extranous_command_type(self, location, command_name):
         # type: (common.SourceLocation, str) -> None
         """Add an error about commands having type when not needed."""
-        # pylint: disable=invalid-name
         self._add_error(
             location, ERROR_ID_IS_COMMAND_TYPE_EXTRANEOUS,
             ("Command '%s' cannot have a 'type' property unless namespace equals 'type'.") %
@@ -783,7 +751,6 @@ class ParserContext(object):
     def add_value_not_numeric_error(self, location, attrname, value):
         # type: (common.SourceLocation, str, str) -> None
         """Add an error about non-numeric value where number expected."""
-        # pylint: disable=invalid-name
         self._add_error(
             location, ERROR_ID_VALUE_NOT_NUMERIC,
             ("'%s' requires a numeric value, but %s can not be cast") % (attrname, value))
@@ -791,7 +758,6 @@ class ParserContext(object):
     def add_server_parameter_invalid_attr(self, location, attrname, conflicts):
         # type: (common.SourceLocation, str, str) -> None
         """Add an error about invalid fields in a server parameter definition."""
-        # pylint: disable=invalid-name
         self._add_error(
             location, ERROR_ID_SERVER_PARAMETER_INVALID_ATTR,
             ("'%s' attribute not permitted with '%s' server parameter") % (attrname, conflicts))
@@ -799,7 +765,6 @@ class ParserContext(object):
     def add_server_parameter_required_attr(self, location, attrname, required, dependant=None):
         # type: (common.SourceLocation, str, str, str) -> None
         """Add an error about missing fields in a server parameter definition."""
-        # pylint: disable=invalid-name
         qualifier = '' if dependant is None else (" when using '%s' attribute" % (dependant))
         self._add_error(location, ERROR_ID_SERVER_PARAMETER_REQUIRED_ATTR,
                         ("'%s' attribute required%s with '%s' server parameter") %
@@ -808,70 +773,60 @@ class ParserContext(object):
     def add_server_parameter_invalid_method_override(self, location, method):
         # type: (common.SourceLocation, str) -> None
         """Add an error about invalid method override in SCP method override."""
-        # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_SERVER_PARAMETER_INVALID_METHOD_OVERRIDE,
                         ("No such method to override in server parameter class: '%s'") % (method))
 
     def add_bad_source_specifier(self, location, value):
         # type: (common.SourceLocation, str) -> None
         """Add an error about invalid source specifier."""
-        # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_BAD_SOURCE_SPECIFIER,
                         ("'%s' is not a valid source specifier") % (value))
 
     def add_bad_duplicate_behavior(self, location, value):
         # type: (common.SourceLocation, str) -> None
         """Add an error about invalid duplicate behavior specifier."""
-        # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_BAD_DUPLICATE_BEHAVIOR_SPECIFIER,
                         ("'%s' is not a valid duplicate behavior specifier") % (value))
 
     def add_bad_numeric_range(self, location, attrname, value):
         # type: (common.SourceLocation, str, str) -> None
         """Add an error about invalid range specifier."""
-        # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_BAD_NUMERIC_RANGE,
                         ("'%s' is not a valid numeric range for '%s'") % (value, attrname))
 
     def add_missing_shortname_for_positional_arg(self, location):
         # type: (common.SourceLocation) -> None
         """Add an error about required short_name for positional args."""
-        # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_MISSING_SHORTNAME_FOR_POSITIONAL,
                         "Missing 'short_name' for positional arg")
 
     def add_invalid_short_name(self, location, name):
         # type: (common.SourceLocation, str) -> None
         """Add an error about invalid short names."""
-        # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_INVALID_SHORT_NAME,
                         ("Invalid 'short_name' value '%s'") % (name))
 
     def add_invalid_single_name(self, location, name):
         # type: (common.SourceLocation, str) -> None
         """Add an error about invalid single names."""
-        # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_INVALID_SINGLE_NAME,
                         ("Invalid 'single_name' value '%s'") % (name))
 
     def add_missing_short_name_with_single_name(self, location, name):
         # type: (common.SourceLocation, str) -> None
         """Add an error about missing required short name when using single name."""
-        # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_MISSING_SHORT_NAME_WITH_SINGLE_NAME,
                         ("Missing 'short_name' required with 'single_name' value '%s'") % (name))
 
     def add_feature_flag_default_true_missing_version(self, location):
         # type: (common.SourceLocation) -> None
         """Add an error about a default flag with a default value of true but no version."""
-        # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_FEATURE_FLAG_DEFAULT_TRUE_MISSING_VERSION,
                         ("Missing 'version' required for feature flag that defaults to true"))
 
     def add_feature_flag_default_false_has_version(self, location):
         # type: (common.SourceLocation) -> None
         """Add an error about a default flag with a default value of false but has a version."""
-        # pylint: disable=invalid-name
         self._add_error(
             location, ERROR_ID_FEATURE_FLAG_DEFAULT_FALSE_HAS_VERSION,
             ("The 'version' attribute is not allowed for feature flag that defaults to false"))
@@ -879,7 +834,6 @@ class ParserContext(object):
     def add_reply_type_invalid_type(self, location, command_name, reply_type_name):
         # type: (common.SourceLocation, str, str) -> None
         """Add an error about a command whose reply_type refers to an unknown type."""
-        # pylint: disable=invalid-name
         self._add_error(
             location, ERROR_ID_INVALID_REPLY_TYPE,
             ("Command '%s' has invalid reply_type '%s'" % (command_name, reply_type_name)))
@@ -887,7 +841,6 @@ class ParserContext(object):
     def add_stability_no_api_version(self, location, command_name):
         # type: (common.SourceLocation, str) -> None
         """Add an error about a command with 'stability' but no 'api_version'."""
-        # pylint: disable=invalid-name
         self._add_error(
             location, ERROR_ID_STABILITY_NO_API_VERSION,
             ("Command '%s' specifies 'stability' but has no 'api_version'" % (command_name, )))
@@ -895,7 +848,6 @@ class ParserContext(object):
     def add_missing_reply_type(self, location, command_name):
         # type: (common.SourceLocation, str) -> None
         """Add an error about a command with 'api_version' but no 'reply_type'."""
-        # pylint: disable=invalid-name
         self._add_error(
             location, ERROR_ID_MISSING_REPLY_TYPE,
             ("Command '%s' has an 'api_version' but no 'reply_type'" % (command_name, )))
@@ -903,7 +855,6 @@ class ParserContext(object):
     def add_bad_field_always_serialize_not_optional(self, location, field_name):
         # type: (common.SourceLocation, str) -> None
         """Add an error about a field with 'always_serialize' but 'optional' isn't set to true."""
-        # pylint: disable=invalid-name
         self._add_error(
             location, ERROR_ID_ILLEGAL_FIELD_ALWAYS_SERIALIZE_NOT_OPTIONAL,
             ("Field '%s' specifies 'always_serialize' but 'optional' isn't true.") % (field_name))
@@ -911,21 +862,18 @@ class ParserContext(object):
     def add_duplicate_command_name_and_alias(self, node):
         # type: (yaml.nodes.Node) -> None
         """Add an error about a command name and command alias having the same name."""
-        # pylint: disable=invalid-name
         self._add_node_error(node, ERROR_ID_COMMAND_DUPLICATES_NAME_AND_ALIAS,
                              "Duplicate command_name and command_alias found.")
 
     def add_unknown_enum_value(self, location, enum_name, enum_value):
         # type: (common.SourceLocation, str, str) -> None
         """Add an error about an unknown enum value."""
-        # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_UNKOWN_ENUM_VALUE,
                         "Cannot find enum value '%s' in enum '%s'." % (enum_value, enum_name))
 
     def add_either_check_or_privilege(self, location):
         # type: (common.SourceLocation) -> None
         """Add an error about specifing both a check and a privilege or neither."""
-        # pylint: disable=invalid-name
         self._add_error(
             location, ERROR_ID_EITHER_CHECK_OR_PRIVILEGE,
             "Must specify either a 'check' and a 'privilege' in an access_check, not both.")
@@ -933,21 +881,18 @@ class ParserContext(object):
     def add_duplicate_action_types(self, location, name):
         # type: (common.SourceLocation, str) -> None
         """Add an error about specifying an action type twice in the same list."""
-        # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_DUPLICATE_ACTION_TYPE,
                         "Cannot specify an action_type '%s' more then once" % (name))
 
     def add_duplicate_access_check(self, location, name):
         # type: (common.SourceLocation, str) -> None
         """Add an error about specifying an access check twice in the same list."""
-        # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_DUPLICATE_ACCESS_CHECK,
                         "Cannot specify an access_check '%s' more then once" % (name))
 
     def add_duplicate_privilege(self, location, resource_pattern, action_type):
         # type: (common.SourceLocation, str, str) -> None
         """Add an error about specifying a privilege twice in the same list."""
-        # pylint: disable=invalid-name
         self._add_error(
             location, ERROR_ID_DUPLICATE_PRIVILEGE,
             "Cannot specify the pair of resource_pattern '%s' and action_type '%s' more then once" %
@@ -956,7 +901,6 @@ class ParserContext(object):
     def add_empty_access_check(self, location):
         # type: (common.SourceLocation) -> None
         """Add an error about specifying one of ignore, none, simple or complex in an access check."""
-        # pylint: disable=invalid-name
         self._add_error(
             location, ERROR_ID_EMPTY_ACCESS_CHECK,
             "Must one and only one of either a 'ignore', 'none', 'simple', or 'complex' in an access_check."
@@ -965,14 +909,12 @@ class ParserContext(object):
     def add_missing_access_check(self, location, name):
         # type: (common.SourceLocation, str) -> None
         """Add an error about a missing access_check when api_version != ""."""
-        # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_MISSING_ACCESS_CHECK,
                         'Command "%s" has api_version != "" but is missing access_check.' % (name))
 
     def add_stability_unknown_value(self, location):
         # type: (common.SourceLocation) -> None
         """Add an error about a field with unknown value set to 'stability' option."""
-        # pylint: disable=invalid-name
         self._add_error(
             location, ERROR_ID_STABILITY_UNKNOWN_VALUE,
             "Field option 'stability' has unknown value, should be one of 'stable', 'unstable' or 'internal.'"
@@ -981,7 +923,6 @@ class ParserContext(object):
     def add_duplicate_unstable_stability(self, location):
         # type: (common.SourceLocation) -> None
         """Add an error about a field specifying both 'unstable' and 'stability'."""
-        # pylint: disable=invalid-name
         self._add_error(location, ERROR_ID_DUPLICATE_UNSTABLE_STABILITY, (
             "Field specifies both 'unstable' and 'stability' options, should use 'stability: [stable|unstable|internal]' instead and remove the deprecated 'unstable' option."
         ))

@@ -31,13 +31,12 @@ from typing import Dict, List, Any, Union, Optional
 
 import requests
 
-# pylint: disable=wrong-import-position
-# pylint: disable=too-many-branches
 from tenacity import wait_fixed, stop_after_delay, retry_if_result, Retrying
 
 sys.path.append(str(Path(os.getcwd(), __file__).parent.parent))
-from buildscripts.util.oauth import Configs, get_oauth_credentials, get_client_cred_oauth_credentials
-from buildscripts.build_system_options import PathOptions
+
+from buildscripts.util.oauth import Configs, get_oauth_credentials, get_client_cred_oauth_credentials  #pylint: disable=wrong-import-position
+from buildscripts.build_system_options import PathOptions  #pylint: disable=wrong-import-position
 
 SYMBOLIZER_PATH_ENV = "MONGOSYMB_SYMBOLIZER_PATH"
 # since older versions may have issues with symbolizing, we are setting the toolchain version to v4
@@ -180,7 +179,6 @@ class PathResolver(DbgFileResolver):
     Cache size differs according to the situation, system resources and overall decision of development team.
     """
 
-    # pylint: disable=too-many-instance-attributes
     # This amount of attributes are necessary.
 
     # the main (API) sever that we'll be sending requests to

@@ -19,7 +19,7 @@ from buildscripts.resmokelib.testing.queue_element import queue_elem_factory, Qu
 from buildscripts.resmokelib.utils import queue as _queue
 
 
-class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
+class TestSuiteExecutor(object):
     """Execute a test suite.
 
     Responsible for setting up and tearing down the fixtures that the
@@ -28,9 +28,8 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
 
     _TIMEOUT = 24 * 60 * 60  # =1 day (a long time to have tests run)
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self, exec_logger, suite, config=None, fixture=None, hooks=None, archive_instance=None,
-            archive=None):
+    def __init__(self, exec_logger, suite, config=None, fixture=None, hooks=None,
+                 archive_instance=None, archive=None):
         """Initialize the TestSuiteExecutor with the test suite to run."""
         self.logger = exec_logger
 
@@ -66,7 +65,7 @@ class TestSuiteExecutor(object):  # pylint: disable=too-many-instance-attributes
         """
         return [self._make_job(job_num) for job_num in range(num_jobs)]
 
-    def run(self):  # pylint: disable=too-many-branches
+    def run(self):
         """Execute the test suite.
 
         Any exceptions that occur during setting up or tearing down a

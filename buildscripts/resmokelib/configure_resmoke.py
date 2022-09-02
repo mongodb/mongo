@@ -97,7 +97,7 @@ def _validate_options(parser, args):
         parser.error(str(error_msgs))
 
 
-def _validate_config(parser):  # pylint: disable=too-many-branches
+def _validate_config(parser):
     """Do validation on the config settings."""
 
     if _config.REPEAT_TESTS_MAX:
@@ -150,7 +150,7 @@ def _find_resmoke_wrappers():
     return list(candidate_installs)
 
 
-def _update_config_vars(values):  # pylint: disable=too-many-statements,too-many-locals,too-many-branches
+def _update_config_vars(values):
     """Update the variables of the config module."""
 
     config = _config.DEFAULTS.copy()

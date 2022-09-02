@@ -5,7 +5,7 @@ from packaging.version import Version
 
 import buildscripts.resmokelib.multiversion.multiversion_service as under_test
 
-# pylint: disable=missing-docstring,invalid-name
+# pylint: disable=invalid-name
 
 
 class TestTagStr(TestCase):

@@ -11,7 +11,7 @@ import buildscripts.resmokelib.testing.fixtures.interface as interface
 import buildscripts.resmokelib.testing.fixtures.external as external
 
 
-class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-instance-attributes
+class ShardedClusterFixture(interface.Fixture):
     """Fixture which provides JSTests with a sharded cluster to run against."""
 
     _CONFIGSVR_REPLSET_NAME = "config-rs"
@@ -19,12 +19,12 @@ class ShardedClusterFixture(interface.Fixture):  # pylint: disable=too-many-inst
 
     AWAIT_SHARDING_INITIALIZATION_TIMEOUT_SECS = 60
 
-    def __init__(  # pylint: disable=too-many-arguments,too-many-locals
-            self, logger, job_num, fixturelib, mongos_executable=None, mongos_options=None,
-            mongod_executable=None, mongod_options=None, dbpath_prefix=None, preserve_dbpath=False,
-            num_shards=1, num_rs_nodes_per_shard=1, num_mongos=1, enable_sharding=None,
-            enable_balancer=True, enable_autosplit=True, auth_options=None, configsvr_options=None,
-            shard_options=None, cluster_logging_prefix=None):
+    def __init__(self, logger, job_num, fixturelib, mongos_executable=None, mongos_options=None,
+                 mongod_executable=None, mongod_options=None, dbpath_prefix=None,
+                 preserve_dbpath=False, num_shards=1, num_rs_nodes_per_shard=1, num_mongos=1,
+                 enable_sharding=None, enable_balancer=True, enable_autosplit=True,
+                 auth_options=None, configsvr_options=None, shard_options=None,
+                 cluster_logging_prefix=None):
         """Initialize ShardedClusterFixture with different options for the cluster processes."""
 
         interface.Fixture.__init__(self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix)
@@ -429,7 +429,6 @@ class ExternalShardedClusterFixture(external.ExternalFixture, ShardedClusterFixt
 class _MongoSFixture(interface.Fixture):
     """Fixture which provides JSTests with a mongos to connect to."""
 
-    # pylint: disable=too-many-arguments
     def __init__(self, logger, job_num, fixturelib, dbpath_prefix, mongos_executable=None,
                  mongos_options=None, add_feature_flags=False):
         """Initialize _MongoSFixture."""
@@ -542,7 +541,6 @@ class _MongoSFixture(interface.Fixture):
         exit_code = self.mongos.wait()
 
         # Python's subprocess module returns negative versions of system calls.
-        # pylint: disable=invalid-unary-operand-type
         if exit_code == 0 or (mode is not None and exit_code == -(mode.value)):
             self.logger.info("Successfully stopped the mongos on port {:d}".format(self.port))
         else:

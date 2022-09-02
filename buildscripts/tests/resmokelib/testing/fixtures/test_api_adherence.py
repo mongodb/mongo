@@ -4,8 +4,6 @@ import unittest
 import ast
 import os
 
-# pylint: disable=missing-docstring
-
 DISALLOWED_ROOT = "buildscripts"
 ALLOWED_IMPORTS = [
     "buildscripts.resmokelib.testing.fixtures.external",

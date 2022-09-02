@@ -25,7 +25,6 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 #
-# pylint: disable=too-many-lines
 """Transform idl.syntax trees from the parser into well-defined idl.ast trees."""
 
 import collections
@@ -177,7 +176,6 @@ def _validate_chain_type_properties(ctxt, idl_type, syntax_type):
 
 def _validate_type_properties(ctxt, idl_type, syntax_type):
     # type: (errors.ParserContext, Union[syntax.Type, ast.Type], str) -> None
-    # pylint: disable=too-many-branches
     """Validate each type is correct."""
     # Validate bson type restrictions
     if not _validate_bson_types_list(ctxt, idl_type, syntax_type):
@@ -258,7 +256,6 @@ def _get_struct_qualified_cpp_name(struct):
 
 def _bind_struct_common(ctxt, parsed_spec, struct, ast_struct):
     # type: (errors.ParserContext, syntax.IDLSpec, syntax.Struct, ast.Struct) -> None
-    # pylint: disable=too-many-branches
 
     ast_struct.name = struct.name
     ast_struct.description = struct.description
@@ -488,7 +485,6 @@ def _bind_variant_field(ctxt, ast_field, idl_type):
 def _bind_command_type(ctxt, parsed_spec, command):
     # type: (errors.ParserContext, syntax.IDLSpec, syntax.Command) -> ast.Field
     """Bind the type field in a command as the first field."""
-    # pylint: disable=too-many-branches,too-many-statements
     ast_field = ast.Field(command.file_name, command.line, command.column)
     ast_field.name = command.name
     ast_field.description = command.description
@@ -681,7 +677,6 @@ def _validate_check_uniqueness(ctxt, access_checks):
 def _bind_access_check(ctxt, parsed_spec, command):
     # type: (errors.ParserContext, syntax.IDLSpec, syntax.Command) -> Optional[List[ast.AccessCheck]]
     """Bind the access_check field in a command."""
-    # pylint: disable=too-many-return-statements
 
     if not command.access_check:
         return None
@@ -770,7 +765,6 @@ def _validate_default_of_type_struct(ctxt, field):
 
 def _validate_variant_type(ctxt, syntax_symbol, field):
     # type: (errors.ParserContext, syntax.VariantType, syntax.Field) -> None
-    # pylint: disable=unused-argument
     """Validate that this field is a proper variant type."""
 
     # Check for duplicate BSON serialization types.
@@ -995,7 +989,6 @@ def _bind_field(ctxt, parsed_spec, field):
     - Create the idl.ast version from the idl.syntax tree.
     - Validate the resulting type is correct.
     """
-    # pylint: disable=too-many-branches,too-many-statements
     ast_field = ast.Field(field.file_name, field.line, field.column)
     ast_field.name = field.name
     ast_field.description = field.description
@@ -1467,7 +1460,6 @@ def _bind_config_option(ctxt, globals_spec, option):
     # type: (errors.ParserContext, syntax.Global, syntax.ConfigOption) -> ast.ConfigOption
     """Bind a config setting."""
 
-    # pylint: disable=too-many-branches,too-many-statements,too-many-return-statements
     node = ast.ConfigOption(option.file_name, option.line, option.column)
 
     if _is_invalid_config_short_name(option.short_name or ''):

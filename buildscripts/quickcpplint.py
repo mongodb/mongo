@@ -63,7 +63,6 @@ def lint_all(file_names: List[str]) -> None:
 
 
 def lint_my(origin_branch: List[str]) -> None:
-    # pylint: disable=unused-argument
     """Lint files command based on local changes."""
     files = git.get_my_files_to_check(is_interesting_file, origin_branch)
     files = [f for f in files if os.path.exists(f)]

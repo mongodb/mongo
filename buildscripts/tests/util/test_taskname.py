@@ -4,7 +4,7 @@ import unittest
 
 import buildscripts.util.taskname as under_test
 
-# pylint: disable=missing-docstring,protected-access,invalid-name
+# pylint: disable=invalid-name
 
 
 class TestNameTask(unittest.TestCase):

@@ -12,9 +12,8 @@ class JSRunnerFileTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self, logger, test_kind, test_name, test_runner_file, shell_executable=None,
-            shell_options=None):
+    def __init__(self, logger, test_kind, test_name, test_runner_file, shell_executable=None,
+                 shell_options=None):
         """Initialize the JSRunnerFileTestCase with the 'test_name' file."""
 
         interface.ProcessTestCase.__init__(self, logger, test_kind, test_name)

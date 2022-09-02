@@ -10,7 +10,7 @@ import queue as _queue
 import time
 
 # Exception that is raised when get_nowait() is called on an empty Queue.
-Empty = _queue.Empty  # pylint: disable=invalid-name
+Empty = _queue.Empty
 
 
 class Queue(_queue.Queue):

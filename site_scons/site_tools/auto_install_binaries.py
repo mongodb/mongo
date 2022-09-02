@@ -564,7 +564,7 @@ def exists(_env):
     return True
 
 
-def generate(env):  # pylint: disable=too-many-statements
+def generate(env):
     """Generate the auto install builders."""
     env["AUTO_INSTALL_ENABLED"] = True
 

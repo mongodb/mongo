@@ -7,7 +7,7 @@ import buildscripts.evergreen_task_timeout as under_test
 from buildscripts.ciconfig.evergreen import EvergreenProjectConfig
 from buildscripts.timeouts.timeout_service import TimeoutService
 
-# pylint: disable=missing-docstring,no-self-use,invalid-name,protected-access
+# pylint: disable=invalid-name
 
 
 class TestTimeoutOverride(unittest.TestCase):

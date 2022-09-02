@@ -1,5 +1,4 @@
 """Unit tests for buildscripts/mongosymb.py."""
-# pylint: disable=missing-docstring
 import unittest
 
 from buildscripts import mongosymb as under_test

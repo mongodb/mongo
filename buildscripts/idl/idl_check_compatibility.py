@@ -25,7 +25,6 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 #
-# pylint: disable=too-many-lines
 """Checks compatibility of old and new IDL files.
 
 In order to support user-selectable API versions for the server, server commands are now
@@ -463,7 +462,6 @@ def get_field_type(field: Union[syntax.Field, syntax.Command], idl_file: syntax.
 def check_subset(ctxt: IDLCompatibilityContext, cmd_name: str, field_name: str, type_name: str,
                  sub_list: List[Union[str, syntax.EnumValue]],
                  super_list: List[Union[str, syntax.EnumValue]], file_path: str):
-    # pylint: disable=too-many-arguments
     """Check if sub_list is a subset of the super_list and log an error if not."""
     if not set(sub_list).issubset(super_list):
         ctxt.add_reply_field_not_subset_error(cmd_name, field_name, type_name, file_path)
@@ -473,7 +471,6 @@ def check_superset(ctxt: IDLCompatibilityContext, cmd_name: str, type_name: str,
                    super_list: List[Union[str, syntax.EnumValue]],
                    sub_list: List[Union[str, syntax.EnumValue]], file_path: str,
                    param_name: Optional[str], is_command_parameter: bool):
-    # pylint: disable=too-many-arguments
     """Check if super_list is a superset of the sub_list and log an error if not."""
     if not set(super_list).issuperset(sub_list):
         ctxt.add_command_or_param_type_not_superset_error(cmd_name, type_name, file_path,
@@ -482,7 +479,6 @@ def check_superset(ctxt: IDLCompatibilityContext, cmd_name: str, type_name: str,
 
 def check_reply_field_type_recursive(ctxt: IDLCompatibilityContext,
                                      field_pair: FieldCompatibilityPair) -> None:
-    # pylint: disable=too-many-branches
     """Check compatibility between old and new reply field type if old field type is a syntax.Type instance."""
     old_field = field_pair.old
     new_field = field_pair.new
@@ -598,7 +594,6 @@ def check_reply_field_type_recursive(ctxt: IDLCompatibilityContext,
 
 def check_reply_field_type(ctxt: IDLCompatibilityContext, field_pair: FieldCompatibilityPair):
     """Check compatibility between old and new reply field type."""
-    # pylint: disable=too-many-branches
     old_field = field_pair.old
     new_field = field_pair.new
     cmd_name = field_pair.cmd_name
@@ -665,7 +660,6 @@ def check_array_type(ctxt: IDLCompatibilityContext, symbol: str,
         -  ArrayTypeCheckResult.FALSE : when the old type and new type aren't of array type.
         -  ArrayTypeCheckResult.INVALID : when one of the types is not of array type while the other one is.
     """
-    # pylint: disable=too-many-arguments,too-many-branches
     old_is_array = isinstance(old_type, syntax.ArrayType)
     new_is_array = isinstance(new_type, syntax.ArrayType)
     if not old_is_array and not new_is_array:
@@ -684,7 +678,6 @@ def check_reply_field(ctxt: IDLCompatibilityContext, old_field: syntax.Field,
                       new_idl_file: syntax.IDLParsedSpec, old_idl_file_path: str,
                       new_idl_file_path: str):
     """Check compatibility between old and new reply field."""
-    # pylint: disable=too-many-arguments
     old_field_type = get_field_type(old_field, old_idl_file, old_idl_file_path)
     new_field_type = get_field_type(new_field, new_idl_file, new_idl_file_path)
     old_field_optional = old_field.optional or (old_field_type
@@ -730,7 +723,6 @@ def check_reply_fields(ctxt: IDLCompatibilityContext, old_reply: syntax.Struct,
                        new_idl_file: syntax.IDLParsedSpec, old_idl_file_path: str,
                        new_idl_file_path: str):
     """Check compatibility between old and new reply fields."""
-    # pylint: disable=too-many-arguments,too-many-branches
     for new_chained_type in new_reply.chained_types or []:
         resolved_new_chained_type = get_chained_type_or_struct(new_chained_type, new_idl_file,
                                                                new_idl_file_path)
@@ -805,7 +797,6 @@ def check_reply_fields(ctxt: IDLCompatibilityContext, old_reply: syntax.Struct,
 def check_param_or_command_type_recursive(ctxt: IDLCompatibilityContext,
                                           field_pair: FieldCompatibilityPair,
                                           is_command_parameter: bool):
-    # pylint: disable=too-many-branches,too-many-locals
     """
     Check compatibility between old and new command or param type recursively.
 
@@ -936,7 +927,6 @@ def check_param_or_command_type_recursive(ctxt: IDLCompatibilityContext,
 def check_param_or_command_type(ctxt: IDLCompatibilityContext, field_pair: FieldCompatibilityPair,
                                 is_command_parameter: bool):
     """Check compatibility between old and new command parameter type or command type."""
-    # pylint: disable=too-many-branches
     old_field = field_pair.old
     new_field = field_pair.new
     field_name = field_pair.field_name
@@ -1004,7 +994,6 @@ def check_param_or_type_validator(ctxt: IDLCompatibilityContext, old_field: synt
     Check compatibility between old and new validators in command parameter type and command type
     struct fields.
     """
-    # pylint: disable=too-many-arguments
     if new_field.validator:
         if old_field.validator:
             if new_field.validator != old_field.validator:
@@ -1034,7 +1023,6 @@ def check_command_params_or_type_struct_fields(
         cmd_name: str, old_idl_file: syntax.IDLParsedSpec, new_idl_file: syntax.IDLParsedSpec,
         old_idl_file_path: str, new_idl_file_path: str, is_command_parameter: bool):
     """Check compatibility between old and new parameters or command type fields."""
-    # pylint: disable=too-many-arguments,too-many-branches
     # Check chained types.
     for old_chained_type in old_struct.chained_types or []:
         resolved_old_chained_type = get_chained_type_or_struct(old_chained_type, old_idl_file,
@@ -1137,7 +1125,6 @@ def check_command_param_or_type_struct_field(
         old_idl_file_path: str, new_idl_file_path: str, type_name: Optional[str],
         is_command_parameter: bool):
     """Check compatibility between the old and new command parameter or command type struct field."""
-    # pylint: disable=too-many-arguments
     ignore_list_name: str = cmd_name + "-param-" + new_field.name
     if not is_unstable(old_field.stability) and is_unstable(
             new_field.stability) and ignore_list_name not in IGNORE_STABLE_TO_UNSTABLE_LIST:
@@ -1188,7 +1175,6 @@ def check_namespace(ctxt: IDLCompatibilityContext, old_cmd: syntax.Command, new_
                     old_idl_file: syntax.IDLParsedSpec, new_idl_file: syntax.IDLParsedSpec,
                     old_idl_file_path: str, new_idl_file_path: str):
     """Check compatibility between old and new namespace."""
-    # pylint: disable=too-many-arguments
     old_namespace = old_cmd.namespace
     new_namespace = new_cmd.namespace
 
@@ -1364,7 +1350,7 @@ def check_security_access_checks(ctxt: IDLCompatibilityContext,
                                  new_access_checks: syntax.AccessChecks, cmd: syntax.Command,
                                  new_idl_file_path: str) -> None:
     """Check the compatibility between security access checks of the old and new command."""
-    # pylint:disable=too-many-locals,too-many-branches,too-many-nested-blocks
+    # pylint:disable=too-many-nested-blocks
     cmd_name = cmd.command_name
     if old_access_checks is not None and new_access_checks is not None:
         old_access_check_type = old_access_checks.get_access_check_type()
@@ -1405,7 +1391,6 @@ def check_security_access_checks(ctxt: IDLCompatibilityContext,
 def check_compatibility(old_idl_dir: str, new_idl_dir: str, old_import_directories: List[str],
                         new_import_directories: List[str]) -> IDLCompatibilityErrorCollection:
     """Check IDL compatibility between old and new IDL commands."""
-    # pylint: disable=too-many-locals
     ctxt = IDLCompatibilityContext(old_idl_dir, new_idl_dir, IDLCompatibilityErrorCollection())
 
     new_commands, new_command_file, new_command_file_path = get_new_commands(

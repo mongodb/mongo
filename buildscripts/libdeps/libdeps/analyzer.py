@@ -21,7 +21,6 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# pylint: disable=too-many-lines
 """
 Libdeps Graph Analysis Tool.
 
@@ -116,7 +115,6 @@ def schema_check(func, schema_version):
 class Analyzer:
     """Base class for different types of analyzers."""
 
-    # pylint: disable=too-many-instance-attributes
     def __init__(self, dependency_graph, progress=True):
         """Store the graph and extract the build_dir from the graph."""
 
@@ -575,7 +573,6 @@ class Efficiency(Analyzer):
     @schema_check(schema_version=1)
     def run(self):
         """Find efficiency of each public dependency originating from a node."""
-        # pylint:disable=too-many-nested-blocks
 
         efficiencies_data = {}
 
@@ -912,7 +909,6 @@ class GaPrettyPrinter(GaPrinter):
     def _print_depends_reports(self, results):
         """Print the depends reports result data."""
 
-        # pylint: disable=too-many-branches
         if DependsReportTypes.DIRECT_DEPENDS.name in results:
             print("\nNodes that directly depend on:")
             for node in results[DependsReportTypes.DIRECT_DEPENDS.name]:

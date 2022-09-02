@@ -137,7 +137,6 @@ class HistoricTaskData(object):
         """Initialize the TestStats with raw results from the Evergreen API."""
         self.historic_test_results = historic_test_results
 
-    # pylint: disable=too-many-arguments
     @classmethod
     def from_evg(cls, evg_api: EvergreenApi, project: str, start_date: datetime, end_date: datetime,
                  task: str, variant: str) -> "HistoricTaskData":

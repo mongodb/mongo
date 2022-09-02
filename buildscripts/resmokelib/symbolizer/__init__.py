@@ -161,7 +161,7 @@ class Symbolizer(Subcommand):
             LOGGER.info("Applying patch diff (if any)...")
             self._patch_diff_by_id()
 
-        except:  # pylint: disable=bare-except
+        except:
             if self.dest_dir is not None:
                 LOGGER.warning("Removing downloaded directory due to error",
                                directory=self.dest_dir)

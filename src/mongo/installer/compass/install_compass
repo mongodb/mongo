@@ -255,7 +255,7 @@ def get_debian_release():
         return match.group(1)
 
 
-def is_supported_linux():  # pylint: disable=too-many-branches,too-many-return-statements
+def is_supported_linux():
     """Checks whether the Linux version is supported by the Compass package."""
 
     # This isn't intended to be an exhaustive check of all compatible

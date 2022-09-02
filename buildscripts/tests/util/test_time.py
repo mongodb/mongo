@@ -4,8 +4,6 @@ import unittest
 
 from buildscripts.util import time as time_utils
 
-#pylint: disable=missing-docstring
-
 
 class Ns2SecTest(unittest.TestCase):
     def test_ns_converted_to_seconds(self):

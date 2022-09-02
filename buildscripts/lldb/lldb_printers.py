@@ -119,18 +119,18 @@ class UniquePtrPrinter:
         self.valobj = valobj
         self.update()
 
-    def num_children(self):  # pylint: disable=no-self-use,no-method-argument
+    def num_children(self):
         """Match LLDB's expected API."""
         return 1
 
-    def get_child_index(self, name):  # pylint: disable=no-self-use,no-method-argument
+    def get_child_index(self, name):
         """Match LLDB's expected API."""
         if name == "ptr":
             return 0
         else:
             return None
 
-    def get_child_at_index(self, index):  # pylint: disable=no-self-use,no-method-argument
+    def get_child_at_index(self, index):
         """Match LLDB's expected API.
 
         Always prints object pointed at by the ptr.
@@ -141,11 +141,11 @@ class UniquePtrPrinter:
         else:
             return None
 
-    def has_children():  # pylint: disable=no-self-use,no-method-argument
+    def has_children(self):
         """Match LLDB's expected API."""
         return True
 
-    def update(self):  # pylint: disable=no-self-use,no-method-argument
+    def update(self):
         """Match LLDB's expected API."""
         pass
 
@@ -158,25 +158,25 @@ class OptionalPrinter:
         self.valobj = valobj
         self.update()
 
-    def num_children(self):  # pylint: disable=no-self-use,no-method-argument
+    def num_children(self):
         """Match LLDB's expected API."""
         return 1
 
-    def get_child_index(self, name):  # pylint: disable=no-self-use,no-method-argument
+    def get_child_index(self, name):
         """Match LLDB's expected API."""
         if name == "value":
             return 0
         else:
             return None
 
-    def get_child_at_index(self, index):  # pylint: disable=no-self-use,no-method-argument
+    def get_child_at_index(self, index):
         """Match LLDB's expected API."""
         if index == 0:
             return self.value
         else:
             return None
 
-    def has_children():  # pylint: disable=no-self-use,no-method-argument
+    def has_children(self):
         """Match LLDB's expected API."""
         return True
 

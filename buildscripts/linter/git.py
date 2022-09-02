@@ -71,7 +71,7 @@ class Repo(_git.Repository):
 
         Returns the full path to the file for clang-format to consume.
         """
-        if candidates is not None and len(candidates) > 0:  # pylint: disable=len-as-condition
+        if candidates is not None and len(candidates) > 0:
             candidates = [self._get_local_dir(f) for f in candidates]
             valid_files = list(
                 set(candidates).intersection(self.get_candidate_files(filter_function)))
@@ -122,7 +122,6 @@ class Repo(_git.Repository):
 
     def get_working_tree_candidate_files(self, filter_function):
         # type: (Callable[[str], bool]) -> List[str]
-        # pylint: disable=invalid-name
         """Query git to get a list of all files in the working tree to consider for analysis."""
         return self._git_ls_files(["--cached", "--others"], filter_function)
 

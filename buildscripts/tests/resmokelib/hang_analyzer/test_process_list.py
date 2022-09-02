@@ -6,8 +6,6 @@ from mock import Mock, patch
 
 from buildscripts.resmokelib.hang_analyzer.process_list import Pinfo, get_processes
 
-# # pylint: disable=missing-docstring
-
 NS = "buildscripts.resmokelib.hang_analyzer.process_list"
 
 

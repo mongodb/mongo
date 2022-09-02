@@ -7,7 +7,7 @@ import sys
 import tempfile
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple
-from distutils import spawn  # pylint: disable=no-name-in-module
+from distutils import spawn
 
 from buildscripts.resmokelib.hang_analyzer.process import call, callo, find_program
 from buildscripts.resmokelib.hang_analyzer.process_list import Pinfo
@@ -52,7 +52,7 @@ class Dumper(metaclass=ABCMeta):
         self._dbg_output = dbg_output
 
     @abstractmethod
-    def dump_info(  # pylint: disable=too-many-arguments,too-many-locals
+    def dump_info(
             self,
             pinfo: Pinfo,
             take_dump: bool,
@@ -174,8 +174,7 @@ class WindowsDumper(Dumper):
 
         return cmds
 
-    def dump_info(  # pylint: disable=too-many-arguments
-            self, pinfo, take_dump):
+    def dump_info(self, pinfo, take_dump):
         """Dump useful information to the console."""
         debugger = "cdb.exe"
         dbg = self._find_debugger(debugger)
@@ -358,8 +357,7 @@ class GDBDumper(Dumper):
         ]
         return cmds
 
-    def _process_specific(  # pylint: disable=too-many-locals
-            self, pinfo, take_dump, logger=None):
+    def _process_specific(self, pinfo, take_dump, logger=None):
         """Return the commands that attach to each process, dump info and detach."""
         cmds = []
 

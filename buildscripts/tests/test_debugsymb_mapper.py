@@ -1,5 +1,5 @@
 """Unit tests for debugsymb_mapper.py."""
-# pylint: disable=missing-docstring
+
 import unittest
 from unittest.mock import MagicMock
 

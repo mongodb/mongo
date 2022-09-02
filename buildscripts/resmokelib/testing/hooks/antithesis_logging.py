@@ -4,7 +4,7 @@ from time import sleep
 from buildscripts.resmokelib.testing.hooks import interface
 
 
-class AntithesisLogging(interface.Hook):  # pylint: disable=too-many-instance-attributes
+class AntithesisLogging(interface.Hook):
     """Prints antithesis commands before & after test run."""
 
     DESCRIPTION = "Prints antithesis commands before & after test run."

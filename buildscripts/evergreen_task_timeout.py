@@ -162,6 +162,9 @@ def output_timeout(exec_timeout: timedelta, idle_timeout: Optional[timedelta],
     :param idle_timeout: Idle timeout to output.
     :param output_file: Location of output file to write.
     """
+    # the math library is triggering this error in this function for some
+    # reason
+    # pylint: disable=c-extension-no-member
     output = {
         "exec_timeout_secs": math.ceil(exec_timeout.total_seconds()),
     }

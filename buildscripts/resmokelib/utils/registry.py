@@ -48,7 +48,7 @@ def make_registry_metaclass(registry_store, base_metaclass=None):
     class Registry(base_metaclass):
         """A metaclass that stores a reference to all registered classes."""
 
-        def __new__(mcs, class_name, base_classes, class_dict):  # pylint: disable=bad-mcs-classmethod-argument,bad-classmethod-argument
+        def __new__(mcs, class_name, base_classes, class_dict):  # pylint: disable=bad-classmethod-argument
             """Create and returns a new instance of Registry.
 
             The registry is a class named 'class_name' derived from 'base_classes'

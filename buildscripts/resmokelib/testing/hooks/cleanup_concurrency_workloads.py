@@ -20,8 +20,8 @@ class CleanupConcurrencyWorkloads(interface.Hook):
 
     IS_BACKGROUND = False
 
-    def __init__(  #pylint: disable=too-many-arguments
-            self, hook_logger, fixture, exclude_dbs=None, same_collection=False, same_db=False):
+    def __init__(self, hook_logger, fixture, exclude_dbs=None, same_collection=False,
+                 same_db=False):
         """Initialize CleanupConcurrencyWorkloads."""
         description = "CleanupConcurrencyWorkloads drops all databases in the fixture"
         interface.Hook.__init__(self, hook_logger, fixture, description)

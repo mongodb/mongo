@@ -34,7 +34,6 @@ import sys
 from os import path
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
 
-# pylint: disable=too-many-lines
 import idl_check_compatibility  # noqa: E402 pylint: disable=wrong-import-position
 import idl_compatibility_errors  # noqa: E402 pylint: disable=wrong-import-position
 
@@ -140,7 +139,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             str(new_command_type_struct_bson_serialization_type_any_error),
             "newCommandTypeStructFieldBsonSerializationTypeAny")
 
-    # pylint: disable=too-many-locals,too-many-statements,invalid-name
+    # pylint: disable=invalid-name
     def test_should_fail(self):
         """Tests that incompatible old and new IDL commands should fail."""
         dir_path = path.dirname(path.realpath(__file__))

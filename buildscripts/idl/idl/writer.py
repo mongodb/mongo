@@ -77,7 +77,6 @@ def get_method_name(name):
 
 def get_method_name_from_qualified_method_name(name):
     # type: (str) -> str
-    # pylint: disable=invalid-name
     """Get a method name from a fully qualified method name."""
     # TODO: in the future, we may want to support full-qualified calls to static methods
     # Strip the global prefix from enum functions

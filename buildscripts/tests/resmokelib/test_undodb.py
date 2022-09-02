@@ -5,9 +5,6 @@ from mock import MagicMock, Mock, patch, call
 import evergreen
 import buildscripts.resmokelib.undodb.fetch as fetch
 
-# # pylint: disable=missing-docstring
-# pylint: disable=no-self-use
-
 
 class TestFetch(unittest.TestCase):
     """Unit tests for the Fetch subcommand."""

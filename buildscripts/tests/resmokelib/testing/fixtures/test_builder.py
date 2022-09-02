@@ -1,5 +1,5 @@
 """Unit tests for the resmokelib.testing.fixtures._builder module."""
-# pylint: disable=missing-class-docstring,protected-access,missing-function-docstring,invalid-name
+# pylint: disable=protected-access,invalid-name
 import unittest
 import filecmp
 import os

@@ -21,7 +21,7 @@ class BenchmarkTestCase(interface.ProcessTestCase):
         self.suite_bm_options = program_options
         self.bm_options = {}
 
-    def validate_benchmark_options(self):  # pylint: disable=no-self-use
+    def validate_benchmark_options(self):
         """Error out early if any options are incompatible with benchmark test suites.
 
         :return: None

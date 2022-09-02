@@ -1,5 +1,4 @@
 """Unit tests for buildscripts/resmokelib/utils/evergreen_conn.py."""
-# pylint: disable=missing-docstring,too-many-arguments
 import unittest
 
 from mock import patch

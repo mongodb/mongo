@@ -49,7 +49,6 @@ import libdeps.analyzer
 class BackendServer:
     """Create small class for storing variables and state of the backend."""
 
-    # pylint: disable=too-many-instance-attributes
     def __init__(self, graphml_dir, frontend_url, memory_limit):
         """Create and setup the state variables."""
         self.app = flask.Flask(__name__)

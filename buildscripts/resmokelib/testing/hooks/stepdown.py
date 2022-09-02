@@ -17,7 +17,7 @@ from buildscripts.resmokelib.testing.fixtures import tenant_migration
 from buildscripts.resmokelib.testing.hooks import interface
 
 
-class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-attributes
+class ContinuousStepdown(interface.Hook):
     """Regularly connect to replica sets and send a replSetStepDown command."""
 
     DESCRIPTION = ("Continuous stepdown (steps down the primary of replica sets at regular"
@@ -28,11 +28,10 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
     # The hook stops the fixture partially during its execution.
     STOPS_FIXTURE = True
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self, hook_logger, fixture, config_stepdown=True, shard_stepdown=True,
-            stepdown_interval_ms=8000, terminate=False, kill=False,
-            use_stepdown_permitted_file=False, wait_for_mongos_retarget=False,
-            background_reconfig=False, auth_options=None, should_downgrade=False):
+    def __init__(self, hook_logger, fixture, config_stepdown=True, shard_stepdown=True,
+                 stepdown_interval_ms=8000, terminate=False, kill=False,
+                 use_stepdown_permitted_file=False, wait_for_mongos_retarget=False,
+                 background_reconfig=False, auth_options=None, should_downgrade=False):
         """Initialize the ContinuousStepdown.
 
         Args:
@@ -119,7 +118,7 @@ class ContinuousStepdown(interface.Hook):  # pylint: disable=too-many-instance-a
         self._stepdown_thread.pause()
         self.logger.info("Paused the stepdown thread.")
 
-    def _add_fixture(self, fixture):  # pylint: disable=too-many-branches
+    def _add_fixture(self, fixture):
         if isinstance(fixture, replicaset.ReplicaSetFixture):
             if not fixture.all_nodes_electable:
                 raise ValueError(
@@ -371,11 +370,10 @@ def is_shard_split(fixture):
     return fixture.__class__.__name__ == 'ShardSplitFixture'
 
 
-class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-attributes
-    def __init__(  # pylint: disable=too-many-arguments
-            self, logger, mongos_fixtures, rs_fixtures, stepdown_interval_secs, terminate, kill,
-            stepdown_lifecycle, wait_for_mongos_retarget, background_reconfig, fixture,
-            auth_options=None, should_downgrade=False):
+class _StepdownThread(threading.Thread):
+    def __init__(self, logger, mongos_fixtures, rs_fixtures, stepdown_interval_secs, terminate,
+                 kill, stepdown_lifecycle, wait_for_mongos_retarget, background_reconfig, fixture,
+                 auth_options=None, should_downgrade=False):
         """Initialize _StepdownThread."""
         threading.Thread.__init__(self, name="StepdownThread")
         self.daemon = True
@@ -403,7 +401,6 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
         self._is_idle_evt = threading.Event()
         self._is_idle_evt.set()
 
-        # pylint: disable=too-many-function-args
         self._step_up_stats = collections.Counter()
 
     def run(self):
@@ -519,7 +516,6 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
         for rs_fixture in self._rs_fixtures:
             self._step_down(rs_fixture)
 
-    # pylint: disable=R0912,R0914,R0915
     def _step_down(self, rs_fixture):
         try:
             old_primary = rs_fixture.get_primary(timeout_secs=self._stepdown_interval_secs)
@@ -603,7 +599,7 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
             new_primary.get_internal_connection_string() if secondaries else "none")
         self._step_up_stats[key] += 1
 
-    def _do_wait_for_mongos_retarget(self):  # pylint: disable=too-many-branches
+    def _do_wait_for_mongos_retarget(self):
         """Run collStats on each collection in each database on each mongos.
 
         This is to ensure mongos can target the primary for each shard with data, including the

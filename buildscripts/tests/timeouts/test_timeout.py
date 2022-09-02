@@ -3,7 +3,7 @@ import unittest
 
 from buildscripts.timeouts import timeout as under_test
 
-# pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access,no-value-for-parameter
+# pylint: disable=invalid-name
 
 
 class CalculateTimeoutTest(unittest.TestCase):

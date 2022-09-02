@@ -17,7 +17,7 @@ from buildscripts.resmokelib.testing.hooks import dbhash_tenant_migration
 from buildscripts.resmokelib.testing.hooks import interface
 
 
-class ContinuousTenantMigration(interface.Hook):  # pylint: disable=too-many-instance-attributes
+class ContinuousTenantMigration(interface.Hook):
     """Starts a tenant migration thread at the beginning of each test."""
 
     DESCRIPTION = ("Continuous tenant migrations")
@@ -187,8 +187,7 @@ def get_primary(rs, logger, max_tries=5):  # noqa: D205,D400
 
 
 class _TenantMigrationOptions:
-    def __init__(  # pylint: disable=too-many-arguments
-            self, donor_rs, recipient_rs, tenant_id, read_preference, logger):
+    def __init__(self, donor_rs, recipient_rs, tenant_id, read_preference, logger):
         self.donor_rs = donor_rs
         self.recipient_rs = recipient_rs
         self.migration_id = uuid.uuid4()
@@ -229,7 +228,7 @@ class _TenantMigrationOptions:
         return str(opts)
 
 
-class _TenantMigrationThread(threading.Thread):  # pylint: disable=too-many-instance-attributes
+class _TenantMigrationThread(threading.Thread):
     THREAD_NAME = "TenantMigrationThread"
 
     WAIT_SECS_RANGES = [[0.05, 0.1], [0.1, 0.5], [1, 5], [5, 15]]

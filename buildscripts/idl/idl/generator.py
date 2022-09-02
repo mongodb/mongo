@@ -25,7 +25,6 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 #
-# pylint: disable=too-many-lines
 """IDL C++ Code Generator."""
 
 import hashlib
@@ -441,8 +440,6 @@ class _CppFileWriterBase(object):
 class _CppHeaderFileWriter(_CppFileWriterBase):
     """C++ .h File writer."""
 
-    # pylint: disable=too-many-public-methods
-
     def gen_class_declaration_block(self, class_name):
         # type: (str) -> writer.IndentedScopedBlock
         """Generate a class declaration block."""
@@ -494,7 +491,6 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
     def gen_protected_serializer_methods(self, struct):
         # type: (ast.Struct) -> None
-        # pylint: disable=invalid-name
         """Generate protected serializer method declarations."""
         struct_type_info = struct_types.get_struct_info(struct)
 
@@ -628,7 +624,6 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
     def gen_string_constants_declarations(self, struct):
         # type: (ast.Struct) -> None
-        # pylint: disable=invalid-name
         """Generate a StringData constant for field name."""
 
         for field in _get_all_fields(struct):
@@ -740,7 +735,6 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
     def gen_comparison_operators_declarations(self, struct):
         # type: (ast.Struct) -> None
         """Generate comparison operators declarations for the type."""
-        # pylint: disable=invalid-name
 
         with self._block("auto _relopTuple() const {", "}"):
             sorted_fields = sorted([
@@ -979,7 +973,6 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
     def generate(self, spec):
         # type: (ast.IDLAST) -> None
         """Generate the C++ header to a stream."""
-        # pylint: disable=too-many-branches,too-many-statements,too-many-locals,too-many-return-statements
         self.gen_file_header()
 
         self._writer.write_unindented_line('#pragma once')
@@ -1174,7 +1167,6 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
 
 class _CppSourceFileWriter(_CppFileWriterBase):
-    # pylint: disable=too-many-public-methods
     """C++ .cpp File writer."""
 
     _EMPTY_TENANT = "boost::optional<mongo::TenantId>{}"
@@ -1187,7 +1179,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
     def _gen_field_deserializer_expression(self, element_name, field, ast_type, tenant):
         # type: (str, ast.Field, ast.Type, str) -> str
-        # pylint: disable=invalid-name,too-many-return-statements
         """
         Generate the C++ deserializer piece for a field.
 
@@ -1305,7 +1296,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
     def _gen_variant_deserializer(self, field, bson_element, tenant):
         # type: (ast.Field, str, str) -> None
-        # pylint: disable=too-many-statements
         """Generate the C++ deserializer piece for a variant field."""
         self._writer.write_empty_line()
         self._writer.write_line('const BSONType variantType = %s.type();' % (bson_element, ))
@@ -1403,7 +1393,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         If field_type is scalar and check_type is True (the default), generate type-checking code.
         Array elements are always type-checked.
         """
-        # pylint: disable=too-many-arguments
         if field_type.is_array:
             predicate = "MONGO_likely(ctxt.checkAndAssertType(%s, Array))" % (bson_element)
             with self._predicate(predicate):
@@ -1510,7 +1499,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
     def gen_op_msg_request_namespace_check(self, struct):
         # type: (ast.Struct) -> None
         """Generate a namespace check for a command."""
-        # pylint: disable=invalid-name
         if not isinstance(struct, ast.Command):
             return
 
@@ -1526,7 +1514,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
     def _gen_constructor(self, struct, constructor, default_init):
         # type: (ast.Struct, struct_types.MethodInfo, bool) -> None
         """Generate the C++ constructor definition."""
-        # pylint: disable=too-many-branches
 
         initializers = ['_%s(std::move(%s))' % (arg.name, arg.name) for arg in constructor.args]
 
@@ -1625,7 +1612,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
     def _gen_fields_deserializer_common(self, struct, bson_object, tenant=_EMPTY_TENANT):
         # type: (ast.Struct, str, str) -> _FieldUsageCheckerBase
         """Generate the C++ code to deserialize list of fields."""
-        # pylint: disable=too-many-branches
         field_usage_check = _get_field_usage_checker(self._writer, struct)
         if isinstance(struct, ast.Command):
             self._writer.write_line('BSONElement commandElement;')
@@ -1713,7 +1699,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
     def get_bson_deserializer_static_common(self, struct, static_method_info, method_info):
         # type: (ast.Struct, struct_types.MethodInfo, struct_types.MethodInfo) -> None
         """Generate the C++ deserializer static method."""
-        # pylint: disable=invalid-name
         func_def = static_method_info.get_definition()
 
         with self._block('%s {' % (func_def), '}'):
@@ -1834,7 +1819,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
     def gen_op_msg_request_deserializer_methods(self, struct):
         # type: (ast.Struct) -> None
         """Generate the C++ deserializer method definitions from OpMsgRequest."""
-        # pylint: disable=invalid-name
         # Commands that have concatentate_with_db namespaces require db name as a parameter
         # 'Empty' structs (those with no fields) don't need to be deserialized
         if not isinstance(struct, ast.Command):
@@ -2032,7 +2016,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
     def _gen_serializer_method_common(self, field):
         # type: (ast.Field) -> None
-        # pylint: disable=too-many-locals
         """Generate the serialize method definition."""
         member_name = _get_field_member_name(field)
 
@@ -2189,7 +2172,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
     def gen_op_msg_request_serializer_method(self, struct):
         # type: (ast.Struct) -> None
         """Generate the serialzer method definition for OpMsgRequest."""
-        # pylint: disable=invalid-name
         if not isinstance(struct, ast.Command):
             return
 
@@ -2214,7 +2196,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
     def gen_string_constants_definitions(self, struct):
         # type: (ast.Struct) -> None
-        # pylint: disable=invalid-name
         """Generate a StringData constant for field name in the cpp file."""
 
         for field in _get_all_fields(struct):
@@ -2236,7 +2217,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
     def gen_authorization_contract_definition(self, struct):
         # type: (ast.Struct) -> None
-        # pylint: disable=invalid-name
         """Generate the authorization contract defintion."""
 
         if not isinstance(struct, ast.Command):
@@ -2575,8 +2555,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         # type: (ast.IDLAST, str) -> None
         """Generate Config Option instances."""
 
-        # pylint: disable=too-many-branches,too-many-statements
-
         has_storage_targets = False
         for opt in spec.configs:
             if opt.cpp_varname is not None:
@@ -2644,8 +2622,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
     def generate(self, spec, header_file_name):
         # type: (ast.IDLAST, str) -> None
         """Generate the C++ source to a stream."""
-
-        # pylint: disable=too-many-statements
 
         self.gen_file_header()
 

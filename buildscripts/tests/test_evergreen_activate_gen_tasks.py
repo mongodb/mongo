@@ -1,13 +1,11 @@
 """Unit tests for the generate_resmoke_suite script."""
+# pylint: disable=invalid-name
 import unittest
 
 from mock import MagicMock, mock
 
 from buildscripts import evergreen_activate_gen_tasks as under_test
 from evergreen import Build, EvergreenApi, Task, Version
-
-# pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access
-# pylint: disable=too-many-locals,too-many-lines,too-many-public-methods,no-value-for-parameter
 
 
 def build_mock_task(display_name, task_id):

@@ -12,7 +12,7 @@ class SetUpEC2Instance(PowercycleCommand):
 
     COMMAND = "setUpEC2Instance"
 
-    def execute(self) -> None:  # pylint: disable=too-many-instance-attributes, too-many-locals, too-many-statements
+    def execute(self) -> None:
         """:return: None."""
 
         default_retry_count = 2

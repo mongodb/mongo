@@ -15,8 +15,7 @@ class EnableSpuriousWriteConflicts(interface.Hook):
 
     IS_BACKGROUND = False
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self, hook_logger, fixture, shell_options=None):
+    def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize ToggleWriteConflicts."""
         super().__init__(hook_logger, fixture, "TogglesWTWriteConflictExceptions")
         self._enable_js_filename = os.path.join("jstests", "hooks", "enable_write_conflicts.js")

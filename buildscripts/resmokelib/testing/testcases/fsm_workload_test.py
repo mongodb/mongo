@@ -15,9 +15,8 @@ class FSMWorkloadTestCase(jsrunnerfile.JSRunnerFileTestCase):
     _COUNTER_LOCK = threading.Lock()
     _COUNTER = 0
 
-    def __init__(  #pylint: disable=too-many-arguments
-            self, logger, selected_tests, shell_executable=None, shell_options=None, same_db=False,
-            same_collection=False, db_name_prefix=None):
+    def __init__(self, logger, selected_tests, shell_executable=None, shell_options=None,
+                 same_db=False, same_collection=False, db_name_prefix=None):
         """Initialize the FSMWorkloadTestCase with the FSM workload file."""
 
         self.same_collection = same_collection

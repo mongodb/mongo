@@ -31,7 +31,8 @@ variable-rgx=[a-z_][a-z0-9_]{1,50}$
 # R0801 - duplicate-code - See PM-1380
 # E0611 - no-name-in-module
 
-disable=bad-continuation,fixme,import-error,line-too-long,no-member,locally-disabled,no-else-return,redefined-variable-type,too-few-public-methods,unused-import,useless-object-inheritance,deprecated-module,unnecessary-pass,duplicate-code,no-else-raise,deprecated-method,exec-used,no-name-in-module,raise-missing-from, unnecessary-comprehension,super-with-arguments,consider-using-sys-exit,import-outside-toplevel,no-else-continue,no-else-break,too-many-arguments,too-many-locals
+disable=bad-continuation,consider-using-sys-exit,deprecated-method,deprecated-module,duplicate-code,exec-used,fixme,import-error,import-outside-toplevel,line-too-long,locally-disabled,missing-class-docstring,missing-docstring,missing-docstring,missing-function-docstring,missing-module-docstring,no-else-break,no-else-continue,no-else-raise,no-else-return,no-member,no-name-in-module,no-self-use,raise-missing-from,redefined-variable-type,super-with-arguments,too-few-public-methods,too-many-arguments,too-many-branches,too-many-function-args,too-many-instance-attributes,too-many-lines,too-many-locals,too-many-public-methods,too-many-return-statements,too-many-statements,unnecessary-comprehension,unnecessary-pass,unused-import,useless-object-inheritance
+enable=useless-suppression
 
 [IMPORTS]
 known-third-party=boto3,botocore,psutil,yaml,xmlrunner

@@ -71,7 +71,6 @@ def callo(args, **kwargs):
 
 def get_tar_path(version, tar_path):
     """Return the path to clang-format in the llvm tarball."""
-    # pylint: disable=too-many-function-args
     return CLANG_FORMAT_SOURCE_TAR_BASE.substitute(version=version, tar_path=tar_path)
 
 
@@ -136,7 +135,6 @@ class ClangFormat(object):
     """ClangFormat class."""
 
     def __init__(self, path, cache_dir):
-        # pylint: disable=too-many-branches,too-many-statements
         """Initialize ClangFormat."""
         self.path = None
 
@@ -406,8 +404,7 @@ def format_my_func(clang_format, origin_branch):
     _format_files(clang_format, files)
 
 
-def reformat_branch(  # pylint: disable=too-many-branches,too-many-locals,too-many-statements
-        clang_format, commit_prior_to_reformat, commit_after_reformat):
+def reformat_branch(clang_format, commit_prior_to_reformat, commit_after_reformat):
     """Reformat a branch made before a clang-format run."""
     clang_format = ClangFormat(clang_format, _get_build_dir())
 

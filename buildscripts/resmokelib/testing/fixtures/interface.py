@@ -148,11 +148,11 @@ class Fixture(object, metaclass=registry.make_registry_metaclass(_FIXTURES)):  #
         """
         pass
 
-    def is_running(self):  # pylint: disable=no-self-use
+    def is_running(self):
         """Return true if the fixture is still operating and more tests and can be run."""
         return True
 
-    def get_node_info(self):  # pylint: disable=no-self-use
+    def get_node_info(self):
         """Return a list of NodeInfo objects."""
         return []
 

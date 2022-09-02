@@ -12,12 +12,11 @@ from buildscripts.resmokelib.testing.testcases import fixture as _fixture
 from buildscripts.resmokelib.utils import queue as _queue
 
 
-class Job(object):  # pylint: disable=too-many-instance-attributes
+class Job(object):
     """Run tests from a queue."""
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self, job_num, logger, fixture, hooks, report, archival, suite_options,
-            test_queue_logger):
+    def __init__(self, job_num, logger, fixture, hooks, report, archival, suite_options,
+                 test_queue_logger):
         """Initialize the job with the specified fixture and hooks."""
 
         self.logger = logger

@@ -27,7 +27,6 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 #
-# pylint: disable=too-many-lines
 """Test cases for IDL binder."""
 
 import textwrap
@@ -68,8 +67,6 @@ def indent_text(count, unindented_text):
 
 class TestBinder(testcase.IDLTestcase):
     """Test cases for the IDL binder."""
-
-    # pylint: disable=too-many-public-methods
 
     # Create a text wrap for common types.
     common_types = textwrap.dedent("""
@@ -1834,7 +1831,6 @@ class TestBinder(testcase.IDLTestcase):
     def test_command_doc_sequence_positive(self):
         # type: () -> None
         """Positive supports_doc_sequence tests."""
-        # pylint: disable=invalid-name
 
         # Setup some common types
         test_preamble = self.common_types + textwrap.dedent("""
@@ -1875,7 +1871,6 @@ class TestBinder(testcase.IDLTestcase):
     def test_command_doc_sequence_negative(self):
         # type: () -> None
         """Negative supports_doc_sequence tests."""
-        # pylint: disable=invalid-name
 
         # Setup some common types
         test_preamble = self.common_types

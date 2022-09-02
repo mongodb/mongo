@@ -2,6 +2,14 @@
 [pydocstyle]
 inherit = false
 
+# D100 - Missing docstring in public module
+# D101 - Missing docstring in public class
+# D102 - Missing docstring in public method
+# D103 - Missing docstring in public function
+# D104 - Missing docstring in public package
+# D105 - Missing docstring in magic method
+# D106 - Missing docstring in public nested class
+# D107 - Missing docstring in __init__
 # D105 - Missing docstring in magic method
 # D107 - Missing docstring in __init__
 # D202 - No blank lines allowed after function docstring
@@ -13,6 +21,6 @@ inherit = false
 # D407 - Missing dashed underline after section
 # D413 - Missing blank line after last section
 # D415 - First line should end with a period, question mark, or exclamation point
-ignore = D105,D202,D203,D212,D213,D301,D401,D407,D413,D415
+ignore = D100,D101,D102,D103,D104,D105,D106,D107,D202,D203,D212,D213,D301,D401,D407,D413,D415
 # Do not run on buildscripts/tests/
 match = ^((?!buildscripts[\\\/]tests[\\\/]).)*$

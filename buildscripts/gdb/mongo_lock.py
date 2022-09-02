@@ -307,7 +307,7 @@ def find_mutex_holder(graph, thread_dict, show):
         graph.add_edge(Lock(int(mutex_value), "Mutex"), mutex_holder)
 
 
-def find_lock_manager_holders(graph, thread_dict, show):  # pylint: disable=too-many-locals
+def find_lock_manager_holders(graph, thread_dict, show):
     """Find lock manager holders."""
     frame = find_frame(r'mongo::LockerImpl::')
     if not frame:

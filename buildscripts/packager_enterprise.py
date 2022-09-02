@@ -116,13 +116,12 @@ class EnterpriseDistro(packager.Distro):
         else:
             raise Exception("BUG: unsupported platform?")
 
-    def build_os(self, arch):  # pylint: disable=too-many-branches
+    def build_os(self, arch):
         """Return the build os label in the binary package to download.
 
         The labels "rhel57", "rhel62", "rhel67", "rhel70", "rhel80" are for redhat,
         the others are delegated to the super class.
         """
-        # pylint: disable=too-many-return-statements
         if arch == "ppc64le":
             if self.dname == 'ubuntu':
                 return ["ubuntu1604", "ubuntu1804"]
@@ -150,7 +149,6 @@ class EnterpriseDistro(packager.Distro):
         if re.search("(redhat|fedora|centos)", self.dname):
             return ["rhel80", "rhel70", "rhel62", "rhel57"]
         return super(EnterpriseDistro, self).build_os(arch)
-        # pylint: enable=too-many-return-statements
 
 
 def main():
@@ -321,7 +319,7 @@ Description: MongoDB packages
         os.chdir(oldpwd)
 
 
-def move_repos_into_place(src, dst):  # pylint: disable=too-many-branches
+def move_repos_into_place(src, dst):
     """Move the repos into place."""
     # Find all the stuff in src/*, move it to a freshly-created
     # directory beside dst, then play some games with symlinks so that

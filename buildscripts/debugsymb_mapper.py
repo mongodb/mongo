@@ -153,7 +153,6 @@ class DownloadOptions(object):
 class Mapper:
     """A class to to basically all of the work."""
 
-    # pylint: disable=too-many-instance-attributes
     # This amount of attributes are necessary.
 
     default_web_service_base_url: str = "https://symbolizer-service.server-tig.prod.corp.mongodb.com"

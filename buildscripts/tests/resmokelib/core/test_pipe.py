@@ -10,7 +10,7 @@ import mock
 
 from buildscripts.resmokelib.core import pipe as _pipe
 
-# pylint: disable=missing-docstring,protected-access
+# pylint: disable=protected-access
 
 
 class TestLoggerPipe(unittest.TestCase):

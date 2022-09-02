@@ -84,12 +84,11 @@ def remove_file(file_name):
     return status, message
 
 
-class Archival(object):  # pylint: disable=too-many-instance-attributes
+class Archival(object):
     """Class to support file archival to S3."""
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self, logger, archival_json_file="archive.json", limit_size_mb=0, limit_files=0,
-            s3_client=None):
+    def __init__(self, logger, archival_json_file="archive.json", limit_size_mb=0, limit_files=0,
+                 s3_client=None):
         """Initialize Archival."""
 
         self.archival_json_file = archival_json_file
@@ -278,7 +277,7 @@ class Archival(object):  # pylint: disable=too-many-instance-attributes
             return 1, str(err), 0
 
         # Round up the size of the archive.
-        size_mb = int(math.ceil(float(file_list_size(temp_file)) / (1024 * 1024)))
+        size_mb = int(math.ceil(float(file_list_size(temp_file)) / (1024 * 1024)))  # pylint: disable=c-extension-no-member
         self._upload_queue.put(
             UploadArgs(self.archival_json_file, display_name, temp_file, "application/x-gzip",
                        s3_bucket, s3_path, True))

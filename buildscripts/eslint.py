@@ -24,7 +24,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from distutils import spawn  # pylint: disable=no-name-in-module
+from distutils import spawn
 from optparse import OptionParser
 import structlog
 
@@ -93,7 +93,6 @@ def get_eslint_from_cache(dest_file, platform, arch):
     print("Downloading ESLint %s from %s, saving to %s" % (ESLINT_VERSION, url, temp_tar_file))
     urllib.request.urlretrieve(url, temp_tar_file)
 
-    # pylint: disable=too-many-function-args
     print("Extracting ESLint %s to %s" % (ESLINT_VERSION, dest_file))
     eslint_distfile = ESLINT_SOURCE_TAR_BASE.substitute(platform=platform, arch=arch)
     extract_eslint(temp_tar_file, eslint_distfile)
@@ -103,7 +102,7 @@ def get_eslint_from_cache(dest_file, platform, arch):
 class ESLint(object):
     """Class encapsulates finding a suitable copy of ESLint, and linting an individual file."""
 
-    def __init__(self, path, cache_dir):  # pylint: disable=too-many-branches
+    def __init__(self, path, cache_dir):
         """Initialize ESLint."""
         eslint_progname = ESLINT_PROGNAME
 

@@ -5,7 +5,7 @@ import os.path
 from buildscripts.resmokelib.testing.hooks import jsfile
 
 
-class CheckReplOplogs(jsfile.PerClusterDataConsistencyHook):  # pylint: disable=non-parent-init-called,super-init-not-called
+class CheckReplOplogs(jsfile.PerClusterDataConsistencyHook):
     """Check that local.oplog.rs matches on the primary and secondaries."""
 
     IS_BACKGROUND = False

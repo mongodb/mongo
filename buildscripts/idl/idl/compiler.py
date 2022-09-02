@@ -47,8 +47,6 @@ from . import syntax
 class CompilerArgs(object):
     """Set of compiler arguments."""
 
-    # pylint: disable=too-many-instance-attributes
-
     def __init__(self):
         # type: () -> None
         """Create a container for compiler arguments."""

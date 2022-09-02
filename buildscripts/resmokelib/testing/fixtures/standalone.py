@@ -17,9 +17,8 @@ import buildscripts.resmokelib.testing.fixtures.interface as interface
 class MongoDFixture(interface.Fixture):
     """Fixture which provides JSTests with a standalone mongod to run against."""
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self, logger, job_num, fixturelib, mongod_executable=None, mongod_options=None,
-            add_feature_flags=False, dbpath_prefix=None, preserve_dbpath=False, port=None):
+    def __init__(self, logger, job_num, fixturelib, mongod_executable=None, mongod_options=None,
+                 add_feature_flags=False, dbpath_prefix=None, preserve_dbpath=False, port=None):
         """Initialize MongoDFixture with different options for the mongod process."""
         interface.Fixture.__init__(self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix)
         self.mongod_options = self.fixturelib.make_historic(
@@ -149,7 +148,6 @@ class MongoDFixture(interface.Fixture):
         exit_code = self.mongod.wait()
 
         # Python's subprocess module returns negative versions of system calls.
-        # pylint: disable=invalid-unary-operand-type
         if exit_code == 0 or (mode is not None and exit_code == -(mode.value)):
             self.logger.info("Successfully stopped the mongod on port {:d}.".format(self.port))
         else:
@@ -215,8 +213,8 @@ class MongodLauncher(object):
         self.fixturelib = fixturelib
         self.config = fixturelib.get_config()
 
-    def launch_mongod_program(  # pylint: disable=too-many-branches,too-many-statements,too-many-arguments
-            self, logger, job_num, executable=None, process_kwargs=None, mongod_options=None):
+    def launch_mongod_program(self, logger, job_num, executable=None, process_kwargs=None,
+                              mongod_options=None):
         """
         Return a Process instance that starts mongod arguments constructed from 'mongod_options'.
 

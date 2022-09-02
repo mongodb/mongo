@@ -76,8 +76,6 @@ class Process(object):
     """Wrapper around subprocess.Popen class."""
 
     # pylint: disable=protected-access
-    # pylint: disable=too-many-arguments
-    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, logger, args, env=None, env_vars=None, cwd=None):
         """Initialize the process with the specified logger, arguments, and environment."""
@@ -175,7 +173,7 @@ class Process(object):
                 if return_code == win32con.STILL_ACTIVE:
                     raise
 
-    def stop(self, mode=None):  # pylint: disable=too-many-branches
+    def stop(self, mode=None):
         """Terminate the process."""
         if mode is None:
             mode = fixture_interface.TeardownMode.TERMINATE

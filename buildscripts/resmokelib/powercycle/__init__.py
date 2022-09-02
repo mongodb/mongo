@@ -103,7 +103,7 @@ class PowercyclePlugin(PluginInterface):
         # Only need to return run_parser for further processing; others don't need additional args.
         return run_parser
 
-    def add_subcommand(self, subparsers):  # pylint: disable=too-many-statements
+    def add_subcommand(self, subparsers):
         """Create and add the parser for the subcommand."""
         intermediate_parser = subparsers.add_parser(
             SUBCOMMAND, help=__doc__, usage="""

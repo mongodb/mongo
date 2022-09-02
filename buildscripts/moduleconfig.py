@@ -33,7 +33,6 @@ import os
 
 
 def discover_modules(module_root, allowed_modules):
-    # pylint: disable=too-many-branches
     """Scan module_root for subdirectories that look like MongoDB modules.
 
     Return a list of imported build.py module objects.

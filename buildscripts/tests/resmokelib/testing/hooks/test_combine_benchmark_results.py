@@ -8,7 +8,7 @@ import mock
 
 import buildscripts.resmokelib.testing.hooks.combine_benchmark_results as cbr
 
-# pylint: disable=missing-docstring,protected-access
+# pylint: disable=protected-access
 from buildscripts.resmokelib.errors import CedarReportError
 
 _BM_CONTEXT = {

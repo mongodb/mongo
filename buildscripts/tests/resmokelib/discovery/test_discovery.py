@@ -6,8 +6,6 @@ from unittest.mock import MagicMock
 import buildscripts.resmokelib.discovery as under_test
 from buildscripts.resmokelib.testing.suite import Suite
 
-# pylint: disable=missing-docstring
-
 
 class TestTestDiscoverySubCommand(unittest.TestCase):
     def test_gather_tests_should_return_discovered_tests(self):

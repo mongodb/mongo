@@ -13,7 +13,7 @@ class RunHangAnalyzerOnRemoteInstance(PowercycleCommand):
 
     COMMAND = "runHangAnalyzerOnRemoteInstance"
 
-    def execute(self) -> None:  # pylint: disable=too-many-locals
+    def execute(self) -> None:
         """:return: None."""
         if "private_ip_address" not in self.expansions:
             return

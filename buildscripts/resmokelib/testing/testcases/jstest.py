@@ -22,7 +22,7 @@ class _SingleJSTestCase(interface.ProcessTestCase):
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
-    def __init__(self, logger, js_filename, _id, shell_executable=None, shell_options=None):  # pylint: disable=too-many-arguments
+    def __init__(self, logger, js_filename, _id, shell_executable=None, shell_options=None):
         """Initialize the _SingleJSTestCase with the JS file to run."""
         interface.ProcessTestCase.__init__(self, logger, "JSTest", js_filename)
 

@@ -13,7 +13,7 @@ from buildscripts.resmokelib.testing.fixtures import interface as _fixtures
 from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
 from buildscripts.resmokelib.utils import queue as _queue
 
-# pylint: disable=missing-docstring,protected-access
+# pylint: disable=protected-access
 
 
 class TestJob(unittest.TestCase):
@@ -191,8 +191,8 @@ class MockTime(object):
         return cur_time
 
 
-class UnitJob(job.Job):  # pylint: disable=too-many-instance-attributes
-    def __init__(self, suite_options):  #pylint: disable=super-init-not-called
+class UnitJob(job.Job):
+    def __init__(self, suite_options):
         super(UnitJob, self).__init__(0, logging.getLogger("job_unittest"), None, [], None, None,
                                       suite_options, logging.getLogger("job_unittest"))
         self.total_test_num = 0

@@ -611,7 +611,6 @@ class BurnInOrchestrator:
         self.burn_in_executor.execute(tests_by_task)
 
 
-# pylint: disable=too-many-function-args
 @click.command(context_settings=dict(ignore_unknown_options=True))
 @click.option("--no-exec", "no_exec", default=False, is_flag=True,
               help="Do not execute the found tests.")
@@ -634,7 +633,6 @@ class BurnInOrchestrator:
 @click.option("--install-dir", "install_dir", type=str,
               help="Path to bin directory of a testable installation")
 @click.argument("resmoke_args", nargs=-1, type=click.UNPROCESSED)
-# pylint: disable=too-many-arguments,too-many-locals
 def main(build_variant: str, no_exec: bool, repeat_tests_num: Optional[int],
          repeat_tests_min: Optional[int], repeat_tests_max: Optional[int],
          repeat_tests_secs: Optional[int], resmoke_args: str, verbose: bool,

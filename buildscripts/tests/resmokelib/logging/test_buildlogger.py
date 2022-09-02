@@ -5,7 +5,7 @@ import unittest
 
 from buildscripts.resmokelib.logging import buildlogger
 
-# pylint: disable=missing-docstring,protected-access
+# pylint: disable=protected-access
 
 
 class TestLogsSplitter(unittest.TestCase):

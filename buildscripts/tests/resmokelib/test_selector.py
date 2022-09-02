@@ -11,7 +11,7 @@ import buildscripts.resmokelib.parser as parser
 import buildscripts.resmokelib.selector as selector
 import buildscripts.resmokelib.utils.globstar as globstar
 
-# pylint: disable=missing-docstring,protected-access
+# pylint: disable=protected-access
 
 FIXTURE_PREFIX = "buildscripts/tests/selftest_fixtures"
 
@@ -162,7 +162,7 @@ class MockTestFileExplorer(object):
         self.binary = MockTestFileExplorer.BINARY
         self.jstest_tag_file = {"dir/subdir1/test11.js": "tagA", "dir/subdir3/a/test3a1.js": "tagB"}
 
-    def is_glob_pattern(self, pattern):  # pylint: disable=no-self-use
+    def is_glob_pattern(self, pattern):
         return globstar.is_glob_pattern(pattern)
 
     def iglob(self, pattern):
@@ -175,16 +175,16 @@ class MockTestFileExplorer(object):
     def jstest_tags(self, file_path):
         return self.tags.get(file_path, [])
 
-    def read_root_file(self, root_file_path):  # pylint: disable=no-self-use,unused-argument
+    def read_root_file(self, root_file_path):  # pylint: disable=unused-argument
         return ["build/testA", "build/testB"]
 
-    def fnmatchcase(self, name, pattern):  # pylint: disable=no-self-use
+    def fnmatchcase(self, name, pattern):
         return fnmatch.fnmatchcase(name, pattern)
 
     def isfile(self, path):
         return path in self.files
 
-    def list_dbtests(self, binary):  # pylint: disable=no-self-use,unused-argument
+    def list_dbtests(self, binary):  # pylint: disable=unused-argument
         return ["dbtestA", "dbtestB", "dbtestC"]
 
     def parse_tag_files(self, test_kind, tag_files=None, tagged_tests=None):  # pylint: disable=unused-argument

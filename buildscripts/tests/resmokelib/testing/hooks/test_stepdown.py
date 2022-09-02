@@ -9,7 +9,7 @@ import mock
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.hooks import stepdown as _stepdown
 
-# pylint: disable=missing-docstring,protected-access
+# pylint: disable=protected-access
 
 
 def _get_threading_lock(test_case, MockCondition):  # pylint: disable=invalid-name

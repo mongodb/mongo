@@ -6,7 +6,7 @@ configuration file.
 from __future__ import annotations
 
 import datetime
-import distutils.spawn  # pylint: disable=no-name-in-module
+import distutils.spawn
 from typing import Set, List, Optional
 
 import yaml
@@ -39,7 +39,7 @@ def parse_evergreen_file(path, evergreen_binary="evergreen"):
     return EvergreenProjectConfig(config)
 
 
-class EvergreenProjectConfig(object):  # pylint: disable=too-many-instance-attributes
+class EvergreenProjectConfig(object):
     """Represent an Evergreen project configuration file."""
 
     def __init__(self, conf):

@@ -234,7 +234,6 @@ class SymbolTable(object):
     def resolve_field_type(self, ctxt, location, field_name, field_type):
         # type: (errors.ParserContext, common.SourceLocation, str, FieldType) -> Optional[Union[Enum, Struct, Type]]
         """Find the type or struct a field refers to or log an error."""
-        # pylint: disable=too-many-return-statements,too-many-branches,too-many-locals
 
         if isinstance(field_type, FieldTypeVariant):
             variant = VariantType(field_type.file_name, field_type.line, field_type.column)
@@ -358,8 +357,6 @@ class Type(common.SourceLocation):
     populated.
     """
 
-    # pylint: disable=too-many-instance-attributes
-
     def __init__(self, file_name, line, column):
         # type: (str, int, int) -> None
         """Construct a Type."""
@@ -413,8 +410,6 @@ class Validator(common.SourceLocation):
     If more than one is included, they must ALL evaluate to true.
     """
 
-    # pylint: disable=too-many-instance-attributes
-
     def __init__(self, file_name, line, column):
         # type: (str, int, int) -> None
         """Construct a Validator."""
@@ -448,8 +443,6 @@ class Field(common.SourceLocation):
     Other fields may be populated. If they do not exist in the source document, they are not
     populated.
     """
-
-    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, file_name, line, column):
         # type: (str, int, int) -> None
@@ -514,8 +507,6 @@ class Struct(common.SourceLocation):
 
     All fields are either required or have a non-None default.
     """
-
-    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, file_name, line, column):
         # type: (str, int, int) -> None
@@ -633,8 +624,6 @@ class Command(Struct):
 
     Namespace is required.
     """
-
-    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, file_name, line, column):
         # type: (str, int, int) -> None
@@ -846,8 +835,6 @@ class ServerParameterClass(common.SourceLocation):
 class ServerParameter(common.SourceLocation):
     """IDL ServerParameter information."""
 
-    # pylint: disable=too-many-instance-attributes
-
     def __init__(self, file_name, line, column):
         # type: (str, int, int) -> None
         """Construct a ServerParameter."""
@@ -872,8 +859,6 @@ class ServerParameter(common.SourceLocation):
 
 class FeatureFlag(common.SourceLocation):
     """IDL FeatureFlag information."""
-
-    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, file_name, line, column):
         # type: (str, int, int) -> None
@@ -916,8 +901,6 @@ class ConfigGlobal(common.SourceLocation):
 
 class ConfigOption(common.SourceLocation):
     """Runtime configuration setting definition."""
-
-    # pylint: disable=too-many-instance-attributes
 
     def __init__(self, file_name, line, column):
         # type: (str, int, int) -> None

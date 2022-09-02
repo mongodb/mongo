@@ -1,3 +1,4 @@
+# pylint: disable=invalid-name
 """Extension to the unittest.TestResult.
 
 This is used to support additional test status and timing information for the report.json file.
@@ -14,7 +15,7 @@ from buildscripts.resmokelib.testing.symbolizer_service import ResmokeSymbolizer
 
 
 # pylint: disable=attribute-defined-outside-init
-class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attributes
+class TestReport(unittest.TestResult):
     """Record test status and timing information."""
 
     def __init__(self, job_logger, suite_options, job_num=None):
@@ -103,7 +104,7 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
 
         return combined_report
 
-    def startTest(self, test):  # pylint: disable=invalid-name
+    def startTest(self, test):
         """Call before 'test' is run."""
 
         unittest.TestResult.startTest(self, test)
@@ -136,7 +137,7 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
         test.override_logger(test_logger)
         test_info.start_time = time.time()
 
-    def stopTest(self, test):  # pylint: disable=invalid-name
+    def stopTest(self, test):
         """Call after 'test' has run."""
 
         # check if there are stacktrace files, if so, invoke the symbolizer here.
@@ -171,7 +172,7 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
         # Restore the original logger for the test.
         test.reset_logger()
 
-    def addError(self, test, err):  # pylint: disable=invalid-name
+    def addError(self, test, err):
         """Call when a non-failureException was raised during the execution of 'test'."""
 
         unittest.TestResult.addError(self, test, err)
@@ -185,7 +186,7 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
             test_info.evergreen_status = "fail"
             test_info.return_code = test.return_code
 
-    def setError(self, test):  # pylint: disable=invalid-name
+    def setError(self, test):
         """Change the outcome of an existing test to an error."""
         self.job_logger.info("setError(%s)", test)
 
@@ -205,7 +206,7 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
         self.num_errored = len(self.get_errored())
         self.num_interrupted = len(self.get_interrupted())
 
-    def addFailure(self, test, err):  # pylint: disable=invalid-name
+    def addFailure(self, test, err):
         """Call when a failureException was raised during the execution of 'test'."""
 
         unittest.TestResult.addFailure(self, test, err)
@@ -223,7 +224,7 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
                 test_info.evergreen_status = self.suite_options.report_failure_status
             test_info.return_code = test.return_code
 
-    def setFailure(self, test, return_code=1):  # pylint: disable=invalid-name
+    def setFailure(self, test, return_code=1):
         """Change the outcome of an existing test to a failure."""
 
         with self._lock:
@@ -246,7 +247,7 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
         self.num_errored = len(self.get_errored())
         self.num_interrupted = len(self.get_interrupted())
 
-    def addSuccess(self, test):  # pylint: disable=invalid-name
+    def addSuccess(self, test):
         """Call when 'test' executed successfully."""
 
         unittest.TestResult.addSuccess(self, test)
@@ -259,7 +260,7 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
             test_info.evergreen_status = "pass"
             test_info.return_code = test.return_code
 
-    def wasSuccessful(self):  # pylint: disable=invalid-name
+    def wasSuccessful(self):
         """Return true if all tests executed successfully."""
 
         with self._lock:
@@ -387,7 +388,7 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
         raise ValueError("Details for %s not found in the report" % (test.basename()))
 
 
-class TestInfo(object):  # pylint: disable=too-many-instance-attributes
+class TestInfo(object):
     """Holder for the test status and timing information."""
 
     def __init__(self, test_id, test_file, dynamic):

@@ -1,5 +1,4 @@
 """Unit tests for buildscripts/resmokelib/testing/symbolizer_service.py."""
-# pylint: disable=missing-docstring
 import os
 import unittest
 from pathlib import Path

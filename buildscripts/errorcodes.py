@@ -25,9 +25,7 @@ except ImportError:
 
 MAXIMUM_CODE = 9999999  # JIRA Ticket + XX
 
-# pylint: disable=invalid-name
 codes = []  # type: ignore
-# pylint: enable=invalid-name
 
 # Each AssertLocation identifies the C++ source location of an assertion
 AssertLocation = namedtuple("AssertLocation", ['sourceFile', 'byteOffset', 'lines', 'code'])
@@ -237,7 +235,7 @@ def read_error_codes(src_root='src/mongo'):
     return (codes, errors, seen)
 
 
-def replace_bad_codes(errors, next_code_generator):  # pylint: disable=too-many-locals
+def replace_bad_codes(errors, next_code_generator):
     """
     Modify C++ source files to replace invalid assertion codes.
 

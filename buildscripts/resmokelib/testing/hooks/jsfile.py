@@ -12,14 +12,13 @@ class JSHook(interface.Hook):
 
     REGISTERED_NAME = registry.LEAVE_UNREGISTERED
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self, hook_logger, fixture, js_filename, description, shell_options=None):
+    def __init__(self, hook_logger, fixture, js_filename, description, shell_options=None):
         """Initialize JSHook."""
         interface.Hook.__init__(self, hook_logger, fixture, description)
         self._js_filename = js_filename
         self._shell_options = shell_options
 
-    def _should_run_after_test(self):  # pylint: disable=no-self-use
+    def _should_run_after_test(self):
         """Provide base callback.
 
         Callback that can be overrided by subclasses to indicate if the JavaScript file should be
@@ -84,9 +83,8 @@ class PerClusterDataConsistencyHook(DataConsistencyHook):
 class DynamicJSTestCase(interface.DynamicTestCase):
     """A dynamic TestCase that runs a JavaScript file."""
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self, logger, test_name, description, base_test_name, hook, js_filename,
-            shell_options=None):
+    def __init__(self, logger, test_name, description, base_test_name, hook, js_filename,
+                 shell_options=None):
         """Initialize DynamicJSTestCase."""
         interface.DynamicTestCase.__init__(self, logger, test_name, description, base_test_name,
                                            hook)
@@ -104,7 +102,7 @@ class DynamicJSTestCase(interface.DynamicTestCase):
         interface.DynamicTestCase.reset_logger(self)
         self._js_test_case.reset_logger()
 
-    def configure(self, fixture, *args, **kwargs):  # pylint: disable=unused-argument
+    def configure(self, fixture, *args, **kwargs):
         """Configure the fixture."""
         super().configure(fixture, *args, **kwargs)
         self._js_test_builder.configure(fixture, *args, **kwargs)

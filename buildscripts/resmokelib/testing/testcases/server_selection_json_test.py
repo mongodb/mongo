@@ -25,7 +25,7 @@ class ServerSelectionJsonTestCase(interface.ProcessTestCase):
         self.json_test_file = os.path.normpath(json_test_file)
         self.program_options = utils.default_if_none(program_options, {}).copy()
 
-    def _find_executable(self):  # pylint: disable=no-self-use
+    def _find_executable(self):
         binary = os.path.join(config.INSTALL_DIR, "server_selection_json_test")
         if os.name == "nt":
             binary += ".exe"

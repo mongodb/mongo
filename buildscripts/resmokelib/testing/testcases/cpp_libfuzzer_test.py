@@ -15,9 +15,8 @@ class CPPLibfuzzerTestCase(interface.ProcessTestCase):
     REGISTERED_NAME = "cpp_libfuzzer_test"
     DEFAULT_TIMEOUT = datetime.timedelta(hours=1)
 
-    def __init__(  # pylint: disable=too-many-arguments
-            self, logger, program_executable, program_options=None, runs=1000000,
-            corpus_directory_stem="corpora"):
+    def __init__(self, logger, program_executable, program_options=None, runs=1000000,
+                 corpus_directory_stem="corpora"):
         """Initialize the CPPLibfuzzerTestCase with the executable to run."""
 
         interface.ProcessTestCase.__init__(self, logger, "C++ libfuzzer test", program_executable)

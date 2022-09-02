@@ -8,8 +8,6 @@ from mock import MagicMock, patch
 
 from buildscripts import validate_mongocryptd as under_test
 
-# pylint: disable=missing-docstring,no-self-use
-
 NS = "buildscripts.validate_mongocryptd"
 
 
