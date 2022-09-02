@@ -946,27 +946,98 @@ class MemoPrinter(OptimizerTypePrinter):
 def register_abt_printers(pp):
     """Registers a number of pretty printers related to the CQF optimizer."""
 
+    # IntervalRequirement printer.
+    pp.add("Interval", "mongo::optimizer::IntervalRequirement", False, IntervalPrinter)
+
+    # Memo printer.
+    pp.add("Memo", "mongo::optimizer::cascades::Memo", False, MemoPrinter)
+
+    # PartialSchemaRequirements printer.
+    schema_req_type = """std::multimap<mongo::optimizer::PartialSchemaKey,
+                        mongo::optimizer::PartialSchemaRequirement,
+                        mongo::optimizer::PartialSchemaKeyLessComparator,
+                        std::allocator<std::pair<mongo::optimizer::PartialSchemaKey const,
+                            mongo::optimizer::PartialSchemaRequirement>
+                        > >"""
+    pp.add("PartialSchemaRequirements", schema_req_type, False, PartialSchemaReqMapPrinter)
+
+    # Attempt to dynamically load the ABT type since it has a templated type set that is bound to
+    # change. This may fail on certain builds, such as those with dynamically linked libraries, so
+    # we catch the lookup error and fallback to registering the static type name which may be
+    # stale.
     try:
         # ABT printer.
         abt_type = gdb.lookup_type("mongo::optimizer::ABT").strip_typedefs()
         pp.add('ABT', abt_type.name, False, ABTPrinter)
 
-        abt_ref_type = gdb.lookup_type(abt_type.name + "::Reference").strip_typedefs()
+        abt_ref_type = abt_type.name + "::Reference"
         # We can re-use the same printer since an ABT is contructable from an ABT::Reference.
-        pp.add('ABT::Reference', abt_ref_type.name, False, ABTPrinter)
+        pp.add('ABT::Reference', abt_ref_type, False, ABTPrinter)
+    except gdb.error:
+        # ABT printer.
+        abt_type_set = ["Blackhole",
+                               "Constant",
+                               "Variable",
+                               "UnaryOp",
+                               "BinaryOp",
+                               "If",
+                               "Let",
+                               "LambdaAbstraction",
+                               "LambdaApplication",
+                               "FunctionCall",
+                               "EvalPath",
+                               "EvalFilter",
+                               "Source",
+                               "PathConstant",
+                               "PathLambda",
+                               "PathIdentity",
+                               "PathDefault",
+                               "PathCompare",
+                               "PathDrop",
+                               "PathKeep",
+                               "PathObj",
+                               "PathArr",
+                               "PathTraverse",
+                               "PathField",
+                               "PathGet",
+                               "PathComposeM",
+                               "PathComposeA",
+                               "ScanNode",
+                               "PhysicalScanNode",
+                               "ValueScanNode",
+                               "CoScanNode",
+                               "IndexScanNode",
+                               "SeekNode",
+                               "MemoLogicalDelegatorNode",
+                               "MemoPhysicalDelegatorNode",
+                               "FilterNode",
+                               "EvaluationNode",
+                               "SargableNode",
+                               "RIDIntersectNode",
+                               "BinaryJoinNode",
+                               "HashJoinNode",
+                               "MergeJoinNode",
+                               "UnionNode",
+                               "GroupByNode",
+                               "UnwindNode",
+                               "UniqueNode",
+                               "CollationNode",
+                               "LimitSkipNode",
+                               "ExchangeNode",
+                               "RootNode",
+                               "References",
+                               "ExpressionBinder"]
+        abt_type = "mongo::optimizer::algebra::PolyValue<"
+        for type_name in abt_type_set:
+            abt_type += "mongo::optimizer::" + type_name
+            if type_name != "ExpressionBinder":
+                abt_type += ", "
+        abt_type += ">"
+        pp.add('ABT', abt_type, False, ABTPrinter)
 
-        # IntervalRequirement printer.
-        pp.add("Interval", "mongo::optimizer::IntervalRequirement", False, IntervalPrinter)
-
-        # PartialSchemaRequirements printer.
-        schema_req_type = gdb.lookup_type(
-            "mongo::optimizer::PartialSchemaRequirements").strip_typedefs()
-        pp.add("PartialSchemaRequirements", schema_req_type.name, False, PartialSchemaReqMapPrinter)
-
-        # Memo printer.
-        pp.add("Memo", "mongo::optimizer::cascades::Memo", False, MemoPrinter)
-    except gdb.error as gdberr:
-        print("Failed to add one or more ABT pretty printers, skipping: " + str(gdberr))
+        abt_ref_type = abt_type + "::Reference"
+        # We can re-use the same printer since an ABT is contructable from an ABT::Reference.
+        pp.add('ABT::Reference', abt_ref_type, False, ABTPrinter)
 
 
 def build_pretty_printer():

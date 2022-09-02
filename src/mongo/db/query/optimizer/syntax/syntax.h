@@ -39,6 +39,14 @@
 
 namespace mongo::optimizer {
 
+/**
+ * This is the core typedef that represents an abstract binding tree (ABT). The templated types
+ * represent all possible instances for a given ABT operator, each deriving from an Operator class
+ * that indicates the number of children nodes.
+ *
+ * NOTE: If the set of possible types in an ABT changes, please update the corresponding gdb
+ * pretty printer.
+ */
 using ABT = algebra::PolyValue<Blackhole,
                                Constant,  // expressions
                                Variable,
