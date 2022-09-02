@@ -51,6 +51,10 @@ structs:
             coordinatorType:
                 description: "Type of the ConfigsvrCoordinator"
                 type: ConfigsvrCoordinatorType
+            subId:
+                description: "Identifier to distinguish from other instances of same type"
+                type: string
+                optional: true
 
     ConfigsvrCoordinatorSession:
         description: "Container for configsvr coordinator session used for guaranteeing remote
