@@ -455,26 +455,14 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
                 Lock::GlobalLock lk(opCtx,
                                     MODE_IS,
                                     Date_t::now() + Milliseconds(500),
-                                    Lock::InterruptBehavior::kLeaveUnlocked);
-                if (lk.isLocked()) {
-                    _debug.storageStats = opCtx->recoveryUnit()->getOperationStatistics();
-                } else {
-                    LOGV2_WARNING_OPTIONS(
-                        20525,
-                        {component},
-                        "Failed to gather storage statistics for {opId} due to {reason}",
-                        "Failed to gather storage statistics for slow operation",
-                        "opId"_attr = opCtx->getOpID(),
-                        "error"_attr = "lock acquire timeout"_sd);
-                }
-            } catch (const ExceptionForCat<ErrorCategory::Interruption>& ex) {
-                LOGV2_WARNING_OPTIONS(
-                    20526,
-                    {component},
-                    "Failed to gather storage statistics for {opId} due to {reason}",
-                    "Failed to gather storage statistics for slow operation",
-                    "opId"_attr = opCtx->getOpID(),
-                    "error"_attr = redact(ex));
+                                    Lock::InterruptBehavior::kThrow);
+                _debug.storageStats = opCtx->recoveryUnit()->getOperationStatistics();
+            } catch (const DBException& ex) {
+                LOGV2_WARNING_OPTIONS(20526,
+                                      {component},
+                                      "Failed to gather storage statistics for slow operation",
+                                      "opId"_attr = opCtx->getOpID(),
+                                      "error"_attr = redact(ex));
             }
         }
 

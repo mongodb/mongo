@@ -585,51 +585,6 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
         // Throws on error.
         try {
             stats = buildIndexFuture.get(opCtx);
-        } catch (const ExceptionForCat<ErrorCategory::Interruption>& interruptionEx) {
-            LOGV2(20441,
-                  "Index build: received interrupt signal",
-                  "buildUUID"_attr = buildUUID,
-                  "signal"_attr = interruptionEx);
-
-            hangBeforeIndexBuildAbortOnInterrupt.pauseWhileSet();
-
-            if (IndexBuildProtocol::kTwoPhase == protocol) {
-                // If this node is no longer a primary, the index build will continue to run in the
-                // background and will complete when this node receives a commitIndexBuild oplog
-                // entry from the new primary.
-                if (ErrorCodes::InterruptedDueToReplStateChange == interruptionEx.code()) {
-                    shouldContinueInBackground = true;
-                    throw;
-                }
-            }
-
-            // It is unclear whether the interruption originated from the current opCtx instance
-            // for the createIndexes command or that the IndexBuildsCoordinator task was interrupted
-            // independently of this command invocation. We'll defensively abort the index build
-            // with the assumption that if the index build was already in the midst of tearing down,
-            // this will be a no-op.
-            {
-                // The current OperationContext may be interrupted, which would prevent us from
-                // taking locks. Use a new OperationContext to abort the index build.
-                auto newClient = opCtx->getServiceContext()->makeClient("abort-index-build");
-                AlternativeClientRegion acr(newClient);
-                const auto abortCtx = cc().makeOperationContext();
-
-                std::string abortReason(str::stream() << "Index build aborted: " << buildUUID
-                                                      << ": " << interruptionEx.toString());
-                if (indexBuildsCoord->abortIndexBuildByBuildUUID(
-                        abortCtx.get(), buildUUID, IndexBuildAction::kPrimaryAbort, abortReason)) {
-                    LOGV2(20443,
-                          "Index build: aborted due to interruption",
-                          "buildUUID"_attr = buildUUID);
-                } else {
-                    // The index build may already be in the midst of tearing down.
-                    LOGV2(5010500,
-                          "Index build: failed to abort index build",
-                          "buildUUID"_attr = buildUUID);
-                }
-            }
-            throw;
         } catch (const ExceptionForCat<ErrorCategory::NotPrimaryError>& ex) {
             LOGV2(20444,
                   "Index build: received interrupt signal due to change in replication state",
@@ -658,6 +613,45 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                       "buildUUID"_attr = buildUUID);
             }
 
+            throw;
+        } catch (const DBException& ex) {
+            if (!opCtx->isKillPending()) {
+                throw;
+            }
+
+            LOGV2(20441,
+                  "Index build: received interrupt signal",
+                  "buildUUID"_attr = buildUUID,
+                  "signal"_attr = ex);
+
+            hangBeforeIndexBuildAbortOnInterrupt.pauseWhileSet();
+
+            // It is unclear whether the interruption originated from the current opCtx instance
+            // for the createIndexes command or that the IndexBuildsCoordinator task was interrupted
+            // independently of this command invocation. We'll defensively abort the index build
+            // with the assumption that if the index build was already in the midst of tearing down,
+            // this will be a no-op.
+            {
+                // The current OperationContext may be interrupted, which would prevent us from
+                // taking locks. Use a new OperationContext to abort the index build.
+                auto newClient = opCtx->getServiceContext()->makeClient("abort-index-build");
+                AlternativeClientRegion acr(newClient);
+                const auto abortCtx = cc().makeOperationContext();
+
+                std::string abortReason(str::stream() << "Index build aborted: " << buildUUID
+                                                      << ": " << ex.toString());
+                if (indexBuildsCoord->abortIndexBuildByBuildUUID(
+                        abortCtx.get(), buildUUID, IndexBuildAction::kPrimaryAbort, abortReason)) {
+                    LOGV2(20443,
+                          "Index build: aborted due to interruption",
+                          "buildUUID"_attr = buildUUID);
+                } else {
+                    // The index build may already be in the midst of tearing down.
+                    LOGV2(5010500,
+                          "Index build: failed to abort index build",
+                          "buildUUID"_attr = buildUUID);
+                }
+            }
             throw;
         }
 

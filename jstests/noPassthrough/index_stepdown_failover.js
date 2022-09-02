@@ -49,7 +49,7 @@ const newPrimaryColl = secondaryColl;
 assert.commandWorked(primary.adminCommand({replSetStepDown: 60, force: true}));
 const exitCode = createIdx({checkExitSuccess: false});
 assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build being terminated');
-checkLog.containsJson(primary, 20441);
+checkLog.containsJson(primary, 20444);
 
 // Unblock the index build on the old primary during the collection scanning phase.
 // This index build will not complete because it has to wait for a commitIndexBuild oplog

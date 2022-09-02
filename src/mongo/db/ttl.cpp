@@ -298,10 +298,10 @@ void TTLMonitor::run() {
             _doTTLPass();
         } catch (const WriteConflictException&) {
             LOGV2_DEBUG(22531, 1, "got WriteConflictException");
-        } catch (const ExceptionForCat<ErrorCategory::Interruption>& interruption) {
+        } catch (const DBException& ex) {
             LOGV2_WARNING(22537,
                           "TTLMonitor was interrupted, waiting before doing another pass",
-                          "interruption"_attr = interruption,
+                          "interruption"_attr = ex,
                           "wait"_attr = Milliseconds(Seconds(ttlMonitorSleepSecs.load())));
         }
     }
@@ -458,10 +458,6 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
             return _deleteExpiredWithIndex(
                 opCtx, ttlCollectionCache, collection, info.getIndexName());
         }
-    } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
-        // The exception is relevant to the entire TTL monitoring process, not just the specific TTL
-        // index. Let the exception escape so it can be addressed at the higher monitoring layer.
-        throw;
     } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
         // The TTL index tried to delete some information from a sharded collection
         // through a direct operation against the shard but the filtering metadata was
@@ -497,6 +493,13 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
                       "error"_attr = ex);
         return false;
     } catch (const DBException& ex) {
+        if (opCtx->isKillPending()) {
+            // The exception is relevant to the entire TTL monitoring process, not just the specific
+            // TTL index. Let the exception escape so it can be addressed at the higher monitoring
+            // layer.
+            throw;
+        }
+
         LOGV2_ERROR(
             5400703, "Error running TTL job on collection", logAttrs(*nss), "error"_attr = ex);
         return false;

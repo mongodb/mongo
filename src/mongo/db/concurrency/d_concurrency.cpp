@@ -170,10 +170,15 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
 
         unlockFCVLock.dismiss();
         unlockPBWM.dismiss();
-    } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
-        // The kLeaveUnlocked behavior suppresses this exception.
-        if (_interruptBehavior == InterruptBehavior::kThrow)
+    } catch (const DBException& ex) {
+        // If our opCtx was killed or we got a LockTimeout or MaxTimeMSExpired, either throw or
+        // suppress the exception depending on the specified interrupt behavior. For any other
+        // exception, always throw.
+        if ((!opCtx->isKillPending() && ex.code() != ErrorCodes::LockTimeout &&
+             ex.code() != ErrorCodes::MaxTimeMSExpired) ||
+            _interruptBehavior == InterruptBehavior::kThrow) {
             throw;
+        }
     }
     auto acquiredLockMode = _opCtx->lockState()->getLockMode(resourceIdGlobal);
     _opCtx->lockState()->setGlobalLockTakenInMode(acquiredLockMode);

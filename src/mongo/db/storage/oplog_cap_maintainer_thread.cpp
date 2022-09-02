@@ -87,13 +87,14 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments() {
                     "Caught an InterruptedDueToStorageChange exception, "
                     "but this thread can safely continue",
                     "error"_attr = e.toStatus());
-    } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
-        return false;
+    } catch (const DBException& ex) {
+        if (opCtx->isKillPending()) {
+            return false;
+        }
+
+        LOGV2_FATAL_NOTRACE(6761100, "Error in OplogCapMaintainerThread", "error"_attr = ex);
     } catch (const std::exception& e) {
-        LOGV2_FATAL_NOTRACE(22243,
-                            "error in OplogCapMaintainerThread: {error}",
-                            "Error in OplogCapMaintainerThread",
-                            "error"_attr = e.what());
+        LOGV2_FATAL_NOTRACE(22243, "Error in OplogCapMaintainerThread", "error"_attr = e.what());
     } catch (...) {
         LOGV2_FATAL_NOTRACE(5184100, "Unknown error in OplogCapMaintainerThread");
     }

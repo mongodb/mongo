@@ -1012,7 +1012,7 @@ void SortedDataIndexAccessMethod::getKeys(OperationContext* opCtx,
             multikeyPaths->clear();
         }
 
-        if (ex.isA<ErrorCategory::Interruption>() || ex.isA<ErrorCategory::ShutdownError>()) {
+        if (opCtx->isKillPending()) {
             throw;
         }
 

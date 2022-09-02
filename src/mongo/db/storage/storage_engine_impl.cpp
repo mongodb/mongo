@@ -1268,24 +1268,20 @@ void StorageEngineImpl::TimestampMonitor::_startup() {
                     }
                 }
 
-            } catch (const ExceptionForCat<ErrorCategory::Interruption>& ex) {
-                if (ex.code() == ErrorCodes::Interrupted) {
-                    LOGV2(6183600, "Timestamp monitor got interrupted, retrying");
+            } catch (const ExceptionFor<ErrorCodes::Interrupted>&) {
+                LOGV2(6183600, "Timestamp monitor got interrupted, retrying");
+                return;
+            } catch (const ExceptionFor<ErrorCodes::InterruptedAtShutdown>& ex) {
+                if (_shuttingDown) {
                     return;
                 }
-                if (ex.code() == ErrorCodes::InterruptedAtShutdown) {
-                    if (_shuttingDown) {
-                        return;
-                    }
-                    _shuttingDown = true;
-                    LOGV2(22263, "Timestamp monitor is stopping", "error"_attr = ex);
-                }
-                if (!ErrorCodes::isCancellationError(ex)) {
-                    throw;
-                }
+                _shuttingDown = true;
+                LOGV2(22263, "Timestamp monitor is stopping", "error"_attr = ex);
+            } catch (const ExceptionForCat<ErrorCategory::CancellationError>&) {
+                return;
             } catch (const DBException& ex) {
                 // Logs and rethrows the exceptions of other types.
-                LOGV2_ERROR(5802500, "Timestamp monitor throws an exception", "error"_attr = ex);
+                LOGV2_ERROR(5802500, "Timestamp monitor threw an exception", "error"_attr = ex);
                 throw;
             }
         },

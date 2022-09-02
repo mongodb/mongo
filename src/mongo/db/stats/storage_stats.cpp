@@ -68,15 +68,25 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     const auto collNss =
         (isTimeseries && !nss.isTimeseriesBucketsCollection()) ? std::move(bucketNss) : nss;
 
+    auto failed = [&](const DBException& ex) {
+        LOGV2_DEBUG(3088801,
+                    2,
+                    "Failed to retrieve storage statistics",
+                    logAttrs(collNss),
+                    "error"_attr = ex);
+        return Status::OK();
+    };
+
     boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> autoColl;
     try {
         autoColl.emplace(opCtx,
                          collNss,
                          AutoGetCollectionViewMode::kViewsForbidden,
                          waitForLock ? Date_t::max() : Date_t::now());
-    } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
-        LOGV2_DEBUG(3088801, 2, "Failed to retrieve storage statistics", logAttrs(collNss));
-        return Status::OK();
+    } catch (const ExceptionFor<ErrorCodes::LockTimeout>& ex) {
+        return failed(ex);
+    } catch (const ExceptionFor<ErrorCodes::MaxTimeMSExpired>& ex) {
+        return failed(ex);
     }
 
     const auto& collection = autoColl->getCollection();  // Will be set if present

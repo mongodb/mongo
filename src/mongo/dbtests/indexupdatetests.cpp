@@ -101,8 +101,8 @@ protected:
                                      MultiIndexBlock::kNoopOnCommitFn));
             wunit.commit();
             abortOnExit.dismiss();
-        } catch (const DBException& e) {
-            if (ErrorCodes::isInterruption(e.code()))
+        } catch (const DBException&) {
+            if (_opCtx->isKillPending())
                 return true;
 
             throw;

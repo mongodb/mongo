@@ -92,17 +92,12 @@ public:
 
         const auto viewCatalogDbNames = catalog->getViewCatalogDbNames(opCtx);
         for (const auto& dbName : viewCatalogDbNames) {
-            try {
-                const auto viewStats = catalog->getViewStatsForDatabase(opCtx, dbName);
-                invariant(viewStats);
+            const auto viewStats = catalog->getViewStatsForDatabase(opCtx, dbName);
+            invariant(viewStats);
 
-                stats.timeseries += viewStats->userTimeseries;
-                stats.views += viewStats->userViews;
-                stats.internalViews += viewStats->internal;
-            } catch (ExceptionForCat<ErrorCategory::Interruption>&) {
-                LOGV2_DEBUG(
-                    5578400, 2, "Failed to collect view catalog statistics", "db"_attr = dbName);
-            }
+            stats.timeseries += viewStats->userTimeseries;
+            stats.views += viewStats->userViews;
+            stats.internalViews += viewStats->internal;
         }
 
         BSONObjBuilder builder;

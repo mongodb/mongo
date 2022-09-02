@@ -470,10 +470,42 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
 
     size_t numScanRestarts = 0;
     bool restartCollectionScan = false;
+    Timer timer;
+
+    auto restart = [&](const DBException& ex) {
+        // Forced replica set re-configs will clear the majority committed snapshot, which may be
+        // used by the collection scan. The collection scan will restart from the beginning in this
+        // case. Capped cursors are invalidated when the document they were positioned on gets
+        // deleted. The collection scan will restart in both cases.
+        restartCollectionScan = true;
+        logAndBackoff(5470300,
+                      ::mongo::logv2::LogComponent::kIndex,
+                      logv2::LogSeverity::Info(),
+                      ++numScanRestarts,
+                      "Index build: collection scan restarting",
+                      "buildUUID"_attr = _buildUUID,
+                      "collectionUUID"_attr = _collectionUUID,
+                      "totalRecords"_attr = progress->hits(),
+                      "duration"_attr = duration_cast<Milliseconds>(timer.elapsed()),
+                      "phase"_attr = IndexBuildPhase_serializer(_phase),
+                      "collectionScanPosition"_attr = _lastRecordIdInserted,
+                      "readSource"_attr =
+                          RecoveryUnit::toString(opCtx->recoveryUnit()->getTimestampReadSource()),
+                      "error"_attr = ex);
+
+        _lastRecordIdInserted = boost::none;
+        for (auto& index : _indexes) {
+            index.bulk =
+                index.real->initiateBulk(getEachIndexBuildMaxMemoryUsageBytes(_indexes.size()),
+                                         /*stateInfo=*/boost::none,
+                                         collection->ns().db());
+        }
+    };
+
     do {
         restartCollectionScan = false;
         progress->reset(collection->numRecords(opCtx));
-        Timer timer;
+        timer.reset();
 
         try {
             // Resumable index builds can only be resumed prior to the oplog recovery phase of
@@ -491,71 +523,36 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                   "totalRecords"_attr = progress->hits(),
                   "readSource"_attr =
                       RecoveryUnit::toString(opCtx->recoveryUnit()->getTimestampReadSource()),
-                  "duration"_attr = duration_cast<Milliseconds>(Seconds(timer.seconds())));
+                  "duration"_attr = duration_cast<Milliseconds>(timer.elapsed()));
+        } catch (const ExceptionFor<ErrorCodes::ReadConcernMajorityNotAvailableYet>& ex) {
+            restart(ex);
+        } catch (const ExceptionFor<ErrorCodes::CappedPositionLost>& ex) {
+            restart(ex);
         } catch (DBException& ex) {
-            if (ex.code() == ErrorCodes::ReadConcernMajorityNotAvailableYet ||
-                ex.code() == ErrorCodes::CappedPositionLost) {
-                // Forced replica set re-configs will clear the majority committed snapshot,
-                // which may be used by the collection scan. The collection scan will restart
-                // from the beginning in this case. Capped cursors are invalidated when the document
-                // they were positioned on gets deleted. The collection scan will restart in both
-                // cases.
-                restartCollectionScan = true;
-                logAndBackoff(
-                    5470300,
-                    ::mongo::logv2::LogComponent::kIndex,
-                    logv2::LogSeverity::Info(),
-                    ++numScanRestarts,
-                    "Index build: collection scan restarting",
-                    "buildUUID"_attr = _buildUUID,
-                    "collectionUUID"_attr = _collectionUUID,
-                    "totalRecords"_attr = progress->hits(),
-                    "duration"_attr = duration_cast<Milliseconds>(Seconds(timer.seconds())),
-                    "phase"_attr = IndexBuildPhase_serializer(_phase),
-                    "collectionScanPosition"_attr = _lastRecordIdInserted,
-                    "readSource"_attr =
-                        RecoveryUnit::toString(opCtx->recoveryUnit()->getTimestampReadSource()),
-                    "error"_attr = ex);
-
-                _lastRecordIdInserted = boost::none;
-                for (auto& index : _indexes) {
-                    index.bulk = index.real->initiateBulk(
-                        getEachIndexBuildMaxMemoryUsageBytes(_indexes.size()),
-                        /*stateInfo=*/boost::none,
-                        collection->ns().db());
-                }
-            } else {
-                if (ex.isA<ErrorCategory::Interruption>() ||
-                    ex.isA<ErrorCategory::ShutdownError>() ||
-                    ErrorCodes::IndexBuildAborted == ex.code()) {
-                    // If the collection scan is stopped due to an interrupt or shutdown event, we
-                    // leave the internal state intact to ensure we have the correct information for
-                    // resuming this index build during startup and rollback.
-                } else {
-                    // Restore pre-collection scan state.
-                    _phase = IndexBuildPhaseEnum::kInitialized;
-                }
-
-                auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
-                LOGV2(4984704,
-                      "Index build: collection scan stopped",
-                      "buildUUID"_attr = _buildUUID,
-                      "collectionUUID"_attr = _collectionUUID,
-                      "totalRecords"_attr = progress->hits(),
-                      "duration"_attr = duration_cast<Milliseconds>(Seconds(timer.seconds())),
-                      "phase"_attr = IndexBuildPhase_serializer(_phase),
-                      "collectionScanPosition"_attr = _lastRecordIdInserted,
-                      "readSource"_attr = RecoveryUnit::toString(readSource),
-                      "error"_attr = ex);
-                ex.addContext(str::stream()
-                              << "collection scan stopped. totalRecords: " << progress->hits()
-                              << "; durationMillis: "
-                              << duration_cast<Milliseconds>(Seconds(timer.seconds()))
-                              << "; phase: " << IndexBuildPhase_serializer(_phase)
-                              << "; collectionScanPosition: " << _lastRecordIdInserted
-                              << "; readSource: " << RecoveryUnit::toString(readSource));
-                return ex.toStatus();
+            // If the index build may be resumed, leave the internal state intact. Otherwise,
+            // restore the state from before the collection scan.
+            if (!opCtx->isKillPending() && ErrorCodes::IndexBuildAborted != ex.code()) {
+                _phase = IndexBuildPhaseEnum::kInitialized;
             }
+
+            auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
+            LOGV2(4984704,
+                  "Index build: collection scan stopped",
+                  "buildUUID"_attr = _buildUUID,
+                  "collectionUUID"_attr = _collectionUUID,
+                  "totalRecords"_attr = progress->hits(),
+                  "duration"_attr = duration_cast<Milliseconds>(timer.elapsed()),
+                  "phase"_attr = IndexBuildPhase_serializer(_phase),
+                  "collectionScanPosition"_attr = _lastRecordIdInserted,
+                  "readSource"_attr = RecoveryUnit::toString(readSource),
+                  "error"_attr = ex);
+            ex.addContext(str::stream()
+                          << "collection scan stopped. totalRecords: " << progress->hits()
+                          << "; durationMillis: " << duration_cast<Milliseconds>(timer.elapsed())
+                          << "; phase: " << IndexBuildPhase_serializer(_phase)
+                          << "; collectionScanPosition: " << _lastRecordIdInserted
+                          << "; readSource: " << RecoveryUnit::toString(readSource));
+            return ex.toStatus();
         }
     } while (restartCollectionScan);
 
@@ -1201,7 +1198,7 @@ Status MultiIndexBlock::_failPointHangDuringBuild(OperationContext* opCtx,
                                     return UUID::parse(elem.String()) == buildUUID;
                                 });
             });
-    } catch (const ExceptionForCat<ErrorCategory::Interruption>& ex) {
+    } catch (const DBException& ex) {
         return ex.toStatus(str::stream() << "Interrupted failpoint " << fp->getName());
     }
 

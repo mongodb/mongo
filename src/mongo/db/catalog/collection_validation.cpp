@@ -626,13 +626,14 @@ Status validate(OperationContext* opCtx,
                       logAttrs(validateState.nss()),
                       logAttrs(validateState.uuid()));
     } catch (const DBException& e) {
-        if (ErrorCodes::isInterruption(e.code())) {
+        if (opCtx->isKillPending() || e.code() == ErrorCodes::Interrupted) {
             LOGV2_OPTIONS(5160301,
                           {LogComponent::kIndex},
                           "Validation interrupted",
-                          "namespace"_attr = validateState.nss());
+                          logAttrs(validateState.nss()));
             return e.toStatus();
         }
+
         string err = str::stream() << "exception during collection validation: " << e.toString();
         results->errors.push_back(err);
         results->valid = false;
