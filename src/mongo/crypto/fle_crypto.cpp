@@ -1353,7 +1353,8 @@ void collectIndexedFields(std::vector<EDCIndexedFields>* pFields,
                           ConstDataRange cdr,
                           StringData fieldPath) {
     auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
-    if (encryptedTypeBinding != EncryptedBinDataType::kFLE2EqualityIndexedValue) {
+    if (encryptedTypeBinding != EncryptedBinDataType::kFLE2EqualityIndexedValue &&
+        encryptedTypeBinding != EncryptedBinDataType::kFLE2RangeIndexedValue) {
         return;
     }
 

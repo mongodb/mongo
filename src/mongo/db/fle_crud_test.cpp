@@ -158,15 +158,20 @@ protected:
 
     void testValidateTags(BSONObj obj);
 
-    void doSingleInsert(int id, BSONElement element, bool bypassDocumentValidation = false);
+    void doSingleInsert(int id,
+                        BSONElement element,
+                        Fle2AlgorithmInt alg = Fle2AlgorithmInt::kEquality,
+                        bool bypassDocumentValidation = false);
     void doSingleInsert(int id, BSONObj obj, bool bypassDocumentValidation = false);
+
+    void doSingleRangeInsert(int id, BSONElement element);
 
     void doSingleInsertWithContention(
         int id, BSONElement element, int64_t cm, uint64_t cf, EncryptedFieldConfig efc);
     void doSingleInsertWithContention(
         int id, BSONObj obj, int64_t cm, uint64_t cf, EncryptedFieldConfig efc);
 
-    void doSingleDelete(int id);
+    void doSingleDelete(int id, Fle2AlgorithmInt alg = Fle2AlgorithmInt::kEquality);
 
     void doSingleUpdate(int id, BSONElement element);
     void doSingleUpdate(int id, BSONObj obj);
@@ -364,7 +369,8 @@ std::vector<char> FleCrudTest::generatePlaceholder(UUID keyId, BSONElement value
     return v;
 }
 
-EncryptedFieldConfig getTestEncryptedFieldConfig() {
+EncryptedFieldConfig getTestEncryptedFieldConfig(
+    Fle2AlgorithmInt alg = Fle2AlgorithmInt::kEquality) {
 
     constexpr auto schema = R"({
     "escCollection": "esc",
@@ -385,7 +391,29 @@ EncryptedFieldConfig getTestEncryptedFieldConfig() {
     ]
 })";
 
-    return EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(schema));
+    constexpr auto rangeSchema = R"({
+    "escCollection": "esc",
+    "eccCollection": "ecc",
+    "ecocCollection": "ecoc",
+    "fields": [
+        {
+            "keyId":
+                            {
+                                "$uuid": "12345678-1234-9876-1234-123456789012"
+                            }
+                        ,
+            "path": "encrypted",
+            "bsonType": "int",
+            "queries": {"queryType": "range", "min": 0, "max": 15, "sparsity": 1}
+
+        }
+    ]
+})";
+
+    if (alg == Fle2AlgorithmInt::kEquality) {
+        return EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(schema));
+    }
+    return EncryptedFieldConfig::parse(IDLParserContext("root"), fromjson(rangeSchema));
 }
 
 void FleCrudTest::assertDocumentCounts(uint64_t edc, uint64_t esc, uint64_t ecc, uint64_t ecoc) {
@@ -443,15 +471,42 @@ void FleCrudTest::validateDocument(int id, boost::optional<BSONObj> doc) {
     }
 }
 
+BSONObj generateFLE2RangeInsertSpec(BSONElement value) {
+    FLE2RangeInsertSpec spec;
+    spec.setValue(value);
+
+    auto lowerDoc = BSON("lb" << 0);
+    spec.setLowerBound(lowerDoc.firstElement());
+    auto upperDoc = BSON("ub" << 15);
+
+    spec.setUpperBound(upperDoc.firstElement());
+    auto specDoc = BSON("s" << spec.toBSON());
+
+    return specDoc;
+}
+
 // Use different keys for index and user
-std::vector<char> generateSinglePlaceholder(BSONElement value, int64_t cm = 0) {
+std::vector<char> generateSinglePlaceholder(BSONElement value,
+                                            Fle2AlgorithmInt alg = Fle2AlgorithmInt::kEquality,
+                                            int64_t cm = 0) {
     FLE2EncryptionPlaceholder ep;
 
-    ep.setAlgorithm(mongo::Fle2AlgorithmInt::kEquality);
+    // Has to be generated outside of if statements to root the
+    // value until ep is finalized as an object.
+    BSONObj temp = generateFLE2RangeInsertSpec(value);
+
+    ep.setAlgorithm(alg);
     ep.setUserKeyId(userKeyId);
     ep.setIndexKeyId(indexKeyId);
-    ep.setValue(value);
     ep.setType(mongo::Fle2PlaceholderType::kInsert);
+
+    if (alg == Fle2AlgorithmInt::kRange) {
+        ep.setValue(temp.firstElement());
+        ep.setSparsity(1);
+    } else {
+        ep.setValue(value);
+    }
+
     ep.setMaxContentionCounter(cm);
 
     BSONObj obj = ep.toBSON();
@@ -472,8 +527,11 @@ void FleCrudTest::testValidateTags(BSONObj obj) {
     FLEClientCrypto::validateTagsArray(obj);
 }
 
-void FleCrudTest::doSingleInsert(int id, BSONElement element, bool bypassDocumentValidation) {
-    auto buf = generateSinglePlaceholder(element);
+void FleCrudTest::doSingleInsert(int id,
+                                 BSONElement element,
+                                 Fle2AlgorithmInt alg,
+                                 bool bypassDocumentValidation) {
+    auto buf = generateSinglePlaceholder(element, alg);
     BSONObjBuilder builder;
     builder.append("_id", id);
     builder.append("counter", 1);
@@ -486,7 +544,7 @@ void FleCrudTest::doSingleInsert(int id, BSONElement element, bool bypassDocumen
 
     auto serverPayload = EDCServerCollection::getEncryptedFieldInfo(result);
 
-    auto efc = getTestEncryptedFieldConfig();
+    auto efc = getTestEncryptedFieldConfig(alg);
 
     uassertStatusOK(processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, result, false));
 }
@@ -497,7 +555,7 @@ void FleCrudTest::doSingleInsert(int id, BSONObj obj, bool bypassDocumentValidat
 
 void FleCrudTest::doSingleInsertWithContention(
     int id, BSONElement element, int64_t cm, uint64_t cf, EncryptedFieldConfig efc) {
-    auto buf = generateSinglePlaceholder(element, cm);
+    auto buf = generateSinglePlaceholder(element, Fle2AlgorithmInt::kEquality, cm);
     BSONObjBuilder builder;
     builder.append("_id", id);
     builder.append("counter", 1);
@@ -567,9 +625,9 @@ void FleCrudTest::doSingleUpdateWithUpdateDoc(int id,
     processUpdate(_queryImpl.get(), expCtx, updateRequest);
 }
 
-void FleCrudTest::doSingleDelete(int id) {
+void FleCrudTest::doSingleDelete(int id, Fle2AlgorithmInt alg) {
 
-    auto efc = getTestEncryptedFieldConfig();
+    auto efc = getTestEncryptedFieldConfig(alg);
 
     auto doc = EncryptionInformationHelpers::encryptionInformationSerializeForDelete(
         _edcNs, efc, &_keyVault);
@@ -805,6 +863,21 @@ TEST_F(FleCrudTest, InsertAndDeleteOne) {
     assertECOCDocumentCountByField("encrypted", 2);
 
     getECCDocument(getTestECCToken(element), 1);
+}
+
+// Insert and delete one document
+TEST_F(FleCrudTest, InsertAndDeleteOneRange) {
+    auto doc = BSON("encrypted" << 5);
+    auto element = doc.firstElement();
+
+    doSingleInsert(1, element, Fle2AlgorithmInt::kRange);
+
+    assertDocumentCounts(1, 5, 0, 5);
+
+    doSingleDelete(1, Fle2AlgorithmInt::kRange);
+
+    assertDocumentCounts(0, 5, 5, 10);
+    assertECOCDocumentCountByField("encrypted", 10);
 }
 
 // Insert two documents, and delete both
