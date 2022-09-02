@@ -674,6 +674,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         replCoord->startup(startupOpCtx.get(), lastShutdownState);
     }
 
+    initializeCommandHooks(serviceContext);
+
     if (!storageGlobalParams.queryableBackupMode) {
 
         if (storageEngine->supportsCappedCollections()) {
@@ -803,8 +805,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     }
 
     LogicalSessionCache::set(serviceContext, makeLogicalSessionCacheD(kind));
-
-    initializeCommandHooks(serviceContext);
 
     // MessageServer::run will return when exit code closes its socket and we don't need the
     // operation context anymore
