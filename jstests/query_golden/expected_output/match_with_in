@@ -1,0 +1,185 @@
+
+
+[jsTest] ----
+[jsTest] Inserting docs:
+[jsTest] ----
+
+{  "_id" : 0 }
+{  "_id" : 1,  "a" : null }
+{  "_id" : 10,  "a" : [ { "c" : 1 } ] }
+{  "_id" : 11,  "a" : [ [ { "c" : 1 } ] ] }
+{  "_id" : 12,  "a" : [ [ [ 1 ] ] ] }
+{  "_id" : 13,  "a" : [ null ] }
+{  "_id" : 2,  "a" : 1,  "b" : {  "c" : 1 } }
+{  "_id" : 3,  "a" : 2,  "b" : {  "c" : 2 } }
+{  "_id" : 4,  "a" : [ ],  "b" : {  "c" : 3 } }
+{  "_id" : 5,  "a" : [ 1 ] }
+{  "_id" : 6,  "a" : [ "1" ] }
+{  "_id" : 7,  "a" : [ [ 1 ] ] }
+{  "_id" : 8,  "a" : {   } }
+{  "_id" : 9,  "a" : {  "c" : 1 } }
+Collection count: 14
+
+[jsTest] ----
+[jsTest] Query: [ { "$match" : { "a" : { "$in" : [ null ] } } } ]
+[jsTest] ----
+
+{  "_id" : 0 }
+{  "_id" : 1,  "a" : null }
+{  "_id" : 13,  "a" : [ null ] }
+
+
+[jsTest] ----
+[jsTest] Query: [ { "$match" : { "a" : { "$in" : [ ] } } } ]
+[jsTest] ----
+
+
+
+
+[jsTest] ----
+[jsTest] Query: [ { "$match" : { "a" : { "$in" : [ 1 ] } } } ]
+[jsTest] ----
+
+{  "_id" : 2,  "a" : 1,  "b" : {  "c" : 1 } }
+{  "_id" : 5,  "a" : [ 1 ] }
+
+
+[jsTest] ----
+[jsTest] Query: [ { "$match" : { "a" : { "$in" : [ "1" ] } } } ]
+[jsTest] ----
+
+{  "_id" : 6,  "a" : [ "1" ] }
+
+
+[jsTest] ----
+[jsTest] Query: [ { "$match" : { "a" : { "$in" : [ 1, "1" ] } } } ]
+[jsTest] ----
+
+{  "_id" : 2,  "a" : 1,  "b" : {  "c" : 1 } }
+{  "_id" : 5,  "a" : [ 1 ] }
+{  "_id" : 6,  "a" : [ "1" ] }
+
+
+[jsTest] ----
+[jsTest] Query: [ { "$match" : { "a" : { "$in" : [ 1, 2 ] } } } ]
+[jsTest] ----
+
+{  "_id" : 2,  "a" : 1,  "b" : {  "c" : 1 } }
+{  "_id" : 3,  "a" : 2,  "b" : {  "c" : 2 } }
+{  "_id" : 5,  "a" : [ 1 ] }
+
+
+[jsTest] ----
+[jsTest] Query: [ { "$match" : { "a" : { "$in" : [ 1, 2, {  } ] } } } ]
+[jsTest] ----
+
+{  "_id" : 2,  "a" : 1,  "b" : {  "c" : 1 } }
+{  "_id" : 3,  "a" : 2,  "b" : {  "c" : 2 } }
+{  "_id" : 5,  "a" : [ 1 ] }
+{  "_id" : 8,  "a" : {   } }
+
+
+[jsTest] ----
+[jsTest] Query: [ { "$match" : { "a" : { "$elemMatch" : { "$in" : [ 1, 2 ] } } } } ]
+[jsTest] ----
+
+{  "_id" : 5,  "a" : [ 1 ] }
+
+
+[jsTest] ----
+[jsTest] Query: [ { "$match" : { "a" : { "$elemMatch" : { "$in" : [ [ 1 ] ] } } } } ]
+[jsTest] ----
+
+{  "_id" : 7,  "a" : [ [ 1 ] ] }
+
+
+[jsTest] ----
+[jsTest] Query: [ { "$match" : { "a" : { "$elemMatch" : { "$in" : [ [ [ 1 ] ] ] } } } } ]
+[jsTest] ----
+
+{  "_id" : 12,  "a" : [ [ [ 1 ] ] ] }
+
+
+[jsTest] ----
+[jsTest] Query: [ { "$match" : { "a" : { "$in" : [ [ ] ] } } } ]
+[jsTest] ----
+
+{  "_id" : 4,  "a" : [ ],  "b" : {  "c" : 3 } }
+
+
+[jsTest] ----
+[jsTest] Query: [ { "$match" : { "a" : { "$in" : [ [ 1 ] ] } } } ]
+[jsTest] ----
+
+{  "_id" : 5,  "a" : [ 1 ] }
+{  "_id" : 7,  "a" : [ [ 1 ] ] }
+
+
+[jsTest] ----
+[jsTest] Query: [ { "$match" : { "a" : { "$in" : [ [ [ 1 ] ] ] } } } ]
+[jsTest] ----
+
+{  "_id" : 12,  "a" : [ [ [ 1 ] ] ] }
+{  "_id" : 7,  "a" : [ [ 1 ] ] }
+
+
+[jsTest] ----
+[jsTest] Query: [ { "$match" : { "a" : { "$in" : [ {  }, { "c" : 1 } ] } } } ]
+[jsTest] ----
+
+{  "_id" : 10,  "a" : [ { "c" : 1 } ] }
+{  "_id" : 8,  "a" : {   } }
+{  "_id" : 9,  "a" : {  "c" : 1 } }
+
+
+[jsTest] ----
+[jsTest] Query: [ { "$match" : { "a" : { "$in" : [ 1, 2 ] }, "b.c" : { "$in" : [ 2, 3 ] } } } ]
+[jsTest] ----
+
+{  "_id" : 3,  "a" : 2,  "b" : {  "c" : 2 } }
+
+
+[jsTest] ----
+[jsTest] Query: [ { "$match" : { "a" : { "$in" : [ 1, 2 ] }, "b.c" : { "$in" : [ ] } } } ]
+[jsTest] ----
+
+
+
+
+[jsTest] ----
+[jsTest] Query: [ { "$match" : { "a" : { "$in" : [ 1, 2 ] }, "b.c" : { "$in" : [ null ] } } } ]
+[jsTest] ----
+
+{  "_id" : 5,  "a" : [ 1 ] }
+
+
+[jsTest] ----
+[jsTest] Query: [ { "$match" : { "a" : { "$type" : "array" } } } ]
+[jsTest] ----
+
+{  "_id" : 10,  "a" : [ { "c" : 1 } ] }
+{  "_id" : 11,  "a" : [ [ { "c" : 1 } ] ] }
+{  "_id" : 12,  "a" : [ [ [ 1 ] ] ] }
+{  "_id" : 13,  "a" : [ null ] }
+{  "_id" : 4,  "a" : [ ],  "b" : {  "c" : 3 } }
+{  "_id" : 5,  "a" : [ 1 ] }
+{  "_id" : 6,  "a" : [ "1" ] }
+{  "_id" : 7,  "a" : [ [ 1 ] ] }
+
+
+[jsTest] ----
+[jsTest] Query: [ { "$match" : { "a" : { "$type" : "double" } } } ]
+[jsTest] ----
+
+{  "_id" : 2,  "a" : 1,  "b" : {  "c" : 1 } }
+{  "_id" : 3,  "a" : 2,  "b" : {  "c" : 2 } }
+{  "_id" : 5,  "a" : [ 1 ] }
+
+
+[jsTest] ----
+[jsTest] Query: [ { "$match" : { "a" : { "$type" : "object" } } } ]
+[jsTest] ----
+
+{  "_id" : 10,  "a" : [ { "c" : 1 } ] }
+{  "_id" : 8,  "a" : {   } }
+{  "_id" : 9,  "a" : {  "c" : 1 } }
