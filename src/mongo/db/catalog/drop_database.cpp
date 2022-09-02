@@ -268,7 +268,7 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
         }
         numCollectionsToDrop = collectionsToDrop.size();
 
-        for (auto nss : collectionsToDrop) {
+        for (const auto& nss : collectionsToDrop) {
             if (!opCtx->writesAreReplicated()) {
                 // Dropping a database on a primary replicates individual collection drops followed
                 // by a database drop oplog entry. When a secondary observes the database drop oplog
