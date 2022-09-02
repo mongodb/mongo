@@ -423,7 +423,8 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
             nss == NamespaceString::kKeysCollectionNamespace ||
             nss.isTemporaryReshardingCollection() || nss.isTimeseriesBucketsCollection() ||
             nss.isChangeStreamPreImagesCollection() ||
-            nss == NamespaceString::kConfigsvrRestoreNamespace || nss.isChangeCollection();
+            nss == NamespaceString::kConfigsvrRestoreNamespace || nss.isChangeCollection() ||
+            nss.isSystemDotJavascript();
     };
 
     if (nss.isSystem()) {

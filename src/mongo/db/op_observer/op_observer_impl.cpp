@@ -1357,6 +1357,9 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
         ReadWriteConcernDefaults::get(opCtx).invalidate();
     } else if (collectionName.isTimeseriesBucketsCollection()) {
         BucketCatalog::get(opCtx).clear(collectionName.getTimeseriesViewNamespace());
+    } else if (collectionName.isSystemDotJavascript()) {
+        // Inform the JavaScript engine of the change to system.js.
+        Scope::storedFuncMod(opCtx);
     }
 
     return {};
