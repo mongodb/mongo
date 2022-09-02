@@ -2,7 +2,7 @@
  * Ensures that the options passed in for TTL indexes are validated during index creation.
  *
  * @tags: [
- *     requires_fcv_61,
+ *     requires_fcv_62,
  *     requires_ttl_index,
  * ]
  */
