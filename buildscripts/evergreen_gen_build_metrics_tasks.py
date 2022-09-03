@@ -20,9 +20,9 @@ def main():
         cache_flags = "--cache=all --cache-dir=$PWD/scons-cache --cache-signature-mode=validate"
 
         scons_task_steps = [
-            "{evg_flags} --build-metrics=build_metrics.json",
+            f"{evg_flags} --build-metrics=build_metrics.json",
             f"{evg_flags} {cache_flags} --cache-populate --build-metrics=populate_cache.json",
-            "{evg_flags} --clean",
+            f"{evg_flags} --clean",
             f"{evg_flags} {cache_flags} --build-metrics=pull_cache.json",
         ]
 
