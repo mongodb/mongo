@@ -4,7 +4,7 @@
  * collection.
  *
  * @tags: [
- *   requires_fcv_51,
+ *   requires_fcv_62,
  *   requires_pipeline_optimization,
  *   requires_timeseries,
  *   does_not_support_stepdowns,
