@@ -769,6 +769,7 @@ struct __wt_connection_stats {
     int64_t rec_split_stashed_bytes;
     int64_t rec_split_stashed_objects;
     int64_t local_objects_inuse;
+    int64_t flush_tier_fail;
     int64_t flush_tier;
     int64_t flush_tier_skipped;
     int64_t flush_tier_switched;

@@ -43,7 +43,7 @@ class test_readonly03(wttest.WiredTigerTestCase, suite_subprocess):
     conn_params = 'create,log=(enabled),operation_tracking=(enabled=false),'
     conn_params_rd = 'readonly=true,operation_tracking=(enabled=false),'
 
-    session_ops = [ 'alter', 'create', 'compact', 'drop', 'log_flush',
+    session_ops = [ 'alter', 'create', 'compact', 'drop', 'flush_tier', 'log_flush',
         'log_printf', 'rename', 'salvage', 'truncate', 'upgrade', ]
     cursor_ops = [ 'insert', 'remove', 'update', ]
 
@@ -99,6 +99,9 @@ class test_readonly03(wttest.WiredTigerTestCase, suite_subprocess):
             elif op == 'drop':
                 self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                     lambda: self.session.drop(self.uri, None), msg)
+            elif op == 'flush_tier':
+                self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                    lambda: self.session.flush_tier(None), msg)
             elif op == 'log_flush':
                 self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                     lambda: self.session.log_flush(None), msg)

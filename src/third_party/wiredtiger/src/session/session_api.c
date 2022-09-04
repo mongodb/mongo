@@ -2013,6 +2013,29 @@ __session_flush_tier(WT_SESSION *wt_session, const char *config)
     SESSION_API_CALL_NOCONF(session, flush_tier);
     ret = __wt_flush_tier(session, config);
 err:
+    if (ret != 0)
+        WT_STAT_CONN_INCR(session, flush_tier_fail);
+    API_END_RET(session, ret);
+}
+
+/*
+ * __session_flush_tier_readonly --
+ *     WT_SESSION->flush_tier method; readonly version.
+ */
+static int
+__session_flush_tier_readonly(WT_SESSION *wt_session, const char *config)
+{
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    WT_UNUSED(config);
+
+    session = (WT_SESSION_IMPL *)wt_session;
+    SESSION_API_CALL_NOCONF(session, flush_tier);
+
+    WT_STAT_CONN_INCR(session, flush_tier_fail);
+    ret = __wt_session_notsup(session);
+err:
     API_END_RET(session, ret);
 }
 
@@ -2046,13 +2069,13 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
         __session_query_timestamp, __session_timestamp_transaction,
         __session_timestamp_transaction_uint, __session_checkpoint, __session_reset_snapshot,
         __session_transaction_pinned_range, __session_get_rollback_reason, __wt_session_breakpoint},
-      stds_readonly = {NULL, NULL, __session_close, __session_reconfigure, __session_flush_tier,
-        __wt_session_strerror, __session_open_cursor, __session_alter_readonly,
-        __session_create_readonly, __wt_session_compact_readonly, __session_drop_readonly,
-        __session_join, __session_log_flush_readonly, __session_log_printf_readonly,
-        __session_rename_readonly, __session_reset, __session_salvage_readonly,
-        __session_truncate_readonly, __session_upgrade_readonly, __session_verify,
-        __session_begin_transaction, __session_commit_transaction,
+      stds_readonly = {NULL, NULL, __session_close, __session_reconfigure,
+        __session_flush_tier_readonly, __wt_session_strerror, __session_open_cursor,
+        __session_alter_readonly, __session_create_readonly, __wt_session_compact_readonly,
+        __session_drop_readonly, __session_join, __session_log_flush_readonly,
+        __session_log_printf_readonly, __session_rename_readonly, __session_reset,
+        __session_salvage_readonly, __session_truncate_readonly, __session_upgrade_readonly,
+        __session_verify, __session_begin_transaction, __session_commit_transaction,
         __session_prepare_transaction_readonly, __session_rollback_transaction,
         __session_query_timestamp, __session_timestamp_transaction,
         __session_timestamp_transaction_uint, __session_checkpoint_readonly,

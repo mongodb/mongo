@@ -6267,296 +6267,298 @@ extern int wiredtiger_extension_terminate(WT_CONNECTION *connection);
 #define	WT_STAT_CONN_REC_SPLIT_STASHED_OBJECTS		1428
 /*! session: attempts to remove a local object and the object is in use */
 #define	WT_STAT_CONN_LOCAL_OBJECTS_INUSE		1429
+/*! session: flush_tier failed calls */
+#define	WT_STAT_CONN_FLUSH_TIER_FAIL			1430
 /*! session: flush_tier operation calls */
-#define	WT_STAT_CONN_FLUSH_TIER				1430
+#define	WT_STAT_CONN_FLUSH_TIER				1431
 /*! session: flush_tier tables skipped due to no checkpoint */
-#define	WT_STAT_CONN_FLUSH_TIER_SKIPPED			1431
+#define	WT_STAT_CONN_FLUSH_TIER_SKIPPED			1432
 /*! session: flush_tier tables switched */
-#define	WT_STAT_CONN_FLUSH_TIER_SWITCHED		1432
+#define	WT_STAT_CONN_FLUSH_TIER_SWITCHED		1433
 /*! session: local objects removed */
-#define	WT_STAT_CONN_LOCAL_OBJECTS_REMOVED		1433
+#define	WT_STAT_CONN_LOCAL_OBJECTS_REMOVED		1434
 /*! session: open session count */
-#define	WT_STAT_CONN_SESSION_OPEN			1434
+#define	WT_STAT_CONN_SESSION_OPEN			1435
 /*! session: session query timestamp calls */
-#define	WT_STAT_CONN_SESSION_QUERY_TS			1435
+#define	WT_STAT_CONN_SESSION_QUERY_TS			1436
 /*! session: table alter failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_ALTER_FAIL		1436
+#define	WT_STAT_CONN_SESSION_TABLE_ALTER_FAIL		1437
 /*! session: table alter successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_ALTER_SUCCESS	1437
+#define	WT_STAT_CONN_SESSION_TABLE_ALTER_SUCCESS	1438
 /*! session: table alter triggering checkpoint calls */
-#define	WT_STAT_CONN_SESSION_TABLE_ALTER_TRIGGER_CHECKPOINT	1438
+#define	WT_STAT_CONN_SESSION_TABLE_ALTER_TRIGGER_CHECKPOINT	1439
 /*! session: table alter unchanged and skipped */
-#define	WT_STAT_CONN_SESSION_TABLE_ALTER_SKIP		1439
+#define	WT_STAT_CONN_SESSION_TABLE_ALTER_SKIP		1440
 /*! session: table compact failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_FAIL		1440
+#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_FAIL		1441
 /*! session: table compact failed calls due to cache pressure */
-#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_FAIL_CACHE_PRESSURE	1441
+#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_FAIL_CACHE_PRESSURE	1442
 /*! session: table compact running */
-#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_RUNNING	1442
+#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_RUNNING	1443
 /*! session: table compact skipped as process would not reduce file size */
-#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_SKIPPED	1443
+#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_SKIPPED	1444
 /*! session: table compact successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_SUCCESS	1444
+#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_SUCCESS	1445
 /*! session: table compact timeout */
-#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_TIMEOUT	1445
+#define	WT_STAT_CONN_SESSION_TABLE_COMPACT_TIMEOUT	1446
 /*! session: table create failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_CREATE_FAIL		1446
+#define	WT_STAT_CONN_SESSION_TABLE_CREATE_FAIL		1447
 /*! session: table create successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_CREATE_SUCCESS	1447
+#define	WT_STAT_CONN_SESSION_TABLE_CREATE_SUCCESS	1448
 /*! session: table create with import failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_CREATE_IMPORT_FAIL	1448
+#define	WT_STAT_CONN_SESSION_TABLE_CREATE_IMPORT_FAIL	1449
 /*! session: table create with import successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_CREATE_IMPORT_SUCCESS	1449
+#define	WT_STAT_CONN_SESSION_TABLE_CREATE_IMPORT_SUCCESS	1450
 /*! session: table drop failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_DROP_FAIL		1450
+#define	WT_STAT_CONN_SESSION_TABLE_DROP_FAIL		1451
 /*! session: table drop successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_DROP_SUCCESS		1451
+#define	WT_STAT_CONN_SESSION_TABLE_DROP_SUCCESS		1452
 /*! session: table rename failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_RENAME_FAIL		1452
+#define	WT_STAT_CONN_SESSION_TABLE_RENAME_FAIL		1453
 /*! session: table rename successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_RENAME_SUCCESS	1453
+#define	WT_STAT_CONN_SESSION_TABLE_RENAME_SUCCESS	1454
 /*! session: table salvage failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_SALVAGE_FAIL		1454
+#define	WT_STAT_CONN_SESSION_TABLE_SALVAGE_FAIL		1455
 /*! session: table salvage successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_SALVAGE_SUCCESS	1455
+#define	WT_STAT_CONN_SESSION_TABLE_SALVAGE_SUCCESS	1456
 /*! session: table truncate failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_TRUNCATE_FAIL	1456
+#define	WT_STAT_CONN_SESSION_TABLE_TRUNCATE_FAIL	1457
 /*! session: table truncate successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_TRUNCATE_SUCCESS	1457
+#define	WT_STAT_CONN_SESSION_TABLE_TRUNCATE_SUCCESS	1458
 /*! session: table verify failed calls */
-#define	WT_STAT_CONN_SESSION_TABLE_VERIFY_FAIL		1458
+#define	WT_STAT_CONN_SESSION_TABLE_VERIFY_FAIL		1459
 /*! session: table verify successful calls */
-#define	WT_STAT_CONN_SESSION_TABLE_VERIFY_SUCCESS	1459
+#define	WT_STAT_CONN_SESSION_TABLE_VERIFY_SUCCESS	1460
 /*! session: tiered operations dequeued and processed */
-#define	WT_STAT_CONN_TIERED_WORK_UNITS_DEQUEUED		1460
+#define	WT_STAT_CONN_TIERED_WORK_UNITS_DEQUEUED		1461
 /*! session: tiered operations removed without processing */
-#define	WT_STAT_CONN_TIERED_WORK_UNITS_REMOVED		1461
+#define	WT_STAT_CONN_TIERED_WORK_UNITS_REMOVED		1462
 /*! session: tiered operations scheduled */
-#define	WT_STAT_CONN_TIERED_WORK_UNITS_CREATED		1462
+#define	WT_STAT_CONN_TIERED_WORK_UNITS_CREATED		1463
 /*! session: tiered storage local retention time (secs) */
-#define	WT_STAT_CONN_TIERED_RETENTION			1463
+#define	WT_STAT_CONN_TIERED_RETENTION			1464
 /*! thread-state: active filesystem fsync calls */
-#define	WT_STAT_CONN_THREAD_FSYNC_ACTIVE		1464
+#define	WT_STAT_CONN_THREAD_FSYNC_ACTIVE		1465
 /*! thread-state: active filesystem read calls */
-#define	WT_STAT_CONN_THREAD_READ_ACTIVE			1465
+#define	WT_STAT_CONN_THREAD_READ_ACTIVE			1466
 /*! thread-state: active filesystem write calls */
-#define	WT_STAT_CONN_THREAD_WRITE_ACTIVE		1466
+#define	WT_STAT_CONN_THREAD_WRITE_ACTIVE		1467
 /*! thread-yield: application thread time evicting (usecs) */
-#define	WT_STAT_CONN_APPLICATION_EVICT_TIME		1467
+#define	WT_STAT_CONN_APPLICATION_EVICT_TIME		1468
 /*! thread-yield: application thread time waiting for cache (usecs) */
-#define	WT_STAT_CONN_APPLICATION_CACHE_TIME		1468
+#define	WT_STAT_CONN_APPLICATION_CACHE_TIME		1469
 /*!
  * thread-yield: connection close blocked waiting for transaction state
  * stabilization
  */
-#define	WT_STAT_CONN_TXN_RELEASE_BLOCKED		1469
+#define	WT_STAT_CONN_TXN_RELEASE_BLOCKED		1470
 /*! thread-yield: connection close yielded for lsm manager shutdown */
-#define	WT_STAT_CONN_CONN_CLOSE_BLOCKED_LSM		1470
+#define	WT_STAT_CONN_CONN_CLOSE_BLOCKED_LSM		1471
 /*! thread-yield: data handle lock yielded */
-#define	WT_STAT_CONN_DHANDLE_LOCK_BLOCKED		1471
+#define	WT_STAT_CONN_DHANDLE_LOCK_BLOCKED		1472
 /*!
  * thread-yield: get reference for page index and slot time sleeping
  * (usecs)
  */
-#define	WT_STAT_CONN_PAGE_INDEX_SLOT_REF_BLOCKED	1472
+#define	WT_STAT_CONN_PAGE_INDEX_SLOT_REF_BLOCKED	1473
 /*! thread-yield: page access yielded due to prepare state change */
-#define	WT_STAT_CONN_PREPARED_TRANSITION_BLOCKED_PAGE	1473
+#define	WT_STAT_CONN_PREPARED_TRANSITION_BLOCKED_PAGE	1474
 /*! thread-yield: page acquire busy blocked */
-#define	WT_STAT_CONN_PAGE_BUSY_BLOCKED			1474
+#define	WT_STAT_CONN_PAGE_BUSY_BLOCKED			1475
 /*! thread-yield: page acquire eviction blocked */
-#define	WT_STAT_CONN_PAGE_FORCIBLE_EVICT_BLOCKED	1475
+#define	WT_STAT_CONN_PAGE_FORCIBLE_EVICT_BLOCKED	1476
 /*! thread-yield: page acquire locked blocked */
-#define	WT_STAT_CONN_PAGE_LOCKED_BLOCKED		1476
+#define	WT_STAT_CONN_PAGE_LOCKED_BLOCKED		1477
 /*! thread-yield: page acquire read blocked */
-#define	WT_STAT_CONN_PAGE_READ_BLOCKED			1477
+#define	WT_STAT_CONN_PAGE_READ_BLOCKED			1478
 /*! thread-yield: page acquire time sleeping (usecs) */
-#define	WT_STAT_CONN_PAGE_SLEEP				1478
+#define	WT_STAT_CONN_PAGE_SLEEP				1479
 /*!
  * thread-yield: page delete rollback time sleeping for state change
  * (usecs)
  */
-#define	WT_STAT_CONN_PAGE_DEL_ROLLBACK_BLOCKED		1479
+#define	WT_STAT_CONN_PAGE_DEL_ROLLBACK_BLOCKED		1480
 /*! thread-yield: page reconciliation yielded due to child modification */
-#define	WT_STAT_CONN_CHILD_MODIFY_BLOCKED_PAGE		1480
+#define	WT_STAT_CONN_CHILD_MODIFY_BLOCKED_PAGE		1481
 /*! transaction: Number of prepared updates */
-#define	WT_STAT_CONN_TXN_PREPARED_UPDATES		1481
+#define	WT_STAT_CONN_TXN_PREPARED_UPDATES		1482
 /*! transaction: Number of prepared updates committed */
-#define	WT_STAT_CONN_TXN_PREPARED_UPDATES_COMMITTED	1482
+#define	WT_STAT_CONN_TXN_PREPARED_UPDATES_COMMITTED	1483
 /*! transaction: Number of prepared updates repeated on the same key */
-#define	WT_STAT_CONN_TXN_PREPARED_UPDATES_KEY_REPEATED	1483
+#define	WT_STAT_CONN_TXN_PREPARED_UPDATES_KEY_REPEATED	1484
 /*! transaction: Number of prepared updates rolled back */
-#define	WT_STAT_CONN_TXN_PREPARED_UPDATES_ROLLEDBACK	1484
+#define	WT_STAT_CONN_TXN_PREPARED_UPDATES_ROLLEDBACK	1485
 /*! transaction: prepared transactions */
-#define	WT_STAT_CONN_TXN_PREPARE			1485
+#define	WT_STAT_CONN_TXN_PREPARE			1486
 /*! transaction: prepared transactions committed */
-#define	WT_STAT_CONN_TXN_PREPARE_COMMIT			1486
+#define	WT_STAT_CONN_TXN_PREPARE_COMMIT			1487
 /*! transaction: prepared transactions currently active */
-#define	WT_STAT_CONN_TXN_PREPARE_ACTIVE			1487
+#define	WT_STAT_CONN_TXN_PREPARE_ACTIVE			1488
 /*! transaction: prepared transactions rolled back */
-#define	WT_STAT_CONN_TXN_PREPARE_ROLLBACK		1488
+#define	WT_STAT_CONN_TXN_PREPARE_ROLLBACK		1489
 /*! transaction: query timestamp calls */
-#define	WT_STAT_CONN_TXN_QUERY_TS			1489
+#define	WT_STAT_CONN_TXN_QUERY_TS			1490
 /*! transaction: race to read prepared update retry */
-#define	WT_STAT_CONN_TXN_READ_RACE_PREPARE_UPDATE	1490
+#define	WT_STAT_CONN_TXN_READ_RACE_PREPARE_UPDATE	1491
 /*! transaction: rollback to stable calls */
-#define	WT_STAT_CONN_TXN_RTS				1491
+#define	WT_STAT_CONN_TXN_RTS				1492
 /*!
  * transaction: rollback to stable history store records with stop
  * timestamps older than newer records
  */
-#define	WT_STAT_CONN_TXN_RTS_HS_STOP_OLDER_THAN_NEWER_START	1492
+#define	WT_STAT_CONN_TXN_RTS_HS_STOP_OLDER_THAN_NEWER_START	1493
 /*! transaction: rollback to stable inconsistent checkpoint */
-#define	WT_STAT_CONN_TXN_RTS_INCONSISTENT_CKPT		1493
+#define	WT_STAT_CONN_TXN_RTS_INCONSISTENT_CKPT		1494
 /*! transaction: rollback to stable keys removed */
-#define	WT_STAT_CONN_TXN_RTS_KEYS_REMOVED		1494
+#define	WT_STAT_CONN_TXN_RTS_KEYS_REMOVED		1495
 /*! transaction: rollback to stable keys restored */
-#define	WT_STAT_CONN_TXN_RTS_KEYS_RESTORED		1495
+#define	WT_STAT_CONN_TXN_RTS_KEYS_RESTORED		1496
 /*! transaction: rollback to stable pages visited */
-#define	WT_STAT_CONN_TXN_RTS_PAGES_VISITED		1496
+#define	WT_STAT_CONN_TXN_RTS_PAGES_VISITED		1497
 /*! transaction: rollback to stable restored tombstones from history store */
-#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_TOMBSTONES	1497
+#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_TOMBSTONES	1498
 /*! transaction: rollback to stable restored updates from history store */
-#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_UPDATES		1498
+#define	WT_STAT_CONN_TXN_RTS_HS_RESTORE_UPDATES		1499
 /*! transaction: rollback to stable skipping delete rle */
-#define	WT_STAT_CONN_TXN_RTS_DELETE_RLE_SKIPPED		1499
+#define	WT_STAT_CONN_TXN_RTS_DELETE_RLE_SKIPPED		1500
 /*! transaction: rollback to stable skipping stable rle */
-#define	WT_STAT_CONN_TXN_RTS_STABLE_RLE_SKIPPED		1500
+#define	WT_STAT_CONN_TXN_RTS_STABLE_RLE_SKIPPED		1501
 /*! transaction: rollback to stable sweeping history store keys */
-#define	WT_STAT_CONN_TXN_RTS_SWEEP_HS_KEYS		1501
+#define	WT_STAT_CONN_TXN_RTS_SWEEP_HS_KEYS		1502
 /*! transaction: rollback to stable tree walk skipping pages */
-#define	WT_STAT_CONN_TXN_RTS_TREE_WALK_SKIP_PAGES	1502
+#define	WT_STAT_CONN_TXN_RTS_TREE_WALK_SKIP_PAGES	1503
 /*! transaction: rollback to stable updates aborted */
-#define	WT_STAT_CONN_TXN_RTS_UPD_ABORTED		1503
+#define	WT_STAT_CONN_TXN_RTS_UPD_ABORTED		1504
 /*! transaction: rollback to stable updates removed from history store */
-#define	WT_STAT_CONN_TXN_RTS_HS_REMOVED			1504
+#define	WT_STAT_CONN_TXN_RTS_HS_REMOVED			1505
 /*! transaction: sessions scanned in each walk of concurrent sessions */
-#define	WT_STAT_CONN_TXN_SESSIONS_WALKED		1505
+#define	WT_STAT_CONN_TXN_SESSIONS_WALKED		1506
 /*! transaction: set timestamp calls */
-#define	WT_STAT_CONN_TXN_SET_TS				1506
+#define	WT_STAT_CONN_TXN_SET_TS				1507
 /*! transaction: set timestamp durable calls */
-#define	WT_STAT_CONN_TXN_SET_TS_DURABLE			1507
+#define	WT_STAT_CONN_TXN_SET_TS_DURABLE			1508
 /*! transaction: set timestamp durable updates */
-#define	WT_STAT_CONN_TXN_SET_TS_DURABLE_UPD		1508
+#define	WT_STAT_CONN_TXN_SET_TS_DURABLE_UPD		1509
 /*! transaction: set timestamp oldest calls */
-#define	WT_STAT_CONN_TXN_SET_TS_OLDEST			1509
+#define	WT_STAT_CONN_TXN_SET_TS_OLDEST			1510
 /*! transaction: set timestamp oldest updates */
-#define	WT_STAT_CONN_TXN_SET_TS_OLDEST_UPD		1510
+#define	WT_STAT_CONN_TXN_SET_TS_OLDEST_UPD		1511
 /*! transaction: set timestamp stable calls */
-#define	WT_STAT_CONN_TXN_SET_TS_STABLE			1511
+#define	WT_STAT_CONN_TXN_SET_TS_STABLE			1512
 /*! transaction: set timestamp stable updates */
-#define	WT_STAT_CONN_TXN_SET_TS_STABLE_UPD		1512
+#define	WT_STAT_CONN_TXN_SET_TS_STABLE_UPD		1513
 /*! transaction: transaction begins */
-#define	WT_STAT_CONN_TXN_BEGIN				1513
+#define	WT_STAT_CONN_TXN_BEGIN				1514
 /*! transaction: transaction checkpoint currently running */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1514
+#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING		1515
 /*!
  * transaction: transaction checkpoint currently running for history
  * store file
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING_HS		1515
+#define	WT_STAT_CONN_TXN_CHECKPOINT_RUNNING_HS		1516
 /*! transaction: transaction checkpoint generation */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_GENERATION		1516
+#define	WT_STAT_CONN_TXN_CHECKPOINT_GENERATION		1517
 /*!
  * transaction: transaction checkpoint history store file duration
  * (usecs)
  */
-#define	WT_STAT_CONN_TXN_HS_CKPT_DURATION		1517
+#define	WT_STAT_CONN_TXN_HS_CKPT_DURATION		1518
 /*! transaction: transaction checkpoint max time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MAX		1518
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MAX		1519
 /*! transaction: transaction checkpoint min time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MIN		1519
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_MIN		1520
 /*!
  * transaction: transaction checkpoint most recent duration for gathering
  * all handles (usecs)
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_HANDLE_DURATION	1520
+#define	WT_STAT_CONN_TXN_CHECKPOINT_HANDLE_DURATION	1521
 /*!
  * transaction: transaction checkpoint most recent duration for gathering
  * applied handles (usecs)
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_HANDLE_DURATION_APPLY	1521
+#define	WT_STAT_CONN_TXN_CHECKPOINT_HANDLE_DURATION_APPLY	1522
 /*!
  * transaction: transaction checkpoint most recent duration for gathering
  * skipped handles (usecs)
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_HANDLE_DURATION_SKIP	1522
+#define	WT_STAT_CONN_TXN_CHECKPOINT_HANDLE_DURATION_SKIP	1523
 /*! transaction: transaction checkpoint most recent handles applied */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_HANDLE_APPLIED	1523
+#define	WT_STAT_CONN_TXN_CHECKPOINT_HANDLE_APPLIED	1524
 /*! transaction: transaction checkpoint most recent handles skipped */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_HANDLE_SKIPPED	1524
+#define	WT_STAT_CONN_TXN_CHECKPOINT_HANDLE_SKIPPED	1525
 /*! transaction: transaction checkpoint most recent handles walked */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_HANDLE_WALKED	1525
+#define	WT_STAT_CONN_TXN_CHECKPOINT_HANDLE_WALKED	1526
 /*! transaction: transaction checkpoint most recent time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_RECENT		1526
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_RECENT		1527
 /*! transaction: transaction checkpoint prepare currently running */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_PREP_RUNNING	1527
+#define	WT_STAT_CONN_TXN_CHECKPOINT_PREP_RUNNING	1528
 /*! transaction: transaction checkpoint prepare max time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_PREP_MAX		1528
+#define	WT_STAT_CONN_TXN_CHECKPOINT_PREP_MAX		1529
 /*! transaction: transaction checkpoint prepare min time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_PREP_MIN		1529
+#define	WT_STAT_CONN_TXN_CHECKPOINT_PREP_MIN		1530
 /*! transaction: transaction checkpoint prepare most recent time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_PREP_RECENT		1530
+#define	WT_STAT_CONN_TXN_CHECKPOINT_PREP_RECENT		1531
 /*! transaction: transaction checkpoint prepare total time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_PREP_TOTAL		1531
+#define	WT_STAT_CONN_TXN_CHECKPOINT_PREP_TOTAL		1532
 /*! transaction: transaction checkpoint scrub dirty target */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TARGET	1532
+#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TARGET	1533
 /*! transaction: transaction checkpoint scrub time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TIME		1533
+#define	WT_STAT_CONN_TXN_CHECKPOINT_SCRUB_TIME		1534
 /*! transaction: transaction checkpoint stop timing stress active */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_STOP_STRESS_ACTIVE	1534
+#define	WT_STAT_CONN_TXN_CHECKPOINT_STOP_STRESS_ACTIVE	1535
 /*! transaction: transaction checkpoint total time (msecs) */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_TOTAL		1535
+#define	WT_STAT_CONN_TXN_CHECKPOINT_TIME_TOTAL		1536
 /*! transaction: transaction checkpoints */
-#define	WT_STAT_CONN_TXN_CHECKPOINT			1536
+#define	WT_STAT_CONN_TXN_CHECKPOINT			1537
 /*! transaction: transaction checkpoints due to obsolete pages */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_OBSOLETE_APPLIED	1537
+#define	WT_STAT_CONN_TXN_CHECKPOINT_OBSOLETE_APPLIED	1538
 /*!
  * transaction: transaction checkpoints skipped because database was
  * clean
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_SKIPPED		1538
+#define	WT_STAT_CONN_TXN_CHECKPOINT_SKIPPED		1539
 /*! transaction: transaction failures due to history store */
-#define	WT_STAT_CONN_TXN_FAIL_CACHE			1539
+#define	WT_STAT_CONN_TXN_FAIL_CACHE			1540
 /*!
  * transaction: transaction fsync calls for checkpoint after allocating
  * the transaction ID
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST		1540
+#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST		1541
 /*!
  * transaction: transaction fsync duration for checkpoint after
  * allocating the transaction ID (usecs)
  */
-#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST_DURATION	1541
+#define	WT_STAT_CONN_TXN_CHECKPOINT_FSYNC_POST_DURATION	1542
 /*! transaction: transaction range of IDs currently pinned */
-#define	WT_STAT_CONN_TXN_PINNED_RANGE			1542
+#define	WT_STAT_CONN_TXN_PINNED_RANGE			1543
 /*! transaction: transaction range of IDs currently pinned by a checkpoint */
-#define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	1543
+#define	WT_STAT_CONN_TXN_PINNED_CHECKPOINT_RANGE	1544
 /*! transaction: transaction range of timestamps currently pinned */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP		1544
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP		1545
 /*! transaction: transaction range of timestamps pinned by a checkpoint */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_CHECKPOINT	1545
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_CHECKPOINT	1546
 /*!
  * transaction: transaction range of timestamps pinned by the oldest
  * active read timestamp
  */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_READER	1546
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_READER	1547
 /*!
  * transaction: transaction range of timestamps pinned by the oldest
  * timestamp
  */
-#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_OLDEST	1547
+#define	WT_STAT_CONN_TXN_PINNED_TIMESTAMP_OLDEST	1548
 /*! transaction: transaction read timestamp of the oldest active reader */
-#define	WT_STAT_CONN_TXN_TIMESTAMP_OLDEST_ACTIVE_READ	1548
+#define	WT_STAT_CONN_TXN_TIMESTAMP_OLDEST_ACTIVE_READ	1549
 /*! transaction: transaction rollback to stable currently running */
-#define	WT_STAT_CONN_TXN_ROLLBACK_TO_STABLE_RUNNING	1549
+#define	WT_STAT_CONN_TXN_ROLLBACK_TO_STABLE_RUNNING	1550
 /*! transaction: transaction walk of concurrent sessions */
-#define	WT_STAT_CONN_TXN_WALK_SESSIONS			1550
+#define	WT_STAT_CONN_TXN_WALK_SESSIONS			1551
 /*! transaction: transactions committed */
-#define	WT_STAT_CONN_TXN_COMMIT				1551
+#define	WT_STAT_CONN_TXN_COMMIT				1552
 /*! transaction: transactions rolled back */
-#define	WT_STAT_CONN_TXN_ROLLBACK			1552
+#define	WT_STAT_CONN_TXN_ROLLBACK			1553
 /*! transaction: update conflicts */
-#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1553
+#define	WT_STAT_CONN_TXN_UPDATE_CONFLICT		1554
 
 /*!
  * @}
