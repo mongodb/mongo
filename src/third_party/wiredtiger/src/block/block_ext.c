@@ -571,7 +571,15 @@ __wt_block_free(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t *addr, 
     WT_RET(__wt_block_addr_unpack(
       session, block, addr, addr_size, &objectid, &offset, &size, &checksum));
 
-    /* We can't reuse free space in an object. */
+    /*
+     * Freeing blocks in a previous object isn't possible in the current architecture. We'd like to
+     * know when a previous object is either completely rewritten (or more likely, empty enough that
+     * rewriting remaining blocks is worth doing). Just knowing which blocks are no longer in use
+     * isn't enough to remove them (because the internal pages have to be rewritten and we don't
+     * know where they are); the simplest solution is probably to keep a count of freed bytes from
+     * each object in the metadata, and when enough of the object is no longer in use, perform a
+     * compaction like process to do any remaining cleanup.
+     */
     if (objectid != block->objectid)
         return (0);
 

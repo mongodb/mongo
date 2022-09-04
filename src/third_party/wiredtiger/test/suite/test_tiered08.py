@@ -52,12 +52,13 @@ class test_tiered08(wttest.WiredTigerTestCase, TieredConfigMixin):
     batch_size = 100000
 
     # Keep inserting keys until we've done this many flush and checkpoint ops.
-    ckpt_flush_target = 10
+    ckpt_target = 1000
+    flush_target = 500
 
     uri = "table:test_tiered08"
 
     def conn_config(self):
-        return get_conn_config(self) + '),statistics=(fast)'
+        return get_conn_config(self) + '),statistics=(fast),timing_stress_for_test=(tiered_flush_finish)'
         
     # Load the storage store extension.
     def conn_extensions(self, extlist):
@@ -84,34 +85,29 @@ class test_tiered08(wttest.WiredTigerTestCase, TieredConfigMixin):
 
         self.pr('Populating tiered table')
         c = self.session.open_cursor(self.uri, None, None)
-        while ckpt_count < self.ckpt_flush_target or flush_count < self.ckpt_flush_target:
+        while ckpt_count < self.ckpt_target or flush_count < self.flush_target:
             for i in range(nkeys, nkeys + self.batch_size):
                 c[self.key_gen(i)] = self.value_gen(i)
             nkeys += self.batch_size
             ckpt_count = self.get_stat(stat.conn.txn_checkpoint)
             flush_count = self.get_stat(stat.conn.flush_tier)
+            self.pr('Populating: ckpt {}, flush {}'.format(str(ckpt_count), str(flush_count)))
         c.close()
         return nkeys
 
     def verify(self, key_count):
-        self.pr('Verifying tiered table')
+        self.pr('Verifying tiered table: {}'.format(str(key_count)))
         c = self.session.open_cursor(self.uri, None, None)
-        for i in range(key_count):
+        # Speed up the test by not looking at every key/value pair.
+        for i in range(1, key_count, 237):
             self.assertEqual(c[self.key_gen(i)], self.value_gen(i))
         c.close()
 
     def test_tiered08(self):
-
-        # FIXME-WT-7833
-        #     This test can trigger races in file handle access during flush_tier.
-        #     We will re-enable it when that is fixed.
-        self.skipTest('Concurrent flush_tier and insert operations not supported yet.')
-
         cfg = self.conn_config()
         self.pr('Config is: ' + cfg)
-        intl_page = 'internal_page_max=16K'
-        base_create = 'key_format=S,value_format=S,' + intl_page
-        self.session.create(self.uri, base_create)
+        self.session.create(self.uri,
+            'key_format=S,value_format=S,internal_page_max=4096,leaf_page_max=4096')
 
         done = threading.Event()
         ckpt = checkpoint_thread(self.conn, done)

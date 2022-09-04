@@ -40,17 +40,14 @@ class test_tiered14(wttest.WiredTigerTestCase, TieredConfigMixin):
 
     uri = "table:test_tiered14-{}"   # format for subtests
 
-    # FIXME-WT-7833: enable the commented scenarios and run the
-    # test with the --long option.
-
     # The multiplier makes the size of keys and values progressively larger.
     # A multiplier of 0 makes the keys and values a single length.
     multiplier = [
         ('0', dict(multiplier=0)),
         ('S', dict(multiplier=1)),
         ('M', dict(multiplier=10)),
-        #('L', dict(multiplier=100, long_only=True)),
-        #('XL', dict(multiplier=1000, long_only=True)),
+        ('L', dict(multiplier=100, long_only=True)),
+        ('XL', dict(multiplier=1000, long_only=True)),
     ]
     keyfmt = [
         ('integer', dict(keyfmt='i')),

@@ -84,7 +84,7 @@ extern int __wt_backup_open(WT_SESSION_IMPL *session)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_bad_object_type(WT_SESSION_IMPL *session, const char *uri)
   WT_GCC_FUNC_DECL_ATTRIBUTE((cold)) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_blkcache_get_handle(WT_SESSION_IMPL *session, WT_BLOCK *orig, uint32_t objectid,
+extern int __wt_blkcache_get_handle(WT_SESSION_IMPL *session, WT_BLOCK *current, uint32_t objectid,
   WT_BLOCK **blockp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_blkcache_map(WT_SESSION_IMPL *session, WT_BLOCK *block, void **mapped_regionp,
   size_t *lengthp, void **mapped_cookiep) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));

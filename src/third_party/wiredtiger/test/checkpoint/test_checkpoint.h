@@ -88,7 +88,6 @@ typedef struct {
 
     COOKIE *cookies;               /* Per-thread info */
     WT_RWLOCK clock_lock;          /* Clock synchronization */
-    WT_RWLOCK flush_lock;          /* Flush synchronization */
     wt_thread_t checkpoint_thread; /* Checkpoint thread */
     wt_thread_t clock_thread;      /* Clock thread */
     wt_thread_t flush_thread;      /* Flush thread */

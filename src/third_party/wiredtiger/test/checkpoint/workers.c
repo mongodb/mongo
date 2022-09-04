@@ -401,8 +401,6 @@ real_worker(void)
             }
             new_txn = true;
             start_txn = false;
-            if (g.tiered)
-                __wt_readlock((WT_SESSION_IMPL *)session, &g.flush_lock);
         }
         keyno = __wt_random(&rnd) % g.nkeys + 1;
         /* If we have specified to run with mix mode deletes we need to do it in it's own txn. */
@@ -428,8 +426,6 @@ real_worker(void)
                 }
             }
             start_txn = true;
-            if (g.tiered)
-                __wt_readunlock((WT_SESSION_IMPL *)session, &g.flush_lock);
             continue;
         } else
             new_txn = false;
@@ -494,8 +490,6 @@ real_worker(void)
                         }
                     }
                     start_txn = true;
-                    if (g.tiered)
-                        __wt_readunlock((WT_SESSION_IMPL *)session, &g.flush_lock);
                 }
             } else if (next_rnd % 15 == 0)
                 /* Occasionally reopen cursors during a running transaction. */
@@ -506,8 +500,6 @@ real_worker(void)
                 goto err;
             }
             start_txn = true;
-            if (g.tiered)
-                __wt_readunlock((WT_SESSION_IMPL *)session, &g.flush_lock);
         }
         if (reopen_cursors) {
             for (j = 0; j < g.ntables; j++) {

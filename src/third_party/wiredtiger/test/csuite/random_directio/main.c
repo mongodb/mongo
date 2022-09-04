@@ -164,12 +164,6 @@ static const char *const uri_rev = "table:rev";
 #define SCHEMA_FREQUENCY_DEFAULT 100
 static uint64_t schema_frequency;
 
-/*
- * TODO: WT-7833 Lock to coordinate inserts and flush_tier. This lock should be removed when that
- * ticket is fixed. Flush_tier should be able to run with ongoing operations.
- */
-static pthread_rwlock_t flush_lock;
-
 #define TEST_STREQ(expect, got, message)                                 \
     do {                                                                 \
         if (!WT_STREQ(expect, got)) {                                    \
@@ -395,11 +389,9 @@ schema_operation(WT_SESSION *session, uint32_t threadid, uint64_t id, uint32_t o
         testutil_check(session->open_cursor(session, uri1, NULL, NULL, &cursor));
         cursor->set_key(cursor, uri1);
         cursor->set_value(cursor, uri1);
-        testutil_check(pthread_rwlock_rdlock(&flush_lock));
         testutil_check(session->log_printf(session, "INSERT: %s", uri1));
         testutil_check(cursor->insert(cursor));
         testutil_check(session->log_printf(session, "INSERT: DONE %s", uri1));
-        testutil_check(pthread_rwlock_unlock(&flush_lock));
         testutil_check(cursor->close(cursor));
         break;
     case 2:
@@ -426,11 +418,9 @@ schema_operation(WT_SESSION *session, uint32_t threadid, uint64_t id, uint32_t o
         /*
         fprintf(stderr, "UPDATE: %s\n", uri2);
         */
-        testutil_check(pthread_rwlock_rdlock(&flush_lock));
         testutil_check(session->log_printf(session, "UPDATE: %s", uri2));
         testutil_check(cursor->update(cursor));
         testutil_check(session->log_printf(session, "UPDATE: DONE %s", uri2));
-        testutil_check(pthread_rwlock_unlock(&flush_lock));
         testutil_check(cursor->close(cursor));
         break;
     case 4:
@@ -514,9 +504,7 @@ thread_flush_run(void *arg)
          * Currently not testing any of the flush tier configuration strings other than defaults. We
          * expect the defaults are what MongoDB wants for now.
          */
-        testutil_check(pthread_rwlock_wrlock(&flush_lock));
         testutil_check(session->flush_tier(session, NULL));
-        testutil_check(pthread_rwlock_unlock(&flush_lock));
         printf("Flush tier %" PRIu32 " completed.\n", i);
         fflush(stdout);
     }
@@ -576,7 +564,6 @@ again:
         gen_kv(buf1, kvsize, i, td->id, large, true);
         gen_kv(buf2, kvsize, i, td->id, large, false);
 
-        testutil_check(pthread_rwlock_rdlock(&flush_lock));
         testutil_check(session->begin_transaction(session, NULL));
         cursor->set_key(cursor, buf1);
         /*
@@ -602,10 +589,8 @@ again:
          * operations are not part of the transaction operations for the main table. If we are
          * running 'integrated' then we'll first do the schema operations and commit later.
          */
-        if (!F_ISSET(td, SCHEMA_INTEGRATED)) {
+        if (!F_ISSET(td, SCHEMA_INTEGRATED))
             testutil_check(session->commit_transaction(session, NULL));
-            testutil_check(pthread_rwlock_unlock(&flush_lock));
-        }
         /*
          * If we are doing a schema test, generate operations for additional tables. Each table has
          * a 'lifetime' of 4 values of the id.
@@ -625,10 +610,8 @@ again:
                 /*
                  * Only rollback if integrated and we have an active transaction.
                  */
-                if (F_ISSET(td, SCHEMA_INTEGRATED)) {
+                if (F_ISSET(td, SCHEMA_INTEGRATED))
                     testutil_check(session->rollback_transaction(session, NULL));
-                    testutil_check(pthread_rwlock_unlock(&flush_lock));
-                }
                 sleep(1);
                 goto again;
             }
@@ -636,10 +619,8 @@ again:
         /*
          * If schema operations are integrated, commit the transaction now that they're complete.
          */
-        if (F_ISSET(td, SCHEMA_INTEGRATED)) {
+        if (F_ISSET(td, SCHEMA_INTEGRATED))
             testutil_check(session->commit_transaction(session, NULL));
-            testutil_check(pthread_rwlock_unlock(&flush_lock));
-        }
     }
     /* NOTREACHED */
 }
@@ -1304,7 +1285,6 @@ main(int argc, char *argv[])
     if (LF_ISSET(TEST_TIERED) && !LF_ISSET(TEST_CKPT))
         usage();
 
-    testutil_check(pthread_rwlock_init(&flush_lock, NULL));
     testutil_work_dir_from_path(home, sizeof(home), working_dir);
     /*
      * If the user wants to verify they need to tell us how many threads there were so we know what
