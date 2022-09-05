@@ -74,6 +74,7 @@ st.rs1.restart(0, {
     startClean: false,
     setParameter: "disableResumableRangeDeleter=true"
 });
+st.rs1.waitForPrimary();
 
 jsTest.log("Shard0 should be able to donate a chunk and shard1 should be able to receive it.");
 // disableResumableRangeDeleter should not prevent a shard from donating a chunk, and should not
@@ -88,6 +89,7 @@ st.rs0.restart(0, {
     startClean: false,
     setParameter: "disableResumableRangeDeleter=false"
 });
+st.rs0.waitForPrimary();
 
 jsTest.log("Shard0 should now be able to re-receive the chunk it failed to receive earlier.");
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName}));
@@ -110,6 +112,7 @@ st.rs1.restart(0, {
 });
 
 st.rs0.getPrimary().adminCommand({setParameter: 1, receiveChunkWaitForRangeDeleterTimeoutMS: 500});
+st.rs1.waitForPrimary();
 
 let bulkOp = st.s.getCollection(ns).initializeUnorderedBulkOp();
 
