@@ -78,8 +78,6 @@ class test_checkpoint06(wttest.WiredTigerTestCase):
         self.session.begin_transaction()
         start = self.session.open_cursor(self.uri)
         start.set_key(5)
-        end = self.session.open_cursor(self.uri)
-        end.set_key(9995)
         self.session.truncate(None, start, None, None)
         if self.prepare:
             self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(3))
@@ -95,7 +93,7 @@ class test_checkpoint06(wttest.WiredTigerTestCase):
             ',stable_timestamp=' + self.timestamp_str(4))
 
         cursor = self.session.open_cursor(self.uri_evict)
-        # Insert some more data to trigger eviction
+        # Insert some more data into another table to trigger eviction
         for i in range(1, nrows + 1):
             self.session.begin_transaction()
             cursor[i] = value

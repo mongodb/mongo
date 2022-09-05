@@ -649,8 +649,8 @@ __inmem_col_int_init_ref(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *home, u
          * fast-delete state for the page.
          */
         if (page_del != NULL && F_ISSET(home->dsk, WT_PAGE_FT_UPDATE)) {
-            WT_RET(__wt_calloc_one(session, &ref->ft_info.del));
-            *ref->ft_info.del = *page_del;
+            WT_RET(__wt_calloc_one(session, &ref->page_del));
+            *ref->page_del = *page_del;
         }
         WT_REF_SET_STATE(ref, WT_REF_DELETED);
     }
@@ -871,8 +871,8 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
              * Recreate the fast-delete state for the page.
              */
             if (F_ISSET(page->dsk, WT_PAGE_FT_UPDATE)) {
-                WT_ERR(__wt_calloc_one(session, &ref->ft_info.del));
-                *ref->ft_info.del = unpack.page_del;
+                WT_ERR(__wt_calloc_one(session, &ref->page_del));
+                *ref->page_del = unpack.page_del;
             }
             WT_REF_SET_STATE(ref, WT_REF_DELETED);
 

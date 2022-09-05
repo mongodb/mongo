@@ -364,7 +364,7 @@ __wt_cursor_valid(WT_CURSOR_BTREE *cbt, WT_ITEM *key, uint64_t recno, bool *vali
          * us whether the insert was actually an append to allow skipping the on-disk check. Note
          * that appends can't have history store content. This is true both for "real" appends at
          * the end of the tree and also for appends that are filling in truncated gaps in the middle
-         * of the tree -- the gap only appears when the truncation becomes globally visible and at
+         * of the tree -- the gap only appears after the truncation becomes globally visible and at
          * that point by definition nothing older can be accessible.
          */
         if (cbt->ins != NULL && !F_ISSET(cbt, WT_CBT_VAR_ONPAGE_MATCH))

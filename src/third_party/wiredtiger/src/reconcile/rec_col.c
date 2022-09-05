@@ -1672,8 +1672,11 @@ next:
      *     - There were invisible updates, because then the page isn't really empty. Also, at least
      *       for now if we try to restore updates to an empty page col_modify will trip on its
      *       shoelaces.
+     *     - We wrote no cells at all. This can happen if a page with no cells and no append list
+     *       entries at all (not just one with no or only aborted updates) gets marked dirty somehow
+     *       and reconciled; this is apparently possible in some circumstances.
      */
-    if (!wrote_real_values && salvage == NULL && r->leave_dirty == false) {
+    if (!wrote_real_values && salvage == NULL && r->leave_dirty == false && r->entries > 0) {
         WT_ASSERT(session, r->entries == 1);
         r->entries = 0;
         WT_STAT_CONN_DATA_INCR(session, rec_vlcs_emptied_pages);

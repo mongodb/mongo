@@ -24,6 +24,9 @@
  * Deleted cells are place-holders for column-store files, where entries cannot
  * be removed in order to preserve the record count.
  *
+ * Note that deleted value cells (WT_CELL_DEL) are different from deleted-address
+ * cells (WT_CELL_ADDR_DEL).
+ *
  * Here's the cell use by page type:
  *
  * WT_PAGE_ROW_INT (row-store internal page):

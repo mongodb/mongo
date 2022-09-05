@@ -607,7 +607,7 @@ __split_parent_discard_ref(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *paren
     }
 
     /* Free any backing fast-truncate memory. */
-    __wt_free(session, ref->ft_info.del);
+    __wt_free(session, ref->page_del);
 
     /* Free the backing block and address. */
     WT_TRET(__wt_ref_block_free(session, ref));
@@ -1780,7 +1780,6 @@ __split_insert(WT_SESSION_IMPL *session, WT_REF *ref)
      */
     WT_ASSERT(session, __wt_leaf_page_can_split(session, page));
     WT_ASSERT(session, __wt_page_is_modified(page));
-    WT_ASSERT(session, ref->ft_info.del == NULL);
 
     F_SET_ATOMIC_16(page, WT_PAGE_SPLIT_INSERT); /* Only split in-memory once. */
 
