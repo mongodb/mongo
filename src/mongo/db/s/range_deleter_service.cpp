@@ -40,6 +40,9 @@ namespace {
 const auto rangeDeleterServiceDecorator = ServiceContext::declareDecoration<RangeDeleterService>();
 }
 
+const ReplicaSetAwareServiceRegistry::Registerer<RangeDeleterService>
+    rangeDeleterServiceRegistryRegisterer("RangeDeleterService");
+
 RangeDeleterService* RangeDeleterService::get(ServiceContext* serviceContext) {
     return &rangeDeleterServiceDecorator(serviceContext);
 }
