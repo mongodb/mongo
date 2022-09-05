@@ -717,14 +717,13 @@ __wt_txn_release(WT_SESSION_IMPL *session)
 }
 
 /*
- * __txn_locate_hs_record --
- *     Locate the update older than the prepared update in the history store and append it to the
- *     update chain if necessary.
+ * __txn_prepare_rollback_restore_hs_update --
+ *     Restore the history store update to the update chain before roll back prepared update evicted
+ *     to disk
  */
 static int
-__txn_locate_hs_record(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_PAGE *page,
-  WT_UPDATE *chain, bool commit, WT_UPDATE **fix_updp, bool *upd_appended,
-  WT_UPDATE *first_committed_upd, bool first_committed_upd_in_hs)
+__txn_prepare_rollback_restore_hs_update(
+  WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_PAGE *page, WT_UPDATE *upd_chain)
 {
     WT_DECL_ITEM(hs_value);
     WT_DECL_RET;
@@ -735,11 +734,9 @@ __txn_locate_hs_record(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_PAGE *
     uint64_t type_full;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
 
-    WT_ASSERT(session, chain != NULL);
+    WT_ASSERT(session, upd_chain != NULL);
 
     hs_tw = NULL;
-    *fix_updp = NULL;
-    *upd_appended = false;
     size = total_size = 0;
     tombstone = upd = NULL;
 
@@ -751,30 +748,12 @@ __txn_locate_hs_record(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_PAGE *
     /* The value older than the prepared update in the history store must be a full value. */
     WT_ASSERT(session, (uint8_t)type_full == WT_UPDATE_STANDARD);
 
-    /*
-     * If the history update already has a stop time point and we are committing the prepared update
-     * there is no work to do. This happens if a deleted key is reinserted by a prepared update.
-     */
-    if (hs_stop_durable_ts != WT_TS_MAX && commit)
-        goto done;
-
-    if (!first_committed_upd_in_hs) {
-        __wt_hs_upd_time_window(hs_cursor, &hs_tw);
-        WT_ERR(__wt_upd_alloc(session, hs_value, WT_UPDATE_STANDARD, &upd, &size));
-        upd->txnid = hs_tw->start_txn;
-        upd->durable_ts = hs_tw->durable_start_ts;
-        upd->start_ts = hs_tw->start_ts;
-        if (commit)
-            *fix_updp = upd;
-    } else if (commit)
-        *fix_updp = first_committed_upd;
-
-    /*
-     * When the prepared update is getting committed or the history store update is still on the
-     * update chain, no need to append it onto the update chain.
-     */
-    if (commit || first_committed_upd_in_hs)
-        goto done;
+    /* Use time window in cell to initialize the update. */
+    __wt_hs_upd_time_window(hs_cursor, &hs_tw);
+    WT_ERR(__wt_upd_alloc(session, hs_value, WT_UPDATE_STANDARD, &upd, &size));
+    upd->txnid = hs_tw->start_txn;
+    upd->durable_ts = hs_tw->durable_start_ts;
+    upd->start_ts = hs_tw->start_ts;
 
     /*
      * Set the flag to indicate that this update has been restored from history store for the
@@ -812,17 +791,16 @@ __txn_locate_hs_record(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_PAGE *
     }
 
     /* Walk to the end of the chain and we can only have prepared updates on the update chain. */
-    for (;; chain = chain->next) {
-        WT_ASSERT(
-          session, chain->txnid != WT_TXN_ABORTED && chain->prepare_state == WT_PREPARE_INPROGRESS);
+    for (;; upd_chain = upd_chain->next) {
+        WT_ASSERT(session,
+          upd_chain->txnid != WT_TXN_ABORTED && upd_chain->prepare_state == WT_PREPARE_INPROGRESS);
 
-        if (chain->next == NULL)
+        if (upd_chain->next == NULL)
             break;
     }
 
     /* Append the update to the end of the chain. */
-    WT_PUBLISH(chain->next, upd);
-    *upd_appended = true;
+    WT_PUBLISH(upd_chain->next, upd);
 
     __wt_cache_page_inmem_incr(session, page, total_size);
 
@@ -831,7 +809,6 @@ err:
         WT_ASSERT(session, tombstone == NULL || upd == tombstone);
         __wt_free_update_list(session, &upd);
     }
-done:
     __wt_scr_free(session, &hs_value);
     return (ret);
 }
@@ -926,34 +903,40 @@ __txn_timestamp_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_UPDATE *
 }
 
 /*
- * __txn_fixup_prepared_update --
- *     Fix the history store record with the max stop time point if we commit the prepared update.
+ * __txn_fixup_hs_update --
+ *     Fix the history store update with the max stop time point if we commit the prepared update.
  */
 static int
-__txn_fixup_prepared_update(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_UPDATE *fix_upd)
+__txn_fixup_hs_update(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor)
 {
+    WT_DECL_ITEM(hs_value);
     WT_DECL_RET;
-    WT_ITEM hs_value;
-    WT_TIME_WINDOW tw;
+    WT_TIME_WINDOW *hs_tw, tw;
     WT_TXN *txn;
-    uint32_t txn_flags;
-#ifdef HAVE_DIAGNOSTIC
-    uint64_t hs_upd_type;
     wt_timestamp_t hs_durable_ts, hs_stop_durable_ts;
-#endif
+    uint64_t type_full;
+    bool txn_error, txn_prepare_ignore_api_check;
 
+    hs_tw = NULL;
     txn = session->txn;
-    WT_TIME_WINDOW_INIT(&tw);
 
-    /* We should not fix a history store record already with a valid tombstone. */
-    WT_ASSERT(session, fix_upd->type != WT_UPDATE_TOMBSTONE);
+    __wt_hs_upd_time_window(hs_cursor, &hs_tw);
+
+    /*
+     * If the history update already has a stop time point there is no work to do. This happens if a
+     * deleted key is reinserted by a prepared update.
+     */
+    if (WT_TIME_WINDOW_HAS_STOP(hs_tw))
+        return (0);
+
+    WT_RET(__wt_scr_alloc(session, 0, &hs_value));
 
     /*
      * Transaction error is cleared temporarily as cursor functions are not allowed after an error
      * or a prepared transaction.
      */
-    txn_flags = FLD_MASK(txn->flags, WT_TXN_ERROR);
-    F_CLR(txn, txn_flags);
+    txn_error = F_ISSET(txn, WT_TXN_ERROR);
+    F_CLR(txn, WT_TXN_ERROR);
 
     /*
      * The API layer will immediately return an error if the WT_TXN_PREPARE flag is set before
@@ -962,34 +945,42 @@ __txn_fixup_prepared_update(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, WT_U
      * marked as a prepared transaction. The flag WT_TXN_PREPARE_IGNORE_API_CHECK is set so that
      * cursor operations can proceed without having to clear the WT_TXN_PREPARE flag.
      */
+    txn_prepare_ignore_api_check = F_ISSET(txn, WT_TXN_PREPARE_IGNORE_API_CHECK);
     F_SET(txn, WT_TXN_PREPARE_IGNORE_API_CHECK);
 
+    /* Get current value. */
+    WT_ERR(
+      hs_cursor->get_value(hs_cursor, &hs_stop_durable_ts, &hs_durable_ts, &type_full, hs_value));
+
+    /* The old stop timestamp must be max. */
+    WT_ASSERT(session, hs_stop_durable_ts == WT_TS_MAX);
+    /* The value older than the prepared update in the history store must be a full value. */
+    WT_ASSERT(session, (uint8_t)type_full == WT_UPDATE_STANDARD);
+
+    /*
+     * Set the stop time point to be the committing transaction's time point and copy the start time
+     * point from the current history store update.
+     */
     tw.stop_ts = txn->commit_timestamp;
     tw.durable_stop_ts = txn->durable_timestamp;
     tw.stop_txn = txn->id;
-    WT_TIME_WINDOW_SET_START(&tw, fix_upd);
+    WT_TIME_WINDOW_COPY_START(&tw, hs_tw);
 
-#ifdef HAVE_DIAGNOSTIC
-    /* Retrieve the existing update value and stop timestamp. */
-    WT_ERR(hs_cursor->get_value(
-      hs_cursor, &hs_stop_durable_ts, &hs_durable_ts, &hs_upd_type, &hs_value));
-    WT_ASSERT(session, hs_stop_durable_ts == WT_TS_MAX);
-    WT_ASSERT(session, (uint8_t)hs_upd_type == WT_UPDATE_STANDARD);
-#endif
     /*
      * We need to update the stop durable timestamp stored in the history store value.
      *
      * Pack the value using cursor api.
      */
-    hs_value.data = fix_upd->data;
-    hs_value.size = fix_upd->size;
     hs_cursor->set_value(hs_cursor, &tw, tw.durable_stop_ts, tw.durable_start_ts,
-      (uint64_t)WT_UPDATE_STANDARD, &hs_value);
+      (uint64_t)WT_UPDATE_STANDARD, hs_value);
     WT_ERR(hs_cursor->update(hs_cursor));
 
 err:
-    F_SET(txn, txn_flags);
-    F_CLR(txn, WT_TXN_PREPARE_IGNORE_API_CHECK);
+    if (!txn_prepare_ignore_api_check)
+        F_CLR(txn, WT_TXN_PREPARE_IGNORE_API_CHECK);
+    if (txn_error)
+        F_SET(txn, WT_TXN_ERROR);
+    __wt_scr_free(session, &hs_value);
 
     return (ret);
 }
@@ -1167,18 +1158,22 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
     WT_PAGE *page;
     WT_TIME_WINDOW tw;
     WT_TXN *txn;
-    WT_UPDATE *first_committed_upd, *fix_upd, *upd, *upd_followed_tombstone;
+    WT_UPDATE *first_committed_upd, *upd, *upd_followed_tombstone;
 #ifdef HAVE_DIAGNOSTIC
     WT_UPDATE *head_upd;
 #endif
-    uint8_t *p, hs_recno_key_buf[WT_INTPACK64_MAXSIZE];
+    uint8_t *p, resolve_case, hs_recno_key_buf[WT_INTPACK64_MAXSIZE];
     char ts_string[3][WT_TS_INT_STRING_SIZE];
-    bool first_committed_upd_in_hs, prepare_on_disk, tw_found, upd_appended;
+    bool tw_found, has_hs_record;
 
     hs_cursor = NULL;
     txn = session->txn;
-    fix_upd = NULL;
-    upd_appended = false;
+    has_hs_record = false;
+#define RESOLVE_UPDATE_CHAIN 0
+#define RESOLVE_PREPARE_ON_DISK 1
+#define RESOLVE_PREPARE_EVICTION_FAILURE 2
+#define RESOLVE_IN_MEMORY 3
+    resolve_case = RESOLVE_UPDATE_CHAIN;
 
     WT_RET(__txn_search_prepared_op(session, op, cursorp, &upd));
 
@@ -1231,49 +1226,98 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
     page = cbt->ref->page;
 
     /*
-     * Locate the previous update from the history store and append it to the update chain if
-     * required. We know there may be content in the history store if the prepared update is written
-     * to the disk image or first committed update older than the prepared update is marked as
-     * WT_UPDATE_HS. The second case is rare but can happen if the eviction that writes the prepared
-     * update to the disk image fails after it has inserted the other updates of the key into the
-     * history store.
+     * If the prepared update is a single tombstone, we don't need to do anything special and we can
+     * directly resolve it in memory.
      *
-     * We need to do this before we resolve the prepared updates because if we abort the prepared
-     * updates first, the history search logic may race with other sessions modifying the same key
-     * and checkpoint moving the new updates to the history store.
+     * If the prepared update is not a tombstone or we have multiple prepared updates in the same
+     * transaction. There are four base cases:
      *
-     * Fix the history store entry for the updates other than tombstone type or the tombstone
-     * followed by the update is also from the same prepared transaction by either restoring the
-     * previous update from history store or removing the key.
+     * 1) Prepared updates are on the update chain and hasn't been reconciled to write to data
+     *    store.
+     *     Simply resolve the prepared updates in memory.
+     *
+     * 2) Prepared updates are written to the data store.
+     *     If there is no older updates written to the history store:
+     *         commit: simply resolve the prepared updates in memory.
+     *         rollback: delete the whole key.
+     *
+     *     If there are older updates written to the history store:
+     *         commit: fix the stop timestamp of the newest update in the history store if it has a
+     *                 max timestamp.
+     *         rollback: restore the newest update in the history store to the data store and mark
+     *                   it to be deleted from the history store in the future reconciliation.
+     *
+     * 3) Prepared updates are successfully reconciled to a new disk image in eviction but the
+     *    eviction fails and the updates are restored back to the old disk image.
+     *     If there is no older updates written to the history store:
+     *         commit: simply resolve the prepared updates in memory.
+     *         rollback: delete the whole key.
+     *
+     *     If there are older updates written to the history store:
+     *          commit: fix the stop timestamp of the newest update in the history store if it has a
+     *                  max timestamp.
+     *          rollback: mark the data update (or tombstone and data update) that is older
+     *                    than the prepared updates to be deleted from the history store in the
+     *                    future reconciliation.
+     *
+     * 4) We are running an in-memory database:
+     *     commit: resolve the prepared updates in memory.
+     *     rollback: if the prepared update is written to the disk image, delete the whole key.
      */
-    prepare_on_disk = F_ISSET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS) &&
-      (upd->type != WT_UPDATE_TOMBSTONE ||
-        (upd->next != NULL && upd->durable_ts == upd->next->durable_ts &&
-          upd->txnid == upd->next->txnid && upd->start_ts == upd->next->start_ts));
-    first_committed_upd_in_hs =
-      first_committed_upd != NULL && F_ISSET(first_committed_upd, WT_UPDATE_HS);
 
     /*
-     * Marked the update older than the prepared update that is already in the history store to be
-     * deleted from the history store.
+     * We also need to handle the on disk prepared updates if we have a prepared delete and a
+     * prepared update on the disk image.
      */
-    if (first_committed_upd_in_hs && !commit) {
-        if (first_committed_upd->type == WT_UPDATE_TOMBSTONE) {
-            for (upd_followed_tombstone = first_committed_upd->next; upd_followed_tombstone != NULL;
-                 upd_followed_tombstone = upd_followed_tombstone->next)
-                if (upd_followed_tombstone->txnid != WT_TXN_ABORTED)
-                    break;
-            /* We may not find a full update following the tombstone if it is obsolete. */
-            if (upd_followed_tombstone != NULL) {
-                WT_ASSERT(session, F_ISSET(upd_followed_tombstone, WT_UPDATE_HS));
-                F_SET(first_committed_upd, WT_UPDATE_TO_DELETE_FROM_HS);
-                F_SET(upd_followed_tombstone, WT_UPDATE_TO_DELETE_FROM_HS);
-            }
-        } else
-            F_SET(first_committed_upd, WT_UPDATE_TO_DELETE_FROM_HS);
-    }
+    if (F_ISSET(upd, WT_UPDATE_PREPARE_RESTORED_FROM_DS) &&
+      (upd->type != WT_UPDATE_TOMBSTONE ||
+        (upd->next != NULL && upd->durable_ts == upd->next->durable_ts &&
+          upd->txnid == upd->next->txnid && upd->start_ts == upd->next->start_ts)))
+        resolve_case = RESOLVE_PREPARE_ON_DISK;
+    else if (first_committed_upd != NULL && F_ISSET(first_committed_upd, WT_UPDATE_HS))
+        resolve_case = RESOLVE_PREPARE_EVICTION_FAILURE;
+    else if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+        resolve_case = RESOLVE_IN_MEMORY;
+    else
+        resolve_case = RESOLVE_UPDATE_CHAIN;
 
-    if (prepare_on_disk || first_committed_upd_in_hs) {
+    switch (resolve_case) {
+    case RESOLVE_PREPARE_EVICTION_FAILURE:
+        /*
+         * If we see the first committed update has been moved to the history store, we must have
+         * done a successful reconciliation on the page but failed to evict it. Also reconciliation
+         * could not possibly empty the page because the prepared update is not globally visible.
+         * Therefore, reconciliation must have either split the page or done a page rewrite.
+         *
+         * In this case, we still need to resolve the prepared update as if we have successfully
+         * evicted the page because the value older than the prepared update has been written to the
+         * history store with the max timestamp.
+         */
+        WT_ASSERT(session,
+          page->modify->rec_result == WT_PM_REC_MULTIBLOCK ||
+            page->modify->rec_result == WT_PM_REC_REPLACE);
+        /*
+         * Marked the update older than the prepared update that is already in the history store to
+         * be deleted from the history store.
+         */
+        if (!commit) {
+            if (first_committed_upd->type == WT_UPDATE_TOMBSTONE) {
+                for (upd_followed_tombstone = first_committed_upd->next;
+                     upd_followed_tombstone != NULL;
+                     upd_followed_tombstone = upd_followed_tombstone->next)
+                    if (upd_followed_tombstone->txnid != WT_TXN_ABORTED)
+                        break;
+                /* We may not find a full update following the tombstone if it is obsolete. */
+                if (upd_followed_tombstone != NULL) {
+                    WT_ASSERT(session, F_ISSET(upd_followed_tombstone, WT_UPDATE_HS));
+                    F_SET(first_committed_upd, WT_UPDATE_TO_DELETE_FROM_HS);
+                    F_SET(upd_followed_tombstone, WT_UPDATE_TO_DELETE_FROM_HS);
+                }
+            } else
+                F_SET(first_committed_upd, WT_UPDATE_TO_DELETE_FROM_HS);
+        }
+        /* Fall through. */
+    case RESOLVE_PREPARE_ON_DISK:
         btree = S2BT(session);
 
         /*
@@ -1291,23 +1335,42 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
             hs_recno_key.size = WT_PTRDIFF(p, hs_recno_key_buf);
             hs_cursor->set_key(hs_cursor, 4, btree->id, &hs_recno_key, WT_TS_MAX, UINT64_MAX);
         }
+        /*
+         * Locate the previous update from the history store. We know there may be content in the
+         * history store if the prepared update is written to the disk image or first committed
+         * update older than the prepared update is marked as WT_UPDATE_HS. The second case is rare
+         * but can happen if the previous eviction that writes the prepared update to the disk image
+         * fails after reconciliation.
+         *
+         * We need to locate the history store update before we resolve the prepared updates because
+         * if we abort the prepared updates first, the history store search may race with other
+         * sessions modifying the same key and checkpoint moving the new updates to the history
+         * store.
+         */
         WT_ERR_NOTFOUND_OK(__wt_curhs_search_near_before(session, hs_cursor), true);
 
         /* We should only get not found if the prepared update is on disk. */
-        WT_ASSERT(session, ret != WT_NOTFOUND || prepare_on_disk);
-        if (ret == WT_NOTFOUND && !commit) {
+        WT_ASSERT(session, ret != WT_NOTFOUND || resolve_case == RESOLVE_PREPARE_ON_DISK);
+        if (ret == 0) {
+            has_hs_record = true;
+            /*
+             * Restore the history store update to the update chain if we are rolling back the
+             * prepared update written to the disk image.
+             */
+            if (!commit && resolve_case == RESOLVE_PREPARE_ON_DISK)
+                WT_ERR(__txn_prepare_rollback_restore_hs_update(session, hs_cursor, page, upd));
+        } else {
+            ret = 0;
             /*
              * Allocate a tombstone and prepend it to the row so when we reconcile the update chain
              * we don't copy the prepared cell, which is now associated with a rolled back prepare,
              * and instead write nothing.
              */
-            WT_ERR(__txn_append_tombstone(session, op, cbt));
-        } else if (ret == 0)
-            WT_ERR(__txn_locate_hs_record(session, hs_cursor, page, upd, commit, &fix_upd,
-              &upd_appended, first_committed_upd, first_committed_upd_in_hs));
-        else
-            ret = 0;
-    } else if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY) && !commit && first_committed_upd == NULL) {
+            if (!commit)
+                WT_ERR(__txn_append_tombstone(session, op, cbt));
+        }
+        break;
+    case RESOLVE_IN_MEMORY:
         /*
          * For in-memory configurations of WiredTiger if a prepared update is reconciled and then
          * rolled back the on-page value will not be marked as aborted until the next eviction. In
@@ -1318,9 +1381,15 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
          * rolling back a prepared reconciled update would result in only aborted updates on the
          * update chain.
          */
-        tw_found = __wt_read_cell_time_window(cbt, &tw);
-        if (tw_found && tw.prepare == WT_PREPARE_INPROGRESS)
-            WT_ERR(__txn_append_tombstone(session, op, cbt));
+        if (!commit && first_committed_upd == NULL) {
+            tw_found = __wt_read_cell_time_window(cbt, &tw);
+            if (tw_found && tw.prepare == WT_PREPARE_INPROGRESS)
+                WT_ERR(__txn_append_tombstone(session, op, cbt));
+        }
+        break;
+    default:
+        WT_ASSERT(session, resolve_case == RESOLVE_UPDATE_CHAIN);
+        break;
     }
 
     /*
@@ -1350,15 +1419,11 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
     __wt_page_modify_set(session, page);
 
     /*
-     * Fix the history store contents if they exist, when there are no more updates in the update
-     * list. Only in eviction, it is possible to write an unfinished history store update when the
-     * prepared updates are written to the data store. When the page is read back into memory, there
-     * will be only one uncommitted prepared update.
+     * Fix the history store record's stop time point if we are committing the prepared update and
+     * the previous update is written to the history store.
      */
-    if (fix_upd != NULL) {
-        WT_ASSERT(session, commit && fix_upd->type != WT_UPDATE_TOMBSTONE);
-        WT_ERR(__txn_fixup_prepared_update(session, hs_cursor, fix_upd));
-    }
+    if (commit && has_hs_record)
+        WT_ERR(__txn_fixup_hs_update(session, hs_cursor));
 
 prepare_verify:
 #ifdef HAVE_DIAGNOSTIC
@@ -1378,8 +1443,8 @@ prepare_verify:
          * If we restored an update from the history store, it should be the last update on the
          * chain.
          */
-        if (upd_appended && head_upd->type == WT_UPDATE_STANDARD &&
-          F_ISSET(head_upd, WT_UPDATE_RESTORED_FROM_HS))
+        if (!commit && resolve_case == RESOLVE_PREPARE_ON_DISK &&
+          head_upd->type == WT_UPDATE_STANDARD && F_ISSET(head_upd, WT_UPDATE_RESTORED_FROM_HS))
             WT_ASSERT(session, head_upd->next == NULL);
     }
 #endif
@@ -1387,8 +1452,6 @@ prepare_verify:
 err:
     if (hs_cursor != NULL)
         WT_TRET(hs_cursor->close(hs_cursor));
-    if (!upd_appended)
-        __wt_free(session, fix_upd);
     return (ret);
 }
 
