@@ -1274,7 +1274,22 @@ __txn_resolve_prepared_op(WT_SESSION_IMPL *session, WT_TXN_OP *op, bool commit, 
         (upd->next != NULL && upd->durable_ts == upd->next->durable_ts &&
           upd->txnid == upd->next->txnid && upd->start_ts == upd->next->start_ts)))
         resolve_case = RESOLVE_PREPARE_ON_DISK;
-    else if (first_committed_upd != NULL && F_ISSET(first_committed_upd, WT_UPDATE_HS))
+    /*
+     * If the first committed update older than the prepared update has already been marked to be
+     * deleted from the history store, we are in the case that there was an older prepared update
+     * that was rolled back.
+     *
+     * 1) We have a prepared update Up and an update U on the update chain initially.
+     * 2) An eviction writes Up to the disk and U to the history store.
+     * 3) The eviction fails and everything is restored.
+     * 4) We rollback Up and mark U to be deleted from the history store.
+     * 5) We add another prepared update to the update chain.
+     *
+     * Check the WT_UPDATE_TO_DELETE_FROM_HS to see if we have already handled the older prepared
+     * update or not. Ignore if it is already handled.
+     */
+    else if (first_committed_upd != NULL && F_ISSET(first_committed_upd, WT_UPDATE_HS) &&
+      !F_ISSET(first_committed_upd, WT_UPDATE_TO_DELETE_FROM_HS))
         resolve_case = RESOLVE_PREPARE_EVICTION_FAILURE;
     else if (F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
         resolve_case = RESOLVE_IN_MEMORY;
