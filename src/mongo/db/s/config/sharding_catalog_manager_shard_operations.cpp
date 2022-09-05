@@ -28,6 +28,7 @@
  */
 
 
+#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/config/sharding_catalog_manager.h"
@@ -226,8 +227,7 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShar
 StatusWith<boost::optional<ShardType>> ShardingCatalogManager::_checkIfShardExists(
     OperationContext* opCtx,
     const ConnectionString& proposedShardConnectionString,
-    const std::string* proposedShardName,
-    long long proposedShardMaxSize) {
+    const std::string* proposedShardName) {
     // Check whether any host in the connection is already part of the cluster.
     const auto existingShards = Grid::get(opCtx)->catalogClient()->getAllShards(
         opCtx, repl::ReadConcernLevel::kLocalReadConcern);
@@ -257,9 +257,6 @@ StatusWith<boost::optional<ShardType>> ShardingCatalogManager::_checkIfShardExis
             if (proposedShardConnectionString.type() ==
                     ConnectionString::ConnectionType::kReplicaSet &&
                 proposedShardConnectionString.getSetName() != existingShardConnStr.getSetName()) {
-                return false;
-            }
-            if (proposedShardMaxSize != existingShard.getMaxSizeMB()) {
                 return false;
             }
             return true;
@@ -576,8 +573,7 @@ StatusWith<std::vector<std::string>> ShardingCatalogManager::_getDBNamesListFrom
 StatusWith<std::string> ShardingCatalogManager::addShard(
     OperationContext* opCtx,
     const std::string* shardProposedName,
-    const ConnectionString& shardConnectionString,
-    const long long maxSize) {
+    const ConnectionString& shardConnectionString) {
     if (!shardConnectionString) {
         return {ErrorCodes::BadValue, "Invalid connection string"};
     }
@@ -593,8 +589,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     // Check if this shard has already been added (can happen in the case of a retry after a network
     // error, for example) and thus this addShard request should be considered a no-op.
-    auto existingShard =
-        _checkIfShardExists(opCtx, shardConnectionString, shardProposedName, maxSize);
+    auto existingShard = _checkIfShardExists(opCtx, shardConnectionString, shardProposedName);
     if (!existingShard.isOK()) {
         return existingShard.getStatus();
     }
@@ -662,10 +657,6 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
             return result.getStatus();
         }
         shardType.setName(result.getValue());
-    }
-
-    if (maxSize > 0) {
-        shardType.setMaxSizeMB(maxSize);
     }
 
     // Helper function that runs a command on the to-be shard and returns the status

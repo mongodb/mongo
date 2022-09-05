@@ -129,17 +129,13 @@ protected:
     const long long kMaxSizeMB = 100;
 
     const BSONObj kShard0 =
-        BSON(ShardType::name(kShardId0.toString())
-             << ShardType::host(kShardHost0.toString()) << ShardType::maxSizeMB(kMaxSizeMB));
+        BSON(ShardType::name(kShardId0.toString()) << ShardType::host(kShardHost0.toString()));
     const BSONObj kShard1 =
-        BSON(ShardType::name(kShardId1.toString())
-             << ShardType::host(kShardHost1.toString()) << ShardType::maxSizeMB(kMaxSizeMB));
+        BSON(ShardType::name(kShardId1.toString()) << ShardType::host(kShardHost1.toString()));
     const BSONObj kShard2 =
-        BSON(ShardType::name(kShardId2.toString())
-             << ShardType::host(kShardHost2.toString()) << ShardType::maxSizeMB(kMaxSizeMB));
+        BSON(ShardType::name(kShardId2.toString()) << ShardType::host(kShardHost2.toString()));
     const BSONObj kShard3 =
-        BSON(ShardType::name(kShardId3.toString())
-             << ShardType::host(kShardHost3.toString()) << ShardType::maxSizeMB(kMaxSizeMB));
+        BSON(ShardType::name(kShardId3.toString()) << ShardType::host(kShardHost3.toString()));
 
     const std::string kPattern = "_id";
     const KeyPattern kKeyPattern = KeyPattern(BSON(kPattern << 1));

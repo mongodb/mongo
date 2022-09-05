@@ -132,10 +132,7 @@ StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::_getStats(
             if (ns) {
                 return shardutil::retrieveCollectionShardSize(opCtx, shard.getName(), *ns);
             }
-            // optimization for the case where the balancer does not care about the dataSize
-            if (!shard.getMaxSizeMB()) {
-                return 0;
-            }
+
             return shardutil::retrieveTotalShardSize(opCtx, shard.getName());
         }();
 
@@ -169,7 +166,6 @@ StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::_getStats(
         }
 
         stats.emplace_back(shard.getName(),
-                           shard.getMaxSizeMB() * 1024 * 1024,
                            shardSizeStatus.getValue(),
                            shard.getDraining(),
                            std::move(shardZones),

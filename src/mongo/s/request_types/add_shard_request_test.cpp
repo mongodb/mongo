@@ -40,7 +40,6 @@ namespace {
 const char kConnString[] = "setname/localhost:27017,localhost:27018,localhost:27019";
 const char kConnStringNonLocalHost[] = "setname/host1:27017,host2:27017,host3:27017";
 const char kShardName[] = "shardName";
-const long long kMaxSizeMB = 10;
 
 // Test parsing the internal fields from a command BSONObj. The internal fields (besides the
 // top-level command name) are identical between the external mongos version and internal config
@@ -64,63 +63,26 @@ TEST(AddShardRequest, ParseInternalFieldsInvalidConnectionString) {
     }
 }
 
-TEST(AddShardRequest, ParseInternalFieldsMissingMaxSize) {
-    {
-        BSONObj obj = BSON(AddShardRequest::mongosAddShard
-                           << kConnString << AddShardRequest::shardName << kShardName);
-
-        auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(obj);
-        ASSERT_OK(swAddShardRequest.getStatus());
-
-        auto req = swAddShardRequest.getValue();
-        ASSERT_EQ(req.getConnString().toString(), kConnString);
-        ASSERT_TRUE(req.hasName());
-        ASSERT_EQ(req.getName(), kShardName);
-        ASSERT_FALSE(req.hasMaxSize());
-    }
-
-    {
-        BSONObj obj = BSON(AddShardRequest::configsvrAddShard
-                           << kConnString << AddShardRequest::shardName << kShardName);
-
-
-        auto swAddShardRequest = AddShardRequest::parseFromConfigCommand(obj);
-        ASSERT_OK(swAddShardRequest.getStatus());
-
-        auto req = swAddShardRequest.getValue();
-        ASSERT_EQ(req.getConnString().toString(), kConnString);
-        ASSERT_TRUE(req.hasName());
-        ASSERT_EQ(req.getName(), kShardName);
-        ASSERT_FALSE(req.hasMaxSize());
-    }
-}
-
 TEST(AddShardRequest, ParseInternalFieldsMissingName) {
     {
-        BSONObj obj = BSON(AddShardRequest::mongosAddShard
-                           << kConnString << AddShardRequest::maxSizeMB << kMaxSizeMB);
+        BSONObj obj = BSON(AddShardRequest::mongosAddShard << kConnString);
 
         auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(obj);
         ASSERT_OK(swAddShardRequest.getStatus());
 
         auto req = swAddShardRequest.getValue();
         ASSERT_EQ(req.getConnString().toString(), kConnString);
-        ASSERT_TRUE(req.hasMaxSize());
-        ASSERT_EQ(req.getMaxSize(), kMaxSizeMB);
         ASSERT_FALSE(req.hasName());
     }
 
     {
-        BSONObj obj = BSON(AddShardRequest::configsvrAddShard
-                           << kConnString << AddShardRequest::maxSizeMB << kMaxSizeMB);
+        BSONObj obj = BSON(AddShardRequest::configsvrAddShard << kConnString);
 
         auto swAddShardRequest = AddShardRequest::parseFromConfigCommand(obj);
         ASSERT_OK(swAddShardRequest.getStatus());
 
         auto req = swAddShardRequest.getValue();
         ASSERT_EQ(req.getConnString().toString(), kConnString);
-        ASSERT_TRUE(req.hasMaxSize());
-        ASSERT_EQ(req.getMaxSize(), kMaxSizeMB);
         ASSERT_FALSE(req.hasName());
     }
 }
@@ -128,32 +90,26 @@ TEST(AddShardRequest, ParseInternalFieldsMissingName) {
 TEST(AddShardRequest, ParseInternalFieldsAllFieldsPresent) {
     {
         BSONObj obj = BSON(AddShardRequest::mongosAddShard
-                           << kConnString << AddShardRequest::shardName << kShardName
-                           << AddShardRequest::maxSizeMB << kMaxSizeMB);
+                           << kConnString << AddShardRequest::shardName << kShardName);
 
         auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(obj);
         ASSERT_OK(swAddShardRequest.getStatus());
 
         auto req = swAddShardRequest.getValue();
         ASSERT_EQ(req.getConnString().toString(), kConnString);
-        ASSERT_TRUE(req.hasMaxSize());
-        ASSERT_EQ(req.getMaxSize(), kMaxSizeMB);
         ASSERT_TRUE(req.hasName());
         ASSERT_EQ(req.getName(), kShardName);
     }
 
     {
         BSONObj obj = BSON(AddShardRequest::configsvrAddShard
-                           << kConnString << AddShardRequest::shardName << kShardName
-                           << AddShardRequest::maxSizeMB << kMaxSizeMB);
+                           << kConnString << AddShardRequest::shardName << kShardName);
 
         auto swAddShardRequest = AddShardRequest::parseFromConfigCommand(obj);
         ASSERT_OK(swAddShardRequest.getStatus());
 
         auto req = swAddShardRequest.getValue();
         ASSERT_EQ(req.getConnString().toString(), kConnString);
-        ASSERT_TRUE(req.hasMaxSize());
-        ASSERT_EQ(req.getMaxSize(), kMaxSizeMB);
         ASSERT_TRUE(req.hasName());
         ASSERT_EQ(req.getName(), kShardName);
     }
@@ -163,8 +119,7 @@ TEST(AddShardRequest, ParseInternalFieldsAllFieldsPresent) {
 
 TEST(AddShardRequest, ToCommandForConfig) {
     BSONObj mongosCmdObj = BSON(AddShardRequest::mongosAddShard
-                                << kConnString << AddShardRequest::shardName << kShardName
-                                << AddShardRequest::maxSizeMB << kMaxSizeMB);
+                                << kConnString << AddShardRequest::shardName << kShardName);
 
     auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(mongosCmdObj);
     ASSERT_OK(swAddShardRequest.getStatus());
@@ -173,12 +128,10 @@ TEST(AddShardRequest, ToCommandForConfig) {
     auto configCmdObj = req.toCommandForConfig();
     ASSERT_EQ(configCmdObj[AddShardRequest::configsvrAddShard.name()].String(), kConnString);
     ASSERT_EQ(configCmdObj[AddShardRequest::shardName.name()].String(), kShardName);
-    ASSERT_EQ(configCmdObj[AddShardRequest::maxSizeMB.name()].Long(), kMaxSizeMB);
 }
 
 TEST(AddShardRequest, ToCommandForConfigMissingName) {
-    BSONObj mongosCmdObj = BSON(AddShardRequest::mongosAddShard
-                                << kConnString << AddShardRequest::maxSizeMB << kMaxSizeMB);
+    BSONObj mongosCmdObj = BSON(AddShardRequest::mongosAddShard << kConnString);
 
     auto swAddShardRequest = AddShardRequest::parseFromMongosCommand(mongosCmdObj);
     ASSERT_OK(swAddShardRequest.getStatus());
@@ -186,7 +139,6 @@ TEST(AddShardRequest, ToCommandForConfigMissingName) {
 
     auto configCmdObj = req.toCommandForConfig();
     ASSERT_EQ(configCmdObj[AddShardRequest::configsvrAddShard.name()].String(), kConnString);
-    ASSERT_EQ(configCmdObj[AddShardRequest::maxSizeMB.name()].Long(), kMaxSizeMB);
     ASSERT_FALSE(configCmdObj.hasField(AddShardRequest::shardName.name()));
 }
 
@@ -201,7 +153,6 @@ TEST(AddShardRequest, ToCommandForConfigMissingMaxSize) {
     auto configCmdObj = req.toCommandForConfig();
     ASSERT_EQ(configCmdObj[AddShardRequest::configsvrAddShard.name()].String(), kConnString);
     ASSERT_EQ(configCmdObj[AddShardRequest::shardName.name()].String(), kShardName);
-    ASSERT_FALSE(configCmdObj.hasField(AddShardRequest::maxSizeMB.name()));
 }
 
 // Test validating an AddShardRequest that was successfully parsed.

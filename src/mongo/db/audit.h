@@ -384,7 +384,7 @@ void logEnableSharding(Client* client, StringData dbname);
 /**
  * Logs the result of a addShard command.
  */
-void logAddShard(Client* client, StringData name, const std::string& servers, long long maxSize);
+void logAddShard(Client* client, StringData name, const std::string& servers);
 
 /**
  * Logs the result of a removeShard command.

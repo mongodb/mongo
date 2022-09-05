@@ -62,7 +62,6 @@ public:
             explicit use_bytes_t() = default;
         };
         ShardStatistics(ShardId shardId,
-                        uint64_t maxSizeBytes,
                         uint64_t currSizeBytes,
                         bool isDraining,
                         std::set<std::string> shardZones,
@@ -70,23 +69,13 @@ public:
                         use_bytes_t t);
 
         ShardStatistics(ShardId shardId,
-                        uint64_t maxSizeMB,
                         uint64_t currSizeMB,
                         bool isDraining,
                         std::set<std::string> shardZones,
                         std::string mongoVersion);
 
-        /**
-         * Returns true if a shard is not allowed to receive any new chunks because it has reached
-         * the per-shard data size limit.
-         */
-        bool isSizeMaxed() const;
-
         // The id of the shard for which this statistic applies
         ShardId shardId;
-
-        // The maximum storage size allowed for the shard. Zero means no maximum specified.
-        uint64_t maxSizeBytes{0};
 
         // The current storage size of the shard.
         uint64_t currSizeBytes{0};

@@ -712,7 +712,6 @@ env.CppUnitTest(
         'balancer/balancer_defragmentation_policy_test.cpp',
         'balancer/cluster_chunks_resize_policy_test.cpp',
         'balancer/balancer_policy_test.cpp',
-        'balancer/cluster_statistics_test.cpp',
         'balancer/core_options_stub.cpp',
         'balancer/balancer_commands_scheduler_test.cpp',
         'balancer/migration_test_fixture.cpp',

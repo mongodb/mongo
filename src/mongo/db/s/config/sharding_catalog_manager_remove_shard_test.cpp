@@ -135,19 +135,16 @@ TEST_F(RemoveShardTest, RemoveShardAnotherShardDraining) {
     ShardType shard1;
     shard1.setName("shard1");
     shard1.setHost("host1:12345");
-    shard1.setMaxSizeMB(100);
     shard1.setState(ShardType::ShardState::kShardAware);
 
     ShardType shard2;
     shard2.setName("shard2");
     shard2.setHost("host2:12345");
-    shard2.setMaxSizeMB(100);
     shard2.setState(ShardType::ShardState::kShardAware);
 
     ShardType shard3;
     shard3.setName("shard3");
     shard3.setHost("host3:12345");
-    shard3.setMaxSizeMB(100);
     shard3.setState(ShardType::ShardState::kShardAware);
 
     setupShards(std::vector<ShardType>{shard1, shard2, shard3});
@@ -170,7 +167,6 @@ TEST_F(RemoveShardTest, RemoveShardCantRemoveLastShard) {
     ShardType shard1;
     shard1.setName("shard1");
     shard1.setHost("host1:12345");
-    shard1.setMaxSizeMB(100);
     shard1.setState(ShardType::ShardState::kShardAware);
 
     setupShards(std::vector<ShardType>{shard1});
@@ -186,13 +182,11 @@ TEST_F(RemoveShardTest, RemoveShardStartDraining) {
     ShardType shard1;
     shard1.setName("shard1");
     shard1.setHost("host1:12345");
-    shard1.setMaxSizeMB(100);
     shard1.setState(ShardType::ShardState::kShardAware);
 
     ShardType shard2;
     shard2.setName("shard2");
     shard2.setHost("host2:12345");
-    shard2.setMaxSizeMB(100);
     shard2.setState(ShardType::ShardState::kShardAware);
 
     setupShards(std::vector<ShardType>{shard1, shard2});
@@ -209,13 +203,11 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingChunksRemaining) {
     ShardType shard1;
     shard1.setName("shard1");
     shard1.setHost("host1:12345");
-    shard1.setMaxSizeMB(100);
     shard1.setState(ShardType::ShardState::kShardAware);
 
     ShardType shard2;
     shard2.setName("shard2");
     shard2.setHost("host2:12345");
-    shard2.setMaxSizeMB(100);
     shard2.setState(ShardType::ShardState::kShardAware);
 
     auto epoch = OID::gen();
@@ -263,13 +255,11 @@ TEST_F(RemoveShardTest, RemoveShardStillDrainingDatabasesRemaining) {
     ShardType shard1;
     shard1.setName("shard1");
     shard1.setHost("host1:12345");
-    shard1.setMaxSizeMB(100);
     shard1.setState(ShardType::ShardState::kShardAware);
 
     ShardType shard2;
     shard2.setName("shard2");
     shard2.setHost("host2:12345");
-    shard2.setMaxSizeMB(100);
     shard2.setState(ShardType::ShardState::kShardAware);
 
     setupShards(std::vector<ShardType>{shard1, shard2});
@@ -296,13 +286,11 @@ TEST_F(RemoveShardTest, RemoveShardCompletion) {
     ShardType shard1;
     shard1.setName("shard1");
     shard1.setHost("host1:12345");
-    shard1.setMaxSizeMB(100);
     shard1.setState(ShardType::ShardState::kShardAware);
 
     ShardType shard2;
     shard2.setName("shard2");
     shard2.setHost("host2:12345");
-    shard2.setMaxSizeMB(100);
     shard2.setState(ShardType::ShardState::kShardAware);
 
     auto epoch = OID::gen();
