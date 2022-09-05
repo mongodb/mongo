@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/util/duration.h"
 #include <condition_variable>
 #include <mutex>
 
@@ -112,7 +113,7 @@ void basicTimeout(OperationContext* opCtx) {
     //
     // Test resize
     //
-    ASSERT(holder->resize(6).isOK());
+    holder->resize(6);
     std::array<boost::optional<Ticket>, 5> tickets;
     {
         auto ticket = holder->waitForTicket(opCtx, &admCtx, mode);
@@ -129,7 +130,7 @@ void basicTimeout(OperationContext* opCtx) {
             holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now() + Milliseconds(1), mode));
     }
 
-    ASSERT(holder->resize(5).isOK());
+    holder->resize(5);
     ASSERT_EQ(holder->used(), 5);
     ASSERT_EQ(holder->outof(), 5);
     ASSERT_FALSE(holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now() + Milliseconds(1), mode));
@@ -156,9 +157,82 @@ public:
         return stats[field].numberLong();
     }
 
+    BSONObj getStats() const {
+        BSONObjBuilder bob;
+        _holder->appendStats(bob);
+        return bob.obj();
+    }
+
+    BSONObj getNonTicketStats() const {
+        return getStats().removeField("out").removeField("available").removeField("totalTickets");
+    }
+
 private:
     TicketHolder* _holder;
 };
+
+template <class H>
+void resizeTest(OperationContext* opCtx) {
+    // Verify that resize operations don't alter metrics outside of those linked to the number of
+    // tickets.
+    ServiceContext serviceContext;
+    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+    auto tickSource = dynamic_cast<TickSourceMock<Microseconds>*>(serviceContext.getTickSource());
+    auto mode = TicketHolder::WaitMode::kInterruptible;
+    std::unique_ptr<TicketHolderWithQueueingStats> holder = std::make_unique<H>(1, &serviceContext);
+    Stats stats(holder.get());
+
+    AdmissionContext admCtx;
+    admCtx.setPriority(AdmissionContext::AcquisitionPriority::kNormal);
+
+    auto ticket =
+        holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now() + Milliseconds{500}, mode);
+
+    ASSERT_EQ(holder->used(), 1);
+    ASSERT_EQ(holder->available(), 0);
+    ASSERT_EQ(holder->outof(), 1);
+
+    auto currentStats = stats.getNonTicketStats();
+
+    tickSource->advance(Microseconds{100});
+    holder->resize(10);
+
+    ASSERT_EQ(holder->available(), 9);
+    ASSERT_EQ(holder->outof(), 10);
+
+    auto newStats = stats.getNonTicketStats();
+
+    ASSERT_EQ(currentStats.woCompare(newStats), 0);
+
+    tickSource->advance(Microseconds{100});
+    ticket.reset();
+
+    currentStats = stats.getNonTicketStats();
+
+    ASSERT_EQ(stats["out"], 0);
+    ASSERT_EQ(stats["available"], 10);
+    ASSERT_EQ(stats["totalTickets"], 10);
+    ASSERT_EQ(stats["totalTimeProcessingMicros"], 200);
+
+    holder->resize(1);
+    newStats = stats.getNonTicketStats();
+    ASSERT_EQ(currentStats.woCompare(newStats), 0);
+
+    tickSource->advance(Microseconds{100});
+    holder->resize(10);
+    currentStats = stats.getNonTicketStats();
+    ASSERT_EQ(currentStats.woCompare(newStats), 0);
+}
+
+TEST_F(TicketHolderTest, ResizeStatsFifo) {
+    resizeTest<FifoTicketHolder>(_opCtx.get());
+}
+TEST_F(TicketHolderTest, ResizeStatsSemaphore) {
+    resizeTest<SemaphoreTicketHolder>(_opCtx.get());
+}
+TEST_F(TicketHolderTest, ResizeStatsPriority) {
+    resizeTest<PriorityTicketHolder>(_opCtx.get());
+}
 
 TEST_F(TicketHolderTest, FifoBasicMetrics) {
     ServiceContext serviceContext;

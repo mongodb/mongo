@@ -138,7 +138,7 @@ public:
                                                Date_t until,
                                                TicketHolder::WaitMode waitMode) override;
 
-    Status resize(int newSize);
+    void resize(int newSize) noexcept;
 
     virtual int available() const = 0;
 
@@ -171,6 +171,8 @@ private:
     void _release(AdmissionContext* admCtx) noexcept override;
 
     virtual void _releaseQueue(AdmissionContext* admCtx) noexcept = 0;
+
+    virtual void _resize(int newSize, int oldSize) noexcept = 0;
 
     AtomicWord<std::int64_t> _totalAddedQueue{0};
     AtomicWord<std::int64_t> _totalRemovedQueue{0};
@@ -229,8 +231,8 @@ public:
 
     void appendStats(BSONObjBuilder& b) const override final;
 
-    Status resizeReaders(int newSize);
-    Status resizeWriters(int newSize);
+    void resizeReaders(int newSize);
+    void resizeWriters(int newSize);
 
 private:
     void _release(AdmissionContext* admCtx) noexcept override final;
@@ -257,6 +259,8 @@ private:
     void _releaseQueue(AdmissionContext* admCtx) noexcept override final;
 
     void _appendImplStats(BSONObjBuilder& b) const override final;
+
+    void _resize(int newSize, int oldSize) noexcept override final;
 
 #if defined(__linux__)
     mutable sem_t _sem;
@@ -299,6 +303,10 @@ private:
     void _appendImplStats(BSONObjBuilder& b) const override final;
 
     void _releaseQueue(AdmissionContext* admCtx) noexcept override final;
+
+    void _dequeueWaiter(WithLock queueLock);
+
+    void _resize(int newSize, int oldSize) noexcept override final;
 
     // Implementation statistics.
     AtomicWord<std::int64_t> _totalTimeQueuedMicros{0};
@@ -384,6 +392,7 @@ private:
 
     void _appendImplStats(BSONObjBuilder& b) const override final{};
 
+    void _resize(int newSize, int oldSize) noexcept override final;
     /**
      * Wakes up a waiting thread (if it exists) in order for it to attempt to obtain a ticket.
      * Implementors MUST wake at least one waiting thread if at least one thread is pending to be

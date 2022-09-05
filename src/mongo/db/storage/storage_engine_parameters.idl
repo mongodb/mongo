@@ -52,7 +52,7 @@ server_parameters:
     # Default value being 0 means we're allowing the underlying storage engines to use their default values.
     default: 0
     validator:
-      gt: 0
+      gte: 5
 
   storageEngineConcurrentReadTransactions:
     description: "Storage Engine Concurrent Read Transactions"
@@ -65,7 +65,7 @@ server_parameters:
     # Default value being 0 means we're allowing the underlying storage engines to use their default values.
     default: 0
     validator:
-      gt: 0
+      gte: 5
 
 feature_flags:
   featureFlagEnableExecutionControl:

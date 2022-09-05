@@ -41,7 +41,7 @@ Status TickerHolderStorageParams::updateConcurrentWriteTransactions(
         if (auto svcCtx = client->getServiceContext()) {
             if (auto ticketHolder =
                     dynamic_cast<ReaderWriterTicketHolder*>(TicketHolder::get(svcCtx))) {
-                return ticketHolder->resizeWriters(newWriteTransactions);
+                ticketHolder->resizeWriters(newWriteTransactions);
             } else {
                 LOGV2_WARNING(
                     6754202,
@@ -60,7 +60,7 @@ Status TickerHolderStorageParams::updateConcurrentReadTransactions(const int& ne
         if (auto svcCtx = client->getServiceContext()) {
             if (auto ticketHolder =
                     dynamic_cast<ReaderWriterTicketHolder*>(TicketHolder::get(svcCtx))) {
-                return ticketHolder->resizeReaders(newReadTransactions);
+                ticketHolder->resizeReaders(newReadTransactions);
             } else {
                 LOGV2_WARNING(
                     6754201,
@@ -80,7 +80,7 @@ Status TickerHolderStorageParams::updateConcurrentTotalTransactions(
         if (auto svcCtx = client->getServiceContext()) {
             if (auto ticketHolder =
                     dynamic_cast<TicketHolderWithQueueingStats*>(TicketHolder::get(svcCtx))) {
-                return ticketHolder->resize(newTotalTransactions);
+                ticketHolder->resize(newTotalTransactions);
             } else {
                 LOGV2_WARNING(
                     6859001,

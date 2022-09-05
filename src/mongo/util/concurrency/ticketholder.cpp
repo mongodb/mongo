@@ -127,35 +127,19 @@ void ReaderWriterTicketHolder::_release(AdmissionContext* admCtx) noexcept {
     }
 }
 
-Status ReaderWriterTicketHolder::resizeReaders(int newSize) {
+void ReaderWriterTicketHolder::resizeReaders(int newSize) {
     return _reader->resize(newSize);
 }
 
-Status ReaderWriterTicketHolder::resizeWriters(int newSize) {
+void ReaderWriterTicketHolder::resizeWriters(int newSize) {
     return _writer->resize(newSize);
 }
 
-Status TicketHolderWithQueueingStats::resize(int newSize) {
+void TicketHolderWithQueueingStats::resize(int newSize) noexcept {
     stdx::lock_guard<Latch> lk(_resizeMutex);
 
-    if (newSize < 5)
-        return Status(ErrorCodes::BadValue,
-                      str::stream() << "Minimum value for ticketholder is 5; given " << newSize);
-
-    AdmissionContext admCtx;
-    while (_outof.load() < newSize) {
-        _release(&admCtx);
-        _outof.fetchAndAdd(1);
-    }
-
-    while (_outof.load() > newSize) {
-        auto ticket = waitForTicket(nullptr, &admCtx, WaitMode::kUninterruptible);
-        ticket.discard();
-        _outof.subtractAndFetch(1);
-    }
-
-    invariant(_outof.load() == newSize);
-    return Status::OK();
+    _resize(newSize, _outof.load());
+    _outof.store(newSize);
 }
 
 void TicketHolderWithQueueingStats::appendStats(BSONObjBuilder& b) const {
@@ -357,6 +341,20 @@ int SemaphoreTicketHolder::available() const {
     return val;
 }
 
+void SemaphoreTicketHolder::_resize(int newSize, int oldSize) noexcept {
+    auto difference = newSize - oldSize;
+
+    if (difference > 0) {
+        for (int i = 0; i < difference; i++) {
+            check(sem_post(&_sem));
+        }
+    } else if (difference < 0) {
+        for (int i = 0; i < -difference; i++) {
+            check(sem_wait(&_sem));
+        }
+    }
+}
+
 #else
 
 SemaphoreTicketHolder::SemaphoreTicketHolder(int numTickets, ServiceContext* svcCtx)
@@ -420,6 +418,21 @@ bool SemaphoreTicketHolder::_tryAcquire() {
     _numTickets--;
     return true;
 }
+
+void SemaphoreTicketHolder::_resize(int newSize, int oldSize) noexcept {
+    auto difference = newSize - oldSize;
+
+    stdx::lock_guard<Latch> lk(_mutex);
+    _numTickets += difference;
+
+    if (difference > 0) {
+        for (int i = 0; i < difference; i++) {
+            _newTicket.notify_one();
+        }
+    }
+    // No need to do anything in the other cases as the number of tickets being <= 0 implies they'll
+    // have to wait until the current ticket holders release their tickets.
+}
 #endif
 
 void SemaphoreTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
@@ -442,10 +455,7 @@ int FifoTicketHolder::queued() const {
     return _enqueuedElements.loadRelaxed();
 }
 
-void FifoTicketHolder::_releaseQueue(AdmissionContext* admCtx) noexcept {
-    invariant(admCtx);
-
-    stdx::lock_guard lk(_queueMutex);
+void FifoTicketHolder::_dequeueWaiter(WithLock queueLock) {
     // This loop will most of the time be executed only once. In case some operations in the
     // queue have been cancelled or already took a ticket the releasing operation should search for
     // a waiting operation to avoid leaving an operation waiting indefinitely.
@@ -469,6 +479,13 @@ void FifoTicketHolder::_releaseQueue(AdmissionContext* admCtx) noexcept {
         }
         return;
     }
+}
+
+void FifoTicketHolder::_releaseQueue(AdmissionContext* admCtx) noexcept {
+    invariant(admCtx);
+
+    stdx::lock_guard lk(_queueMutex);
+    _dequeueWaiter(lk);
 }
 
 boost::optional<Ticket> FifoTicketHolder::_tryAcquireImpl(AdmissionContext* admCtx) {
@@ -563,6 +580,21 @@ boost::optional<Ticket> FifoTicketHolder::_waitForTicketUntilImpl(OperationConte
     }
 }
 
+void FifoTicketHolder::_resize(int newSize, int oldSize) noexcept {
+    auto difference = newSize - oldSize;
+
+    if (difference > 0) {
+        stdx::lock_guard lk(_queueMutex);
+        for (int i = 0; i < difference; i++) {
+            _dequeueWaiter(lk);
+        }
+    } else {
+        _ticketsAvailable.addAndFetch(difference);
+        // No need to do anything in the other cases as the number of tickets being <= 0 implies
+        // they'll have to wait until the current ticket holders release their tickets.
+    }
+}
+
 void FifoTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
     b.append("totalTimeQueuedMicros", _totalTimeQueuedMicros.loadRelaxed());
 }
@@ -651,6 +683,24 @@ boost::optional<Ticket> SchedulingTicketHolder::_waitForTicketUntilImpl(Operatio
     } else {
         return boost::none;
     }
+}
+
+void SchedulingTicketHolder::_resize(int newSize, int oldSize) noexcept {
+    auto difference = newSize - oldSize;
+
+    _ticketsAvailable.fetchAndAdd(difference);
+
+    if (difference > 0) {
+        // As we're adding tickets the waiting threads need to be notified that there are new
+        // tickets available.
+        ReleaserLockGuard lk(_queueMutex);
+        for (int i = 0; i < difference; i++) {
+            _dequeueWaitingThread();
+        }
+    }
+
+    // No need to do anything in the other cases as the number of tickets being <= 0 implies they'll
+    // have to wait until the current ticket holders release their tickets.
 }
 
 bool SchedulingTicketHolder::Queue::attemptToDequeue() {
