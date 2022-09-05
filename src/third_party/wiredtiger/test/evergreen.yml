@@ -780,7 +780,6 @@ variables:
   - &configure_flags_tiered_storage_s3
     ENABLE_S3: -DENABLE_S3=1
     IMPORT_S3_SDK: -DIMPORT_S3_SDK=external
-    CMAKE_PREFIX_PATH: # FIXME-WT-9590 - the S3 extension tests core with TCMALLOC.
 
   # Configure flags for address sanitizer for mongodb toolchain v4 clang (include builtins).
   - &configure_flags_address_sanitizer_mongodb_v4_clang_with_builtins
