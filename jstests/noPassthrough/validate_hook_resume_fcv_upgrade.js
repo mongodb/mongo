@@ -3,8 +3,6 @@
  * server regardless of what state any previous upgrades or downgrades have left it in.
  */
 
-load("jstests/libs/logv2_helpers.js");
-
 // The global 'db' variable is used by the data consistency hooks.
 var db;
 
@@ -16,41 +14,22 @@ var db;
 TestData.skipCollectionAndIndexValidation = true;
 
 function makePatternForValidate(dbName, collName) {
-    if (isJsonLogNoConn()) {
-        return new RegExp(
-            `Slow query.*"ns":"${
-                dbName}\\.\\$cmd","appName":"MongoDB Shell","command":{"validate":"${collName}"`,
-            "g");
-    }
-
-    return new RegExp("COMMAND.*command " + dbName +
-                          "\\.\\$cmd appName: \"MongoDB Shell\" command: validate { validate: \"" +
-                          collName + "\"",
-                      "g");
+    return new RegExp(
+        `Slow query.*"ns":"${dbName}\\.\\$cmd","appName":"MongoDB Shell","command":{"validate":"${
+            collName}"`,
+        "g");
 }
 
 function makePatternForSetFCV(targetVersion) {
-    if (isJsonLogNoConn()) {
-        return new RegExp(
-            `Slow query.*"appName":"MongoDB Shell","command":{"setFeatureCompatibilityVersion":"${
-                targetVersion}"`,
-            "g");
-    }
     return new RegExp(
-        "COMMAND.*command.*appName: \"MongoDB Shell\" command: setFeatureCompatibilityVersion" +
-            " { setFeatureCompatibilityVersion: \"" + targetVersion + "\"",
+        `Slow query.*"appName":"MongoDB Shell","command":{"setFeatureCompatibilityVersion":"${
+            targetVersion}"`,
         "g");
 }
 
 function makePatternForSetParameter(paramName) {
-    if (isJsonLogNoConn()) {
-        return new RegExp(
-            `Slow query.*"appName":"MongoDB Shell","command":{"setParameter":1,"${paramName}":`,
-            "g");
-    }
-    return new RegExp("COMMAND.*command.*appName: \"MongoDB Shell\" command: setParameter" +
-                          " { setParameter: 1\\.0, " + paramName + ":",
-                      "g");
+    return new RegExp(
+        `Slow query.*"appName":"MongoDB Shell","command":{"setParameter":1,"${paramName}":`, "g");
 }
 
 function countMatches(pattern, output) {

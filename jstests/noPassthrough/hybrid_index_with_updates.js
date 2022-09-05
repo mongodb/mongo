@@ -2,7 +2,6 @@
  * Tests that write operations are accepted and result in correct indexing behavior for each phase
  * of hybrid index builds.
  */
-load("jstests/libs/logv2_helpers.js");
 
 (function() {
 "use strict";

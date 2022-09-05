@@ -12,7 +12,6 @@
 (function() {
 "use strict";
 load("jstests/libs/fail_point_util.js");
-load("jstests/libs/logv2_helpers.js");
 
 var name = 'initial_sync_applier_error';
 var replSet = new ReplSetTest({
@@ -43,11 +42,7 @@ var newCollName = name + '_2';
 assert.commandWorked(coll.renameCollection(newCollName, true));
 failPoint.off();
 
-if (isJsonLog(secondary)) {
-    checkLog.contains(secondary, 'Initial sync done');
-} else {
-    checkLog.contains(secondary, 'initial sync done');
-}
+checkLog.contains(secondary, 'Initial sync done');
 
 replSet.awaitReplication();
 replSet.awaitSecondaryNodes();

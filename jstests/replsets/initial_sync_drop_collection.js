@@ -8,7 +8,6 @@
 load("jstests/libs/fail_point_util.js");
 load('jstests/replsets/libs/two_phase_drops.js');
 load("jstests/libs/uuid_util.js");
-load("jstests/libs/logv2_helpers.js");
 
 // Set up replica set. Disallow chaining so nodes always sync from primary.
 const testName = "initial_sync_drop_collection";

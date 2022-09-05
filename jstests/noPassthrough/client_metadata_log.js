@@ -4,7 +4,6 @@
  *   requires_sharding,
  * ]
  */
-load("jstests/libs/logv2_helpers.js");
 
 (function() {
 'use strict';
@@ -16,14 +15,8 @@ let checkLog = function(conn) {
     print(`Checking ${conn.fullOptions.logFile} for client metadata message`);
     let log = cat(conn.fullOptions.logFile);
 
-    let predicate = null;
-    if (isJsonLog(conn)) {
-        predicate =
-            /"id":51800,.*"msg":"client metadata","attr":.*"doc":{"application":{"name":".*"},"driver":{"name":".*","version":".*"},"os":{"type":".*","name":".*","architecture":".*","version":".*"}}/;
-    } else {
-        predicate =
-            /received client metadata from .*: {"application":{"name":".*"},"driver":{"name":".*","version":".*"},"os":{"type":".*","name":".*","architecture":".*","version":".*"}}/;
-    }
+    const predicate =
+        /"id":51800,.*"msg":"client metadata","attr":.*"doc":{"application":{"name":".*"},"driver":{"name":".*","version":".*"},"os":{"type":".*","name":".*","architecture":".*","version":".*"}}/;
 
     assert(predicate.test(log),
            "'client metadata' log line missing in log file!\n" +

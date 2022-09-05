@@ -1,5 +1,4 @@
 // Test read after opTime functionality with maxTimeMS on config servers (CSRS only)`.
-load("jstests/libs/logv2_helpers.js");
 
 (function() {
 'use strict';
@@ -36,10 +35,7 @@ assert.commandFailedWithCode(
     runFindCommand(new Timestamp(lastOp.ts.getTime() + pingIntervalSeconds * 5, 0)),
     ErrorCodes.MaxTimeMSExpired);
 
-var msg = 'Command on database local timed out waiting for read concern to be satisfied';
-if (isJsonLogNoConn()) {
-    msg = /Command timed out waiting for read concern to be satisfied.*"db":"local"/;
-}
+var msg = /Command timed out waiting for read concern to be satisfied.*"db":"local"/;
 
 assert.soon(function() {
     var logMessages = assert.commandWorked(primaryConn.adminCommand({getLog: 'global'})).log;

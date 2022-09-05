@@ -6,7 +6,6 @@
 
 var ElectionHandoffTest = (function() {
     load("jstests/replsets/rslib.js");
-    load("jstests/libs/logv2_helpers.js");
 
     const kStepDownPeriodSecs = 30;
     const kSIGTERM = 15;
@@ -76,26 +75,13 @@ var ElectionHandoffTest = (function() {
         // The checkLog() function blocks until the log line appears.
         checkLog.contains(expectedCandidate, "Starting an election due to step up request");
 
-        if (isJsonLog(expectedCandidate)) {
-            // If there are only two nodes in the set, verify that the old primary voted "yes".
-            if (numNodes === 2) {
-                checkLog.contains(
-                    expectedCandidate,
-                    `Skipping dry run and running for election","attr":{"newTerm":${term + 1}}}`);
-                checkLog.checkContainsOnceJson(
-                    expectedCandidate,
-                    51799,
-                    {"term": term + 1, vote: "yes", "from": primary.host});
-            }
-        } else {
-            // If there are only two nodes in the set, verify that the old primary voted "yes".
-            if (numNodes === 2) {
-                checkLog.contains(expectedCandidate,
-                                  `skipping dry run and running for election in term ${term + 1}`);
-                checkLog.contains(
-                    expectedCandidate,
-                    `VoteRequester(term ${term + 1}) received a yes vote from ${primary.host}`);
-            }
+        // If there are only two nodes in the set, verify that the old primary voted "yes".
+        if (numNodes === 2) {
+            checkLog.contains(
+                expectedCandidate,
+                `Skipping dry run and running for election","attr":{"newTerm":${term + 1}}}`);
+            checkLog.checkContainsOnceJson(
+                expectedCandidate, 51799, {"term": term + 1, vote: "yes", "from": primary.host});
         }
 
         rst.awaitNodesAgreeOnPrimary();

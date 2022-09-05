@@ -5,7 +5,6 @@
 "use strict";
 
 // For getLatestProfilerEntry().
-load("jstests/libs/logv2_helpers.js");
 load("jstests/libs/profiler.js");
 load("jstests/libs/sbe_util.js");
 
@@ -31,12 +30,8 @@ assert.commandWorked(testDB.setLogLevel(0, "query"));
 // Returns true if the logLine command components correspond to the profile entry. This is
 // sufficient for the purpose of testing query hashes.
 function logMatchesEntry(logLine, profileEntry) {
-    if ((!isJsonLogNoConn() ? logLine.indexOf("command: find { find: \"test\"") >= 0
-                            : logLine.indexOf('command":{"find":"test"') >= 0) &&
-        logLine.indexOf(profileEntry["command"]["comment"]) >= 0) {
-        return true;
-    }
-    return false;
+    return logLine.indexOf('command":{"find":"test"') >= 0 &&
+        logLine.indexOf(profileEntry["command"]["comment"]) >= 0;
 }
 
 // Fetch the log line that corresponds to the profile entry. If there is no such line, return

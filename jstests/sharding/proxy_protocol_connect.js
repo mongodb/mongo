@@ -8,7 +8,6 @@ if (_isWindows()) {
     // The proxy protocol python package currently doesn't support Windows.
     return;
 }
-load("jstests/libs/logv2_helpers.js");
 load("jstests/sharding/libs/proxy_protocol.js");
 
 // Test that you can connect to the load balancer port over a proxy.

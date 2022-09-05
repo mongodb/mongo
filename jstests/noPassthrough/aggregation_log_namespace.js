@@ -5,7 +5,6 @@
 'use strict';
 
 load("jstests/aggregation/extras/merge_helpers.js");  // For withEachKindOfWriteStage.
-load("jstests/libs/logv2_helpers.js");
 
 // Runs the given 'pipeline' and verifies that the namespace is correctly logged in the global
 // log for the aggregate command. The 'comment' parameter is used to match a log entry against
@@ -13,20 +12,11 @@ load("jstests/libs/logv2_helpers.js");
 function verifyLoggedNamespace({pipeline, comment}) {
     assert.commandWorked(db.runCommand(
         {aggregate: source.getName(), comment: comment, pipeline: pipeline, cursor: {}}));
-    if (isJsonLogNoConn()) {
-        checkLog.containsWithCount(
-            conn,
-            `"appName":"MongoDB Shell",` +
-                `"command":{"aggregate":"${source.getName()}","comment":"${comment}"`,
-            1);
-
-    } else {
-        checkLog.containsWithCount(
-            conn,
-            `command ${source.getFullName()} appName: "MongoDB Shell" ` +
-                `command: aggregate { aggregate: "${source.getName()}", comment: "${comment}"`,
-            1);
-    }
+    checkLog.containsWithCount(
+        conn,
+        `"appName":"MongoDB Shell",` +
+            `"command":{"aggregate":"${source.getName()}","comment":"${comment}"`,
+        1);
 }
 
 const mongodOptions = {};

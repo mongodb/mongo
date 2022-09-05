@@ -6,7 +6,6 @@
 (function() {
 'use strict';
 
-load("jstests/libs/logv2_helpers.js");
 load('jstests/replsets/libs/two_phase_drops.js');  // For TwoPhaseDropCollectionTest.
 
 // Return a list of all indexes for a given collection. Use 'args' as the
@@ -103,11 +102,7 @@ try {
 
     // Confirm in the logs that the renameCollection dropped the target collection on the
     // secondary using two phase collection drop.
-    if (isJsonLog(secondary)) {
-        checkLog.containsJson(secondary, 20315, {namespace: toColl.getFullName()});
-    } else {
-        checkLog.contains(secondary, new RegExp('dropCollection:.*' + toColl.getFullName()));
-    }
+    checkLog.containsJson(secondary, 20315, {namespace: toColl.getFullName()});
 
     // Rename target collection back to source collection. This helps to ensure the collection
     // metadata is updated correctly on both primary and secondary.

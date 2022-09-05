@@ -10,8 +10,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/logv2_helpers.js");
-
 let replSetTest = new ReplSetTest({name: "hybrid_updates", nodes: 2});
 replSetTest.startSet();
 replSetTest.initiate();

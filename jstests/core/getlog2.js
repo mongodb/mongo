@@ -8,7 +8,6 @@
 //   does_not_support_stepdowns,
 //   no_selinux,
 // ]
-load("jstests/libs/logv2_helpers.js");
 
 (function() {
 'use strict';
@@ -32,12 +31,9 @@ function contains(arr, func) {
 }
 
 function stringContains(haystack, needle) {
-    if (isJsonLog(db.getMongo())) {
-        if (needle.indexOf(":"))
-            needle = '"' + needle.replace(':', "\":");
-        needle = needle.replace(/ /g, "");
-    }
-
+    if (needle.indexOf(":"))
+        needle = '"' + needle.replace(':', "\":");
+    needle = needle.replace(/ /g, "");
     return haystack.indexOf(needle) != -1;
 }
 

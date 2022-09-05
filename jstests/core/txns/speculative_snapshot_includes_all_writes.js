@@ -12,8 +12,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/logv2_helpers.js");
-
 const dbName = "test";
 const collName = "speculative_snapshot_includes_all_writes_1";
 const collName2 = "speculative_snapshot_includes_all_writes_2";
@@ -73,13 +71,7 @@ try {
                 {_id: "b"}, {writeConcern: {w: "majority"}}));
     });
 
-    if (isJsonLog(db.getMongo())) {
-        checkLog.containsJson(db.getMongo(), 20289);
-    } else {
-        checkLog.contains(
-            db.getMongo(),
-            "hangAfterCollectionInserts fail point enabled for " + testColl2.getFullName());
-    }
+    checkLog.containsJson(db.getMongo(), 20289);
 
     jsTest.log("Create a write following the uncommitted write.");
     // Note this write must use local write concern; it cannot be majority committed until

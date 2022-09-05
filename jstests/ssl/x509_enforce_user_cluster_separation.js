@@ -1,5 +1,4 @@
 // Check if this build supports the authenticationMechanisms startup parameter.
-load("jstests/libs/logv2_helpers.js");
 
 const SERVER_CERT = "jstests/libs/server.pem";
 const SERVER_SAN_CERT = "jstests/libs/server_SAN.pem";

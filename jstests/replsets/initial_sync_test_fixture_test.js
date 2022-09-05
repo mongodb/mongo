@@ -20,7 +20,6 @@
 
 load("jstests/core/txns/libs/prepare_helpers.js");
 load("jstests/replsets/libs/initial_sync_test.js");
-load("jstests/libs/logv2_helpers.js");
 
 /**
  * Helper function to check that specific messages appeared or did not appear in the logs.
@@ -52,19 +51,12 @@ function checkLogForGetTimestampMsg(node, timestampName, timestamp, contains) {
  * UUID to make sure that it corresponds to the expected collection.
  */
 function checkLogForCollectionClonerMsg(node, commandName, dbname, contains, collUUID) {
-    let msg =
-        "Collection Cloner scheduled a remote command on the " + dbname + " db: { " + commandName;
-
-    if (isJsonLog(node)) {
-        msg = 'Collection Cloner scheduled a remote command","attr":{"stage":"' + dbname +
-            " db: { " + commandName;
-    }
+    let msg = 'Collection Cloner scheduled a remote command","attr":{"stage":"' + dbname +
+        " db: { " + commandName;
 
     if (commandName === "listIndexes" && contains) {
         msg += ": " + collUUID;
-        if (isJsonLog(node)) {
-            msg = msg.replace('("', '(\\"').replace('")', '\\")');
-        }
+        msg = msg.replace('("', '(\\"').replace('")', '\\")');
     }
 
     checkLogForMsg(node, msg, contains);

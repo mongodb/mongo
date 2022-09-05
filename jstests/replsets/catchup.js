@@ -3,7 +3,6 @@
 (function() {
 "use strict";
 
-load("jstests/libs/logv2_helpers.js");
 load("jstests/libs/write_concern_util.js");
 load("jstests/replsets/libs/election_metrics.js");
 load("jstests/replsets/rslib.js");
@@ -119,11 +118,7 @@ restartServerReplication(stepUpResults.oldSecondaries);
 assert.eq(stepUpResults.newPrimary, rst.getPrimary());
 
 // Wait until the new primary completes the transition to primary and writes a no-op.
-if (isJsonLog(stepUpResults.newPrimary)) {
-    checkLog.contains(stepUpResults.newPrimary, "Transition to primary complete");
-} else {
-    checkLog.contains(stepUpResults.newPrimary, "transition to primary complete");
-}
+checkLog.contains(stepUpResults.newPrimary, "Transition to primary complete");
 // Check that the new primary's term has been updated because of the no-op.
 assert.eq(getLatestOp(stepUpResults.newPrimary).t, stepUpResults.latestOpOnNewPrimary.t + 1);
 

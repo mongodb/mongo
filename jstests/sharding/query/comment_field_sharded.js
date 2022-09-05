@@ -8,7 +8,6 @@
 
 load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
 load("jstests/libs/profiler.js");         // For profilerHas*OrThrow helper functions.
-load("jstests/libs/logv2_helpers.js");
 
 // This test runs manual getMores using different connections, which will not inherit the
 // implicit session of the cursor establishing command.
@@ -168,19 +167,12 @@ function runCommentParamTest({
     // current operation.
     if (commentObj["uuid"]) {
         // Verify that a field with 'comment' exists in the same line as the command.
-        let expectStrings = [
-            ", comment: ",
-            checkLog.formatAsLogLine(commentObj),
-            'appName: "MongoDB Shell" command: ' + ((cmdName === "getMore") ? cmdName : "")
+        const expectStrings = [
+            ',"comment":',
+            checkLog.formatAsJsonLogLine(commentObj),
+            '"appName":"MongoDB Shell","command":{' +
+                ((cmdName === "getMore") ? '"' + cmdName + '"' : "")
         ];
-        if (isJsonLog(testDB.getMongo())) {
-            expectStrings = [
-                ',"comment":',
-                checkLog.formatAsJsonLogLine(commentObj),
-                '"appName":"MongoDB Shell","command":{' +
-                    ((cmdName === "getMore") ? '"' + cmdName + '"' : "")
-            ];
-        }
 
         verifyLogContains(
             [testDB, shard0DB, shard1DB],

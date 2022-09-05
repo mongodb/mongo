@@ -32,7 +32,6 @@
 "use strict";
 
 load('jstests/libs/profiler.js');
-load("jstests/libs/logv2_helpers.js");
 load('jstests/sharding/libs/last_lts_mongod_commands.js');
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
@@ -802,27 +801,14 @@ let setDefaultRWConcernActualTestCase = {
 //     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 function createLogLineRegularExpressionForTestCase(test, cmdName, targetId, explicitRWC) {
     let expectedProvenance = explicitRWC ? "clientSupplied" : "customDefault";
-    if (isJsonLogNoConn()) {
-        let pattern = `"command":{"${cmdName}"`;
-        pattern += `.*"comment":"${targetId}"`;
-        if (test.checkReadConcern) {
-            pattern += `.*"readConcern":{"level":"majority","provenance":"${expectedProvenance}"}`;
-        }
-        if (test.checkWriteConcern) {
-            pattern += `.*"writeConcern":{"w":"majority","wtimeout":1234567,"provenance":"${
-                expectedProvenance}"}`;
-        }
-        return new RegExp(pattern);
-    }
-
-    let pattern = `command: ${cmdName} `;
-    pattern += `.* comment: "${targetId}"`;
+    let pattern = `"command":{"${cmdName}"`;
+    pattern += `.*"comment":"${targetId}"`;
     if (test.checkReadConcern) {
-        pattern += `.* readConcern:{ level: "majority", provenance: "${expectedProvenance}" }`;
+        pattern += `.*"readConcern":{"level":"majority","provenance":"${expectedProvenance}"}`;
     }
     if (test.checkWriteConcern) {
-        pattern += `.* writeConcern:{ w: "majority", wtimeout: 1234567, provenance: "${
-            expectedProvenance}" }`;
+        pattern += `.*"writeConcern":{"w":"majority","wtimeout":1234567,"provenance":"${
+            expectedProvenance}"}`;
     }
     return new RegExp(pattern);
 }

@@ -1,7 +1,6 @@
 /**
  * Test that createCollection logs for a validator that can't match documents.
  */
-load("jstests/libs/logv2_helpers.js");
 
 (function() {
 "use strict";

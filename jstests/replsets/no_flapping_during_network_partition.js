@@ -12,7 +12,6 @@
 
 (function() {
 "use strict";
-load("jstests/libs/logv2_helpers.js");
 
 var name = "no_flapping_during_network_partition";
 
@@ -41,21 +40,13 @@ primary.disconnect(secondary);
 
 jsTestLog("Wait long enough for the secondary to call for an election.");
 checkLog.contains(secondary, "can see a healthy primary");
-if (isJsonLog(secondary)) {
-    checkLog.contains(secondary, "Not running for primary");
-} else {
-    checkLog.contains(secondary, "not running for primary");
-}
+checkLog.contains(secondary, "Not running for primary");
 
 jsTestLog("Verify the primary and secondary do not change during the partition.");
 assert.eq(primary, replTest.getPrimary());
 assert.eq(secondary, replTest.getSecondary());
 
-if (isJsonLog(secondary)) {
-    checkLog.contains(secondary, "Not running for primary");
-} else {
-    checkLog.contains(secondary, "not running for primary");
-}
+checkLog.contains(secondary, "Not running for primary");
 
 jsTestLog("Heal the partition.");
 primary.reconnect(secondary);

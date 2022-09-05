@@ -6,7 +6,6 @@
  *   requires_sharding,
  * ]
  */
-load("jstests/libs/logv2_helpers.js");
 
 (function() {
 "use strict";
@@ -58,26 +57,17 @@ function assertMatchingLogLineExists(fields) {
         return fieldNames.every((fieldName) => {
             const fieldValue = fields[fieldName];
             let regex;
-            if (isJsonLogNoConn()) {
-                const regexDecimal = "\"" + escapeRegex(fieldName) + "\":? ?(" +
-                    escapeRegex(checkLog.formatAsJsonLogLine(fieldValue, false, true)) + "|" +
-                    escapeRegex(checkLog.formatAsJsonLogLine(fieldValue, true, true)) + ")";
+            const regexDecimal = "\"" + escapeRegex(fieldName) + "\":? ?(" +
+                escapeRegex(checkLog.formatAsJsonLogLine(fieldValue, false, true)) + "|" +
+                escapeRegex(checkLog.formatAsJsonLogLine(fieldValue, true, true)) + ")";
 
-                const regexNoDecimal = "\"" + escapeRegex(fieldName) + "\":? ?(" +
-                    escapeRegex(checkLog.formatAsJsonLogLine(fieldValue, false, false)) + "|" +
-                    escapeRegex(checkLog.formatAsJsonLogLine(fieldValue, true, false)) + ")";
+            const regexNoDecimal = "\"" + escapeRegex(fieldName) + "\":? ?(" +
+                escapeRegex(checkLog.formatAsJsonLogLine(fieldValue, false, false)) + "|" +
+                escapeRegex(checkLog.formatAsJsonLogLine(fieldValue, true, false)) + ")";
 
-                const matchDecimal = line.match(regexDecimal);
-                const matchNoDecimal = line.match(regexNoDecimal);
-                return (matchDecimal && matchDecimal[0]) || (matchNoDecimal && matchNoDecimal[0]);
-            } else {
-                const regex = escapeRegex(fieldName) + ":? ?(" +
-                    escapeRegex(checkLog.formatAsLogLine(fieldValue)) + "|" +
-                    escapeRegex(checkLog.formatAsLogLine(fieldValue, true)) + ")";
-
-                const match = line.match(regex);
-                return match && match[0];
-            }
+            const matchDecimal = line.match(regexDecimal);
+            const matchNoDecimal = line.match(regexNoDecimal);
+            return (matchDecimal && matchDecimal[0]) || (matchNoDecimal && matchNoDecimal[0]);
         });
     }
 

@@ -3,7 +3,6 @@
 (function() {
 "use strict";
 load("jstests/libs/fail_point_util.js");
-load("jstests/libs/logv2_helpers.js");
 
 function runTest(conn) {
     function runHelloCommand() {

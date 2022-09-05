@@ -1,5 +1,4 @@
 // Check if this build supports the authenticationMechanisms startup parameter.
-load("jstests/libs/logv2_helpers.js");
 
 const SERVER_CERT = "jstests/libs/server.pem";
 const CA_CERT = "jstests/libs/ca.pem";
@@ -49,22 +48,14 @@ function authAndTest(mongo) {
     const log =
         assert.commandWorked(external.getSiblingDB("admin").runCommand({getLog: "global"})).log;
 
-    if (isJsonLog(mongo)) {
-        function checkAuthSuccess(element, index, array) {
-            const logJson = JSON.parse(element);
+    function checkAuthSuccess(element, index, array) {
+        const logJson = JSON.parse(element);
 
-            return logJson.id === 20429 && logJson.attr.user === CLIENT_USER &&
-                logJson.attr.db === "$external" &&
-                /(?:\d{1,3}\.){3}\d{1,3}:\d+/.test(logJson.attr.client);
-        }
-        assert(log.some(checkAuthSuccess));
-    } else {
-        const successRegex =
-            new RegExp(`Successfully authenticated as principal ${CLIENT_USER} on ` +
-                       `\\$external from client (?:\\d{1,3}\\.){3}\\d{1,3}:\\d+`);
-
-        assert(log.some((line) => successRegex.test(line)));
+        return logJson.id === 20429 && logJson.attr.user === CLIENT_USER &&
+            logJson.attr.db === "$external" &&
+            /(?:\d{1,3}\.){3}\d{1,3}:\d+/.test(logJson.attr.client);
     }
+    assert(log.some(checkAuthSuccess));
 
     let createServerUser = function() {
         // It should be impossible to create users with the same name as the server's subject,

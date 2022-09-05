@@ -9,7 +9,6 @@
 "use strict";
 
 load("jstests/libs/fail_point_util.js");
-load("jstests/libs/logv2_helpers.js");
 load('jstests/noPassthrough/libs/index_build.js');
 
 const rst = new ReplSetTest({
@@ -62,11 +61,7 @@ assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build be
 // With both single-phase and two-phase index builds, a stepdown at this point will abort the index
 // build because the builder thread cannot generate an optime. Wait for the command thread, not the
 // IndexBuildsCoordinator, to report the index build as failed.
-if (isJsonLog(primary)) {
-    checkLog.containsJson(primary, 20449);
-} else {
-    checkLog.contains(primary, 'Index build failed: ');
-}
+checkLog.containsJson(primary, 20449);
 
 // Check that no new index has been created.  This verifies that the index build was aborted
 // rather than successfully completed.
