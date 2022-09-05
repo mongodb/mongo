@@ -1194,7 +1194,7 @@ ThreadRunner::random_signed()
 {
     uint32_t r = random_value();
     int sign = ((r & 0x1) == 0 ? 1 : -1);
-    return (((float)r * sign) / UINT32_MAX);
+    return ((r * sign) / (float)UINT32_MAX);
 }
 
 Throttle::Throttle(ThreadRunner &runner, double throttle, double throttle_burst)
