@@ -27,22 +27,18 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/migration_coordinator.h"
 
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
-#include "mongo/db/vector_clock.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
-
 
 namespace mongo {
 
@@ -191,7 +187,7 @@ SemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient(
         23894, 2, "Making commit decision durable", "migrationId"_attr = _migrationInfo.getId());
     migrationutil::persistCommitDecision(opCtx, _migrationInfo);
 
-    waitForReleaseRecipientCriticalSectionFuture(opCtx);
+    _waitForReleaseRecipientCriticalSectionFutureIgnoreShardNotFound(opCtx);
 
     LOGV2_DEBUG(
         23895,
@@ -262,7 +258,7 @@ void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* 
 
     hangBeforeSendingAbortDecision.pauseWhileSet();
 
-    waitForReleaseRecipientCriticalSectionFuture(opCtx);
+    _waitForReleaseRecipientCriticalSectionFutureIgnoreShardNotFound(opCtx);
 
     // Ensure removing the local range deletion document to prevent incoming migrations with
     // overlapping ranges to hang.
@@ -313,7 +309,17 @@ void MigrationCoordinator::forgetMigration(OperationContext* opCtx) {
                 2,
                 "Deleting migration coordinator document",
                 "migrationId"_attr = _migrationInfo.getId());
-    migrationutil::deleteMigrationCoordinatorDocumentLocally(opCtx, _migrationInfo.getId());
+
+    // Before deleting the migration coordinator document, ensure that in the case of a crash, the
+    // node will start-up from at least the configTime, which it obtained as part of recovery of the
+    // shardVersion, which will ensure that it will see at least the same shardVersion.
+    VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
+
+    PersistentTaskStore<MigrationCoordinatorDocument> store(
+        NamespaceString::kMigrationCoordinatorsNamespace);
+    store.remove(opCtx,
+                 BSON(MigrationCoordinatorDocument::kIdFieldName << _migrationInfo.getId()),
+                 WriteConcernOptions{1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)});
 }
 
 void MigrationCoordinator::launchReleaseRecipientCriticalSection(OperationContext* opCtx) {
@@ -325,7 +331,8 @@ void MigrationCoordinator::launchReleaseRecipientCriticalSection(OperationContex
             _migrationInfo.getMigrationSessionId());
 }
 
-void MigrationCoordinator::waitForReleaseRecipientCriticalSectionFuture(OperationContext* opCtx) {
+void MigrationCoordinator::_waitForReleaseRecipientCriticalSectionFutureIgnoreShardNotFound(
+    OperationContext* opCtx) {
     invariant(_releaseRecipientCriticalSectionFuture);
     try {
         _releaseRecipientCriticalSectionFuture->get(opCtx);
@@ -338,5 +345,4 @@ void MigrationCoordinator::waitForReleaseRecipientCriticalSectionFuture(Operatio
 }
 
 }  // namespace migrationutil
-
 }  // namespace mongo

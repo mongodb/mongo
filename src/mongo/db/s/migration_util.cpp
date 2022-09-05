@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/migration_util.h"
 
 #include <fmt/format.h>
@@ -42,14 +39,12 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/active_migrations_registry.h"
-#include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_coordinator.h"
 #include "mongo/db/s/migration_destination_manager.h"
@@ -59,7 +54,6 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/session/logical_session_cache.h"
-#include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/executor/network_interface_factory.h"
@@ -76,7 +70,6 @@
 #include "mongo/util/future_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingMigration
-
 
 namespace mongo {
 namespace migrationutil {
@@ -112,7 +105,6 @@ const Backoff kExponentialBackoff(Seconds(10), Milliseconds::max());
 const WriteConcernOptions kMajorityWriteConcern(WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
                                                 WriteConcernOptions::kNoTimeout);
-
 
 class MigrationUtilExecutor {
 public:
@@ -272,6 +264,41 @@ void refreshFilteringMetadataUntilSuccess(OperationContext* opCtx, const Namespa
         });
 }
 
+void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
+                                     const NamespaceString& nss,
+                                     const UUID& collUUID,
+                                     const ChunkRange& range,
+                                     const ChunkVersion& preMigrationChunkVersion) {
+    ConfigsvrEnsureChunkVersionIsGreaterThan ensureChunkVersionIsGreaterThanRequest;
+    ensureChunkVersionIsGreaterThanRequest.setDbName(NamespaceString::kAdminDb);
+    ensureChunkVersionIsGreaterThanRequest.setMinKey(range.getMin());
+    ensureChunkVersionIsGreaterThanRequest.setMaxKey(range.getMax());
+    ensureChunkVersionIsGreaterThanRequest.setVersion(preMigrationChunkVersion);
+    ensureChunkVersionIsGreaterThanRequest.setNss(nss);
+    ensureChunkVersionIsGreaterThanRequest.setCollectionUUID(collUUID);
+    const auto ensureChunkVersionIsGreaterThanRequestBSON =
+        ensureChunkVersionIsGreaterThanRequest.toBSON({});
+
+    hangInEnsureChunkVersionIsGreaterThanInterruptible.pauseWhileSet(opCtx);
+
+    const auto ensureChunkVersionIsGreaterThanResponse =
+        Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            "admin",
+            CommandHelpers::appendMajorityWriteConcern(ensureChunkVersionIsGreaterThanRequestBSON),
+            Shard::RetryPolicy::kIdempotent);
+    const auto ensureChunkVersionIsGreaterThanStatus =
+        Shard::CommandResponse::getEffectiveStatus(ensureChunkVersionIsGreaterThanResponse);
+
+    uassertStatusOK(ensureChunkVersionIsGreaterThanStatus);
+
+    if (hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible.shouldFail()) {
+        hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible.pauseWhileSet();
+        uasserted(ErrorCodes::InternalError,
+                  "simulate an error response for _configsvrEnsureChunkVersionIsGreaterThan");
+    }
+}
 
 }  // namespace
 
@@ -877,55 +904,6 @@ void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& mi
         hangInReadyRangeDeletionLocallyThenSimulateErrorUninterruptible.pauseWhileSet(opCtx);
         uasserted(ErrorCodes::InternalError,
                   "simulate an error response when initiating range deletion locally");
-    }
-}
-
-void deleteMigrationCoordinatorDocumentLocally(OperationContext* opCtx, const UUID& migrationId) {
-    // Before deleting the migration coordinator document, ensure that in the case of a crash, the
-    // node will start-up from at least the configTime, which it obtained as part of recovery of the
-    // shardVersion, which will ensure that it will see at least the same shardVersion.
-    VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
-
-    PersistentTaskStore<MigrationCoordinatorDocument> store(
-        NamespaceString::kMigrationCoordinatorsNamespace);
-    store.remove(opCtx,
-                 BSON(MigrationCoordinatorDocument::kIdFieldName << migrationId),
-                 WriteConcernOptions{1, WriteConcernOptions::SyncMode::UNSET, Seconds(0)});
-}
-
-void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
-                                     const NamespaceString& nss,
-                                     const UUID& collUUID,
-                                     const ChunkRange& range,
-                                     const ChunkVersion& preMigrationChunkVersion) {
-    ConfigsvrEnsureChunkVersionIsGreaterThan ensureChunkVersionIsGreaterThanRequest;
-    ensureChunkVersionIsGreaterThanRequest.setDbName(NamespaceString::kAdminDb);
-    ensureChunkVersionIsGreaterThanRequest.setMinKey(range.getMin());
-    ensureChunkVersionIsGreaterThanRequest.setMaxKey(range.getMax());
-    ensureChunkVersionIsGreaterThanRequest.setVersion(preMigrationChunkVersion);
-    ensureChunkVersionIsGreaterThanRequest.setNss(nss);
-    ensureChunkVersionIsGreaterThanRequest.setCollectionUUID(collUUID);
-    const auto ensureChunkVersionIsGreaterThanRequestBSON =
-        ensureChunkVersionIsGreaterThanRequest.toBSON({});
-
-    hangInEnsureChunkVersionIsGreaterThanInterruptible.pauseWhileSet(opCtx);
-
-    const auto ensureChunkVersionIsGreaterThanResponse =
-        Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            "admin",
-            CommandHelpers::appendMajorityWriteConcern(ensureChunkVersionIsGreaterThanRequestBSON),
-            Shard::RetryPolicy::kIdempotent);
-    const auto ensureChunkVersionIsGreaterThanStatus =
-        Shard::CommandResponse::getEffectiveStatus(ensureChunkVersionIsGreaterThanResponse);
-
-    uassertStatusOK(ensureChunkVersionIsGreaterThanStatus);
-
-    if (hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible.shouldFail()) {
-        hangInEnsureChunkVersionIsGreaterThanThenSimulateErrorUninterruptible.pauseWhileSet();
-        uasserted(ErrorCodes::InternalError,
-                  "simulate an error response for _configsvrEnsureChunkVersionIsGreaterThan");
     }
 }
 

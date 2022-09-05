@@ -34,8 +34,8 @@
 #include "mongo/s/catalog/type_chunk.h"
 
 namespace mongo {
-
 namespace migrationutil {
+
 /**
  * Manages the migration commit/abort process, including updates to config.rangeDeletions on the
  * donor and the recipient, and updates to the routing table on the config server.
@@ -50,6 +50,7 @@ public:
                          ChunkRange range,
                          ChunkVersion preMigrationChunkVersion,
                          bool waitForDelete);
+
     MigrationCoordinator(const MigrationCoordinatorDocument& doc);
     MigrationCoordinator(const MigrationCoordinator&) = delete;
     MigrationCoordinator& operator=(const MigrationCoordinator&) = delete;
@@ -116,9 +117,10 @@ private:
     void _abortMigrationOnDonorAndRecipient(OperationContext* opCtx);
 
     /**
-     * Waits for the completion of _releaseRecipientCriticalSectionFuture
+     * Waits for the completion of _releaseRecipientCriticalSectionFuture and ignores ShardNotFound
+     * exceptions.
      */
-    void waitForReleaseRecipientCriticalSectionFuture(OperationContext* opCtx);
+    void _waitForReleaseRecipientCriticalSectionFutureIgnoreShardNotFound(OperationContext* opCtx);
 
     MigrationCoordinatorDocument _migrationInfo;
     bool _waitForDelete = false;

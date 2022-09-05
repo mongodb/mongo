@@ -210,20 +210,6 @@ void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                              const UUID& migrationId);
 
 /**
- * Deletes the migration coordinator document with the specified id from
- * config.migrationCoordinators without waiting for majority writeConcern.
- */
-void deleteMigrationCoordinatorDocumentLocally(OperationContext* opCtx, const UUID& migrationId);
-
-/**
- * Sends _configsvrEnsureChunkVersionIsGreaterThan for the range and preMigrationChunkVersion until
- * hearing success or the node steps down or shuts down.
- */
-void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
-                                     const ChunkRange& range,
-                                     const ChunkVersion& preMigrationChunkVersion);
-
-/**
  * Submits an asynchronous task to scan config.migrationCoordinators and drive each unfinished
  * migration coordination to completion.
  */
