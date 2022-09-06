@@ -406,7 +406,7 @@ size_t Exchange::getTargetConsumer(const Document& input) {
     // Build the key.
     BSONObjBuilder kb;
     size_t counter = 0;
-    for (auto elem : _keyPattern) {
+    for (const auto& elem : _keyPattern) {
         auto value = input.getNestedField(_keyPaths[counter]);
 
         // By definition we send documents with missing fields to the consumer 0.
