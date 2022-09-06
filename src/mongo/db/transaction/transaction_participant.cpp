@@ -1812,7 +1812,7 @@ void TransactionParticipant::Participant::commitUnpreparedTransaction(OperationC
             "commitTransaction must provide commitTimestamp to prepared transaction.",
             !o().txnState.isPrepared());
 
-    auto txnOps = retrieveCompletedTransactionOperations(opCtx);
+    auto& txnOps = retrieveCompletedTransactionOperations(opCtx);
     auto opObserver = opCtx->getServiceContext()->getOpObserver();
     invariant(opObserver);
 
