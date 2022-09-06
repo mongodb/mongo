@@ -79,9 +79,13 @@ private:
     void onInitialDataAvailable(OperationContext*, bool) final {}
 
     void onShutdown() final {
-        stdx::unique_lock<Latch> lk(_mutex);
-        _interrupt(lk);
-        _reset(lk);
+        {
+            stdx::lock_guard lk(_mutex);
+            // Prevents a new migration from starting up during or after shutdown.
+            _isShuttingDown = true;
+        }
+        interruptAll();
+        _reset();
     }
 
     void onStartup(OperationContext*) final {}
@@ -97,12 +101,12 @@ private:
     /**
      * A worker function that waits for ImporterEvents and handles cloning and importing files.
      */
-    void _handleEvents(OperationContext* opCtx);
+    void _handleEvents(const UUID& migrationId);
 
     /**
      * Called to inform the primary that we have finished copying and importing all files.
      */
-    void _voteImportedFiles(OperationContext* opCtx);
+    void _voteImportedFiles(OperationContext* opCtx, const UUID& migrationId);
 
     /**
      * Called internally by interrupt and interruptAll to interrupt a running file import operation.
@@ -112,7 +116,7 @@ private:
     /**
      * Waits for all async work to be finished and then resets internal state.
      */
-    void _reset(WithLock);
+    void _reset();
 
     // Explicit State enum ordering defined here because we rely on comparison
     // operators for state checking in various TenantFileImporterService methods.
@@ -165,8 +169,13 @@ private:
     // (W)  Synchronization required only for writes.
     // (I)  Independently synchronized, see member variable comment.
 
-    // The worker thread that processes ImporterEvents
-    std::unique_ptr<stdx::thread> _thread;  // (M)
+    // Set to true when the shutdown procedure is initiated.
+    bool _isShuttingDown = false;  // (M)
+
+    OperationContext* _opCtx;  // (M)
+
+    // The worker thread that processes ImporterEvents.
+    std::unique_ptr<stdx::thread> _workerThread;  // (M)
 
     // The UUID of the current running migration.
     boost::optional<UUID> _migrationId;  // (M)
