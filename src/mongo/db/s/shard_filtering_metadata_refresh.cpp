@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 
 #include "mongo/db/catalog/database_holder.h"
@@ -50,7 +49,6 @@
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 namespace {
@@ -313,12 +311,19 @@ void onDbVersionMismatch(OperationContext* opCtx,
     }
 }
 
-// Return true if joins a shard version update/recover/refresh (in that case, all locks are dropped)
+/**
+ * Blocking method, which will wait for any concurrent operations that could change the shard
+ * version to complete (namely critical section and concurrent onShardVersionMismatch invocations).
+ *
+ * Returns 'true' if there were concurrent operations that had to be joined (in which case all locks
+ * will be dropped). If there were none, returns false and the locks continue to be held.
+ */
 bool joinShardVersionOperation(OperationContext* opCtx,
                                CollectionShardingRuntime* csr,
                                boost::optional<Lock::DBLock>* dbLock,
                                boost::optional<Lock::CollectionLock>* collLock,
                                boost::optional<CollectionShardingRuntime::CSRLock>* csrLock) {
+    invariant(dbLock->has_value());
     invariant(collLock->has_value());
     invariant(csrLock->has_value());
 
@@ -484,6 +489,7 @@ void onShardVersionMismatch(OperationContext* opCtx,
 
     while (true) {
         boost::optional<SharedSemiFuture<void>> inRecoverOrRefresh;
+
         {
             boost::optional<Lock::DBLock> dbLock;
             boost::optional<Lock::CollectionLock> collLock;
@@ -498,8 +504,7 @@ void onShardVersionMismatch(OperationContext* opCtx,
                 continue;
             }
 
-            auto metadata = csr->getCurrentMetadataIfKnown();
-            if (metadata) {
+            if (auto metadata = csr->getCurrentMetadataIfKnown()) {
                 // Check if the current shard version is fresh enough
                 if (shardVersionReceived) {
                     const auto currentShardVersion = metadata->getShardVersion();
@@ -514,22 +519,23 @@ void onShardVersionMismatch(OperationContext* opCtx,
             csrLock.reset();
             csrLock.emplace(CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr));
 
-            // If there is no ongoing shard version operation, initialize the RecoverRefreshThread
-            // thread and associate it to the CSR.
-            if (!joinShardVersionOperation(opCtx, csr, &dbLock, &collLock, &csrLock)) {
-                // If the shard doesn't yet know its filtering metadata, recovery needs to be run
-                const bool runRecover = metadata ? false : true;
-                CancellationSource cancellationSource;
-                CancellationToken cancellationToken = cancellationSource.token();
-                csr->setShardVersionRecoverRefreshFuture(
-                    recoverRefreshShardVersion(
-                        opCtx->getServiceContext(), nss, runRecover, std::move(cancellationToken)),
-                    std::move(cancellationSource),
-                    *csrLock);
-                inRecoverOrRefresh = csr->getShardVersionRecoverRefreshFuture(opCtx);
-            } else {
+            if (joinShardVersionOperation(opCtx, csr, &dbLock, &collLock, &csrLock)) {
                 continue;
             }
+
+            // If we reached here, there were no ongoing critical sections or recoverRefresh running
+            // and we are holding the exclusive CSR lock.
+
+            // If the shard doesn't yet know its filtering metadata, recovery needs to be run
+            const bool runRecover = csr->getCurrentMetadataIfKnown() ? false : true;
+            CancellationSource cancellationSource;
+            CancellationToken cancellationToken = cancellationSource.token();
+            csr->setShardVersionRecoverRefreshFuture(
+                recoverRefreshShardVersion(
+                    opCtx->getServiceContext(), nss, runRecover, std::move(cancellationToken)),
+                std::move(cancellationSource),
+                *csrLock);
+            inRecoverOrRefresh = csr->getShardVersionRecoverRefreshFuture(opCtx);
         }
 
         try {
