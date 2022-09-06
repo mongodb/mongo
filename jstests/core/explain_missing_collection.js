@@ -5,6 +5,7 @@
  * ]
  */
 (function() {
+db.filler_collection.drop();
 assert.commandWorked(db.createCollection("filler_collection"));
 
 var missingColl = db.explain_null_collection;
