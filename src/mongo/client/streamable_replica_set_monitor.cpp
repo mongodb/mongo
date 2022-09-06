@@ -199,7 +199,6 @@ StreamableReplicaSetMonitor::StreamableReplicaSetMonitor(
       _uri(uri),
       _connectionManager(connectionManager),
       _executor(executor),
-      _random(PseudoRandom(SecureRandom().nextInt64())),
       _stats(std::make_shared<ReplicaSetMonitorStats>(managerStats)) {
     // Maintain order of original seed list
     std::vector<HostAndPort> seedsNoDups;
@@ -331,8 +330,9 @@ SemiFuture<HostAndPort> StreamableReplicaSetMonitor::getHostOrRefresh(
     return getHostsOrRefresh(criteria, excludedHosts, cancelToken)
         .thenRunOn(_executor)
         .then([self = shared_from_this()](const std::vector<HostAndPort>& result) {
-            invariant(result.size());
-            return result[self->_random.nextInt64(result.size())];
+            invariant(!result.empty());
+            // We do a random shuffle when we get the hosts so we can just pick the first one
+            return result[0];
         })
         .semi();
 }

@@ -312,7 +312,6 @@ private:
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ReplicaSetMonitor");
     std::list<HostQueryPtr> _outstandingQueries;
     boost::optional<ChangeNotifierState> _confirmedNotifierState;
-    mutable PseudoRandom _random;
     std::shared_ptr<ReplicaSetMonitorStats> _stats;
 
     static constexpr auto kDefaultLogLevel = 0;
