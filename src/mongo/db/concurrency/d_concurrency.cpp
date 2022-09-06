@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/concurrency/d_concurrency.h"
 
 #include <memory>
@@ -48,9 +45,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-
 namespace mongo {
-
 namespace {
 
 /**
@@ -133,9 +128,6 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
                              InterruptBehavior behavior,
                              bool skipRSTLLock)
     : _opCtx(opCtx),
-      _result(LOCK_INVALID),
-      _pbwm(opCtx->lockState(), resourceIdParallelBatchWriterMode),
-      _fcvLock(opCtx->lockState(), resourceIdFeatureCompatibilityVersion),
       _interruptBehavior(behavior),
       _skipRSTLLock(skipRSTLLock),
       _isOutermostLock(!opCtx->lockState()->isLocked()) {
@@ -143,20 +135,25 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
 
     try {
         if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
-            _pbwm.lock(opCtx, MODE_IS, deadline);
+            _pbwm.emplace(
+                opCtx, opCtx->lockState(), resourceIdParallelBatchWriterMode, MODE_IS, deadline);
         }
         ScopeGuard unlockPBWM([this] {
             if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
-                _pbwm.unlock();
+                _pbwm.reset();
             }
         });
 
         if (_opCtx->lockState()->shouldConflictWithSetFeatureCompatibilityVersion()) {
-            _fcvLock.lock(_opCtx, isSharedLockMode(lockMode) ? MODE_IS : MODE_IX, deadline);
+            _fcvLock.emplace(_opCtx,
+                             opCtx->lockState(),
+                             resourceIdFeatureCompatibilityVersion,
+                             isSharedLockMode(lockMode) ? MODE_IS : MODE_IX,
+                             deadline);
         }
         ScopeGuard unlockFCVLock([this] {
             if (_opCtx->lockState()->shouldConflictWithSetFeatureCompatibilityVersion()) {
-                _fcvLock.unlock();
+                _fcvLock.reset();
             }
         });
 

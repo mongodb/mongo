@@ -54,15 +54,16 @@ public:
         ResourceLock& operator=(const ResourceLock&) = delete;
 
     public:
-        ResourceLock(Locker* locker, ResourceId rid)
-            : _rid(rid), _locker(locker), _result(LOCK_INVALID) {}
-
         ResourceLock(Locker* locker, ResourceId rid, LockMode mode)
             : ResourceLock(nullptr, locker, rid, mode) {}
 
-        ResourceLock(OperationContext* opCtx, Locker* locker, ResourceId rid, LockMode mode)
+        ResourceLock(OperationContext* opCtx,
+                     Locker* locker,
+                     ResourceId rid,
+                     LockMode mode,
+                     Date_t deadline = Date_t::max())
             : _rid(rid), _locker(locker), _result(LOCK_INVALID) {
-            lock(opCtx, mode);
+            lock(opCtx, mode, deadline);
         }
 
         ResourceLock(ResourceLock&& otherLock)
@@ -250,9 +251,11 @@ public:
         void _unlock();
 
         OperationContext* const _opCtx;
-        LockResult _result;
-        ResourceLock _pbwm;
-        ResourceLock _fcvLock;
+        LockResult _result{LOCK_INVALID};
+
+        boost::optional<ResourceLock> _pbwm;
+        boost::optional<ResourceLock> _fcvLock;
+
         InterruptBehavior _interruptBehavior;
         bool _skipRSTLLock;
         const bool _isOutermostLock;

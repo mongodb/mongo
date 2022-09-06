@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include <functional>
 #include <memory>
 #include <string>
@@ -52,7 +49,6 @@
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace {
@@ -2338,18 +2334,17 @@ TEST_F(DConcurrencyTestFixture, FailPointInLockDoesNotFailUninterruptibleNonInte
 
 TEST_F(DConcurrencyTestFixture, PBWMRespectsMaxTimeMS) {
     auto clientOpCtxPairs = makeKClientsWithLockers(2);
+
     auto opCtx1 = clientOpCtxPairs[0].second.get();
+    Lock::ResourceLock pbwm1(
+        opCtx1, opCtx1->lockState(), resourceIdParallelBatchWriterMode, MODE_X);
+
     auto opCtx2 = clientOpCtxPairs[1].second.get();
-
-    Lock::ResourceLock pbwm1(opCtx1->lockState(), resourceIdParallelBatchWriterMode);
-    pbwm1.lock(nullptr, MODE_X);
-
     opCtx2->setDeadlineAfterNowBy(Seconds{1}, ErrorCodes::ExceededTimeLimit);
-
-    Lock::ResourceLock pbwm2(opCtx2->lockState(), resourceIdParallelBatchWriterMode);
-
     ASSERT_THROWS_CODE(
-        pbwm2.lock(opCtx2, MODE_X), AssertionException, ErrorCodes::ExceededTimeLimit);
+        Lock::ResourceLock(opCtx2, opCtx2->lockState(), resourceIdParallelBatchWriterMode, MODE_X),
+        AssertionException,
+        ErrorCodes::ExceededTimeLimit);
 }
 
 TEST_F(DConcurrencyTestFixture, DifferentTenantsTakeDBLockOnConflictingNamespaceOk) {

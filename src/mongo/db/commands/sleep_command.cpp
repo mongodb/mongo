@@ -125,15 +125,16 @@ public:
     }
 
     void _sleepInPBWM(mongo::OperationContext* opCtx, long long millis) {
-        Lock::ResourceLock pbwm(opCtx->lockState(), resourceIdParallelBatchWriterMode);
-        pbwm.lock(nullptr, MODE_X);
+        Lock::ResourceLock pbwm(
+            opCtx, opCtx->lockState(), resourceIdParallelBatchWriterMode, MODE_X);
+        LOGV2(6001604, "PBWM MODE_X lock acquired by sleep command.");
         opCtx->sleepFor(Milliseconds(millis));
         pbwm.unlock();
     }
 
     void _sleepInRSTL(mongo::OperationContext* opCtx, long long millis) {
-        Lock::ResourceLock rstl(opCtx->lockState(), resourceIdReplicationStateTransitionLock);
-        rstl.lock(nullptr, MODE_X);
+        Lock::ResourceLock rstl(
+            opCtx, opCtx->lockState(), resourceIdReplicationStateTransitionLock, MODE_X);
         LOGV2(6001600, "RSTL MODE_X lock acquired by sleep command.");
         opCtx->sleepFor(Milliseconds(millis));
         rstl.unlock();
