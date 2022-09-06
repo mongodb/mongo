@@ -31,6 +31,7 @@
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/initial_split_policy.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/unittest/unittest.h"
@@ -1763,9 +1764,9 @@ TEST_F(ReshardingInitSplitTest, NoZones) {
     shardRegistry()->reload(operationContext());
 
     std::list<BSONObj> mockSamples;
-    mockSamples.push_back(BSON("x" << 10 << "y" << 10));
-    mockSamples.push_back(BSON("x" << 10 << "y" << 20));
-    mockSamples.push_back(BSON("x" << 10 << "y" << 30));
+    mockSamples.push_back(BSON("y" << 10));
+    mockSamples.push_back(BSON("y" << 20));
+    mockSamples.push_back(BSON("y" << 30));
 
     auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
 
@@ -1800,9 +1801,9 @@ TEST_F(ReshardingInitSplitTest, HashedShardKey) {
     shardRegistry()->reload(operationContext());
 
     std::list<BSONObj> mockSamples;
-    mockSamples.push_back(BSON("x" << 10 << "y" << 7766103514953448109LL));
-    mockSamples.push_back(BSON("x" << 10 << "y" << -9117533237618642180LL));
-    mockSamples.push_back(BSON("x" << 10 << "y" << -1196399207910989725LL));
+    mockSamples.push_back(BSON("y" << 7766103514953448109LL));
+    mockSamples.push_back(BSON("y" << -9117533237618642180LL));
+    mockSamples.push_back(BSON("y" << -1196399207910989725LL));
 
     auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
 
@@ -1865,9 +1866,9 @@ TEST_F(ReshardingInitSplitTest, ZonesCoversEntireDomainButInsufficient) {
     shardRegistry()->reload(operationContext());
 
     std::list<BSONObj> mockSamples;
-    mockSamples.push_back(BSON("x" << 10 << "y" << 10));
-    mockSamples.push_back(BSON("x" << 10 << "y" << 20));
-    mockSamples.push_back(BSON("x" << 10 << "y" << 30));
+    mockSamples.push_back(BSON("y" << 10));
+    mockSamples.push_back(BSON("y" << 20));
+    mockSamples.push_back(BSON("y" << 30));
 
     auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
 
@@ -1905,9 +1906,9 @@ TEST_F(ReshardingInitSplitTest, SamplesCoincidingWithZones) {
     shardRegistry()->reload(operationContext());
 
     std::list<BSONObj> mockSamples;
-    mockSamples.push_back(BSON("x" << 10 << "y" << 10));
-    mockSamples.push_back(BSON("x" << 10 << "y" << 20));
-    mockSamples.push_back(BSON("x" << 10 << "y" << 30));
+    mockSamples.push_back(BSON("y" << 10));
+    mockSamples.push_back(BSON("y" << 20));
+    mockSamples.push_back(BSON("y" << 30));
 
     auto mockSampleSource = std::make_unique<MockPipelineSource>(std::move(mockSamples));
 

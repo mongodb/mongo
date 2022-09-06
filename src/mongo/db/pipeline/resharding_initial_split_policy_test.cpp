@@ -31,6 +31,7 @@
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/s/config/initial_split_policy.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/query/sharded_agg_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
@@ -45,7 +46,6 @@ const ShardId primaryShardId = ShardId("0");
 
 TEST_F(ReshardingSplitPolicyTest, ShardKeyWithNonDottedFieldAndIdIsNotProjectedSucceeds) {
     auto shardKeyPattern = ShardKeyPattern(BSON("a" << 1));
-
     auto pipeline =
         Pipeline::parse(ReshardingSplitPolicy::createRawPipeline(
                             shardKeyPattern, 2 /* samplingRatio */, 1 /* numSplitPoints */),
@@ -53,7 +53,6 @@ TEST_F(ReshardingSplitPolicyTest, ShardKeyWithNonDottedFieldAndIdIsNotProjectedS
     auto mockSource =
         DocumentSourceMock::createForTest({"{_id: 10, a: 15}", "{_id: 3, a: 5}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
-
     // We sample all of the documents since numSplitPoints(1) * samplingRatio (2) = 2 and the
     // document source has 2 chunks. So we can assert on the returned values.
     auto next = pipeline->getNext();
@@ -90,7 +89,6 @@ TEST_F(ReshardingSplitPolicyTest, ShardKeyWithIdFieldIsProjectedSucceeds) {
 TEST_F(ReshardingSplitPolicyTest, CompoundShardKeyWithNonDottedHashedFieldSucceeds) {
     auto shardKeyPattern = ShardKeyPattern(BSON("a" << 1 << "b"
                                                     << "hashed"));
-
     auto pipeline =
         Pipeline::parse(ReshardingSplitPolicy::createRawPipeline(
                             shardKeyPattern, 2 /* samplingRatio */, 1 /* numSplitPoints */),
@@ -98,7 +96,6 @@ TEST_F(ReshardingSplitPolicyTest, CompoundShardKeyWithNonDottedHashedFieldSuccee
     auto mockSource = DocumentSourceMock::createForTest(
         {"{x: 1, b: 16, a: 15}", "{x: 2, b: 123, a: 5}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
-
     // We sample all of the documents since numSplitPoints(1) * samplingRatio (2) = 2 and the
     // document source has 2 chunks. So we can assert on the returned values.
     auto next = pipeline->getNext();
@@ -126,9 +123,9 @@ TEST_F(ReshardingSplitPolicyTest, CompoundShardKeyWithDottedFieldSucceeds) {
     // We sample all of the documents since numSplitPoints(1) * samplingRatio (2) = 2 and the
     // document source has 2 chunks. So we can assert on the returned values.
     auto next = pipeline->getNext();
-    ASSERT_BSONOBJ_EQ(next.value().toBson(), BSON("a" << BSON("b" << 10) << "c" << 5));
+    ASSERT_BSONOBJ_EQ(next.value().toBson(), BSON("a.b" << 10 << "c" << 5));
     next = pipeline->getNext();
-    ASSERT_BSONOBJ_EQ(next.value().toBson(), BSON("a" << BSON("b" << 20) << "c" << 1));
+    ASSERT_BSONOBJ_EQ(next.value().toBson(), BSON("a.b" << 20 << "c" << 1));
     ASSERT(!pipeline->getNext());
 }
 
@@ -148,10 +145,10 @@ TEST_F(ReshardingSplitPolicyTest, CompoundShardKeyWithDottedHashedFieldSucceeds)
     // document source has 2 chunks. So we can assert on the returned values.
     auto next = pipeline->getNext();
     ASSERT_BSONOBJ_EQ(next.value().toBson(),
-                      BSON("a" << BSON("b" << 10 << "c" << -6548868637522515075LL) << "c" << 5));
+                      BSON("a.b" << 10 << "c" << 5 << "a.c" << -6548868637522515075LL));
     next = pipeline->getNext();
     ASSERT_BSONOBJ_EQ(next.value().toBson(),
-                      BSON("a" << BSON("b" << 20 << "c" << 2598032665634823220LL) << "c" << 1));
+                      BSON("a.b" << 20 << "c" << 1 << "a.c" << 2598032665634823220LL));
     ASSERT(!pipeline->getNext());
 }
 
@@ -198,5 +195,57 @@ TEST_F(ReshardingSplitPolicyTest, SamplingSuceeds) {
     }
 }
 
+TEST_F(ReshardingSplitPolicyTest, ShardKeyWithDottedPathAndIdIsNotProjectedSucceeds) {
+    auto shardKeyPattern = ShardKeyPattern(BSON("b" << 1));
+    auto pipeline =
+        Pipeline::parse(ReshardingSplitPolicy::createRawPipeline(
+                            shardKeyPattern, 2 /* samplingRatio */, 1 /* numSplitPoints */),
+                        expCtx());
+    auto mockSource = DocumentSourceMock::createForTest(
+        {"{_id: {a: 15}, b: 10}", "{_id: {a: 5}, b:1}"}, expCtx());
+    pipeline->addInitialSource(mockSource.get());
+    auto next = pipeline->getNext();
+    ASSERT_BSONOBJ_EQ(next.value().toBson(), BSON("b" << 1));
+    next = pipeline->getNext();
+    ASSERT_BSONOBJ_EQ(next.value().toBson(), BSON("b" << 10));
+    ASSERT(!pipeline->getNext());
+}
+
+TEST_F(ReshardingSplitPolicyTest, CompoundShardKeyWithDottedPathAndIdIsProjectedSucceeds) {
+    auto shardKeyPattern = ShardKeyPattern(BSON("_id.a" << 1 << "c" << 1));
+    auto pipeline =
+        Pipeline::parse(ReshardingSplitPolicy::createRawPipeline(
+                            shardKeyPattern, 2 /* samplingRatio */, 1 /* numSplitPoints */),
+                        expCtx());
+    auto mockSource = DocumentSourceMock::createForTest(
+        {"{_id: {a: 15}, c: 10}", "{_id: {a: 5}, c: 1}"}, expCtx());
+    pipeline->addInitialSource(mockSource.get());
+    auto next = pipeline->getNext();
+    ASSERT_BSONOBJ_EQ(next.value().toBson(), BSON("_id.a" << 5 << "c" << 1));
+    next = pipeline->getNext();
+    ASSERT_BSONOBJ_EQ(next.value().toBson(), BSON("_id.a" << 15 << "c" << 10));
+    ASSERT(!pipeline->getNext());
+}
+
+TEST_F(ReshardingSplitPolicyTest, CompoundShardKeyWithDottedHashedPathSucceeds) {
+    auto shardKeyPattern = ShardKeyPattern(BSON("_id.a" << 1 << "b" << 1 << "_id.b"
+                                                        << "hashed"));
+
+    auto pipeline =
+        Pipeline::parse(ReshardingSplitPolicy::createRawPipeline(
+                            shardKeyPattern, 2 /* samplingRatio */, 1 /* numSplitPoints */),
+                        expCtx());
+    auto mockSource = DocumentSourceMock::createForTest(
+        {"{x: 10, _id: {a: 20, b: 16}, b: 1}", "{x: 3, _id: {a: 10, b: 123}, b: 5}"}, expCtx());
+    pipeline->addInitialSource(mockSource.get());
+
+    auto next = pipeline->getNext();
+    ASSERT_BSONOBJ_EQ(next.value().toBson(),
+                      BSON("_id.a" << 10 << "b" << 5 << "_id.b" << -6548868637522515075LL));
+    next = pipeline->getNext();
+    ASSERT_BSONOBJ_EQ(next.value().toBson(),
+                      BSON("_id.a" << 20 << "b" << 1 << "_id.b" << 2598032665634823220LL));
+    ASSERT(!pipeline->getNext());
+}
 }  // namespace
 }  // namespace mongo
