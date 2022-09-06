@@ -1341,6 +1341,9 @@ Additionally, users can specify that they'd like to perform a `full` validation.
   as part of the storage interface.
 * These hooks enable storage engines to perform internal data structure checks that MongoDB would
   otherwise not be able to perform.
+* More comprehensive and time-consuming checks will run to detect more types of non-conformant BSON
+  documents with duplicate field names, invalid UTF-8 characters, and non-decompressible BSON
+  Columns.
 * Full validations are not compatible with background validation.
 
 [Public docs on how to run validation and interpret the results.](https://docs.mongodb.com/manual/reference/command/validate/)
@@ -1353,7 +1356,7 @@ Additionally, users can specify that they'd like to perform a `full` validation.
 * Index entries are in increasing order if the sort order is ascending.
 * Index entries are in decreasing order if the sort order is descending.
 * Unique indexes do not have duplicate keys.
-* Documents in the collection are valid `BSON`.
+* Documents in the collection are valid and conformant `BSON`.
 * Fast count matches the number of records in the `RecordStore`.
   + For foreground validation only.
 * The number of _id index entries always matches the number of records in the `RecordStore`.
@@ -1363,6 +1366,7 @@ Additionally, users can specify that they'd like to perform a `full` validation.
 * The number of index entries for each index is not less than the number of records in the record
   store.
   + Not checked for sparse and partial indexes.
+* Time-series bucket collections are valid.
 
 ## Validation Procedure
 * Instantiates the objects used throughout the validation procedure.
@@ -1376,7 +1380,9 @@ Additionally, users can specify that they'd like to perform a `full` validation.
       reporting.
     + [ValidateAdaptor](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.h)
       used to traverse the record store and indexes. Validates that the records seen are valid
-      `BSON` and not corrupted.
+      `BSON` conformant to most [BSON specifications](https://bsonspec.org/spec.html). In `full`
+      and `checkBSONConformant` validation modes, all `BSON` checks, including the time-consuming
+      ones, will be enabled.
 * If a `full` validation was requested, we run the storage engines validation hooks at this point to
   allow a more thorough check to be performed.
 * Validates the [collection’s in-memory](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/collection.h)
@@ -1385,11 +1391,8 @@ Additionally, users can specify that they'd like to perform a `full` validation.
   between the two.
 * [Initializes all the cursors](https://github.com/mongodb/mongo/blob/07765dda62d4709cddc9506ea378c0d711791b57/src/mongo/db/catalog/validate_state.cpp#L144-L205)
   on the `RecordStore` and `SortedDataInterface` of each index in the `ValidateState` object.
-    + We choose a read timestamp (`ReadSource`) based on the validation mode and node configuration:
-      |                |  Standalone  | Replica Set  |
-      | -------------- | :----------: | ------------ |
-      | **Foreground** | kNoTimestamp | kNoTimestamp |
-      | **Background** | kNoTimestamp | kNoOverlap   |
+    + We choose a read timestamp (`ReadSource`) based on the validation mode: `kNoTimestamp`
+    for foreground validation and `kCheckpoint` for background validation.
 * Traverses the `RecordStore` using the `ValidateAdaptor` object.
     + [Validates each record and adds the document's index key set to the IndexConsistency object](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.cpp#L61-L140)
       for consistency checks at later stages.
