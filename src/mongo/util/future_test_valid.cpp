@@ -40,21 +40,14 @@ namespace mongo {
 namespace {
 
 /**
- * TODO(SERVER-66036): Expand testing to ensure that `valid()` semantics are in line with "valid
- * usage" semantics.
- */
-
-/**
  * These tests validate the postconditions of operations on the 4 future types:
  * - Future
  * - SemiFuture
  * - SharedSemiFuture
  * - ExecutorFuture
- *
- * TODO(SERVER-66036): use FUTURE_SUCCESS_TEST in all helpers for better coverage of ExecutorFuture.
  */
 
-/** Asserts that the Future is still valid() after `func`. */
+/** Asserts that the Future or ExecutorFuture is still valid() after `func`. */
 template <typename TestFunc>
 void assertFutureValidAfter(const TestFunc& func) {
     FUTURE_SUCCESS_TEST([] { return 0; },
@@ -64,16 +57,38 @@ void assertFutureValidAfter(const TestFunc& func) {
                         });
 }
 
-/** Asserts that `func` returns a valid() future while making the input Future non-valid(). */
+/** Asserts that the Future or ExecutorFuture is invalid() after `func`. */
+template <typename TestFunc>
+void assertFutureInvalidAfter(const TestFunc& func) {
+    FUTURE_SUCCESS_TEST([] { return 0; },
+                        [func](auto&& fut) {
+                            func(std::move(fut));
+                            ASSERT_FALSE(fut.valid());
+                        });
+}
+
+/**
+ * Asserts that `func` returns a valid() future while making the input Future or ExecutorFuture
+ * non-valid().
+ */
 template <DoExecutorFuture doExecutorFuture = kDoExecutorFuture, typename TestFunc>
 void assertFutureTransfersValid(const TestFunc& func) {
-    // TODO(SERVER-66036): use FUTURE_SUCCESS_TEST once moves from _immediate have the same
-    // semantics as moves from SharedState
-    auto [promise, fut] = makePromiseFuture<int>();
-    promise.emplaceValue(0);
-    auto otherFut = func(std::move(fut));
-    ASSERT_FALSE(fut.valid());  // NOLINT
-    ASSERT_TRUE(otherFut.valid());
+    FUTURE_SUCCESS_TEST<doExecutorFuture>([] { return 0; },
+                                          [func](auto&& fut) {
+                                              auto otherFut = func(std::move(fut));
+                                              ASSERT_FALSE(fut.valid());
+                                              ASSERT_TRUE(otherFut.valid());
+                                          });
+}
+
+/** Passes an invalid Future or ExecutorFuture into `func`. To be used with DEATH_TEST. */
+template <DoExecutorFuture doExecutorFuture = kDoExecutorFuture, typename TestFunc>
+void callWithInvalidFuture(const TestFunc& func) {
+    FUTURE_SUCCESS_TEST<doExecutorFuture>([] { return 0; },
+                                          [func](auto&& fut) {
+                                              [[maybe_unused]] auto val = std::move(fut).get();
+                                              (void)func(std::move(fut));
+                                          });
 }
 
 TEST(FutureValid, ValidAtStart) {
@@ -89,16 +104,60 @@ TEST(FutureValid, ValidAfterGetConstLvalue) {
     assertFutureValidAfter([](const auto& fut) { [[maybe_unused]] auto val = fut.get(); });
 }
 
+DEATH_TEST(FutureValid, GetConstLvalueCrashesOnInvalidFuture, "Invariant failure") {
+    callWithInvalidFuture([](const auto& fut) { [[maybe_unused]] auto val = fut.get(); });
+}
+
+TEST(FutureValid, InvalidAfterGetRvalue) {
+    assertFutureInvalidAfter([](auto&& fut) { [[maybe_unused]] auto val = std::move(fut).get(); });
+}
+
+DEATH_TEST(FutureValid, GetRvalueCrashesOnInvalidFuture, "Invariant failure") {
+    callWithInvalidFuture([](auto&& fut) { [[maybe_unused]] auto val = std::move(fut).get(); });
+}
+
 TEST(FutureValid, ValidAfterGetNoThrowConstLvalue) {
     assertFutureValidAfter([](const auto& fut) { [[maybe_unused]] auto val = fut.getNoThrow(); });
+}
+
+DEATH_TEST(FutureValid, GetNoThrowConstLvalueCrashesOnInvalidFuture, "Invariant failure") {
+    callWithInvalidFuture([](const auto& fut) { [[maybe_unused]] auto val = fut.getNoThrow(); });
+}
+
+TEST(FutureValid, InvalidAfterGetNoThrowRvalue) {
+    assertFutureInvalidAfter(
+        [](auto&& fut) { [[maybe_unused]] auto val = std::move(fut).getNoThrow(); });
+}
+
+DEATH_TEST(FutureValid, GetNoThrowRvalueCrashesOnInvalidFuture, "Invariant failure") {
+    callWithInvalidFuture(
+        [](auto&& fut) { [[maybe_unused]] auto val = std::move(fut).getNoThrow(); });
 }
 
 TEST(FutureValid, ValidAfterWait) {
     assertFutureValidAfter([](auto&& fut) { fut.wait(); });
 }
 
+DEATH_TEST(FutureValid, WaitCrashesOnInvalidFuture, "Invariant failure") {
+    callWithInvalidFuture([](auto&& fut) { fut.wait(); });
+}
+
 TEST(FutureValid, ValidAfterWaitNoThrow) {
     assertFutureValidAfter([](auto&& fut) { [[maybe_unused]] auto status = fut.waitNoThrow(); });
+}
+
+DEATH_TEST(FutureValid, WaitNoThrowCrashesOnInvalidFuture, "Invariant failure") {
+    callWithInvalidFuture([](auto&& fut) { [[maybe_unused]] auto status = fut.waitNoThrow(); });
+}
+
+TEST(FutureValid, ThenTransfersValid) {
+    assertFutureTransfersValid(
+        [](auto&& fut) { return std::move(fut).then([](int i) { return i + 2; }); });
+}
+
+DEATH_TEST(FutureValid, ThenCrashesOnInvalidFuture, "Invariant failure") {
+    callWithInvalidFuture(
+        [](auto&& fut) { return std::move(fut).then([](int i) { return i + 2; }); });
 }
 
 TEST(FutureValid, ThenRunOnTransfersValid) {
@@ -106,6 +165,45 @@ TEST(FutureValid, ThenRunOnTransfersValid) {
         auto exec = InlineQueuedCountingExecutor::make();
         return std::move(fut).thenRunOn(exec);
     });
+}
+
+TEST(FutureValid, InvalidTransfersValid) {
+    assertFutureTransfersValid([](auto&& fut) { return std::move(fut).ignoreValue(); });
+}
+
+TEST(FutureValid, InvalidAfterGetAsync) {
+    assertFutureInvalidAfter([](auto&& fut) { std::move(fut).getAsync([](auto) {}); });
+}
+
+TEST(FutureValid, OnCompletionTransfersValid) {
+    assertFutureTransfersValid([](auto&& fut) { return std::move(fut).onCompletion([](auto) {}); });
+}
+
+TEST(FutureValid, OnErrorTransfersValid) {
+    assertFutureTransfersValid(
+        [](auto&& fut) { return std::move(fut).onError([](auto) { return 0; }); });
+}
+
+TEST(FutureValid, OnErrorCategoryTransfersValid) {
+    assertFutureTransfersValid([](auto&& fut) {
+        return std::move(fut).template onErrorCategory<ErrorCategory::NetworkError>(
+            [](auto) { return 0; });
+    });
+}
+
+TEST(FutureValid, TapTransfersValid) {
+    assertFutureTransfersValid<kNoExecutorFuture_needsTap>(
+        [](auto&& fut) { return std::move(fut).tap([](auto) {}); });
+}
+
+TEST(FutureValid, TapErrorTransfersValid) {
+    assertFutureTransfersValid<kNoExecutorFuture_needsTap>(
+        [](auto&& fut) { return std::move(fut).tapError([](auto) {}); });
+}
+
+TEST(FutureValid, TapAllTransfersValid) {
+    assertFutureTransfersValid<kNoExecutorFuture_needsTap>(
+        [](auto&& fut) { return std::move(fut).tapAll([](auto) {}); });
 }
 
 TEST(FutureValid, MoveTransfersValid) {
@@ -118,6 +216,21 @@ TEST(FutureValid, SemiTransfersValid) {
 
 TEST(FutureValid, ShareTransfersValid) {
     assertFutureTransfersValid([](auto&& fut) { return std::move(fut).share(); });
+}
+
+DEATH_TEST(FutureValid, ShareCrashesOnInvalidFuture, "Invariant failure") {
+    callWithInvalidFuture([](auto&& fut) { return std::move(fut).share(); });
+}
+
+/** Asserts that the SemiFuture is invalid() after `func`. */
+template <typename TestFunc>
+void assertSemiFutureInvalidAfter(const TestFunc& func) {
+    FUTURE_SUCCESS_TEST([] { return 0; },
+                        [func](auto&& fut) {
+                            auto semiFut = std::move(fut).semi();
+                            func(std::move(semiFut));
+                            ASSERT_FALSE(semiFut.valid());
+                        });
 }
 
 /** Asserts that the SemiFuture is still valid() after `func`. */
@@ -134,14 +247,13 @@ void assertSemiFutureValidAfter(const TestFunc& func) {
 /* Asserts that `func` returns a valid() future while making the input SemiFuture non-valid(). */
 template <typename TestFunc>
 void assertSemiFutureTransfersValid(const TestFunc& func) {
-    // TODO(SERVER-66036): use FUTURE_SUCCESS_TEST once moves from _immediate have the same
-    // semantics as moves from SharedState
-    auto [promise, fut] = makePromiseFuture<int>();
-    promise.emplaceValue(0);
-    auto semiFut = std::move(fut).semi();
-    auto otherFut = func(std::move(semiFut));
-    ASSERT_FALSE(semiFut.valid());  // NOLINT
-    ASSERT_TRUE(otherFut.valid());
+    FUTURE_SUCCESS_TEST([] { return 0; },
+                        [func](auto&& fut) {
+                            auto semiFut = std::move(fut).semi();
+                            auto otherFut = func(std::move(semiFut));
+                            ASSERT_FALSE(semiFut.valid());
+                            ASSERT_TRUE(otherFut.valid());
+                        });
 }
 
 // TODO SERVER-64948: this test is only needed if the lvalue& getter is kept around.
@@ -153,9 +265,19 @@ TEST(SemiFutureValid, ValidAfterGetConstLvalue) {
     assertSemiFutureValidAfter([](const auto& fut) { [[maybe_unused]] auto val = fut.get(); });
 }
 
+TEST(SemiFutureValid, InvalidAfterGetRvalue) {
+    assertSemiFutureInvalidAfter(
+        [](auto&& fut) { [[maybe_unused]] auto val = std::move(fut).get(); });
+}
+
 TEST(SemiFutureValid, ValidAfterGetNoThrowConstLvalue) {
     assertSemiFutureValidAfter(
         [](const auto& fut) { [[maybe_unused]] auto val = fut.getNoThrow(); });
+}
+
+TEST(SemiFutureValid, InvalidAfterGetNoThrowRvalue) {
+    assertSemiFutureInvalidAfter(
+        [](auto&& fut) { [[maybe_unused]] auto val = std::move(fut).getNoThrow(); });
 }
 
 TEST(SemiFutureValid, ValidAfterWait) {
@@ -172,6 +294,10 @@ TEST(SemiFutureValid, ThenRunOnTransfersValid) {
         auto exec = InlineQueuedCountingExecutor::make();
         return std::move(fut).thenRunOn(exec);
     });
+}
+
+TEST(SemiFutureValid, IgnoreValueTransfersValid) {
+    assertSemiFutureTransfersValid([](auto&& fut) { return std::move(fut).ignoreValue(); });
 }
 
 TEST(SemiFutureValid, MoveTransfersValid) {
@@ -207,27 +333,36 @@ void assertSharedSemiFutureValidAfter(const TestFunc& func) {
  */
 template <typename TestFunc>
 void assertSharedSemiFutureTransfersValid(const TestFunc& func) {
-    // TODO(SERVER-66036): use FUTURE_SUCCESS_TEST once moves from _immediate have the same
-    // semantics as moves from SharedState
-    auto [promise, fut] = makePromiseFuture<int>();
-    promise.emplaceValue(0);
-    auto sharedFut = std::move(fut).share();
-    auto otherFut = func(std::move(sharedFut));
-    ASSERT_FALSE(sharedFut.valid());  // NOLINT
-    ASSERT_TRUE(otherFut.valid());
+    FUTURE_SUCCESS_TEST([] { return 0; },
+                        [func](auto&& fut) {
+                            auto sharedFut = std::move(fut).share();
+                            auto otherFut = func(std::move(sharedFut));
+                            ASSERT_FALSE(sharedFut.valid());
+                            ASSERT_TRUE(otherFut.valid());
+                        });
 }
 
 /** Asserts that `func` returns a valid() Future and keeps the input SharedSemiFuture valid(). */
 template <typename TestFunc>
 void assertSharedSemiFutureSplits(const TestFunc& func) {
-    // TODO(SERVER-66036): use FUTURE_SUCCESS_TEST once moves from _immediate have the same
-    // semantics as moves from SharedState
-    auto [promise, fut] = makePromiseFuture<int>();
-    promise.emplaceValue(0);
-    auto sharedFut = std::move(fut).share();
-    auto otherFut = func(std::move(sharedFut));
-    ASSERT_TRUE(sharedFut.valid());  // NOLINT
-    ASSERT_TRUE(otherFut.valid());
+    FUTURE_SUCCESS_TEST([] { return 0; },
+                        [func](auto&& fut) {
+                            auto sharedFut = std::move(fut).share();
+                            auto otherFut = func(std::move(sharedFut));
+                            ASSERT_TRUE(sharedFut.valid());
+                            ASSERT_TRUE(otherFut.valid());
+                        });
+}
+
+/** Passes an invalid SharedSemiFuture into `func`. To be used with DEATH_TEST. */
+template <DoExecutorFuture doExecutorFuture = kDoExecutorFuture, typename TestFunc>
+void callWithInvalidSharedSemiFuture(const TestFunc& func) {
+    FUTURE_SUCCESS_TEST<doExecutorFuture>([] { return 0; },
+                                          [func](auto&& fut) {
+                                              auto sharedFut = std::move(fut).share();
+                                              auto otherSharedFut = std::move(sharedFut);
+                                              (void)func(std::move(sharedFut));
+                                          });
 }
 
 TEST(SharedSemiFutureValid, ValidAfterGetLvalue) {
@@ -265,6 +400,13 @@ TEST(SharedSemiFutureValid, ValidAfterThenRunOn) {
     });
 }
 
+DEATH_TEST(SharedSemiFutureValid, ThenRunOnCrashesOnInvalidFuture, "Invariant failure") {
+    callWithInvalidSharedSemiFuture([](auto&& fut) {
+        auto exec = InlineQueuedCountingExecutor::make();
+        return fut.thenRunOn(exec);
+    });
+}
+
 TEST(SharedSemiFutureValid, MoveTransfersValid) {
     assertSharedSemiFutureTransfersValid([](auto&& fut) { return std::move(fut); });
 }
@@ -273,12 +415,59 @@ TEST(SharedSemiFutureValid, SemiRetainsValid) {
     assertSharedSemiFutureSplits([](auto&& fut) { return std::move(fut).semi(); });
 }
 
+DEATH_TEST(SharedSemiFutureValid, SemiCrashesOnInvalidFuture, "Invariant failure") {
+    callWithInvalidSharedSemiFuture([](auto&& fut) { return std::move(fut).semi(); });
+}
+
 TEST(SharedSemiFutureValid, SplitRetainsValid) {
     assertSharedSemiFutureSplits([](auto&& fut) { return std::move(fut).split(); });
 }
 
+DEATH_TEST(SharedSemiFutureValid, SplitCrashesOnInvalidFuture, "Invariant failure") {
+    callWithInvalidSharedSemiFuture([](auto&& fut) { return std::move(fut).split(); });
+}
+
 TEST(SharedSemiFutureValid, UnsafeToInlineFutureRetainsValid) {
     assertSharedSemiFutureSplits([](auto&& fut) { return std::move(fut).unsafeToInlineFuture(); });
+}
+
+/*
+ * Handles the case around an interrupted get() operation. We expect that the Future remains valid
+ * up until the point where the value is made available. I.e. a continuation can be chained off of
+ * a Future whose get() has been interrupted because the caller never gets access to the value.
+ */
+TEST(FutureValid, InterruptedGetValidity) {
+    FUTURE_SUCCESS_TEST([] { return 0; },
+                        [](auto&& fut) {
+                            const auto exec = InlineRecursiveCountingExecutor::make();
+                            DummyInterruptible dummyInterruptible;
+
+                            auto res = std::move(fut).getNoThrow(&dummyInterruptible);
+
+                            if (!res.isOK()) {
+                                ASSERT_EQ(res.getStatus(), ErrorCodes::Interrupted);
+                                ASSERT_TRUE(fut.valid());
+                            } else {
+                                ASSERT_FALSE(fut.valid());
+                            }
+                        });
+}
+TEST(SemiFutureValid, InterruptedGetValidity) {
+    FUTURE_SUCCESS_TEST([] { return 0; },
+                        [](auto&& fut) {
+                            auto semiFut = std::move(fut).semi();
+                            const auto exec = InlineRecursiveCountingExecutor::make();
+                            DummyInterruptible dummyInterruptible;
+
+                            auto res = std::move(semiFut).getNoThrow(&dummyInterruptible);
+
+                            if (!res.isOK()) {
+                                ASSERT_EQ(res.getStatus(), ErrorCodes::Interrupted);
+                                ASSERT_TRUE(semiFut.valid());
+                            } else {
+                                ASSERT_FALSE(semiFut.valid());
+                            }
+                        });
 }
 
 }  // namespace
