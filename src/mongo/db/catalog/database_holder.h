@@ -64,8 +64,9 @@ public:
     virtual ~DatabaseHolder() = default;
 
     /**
-     * Retrieves an already opened database or returns nullptr. Must be called with the database
-     * locked in at least IS-mode.
+     * Retrieves an already opened database or returns nullptr.
+     *
+     * The caller must hold the database lock in MODE_IS.
      */
     virtual Database* getDb(OperationContext* opCtx, const DatabaseName& dbName) const = 0;
 
@@ -77,7 +78,9 @@ public:
 
     /**
      * Retrieves a database reference if it is already opened, or opens it if it hasn't been
-     * opened/created yet. Must be called with the database locked in X-mode.
+     * opened/created yet.
+     *
+     * The caller must hold the database lock in MODE_IX.
      *
      * @param justCreated Returns whether the database was newly created (true) or it already
      *          existed (false). Can be NULL if this information is not necessary.
@@ -91,22 +94,24 @@ public:
      * doesn't notify the replication subsystem or do any other consistency checks, so it should
      * not be used directly from user commands.
      *
-     * Must be called with the specified database locked in X mode. The caller must ensure no index
-     * builds are in progress on the database.
+     * The caller must hold the database lock in MODE_X and ensure no index builds are in progress
+     * on the database.
      */
     virtual void dropDb(OperationContext* opCtx, Database* db) = 0;
 
     /**
-     * Closes the specified database. Must be called with the database locked in X-mode.
-     * No background jobs must be in progress on the database when this function is called.
+     * Closes the specified database.
+     *
+     * The caller must hold the database lock in MODE_X. No background jobs must be in progress on
+     * the database when this function is called.
      */
     virtual void close(OperationContext* opCtx, const DatabaseName& dbName) = 0;
 
     /**
-     * Closes all opened databases. Must be called with the global lock acquired in X-mode.
-     * Will uassert if any background jobs are running when this function is called.
+     * Closes all opened databases.
      *
-     * The caller must hold the global X lock and ensure there are no index builds in progress.
+     * The caller must hold the global lock in MODE_X and ensure no index builds are in progress on
+     * the databases. Will uassert if any background jobs are running when this function is called.
      */
     virtual void closeAll(OperationContext* opCtx) = 0;
 
@@ -126,7 +131,7 @@ public:
      * Caches the information of the database with the specific name if the database is open,
      * otherwise it does nothing.
      *
-     * The database must be locked in X mode when calling this function.
+     * The caller must hold the database lock in MODE_X.
      */
     virtual void setDbInfo(OperationContext* opCtx,
                            const DatabaseName& dbName,
@@ -136,7 +141,7 @@ public:
      * Clears the cached information of the database with the specific name if the database is open,
      * otherwise it does nothing.
      *
-     * The database must be locked in IX mode when calling this function.
+     * The caller must hold the database lock in MODE_IX.
      */
     virtual void clearDbInfo(OperationContext* opCtx, const DatabaseName& dbName) = 0;
 
@@ -151,7 +156,7 @@ public:
      * Returns the primary shard ID of the database with the specific name if the database is open
      * and the primary shard ID is known, otherwise it returns `boost::none`.
      *
-     * The database must be locked in IS mode when calling this function.
+     * The caller must hold the database lock in MODE_IS.
      */
     virtual boost::optional<ShardId> getDbPrimary(OperationContext* opCtx,
                                                   const DatabaseName& dbName) const = 0;
