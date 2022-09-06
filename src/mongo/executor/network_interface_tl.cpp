@@ -153,6 +153,7 @@ public:
      * Increment the count of commands sent over the network
      */
     void recordSent() {
+        stdx::lock_guard lk(_mutex);
         ++_data.sent;
     }
 
