@@ -126,7 +126,7 @@ void IndexBuildsCoordinatorMongod::shutdown(OperationContext* opCtx) {
 
 StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
 IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
-                                              std::string dbName,
+                                              const DatabaseName& dbName,
                                               const UUID& collectionUUID,
                                               const std::vector<BSONObj>& specs,
                                               const UUID& buildUUID,
@@ -138,7 +138,7 @@ IndexBuildsCoordinatorMongod::startIndexBuild(OperationContext* opCtx,
 
 StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
 IndexBuildsCoordinatorMongod::resumeIndexBuild(OperationContext* opCtx,
-                                               std::string dbName,
+                                               const DatabaseName& dbName,
                                                const UUID& collectionUUID,
                                                const std::vector<BSONObj>& specs,
                                                const UUID& buildUUID,
@@ -157,7 +157,7 @@ IndexBuildsCoordinatorMongod::resumeIndexBuild(OperationContext* opCtx,
 
 StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>
 IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
-                                               std::string dbName,
+                                               const DatabaseName& dbName,
                                                const UUID& collectionUUID,
                                                const std::vector<BSONObj>& specs,
                                                const UUID& buildUUID,
@@ -197,7 +197,8 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
             // The checks here catch empty index builds and also allow us to stop index
             // builds before waiting for throttling. It may race with the abort at the start
             // of migration so we do check again later.
-            uassertStatusOK(tenant_migration_access_blocker::checkIfCanBuildIndex(opCtx, dbName));
+            uassertStatusOK(tenant_migration_access_blocker::checkIfCanBuildIndex(
+                opCtx, dbName.toStringWithTenantId()));
             uassertStatusOK(writeBlockState->checkIfIndexBuildAllowedToStart(opCtx, nss));
 
             stdx::unique_lock<Latch> lk(_throttlingMutex);
@@ -271,8 +272,8 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         }
 
         if (opCtx->getClient()->isFromUserConnection()) {
-            auto migrationStatus =
-                tenant_migration_access_blocker::checkIfCanBuildIndex(opCtx, dbName);
+            auto migrationStatus = tenant_migration_access_blocker::checkIfCanBuildIndex(
+                opCtx, dbName.toStringWithTenantId());
             if (!migrationStatus.isOK()) {
                 LOGV2(4886200,
                       "Aborted index build before start due to tenant migration",
@@ -343,7 +344,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         startPromise = std::move(startPromise),
         startTimestamp,
         shardVersion = oss.getShardVersion(nss),
-        dbVersion = oss.getDbVersion(dbName),
+        dbVersion = oss.getDbVersion(dbName.toStringWithTenantId()),
         resumeInfo,
         impersonatedClientAttrs = std::move(impersonatedClientAttrs),
         forwardableOpMetadata = std::move(forwardableOpMetadata)
@@ -390,9 +391,9 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         // Start collecting metrics for the index build. The metrics for this operation will only be
         // aggregated globally if the node commits or aborts while it is primary.
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx.get());
-        if (ResourceConsumption::shouldCollectMetricsForDatabase(dbName) &&
+        if (ResourceConsumption::shouldCollectMetricsForDatabase(dbName.toStringWithTenantId()) &&
             ResourceConsumption::isMetricsCollectionEnabled()) {
-            metricsCollector.beginScopedCollecting(opCtx.get(), dbName);
+            metricsCollector.beginScopedCollecting(opCtx.get(), dbName.toStringWithTenantId());
         }
 
         // Index builds should never take the PBWM lock, even on a primary. This allows the

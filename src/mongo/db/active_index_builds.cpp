@@ -171,9 +171,12 @@ std::vector<std::shared_ptr<ReplIndexBuildState>> ActiveIndexBuilds::_filterInde
     return indexBuilds;
 }
 
-void ActiveIndexBuilds::awaitNoBgOpInProgForDb(OperationContext* opCtx, StringData db) {
+void ActiveIndexBuilds::awaitNoBgOpInProgForDb(OperationContext* opCtx,
+                                               const DatabaseName& dbName) {
     stdx::unique_lock<Latch> lk(_mutex);
-    auto indexBuildFilter = [db](const auto& replState) { return db == replState.dbName; };
+    auto indexBuildFilter = [dbName](const auto& replState) {
+        return dbName.toStringWithTenantId() == replState.dbName;
+    };
     auto pred = [&, this]() {
         auto dbIndexBuilds = _filterIndexBuilds_inlock(lk, indexBuildFilter);
         return dbIndexBuilds.empty();

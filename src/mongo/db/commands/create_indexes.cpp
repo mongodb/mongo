@@ -569,7 +569,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
     try {
         auto buildIndexFuture =
             uassertStatusOK(indexBuildsCoord->startIndexBuild(opCtx,
-                                                              cmd.getDbName().toString(),
+                                                              cmd.getDbName(),
                                                               *collectionUUID,
                                                               specs,
                                                               buildUUID,

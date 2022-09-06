@@ -58,7 +58,7 @@ public:
 
     StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> startIndexBuild(
         OperationContext* opCtx,
-        std::string dbName,
+        const DatabaseName& dbName,
         const UUID& collectionUUID,
         const std::vector<BSONObj>& specs,
         const UUID& buildUUID,
@@ -67,7 +67,7 @@ public:
 
     StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> resumeIndexBuild(
         OperationContext* opCtx,
-        std::string dbName,
+        const DatabaseName& dbName,
         const UUID& collectionUUID,
         const std::vector<BSONObj>& specs,
         const UUID& buildUUID,

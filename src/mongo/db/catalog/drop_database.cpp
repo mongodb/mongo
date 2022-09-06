@@ -98,8 +98,7 @@ void _finishDropDatabase(OperationContext* opCtx,
     ScopeGuard dropPendingGuard([db, opCtx] { db->setDropPending(opCtx, false); });
 
     if (!abortIndexBuilds) {
-        // TODO SERVER-67439 Use dbName directly
-        IndexBuildsCoordinator::get(opCtx)->assertNoBgOpInProgForDb(dbName.toStringWithTenantId());
+        IndexBuildsCoordinator::get(opCtx)->assertNoBgOpInProgForDb(dbName);
     }
 
     writeConflictRetry(opCtx, "dropDatabase_database", dbName.toString(), [&] {
@@ -184,9 +183,7 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
         if (abortIndexBuilds) {
             // We need to keep aborting all the active index builders for this database until there
             // are none left when we retrieve the exclusive database lock again.
-
-            // TODO SERVER-67439 Change to use dbName directly
-            while (indexBuildsCoord->inProgForDb(dbName.toStringWithTenantId())) {
+            while (indexBuildsCoord->inProgForDb(dbName)) {
                 // Create a scope guard to reset the drop-pending state on the database to false if
                 // there is a replica state change that kills this operation while the locks were
                 // yielded.
@@ -204,9 +201,7 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
 
                 // Sends the abort signal to all the active index builders for this database. Waits
                 // for aborted index builds to complete.
-                // TODO SERVER-67439 Change to use dbName directly
-                indexBuildsCoord->abortDatabaseIndexBuilds(
-                    opCtx, dbName.toStringWithTenantId(), "dropDatabase command");
+                indexBuildsCoord->abortDatabaseIndexBuilds(opCtx, dbName, "dropDatabase command");
 
                 if (MONGO_unlikely(dropDatabaseHangAfterWaitingForIndexBuilds.shouldFail())) {
                     LOGV2(4612300,

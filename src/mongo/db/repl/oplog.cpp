@@ -137,7 +137,7 @@ void abortIndexBuilds(OperationContext* opCtx,
                       const std::string& reason) {
     auto indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx);
     if (commandType == OplogEntry::CommandType::kDropDatabase) {
-        indexBuildsCoordinator->abortDatabaseIndexBuilds(opCtx, nss.db(), reason);
+        indexBuildsCoordinator->abortDatabaseIndexBuilds(opCtx, nss.dbName(), reason);
     } else if (commandType == OplogEntry::CommandType::kDrop ||
                commandType == OplogEntry::CommandType::kDropIndexes ||
                commandType == OplogEntry::CommandType::kCollMod ||

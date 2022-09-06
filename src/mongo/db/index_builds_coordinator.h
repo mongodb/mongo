@@ -139,7 +139,7 @@ public:
      */
     virtual StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> startIndexBuild(
         OperationContext* opCtx,
-        std::string dbName,
+        const DatabaseName& dbName,
         const UUID& collectionUUID,
         const std::vector<BSONObj>& specs,
         const UUID& buildUUID,
@@ -159,7 +159,7 @@ public:
      */
     virtual StatusWith<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>> resumeIndexBuild(
         OperationContext* opCtx,
-        std::string dbName,
+        const DatabaseName& dbName,
         const UUID& collectionUUID,
         const std::vector<BSONObj>& specs,
         const UUID& buildUUID,
@@ -249,7 +249,7 @@ public:
      * Does not stop new index builds from starting. Caller must make that guarantee.
      */
     void abortDatabaseIndexBuilds(OperationContext* opCtx,
-                                  StringData db,
+                                  const DatabaseName& dbName,
                                   const std::string& reason);
 
     /**
@@ -263,7 +263,7 @@ public:
      */
     void abortTenantIndexBuilds(OperationContext* opCtx,
                                 MigrationProtocolEnum protocol,
-                                StringData db,
+                                StringData tenantId,
                                 const std::string& reason);
     /**
      * Signals all of the index builds to abort and then waits until the index builds are no longer
@@ -364,7 +364,7 @@ public:
     /**
      * Returns the number of index builds that are running on the specified database.
      */
-    int numInProgForDb(StringData db) const;
+    int numInProgForDb(const DatabaseName& dbName) const;
 
     /**
      * Returns true if an index build is in progress on the specified collection.
@@ -375,7 +375,7 @@ public:
     /**
      * Returns true if an index build is in progress on the specified database.
      */
-    bool inProgForDb(StringData db) const;
+    bool inProgForDb(const DatabaseName& dbName) const;
 
     /**
      * Uasserts if any index builds are in progress on any database.
@@ -390,7 +390,7 @@ public:
     /**
      * Uasserts if any index builds is in progress on the specified database.
      */
-    void assertNoBgOpInProgForDb(StringData db) const;
+    void assertNoBgOpInProgForDb(const DatabaseName& dbName) const;
 
     /**
      * Waits for all index builds on a specified collection to finish.
@@ -404,7 +404,7 @@ public:
     /**
      * Waits for all index builds on a specified database to finish.
      */
-    void awaitNoBgOpInProgForDb(OperationContext* opCtx, StringData db);
+    void awaitNoBgOpInProgForDb(OperationContext* opCtx, const DatabaseName& dbName);
 
     /**
      * Waits until an index build completes. If there are no index builds in progress, returns
@@ -558,7 +558,7 @@ protected:
      */
     StatusWith<boost::optional<SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>>>
     _filterSpecsAndRegisterBuild(OperationContext* opCtx,
-                                 StringData dbName,
+                                 const DatabaseName& dbName,
                                  const UUID& collectionUUID,
                                  const std::vector<BSONObj>& specs,
                                  const UUID& buildUUID,
@@ -591,7 +591,7 @@ protected:
      * Helper function for startIndexBuild during the two-phase index build recovery process.
      */
     Status _setUpIndexBuildForTwoPhaseRecovery(OperationContext* opCtx,
-                                               StringData dbName,
+                                               const DatabaseName& dbName,
                                                const UUID& collectionUUID,
                                                const std::vector<BSONObj>& specs,
                                                const UUID& buildUUID);
@@ -600,7 +600,7 @@ protected:
      * it was in when the node cleanly shut down.
      */
     Status _setUpResumeIndexBuild(OperationContext* opCtx,
-                                  std::string dbName,
+                                  const DatabaseName& dbName,
                                   const UUID& collectionUUID,
                                   const std::vector<BSONObj>& specs,
                                   const UUID& buildUUID,

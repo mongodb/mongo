@@ -75,7 +75,7 @@ public:
     void awaitNoIndexBuildInProgressForCollection(OperationContext* opCtx,
                                                   const UUID& collectionUUID);
 
-    void awaitNoBgOpInProgForDb(OperationContext* opCtx, StringData db);
+    void awaitNoBgOpInProgForDb(OperationContext* opCtx, const DatabaseName& dbName);
 
     /**
      * Unregisters the index build.

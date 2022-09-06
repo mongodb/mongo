@@ -303,7 +303,7 @@ void DatabaseHolderImpl::closeAll(OperationContext* opCtx) {
             for (DBs::const_iterator i = _dbs.begin(); i != _dbs.end(); ++i) {
                 // It is the caller's responsibility to ensure that no index builds are active in
                 // the database.
-                IndexBuildsCoordinator::get(opCtx)->assertNoBgOpInProgForDb(i->first.toString());
+                IndexBuildsCoordinator::get(opCtx)->assertNoBgOpInProgForDb(i->first);
                 dbs.push_back(i->first);
             }
         }
