@@ -182,8 +182,7 @@ public:
 
     /**
      * Initializes all the cursors to be used during validation and moves the traversal record
-     * store cursor to the first record. For background validation, this should be called while
-     * holding the checkpoint lock when performing a background validation.
+     * store cursor to the first record.
      */
     void initializeCursors(OperationContext* opCtx);
 
@@ -229,8 +228,7 @@ private:
 
     /**
      * Saves and restores the open cursors to release snapshots and minimize cache pressure for
-     * validation.  For background validation, also refreshes the snapshot by starting a new storage
-     * transaction.
+     * validation.
      */
     void _yieldCursors(OperationContext* opCtx);
 

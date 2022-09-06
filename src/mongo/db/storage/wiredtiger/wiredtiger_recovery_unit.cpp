@@ -377,21 +377,6 @@ void WiredTigerRecoveryUnit::preallocateSnapshotForOplogRead() {
     preallocateSnapshot();
 }
 
-void WiredTigerRecoveryUnit::refreshSnapshot() {
-    // Currently, this code only works for kNoOverlap or kNoTimestamp.
-    invariant(_timestampReadSource == ReadSource::kNoOverlap ||
-              _timestampReadSource == ReadSource::kNoTimestamp);
-    invariant(_isActive());
-    invariant(!_inUnitOfWork());
-    invariant(!_noEvictionAfterRollback);
-    invariant(_abandonSnapshotMode == AbandonSnapshotMode::kAbort);
-
-    auto session = _session->getSession();
-    invariantWTOK(session->reset_snapshot(session), session);
-    LOGV2_DEBUG(
-        6235000, 3, "WT refreshed snapshot", "snapshotId"_attr = getSnapshotId().toNumber());
-}
-
 void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     invariant(_isActive(), toString(_getState()));
 

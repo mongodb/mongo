@@ -1,5 +1,7 @@
 /**
  * Tests that the validate command detects invalid index options.
+ *
+ * @tags: [requires_fsync, requires_wiredtiger, requires_persistence]
  */
 (function() {
 "use strict";
@@ -27,6 +29,8 @@ fp.off();
 let validateRes = assert.commandWorked(db.runCommand({validate: collName}));
 assert(!validateRes.valid);
 
+// Forces a checkpoint to make the background validation see the data.
+assert.commandWorked(db.adminCommand({fsync: 1}));
 validateRes = assert.commandWorked(db.runCommand({validate: collName, background: true}));
 assert(!validateRes.valid);
 

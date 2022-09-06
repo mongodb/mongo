@@ -311,8 +311,8 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
             auto config = syncType == Fsync::kCheckpointStableTimestamp ? "use_timestamp=true"
                                                                         : "use_timestamp=false";
             {
-                _engine->clearIndividuallyCheckpointedIndexes();
                 invariantWTOK(s->checkpoint(s, config), s);
+                _engine->clearIndividuallyCheckpointedIndexes();
             }
 
             if (token) {
@@ -365,10 +365,10 @@ void WiredTigerSessionCache::waitUntilDurable(OperationContext* opCtx,
                       _waitUntilDurableSession);
         LOGV2_DEBUG(22419, 4, "flushed journal");
     } else {
-        _engine->clearIndividuallyCheckpointedIndexes();
         invariantWTOK(_waitUntilDurableSession->checkpoint(_waitUntilDurableSession, nullptr),
                       _waitUntilDurableSession);
         LOGV2_DEBUG(22420, 4, "created checkpoint");
+        _engine->clearIndividuallyCheckpointedIndexes();
     }
 
     if (token) {

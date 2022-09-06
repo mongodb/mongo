@@ -144,6 +144,8 @@ public:
 
     int getTotalIndexCount(OperationContext* opCtx, const RecordId& catalogId) const;
 
+    void getReadyIndexes(OperationContext* opCtx, RecordId catalogId, StringSet* names) const;
+
     bool isIndexPresent(OperationContext* opCtx,
                         const RecordId& catalogId,
                         StringData indexName) const;

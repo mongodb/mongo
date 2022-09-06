@@ -93,7 +93,12 @@ WiredTigerCursor::WiredTigerCursor(const std::string& uri,
 }
 
 WiredTigerCursor::~WiredTigerCursor() {
-    _session->releaseCursor(_tableID, _cursor, _config);
+    if (_isCheckpoint) {
+        // Closes the checkpoint cursor to avoid outdated data view when opening a new one.
+        _session->closeCursor(_cursor);
+    } else {
+        _session->releaseCursor(_tableID, _cursor, _config);
+    }
 }
 
 void WiredTigerCursor::reset() {

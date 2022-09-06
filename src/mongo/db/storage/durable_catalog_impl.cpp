@@ -824,6 +824,21 @@ int DurableCatalogImpl::getTotalIndexCount(OperationContext* opCtx,
     return md->getTotalIndexCount();
 }
 
+void DurableCatalogImpl::getReadyIndexes(OperationContext* opCtx,
+                                         RecordId catalogId,
+                                         StringSet* names) const {
+    auto md = getMetaData(opCtx, catalogId);
+
+    if (!md) {
+        return;
+    }
+
+    for (const auto& index : md->indexes) {
+        if (index.ready)
+            names->insert(index.spec["name"].String());
+    }
+}
+
 bool DurableCatalogImpl::isIndexPresent(OperationContext* opCtx,
                                         const RecordId& catalogId,
                                         StringData indexName) const {

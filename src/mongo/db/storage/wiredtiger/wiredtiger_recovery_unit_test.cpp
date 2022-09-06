@@ -623,7 +623,7 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CommitTimestampAfterSetTimestampOnAbor
     ASSERT(!commitTs);
 }
 
-TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorsCached) {
+TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorsAreNotCached) {
     auto opCtx = clientAndCtx1.second.get();
 
     // Hold the global lock throughout the test to avoid having the global lock destructor
@@ -663,7 +663,8 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorsCached) {
     // Force a checkpoint.
     engine->flushAllFiles(opCtx, /*callerHoldsReadLock*/ false);
 
-    // Test 2: Checkpoint cursors will be released into the cache.
+    // Test 2: Checkpoint cursors are not expected to be cached, they
+    // should be immediately closed when destructed.
     ru->setTimestampReadSource(WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
 
     // Close any cached cursors to establish a new 'before' state.
@@ -673,9 +674,9 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorsCached) {
     // Will search the checkpoint cursor for the record, then release the checkpoint cursor.
     ASSERT_TRUE(rs->findRecord(opCtx, s.getValue(), &rd));
 
-    // A new cursor should have been released into the cache, along with a metadata cursor that is
-    // opened to determine if the table is LSM. Metadata cursors are cached.
-    ASSERT_GT(ru->getSession()->cachedCursors(), cachedCursorsBefore + 1);
+    // No new cursors should have been released into the cache, with the exception of a metadata
+    // cursor that is opened to determine if the table is LSM. Metadata cursors are cached.
+    ASSERT_EQ(ru->getSession()->cachedCursors(), cachedCursorsBefore + 1);
 
     // All opened cursors are closed.
     ASSERT_EQ(0, ru->getSession()->cursorsOut());

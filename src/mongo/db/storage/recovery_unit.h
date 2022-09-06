@@ -425,11 +425,6 @@ public:
     }
 
     /**
-     * Refreshes a read transaction by resetting the snapshot in use
-     */
-    virtual void refreshSnapshot() {}
-
-    /**
      * The ReadSource indicates which external or provided timestamp to read from for future
      * transactions.
      */
