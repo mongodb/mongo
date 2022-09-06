@@ -1633,7 +1633,9 @@ void BucketCatalog::_expireIdleBuckets(Stripe* stripe,
            numExpired <= gTimeseriesIdleBucketExpiryMaxCountPerAttempt) {
         Bucket* bucket = stripe->idleBuckets.back();
 
-        if (canArchive) {
+        if (canArchive && BucketState::kCleared != _bucketStateManager.getBucketState(bucket)) {
+            // Can archive a bucket if it hasn't been cleared. Note: an idle bucket cannot be
+            // kPreparedAndCleared.
             _archiveBucket(stripe, stripeLock, bucket);
             stats.incNumBucketsArchivedDueToMemoryThreshold();
         } else {
