@@ -44,8 +44,9 @@ MONGO_FAIL_POINT_DEFINE(sdamServerSelectorIgnoreLatencyWindow);
 
 ServerSelector::~ServerSelector() {}
 
-SdamServerSelector::SdamServerSelector(const SdamConfiguration& config)
-    : _config(config), _random(PseudoRandom(SecureRandom().nextInt64())) {}
+thread_local PseudoRandom SdamServerSelector::_random = PseudoRandom(SecureRandom().nextInt64());
+
+SdamServerSelector::SdamServerSelector(const SdamConfiguration& config) : _config(config) {}
 
 void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>* result,
                                               const TopologyDescriptionPtr topologyDescription,

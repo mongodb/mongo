@@ -201,7 +201,7 @@ private:
     };
 
     SdamConfiguration _config;
-    mutable PseudoRandom _random;
+    static thread_local PseudoRandom _random;
 };
 
 // This is used to filter out servers based on their current latency measurements.
