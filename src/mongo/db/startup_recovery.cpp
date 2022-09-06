@@ -144,7 +144,7 @@ bool checkIdIndexExists(OperationContext* opCtx, const CollectionPtr& coll) {
     auto indexNames = std::vector<std::string>(indexCount);
     coll->getAllIndexes(&indexNames);
 
-    for (auto name : indexNames) {
+    for (const auto& name : indexNames) {
         if (name == "_id_") {
             return true;
         }
