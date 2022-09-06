@@ -2260,7 +2260,7 @@ void WiredTigerKVEngine::setOldestTimestamp(Timestamp newOldestTimestamp, bool f
     // there are no races with pinning the oldest timestamp.
     stdx::lock_guard<Latch> lock(_oldestTimestampPinRequestsMutex);
     const Timestamp currOldestTimestamp = Timestamp(_oldestTimestamp.load());
-    for (auto it : _oldestTimestampPinRequests) {
+    for (const auto& it : _oldestTimestampPinRequests) {
         invariant(it.second >= currOldestTimestamp);
         newOldestTimestamp = std::min(newOldestTimestamp, it.second);
     }
