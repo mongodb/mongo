@@ -632,6 +632,9 @@ private:
         auto [tag, val] = convertFrom(Value(expr->getData()));
         ABT result = make<PathCompare>(op, make<Constant>(tag, val));
 
+        bool tagNullMatchMissingField =
+            tag == sbe::value::TypeTags::Null && (op == Operations::Lte || op == Operations::Gte);
+
         switch (op) {
             case Operations::Lt:
             case Operations::Lte: {
@@ -643,7 +646,8 @@ private:
                 }
                 // Handle null and missing semantics
                 // find({a: {$lt: MaxKey()}}) matches {a: null} and {b: 1}
-                if (tag == sbe::value::TypeTags::MaxKey) {
+                // find({a: {$lte: null}}) matches {a: null} and {b: 1})
+                if (tag == sbe::value::TypeTags::MaxKey || tagNullMatchMissingField) {
                     maybeComposePath<PathComposeA>(result,
                                                    make<PathDefault>(Constant::boolean(true)));
                 }
@@ -660,7 +664,8 @@ private:
                 }
                 // Handle null and missing semantics
                 // find({a: {$gt: MinKey()}}) matches {a: null} and {b: 1}
-                if (tag == sbe::value::TypeTags::MinKey) {
+                // find({a: {$gte: null}}) matches {a: null} and {b: 1})
+                if (tag == sbe::value::TypeTags::MinKey || tagNullMatchMissingField) {
                     maybeComposePath<PathComposeA>(result,
                                                    make<PathDefault>(Constant::boolean(true)));
                 }

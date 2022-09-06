@@ -85,9 +85,11 @@ let tests = [
     {filter: {a: {$gte: new Timestamp(10, 1)}}, expected: []},
 
     // Null
-    // TODO SERVER-67853 Uncomment after fixing ABT Translation for comparing GTE and LTE null
-    // {filter: {a: {$gte: null}}, expected: [docs[1], docs[29]]},
-    // {filter: {a: {$lte: null}}, expected: [docs[1], docs[29]]},
+    {filter: {a: {$eq: null}}, expected: [docs[1], docs[29]]},
+    {filter: {a: {$gte: null}}, expected: [docs[1], docs[29]]},
+    {filter: {a: {$lte: null}}, expected: [docs[1], docs[29]]},
+    {filter: {a: {$gt: null}}, expected: []},
+    {filter: {a: {$lt: null}}, expected: []},
 
     {filter: {a: {$gte: false}}, expected: [docs[26], docs[27]]},
     {filter: {a: {$lt: false}}, expected: []},
