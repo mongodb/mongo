@@ -1097,7 +1097,7 @@ void WiredTigerUtil::appendSnapshotWindowSettings(WiredTigerKVEngine* engine,
     settings.append("pinned timestamp requests", static_cast<int>(pinnedTimestamps.size()));
 
     Timestamp minPinned = Timestamp::max();
-    for (auto it : pinnedTimestamps) {
+    for (const auto& it : pinnedTimestamps) {
         minPinned = std::min(minPinned, it.second);
     }
     settings.append("min pinned timestamp", minPinned);
