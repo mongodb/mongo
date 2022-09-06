@@ -39,6 +39,7 @@
 #include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/grid.h"
@@ -636,34 +637,29 @@ std::vector<BSONObj> ReshardingSplitPolicy::createRawPipeline(const ShardKeyPatt
 
     std::vector<BSONObj> res;
     const auto& shardKeyFields = shardKey.getKeyPatternFields();
-
-    BSONObjBuilder projectValBuilder;
     BSONObjBuilder sortValBuilder;
-
+    using Doc = Document;
+    using Arr = std::vector<Value>;
+    using V = Value;
+    Arr arrayToObjectBuilder;
     for (auto&& fieldRef : shardKeyFields) {
         // If the shard key includes a hashed field and current fieldRef is the hashed field.
         if (shardKey.isHashedPattern() &&
             fieldRef->dottedField().compare(shardKey.getHashedField().fieldNameStringData()) == 0) {
-            projectValBuilder.append(fieldRef->dottedField(),
-                                     BSON("$toHashedIndexKey"
-                                          << "$" + fieldRef->dottedField()));
+            arrayToObjectBuilder.emplace_back(
+                Doc{{"k", V{fieldRef->dottedField()}},
+                    {"v", Doc{{"$toHashedIndexKey", V{"$" + fieldRef->dottedField()}}}}});
         } else {
-            projectValBuilder.append(
-                str::stream() << fieldRef->dottedField(),
-                BSON("$ifNull" << BSON_ARRAY("$" + fieldRef->dottedField() << BSONNULL)));
+            arrayToObjectBuilder.emplace_back(Doc{
+                {"k", V{fieldRef->dottedField()}},
+                {"v", Doc{{"$ifNull", V{Arr{V{"$" + fieldRef->dottedField()}, V{BSONNULL}}}}}}});
         }
-
         sortValBuilder.append(fieldRef->dottedField().toString(), 1);
     }
-
-    // Do not project _id if it's not part of the shard key.
-    if (!shardKey.hasId()) {
-        projectValBuilder.append("_id", 0);
-    }
-
     res.push_back(BSON("$sample" << BSON("size" << numSplitPoints * samplesPerChunk)));
-    res.push_back(BSON("$project" << projectValBuilder.obj()));
     res.push_back(BSON("$sort" << sortValBuilder.obj()));
+    res.push_back(
+        Doc{{"$replaceWith", Doc{{"$arrayToObject", Arr{V{arrayToObjectBuilder}}}}}}.toBson());
     return res;
 }
 
@@ -786,14 +782,10 @@ void ReshardingSplitPolicy::_appendSplitPointsFromSample(BSONObjSet* splitPoints
 
     while (nextKey && nRemaining > 0) {
         // if key is hashed, nextKey values are already hashed
-        auto result = splitPoints->insert(
-            dotted_path_support::extractElementsBasedOnTemplate(*nextKey, shardKey.toBSON())
-                .getOwned());
-
+        auto result = splitPoints->insert(nextKey->getOwned());
         if (result.second) {
             nRemaining--;
         }
-
         nextKey = _samples->getNext();
     }
 }
@@ -805,7 +797,6 @@ ReshardingSplitPolicy::_makePipelineDocumentSource(OperationContext* opCtx,
                                                    int numInitialChunks,
                                                    int samplesPerChunk) {
     auto rawPipeline = createRawPipeline(shardKey, numInitialChunks - 1, samplesPerChunk);
-
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
     resolvedNamespaces[ns.coll()] = {ns, std::vector<BSONObj>{}};
 
