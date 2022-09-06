@@ -189,7 +189,7 @@ WriteConcernW deserializeWriteConcernW(BSONElement wEl) {
         uassert(ErrorCodes::FailedToParse, "tagged write concern requires tags", !wTags.isEmpty());
 
         WTags tags;
-        for (auto e : wTags) {
+        for (auto&& e : wTags) {
             uassert(
                 ErrorCodes::FailedToParse,
                 "tags must be a single level document with only number values; found: {}"_format(
