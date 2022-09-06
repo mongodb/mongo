@@ -183,8 +183,7 @@ public:
     /**
      * Returns whether this SemiFuture can or will be able to access a deferred status or value.
      *
-     * NOTE: valid() will still return true if the value inside of the future is moved from. This
-     * should not be used as a way to determine usage validity until SERVER-66036.
+     * TODO(SERVER-66010): Document validity semantics in `Future` member functions.
      */
     bool valid() const {
         return _impl.valid();
@@ -223,7 +222,6 @@ public:
     T get(Interruptible* interruptible = Interruptible::notInterruptible()) && {
         return std::move(_impl).get(interruptible);
     }
-
     future_details::AddRefUnlessVoid<T> get(
         Interruptible* interruptible = Interruptible::notInterruptible()) & {
         return _impl.get(interruptible);
@@ -1394,7 +1392,7 @@ auto ExecutorFuture<T>::_wrapCBHelper(ExecutorPtr exec, UniqueFunc&& func) {
 }
 
 template <typename T>
-    inline ExecutorFuture<T> SemiFuture<T>::thenRunOn(ExecutorPtr exec) && noexcept {
+    ExecutorFuture<T> SemiFuture<T>::thenRunOn(ExecutorPtr exec) && noexcept {
     return ExecutorFuture<T>(std::move(exec), std::move(_impl));
 }
 
@@ -1403,13 +1401,16 @@ template <typename T>
     return Future<T>(std::move(_impl));
 }
 
+namespace future_details {
 template <typename T>
-    inline SharedSemiFuture<future_details::FakeVoidToVoid<T>>
-    future_details::FutureImpl<T>::share() && noexcept {
+    SharedSemiFuture<FakeVoidToVoid<T>> FutureImpl<T>::share() && noexcept {
+    invariant(valid());
     using Out = SharedSemiFuture<FakeVoidToVoid<T>>;
     if (_immediate)
-        return Out(SharedStateHolder<FakeVoidToVoid<T>>::makeReady(std::move(*_immediate)));
+        return Out(SharedStateHolder<FakeVoidToVoid<T>>::makeReady(*std::exchange(_immediate, {})));
+
     return Out(SharedStateHolder<FakeVoidToVoid<T>>(std::move(_shared)));
 }
+}  // namespace future_details
 
 }  // namespace mongo

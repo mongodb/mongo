@@ -692,6 +692,7 @@ public:
     }
 
     bool isReady() const {
+        invariant(_shared);
         return _shared->state.load(std::memory_order_acquire) == SSBState::kFinished;
     }
 
@@ -699,11 +700,17 @@ public:
         return _shared != nullptr;
     }
 
+    void reset() {
+        _shared.reset();
+    }
+
     void wait(Interruptible* interruptible) const {
+        invariant(_shared);
         _shared->wait(interruptible);
     }
 
     Status waitNoThrow(Interruptible* interruptible) const noexcept {
+        invariant(_shared);
         try {
             _shared->wait(interruptible);
         } catch (const DBException& ex) {
@@ -714,34 +721,41 @@ public:
     }
 
     T get(Interruptible* interruptible) && {
+        invariant(_shared);
         _shared->wait(interruptible);
-        uassertStatusOK(std::move(_shared->status));
-        return std::move(*(_shared->data));
+        auto sharedState = std::move(_shared);
+        uassertStatusOK(std::move(sharedState->status));
+        return std::move(*sharedState->data);
     }
     T& get(Interruptible* interruptible) & {
+        invariant(_shared);
         _shared->wait(interruptible);
         uassertStatusOK(_shared->status);
         return *(_shared->data);
     }
     const T& get(Interruptible* interruptible) const& {
+        invariant(_shared);
         _shared->wait(interruptible);
         uassertStatusOK(_shared->status);
         return *(_shared->data);
     }
 
     StatusWith<T> getNoThrow(Interruptible* interruptible) && noexcept {
+        invariant(_shared);
         try {
             _shared->wait(interruptible);
         } catch (const DBException& ex) {
             return ex.toStatus();
         }
-
-        if (!_shared->status.isOK())
-            return std::move(_shared->status);
-        return std::move(*_shared->data);
+        auto sharedState = std::move(_shared);
+        if (!sharedState->status.isOK()) {
+            return std::move(sharedState->status);
+        }
+        return std::move(*sharedState->data);
     }
 
     StatusWith<T> getNoThrow(Interruptible* interruptible) const& noexcept {
+        invariant(_shared);
         try {
             _shared->wait(interruptible);
         } catch (const DBException& ex) {
@@ -758,10 +772,12 @@ public:
     }
 
     SharedState<T>* operator->() {
+        invariant(_shared);
         return _shared.operator->();
     }
 
     SharedStateHolder<VoidToFakeVoid<T>> addChild() const {
+        invariant(_shared);
         return SharedStateHolder<VoidToFakeVoid<T>>(_shared->addChild());
     }
 
@@ -804,6 +820,10 @@ public:
 
     bool valid() const {
         return _inner.valid();
+    }
+
+    void reset() {
+        _inner.reset();
     }
 
     void wait(Interruptible* interruptible) const {
@@ -870,7 +890,7 @@ public:
     SharedSemiFuture<FakeVoidToVoid<T>> share() && noexcept;
 
     bool isReady() const {
-        return _immediate || _shared.isReady();
+        return _immediate || (_shared.valid() && _shared.isReady());
     }
 
     /**
@@ -897,7 +917,7 @@ public:
 
     T get(Interruptible* interruptible) && {
         if (_immediate)
-            return std::move(*_immediate);
+            return *std::exchange(_immediate, {});
         return std::move(_shared).get(interruptible);
     }
     T& get(Interruptible* interruptible) & {
@@ -913,7 +933,7 @@ public:
 
     StatusWith<T> getNoThrow(Interruptible* interruptible) && noexcept {
         if (_immediate)
-            return std::move(*_immediate);
+            return *std::exchange(_immediate, {});
         return std::move(_shared).getNoThrow(interruptible);
     }
     StatusWith<T> getNoThrow(Interruptible* interruptible) const& noexcept {
@@ -1251,16 +1271,17 @@ private:
     template <typename SuccessFunc, typename FailFunc, typename NotReady>
     auto generalImpl(SuccessFunc&& success, FailFunc&& fail, NotReady&& notReady) noexcept {
         if (_immediate) {
-            return success(std::move(*_immediate));
+            return success(*std::exchange(_immediate, {}));
         }
 
         auto oldState = _shared->state.load(std::memory_order_acquire);
         dassert(oldState != SSBState::kHaveCallback);
         if (oldState == SSBState::kFinished) {
-            if (_shared->status.isOK()) {
-                return success(std::move(*_shared->data));
+            auto sharedState = std::move(_shared);
+            if (sharedState->status.isOK()) {
+                return success(std::move(*sharedState->data));
             } else {
-                return fail(std::move(_shared->status));
+                return fail(std::move(sharedState->status));
             }
         }
 
@@ -1268,13 +1289,16 @@ private:
         // support both void- and value-returning notReady implementations since we can't assign
         // void to a variable.
         ON_BLOCK_EXIT([&] {
-            dassert(_shared->children.empty());
+            // The setting of a callback by `notReady` must explicitly make this Future non-valid().
+            auto sharedState = std::move(_shared);
+
+            dassert(sharedState->children.empty());
             // oldState could be either kInit or kWaitingOrHaveChildren, depending on whether we've
             // failed a call to wait().
-            if (MONGO_unlikely(!_shared->state.compare_exchange_strong(
+            if (MONGO_unlikely(!sharedState->state.compare_exchange_strong(
                     oldState, SSBState::kHaveCallback, std::memory_order_acq_rel))) {
                 dassert(oldState == SSBState::kFinished);
-                _shared->callback(_shared.getPtr());
+                sharedState->callback(sharedState.getPtr());
             }
         });
 
@@ -1314,7 +1338,7 @@ private:
     }
 
     template <typename Result, typename OnReady>
-    inline FutureImpl<Result> makeContinuation(OnReady&& onReady) {
+    FutureImpl<Result> makeContinuation(OnReady&& onReady) {
         invariant(!_shared->callback && !_shared->continuation);
 
         auto continuation = make_intrusive<SharedState<Result>>();
@@ -1329,8 +1353,45 @@ private:
         return FutureImpl<Result>(SharedStateHolder<Result>(std::move(continuation)));
     }
 
+    /**
+     * Ensures clearing of the moved-from optional in the move assignment operator and move
+     * constructor. Regular boost::optional doesn't enforce such strict semantics. This behaviour
+     * enables `has_value`, `operator!`, `operator bool` to be a source of truth after a move.
+     */
+    class ResetOnMoveOptional : public boost::optional<T> {
+        using Base = boost::optional<T>;
+
+    public:
+        using Base::Base;
+        using Base::operator=;
+
+        ResetOnMoveOptional(ResetOnMoveOptional&& other) noexcept(
+            std::is_nothrow_move_assignable_v<T>&& std::is_nothrow_move_constructible_v<T>)
+            : Base(other._stealBase()) {}
+
+        ResetOnMoveOptional& operator=(ResetOnMoveOptional&& other) noexcept(
+            std::is_nothrow_move_assignable_v<T>&& std::is_nothrow_move_constructible_v<T>) {
+            if (this != &other)
+                _base() = other._stealBase();
+            return *this;
+        }
+
+    private:
+        Base& _base() {
+            return *this;
+        }
+
+        const Base& _base() const {
+            return *this;
+        }
+
+        Base _stealBase() {
+            return std::exchange(_base(), {});
+        }
+    };
+
     // At most one of these will be active.
-    boost::optional<T> _immediate;
+    ResetOnMoveOptional _immediate;
     SharedStateHolder<T> _shared;
 };
 
