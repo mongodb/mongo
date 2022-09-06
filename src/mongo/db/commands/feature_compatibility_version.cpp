@@ -106,7 +106,7 @@ public:
                          std::make_tuple(GenericFCV::kLastContinuous,
                                          GenericFCV::kUpgradingFromLastContinuousToLatest,
                                          GenericFCV::kLatest)}) {
-            for (auto isFromConfigServer : std::vector{false, true}) {
+            for (auto&& isFromConfigServer : {false, true}) {
                 // Start or complete upgrading to latest. If this release's lastContinuous ==
                 // lastLTS then the second loop iteration just overwrites the first.
                 _transitions[{from, to, isFromConfigServer}] = upgrading;
@@ -131,7 +131,7 @@ public:
                                          GenericFCV::kLastContinuous),
                          std::make_tuple(GenericFCV::kDowngradingFromLatestToLastLTS,
                                          GenericFCV::kLastLTS)}) {
-            for (auto isFromConfigServer : std::vector{false, true}) {
+            for (auto&& isFromConfigServer : {false, true}) {
                 // Start or complete downgrade from latest.  If this release's lastContinuous ==
                 // lastLTS then the second loop iteration just overwrites the first.
                 _transitions[{GenericFCV::kLatest, to, isFromConfigServer}] = downgrading;
@@ -149,7 +149,7 @@ public:
      */
     void featureFlaggedAddNewTransitionState() {
         if (repl::feature_flags::gDowngradingToUpgrading.isEnabledAndIgnoreFCV()) {
-            for (auto isFromConfigServer : std::vector{false, true}) {
+            for (auto&& isFromConfigServer : {false, true}) {
                 _transitions[{GenericFCV::kDowngradingFromLatestToLastLTS,
                               GenericFCV::kLatest,
                               isFromConfigServer}] = GenericFCV::kUpgradingFromLastLTSToLatest;
