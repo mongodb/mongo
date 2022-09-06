@@ -87,7 +87,7 @@ void appendMultikeyPathsAsBytes(BSONObj keyPattern,
  */
 void parseMultikeyPathsFromBytes(BSONObj multikeyPathsObj, MultikeyPaths* multikeyPaths) {
     invariant(multikeyPaths);
-    for (auto elem : multikeyPathsObj) {
+    for (const auto& elem : multikeyPathsObj) {
         MultikeyComponents multikeyComponents;
         int len;
         const char* data = elem.binData(len);
