@@ -1375,7 +1375,7 @@ public:
         // Save a flag to determine if we are in the case of an iso
         // week year. Note that the agg expression parser ensures that one of date or
         // isoWeekYear inputs are provided so we don't need to enforce that at this depth.
-        auto isIsoWeekYear = eIsoWeekYear ? true : false;
+        auto isIsoWeekYear = static_cast<bool>(eIsoWeekYear);
 
         auto frameId = _context->state.frameId();
         sbe::EVariable yearRef(frameId, 0);
@@ -1482,15 +1482,9 @@ public:
         // Operands is for the outer let bindings.
         sbe::EExpression::Vector operands;
         if (isIsoWeekYear) {
-            if (!eIsoWeekYear) {
-                eIsoWeekYear = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
-                                                          sbe::value::bitcastFrom<int32_t>(1970));
-                operands.push_back(std::move(eIsoWeekYear));
-            } else {
-                boundChecks.push_back(boundedCheck(yearRef, 1, 9999, "isoWeekYear"));
-                operands.push_back(fieldConversionBinding(
-                    std::move(eIsoWeekYear), _context->state.frameIdGenerator, "isoWeekYear"));
-            }
+            boundChecks.push_back(boundedCheck(yearRef, 1, 9999, "isoWeekYear"));
+            operands.push_back(fieldConversionBinding(
+                std::move(eIsoWeekYear), _context->state.frameIdGenerator, "isoWeekYear"));
             if (!eIsoWeek) {
                 eIsoWeek = sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
                                                       sbe::value::bitcastFrom<int32_t>(1));
