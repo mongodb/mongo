@@ -39,9 +39,19 @@ namespace mongo::global_index {
  * Creates the internal collection implements the global index container with the given UUID on the
  * shard. Replicates as a 'createGlobalIndex' command. This container-backing collection:
  * - is clustered by _id. The _id field stores the cluster-unique document key of the index entry;
- * - has a secondary unique index on the indexKey field which stores a binary-comparable
+ * - has a secondary unique index on the 'ik' field which stores a binary-comparable
  *   representation of the index key value.
  */
 void createContainer(OperationContext* opCtx, const UUID& indexUUID);
+
+/**
+ * Inserts a key into the global index container identified by UUID. Replicates as an 'xi' command.
+ * - 'key' is the unique index key.
+ * - 'docKey' is the document key of the index entry.
+ */
+void insertKey(OperationContext* opCtx,
+               const UUID& indexUUID,
+               const BSONObj& key,
+               const BSONObj& docKey);
 
 }  // namespace mongo::global_index

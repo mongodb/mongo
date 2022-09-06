@@ -165,6 +165,8 @@ DurableOplogEntry::CommandType parseCommandType(const BSONObj& objectField) {
         return DurableOplogEntry::CommandType::kImportCollection;
     } else if (commandString == "createGlobalIndex") {
         return DurableOplogEntry::CommandType::kCreateGlobalIndex;
+    } else if (commandString == "xi") {
+        return DurableOplogEntry::CommandType::kInsertGlobalIndexKey;
     } else {
         uasserted(ErrorCodes::BadValue,
                   str::stream() << "Unknown oplog entry command type: " << commandString
@@ -272,6 +274,18 @@ ReplOperation MutableOplogEntry::makeDeleteOperation(const NamespaceString& nss,
     op.setNss(nss);
     op.setUuid(uuid);
     op.setObject(docToDelete.getOwned());
+    return op;
+}
+
+ReplOperation MutableOplogEntry::makeInsertGlobalIndexKeyOperation(const NamespaceString& indexNss,
+                                                                   const UUID indexUuid,
+                                                                   const BSONObj& key,
+                                                                   const BSONObj& docKey) {
+    ReplOperation op;
+    op.setOpType(OpTypeEnum::kInsertGlobalIndexKey);
+    op.setNss(indexNss.getCommandNS());
+    op.setUuid(indexUuid);
+    op.setObject(BSON("key" << key << "docKey" << docKey));
     return op;
 }
 
@@ -383,6 +397,7 @@ bool DurableOplogEntry::isCrudOpType(OpTypeEnum opType) {
         case OpTypeEnum::kInsert:
         case OpTypeEnum::kDelete:
         case OpTypeEnum::kUpdate:
+        case OpTypeEnum::kInsertGlobalIndexKey:
             return true;
         case OpTypeEnum::kCommand:
         case OpTypeEnum::kNoop:
@@ -404,6 +419,7 @@ bool DurableOplogEntry::isUpdateOrDelete() const {
         case OpTypeEnum::kInsert:
         case OpTypeEnum::kCommand:
         case OpTypeEnum::kNoop:
+        case OpTypeEnum::kInsertGlobalIndexKey:
             return false;
     }
     MONGO_UNREACHABLE;

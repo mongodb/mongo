@@ -337,6 +337,7 @@ void writeToImageCollection(OperationContext* opCtx,
     "d" delete
     "c" db cmd
     "n" no op
+    "xi" insert global index key
 */
 
 
@@ -1822,6 +1823,15 @@ Status applyOperation_inlock(OperationContext* opCtx,
             if (incrementOpsAppliedStats) {
                 incrementOpsAppliedStats();
             }
+            break;
+        }
+        case OpTypeEnum::kInsertGlobalIndexKey: {
+            invariant(op.getUuid());
+
+            global_index::insertKey(opCtx,
+                                    *op.getUuid(),
+                                    op.getObject().getObjectField("key"),
+                                    op.getObject().getObjectField("docKey"));
             break;
         }
         default: {

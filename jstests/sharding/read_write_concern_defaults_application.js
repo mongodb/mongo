@@ -164,6 +164,7 @@ let testCases = {
     _shardsvrDropDatabase: {skip: "internal command"},
     _shardsvrDropDatabaseParticipant: {skip: "internal command"},
     _shardsvrGetStatsForBalancing: {skip: "internal command"},
+    _shardsvrInsertGlobalIndexKey: {skip: "internal command"},
     _shardsvrJoinMigrations: {skip: "internal command"},
     _shardsvrMovePrimary: {skip: "internal command"},
     _shardsvrMoveRange: {

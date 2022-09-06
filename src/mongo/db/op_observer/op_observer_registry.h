@@ -139,6 +139,17 @@ public:
             o->onInserts(opCtx, coll, begin, end, fromMigrate);
     }
 
+    void onInsertGlobalIndexKey(OperationContext* opCtx,
+                                const NamespaceString& globalIndexNss,
+                                const UUID& globalIndexUuid,
+                                const BSONObj& key,
+                                const BSONObj& docKey) override {
+
+        ReservedTimes times{opCtx};
+        for (auto& o : _observers)
+            o->onInsertGlobalIndexKey(opCtx, globalIndexNss, globalIndexUuid, key, docKey);
+    }
+
     void onUpdate(OperationContext* const opCtx, const OplogUpdateEntryArgs& args) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)

@@ -29,8 +29,7 @@ function verifyIndexSpecs(node, namespace) {
     const primaryIndexSpecs =
         {"v": 2, "key": {"_id": 1}, "name": "_id_", "unique": true, "clustered": true};
 
-    const secondaryIndexSpecs =
-        {"v": 2, "key": {"indexKey": 1}, "name": "indexKey_1", "unique": true};
+    const secondaryIndexSpecs = {"v": 2, "key": {"ik": 1}, "name": "ik_1", "unique": true};
 
     const referenceIndexSpecList = [primaryIndexSpecs, secondaryIndexSpecs];
 

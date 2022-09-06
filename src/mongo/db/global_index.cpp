@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
+#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -38,6 +39,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
@@ -69,8 +71,8 @@ void createContainer(OperationContext* opCtx, const UUID& indexUUID) {
     // Create the container.
     return writeConflictRetry(opCtx, "createGlobalIndexContainer", nss.ns(), [&]() {
         const auto indexKeySpec = BSON("v" << 2 << "name"
-                                           << "indexKey_1"
-                                           << "key" << BSON("indexKey" << 1) << "unique" << true);
+                                           << "ik_1"
+                                           << "key" << BSON("ik" << 1) << "unique" << true);
 
         WriteUnitOfWork wuow(opCtx);
 
@@ -102,15 +104,13 @@ void createContainer(OperationContext* opCtx, const UUID& indexUUID) {
                     str::stream() << "Collection with UUID " << indexUUID
                                   << " already exists but it's not clustered.",
                     autoColl->getCollectionOptions().clusteredIndex);
-            tassert(6789205,
-                    str::stream() << "Collection with UUID " << indexUUID
-                                  << " already exists but it's missing a unique index on "
-                                     "'indexKey'.",
-                    autoColl->getIndexCatalog()->findIndexByKeyPatternAndOptions(
-                        opCtx,
-                        BSON("indexKey" << 1),
-                        indexKeySpec,
-                        IndexCatalog::InclusionPolicy::kReady));
+            tassert(
+                6789205,
+                str::stream() << "Collection with UUID " << indexUUID
+                              << " already exists but it's missing a unique index on "
+                                 "'ik'.",
+                autoColl->getIndexCatalog()->findIndexByKeyPatternAndOptions(
+                    opCtx, BSON("ik" << 1), indexKeySpec, IndexCatalog::InclusionPolicy::kReady));
             tassert(6789206,
                     str::stream() << "Collection with namespace " << nss.ns()
                                   << " already exists but it has inconsistent UUID "
@@ -119,6 +119,62 @@ void createContainer(OperationContext* opCtx, const UUID& indexUUID) {
             LOGV2(6789201, "Global index container already exists", "indexUUID"_attr = indexUUID);
         }
         return;
+    });
+}
+
+void insertKey(OperationContext* opCtx,
+               const UUID& indexUUID,
+               const BSONObj& key,
+               const BSONObj& docKey) {
+    const auto ns = NamespaceString::makeGlobalIndexNSS(indexUUID);
+
+    // Generate the KeyString representation of the index key.
+    // Current limitations:
+    // - Only supports ascending order.
+    // - We assume unique: true, and there's no support for other index options.
+    // - No support for multikey indexes.
+
+    KeyString::Builder ks(KeyString::Version::V1);
+    ks.resetToKey(key, KeyString::ALL_ASCENDING);
+    const auto& indexTB = ks.getTypeBits();
+
+    // Build the index entry, consisting of:
+    // - '_id': the document key.
+    // - 'ik': the KeyString representation of the index key.
+    // - 'tb': the index key's TypeBits. Only present if non-zero.
+
+    BSONObjBuilder indexEntryBuilder;
+    indexEntryBuilder.append("_id", docKey);
+    indexEntryBuilder.append(
+        "ik", BSONBinData(ks.getBuffer(), ks.getSize(), BinDataType::BinDataGeneral));
+    if (!indexTB.isAllZeros()) {
+        indexEntryBuilder.append(
+            "tb", BSONBinData(indexTB.getBuffer(), indexTB.getSize(), BinDataType::BinDataGeneral));
+    }
+    const auto indexEntry = indexEntryBuilder.obj();
+
+    // Insert the index entry.
+
+    writeConflictRetry(opCtx, "insertGlobalIndexKey", ns.toString(), [&] {
+        WriteUnitOfWork wuow(opCtx);
+        AutoGetCollection container(opCtx, ns, MODE_IX);
+
+        {
+            repl::UnreplicatedWritesBlock unreplicatedWrites(opCtx);
+
+            uassert(6789402,
+                    str::stream() << "Global index container with UUID " << indexUUID
+                                  << " does not exist.",
+                    CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, ns));
+
+            uassertStatusOK(collection_internal::insertDocument(
+                opCtx, *container, InsertStatement(indexEntry), nullptr));
+        }
+
+        opCtx->getServiceContext()->getOpObserver()->onInsertGlobalIndexKey(
+            opCtx, ns, indexUUID, key, docKey);
+
+        wuow.commit();
     });
 }
 
