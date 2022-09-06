@@ -3,8 +3,6 @@ test_kind: js_test
 selector:
   roots:
   - jstests/core/**/*.js
-  - jstests/fle2/**/*.js
-  - src/mongo/db/modules/*/jstests/fle2/*.js
   exclude_files:
   # Has conditional logic for standalone servers and replica sets, but can't distinguish the two
   # when connected to mongos.
