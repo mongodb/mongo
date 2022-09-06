@@ -156,7 +156,7 @@ StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
         if (!view) {
             // Return error status if pipeline is too large.
             int pipelineSize = 0;
-            for (auto obj : resolvedPipeline) {
+            for (const auto& obj : resolvedPipeline) {
                 pipelineSize += obj.objsize();
             }
             if (pipelineSize > ViewGraph::kMaxViewPipelineSizeBytes) {
