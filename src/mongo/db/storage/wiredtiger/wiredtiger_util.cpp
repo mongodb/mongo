@@ -107,6 +107,9 @@ void setTableWriteTimestampAssertion(WiredTigerSessionCache* sessionCache,
                 "writeTimestampAssertionOn"_attr = on);
     auto status = sessionCache->getKVEngine()->alterMetadata(uri, setting);
     if (!status.isOK()) {
+        // Dump the storage engine's internal state to assist in diagnosis.
+        sessionCache->getKVEngine()->dump();
+
         auto sessionPtr = sessionCache->getSession();
         LOGV2_FATAL(
             6003701,
@@ -874,6 +877,9 @@ Status WiredTigerUtil::setTableLogging(OperationContext* opCtx, const std::strin
     // WT_SESSION::alter may return EBUSY and require taking a checkpoint to make progress.
     auto status = sessionCache->getKVEngine()->alterMetadata(uri, setting);
     if (!status.isOK()) {
+        // Dump the storage engine's internal state to assist in diagnosis.
+        sessionCache->getKVEngine()->dump();
+
         LOGV2_FATAL(50756,
                     "Failed to update log setting",
                     "uri"_attr = uri,

@@ -2422,6 +2422,9 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
     } while (ret == EBUSY);
 
     if (ret) {
+        // Dump the storage engine's internal state to assist in diagnosis.
+        dump();
+
         return {ErrorCodes::UnrecoverableRollbackError,
                 str::stream() << "Error rolling back to stable. Err: " << wiredtiger_strerror(ret)};
     }
