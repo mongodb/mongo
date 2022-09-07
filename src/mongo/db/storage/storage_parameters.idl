@@ -113,7 +113,7 @@ server_parameters:
         set_at: startup
         cpp_varname: gYieldingSupportForSBE
         cpp_vartype: bool
-        default: true
+        default: false
 
 feature_flags:
     featureFlagClusteredIndexes:
