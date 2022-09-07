@@ -54,18 +54,18 @@ public:
      *
      * 'kNormal': It's important that the operation be throttled under load. If this operation is
      * throttled, it will not affect system availability or observability. Most operations, both
-     * user and internal, should use this priority unless they qualify as 'kLow' or 'kHigh'
+     * user and internal, should use this priority unless they qualify as 'kLow' or 'kImmediate'
      * priority.
      *
-     * 'kHigh': It's crucial that the operation makes forward progress - bypassing ticket
+     * 'kImmediate': It's crucial that the operation makes forward progress - bypassing ticket
      * acquisition. Reserved for operations critical to availability (e.g. replication workers) or
      * observability (e.g. FTDC), and any operation that is releasing resources (e.g. committing or
      * aborting prepared transactions). Should be used sparingly.
      *
-     * TODO SERVER-67951: Update comment to address that kHigh priority operations are always
+     * TODO SERVER-67951: Update comment to address that kImmediate priority operations are always
      * granted a ticket immediately upon request.
      */
-    enum class AcquisitionPriority { kLow, kNormal, kHigh };
+    enum class Priority { kLow, kNormal, kImmediate };
 
     void start(TickSource* tickSource) {
         admissions++;
@@ -93,11 +93,11 @@ public:
         return _lockMode;
     }
 
-    void setPriority(AcquisitionPriority priority) {
+    void setPriority(Priority priority) {
         _priority = priority;
     }
 
-    AcquisitionPriority getPriority() const {
+    Priority getPriority() const {
         invariant(_priority);
         return _priority.get();
     }
@@ -107,7 +107,7 @@ private:
     int admissions{0};
     LockMode _lockMode = LockMode::MODE_NONE;
     // TODO SERVER-68933: Don't default _priority to kNormal.
-    boost::optional<AcquisitionPriority> _priority{AcquisitionPriority::kNormal};
+    boost::optional<Priority> _priority{Priority::kNormal};
 };
 
 }  // namespace mongo

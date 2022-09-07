@@ -300,7 +300,7 @@ void OplogBatcher::_run(StorageInterface* storageInterface) {
             // We do not want to serialize the OplogBatcher with oplog application, nor
             // do we want to take a WiredTiger read ticket.
             ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(opCtx->lockState());
-            opCtx->lockState()->skipAcquireTicket();
+            opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
 
             // During storage change operations, we may shut down storage under a global lock
             // and wait for any storage-using opCtxs to exit.  This results in a deadlock with

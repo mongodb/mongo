@@ -1402,7 +1402,7 @@ void TransactionParticipant::Participant::_releaseTransactionResourcesToOpCtx(
     }
 
     if (acquireTicket == AcquireTicket::kSkip) {
-        stashLocker->skipAcquireTicket();
+        stashLocker->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
     }
 
     tempTxnResourceStash->release(opCtx);

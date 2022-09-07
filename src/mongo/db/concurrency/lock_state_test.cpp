@@ -1237,25 +1237,27 @@ TEST_F(LockerImplTest, ConvertLockPendingUnlockAndUnlock) {
     locker.unlockGlobal();
 }
 
-TEST_F(LockerImplTest, SkipTicketAcquisitionForLockRAIIType) {
+TEST_F(LockerImplTest, SetTicketAcquisitionForLockRAIIType) {
     auto opCtx = makeOperationContext();
 
     // By default, ticket acquisition is required.
     ASSERT_TRUE(opCtx->lockState()->shouldAcquireTicket());
 
     {
-        SkipTicketAcquisitionForLock skipTicketAcquisition(opCtx.get());
+        SetTicketAquisitionPriorityForLock setTicketAquisition(
+            opCtx.get(), AdmissionContext::Priority::kImmediate);
         ASSERT_FALSE(opCtx->lockState()->shouldAcquireTicket());
     }
 
     ASSERT_TRUE(opCtx->lockState()->shouldAcquireTicket());
 
     // If ticket acquisitions are disabled on the lock state, the RAII type has no effect.
-    opCtx->lockState()->skipAcquireTicket();
+    opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
     ASSERT_FALSE(opCtx->lockState()->shouldAcquireTicket());
 
     {
-        SkipTicketAcquisitionForLock skipTicketAcquisition(opCtx.get());
+        SetTicketAquisitionPriorityForLock setTicketAquisition(
+            opCtx.get(), AdmissionContext::Priority::kImmediate);
         ASSERT_FALSE(opCtx->lockState()->shouldAcquireTicket());
     }
 

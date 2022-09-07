@@ -510,22 +510,19 @@ public:
     }
 
     /**
-     * This will opt in or out of the ticket mechanism. This should be used sparingly for special
-     * purpose threads, such as FTDC and committing or aborting prepared transactions.
+     * This will set the admission priority for the ticket mechanism.
      */
-    void skipAcquireTicket() {
-        // Should not hold or wait for the ticket.
+    void setAdmissionPriority(AdmissionContext::Priority priority) {
         invariant(isNoop() || getClientState() == Locker::ClientState::kInactive);
-        _admCtx.setPriority(AdmissionContext::AcquisitionPriority::kHigh);
+        _admCtx.setPriority(priority);
     }
-    void setAcquireTicket() {
-        // Should hold or wait for the ticket.
-        invariant(isNoop() || getClientState() == Locker::ClientState::kInactive);
-        _admCtx.setPriority(AdmissionContext::AcquisitionPriority::kNormal);
+
+    AdmissionContext::Priority getAcquisitionPriority() {
+        return _admCtx.getPriority();
     }
 
     bool shouldAcquireTicket() const {
-        return _admCtx.getPriority() != AdmissionContext::AcquisitionPriority::kHigh;
+        return _admCtx.getPriority() != AdmissionContext::Priority::kImmediate;
     }
 
     /**

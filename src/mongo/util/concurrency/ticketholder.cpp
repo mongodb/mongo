@@ -829,9 +829,9 @@ SchedulingTicketHolder::Queue& PriorityTicketHolder::_getQueueToUse(
     OperationContext* opCtx, const AdmissionContext* admCtx) {
     auto priority = admCtx->getPriority();
     switch (priority) {
-        case AdmissionContext::AcquisitionPriority::kLow:
+        case AdmissionContext::Priority::kLow:
             return _queues[static_cast<unsigned int>(QueueType::LowPriorityQueue)];
-        case AdmissionContext::AcquisitionPriority::kNormal:
+        case AdmissionContext::Priority::kNormal:
             return _queues[static_cast<unsigned int>(QueueType::NormalPriorityQueue)];
         default:
             MONGO_UNREACHABLE;

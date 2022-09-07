@@ -1469,7 +1469,7 @@ TEST_F(DConcurrencyTestFixture, NoThrottlingWhenNotAcquiringTickets) {
     auto opctx2 = clientOpctxPairs[1].second.get();
 
     // Prevent the enforcement of ticket throttling.
-    opctx1->lockState()->skipAcquireTicket();
+    opctx1->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
 
     // Both locks should be acquired immediately because there is no throttling.
     Lock::GlobalRead R1(opctx1, Date_t::now(), Lock::InterruptBehavior::kThrow);

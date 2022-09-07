@@ -68,7 +68,7 @@ std::tuple<BSONObj, Date_t> FTDCCollectorCollection::collect(Client* client) {
     // batches that are taking a long time.
     auto opCtx = client->makeOperationContext();
     ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(opCtx->lockState());
-    opCtx->lockState()->skipAcquireTicket();
+    opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
 
     for (auto& collector : _collectors) {
         // Skip collection if this collector has no data to return

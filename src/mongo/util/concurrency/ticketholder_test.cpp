@@ -73,7 +73,7 @@ void basicTimeout(OperationContext* opCtx) {
     ASSERT_EQ(holder->outof(), 1);
 
     AdmissionContext admCtx;
-    admCtx.setPriority(AdmissionContext::AcquisitionPriority::kNormal);
+    admCtx.setPriority(AdmissionContext::Priority::kNormal);
     {
         auto ticket = holder->waitForTicket(opCtx, &admCtx, mode);
         ASSERT_EQ(holder->used(), 1);
@@ -183,7 +183,7 @@ void resizeTest(OperationContext* opCtx) {
     Stats stats(holder.get());
 
     AdmissionContext admCtx;
-    admCtx.setPriority(AdmissionContext::AcquisitionPriority::kNormal);
+    admCtx.setPriority(AdmissionContext::Priority::kNormal);
 
     auto ticket =
         holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now() + Milliseconds{500}, mode);
@@ -368,7 +368,7 @@ TEST_F(TicketHolderTest, PriorityTwoQueuedOperations) {
         // Allocate the only available ticket. Priority is irrelevant when there are tickets
         // available.
         AdmissionContext admCtx;
-        admCtx.setPriority(AdmissionContext::AcquisitionPriority::kLow);
+        admCtx.setPriority(AdmissionContext::Priority::kLow);
         boost::optional<Ticket> ticket =
             holder.waitForTicket(_opCtx.get(), &admCtx, TicketHolder::WaitMode::kInterruptible);
         ASSERT(ticket);
@@ -380,7 +380,7 @@ TEST_F(TicketHolderTest, PriorityTwoQueuedOperations) {
         // Each ticket is assigned with a pointer to an AdmissionContext. The AdmissionContext must
         // survive the lifetime of the ticket.
         AdmissionContext admCtxLowPriority;
-        admCtxLowPriority.setPriority(AdmissionContext::AcquisitionPriority::kLow);
+        admCtxLowPriority.setPriority(AdmissionContext::Priority::kLow);
 
         stdx::thread lowPriorityThread([&]() {
             ticketLowPriority = holder.waitForTicket(opCtxLowPriority.get(),
@@ -395,7 +395,7 @@ TEST_F(TicketHolderTest, PriorityTwoQueuedOperations) {
         // Each ticket is assigned with a pointer to an AdmissionContext. The AdmissionContext must
         // survive the lifetime of the ticket.
         AdmissionContext admCtxNormalPriority;
-        admCtxNormalPriority.setPriority(AdmissionContext::AcquisitionPriority::kNormal);
+        admCtxNormalPriority.setPriority(AdmissionContext::Priority::kNormal);
 
         stdx::thread normalPriorityThread([&]() {
             ticketNormalPriority = holder.waitForTicket(opCtxNormalPriority.get(),
@@ -438,7 +438,7 @@ TEST_F(TicketHolderTest, PriorityTwoNormalOneLowQueuedOperations) {
         // Allocate the only available ticket. Priority is irrelevant when there are tickets
         // available.
         AdmissionContext admCtx;
-        admCtx.setPriority(AdmissionContext::AcquisitionPriority::kLow);
+        admCtx.setPriority(AdmissionContext::Priority::kLow);
         boost::optional<Ticket> ticket =
             holder.waitForTicket(_opCtx.get(), &admCtx, TicketHolder::WaitMode::kInterruptible);
         ASSERT(ticket);
@@ -450,7 +450,7 @@ TEST_F(TicketHolderTest, PriorityTwoNormalOneLowQueuedOperations) {
         // Each ticket is assigned with a pointer to an AdmissionContext. The AdmissionContext must
         // survive the lifetime of the ticket.
         AdmissionContext admCtxLowPriority;
-        admCtxLowPriority.setPriority(AdmissionContext::AcquisitionPriority::kLow);
+        admCtxLowPriority.setPriority(AdmissionContext::Priority::kLow);
 
         stdx::thread lowPriorityThread([&]() {
             ticketLowPriority = holder.waitForTicket(opCtxLowPriority.get(),
@@ -465,7 +465,7 @@ TEST_F(TicketHolderTest, PriorityTwoNormalOneLowQueuedOperations) {
         // Each ticket is assigned with a pointer to an AdmissionContext. The AdmissionContext must
         // survive the lifetime of the ticket.
         AdmissionContext admCtxNormal1Priority;
-        admCtxNormal1Priority.setPriority(AdmissionContext::AcquisitionPriority::kNormal);
+        admCtxNormal1Priority.setPriority(AdmissionContext::Priority::kNormal);
 
         stdx::thread normal1PriorityThread([&]() {
             ticketNormal1Priority = holder.waitForTicket(opCtxNormal1Priority.get(),
@@ -493,7 +493,7 @@ TEST_F(TicketHolderTest, PriorityTwoNormalOneLowQueuedOperations) {
         // Each ticket is assigned with a pointer to an AdmissionContext. The AdmissionContext must
         // survive the lifetime of the ticket.
         AdmissionContext admCtxNormal2Priority;
-        admCtxNormal2Priority.setPriority(AdmissionContext::AcquisitionPriority::kNormal);
+        admCtxNormal2Priority.setPriority(AdmissionContext::Priority::kNormal);
         stdx::thread normal2PriorityThread([&]() {
             ticketNormal2Priority = holder.waitForTicket(opCtxNormal2Priority.get(),
                                                          &admCtxNormal2Priority,

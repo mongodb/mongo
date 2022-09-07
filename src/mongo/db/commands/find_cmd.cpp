@@ -429,7 +429,7 @@ public:
                 // on ticket acquisition can cause complicated deadlocks. Primaries may depend on
                 // data reaching secondaries in order to proceed; and secondaries may get stalled
                 // replicating because of an inability to acquire a read ticket.
-                opCtx->lockState()->skipAcquireTicket();
+                opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
             }
 
             // If this read represents a reverse oplog scan, we want to bypass oplog visibility

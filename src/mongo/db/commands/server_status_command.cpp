@@ -88,7 +88,7 @@ public:
         // This command is important to observability, and like FTDC, does not need to acquire the
         // PBWM lock to return correct results.
         ShouldNotConflictWithSecondaryBatchApplicationBlock noPBWMBlock(opCtx->lockState());
-        opCtx->lockState()->skipAcquireTicket();
+        opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
 
         // --- basic fields that are global
 

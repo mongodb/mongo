@@ -3226,7 +3226,7 @@ Status ReplicationCoordinatorImpl::processReplSetGetStatus(
         // application.
         ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
             opCtx->lockState());
-        opCtx->lockState()->skipAcquireTicket();
+        opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
         // We need to hold the lock so that we don't run when storage is being shutdown.
         Lock::GlobalLock lk(opCtx,
                             MODE_IS,
