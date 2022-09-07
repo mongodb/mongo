@@ -89,7 +89,7 @@ public:
      */
     template <typename H>
     friend H AbslHashValue(H h, const TenantId& tenantId) {
-        return H::combine(std::move(h), tenantId.hash());
+        return H::combine(std::move(h), tenantId._oid);
     }
 
     /**
