@@ -302,7 +302,9 @@ protected:
 
     /**
      * Validate the instance to be created with initialState does not conflict with any existing
-     * ones. The implementation should throw ConflictingOperationInProgress if there is a conflict.
+     * ones. The implementation can choose to throw ConflictingOperationInProgress if there is a
+     * conflict or a named error code specified to the particular service if it would like to attach
+     * ErrorExtraInfo.
      */
     virtual void checkIfConflictsWithOtherInstances(
         OperationContext* opCtx,

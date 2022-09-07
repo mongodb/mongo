@@ -192,6 +192,7 @@ env.Library(
         'resharding/resharding_feature_flag.idl',
         'resharding/resume_token.idl',
         'resharding/type_collection_fields.idl',
+        'resharding/resharding_coordinator_service_conflicting_op_in_progress_info.cpp',
         'shard_cannot_refresh_due_to_locks_held_exception.cpp',
         'shard_invalidated_for_targeting_exception.cpp',
         'shard_version.cpp',

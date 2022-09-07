@@ -34,6 +34,7 @@
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/repl/primary_only_service_op_observer.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
@@ -50,6 +51,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/resharding/resharding_coordinator_service_conflicting_op_in_progress_info.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
@@ -169,6 +171,8 @@ public:
         _opObserverRegistry->addObserver(std::make_unique<ReshardingOpObserver>());
         _opObserverRegistry->addObserver(
             std::make_unique<CoordinatorOpObserverForTest>(_controller));
+        _opObserverRegistry->addObserver(
+            std::make_unique<repl::PrimaryOnlyServiceOpObserver>(getServiceContext()));
 
         _registry = repl::PrimaryOnlyServiceRegistry::get(getServiceContext());
         auto service = makeService(getServiceContext());
@@ -195,14 +199,21 @@ public:
     }
 
     ReshardingCoordinatorDocument makeCoordinatorDoc(
-        CoordinatorStateEnum state, boost::optional<Timestamp> fetchTimestamp = boost::none) {
+        CoordinatorStateEnum state,
+        UUID reshardingUUID,
+        NamespaceString originalNss,
+        NamespaceString tempNss,
+        const ShardKeyPattern& newShardKey,
+        boost::optional<Timestamp> fetchTimestamp = boost::none) {
         CommonReshardingMetadata meta(
-            _reshardingUUID, _originalNss, UUID::gen(), _tempNss, _newShardKey.toBSON());
+            reshardingUUID, originalNss, UUID::gen(), tempNss, newShardKey.toBSON());
+
         meta.setStartTime(getServiceContext()->getFastClockSource()->now());
 
         ReshardingCoordinatorDocument doc(state,
                                           {DonorShardEntry(ShardId("shard0000"), {})},
                                           {RecipientShardEntry(ShardId("shard0001"), {})});
+
         doc.setCommonReshardingMetadata(meta);
         resharding::emplaceCloneTimestampIfExists(doc, cloneTimestamp);
         return doc;
@@ -366,10 +377,23 @@ public:
         CoordinatorStateEnum state,
         OID epoch,
         boost::optional<Timestamp> fetchTimestamp = boost::none) {
+        return insertStateAndCatalogEntries(
+            state, epoch, _originalUUID, _originalNss, _tempNss, _newShardKey, fetchTimestamp);
+    }
+
+    ReshardingCoordinatorDocument insertStateAndCatalogEntries(
+        CoordinatorStateEnum state,
+        OID epoch,
+        UUID reshardingUUID,
+        NamespaceString originalNss,
+        NamespaceString tempNss,
+        const ShardKeyPattern& newShardKey,
+        boost::optional<Timestamp> fetchTimestamp = boost::none) {
         auto opCtx = operationContext();
         DBDirectClient client(opCtx);
 
-        auto coordinatorDoc = makeCoordinatorDoc(state, fetchTimestamp);
+        auto coordinatorDoc = makeCoordinatorDoc(
+            state, reshardingUUID, originalNss, tempNss, newShardKey, fetchTimestamp);
 
         TypeCollectionReshardingFields reshardingFields(coordinatorDoc.getReshardingUUID());
         reshardingFields.setState(coordinatorDoc.getState());
@@ -505,18 +529,35 @@ public:
     }
 
     auto initializeAndGetCoordinator() {
-        auto doc = insertStateAndCatalogEntries(CoordinatorStateEnum::kUnused, _originalEpoch);
+        return initializeAndGetCoordinator(
+            _reshardingUUID, _originalNss, _tempNss, _newShardKey, _originalUUID, _oldShardKey);
+    }
+
+    std::shared_ptr<ReshardingCoordinator> initializeAndGetCoordinator(
+        UUID reshardingUUID,
+        NamespaceString originalNss,
+        NamespaceString tempNss,
+        const ShardKeyPattern& newShardKey,
+        UUID originalUUID,
+        const ShardKeyPattern& oldShardKey,
+        boost::optional<Timestamp> fetchTimestamp = boost::none) {
+        auto doc = insertStateAndCatalogEntries(CoordinatorStateEnum::kUnused,
+                                                _originalEpoch,
+                                                reshardingUUID,
+                                                originalNss,
+                                                tempNss,
+                                                newShardKey,
+                                                fetchTimestamp);
         auto opCtx = operationContext();
-        auto donorChunk = makeAndInsertChunksForDonorShard(_originalUUID,
+        auto donorChunk = makeAndInsertChunksForDonorShard(originalUUID,
                                                            _originalEpoch,
                                                            _originalTimestamp,
-                                                           _oldShardKey,
+                                                           oldShardKey,
                                                            std::vector{OID::gen(), OID::gen()});
-
-        auto initialChunks = makeChunks(_reshardingUUID,
+        auto initialChunks = makeChunks(reshardingUUID,
                                         _tempEpoch,
                                         _tempTimestamp,
-                                        _newShardKey,
+                                        newShardKey,
                                         std::vector{OID::gen(), OID::gen()});
 
         std::vector<ReshardedChunk> presetReshardedChunks;
@@ -897,6 +938,51 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorFailsIfMigrationNo
             CollectionType::ConfigNS, BSON(CollectionType::kNssFieldName << _originalNss.ns())));
         ASSERT_FALSE(collDoc.getAllowMigrations());
     }
+}
+
+TEST_F(ReshardingCoordinatorServiceTest, MultipleReshardingOperationsFail) {
+    auto coordinator = initializeAndGetCoordinator();
+
+    // Asserts that a resharding op with same namespace and same shard key fails with
+    // ReshardingCoordinatorServiceConflictingOperationInProgress
+    ASSERT_THROWS_WITH_CHECK(
+        initializeAndGetCoordinator(
+            UUID::gen(), _originalNss, _tempNss, _newShardKey, UUID::gen(), _oldShardKey),
+        DBException,
+        [&](const DBException& ex) {
+            ASSERT_EQ(ex.code(),
+                      ErrorCodes::ReshardingCoordinatorServiceConflictingOperationInProgress);
+            ASSERT_EQ(ex.extraInfo<ReshardingCoordinatorServiceConflictingOperationInProgressInfo>()
+                          ->getInstance(),
+                      coordinator);
+        });
+
+    // Asserts that a resharding op with different namespace and different shard key fails with
+    // ConflictingOperationInProgress.
+    ASSERT_THROWS_CODE(initializeAndGetCoordinator(
+                           UUID::gen(),
+                           NamespaceString("db.moo"),
+                           NamespaceString("db.system.resharding." + UUID::gen().toString()),
+                           ShardKeyPattern(BSON("shardKeyV1" << 1)),
+                           UUID::gen(),
+                           ShardKeyPattern(BSON("shardKeyV2" << 1))),
+                       DBException,
+                       ErrorCodes::ConflictingOperationInProgress);
+
+    // Asserts that a resharding op with same namespace and different shard key fails with
+    // ConflictingOperationInProgress.
+    ASSERT_THROWS_CODE(initializeAndGetCoordinator(
+                           UUID::gen(),
+                           _originalNss,
+                           NamespaceString("db.system.resharding." + UUID::gen().toString()),
+                           ShardKeyPattern(BSON("shardKeyV1" << 1)),
+                           UUID::gen(),
+                           _oldShardKey),
+                       DBException,
+                       ErrorCodes::ConflictingOperationInProgress);
+
+    coordinator->abort();
+    coordinator->getCompletionFuture().wait();
 }
 
 }  // namespace
