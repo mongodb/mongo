@@ -115,6 +115,9 @@ private:
         // Identifier for the storage to drop the associated collection or index data.
         std::string identName;
 
+        // Whether the storage engine dropped the ident.
+        bool isDropped;
+
         // The collection or index data can be safely dropped when no references to this token
         // remain.
         std::weak_ptr<void> dropToken;

@@ -115,6 +115,7 @@ namespace mongo {
 
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(WTDropEBUSY);
 MONGO_FAIL_POINT_DEFINE(WTPauseStableTimestamp);
 MONGO_FAIL_POINT_DEFINE(WTPreserveSnapshotHistoryIndefinitely);
 MONGO_FAIL_POINT_DEFINE(WTSetOldestTSToStableTS);
@@ -332,8 +333,6 @@ WiredTigerKVEngine::WiredTigerKVEngine(const std::string& canonicalName,
             }
         }
     }
-
-    _previousCheckedDropsQueued.store(_clockSource->now().toMillisSinceEpoch());
 
     std::stringstream ss;
     ss << "create,";
@@ -1822,14 +1821,12 @@ Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
         session.getSession(), uri.c_str(), "force,checkpoint_wait=false");
     LOGV2_DEBUG(22338, 1, "WT drop", "uri"_attr = uri, "ret"_attr = ret);
 
-    if (ret == EBUSY) {
-        // this is expected, queue it up
-        {
-            stdx::lock_guard<Latch> lk(_identToDropMutex);
-            _identToDrop.push_front({std::move(uri), std::move(onDrop)});
-        }
-        _sessionCache->closeCursorsForQueuedDrops();
-        return Status::OK();
+    if (ret == EBUSY || MONGO_unlikely(WTDropEBUSY.shouldFail())) {
+        // Drop requires exclusive access to the table. EBUSY will be returned if there's a
+        // checkpoint running, if there are any open cursors on the ident, or the ident is otherwise
+        // in use.
+        return {ErrorCodes::ObjectIsBusy,
+                str::stream() << "Failed to remove drop-pending ident " << ident};
     }
 
     if (onDrop) {
@@ -1878,94 +1875,6 @@ void WiredTigerKVEngine::dropIdentForImport(OperationContext* opCtx, StringData 
                       "ret"_attr = ret);
     } while (ret == EBUSY);
     invariantWTOK(ret, session.getSession());
-}
-
-std::list<WiredTigerCachedCursor> WiredTigerKVEngine::filterCursorsWithQueuedDrops(
-    std::list<WiredTigerCachedCursor>* cache) {
-    std::list<WiredTigerCachedCursor> toDrop;
-
-    stdx::lock_guard<Latch> lk(_identToDropMutex);
-    if (_identToDrop.empty())
-        return toDrop;
-
-    for (auto i = cache->begin(); i != cache->end();) {
-        if (!i->_cursor ||
-            std::find_if(_identToDrop.begin(), _identToDrop.end(), [i](const auto& identToDrop) {
-                return identToDrop.uri == std::string(i->_cursor->uri);
-            }) == _identToDrop.end()) {
-            ++i;
-            continue;
-        }
-        toDrop.push_back(*i);
-        i = cache->erase(i);
-    }
-
-    return toDrop;
-}
-
-bool WiredTigerKVEngine::haveDropsQueued() const {
-    Date_t now = _clockSource->now();
-    Milliseconds delta = now - Date_t::fromMillisSinceEpoch(_previousCheckedDropsQueued.load());
-
-    if (_sizeStorerSyncTracker.intervalHasElapsed()) {
-        _sizeStorerSyncTracker.resetLastTime();
-        syncSizeInfo(false);
-    }
-
-    // We only want to check the queue max once per second or we'll thrash
-    if (delta < Milliseconds(1000))
-        return false;
-
-    _previousCheckedDropsQueued.store(now.toMillisSinceEpoch());
-
-    // Don't wait for the mutex: if we can't get it, report that no drops are queued.
-    stdx::unique_lock<Latch> lk(_identToDropMutex, stdx::defer_lock);
-    return lk.try_lock() && !_identToDrop.empty();
-}
-
-void WiredTigerKVEngine::dropSomeQueuedIdents() {
-    int numInQueue;
-
-    WiredTigerSession session(_conn);
-
-    {
-        stdx::lock_guard<Latch> lk(_identToDropMutex);
-        numInQueue = _identToDrop.size();
-    }
-
-    int numToDelete = 10;
-    int tenPercentQueue = numInQueue * 0.1;
-    if (tenPercentQueue > 10)
-        numToDelete = tenPercentQueue;
-
-    LOGV2_DEBUG(22339,
-                1,
-                "WT Queue: attempting to drop tables",
-                "numInQueue"_attr = numInQueue,
-                "numToDelete"_attr = numToDelete);
-    for (int i = 0; i < numToDelete; i++) {
-        IdentToDrop identToDrop;
-        {
-            stdx::lock_guard<Latch> lk(_identToDropMutex);
-            if (_identToDrop.empty())
-                break;
-            identToDrop = std::move(_identToDrop.front());
-            _identToDrop.pop_front();
-        }
-        int ret = session.getSession()->drop(
-            session.getSession(), identToDrop.uri.c_str(), "force,checkpoint_wait=false");
-        LOGV2_DEBUG(22340, 1, "WT queued drop", "uri"_attr = identToDrop.uri, "ret"_attr = ret);
-
-        if (ret == EBUSY) {
-            stdx::lock_guard<Latch> lk(_identToDropMutex);
-            _identToDrop.push_back(std::move(identToDrop));
-        } else {
-            invariantWTOK(ret, session.getSession());
-            if (identToDrop.callback) {
-                identToDrop.callback();
-            }
-        }
-    }
 }
 
 bool WiredTigerKVEngine::supportsDirectoryPerDB() const {

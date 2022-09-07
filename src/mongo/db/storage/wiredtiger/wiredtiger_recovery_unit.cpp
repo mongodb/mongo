@@ -348,12 +348,7 @@ WiredTigerSession* WiredTigerRecoveryUnit::getSession() {
 
 WiredTigerSession* WiredTigerRecoveryUnit::getSessionNoTxn() {
     _ensureSession();
-    WiredTigerSession* session = _session.get();
-
-    // Handling queued drops can be slow, which is not desired for internal operations like FTDC
-    // sampling. Disable handling of queued drops for such sessions.
-    session->dropQueuedIdentsAtSessionEndAllowed(false);
-    return session;
+    return _session.get();
 }
 
 void WiredTigerRecoveryUnit::doAbandonSnapshot() {

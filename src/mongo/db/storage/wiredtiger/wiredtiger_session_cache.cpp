@@ -52,7 +52,6 @@ namespace mongo {
 
 WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn, uint64_t epoch, uint64_t cursorEpoch)
     : _epoch(epoch),
-      _cursorEpoch(cursorEpoch),
       _session(nullptr),
       _cursorGen(0),
       _cursorsOut(0),
@@ -65,7 +64,6 @@ WiredTigerSession::WiredTigerSession(WT_CONNECTION* conn,
                                      uint64_t epoch,
                                      uint64_t cursorEpoch)
     : _epoch(epoch),
-      _cursorEpoch(cursorEpoch),
       _cache(cache),
       _session(nullptr),
       _cursorGen(0),
@@ -185,20 +183,6 @@ void WiredTigerSession::closeAllCursors(const std::string& uri) {
             i = _cursors.erase(i);
         } else
             ++i;
-    }
-}
-
-void WiredTigerSession::closeCursorsForQueuedDrops(WiredTigerKVEngine* engine) {
-    invariant(_session);
-
-    _cursorEpoch = _cache->getCursorEpoch();
-    auto toDrop = engine->filterCursorsWithQueuedDrops(&_cursors);
-
-    for (auto i = toDrop.begin(); i != toDrop.end(); i++) {
-        WT_CURSOR* cursor = i->_cursor;
-        if (cursor) {
-            invariantWTOK(cursor->close(cursor), _session);
-        }
     }
 }
 
@@ -401,16 +385,6 @@ void WiredTigerSessionCache::closeAllCursors(const std::string& uri) {
     }
 }
 
-void WiredTigerSessionCache::closeCursorsForQueuedDrops() {
-    // Increment the cursor epoch so that all cursors from this epoch are closed.
-    _cursorEpoch.fetchAndAdd(1);
-
-    stdx::lock_guard<Latch> lock(_cacheLock);
-    for (SessionCache::iterator i = _sessions.begin(); i != _sessions.end(); i++) {
-        (*i)->closeCursorsForQueuedDrops(_engine);
-    }
-}
-
 size_t WiredTigerSessionCache::getIdleSessionsCount() {
     stdx::lock_guard<Latch> lock(_cacheLock);
     return _sessions.size();
@@ -485,8 +459,7 @@ UniqueWiredTigerSession WiredTigerSessionCache::getSession() {
     }
 
     // Outside of the cache partition lock, but on release will be put back on the cache
-    return UniqueWiredTigerSession(
-        new WiredTigerSession(_conn, this, _epoch.load(), _cursorEpoch.load()));
+    return UniqueWiredTigerSession(new WiredTigerSession(_conn, this, _epoch.load()));
 }
 
 void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
@@ -524,18 +497,10 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
         invariantWTOK(ss->reset(ss), ss);
     }
 
-    // If the cursor epoch has moved on, close all cursors in the session.
-    uint64_t cursorEpoch = _cursorEpoch.load();
-    if (session->_getCursorEpoch() != cursorEpoch)
-        session->closeCursorsForQueuedDrops(_engine);
-
     bool returnedToCache = false;
     uint64_t currentEpoch = _epoch.load();
-    bool dropQueuedIdentsAtSessionEnd = session->isDropQueuedIdentsAtSessionEndAllowed();
 
-    // Reset this session's flag for dropping queued idents to default, before returning it to
-    // session cache. Also set the time this session got idle at.
-    session->dropQueuedIdentsAtSessionEndAllowed(true);
+    // Set the time this session got idle at.
     session->setIdleExpireTime(_clockSource->now());
 
     if (session->_getEpoch() == currentEpoch) {  // check outside of lock to reduce contention
@@ -549,9 +514,6 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
 
     if (!returnedToCache)
         delete session;
-
-    if (dropQueuedIdentsAtSessionEnd && _engine && _engine->haveDropsQueued())
-        _engine->dropSomeQueuedIdents();
 }
 
 

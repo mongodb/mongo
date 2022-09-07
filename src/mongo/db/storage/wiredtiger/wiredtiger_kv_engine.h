@@ -301,10 +301,6 @@ public:
     WT_CONNECTION* getConnection() {
         return _conn;
     }
-    void dropSomeQueuedIdents();
-    std::list<WiredTigerCachedCursor> filterCursorsWithQueuedDrops(
-        std::list<WiredTigerCachedCursor>* cache);
-    bool haveDropsQueued() const;
 
     void syncSizeInfo(bool sync) const;
 
@@ -514,11 +510,6 @@ private:
 
     std::string _rsOptions;
     std::string _indexOptions;
-
-    mutable Mutex _identToDropMutex = MONGO_MAKE_LATCH("WiredTigerKVEngine::_identToDropMutex");
-    std::list<IdentToDrop> _identToDrop;
-
-    mutable AtomicWord<long long> _previousCheckedDropsQueued;
 
     std::unique_ptr<WiredTigerSession> _backupSession;
     WiredTigerBackup _wtBackup;

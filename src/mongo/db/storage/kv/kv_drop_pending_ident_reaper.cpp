@@ -58,6 +58,7 @@ void KVDropPendingIdentReaper::addDropPendingIdent(const Timestamp& dropTimestam
     if (std::find_if(lowerBound, upperBound, matcher) == upperBound) {
         IdentInfo info;
         info.identName = ident->getIdent();
+        info.isDropped = false;
         info.dropToken = ident;
         info.onDrop = std::move(onDrop);
         _dropPendingIdents.insert(std::make_pair(dropTimestamp, info));
@@ -126,12 +127,25 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
             auto status =
                 _engine->dropIdent(opCtx->recoveryUnit(), identName, std::move(identInfo.onDrop));
             if (!status.isOK()) {
+                if (status == ErrorCodes::ObjectIsBusy) {
+                    LOGV2(6936300,
+                          "Drop-pending ident is still in use",
+                          "ident"_attr = identName,
+                          "dropTimestamp"_attr = dropTimestamp,
+                          "error"_attr = status);
+                    return;
+                }
                 LOGV2_FATAL_NOTRACE(51022,
                                     "Failed to remove drop-pending ident",
                                     "ident"_attr = identName,
                                     "dropTimestamp"_attr = dropTimestamp,
                                     "error"_attr = status);
             }
+
+            // Ident drops are non-transactional and cannot be rolled back. So this does not need to
+            // be in an onCommit handler.
+            identInfo.isDropped = true;
+
             wuow.commit();
         });
     }
@@ -142,6 +156,11 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
 
         stdx::lock_guard<Latch> lock(_mutex);
         for (const auto& timestampAndIdentInfo : toDrop) {
+            if (!timestampAndIdentInfo.second.isDropped) {
+                // This ident was not dropped. Skip removing it from the drop pending list.
+                continue;
+            }
+
             // Some idents with drop timestamps safe to drop may not have been dropped because they
             // are still in use by another operation. Therefore, we must iterate the entries in the
             // multimap matching a particular timestamp and erase only the entry with a match on the
