@@ -225,11 +225,11 @@ write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(
 /**
  * Transforms a single time-series insert to an update request on an existing bucket.
  */
-write_ops::UpdateOpEntry makeTimeseriesCompressionOpEntry(
+write_ops::UpdateOpEntry makeTimeseriesTransformationOpEntry(
     OperationContext* opCtx,
     const OID& bucketId,
-    write_ops::UpdateModification::TransformFunc compressionFunc) {
-    write_ops::UpdateModification u(std::move(compressionFunc));
+    write_ops::UpdateModification::TransformFunc transformationFunc) {
+    write_ops::UpdateModification u(std::move(transformationFunc));
     write_ops::UpdateOpEntry update(BSON("_id" << bucketId), std::move(u));
     invariant(!update.getMulti(), bucketId.toString());
     invariant(!update.getUpsert(), bucketId.toString());
@@ -649,13 +649,14 @@ public:
             return op;
         }
 
-        write_ops::UpdateCommandRequest _makeTimeseriesCompressionOp(
+        write_ops::UpdateCommandRequest _makeTimeseriesTransformationOp(
             OperationContext* opCtx,
             const OID& bucketId,
-            write_ops::UpdateModification::TransformFunc compressionFunc) const {
+            write_ops::UpdateModification::TransformFunc transformationFunc) const {
             write_ops::UpdateCommandRequest op(
                 makeTimeseriesBucketsNamespace(ns()),
-                {makeTimeseriesCompressionOpEntry(opCtx, bucketId, std::move(compressionFunc))});
+                {makeTimeseriesTransformationOpEntry(
+                    opCtx, bucketId, std::move(transformationFunc))});
 
             write_ops::WriteCommandRequestBase base;
             // The schema validation configured in the bucket collection is intended for direct
@@ -694,15 +695,13 @@ public:
             OperationContext* opCtx,
             std::shared_ptr<BucketCatalog::WriteBatch> batch,
             const BSONObj& metadata,
-            std::vector<StmtId>&& stmtIds) const {
+            const write_ops::UpdateCommandRequest& op) const {
             if (auto status = checkFailUnorderedTimeseriesInsertFailPoint(metadata)) {
                 return {status->first, status->second};
             }
 
-            return _getTimeseriesSingleWriteResult(write_ops_exec::performUpdates(
-                opCtx,
-                _makeTimeseriesUpdateOp(opCtx, batch, metadata, std::move(stmtIds)),
-                OperationSource::kTimeseriesInsert));
+            return _getTimeseriesSingleWriteResult(
+                write_ops_exec::performUpdates(opCtx, op, OperationSource::kTimeseriesInsert));
         }
 
         TimeseriesSingleWriteResult _performTimeseriesBucketCompression(
@@ -753,8 +752,8 @@ public:
                 return compressed.compressedBucket;
             };
 
-            auto compressionOp =
-                _makeTimeseriesCompressionOp(opCtx, closedBucket.bucketId, bucketCompressionFunc);
+            auto compressionOp = _makeTimeseriesTransformationOp(
+                opCtx, closedBucket.bucketId, bucketCompressionFunc);
             auto result = _getTimeseriesSingleWriteResult(
                 write_ops_exec::performUpdates(opCtx, compressionOp, OperationSource::kStandard));
 
@@ -773,6 +772,18 @@ public:
             }
 
             return result;
+        }
+
+        write_ops::UpdateCommandRequest _makeTimeseriesDecompressionOp(
+            OperationContext* opCtx,
+            const std::shared_ptr<BucketCatalog::WriteBatch>& batch) const {
+            auto bucketDecompressionFunc =
+                [&](const BSONObj& bucketDoc) -> boost::optional<BSONObj> {
+                return timeseries::decompressBucket(bucketDoc);
+            };
+
+            return _makeTimeseriesTransformationOp(
+                opCtx, batch->bucket().id, bucketDecompressionFunc);
         }
 
         /**
@@ -816,8 +827,26 @@ public:
                               << "Expected 1 insertion of document with _id '" << docId
                               << "', but found " << output.result.getValue().getN() << ".");
             } else {
-                const auto output =
-                    _performTimeseriesUpdate(opCtx, batch, metadata, std::move(stmtIds));
+                if (batch->needToDecompressBucketBeforeInserting()) {
+                    const auto output = _performTimeseriesUpdate(
+                        opCtx, batch, metadata, _makeTimeseriesDecompressionOp(opCtx, batch));
+                    if (auto error =
+                            generateError(opCtx, output.result, start + index, errors->size())) {
+                        errors->emplace_back(std::move(*error));
+                        bucketCatalog.abort(batch, output.result.getStatus());
+                        return output.canContinue;
+                    }
+                    invariant(output.result.getValue().getNModified() == 1,
+                              str::stream() << "Expected 1 update of document with _id '" << docId
+                                            << "', but found "
+                                            << output.result.getValue().getNModified() << ".");
+                }
+
+                const auto output = _performTimeseriesUpdate(
+                    opCtx,
+                    batch,
+                    metadata,
+                    _makeTimeseriesUpdateOp(opCtx, batch, metadata, std::move(stmtIds)));
                 if (auto error =
                         generateError(opCtx, output.result, start + index, errors->size())) {
                     errors->emplace_back(std::move(*error));
@@ -909,6 +938,9 @@ public:
                         insertOps.push_back(_makeTimeseriesInsertOp(
                             batch, metadata, std::move(stmtIds[batch.get()->bucket().id])));
                     } else {
+                        if (batch.get()->needToDecompressBucketBeforeInserting()) {
+                            updateOps.push_back(_makeTimeseriesDecompressionOp(opCtx, batch));
+                        }
                         updateOps.push_back(_makeTimeseriesUpdateOp(
                             opCtx, batch, metadata, std::move(stmtIds[batch.get()->bucket().id])));
                     }

@@ -667,6 +667,10 @@ uint32_t BucketCatalog::WriteBatch::numPreviouslyCommittedMeasurements() const {
     return _numPreviouslyCommittedMeasurements;
 }
 
+bool BucketCatalog::WriteBatch::needToDecompressBucketBeforeInserting() const {
+    return _needToDecompressBucketBeforeInserting;
+}
+
 bool BucketCatalog::WriteBatch::finished() const {
     return _promise.getFuture().isReady();
 }

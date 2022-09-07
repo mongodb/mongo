@@ -185,6 +185,7 @@ public:
         const BSONObj& max() const;
         const StringMap<std::size_t>& newFieldNamesToBeInserted() const;
         uint32_t numPreviouslyCommittedMeasurements() const;
+        bool needToDecompressBucketBeforeInserting() const;
 
         /**
          * Returns whether the batch has already been committed or aborted.
@@ -230,7 +231,8 @@ public:
         BSONObj _min;  // Batch-local min; full if first batch, updates otherwise.
         BSONObj _max;  // Batch-local max; full if first batch, updates otherwise.
         uint32_t _numPreviouslyCommittedMeasurements = 0;
-        StringMap<std::size_t> _newFieldNamesToBeInserted;  // Value is hash of string key
+        StringMap<std::size_t> _newFieldNamesToBeInserted;    // Value is hash of string key
+        bool _needToDecompressBucketBeforeInserting = false;  // Bucket is compressed on-disk.
 
         AtomicWord<bool> _commitRights{false};
         SharedPromise<CommitInfo> _promise;

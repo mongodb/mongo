@@ -359,6 +359,62 @@ CompressionResult compressBucket(const BSONObj& bucketDoc,
     return {};
 }
 
+boost::optional<BSONObj> decompressBucket(const BSONObj& bucketDoc) {
+    BSONObjBuilder builder;
+
+    for (auto&& topLevel : bucketDoc) {
+        if (topLevel.fieldNameStringData() == kBucketControlFieldName) {
+            BSONObjBuilder controlBuilder{builder.subobjStart(kBucketControlFieldName)};
+
+            for (auto&& e : topLevel.Obj()) {
+                if (e.fieldNameStringData() == kBucketControlVersionFieldName) {
+                    // Check that we have a compressed bucket, and rewrite the version to signal
+                    // it's uncompressed now.
+                    if (e.type() != BSONType::NumberInt ||
+                        e.numberInt() != kTimeseriesControlCompressedVersion) {
+                        // This bucket isn't compressed.
+                        return boost::none;
+                    }
+                    builder.append(kBucketControlVersionFieldName,
+                                   kTimeseriesControlDefaultVersion);
+                } else if (e.fieldNameStringData() == kBucketControlCountFieldName) {
+                    // Omit the count field when decompressing.
+                    continue;
+                } else {
+                    // Just copy all the other fields.
+                    builder.append(e);
+                }
+            }
+        } else if (topLevel.fieldNameStringData() == kBucketDataFieldName) {
+            BSONObjBuilder dataBuilder{builder.subobjStart(kBucketDataFieldName)};
+
+            // Iterate over the compressed data columns and decompress each one.
+            for (auto&& e : topLevel.Obj()) {
+                if (e.type() != BSONType::BinData) {
+                    // This bucket isn't actually compressed.
+                    return boost::none;
+                }
+
+                BSONObjBuilder columnBuilder{dataBuilder.subobjStart(e.fieldNameStringData())};
+
+                BSONColumn column{e};
+                DecimalCounter<uint32_t> count{0};
+                for (auto&& measurement : column) {
+                    if (!measurement.eoo()) {
+                        builder.appendAs(measurement, count);
+                    }
+                    count++;
+                }
+            }
+        } else {
+            // If it's not control or data, we can just copy it and continue.
+            builder.append(topLevel);
+        }
+    }
+
+    return builder.obj();
+}
+
 bool isCompressedBucket(const BSONObj& bucketDoc) {
     auto&& controlField = bucketDoc[timeseries::kBucketControlFieldName];
     uassert(6540600,

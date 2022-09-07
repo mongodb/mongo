@@ -33,6 +33,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 
 namespace mongo {
 
@@ -60,6 +61,8 @@ CompressionResult compressBucket(const BSONObj& bucketDoc,
                                  const NamespaceString& nss,
                                  bool eligibleForReopening,
                                  bool validateDecompression);
+
+boost::optional<BSONObj> decompressBucket(const BSONObj& bucketDoc);
 
 /**
  * Returns whether a timeseries bucket has been compressed to the v2 format.
