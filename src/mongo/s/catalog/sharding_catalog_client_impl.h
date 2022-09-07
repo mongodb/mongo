@@ -107,6 +107,11 @@ public:
         const ChunkVersion& sinceVersion,
         const repl::ReadConcernArgs& readConcern) override;
 
+    std::pair<CollectionType, std::vector<IndexCatalogType>> getCollectionAndGlobalIndexes(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const repl::ReadConcernArgs& readConcern) override;
+
     StatusWith<std::vector<TagsType>> getTagsForCollection(OperationContext* opCtx,
                                                            const NamespaceString& nss) override;
 

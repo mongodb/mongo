@@ -104,6 +104,13 @@ std::pair<CollectionType, std::vector<ChunkType>> ShardingCatalogClientMock::get
     uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
 
+std::pair<CollectionType, std::vector<IndexCatalogType>>
+ShardingCatalogClientMock::getCollectionAndGlobalIndexes(OperationContext* opCtx,
+                                                         const NamespaceString& nss,
+                                                         const repl::ReadConcernArgs& readConcern) {
+    uasserted(ErrorCodes::InternalError, "Method not implemented");
+}
+
 StatusWith<std::vector<TagsType>> ShardingCatalogClientMock::getTagsForCollection(
     OperationContext* opCtx, const NamespaceString& nss) {
     return {ErrorCodes::InternalError, "Method not implemented"};

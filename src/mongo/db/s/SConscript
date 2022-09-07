@@ -739,6 +739,7 @@ env.CppUnitTest(
         'resharding/resharding_coordinator_test.cpp',
         'resharding/resharding_coordinator_service_test.cpp',
         'resharding/resharding_util_test.cpp',
+        'sharding_catalog_client_aggregations_test.cpp',
         'sharding_ddl_util_test.cpp',
         'sharding_util_refresh_test.cpp',
         'topology_time_ticker_test.cpp',

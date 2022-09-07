@@ -38,8 +38,10 @@
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/index_version.h"
 
 namespace mongo {
 
@@ -190,6 +192,15 @@ public:
         OperationContext* opCtx,
         const NamespaceString& nss,
         const ChunkVersion& sinceVersion,
+        const repl::ReadConcernArgs& readConcern) = 0;
+
+    /**
+     * Retrieves the collection metadata and its global index metadata. This function will return
+     * all of the global idexes for a collection.
+     */
+    virtual std::pair<CollectionType, std::vector<IndexCatalogType>> getCollectionAndGlobalIndexes(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
         const repl::ReadConcernArgs& readConcern) = 0;
 
     /**
