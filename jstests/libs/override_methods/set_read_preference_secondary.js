@@ -9,6 +9,9 @@ load("jstests/libs/override_methods/override_helpers.js");
 const kReadPreferenceSecondary = {
     mode: "secondary"
 };
+
+const {defaultReadPreference: kReadPreferenceToUse = kReadPreferenceSecondary} = TestData;
+
 const kCommandsSupportingReadPreference = new Set([
     "aggregate",
     "collStats",
@@ -135,9 +138,9 @@ function runCommandWithReadPreferenceSecondary(
 
     if (shouldForceReadPreference) {
         if (commandObj.hasOwnProperty("$readPreference") &&
-            !bsonBinaryEqual({_: commandObj.$readPreference}, {_: kReadPreferenceSecondary})) {
-            throw new Error("Cowardly refusing to override read preference of command: " +
-                            tojson(commandObj));
+            !bsonBinaryEqual({_: commandObj.$readPreference}, {_: kReadPreferenceToUse})) {
+            throw new Error("Cowardly refusing to override read preference to " +
+                            tojson(kReadPreferenceToUse) + " for command: " + tojson(commandObj));
         } else if (!commandObj.hasOwnProperty("$readPreference")) {
             if (commandObj === commandObjUnwrapped) {
                 // We wrap the command object using a "query" field rather than a "$query" field to
@@ -149,7 +152,7 @@ function runCommandWithReadPreferenceSecondary(
                 commandObj = Object.assign({}, commandObj);
             }
 
-            commandObj.$readPreference = kReadPreferenceSecondary;
+            commandObj.$readPreference = kReadPreferenceToUse;
         }
     }
 

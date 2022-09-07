@@ -412,6 +412,7 @@ jsTestOptions = function() {
             skipCheckOrphans: TestData.skipCheckOrphans || false,
             skipCheckRoutingTableConsistency: TestData.skipCheckRoutingTableConsistency || false,
             inEvergreen: TestData.inEvergreen || false,
+            defaultReadPreference: TestData.defaultReadPreference,
 
             undoRecorderPath: TestData.undoRecorderPath,
             backupOnRestartDir: TestData.backupOnRestartDir || false,
