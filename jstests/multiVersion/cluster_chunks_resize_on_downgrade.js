@@ -1,8 +1,8 @@
 /**
- * Tests that chunks are re-split upon downgrade from v6.0.
+ * Tests that chunks are re-split upon downgrade to v6.0.
  *
  * @tags: [
- *  requires_fcv_61,
+ *     multiversion_incompatible,
  * ]
  */
 

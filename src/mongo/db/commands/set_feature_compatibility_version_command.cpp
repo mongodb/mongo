@@ -767,7 +767,7 @@ private:
                        const SetFeatureCompatibilityVersion& request,
                        boost::optional<Timestamp> changeTimestamp) {
         const auto requestedVersion = request.getCommandParameter();
-        // TODO  SERVER-65332 remove logic bound to this future object When kLastLTS is 6.0
+        // TODO  SERVER-65332 remove logic bound to this future object when v7.0 branches out
         boost::optional<SharedSemiFuture<void>> chunkResizeAsyncTask;
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
@@ -782,7 +782,10 @@ private:
         // should go in this function.
         _prepareForDowngrade(opCtx);
 
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+            requestedVersion == GenericFCV::kLastLTS) {
+            // As data size aware balancing is supported starting from v6.1, chunks resizing is
+            // required only when downgrading to v6.0
             chunkResizeAsyncTask =
                 Balancer::get(opCtx)->applyLegacyChunkSizeConstraintsOnClusterData(opCtx);
         }
@@ -836,16 +839,18 @@ private:
             // Tell the shards to enter phase-2 of setFCV (fully downgraded)
             _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kComplete);
 
-            // chunkResizeAsyncTask is only used by config servers as part of internal server
-            // downgrade cleanup. Waiting for the task to complete is put at the end of
-            // _runDowngrade instead of inside _internalServerDowngradeCleanup because the task
-            // might take a long time to complete.
-            invariant(chunkResizeAsyncTask.has_value());
-            LOGV2(6417108, "Waiting for cluster chunks resize process to complete.");
-            uassertStatusOKWithContext(
-                chunkResizeAsyncTask->getNoThrow(opCtx),
-                "Failed to enforce chunk size constraint during FCV downgrade");
-            LOGV2(6417109, "Cluster chunks resize process completed.");
+            if (requestedVersion == GenericFCV::kLastLTS) {
+                // chunkResizeAsyncTask is only used by config servers as part of internal server
+                // downgrade cleanup. Waiting for the task to complete is put at the end of
+                // _runDowngrade instead of inside _internalServerDowngradeCleanup because the task
+                // might take a long time to complete.
+                invariant(chunkResizeAsyncTask.has_value());
+                LOGV2(6417108, "Waiting for cluster chunks resize process to complete.");
+                uassertStatusOKWithContext(
+                    chunkResizeAsyncTask->getNoThrow(opCtx),
+                    "Failed to enforce chunk size constraint during FCV downgrade");
+                LOGV2(6417109, "Cluster chunks resize process completed.");
+            }
         }
 
         hangWhileDowngrading.pauseWhileSet(opCtx);
