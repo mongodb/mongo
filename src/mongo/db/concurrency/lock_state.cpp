@@ -202,11 +202,15 @@ void LockerImpl::dump() const {
         ResourceId key;
         LockRequest::Status status;
         LockMode mode;
+        unsigned int recursiveCount;
+        unsigned int unlockPending;
 
         BSONObj toBSON() const {
             BSONObjBuilder b;
             b.append("key", key.toString());
             b.append("status", lockRequestStatusName(status));
+            b.append("recursiveCount", static_cast<int>(recursiveCount));
+            b.append("unlockPending", static_cast<int>(unlockPending));
             b.append("mode", modeName(mode));
             return b.obj();
         }
@@ -218,7 +222,8 @@ void LockerImpl::dump() const {
     {
         auto lg = stdx::lock_guard(_lock);
         for (auto it = _requests.begin(); !it.finished(); it.next())
-            entries.push_back({it.key(), it->status, it->mode});
+            entries.push_back(
+                {it.key(), it->status, it->mode, it->recursiveCount, it->unlockPending});
     }
     LOGV2(20523,
           "Locker id {id} status: {requests}",
