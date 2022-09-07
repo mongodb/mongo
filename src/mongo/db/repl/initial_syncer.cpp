@@ -114,6 +114,9 @@ MONGO_FAIL_POINT_DEFINE(failInitialSyncBeforeApplyingBatch);
 // Failpoint which fasserts if applying a batch fails.
 MONGO_FAIL_POINT_DEFINE(initialSyncFassertIfApplyingBatchFails);
 
+// Failpoint which causes the initial sync function to hang before stopping the oplog fetcher.
+MONGO_FAIL_POINT_DEFINE(initialSyncHangBeforeCompletingOplogFetching);
+
 // Failpoint which skips clearing _initialSyncState after a successful initial sync attempt.
 MONGO_FAIL_POINT_DEFINE(skipClearInitialSyncState);
 
@@ -1185,22 +1188,30 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
     std::shared_ptr<OnCompletionGuard> onCompletionGuard) {
     OpTimeAndWallTime resultOpTimeAndWallTime = {OpTime(), Date_t()};
     {
+        {
+            stdx::lock_guard<Latch> lock(_mutex);
+            auto status = _checkForShutdownAndConvertStatus_inlock(
+                result.getStatus(), "error fetching last oplog entry for stop timestamp");
+            if (!status.isOK()) {
+                onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
+                return;
+            }
+
+            auto&& optimeStatus = parseOpTimeAndWallTime(result);
+            if (!optimeStatus.isOK()) {
+                onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock,
+                                                                          optimeStatus.getStatus());
+                return;
+            }
+            resultOpTimeAndWallTime = optimeStatus.getValue();
+        }
+
+        // Release the _mutex to write to disk.
+        auto opCtx = makeOpCtx();
+        _replicationProcess->getConsistencyMarkers()->setMinValid(opCtx.get(),
+                                                                  resultOpTimeAndWallTime.opTime);
+
         stdx::lock_guard<Latch> lock(_mutex);
-        auto status = _checkForShutdownAndConvertStatus_inlock(
-            result.getStatus(), "error fetching last oplog entry for stop timestamp");
-        if (!status.isOK()) {
-            onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock, status);
-            return;
-        }
-
-        auto&& optimeStatus = parseOpTimeAndWallTime(result);
-        if (!optimeStatus.isOK()) {
-            onCompletionGuard->setResultAndCancelRemainingWork_inlock(lock,
-                                                                      optimeStatus.getStatus());
-            return;
-        }
-        resultOpTimeAndWallTime = optimeStatus.getValue();
-
         _initialSyncState->stopTimestamp = resultOpTimeAndWallTime.opTime.getTimestamp();
 
         // If the beginFetchingTimestamp is different from the stopTimestamp, it indicates that
@@ -1462,6 +1473,13 @@ void InitialSyncer::_rollbackCheckerCheckForRollbackCallback(
                                  << " during initial sync"));
         return;
     }
+
+    if (MONGO_FAIL_POINT(initialSyncHangBeforeCompletingOplogFetching)) {
+        log() << "initial sync - initialSyncHangBeforeCompletingOplogFetching fail point "
+                 "enabled. Blocking until fail point is disabled.";
+        MONGO_FAIL_POINT_PAUSE_WHILE_SET(initialSyncHangBeforeCompletingOplogFetching);
+    }
+
 
     // Update all unique indexes belonging to non-replicated collections on secondaries. See comment
     // in ReplicationCoordinatorExternalStateImpl::initializeReplSetStorage() for the explanation of
