@@ -1453,8 +1453,8 @@ void InitialSyncer::_lastOplogEntryFetcherCallbackForStopTimestamp(
 
         // Release the _mutex to write to disk.
         auto opCtx = makeOpCtx();
-        _replicationProcess->getConsistencyMarkers()->setMinValid(
-            opCtx.get(), resultOpTimeAndWallTime.opTime, true);
+        _replicationProcess->getConsistencyMarkers()->setMinValid(opCtx.get(),
+                                                                  resultOpTimeAndWallTime.opTime);
 
         stdx::lock_guard<Latch> lock(_mutex);
         _initialSyncState->stopTimestamp = resultOpTimeAndWallTime.opTime.getTimestamp();

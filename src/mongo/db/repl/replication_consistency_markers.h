@@ -141,9 +141,7 @@ public:
      * ignore the storage engine's rollback method by setting the 'alwaysAllowUntimestampedWrite'
      * parameter to true.
      */
-    virtual void setMinValid(OperationContext* opCtx,
-                             const OpTime& minValid,
-                             bool alwaysAllowUntimestampedWrite = false) = 0;
+    virtual void setMinValid(OperationContext* opCtx, const OpTime& minValid) = 0;
 
     // -------- Oplog Truncate After Point ----------
 
