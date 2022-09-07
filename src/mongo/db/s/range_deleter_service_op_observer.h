@@ -57,6 +57,12 @@ public:
                                 const BSONObj& key,
                                 const BSONObj& docKey) final{};
 
+    void onDeleteGlobalIndexKey(OperationContext* opCtx,
+                                const NamespaceString& globalIndexNss,
+                                const UUID& globalIndexUuid,
+                                const BSONObj& key,
+                                const BSONObj& docKey) final {}
+
     void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) override;
 
     void aboutToDelete(OperationContext* opCtx,

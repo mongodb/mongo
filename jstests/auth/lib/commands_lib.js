@@ -2821,6 +2821,24 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "_shardsvrDeleteGlobalIndexKey",
+          command: {_shardsvrDeleteGlobalIndexKey: UUID(), key: {a: 1}, docKey: {shk: 1, _id: 1}},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                expectFail: true
+              },
+              {runOnDb: firstDbName,
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+                expectFail: true
+              },
+          ]
+        },
+        {
           testname: "commitTxn",
           command: {commitTransaction: 1},
           // TODO (SERVER-53497): Enable auth testing for abortTransaction and commitTransaction.

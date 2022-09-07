@@ -52,3 +52,20 @@ commands:
       docKey:
         type: object
         description: "The document key: the document's shard key followed by its _id."
+
+  _shardsvrDeleteGlobalIndexKey:
+    description: "Internal command to delete a key from a global index container."
+    command_name: _shardsvrDeleteGlobalIndexKey
+    cpp_name: DeleteGlobalIndexKey
+    strict: true
+    type: uuid
+    namespace: type
+    api_version: ""
+    reply_type: OkReply
+    fields:
+      key:
+        type: object
+        description: "The index key."
+      docKey:
+        type: object
+        description: "The document key: the document's shard key followed by its _id."

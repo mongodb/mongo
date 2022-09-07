@@ -1872,6 +1872,15 @@ Status applyOperation_inlock(OperationContext* opCtx,
                                     op.getObject().getObjectField("docKey"));
             break;
         }
+        case OpTypeEnum::kDeleteGlobalIndexKey: {
+            invariant(op.getUuid());
+
+            global_index::deleteKey(opCtx,
+                                    *op.getUuid(),
+                                    op.getObject().getObjectField("key"),
+                                    op.getObject().getObjectField("docKey"));
+            break;
+        }
         default: {
             // Commands are processed in applyCommand_inlock().
             invariant(false, str::stream() << "Unsupported opType " << OpType_serializer(opType));

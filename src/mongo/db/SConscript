@@ -121,6 +121,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/db/transaction/transaction',
         'index_builds_coordinator_interface',
+        'query_exec',
         'shard_role',
     ],
 )

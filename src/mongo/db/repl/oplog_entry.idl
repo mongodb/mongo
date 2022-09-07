@@ -51,6 +51,7 @@ enums:
             kDelete: "d"
             kNoop: "n"
             kInsertGlobalIndexKey: "xi"
+            kDeleteGlobalIndexKey: "xd"
     RetryImage:
         description: "Dictates whether a pre-image or post-image is to be stored on behalf of this
                       retryable write."

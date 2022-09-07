@@ -235,6 +235,10 @@ public:
                                                            UUID indexUuid,
                                                            const BSONObj& key,
                                                            const BSONObj& docKey);
+    static ReplOperation makeDeleteGlobalIndexKeyOperation(const NamespaceString& indexNss,
+                                                           UUID indexUuid,
+                                                           const BSONObj& key,
+                                                           const BSONObj& docKey);
 
     static ReplOperation makeCreateCommand(NamespaceString nss,
                                            const mongo::CollectionOptions& options,
@@ -428,6 +432,7 @@ public:
     using MutableOplogEntry::getOpTime;
     using MutableOplogEntry::makeCreateCommand;
     using MutableOplogEntry::makeCreateIndexesCommand;
+    using MutableOplogEntry::makeDeleteGlobalIndexKeyOperation;
     using MutableOplogEntry::makeDeleteOperation;
     using MutableOplogEntry::makeInsertGlobalIndexKeyOperation;
     using MutableOplogEntry::makeInsertOperation;
@@ -455,6 +460,7 @@ public:
         kCreateGlobalIndex,
         kDropGlobalIndex,
         kInsertGlobalIndexKey,
+        kDeleteGlobalIndexKey,
     };
 
     // Get the in-memory size in bytes of a ReplOperation.

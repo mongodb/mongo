@@ -125,6 +125,17 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
     }
     return builder.obj();
 }
+
+ReplOperation makeGlobalIndexCrudOperation(const NamespaceString& indexNss,
+                                           const UUID indexUuid,
+                                           const BSONObj& key,
+                                           const BSONObj& docKey) {
+    ReplOperation op;
+    op.setNss(indexNss.getCommandNS());
+    op.setUuid(indexUuid);
+    op.setObject(BSON("key" << key << "docKey" << docKey));
+    return op;
+}
 }  // namespace
 
 DurableOplogEntry::CommandType parseCommandType(const BSONObj& objectField) {
@@ -171,6 +182,8 @@ DurableOplogEntry::CommandType parseCommandType(const BSONObj& objectField) {
         return DurableOplogEntry::CommandType::kDropGlobalIndex;
     } else if (commandString == "xi") {
         return DurableOplogEntry::CommandType::kInsertGlobalIndexKey;
+    } else if (commandString == "xd") {
+        return DurableOplogEntry::CommandType::kDeleteGlobalIndexKey;
     } else {
         uasserted(ErrorCodes::BadValue,
                   str::stream() << "Unknown oplog entry command type: " << commandString
@@ -285,11 +298,17 @@ ReplOperation MutableOplogEntry::makeInsertGlobalIndexKeyOperation(const Namespa
                                                                    const UUID indexUuid,
                                                                    const BSONObj& key,
                                                                    const BSONObj& docKey) {
-    ReplOperation op;
+    ReplOperation op = makeGlobalIndexCrudOperation(indexNss, indexUuid, key, docKey);
     op.setOpType(OpTypeEnum::kInsertGlobalIndexKey);
-    op.setNss(indexNss.getCommandNS());
-    op.setUuid(indexUuid);
-    op.setObject(BSON("key" << key << "docKey" << docKey));
+    return op;
+}
+
+ReplOperation MutableOplogEntry::makeDeleteGlobalIndexKeyOperation(const NamespaceString& indexNss,
+                                                                   const UUID indexUuid,
+                                                                   const BSONObj& key,
+                                                                   const BSONObj& docKey) {
+    ReplOperation op = makeGlobalIndexCrudOperation(indexNss, indexUuid, key, docKey);
+    op.setOpType(OpTypeEnum::kDeleteGlobalIndexKey);
     return op;
 }
 
@@ -402,6 +421,7 @@ bool DurableOplogEntry::isCrudOpType(OpTypeEnum opType) {
         case OpTypeEnum::kDelete:
         case OpTypeEnum::kUpdate:
         case OpTypeEnum::kInsertGlobalIndexKey:
+        case OpTypeEnum::kDeleteGlobalIndexKey:
             return true;
         case OpTypeEnum::kCommand:
         case OpTypeEnum::kNoop:
@@ -419,6 +439,7 @@ bool DurableOplogEntry::isUpdateOrDelete() const {
     switch (opType) {
         case OpTypeEnum::kDelete:
         case OpTypeEnum::kUpdate:
+        case OpTypeEnum::kDeleteGlobalIndexKey:
             return true;
         case OpTypeEnum::kInsert:
         case OpTypeEnum::kCommand:
@@ -757,6 +778,7 @@ mongo::Date_t OplogEntry::getWallClockTimeForPreImage() const {
 bool OplogEntry::isCrudOpType() const {
     return _entry.isCrudOpType();
 }
+
 bool OplogEntry::isUpdateOrDelete() const {
     return _entry.isUpdateOrDelete();
 }

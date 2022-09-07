@@ -254,7 +254,6 @@ std::vector<OplogEntry> SessionUpdateTracker::_flush(const OplogEntry& entry) {
     switch (entry.getOpType()) {
         case OpTypeEnum::kInsert:
         case OpTypeEnum::kNoop:
-        case OpTypeEnum::kInsertGlobalIndexKey:
             // Session table is keyed by session id, so nothing to do here because
             // it would have triggered a unique index violation in the primary if
             // it was trying to insert with the same session id with existing ones.
@@ -268,6 +267,13 @@ std::vector<OplogEntry> SessionUpdateTracker::_flush(const OplogEntry& entry) {
 
         case OpTypeEnum::kCommand:
             return flushAll();
+
+        // The following cases should never be hit, we break to hit MONGO_UNREACHABLE. Reason:
+        // SessionUpdateTracker should only be called when the ns target is config.transactions or
+        // config.$cmd. This should never be the case with global index operations.
+        case OpTypeEnum::kInsertGlobalIndexKey:
+        case OpTypeEnum::kDeleteGlobalIndexKey:
+            break;
     }
 
     MONGO_UNREACHABLE;

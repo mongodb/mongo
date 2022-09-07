@@ -60,4 +60,14 @@ void insertKey(OperationContext* opCtx,
                const BSONObj& key,
                const BSONObj& docKey);
 
+/**
+ * Deletes a key from the global index container identified by UUID. Replicates as an 'xd' command.
+ * - 'key' is the unique index key.
+ * - 'docKey' is the document key of the index entry.
+ */
+void deleteKey(OperationContext* opCtx,
+               const UUID& indexUUID,
+               const BSONObj& key,
+               const BSONObj& docKey);
+
 }  // namespace mongo::global_index

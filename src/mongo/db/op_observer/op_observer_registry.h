@@ -166,6 +166,16 @@ public:
             o->onInsertGlobalIndexKey(opCtx, globalIndexNss, globalIndexUuid, key, docKey);
     }
 
+    void onDeleteGlobalIndexKey(OperationContext* opCtx,
+                                const NamespaceString& globalIndexNss,
+                                const UUID& globalIndexUuid,
+                                const BSONObj& key,
+                                const BSONObj& docKey) override {
+        ReservedTimes times{opCtx};
+        for (auto& o : _observers)
+            o->onDeleteGlobalIndexKey(opCtx, globalIndexNss, globalIndexUuid, key, docKey);
+    }
+
     void onUpdate(OperationContext* const opCtx, const OplogUpdateEntryArgs& args) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)

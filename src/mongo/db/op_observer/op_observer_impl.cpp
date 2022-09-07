@@ -726,6 +726,25 @@ void OpObserverImpl::onInsertGlobalIndexKey(OperationContext* opCtx,
     txnParticipant.addTransactionOperation(opCtx, op);
 }
 
+void OpObserverImpl::onDeleteGlobalIndexKey(OperationContext* opCtx,
+                                            const NamespaceString& globalIndexNss,
+                                            const UUID& globalIndexUuid,
+                                            const BSONObj& key,
+                                            const BSONObj& docKey) {
+    if (!opCtx->writesAreReplicated()) {
+        return;
+    }
+
+    // _shardsvrDeleteGlobalIndexKey must run inside a multi-doc transaction.
+    auto txnParticipant = TransactionParticipant::get(opCtx);
+    invariant(txnParticipant && txnParticipant.transactionIsOpen());
+    invariant(!opCtx->isRetryableWrite());
+
+    const auto op = MutableOplogEntry::makeDeleteGlobalIndexKeyOperation(
+        globalIndexNss, globalIndexUuid, key, docKey);
+    txnParticipant.addTransactionOperation(opCtx, op);
+}
+
 void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
     failCollectionUpdates.executeIf(
         [&](const BSONObj&) {

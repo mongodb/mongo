@@ -35,10 +35,12 @@
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/exec/delete_stage.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction/transaction_participant.h"
@@ -49,6 +51,44 @@
 namespace mongo::global_index {
 
 namespace {  // Anonymous namespace for private functions.
+
+constexpr StringData kIndexKeyIndexName = "ik_1"_sd;
+
+// Build an index entry to insert.
+BSONObj buildIndexEntry(const BSONObj& key, const BSONObj& docKey) {
+    // Generate the KeyString representation of the index key.
+    // Current limitations:
+    // - Only supports ascending order.
+    // - We assume unique: true, and there's no support for other index options.
+    // - No support for multikey indexes.
+
+    KeyString::Builder ks(KeyString::Version::V1);
+    ks.resetToKey(key, KeyString::ALL_ASCENDING);
+    const auto& indexTB = ks.getTypeBits();
+
+    // Build the index entry, consisting of:
+    // - '_id': the document key, if provided (for inserts).
+    // - 'ik': the KeyString representation of the index key.
+    // - 'tb': the index key's TypeBits. Only present if non-zero.
+
+    BSONObjBuilder indexEntryBuilder;
+    indexEntryBuilder.append("_id", docKey);
+    indexEntryBuilder.append(
+        "ik", BSONBinData(ks.getBuffer(), ks.getSize(), BinDataType::BinDataGeneral));
+    if (!indexTB.isAllZeros()) {
+        indexEntryBuilder.append(
+            "tb", BSONBinData(indexTB.getBuffer(), indexTB.getSize(), BinDataType::BinDataGeneral));
+    }
+    return indexEntryBuilder.obj();
+}
+
+RecordIdBound docKeyToRecordIdBound(const BSONObj& docKey) {
+    // Build RecordIdBound corresponding to docKey.
+    KeyString::Builder keyBuilder(KeyString::Version::kLatestVersion);
+    keyBuilder.appendObject(docKey);
+    return RecordIdBound(RecordId(keyBuilder.getBuffer(), keyBuilder.getSize()));
+}
+
 bool checkRetryableDDLStatementExecuted(OperationContext* opCtx) {
     // StmtId will always be 0, as the ddl commands only replicate a
     // createGlobalIndex/dropGlobalIndex oplog entry.
@@ -80,15 +120,14 @@ void createContainer(OperationContext* opCtx, const UUID& indexUUID) {
 
     // Create the container.
     return writeConflictRetry(opCtx, "createGlobalIndexContainer", nss.ns(), [&]() {
-        const auto indexKeySpec = BSON("v" << 2 << "name"
-                                           << "ik_1"
-                                           << "key" << BSON("ik" << 1) << "unique" << true);
+        const auto indexKeySpec = BSON("v" << 2 << "name" << kIndexKeyIndexName << "key"
+                                           << BSON("ik" << 1) << "unique" << true);
 
         WriteUnitOfWork wuow(opCtx);
 
         // createIndexesOnEmptyCollection requires the MODE_X collection lock.
         AutoGetCollection autoColl(opCtx, nss, MODE_X);
-        if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
+        if (!autoColl) {
             {
                 repl::UnreplicatedWritesBlock unreplicatedWrites(opCtx);
 
@@ -147,7 +186,7 @@ void dropContainer(OperationContext* opCtx, const UUID& indexUUID) {
     // Drop the container.
     return writeConflictRetry(opCtx, "dropGlobalIndexContainer", nss.ns(), [&]() {
         AutoGetCollection autoColl(opCtx, nss, MODE_X);
-        if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
+        if (!autoColl) {
             // Idempotent command, return OK if the collection is non-existing.
             return;
         }
@@ -171,32 +210,7 @@ void insertKey(OperationContext* opCtx,
                const BSONObj& key,
                const BSONObj& docKey) {
     const auto ns = NamespaceString::makeGlobalIndexNSS(indexUUID);
-
-    // Generate the KeyString representation of the index key.
-    // Current limitations:
-    // - Only supports ascending order.
-    // - We assume unique: true, and there's no support for other index options.
-    // - No support for multikey indexes.
-
-    KeyString::Builder ks(KeyString::Version::V1);
-    ks.resetToKey(key, KeyString::ALL_ASCENDING);
-    const auto& indexTB = ks.getTypeBits();
-
-    // Build the index entry, consisting of:
-    // - '_id': the document key.
-    // - 'ik': the KeyString representation of the index key.
-    // - 'tb': the index key's TypeBits. Only present if non-zero.
-
-    BSONObjBuilder indexEntryBuilder;
-    indexEntryBuilder.append("_id", docKey);
-    indexEntryBuilder.append(
-        "ik", BSONBinData(ks.getBuffer(), ks.getSize(), BinDataType::BinDataGeneral));
-    if (!indexTB.isAllZeros()) {
-        indexEntryBuilder.append(
-            "tb", BSONBinData(indexTB.getBuffer(), indexTB.getSize(), BinDataType::BinDataGeneral));
-    }
-    const auto indexEntry = indexEntryBuilder.obj();
-
+    const auto indexEntry = buildIndexEntry(key, docKey);
     // Insert the index entry.
 
     writeConflictRetry(opCtx, "insertGlobalIndexKey", ns.toString(), [&] {
@@ -209,13 +223,73 @@ void insertKey(OperationContext* opCtx,
             uassert(6789402,
                     str::stream() << "Global index container with UUID " << indexUUID
                                   << " does not exist.",
-                    CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, ns));
+                    container);
 
             uassertStatusOK(collection_internal::insertDocument(
                 opCtx, *container, InsertStatement(indexEntry), nullptr));
         }
 
         opCtx->getServiceContext()->getOpObserver()->onInsertGlobalIndexKey(
+            opCtx, ns, indexUUID, key, docKey);
+
+        wuow.commit();
+    });
+}
+
+void deleteKey(OperationContext* opCtx,
+               const UUID& indexUUID,
+               const BSONObj& key,
+               const BSONObj& docKey) {
+    const auto ns = NamespaceString::makeGlobalIndexNSS(indexUUID);
+
+    // Find and delete the index entry.
+    writeConflictRetry(opCtx, "deleteGlobalIndexKey", ns.toString(), [&] {
+        WriteUnitOfWork wuow(opCtx);
+
+        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
+        auto& collection = autoColl.getCollection();
+        uassert(6924201,
+                str::stream() << "Global index container with UUID " << indexUUID
+                              << " does not exist.",
+                collection);
+
+        {
+            repl::UnreplicatedWritesBlock unreplicatedWrites(opCtx);
+
+            // Params for single delete (isMulti=false).
+            auto deleteStageParams = std::make_unique<DeleteStageParams>();
+            deleteStageParams->returnDeleted = true;
+
+            auto docKeyRecordId = docKeyToRecordIdBound(docKey);
+
+            // Global index container is a clustered collection, where the _id is the docKey, which
+            // is why we delete using a collection scan.
+            auto planExecutor = InternalPlanner::deleteWithCollectionScan(
+                opCtx,
+                &collection,
+                std::move(deleteStageParams),
+                PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                InternalPlanner::FORWARD,
+                docKeyRecordId,
+                docKeyRecordId,
+                CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords);
+
+            // For now _id is unique, so we asume only one entry can be returned.
+            BSONObj deletedObj;
+            planExecutor->getNext(&deletedObj, nullptr);
+
+            // Return error if no document has been found (deletedObj is empty) or if the associated
+            // "key" does not match the key provided as parameter.
+            uassert(ErrorCodes::KeyNotFound,
+                    str::stream() << "Global index container with UUID " << indexUUID
+                                  << " does not contain specified entry. key:" << key
+                                  << ", docKey:" << docKey,
+                    deletedObj.woCompare(buildIndexEntry(key, docKey)) == 0);
+
+            fassert(6924202, planExecutor->isEOF());
+        }
+
+        opCtx->getServiceContext()->getOpObserver()->onDeleteGlobalIndexKey(
             opCtx, ns, indexUUID, key, docKey);
 
         wuow.commit();

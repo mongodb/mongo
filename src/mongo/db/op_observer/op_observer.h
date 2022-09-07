@@ -185,6 +185,12 @@ public:
                                         const BSONObj& key,
                                         const BSONObj& docKey) = 0;
 
+    virtual void onDeleteGlobalIndexKey(OperationContext* opCtx,
+                                        const NamespaceString& globalIndexNss,
+                                        const UUID& globalIndexUuid,
+                                        const BSONObj& key,
+                                        const BSONObj& docKey) = 0;
+
     virtual void onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) = 0;
     virtual void aboutToDelete(OperationContext* opCtx,
                                const NamespaceString& nss,

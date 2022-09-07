@@ -98,6 +98,7 @@ const allCommands = {
     _shardsvrCreateCollectionParticipant: {skip: isPrimaryOnly},
     _shardsvrGetStatsForBalancing: {skip: isPrimaryOnly},
     _shardsvrInsertGlobalIndexKey: {skip: isPrimaryOnly},
+    _shardsvrDeleteGlobalIndexKey: {skip: isPrimaryOnly},
     _shardsvrJoinMigrations: {skip: isAnInternalCommand},
     _shardsvrMovePrimary: {skip: isPrimaryOnly},
     _shardsvrMoveRange: {skip: isPrimaryOnly},
