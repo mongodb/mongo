@@ -28,10 +28,13 @@
  */
 
 #include "mongo/db/s/range_deleter_service.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/s/balancer_stats_registry.h"
 #include "mongo/db/s/range_deleter_service_op_observer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/util/future_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kShardingRangeDeleter
 
@@ -83,18 +86,88 @@ void RangeDeleterService::onStepUpComplete(OperationContext* opCtx, long long te
     _executor = std::move(taskExecutor);
     _executor->startup();
 
-    _recoverRangeDeletionsOnStepUp();
+    _recoverRangeDeletionsOnStepUp(opCtx);
 }
 
-void RangeDeleterService::_recoverRangeDeletionsOnStepUp() {
-
+void RangeDeleterService::_recoverRangeDeletionsOnStepUp(OperationContext* opCtx) {
     if (disableResumableRangeDeleter.load()) {
         _state.store(kDown);
         return;
     }
 
-    // TODO SERVER-68348 Asynchronously register tasks on the range deleter service on step-up
-    _state.store(kUp);
+    LOGV2(6834800, "Resubmitting range deletion tasks");
+
+    ServiceContext* serviceContext = opCtx->getServiceContext();
+
+    ExecutorFuture<void>(_executor)
+        .then([serviceContext, this] {
+            ThreadClient tc("ResubmitRangeDeletionsOnStepUp", serviceContext);
+            {
+                stdx::lock_guard<Client> lk(*tc.get());
+                tc->setSystemOperationKillableByStepdown(lk);
+            }
+            auto opCtx = tc->makeOperationContext();
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
+            ScopedRangeDeleterLock rangeDeleterLock(opCtx.get());
+            DBDirectClient client(opCtx.get());
+
+            int nRescheduledTasks = 0;
+
+            // (1) register range deletion tasks marked as "processing"
+            auto processingTasksCompletionFuture = [&] {
+                std::vector<ExecutorFuture<void>> processingTasksCompletionFutures;
+                FindCommandRequest findCommand(NamespaceString::kRangeDeletionNamespace);
+                findCommand.setFilter(BSON(RangeDeletionTask::kProcessingFieldName << true));
+                auto cursor = client.find(std::move(findCommand));
+
+                while (cursor->more()) {
+                    auto completionFuture = this->registerTask(
+                        RangeDeletionTask::parse(IDLParserContext("rangeDeletionRecovery"),
+                                                 cursor->next()),
+                        SemiFuture<void>::makeReady(),
+                        true /* fromResubmitOnStepUp */);
+                    nRescheduledTasks++;
+                    processingTasksCompletionFutures.push_back(
+                        completionFuture.thenRunOn(_executor));
+                }
+
+                if (nRescheduledTasks > 1) {
+                    LOGV2_WARNING(6834801,
+                                  "Rescheduling several range deletions marked as processing. "
+                                  "Orphans count may be off while they are not drained",
+                                  "numRangeDeletionsMarkedAsProcessing"_attr = nRescheduledTasks);
+                }
+
+                return processingTasksCompletionFutures.size() > 0
+                    ? whenAllSucceed(std::move(processingTasksCompletionFutures)).share()
+                    : SemiFuture<void>::makeReady().share();
+            }();
+
+            // (2) register all other "non-pending" tasks
+            {
+                FindCommandRequest findCommand(NamespaceString::kRangeDeletionNamespace);
+                findCommand.setFilter(BSON(RangeDeletionTask::kProcessingFieldName
+                                           << BSON("$ne" << true)
+                                           << RangeDeletionTask::kPendingFieldName
+                                           << BSON("$ne" << true)));
+                auto cursor = client.find(std::move(findCommand));
+                while (cursor->more()) {
+                    (void)this->registerTask(
+                        RangeDeletionTask::parse(IDLParserContext("rangeDeletionRecovery"),
+                                                 cursor->next()),
+                        processingTasksCompletionFuture.thenRunOn(_executor).semi(),
+                        true /* fromResubmitOnStepUp */);
+                }
+            }
+
+            LOGV2_INFO(6834802,
+                       "Finished resubmitting range deletion tasks",
+                       "nRescheduledTasks"_attr = nRescheduledTasks);
+
+            this->_state.store(kUp);
+        })
+        .getAsync([](auto) {});
 }
 
 void RangeDeleterService::onStepDown() {
@@ -124,7 +197,9 @@ BSONObj RangeDeleterService::dumpState() {
 }
 
 SharedSemiFuture<void> RangeDeleterService::registerTask(
-    const RangeDeletionTask& rdt, SemiFuture<void>&& waitForActiveQueriesToComplete) {
+    const RangeDeletionTask& rdt,
+    SemiFuture<void>&& waitForActiveQueriesToComplete,
+    bool fromResubmitOnStepUp) {
 
     if (disableResumableRangeDeleter.load()) {
         return SemiFuture<void>::makeReady(
@@ -182,7 +257,8 @@ SharedSemiFuture<void> RangeDeleterService::registerTask(
             .share();
 
     auto [taskCompletionFuture, inserted] = [&]() -> std::pair<SharedSemiFuture<void>, bool> {
-        auto lock = _acquireMutexFailIfServiceNotUp();
+        auto lock = fromResubmitOnStepUp ? _acquireMutexUnconditionally()
+                                         : _acquireMutexFailIfServiceNotUp();
         auto [registeredTask, inserted] = _rangeDeletionTasks[rdt.getCollectionUuid()].insert(
             std::make_shared<RangeDeletion>(RangeDeletion(rdt, chainCompletionFuture)));
         auto retFuture = static_cast<RangeDeletion*>(registeredTask->get())->getCompletionFuture();
