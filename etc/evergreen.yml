@@ -2683,7 +2683,7 @@ buildvariants:
   run_on:
   - rhel80-large
   stepback: false
-  expansions:
+  expansions: &enterprise-rhel80-debug-tsan-expansions-template
     additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
     lang_environment: LANG=C
     toolchain_version: v3
@@ -2704,13 +2704,226 @@ buildvariants:
     resmoke_jobs_factor: 0.3
     scons_cache_scope: shared
     separate_debug: off
+    large_distro_name: rhel80-medium
   tasks:
   - name: compile_test_and_package_serial_TG
+  # - name: test_api_version_compatibility # Not relevant for TSAN
+  # - name: burn_in_tests_gen # No burn in tests needed
+  - name: check_feature_flag_tags
+  # - name: .aggfuzzer !.feature_flag_guarded # Not passing
+  # - name: .aggregation !.feature_flag_guarded # Not passing
+  # - name: audit # Not passing
+  # - name: .auth # Not passing
+  # - name: burn_in_tags_gen # No burn in tests needed
+  - name: buildscripts_test
+  # - name: resmoke_end2end_tests # Not passing
+  # - name: unittest_shell_hang_analyzer_gen # Not passing
+  # - name: .causally_consistent !.sharding # Not passing
+  # - name: .change_streams # Not passing
+  # - name: .change_stream_fuzzer # Not passing
+  # - name: .misc_js # Not passing
+  # - name: .concurrency !.large !.ubsan !.no_txns !.debug_only # Not passing
+  # - name: .concurrency .large !.ubsan !.no_txns !.debug_only # Not passing
+  #   distros:
+  #   - rhel80-medium
+  # - name: config_fuzzer_concurrency # Not passing
+  # - name: config_fuzzer_simulate_crash_concurrency_replication # Not passing
+  #   distros:
+  #   - rhel80-large
+  # - name: config_fuzzer_concurrency_replication # Not passing
+  #   distros:
+  #   - rhel80-large
+  - name: config_fuzzer_jsCore
+    distros:
+    - rhel80-large
+  # - name: disk_wiredtiger # Not passing
+  # - name: .encrypt # Not passing
+  # - name: idl_tests # Not relevant for TSAN
+  # - name: initial_sync_fuzzer_gen # Not passing
+  # - name: .integration # Not passing
+  #   distros:
+  #   - rhel80-medium
   - name: jsCore
+    distros:
+    - rhel80-xlarge
+  # - name: .jscore .common !jsCore # Not passing
+  - name: jsCore_minimum_batch_size
+  - name: jsCore_txns_large_txns_format
+  - name: json_schema
+  # - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer. # Not passing
+  # - name: libunwind_tests # Cant be used because tsan does not use libunwind
+  # - name: .multiversion_sanity_check # Multiversion does not pass yet, also making this work is going to be pretty tricky
+  - name: mqlrun
+  # - name: .multi_shard # Not passing
+  # - name: multi_stmt_txn_jscore_passthrough_with_migration_gen # Not passing
+  # - name: multiversion_gen # Multiversion does not pass yet, also making this work is going to be pretty tricky
+  # - name: .query_fuzzer # Not passing
+  # - name: .random_multiversion_ds # Multiversion does not pass yet, also making this work is going to be pretty tricky
+  # - name: .read_write_concern .large # Not passing
+  #   distros:
+  #   - rhel80-medium
+  # - name: .read_write_concern !.large # Not passing
+  # - name: .replica_sets !.encrypt !.auth # Not passing
+  #   distros:
+  #   - rhel80-xlarge
+  # - name: replica_sets_api_version_jscore_passthrough_gen # Not passing
+  # - name: replica_sets_reconfig_jscore_passthrough_gen # Not passing
+  # - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen # Not passing
+  #   distros:
+  #   - rhel80-xlarge
+  # - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen # Not passing
+  #   distros:
+  #   - rhel80-xlarge
+  # - name: retryable_writes_jscore_passthrough_gen # Not passing
+  # - name: retryable_writes_jscore_stepdown_passthrough_gen # Not passing
+  #   distros:
+  #   - rhel80-medium
+  - name: read_only # TODO: replace with .read_only after read_only_sharded is fixed
+  # - name: .read_only # Not passing, see above
+  # - name: .rollbackfuzzer # Not passing
+  - name: sasl
+  # - name: search # Not passing
+  # - name: search_auth # Not passing
+  - name: search_ssl
+  - name: session_jscore_passthrough
+  # - name: .sharding .jscore !.wo_snapshot !.multi_stmt # Not passing
+  # - name: sharding_api_version_jscore_passthrough_gen # Not passing
+  # - name: .sharding .txns # Not passing
+  # - name: .sharding .common # Not passing
+  # - name: sharding_opportunistic_secondary_targeting_gen # Not passing
+  - name: .stitch
+  # - name: .crypt # Doesn't pass on v4
+  #   distros:
+  #   - rhel80-xlarge
+  # - name: .updatefuzzer # Cannot find the variant on older versions. Should not be enabled with TSAN
+  # - name: secondary_reads_passthrough_gen # Not passing
+  - name: server_discovery_and_monitoring_json_test_TG
+  # - name: .serverless # Not passing
+    # distros:
+    # - rhel80-xlarge
+  - name: server_selection_json_test_TG
+    distros:
+    - rhel80-xlarge
+
+- &enterprise-rhel80-debug-complete-tsan-template
+  name: enterprise-rhel80-debug-complete-tsan
+  display_name: ~ TSAN Enterprise RHEL 8.0 COMPLETE DEBUG
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
+  run_on:
+  - rhel80-large
+  stepback: false
+  expansions:
+    <<: *enterprise-rhel80-debug-tsan-expansions-template
+  tasks:
+  - name: compile_test_and_package_serial_TG
+  # - name: test_api_version_compatibility # Not relevant for TSAN
+  # - name: burn_in_tests_gen # No burn in tests needed
+  - name: check_feature_flag_tags
+  - name: .aggfuzzer !.feature_flag_guarded
+  - name: .aggregation !.feature_flag_guarded
+  - name: audit
+  - name: .auth
+  # - name: burn_in_tags_gen # No burn in tests needed
+  - name: buildscripts_test
+  - name: resmoke_end2end_tests
+  - name: unittest_shell_hang_analyzer_gen
+  - name: .causally_consistent !.sharding
+  - name: .change_streams
+  - name: .change_stream_fuzzer
+  - name: .misc_js
+  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
+  - name: .concurrency .large !.ubsan !.no_txns !.debug_only
+    distros:
+    - rhel80-medium
+  - name: config_fuzzer_concurrency
+  - name: config_fuzzer_simulate_crash_concurrency_replication
+    distros:
+    - rhel80-large
+  - name: config_fuzzer_concurrency_replication
+    distros:
+    - rhel80-large
+  - name: config_fuzzer_jsCore
+    distros:
+    - rhel80-large
+  - name: disk_wiredtiger
+  - name: .encrypt
+  # - name: idl_tests # Not relevant for TSAN
+  - name: initial_sync_fuzzer_gen
+  - name: .integration
+    distros:
+    - rhel80-medium
+  - name: jsCore
+    distros:
+    - rhel80-xlarge
+  - name: .jscore .common !jsCore
+  - name: jsCore_minimum_batch_size
+  - name: jsCore_txns_large_txns_format
+  - name: json_schema
+  - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
+  # - name: libunwind_tests # Cant be used because tsan does not use libunwind
+  # - name: .multiversion_sanity_check # Multiversion does not pass yet, also making this work is going to be pretty tricky
+  - name: mqlrun
+  - name: .multi_shard
+  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+  # - name: multiversion_gen # Multiversion does not pass yet, also making this work is going to be pretty tricky
+  - name: .query_fuzzer
+  # - name: .random_multiversion_ds # Multiversion does not pass yet, also making this work is going to be pretty tricky
+  - name: .read_write_concern .large
+    distros:
+    - rhel80-medium
+  - name: .read_write_concern !.large
+  - name: .replica_sets !.encrypt !.auth
+    distros:
+    - rhel80-xlarge
+  - name: replica_sets_api_version_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
+    distros:
+    - rhel80-xlarge
+  - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
+    distros:
+    - rhel80-xlarge
+  - name: retryable_writes_jscore_passthrough_gen
+  - name: retryable_writes_jscore_stepdown_passthrough_gen
+    distros:
+    - rhel80-medium
+  - name: .read_only
+  - name: .rollbackfuzzer
+  - name: sasl
+  - name: search
+  - name: search_auth
+  - name: search_ssl
+  - name: session_jscore_passthrough
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: sharding_api_version_jscore_passthrough_gen
+  - name: .sharding .txns
+  - name: .sharding .common
+  - name: sharding_opportunistic_secondary_targeting_gen
+  - name: .stitch
+  # - name: .crypt # Doesn't pass on v4
+  #   distros:
+  #   - rhel80-xlarge
+  # - name: .updatefuzzer # Cannot find the variant on older versions
+  - name: secondary_reads_passthrough_gen
+  - name: server_discovery_and_monitoring_json_test_TG
+  - name: .serverless
+    distros:
+    - rhel80-xlarge
+  - name: server_selection_json_test_TG
+    distros:
+    - rhel80-xlarge
 
 - <<: *enterprise-rhel80-debug-tsan-template
   name: enterprise-rhel80-debug-v4tsan-experimental
   display_name: "~ V4 Toolchain TSAN Enterprise RHEL 8.0 DEBUG"
+  expansions:
+    toolchain_version: v4
+
+- <<: *enterprise-rhel80-debug-complete-tsan-template
+  name: enterprise-rhel80-debug-complete-v4tsan-experimental
+  display_name: "~ V4 Toolchain TSAN Enterprise RHEL 8.0 COMPLETE DEBUG"
   expansions:
     toolchain_version: v4
 

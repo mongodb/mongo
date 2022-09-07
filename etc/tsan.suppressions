@@ -2,6 +2,9 @@
 # parsed as JSON. Suppress those messages specifically.
 signal:src/mongo/unittest/death_test.cpp
 
+# For some reason there is a race condition in mktime and we need to not alert for that
+race:tzset_internal
+
 # WiredTiger is known to cause false positives for data races because it uses a
 # nonstandard thread model that TSAN doesn't know how to deal with. We have
 # already denylisted WiredTiger in TSAN, but that only affects threads created
