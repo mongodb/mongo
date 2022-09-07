@@ -59,8 +59,16 @@ admin_s1.runCommand({replSetFreeze: 999999});
 print("6. Bring up #3");
 var hostname = getHostName();
 
-var secondary2 =
-    MongoRunner.runMongod(Object.merge({replSet: basename, oplogSize: 2}, x509_options2));
+var secondary2 = MongoRunner.runMongod(Object.merge({
+    replSet: basename,
+    oplogSize: 2,
+    // Preserve the initial sync state to validate an assertion.
+    setParameter: {
+        "failpoint.skipClearInitialSyncState": tojson({mode: 'alwaysOn'}),
+        "failpoint.initialSyncHangBeforeCompletingOplogFetching": tojson({mode: 'alwaysOn'}),
+    }
+},
+                                                    x509_options2));
 
 var local_s2 = secondary2.getDB("local");
 var admin_s2 = secondary2.getDB("admin");
@@ -75,6 +83,18 @@ try {
 }
 reconnect(secondary1);
 reconnect(secondary2);
+
+assert.commandWorked(secondary2.adminCommand({
+    waitForFailPoint: "initialSyncHangBeforeCompletingOplogFetching",
+    timesEntered: 1,
+    maxTimeMS: 60 * 1000,
+}));
+
+// Fetch the minValid document at the end of initial sync.
+let syncingNodeMinvalid = secondary2.getDB("local").replset.minvalid.findOne()["ts"];
+assert.commandWorked(secondary2.adminCommand(
+    {configureFailPoint: "initialSyncHangBeforeCompletingOplogFetching", mode: "off"}));
+
 replTest.waitForAllNewlyAddedRemovals();
 
 print("Config 1: " + tojsononeline(config));
@@ -113,6 +133,11 @@ assert.commandWorked(bulk.execute());
 
 print("11. Everyone happy eventually");
 replTest.awaitReplication();
+
+// SERVER-69001: Assert that the last oplog for initial sync was persisted in the minvalid document.
+let lastInitialSyncOp =
+    secondary2.adminCommand("replSetGetStatus")["initialSyncStatus"]["initialSyncOplogEnd"];
+assert.eq(lastInitialSyncOp, syncingNodeMinvalid);
 
 MongoRunner.stopMongod(secondary2);
 replTest.stopSet();

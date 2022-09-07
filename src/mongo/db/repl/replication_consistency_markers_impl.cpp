@@ -216,15 +216,16 @@ void ReplicationConsistencyMarkersImpl::setMinValid(OperationContext* opCtx,
                 "Setting minvalid to exactly",
                 "minValidString"_attr = minValid.toString(),
                 "minValidBSON"_attr = minValid.toBSON());
+
     TimestampedBSONObj update;
     update.obj =
         BSON("$set" << BSON(MinValidDocument::kMinValidTimestampFieldName
                             << minValid.getTimestamp() << MinValidDocument::kMinValidTermFieldName
                             << minValid.getTerm()));
 
-    // This method is only used with storage engines that do not support recover to stable
-    // timestamp. As a result, their timestamps do not matter.
-    invariant(!opCtx->getServiceContext()->getStorageEngine()->supportsRecoverToStableTimestamp());
+    // We do not provide a timestamp when we set the initial sync flag. Initial sync can only
+    // occur right when we start up, and thus there cannot be any checkpoints being taken. This
+    // write should go into the next checkpoint.
     update.timestamp = Timestamp();
 
     _updateMinValidDocument(opCtx, update);

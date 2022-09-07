@@ -269,16 +269,15 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
             secondary.await_ready()
 
             client = secondary.mongo_client()
-            minvalid_doc = client.local["replset.minvalid"].find_one()
             oplog_truncate_after_doc = client.local["replset.oplogTruncateAfterPoint"].find_one()
             recovery_timestamp_res = client.admin.command("replSetTest",
                                                           getLastStableRecoveryTimestamp=True)
             latest_oplog_doc = client.local["oplog.rs"].find_one(sort=[("$natural",
                                                                         pymongo.DESCENDING)])
 
-            self.logger.info("Checking invariants: minValid: {}, oplogTruncateAfterPoint: {},"
+            self.logger.info("Checking replication invariants. oplogTruncateAfterPoint: {},"
                              " stable recovery timestamp: {}, latest oplog doc: {}".format(
-                                 minvalid_doc, oplog_truncate_after_doc, recovery_timestamp_res,
+                                 oplog_truncate_after_doc, recovery_timestamp_res,
                                  latest_oplog_doc))
 
             null_ts = bson.Timestamp(0, 0)
@@ -291,13 +290,6 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
             if latest_oplog_entry_ts is None:
                 raise errors.ServerFailure(
                     "Latest oplog entry had no 'ts' field: {}".format(latest_oplog_doc))
-
-            # The "oplogTruncateAfterPoint" document may not exist at startup. If so, we default
-            # it to null.
-            oplog_truncate_after_ts = null_ts
-            if oplog_truncate_after_doc is not None:
-                oplog_truncate_after_ts = oplog_truncate_after_doc.get(
-                    "oplogTruncateAfterPoint", null_ts)
 
             # The "lastStableRecoveryTimestamp" field is present if the storage engine supports
             # "recover to a timestamp". If it's a null timestamp on a durable storage engine, that
@@ -320,94 +312,6 @@ class PeriodicKillSecondariesTestCase(interface.DynamicTestCase):
                                            " latest oplog entry={}".format(
                                                recovery_timestamp, latest_oplog_entry_ts,
                                                recovery_timestamp_res, latest_oplog_doc))
-
-            if minvalid_doc is not None:
-                applied_through_ts = minvalid_doc.get("begin", {}).get("ts", null_ts)
-                minvalid_ts = minvalid_doc.get("ts", null_ts)
-
-                # The "appliedThrough" value should always equal the "last stable recovery
-                # timestamp", AKA the stable checkpoint for durable engines, on server restart.
-                #
-                # The written "appliedThrough" time is updated with the latest timestamp at the end
-                # of each batch application, and batch boundaries are the only valid stable
-                # timestamps on secondaries. Therefore, a non-null appliedThrough timestamp must
-                # equal the checkpoint timestamp, because any stable timestamp that the checkpoint
-                # could use includes an equal persisted appliedThrough timestamp.
-                if (recovery_timestamp != null_ts and applied_through_ts != null_ts
-                        and (not recovery_timestamp == applied_through_ts)):
-                    raise errors.ServerFailure(
-                        "The condition last stable recovery timestamp ({}) == appliedThrough ({})"
-                        " doesn't hold: minValid document={},"
-                        " getLastStableRecoveryTimestamp result={}, last oplog entry={}".format(
-                            recovery_timestamp, applied_through_ts, minvalid_doc,
-                            recovery_timestamp_res, latest_oplog_doc))
-
-                if applied_through_ts == null_ts:
-                    # We clear "appliedThrough" to represent having applied through the top of the
-                    # oplog in PRIMARY state or immediately after "rollback via refetch".
-                    # If we are using a storage engine that supports "recover to a timestamp,"
-                    # then we will have a "last stable recovery timestamp" and we should use that
-                    # as our "appliedThrough" (similarly to why we assert their equality above).
-                    # If both are null, then we are in PRIMARY state on a storage engine that does
-                    # not support "recover to a timestamp" or in RECOVERING immediately after
-                    # "rollback via refetch". Since we do not update "minValid" in PRIMARY state,
-                    # we leave "appliedThrough" as null so that the invariants below hold, rather
-                    # than substituting the latest oplog entry for the "appliedThrough" value.
-                    applied_through_ts = recovery_timestamp
-
-                if minvalid_ts == null_ts:
-                    # The server treats the "ts" field in the minValid document as missing when its
-                    # value is the null timestamp.
-                    minvalid_ts = applied_through_ts
-
-                if latest_oplog_entry_ts == null_ts:
-                    # If the oplog is empty, we treat the "minValid" as the latest oplog entry.
-                    latest_oplog_entry_ts = minvalid_ts
-
-                if oplog_truncate_after_ts == null_ts:
-                    # The server treats the "oplogTruncateAfterPoint" field as missing when its
-                    # value is the null timestamp. When it is null, the oplog is complete and
-                    # should not be truncated, so it is effectively the top of the oplog.
-                    oplog_truncate_after_ts = latest_oplog_entry_ts
-
-                # Check the ordering invariants before the secondary has reconciled the end of
-                # its oplog.
-                # The "oplogTruncateAfterPoint" is set to the first timestamp of each batch of
-                # oplog entries before they are written to the oplog. Thus, it can be ahead
-                # of the top of the oplog before any oplog entries are written, and behind it
-                # after some are written. Thus, we cannot compare it to the top of the oplog.
-
-                # appliedThrough <= minValid
-                # appliedThrough represents the end of the previous batch, so it is always the
-                # earliest.
-                if applied_through_ts > minvalid_ts:
-                    raise errors.ServerFailure(
-                        "The condition appliedThrough <= minValid ({} <= {}) doesn't hold: minValid"
-                        " document={}, latest oplog entry={}".format(
-                            applied_through_ts, minvalid_ts, minvalid_doc, latest_oplog_doc))
-
-                # minValid <= oplogTruncateAfterPoint
-                # This is true because this hook is never run after a rollback. Thus, we only
-                # move "minValid" to the end of each batch after the batch is written to the oplog.
-                # We reset the "oplogTruncateAfterPoint" to null before we move "minValid" from
-                # the end of the previous batch to the end of the current batch. Thus "minValid"
-                # must be less than or equal to the "oplogTruncateAfterPoint".
-                if minvalid_ts > oplog_truncate_after_ts:
-                    raise errors.ServerFailure(
-                        "The condition minValid <= oplogTruncateAfterPoint ({} <= {}) doesn't"
-                        " hold: minValid document={}, oplogTruncateAfterPoint document={},"
-                        " latest oplog entry={}".format(minvalid_ts, oplog_truncate_after_ts,
-                                                        minvalid_doc, oplog_truncate_after_doc,
-                                                        latest_oplog_doc))
-
-                # minvalid <= latest oplog entry
-                # "minValid" is set to the end of a batch after the batch is written to the oplog.
-                # Thus it is always less than or equal to the top of the oplog.
-                if minvalid_ts > latest_oplog_entry_ts:
-                    raise errors.ServerFailure(
-                        "The condition minValid <= top of oplog ({} <= {}) doesn't"
-                        " hold: minValid document={}, latest oplog entry={}".format(
-                            minvalid_ts, latest_oplog_entry_ts, minvalid_doc, latest_oplog_doc))
 
             try:
                 secondary.teardown()
