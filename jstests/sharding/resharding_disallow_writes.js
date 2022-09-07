@@ -72,14 +72,18 @@ reshardingTest.withReshardingInBackground(
             assert(ErrorCodes.isExceededTimeLimitError(res.code));
 
             jsTestLog("Attempting collMod");
-            assert.commandFailedWithCode(
-                sourceCollection.runCommand({collMod: sourceCollection.getName()}),
-                ErrorCodes.ReshardCollectionInProgress);
+            // The collMod operation may block behind the critical section if the metadata of the
+            // collection is UNKNOWN.
+            res =
+                sourceCollection.runCommand({collMod: sourceCollection.getName(), maxTimeMS: 5000});
+            assert(ErrorCodes.isExceededTimeLimitError(res.code) ||
+                   res.code === ErrorCodes.ReshardCollectionInProgress);
 
             jsTestLog("Attempting drop index");
-            assert.commandFailedWithCode(
-                sourceCollection.runCommand({dropIndexes: collName, index: {oldKey: 1}}),
-                ErrorCodes.ReshardCollectionInProgress);
+            res = sourceCollection.runCommand(
+                {dropIndexes: collName, index: {oldKey: 1}, maxTimeMS: 5000});
+            assert(ErrorCodes.isExceededTimeLimitError(res.code) ||
+                   res.code === ErrorCodes.ReshardCollectionInProgress);
 
             jsTestLog("Completed operations");
         }
