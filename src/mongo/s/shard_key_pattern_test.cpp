@@ -1014,5 +1014,83 @@ TEST_F(ShardKeyPatternTest, ExtractShardKeyFromDocumentKey_Hashed) {
         BSONObj());
 }
 
+TEST_F(ShardKeyPatternTest, IsExtendedBy) {
+
+    // NumberOfFields
+    ShardKeyPattern shardKeyPattern1(BSON("a" << 1));
+    ShardKeyPattern shardKeyPattern2(BSON("a" << 1 << "b" << 1));
+    ShardKeyPattern shardKeyPattern3(BSON("a" << 1 << "b" << 1 << "c" << 1));
+
+    // NumberOfFields_PositionOfHash
+    ShardKeyPattern shardKeyPatternHashed1_0(BSON("a"
+                                                  << "hashed"));
+    ShardKeyPattern shardKeyPatternHashed2_0(BSON("a"
+                                                  << "hashed"
+                                                  << "b" << 1));
+    ShardKeyPattern shardKeyPatternHashed2_1(BSON("a" << 1 << "b"
+                                                      << "hashed"));
+    ShardKeyPattern shardKeyPatternHashed3_0(BSON("a"
+                                                  << "hashed"
+                                                  << "b" << 1 << "c" << 1));
+    ShardKeyPattern shardKeyPatternHashed3_1(BSON("a" << 1 << "b"
+                                                      << "hashed"
+                                                      << "c" << 1));
+    ShardKeyPattern shardKeyPatternHashed3_2(BSON("a" << 1 << "b" << 1 << "c"
+                                                      << "hashed"));
+
+    // same pattern, always true
+    ASSERT_TRUE(shardKeyPattern1.isExtendedBy(shardKeyPattern1));
+    ASSERT_TRUE(shardKeyPattern2.isExtendedBy(shardKeyPattern2));
+    ASSERT_TRUE(shardKeyPattern3.isExtendedBy(shardKeyPattern3));
+    ASSERT_TRUE(shardKeyPatternHashed1_0.isExtendedBy(shardKeyPatternHashed1_0));
+    ASSERT_TRUE(shardKeyPatternHashed2_0.isExtendedBy(shardKeyPatternHashed2_0));
+    ASSERT_TRUE(shardKeyPatternHashed2_1.isExtendedBy(shardKeyPatternHashed2_1));
+    ASSERT_TRUE(shardKeyPatternHashed3_0.isExtendedBy(shardKeyPatternHashed3_0));
+    ASSERT_TRUE(shardKeyPatternHashed3_1.isExtendedBy(shardKeyPatternHashed3_1));
+    ASSERT_TRUE(shardKeyPatternHashed3_2.isExtendedBy(shardKeyPatternHashed3_2));
+
+    // different number of fields, same values
+    ASSERT_TRUE(shardKeyPattern1.isExtendedBy(shardKeyPattern2));
+    ASSERT_TRUE(shardKeyPattern2.isExtendedBy(shardKeyPattern3));
+    ASSERT_TRUE(shardKeyPattern1.isExtendedBy(shardKeyPattern3));
+
+    ASSERT_FALSE(shardKeyPattern2.isExtendedBy(shardKeyPattern1));
+    ASSERT_FALSE(shardKeyPattern3.isExtendedBy(shardKeyPattern2));
+    ASSERT_FALSE(shardKeyPattern3.isExtendedBy(shardKeyPattern1));
+
+    // different number of fields, different values
+    // { a : 1 } is not extended by { a : "hashed" } and viceversa
+    ASSERT_FALSE(shardKeyPattern1.isExtendedBy(shardKeyPatternHashed1_0));
+    ASSERT_FALSE(shardKeyPatternHashed1_0.isExtendedBy(shardKeyPattern1));
+
+    // { a : 1, b : 1 } is not extended by { a : 1, b : "hashed" } and viceversa
+    ASSERT_FALSE(shardKeyPattern2.isExtendedBy(shardKeyPatternHashed2_1));
+    ASSERT_FALSE(shardKeyPatternHashed2_1.isExtendedBy(shardKeyPattern2));
+
+    // { a : 1 } is extended by { a : 1, b : "hashed" } but not viceversa
+    ASSERT_TRUE(shardKeyPattern1.isExtendedBy(shardKeyPatternHashed2_1));
+    ASSERT_FALSE(shardKeyPatternHashed2_1.isExtendedBy(shardKeyPattern1));
+
+    // { a : 1, b : 1 } is extended by { a : 1, b : 1, c : "hashed" } but not viceversa
+    ASSERT_TRUE(shardKeyPattern2.isExtendedBy(shardKeyPatternHashed3_2));
+    ASSERT_FALSE(shardKeyPatternHashed3_2.isExtendedBy(shardKeyPattern2));
+
+    // { a : 1, b : 1, c : 1 } is not extended by { a : 1, b : 1, c : "hashed" } and viceversa
+    ASSERT_FALSE(shardKeyPattern3.isExtendedBy(shardKeyPatternHashed3_2));
+    ASSERT_FALSE(shardKeyPatternHashed3_2.isExtendedBy(shardKeyPattern3));
+
+    // { a: "hashed", b : 1 } is not extended by { a : 1, b : 1, c : "hashed" } and viceversa
+    ASSERT_FALSE(shardKeyPatternHashed2_1.isExtendedBy(shardKeyPatternHashed3_2));
+    ASSERT_FALSE(shardKeyPatternHashed3_2.isExtendedBy(shardKeyPatternHashed2_1));
+
+    // { a : "hashed", b : 1 } is extended by { a : "hashed", b : 1, c : "1" } but not viceversa
+    ASSERT_TRUE(shardKeyPatternHashed2_0.isExtendedBy(shardKeyPatternHashed3_0));
+    ASSERT_FALSE(shardKeyPatternHashed3_0.isExtendedBy(shardKeyPatternHashed2_0));
+
+    // { a : 1, b : "hashed " } is extended by { a : 1, b : "hashed", c : "1" } but not viceversa
+    ASSERT_TRUE(shardKeyPatternHashed2_1.isExtendedBy(shardKeyPatternHashed3_1));
+    ASSERT_FALSE(shardKeyPatternHashed3_1.isExtendedBy(shardKeyPatternHashed2_1));
+}
+
 }  // namespace
 }  // namespace mongo
