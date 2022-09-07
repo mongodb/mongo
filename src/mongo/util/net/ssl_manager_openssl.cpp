@@ -990,7 +990,7 @@ Future<OCSPFetchResponse> dispatchOCSPRequests(SSL_CTX* context,
     std::vector<Future<UniqueOCSPResponse>> futureResponses{};
     std::vector<OCSPCertIDSet*> requestedCertIDSets{};
 
-    for (auto host : leafResponders) {
+    for (auto& host : leafResponders) {
         auto& ocspRequestAndIDs = ocspRequestMap[host];
         Future<UniqueOCSPResponse> futureResponse =
             retrieveOCSPResponse(host, ocspRequestAndIDs, purpose);
