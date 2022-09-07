@@ -196,6 +196,17 @@ inline void protocolStorageOptionsCompatibilityCheck(OperationContext* opCtx,
         !opCtx->getServiceContext()->getStorageEngine()->isUsingDirectoryForIndexes());
 }
 
+inline void protocolReadPreferenceCompatibilityCheck(OperationContext* opCtx,
+                                                     const MigrationProtocolEnum& protocol,
+                                                     const ReadPreferenceSetting& readPreference) {
+    if (protocol != MigrationProtocolEnum::kShardMerge)
+        return;
+
+    uassert(ErrorCodes::FailedToSatisfyReadPreference,
+            "Shard Merge protocol only supports primary read preference",
+            !readPreference.canRunOnSecondary());
+}
+
 /*
  * Creates an ExternalKeysCollectionDocument representing an config.external_validation_keys
  * document from the given the admin.system.keys document BSONObj.
