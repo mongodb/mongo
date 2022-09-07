@@ -51,20 +51,12 @@ let testCases = {
     _configsvrCommitChunkMigration: {skip: "primary only"},
     _configsvrCommitChunkSplit: {skip: "primary only"},
     _configsvrCommitIndex: {skip: "primary only"},
-    _configsvrCommitMovePrimary:
-        {skip: "primary only"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
     _configureCollectionAutoSplitter: {
         skip: "primary only"
     },  // TODO SERVER-62374: remove this once 5.3 becomes last continuos release
     _configsvrConfigureCollectionBalancing: {skip: "primary only"},
-    _configsvrDropCollection:
-        {skip: "primary only"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
-    _configsvrDropDatabase:
-        {skip: "primary only"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
     _configsvrDropIndexCatalogEntry: {skip: "primary only"},
     _configsvrMoveChunk: {skip: "primary only"},
-    _configsvrMovePrimary:
-        {skip: "primary only"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
     _configsvrMoveRange: {skip: "primary only"},
     _configsvrRemoveChunks: {skip: "primary only"},
     _configsvrRemoveShardFromZone: {skip: "primary only"},
@@ -73,8 +65,6 @@ let testCases = {
     _configsvrSetAllowMigrations: {skip: "primary only"},
     _configsvrSetClusterParameter: {skip: "primary only"},
     _configsvrSetUserWriteBlockMode: {skip: "primary only"},
-    _configsvrShardCollection:
-        {skip: "primary only"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
     _configsvrUpdateZoneKeyRange: {skip: "primary only"},
     _flushReshardingStateChange: {skip: "does not return user data"},
     _flushRoutingTableCacheUpdates: {skip: "does not return user data"},

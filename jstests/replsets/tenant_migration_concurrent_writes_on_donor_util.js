@@ -318,8 +318,6 @@ TenantMigrationConcurrentWriteUtil.testCases = {
     _shardsvrDropIndexCatalogEntryParticipant: {skip: isOnlySupportedOnShardedCluster},
     _shardsvrMovePrimary: {skip: isNotRunOnUserDatabase},
     _shardsvrSetAllowMigrations: {skip: isOnlySupportedOnShardedCluster},
-    _shardsvrShardCollection:
-        {skip: isNotRunOnUserDatabase},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
     _shardsvrRenameCollection: {skip: isOnlySupportedOnShardedCluster},
     _shardsvrUnregisterIndex: {skip: isOnlySupportedOnShardedCluster},
     _transferMods: {skip: isNotRunOnUserDatabase},
