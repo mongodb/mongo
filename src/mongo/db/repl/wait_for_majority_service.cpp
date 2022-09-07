@@ -161,7 +161,7 @@ SemiFuture<void> WaitForMajorityService::waitUntilMajority(const repl::OpTime& o
                 scopedClientLock, opCtx, ErrorCodes::WaitForMajorityServiceEarlierOpTimeAvailable);
     }
 
-    auto resultIter = _queuedOpTimes.emplace(
+    _queuedOpTimes.emplace(
         std::piecewise_construct, std::forward_as_tuple(opTime), std::forward_as_tuple(request));
 
 
@@ -170,7 +170,7 @@ SemiFuture<void> WaitForMajorityService::waitUntilMajority(const repl::OpTime& o
         _hasNewOpTimeCV.notifyAllAndReset();
     }
 
-    cancelToken.onCancel().thenRunOn(_pool).getAsync([this, resultIter, request](Status s) {
+    cancelToken.onCancel().thenRunOn(_pool).getAsync([this, request](Status s) {
         if (!s.isOK()) {
             return;
         }
@@ -178,7 +178,12 @@ SemiFuture<void> WaitForMajorityService::waitUntilMajority(const repl::OpTime& o
         if (!request->hasBeenProcessed.swap(true)) {
             request->result.setError(waitUntilMajorityCanceledStatus());
             stdx::lock_guard lk(_mutex);
-            _queuedOpTimes.erase(resultIter);
+            auto it = std::find_if(
+                std::begin(_queuedOpTimes),
+                std::end(_queuedOpTimes),
+                [&request](auto&& requestIter) { return request == requestIter.second; });
+            invariant(it != _queuedOpTimes.end());
+            _queuedOpTimes.erase(it);
         }
     });
     return std::move(future).semi();
