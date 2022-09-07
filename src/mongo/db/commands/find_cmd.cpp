@@ -295,6 +295,15 @@ public:
                         AutoGetCollectionViewMode::kViewsPermitted);
             const auto nss = ctx->getNss();
 
+            // Going forward this operation must never ignore interrupt signals while waiting for
+            // lock acquisition. This InterruptibleLockGuard will ensure that waiting for lock
+            // re-acquisition after yielding will not ignore interrupt signals. This is necessary to
+            // avoid deadlocking with replication rollback, which at the storage layer waits for all
+            // cursors to be closed under the global MODE_X lock, after having sent interrupt
+            // signals to read operations. This operation must never hold open storage cursors while
+            // ignoring interrupt.
+            InterruptibleLockGuard interruptibleLockAcquisition(opCtx->lockState());
+
             // Parse the command BSON to a FindCommandRequest.
             auto findCommand = parseCmdObjectToFindCommandRequest(opCtx, nss, _request.body);
 
@@ -470,6 +479,15 @@ public:
                         CommandHelpers::parseNsOrUUID(_dbName, _request.body),
                         AutoGetCollectionViewMode::kViewsPermitted);
             const auto& nss = ctx->getNss();
+
+            // Going forward this operation must never ignore interrupt signals while waiting for
+            // lock acquisition. This InterruptibleLockGuard will ensure that waiting for lock
+            // re-acquisition after yielding will not ignore interrupt signals. This is necessary to
+            // avoid deadlocking with replication rollback, which at the storage layer waits for all
+            // cursors to be closed under the global MODE_X lock, after having sent interrupt
+            // signals to read operations. This operation must never hold open storage cursors while
+            // ignoring interrupt.
+            InterruptibleLockGuard interruptibleLockAcquisition(opCtx->lockState());
 
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "UUID " << findCommand->getNamespaceOrUUID().uuid().value()

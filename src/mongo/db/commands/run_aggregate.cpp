@@ -705,6 +705,14 @@ Status runAggregate(OperationContext* opCtx,
     boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
     MultipleCollectionAccessor collections;
 
+    // Going forward this operation must never ignore interrupt signals while waiting for lock
+    // acquisition. This InterruptibleLockGuard will ensure that waiting for lock re-acquisition
+    // after yielding will not ignore interrupt signals. This is necessary to avoid deadlocking with
+    // replication rollback, which at the storage layer waits for all cursors to be closed under the
+    // global MODE_X lock, after having sent interrupt signals to read operations. This operation
+    // must never hold open storage cursors while ignoring interrupt.
+    InterruptibleLockGuard interruptibleLockAcquisition(opCtx->lockState());
+
     auto initContext = [&](AutoGetCollectionViewMode m) -> void {
         ctx.emplace(opCtx,
                     nss,
