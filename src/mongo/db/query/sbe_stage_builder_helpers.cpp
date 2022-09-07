@@ -312,13 +312,6 @@ EvalStage makeLimitCoScanStage(PlanNodeId planNodeId, long long limit) {
     return {makeLimitCoScanTree(planNodeId, limit), sbe::makeSV()};
 }
 
-EvalStage stageOrLimitCoScan(EvalStage stage, PlanNodeId planNodeId, long long limit) {
-    if (stage.stage) {
-        return stage;
-    }
-    return makeLimitCoScanStage(planNodeId, limit);
-}
-
 std::pair<sbe::value::SlotId, EvalStage> projectEvalExpr(
     EvalExpr expr,
     EvalStage stage,
@@ -339,14 +332,13 @@ std::pair<sbe::value::SlotId, EvalStage> projectEvalExpr(
 EvalStage makeProject(EvalStage stage,
                       sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects,
                       PlanNodeId planNodeId) {
-    stage = stageOrLimitCoScan(std::move(stage), planNodeId);
-
-    auto outSlots = std::move(stage.outSlots);
+    auto outSlots = stage.extractOutSlots();
     for (auto& [slot, _] : projects) {
         outSlots.push_back(slot);
     }
 
-    return {sbe::makeS<sbe::ProjectStage>(std::move(stage.stage), std::move(projects), planNodeId),
+    return {sbe::makeS<sbe::ProjectStage>(
+                stage.extractStage(planNodeId), std::move(projects), planNodeId),
             std::move(outSlots)};
 }
 
@@ -356,23 +348,23 @@ EvalStage makeLoopJoin(EvalStage left,
                        const sbe::value::SlotVector& lexicalEnvironment) {
     // If 'left' and 'right' are both null, we just return null. If one of 'left'/'right' is null
     // and the other is non-null, return whichever one is non-null.
-    if (!left.stage) {
+    if (left.stageIsNull()) {
         return right;
-    } else if (!right.stage) {
+    } else if (right.stageIsNull()) {
         return left;
     }
 
-    auto outerProjects = left.outSlots;
-    auto outerCorrelated = left.outSlots;
+    auto outerProjects = left.getOutSlots();
+    auto outerCorrelated = left.getOutSlots();
 
     outerCorrelated.insert(
         outerCorrelated.end(), lexicalEnvironment.begin(), lexicalEnvironment.end());
 
-    auto outSlots = std::move(left.outSlots);
-    outSlots.insert(outSlots.end(), right.outSlots.begin(), right.outSlots.end());
+    auto outSlots = left.extractOutSlots();
+    outSlots.insert(outSlots.end(), right.getOutSlots().begin(), right.getOutSlots().end());
 
-    return {sbe::makeS<sbe::LoopJoinStage>(std::move(left.stage),
-                                           std::move(right.stage),
+    return {sbe::makeS<sbe::LoopJoinStage>(left.extractStage(planNodeId),
+                                           right.extractStage(planNodeId),
                                            std::move(outerProjects),
                                            std::move(outerCorrelated),
                                            nullptr,
@@ -385,8 +377,8 @@ EvalStage makeUnwind(EvalStage inputEvalStage,
                      PlanNodeId planNodeId,
                      bool preserveNullAndEmptyArrays) {
     auto unwindSlot = slotIdGenerator->generate();
-    auto unwindStage = sbe::makeS<sbe::UnwindStage>(std::move(inputEvalStage.stage),
-                                                    inputEvalStage.outSlots.front(),
+    auto unwindStage = sbe::makeS<sbe::UnwindStage>(inputEvalStage.extractStage(planNodeId),
+                                                    inputEvalStage.getOutSlots().front(),
                                                     unwindSlot,
                                                     slotIdGenerator->generate(),
                                                     preserveNullAndEmptyArrays,
@@ -401,8 +393,8 @@ EvalStage makeBranch(EvalStage thenStage,
                      sbe::value::SlotVector elseVals,
                      sbe::value::SlotVector outputVals,
                      PlanNodeId planNodeId) {
-    auto branchStage = sbe::makeS<sbe::BranchStage>(std::move(thenStage.stage),
-                                                    std::move(elseStage.stage),
+    auto branchStage = sbe::makeS<sbe::BranchStage>(thenStage.extractStage(planNodeId),
+                                                    elseStage.extractStage(planNodeId),
                                                     std::move(ifExpr),
                                                     std::move(thenVals),
                                                     std::move(elseVals),
@@ -421,21 +413,18 @@ EvalStage makeTraverse(EvalStage outer,
                        PlanNodeId planNodeId,
                        boost::optional<size_t> nestedArraysDepth,
                        const sbe::value::SlotVector& lexicalEnvironment) {
-    outer = stageOrLimitCoScan(std::move(outer), planNodeId);
-    inner = stageOrLimitCoScan(std::move(inner), planNodeId);
-
     sbe::value::SlotVector outerCorrelated = lexicalEnvironment;
-    for (auto slot : outer.outSlots) {
+    for (auto slot : outer.getOutSlots()) {
         if (slot != inField) {
             outerCorrelated.push_back(slot);
         }
     }
 
-    auto outSlots = std::move(outer.outSlots);
+    auto outSlots = outer.extractOutSlots();
     outSlots.push_back(outField);
 
-    return {sbe::makeS<sbe::TraverseStage>(std::move(outer.stage),
-                                           std::move(inner.stage),
+    return {sbe::makeS<sbe::TraverseStage>(outer.extractStage(planNodeId),
+                                           inner.extractStage(planNodeId),
                                            inField,
                                            outField,
                                            outFieldInner,
@@ -452,8 +441,8 @@ EvalStage makeLimitSkip(EvalStage input,
                         boost::optional<long long> limit,
                         boost::optional<long long> skip) {
     return EvalStage{
-        sbe::makeS<sbe::LimitSkipStage>(std::move(input.stage), limit, skip, planNodeId),
-        std::move(input.outSlots)};
+        sbe::makeS<sbe::LimitSkipStage>(input.extractStage(planNodeId), limit, skip, planNodeId),
+        input.extractOutSlots()};
 }
 
 EvalStage makeUnion(std::vector<EvalStage> inputStages,
@@ -463,7 +452,7 @@ EvalStage makeUnion(std::vector<EvalStage> inputStages,
     sbe::PlanStage::Vector branches;
     branches.reserve(inputStages.size());
     for (auto& inputStage : inputStages) {
-        branches.emplace_back(std::move(inputStage.stage));
+        branches.emplace_back(inputStage.extractStage(planNodeId));
     }
     return EvalStage{sbe::makeS<sbe::UnionStage>(
                          std::move(branches), std::move(inputVals), outputVals, planNodeId),
@@ -476,18 +465,19 @@ EvalStage makeHashAgg(EvalStage stage,
                       boost::optional<sbe::value::SlotId> collatorSlot,
                       bool allowDiskUse,
                       PlanNodeId planNodeId) {
-    stage.outSlots = gbs;
+    stage.setOutSlots(gbs);
     for (auto& [slot, _] : aggs) {
-        stage.outSlots.push_back(slot);
+        stage.addOutSlot(slot);
     }
-    stage.stage = sbe::makeS<sbe::HashAggStage>(std::move(stage.stage),
-                                                std::move(gbs),
-                                                std::move(aggs),
-                                                sbe::makeSV(),
-                                                true /* optimized close */,
-                                                collatorSlot,
-                                                allowDiskUse,
-                                                planNodeId);
+
+    stage.setStage(sbe::makeS<sbe::HashAggStage>(stage.extractStage(planNodeId),
+                                                 std::move(gbs),
+                                                 std::move(aggs),
+                                                 sbe::makeSV(),
+                                                 true /* optimized close */,
+                                                 collatorSlot,
+                                                 allowDiskUse,
+                                                 planNodeId));
     return stage;
 }
 
@@ -501,17 +491,17 @@ EvalStage makeMkBsonObj(EvalStage stage,
                         bool forceNewObject,
                         bool returnOldObject,
                         PlanNodeId planNodeId) {
-    stage.stage = sbe::makeS<sbe::MakeBsonObjStage>(std::move(stage.stage),
-                                                    objSlot,
-                                                    rootSlot,
-                                                    fieldBehavior,
-                                                    std::move(fields),
-                                                    std::move(projectFields),
-                                                    std::move(projectVars),
-                                                    forceNewObject,
-                                                    returnOldObject,
-                                                    planNodeId);
-    stage.outSlots.push_back(objSlot);
+    stage.setStage(sbe::makeS<sbe::MakeBsonObjStage>(stage.extractStage(planNodeId),
+                                                     objSlot,
+                                                     rootSlot,
+                                                     fieldBehavior,
+                                                     std::move(fields),
+                                                     std::move(projectFields),
+                                                     std::move(projectVars),
+                                                     forceNewObject,
+                                                     returnOldObject,
+                                                     planNodeId));
+    stage.addOutSlot(objSlot);
 
     return stage;
 }
@@ -537,7 +527,7 @@ EvalExprStagePair generateUnion(std::vector<EvalExprStagePair> branches,
             return branchFn(std::move(expr), std::move(stage), planNodeId, slotIdGenerator);
         }();
 
-        stages.emplace_back(std::move(stage.stage));
+        stages.emplace_back(stage.extractStage(planNodeId));
         inputs.emplace_back(sbe::makeSV(slot));
     }
 
@@ -556,8 +546,8 @@ EvalExprStagePair generateSingleResultUnion(std::vector<EvalExprStagePair> branc
     auto [unionEvalExpr, unionEvalStage] =
         generateUnion(std::move(branches), std::move(branchFn), planNodeId, slotIdGenerator);
     return {std::move(unionEvalExpr),
-            EvalStage{makeLimitTree(std::move(unionEvalStage.stage), planNodeId),
-                      std::move(unionEvalStage.outSlots)}};
+            EvalStage{makeLimitTree(unionEvalStage.extractStage(planNodeId), planNodeId),
+                      unionEvalStage.extractOutSlots()}};
 }
 
 EvalExprStagePair generateShortCircuitingLogicalOp(sbe::EPrimBinary::Op logicOp,

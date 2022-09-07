@@ -124,7 +124,7 @@ struct ExpressionVisitorContext {
     EvalExprStagePair done() {
         invariant(evalStack.framesCount() == 1);
         auto [expr, stage] = popFrame();
-        return {std::move(expr), stageOrLimitCoScan(std::move(stage), planNodeId)};
+        return {std::move(expr), std::move(stage)};
     }
 
     StageBuilderState& state;
@@ -1133,8 +1133,7 @@ public:
         for (size_t idx = 0; idx < numChildren; ++idx) {
             auto outputSlot = _context->state.slotId();
             projections.emplace(outputSlot, _context->popExpr());
-            unionBranches.emplace_back(
-                EvalStage{makeLimitCoScanTree(_context->planNodeId), sbe::makeSV()});
+            unionBranches.emplace_back();
             unionInputSlots.emplace_back(sbe::makeSV(outputSlot));
             nullChecks.emplace_back(generateNullOrMissing(outputSlot));
         }
@@ -1167,7 +1166,7 @@ public:
         // input and concatenate it into an array using addToArray.
         auto unwindEvalStage =
             makeUnwind(std::move(filter), _context->state.slotIdGenerator, _context->planNodeId);
-        auto unwindSlot = unwindEvalStage.outSlots.front();
+        auto unwindSlot = unwindEvalStage.getOutSlots().front();
 
         // Create a group stage to append all streamed elements into one array. This is the final
         // output when the input consists entirely of arrays.
@@ -1196,11 +1195,8 @@ public:
         // and concatenates elements into the output array.
         auto [nullSlot, nullStage] = [&] {
             auto outputSlot = _context->state.slotId();
-            auto nullEvalStage =
-                makeProject({makeLimitCoScanTree(_context->planNodeId), sbe::makeSV()},
-                            _context->planNodeId,
-                            outputSlot,
-                            makeConstant(sbe::value::TypeTags::Null, 0));
+            auto nullEvalStage = makeProject(
+                {}, _context->planNodeId, outputSlot, makeConstant(sbe::value::TypeTags::Null, 0));
             return std::make_pair(outputSlot, std::move(nullEvalStage));
         }();
 
@@ -1963,8 +1959,8 @@ public:
         //
         // As the main evaluation tree is now the outer branch of a top NLJ, we use the limit 1 /
         // coscan subtree for the 'from' branch of the traverse stage.
-        auto inputArrayEvalStage = expr->hasLimit() ? makeLimitCoScanStage(_context->planNodeId)
-                                                    : _context->extractCurrentEvalStage();
+        auto inputArrayEvalStage =
+            expr->hasLimit() ? EvalStage{} : _context->extractCurrentEvalStage();
         auto projectInputArray = makeProject(std::move(inputArrayEvalStage),
                                              _context->planNodeId,
                                              inputArraySlot,

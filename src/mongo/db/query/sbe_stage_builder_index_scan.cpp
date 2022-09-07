@@ -1130,7 +1130,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
                                                std::move(indexFilterKeySlots),
                                                std::move(indexFilterKeyFields),
                                                ixn->nodeId());
-        stage = std::move(outputStage.stage);
+        stage = outputStage.extractStage(ixn->nodeId());
     }
 
     outputs.setIndexKeySlots(makeIndexKeyOutputSlotsMatchingParentReqs(
@@ -1423,7 +1423,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
                                                std::move(indexFilterKeySlots),
                                                std::move(indexFilterKeyFields),
                                                ixn->nodeId());
-        stage = std::move(outputStage.stage);
+        stage = outputStage.extractStage(ixn->nodeId());
     }
 
     outputs.setIndexKeySlots(makeIndexKeyOutputSlotsMatchingParentReqs(

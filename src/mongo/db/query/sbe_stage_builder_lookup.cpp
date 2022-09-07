@@ -383,7 +383,7 @@ std::pair<SlotId /* keyValuesSetSlot */, std::unique_ptr<sbe::PlanStage>> buildK
     // Attach the set of key values to the original local record.
     std::unique_ptr<sbe::PlanStage> nljLocalWithKeyValuesSet =
         makeS<LoopJoinStage>(std::move(inputStage),
-                             std::move(packedKeyValuesStage.stage),
+                             packedKeyValuesStage.extractStage(nodeId),
                              makeSV(recordSlot) /* outerProjects */,
                              makeSV(recordSlot) /* outerCorrelated */,
                              nullptr /* predicate */,
@@ -446,7 +446,7 @@ std::pair<SlotId /* resultSlot */, std::unique_ptr<sbe::PlanStage>> buildForeign
 
     SlotId unionOutputSlot = slotIdGenerator.generate();
     EvalStage unionStage =
-        makeUnion(makeVector(EvalStage{std::move(innerBranch.stage), SlotVector{}},
+        makeUnion(makeVector(EvalStage{innerBranch.extractStage(nodeId), SlotVector{}},
                              EvalStage{std::move(emptyArrayStage), SlotVector{}}),
                   {makeSV(matchedRecordsSlot), makeSV(emptyArraySlot)} /* inputs */,
                   makeSV(unionOutputSlot),
@@ -454,7 +454,7 @@ std::pair<SlotId /* resultSlot */, std::unique_ptr<sbe::PlanStage>> buildForeign
 
     return std::make_pair(
         unionOutputSlot,
-        std::move(makeLimitSkip(std::move(unionStage), nodeId, 1 /* limit */).stage));
+        makeLimitSkip(std::move(unionStage), nodeId, 1 /* limit */).extractStage(nodeId));
 }
 
 // Creates stages that extract key values from the given foreign record, compares them to the local

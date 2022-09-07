@@ -32,6 +32,8 @@
 #include <stack>
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/stages/co_scan.h"
+#include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/stdx/variant.h"
 
 namespace mongo::stage_builder {
@@ -117,13 +119,71 @@ private:
 };
 
 /**
- * EvalStage contains a PlanStage ('stage') and a vector of slots ('outSlots'). The outSlots vector
- * allows us to make sure important/relevant slots produced by 'stage' remain visible when 'stage'
- * is used on the left side of a LoopJoinStage.
+ * EvalStage contains a PlanStage (_stage) and a vector of slots (_outSlots).
+ *
+ * _stage can be nullptr or it can point to an SBE PlanStage tree. If _stage is nullptr, the
+ * extractStage() method will return a Limit-1/CoScan tree. If _stage is not nullptr, then the
+ * extractStage() method will return _stage. EvalStage's default constructor initializes
+ * _stage to be nullptr.
+ *
+ * The stageIsNull() method allows callers to check if _state is nullptr. Some helper functions
+ * (such as makeLoopJoin()) take advantage of this knowledge and are able to perform optimizations
+ * in the case where stageIsNull() == true.
+ *
+ * The _outSlots vector keeps track of all of the "output" slots that are produced by the current
+ * sbe::PlanStage tree (_stage). The _outSlots vector is used by makeLoopJoin() and makeTraverse()
+ * to ensure that all of the slots produced by the left side are visible to the right side and are
+ * also visible to the parent of the LoopJoinStage/TraverseStage.
  */
-struct EvalStage {
-    std::unique_ptr<sbe::PlanStage> stage;
-    sbe::value::SlotVector outSlots;
+class EvalStage {
+public:
+    EvalStage() {}
+
+    EvalStage(std::unique_ptr<sbe::PlanStage> stage, sbe::value::SlotVector outSlots)
+        : _stage(std::move(stage)), _outSlots(std::move(outSlots)) {}
+
+    EvalStage(EvalStage&& other)
+        : _stage(std::move(other._stage)), _outSlots(std::move(other._outSlots)) {}
+
+    EvalStage& operator=(EvalStage&& other) {
+        _stage = std::move(other._stage);
+        _outSlots = std::move(other._outSlots);
+        return *this;
+    }
+
+    bool stageIsNull() const {
+        return !_stage;
+    }
+
+    std::unique_ptr<sbe::PlanStage> extractStage(PlanNodeId planNodeId) {
+        return _stage ? std::move(_stage)
+                      : sbe::makeS<sbe::LimitSkipStage>(
+                            sbe::makeS<sbe::CoScanStage>(planNodeId), 1, boost::none, planNodeId);
+    }
+
+    void setStage(std::unique_ptr<sbe::PlanStage> stage) {
+        _stage = std::move(stage);
+    }
+
+    const sbe::value::SlotVector& getOutSlots() const {
+        return _outSlots;
+    }
+
+    sbe::value::SlotVector extractOutSlots() {
+        return std::move(_outSlots);
+    }
+
+    void setOutSlots(sbe::value::SlotVector outSlots) {
+        _outSlots = std::move(outSlots);
+    }
+
+    void addOutSlot(sbe::value::SlotId slot) {
+        _outSlots.push_back(slot);
+    }
+
+private:
+    std::unique_ptr<sbe::PlanStage> _stage;
+    sbe::value::SlotVector _outSlots;
 };
 
 /**

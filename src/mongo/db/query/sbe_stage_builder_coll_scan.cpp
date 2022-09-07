@@ -459,7 +459,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
                                                {std::move(stage), std::move(relevantSlots)},
                                                resultSlot,
                                                csn->nodeId());
-        stage = std::move(outputStage.stage);
+        stage = outputStage.extractStage(csn->nodeId());
 
         // We may be requested to stop applying the filter after the first match. This can happen
         // if the query is just a lower bound on 'ts' on a forward scan. In this case every document
@@ -608,7 +608,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
                                                {std::move(stage), std::move(relevantSlots)},
                                                resultSlot,
                                                csn->nodeId());
-        stage = std::move(outputStage.stage);
+        stage = outputStage.extractStage(csn->nodeId());
     }
 
     PlanStageSlots outputs;

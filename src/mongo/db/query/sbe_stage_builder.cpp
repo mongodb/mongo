@@ -913,7 +913,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                {std::move(stage), std::move(relevantSlots)},
                                                reconstructedRecordSlot,
                                                csn->nodeId());
-        stage = std::move(outputStage.stage);
+        stage = outputStage.extractStage(csn->nodeId());
     }
 
     return {std::move(stage), std::move(outputs)};
@@ -989,7 +989,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                {std::move(stage), std::move(relevantSlots)},
                                                outputs.get(kResult),
                                                root->nodeId());
-        stage = std::move(outputStage.stage);
+        stage = outputStage.extractStage(root->nodeId());
     }
 
     return {std::move(stage), std::move(outputs)};
@@ -1838,7 +1838,7 @@ SlotBasedStageBuilder::buildProjectionDefault(const QuerySolutionNode* root,
                                outputs.get(kResult),
                                root->nodeId());
 
-        resultStage = std::move(stage.stage);
+        resultStage = stage.extractStage(root->nodeId());
     }
 
     outputs.set(kResult, resultSlot);
@@ -1894,7 +1894,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                {std::move(stage), std::move(relevantSlots)},
                                                outputs.get(kResult),
                                                root->nodeId());
-        stage = std::move(outputStage.stage);
+        stage = outputStage.extractStage(root->nodeId());
     }
 
     return {std::move(stage), std::move(outputs)};
@@ -2439,7 +2439,7 @@ std::tuple<std::vector<std::string>, sbe::value::SlotVector, EvalStage> generate
     PlanNodeId nodeId,
     sbe::value::SlotIdGenerator* slotIdGenerator) {
     sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> prjSlotToExprMap;
-    sbe::value::SlotVector groupOutSlots{groupEvalStage.outSlots};
+    sbe::value::SlotVector groupOutSlots{groupEvalStage.getOutSlots()};
     // To passthrough the output slots of accumulators with trivial finalizers, we need to find
     // their slot ids. We can do this by sorting 'groupEvalStage.outSlots' because the slot ids
     // correspond to the order in which the accumulators were translated (that is, the order in
@@ -2607,7 +2607,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         5851603,
         "Group stage's output slots must include deduped slots for group-by keys and slots for all "
         "accumulators",
-        groupEvalStage.outSlots.size() ==
+        groupEvalStage.getOutSlots().size() ==
             std::accumulate(aggSlotsVec.begin(),
                             aggSlotsVec.end(),
                             dedupedGroupBySlots.size(),
@@ -2616,7 +2616,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             "Group stage's output slots must contain the deduped groupBySlots at the front",
             std::equal(dedupedGroupBySlots.begin(),
                        dedupedGroupBySlots.end(),
-                       groupEvalStage.outSlots.begin()));
+                       groupEvalStage.getOutSlots().begin()));
 
     // Builds the final stage(s) over the collected accumulators.
     auto [fieldNames, finalSlots, groupFinalEvalStage] =
@@ -2648,7 +2648,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         // This mkbson stage combines 'finalSlots' into a bsonObject result slot which has
         // 'fieldNames' fields.
         if (groupNode->shouldProduceBson) {
-            outStage = sbe::makeS<sbe::MakeBsonObjStage>(std::move(groupFinalEvalStage.stage),
+            outStage = sbe::makeS<sbe::MakeBsonObjStage>(groupFinalEvalStage.extractStage(nodeId),
                                                          outputs.get(kResult),  // objSlot
                                                          boost::none,           // rootSlot
                                                          boost::none,           // fieldBehavior
@@ -2659,7 +2659,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                          false,                  // returnOldObject
                                                          nodeId);
         } else {
-            outStage = sbe::makeS<sbe::MakeObjStage>(std::move(groupFinalEvalStage.stage),
+            outStage = sbe::makeS<sbe::MakeObjStage>(groupFinalEvalStage.extractStage(nodeId),
                                                      outputs.get(kResult),        // objSlot
                                                      boost::none,                 // rootSlot
                                                      boost::none,                 // fieldBehavior
@@ -2675,7 +2675,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             outputs.set("CURRENT." + fieldNames[i], finalSlots[i]);
         };
 
-        outStage = std::move(groupFinalEvalStage.stage);
+        outStage = groupFinalEvalStage.extractStage(nodeId);
     }
 
     return {std::move(outStage), std::move(outputs)};

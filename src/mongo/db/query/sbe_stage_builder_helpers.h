@@ -192,11 +192,6 @@ std::unique_ptr<sbe::PlanStage> makeLimitCoScanTree(PlanNodeId planNodeId, long 
 EvalStage makeLimitCoScanStage(PlanNodeId planNodeId, long long limit = 1);
 
 /**
- * If 'stage.stage' is 'nullptr', return limit-1/coscan tree. Otherwise, return stage.
- */
-EvalStage stageOrLimitCoScan(EvalStage stage, PlanNodeId planNodeId, long long limit = 1);
-
-/**
  * Check if expression returns Nothing and return boolean false if so. Otherwise, return the
  * expression.
  */
@@ -340,11 +335,9 @@ template <bool IsConst, bool IsEof = false>
 EvalStage makeFilter(EvalStage stage,
                      std::unique_ptr<sbe::EExpression> filter,
                      PlanNodeId planNodeId) {
-    stage = stageOrLimitCoScan(std::move(stage), planNodeId);
-
     return {sbe::makeS<sbe::FilterStage<IsConst, IsEof>>(
-                std::move(stage.stage), std::move(filter), planNodeId),
-            std::move(stage.outSlots)};
+                stage.extractStage(planNodeId), std::move(filter), planNodeId),
+            stage.extractOutSlots()};
 }
 
 EvalStage makeProject(EvalStage stage,

@@ -475,6 +475,11 @@ assertResultsMatchWithAndWithoutPushdown(
     [{$sortByCount: "$item"}],
     [{"_id": "a", "count": 2}, {"_id": "b", "count": 2}, {"_id": "c", "count": 1}]);
 
+assertResultsMatchWithAndWithoutPushdown(
+    coll,
+    [{$sortByCount: {$cond: [{$eq: ["$item", {$const: "a"}]}, "$price", "$quantity"]}}],
+    [{_id: 5, count: 4}, {_id: 10, count: 1}]);
+
 // When at the mongos-side in a sharded environment or we are spilling $doingMerge is set to true.
 // We should bail out and not push down $group stages and the suffix of the pipeline when we
 // encounter a $group stage with this flag set.

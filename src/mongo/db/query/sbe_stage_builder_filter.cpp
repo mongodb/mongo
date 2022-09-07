@@ -455,10 +455,7 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
 
         auto buildUnionBranch = [&](std::unique_ptr<sbe::EExpression> arrayExpr) {
             auto currentArraySlot = slotIdGenerator->generate();
-            auto branch = makeProject(makeLimitCoScanStage(planNodeId),
-                                      planNodeId,
-                                      currentArraySlot,
-                                      std::move(arrayExpr));
+            auto branch = makeProject({}, planNodeId, currentArraySlot, std::move(arrayExpr));
             return std::make_pair(sbe::makeSV(currentArraySlot), std::move(branch));
         };
 
@@ -1352,10 +1349,9 @@ public:
                 "Eval frame for $expr is not computed over expression's input slot",
                 *frame.data().inputSlot == *_context->inputSlot);
 
-        auto currentStage = stageOrLimitCoScan(frame.extractStage(), _context->planNodeId);
         auto&& [expr, stage] = generateExpression(_context->state,
                                                   matchExpr->getExpression().get(),
-                                                  std::move(currentStage),
+                                                  frame.extractStage(),
                                                   *frame.data().inputSlot,
                                                   _context->planNodeId);
         auto frameId = _context->state.frameId();
