@@ -33,6 +33,7 @@
 
 #include <vector>
 
+#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/hasher.h"
@@ -288,7 +289,7 @@ bool ShardKeyPattern::isShardKey(const BSONObj& shardKey) const {
 }
 
 bool ShardKeyPattern::isExtendedBy(const ShardKeyPattern& newShardKeyPattern) const {
-    return toBSON().isFieldNamePrefixOf(newShardKeyPattern.toBSON());
+    return toBSON().isPrefixOf(newShardKeyPattern.toBSON(), SimpleBSONElementComparator::kInstance);
 }
 
 BSONObj ShardKeyPattern::normalizeShardKey(const BSONObj& shardKey) const {
