@@ -498,6 +498,23 @@ TEST(Optimizer, Union) {
         rootNode);
 }
 
+TEST(Optimizer, UnionReferences) {
+    ABT scanNode1 = make<ScanNode>("ptest1", "test1");
+    ABT projNode1 = make<EvaluationNode>("A", Constant::int64(3), std::move(scanNode1));
+    ABT scanNode2 = make<ScanNode>("ptest2", "test2");
+    ABT projNode2 = make<EvaluationNode>("B", Constant::int64(4), std::move(scanNode2));
+
+    ABT unionNode =
+        make<UnionNode>(ProjectionNameVector{"ptest3", "C"}, makeSeq(projNode1, projNode2));
+    ABTVector unionNodeReferences =
+        unionNode.cast<UnionNode>()->get<1>().cast<References>()->nodes();
+    ABTVector expectedUnionNodeReferences = {make<Variable>("ptest3"),
+                                             make<Variable>("C"),
+                                             make<Variable>("ptest3"),
+                                             make<Variable>("C")};
+    ASSERT(unionNodeReferences == expectedUnionNodeReferences);
+}
+
 TEST(Optimizer, Unwind) {
     ABT scanNode = make<ScanNode>("p1", "test");
     ABT evalNode = make<EvaluationNode>(

@@ -605,6 +605,23 @@ public:
         tassert(6624017, "Invalid binder type", result.is<ExpressionBinder>());
         return *result.cast<ExpressionBinder>();
     }
+
+private:
+    // This struct is a workaround to avoid a use-after-move problem while initializing the base
+    // class and passing constructor arguments. Due to the way how the base class is designed, we
+    // need to std::move the children vector as the first argument to the Base ctor, but then
+    // obtain the size of the moved vector while computing the last argument. So, we'll preserve
+    // the children's vector size in this struct to avoid this situation.
+    struct UnionNodeChildren {
+        UnionNodeChildren(ABTVector children) : _nodes(std::move(children)) {
+            _numOfNodes = _nodes.size();
+        }
+
+        ABTVector _nodes;
+        size_t _numOfNodes;
+    };
+
+    UnionNode(ProjectionNameVector unionProjectionNames, UnionNodeChildren children);
 };
 
 #define GROUPNODETYPE_OPNAMES(F) \

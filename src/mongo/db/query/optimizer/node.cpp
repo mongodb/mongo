@@ -581,9 +581,12 @@ static ABT buildUnionReferences(const ProjectionNameVector& names, const size_t 
 }
 
 UnionNode::UnionNode(ProjectionNameVector unionProjectionNames, ABTVector children)
-    : Base(std::move(children),
+    : UnionNode(std::move(unionProjectionNames), UnionNodeChildren{std::move(children)}) {}
+
+UnionNode::UnionNode(ProjectionNameVector unionProjectionNames, UnionNodeChildren children)
+    : Base(std::move(children._nodes),
            buildSimpleBinder(unionProjectionNames),
-           buildUnionReferences(unionProjectionNames, children.size())) {
+           buildUnionReferences(unionProjectionNames, children._numOfNodes)) {
     tassert(
         6624007, "UnionNode must have a non-empty projection list", !unionProjectionNames.empty());
 
