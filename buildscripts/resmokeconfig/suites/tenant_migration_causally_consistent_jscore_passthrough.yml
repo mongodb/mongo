@@ -66,6 +66,7 @@ selector:
   - uses_transactions
   # Parallel shell is not causally consistent because it uses a different session.
   - uses_parallel_shell
+  - requires_timeseries # Tenant migration not supported
 
 executor:
   archive:

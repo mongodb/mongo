@@ -83,6 +83,7 @@ selector:
   - cannot_create_unique_index_when_using_hashed_shard_key
   # system.profile collection doesn't exist on mongos.
   - requires_profiling
+  - requires_timeseries # Implicit collection creation not supported
 
 executor:
   archive:

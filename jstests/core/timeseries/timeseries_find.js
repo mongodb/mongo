@@ -2,14 +2,15 @@
  * Test that variable-type fields are found correctly in timeseries collections.
  *
  * @tags: [
- *     does_not_support_transactions,
- *     does_not_support_stepdowns,
- *     requires_pipeline_optimization,
- *     requires_timeseries,
- *     # Required because of deficiencies in the burnin multiversion system.
- *     requires_fcv_51,
- *     # Explain of a resolved view must be executed by mongos.
- *     directly_against_shardsvrs_incompatible,
+ *   # Explain of a resolved view must be executed by mongos.
+ *   directly_against_shardsvrs_incompatible,
+ *   # This test depends on certain writes ending up in the same bucket. Stepdowns may result in
+ *   # writes splitting between two primaries, and thus different buckets.
+ *   does_not_support_stepdowns,
+ *   # Requires pipeline optimization to run in order to produce expected explain output
+ *   requires_pipeline_optimization,
+ *   # We need a timeseries collection.
+ *   requires_timeseries,
  * ]
  */
 

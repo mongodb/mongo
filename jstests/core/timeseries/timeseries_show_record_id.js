@@ -2,8 +2,8 @@
  * Verifies that showRecordId() returns the ObjectId type for time-series collections.
  *
  * @tags: [
- *   does_not_support_stepdowns,
- *   does_not_support_transactions,
+ *   # We need a timeseries collection.
+ *   requires_timeseries,
  * ]
  */
 (function() {

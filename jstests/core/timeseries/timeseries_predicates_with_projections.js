@@ -3,8 +3,9 @@
  * collections.
  *
  * @tags: [
- *   does_not_support_stepdowns,
- *   does_not_support_transactions,
+ *   # deleteMany({}) is not retryable
+ *   requires_non_retryable_writes,
+ *   # We need a timeseries collection.
  *   requires_timeseries,
  * ]
  */

@@ -2,16 +2,21 @@
  * Tests running the update command on a time-series collection with concurrent modifications to the
  * collection.
  * @tags: [
- *   assumes_unsharded_collection, # TODO SERVER-60233: Remove this tag.
- *   does_not_support_stepdowns,
- *   does_not_support_transactions,
- *   requires_multi_updates,
+ *   # Fail points in this test do not exist on mongos.
+ *   assumes_against_mongod_not_mongos,
  *   # $currentOp can't run with a readConcern other than 'local'.
  *   assumes_read_concern_unchanged,
  *   # This test only synchronizes updates on the primary.
  *   assumes_read_preference_unchanged,
- *   # Fail points in this test do not exist on mongos.
- *   assumes_against_mongod_not_mongos,
+ *   assumes_unsharded_collection, # TODO SERVER-60233: Remove this tag.
+ *   # This test depends on certain writes ending up in the same bucket. Stepdowns may result in
+ *   # writes splitting between two primaries, and thus different buckets.
+ *   does_not_support_stepdowns,
+ *   # Specifically testing multi-updates.
+ *   requires_multi_updates,
+ *   # We need a timeseries collection.
+ *   requires_timeseries,
+ *   # Test uses parallel shell to wait on fail point.
  *   uses_parallel_shell,
  * ]
  */

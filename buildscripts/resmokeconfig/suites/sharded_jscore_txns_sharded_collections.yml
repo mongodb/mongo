@@ -42,6 +42,8 @@ selector:
   - requires_capped
   # Prepare is not a command on mongos.
   - uses_prepare_transaction
+  - requires_timeseries # Implicit collection creation not supported
+
 executor:
   archive:
     hooks:

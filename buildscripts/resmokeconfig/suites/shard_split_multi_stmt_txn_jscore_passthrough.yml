@@ -248,6 +248,7 @@ selector:
   # Multi-updates that conflict with shard split are not retried by inject_tenant_prefix.js.
   - requires_multi_updates
   - shard_split_incompatible
+  - requires_timeseries # Tenant migration, transactions not supported
 
 executor:
   archive:

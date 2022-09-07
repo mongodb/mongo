@@ -2,15 +2,23 @@
  * Tests the creation of partial, TTL indexes on a time-series collection.
  *
  * @tags: [
+ *   # This test depends on certain writes ending up in the same bucket. Stepdowns may result in
+ *   # writes splitting between two primaries, and thus different buckets.
  *   does_not_support_stepdowns,
- *   does_not_support_transactions,
- *   featureFlagTimeseriesScalabilityImprovements,
+ *   # We need a timeseries collection.
+ *   requires_timeseries,
  * ]
  */
 (function() {
 "use strict";
 
 load("jstests/core/timeseries/libs/timeseries.js");
+
+if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db.getMongo())) {
+    jsTestLog(
+        "Skipped test as the featureFlagTimeseriesScalabilityImprovements feature flag is not enabled.");
+    return;
+}
 
 const collName = "timeseries_index_ttl_partial";
 const indexName = "partialTTLIndex";

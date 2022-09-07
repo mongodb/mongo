@@ -3,11 +3,15 @@
  * control.min and control.max fields.
  *
  * @tags: [
+ *   # This test depends on certain writes ending up in the same bucket. Stepdowns may result in
+ *   # writes splitting between two primaries, and thus different buckets.
  *   does_not_support_stepdowns,
- *   does_not_support_transactions,
- *   tenant_migration_incompatible,
+ *   # Test examines collection stats.
  *   requires_collstats,
+ *   # Large measurement handling changed in binVersion 6.1.
  *   requires_fcv_61,
+ *   # We need a timeseries collection.
+ *   requires_timeseries,
  * ]
  */
 (function() {

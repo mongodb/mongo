@@ -2,11 +2,15 @@
  * Tests index usage on meta and time fields for timeseries collections.
  *
  * @tags: [
- *   does_not_support_stepdowns,
- *   does_not_support_transactions,
- *   requires_pipeline_optimization,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
+ *   # Refusing to run a test that issues an aggregation command with explain because it may return
+ *   # incomplete results if interrupted by a stepdown.
+ *   does_not_support_stepdowns,
+ *   # Tests that optimization produces expected query plans.
+ *   requires_pipeline_optimization,
+ *   # We need a timeseries collection.
+ *   requires_timeseries,
  * ]
  */
 (function() {

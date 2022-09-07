@@ -2,7 +2,8 @@
  * Tests the result of running listCollections when there are time-series collections present.
  *
  * @tags: [
- *   does_not_support_transactions,
+ *   # We need a timeseries collection.
+ *   requires_timeseries,
  * ]
  */
 (function() {

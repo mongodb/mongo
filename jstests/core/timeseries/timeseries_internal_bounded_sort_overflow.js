@@ -2,14 +2,13 @@
  * Reproducer for an integer overflow bug in $_internalBoundedSort.
  *
  * @tags: [
- *   requires_fcv_60,
- *   # Cannot insert into a time-series collection in a multi-document transaction.
- *   does_not_support_transactions,
+ *   # Explain of a resolved view must be executed by mongos.
+ *   directly_against_shardsvrs_incompatible,
  *   # Refusing to run a test that issues an aggregation command with explain because it may return
  *   # incomplete results if interrupted by a stepdown.
  *   does_not_support_stepdowns,
- *   # Explain of a resolved view must be executed by mongos.
- *   directly_against_shardsvrs_incompatible,
+ *   # We need a timeseries collection.
+ *   requires_timeseries,
  * ]
  */
 (function() {

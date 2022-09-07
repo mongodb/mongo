@@ -2,9 +2,8 @@
  * Test the behavior of $project on time-series collections.
  *
  * @tags: [
- *   does_not_support_stepdowns,
- *   does_not_support_transactions,
- *   requires_fcv_53,
+ *   # We need a timeseries collection.
+ *   requires_timeseries,
  * ]
  */
 (function() {

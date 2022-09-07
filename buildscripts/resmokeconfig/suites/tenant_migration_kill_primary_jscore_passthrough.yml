@@ -142,6 +142,7 @@ selector:
   # Full validation can cause ongoing queries to fail. This can affect the tenant migration
   # process.
   - uses_full_validation
+  - requires_timeseries # Tenant migration not supported
 
 executor:
   archive:

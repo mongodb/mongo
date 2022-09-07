@@ -2,10 +2,12 @@
  * This tests that partialFilterExpressions can include the $internalBucketGeoWithin operator when
  * indexing buckets of timeseries operators.
  * @tags: [
- * requires_non_retryable_writes,
- * requires_fcv_51,
- * assumes_no_implicit_collection_creation_after_drop,
- *  does_not_support_transactions
+ *   # Refusing to run a test that issues an aggregation command with explain because it may
+ *   # return incomplete results if interrupted by a stepdown.
+ *   does_not_support_stepdowns,
+ *   requires_non_retryable_writes,
+ *   # We need a timeseries collection.
+ *   requires_timeseries,
  * ]
  */
 

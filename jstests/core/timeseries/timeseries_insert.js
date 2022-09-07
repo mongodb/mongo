@@ -1,7 +1,8 @@
 /**
  * Inserts time-series data based on the TSBS document-per-event format.
- * * @tags: [
- *   does_not_support_transactions,
+ * @tags: [
+ *   # We need a timeseries collection.
+ *   requires_timeseries,
  * ]
  */
 (function() {

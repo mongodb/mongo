@@ -251,6 +251,7 @@ selector:
   - uses_full_validation
   # Multi-updates that conflict with tenant migration are not retried by inject_tenant_prefix.js.
   - requires_multi_updates
+  - requires_timeseries # Tenant migration, transactions not supported
 
 executor:
   archive:

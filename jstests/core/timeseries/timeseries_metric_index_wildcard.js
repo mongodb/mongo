@@ -2,9 +2,8 @@
  * Tests that wildcard indexes are prohibited on measurement fields.
  *
  * @tags: [
- *     does_not_support_stepdowns,
- *     does_not_support_transactions,
- *     requires_find_command,
+ *   # We need a timeseries collection.
+ *   requires_timeseries,
  * ]
  */
 (function() {

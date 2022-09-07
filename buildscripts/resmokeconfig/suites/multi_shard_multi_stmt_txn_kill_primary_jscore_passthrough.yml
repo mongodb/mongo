@@ -342,6 +342,7 @@ selector:
   # that use API parameters cannot be run with transactions.
   - uses_api_parameters
   - does_not_support_causal_consistency
+  - requires_timeseries # Implicit collection creation, transactions not supported
 
 executor:
   archive:

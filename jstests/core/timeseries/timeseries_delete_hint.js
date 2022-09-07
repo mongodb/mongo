@@ -1,18 +1,20 @@
 /**
  * Tests running the delete command with a hint on a time-series collection.
  * @tags: [
- *   assumes_no_implicit_collection_creation_after_drop,
- *   does_not_support_stepdowns,
- *   does_not_support_transactions,
+
  *   # $currentOp can't run with a readConcern other than 'local'.
  *   assumes_read_concern_unchanged,
  *   # This test only synchronizes deletes on the primary.
  *   assumes_read_preference_unchanged,
  *   # Fail points in this test do not exist on mongos.
  *   assumes_against_mongod_not_mongos,
+ *   # This test depends on certain writes ending up in the same bucket. Stepdowns may result in
+ *   # writes splitting between two primaries, and thus different buckets.
+ *   does_not_support_stepdowns,
+ *   # We need a timeseries collection.
+ *   requires_timeseries,
+ *   # Uses parallel shell to wait on fail point
  *   uses_parallel_shell,
- *   # This test is multiversion incompatible with binaries < 6.0.
- *   requires_fcv_60
  * ]
  */
 (function() {

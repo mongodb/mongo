@@ -2,8 +2,8 @@
  * Tests that collMod can change the expireAfterSeconds option on a time-series collection.
  *
  * @tags: [
- *   does_not_support_stepdowns,
- *   does_not_support_transactions,
+ *   # We need a timeseries collection.
+ *   requires_timeseries,
  * ]
  */
 (function() {

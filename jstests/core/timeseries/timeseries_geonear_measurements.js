@@ -10,13 +10,15 @@
  * collection (both with, and without, a 2dsphere index).
  *
  * @tags: [
- *     does_not_support_transactions,
- *     does_not_support_stepdowns,
- *     requires_fcv_51,
- *     requires_pipeline_optimization,
- *     requires_timeseries,
- *     # Explain of a resolved view must be executed by mongos.
- *     directly_against_shardsvrs_incompatible,
+ *   # Explain of a resolved view must be executed by mongos.
+ *   directly_against_shardsvrs_incompatible,
+ *   # Refusing to run a test that issues an aggregation command with explain because it may return
+ *   # incomplete results if interrupted by a stepdown.
+ *   does_not_support_stepdowns,
+ *   # Time series geo functionality requires pipeline optimization
+ *   requires_pipeline_optimization,
+ *   # We need a timeseries collection.
+ *   requires_timeseries,
  * ]
  */
 

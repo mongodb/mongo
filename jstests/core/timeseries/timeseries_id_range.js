@@ -6,11 +6,13 @@
  *   # The test assumes no index exists on the time field. shardCollection implicitly creates an
  *   # index.
  *   assumes_unsharded_collection,
- *   does_not_support_stepdowns,
- *   does_not_support_transactions,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
- *   tenant_migration_incompatible,
+ *   # This test depends on certain writes ending up in the same bucket. Stepdowns may result in
+ *   # writes splitting between two primaries, and thus different buckets.
+ *   does_not_support_stepdowns,
+ *   # We need a timeseries collection.
+ *   requires_timeseries,
  * ]
  */
 (function() {

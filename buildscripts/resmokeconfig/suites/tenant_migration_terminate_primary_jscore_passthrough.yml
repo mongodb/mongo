@@ -134,6 +134,7 @@ selector:
   # process.
   - uses_full_validation
   - uses_transactions
+  - requires_timeseries # Tenant migration not supported
 
 executor:
   archive:

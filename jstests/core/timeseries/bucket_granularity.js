@@ -2,15 +2,11 @@
  * Tests correctness of time-series bucket granularity configuration.
  *
  * @tags: [
- *   assumes_no_implicit_collection_creation_after_drop,
- *   assumes_unsharded_collection,
  *   # This test depends on certain writes ending up in the same bucket. Stepdowns may result in
  *   # writes splitting between two primaries, and thus different buckets.
  *   does_not_support_stepdowns,
- *   does_not_support_transactions,
+ *   # We need a timeseries collection.
  *   requires_timeseries,
- *   # Same goes for tenant migrations.
- *   tenant_migration_incompatible,
  * ]
  */
 

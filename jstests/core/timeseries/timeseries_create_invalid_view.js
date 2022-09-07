@@ -2,8 +2,10 @@
  * Verify we cannot create a view on a system.buckets collection.
  *
  * @tags: [
- *   does_not_support_transactions,
+ *   # This restriction was added in 6.1.
  *   requires_fcv_61,
+ *   # We need a timeseries collection.
+ *   requires_timeseries,
  * ]
  */
 (function() {

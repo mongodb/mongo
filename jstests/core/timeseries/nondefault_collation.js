@@ -6,10 +6,11 @@
  *   requires_non_retryable_writes,
  *   requires_pipeline_optimization,
  *   does_not_support_stepdowns,
- *   does_not_support_transactions,
  *   multiversion_incompatible,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
+ *   # We need a timeseries collection.
+ *   requires_timeseries,
  * ]
  */
 (function() {

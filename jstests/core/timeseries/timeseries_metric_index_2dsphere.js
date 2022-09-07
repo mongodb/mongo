@@ -4,10 +4,15 @@
  * Tests index creation, document insertion, index utilization for queries, and index drop.
  *
  * @tags: [
- *   does_not_support_stepdowns,
- *   does_not_support_transactions,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
+ *   # Time series geo functionality requires optimization.
+ *   requires_pipeline_optimization,
+ *   # Refusing to run a test that issues an aggregation command with explain because it may return
+ *   # incomplete results if interrupted by a stepdown.
+ *   does_not_support_stepdowns,
+ *   # We need a timeseries collection.
+ *   requires_timeseries,
  * ]
  */
 

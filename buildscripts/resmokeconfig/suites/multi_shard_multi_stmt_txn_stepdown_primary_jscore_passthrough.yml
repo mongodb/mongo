@@ -340,6 +340,8 @@ selector:
   # Transaction-continuing commands must use the same API parameters as the first command, so tests
   # that use API parameters cannot be run with transactions.
   - uses_api_parameters
+  - requires_timeseries # Implicit collection creation, transactions not supported
+
 executor:
   archive:
     hooks:

@@ -2,11 +2,10 @@
  * Test the behavior of $geoNear minDistance/maxDistance on time-series measurements.
  *
  * @tags: [
- *     does_not_support_transactions,
- *     does_not_support_stepdowns,
- *     requires_fcv_51,
- *     requires_pipeline_optimization,
- *     requires_timeseries,
+ *   # Time series geo functionality requires pipeline optimization
+ *   requires_pipeline_optimization,
+ *   # We need a timeseries collection.
+ *   requires_timeseries,
  * ]
  */
 

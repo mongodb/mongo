@@ -5,9 +5,10 @@
  * @tags: [
  *   # Queries on mongoS may not request or provide a resume token.
  *   assumes_against_mongod_not_mongos,
+ *   # Resuming may not work properly with stepdowns.
  *   does_not_support_stepdowns,
- *   does_not_support_transactions,
- *   tenant_migration_incompatible,
+ *   # We need a timeseries collection.
+ *   requires_timeseries,
  * ]
  */
 (function() {

@@ -39,6 +39,7 @@ selector:
   # process.
   - uses_full_validation
   - tenant_migration_incompatible
+  - requires_timeseries # Tenant migration not supported
 
 executor:
   archive:

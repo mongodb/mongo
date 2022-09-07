@@ -42,6 +42,7 @@ selector:
   - uses_full_validation
   - tenant_migration_incompatible
   - shard_split_incompatible
+  - requires_timeseries # Tenant migration not supported
 
 executor:
   archive:

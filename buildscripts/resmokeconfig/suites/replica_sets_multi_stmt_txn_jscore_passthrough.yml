@@ -234,6 +234,7 @@ selector:
   # "Cowardly refusing to run test with transaction override enabled when it uses
   # startParallelShell()"
   - uses_parallel_shell
+  - requires_timeseries # Transactions not supported
 
 executor:
   archive:

@@ -2,16 +2,15 @@
  * Tests the optimization of "lastpoint"-type queries on time-series collections.
  *
  * @tags: [
- *   # This test depends on certain writes ending up in the same bucket. Stepdowns may result in
- *   # writes splitting between two primaries, and thus different buckets.
- *   does_not_support_stepdowns,
- *   # Same goes for tenant migrations.
- *   tenant_migration_incompatible,
- *   does_not_support_transactions,
- *   requires_timeseries,
- *   requires_pipeline_optimization,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
+ *   # Testing last point optimization.
+ *   requires_pipeline_optimization,
+ *   # Refusing to run a test that issues an aggregation command with explain because it may return
+ *   # incomplete results if interrupted by a stepdown.
+ *   does_not_support_stepdowns,
+ *   # We need a timeseries collection.
+ *   requires_timeseries,
  * ]
  */
 (function() {

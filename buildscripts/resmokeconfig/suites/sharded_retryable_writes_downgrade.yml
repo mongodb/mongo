@@ -141,6 +141,7 @@ selector:
   # Used for tests which can run in multiversion configurations but cannot run while a replica set
   # or shard is being actively upgraded or downgraded.
   - cannot_run_during_upgrade_downgrade
+  - requires_timeseries # Implicit collection creation, transactions not supported
 
 executor:
   archive:
