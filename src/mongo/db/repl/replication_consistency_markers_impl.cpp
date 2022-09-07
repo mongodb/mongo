@@ -225,7 +225,6 @@ void ReplicationConsistencyMarkersImpl::setMinValid(OperationContext* opCtx,
 
     // This method is only used with storage engines that do not support recover to stable
     // timestamp. As a result, their timestamps do not matter.
-    invariant(!opCtx->getServiceContext()->getStorageEngine()->supportsRecoverToStableTimestamp());
     update.timestamp = Timestamp();
 
     _updateMinValidDocument(opCtx, update);
