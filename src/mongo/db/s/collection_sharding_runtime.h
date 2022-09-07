@@ -113,10 +113,10 @@ public:
      * Marks the collection's filtering metadata as UNKNOWN, meaning that all attempts to check for
      * shard version match will fail with StaleConfig errors in order to trigger an update.
      *
+     * Interrupts any ongoing shard metadata refresh.
+     *
      * It is safe to call this method with only an intent lock on the collection (as opposed to
-     * setFilteringMetadata which requires exclusive), however note that clearing a collection's
-     * filtering metadata will interrupt all in-progress orphan cleanups in which case orphaned data
-     * will remain behind on disk.
+     * setFilteringMetadata which requires exclusive).
      */
     void clearFilteringMetadata(OperationContext* opCtx);
 
@@ -125,6 +125,8 @@ public:
      * with both the collection lock and CSRLock held in exclusive mode.
      *
      * In these methods, the CSRLock ensures concurrent access to the critical section.
+     *
+     * Entering into the Critical Section interrupts any ongoing filtering metadata refresh.
      */
     void enterCriticalSectionCatchUpPhase(const CSRLock&, const BSONObj& reason);
     void enterCriticalSectionCommitPhase(const CSRLock&, const BSONObj& reason);
