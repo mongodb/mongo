@@ -634,7 +634,11 @@ var ReshardingTest = class {
 
     /** @private */
     _checkConsistency() {
-        const nsCursor = this._st.s.getCollection(this._ns).find().sort({_id: 1});
+        // The "available" read concern level won't block this find cmd behind the critical section.
+        // Tests for resharding are not expected to have unowned documents in the collection being
+        // resharded.
+        const nsCursor =
+            this._st.s.getCollection(this._ns).find().readConcern("available").sort({_id: 1});
         const tempNsCursor = this._st.s.getCollection(this._tempNs).find().sort({_id: 1});
 
         const diff = ((diff) => {

@@ -56,6 +56,8 @@ public:
      * specified namespace and reason. It works even if the namespace's current metadata are
      * UNKNOWN.
      *
+     * Entering into the Critical Section interrupts any ongoing filtering metadata refresh.
+     *
      * It adds a doc to config.collectionCriticalSections with with writeConcern write concern.
      *
      * Do nothing if the collection critical section is taken for that nss and reason, and will
@@ -86,7 +88,9 @@ public:
     /**
      * Releases the recoverable critical section for the given nss and reason.
      *
-     * It removes a doc from config.collectionCriticalSections with writeConcern write concern.
+     * It removes a doc from config.collectionCriticalSections with writeConcern write concern. As
+     * part of the removal, the filtering information is cleared on secondary nodes. It is
+     * responsability of the caller to properly set the filtering information on the primary node.
      *
      * Do nothing if the collection critical section is not taken for that nss and reason.
      */
