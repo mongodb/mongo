@@ -1,12 +1,20 @@
 /**
  * Tests support for the configureQueryAnalyzer command.
  *
- * @tags: [requires_fcv_61, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_62, featureFlagAnalyzeShardKey]
  */
 (function() {
 "use strict";
 
-function runTestExistingNs(conn, ns) {
+function testNonExistingCollection(conn, ns) {
+    jsTest.log(`Running configureQueryAnalyzer command against an non-existing collection ${
+        ns} on ${conn}`);
+    assert.commandFailedWithCode(
+        conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: 1}),
+        ErrorCodes.NamespaceNotFound);
+}
+
+function testExistingCollection(conn, ns) {
     jsTest.log(
         `Running configureQueryAnalyzer command against an existing collection ${ns} on ${conn}`);
 
@@ -46,14 +54,6 @@ function runTestExistingNs(conn, ns) {
                                  ErrorCodes.InvalidOptions);
 }
 
-function runTestNonExistingNs(conn, ns) {
-    jsTest.log(`Running configureQueryAnalyzer command against an non-existing collection ${
-        ns} on ${conn}`);
-    assert.commandFailedWithCode(
-        conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: 1}),
-        ErrorCodes.NamespaceNotFound);
-}
-
 {
     const st = new ShardingTest({shards: 1, rs: {nodes: 2}});
     const shard0Primary = st.rs0.getPrimary();
@@ -75,18 +75,18 @@ function runTestNonExistingNs(conn, ns) {
     assert.commandWorked(st.s.getDB(dbName).createCollection(unshardedCollName));
 
     // Verify that the command is supported on mongos and configsvr primary mongod.
-    function runTestSupported(conn) {
-        runTestExistingNs(conn, unshardedNs);
-        runTestExistingNs(conn, shardedNs);
-        runTestNonExistingNs(conn, nonExistingNs);
+    function testSupported(conn) {
+        testNonExistingCollection(conn, nonExistingNs);
+        testExistingCollection(conn, unshardedNs);
+        testExistingCollection(conn, shardedNs);
     }
 
-    runTestSupported(st.s);
-    runTestSupported(configPrimary);
+    testSupported(st.s);
+    testSupported(configPrimary);
 
     // Verify that the command is not supported on configsvr secondary mongods or any shardvr
     // mongods.
-    function runTestNotSupported(conn, errorCode) {
+    function testNotSupported(conn, errorCode) {
         assert.commandFailedWithCode(
             conn.adminCommand({configureQueryAnalyzer: unshardedNs, mode: "full", sampleRate: 1}),
             errorCode);
@@ -96,11 +96,11 @@ function runTestNonExistingNs(conn, ns) {
     }
 
     configSecondaries.forEach(node => {
-        runTestNotSupported(node, ErrorCodes.NotWritablePrimary);
+        testNotSupported(node, ErrorCodes.NotWritablePrimary);
     });
-    runTestNotSupported(shard0Primary, ErrorCodes.IllegalOperation);
+    testNotSupported(shard0Primary, ErrorCodes.IllegalOperation);
     shard0Secondaries.forEach(node => {
-        runTestNotSupported(node, ErrorCodes.NotWritablePrimary);
+        testNotSupported(node, ErrorCodes.NotWritablePrimary);
     });
 
     st.stop();
@@ -121,22 +121,22 @@ function runTestNonExistingNs(conn, ns) {
     assert.commandWorked(primary.getDB(dbName).createCollection(unshardedCollName));
 
     // Verify that the command is supported on primary mongod.
-    function runTestSupported(conn) {
-        runTestExistingNs(conn, unshardedNs);
-        runTestNonExistingNs(conn, nonExistingNs);
+    function testSupported(conn) {
+        testNonExistingCollection(conn, nonExistingNs);
+        testExistingCollection(conn, unshardedNs);
     }
 
-    runTestSupported(primary, unshardedNs);
+    testSupported(primary, unshardedNs);
 
     // Verify that the command is not supported on secondary mongods.
-    function runTestNotSupported(conn, errorCode) {
+    function testNotSupported(conn, errorCode) {
         assert.commandFailedWithCode(
             conn.adminCommand({configureQueryAnalyzer: unshardedNs, mode: "full", sampleRate: 1}),
             errorCode);
     }
 
     secondaries.forEach(node => {
-        runTestNotSupported(node, ErrorCodes.NotWritablePrimary);
+        testNotSupported(node, ErrorCodes.NotWritablePrimary);
     });
 
     rst.stopSet();

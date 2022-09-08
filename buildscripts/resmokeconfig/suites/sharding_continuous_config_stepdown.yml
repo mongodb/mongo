@@ -85,8 +85,8 @@ selector:
   - jstests/sharding/sharding_rs1.js
   - jstests/sharding/move_primary_fails_without_database_version.js
   # Calls the config server primary directly (not through mongos)
+  - jstests/sharding/analyze_shard_key/configure_query_analyzer_basic.js
   - jstests/sharding/configsvr_metadata_commands_require_majority_write_concern.js
-  - jstests/sharding/configure_query_analyzer_basic.js
   - jstests/sharding/min_optime_recovery_on_successful_move_chunk_commit.js
   - jstests/sharding/read_after_optime.js
   - jstests/sharding/server_status.js
