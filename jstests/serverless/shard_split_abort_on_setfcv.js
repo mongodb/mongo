@@ -34,7 +34,7 @@ pauseAfterBlockingFp.off();
 assert.commandFailedWithCode(commitThread.returnData(), ErrorCodes.TenantMigrationAborted);
 
 jsTestLog("Test FCV Upgrade");
-if (lastContinuousFCV == "6.0") {
+if (lastContinuousFCV == "6.1") {
     const secondSplit = test.createSplitOperation(tenantIds);
     assert.commandFailedWithCode(secondSplit.commit(), ErrorCodes.IllegalOperation);
 } else {

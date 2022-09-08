@@ -13,7 +13,7 @@ load("jstests/serverless/libs/basic_serverless_test.js");
 // downgrade versions. Eventually, we will run this test when we have two consecutive versions
 // that support `commitShardSplit` without a feature flag. This check will be removed as part
 // of SERVER-66965.
-if (MongoRunner.compareBinVersions(latestFCV, "6.2") < 0) {
+if (MongoRunner.compareBinVersions(latestFCV, "6.3") < 0) {
     return;
 }
 
