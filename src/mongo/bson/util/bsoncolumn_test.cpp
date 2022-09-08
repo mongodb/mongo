@@ -494,6 +494,21 @@ public:
         }
     }
 
+    /**
+     * Constructs a BSON Column encoding with a non-zero delta after the specified element, and
+     * expects error 6785500 to be thrown.
+     */
+    void testInvalidDelta(BSONElement elem) {
+        BufBuilder expected;
+        appendLiteral(expected, elem);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlock64(expected, Simple8bTypeUtil::encodeInt64(1));
+        appendEOO(expected);
+
+        BSONColumn col(createBSONColumn(expected.buf(), expected.len()));
+        ASSERT_THROWS_CODE(std::distance(col.begin(), col.end()), DBException, 6785500);
+    }
+
     const boost::optional<uint64_t> kDeltaForBinaryEqualValues = Simple8bTypeUtil::encodeInt64(0);
     const boost::optional<uint128_t> kDeltaForBinaryEqualValues128 =
         Simple8bTypeUtil::encodeInt128(0);
@@ -5233,6 +5248,47 @@ TEST_F(BSONColumnTest, InvalidInterleavedWhenAlreadyInterleaved) {
 
     BSONColumn col(createBSONColumn(expected.buf(), expected.len()));
     ASSERT_THROWS(std::distance(col.begin(), col.end()), DBException);
+}
+
+TEST_F(BSONColumnTest, InvalidDeltaAfterInterleaved) {
+    // This test uses a non-zero delta value after an interleaved object, which is invalid.
+    auto test = [&](bool arrayCompression, auto appendInterleavedStartFunc) {
+        BufBuilder expected;
+        appendInterleavedStartFunc(expected, BSON("a" << 1));
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+        appendEOO(expected);
+        appendSimple8bControl(expected, 0b1000, 0b0000);
+        appendSimple8bBlock64(expected, Simple8bTypeUtil::encodeInt64(1));
+        appendEOO(expected);
+
+        BSONColumn col(createBSONColumn(expected.buf(), expected.len()));
+        ASSERT_THROWS_CODE(std::distance(col.begin(), col.end()), DBException, 6785500);
+    };
+
+    test(false, appendInterleavedStartLegacy);
+    test(true, appendInterleavedStart);
+
+    BufBuilder expected;
+    appendInterleavedStartArrayRoot(expected, BSON_ARRAY(1));
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlocks64(expected, {kDeltaForBinaryEqualValues}, 1);
+    appendEOO(expected);
+    appendSimple8bControl(expected, 0b1000, 0b0000);
+    appendSimple8bBlock64(expected, Simple8bTypeUtil::encodeInt64(1));
+    appendEOO(expected);
+
+    BSONColumn col(createBSONColumn(expected.buf(), expected.len()));
+    ASSERT_THROWS_CODE(std::distance(col.begin(), col.end()), DBException, 6785500);
+}
+
+TEST_F(BSONColumnTest, InvalidDelta) {
+    testInvalidDelta(createRegex());
+    testInvalidDelta(createDBRef("ns", OID{"112233445566778899AABBCC"}));
+    testInvalidDelta(createCodeWScope("code", BSONObj{}));
+    testInvalidDelta(createSymbol("symbol"));
+    testInvalidDelta(BSON("obj" << BSON("a" << 1)).firstElement());
+    testInvalidDelta(BSON("arr" << BSON_ARRAY("a")).firstElement());
 }
 
 TEST_F(BSONColumnTest, AppendMinKey) {

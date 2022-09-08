@@ -724,6 +724,14 @@ BSONElement BSONColumn::Iterator::DecodingState::_loadDelta(BSONColumn& column,
         case bsonTimestamp: {
             DataView(elem.value()).write<LittleEndian<long long>>(valueToWrite);
         } break;
+        case RegEx:
+        case DBRef:
+        case CodeWScope:
+        case Symbol:
+        case Object:
+        case Array:
+        case EOO:  // EOO indicates the end of an interleaved object.
+            uasserted(6785500, "Invalid delta in BSON Column encoding");
         default:
             // No other types use int64 and need to allocate value storage
             MONGO_UNREACHABLE;
