@@ -3,6 +3,10 @@
  * events with the 'rawUpdateDescription' field instead of the 'updateDescription' field, and tests
  * that the 'showRawUpdateDescription' option has no effect on replacements or other types of
  * events.
+ *
+ * @tags: [
+ *   multiversion_incompatible,
+ * ]
  */
 (function() {
 "use strict";
