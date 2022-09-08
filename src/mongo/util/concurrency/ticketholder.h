@@ -333,6 +333,16 @@ private:
  * Releasers will wake up a waiter from a group chosen according to some logic.
  */
 class SchedulingTicketHolder : public TicketHolderWithQueueingStats {
+    // Using a shared_mutex is fine here because usual considerations for avoiding them do not apply
+    // in this case:
+    //   * Operations are short and do not block while holding the lock (i.e. they only do CPU-bound
+    //   work)
+    //   * Writer starvation is not possible as there are a finite number of operations to be
+    //   performed in the reader case. Once all tickets get released no other thread can take the
+    //   shared lock.
+    //
+    // The alternative of using ResourceMutex is not appropriate as the class serves as a
+    // concurrency primitive and is performance sensitive.
     using QueueMutex = std::shared_mutex;                    // NOLINT
     using ReleaserLockGuard = std::shared_lock<QueueMutex>;  // NOLINT
     using EnqueuerLockGuard = std::unique_lock<QueueMutex>;  // NOLINT
@@ -398,6 +408,8 @@ private:
      * Implementors MUST wake at least one waiting thread if at least one thread is pending to be
      * woken between all the queues. In other words, attemptToDequeue on each non-empty Queue must
      * be called until either it returns true at least once or has been called on all queues.
+     *
+     * Care must be taken to ensure that only CPU-bound work is performed here and it doesn't block.
      *
      * When called the following invariants will be held:
      * - The number of items in each queue will not change during the execution
