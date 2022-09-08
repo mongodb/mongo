@@ -74,24 +74,4 @@ Status TickerHolderStorageParams::updateConcurrentReadTransactions(const int& ne
     return Status::OK();
 }
 
-Status TickerHolderStorageParams::updateConcurrentTotalTransactions(
-    const int& newTotalTransactions) {
-    if (auto client = Client::getCurrent()) {
-        if (auto svcCtx = client->getServiceContext()) {
-            if (auto ticketHolder =
-                    dynamic_cast<TicketHolderWithQueueingStats*>(TicketHolder::get(svcCtx))) {
-                ticketHolder->resize(newTotalTransactions);
-            } else {
-                LOGV2_WARNING(
-                    6859001,
-                    "Attempting to update total tickets on an incompatible queueing policy");
-                return Status(
-                    ErrorCodes::IllegalOperation,
-                    "Attempting to update total tickets on an incompatible queueing policy");
-            }
-        }
-    }
-    return Status::OK();
-}
-
 }  // namespace mongo

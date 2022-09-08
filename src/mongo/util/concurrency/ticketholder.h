@@ -279,55 +279,6 @@ private:
 };
 
 /**
- * A ticketholder implementation that uses a queue for pending operations.
- * Any change to the implementation should be paired with a change to the _ticketholder.tla_ file in
- * order to formally verify that the changes won't lead to a deadlock.
- */
-class FifoTicketHolder final : public TicketHolderWithQueueingStats {
-public:
-    explicit FifoTicketHolder(int numTickets, ServiceContext* serviceContext);
-    ~FifoTicketHolder() override final;
-
-    int available() const override final;
-
-    int queued() const override final;
-
-private:
-    boost::optional<Ticket> _waitForTicketUntilImpl(OperationContext* opCtx,
-                                                    AdmissionContext* admCtx,
-                                                    Date_t until,
-                                                    WaitMode waitMode) override final;
-
-    boost::optional<Ticket> _tryAcquireImpl(AdmissionContext* admCtx) override final;
-
-    void _appendImplStats(BSONObjBuilder& b) const override final;
-
-    void _releaseQueue(AdmissionContext* admCtx) noexcept override final;
-
-    void _dequeueWaiter(WithLock queueLock);
-
-    void _resize(int newSize, int oldSize) noexcept override final;
-
-    // Implementation statistics.
-    AtomicWord<std::int64_t> _totalTimeQueuedMicros{0};
-
-    enum class WaitingState { Waiting, Cancelled, Assigned };
-    struct WaitingElement {
-        stdx::condition_variable signaler;
-        Mutex modificationMutex = MONGO_MAKE_LATCH(
-            HierarchicalAcquisitionLevel(0), "FifoTicketHolder::WaitingElement::modificationMutex");
-        WaitingState state;
-    };
-    std::queue<std::shared_ptr<WaitingElement>> _queue;
-    // _queueMutex protects all modifications made to either the _queue, or the statistics of the
-    // queue.
-    Mutex _queueMutex =
-        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(1), "FifoTicketHolder::_queueMutex");
-    AtomicWord<int> _enqueuedElements;
-    AtomicWord<int> _ticketsAvailable;
-};
-
-/**
  * A ticketholder implementation that centralises all ticket acquisition/releases.
  * Waiters will get placed in a specific internal queue according to some logic.
  * Releasers will wake up a waiter from a group chosen according to some logic.
@@ -428,24 +379,6 @@ private:
     ServiceContext* _serviceContext;
 };
 
-class StochasticTicketHolder final : public SchedulingTicketHolder {
-public:
-    explicit StochasticTicketHolder(int numTickets,
-                                    int readerWeight,
-                                    int writerWeight,
-                                    ServiceContext* serviceContext);
-
-private:
-    enum class QueueType : unsigned int { ReaderQueue = 0, WriterQueue = 1 };
-
-    void _dequeueWaitingThread() override final;
-
-    Queue& _getQueueToUse(OperationContext* opCtx, const AdmissionContext* admCtx) override final;
-
-    std::uint32_t _readerWeight;
-    std::uint32_t _totalWeight;
-};
-
 class PriorityTicketHolder final : public SchedulingTicketHolder {
 public:
     explicit PriorityTicketHolder(int numTickets, ServiceContext* serviceContext);
@@ -471,7 +404,6 @@ class Ticket {
     friend class ReaderWriterTicketHolder;
     friend class TicketHolderWithQueueingStats;
     friend class SemaphoreTicketHolder;
-    friend class FifoTicketHolder;
     friend class SchedulingTicketHolder;
 
 public:

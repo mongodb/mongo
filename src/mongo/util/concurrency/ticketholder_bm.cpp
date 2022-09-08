@@ -55,11 +55,7 @@ public:
 
 
     TicketHolderFixture(int threads, ServiceContext* serviceContext) {
-        if constexpr (std::is_same_v<TicketHolderImpl, StochasticTicketHolder>) {
-            ticketHolder = std::make_unique<StochasticTicketHolder>(kTickets, 1, 1, serviceContext);
-        } else {
-            ticketHolder = std::make_unique<TicketHolderImpl>(kTickets, serviceContext);
-        }
+        ticketHolder = std::make_unique<TicketHolderImpl>(kTickets, serviceContext);
         for (int i = 0; i < threads; ++i) {
             clients.push_back(
                 serviceContext->makeClient(str::stream() << "test client for thread " << i));
@@ -96,11 +92,7 @@ void BM_acquireAndRelease(benchmark::State& state) {
     double acquired = 0;
     auto mode = (state.thread_index % 2) == 0 ? MODE_IS : MODE_IX;
     TicketHolderFixture<TicketHolderImpl>* fixture;
-    if constexpr (std::is_base_of_v<SchedulingTicketHolder, TicketHolderImpl>) {
-        fixture = readTicketHolder.get();
-    } else {
-        fixture = (mode == MODE_IS ? readTicketHolder : writeTicketHolder).get();
-    }
+    fixture = (mode == MODE_IS ? readTicketHolder : writeTicketHolder).get();
     for (auto _ : state) {
         AdmissionContext admCtx;
         admCtx.setLockMode(mode);
@@ -129,12 +121,7 @@ BENCHMARK_TEMPLATE(BM_acquireAndRelease, SemaphoreTicketHolder)
     ->Threads(kTickets)
     ->Threads(kThreadMax);
 
-BENCHMARK_TEMPLATE(BM_acquireAndRelease, FifoTicketHolder)
-    ->Threads(kThreadMin)
-    ->Threads(kTickets)
-    ->Threads(kThreadMax);
-
-BENCHMARK_TEMPLATE(BM_acquireAndRelease, StochasticTicketHolder)
+BENCHMARK_TEMPLATE(BM_acquireAndRelease, PriorityTicketHolder)
     ->Threads(kThreadMin)
     ->Threads(kTickets)
     ->Threads(kThreadMax);

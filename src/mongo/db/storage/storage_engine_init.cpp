@@ -44,7 +44,6 @@
 #include "mongo/db/storage/storage_engine_change_context.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/db/storage/storage_engine_metadata.h"
-#include "mongo/db/storage/storage_engine_parameters.h"
 #include "mongo/db/storage/storage_engine_parameters_gen.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -166,36 +165,6 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
                 std::make_unique<PriorityTicketHolder>(readTransactions, svcCtx),
                 std::make_unique<PriorityTicketHolder>(writeTransactions, svcCtx));
             TicketHolder::use(svcCtx, std::move(ticketHolder));
-        } else if (feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCV()) {
-            LOGV2_DEBUG(5190400, 1, "Enabling new ticketing policies");
-            switch (gTicketQueueingPolicy) {
-                case QueueingPolicyEnum::Semaphore: {
-                    LOGV2_DEBUG(6382201, 1, "Using Semaphore-based ticketing scheduler");
-                    auto ticketHolder = std::make_unique<ReaderWriterTicketHolder>(
-                        std::make_unique<SemaphoreTicketHolder>(readTransactions, svcCtx),
-                        std::make_unique<SemaphoreTicketHolder>(writeTransactions, svcCtx));
-                    TicketHolder::use(svcCtx, std::move(ticketHolder));
-                    break;
-                }
-                case QueueingPolicyEnum::FifoQueue: {
-                    LOGV2_DEBUG(6382200, 1, "Using FIFO queue-based ticketing scheduler");
-                    auto ticketHolder = std::make_unique<ReaderWriterTicketHolder>(
-                        std::make_unique<FifoTicketHolder>(readTransactions, svcCtx),
-                        std::make_unique<FifoTicketHolder>(writeTransactions, svcCtx));
-                    TicketHolder::use(svcCtx, std::move(ticketHolder));
-                    break;
-                }
-                case QueueingPolicyEnum::SchedulingQueue: {
-                    LOGV2_DEBUG(6615200, 1, "Using Scheduling Queue-based ticketing scheduler");
-                    auto ticketHolder = std::make_unique<StochasticTicketHolder>(
-                        readTransactions + writeTransactions,
-                        readTransactions,
-                        writeTransactions,
-                        svcCtx);
-                    TicketHolder::use(svcCtx, std::move(ticketHolder));
-                    break;
-                }
-            }
         } else {
             auto ticketHolder = std::make_unique<ReaderWriterTicketHolder>(
                 std::make_unique<SemaphoreTicketHolder>(readTransactions, svcCtx),

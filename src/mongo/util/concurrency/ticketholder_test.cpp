@@ -136,9 +136,6 @@ void basicTimeout(OperationContext* opCtx) {
     ASSERT_FALSE(holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now() + Milliseconds(1), mode));
 }
 
-TEST_F(TicketHolderTest, BasicTimeoutFifo) {
-    basicTimeout<FifoTicketHolder>(_opCtx.get());
-}
 TEST_F(TicketHolderTest, BasicTimeoutSemaphore) {
     basicTimeout<SemaphoreTicketHolder>(_opCtx.get());
 }
@@ -224,138 +221,11 @@ void resizeTest(OperationContext* opCtx) {
     ASSERT_EQ(currentStats.woCompare(newStats), 0);
 }
 
-TEST_F(TicketHolderTest, ResizeStatsFifo) {
-    resizeTest<FifoTicketHolder>(_opCtx.get());
-}
 TEST_F(TicketHolderTest, ResizeStatsSemaphore) {
     resizeTest<SemaphoreTicketHolder>(_opCtx.get());
 }
 TEST_F(TicketHolderTest, ResizeStatsPriority) {
     resizeTest<PriorityTicketHolder>(_opCtx.get());
-}
-
-TEST_F(TicketHolderTest, FifoBasicMetrics) {
-    ServiceContext serviceContext;
-    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
-    auto tickSource = dynamic_cast<TickSourceMock<Microseconds>*>(serviceContext.getTickSource());
-    FifoTicketHolder holder(1, &serviceContext);
-    Stats stats(&holder);
-    AdmissionContext admCtx;
-
-    boost::optional<Ticket> ticket =
-        holder.waitForTicket(_opCtx.get(), &admCtx, TicketHolder::WaitMode::kInterruptible);
-
-    unittest::Barrier barrierAcquiredTicket(2);
-    unittest::Barrier barrierReleaseTicket(2);
-    stdx::thread waiting([&]() {
-        auto client = this->getServiceContext()->makeClient("waiting");
-        auto opCtx = client->makeOperationContext();
-        AdmissionContext admCtx;
-
-        auto ticket =
-            holder.waitForTicket(opCtx.get(), &admCtx, TicketHolder::WaitMode::kInterruptible);
-        barrierAcquiredTicket.countDownAndWait();
-        barrierReleaseTicket.countDownAndWait();
-    });
-
-    while (holder.queued() == 0) {
-        // Wait for thread to start waiting.
-    }
-
-    {
-        // Test that the metrics eventually converge to the following set of values. There can be
-        // cases where the values are incorrect for brief periods of time due to optimistic
-        // concurrency.
-        auto deadline = Date_t::now() + Milliseconds{100};
-        while (true) {
-            try {
-                ASSERT_EQ(stats["out"], 1);
-                ASSERT_EQ(stats["available"], 0);
-                ASSERT_EQ(stats["addedToQueue"], 1);
-                ASSERT_EQ(stats["queueLength"], 1);
-                break;
-            } catch (...) {
-                if (Date_t::now() > deadline) {
-                    throw;
-                }
-                // Sleep to allow other threads to process and converge the metrics.
-                stdx::this_thread::sleep_for(Milliseconds{1}.toSystemDuration());
-            }
-        }
-    }
-    tickSource->advance(Microseconds(100));
-    ticket.reset();
-
-    while (holder.queued() > 0) {
-        // Wait for thread to take ticket.
-    }
-
-    barrierAcquiredTicket.countDownAndWait();
-    tickSource->advance(Microseconds(200));
-    barrierReleaseTicket.countDownAndWait();
-
-    waiting.join();
-
-    ASSERT_EQ(admCtx.getAdmissions(), 1);
-    ASSERT_EQ(stats["out"], 0);
-    ASSERT_EQ(stats["available"], 1);
-    ASSERT_EQ(stats["addedToQueue"], 1);
-    ASSERT_EQ(stats["removedFromQueue"], 1);
-    ASSERT_EQ(stats["queueLength"], 0);
-    ASSERT_EQ(stats["totalTimeQueuedMicros"], 100);
-    ASSERT_EQ(stats["startedProcessing"], 2);
-    ASSERT_EQ(stats["finishedProcessing"], 2);
-    ASSERT_EQ(stats["processing"], 0);
-    ASSERT_EQ(stats["totalTimeProcessingMicros"], 300);
-    ASSERT_EQ(stats["canceled"], 0);
-    ASSERT_EQ(stats["newAdmissions"], 2);
-
-    // Retake ticket.
-    holder.waitForTicket(_opCtx.get(), &admCtx, TicketHolder::WaitMode::kInterruptible);
-
-    ASSERT_EQ(admCtx.getAdmissions(), 2);
-    ASSERT_EQ(stats["newAdmissions"], 2);
-}
-
-TEST_F(TicketHolderTest, FifoCanceled) {
-    ServiceContext serviceContext;
-    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
-    auto tickSource = dynamic_cast<TickSourceMock<Microseconds>*>(serviceContext.getTickSource());
-    FifoTicketHolder holder(1, &serviceContext);
-    Stats stats(&holder);
-    AdmissionContext admCtx;
-
-    {
-        auto ticket =
-            holder.waitForTicket(_opCtx.get(), &admCtx, TicketHolder::WaitMode::kInterruptible);
-
-        stdx::thread waiting([&]() {
-            auto client = this->getServiceContext()->makeClient("waiting");
-            auto opCtx = client->makeOperationContext();
-
-            AdmissionContext admCtx;
-            auto deadline = Date_t::now() + Milliseconds(100);
-            ASSERT_FALSE(holder.waitForTicketUntil(
-                opCtx.get(), &admCtx, deadline, TicketHolder::WaitMode::kInterruptible));
-        });
-
-        while (holder.queued() == 0) {
-            // Wait for thread to take ticket.
-        }
-
-        tickSource->advance(Microseconds(100));
-        waiting.join();
-    }
-
-    ASSERT_EQ(stats["addedToQueue"], 1);
-    ASSERT_EQ(stats["removedFromQueue"], 1);
-    ASSERT_EQ(stats["queueLength"], 0);
-    ASSERT_EQ(stats["totalTimeQueuedMicros"], 100);
-    ASSERT_EQ(stats["startedProcessing"], 1);
-    ASSERT_EQ(stats["finishedProcessing"], 1);
-    ASSERT_EQ(stats["processing"], 0);
-    ASSERT_EQ(stats["totalTimeProcessingMicros"], 100);
-    ASSERT_EQ(stats["canceled"], 1);
 }
 
 TEST_F(TicketHolderTest, PriorityTwoQueuedOperations) {
