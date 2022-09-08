@@ -59,6 +59,7 @@
 #include "mongo/util/future.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers.h"
+#include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
 #include "mongo/util/time_support.h"
@@ -127,8 +128,8 @@ public:
     }
 
     PseudoRandom makeSeededPRNG() {
-        static PseudoRandom globalPRNG(mongoBridgeGlobalParams.seed);
-        return PseudoRandom(globalPRNG.nextInt64());
+        static StaticImmortal g = PseudoRandom{mongoBridgeGlobalParams.seed};
+        return PseudoRandom{g->nextInt64()};
     }
 
     static BridgeContext* get();
