@@ -48,7 +48,6 @@ const clearCollection = function() {
 
     expectedStats.bucketCount = 0;
     expectedStats.numCompressedBuckets = 0;
-    expectedStats.numUncompressedBuckets = 0;
     expectedStats.numSubObjCompressionRestart = 0;
     if (!initialized || !isTimeseriesScalabilityImprovementsEnabled) {
         expectedStats.numBucketInserts = 0;
@@ -93,15 +92,16 @@ const checkCollStats = function(empty = false) {
             // least one of those inserted buckets that we expect to have triggered an expiration
             // did in fact land in a shard with an existing idle bucket that it could expire.
             if (value > 33) {
-                assert.gte(
-                    stats.timeseries[stat],
-                    1,
-                    "Invalid 'timeseries." + stat + "' value in collStats: " + tojson(stats));
+                assert.gte(stats.timeseries[stat],
+                           1,
+                           "Invalid 'timeseries." + stat +
+                               "' value in collStats: " + tojson(stats.timeseries));
             }
         } else {
             assert.eq(stats.timeseries[stat],
                       value,
-                      "Invalid 'timeseries." + stat + "' value in collStats: " + tojson(stats));
+                      "Invalid 'timeseries." + stat +
+                          "' value in collStats: " + tojson(stats.timeseries));
         }
     }
 
@@ -118,7 +118,8 @@ const checkCollStats = function(empty = false) {
     if (expectedStats.numCompressedBuckets > 0) {
         assert.lt(stats.timeseries["numBytesCompressed"],
                   stats.timeseries["numBytesUncompressed"],
-                  "Invalid 'timeseries.numBytesCompressed' value in collStats: " + tojson(stats));
+                  "Invalid 'timeseries.numBytesCompressed' value in collStats: " +
+                      tojson(stats.timeseries));
     }
 };
 

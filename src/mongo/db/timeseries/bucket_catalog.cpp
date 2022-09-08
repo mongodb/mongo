@@ -1518,9 +1518,7 @@ void BucketCatalog::_archiveBucket(Stripe* stripe, WithLock stripeLock, Bucket* 
     auto it = archivedSet.find(bucket->getTime());
     if (it == archivedSet.end()) {
         archivedSet.emplace(bucket->getTime(),
-                            ArchivedBucket{bucket->id(),
-                                           bucket->getTimeField().toString(),
-                                           bucket->numMeasurements()});
+                            ArchivedBucket{bucket->id(), bucket->getTimeField().toString()});
 
         long long memory = _marginalMemoryUsageForArchivedBucket(archivedSet[bucket->getTime()],
                                                                  archivedSet.size() == 1);
@@ -1661,7 +1659,7 @@ void BucketCatalog::_expireIdleBuckets(Stripe* stripe,
         invariant(!archivedSet.empty());
 
         auto& [timestamp, bucket] = *archivedSet.begin();
-        ClosedBucket closed{bucket.bucketId, bucket.timeField, bucket.numMeasurements, true};
+        ClosedBucket closed{bucket.bucketId, bucket.timeField, boost::none, true};
 
         long long memory = _marginalMemoryUsageForArchivedBucket(bucket, archivedSet.size() == 1);
         _bucketStateManager.eraseBucketState(bucket.bucketId);
@@ -1832,8 +1830,12 @@ std::shared_ptr<BucketCatalog::ExecutionStats> BucketCatalog::_getExecutionStats
 
 long long BucketCatalog::_marginalMemoryUsageForArchivedBucket(const ArchivedBucket& bucket,
                                                                bool onlyEntryForMatchingMetaHash) {
-    return sizeof(std::size_t) + sizeof(Date_t) + sizeof(ArchivedBucket) + bucket.timeField.size() +
-        (onlyEntryForMatchingMetaHash ? sizeof(decltype(Stripe::archivedBuckets)::value_type) : 0);
+    return sizeof(Date_t) +        // key in set of archived buckets for meta hash
+        sizeof(ArchivedBucket) +   // main data for archived bucket
+        bucket.timeField.size() +  // allocated space for timeField string, ignoring SSO
+        (onlyEntryForMatchingMetaHash ? sizeof(std::size_t) +           // key in set (meta hash)
+                 sizeof(decltype(Stripe::archivedBuckets)::value_type)  // set container
+                                      : 0);
 }
 
 class BucketCatalog::ServerStatus : public ServerStatusSection {

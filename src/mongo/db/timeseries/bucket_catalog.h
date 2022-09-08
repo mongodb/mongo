@@ -138,7 +138,7 @@ public:
     struct ClosedBucket {
         OID bucketId;
         std::string timeField;
-        uint32_t numMeasurements;
+        boost::optional<uint32_t> numMeasurements;
         bool eligibleForReopening = false;
     };
     using ClosedBuckets = std::vector<ClosedBucket>;
@@ -479,7 +479,6 @@ protected:
     struct ArchivedBucket {
         OID bucketId;
         std::string timeField;
-        uint32_t numMeasurements;
     };
 
     /**

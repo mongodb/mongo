@@ -712,7 +712,8 @@ public:
             }
 
             // Buckets with just a single measurement is not worth compressing.
-            if (closedBucket.numMeasurements <= 1) {
+            if (closedBucket.numMeasurements.has_value() &&
+                closedBucket.numMeasurements.value() <= 1) {
                 return {SingleWriteResult(), true};
             }
 
