@@ -112,6 +112,7 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
         // after dropping each ident.
         Lock::GlobalLock globalLock(opCtx, MODE_IX);
 
+<<<<<<< HEAD
         const auto& dropTimestamp = timestampAndIdentInfo.first;
         auto& identInfo = timestampAndIdentInfo.second;
         const auto& identName = identInfo.identName;
@@ -130,6 +131,44 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
                                 "error"_attr = status);
         }
         wuow.commit();
+=======
+            const auto& dropTimestamp = timestampAndIdentInfo.first;
+            auto& identInfo = timestampAndIdentInfo.second;
+            const auto& identName = identInfo.identName;
+            LOGV2(22237,
+                  "Completing drop for ident",
+                  "ident"_attr = identName,
+                  "dropTimestamp"_attr = dropTimestamp);
+            WriteUnitOfWork wuow(opCtx);
+            auto status =
+                _engine->dropIdent(opCtx->recoveryUnit(), identName, std::move(identInfo.onDrop));
+            if (!status.isOK()) {
+                if (status == ErrorCodes::ObjectIsBusy) {
+                    LOGV2(6936300,
+                          "Drop-pending ident is still in use",
+                          "ident"_attr = identName,
+                          "dropTimestamp"_attr = dropTimestamp,
+                          "error"_attr = status);
+                    return;
+                }
+                LOGV2_FATAL_NOTRACE(51022,
+                                    "Failed to remove drop-pending ident",
+                                    "ident"_attr = identName,
+                                    "dropTimestamp"_attr = dropTimestamp,
+                                    "error"_attr = status);
+            }
+
+            // Ident drops are non-transactional and cannot be rolled back. So this does not need to
+            // be in an onCommit handler.
+            identInfo.isDropped = true;
+
+            wuow.commit();
+            LOGV2(6776600,
+                  "The ident was successfully dropped",
+                  "ident"_attr = identName,
+                  "dropTimestamp"_attr = dropTimestamp);
+        });
+>>>>>>> 260385f49a7 (SERVER-67766 Log index and collection successful drop)
     }
 
     {
