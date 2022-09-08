@@ -3129,6 +3129,7 @@ void TransactionParticipant::Participant::_resetTransactionStateAndUnlock(
     p().transactionOperationBytes = 0;
     p().transactionOperations.clear();
     p().transactionStmtIds.clear();
+    p().numberOfPrePostImagesToWrite = 0;
     o(*lk).prepareOpTime = repl::OpTime();
     o(*lk).recoveryPrepareOpTime = repl::OpTime();
     p().autoCommit = boost::none;
