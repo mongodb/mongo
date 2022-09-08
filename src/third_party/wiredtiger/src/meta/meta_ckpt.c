@@ -12,9 +12,11 @@ static int __ckpt_last(WT_SESSION_IMPL *, const char *, WT_CKPT *);
 static int __ckpt_last_name(WT_SESSION_IMPL *, const char *, const char **, int64_t *, uint64_t *);
 static int __ckpt_load(WT_SESSION_IMPL *, WT_CONFIG_ITEM *, WT_CONFIG_ITEM *, WT_CKPT *);
 static int __ckpt_named(WT_SESSION_IMPL *, const char *, const char *, WT_CKPT *);
+static int __ckpt_parse_time(WT_SESSION_IMPL *, WT_CONFIG_ITEM *, uint64_t *);
 static int __ckpt_set(WT_SESSION_IMPL *, const char *, const char *, bool);
 static int __ckpt_version_chk(WT_SESSION_IMPL *, const char *, const char *);
 static int __meta_blk_mods_load(WT_SESSION_IMPL *, const char *, WT_CKPT *, WT_CKPT *, bool);
+
 /*
  * __ckpt_load_blk_mods --
  *     Load the block information from the config string.
@@ -173,6 +175,30 @@ err:
 }
 
 /*
+ * __ckpt_parse_time --
+ *     Parse clock time from checkpoint metadata config. This requires special handling because
+ *     times are unsigned values and config parsing treats numeric values as signed.
+ */
+static int
+__ckpt_parse_time(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *config_value, uint64_t *timep)
+{
+    char timebuf[64];
+
+    WT_UNUSED(session);
+    *timep = 0;
+
+    if (config_value->len == 0 || config_value->len > sizeof(timebuf) - 1)
+        return (WT_ERROR);
+    memcpy(timebuf, config_value->str, config_value->len);
+    timebuf[config_value->len] = '\0';
+    /* NOLINTNEXTLINE(cert-err34-c) */
+    if (sscanf(timebuf, "%" SCNu64, timep) != 1)
+        return (WT_ERROR);
+
+    return (0);
+}
+
+/*
  * __wt_meta_checkpoint_by_name --
  *     Look up the requested named checkpoint in the metadata and return its order and time
  *     information.
@@ -213,7 +239,7 @@ __wt_meta_checkpoint_by_name(WT_SESSION_IMPL *session, const char *uri, const ch
             WT_ERR(__wt_config_subgets(session, &v, "write_gen", &a));
             if ((uint64_t)a.val >= conn->base_write_gen) {
                 WT_ERR(__wt_config_subgets(session, &v, "time", &a));
-                *timep = (uint64_t)a.val;
+                WT_ERR(__ckpt_parse_time(session, &a, timep));
             }
             break;
         }
@@ -372,12 +398,10 @@ __ckpt_last_name(WT_SESSION_IMPL *session, const char *config, const char **name
 {
     WT_CONFIG ckptconf;
     WT_CONFIG_ITEM a, k, v;
-    WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     uint64_t time;
     int64_t found;
 
-    conn = S2C(session);
     *namep = NULL;
     time = 0;
 
@@ -391,13 +415,9 @@ __ckpt_last_name(WT_SESSION_IMPL *session, const char *config, const char **name
             continue;
         found = a.val;
 
-        /* If the write generation is current, extract the wall-clock time for matching purposes. */
-        WT_ERR(__wt_config_subgets(session, &v, "write_gen", &a));
-        if ((uint64_t)a.val >= conn->base_write_gen) {
-            WT_ERR(__wt_config_subgets(session, &v, "time", &a));
-            time = (uint64_t)a.val;
-        } else
-            time = 0;
+        /* Extract the wall-clock time for matching purposes. */
+        WT_ERR(__wt_config_subgets(session, &v, "time", &a));
+        WT_ERR(__ckpt_parse_time(session, &a, &time));
 
         __wt_free(session, *namep);
         WT_ERR(__wt_strndup(session, k.str, k.len, namep));
@@ -891,7 +911,6 @@ __ckpt_load(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v, WT_C
 {
     WT_CONFIG_ITEM a;
     WT_DECL_RET;
-    char timebuf[64];
 
     /*
      * Copy the name, address (raw and hex), order and time into the slot. If there's no address,
@@ -908,17 +927,13 @@ __ckpt_load(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v, WT_C
 
     WT_RET(__wt_config_subgets(session, v, "order", &a));
     if (a.len == 0)
-        goto format;
+        WT_RET_MSG(session, WT_ERROR, "corrupted order value in checkpoint config");
     ckpt->order = a.val;
 
     WT_RET(__wt_config_subgets(session, v, "time", &a));
-    if (a.len == 0 || a.len > sizeof(timebuf) - 1)
-        goto format;
-    memcpy(timebuf, a.str, a.len);
-    timebuf[a.len] = '\0';
-    /* NOLINTNEXTLINE(cert-err34-c) */
-    if (sscanf(timebuf, "%" SCNu64, &ckpt->sec) != 1)
-        goto format;
+    ret = __ckpt_parse_time(session, &a, &ckpt->sec);
+    if (ret != 0)
+        WT_RET_MSG(session, WT_ERROR, "corrupted time value in checkpoint config");
 
     WT_RET(__wt_config_subgets(session, v, "size", &a));
     ckpt->size = (uint64_t)a.val;
@@ -985,7 +1000,7 @@ __ckpt_load(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v, WT_C
 
     WT_RET(__wt_config_subgets(session, v, "write_gen", &a));
     if (a.len == 0)
-        goto format;
+        WT_RET_MSG(session, WT_ERROR, "corrupted write_gen in checkpoint config");
     ckpt->write_gen = (uint64_t)a.val;
 
     /*
@@ -999,17 +1014,15 @@ __ckpt_load(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *k, WT_CONFIG_ITEM *v, WT_C
         ckpt->run_write_gen = (uint64_t)a.val;
 
     return (0);
-
-format:
-    WT_RET_MSG(session, WT_ERROR, "corrupted checkpoint list");
 }
 
 /*
- * __wt_metadata_update_base_write_gen --
- *     Update the connection's base write generation from the config string.
+ * __wt_metadata_update_connection --
+ *     Update the connection's base write generation and most recent checkpoint time from the config
+ *     string.
  */
 int
-__wt_metadata_update_base_write_gen(WT_SESSION_IMPL *session, const char *config)
+__wt_metadata_update_connection(WT_SESSION_IMPL *session, const char *config)
 {
     WT_CKPT ckpt;
     WT_CONNECTION_IMPL *conn;
@@ -1020,6 +1033,7 @@ __wt_metadata_update_base_write_gen(WT_SESSION_IMPL *session, const char *config
 
     if ((ret = __ckpt_last(session, config, &ckpt)) == 0) {
         conn->base_write_gen = WT_MAX(ckpt.write_gen + 1, conn->base_write_gen);
+        conn->ckpt_most_recent = WT_MAX(ckpt.sec, conn->ckpt_most_recent);
         __wt_meta_checkpoint_free(session, &ckpt);
     } else
         WT_RET_NOTFOUND_OK(ret);
@@ -1028,21 +1042,26 @@ __wt_metadata_update_base_write_gen(WT_SESSION_IMPL *session, const char *config
 }
 
 /*
- * __wt_metadata_init_base_write_gen --
- *     Initialize the connection's base write generation.
+ * __wt_metadata_load_prior_state --
+ *     Initialize the connection's base write generation and most recent checkpoint time.
  */
 int
-__wt_metadata_init_base_write_gen(WT_SESSION_IMPL *session)
+__wt_metadata_load_prior_state(WT_SESSION_IMPL *session)
 {
+    WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     char *config;
 
+    conn = S2C(session);
+
     /* Initialize the base write gen to 1 */
-    S2C(session)->base_write_gen = 1;
+    conn->base_write_gen = 1;
+    /* Initialize most recent checkpoint time with current clock */
+    __wt_seconds(session, &conn->ckpt_most_recent);
     /* Retrieve the metadata entry for the metadata file. */
     WT_ERR(__wt_metadata_search(session, WT_METAFILE_URI, &config));
-    /* Update base write gen to the write gen of metadata. */
-    WT_ERR(__wt_metadata_update_base_write_gen(session, config));
+    /* Update base write gen and most recent checkpoint time from the metadata. */
+    WT_ERR(__wt_metadata_update_connection(session, config));
 
 err:
     __wt_free(session, config);
@@ -1071,8 +1090,8 @@ __wt_metadata_correct_base_write_gen(WT_SESSION_IMPL *session)
 
         WT_ERR(cursor->get_value(cursor, &config));
 
-        /* Update base write gen to the write gen. */
-        WT_ERR(__wt_metadata_update_base_write_gen(session, config));
+        /* Update base write gen and most recent checkpoint time. */
+        WT_ERR(__wt_metadata_update_connection(session, config));
     }
     WT_ERR_NOTFOUND_OK(ret, false);
 
@@ -1577,14 +1596,12 @@ __wt_meta_read_checkpoint_snapshot(WT_SESSION_IMPL *session, const char *ckpt_na
     WT_CONFIG list;
     WT_CONFIG_ITEM cval;
     WT_CONFIG_ITEM k;
-    WT_CONNECTION_IMPL *conn;
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
     uint64_t write_gen;
     uint32_t counter;
     char *sys_config;
 
-    conn = S2C(session);
     write_gen = 0;
     counter = 0;
     sys_config = NULL;
@@ -1660,14 +1677,11 @@ __wt_meta_read_checkpoint_snapshot(WT_SESSION_IMPL *session, const char *ckpt_na
         if (snap_write_gen != NULL)
             *snap_write_gen = write_gen;
 
-        /*
-         * If the write generation is current, extract the checkpoint time. Otherwise we use 0.
-         */
-        if (ckpttime != NULL && cval.val != 0 && write_gen >= conn->base_write_gen) {
+        /* Extract the checkpoint time. */
+        if (ckpttime != NULL) {
             WT_ERR_NOTFOUND_OK(
               __wt_config_getones(session, sys_config, WT_SYSTEM_CKPT_SNAPSHOT_TIME, &cval), false);
-            if (cval.val != 0)
-                *ckpttime = (uint64_t)cval.val;
+            WT_ERR(__ckpt_parse_time(session, &cval, ckpttime));
         }
 
         /*
@@ -1696,11 +1710,9 @@ __meta_retrieve_timestamp(WT_SESSION_IMPL *session, const char *system_uri,
   const char *timestamp_name, wt_timestamp_t *timestampp, uint64_t *ckpttime)
 {
     WT_CONFIG_ITEM cval;
-    WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     char *sys_config;
 
-    conn = S2C(session);
     sys_config = NULL;
     *timestampp = WT_TXN_NONE;
     if (ckpttime != NULL)
@@ -1718,16 +1730,10 @@ __meta_retrieve_timestamp(WT_SESSION_IMPL *session, const char *system_uri,
         }
 
         if (ckpttime != NULL) {
-            /* If the write generation is current, extract the checkpoint time. Otherwise we use 0.
-             */
+            /* Extract the checkpoint time. */
             WT_ERR_NOTFOUND_OK(
-              __wt_config_getones(session, sys_config, WT_SYSTEM_TS_WRITE_GEN, &cval), false);
-            if (cval.val != 0 && (uint64_t)cval.val >= conn->base_write_gen) {
-                WT_ERR_NOTFOUND_OK(
-                  __wt_config_getones(session, sys_config, WT_SYSTEM_TS_TIME, &cval), false);
-                if (cval.val != 0)
-                    *ckpttime = (uint64_t)cval.val;
-            }
+              __wt_config_getones(session, sys_config, WT_SYSTEM_TS_TIME, &cval), false);
+            WT_ERR(__ckpt_parse_time(session, &cval, ckpttime));
         }
     }
 

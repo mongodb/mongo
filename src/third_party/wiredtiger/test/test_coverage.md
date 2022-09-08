@@ -15,6 +15,7 @@
 |Checkpoint|History Store|[test_checkpoint03.py](../test/suite/test_checkpoint03.py)
 |Checkpoint|Metadata|[test_checkpoint_snapshot01.py](../test/suite/test_checkpoint_snapshot01.py)
 |Checkpoint|Obsolete Data|[test_checkpoint08.py](../test/suite/test_checkpoint08.py)
+|Checkpoint|Recovery|[test_bug029.py](../test/suite/test_bug029.py)
 |Compression||[test_dictionary.py](../test/suite/test_dictionary.py)
 |Config Api||[test_base02.py](../test/suite/test_base02.py), [test_config02.py](../test/suite/test_config02.py)
 |Connection Api||[test_version.py](../test/suite/test_version.py)
