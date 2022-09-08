@@ -419,10 +419,10 @@ AccumulatorTopBottomN<sense, single>::AccumulatorTopBottomN(ExpressionContext* c
                                                             bool isRemovable)
     : AccumulatorN(expCtx), _isRemovable(isRemovable), _sortPattern(std::move(sp)) {
 
-    // Modify sortPattern to sort based on fields where they are in the evaluated argument instead
-    // of where they would be in the raw document received by $group and friends. "auto part" makes
-    // a copy because SortPatternPart returns a const iterator.
+    // Make a copy of _sortPattern to sort based on fields where they are in the evaluated argument
+    // instead of where they would be in the raw document received by $group and friends.
     std::vector<SortPattern::SortPatternPart> parts;
+    parts.reserve(_sortPattern.size());
     int sortOrder = 0;
     for (auto part : _sortPattern) {
         const auto newFieldName =
@@ -434,10 +434,10 @@ AccumulatorTopBottomN<sense, single>::AccumulatorTopBottomN(ExpressionContext* c
             // parseAccumulatorTopBottomNSortBy().
             part.expression = nullptr;
         }
-        parts.push_back(part);
+        parts.push_back(std::move(part));
         sortOrder++;
     }
-    SortPattern internalSortPattern(parts);
+    SortPattern internalSortPattern(std::move(parts));
 
     _sortKeyComparator.emplace(internalSortPattern);
     _sortKeyGenerator.emplace(std::move(internalSortPattern), expCtx->getCollator());
