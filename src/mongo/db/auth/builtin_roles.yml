@@ -576,6 +576,14 @@ roles:
               actions:
                   - find
                   - remove
+            - matchType: exact_namespace
+              db: 'config'
+              collection: 'system.change_collection'
+              actions:
+                  - find
+                  - insert # Root user should be cautious while performing inserts.
+                  - remove
+                  - update
 
     # Placeholder role with no privileges for 6.0.0.
     # From 7.0 onwards, this method will assign the requisite
