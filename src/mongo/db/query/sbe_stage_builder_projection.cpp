@@ -83,7 +83,7 @@ public:
         return _mode;
     }
 
-    const bool hasSlot() const {
+    bool hasSlot() const {
         return _expr.getSlot().has_value();
     }
 
