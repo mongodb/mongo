@@ -159,9 +159,7 @@ __wt_block_checkpoint_unload(WT_SESSION_IMPL *session, WT_BLOCK *block, bool che
 
         __wt_spin_lock(session, &block->live_lock);
         __wt_block_ckpt_destroy(session, &block->live);
-#ifdef HAVE_DIAGNOSTIC
         block->live_open = false;
-#endif
         __wt_spin_unlock(session, &block->live_lock);
     }
 
