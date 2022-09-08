@@ -674,6 +674,30 @@ private:
                     });
             }
         }
+
+        if (!feature_flags::gfeatureFlagCappedCollectionsRelaxedSize.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
+                Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+                catalog::forEachCollectionFromDb(
+                    opCtx,
+                    dbName,
+                    MODE_S,
+                    [&](const CollectionPtr& collection) {
+                        uasserted(
+                            ErrorCodes::CannotDowngrade,
+                            str::stream()
+                                << "Cannot downgrade the cluster when there are capped "
+                                   "collection with a size that is non multiple of 256 bytes. "
+                                   "Drop or resize the following collection: '"
+                                << collection->ns() << "'");
+                        return true;
+                    },
+                    [&](const CollectionPtr& collection) {
+                        return collection->isCapped() && collection->getCappedMaxSize() % 256 != 0;
+                    });
+            }
+        }
     }
 
     // This helper function is for any internal server downgrade cleanup, such as dropping

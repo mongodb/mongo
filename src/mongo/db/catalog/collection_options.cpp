@@ -48,8 +48,12 @@
 namespace mongo {
 namespace {
 long long adjustCappedSize(long long cappedSize) {
-    cappedSize += 0xff;
-    cappedSize &= 0xffffffffffffff00LL;
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        !feature_flags::gfeatureFlagCappedCollectionsRelaxedSize.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        cappedSize += 0xff;
+        cappedSize &= 0xffffffffffffff00LL;
+    }
     return cappedSize;
 }
 

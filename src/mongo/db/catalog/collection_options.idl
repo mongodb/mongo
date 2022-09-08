@@ -34,6 +34,13 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
 
+feature_flags:
+  featureFlagCappedCollectionsRelaxedSize:
+    description: Enables capped collections to have a size non multiple of 256 bytes.
+    cpp_varname: feature_flags::gfeatureFlagCappedCollectionsRelaxedSize
+    default: true
+    version: 6.2
+
 enums:
     ValidationLevel:
         description: "Determines how strictly MongoDB applies the validation rules to existing documents during an update."

@@ -11,6 +11,7 @@ load('jstests/libs/collection_drop_recreate.js');  // For 'assertDropAndRecreate
                                                    // 'assertDropCollection'.
 load('jstests/libs/change_stream_util.js');        // For 'ChangeStreamTest' and
                                                    // 'assertChangeStreamEventEq'.
+load("jstests/libs/feature_flag_util.js");
 
 const testDB = db.getSiblingDB(jsTestName());
 
@@ -68,13 +69,24 @@ function runTest(startChangeStream) {
     assertDropCollection(testDB, collName);
 
     // With capped collection parameters.
-    validateExpectedEventAndDropCollection(
-        {create: collName, capped: true, size: 1000, max: 1000}, {
-            operationType: "create",
-            ns: ns,
-            operationDescription:
-                {idIndex: {v: 2, key: {_id: 1}, name: "_id_"}, capped: true, size: 1024, max: 1000}
-        });
+    let expectedSize;
+
+    if (FeatureFlagUtil.isEnabled(testDB, "CappedCollectionsRelaxedSize")) {
+        expectedSize = 1000;
+    } else {
+        expectedSize = 1024;
+    }
+    validateExpectedEventAndDropCollection({create: collName, capped: true, size: 1000, max: 1000},
+                                           {
+                                               operationType: "create",
+                                               ns: ns,
+                                               operationDescription: {
+                                                   idIndex: {v: 2, key: {_id: 1}, name: "_id_"},
+                                                   capped: true,
+                                                   size: expectedSize,
+                                                   max: 1000
+                                               }
+                                           });
 
     // With wired tiger setting.
     const customWiredTigerSettings = {wiredTiger: {configString: "block_compressor=zlib"}};

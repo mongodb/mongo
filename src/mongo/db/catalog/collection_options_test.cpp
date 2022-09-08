@@ -99,9 +99,27 @@ TEST(CollectionOptions, ErrorBadMax) {
         CollectionOptions::parse(BSON("capped" << true << "max" << (1LL << 31))).getStatus());
 }
 
+TEST(CollectionOptions, CappedSizeNotRoundUpForAlignment) {
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(
+        multiversion::FeatureCompatibilityVersion::kVersion_6_2);
+    const long long kUnalignedCappedSize = 1000;
+    const long long kAlignedCappedSize = 1000;
+
+    // Check size rounds up to multiple of alignment.
+    auto options = assertGet(
+        CollectionOptions::parse((BSON("capped" << true << "size" << kUnalignedCappedSize))));
+
+    ASSERT_EQUALS(options.capped, true);
+    ASSERT_EQUALS(options.cappedSize, kAlignedCappedSize);
+    ASSERT_EQUALS(options.cappedMaxDocs, 0);
+}
+
 TEST(CollectionOptions, CappedSizeRoundsUpForAlignment) {
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(
+        multiversion::FeatureCompatibilityVersion::kVersion_6_0);
     const long long kUnalignedCappedSize = 1000;
     const long long kAlignedCappedSize = 1024;
+
     // Check size rounds up to multiple of alignment.
     auto options = assertGet(
         CollectionOptions::parse((BSON("capped" << true << "size" << kUnalignedCappedSize))));

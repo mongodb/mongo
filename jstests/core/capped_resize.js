@@ -11,6 +11,8 @@
  * ]
  */
 (function() {
+load("jstests/libs/feature_flag_util.js");
+
 const testDB = db.getSiblingDB(jsTestName());
 const cappedColl = testDB["capped_coll"];
 
@@ -99,6 +101,16 @@ let verifyLimitUpdate = function(updates) {
     assert.commandFailed(testDB.runCommand({collMod: cappedColl.getName(), cappedSize: 0}));
     assert.commandFailed(
         testDB.runCommand({collMod: cappedColl.getName(), cappedSize: negativeSize}));
+
+    // The maximum size can be a non-multiple of 256 bytes.
+    // We modify the collection to have a size multiple of 256, then
+    // we modify the collection to have a size non multiple of 256 and finally
+    // we modify the collection to have a size multiple of 256
+    if (FeatureFlagUtil.isEnabled(testDB, "CappedCollectionsRelaxedSize")) {
+        verifyLimitUpdate({cappedSize: 25 * 1024});
+        verifyLimitUpdate({cappedSize: 50 * 1023});
+        verifyLimitUpdate({cappedSize: 50 * 1024});
+    }
 })();
 
 (function updateMaxLimit() {
