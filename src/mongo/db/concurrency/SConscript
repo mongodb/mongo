@@ -9,15 +9,12 @@ env.Library(
     source=[
         'deferred_writer.cpp',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog/collection',
-    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
-        "$BUILD_DIR/mongo/db/catalog/collection_crud",
+        '$BUILD_DIR/mongo/db/catalog/collection_crud',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
-        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
     ],
 )

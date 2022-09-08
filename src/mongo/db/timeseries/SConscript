@@ -147,7 +147,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
         '$BUILD_DIR/mongo/db/catalog/collection_crud',
-        '$BUILD_DIR/mongo/db/catalog_raii',
+        '$BUILD_DIR/mongo/db/shard_role',
         'bucket_catalog',
         'bucket_compression',
         'timeseries_conversion_util',

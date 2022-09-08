@@ -112,13 +112,13 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
         '$BUILD_DIR/mongo/db/catalog/collection_crud',
-        '$BUILD_DIR/mongo/db/catalog_raii',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/session/logical_session_id_helpers',
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/db/transaction/transaction',
-        "index_builds_coordinator_interface",
+        'index_builds_coordinator_interface',
+        'shard_role',
     ],
 )
 
@@ -564,15 +564,14 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
         '$BUILD_DIR/mongo/db/catalog/collection_crud',
-        '$BUILD_DIR/mongo/db/catalog_raii',
-        '$BUILD_DIR/mongo/db/change_stream_options_manager',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
-        '$BUILD_DIR/mongo/db/curop',
-        '$BUILD_DIR/mongo/db/db_raii',
-        '$BUILD_DIR/mongo/db/query_exec',
-        '$BUILD_DIR/mongo/db/record_id_helpers',
         '$BUILD_DIR/mongo/db/repl/storage_interface',
+        'change_stream_options_manager',
+        'curop',
+        'query_exec',
+        'record_id_helpers',
         'server_base',
+        'shard_role',
     ],
 )
 
@@ -802,17 +801,24 @@ env.Library(
 )
 
 env.Library(
-    target='db_raii',
+    target='shard_role',
     source=[
+        'catalog_raii.cpp',
+        'catalog/catalog_helper.cpp',
         'db_raii.cpp',
     ],
     LIBDEPS=[
-        'catalog_raii',
+        'catalog/collection',
+        'catalog/collection_catalog',
+        'catalog/database_holder',
+        'concurrency/lock_manager',
         's/sharding_api_d',
         'stats/top',
+        'storage/write_unit_of_work',
+        'views/views',
     ],
     LIBDEPS_PRIVATE=[
-        'catalog/database_holder',
+        '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
         'curop',
         'multitenancy',
         'server_base',
@@ -829,27 +835,6 @@ env.Library(
         '$BUILD_DIR/mongo/idl/feature_flag',
         'server_base',
         'server_options_core',
-    ],
-)
-
-env.Library(
-    target='catalog_raii',
-    source=[
-        'catalog/catalog_helper.cpp',
-        'catalog_raii.cpp',
-    ],
-    LIBDEPS=[
-        'catalog/collection',
-        'catalog/collection_catalog',
-        'concurrency/lock_manager',
-        'views/views',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/database_holder',
-        '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
-        '$BUILD_DIR/mongo/db/s/sharding_api_d',
-        'multitenancy',
-        'server_base',
     ],
 )
 
@@ -952,7 +937,6 @@ env.Library(
         'dbhelpers.cpp',
     ],
     LIBDEPS=[
-        'db_raii',
         'index/index_access_method',
         'query_exec',
     ],
@@ -960,6 +944,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/ops/write_ops',
         'record_id_helpers',
+        'shard_role',
     ],
 )
 
@@ -971,8 +956,8 @@ env.Library(
     LIBDEPS=[
         'catalog/index_key_validate',
         'catalog/multi_index_block',
-        'db_raii',
         'index_builds_coordinator_interface',
+        'shard_role',
     ],
 )
 
@@ -1073,13 +1058,13 @@ env.Library(
 )
 
 env.Library(
-    target="index_builds_coordinator_mongod",
+    target='index_builds_coordinator_mongod',
     source=[
-        "index_builds_coordinator_mongod.cpp",
+        'index_builds_coordinator_mongod.cpp',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/util/concurrency/thread_pool",
-        "index_builds_coordinator_interface",
+        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
+        'index_builds_coordinator_interface',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
@@ -1089,24 +1074,22 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/two_phase_index_build_knobs_idl',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
         'curop',
-        'db_raii',
         'index_build_entry_helpers',
         'resumable_index_builds_idl',
+        'shard_role',
     ],
 )
 
 env.Library(
-    target="index_builds_coordinator_interface",
+    target='index_builds_coordinator_interface',
     source=[
-        "index_builds_coordinator.cpp",
-        "repl_index_build_state.cpp",
-        "active_index_builds.cpp",
+        'index_builds_coordinator.cpp',
+        'repl_index_build_state.cpp',
+        'active_index_builds.cpp',
     ],
     LIBDEPS=[
-        "$BUILD_DIR/mongo/base",
-        "$BUILD_DIR/mongo/db/catalog/commit_quorum_options",
-        "$BUILD_DIR/mongo/db/catalog/index_builds_manager",
-        '$BUILD_DIR/mongo/db/catalog_raii',
+        '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
+        '$BUILD_DIR/mongo/db/catalog/index_builds_manager',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection',
@@ -1122,17 +1105,16 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/replica_set_messages',
         '$BUILD_DIR/mongo/db/repl/tenant_migration_access_blocker',
         '$BUILD_DIR/mongo/db/repl/timestamp_block',
-        '$BUILD_DIR/mongo/db/s/sharding_api_d',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/storage/encryption_hooks',
         '$BUILD_DIR/mongo/db/storage/storage_util',
         '$BUILD_DIR/mongo/db/storage/two_phase_index_build_knobs_idl',
-        "$BUILD_DIR/mongo/executor/task_executor_interface",
+        '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/util/fail_point',
-        'catalog/database_holder',
-        'db_raii',
         'index_build_entry_helpers',
         'resumable_index_builds_idl',
         'server_options_core',
+        'shard_role',
     ],
 )
 
@@ -1149,11 +1131,10 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
-        'catalog_raii',
-        'db_raii',
         'dbhelpers',
         'server_base',
         'service_context',
+        'shard_role',
     ],
 )
 
@@ -1163,23 +1144,20 @@ env.Library(
         'cloner.cpp',
         'cloner.idl',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog/collection_options',
-        '$BUILD_DIR/mongo/db/catalog/multi_index_block',
-        'dbdirectclient',
-        'repl/isself',
-    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/client/authentication',
         'catalog/collection_crud',
-        'catalog/database_holder',
+        'catalog/collection_options',
+        'catalog/multi_index_block',
         'commands/list_collections_filter',
         'concurrency/exception_util',
+        'dbdirectclient',
         'index_builds_coordinator_interface',
         'multitenancy',
         'ops/write_ops',
-        's/sharding_api_d',
+        'repl/isself',
+        'server_base',
+        'shard_role',
     ],
 )
 
@@ -1204,7 +1182,7 @@ env.Library(
         "$BUILD_DIR/mongo/db/catalog/collection_options",
         "$BUILD_DIR/mongo/db/concurrency/exception_util",
         "$BUILD_DIR/mongo/db/stats/resource_consumption_metrics",
-        "db_raii",
+        "shard_role",
     ],
 )
 
@@ -1241,7 +1219,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/s/grid',
-        'catalog_raii',
         'concurrency/exception_util',
         'curop',
         'repl/repl_coordinator_interface',
@@ -1249,6 +1226,7 @@ env.Library(
         'repl/tenant_migration_access_blocker',
         's/sharding_api_d',
         'server_base',
+        'shard_role',
     ],
 )
 
@@ -1257,12 +1235,11 @@ env.Library(
     source=[
         'rebuild_indexes.cpp',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/catalog/collection',
-    ],
     LIBDEPS_PRIVATE=[
         'catalog/index_key_validate',
         'index_builds_coordinator_interface',
+        'server_base',
+        'storage/write_unit_of_work',
     ],
 )
 
@@ -1271,12 +1248,8 @@ env.Library(
     source=[
         'repair.cpp',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/catalog/collection',
-        'rw_concern_d',
-        'vector_clock',
-    ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/catalog/collection_validation',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/catalog/document_validation',
@@ -1288,6 +1261,8 @@ env.Library(
         'index_builds_coordinator_interface',
         'multitenancy',
         'rebuild_indexes',
+        'rw_concern_d',
+        'vector_clock',
     ],
 )
 
@@ -1297,23 +1272,20 @@ env.Library(
         'ttl.cpp',
         'ttl.idl',
     ],
-    LIBDEPS=[
-        'db_raii',
-        'query_exec',
-        'ttl_collection_cache',
-    ],
     LIBDEPS_PRIVATE=[
         'catalog/catalog_helpers',
-        'catalog/database_holder',
         'commands/fsync_locked',
         'commands/server_status_core',
         'ops/write_ops',
+        'query_exec',
         'record_id_helpers',
         'repl/replica_set_aware_service',
         'repl/tenant_migration_access_blocker',
         's/sharding_runtime_d',
         'server_base',
         'service_context',
+        'shard_role',
+        'ttl_collection_cache',
     ],
 )
 
@@ -1454,7 +1426,6 @@ env.Library(
         'curop',
         'curop_failpoint_helpers',
         'cursor_server_params',
-        'db_raii',
         'dbdirectclient',
         'exec/projection_executor',
         'exec/sbe/query_sbe_abt',
@@ -1476,6 +1447,7 @@ env.Library(
         'repl/repl_coordinator_interface',
         's/sharding_api_d',
         'session/logical_session_cache',
+        'shard_role',
         'shared_request_handling',
         'stats/serveronly_stats',
         'storage/remove_saver',
@@ -2199,7 +2171,6 @@ env.Library(
         'concurrency/lock_manager',
         'curop',
         'curop_metrics',
-        'db_raii',
         'dbdirectclient',
         'dbhelpers',
         'exec/working_set',
@@ -2242,6 +2213,7 @@ env.Library(
         'session/logical_session_cache_impl',
         'session/sessions_collection_rs',
         'session/sessions_collection_standalone',
+        'shard_role',
         'startup_warnings_mongod',
         'stats/change_collection_server_status',
         'stats/counters',
@@ -2592,7 +2564,6 @@ if wiredtiger:
             '$BUILD_DIR/mongo/util/net/network',
             '$BUILD_DIR/mongo/util/net/ssl_options_server',
             'batched_write_context',
-            'catalog_raii',
             'collection_index_usage_tracker',
             'commands',
             'common',
@@ -2623,6 +2594,7 @@ if wiredtiger:
             'service_context_devnull_test_fixture',
             'service_context_test_fixture',
             'service_liaison_mock',
+            'shard_role',
             'signed_logical_time',
             'snapshot_window_options',
             'startup_warnings_mongod',

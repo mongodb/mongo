@@ -49,7 +49,6 @@ wtEnv.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
-        '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/curop',
@@ -57,7 +56,6 @@ wtEnv.Library(
         '$BUILD_DIR/mongo/db/index/index_descriptor',
         '$BUILD_DIR/mongo/db/prepare_conflict_tracker',
         '$BUILD_DIR/mongo/db/record_id_helpers',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/repl/repl_settings',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/server_options_servers',
@@ -77,13 +75,12 @@ wtEnv.Library(
         'storage_wiredtiger_customization_hooks',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
-        '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/mongod_options',
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/db/snapshot_window_options',
         '$BUILD_DIR/mongo/db/storage/backup_block',
         '$BUILD_DIR/mongo/db/storage/storage_engine_parameters',
@@ -103,7 +100,7 @@ wtEnv.Library(
         'wiredtiger_global_options.idl',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/db/storage/storage_engine_impl',
         '$BUILD_DIR/mongo/db/storage/storage_engine_lock_file',
         '$BUILD_DIR/mongo/db/storage/storage_engine_metadata',
@@ -113,7 +110,6 @@ wtEnv.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/storage/storage_engine_common',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
     ],
@@ -202,8 +198,8 @@ wtEnv.Library(
         'wiredtiger_import.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/db_raii',
         '$BUILD_DIR/mongo/db/repl/oplog',
+        '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/db/storage/bson_collection_catalog_entry',
         'storage_wiredtiger_core',
     ],

@@ -184,8 +184,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog/collection',
-        '$BUILD_DIR/mongo/db/catalog_raii',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
         '$BUILD_DIR/mongo/db/index_commands_idl',
@@ -195,6 +193,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/storage_interface',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         'kill_sessions',
         'logical_session_id',

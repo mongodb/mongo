@@ -124,8 +124,10 @@ env.Library(
         'stages/scan.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/db_raii', '$BUILD_DIR/mongo/db/index/index_access_method',
-        '$BUILD_DIR/mongo/db/storage/execution_context', 'query_sbe'
+        '$BUILD_DIR/mongo/db/index/index_access_method',
+        '$BUILD_DIR/mongo/db/shard_role',
+        '$BUILD_DIR/mongo/db/storage/execution_context',
+        'query_sbe',
     ],
 )
 

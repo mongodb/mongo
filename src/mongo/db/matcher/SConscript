@@ -26,11 +26,11 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/catalog/index_catalog',
-        '$BUILD_DIR/mongo/db/catalog_raii',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/exec/js_function',
         '$BUILD_DIR/mongo/db/fts/base_fts',
         '$BUILD_DIR/mongo/db/query_expressions',
+        '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/scripting/scripting_server',
     ],
 )

@@ -466,7 +466,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/change_stream_pre_images_collection_manager',
-        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/util/periodic_runner',
     ],
 )
