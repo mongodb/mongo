@@ -4,7 +4,7 @@
  * bucket namespace of that view exists.
  *
  * @tags: [
- * featureFlagExtendValidateCommand
+ * requires_fcv_62
  * ]
  */
 

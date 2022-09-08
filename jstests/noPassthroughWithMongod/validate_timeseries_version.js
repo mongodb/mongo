@@ -3,7 +3,7 @@
  * bucket collections and return warnings properly.
  *
  * @tags: [
- * featureFlagExtendValidateCommand
+ * requires_fcv_62
  * ]
  */
 

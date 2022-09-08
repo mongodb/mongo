@@ -172,7 +172,8 @@ feature_flags:
     featureFlagExtendValidateCommand:
         description: "Enable checks on more types of inconsistencies for the validate command"
         cpp_varname: feature_flags::gExtendValidateCommand
-        default: false
+        default: true
+        version: 6.2
     featureFlagPointInTimeCatalogLookups:
         description: "Support reads when in-memory catalog is out-of-sync with storage transaction"
         cpp_varname: feature_flags::gPointInTimeCatalogLookups

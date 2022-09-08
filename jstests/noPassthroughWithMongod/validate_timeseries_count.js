@@ -3,7 +3,7 @@
  * collection matches the 'control.count' field.
  *
  * @tags: [
- * featureFlagExtendValidateCommand
+ * requires_fcv_62
  * ]
  */
 

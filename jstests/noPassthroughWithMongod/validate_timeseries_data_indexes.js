@@ -1,7 +1,7 @@
 /**
  * Tests that the validate command now checks the indexes in the time-series buckets data fields.
  *
- * @tags: [featureFlagExtendValidateCommand]
+ * @tags: [requires_fcv_62]
  */
 
 (function() {

@@ -4,7 +4,7 @@
  * field.
  *
  * @tags: [
- * featureFlagExtendValidateCommand
+ * requires_fcv_62
  * ]
  */
 

@@ -2,7 +2,7 @@
  * Tests that the validate command now checks that 'control.min' and 'control.max' fields in a
  * time-series bucket agree with those in 'data', and that it adds a warning and
  * increments the number of noncompliant documents if they don't.
- * @tags: [featureFlagExtendValidateCommand]
+ * @tags: [requires_fcv_62]
  */
 
 (function() {

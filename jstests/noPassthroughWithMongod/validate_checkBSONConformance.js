@@ -1,7 +1,7 @@
 /*
  * Tests the usage of 'checkBSONConformance' option of the validate command.
  *
- * @tags: [featureFlagExtendValidateCommand]
+ * @tags: [requires_fcv_62]
  */
 
 (function() {

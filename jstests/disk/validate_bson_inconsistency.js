@@ -1,7 +1,7 @@
 /**
  * Tests that the validate command detects various types of BSON inconsistencies.
  *
- * @tags: [featureFlagExtendValidateCommand]
+ * @tags: [requires_fcv_62]
  */
 
 (function() {
