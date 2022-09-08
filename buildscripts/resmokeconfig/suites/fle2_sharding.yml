@@ -12,7 +12,7 @@ executor:
       - ValidateCollections
   config:
     shell_options:
-      eval: "testingReplication = false; testingFLESharding = true;"
+      eval: "testingReplication = false; testingFLESharding = true; testingFLE2Range = true;"
       setShellParameter: featureFlagFLE2Range=true
   hooks:
   - class: CheckReplDBHash
