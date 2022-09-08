@@ -74,13 +74,22 @@ public:
     /** Constructs an empty StringData. */
     constexpr StringData() = default;
 
-    /**
-     * Constructs a StringData, for the case where the length of the
-     * string is not known. 'c' must either be NULL, or a pointer to a
-     * null-terminated string.
-     */
+/**
+ * Constructs a StringData, for the case where the length of the
+ * string is not known. 'c' must either be NULL, or a pointer to a
+ * null-terminated string.
+ * Workaround for ticket SERVER-68887, it seems like a compiler bug with gcc11,
+ * it has been fixed in gcc 11.3, created a ticket SERVER-69503 to update v4 gcc to 11.3.
+ * we can delete 'GCC diagnostic ignored' when we change the minimum version of gcc to 11.3
+ */
+#if defined(__GNUC__) && (__GNUC__) >= 11
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overread"
+#endif
     StringData(const char* str) : StringData(str, str ? std::strlen(str) : 0) {}
-
+#if defined(__GNUC__) && (__GNUC__) >= 11
+#pragma GCC diagnostic pop
+#endif
     /**
      * Constructs a StringData, for the case of a std::string. We can
      * use the trusted init path with no follow on checks because
