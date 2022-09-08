@@ -196,7 +196,7 @@ private:
         auto actualIndex = StringData(ptr + sizeof(char));
         uassert(NonConformantBSON,
                 fmt::format("Indices of BSON Array are invalid. Expected {}, but got {}.",
-                            indexCount.back().counter,
+                            (StringData)indexCount.back().counter,
                             actualIndex),
                 indexCount.back().counter == actualIndex);
         ++indexCount.back().counter;
