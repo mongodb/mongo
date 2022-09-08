@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -30,70 +30,51 @@
 #pragma once
 
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_coll_stats_gen.h"
 
 namespace mongo {
 
 /**
- * Provides a document source interface to retrieve collection-level statistics for a given
- * collection.
+ * This aggregation stage is the ‘$_internalAllCollectionStats´. It takes no arguments. Its
+ * response will be a cursor, each document of which represents the collection statistics for a
+ * single collection for all the existing collections.
+ *
+ * When executing the '$_internalAllCollectionStats' aggregation stage, we will need to obtain the
+ * catalog containing all collections namespaces.
+ *
+ * Then, for each collection, we will call `makeStatsForNs` method from DocumentSourceCollStats that
+ * will retrieve all storage stats for that particular collection.
  */
-class DocumentSourceCollStats : public DocumentSource {
+class DocumentSourceInternalAllCollectionStats final : public DocumentSource {
 public:
-    static constexpr StringData kStageName = "$collStats"_sd;
+    static constexpr StringData kStageNameInternal = "$_internalAllCollectionStats"_sd;
 
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
-                                                 const BSONElement& specElem) {
-            uassert(5447000,
-                    str::stream() << "$collStats must take a nested object but found: " << specElem,
-                    specElem.type() == BSONType::Object);
-            auto spec = DocumentSourceCollStatsSpec::parse(IDLParserContext(kStageName),
-                                                           specElem.embeddedObject());
-            return std::make_unique<LiteParsed>(specElem.fieldName(), nss, std::move(spec));
+                                                 const BSONElement& spec) {
+            return std::make_unique<LiteParsed>(spec.fieldName());
         }
 
-        explicit LiteParsed(std::string parseTimeName,
-                            NamespaceString nss,
-                            DocumentSourceCollStatsSpec spec)
-            : LiteParsedDocumentSource(std::move(parseTimeName)),
-              _nss(std::move(nss)),
-              _spec(std::move(spec)) {}
-
-        bool isCollStats() const final {
-            return true;
-        }
-
-        PrivilegeVector requiredPrivileges(bool isMongos,
-                                           bool bypassDocumentValidation) const final {
-            return {Privilege(ResourcePattern::forExactNamespace(_nss), ActionType::collStats)};
-        }
-
-        void assertPermittedInAPIVersion(const APIParameters&) const;
+        explicit LiteParsed(std::string parseTimeName)
+            : LiteParsedDocumentSource(std::move(parseTimeName)) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return stdx::unordered_set<NamespaceString>();
         }
 
+        PrivilegeVector requiredPrivileges(bool isMongos,
+                                           bool bypassDocumentValidation) const final;
+
         bool isInitialSource() const final {
             return true;
         }
-
-    private:
-        const NamespaceString _nss;
-        const DocumentSourceCollStatsSpec _spec;
     };
 
-    static BSONObj makeStatsForNs(const boost::intrusive_ptr<ExpressionContext>&,
-                                  const NamespaceString&,
-                                  const DocumentSourceCollStatsSpec&);
-
-    DocumentSourceCollStats(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                            DocumentSourceCollStatsSpec spec)
-        : DocumentSource(kStageName, pExpCtx), _collStatsSpec(std::move(spec)) {}
-
     const char* getSourceName() const final;
+
+    void addVariableRefs(std::set<Variables::Id>* refs) const final{};
+
+    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints(StreamType::kStreaming,
@@ -105,6 +86,7 @@ public:
                                      LookupRequirement::kAllowed,
                                      UnionRequirement::kAllowed);
 
+        constraints.isIndependentOfAnyCollection = true;
         constraints.requiresInputDocSource = false;
         return constraints;
     }
@@ -113,19 +95,15 @@ public:
         return boost::none;
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-
-    void addVariableRefs(std::set<Variables::Id>* refs) const final {}
-
-    static boost::intrusive_ptr<DocumentSource> createFromBson(
+    static boost::intrusive_ptr<DocumentSource> createFromBsonInternal(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
+    DocumentSourceInternalAllCollectionStats(
+        const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
+
     GetNextResult doGetNext() final;
 
-    // The raw object given to $collStats containing user specified options.
-    DocumentSourceCollStatsSpec _collStatsSpec;
-    bool _finished = false;
+    boost::optional<std::deque<BSONObj>> _catalogDocs;
 };
-
 }  // namespace mongo

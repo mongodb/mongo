@@ -1562,11 +1562,14 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
         [&](OperationContext* opCtx, const ChunkManager& cm) {
             auto pipelineToTarget = pipeline->clone();
 
-            if (!cm.isSharded()) {
+            if (!cm.isSharded() && expCtx->ns != NamespaceString::kConfigsvrCollectionsNamespace) {
                 // If the collection is unsharded and we are on the primary, we should be able to
                 // do a local read. The primary may be moved right after the primary shard check,
                 // but the local read path will do a db version check before it establishes a cursor
                 // to catch this case and ensure we fail to read locally.
+                // There is the case where we are in config.collections (collection unsharded) and
+                // we want to broadcast to all shards. In this case we don't want to do a local read
+                // and we must target the config servers.
                 try {
                     auto expectUnshardedCollection(
                         expCtx->mongoProcessInterface->expectUnshardedCollectionInScope(
