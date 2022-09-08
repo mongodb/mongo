@@ -147,6 +147,10 @@ void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, cons
             identInfo.isDropped = true;
 
             wuow.commit();
+            LOGV2(6776600,
+                  "The ident was successfully dropped",
+                  "ident"_attr = identName,
+                  "dropTimestamp"_attr = dropTimestamp);
         });
     }
 
