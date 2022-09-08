@@ -1,4 +1,4 @@
-# Stressful configuration for the cursor_bound_01 test.
+# Stressful configuration for the bounded_cursor_stress test.
 duration_seconds=3600,
 cache_size_mb=1500,
 reverse_collator=true,

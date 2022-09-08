@@ -1245,7 +1245,7 @@ tasks:
           test_config_filename: configs/bounded_cursor_perf_default.txt
           test_name: bounded_cursor_perf
 
-  - name: cppsuite-cursor-bound-01-default
+  - name: cppsuite-bounded-cursor-stress-default
     tags: ["pull_request"]
     depends_on:
       - name: compile
@@ -1254,10 +1254,10 @@ tasks:
       - func: "cppsuite test"
         vars:
           test_config: debug_mode=(cursor_copy=true)
-          test_config_filename: configs/cursor_bound_01_default.txt
-          test_name: cursor_bound_01
+          test_config_filename: configs/bounded_cursor_stress_default.txt
+          test_name: bounded_cursor_stress
 
-  - name: cppsuite-cursor-bound-01-reverse-default
+  - name: cppsuite-bounded-cursor-stress-reverse-default
     tags: ["pull_request"]
     depends_on:
       - name: compile
@@ -1266,10 +1266,10 @@ tasks:
       - func: "cppsuite test"
         vars:
           test_config: debug_mode=(cursor_copy=true)
-          test_config_filename: configs/cursor_bound_01_reverse_default.txt
-          test_name: cursor_bound_01
+          test_config_filename: configs/bounded_cursor_stress_reverse_default.txt
+          test_name: bounded_cursor_stress
 
-  - name: cppsuite-cursor-bound-02-default
+  - name: cppsuite-bounded-cursor-prefix-stat-default
     tags: ["pull_request"]
     depends_on:
       - name: compile
@@ -1278,10 +1278,10 @@ tasks:
       - func: "cppsuite test"
         vars:
           test_config: debug_mode=(cursor_copy=true)
-          test_config_filename: configs/cursor_bound_02_default.txt
-          test_name: cursor_bound_02
+          test_config_filename: configs/bounded_cursor_prefix_stat_default.txt
+          test_name: bounded_cursor_prefix_stat
 
-  - name: cppsuite-cursor-bound-03-default
+  - name: bounded-cursor-prefix-search-near-default
     tags: ["pull_request"]
     depends_on:
       - name: compile
@@ -1290,10 +1290,10 @@ tasks:
       - func: "cppsuite test"
         vars:
           test_config: debug_mode=(cursor_copy=true)
-          test_config_filename: configs/cursor_bound_03_default.txt
-          test_name: cursor_bound_03
+          test_config_filename: configs/bounded_cursor_prefix_search_near_default.txt
+          test_name: bounded_cursor_prefix_search_near
 
-  - name: cppsuite-cursor-bound-04-default
+  - name: bounded-cursor-prefix-indices-default
     tags: ["pull_request"]
     depends_on:
       - name: compile
@@ -1302,8 +1302,8 @@ tasks:
       - func: "cppsuite test"
         vars:
           test_config: debug_mode=(cursor_copy=true)
-          test_config_filename: configs/cursor_bound_04_default.txt
-          test_name: cursor_bound_04
+          test_config_filename: configs/bounded_cursor_prefix_indices_default.txt
+          test_name: bounded_cursor_prefix_indices
 
   - name: cppsuite-operations-test-stress
     depends_on:
@@ -1335,55 +1335,55 @@ tasks:
           test_config_filename: configs/burst_inserts_stress.txt
           test_name: burst_inserts
 
-  - name: cppsuite-cursor-bound-01-stress
+  - name: cppsuite-bounded-cursor-stress-stress
     depends_on:
       - name: compile
     commands:
       - func: "fetch artifacts"
       - func: "cppsuite test"
         vars:
-          test_config_filename: configs/cursor_bound_01_stress.txt
-          test_name: cursor_bound_01
+          test_config_filename: configs/bounded_cursor_stress_stress.txt
+          test_name: bounded_cursor_stress
 
-  - name: cppsuite-cursor-bound-01-reverse-stress
+  - name: cppsuite-bounded-cursor-stress-reverse-stress
     depends_on:
       - name: compile
     commands:
       - func: "fetch artifacts"
       - func: "cppsuite test"
         vars:
-          test_config_filename: configs/cursor_bound_01_reverse_stress.txt
-          test_name: cursor_bound_01
+          test_config_filename: configs/bounded_cursor_stress_reverse_stress.txt
+          test_name: bounded_cursor_stress
 
-  - name: cppsuite-cursor-bound-02-stress
+  - name: cppsuite-bounded-cursor-prefix-stat-stress
     depends_on:
       - name: compile
     commands:
       - func: "fetch artifacts"
       - func: "cppsuite test"
         vars:
-          test_config_filename: configs/cursor_bound_02_stress.txt
-          test_name: cursor_bound_02
+          test_config_filename: configs/bounded_cursor_prefix_stat_stress.txt
+          test_name: bounded_cursor_prefix_stat
 
-  - name: cppsuite-cursor-bound-03-stress
+  - name: cppsuite-bounded-cursor-prefix-search-near-stress
     depends_on:
       - name: compile
     commands:
       - func: "fetch artifacts"
       - func: "cppsuite test"
         vars:
-          test_config_filename: configs/cursor_bound_03_stress.txt
-          test_name: cursor_bound_03
+          test_config_filename: configs/bounded_cursor_prefix_search_near_stress.txt
+          test_name: bounded_cursor_prefix_search_near
 
-  - name: cppsuite-cursor-bound-04-stress
+  - name: cppsuite-bounded-cursor-prefix-indices-stress
     depends_on:
       - name: compile
     commands:
       - func: "fetch artifacts"
       - func: "cppsuite test"
         vars:
-          test_config_filename: configs/cursor_bound_04_stress.txt
-          test_name: cursor_bound_04
+          test_config_filename: configs/bounded_cursor_prefix_indices_stress.txt
+          test_name: bounded_cursor_prefix_indices
 
   - name: cppsuite-search-near-01-stress
     depends_on:
@@ -4266,11 +4266,11 @@ buildvariants:
     - name: compile
     - name: cppsuite-operations-test-stress
     - name: cppsuite-burst-inserts-stress
-    - name: cppsuite-cursor-bound-01-stress
-    - name: cppsuite-cursor-bound-01-reverse-stress
-    - name: cppsuite-cursor-bound-02-stress
-    - name: cppsuite-cursor-bound-03-stress
-    - name: cppsuite-cursor-bound-04-stress
+    - name: cppsuite-bounded-cursor-prefix-indices-stress
+    - name: cppsuite-bounded-cursor-prefix-search-near-stress
+    - name: cppsuite-bounded-cursor-prefix-stat-stress
+    - name: cppsuite-bounded-cursor-stress-reverse-stress
+    - name: cppsuite-bounded-cursor-stress-stress
     - name: cppsuite-hs-cleanup-stress
     - name: cppsuite-search-near-01-stress
     - name: cppsuite-search-near-02-stress

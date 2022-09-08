@@ -1,4 +1,4 @@
-# Configuration for cursor_bound_02 stress test.
+# Configuration for bounded_cursor_prefix_stat stress test.
 # The test will generate key_count_per_collection number of keys for each prefix in aaa -> zzz.
 # This config will have a 30 minute duration, with 3 tables of an entry for each prefix.
 #

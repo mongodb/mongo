@@ -32,6 +32,10 @@
 #include "src/common/constants.h"
 #include "src/common/random_generator.h"
 
+extern "C" {
+#include "test_util.h"
+}
+
 namespace test_harness {
 bound::bound()
 {
@@ -73,6 +77,13 @@ bool
 bound::get_inclusive() const
 {
     return _inclusive;
+}
+
+void
+bound::apply(scoped_cursor &cursor) const
+{
+    cursor->set_key(cursor.get(), _key.c_str());
+    testutil_check(cursor->bound(cursor.get(), get_config().c_str()));
 }
 
 void

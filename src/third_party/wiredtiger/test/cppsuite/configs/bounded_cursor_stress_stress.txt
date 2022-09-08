@@ -1,6 +1,6 @@
-# Stressful configuration for the cursor_bound_01 test.
+# Stressful configuration for the bounded_cursor_stress test.
 duration_seconds=3600,
-cache_size_mb=1500,
+cache_size_mb=900,
 reverse_collator=false,
 timestamp_manager=
 (
@@ -22,8 +22,8 @@ workload_manager=
     insert_config=
     (
         key_size=100,
-        op_rate=100ms,
-        thread_count=10,
+        op_rate=10ms,
+        thread_count=15,
         value_size=1000000,
         ops_per_transaction=(max=20,min=0)
     ),
@@ -42,7 +42,7 @@ workload_manager=
     #100MB/s update rate
     update_config=
     (
-        op_rate=100ms,
+        op_rate=10ms,
         thread_count=10,
         value_size=1000000,
         ops_per_transaction=(max=20,min=0)

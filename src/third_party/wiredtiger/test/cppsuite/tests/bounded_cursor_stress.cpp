@@ -26,6 +26,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include "src/bound/bound_set.h"
 #include "src/common/constants.h"
 #include "src/common/random_generator.h"
 #include "src/bound/bound.h"
@@ -46,7 +47,7 @@ using namespace test_harness;
  * random bounds set. Both next() and prev() calls with bounds set is verified against the
  * default cursor next() and prev() calls.
  */
-class cursor_bound_01 : public test {
+class bounded_cursor_stress : public test {
     /* Class helper to represent the lower and uppers bounds for the range cursor. */
     private:
     bool _reverse_collator_enabled = false;
@@ -54,7 +55,7 @@ class cursor_bound_01 : public test {
     enum class bound_action { NO_BOUNDS, LOWER_BOUND_SET, UPPER_BOUND_SET, ALL_BOUNDS_SET };
 
     public:
-    cursor_bound_01(const test_args &args) : test(args)
+    bounded_cursor_stress(const test_args &args) : test(args)
     {
         /* Track reverse_collator value as it is required for the custom comparator. */
         _reverse_collator_enabled = _config->get_bool(REVERSE_COLLATOR);
@@ -82,7 +83,7 @@ class cursor_bound_01 : public test {
      * bound and upper bound checks while walking the tree.
      */
     void
-    cursor_traversal(scoped_cursor &range_cursor, scoped_cursor &normal_cursor,
+    cursor_traversal(scoped_cursor &bounded_cursor, scoped_cursor &normal_cursor,
       const bound &lower_bound, const bound &upper_bound, bool next)
     {
         int exact, normal_ret, range_ret;
@@ -91,7 +92,7 @@ class cursor_bound_01 : public test {
         auto lower_key = lower_bound.get_key();
         auto upper_key = upper_bound.get_key();
         if (next) {
-            range_ret = range_cursor->next(range_cursor.get());
+            range_ret = bounded_cursor->next(bounded_cursor.get());
             /*
              * If the key exists, position the cursor to the lower key using search near otherwise
              * use prev().
@@ -106,7 +107,7 @@ class cursor_bound_01 : public test {
             } else
                 normal_ret = normal_cursor->next(normal_cursor.get());
         } else {
-            range_ret = range_cursor->prev(range_cursor.get());
+            range_ret = bounded_cursor->prev(bounded_cursor.get());
             /*
              * If the key exists, position the cursor to the upper key using search near otherwise
              * use next().
@@ -147,15 +148,15 @@ class cursor_bound_01 : public test {
         /* Retrieve the key the cursor is pointing at. */
         const char *range_key;
         testutil_check(normal_cursor->get_key(normal_cursor.get(), &normal_key));
-        testutil_check(range_cursor->get_key(range_cursor.get(), &range_key));
+        testutil_check(bounded_cursor->get_key(bounded_cursor.get(), &range_key));
         testutil_assert(std::string(normal_key).compare(range_key) == 0);
         while (true) {
             if (next) {
                 normal_ret = normal_cursor->next(normal_cursor.get());
-                range_ret = range_cursor->next(range_cursor.get());
+                range_ret = bounded_cursor->next(bounded_cursor.get());
             } else {
                 normal_ret = normal_cursor->prev(normal_cursor.get());
-                range_ret = range_cursor->prev(range_cursor.get());
+                range_ret = bounded_cursor->prev(bounded_cursor.get());
             }
 
             if (normal_ret == WT_ROLLBACK || range_ret == WT_ROLLBACK)
@@ -182,7 +183,7 @@ class cursor_bound_01 : public test {
             }
             /* Make sure that records match between both cursors. */
             testutil_check(normal_cursor->get_key(normal_cursor.get(), &normal_key));
-            testutil_check(range_cursor->get_key(range_cursor.get(), &range_key));
+            testutil_check(bounded_cursor->get_key(bounded_cursor.get(), &range_key));
             testutil_assert(std::string(normal_key).compare(range_key) == 0);
             if (next && !upper_key.empty())
                 testutil_assert(custom_lexicographical_compare(
@@ -198,43 +199,39 @@ class cursor_bound_01 : public test {
      * bounds on the range cursor. The lower and upper bounds are randomly generated strings and the
      * inclusive configuration is also randomly set as well.
      */
-    std::pair<bound, bound>
-    set_random_bounds(thread_worker *tc, scoped_cursor &range_cursor)
+    bound_set
+    set_random_bounds(thread_worker *tc, scoped_cursor &bounded_cursor)
     {
         bound lower_bound, upper_bound;
 
-        testutil_check(range_cursor->reset(range_cursor.get()));
+        testutil_check(bounded_cursor->reset(bounded_cursor.get()));
         bound_action action =
           static_cast<bound_action>(random_generator::instance().generate_integer(0, 3));
         if (action == bound_action::NO_BOUNDS)
-            testutil_check(range_cursor->bound(range_cursor.get(), "action=clear"));
+            testutil_check(bounded_cursor->bound(bounded_cursor.get(), "action=clear"));
 
-        if (action == bound_action::LOWER_BOUND_SET || action == bound_action::ALL_BOUNDS_SET) {
+        if (action == bound_action::LOWER_BOUND_SET || action == bound_action::ALL_BOUNDS_SET)
             lower_bound = bound(tc->key_size, true);
-            range_cursor->set_key(range_cursor.get(), lower_bound.get_key().c_str());
-            testutil_check(
-              range_cursor->bound(range_cursor.get(), lower_bound.get_config().c_str()));
-        }
 
         if (action == bound_action::UPPER_BOUND_SET || action == bound_action::ALL_BOUNDS_SET) {
             if (action == bound_action::ALL_BOUNDS_SET) {
                 /* Ensure that the lower and upper bounds are never overlapping. */
-                if (_reverse_collator_enabled)
-                    upper_bound = bound(tc->key_size, false, lower_bound.get_key()[0] - 1);
-                else
-                    upper_bound = bound(tc->key_size, false, lower_bound.get_key()[0] + 1);
+                auto diff = _reverse_collator_enabled ? -1 : 1;
+                upper_bound = bound(tc->key_size, false, lower_bound.get_key()[0] + diff);
             } else
                 upper_bound = bound(tc->key_size, false);
-            range_cursor->set_key(range_cursor.get(), upper_bound.get_key().c_str());
-            testutil_check(
-              range_cursor->bound(range_cursor.get(), upper_bound.get_config().c_str()));
         }
 
         if (action == bound_action::ALL_BOUNDS_SET)
             testutil_assert(
               custom_lexicographical_compare(lower_bound.get_key(), upper_bound.get_key(), false));
 
-        return std::make_pair(lower_bound, upper_bound);
+        if (!lower_bound.get_key().empty())
+            lower_bound.apply(bounded_cursor);
+        if (!upper_bound.get_key().empty())
+            upper_bound.apply(bounded_cursor);
+
+        return bound_set(lower_bound, upper_bound);
     }
 
     /*
@@ -245,16 +242,18 @@ class cursor_bound_01 : public test {
      * key or with WT_NOTFOUND.
      */
     void
-    validate_bound_search(int range_ret, scoped_cursor &range_cursor, const std::string &search_key,
-      const bound &lower_bound, const bound &upper_bound)
+    validate_bound_search(int range_ret, scoped_cursor &bounded_cursor,
+      const std::string &search_key, const bound_set &bounds)
     {
+        auto lower_bound = bounds.get_lower();
+        auto upper_bound = bounds.get_upper();
         auto lower_key = lower_bound.get_key();
         auto upper_key = upper_bound.get_key();
         auto lower_inclusive = lower_bound.get_inclusive();
         auto upper_inclusive = upper_bound.get_inclusive();
 
         const char *key;
-        testutil_check(range_cursor->get_key(range_cursor.get(), &key));
+        testutil_check(bounded_cursor->get_key(bounded_cursor.get(), &key));
         logger::log_msg(LOG_TRACE,
           "bounded search found key: " + std::string(key) + " with lower bound: " + lower_key +
             " upper bound: " + upper_key);
@@ -296,10 +295,11 @@ class cursor_bound_01 : public test {
      * valid key or with WT_NOTFOUND.
      */
     void
-    validate_bound_search_near(int range_ret, int range_exact, scoped_cursor &range_cursor,
-      scoped_cursor &normal_cursor, const std::string &search_key, const bound &lower_bound,
-      const bound &upper_bound)
+    validate_bound_search_near(int range_ret, int range_exact, scoped_cursor &bounded_cursor,
+      scoped_cursor &normal_cursor, const std::string &search_key, const bound_set &bounds)
     {
+        auto lower_bound = bounds.get_lower();
+        auto upper_bound = bounds.get_upper();
         /* Range cursor has successfully returned with a key. */
         if (range_ret == 0) {
             auto lower_key = lower_bound.get_key();
@@ -308,7 +308,7 @@ class cursor_bound_01 : public test {
             auto upper_inclusive = upper_bound.get_inclusive();
 
             const char *key;
-            testutil_check(range_cursor->get_key(range_cursor.get(), &key));
+            testutil_check(bounded_cursor->get_key(bounded_cursor.get(), &key));
             logger::log_msg(LOG_TRACE,
               "bounded search_near found key: " + std::string(key) +
                 " with lower bound: " + lower_key + " upper bound: " + upper_key);
@@ -619,8 +619,8 @@ class cursor_bound_01 : public test {
                 cursors.emplace(coll.id, std::move(tc->session.open_scoped_cursor(coll.name)));
 
             /* Set random bounds on cached range cursor. */
-            auto &range_cursor = cursors[coll.id];
-            auto bound_pair = set_random_bounds(tc, range_cursor);
+            auto &bounded_cursor = cursors[coll.id];
+            auto bound_pair = set_random_bounds(tc, bounded_cursor);
 
             scoped_cursor normal_cursor = tc->session.open_scoped_cursor(coll.name);
             wt_timestamp_t ts = tc->tsm->get_valid_read_ts();
@@ -638,15 +638,15 @@ class cursor_bound_01 : public test {
                   key_size, characters_type::ALPHABET);
 
                 int exact = 0;
-                range_cursor->set_key(range_cursor.get(), srch_key.c_str());
-                auto ret = range_cursor->search_near(range_cursor.get(), &exact);
+                bounded_cursor->set_key(bounded_cursor.get(), srch_key.c_str());
+                auto ret = bounded_cursor->search_near(bounded_cursor.get(), &exact);
                 testutil_assert(ret == 0 || ret == WT_NOTFOUND || ret == WT_ROLLBACK);
                 if (ret == WT_ROLLBACK)
                     continue;
 
                 /* Verify the bound search_near result using the normal cursor. */
-                validate_bound_search_near(ret, exact, range_cursor, normal_cursor, srch_key,
-                  bound_pair.first, bound_pair.second);
+                validate_bound_search_near(
+                  ret, exact, bounded_cursor, normal_cursor, srch_key, bound_pair);
 
                 /*
                  * If search near was successful, use the key it's currently positioned on as the
@@ -654,20 +654,19 @@ class cursor_bound_01 : public test {
                  */
                 if (ret == 0) {
                     const char *range_srch_key;
-                    testutil_check(range_cursor->get_key(range_cursor.get(), &range_srch_key));
+                    testutil_check(bounded_cursor->get_key(bounded_cursor.get(), &range_srch_key));
                     /*
                      * Take a copy of the range search key as it the buffer returned by WiredTiger
                      * won't be valid after the call to set_key.
                      */
                     std::string range_key_copy(range_srch_key);
-                    range_cursor->set_key(range_cursor.get(), range_key_copy.c_str());
-                    ret = range_cursor->search(range_cursor.get());
+                    bounded_cursor->set_key(bounded_cursor.get(), range_key_copy.c_str());
+                    ret = bounded_cursor->search(bounded_cursor.get());
 
                     testutil_assert(ret == 0 || ret == WT_NOTFOUND || ret == WT_ROLLBACK);
                     if (ret == WT_ROLLBACK)
                         continue;
-                    validate_bound_search(
-                      ret, range_cursor, range_key_copy, bound_pair.first, bound_pair.second);
+                    validate_bound_search(ret, bounded_cursor, range_key_copy, bound_pair);
                 }
 
                 tc->txn.add_op();
@@ -675,7 +674,7 @@ class cursor_bound_01 : public test {
                     tc->txn.commit();
                 tc->sleep();
             }
-            range_cursor->reset(range_cursor.get());
+            bounded_cursor->reset(bounded_cursor.get());
             normal_cursor->reset(normal_cursor.get());
         }
         /* Roll back the last transaction if still active now the work is finished. */
@@ -703,8 +702,8 @@ class cursor_bound_01 : public test {
                 cursors.emplace(coll.id, std::move(tc->session.open_scoped_cursor(coll.name)));
 
             /* Set random bounds on cached range cursor. */
-            auto &range_cursor = cursors[coll.id];
-            auto bound_pair = set_random_bounds(tc, range_cursor);
+            auto &bounded_cursor = cursors[coll.id];
+            auto bound_pair = set_random_bounds(tc, bounded_cursor);
 
             scoped_cursor normal_cursor = tc->session.open_scoped_cursor(coll.name);
             wt_timestamp_t ts = tc->tsm->get_valid_read_ts();
@@ -715,11 +714,11 @@ class cursor_bound_01 : public test {
             tc->txn.begin(
               "roundup_timestamps=(read=true),read_timestamp=" + tc->tsm->decimal_to_hex(ts));
             while (tc->txn.active() && tc->running()) {
-                cursor_traversal(
-                  range_cursor, normal_cursor, bound_pair.first, bound_pair.second, true);
+                cursor_traversal(bounded_cursor, normal_cursor, bound_pair.get_lower(),
+                  bound_pair.get_upper(), true);
                 testutil_check(normal_cursor->reset(normal_cursor.get()));
-                cursor_traversal(
-                  range_cursor, normal_cursor, bound_pair.first, bound_pair.second, false);
+                cursor_traversal(bounded_cursor, normal_cursor, bound_pair.get_lower(),
+                  bound_pair.get_upper(), false);
                 tc->txn.add_op();
                 tc->txn.try_rollback();
                 tc->sleep();

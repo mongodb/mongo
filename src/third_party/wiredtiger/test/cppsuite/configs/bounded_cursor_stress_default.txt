@@ -1,4 +1,4 @@
-# Configuration for cursor_bound_01 default test.
+# Configuration for bounded_cursor_stress default test.
 duration_seconds=60,
 cache_size_mb=100,
 reverse_collator=false,

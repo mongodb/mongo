@@ -41,9 +41,9 @@ using namespace test_harness;
  *  - M threads will execute search_near calls with bounds enabled using random prefixes as well.
  * Each search_near call with bounds enabled is verified using the default search_near.
  */
-class cursor_bound_03 : public test {
+class bounded_cursor_prefix_search_near : public test {
     public:
-    cursor_bound_03(const test_args &args) : test(args)
+    bounded_cursor_prefix_search_near(const test_args &args) : test(args)
     {
         init_operation_tracker();
     }

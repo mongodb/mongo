@@ -36,10 +36,10 @@
 #include "bounded_cursor_perf.cpp"
 #include "burst_inserts.cpp"
 #include "cache_resize.cpp"
-#include "cursor_bound_01.cpp"
-#include "cursor_bound_02.cpp"
-#include "cursor_bound_03.cpp"
-#include "cursor_bound_04.cpp"
+#include "bounded_cursor_stress.cpp"
+#include "bounded_cursor_prefix_stat.cpp"
+#include "bounded_cursor_prefix_search_near.cpp"
+#include "bounded_cursor_prefix_indices.cpp"
 #include "hs_cleanup.cpp"
 #include "operations_test.cpp"
 #include "search_near_01.cpp"
@@ -136,14 +136,14 @@ run_test(const std::string &test_name, const std::string &config, const std::str
         burst_inserts(args).run();
     else if (test_name == "cache_resize")
         cache_resize(args).run();
-    else if (test_name == "cursor_bound_01")
-        cursor_bound_01(args).run();
-    else if (test_name == "cursor_bound_02")
-        cursor_bound_02(args).run();
-    else if (test_name == "cursor_bound_03")
-        cursor_bound_03(args).run();
-    else if (test_name == "cursor_bound_04")
-        cursor_bound_04(args).run();
+    else if (test_name == "bounded_cursor_prefix_indices")
+        bounded_cursor_prefix_indices(args).run();
+    else if (test_name == "bounded_cursor_prefix_search_near")
+        bounded_cursor_prefix_search_near(args).run();
+    else if (test_name == "bounded_cursor_prefix_stat")
+        bounded_cursor_prefix_stat(args).run();
+    else if (test_name == "bounded_cursor_stress")
+        bounded_cursor_stress(args).run();
     else if (test_name == "hs_cleanup")
         hs_cleanup(args).run();
     else if (test_name == "operations_test")
@@ -178,8 +178,9 @@ main(int argc, char *argv[])
 {
     std::string cfg, config_filename, current_cfg, current_test_name, test_name, wt_open_config;
     int64_t error_code = 0;
-    const std::vector<std::string> all_tests = {"bounded_cursor_perf", "burst_inserts",
-      "cache_resize", "cursor_bound_01", "cursor_bound_02", "cursor_bound_03", "cursor_bound_04",
+    const std::vector<std::string> all_tests = {"bounded_cursor_perf",
+      "bounded_cursor_prefix_indices", "bounded_cursor_prefix_search_near",
+      "bounded_cursor_prefix_stat", "bounded_cursor_stress", "burst_inserts", "cache_resize",
       "hs_cleanup", "operations_test", "search_near_01", "search_near_02", "search_near_03",
       "test_template"};
 

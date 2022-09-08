@@ -114,6 +114,63 @@ static const WT_CONFIG_CHECK confchk_bounded_cursor_perf[] = {
   {"workload_manager", "category", NULL, NULL, confchk_workload_manager_subconfigs, 9},
   {NULL, NULL, NULL, NULL, NULL, 0}};
 
+static const WT_CONFIG_CHECK confchk_bounded_cursor_prefix_indices[] = {
+  {"cache_max_wait_ms", "int", NULL, "min=0", NULL, 0},
+  {"cache_size_mb", "int", NULL, "min=0,max=100000000000", NULL, 0},
+  {"compression_enabled", "boolean", NULL, NULL, NULL, 0},
+  {"duration_seconds", "int", NULL, "min=0,max=1000000", NULL, 0},
+  {"enable_logging", "boolean", NULL, NULL, NULL, 0},
+  {"metrics_monitor", "category", NULL, NULL, confchk_metrics_monitor_subconfigs, 6},
+  {"operation_tracker", "category", NULL, NULL, confchk_operation_tracker_subconfigs, 4},
+  {"reverse_collator", "boolean", NULL, NULL, NULL, 0},
+  {"statistics_config", "category", NULL, NULL, confchk_statistics_config_subconfigs, 2},
+  {"timestamp_manager", "category", NULL, NULL, confchk_timestamp_manager_subconfigs, 4},
+  {"workload_manager", "category", NULL, NULL, confchk_workload_manager_subconfigs, 9},
+  {NULL, NULL, NULL, NULL, NULL, 0}};
+
+static const WT_CONFIG_CHECK confchk_bounded_cursor_prefix_search_near[] = {
+  {"cache_max_wait_ms", "int", NULL, "min=0", NULL, 0},
+  {"cache_size_mb", "int", NULL, "min=0,max=100000000000", NULL, 0},
+  {"compression_enabled", "boolean", NULL, NULL, NULL, 0},
+  {"duration_seconds", "int", NULL, "min=0,max=1000000", NULL, 0},
+  {"enable_logging", "boolean", NULL, NULL, NULL, 0},
+  {"metrics_monitor", "category", NULL, NULL, confchk_metrics_monitor_subconfigs, 6},
+  {"operation_tracker", "category", NULL, NULL, confchk_operation_tracker_subconfigs, 4},
+  {"reverse_collator", "boolean", NULL, NULL, NULL, 0},
+  {"statistics_config", "category", NULL, NULL, confchk_statistics_config_subconfigs, 2},
+  {"timestamp_manager", "category", NULL, NULL, confchk_timestamp_manager_subconfigs, 4},
+  {"workload_manager", "category", NULL, NULL, confchk_workload_manager_subconfigs, 9},
+  {NULL, NULL, NULL, NULL, NULL, 0}};
+
+static const WT_CONFIG_CHECK confchk_bounded_cursor_prefix_stat[] = {
+  {"cache_max_wait_ms", "int", NULL, "min=0", NULL, 0},
+  {"cache_size_mb", "int", NULL, "min=0,max=100000000000", NULL, 0},
+  {"compression_enabled", "boolean", NULL, NULL, NULL, 0},
+  {"duration_seconds", "int", NULL, "min=0,max=1000000", NULL, 0},
+  {"enable_logging", "boolean", NULL, NULL, NULL, 0},
+  {"metrics_monitor", "category", NULL, NULL, confchk_metrics_monitor_subconfigs, 6},
+  {"operation_tracker", "category", NULL, NULL, confchk_operation_tracker_subconfigs, 4},
+  {"reverse_collator", "boolean", NULL, NULL, NULL, 0},
+  {"search_near_threads", "string", NULL, NULL, NULL, 0},
+  {"statistics_config", "category", NULL, NULL, confchk_statistics_config_subconfigs, 2},
+  {"timestamp_manager", "category", NULL, NULL, confchk_timestamp_manager_subconfigs, 4},
+  {"workload_manager", "category", NULL, NULL, confchk_workload_manager_subconfigs, 9},
+  {NULL, NULL, NULL, NULL, NULL, 0}};
+
+static const WT_CONFIG_CHECK confchk_bounded_cursor_stress[] = {
+  {"cache_max_wait_ms", "int", NULL, "min=0", NULL, 0},
+  {"cache_size_mb", "int", NULL, "min=0,max=100000000000", NULL, 0},
+  {"compression_enabled", "boolean", NULL, NULL, NULL, 0},
+  {"duration_seconds", "int", NULL, "min=0,max=1000000", NULL, 0},
+  {"enable_logging", "boolean", NULL, NULL, NULL, 0},
+  {"metrics_monitor", "category", NULL, NULL, confchk_metrics_monitor_subconfigs, 6},
+  {"operation_tracker", "category", NULL, NULL, confchk_operation_tracker_subconfigs, 4},
+  {"reverse_collator", "boolean", NULL, NULL, NULL, 0},
+  {"statistics_config", "category", NULL, NULL, confchk_statistics_config_subconfigs, 2},
+  {"timestamp_manager", "category", NULL, NULL, confchk_timestamp_manager_subconfigs, 4},
+  {"workload_manager", "category", NULL, NULL, confchk_workload_manager_subconfigs, 9},
+  {NULL, NULL, NULL, NULL, NULL, 0}};
+
 static const WT_CONFIG_CHECK confchk_burst_inserts[] = {
   {"burst_duration", "string", NULL, NULL, NULL, 0},
   {"cache_max_wait_ms", "int", NULL, "min=0", NULL, 0},
@@ -130,63 +187,6 @@ static const WT_CONFIG_CHECK confchk_burst_inserts[] = {
   {NULL, NULL, NULL, NULL, NULL, 0}};
 
 static const WT_CONFIG_CHECK confchk_cache_resize[] = {
-  {"cache_max_wait_ms", "int", NULL, "min=0", NULL, 0},
-  {"cache_size_mb", "int", NULL, "min=0,max=100000000000", NULL, 0},
-  {"compression_enabled", "boolean", NULL, NULL, NULL, 0},
-  {"duration_seconds", "int", NULL, "min=0,max=1000000", NULL, 0},
-  {"enable_logging", "boolean", NULL, NULL, NULL, 0},
-  {"metrics_monitor", "category", NULL, NULL, confchk_metrics_monitor_subconfigs, 6},
-  {"operation_tracker", "category", NULL, NULL, confchk_operation_tracker_subconfigs, 4},
-  {"reverse_collator", "boolean", NULL, NULL, NULL, 0},
-  {"statistics_config", "category", NULL, NULL, confchk_statistics_config_subconfigs, 2},
-  {"timestamp_manager", "category", NULL, NULL, confchk_timestamp_manager_subconfigs, 4},
-  {"workload_manager", "category", NULL, NULL, confchk_workload_manager_subconfigs, 9},
-  {NULL, NULL, NULL, NULL, NULL, 0}};
-
-static const WT_CONFIG_CHECK confchk_cursor_bound_01[] = {
-  {"cache_max_wait_ms", "int", NULL, "min=0", NULL, 0},
-  {"cache_size_mb", "int", NULL, "min=0,max=100000000000", NULL, 0},
-  {"compression_enabled", "boolean", NULL, NULL, NULL, 0},
-  {"duration_seconds", "int", NULL, "min=0,max=1000000", NULL, 0},
-  {"enable_logging", "boolean", NULL, NULL, NULL, 0},
-  {"metrics_monitor", "category", NULL, NULL, confchk_metrics_monitor_subconfigs, 6},
-  {"operation_tracker", "category", NULL, NULL, confchk_operation_tracker_subconfigs, 4},
-  {"reverse_collator", "boolean", NULL, NULL, NULL, 0},
-  {"statistics_config", "category", NULL, NULL, confchk_statistics_config_subconfigs, 2},
-  {"timestamp_manager", "category", NULL, NULL, confchk_timestamp_manager_subconfigs, 4},
-  {"workload_manager", "category", NULL, NULL, confchk_workload_manager_subconfigs, 9},
-  {NULL, NULL, NULL, NULL, NULL, 0}};
-
-static const WT_CONFIG_CHECK confchk_cursor_bound_02[] = {
-  {"cache_max_wait_ms", "int", NULL, "min=0", NULL, 0},
-  {"cache_size_mb", "int", NULL, "min=0,max=100000000000", NULL, 0},
-  {"compression_enabled", "boolean", NULL, NULL, NULL, 0},
-  {"duration_seconds", "int", NULL, "min=0,max=1000000", NULL, 0},
-  {"enable_logging", "boolean", NULL, NULL, NULL, 0},
-  {"metrics_monitor", "category", NULL, NULL, confchk_metrics_monitor_subconfigs, 6},
-  {"operation_tracker", "category", NULL, NULL, confchk_operation_tracker_subconfigs, 4},
-  {"reverse_collator", "boolean", NULL, NULL, NULL, 0},
-  {"search_near_threads", "string", NULL, NULL, NULL, 0},
-  {"statistics_config", "category", NULL, NULL, confchk_statistics_config_subconfigs, 2},
-  {"timestamp_manager", "category", NULL, NULL, confchk_timestamp_manager_subconfigs, 4},
-  {"workload_manager", "category", NULL, NULL, confchk_workload_manager_subconfigs, 9},
-  {NULL, NULL, NULL, NULL, NULL, 0}};
-
-static const WT_CONFIG_CHECK confchk_cursor_bound_03[] = {
-  {"cache_max_wait_ms", "int", NULL, "min=0", NULL, 0},
-  {"cache_size_mb", "int", NULL, "min=0,max=100000000000", NULL, 0},
-  {"compression_enabled", "boolean", NULL, NULL, NULL, 0},
-  {"duration_seconds", "int", NULL, "min=0,max=1000000", NULL, 0},
-  {"enable_logging", "boolean", NULL, NULL, NULL, 0},
-  {"metrics_monitor", "category", NULL, NULL, confchk_metrics_monitor_subconfigs, 6},
-  {"operation_tracker", "category", NULL, NULL, confchk_operation_tracker_subconfigs, 4},
-  {"reverse_collator", "boolean", NULL, NULL, NULL, 0},
-  {"statistics_config", "category", NULL, NULL, confchk_statistics_config_subconfigs, 2},
-  {"timestamp_manager", "category", NULL, NULL, confchk_timestamp_manager_subconfigs, 4},
-  {"workload_manager", "category", NULL, NULL, confchk_workload_manager_subconfigs, 9},
-  {NULL, NULL, NULL, NULL, NULL, 0}};
-
-static const WT_CONFIG_CHECK confchk_cursor_bound_04[] = {
   {"cache_max_wait_ms", "int", NULL, "min=0", NULL, 0},
   {"cache_size_mb", "int", NULL, "min=0,max=100000000000", NULL, 0},
   {"compression_enabled", "boolean", NULL, NULL, NULL, 0},
@@ -312,6 +312,110 @@ static const WT_CONFIG_ENTRY config_entries[] = {
     "update_config=(key_size=5,op_rate=1s,ops_per_transaction=(max=1,"
     "min=0),thread_count=0,value_size=5))",
     confchk_bounded_cursor_perf, 11},
+  {"bounded_cursor_prefix_indices",
+    "cache_max_wait_ms=0,cache_size_mb=0,compression_enabled=false,"
+    "duration_seconds=0,enable_logging=false,"
+    "metrics_monitor=(cache_hs_insert=(max=1,min=0,postrun=false,"
+    "runtime=false,save=false),cc_pages_removed=(max=1,min=0,"
+    "postrun=false,runtime=false,save=false),enabled=true,op_rate=1s,"
+    "stat_cache_size=(max=1,min=0,postrun=false,runtime=false,"
+    "save=false),stat_db_size=(max=1,min=0,postrun=false,"
+    "runtime=false,save=false)),operation_tracker=(enabled=true,"
+    "op_rate=1s,tracking_key_format=QSQ,tracking_value_format=iS),"
+    "reverse_collator=false,statistics_config=(enable_logging=true,"
+    "type=all),timestamp_manager=(enabled=true,oldest_lag=1,"
+    "op_rate=1s,stable_lag=1),"
+    "workload_manager=(checkpoint_config=(op_rate=60s,thread_count=1)"
+    ",custom_config=(key_size=5,op_rate=1s,ops_per_transaction=(max=1"
+    ",min=0),thread_count=0,value_size=5),enabled=true,"
+    "insert_config=(key_size=5,op_rate=1s,ops_per_transaction=(max=1,"
+    "min=0),thread_count=0,value_size=5),op_rate=1s,"
+    "populate_config=(collection_count=1,key_count_per_collection=0,"
+    "key_size=5,thread_count=1,value_size=5),read_config=(key_size=5,"
+    "op_rate=1s,ops_per_transaction=(max=1,min=0),thread_count=0,"
+    "value_size=5),remove_config=(op_rate=1s,"
+    "ops_per_transaction=(max=1,min=0),thread_count=0),"
+    "update_config=(key_size=5,op_rate=1s,ops_per_transaction=(max=1,"
+    "min=0),thread_count=0,value_size=5))",
+    confchk_bounded_cursor_prefix_indices, 11},
+  {"bounded_cursor_prefix_search_near",
+    "cache_max_wait_ms=0,cache_size_mb=0,compression_enabled=false,"
+    "duration_seconds=0,enable_logging=false,"
+    "metrics_monitor=(cache_hs_insert=(max=1,min=0,postrun=false,"
+    "runtime=false,save=false),cc_pages_removed=(max=1,min=0,"
+    "postrun=false,runtime=false,save=false),enabled=true,op_rate=1s,"
+    "stat_cache_size=(max=1,min=0,postrun=false,runtime=false,"
+    "save=false),stat_db_size=(max=1,min=0,postrun=false,"
+    "runtime=false,save=false)),operation_tracker=(enabled=true,"
+    "op_rate=1s,tracking_key_format=QSQ,tracking_value_format=iS),"
+    "reverse_collator=false,statistics_config=(enable_logging=true,"
+    "type=all),timestamp_manager=(enabled=true,oldest_lag=1,"
+    "op_rate=1s,stable_lag=1),"
+    "workload_manager=(checkpoint_config=(op_rate=60s,thread_count=1)"
+    ",custom_config=(key_size=5,op_rate=1s,ops_per_transaction=(max=1"
+    ",min=0),thread_count=0,value_size=5),enabled=true,"
+    "insert_config=(key_size=5,op_rate=1s,ops_per_transaction=(max=1,"
+    "min=0),thread_count=0,value_size=5),op_rate=1s,"
+    "populate_config=(collection_count=1,key_count_per_collection=0,"
+    "key_size=5,thread_count=1,value_size=5),read_config=(key_size=5,"
+    "op_rate=1s,ops_per_transaction=(max=1,min=0),thread_count=0,"
+    "value_size=5),remove_config=(op_rate=1s,"
+    "ops_per_transaction=(max=1,min=0),thread_count=0),"
+    "update_config=(key_size=5,op_rate=1s,ops_per_transaction=(max=1,"
+    "min=0),thread_count=0,value_size=5))",
+    confchk_bounded_cursor_prefix_search_near, 11},
+  {"bounded_cursor_prefix_stat",
+    "cache_max_wait_ms=0,cache_size_mb=0,compression_enabled=false,"
+    "duration_seconds=0,enable_logging=false,"
+    "metrics_monitor=(cache_hs_insert=(max=1,min=0,postrun=false,"
+    "runtime=false,save=false),cc_pages_removed=(max=1,min=0,"
+    "postrun=false,runtime=false,save=false),enabled=true,op_rate=1s,"
+    "stat_cache_size=(max=1,min=0,postrun=false,runtime=false,"
+    "save=false),stat_db_size=(max=1,min=0,postrun=false,"
+    "runtime=false,save=false)),operation_tracker=(enabled=true,"
+    "op_rate=1s,tracking_key_format=QSQ,tracking_value_format=iS),"
+    "reverse_collator=false,search_near_threads=10,"
+    "statistics_config=(enable_logging=true,type=all),"
+    "timestamp_manager=(enabled=true,oldest_lag=1,op_rate=1s,"
+    "stable_lag=1),workload_manager=(checkpoint_config=(op_rate=60s,"
+    "thread_count=1),custom_config=(key_size=5,op_rate=1s,"
+    "ops_per_transaction=(max=1,min=0),thread_count=0,value_size=5),"
+    "enabled=true,insert_config=(key_size=5,op_rate=1s,"
+    "ops_per_transaction=(max=1,min=0),thread_count=0,value_size=5),"
+    "op_rate=1s,populate_config=(collection_count=1,"
+    "key_count_per_collection=0,key_size=5,thread_count=1,"
+    "value_size=5),read_config=(key_size=5,op_rate=1s,"
+    "ops_per_transaction=(max=1,min=0),thread_count=0,value_size=5),"
+    "remove_config=(op_rate=1s,ops_per_transaction=(max=1,min=0),"
+    "thread_count=0),update_config=(key_size=5,op_rate=1s,"
+    "ops_per_transaction=(max=1,min=0),thread_count=0,value_size=5))",
+    confchk_bounded_cursor_prefix_stat, 12},
+  {"bounded_cursor_stress",
+    "cache_max_wait_ms=0,cache_size_mb=0,compression_enabled=false,"
+    "duration_seconds=0,enable_logging=false,"
+    "metrics_monitor=(cache_hs_insert=(max=1,min=0,postrun=false,"
+    "runtime=false,save=false),cc_pages_removed=(max=1,min=0,"
+    "postrun=false,runtime=false,save=false),enabled=true,op_rate=1s,"
+    "stat_cache_size=(max=1,min=0,postrun=false,runtime=false,"
+    "save=false),stat_db_size=(max=1,min=0,postrun=false,"
+    "runtime=false,save=false)),operation_tracker=(enabled=true,"
+    "op_rate=1s,tracking_key_format=QSQ,tracking_value_format=iS),"
+    "reverse_collator=false,statistics_config=(enable_logging=true,"
+    "type=all),timestamp_manager=(enabled=true,oldest_lag=1,"
+    "op_rate=1s,stable_lag=1),"
+    "workload_manager=(checkpoint_config=(op_rate=60s,thread_count=1)"
+    ",custom_config=(key_size=5,op_rate=1s,ops_per_transaction=(max=1"
+    ",min=0),thread_count=0,value_size=5),enabled=true,"
+    "insert_config=(key_size=5,op_rate=1s,ops_per_transaction=(max=1,"
+    "min=0),thread_count=0,value_size=5),op_rate=1s,"
+    "populate_config=(collection_count=1,key_count_per_collection=0,"
+    "key_size=5,thread_count=1,value_size=5),read_config=(key_size=5,"
+    "op_rate=1s,ops_per_transaction=(max=1,min=0),thread_count=0,"
+    "value_size=5),remove_config=(op_rate=1s,"
+    "ops_per_transaction=(max=1,min=0),thread_count=0),"
+    "update_config=(key_size=5,op_rate=1s,ops_per_transaction=(max=1,"
+    "min=0),thread_count=0,value_size=5))",
+    confchk_bounded_cursor_stress, 11},
   {"burst_inserts",
     "burst_duration=90,cache_max_wait_ms=0,cache_size_mb=0,"
     "compression_enabled=false,duration_seconds=0,"
@@ -365,110 +469,6 @@ static const WT_CONFIG_ENTRY config_entries[] = {
     "update_config=(key_size=5,op_rate=1s,ops_per_transaction=(max=1,"
     "min=0),thread_count=0,value_size=5))",
     confchk_cache_resize, 11},
-  {"cursor_bound_01",
-    "cache_max_wait_ms=0,cache_size_mb=0,compression_enabled=false,"
-    "duration_seconds=0,enable_logging=false,"
-    "metrics_monitor=(cache_hs_insert=(max=1,min=0,postrun=false,"
-    "runtime=false,save=false),cc_pages_removed=(max=1,min=0,"
-    "postrun=false,runtime=false,save=false),enabled=true,op_rate=1s,"
-    "stat_cache_size=(max=1,min=0,postrun=false,runtime=false,"
-    "save=false),stat_db_size=(max=1,min=0,postrun=false,"
-    "runtime=false,save=false)),operation_tracker=(enabled=true,"
-    "op_rate=1s,tracking_key_format=QSQ,tracking_value_format=iS),"
-    "reverse_collator=false,statistics_config=(enable_logging=true,"
-    "type=all),timestamp_manager=(enabled=true,oldest_lag=1,"
-    "op_rate=1s,stable_lag=1),"
-    "workload_manager=(checkpoint_config=(op_rate=60s,thread_count=1)"
-    ",custom_config=(key_size=5,op_rate=1s,ops_per_transaction=(max=1"
-    ",min=0),thread_count=0,value_size=5),enabled=true,"
-    "insert_config=(key_size=5,op_rate=1s,ops_per_transaction=(max=1,"
-    "min=0),thread_count=0,value_size=5),op_rate=1s,"
-    "populate_config=(collection_count=1,key_count_per_collection=0,"
-    "key_size=5,thread_count=1,value_size=5),read_config=(key_size=5,"
-    "op_rate=1s,ops_per_transaction=(max=1,min=0),thread_count=0,"
-    "value_size=5),remove_config=(op_rate=1s,"
-    "ops_per_transaction=(max=1,min=0),thread_count=0),"
-    "update_config=(key_size=5,op_rate=1s,ops_per_transaction=(max=1,"
-    "min=0),thread_count=0,value_size=5))",
-    confchk_cursor_bound_01, 11},
-  {"cursor_bound_02",
-    "cache_max_wait_ms=0,cache_size_mb=0,compression_enabled=false,"
-    "duration_seconds=0,enable_logging=false,"
-    "metrics_monitor=(cache_hs_insert=(max=1,min=0,postrun=false,"
-    "runtime=false,save=false),cc_pages_removed=(max=1,min=0,"
-    "postrun=false,runtime=false,save=false),enabled=true,op_rate=1s,"
-    "stat_cache_size=(max=1,min=0,postrun=false,runtime=false,"
-    "save=false),stat_db_size=(max=1,min=0,postrun=false,"
-    "runtime=false,save=false)),operation_tracker=(enabled=true,"
-    "op_rate=1s,tracking_key_format=QSQ,tracking_value_format=iS),"
-    "reverse_collator=false,search_near_threads=10,"
-    "statistics_config=(enable_logging=true,type=all),"
-    "timestamp_manager=(enabled=true,oldest_lag=1,op_rate=1s,"
-    "stable_lag=1),workload_manager=(checkpoint_config=(op_rate=60s,"
-    "thread_count=1),custom_config=(key_size=5,op_rate=1s,"
-    "ops_per_transaction=(max=1,min=0),thread_count=0,value_size=5),"
-    "enabled=true,insert_config=(key_size=5,op_rate=1s,"
-    "ops_per_transaction=(max=1,min=0),thread_count=0,value_size=5),"
-    "op_rate=1s,populate_config=(collection_count=1,"
-    "key_count_per_collection=0,key_size=5,thread_count=1,"
-    "value_size=5),read_config=(key_size=5,op_rate=1s,"
-    "ops_per_transaction=(max=1,min=0),thread_count=0,value_size=5),"
-    "remove_config=(op_rate=1s,ops_per_transaction=(max=1,min=0),"
-    "thread_count=0),update_config=(key_size=5,op_rate=1s,"
-    "ops_per_transaction=(max=1,min=0),thread_count=0,value_size=5))",
-    confchk_cursor_bound_02, 12},
-  {"cursor_bound_03",
-    "cache_max_wait_ms=0,cache_size_mb=0,compression_enabled=false,"
-    "duration_seconds=0,enable_logging=false,"
-    "metrics_monitor=(cache_hs_insert=(max=1,min=0,postrun=false,"
-    "runtime=false,save=false),cc_pages_removed=(max=1,min=0,"
-    "postrun=false,runtime=false,save=false),enabled=true,op_rate=1s,"
-    "stat_cache_size=(max=1,min=0,postrun=false,runtime=false,"
-    "save=false),stat_db_size=(max=1,min=0,postrun=false,"
-    "runtime=false,save=false)),operation_tracker=(enabled=true,"
-    "op_rate=1s,tracking_key_format=QSQ,tracking_value_format=iS),"
-    "reverse_collator=false,statistics_config=(enable_logging=true,"
-    "type=all),timestamp_manager=(enabled=true,oldest_lag=1,"
-    "op_rate=1s,stable_lag=1),"
-    "workload_manager=(checkpoint_config=(op_rate=60s,thread_count=1)"
-    ",custom_config=(key_size=5,op_rate=1s,ops_per_transaction=(max=1"
-    ",min=0),thread_count=0,value_size=5),enabled=true,"
-    "insert_config=(key_size=5,op_rate=1s,ops_per_transaction=(max=1,"
-    "min=0),thread_count=0,value_size=5),op_rate=1s,"
-    "populate_config=(collection_count=1,key_count_per_collection=0,"
-    "key_size=5,thread_count=1,value_size=5),read_config=(key_size=5,"
-    "op_rate=1s,ops_per_transaction=(max=1,min=0),thread_count=0,"
-    "value_size=5),remove_config=(op_rate=1s,"
-    "ops_per_transaction=(max=1,min=0),thread_count=0),"
-    "update_config=(key_size=5,op_rate=1s,ops_per_transaction=(max=1,"
-    "min=0),thread_count=0,value_size=5))",
-    confchk_cursor_bound_03, 11},
-  {"cursor_bound_04",
-    "cache_max_wait_ms=0,cache_size_mb=0,compression_enabled=false,"
-    "duration_seconds=0,enable_logging=false,"
-    "metrics_monitor=(cache_hs_insert=(max=1,min=0,postrun=false,"
-    "runtime=false,save=false),cc_pages_removed=(max=1,min=0,"
-    "postrun=false,runtime=false,save=false),enabled=true,op_rate=1s,"
-    "stat_cache_size=(max=1,min=0,postrun=false,runtime=false,"
-    "save=false),stat_db_size=(max=1,min=0,postrun=false,"
-    "runtime=false,save=false)),operation_tracker=(enabled=true,"
-    "op_rate=1s,tracking_key_format=QSQ,tracking_value_format=iS),"
-    "reverse_collator=false,statistics_config=(enable_logging=true,"
-    "type=all),timestamp_manager=(enabled=true,oldest_lag=1,"
-    "op_rate=1s,stable_lag=1),"
-    "workload_manager=(checkpoint_config=(op_rate=60s,thread_count=1)"
-    ",custom_config=(key_size=5,op_rate=1s,ops_per_transaction=(max=1"
-    ",min=0),thread_count=0,value_size=5),enabled=true,"
-    "insert_config=(key_size=5,op_rate=1s,ops_per_transaction=(max=1,"
-    "min=0),thread_count=0,value_size=5),op_rate=1s,"
-    "populate_config=(collection_count=1,key_count_per_collection=0,"
-    "key_size=5,thread_count=1,value_size=5),read_config=(key_size=5,"
-    "op_rate=1s,ops_per_transaction=(max=1,min=0),thread_count=0,"
-    "value_size=5),remove_config=(op_rate=1s,"
-    "ops_per_transaction=(max=1,min=0),thread_count=0),"
-    "update_config=(key_size=5,op_rate=1s,ops_per_transaction=(max=1,"
-    "min=0),thread_count=0,value_size=5))",
-    confchk_cursor_bound_04, 11},
   {"hs_cleanup",
     "cache_max_wait_ms=0,cache_size_mb=0,compression_enabled=false,"
     "duration_seconds=0,enable_logging=false,"
