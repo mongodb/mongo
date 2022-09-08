@@ -6,7 +6,6 @@
 "use strict";
 
 load("jstests/libs/sbe_util.js");  // For 'checkSBEEnabled()'.
-load("jstests/libs/log.js");       // For 'verifySlowQueryLog()'.
 
 const conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod was unable to start up");

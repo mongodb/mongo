@@ -8,7 +8,6 @@
 
 load("jstests/libs/profiler.js");  // For 'getLatestProfilerEntry()'.
 load("jstests/libs/sbe_util.js");  // For 'checkSBEEnabled()'.
-load("jstests/libs/log.js");       // For 'verifySlowQueryLog()'.
 
 let conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod was unable to start up");
@@ -50,6 +49,17 @@ const framework = {
         cqf: "aggCQF"
     }
 };
+
+// Ensure the slow query log contains the correct information about the queryFramework used.
+function verifySlowQueryLog(db, expectedComment, queryFramework) {
+    const logId = 51803;  // ID for 'Slow Query' commands
+    const expectedLog = {command: {comment: expectedComment}};
+    if (queryFramework) {
+        expectedLog.queryFramework = queryFramework;
+    }
+    assert(checkLog.checkContainsWithCountJson(db, logId, expectedLog, 1, null, true),
+           "failed to find [" + tojson(expectedLog) + "] in the slow query log");
+}
 
 // Ensure the profile filter contains the correct information about the queryFramework used.
 function verifyProfiler(expectedComment, queryFramework) {
