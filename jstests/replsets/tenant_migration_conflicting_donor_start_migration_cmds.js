@@ -335,6 +335,11 @@ function testConcurrentConflictingMigrations({
 
 // Test different cloning read preference.
 (() => {
+    if (TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("admin"))) {
+        jsTestLog(
+            "Skip: featureFlagShardMerge is enabled and this test tests migration's secondary read preference.");
+        return;
+    }
     const makeTestParams = () => {
         const migrationOpts0 = {
             migrationIdString: extractUUIDFromObject(UUID()),

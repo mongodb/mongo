@@ -74,6 +74,14 @@ const donorPrimary = donorRst.getPrimary();
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst: donorRst});
 
+if (TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("admin"))) {
+    jsTestLog(
+        "Skip: incompatible with featureFlagShardMerge. Only 'primary' read preference is supported.");
+    donorRst.stopSet();
+    tenantMigrationTest.stop();
+    return;
+}
+
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 const kTenantId = "testTenantId";
 const migrationId = UUID();
