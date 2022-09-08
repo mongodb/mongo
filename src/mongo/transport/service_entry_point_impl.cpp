@@ -295,7 +295,7 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
     auto client = _svcCtx->makeClient("conn{}"_format(session->id()), session);
     auto clientPtr = client.get();
 
-    Sessions::iterator iter;
+    std::shared_ptr<transport::SessionWorkflow> workflow;
     {
         auto sync = _sessions->sync();
         if (sync.size() >= _maxSessions && !isPrivilegedSession) {
@@ -320,8 +320,8 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
             transport::ServiceExecutorContext::set(&*client, std::move(seCtx));
         }
 
-        auto workflow = transport::SessionWorkflow::make(std::move(client));
-        iter = sync.insert(std::move(workflow));
+        workflow = transport::SessionWorkflow::make(std::move(client));
+        auto iter = sync.insert(workflow);
         if (!quiet()) {
             LOGV2(22943,
                   "Connection accepted",
@@ -331,7 +331,7 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
     }
 
     onClientConnect(clientPtr);
-    iter->second.workflow->start();
+    workflow->start();
 }
 
 void ServiceEntryPointImpl::onClientDisconnect(Client* client) {
