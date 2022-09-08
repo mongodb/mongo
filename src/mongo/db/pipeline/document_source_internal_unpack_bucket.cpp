@@ -419,7 +419,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
     return make_intrusive<DocumentSourceInternalUnpackBucket>(
         expCtx,
         BucketUnpacker{std::move(bucketSpec), BucketUnpacker::Behavior::kExclude},
-        3600,
+        // Using the bucket span associated with the default granularity seconds.
+        timeseries::getMaxSpanSecondsFromGranularity(BucketGranularityEnum::Seconds),
         assumeClean);
 }
 
