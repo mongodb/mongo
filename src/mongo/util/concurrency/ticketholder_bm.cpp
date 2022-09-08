@@ -91,11 +91,14 @@ void BM_acquireAndRelease(benchmark::State& state) {
     }
     double acquired = 0;
     auto mode = (state.thread_index % 2) == 0 ? MODE_IS : MODE_IX;
+    auto priority = (state.thread_index % 2) == 0 ? AdmissionContext::Priority::kLow
+                                                  : AdmissionContext::Priority::kNormal;
     TicketHolderFixture<TicketHolderImpl>* fixture;
     fixture = (mode == MODE_IS ? readTicketHolder : writeTicketHolder).get();
     for (auto _ : state) {
         AdmissionContext admCtx;
         admCtx.setLockMode(mode);
+        admCtx.setPriority(priority);
         auto opCtx = fixture->opCtxs[state.thread_index].get();
         {
             auto ticket = fixture->ticketHolder->waitForTicket(opCtx, &admCtx, waitMode);
