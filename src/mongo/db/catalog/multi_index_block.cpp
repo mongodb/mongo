@@ -529,12 +529,6 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
         } catch (const ExceptionFor<ErrorCodes::CappedPositionLost>& ex) {
             restart(ex);
         } catch (DBException& ex) {
-            // If the index build may be resumed, leave the internal state intact. Otherwise,
-            // restore the state from before the collection scan.
-            if (!opCtx->isKillPending() && ErrorCodes::IndexBuildAborted != ex.code()) {
-                _phase = IndexBuildPhaseEnum::kInitialized;
-            }
-
             auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
             LOGV2(4984704,
                   "Index build: collection scan stopped",
