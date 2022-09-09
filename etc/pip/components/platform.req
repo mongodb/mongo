@@ -3,3 +3,4 @@ pypiwin32>=223; sys_platform == "win32" and python_version > "3"
 pywin32>=225; sys_platform == "win32" and python_version > "3"
 
 cryptography == 2.3; platform_machine == "s390x" or platform_machine == "ppc64le" # Needed for oauthlib to use RSAAlgorithm # Version locked - see SERVER-36618
+cryptography == 36.0.2; platform_machine != "s390x" and platform_machine != "ppc64le"
