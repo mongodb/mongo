@@ -74,8 +74,13 @@ class test_truncate18(wttest.WiredTigerTestCase):
     ]
     format_values = [
         ('integer_row', dict(key_format='i', value_format='S', extraconfig='')),
+        ('column', dict(key_format='r', value_format='S', extraconfig='')),
     ]
-    scenarios = make_scenarios(trunc_values, format_values)
+    trunc_range_values = [
+        ('front', dict(truncate_front=True)),
+        ('back', dict(truncate_front=False)),
+    ]
+    scenarios = make_scenarios(trunc_values, format_values, trunc_range_values)
 
     # Truncate, from keynum1 to keynum2, inclusive.
     def truncate(self, uri, make_key, keynum1, keynum2, read_ts, commit_ts):
@@ -151,8 +156,14 @@ class test_truncate18(wttest.WiredTigerTestCase):
         # Reopen the connection again so nothing is in memory and we can fast-truncate.
         self.reopen_conn()
 
-        # Truncate most of the tree, beginning at the first key, at time 20.
-        err = self.truncate(ds.uri, ds.key, 1, 7 * nrows // 8, 15, 20)
+        # Truncate most of the tree at time 20. Including either the start or end of the tree.
+        if self.truncate_front:
+            start_key = 1
+            end_key = 7 * nrows // 8
+        else:
+            start_key = nrows // 8
+            end_key = nrows
+        err = self.truncate(ds.uri, ds.key, start_key, end_key, 15, 20)
         self.assertEqual(err, 0)
 
         # Make sure we did at least one fast-delete. (Unless we specifically didn't want to,

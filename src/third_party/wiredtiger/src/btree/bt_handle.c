@@ -830,7 +830,9 @@ err:
 
 /*
  * __btree_get_last_recno --
- *     Set the last record number for a column-store.
+ *     Set the last record number for a column-store. Note that this is used to handle appending to
+ *     a column store after a truncate operation. It is not related to the WT_CURSOR::largest_key
+ *     API.
  */
 static int
 __btree_get_last_recno(WT_SESSION_IMPL *session)
@@ -841,6 +843,16 @@ __btree_get_last_recno(WT_SESSION_IMPL *session)
     uint32_t flags;
 
     btree = S2BT(session);
+
+    /*
+     * The last record number is used to support appending to a column store tree that has had a
+     * final page truncated. Since checkpoint trees are read-only they don't need the value.
+     */
+    if (WT_READING_CHECKPOINT(session)) {
+        btree->last_recno = WT_RECNO_OOB;
+        return (0);
+    }
+
     flags = WT_READ_PREV;
     if (!F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT))
         LF_SET(WT_READ_VISIBLE_ALL);
