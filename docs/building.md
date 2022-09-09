@@ -78,6 +78,10 @@ errors. To ignore the warnings, pass the switch
 
     $ python3 buildscripts/scons.py install-mongod --disable-warnings-as-errors
 
+***Note***: On memory-constrained systems, you may run into an error such as `g++: fatal error: Killed signal terminated program cc1plus`. To use less memory during building, pass the parameter `-j1` to scons. This can be incremented to `-j2`, `-j3`, and higher as appropriate to find the fastest working option on your system.
+
+    $ python3 buildscripts/scons.py install-mongod -j1
+
 To install `mongod` directly to `/opt/mongo`
 
     $ python3 buildscripts/scons.py DESTDIR=/opt/mongo install-mongod
