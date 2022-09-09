@@ -132,6 +132,7 @@ __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
     }
 
     __wt_free(session, block->name);
+    __wt_spin_destroy(session, &block->cache_lock);
     __wt_free(session, block->related);
 
     WT_TRET(__wt_close(session, &block->fh));
@@ -204,6 +205,9 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename, uint32_t objecti
     block->ref = 1;
     WT_CONN_BLOCK_INSERT(conn, block, bucket);
     block->linked = true;
+
+    /* Initialize the block cache layer lock. */
+    WT_ERR(__wt_spin_init(session, &block->cache_lock, "block cache"));
 
     /* If not passed an allocation size, get one from the configuration. */
     if (allocsize == 0) {

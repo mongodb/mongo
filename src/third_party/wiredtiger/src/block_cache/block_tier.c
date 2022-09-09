@@ -97,41 +97,54 @@ err:
 
 /*
  * __wt_blkcache_get_handle --
- *     Get a block handle for an object, creating it if it doesn't exist, optionally cache a
- *     reference.
+ *     Get a cached block handle for an object, creating it if it doesn't exist.
  */
 int
 __wt_blkcache_get_handle(
-  WT_SESSION_IMPL *session, WT_BLOCK *orig, uint32_t objectid, WT_BLOCK **blockp)
+  WT_SESSION_IMPL *session, WT_BLOCK *current, uint32_t objectid, WT_BLOCK **blockp)
 {
+    WT_DECL_RET;
     u_int i;
 
     *blockp = NULL;
 
     /* We should never be looking for our own object. */
-    WT_ASSERT(session, orig == NULL || orig->objectid != objectid);
+    WT_ASSERT(session, current->objectid != objectid);
 
     /*
      * Check the local cache for the object. We don't have to check the name because we can only
      * reference objects in our name space.
      */
-    if (orig != NULL) {
-        for (i = 0; i < orig->related_next; ++i)
-            if (orig->related[i]->objectid == objectid) {
-                *blockp = orig->related[i];
-                return (0);
-            }
+    for (i = 0; i < current->related_next; ++i)
+        if (current->related[i]->objectid == objectid) {
+            *blockp = current->related[i];
+            return (0);
+        }
 
+    /* Lock the block cache layer.  */
+    __wt_spin_lock(session, &current->cache_lock);
+
+    /* Check to make sure the object wasn't cached while we locked. */
+    for (i = 0; i < current->related_next; ++i)
+        if (current->related[i]->objectid == objectid) {
+            *blockp = current->related[i];
+            break;
+        }
+
+    /* Open the object. */
+    if (*blockp == NULL) {
         /* Allocate space to store a reference (do first for less complicated cleanup). */
-        WT_RET(__wt_realloc_def(
-          session, &orig->related_allocated, orig->related_next + 1, &orig->related));
+        WT_ERR(__wt_realloc_def(
+          session, &current->related_allocated, current->related_next + 1, &current->related));
+
+        /* Get a reference to the object, opening it as necessary. */
+        WT_ERR(__wt_blkcache_tiered_open(session, NULL, objectid, blockp));
+
+        /* Save a reference in the block in which we started for fast subsequent access. */
+        current->related[current->related_next++] = *blockp;
     }
 
-    /* Get a reference to the object, opening it as necessary. */
-    WT_RET(__wt_blkcache_tiered_open(session, NULL, objectid, blockp));
-
-    /* Save a reference in the block in which we started for fast subsequent access. */
-    if (orig != NULL)
-        orig->related[orig->related_next++] = *blockp;
-    return (0);
+err:
+    __wt_spin_unlock(session, &current->cache_lock);
+    return (ret);
 }

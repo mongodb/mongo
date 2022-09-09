@@ -61,10 +61,8 @@ start_threads(void)
 {
     set_stable();
     testutil_check(__wt_thread_create(NULL, &g.checkpoint_thread, checkpointer, NULL));
-    if (g.tiered) {
-        testutil_check(__wt_rwlock_init(NULL, &g.flush_lock));
+    if (g.tiered)
         testutil_check(__wt_thread_create(NULL, &g.flush_thread, flush_thread, NULL));
-    }
     if (g.use_timestamps) {
         testutil_check(__wt_rwlock_init(NULL, &g.clock_lock));
         testutil_check(__wt_thread_create(NULL, &g.clock_thread, clock_thread, NULL));
@@ -78,14 +76,9 @@ start_threads(void)
 void
 end_threads(void)
 {
-    if (g.tiered) {
-        /*
-         * The flush lock is also used by the worker threads. They have exited by the time this is
-         * called, so it is safe to destroy it.
-         */
+    if (g.tiered)
         testutil_check(__wt_thread_join(NULL, &g.flush_thread));
-        __wt_rwlock_destroy(NULL, &g.flush_lock);
-    }
+
     /* Shutdown checkpoint after flush thread completes because flush depends on checkpoint. */
     testutil_check(__wt_thread_join(NULL, &g.checkpoint_thread));
 
@@ -157,7 +150,6 @@ flush_thread(void *arg)
 {
     WT_RAND_STATE rnd;
     WT_SESSION *wt_session;
-    WT_SESSION_IMPL *session;
     uint64_t delay;
     char tid[128];
 
@@ -165,17 +157,13 @@ flush_thread(void *arg)
 
     __wt_random_init(&rnd);
     testutil_check(g.conn->open_session(g.conn, NULL, NULL, &wt_session));
-    session = (WT_SESSION_IMPL *)wt_session;
 
     testutil_check(__wt_thread_str(tid, sizeof(tid)));
     printf("flush thread starting: tid: %s\n", tid);
     fflush(stdout);
 
     while (g.running) {
-        /* FIXME-WT-7833 Remove this lock when that ticket merges. */
-        __wt_writelock(session, &g.flush_lock);
         testutil_check(wt_session->flush_tier(wt_session, NULL));
-        __wt_writeunlock(session, &g.flush_lock);
         printf("Finished a flush_tier\n");
         fflush(stdout);
 
