@@ -778,7 +778,7 @@ aborts, all of its operations abort and all corresponding data changes are abort
 All transactions are associated with a server session and at any given time, only one open
 transaction can be associated with a single session. The state of a transaction is maintained
 through the
-[`TransactionParticipant`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/transaction_participant.h),
+[`TransactionParticipant`](https://github.com/mongodb/mongo/blob/v6.1/src/mongo/db/transaction/transaction_participant.h),
 which is a decoration on the session. Any thread that attempts to modify the state of the
 transaction, which can include committing, aborting, or adding an operation to the transaction, must
 have the correct session checked out before doing so. Only one operation can check out a session at
@@ -1030,7 +1030,7 @@ actually applying the oplog entry and preparing the transaction, the node will w
 application has completed to reconstruct the transaction. If the node encounters a
 `commitTransaction` oplog entry, it will immediately commit the transaction. If the transaction it's
 about to commit was prepared, the node will find the `prepareTransaction` oplog entry(s) using the
-[`TransactionHistoryIterator`](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/transaction_history_iterator.h)
+[`TransactionHistoryIterator`](https://github.com/mongodb/mongo/blob/v6.1/src/mongo/db/transaction/transaction_history_iterator.h)
 to get the operations for the transaction, prepare it and then immediately commit it.
 
 When oplog application for recovery or initial sync completes, the node will iterate

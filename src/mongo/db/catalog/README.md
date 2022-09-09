@@ -394,7 +394,7 @@ rolls-back writes when it goes out of scope and its destructor is called before 
 The WriteUnitOfWork has a [`groupOplogEntries` option](https://github.com/mongodb/mongo/blob/fa32d665bd63de7a9d246fa99df5e30840a931de/src/mongo/db/storage/write_unit_of_work.h#L67)
 to replicate multiple writes transactionally. This option uses the [`BatchedWriteContext` class](https://github.com/mongodb/mongo/blob/9ab71f9b2fac1e384529fafaf2a819ce61834228/src/mongo/db/batched_write_context.h#L46)
 to stage writes and to generate a single applyOps entry at commit, similar to what multi-document
-transactions do via the [`TransactionParticipant` class](https://github.com/mongodb/mongo/blob/9ab71f9b2fac1e384529fafaf2a819ce61834228/src/mongo/db/transaction_participant.h#L82).
+transactions do via the [`TransactionParticipant` class](https://github.com/mongodb/mongo/blob/219990f17695b0ea4695f827a42a18e012b1e9cf/src/mongo/db/transaction/transaction_participant.h#L82).
 Unlike a multi-document transaction, the applyOps entry lacks the `lsId` and the `txnNumber`
 fields. Callers must ensure that the WriteUnitOfWork does not generate more than 16MB of oplog,
 otherwise the operation will fail with `TransactionTooLarge` code.
