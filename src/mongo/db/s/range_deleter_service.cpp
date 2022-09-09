@@ -165,7 +165,12 @@ void RangeDeleterService::_recoverRangeDeletionsOnStepUp(OperationContext* opCtx
                        "Finished resubmitting range deletion tasks",
                        "nRescheduledTasks"_attr = nRescheduledTasks);
 
-            this->_state.store(kUp);
+            auto lock = _acquireMutexUnconditionally();
+            // Since the recovery is only spawned on step-up but may complete later, it's not
+            // assumable that the node is still primary when the all resubmissions finish
+            if (_state.load() != kDown) {
+                this->_state.store(kUp);
+            }
         })
         .getAsync([](auto) {});
 }
@@ -176,9 +181,12 @@ void RangeDeleterService::onStepDown() {
     }
 
     auto lock = _acquireMutexUnconditionally();
-    dassert(_state.load() != kDown, "Service expected to be initializing/up before stepping down");
 
-    _executor->shutdown();
+    // It may happen for the `onStepDown` hook to be invoked on a SECONDARY node transitioning
+    // to ROLLBACK, hence the executor may have never been initialized
+    if (_executor) {
+        _executor->shutdown();
+    }
 
     _state.store(kDown);
 }
