@@ -74,3 +74,30 @@ env.Library(
         '$BUILD_DIR/mongo/transport/service_entry_point',
     ],
 )
+
+env.CppUnitTest(
+    target='db_transaction_test',
+    source=[
+        'internal_transactions_reap_service_test.cpp',
+        'transaction_api_test.cpp',
+        'transaction_history_iterator_test.cpp',
+        'transaction_participant_retryable_writes_test.cpp',
+        'transaction_participant_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/auth/authmocks',
+        '$BUILD_DIR/mongo/db/op_observer/op_observer',
+        '$BUILD_DIR/mongo/db/repl/image_collection_entry',
+        '$BUILD_DIR/mongo/db/repl/mock_repl_coord_server_fixture',
+        '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
+        '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
+        '$BUILD_DIR/mongo/db/s/sharding_api_d',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/mongo/db/session/session_catalog',
+        '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
+        '$BUILD_DIR/mongo/db/stats/transaction_stats',
+        'transaction',
+        'transaction_api',
+    ],
+)
