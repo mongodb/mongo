@@ -777,23 +777,34 @@ public:
                                                      RepetitionEstimate{estimatedRepetitions});
         }
 
-        const auto& optimizeFn = std::bind(&ImplementationVisitor::optimizeRIDIntersect,
-                                           this,
-                                           isIndex,
-                                           dedupRID,
-                                           indexingAvailability.getEqPredsOnly(),
-                                           std::cref(ridProjName),
-                                           std::cref(collationLeftRightSplit),
-                                           std::cref(collationRightLeftSplit),
-                                           intersectedCE,
-                                           leftCE,
-                                           rightCE,
-                                           std::cref(leftPhysProps),
-                                           std::cref(rightPhysProps),
-                                           std::cref(node.getLeftChild()),
-                                           std::cref(node.getRightChild()));
+        const auto& optimizeFn = [this,
+                                  isIndex,
+                                  dedupRID,
+                                  &indexingAvailability,
+                                  &ridProjName,
+                                  &collationLeftRightSplit,
+                                  &collationRightLeftSplit,
+                                  intersectedCE,
+                                  leftCE,
+                                  rightCE,
+                                  &leftPhysProps,
+                                  &rightPhysProps,
+                                  &node] {
+            optimizeRIDIntersect(isIndex,
+                                 dedupRID,
+                                 indexingAvailability.getEqPredsOnly(),
+                                 ridProjName,
+                                 collationLeftRightSplit,
+                                 collationRightLeftSplit,
+                                 intersectedCE,
+                                 leftCE,
+                                 rightCE,
+                                 leftPhysProps,
+                                 rightPhysProps,
+                                 node.getLeftChild(),
+                                 node.getRightChild());
+        };
 
-        // Always optimize under same distributions on left and on right.
         optimizeFn();
 
         if (isIndex) {
