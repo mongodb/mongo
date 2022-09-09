@@ -29,17 +29,16 @@
 
 #include "mongo/db/pipeline/document_source_internal_all_collection_stats.h"
 
-#include "mongo/db/pipeline/document_source_coll_stats.h"
-#include "mongo/db/pipeline/document_source_coll_stats_gen.h"
-
 
 namespace mongo {
 
 using boost::intrusive_ptr;
 
 DocumentSourceInternalAllCollectionStats::DocumentSourceInternalAllCollectionStats(
-    const intrusive_ptr<ExpressionContext>& pExpCtx)
-    : DocumentSource(kStageNameInternal, pExpCtx) {}
+    const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+    DocumentSourceInternalAllCollectionStatsSpec spec)
+    : DocumentSource(kStageNameInternal, pExpCtx),
+      _internalAllCollectionStatsSpec(std::move(spec)) {}
 
 REGISTER_DOCUMENT_SOURCE(_internalAllCollectionStats,
                          DocumentSourceInternalAllCollectionStats::LiteParsed::parse,
@@ -63,12 +62,10 @@ DocumentSource::GetNextResult DocumentSourceInternalAllCollectionStats::doGetNex
         BSONObj obj(std::move(_catalogDocs->front()));
         NamespaceString nss(obj["ns"].String());
 
-        DocumentSourceCollStatsSpec collStatsSpec;
-        collStatsSpec.setStorageStats(StorageStatsSpec{});
-
         _catalogDocs->pop_front();
         try {
-            return {Document{DocumentSourceCollStats::makeStatsForNs(pExpCtx, nss, collStatsSpec)}};
+            return {Document{DocumentSourceCollStats::makeStatsForNs(
+                pExpCtx, nss, _internalAllCollectionStatsSpec.getStats().get())}};
         } catch (const ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
             // We don't want to retrieve data for views, only for collections.
             continue;
@@ -81,14 +78,18 @@ DocumentSource::GetNextResult DocumentSourceInternalAllCollectionStats::doGetNex
 intrusive_ptr<DocumentSource> DocumentSourceInternalAllCollectionStats::createFromBsonInternal(
     BSONElement elem, const intrusive_ptr<ExpressionContext>& pExpCtx) {
     uassert(6789103,
-            "The $_internalAllCollectionStats stage specification must be an empty object",
-            elem.type() == Object && elem.Obj().isEmpty());
+            str::stream() << "$_internalAllCollectionStats must take a nested object but found: "
+                          << elem,
+            elem.type() == BSONType::Object);
 
     uassert(6789104,
             "The $_internalAllCollectionStats stage must be run on the admin database",
             pExpCtx->ns.isAdminDB() && pExpCtx->ns.isCollectionlessAggregateNS());
 
-    return new DocumentSourceInternalAllCollectionStats(pExpCtx);
+    auto spec = DocumentSourceInternalAllCollectionStatsSpec::parse(
+        IDLParserContext(kStageNameInternal), elem.embeddedObject());
+
+    return make_intrusive<DocumentSourceInternalAllCollectionStats>(pExpCtx, std::move(spec));
 }
 
 const char* DocumentSourceInternalAllCollectionStats::getSourceName() const {
@@ -97,6 +98,6 @@ const char* DocumentSourceInternalAllCollectionStats::getSourceName() const {
 
 Value DocumentSourceInternalAllCollectionStats::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(DOC(getSourceName() << Document()));
+    return Value(Document{{getSourceName(), _internalAllCollectionStatsSpec.toBSON()}});
 }
 }  // namespace mongo

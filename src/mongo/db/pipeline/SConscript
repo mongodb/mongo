@@ -425,6 +425,7 @@ env.Library(
         'document_source_coll_stats.idl',
         'document_source_densify.idl',
         'document_source_fill.idl',
+        'document_source_internal_all_collection_stats.idl',
         'document_source_internal_apply_oplog_update.idl',
         'document_source_list_sessions.idl',
         'document_source_merge.idl',

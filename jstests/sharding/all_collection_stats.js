@@ -1,5 +1,5 @@
 /*
- * Test to validate the $_internalAllCollectionStats stage.
+ * Test to validate the $_internalAllCollectionStats stage for storageStats.
  *
  * @tags: [
  *   requires_fcv_62,
@@ -31,7 +31,8 @@ for (let i = 10; i < 20; i++) {
 }
 
 // Get output data
-const outputData = adminDb.aggregate([{$_internalAllCollectionStats: {}}]).toArray();
+const outputData =
+    adminDb.aggregate([{$_internalAllCollectionStats: {stats: {storageStats: {}}}}]).toArray();
 assert.gte(outputData.length, 20);
 
 // Testing for comparing each collection returned from $_internalAllCollectionStats to $collStats
@@ -62,10 +63,12 @@ assert.commandFailedWithCode(
     adminDb.runCommand({aggregate: 1, pipeline: [{$_internalAllCollectionStats: 3}], cursor: {}}),
     6789103);
 
-const response = assert.commandFailedWithCode(
-    testDb.runCommand(
-        {aggregate: "foo", pipeline: [{$_internalAllCollectionStats: {}}], cursor: {}}),
-    6789104);
+const response = assert.commandFailedWithCode(testDb.runCommand({
+    aggregate: "foo",
+    pipeline: [{$_internalAllCollectionStats: {stats: {storageStats: {}}}}],
+    cursor: {}
+}),
+                                              6789104);
 assert.neq(-1, response.errmsg.indexOf("$_internalAllCollectionStats"), response.errmsg);
 assert.neq(-1, response.errmsg.indexOf("admin database"), response.errmsg);
 

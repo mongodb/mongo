@@ -69,7 +69,8 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceShardedDataDistribution::creat
         NamespaceString::kConfigsvrCollectionsNamespace, std::vector<BSONObj>{}};
     expCtx->setResolvedNamespaces(resolvedNamespaces);
 
-    static const BSONObj kAllCollStatsObj = fromjson("{$_internalAllCollectionStats: {}}");
+    static const BSONObj kAllCollStatsObj =
+        fromjson("{$_internalAllCollectionStats: {stats: {storageStats: {}}}}}");
     static const BSONObj kGroupObj = fromjson(R"({
         $group: {
             _id: "$ns",

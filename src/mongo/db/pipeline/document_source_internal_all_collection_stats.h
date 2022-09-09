@@ -30,6 +30,8 @@
 #pragma once
 
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_coll_stats.h"
+#include "mongo/db/pipeline/document_source_internal_all_collection_stats_gen.h"
 
 namespace mongo {
 
@@ -47,6 +49,9 @@ namespace mongo {
 class DocumentSourceInternalAllCollectionStats final : public DocumentSource {
 public:
     static constexpr StringData kStageNameInternal = "$_internalAllCollectionStats"_sd;
+
+    DocumentSourceInternalAllCollectionStats(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
+                                             DocumentSourceInternalAllCollectionStatsSpec spec);
 
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
@@ -99,11 +104,11 @@ public:
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 private:
-    DocumentSourceInternalAllCollectionStats(
-        const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
-
     GetNextResult doGetNext() final;
 
+    // The specification object given to $_internalAllCollectionStats containing user specified
+    // options.
+    DocumentSourceInternalAllCollectionStatsSpec _internalAllCollectionStatsSpec;
     boost::optional<std::deque<BSONObj>> _catalogDocs;
 };
 }  // namespace mongo
