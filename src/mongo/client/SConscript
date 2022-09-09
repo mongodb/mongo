@@ -84,6 +84,8 @@ saslClientSource = [
     'sasl_client_authenticate_impl.cpp',
     'sasl_client_conversation.cpp',
     'sasl_client_session.cpp',
+    'sasl_oidc_client_conversation.cpp',
+    'sasl_oidc_client_params.idl',
     'sasl_plain_client_conversation.cpp',
     'sasl_scram_client_conversation.cpp',
 ]
@@ -125,6 +127,7 @@ saslClientEnv.Library(
         "sasl_aws_client" if get_option('ssl') == 'on' else '',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/oidc_protocol',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/shell/program_runner',
         '$BUILD_DIR/mongo/util/net/http_client',

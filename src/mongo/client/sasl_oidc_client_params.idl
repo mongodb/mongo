@@ -1,0 +1,21 @@
+# Copyright (C) 2023-present MongoDB, Inc.
+
+global:
+    cpp_namespace: "mongo"
+    configs:
+        section: 'OIDC Options'
+        source: [ cli ]
+    cpp_includes:
+        - mongo/client/sasl_oidc_client_params.h
+
+imports:
+    - "mongo/db/basic_types.idl"
+
+configs:
+    oidcAccessToken:
+        description: >-
+            If set, the shell will pass this token to the server for any user that tries
+            authenticating with the MONGODB-OIDC mechanism. This will bypass the device authorization
+            grant flow.
+        arg_vartype: String
+        cpp_varname: oidcClientGlobalParams.oidcAccessToken

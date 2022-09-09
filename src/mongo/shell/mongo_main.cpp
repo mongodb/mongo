@@ -49,6 +49,7 @@
 #include "mongo/client/authenticate.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/sasl_aws_client_options.h"
+#include "mongo/client/sasl_oidc_client_params.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/client.h"
@@ -680,8 +681,8 @@ static void edit(const std::string& whatToEdit) {
 
 bool mechanismRequiresPassword(const MongoURI& uri) {
     if (const auto authMechanisms = uri.getOption("authMechanism")) {
-        constexpr std::array<StringData, 2> passwordlessMechanisms{auth::kMechanismGSSAPI,
-                                                                   auth::kMechanismMongoX509};
+        constexpr std::array<StringData, 3> passwordlessMechanisms{
+            auth::kMechanismGSSAPI, auth::kMechanismMongoX509, auth::kMechanismMongoOIDC};
         const std::string& authMechanism = authMechanisms.value();
         for (const auto& mechanism : passwordlessMechanisms) {
             if (mechanism.toString() == authMechanism) {
@@ -785,6 +786,11 @@ int mongo_main(int argc, char* argv[]) {
                                                awsIam::saslAwsClientGlobalParams.awsSessionToken);
         }
 #endif
+        if (!oidcClientGlobalParams.oidcAccessToken.empty()) {
+            parsedURI.setOptionIfNecessary("authmechanismproperties"s,
+                                           str::stream() << "OIDC_ACCESS_TOKEN:"
+                                                         << oidcClientGlobalParams.oidcAccessToken);
+        }
 
         if (const auto authMechanisms = parsedURI.getOption("authMechanism")) {
             std::stringstream ss;

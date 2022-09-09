@@ -92,6 +92,10 @@ constexpr auto saslCommandDigestPasswordFieldName = "digestPassword"_sd;
 // Field containing optional session token information for MONGODB-AWS sasl mechanism.
 constexpr auto saslCommandIamSessionToken = "awsIamSessionToken"_sd;
 
+// Field containing optional access token to be passed in directly for the MONGODB-OIDC SASL
+// mechanism.
+constexpr auto saslCommandOIDCAccessToken = "oidcAccessToken"_sd;
+
 // Field in saslStart.options for mechanisms which omit empty "OK" exchange.
 constexpr auto saslCommandOptionSkipEmptyExchange = "skipEmptyExchange"_sd;
 

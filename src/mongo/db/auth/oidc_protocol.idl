@@ -49,7 +49,7 @@ structs:
         description: "Server's reply to clientStep1"
         strict: false
         fields:
-            authorizeEndpoint:
+            authorizationEndpoint:
                 description: >-
                     URL where the IDP may be contacted for end user
                     authentication and authorization code generation.
@@ -61,7 +61,7 @@ structs:
                     code <=> ID/access token exchange.
                 type: string
                 optional: true # Req if deviceAuthorizeEndpoint not present
-            deviceAuthorizeEndpoint:
+            deviceAuthorizationEndpoint:
                 description: >-
                     URL where the IDP may be contacted for device
                     authentication and authorization code generation.

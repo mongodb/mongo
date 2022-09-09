@@ -32,6 +32,7 @@
 #include "mongo/client/cyrus_sasl_client_session.h"
 
 #include "mongo/base/init.h"
+#include "mongo/client/authenticate.h"
 #include "mongo/client/native_sasl_client_session.h"
 #include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
@@ -47,7 +48,8 @@ void saslSetError(sasl_conn_t* conn, const std::string& msg) {
 }
 
 SaslClientSession* createCyrusSaslClientSession(const std::string& mech) {
-    if ((mech == "SCRAM-SHA-1") || (mech == "SCRAM-SHA-256") || mech == "MONGODB-AWS") {
+    if ((mech == auth::kMechanismScramSha1) || (mech == auth::kMechanismScramSha256) ||
+        (mech == auth::kMechanismMongoAWS) || (mech == auth::kMechanismMongoOIDC)) {
         return new NativeSaslClientSession();
     }
     return new CyrusSaslClientSession();

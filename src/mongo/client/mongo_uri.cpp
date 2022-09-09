@@ -593,9 +593,10 @@ constexpr auto kAuthMechanismPropertiesKey = "mechanism_properties"_sd;
 constexpr auto kAuthServiceName = "SERVICE_NAME"_sd;
 constexpr auto kAuthServiceRealm = "SERVICE_REALM"_sd;
 constexpr auto kAuthAwsSessionToken = "AWS_SESSION_TOKEN"_sd;
+constexpr auto kAuthOIDCAccessToken = "OIDC_ACCESS_TOKEN"_sd;
 
-constexpr std::array<StringData, 3> kSupportedAuthMechanismProperties = {
-    kAuthServiceName, kAuthServiceRealm, kAuthAwsSessionToken};
+constexpr std::array<StringData, 4> kSupportedAuthMechanismProperties = {
+    kAuthServiceName, kAuthServiceRealm, kAuthAwsSessionToken, kAuthOIDCAccessToken};
 
 BSONObj parseAuthMechanismProperties(const std::string& propStr) {
     BSONObjBuilder bob;
@@ -621,8 +622,10 @@ BSONObj parseAuthMechanismProperties(const std::string& propStr) {
 boost::optional<BSONObj> MongoURI::makeAuthObjFromOptions(
     int maxWireVersion, const std::vector<std::string>& saslMechsForAuth) const {
     // Usually, a username is required to authenticate.
-    // However X509 based authentication may, and typically does,
-    // omit the username, inferring it from the client certificate instead.
+    // However certain authentication mechanisms may omit the username.
+    // This includes X509, which infers the username from the certificate;
+    // AWS-IAM, which infers it from the session token;
+    // and OIDC, which infers it from the access token.
     bool usernameRequired = true;
 
     BSONObjBuilder bob;
@@ -642,7 +645,8 @@ boost::optional<BSONObj> MongoURI::makeAuthObjFromOptions(
     it = _options.find("authMechanism");
     if (it != _options.end()) {
         bob.append(saslCommandMechanismFieldName, it->second);
-        if (it->second == auth::kMechanismMongoX509 || it->second == auth::kMechanismMongoAWS) {
+        if (it->second == auth::kMechanismMongoX509 || it->second == auth::kMechanismMongoAWS ||
+            it->second == auth::kMechanismMongoOIDC) {
             usernameRequired = false;
         }
     } else if (!saslMechsForAuth.empty()) {
@@ -695,6 +699,10 @@ boost::optional<BSONObj> MongoURI::makeAuthObjFromOptions(
 
         if (parsed.hasField(kAuthAwsSessionToken)) {
             bob.append(saslCommandIamSessionToken, parsed[kAuthAwsSessionToken].String());
+        }
+
+        if (parsed.hasField(kAuthOIDCAccessToken)) {
+            bob.append(saslCommandOIDCAccessToken, parsed[kAuthOIDCAccessToken].String());
         }
     }
 
