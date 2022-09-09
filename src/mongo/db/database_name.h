@@ -96,7 +96,7 @@ public:
     }
 
     bool equalCaseInsensitive(const DatabaseName& other) const {
-        return boost::iequals(toStringWithTenantId(), other.toStringWithTenantId());
+        return (_tenantId == other._tenantId) && boost::iequals(toString(), other.toString());
     }
 
     template <typename H>
