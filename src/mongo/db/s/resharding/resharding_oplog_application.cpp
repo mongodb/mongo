@@ -105,7 +105,7 @@ void runWithTransaction(OperationContext* opCtx,
 
     func(asr.opCtx());
 
-    if (txnParticipant.retrieveCompletedTransactionOperations(asr.opCtx()).size() > 0) {
+    if (txnParticipant.retrieveCompletedTransactionOperations(asr.opCtx())->size() > 0) {
         // Similar to the `isTimestamped` check in `applyOperation`, we only want to commit the
         // transaction if we're doing replicated writes.
         txnParticipant.commitUnpreparedTransaction(asr.opCtx());

@@ -620,7 +620,7 @@ public:
          * to the transaction.  It is legal to call this method only when the transaction state is
          * in progress or committed.
          */
-        std::vector<repl::ReplOperation>& retrieveCompletedTransactionOperations(
+        std::vector<repl::ReplOperation>* retrieveCompletedTransactionOperations(
             OperationContext* opCtx);
 
         /**
