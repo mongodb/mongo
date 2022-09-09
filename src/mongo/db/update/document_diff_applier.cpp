@@ -40,10 +40,6 @@
 namespace mongo::doc_diff {
 namespace {
 
-// Optimizes for time-series documents in the bucket collection. Adds "_id" and "version" fields to
-// merge into fewer damages.
-constexpr int SmallFieldSize = 20;
-
 struct Update {
     BSONElement newElt;
 };
@@ -241,11 +237,6 @@ int32_t computeDamageOnObject(const BSONObj& preImageRoot,
             targetOffsetInPostImage(elt.rawdata(), preImageRoot.objdata(), offsetRoot, diffSize);
         if (it == tables.fieldMap.end()) {
             // Field is not modified.
-            auto eltSize = elt.size();
-            if (eltSize < SmallFieldSize) {
-                appendDamage(damages, bufBuilder->len(), eltSize, targetOffset, eltSize);
-                bufBuilder->appendBuf(elt.rawdata(), eltSize);
-            }
             continue;
         }
 
