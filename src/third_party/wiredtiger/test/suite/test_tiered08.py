@@ -104,6 +104,14 @@ class test_tiered08(wttest.WiredTigerTestCase, TieredConfigMixin):
         c.close()
 
     def test_tiered08(self):
+
+        # FIXME-WT-9823, FIXME-WT-9837
+        # This part of the test multi-threads checkpoint, flush, and insert
+        # operations, creating races in tiered storage. It triggers several 
+        # bugs that occur frequently in our testing. We will re-enable this
+        # testing when the bugs have been addressed.
+        self.skipTest('Concurrent flush_tier, checkpoint, and insert operations cause races.')
+
         cfg = self.conn_config()
         self.pr('Config is: ' + cfg)
         self.session.create(self.uri,
