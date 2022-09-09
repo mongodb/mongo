@@ -200,6 +200,7 @@ protected:
 
     void _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::Error expectedError,
                                                            const OplogEntry& op,
+                                                           const NamespaceString& targetNss,
                                                            bool expectedApplyOpCalled);
 
     Status _applyOplogEntryOrGroupedInsertsWrapper(OperationContext* opCtx,

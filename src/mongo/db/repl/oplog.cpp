@@ -1599,8 +1599,12 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     // document.
                     invariant(op.getObject2());
                     auto&& documentId = *op.getObject2();
-                    auto documentFound = Helpers::findById(
-                        opCtx, collection->ns().ns(), documentId, changeStreamPreImage);
+
+                    // TODO SERVER-69541 pass in NamespaceString object instead
+                    auto documentFound = Helpers::findById(opCtx,
+                                                           collection->ns().toStringWithTenantId(),
+                                                           documentId,
+                                                           changeStreamPreImage);
                     invariant(documentFound);
                 }
 

@@ -187,7 +187,7 @@ NamespaceString OplogApplierUtils::parseUUIDOrNs(OperationContext* opCtx,
 NamespaceStringOrUUID OplogApplierUtils::getNsOrUUID(const NamespaceString& nss,
                                                      const OplogEntry& op) {
     if (auto ui = op.getUuid()) {
-        return {nss.db().toString(), ui.value()};
+        return {nss.dbName(), ui.value()};
     }
     return nss;
 }
@@ -206,6 +206,9 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
     CurOp individualOp(opCtx);
     const NamespaceString nss(op.getNss());
     auto opType = op.getOpType();
+
+    invariant(op.getTid() == nss.tenantId());
+
     if (opType == OpTypeEnum::kNoop) {
         incrementOpsAppliedStats();
         return Status::OK();

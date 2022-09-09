@@ -129,10 +129,12 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentDataba
 
 TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
        applyOplogEntryOrGroupedInsertsDeleteDocumentDatabaseMissing) {
+
+    const NamespaceString nss(boost::none, "test.t");
     NamespaceString otherNss("test.othername");
     auto op = makeOplogEntry(OpTypeEnum::kDelete, otherNss, {});
     int prevDeleteFromMissing = replOpCounters.getDeleteFromMissingNamespace()->load();
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, false);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, false);
     auto postDeleteFromMissing = replOpCounters.getDeleteFromMissingNamespace()->load();
     ASSERT_EQ(1, postDeleteFromMissing - prevDeleteFromMissing);
 
@@ -170,7 +172,7 @@ TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
     NamespaceString otherNss(nss.getSisterNS("othername"));
     auto op = makeOplogEntry(OpTypeEnum::kDelete, otherNss, kUuid);
     int prevDeleteFromMissing = replOpCounters.getDeleteFromMissingNamespace()->load();
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, false);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, false);
     auto postDeleteFromMissing = replOpCounters.getDeleteFromMissingNamespace()->load();
     ASSERT_EQ(1, postDeleteFromMissing - prevDeleteFromMissing);
 
@@ -214,7 +216,7 @@ TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
     // implicitly create the collection.
     auto op = makeOplogEntry(OpTypeEnum::kDelete, nss, {});
     int prevDeleteFromMissing = replOpCounters.getDeleteFromMissingNamespace()->load();
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, false);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, false);
     ASSERT_FALSE(collectionExists(_opCtx.get(), nss));
     auto postDeleteFromMissing = replOpCounters.getDeleteFromMissingNamespace()->load();
     ASSERT_EQ(1, postDeleteFromMissing - prevDeleteFromMissing);
@@ -242,7 +244,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentCollec
     const NamespaceString nss("test.t");
     repl::createCollection(_opCtx.get(), nss, {});
     auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, {});
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, true);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, true);
 }
 
 TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
@@ -251,7 +253,7 @@ TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
     repl::createCollection(_opCtx.get(), nss, {});
     auto op = makeOplogEntry(OpTypeEnum::kDelete, nss, {});
     int prevDeleteWasEmpty = replOpCounters.getDeleteWasEmpty()->load();
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, false);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, false);
     auto postDeleteWasEmpty = replOpCounters.getDeleteWasEmpty()->load();
     ASSERT_EQ(1, postDeleteWasEmpty - prevDeleteWasEmpty);
 
@@ -277,7 +279,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentCollec
     createCollection(_opCtx.get(), nss, createRecordPreImageCollectionOptions());
     ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {BSON("_id" << 0)}, 0));
     auto op = makeOplogEntry(OpTypeEnum::kDelete, nss, {});
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, true);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, true);
 }
 
 TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
@@ -287,7 +289,7 @@ TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
     ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {BSON("_id" << 0)}, 0));
     auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, uuid);
     int prevInsertOnExistingDoc = replOpCounters.getInsertOnExistingDoc()->load();
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, false);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, false);
     auto postInsertOnExistingDoc = replOpCounters.getInsertOnExistingDoc()->load();
     ASSERT_EQ(1, postInsertOnExistingDoc - prevInsertOnExistingDoc);
 
@@ -304,7 +306,7 @@ TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {BSON("_id" << 0)}, 0));
     auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, uuid);
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::DuplicateKey, op, false);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::DuplicateKey, op, nss, false);
 }
 
 TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
@@ -318,7 +320,7 @@ TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
                                  BSON(doc_diff::kUpdateSectionFieldName << fromjson("{a: 1}"))),
                              BSON("_id" << 0));
     int prevUpdateOnMissingDoc = replOpCounters.getUpdateOnMissingDoc()->load();
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, true);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, true);
     auto postUpdateOnMissingDoc = replOpCounters.getUpdateOnMissingDoc()->load();
     ASSERT_EQ(1, postUpdateOnMissingDoc - prevUpdateOnMissingDoc);
 
@@ -339,7 +341,8 @@ TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
                              update_oplog_entry::makeDeltaOplogEntry(
                                  BSON(doc_diff::kUpdateSectionFieldName << fromjson("{a: 1}"))),
                              BSON("_id" << 0));
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::UpdateOperationFailed, op, false);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(
+        ErrorCodes::UpdateOperationFailed, op, nss, false);
 }
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentCollectionLockedByUUID) {
@@ -348,7 +351,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentCollec
     // Test that the collection to lock is determined by the UUID and not the 'ns' field.
     NamespaceString otherNss(nss.getSisterNS("othername"));
     auto op = makeOplogEntry(OpTypeEnum::kInsert, otherNss, uuid);
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, true);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, true);
 }
 
 TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
@@ -362,7 +365,7 @@ TEST_F(OplogApplierImplTestDisableSteadyStateConstraints,
     NamespaceString otherNss(nss.getSisterNS("othername"));
     auto op = makeOplogEntry(OpTypeEnum::kDelete, otherNss, options.uuid);
     int prevDeleteWasEmpty = replOpCounters.getDeleteWasEmpty()->load();
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, false);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, false);
     auto postDeleteWasEmpty = replOpCounters.getDeleteWasEmpty()->load();
     ASSERT_EQ(1, postDeleteWasEmpty - prevDeleteWasEmpty);
 
@@ -399,7 +402,7 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentCollec
     // Test that the collection to lock is determined by the UUID and not the 'ns' field.
     NamespaceString otherNss(nss.getSisterNS("othername"));
     auto op = makeOplogEntry(OpTypeEnum::kDelete, otherNss, options.uuid);
-    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, true);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, true);
 }
 
 TEST_F(OplogApplierImplTest, applyOplogEntryToRecordChangeStreamPreImages) {
@@ -698,6 +701,172 @@ TEST_F(OplogApplierImplTest,
     ASSERT_EQUALS(NamespaceString::kSessionTransactionsTableNamespace, secondDerivedOp.getNss());
     ASSERT_EQUALS(secondInsertOpTime.getTimestamp(),
                   secondDerivedOp.getObject()["lastWriteOpTime"]["ts"].timestamp());
+}
+
+TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentIncludesTenantId) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    const TenantId tid(OID::gen());
+    const NamespaceString nss(tid, "test.t");
+    BSONObj doc = BSON("_id" << 0);
+
+    repl::createCollection(_opCtx.get(), nss, {});
+
+    auto op = makeOplogEntry(OpTypeEnum::kInsert, nss, boost::none, doc, boost::none);
+
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, true);
+
+    // TODO SERVER-67423: use docExists to check that the doc actually got inserted
+}
+
+TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentIncorrectTenantId) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    const auto commonNss("test.t"_sd);
+    const TenantId tid1(OID::gen());
+    const TenantId tid2(OID::gen());
+    const NamespaceString nssTenant1(tid1, commonNss);
+    const NamespaceString nssTenant2(tid2, commonNss);
+    BSONObj doc = BSON("_id" << 0);
+
+    repl::createCollection(_opCtx.get(), nssTenant1, {});
+
+    auto op = makeOplogEntry(OpTypeEnum::kInsert, nssTenant2, boost::none, doc, boost::none);
+
+    ASSERT_THROWS(
+        _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nssTenant2, false),
+        ExceptionFor<ErrorCodes::NamespaceNotFound>);
+
+    // TODO SERVER-67423: use docExists to check that the doc still exists on nssTenant1, and does
+    // not exist on nssTenant2
+}
+
+TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentIncludesTenantId) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    const TenantId tid(OID::gen());
+    const NamespaceString nss(tid, "test.t");
+    BSONObj doc = BSON("_id" << 0);
+
+    // this allows us to set deleteArgs.deletedDoc needed by the onDeleteFn validation function in
+    // _testApplyOplogEntryOrGroupedInsertsCrudOperation below
+    CollectionOptions options = createRecordPreImageCollectionOptions();
+
+    repl::createCollection(_opCtx.get(), nss, options);
+    ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {doc}, 0));
+
+    auto op = makeOplogEntry(OpTypeEnum::kDelete, nss, boost::none);
+
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, true);
+
+    // TODO SERVER-67423: use docExists to check that the doc actually got deleted
+}
+
+TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,  // see TODO SERVER-67423 below
+       applyOplogEntryOrGroupedInsertsDeleteDocumentIncorrectTenantId) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    const auto commonNss("test.t"_sd);
+    const TenantId tid1(OID::gen());
+    const TenantId tid2(OID::gen());
+    const NamespaceString nssTenant1(tid1, commonNss);
+    const NamespaceString nssTenant2(tid2, commonNss);
+    BSONObj doc = BSON("_id" << 0);
+
+    repl::createCollection(_opCtx.get(), nssTenant1, {});
+    ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nssTenant1, {doc}, 0));
+
+    auto op = makeOplogEntry(OpTypeEnum::kDelete, nssTenant2, boost::none);
+
+    ASSERT_THROWS(
+        _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nssTenant2, false),
+        ExceptionFor<ErrorCodes::NamespaceNotFound>);
+
+    // TODO SERVER-67423: use docExists to check that the doc still exists on nssTenant1, and does
+    // not exist on nssTenant2. Also, we are using OplogApplierImplTestEnableSteadyStateConstraints
+    // because according to OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon not enabling
+    // steady state constraints allows the delete to fail silently.  While updating SERVER-67423, we
+    // can instead use docExists to check the results of the deletion rather than rely on the
+    // exception
+}
+
+// Steady state constraints are required for secondaries in order to avoid turning an insert into an
+// upsert and masking duplicateKey errors.
+TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
+       applyOplogEntryOrGroupedInsertsUuidIncludesTenantId) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    const auto commonNss("test.t"_sd);
+    const TenantId tid1(OID::gen());
+    const TenantId tid2(OID::gen());
+    const NamespaceString nssTenant1(tid1, commonNss);
+    const NamespaceString nssTenant2(tid2, commonNss);
+    BSONObj doc = BSON("_id" << 0);
+
+    auto uuid1 = createCollectionWithUuid(_opCtx.get(), nssTenant1);
+    auto uuid2 = createCollectionWithUuid(_opCtx.get(), nssTenant2);
+
+    // Only insert on tenant1, such that we will cause a duplicate key error on one tenant but not
+    // the other.
+    ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nssTenant1, {doc}, 0));
+
+    auto duplicateInsertOp = makeOplogEntry(OpTypeEnum::kInsert, nssTenant1, uuid1);
+    auto successfulInsertOp = makeOplogEntry(OpTypeEnum::kInsert, nssTenant2, uuid2);
+
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(
+        ErrorCodes::DuplicateKey, duplicateInsertOp, nssTenant1, false);
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(
+        ErrorCodes::OK, successfulInsertOp, nssTenant2, true);
+}
+
+TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsUpdateDocumentIncludesTenantId) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    const TenantId tid(OID::gen());
+    const NamespaceString nss(tid, "test.t");
+    BSONObj doc = BSON("_id" << 0);
+
+    createCollection(_opCtx.get(), nss, {});
+    ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nss, {doc}, 0));
+
+    auto op = makeOplogEntry(repl::OpTypeEnum::kUpdate,
+                             nss,
+                             boost::none,
+                             update_oplog_entry::makeDeltaOplogEntry(
+                                 BSON(doc_diff::kUpdateSectionFieldName << fromjson("{a: 1}"))),
+                             BSON("_id" << 0));
+
+    _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nss, true);
+
+    // TODO SERVER-67423: use docExists to check that the doc exists in its new updated form
+}
+
+TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsUpdateDocumentIncorrectTenantId) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    const auto commonNss("test.t"_sd);
+    const TenantId tid1(OID::gen());
+    const TenantId tid2(OID::gen());
+    const NamespaceString nssTenant1(tid1, commonNss);
+    const NamespaceString nssTenant2(tid2, commonNss);
+    BSONObj doc = BSON("_id" << 0);
+
+    createCollection(_opCtx.get(), nssTenant1, {});
+    ASSERT_OK(getStorageInterface()->insertDocument(_opCtx.get(), nssTenant1, {doc}, 0));
+
+    auto op = makeOplogEntry(repl::OpTypeEnum::kUpdate,
+                             nssTenant2,
+                             boost::none,
+                             update_oplog_entry::makeDeltaOplogEntry(
+                                 BSON(doc_diff::kUpdateSectionFieldName << fromjson("{a: 1}"))),
+                             BSON("_id" << 0));
+
+    ASSERT_THROWS(
+        _testApplyOplogEntryOrGroupedInsertsCrudOperation(ErrorCodes::OK, op, nssTenant2, true),
+        ExceptionFor<ErrorCodes::NamespaceNotFound>);
+
+    // TODO SERVER-67423: use docExists to check that the original doc still exists on nssTenant1,
+    // and no doc exists on nssTenant2
 }
 
 class MultiOplogEntryOplogApplierImplTest : public OplogApplierImplTest {
