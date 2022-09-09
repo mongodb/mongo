@@ -2396,9 +2396,7 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
         fassertFailedNoTrace(5642402);
     }
     // TODO (SERVER-69264): Remove ErrorCodes::CannotCreateIndex.
-    // TODO (SERVER-69496): Remove ErrorCodes::InterruptedAtShutdown.
-    invariant(opCtx->isKillPending() || status.code() == ErrorCodes::CannotCreateIndex ||
-                  status.code() == ErrorCodes::InterruptedAtShutdown,
+    invariant(opCtx->isKillPending() || status.code() == ErrorCodes::CannotCreateIndex,
               str::stream() << "Unexpected error code during index build cleanup: " << status);
     if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
         _cleanUpSinglePhaseAfterFailure(opCtx, collection, replState, indexBuildOptions, status);
