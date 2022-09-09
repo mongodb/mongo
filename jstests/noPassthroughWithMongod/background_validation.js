@@ -5,7 +5,7 @@
  * Checks that {background:true} runs.
  * Checks that {background:true} can run concurrently with CRUD ops on the same collection.
  *
- * @tags: [requires_fsync]
+ * @tags: [requires_fsync, requires_wiredtiger, requires_persistence]
  */
 
 (function() {
