@@ -1006,6 +1006,19 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exactp)
             __cursor_state_restore(cursor, &state);
         else {
             __wt_value_return(cbt, cbt->upd_value);
+            /*
+             * This compare is needed for bounded cursors in the event that a valid key is found.
+             * The returned value of exact must reflect the comparison between the found key and the
+             * original search key, not the repositioned bounds key. This comparison ensures that is
+             * the case.
+             */
+            if (WT_CURSOR_BOUNDS_SET(cursor)) {
+                if (btree->type == BTREE_ROW)
+                    WT_ERR(
+                      __wt_compare(session, btree->collator, &cursor->key, &state.key, &exact));
+                else
+                    exact = cbt->recno < state.recno ? -1 : cbt->recno == state.recno ? 0 : 1;
+            }
             goto done;
         }
     }
