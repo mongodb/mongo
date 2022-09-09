@@ -600,8 +600,11 @@ __bm_switch_object(WT_BM *bm, WT_SESSION_IMPL *session, uint32_t objectid)
 
     current = bm->block;
 
-    /* There should not be a checkpoint in progress. */
-    WT_ASSERT(session, !S2C(session)->txn_global.checkpoint_running);
+    /*
+     * There should not be a checkpoint in progress if we are switching objects. It is allowed if we
+     * are creating the first tiered object.
+     */
+    WT_ASSERT(session, !S2C(session)->txn_global.checkpoint_running || objectid == 1);
 
     WT_RET(__wt_blkcache_tiered_open(session, NULL, objectid, &block));
 
