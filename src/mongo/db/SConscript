@@ -61,6 +61,9 @@ env.Library(
     target='server_base', source=[
         'basic_types.idl',
         'database_name.cpp',
+        'feature_compatibility_version_parser.cpp',
+        'feature_compatibility_version_document.idl',
+        'feature_flag.cpp',
         'index_names.cpp',
         'keypattern.cpp',
         'logical_time.cpp',
@@ -130,7 +133,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/security_token',
-        '$BUILD_DIR/mongo/idl/feature_flag',
         'server_base',
         'server_feature_flags',
     ],
@@ -269,13 +271,30 @@ env.Library(
     ],
 )
 
+env.Command(
+    target=[
+        'feature_flag_test.idl',
+    ],
+    source=[
+        '#buildscripts/cheetah_source_generator.py',
+        'feature_flag_test.idl.tpl',
+        '$BUILD_DIR/mongo/util/version/releases.yml',
+    ],
+    action=[
+        '$PYTHON ${SOURCES[0]} -o ${TARGETS[0]} ${SOURCES[1]} ${SOURCES[2]} ${MONGO_VERSION}',
+    ],
+    # Ensure that that SCons is used to produce this file rather than Ninja, to avoid spurious
+    # dependency cycles due to how we manage generated sources with Ninja.
+    NINJA_TEMPLATE=True,
+)
+
 env.Library(
     target='server_feature_flags',
     source=[
+        'feature_flag_test.idl',
         'server_feature_flags.idl',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/feature_flag',
         'server_base',
     ],
 )
@@ -400,9 +419,9 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/repl_settings',
         '$BUILD_DIR/mongo/db/repl/replica_set_messages',
         '$BUILD_DIR/mongo/db/storage/storage_options',
-        '$BUILD_DIR/mongo/idl/feature_flag',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         'global_settings',
+        'server_base',
         'server_options_base',
         'server_options_servers',
     ],
@@ -448,7 +467,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/repl/repl_server_parameters',
-        '$BUILD_DIR/mongo/idl/feature_flag',
         '$BUILD_DIR/mongo/util/caching',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         'server_base',
@@ -539,7 +557,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_knobs',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_options',
-        '$BUILD_DIR/mongo/idl/feature_flag',
     ],
 )
 
@@ -854,7 +871,6 @@ env.Library(
         'internal_transactions_feature_flag.idl',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/feature_flag',
         'server_base',
         'server_options_core',
     ],
@@ -1942,10 +1958,10 @@ env.Library(
         'client_metadata_propagation_egress_hook.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/idl/feature_flag',
         '$BUILD_DIR/mongo/rpc/client_metadata',
         '$BUILD_DIR/mongo/rpc/metadata',
         '$BUILD_DIR/mongo/rpc/metadata_impersonated_user',
+        'server_base',
         'server_feature_flags',
     ],
 )

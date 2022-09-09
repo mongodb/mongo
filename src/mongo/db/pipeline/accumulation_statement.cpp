@@ -34,8 +34,8 @@
 
 #include "mongo/db/pipeline/accumulation_statement.h"
 
-#include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/stats/counters.h"

@@ -35,8 +35,8 @@
 #include <ostream>
 
 #include "mongo/db/client.h"
-#include "mongo/db/commands/feature_compatibility_version_document_gen.h"
-#include "mongo/db/commands/feature_compatibility_version_parser.h"
+#include "mongo/db/feature_compatibility_version_document_gen.h"
+#include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/db/index_builds_coordinator_mongod.h"
 #include "mongo/db/json.h"
 #include "mongo/db/namespace_string.h"

@@ -36,7 +36,7 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/unordered_fields_bsonelement_comparator.h"
-#include "mongo/db/commands/feature_compatibility_version_documentation.h"
+#include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/matcher/doc_validation_util.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_parser.h"

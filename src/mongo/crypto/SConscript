@@ -82,7 +82,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/pipeline/value_idl',
-        '$BUILD_DIR/mongo/idl/feature_flag',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )

@@ -31,9 +31,9 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/feature_compatibility_version_documentation.h"
-#include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"
+#include "mongo/db/feature_compatibility_version_documentation.h"
+#include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"

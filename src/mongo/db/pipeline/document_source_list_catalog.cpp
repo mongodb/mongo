@@ -31,7 +31,7 @@
 
 #include <fmt/format.h>
 
-#include "mongo/db/commands/feature_compatibility_version_documentation.h"
+#include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"

@@ -29,9 +29,9 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
 #include "mongo/db/commands/tenant_migration_recipient_cmds_gen.h"
+#include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"

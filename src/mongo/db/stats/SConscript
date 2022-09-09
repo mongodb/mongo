@@ -80,7 +80,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/idl/feature_flag',
     ],
 )
 

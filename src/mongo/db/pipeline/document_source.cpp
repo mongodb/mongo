@@ -32,8 +32,8 @@
 
 #include "mongo/db/pipeline/document_source.h"
 
-#include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_group.h"

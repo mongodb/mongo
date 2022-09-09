@@ -14,8 +14,8 @@ env.Library(
         '$BUILD_DIR/mongo/util/net/network',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_feature_flags',
-        '$BUILD_DIR/mongo/idl/feature_flag',
     ],
 )
 
@@ -118,8 +118,8 @@ env.Library(
         'remote_command',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_feature_flags',
-        '$BUILD_DIR/mongo/idl/feature_flag',
         'egress_tag_closer_manager',
     ],
 )

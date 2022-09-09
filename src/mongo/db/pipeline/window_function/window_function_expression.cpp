@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/commands/feature_compatibility_version_documentation.h"
+#include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/pipeline/accumulation_statement.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
 #include "mongo/db/pipeline/document_source_project.h"

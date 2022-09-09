@@ -31,7 +31,7 @@
 
 #include <string>
 
-#include "mongo/db/commands/feature_compatibility_version_parser.h"
+#include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/util/version/releases.h"

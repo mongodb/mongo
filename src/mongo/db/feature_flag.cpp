@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/idl/feature_flag.h"
+#include "mongo/db/feature_flag.h"
 
 #include "mongo/util/debug_util.h"
 #include "mongo/util/version/releases.h"

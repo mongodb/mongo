@@ -36,10 +36,10 @@
 
 #include "mongo/base/status.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/commands/feature_compatibility_version_gen.h"
-#include "mongo/db/commands/feature_compatibility_version_parser.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/feature_compatibility_version_documentation.h"
+#include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"

@@ -30,7 +30,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/basic.h"
 
-#include "mongo/idl/feature_flag_test_gen.h"
+#include "mongo/db/feature_flag_test_gen.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest.h"

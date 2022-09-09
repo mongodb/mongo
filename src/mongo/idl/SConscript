@@ -22,7 +22,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
-        'feature_flag',
     ],
 )
 
@@ -92,35 +91,6 @@ env.CppUnitTest(
     ],
 )
 
-env.Command(
-    target=[
-        'feature_flag_test.idl',
-    ],
-    source=[
-        '#buildscripts/cheetah_source_generator.py',
-        'feature_flag_test.idl.tpl',
-        '$BUILD_DIR/mongo/util/version/releases.yml',
-    ],
-    action=[
-        '$PYTHON ${SOURCES[0]} -o ${TARGETS[0]} ${SOURCES[1]} ${SOURCES[2]} ${MONGO_VERSION}',
-    ],
-    # Ensure that that SCons is used to produce this file rather than Ninja, to avoid spurious
-    # dependency cycles due to how we manage generated sources with Ninja.
-    NINJA_TEMPLATE=True,
-)
-
-env.Library(
-    target='feature_flag',
-    source=[
-        'feature_flag.cpp',
-        'feature_flag_test.idl',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/commands/feature_compatibility_parsers',
-        '$BUILD_DIR/mongo/db/server_base',
-    ],
-)
-
 env.CppUnitTest(
     target='idl_test',
     source=[
@@ -141,11 +111,11 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
         'cluster_server_parameter',
-        'feature_flag',
     ],
 )

@@ -29,12 +29,12 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/commands/feature_compatibility_version_parser.h"
+#include "mongo/db/feature_compatibility_version_parser.h"
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/commands/feature_compatibility_version_document_gen.h"
-#include "mongo/db/commands/feature_compatibility_version_documentation.h"
+#include "mongo/db/feature_compatibility_version_document_gen.h"
+#include "mongo/db/feature_compatibility_version_documentation.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/version/releases.h"
 

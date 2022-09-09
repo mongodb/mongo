@@ -16,7 +16,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/idl/feature_flag',
     ],
 )
 
@@ -203,7 +202,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/global_settings',
-        '$BUILD_DIR/mongo/idl/feature_flag',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         '$BUILD_DIR/mongo/util/icu',
         '$BUILD_DIR/mongo/util/net/ssl_manager',

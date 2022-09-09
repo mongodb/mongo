@@ -1016,7 +1016,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         if spec.server_parameters:
             if [param for param in spec.server_parameters if param.feature_flag]:
-                header_list.append('mongo/idl/feature_flag.h')
+                header_list.append('mongo/db/feature_flag.h')
             header_list.append('mongo/db/server_parameter.h')
             header_list.append('mongo/db/server_parameter_with_storage.h')
 

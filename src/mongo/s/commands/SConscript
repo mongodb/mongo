@@ -112,7 +112,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/core',
         '$BUILD_DIR/mongo/db/commands/create_command',
         '$BUILD_DIR/mongo/db/commands/current_op_common',
-        '$BUILD_DIR/mongo/db/commands/feature_compatibility_parsers',
         '$BUILD_DIR/mongo/db/commands/kill_common',
         '$BUILD_DIR/mongo/db/commands/list_databases_command',
         '$BUILD_DIR/mongo/db/commands/map_reduce_parser',
