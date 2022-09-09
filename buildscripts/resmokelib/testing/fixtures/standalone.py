@@ -303,6 +303,13 @@ class MongodLauncher(object):
                 "mode": "alwaysOn", "data": {"numTickets": self.config.FLOW_CONTROL_TICKETS}
             }
 
+        # The internalQueryForceClassicEngine parameter was renamed to
+        # internalQueryFrameworkControl starting in version 6.1.
+        if "internalQueryFrameworkControl" in suite_set_parameters and suite_set_parameters[
+                "internalQueryFrameworkControl"] == "forceClassicEngine":
+            del suite_set_parameters["internalQueryFrameworkControl"]
+            suite_set_parameters["internalQueryForceClassicEngine"] = True
+
         _add_testing_set_parameters(suite_set_parameters)
 
         shortcut_opts = {
