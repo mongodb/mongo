@@ -20,7 +20,13 @@ TestData.skipCheckOrphans = true;
 (function() {
 'use strict';
 
-var st = new ShardingTest({shards: 3, mongos: 1, other: {rs: true, rsOptions: {nodes: 2}}});
+const mongosParameters = Object.assign({logComponentVerbosity: tojson({network: {verbosity: 3}})});
+
+var st = new ShardingTest({
+    shards: 3,
+    mongos: [{setParameter: mongosParameters}],
+    other: {rs: true, rsOptions: {nodes: 2}}
+});
 
 var mongos = st.s0;
 var admin = mongos.getDB("admin");
