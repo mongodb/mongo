@@ -488,11 +488,8 @@ error_codes:
     - {code: 376, name: ChangeStreamNotEnabled}
     - {code: 377, name: FLEMaxTagLimitExceeded }
     - {code: 378, name: NonConformantBSON, categories: [ValidationError]}
-    
+
     - {code: 379, name: DatabaseMetadataRefreshCanceled, categories: [InternalOnly]}
-
-    - {code: 380, name: ReshardingCoordinatorServiceConflictingOperationInProgress, extra: ReshardingCoordinatorServiceConflictingOperationInProgressInfo, categories: [InternalOnly]}
-
 
     # Error codes 4000-8999 are reserved.
 

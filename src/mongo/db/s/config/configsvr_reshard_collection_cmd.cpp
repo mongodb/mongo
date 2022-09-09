@@ -46,16 +46,34 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/reshard_collection_gen.h"
-#include "mongo/s/resharding/resharding_coordinator_service_conflicting_op_in_progress_info.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+
 
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(reshardCollectionJoinedExistingOperation);
 
 namespace {
+
+// Returns a resharding instance if one exists for the same collection and shard key already.
+boost::optional<std::shared_ptr<ReshardingCoordinatorService::ReshardingCoordinator>>
+getExistingInstanceToJoin(OperationContext* opCtx,
+                          const NamespaceString& nss,
+                          const BSONObj& newShardKey) {
+    auto instances =
+        resharding::getReshardingStateMachines<ReshardingCoordinatorService,
+                                               ReshardingCoordinatorService::ReshardingCoordinator>(
+            opCtx, nss);
+    for (const auto& instance : instances) {
+        if (SimpleBSONObjComparator::kInstance.evaluate(
+                instance->getMetadata().getReshardingKey().toBSON() == newShardKey)) {
+            return instance;
+        }
+    }
+    return boost::none;
+}
 
 class ConfigsvrReshardCollectionCommand final
     : public TypedCommand<ConfigsvrReshardCollectionCommand> {
@@ -128,13 +146,24 @@ public:
 
             // Returns boost::none if there isn't any work to be done by the resharding operation.
             auto instance = ([&]() -> boost::optional<std::shared_ptr<
-                                       const ReshardingCoordinatorService::ReshardingCoordinator>> {
+                                       ReshardingCoordinatorService::ReshardingCoordinator>> {
                 FixedFCVRegion fixedFcv(opCtx);
 
                 uassert(ErrorCodes::CommandNotSupported,
                         "reshardCollection command not enabled",
                         resharding::gFeatureFlagResharding.isEnabled(
                             serverGlobalParams.featureCompatibility));
+
+                if (auto existingInstance =
+                        getExistingInstanceToJoin(opCtx, nss, request().getKey())) {
+                    // Join the existing resharding operation to prevent generating a new resharding
+                    // instance if the same command is issued consecutively due to client disconnect
+                    // etc.
+                    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+                    reshardCollectionJoinedExistingOperation.pauseWhileSet(opCtx);
+                    existingInstance.value()->getCoordinatorDocWrittenFuture().get(opCtx);
+                    return existingInstance;
+                }
 
                 // (Generic FCV reference): To run this command and ensure the consistency of the
                 // metadata we need to make sure we are on a stable state.
@@ -185,7 +214,12 @@ public:
                 coordinatorDoc.setNumInitialChunks(request().getNumInitialChunks());
 
                 opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-                auto instance = getOrCreateReshardingCoordinator(opCtx, coordinatorDoc);
+                auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
+                auto service =
+                    registry->lookupServiceByName(ReshardingCoordinatorService::kServiceName);
+                auto instance = ReshardingCoordinatorService::ReshardingCoordinator::getOrCreate(
+                    opCtx, service, coordinatorDoc.toBSON());
+
                 instance->getCoordinatorDocWrittenFuture().get(opCtx);
                 return instance;
             })();
@@ -197,15 +231,6 @@ public:
             }
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
         }
-
-        /**
-         * Helper function to create a new instance or join the existing resharding operation to
-         * prevent generating a new resharding instance if the same command is issued consecutively
-         * due to client disconnect etc.
-         */
-        std::shared_ptr<const ReshardingCoordinatorService::ReshardingCoordinator>
-        getOrCreateReshardingCoordinator(OperationContext* opCtx,
-                                         const ReshardingCoordinatorDocument& coordinatorDoc);
 
     private:
         NamespaceString ns() const override {
@@ -242,30 +267,7 @@ public:
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
     }
-
 } configsvrReshardCollectionCmd;
-
-std::shared_ptr<const ReshardingCoordinatorService::ReshardingCoordinator>
-ConfigsvrReshardCollectionCommand::Invocation::getOrCreateReshardingCoordinator(
-    OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
-    try {
-        auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
-        auto service = registry->lookupServiceByName(ReshardingCoordinatorService::kServiceName);
-        auto instance = ReshardingCoordinatorService::ReshardingCoordinator::getOrCreate(
-            opCtx, service, coordinatorDoc.toBSON());
-
-        return std::shared_ptr<const ReshardingCoordinatorService::ReshardingCoordinator>(instance);
-    } catch (
-        const ExceptionFor<ErrorCodes::ReshardingCoordinatorServiceConflictingOperationInProgress>&
-            ex) {
-        reshardCollectionJoinedExistingOperation.pauseWhileSet(opCtx);
-        return ex.extraInfo<ReshardingCoordinatorServiceConflictingOperationInProgressInfo>()
-            ->getInstance();
-
-    } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>& ex) {
-        uasserted(ErrorCodes::ReshardCollectionInProgress, ex.toStatus().reason());
-    }
-}
 
 }  // namespace
 }  // namespace mongo

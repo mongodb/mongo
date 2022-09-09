@@ -65,7 +65,6 @@
 #include "mongo/s/request_types/drop_collection_if_uuid_not_matching_gen.h"
 #include "mongo/s/request_types/flush_resharding_state_change_gen.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
-#include "mongo/s/resharding/resharding_coordinator_service_conflicting_op_in_progress_info.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
@@ -711,7 +710,20 @@ void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
 
             // Insert the coordinator document to config.reshardingOperations.
             invariant(coordinatorDoc.getActive());
-            writeToCoordinatorStateNss(opCtx, metrics, coordinatorDoc, txnNumber);
+            try {
+                writeToCoordinatorStateNss(opCtx, metrics, coordinatorDoc, txnNumber);
+            } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
+                auto extraInfo = ex.extraInfo<DuplicateKeyErrorInfo>();
+                if (extraInfo->getKeyPattern().woCompare(BSON("active" << 1)) == 0) {
+                    uasserted(ErrorCodes::ReshardCollectionInProgress,
+                              str::stream()
+                                  << "Only one resharding operation is allowed to be active at a "
+                                     "time, aborting resharding op for "
+                                  << coordinatorDoc.getSourceNss());
+                }
+
+                throw;
+            }
 
             // Update the config.collections entry for the original collection to include
             // 'reshardingFields'
@@ -960,37 +972,6 @@ ThreadPool::Limits ReshardingCoordinatorService::getThreadPoolLimits() const {
     ThreadPool::Limits threadPoolLimit;
     threadPoolLimit.maxThreads = resharding::gReshardingCoordinatorServiceMaxThreadCount;
     return threadPoolLimit;
-}
-
-void ReshardingCoordinatorService::checkIfConflictsWithOtherInstances(
-    OperationContext* opCtx,
-    BSONObj initialState,
-    const std::vector<const PrimaryOnlyService::Instance*>& existingInstances) {
-    auto coordinatorDoc = ReshardingCoordinatorDocument::parse(
-        IDLParserContext("ReshardingCoordinatorService::checkIfConflictsWithOtherInstances"),
-        std::move(initialState));
-
-    for (const auto& instance : existingInstances) {
-        auto typedInstance =
-            checked_cast<const ReshardingCoordinatorService::ReshardingCoordinator*>(instance);
-        const bool isNssSame =
-            typedInstance->getMetadata().getSourceNss() == coordinatorDoc.getSourceNss();
-        const bool isReshardingKeySame = SimpleBSONObjComparator::kInstance.evaluate(
-            typedInstance->getMetadata().getReshardingKey().toBSON() ==
-            coordinatorDoc.getReshardingKey().toBSON());
-
-        iassert(ErrorCodes::ConflictingOperationInProgress,
-                str::stream() << "Only one resharding operation is allowed to be active at a "
-                                 "time, aborting resharding op for "
-                              << coordinatorDoc.getSourceNss(),
-                isNssSame && isReshardingKeySame);
-
-        iasserted(ReshardingCoordinatorServiceConflictingOperationInProgressInfo(
-                      typedInstance->shared_from_this()),
-                  str::stream() << "Found an active resharding operation for "
-                                << coordinatorDoc.getSourceNss() << " with resharding key "
-                                << coordinatorDoc.getReshardingKey().toString());
-    }
 }
 
 std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingCoordinatorService::constructInstance(
