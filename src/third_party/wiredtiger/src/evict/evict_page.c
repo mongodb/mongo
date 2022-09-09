@@ -10,6 +10,7 @@
 
 static int __evict_page_clean_update(WT_SESSION_IMPL *, WT_REF *, uint32_t);
 static int __evict_page_dirty_update(WT_SESSION_IMPL *, WT_REF *, uint32_t);
+static int __evict_reconcile(WT_SESSION_IMPL *, WT_REF *, uint32_t);
 static int __evict_review(WT_SESSION_IMPL *, WT_REF *, uint32_t, bool *);
 
 /*
@@ -168,11 +169,27 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
     WT_ERR(__evict_review(session, ref, flags, &inmem_split));
 
     /*
-     * If there was an in-memory split, the tree has been left in the state we want: there is
-     * nothing more to do.
+     * If we decide to do an in-memory split. Do it now. If an in-memory split completes, the page
+     * stays in memory and the tree is left in the desired state: avoid the usual cleanup.
      */
-    if (inmem_split)
+    if (inmem_split) {
+        WT_ERR(__wt_split_insert(session, ref));
         goto done;
+    }
+
+    /* No need to reconcile the page if it is from a dead tree or it is clean. */
+    if (!tree_dead && __wt_page_is_modified(page))
+        WT_ERR(__evict_reconcile(session, ref, flags));
+
+    /*
+     * Fail 0.1% of the time after we have done reconciliation. We should always evict the page of a
+     * dead tree.
+     */
+    if (!closing && !tree_dead &&
+      __wt_failpoint(session, WT_TIMING_STRESS_FAILPOINT_EVICTION_FAIL_AFTER_RECONCILIATION, 10)) {
+        ret = EBUSY;
+        goto err;
+    }
 
     /* Check we are not evicting an accessible internal page with an active split generation. */
     WT_ASSERT(session,
@@ -205,6 +222,11 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
         WT_ERR(__evict_page_clean_update(session, ref, flags));
     else
         WT_ERR(__evict_page_dirty_update(session, ref, flags));
+
+    /*
+     * We have loaded the new disk image and updated the tree structure. We can no longer fail after
+     * this point.
+     */
 
     if (time_start != 0) {
         time_stop = __wt_clock(session);
@@ -369,6 +391,7 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_
     WT_MULTI multi;
     WT_PAGE_MODIFY *mod;
     bool closing;
+    void *tmp;
 
     mod = ref->page->modify;
     closing = FLD_ISSET(evict_flags, WT_EVICT_CALL_CLOSING);
@@ -431,13 +454,20 @@ __evict_page_dirty_update(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_
             __wt_ref_out(session, ref);
             WT_REF_SET_STATE(ref, WT_REF_DISK);
         } else {
-            /*
-             * The split code works with WT_MULTI structures, build one for the disk image.
-             */
+            /* The split code works with WT_MULTI structures, build one for the disk image. */
             memset(&multi, 0, sizeof(multi));
             multi.disk_image = mod->mod_disk_image;
-
-            WT_RET(__wt_split_rewrite(session, ref, &multi));
+            /*
+             * Store the disk image to a temporary pointer in case we fail to rewrite the page and
+             * we need to link the new disk image back to the old disk image.
+             */
+            tmp = mod->mod_disk_image;
+            mod->mod_disk_image = NULL;
+            ret = __wt_split_rewrite(session, ref, &multi);
+            if (ret != 0) {
+                mod->mod_disk_image = tmp;
+                return (ret);
+            }
         }
 
         break;
@@ -575,27 +605,22 @@ __evict_child_check(WT_SESSION_IMPL *session, WT_REF *parent)
 
 /*
  * __evict_review --
- *     Get exclusive access to the page and review the page and its subtree for conditions that
- *     would block its eviction.
+ *     Review the page and its subtree for conditions that would block its eviction.
  */
 static int
 __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool *inmem_splitp)
 {
     WT_BTREE *btree;
-    WT_CACHE *cache;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_PAGE *page;
-    uint32_t flags;
     bool closing, modified;
-    bool is_eviction_thread, use_snapshot_for_app_thread;
 
     *inmem_splitp = false;
 
     btree = S2BT(session);
     conn = S2C(session);
     page = ref->page;
-    flags = WT_REC_EVICT;
     closing = FLD_ISSET(evict_flags, WT_EVICT_CALL_CLOSING);
 
     /*
@@ -640,13 +665,9 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
         if (!__wt_page_can_evict(session, ref, inmem_splitp))
             return (__wt_set_return(session, EBUSY));
 
-        /*
-         * Check for an append-only workload needing an in-memory split; we can't do this earlier
-         * because in-memory splits require exclusive access. If an in-memory split completes, the
-         * page stays in memory and the tree is left in the desired state: avoid the usual cleanup.
-         */
+        /* Check for an append-only workload needing an in-memory split. */
         if (*inmem_splitp)
-            return (__wt_split_insert(session, ref));
+            return (0);
     }
 
     /* If the page is clean, we're done and we can evict. */
@@ -655,12 +676,12 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
 
     /*
      * If we are trying to evict a dirty page that does not belong to history store(HS) and
-     * checkpoint is processing the HS file, then avoid evicting the dirty non-HS page for now if
-     * the cache is already dominated by dirty HS content.
+     * checkpoint is processing the HS file, avoid evicting the dirty non-HS page for now if the
+     * cache is already dominated by dirty HS content.
      *
-     * Evicting a non-HS dirty page can generate even more HS content. As we can not evict HS pages
+     * Evicting an non-HS dirty page can generate even more HS content. As we cannot evict HS pages
      * while checkpoint is operating on the HS file, we can end up in a situation where we exceed
-     * the cache size limits.
+     * the cache size limit.
      */
     if (conn->txn_global.checkpoint_running_hs && !WT_IS_HS(btree->dhandle) &&
       __wt_cache_hs_dirty(session) && __wt_cache_full(session)) {
@@ -674,33 +695,28 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
     if (F_ISSET(session, WT_SESSION_NO_RECONCILE))
         return (__wt_set_return(session, EBUSY));
 
-    /*
-     * If the page is dirty, reconcile it to decide if we can evict it.
-     *
-     * If we have an exclusive lock (we're discarding the tree), assert there are no updates we
-     * cannot read.
-     *
-     * Don't set any other flags for internal pages: there are no update lists to be saved and
-     * restored, changes can't be written into the history store table, nor can we re-create
-     * internal pages in memory.
-     *
-     * For leaf pages:
-     *
-     * In-memory pages are a known configuration.
-     *
-     * Set the update/restore flag, so reconciliation will write blocks it can write and create a
-     * list of skipped updates for blocks it cannot write, along with disk images. This is how
-     * eviction of active, huge pages works: we take a big page and reconcile it into blocks, some
-     * of which we write and discard, the rest of which we re-create as smaller in-memory pages,
-     * (restoring the updates that stopped us from writing the block), and inserting the whole mess
-     * into the page's parent. Set the flag in all cases because the incremental cost of
-     * update/restore in reconciliation is minimal, eviction shouldn't have picked a page where
-     * update/restore is necessary, absent some cache pressure. It's possible updates occurred after
-     * we selected this page for eviction, but it's unlikely and we don't try and manage that risk.
-     *
-     * Additionally, if we aren't trying to free space in the cache, scrub the page and keep it in
-     * memory.
-     */
+    return (0);
+}
+
+/*
+ * __evict_reconcile --
+ *     Reconcile the page for eviction.
+ */
+static int
+__evict_reconcile(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags)
+{
+    WT_BTREE *btree;
+    WT_CACHE *cache;
+    WT_CONNECTION_IMPL *conn;
+    WT_DECL_RET;
+    uint32_t flags;
+    bool closing, is_eviction_thread, use_snapshot_for_app_thread;
+
+    btree = S2BT(session);
+    conn = S2C(session);
+    flags = WT_REC_EVICT;
+    closing = FLD_ISSET(evict_flags, WT_EVICT_CALL_CLOSING);
+
     cache = conn->cache;
 
     /*
@@ -710,22 +726,36 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
     if (FLD_ISSET(evict_flags, WT_EVICT_CALL_URGENT))
         LF_SET(WT_REC_CALL_URGENT);
 
+    /*
+     * If we have an exclusive lock (we're discarding the tree), assert there are no updates we
+     * cannot read.
+     */
     if (closing)
         LF_SET(WT_REC_VISIBILITY_ERR);
+    /*
+     * Don't set any other flags for internal pages: there are no update lists to be saved and
+     * restored, changes can't be written into the history store table, nor can we re-create
+     * internal pages in memory.
+     *
+     * Don't set any other flags for history store table as all the content is evictable.
+     */
     else if (F_ISSET(ref, WT_REF_FLAG_INTERNAL) || WT_IS_HS(btree->dhandle))
         ;
-    else if (WT_SESSION_BTREE_SYNC(session) && !WT_IS_METADATA(btree->dhandle))
-        LF_SET(WT_REC_HS);
+    /* Always do update restore for in-memory database. */
     else if (F_ISSET(conn, WT_CONN_IN_MEMORY))
         LF_SET(WT_REC_IN_MEMORY | WT_REC_SCRUB);
+    /* For data store leaf pages, write the history to history store except for metadata. */
     else if (!WT_IS_METADATA(btree->dhandle)) {
         LF_SET(WT_REC_HS);
 
         /*
-         * Scrub if we're supposed to or toss it in sometimes if we are in debugging mode.
+         * Scrub and we're supposed to or toss it in sometimes if we are in debugging mode.
+         *
+         * Note that don't scrub if checkpoint is running on the tree.
          */
-        if (F_ISSET(cache, WT_CACHE_EVICT_SCRUB) ||
-          (F_ISSET(cache, WT_CACHE_EVICT_DEBUG_MODE) && __wt_random(&session->rnd) % 3 == 0))
+        if (!WT_SESSION_BTREE_SYNC(session) &&
+          (F_ISSET(cache, WT_CACHE_EVICT_SCRUB) ||
+            (F_ISSET(cache, WT_CACHE_EVICT_DEBUG_MODE) && __wt_random(&session->rnd) % 3 == 0)))
             LF_SET(WT_REC_SCRUB);
     }
 
@@ -764,10 +794,8 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
         __wt_txn_bump_snapshot(session);
     else if (use_snapshot_for_app_thread)
         LF_SET(WT_REC_APP_EVICTION_SNAPSHOT);
-    else {
-        if (!WT_SESSION_BTREE_SYNC(session))
-            LF_SET(WT_REC_VISIBLE_ALL);
-    }
+    else if (!WT_SESSION_BTREE_SYNC(session))
+        LF_SET(WT_REC_VISIBLE_ALL);
 
     WT_ASSERT(session, LF_ISSET(WT_REC_VISIBLE_ALL) || F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT));
 
@@ -778,7 +806,7 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
      * Reconcile the page. Force read-committed isolation level if we are using snapshots for
      * eviction workers or application threads.
      */
-    if (LF_ISSET(WT_REC_APP_EVICTION_SNAPSHOT) || is_eviction_thread)
+    if (is_eviction_thread || use_snapshot_for_app_thread)
         WT_WITH_TXN_ISOLATION(
           session, WT_ISO_READ_COMMITTED, ret = __wt_reconcile(session, ref, NULL, flags));
     else
@@ -796,22 +824,8 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
      * Success: assert that the page is clean or reconciliation was configured to save updates.
      */
     WT_ASSERT(session,
-      !__wt_page_is_modified(page) || LF_ISSET(WT_REC_HS | WT_REC_IN_MEMORY) ||
+      !__wt_page_is_modified(ref->page) || LF_ISSET(WT_REC_HS | WT_REC_IN_MEMORY) ||
         WT_IS_METADATA(btree->dhandle));
-
-    /*
-     * FIXME-WT-9751
-     *
-     * Disable this failpoint for now - triggering it leads to a memory leak in testing. We want to
-     * fix the leak and take the time to cleanup the code, so disable the failpoint in the meantime
-     * to reduce testing noise.
-     */
-#if 0
-    /* Fail 0.1% of the time. */
-    if (!closing &&
-      __wt_failpoint(session, WT_TIMING_STRESS_FAILPOINT_EVICTION_FAIL_AFTER_RECONCILIATION, 10))
-        return (EBUSY);
-#endif
 
     return (0);
 }
