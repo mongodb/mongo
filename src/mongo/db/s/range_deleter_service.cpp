@@ -204,6 +204,16 @@ BSONObj RangeDeleterService::dumpState() {
     return builder.obj();
 }
 
+long long RangeDeleterService::totalNumOfRegisteredTasks() {
+    auto lock = _acquireMutexUnconditionally();
+
+    long long counter = 0;
+    for (const auto& [collUUID, ranges] : _rangeDeletionTasks) {
+        counter += ranges.size();
+    }
+    return counter;
+}
+
 SharedSemiFuture<void> RangeDeleterService::registerTask(
     const RangeDeletionTask& rdt,
     SemiFuture<void>&& waitForActiveQueriesToComplete,

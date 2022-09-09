@@ -536,6 +536,26 @@ TEST_F(RangeDeleterServiceTest, DumpState) {
         << "Expected " << state << " == " << expectedState;
 }
 
+TEST_F(RangeDeleterServiceTest, TotalNumOfRegisteredTasks) {
+    auto rds = RangeDeleterService::get(opCtx);
+    auto task0WithOngoingQueriesCollA = rangeDeletionTask0ForCollA;
+    auto task1WithOngoingQueriesCollA = rangeDeletionTask1ForCollA;
+    auto taskWithOngoingQueriesCollB = rangeDeletionTask0ForCollB;
+
+    // Register 2 tasks for `collA` and 1 task for `collB`
+    auto completionFuture0CollA =
+        rds->registerTask(rangeDeletionTask0ForCollA->getTask(),
+                          rangeDeletionTask0ForCollA->getOngoingQueriesFuture());
+    auto completionFuture1CollA =
+        rds->registerTask(rangeDeletionTask1ForCollA->getTask(),
+                          rangeDeletionTask1ForCollA->getOngoingQueriesFuture());
+    auto completionFutureCollB =
+        rds->registerTask(rangeDeletionTask0ForCollB->getTask(),
+                          rangeDeletionTask0ForCollB->getOngoingQueriesFuture());
+
+    ASSERT_EQ(3, rds->totalNumOfRegisteredTasks());
+}
+
 TEST_F(RangeDeleterServiceTest, RegisterTaskWithDisableResumableRangeDeleterFlagEnabled) {
 
     RAIIServerParameterControllerForTest enableFeatureFlag{"disableResumableRangeDeleter", true};

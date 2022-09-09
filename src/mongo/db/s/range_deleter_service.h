@@ -152,6 +152,11 @@ public:
      */
     BSONObj dumpState();
 
+    /*
+     * Returns the total number of range deletion tasks registered on the service.
+     */
+    long long totalNumOfRegisteredTasks();
+
 private:
     /* Asynchronously register range deletions on the service. To be called on on step-up */
     void _recoverRangeDeletionsOnStepUp(OperationContext* opCtx);
