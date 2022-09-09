@@ -433,13 +433,22 @@ err:
 static int
 __curtable_reset(WT_CURSOR *cursor)
 {
+    WT_CURSOR *primary;
     WT_CURSOR_TABLE *ctable;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
 
     ctable = (WT_CURSOR_TABLE *)cursor;
+    /* Grab the primary cursor to reset the bounds. */
+    primary = *ctable->cg_cursors;
+
     JOINABLE_CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, reset, NULL);
+
     APPLY_CG(ctable, reset);
+
+    /* If a user calls cursor reset also reset the bounds. */
+    if (API_USER_ENTRY(session))
+        __wt_cursor_bound_reset(primary);
 
 err:
     API_END_RET(session, ret);

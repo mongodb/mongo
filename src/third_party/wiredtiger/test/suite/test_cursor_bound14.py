@@ -39,8 +39,7 @@ class test_cursor_bound14(bound_base):
     types = [
         ('file', dict(uri='file:', use_colgroup=False)),
         ('table', dict(uri='table:', use_colgroup=False)),
-        # FIXME-WT-9738: Uncomment once bug with remove operations on a bounded cursor with colgroups is fixed.
-        #('colgroup', dict(uri='table:', use_colgroup=True))
+        ('colgroup', dict(uri='table:', use_colgroup=True))
     ]
 
     key_formats = [
