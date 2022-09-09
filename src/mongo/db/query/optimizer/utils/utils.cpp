@@ -351,7 +351,8 @@ class PartialSchemaReqConverter {
 public:
     using ResultType = boost::optional<PartialSchemaReqConversion>;
 
-    PartialSchemaReqConverter(const bool isFilterContext) : _isFilterContext(isFilterContext) {}
+    PartialSchemaReqConverter(const bool isFilterContext, const PathToIntervalFn& pathToInterval)
+        : _isFilterContext(isFilterContext), _pathToInterval(pathToInterval) {}
 
     ResultType handleEvalPathAndEvalFilter(ResultType pathResult, ResultType inputResult) {
         if (!pathResult || !inputResult) {
@@ -671,6 +672,17 @@ public:
             // We allow expressions to participate in bounds.
             return {{n}};
         }
+
+        if (_pathToInterval) {
+            // If we have a path converter, attempt to convert directly into bounds.
+            if (auto conversion = _pathToInterval(n); conversion) {
+                return {{PartialSchemaRequirements{
+                    {PartialSchemaKey{},
+                     PartialSchemaRequirement{"" /*boundProjectionName*/,
+                                              std::move(*conversion)}}}}};
+            }
+        }
+
         // General case. Reject conversion.
         return {};
     }
@@ -681,7 +693,30 @@ public:
 
 private:
     const bool _isFilterContext;
+    const PathToIntervalFn& _pathToInterval;
 };
+
+boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(
+    const ABT& expr, const bool isFilterContext, const PathToIntervalFn& pathToInterval) {
+    PartialSchemaReqConverter converter(isFilterContext, pathToInterval);
+    auto result = converter.convert(expr);
+    if (!result) {
+        return {};
+    }
+
+    auto& reqMap = result->_reqMap;
+    if (reqMap.empty()) {
+        return {};
+    }
+
+    for (const auto& [key, req] : reqMap) {
+        if (key._path.is<PathIdentity>() && isIntervalReqFullyOpenDNF(req.getIntervals())) {
+            // We need to determine either path or interval (or both).
+            return {};
+        }
+    }
+    return result;
+}
 
 /**
  * Check if an index path contains a Traverse element.
@@ -774,28 +809,6 @@ public:
         return candidatePrefix.visit(instance, node);
     }
 };
-
-boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(
-    const ABT& expr, const bool isFilterContext) {
-    PartialSchemaReqConverter converter(isFilterContext);
-    auto result = converter.convert(expr);
-    if (!result) {
-        return {};
-    }
-
-    auto& reqMap = result->_reqMap;
-    if (reqMap.empty()) {
-        return {};
-    }
-
-    for (const auto& [key, req] : reqMap) {
-        if (key._path.is<PathIdentity>() && isIntervalReqFullyOpenDNF(req.getIntervals())) {
-            // We need to determine either path or interval (or both).
-            return {};
-        }
-    }
-    return result;
-}
 
 bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
                                    const IndexPathSet& nonMultiKeyPaths,
@@ -1315,10 +1328,22 @@ private:
 void lowerPartialSchemaRequirement(const PartialSchemaKey& key,
                                    const PartialSchemaRequirement& req,
                                    ABT& node,
+                                   const PathToIntervalFn& pathToInterval,
                                    const std::function<void(const ABT& node)>& visitor) {
     const bool hasBoundProjName = req.hasBoundProjectionName();
-    PartialSchemaReqLowerTransport transport(hasBoundProjName);
-    ABT path = transport.lower(req.getIntervals());
+
+    ABT path = make<PathIdentity>();
+    if (pathToInterval) {
+        // If we have a path converter, attempt to convert bounds back into a path element.
+        if (auto conversion = pathToInterval(make<PathArr>());
+            conversion && *conversion == req.getIntervals()) {
+            path = make<PathArr>();
+        }
+    }
+    if (path.is<PathIdentity>()) {
+        PartialSchemaReqLowerTransport transport(hasBoundProjName);
+        path = transport.lower(req.getIntervals());
+    }
     const bool pathIsId = path.is<PathIdentity>();
 
     if (hasBoundProjName) {
@@ -1352,6 +1377,7 @@ void lowerPartialSchemaRequirements(const CEType scanGroupCE,
                                     std::vector<SelectivityType> indexPredSels,
                                     ResidualRequirementsWithCE& requirements,
                                     ABT& physNode,
+                                    const PathToIntervalFn& pathToInterval,
                                     NodeCEMap& nodeCEMap) {
     sortResidualRequirements(requirements);
 
@@ -1367,9 +1393,10 @@ void lowerPartialSchemaRequirements(const CEType scanGroupCE,
             indexPredSels.push_back(ce / scanGroupCE);
         }
 
-        lowerPartialSchemaRequirement(residualKey, residualReq, physNode, [&](const ABT& node) {
-            nodeCEMap.emplace(node.cast<Node>(), residualCE);
-        });
+        lowerPartialSchemaRequirement(
+            residualKey, residualReq, physNode, pathToInterval, [&](const ABT& node) {
+                nodeCEMap.emplace(node.cast<Node>(), residualCE);
+            });
     }
 }
 

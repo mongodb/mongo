@@ -86,8 +86,7 @@ void ConstEval::removeUnusedEvalNodes() {
             // Do not inline nodes which can become Sargable.
             // TODO: consider caching.
             // TODO: consider deriving IndexingAvailability.
-            if (!_disableSargableInlining ||
-                !convertExprToPartialSchemaReq(k->getProjection(), false /*isFilterContext*/)) {
+            if (!_disableInline || !_disableInline(k->getProjection())) {
                 // Schedule node inlining as there is exactly one reference.
                 _singleRef.emplace(v.front());
                 _changed = true;

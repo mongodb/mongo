@@ -78,16 +78,20 @@ function getPlanSkeleton(node) {
 }
 
 function navigateToPath(doc, path) {
+    let result;
+    let field;
+
     try {
-        let result = doc;
-        for (const field of path.split(".")) {
+        result = doc;
+        for (field of path.split(".")) {
             assert(result.hasOwnProperty(field));
             result = result[field];
         }
         return result;
     } catch (e) {
         jsTestLog("Error navigating to path '" + path + "'");
-        printjson(doc);
+        jsTestLog("Missing field: " + field);
+        printjson(result);
         throw e;
     }
 }

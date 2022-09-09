@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/cascades/ce_hinted.h"
 #include "mongo/db/query/optimizer/cascades/cost_derivation.h"
@@ -1798,6 +1799,7 @@ TEST(PhysRewriter, FilterReorder) {
         {{{"c1", ScanDefinition{{}, {}}}}},
         std::make_unique<HintedCE>(std::move(hints)),
         std::make_unique<DefaultCosting>(),
+        {} /*pathToInterval*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -1895,6 +1897,7 @@ TEST(PhysRewriter, CoveredScan) {
                  makeIndexDefinition("a", CollationOp::Ascending, false /*isMultiKey*/)}}}}}},
         std::make_unique<HintedCE>(std::move(hints)),
         std::make_unique<DefaultCosting>(),
+        {} /*pathToInterval*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -2213,6 +2216,7 @@ TEST(PhysRewriter, MultiKeyIndex) {
                  makeIndexDefinition("b", CollationOp::Descending, false /*isMultiKey*/)}}}}}},
         std::make_unique<HintedCE>(std::move(hints)),
         std::make_unique<DefaultCosting>(),
+        {} /*pathToInterval*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     {
@@ -2702,6 +2706,7 @@ TEST(PhysRewriter, CompoundIndex4Negative) {
                                  false /*isMultiKey*/}}}}}}},
         std::make_unique<HintedCE>(std::move(hints)),
         std::make_unique<DefaultCosting>(),
+        {} /*pathToInterval*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -3339,13 +3344,17 @@ TEST(PhysRewriter, ElemMatchIndex) {
          OptPhaseManager::OptPhase::MemoExplorationPhase,
          OptPhaseManager::OptPhase::MemoImplementationPhase},
         prefixId,
+        false /*requireRID*/,
         {{{"c1",
            ScanDefinition{{}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}}}}}},
+        std::make_unique<HeuristicCE>(),
+        std::make_unique<DefaultCosting>(),
+        defaultConvertPathToInterval,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
     ASSERT_TRUE(phaseManager.optimize(optimized));
-    ASSERT_EQ(5, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_EQ(6, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -3353,19 +3362,20 @@ TEST(PhysRewriter, ElemMatchIndex) {
         "|   |       root\n"
         "|   RefBlock: \n"
         "|       Variable [root]\n"
-        "Filter []\n"
-        "|   EvalFilter []\n"
-        "|   |   Variable [root]\n"
-        "|   PathGet [a]\n"
-        "|   PathArr []\n"
         "BinaryJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
+        "|   Filter []\n"
+        "|   |   EvalFilter []\n"
+        "|   |   |   Variable [evalTemp_4]\n"
+        "|   |   PathArr []\n"
         "|   LimitSkip []\n"
         "|   |   limitSkip:\n"
         "|   |       limit: 1\n"
         "|   |       skip: 0\n"
-        "|   Seek [ridProjection: rid_0, {'<root>': root}, c1]\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': evalTemp_4}, c1]\n"
         "|   |   BindBlock:\n"
+        "|   |       [evalTemp_4]\n"
+        "|   |           Source []\n"
         "|   |       [root]\n"
         "|   |           Source []\n"
         "|   RefBlock: \n"
@@ -3417,17 +3427,21 @@ TEST(PhysRewriter, ElemMatchIndex1) {
          OptPhaseManager::OptPhase::MemoExplorationPhase,
          OptPhaseManager::OptPhase::MemoImplementationPhase},
         prefixId,
+        false /*requireRID*/,
         {{{"c1",
            ScanDefinition{{},
                           {{"index1",
                             makeCompositeIndexDefinition(
                                 {{"b", CollationOp::Ascending, true /*isMultiKey*/},
                                  {"a", CollationOp::Ascending, true /*isMultiKey*/}})}}}}}},
+        std::make_unique<HeuristicCE>(),
+        std::make_unique<DefaultCosting>(),
+        defaultConvertPathToInterval,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
     ASSERT_TRUE(phaseManager.optimize(optimized));
-    ASSERT_BETWEEN(5, 10, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(8, 12, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Demonstrate we can cover both the filter and the extracted elemMatch predicate with the
     // index.
@@ -3437,19 +3451,20 @@ TEST(PhysRewriter, ElemMatchIndex1) {
         "|   |       root\n"
         "|   RefBlock: \n"
         "|       Variable [root]\n"
-        "Filter []\n"
-        "|   EvalFilter []\n"
-        "|   |   Variable [root]\n"
-        "|   PathGet [a]\n"
-        "|   PathArr []\n"
         "BinaryJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
+        "|   Filter []\n"
+        "|   |   EvalFilter []\n"
+        "|   |   |   Variable [evalTemp_19]\n"
+        "|   |   PathArr []\n"
         "|   LimitSkip []\n"
         "|   |   limitSkip:\n"
         "|   |       limit: 1\n"
         "|   |       skip: 0\n"
-        "|   Seek [ridProjection: rid_0, {'<root>': root}, c1]\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': evalTemp_19}, c1]\n"
         "|   |   BindBlock:\n"
+        "|   |       [evalTemp_19]\n"
+        "|   |           Source []\n"
         "|   |       [root]\n"
         "|   |           Source []\n"
         "|   RefBlock: \n"
@@ -3462,6 +3477,68 @@ TEST(PhysRewriter, ElemMatchIndex1) {
         "    BindBlock:\n"
         "        [rid_0]\n"
         "            Source []\n",
+        optimized);
+}
+
+TEST(PhysRewriter, ElemMatchIndexNoArrays) {
+    using namespace properties;
+    PrefixId prefixId;
+
+    ABT scanNode = make<ScanNode>("root", "c1");
+
+    // This encodes an elemMatch with a conjunction >70 and <90.
+    ABT filterNode = make<FilterNode>(
+        make<EvalFilter>(
+            make<PathGet>(
+                "a",
+                make<PathComposeM>(
+                    make<PathArr>(),
+                    make<PathTraverse>(
+                        make<PathComposeM>(make<PathCompare>(Operations::Gt, Constant::int64(70)),
+                                           make<PathCompare>(Operations::Lt, Constant::int64(90))),
+                        PathTraverse::kSingleLevel))),
+            make<Variable>("root")),
+        std::move(scanNode));
+
+    ABT rootNode =
+        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
+
+    OptPhaseManager phaseManager(
+        {OptPhaseManager::OptPhase::MemoSubstitutionPhase,
+         OptPhaseManager::OptPhase::MemoExplorationPhase,
+         OptPhaseManager::OptPhase::MemoImplementationPhase},
+        prefixId,
+        false /*requireRID*/,
+        {{{"c1",
+           ScanDefinition{
+               {},
+               {{"index1",
+                 makeIndexDefinition("a", CollationOp::Ascending, false /*multiKey*/)}}}}}},
+        std::make_unique<HeuristicCE>(),
+        std::make_unique<DefaultCosting>(),
+        defaultConvertPathToInterval,
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = rootNode;
+    ASSERT_TRUE(phaseManager.optimize(optimized));
+    ASSERT_EQ(2, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+
+    // If we do not have arrays (index is not multikey) we simplify to unsatisfiable query.
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       root\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
+        "Evaluation []\n"
+        "|   BindBlock:\n"
+        "|       [root]\n"
+        "|           Const [Nothing]\n"
+        "LimitSkip []\n"
+        "|   limitSkip:\n"
+        "|       limit: 0\n"
+        "|       skip: 0\n"
+        "CoScan []\n",
         optimized);
 }
 
@@ -3499,12 +3576,16 @@ TEST(PhysRewriter, ObjectElemMatch) {
          OptPhaseManager::OptPhase::MemoExplorationPhase,
          OptPhaseManager::OptPhase::MemoImplementationPhase},
         prefixId,
+        false /*requireRID*/,
         {{{"c1",
            ScanDefinition{{},
                           {{"index1",
                             makeCompositeIndexDefinition(
                                 {{"b", CollationOp::Ascending, true /*isMultiKey*/},
                                  {"a", CollationOp::Ascending, true /*isMultiKey*/}})}}}}}},
+        std::make_unique<HeuristicCE>(),
+        std::make_unique<DefaultCosting>(),
+        defaultConvertPathToInterval,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -3534,11 +3615,12 @@ TEST(PhysRewriter, ObjectElemMatch) {
         "|   Const [1]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
-        "|   |   Variable [root]\n"
-        "|   PathGet [a]\n"
+        "|   |   Variable [evalTemp_0]\n"
         "|   PathArr []\n"
-        "PhysicalScan [{'<root>': root}, c1]\n"
+        "PhysicalScan [{'<root>': root, 'a': evalTemp_0}, c1]\n"
         "    BindBlock:\n"
+        "        [evalTemp_0]\n"
+        "            Source []\n"
         "        [root]\n"
         "            Source []\n",
         optimized);
@@ -3832,6 +3914,7 @@ TEST(PhysRewriter, IndexPartitioning) {
          5 /*numberOfPartitions*/},
         std::make_unique<HintedCE>(std::move(hints)),
         std::make_unique<DefaultCosting>(),
+        {} /*pathToInterval*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -4399,8 +4482,9 @@ TEST(PhysRewriter, PartialIndex1) {
                           make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(2)),
                                              PathTraverse::kSingleLevel)),
             make<Variable>("root")),
-        true /*isFilterContext*/);
-    ASSERT_TRUE(conversionResult.has_value());
+        true /*isFilterContext*/,
+        {} /*pathToInterval*/);
+    ASSERT_TRUE(conversionResult);
     ASSERT_FALSE(conversionResult->_retainPredicate);
 
     OptPhaseManager phaseManager(
@@ -4479,8 +4563,9 @@ TEST(PhysRewriter, PartialIndex2) {
                           make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(3)),
                                              PathTraverse::kSingleLevel)),
             make<Variable>("root")),
-        true /*isFilterContext*/);
-    ASSERT_TRUE(conversionResult.has_value());
+        true /*isFilterContext*/,
+        {} /*pathToInterval*/);
+    ASSERT_TRUE(conversionResult);
     ASSERT_FALSE(conversionResult->_retainPredicate);
 
     OptPhaseManager phaseManager(
@@ -4558,8 +4643,9 @@ TEST(PhysRewriter, PartialIndexReject) {
                           make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(4)),
                                              PathTraverse::kSingleLevel)),
             make<Variable>("root")),
-        true /*isFilterContext*/);
-    ASSERT_TRUE(conversionResult.has_value());
+        true /*isFilterContext*/,
+        {} /*pathToInterval*/);
+    ASSERT_TRUE(conversionResult);
     ASSERT_FALSE(conversionResult->_retainPredicate);
 
     OptPhaseManager phaseManager(
@@ -4636,6 +4722,7 @@ TEST(PhysRewriter, RequireRID) {
         {{{"c1", ScanDefinition{{}, {}}}}},
         std::make_unique<HeuristicCE>(),
         std::make_unique<DefaultCosting>(),
+        {} /*pathToInterval*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;

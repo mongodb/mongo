@@ -188,14 +188,19 @@ struct PartialSchemaReqConversion {
     bool _retainPredicate;
 };
 
+using PathToIntervalFn = std::function<boost::optional<IntervalReqExpr::Node>(const ABT&)>;
+
 /**
  * Takes an expression that comes from an Filter or Evaluation node, and attempt to convert
  * to a PartialSchemaReqConversion. This is done independent of the availability of indexes.
  * Essentially this means to extract intervals over paths whenever possible. If the conversion is
  * not possible, return empty result.
+ *
+ * A direct node-to-intervals converter may be specified, used to selectively expands for example
+ * PathArr into an equivalent interval representation.
  */
-boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(const ABT& expr,
-                                                                          bool isFilterContext);
+boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(
+    const ABT& expr, bool isFilterContext, const PathToIntervalFn& pathToInterval);
 
 /**
  * Given a set of non-multikey paths, remove redundant Traverse elements from paths in a Partial
@@ -260,6 +265,7 @@ bool checkMaybeHasNull(const IntervalReqExpr::Node& intervals);
 void lowerPartialSchemaRequirement(const PartialSchemaKey& key,
                                    const PartialSchemaRequirement& req,
                                    ABT& node,
+                                   const PathToIntervalFn& pathToInterval,
                                    const std::function<void(const ABT& node)>& visitor =
                                        [](const ABT&) {});
 
@@ -267,6 +273,7 @@ void lowerPartialSchemaRequirements(CEType scanGroupCE,
                                     std::vector<SelectivityType> indexPredSels,
                                     ResidualRequirementsWithCE& requirements,
                                     ABT& physNode,
+                                    const PathToIntervalFn& pathToInterval,
                                     NodeCEMap& nodeCEMap);
 
 void sortResidualRequirements(ResidualRequirementsWithCE& residualReq);

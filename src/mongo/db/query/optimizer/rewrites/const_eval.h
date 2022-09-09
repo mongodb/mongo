@@ -33,17 +33,18 @@
 #include "mongo/db/query/optimizer/utils/abt_hash.h"
 
 namespace mongo::optimizer {
+
+using DisableInlineFn = std::function<bool(const ABT&)>;
+
 /**
  * This is an example rewriter that does constant evaluation in-place.
  */
 class ConstEval {
 public:
     ConstEval(VariableEnvironment& env,
-              const bool disableSargableInlining = false,
+              DisableInlineFn disableInline = {},
               ProjectionNameSet* erasedProjNames = nullptr)
-        : _disableSargableInlining(disableSargableInlining),
-          _env(env),
-          _erasedProjNames(erasedProjNames) {}
+        : _env(env), _erasedProjNames(std::move(erasedProjNames)), _disableInline(disableInline) {}
 
     // The default noop transport. Note the first ABT& parameter.
     template <typename T, typename... Ts>
@@ -99,10 +100,13 @@ private:
     void swapAndUpdate(ABT& n, ABT newN);
     void removeUnusedEvalNodes();
 
-    // Controls if we can inline certain EvaluationNodes.
-    const bool _disableSargableInlining;
-
     VariableEnvironment& _env;
+    // Optionally collect projection names from erased Eval nodes.
+    ProjectionNameSet* _erasedProjNames;
+
+    // Used to indicate if a given Evaluation node should not be inlined.
+    DisableInlineFn _disableInline;
+
     opt::unordered_set<const Variable*> _singleRef;
     opt::unordered_set<const EvaluationNode*> _noRefProj;
     opt::unordered_map<const Let*, std::vector<const Variable*>> _letRefs;
@@ -116,9 +120,6 @@ private:
     bool _inRefBlock{false};
     size_t _inCostlyCtx{0};
     bool _changed{false};
-
-    // Optionally collect projection names from erased Eval nodes.
-    ProjectionNameSet* _erasedProjNames;
 };
 
 }  // namespace mongo::optimizer

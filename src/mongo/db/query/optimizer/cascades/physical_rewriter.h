@@ -56,6 +56,7 @@ public:
                      const QueryHints& hints,
                      const RIDProjectionsMap& ridProjections,
                      const CostingInterface& costDerivation,
+                     const PathToIntervalFn& pathToInterval,
                      std::unique_ptr<LogicalRewriter>& logicalRewriter);
 
     /**
@@ -87,6 +88,7 @@ private:
     const CostingInterface& _costDerivation;
     const QueryHints& _hints;
     const RIDProjectionsMap& _ridProjections;
+    const PathToIntervalFn& _pathToInterval;
     // If set, we'll perform logical rewrites as part of OptimizeGroup().
     std::unique_ptr<LogicalRewriter>& _logicalRewriter;
 };

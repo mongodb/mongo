@@ -81,6 +81,7 @@ public:
                     Metadata metadata,
                     std::unique_ptr<CEInterface> ceDerivation,
                     std::unique_ptr<CostingInterface> costDerivation,
+                    PathToIntervalFn pathToInterval,
                     DebugInfo debugInfo,
                     QueryHints queryHints = {});
 
@@ -104,6 +105,8 @@ public:
     QueryHints& getHints();
 
     const Memo& getMemo() const;
+
+    const PathToIntervalFn& getPathToInterval() const;
 
     const Metadata& getMetadata() const;
 
@@ -160,9 +163,14 @@ private:
     Memo _memo;
 
     /**
-     * Cost derivation function.
+     * Cost derivation interface.
      */
     std::unique_ptr<CostingInterface> _costDerivation;
+
+    /**
+     * Path ABT node to index bounds converter interface.
+     */
+    PathToIntervalFn _pathToInterval;
 
     /**
      * Root physical node if we have performed physical rewrites.

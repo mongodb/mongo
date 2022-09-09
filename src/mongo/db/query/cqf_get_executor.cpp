@@ -34,6 +34,7 @@
 #include "mongo/db/pipeline/abt/canonical_query_translation.h"
 #include "mongo/db/pipeline/abt/document_source_visitor.h"
 #include "mongo/db/pipeline/abt/match_expression_visitor.h"
+#include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/query/ce/ce_histogram.h"
 #include "mongo/db/query/ce/ce_sampling.h"
 #include "mongo/db/query/ce/collection_statistics.h"
@@ -202,7 +203,8 @@ static opt::unordered_map<std::string, optimizer::IndexDefinition> buildIndexSpe
 
             // TODO: simplify expression.
 
-            auto conversion = convertExprToPartialSchemaReq(exprABT, true /*isFilterContext*/);
+            auto conversion = convertExprToPartialSchemaReq(
+                exprABT, true /*isFilterContext*/, {} /*pathToIntervalFn*/);
             if (!conversion) {
                 // TODO: should this conversion be always possible?
                 continue;
@@ -540,6 +542,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
                                                 std::move(metadataForSampling),
                                                 std::make_unique<HeuristicCE>(),
                                                 std::make_unique<DefaultCosting>(),
+                                                defaultConvertPathToInterval,
                                                 DebugInfo::kDefaultForProd,
                                                 {});
 
@@ -550,6 +553,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
             std::move(metadata),
             std::make_unique<CESamplingTransport>(opCtx, phaseManagerForSampling, numRecords),
             std::make_unique<DefaultCosting>(),
+            defaultConvertPathToInterval,
             DebugInfo::kDefaultForProd,
             std::move(queryHints)};
 
@@ -571,6 +575,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
                                      std::move(metadata),
                                      std::move(ceDerivation),
                                      std::make_unique<DefaultCosting>(),
+                                     defaultConvertPathToInterval,
                                      DebugInfo::kDefaultForProd,
                                      std::move(queryHints)};
 
@@ -585,7 +590,11 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
     // Default to using heuristics.
     OptPhaseManager phaseManager{OptPhaseManager::getAllRewritesSet(),
                                  prefixId,
+                                 false /*requireRID*/,
                                  std::move(metadata),
+                                 std::make_unique<HeuristicCE>(),
+                                 std::make_unique<DefaultCosting>(),
+                                 defaultConvertPathToInterval,
                                  DebugInfo::kDefaultForProd,
                                  std::move(queryHints)};
 

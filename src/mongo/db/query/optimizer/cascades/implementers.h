@@ -45,6 +45,7 @@ void addImplementers(const Memo& memo,
                      PrefixId& prefixId,
                      PhysOptimizationResult& bestResult,
                      const properties::LogicalProps& logicalProps,
-                     const OrderPreservingABTSet& logicalNodes);
+                     const OrderPreservingABTSet& logicalNodes,
+                     const PathToIntervalFn& pathToInterval);
 
 }  // namespace mongo::optimizer::cascades

@@ -31,9 +31,9 @@
 
 #include "mongo/db/query/ce/ce_test_utils.h"
 
+#include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/cascades/cost_derivation.h"
-#include "mongo/db/query/optimizer/cascades/logical_props_derivation.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
@@ -66,8 +66,18 @@ optimizer::CEType CETester::getCE(ABT& abt) const {
         std::cout << ExplainGenerator::explainV2(abt) << std::endl;
     }
 
-    // Optimize ABT.
-    OptPhaseManager phaseManager = getPhaseManager();
+    // TODO SERVER-68914. We currently need to construct the Phase manager in place.
+    ScanDefinition sd({}, _indexes, {DistributionType::Centralized}, true, _collCard);
+    Metadata metadata({{_collName, sd}});
+    OptPhaseManager phaseManager{_optPhases,
+                                 _prefixId,
+                                 false /*requireRID*/,
+                                 metadata,
+                                 getCETransport(),
+                                 std::make_unique<DefaultCosting>(),
+                                 defaultConvertPathToInterval,
+                                 DebugInfo::kDefaultForTests};
+
     ASSERT_TRUE(phaseManager.optimize(abt));
 
     const auto& memo = phaseManager.getMemo();
@@ -124,18 +134,6 @@ optimizer::CEType CETester::getCE(ABT& abt) const {
     ASSERT_NOT_EQUALS(outCard, kInvalidCardinality);
 
     return outCard;
-}
-
-optimizer::OptPhaseManager CETester::getPhaseManager() const {
-    ScanDefinition sd({}, _indexes, {DistributionType::Centralized}, true, _collCard);
-    Metadata metadata({{_collName, sd}});
-    return {_optPhases,
-            _prefixId,
-            true /*requireRID*/,
-            metadata,
-            getCETransport(),
-            std::make_unique<DefaultCosting>(),
-            DebugInfo::kDefaultForTests};
 }
 
 }  // namespace mongo::ce

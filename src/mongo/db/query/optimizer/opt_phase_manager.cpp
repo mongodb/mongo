@@ -58,6 +58,7 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
                       std::move(metadata),
                       std::make_unique<HeuristicCE>(),
                       std::make_unique<DefaultCosting>(),
+                      {} /*pathToInterval*/,
                       std::move(debugInfo),
                       std::move(queryHints)) {}
 
@@ -67,6 +68,7 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
                                  Metadata metadata,
                                  std::unique_ptr<CEInterface> ceDerivation,
                                  std::unique_ptr<CostingInterface> costDerivation,
+                                 PathToIntervalFn pathToInterval,
                                  DebugInfo debugInfo,
                                  QueryHints queryHints)
     : _phaseSet(std::move(phaseSet)),
@@ -78,6 +80,7 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
             std::make_unique<DefaultLogicalPropsDerivation>(),
             std::move(ceDerivation)),
       _costDerivation(std::move(costDerivation)),
+      _pathToInterval(std::move(pathToInterval)),
       _physicalNodeId(),
       _requireRID(requireRID),
       _ridProjections(),
@@ -148,8 +151,8 @@ bool OptPhaseManager::runMemoLogicalRewrite(const OptPhase phase,
 
     _memo.clear();
     const bool useHeuristicCE = phase == OptPhase::MemoSubstitutionPhase;
-    logicalRewriter =
-        std::make_unique<LogicalRewriter>(_memo, _prefixId, rewriteSet, _hints, useHeuristicCE);
+    logicalRewriter = std::make_unique<LogicalRewriter>(
+        _memo, _prefixId, rewriteSet, _hints, _pathToInterval, useHeuristicCE);
     rootGroupId = logicalRewriter->addRootNode(input);
 
     if (runStandalone) {
@@ -198,7 +201,8 @@ bool OptPhaseManager::runMemoPhysicalRewrite(const OptPhase phase,
                     IndexingRequirement(IndexReqTarget::Complete, true /*dedupRID*/, rootGroupId));
     }
 
-    PhysicalRewriter rewriter(_memo, _hints, _ridProjections, *_costDerivation, logicalRewriter);
+    PhysicalRewriter rewriter(
+        _memo, _hints, _ridProjections, *_costDerivation, _pathToInterval, logicalRewriter);
 
     auto optGroupResult =
         rewriter.optimizeGroup(rootGroupId, std::move(physProps), _prefixId, CostType::kInfinity);
@@ -251,8 +255,12 @@ bool OptPhaseManager::optimize(ABT& input) {
         return false;
     }
 
+    const auto sargableCheckFn = [this](const ABT& expr) {
+        return convertExprToPartialSchemaReq(expr, false /*isFilterContext*/, _pathToInterval)
+            .has_value();
+    };
     if (!runStructuralPhases<OptPhase::ConstEvalPre, OptPhase::PathFuse, ConstEval, PathFusion>(
-            ConstEval{env, true /*disableSargableInlining*/}, PathFusion{env}, env, input)) {
+            ConstEval{env, sargableCheckFn}, PathFusion{env}, env, input)) {
         return false;
     }
 
@@ -267,7 +275,7 @@ bool OptPhaseManager::optimize(ABT& input) {
 
     ProjectionNameSet erasedProjNames;
     if (!runStructuralPhase<OptPhase::ConstEvalPost, ConstEval>(
-            ConstEval{env, false /*disableSargableInlining*/, &erasedProjNames}, env, input)) {
+            ConstEval{env, {} /*disableInline*/, &erasedProjNames}, env, input)) {
         return false;
     }
     if (!erasedProjNames.empty()) {
@@ -315,6 +323,10 @@ QueryHints& OptPhaseManager::getHints() {
 
 const Memo& OptPhaseManager::getMemo() const {
     return _memo;
+}
+
+const PathToIntervalFn& OptPhaseManager::getPathToInterval() const {
+    return _pathToInterval;
 }
 
 const Metadata& OptPhaseManager::getMetadata() const {

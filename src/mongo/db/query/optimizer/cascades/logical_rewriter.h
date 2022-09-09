@@ -62,6 +62,7 @@ public:
                     PrefixId& prefixId,
                     RewriteSet rewriteSet,
                     const QueryHints& hints,
+                    const PathToIntervalFn& pathToInterval,
                     bool useHeuristicCE);
 
     LogicalRewriter() = delete;
@@ -123,6 +124,7 @@ private:
     Memo& _memo;
     PrefixId& _prefixId;
     const QueryHints& _hints;
+    const PathToIntervalFn& _pathToInterval;
 
     RewriteFnMap _rewriteMap;
 

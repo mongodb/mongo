@@ -147,7 +147,7 @@ public:
         for (const auto& [key, req] : node.getReqMap()) {
             if (!isIntervalReqFullyOpenDNF(req.getIntervals())) {
                 ABT lowered = extracted;
-                lowerPartialSchemaRequirement(key, req, lowered);
+                lowerPartialSchemaRequirement(key, req, lowered, _phaseManager.getPathToInterval());
                 uassert(6624243, "Expected a filter node", lowered.is<FilterNode>());
                 result = estimateFilterCE(memo, logicalProps, n, std::move(lowered), result);
             }

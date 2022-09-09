@@ -45,4 +45,17 @@ ABT translateFieldPath(const FieldPath& fieldPath,
                        const ABTFieldNameFn& fieldNameFn,
                        size_t skipFromStart = 0);
 
+/**
+ * Return the minimum or maximum value for the "class" of values represented by the input
+ * constant. Used to support type bracketing.
+ * Return format is <min/max value, bool inclusive>
+ */
+std::pair<boost::optional<ABT>, bool> getMinMaxBoundForType(bool isMin,
+                                                            const sbe::value::TypeTags& tag);
+
+/**
+ * Used by the optimizer to optionally convert path elements (e.g. PathArr) directly into intervals.
+ */
+boost::optional<IntervalReqExpr::Node> defaultConvertPathToInterval(const ABT& node);
+
 }  // namespace mongo::optimizer

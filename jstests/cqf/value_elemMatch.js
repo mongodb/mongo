@@ -32,13 +32,13 @@ assert.commandWorked(t.createIndex({a: 1}));
     const res =
         t.explain("executionStats").aggregate([{$match: {a: {$elemMatch: {$gte: 5, $lte: 6}}}}]);
     assert.eq(2, res.executionStats.nReturned);
-    assertValueOnPlanPath("IndexScan", res, "child.child.leftChild.child.nodeType");
+    assertValueOnPlanPath("IndexScan", res, "child.leftChild.child.nodeType");
 }
 {
     const res =
         t.explain("executionStats").aggregate([{$match: {a: {$elemMatch: {$lt: 11, $gt: 9}}}}]);
     assert.eq(1, res.executionStats.nReturned);
-    assertValueOnPlanPath("IndexScan", res, "child.child.leftChild.child.nodeType");
+    assertValueOnPlanPath("IndexScan", res, "child.leftChild.child.nodeType");
 }
 {
     // Contradiction.

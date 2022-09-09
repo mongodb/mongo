@@ -81,12 +81,14 @@ LogicalRewriter::LogicalRewriter(Memo& memo,
                                  PrefixId& prefixId,
                                  const RewriteSet rewriteSet,
                                  const QueryHints& hints,
+                                 const PathToIntervalFn& pathToInterval,
                                  const bool useHeuristicCE)
     : _activeRewriteSet(std::move(rewriteSet)),
       _groupsPending(),
       _memo(memo),
       _prefixId(prefixId),
       _hints(hints),
+      _pathToInterval(pathToInterval),
       _useHeuristicCE(useHeuristicCE) {
     initializeRewrites();
 
@@ -212,6 +214,10 @@ public:
 
     auto& getSargableSplitCountMap() const {
         return _rewriter._sargableSplitCountMap;
+    }
+
+    const auto& getPathToInterval() const {
+        return _rewriter._pathToInterval;
     }
 
 private:
@@ -671,8 +677,8 @@ static void convertFilterToSargableNode(ABT::reference_type node,
         return;
     }
 
-    auto conversion =
-        convertExprToPartialSchemaReq(filterNode.getFilter(), true /*isFilterContext*/);
+    auto conversion = convertExprToPartialSchemaReq(
+        filterNode.getFilter(), true /*isFilterContext*/, ctx.getPathToInterval());
     if (!conversion) {
         return;
     }
@@ -885,8 +891,8 @@ struct SubstituteConvert<EvaluationNode> {
         }
 
         // We still want to extract sargable nodes from EvalNode to use for PhysicalScans.
-        auto conversion =
-            convertExprToPartialSchemaReq(evalNode.getProjection(), false /*isFilterContext*/);
+        auto conversion = convertExprToPartialSchemaReq(
+            evalNode.getProjection(), false /*isFilterContext*/, ctx.getPathToInterval());
         if (!conversion) {
             return;
         }
@@ -936,7 +942,7 @@ static void lowerSargableNode(const SargableNode& node, RewriteContext& ctx) {
     ABT n = node.getChild();
     const auto reqMap = node.getReqMap();
     for (const auto& [key, req] : reqMap) {
-        lowerPartialSchemaRequirement(key, req, n);
+        lowerPartialSchemaRequirement(key, req, n, ctx.getPathToInterval());
     }
     ctx.addNode(n, true /*clear*/);
 }

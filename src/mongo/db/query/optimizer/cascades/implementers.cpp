@@ -559,8 +559,12 @@ public:
                                               nodeCEMap);
                 }
 
-                lowerPartialSchemaRequirements(
-                    scanGroupCE, std::move(indexPredSels), residualReqsWithCE, physNode, nodeCEMap);
+                lowerPartialSchemaRequirements(scanGroupCE,
+                                               std::move(indexPredSels),
+                                               residualReqsWithCE,
+                                               physNode,
+                                               _pathToInterval,
+                                               nodeCEMap);
 
                 if (needsUniqueStage) {
                     // Insert unique stage if we need to, after the residual requirements.
@@ -633,8 +637,12 @@ public:
                     residualKey, residualReq, partialSchemaKeyCE.at(entryIndex).second);
             }
 
-            lowerPartialSchemaRequirements(
-                baseCE, {} /*indexPredSels*/, residualReqsWithCE, physNode, nodeCEMap);
+            lowerPartialSchemaRequirements(baseCE,
+                                           {} /*indexPredSels*/,
+                                           residualReqsWithCE,
+                                           physNode,
+                                           _pathToInterval,
+                                           nodeCEMap);
             optimizeChildrenNoAssert(
                 _queue, kDefaultPriority, rule, std::move(physNode), {}, std::move(nodeCEMap));
         }
@@ -1182,14 +1190,16 @@ public:
                           PrefixId& prefixId,
                           PhysRewriteQueue& queue,
                           const PhysProps& physProps,
-                          const LogicalProps& logicalProps)
+                          const LogicalProps& logicalProps,
+                          const PathToIntervalFn& pathToInterval)
         : _memo(memo),
           _hints(hints),
           _ridProjections(ridProjections),
           _prefixId(prefixId),
           _queue(queue),
           _physProps(physProps),
-          _logicalProps(logicalProps) {}
+          _logicalProps(logicalProps),
+          _pathToInterval(pathToInterval) {}
 
 private:
     template <class NodeType, class PropType, PhysicalRewriteType rule>
@@ -1576,7 +1586,7 @@ private:
         }
     }
 
-    // We don't own any of those;
+    // We don't own any of those:
     const Memo& _memo;
     const QueryHints& _hints;
     const RIDProjectionsMap& _ridProjections;
@@ -1584,6 +1594,7 @@ private:
     PhysRewriteQueue& _queue;
     const PhysProps& _physProps;
     const LogicalProps& _logicalProps;
+    const PathToIntervalFn& _pathToInterval;
 };
 
 void addImplementers(const Memo& memo,
@@ -1592,14 +1603,16 @@ void addImplementers(const Memo& memo,
                      PrefixId& prefixId,
                      PhysOptimizationResult& bestResult,
                      const properties::LogicalProps& logicalProps,
-                     const OrderPreservingABTSet& logicalNodes) {
+                     const OrderPreservingABTSet& logicalNodes,
+                     const PathToIntervalFn& pathToInterval) {
     ImplementationVisitor visitor(memo,
                                   hints,
                                   ridProjections,
                                   prefixId,
                                   bestResult._queue,
                                   bestResult._physProps,
-                                  logicalProps);
+                                  logicalProps,
+                                  pathToInterval);
     while (bestResult._lastImplementedNodePos < logicalNodes.size()) {
         logicalNodes.at(bestResult._lastImplementedNodePos++).visit(visitor);
     }

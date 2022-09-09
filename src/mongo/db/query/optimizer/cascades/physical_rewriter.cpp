@@ -109,11 +109,13 @@ PhysicalRewriter::PhysicalRewriter(Memo& memo,
                                    const QueryHints& hints,
                                    const RIDProjectionsMap& ridProjections,
                                    const CostingInterface& costDerivation,
+                                   const PathToIntervalFn& pathToInterval,
                                    std::unique_ptr<LogicalRewriter>& logicalRewriter)
     : _memo(memo),
       _costDerivation(costDerivation),
       _hints(hints),
       _ridProjections(ridProjections),
+      _pathToInterval(pathToInterval),
       _logicalRewriter(logicalRewriter) {}
 
 static void printCandidateInfo(const ABT& node,
@@ -358,8 +360,14 @@ PhysicalRewriter::OptimizeGroupResult PhysicalRewriter::optimizeGroup(const Grou
 
         // Add rewrites to convert logical into physical nodes. Only add rewrites for newly added
         // logical nodes.
-        addImplementers(
-            _memo, _hints, _ridProjections, prefixId, bestResult, logicalProps, logicalNodes);
+        addImplementers(_memo,
+                        _hints,
+                        _ridProjections,
+                        prefixId,
+                        bestResult,
+                        logicalProps,
+                        logicalNodes,
+                        _pathToInterval);
 
         // Perform physical rewrites, use branch-and-bound.
         while (!bestResult._queue.empty()) {

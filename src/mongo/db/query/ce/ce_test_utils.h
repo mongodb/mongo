@@ -119,9 +119,6 @@ protected:
     virtual std::unique_ptr<cascades::CEInterface> getCETransport() const = 0;
 
 private:
-    // Construct placeholder PhaseManager. Notice that it also creates a Memo internally.
-    OptPhaseManager getPhaseManager() const;
-
     std::string _collName;
     // The number of records in the collection we are testing.
     double _collCard;

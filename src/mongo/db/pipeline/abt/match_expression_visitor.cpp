@@ -491,123 +491,6 @@ private:
         _ctx.push(std::move(result));
     }
 
-    /**
-     * Return the minimum or maximum value for the "class" of values represented by the input
-     * constant. Used to support type bracketing.
-     * Return format is <min/max value, bool inclusive>
-     */
-    template <bool isMin>
-    std::pair<boost::optional<ABT>, bool> getMinMaxBoundForType(const sbe::value::TypeTags& tag) {
-        switch (tag) {
-            case sbe::value::TypeTags::NumberInt32:
-            case sbe::value::TypeTags::NumberInt64:
-            case sbe::value::TypeTags::NumberDouble:
-            case sbe::value::TypeTags::NumberDecimal:
-                if constexpr (isMin)
-                    return {Constant::fromDouble(std::numeric_limits<double>::quiet_NaN()), true};
-                else
-                    return {Constant::str(""), false};
-            case sbe::value::TypeTags::StringSmall:
-            case sbe::value::TypeTags::StringBig:
-            case sbe::value::TypeTags::bsonString:
-            case sbe::value::TypeTags::bsonSymbol:
-                if constexpr (isMin)
-                    return {Constant::str(""), true};
-                else {
-                    return {Constant::emptyObject(), false};
-                }
-            case sbe::value::TypeTags::Date:
-                if constexpr (isMin)
-                    return {Constant::date(Date_t::min()), true};
-                else
-                    return {Constant::date(Date_t::max()), true};
-            case sbe::value::TypeTags::Timestamp:
-                if constexpr (isMin)
-                    return {Constant::timestamp(Timestamp::min()), true};
-                else
-                    return {Constant::timestamp(Timestamp::max()), true};
-            case sbe::value::TypeTags::Null:
-                return {Constant::null(), true};
-            case sbe::value::TypeTags::bsonUndefined: {
-                auto [tag, val] = convertFrom(mongo::Value(BSONUndefined));
-                return {make<Constant>(sbe::value::TypeTags::bsonUndefined, val), true};
-            }
-            case sbe::value::TypeTags::Object:
-            case sbe::value::TypeTags::bsonObject:
-                if constexpr (isMin)
-                    return {Constant::emptyObject(), true};
-                else
-                    return {Constant::emptyArray(), false};
-            case sbe::value::TypeTags::Array:
-            case sbe::value::TypeTags::ArraySet:
-            case sbe::value::TypeTags::bsonArray:
-                if constexpr (isMin) {
-                    return {Constant::emptyArray(), true};
-                } else {
-                    auto [tag, val] = mongo::optimizer::convertFrom(mongo::Value(BSONBinData()));
-                    return {make<Constant>(sbe::value::TypeTags::bsonBinData, val), false};
-                }
-            case sbe::value::TypeTags::bsonBinData:
-                if constexpr (isMin) {
-                    auto [tag, val] = mongo::optimizer::convertFrom(mongo::Value(BSONBinData()));
-                    return {make<Constant>(sbe::value::TypeTags::bsonBinData, val), true};
-                } else {
-                    auto [tag, val] = mongo::optimizer::convertFrom(mongo::Value(OID()));
-                    return {make<Constant>(sbe::value::TypeTags::ObjectId, val), false};
-                }
-            case sbe::value::TypeTags::Boolean:
-                if constexpr (isMin)
-                    return {Constant::boolean(false), true};
-                else
-                    return {Constant::boolean(true), true};
-            case sbe::value::TypeTags::ObjectId:
-            case sbe::value::TypeTags::bsonObjectId:
-                if constexpr (isMin) {
-                    auto [tag, val] = mongo::optimizer::convertFrom(mongo::Value(OID()));
-                    return {make<Constant>(sbe::value::TypeTags::ObjectId, val), true};
-                } else {
-                    auto [tag, val] = mongo::optimizer::convertFrom(mongo::Value(OID::max()));
-                    return {make<Constant>(sbe::value::TypeTags::ObjectId, val), true};
-                }
-            case sbe::value::TypeTags::bsonRegex:
-                if constexpr (isMin) {
-                    auto [tag, val] = convertFrom(mongo::Value(BSONRegEx("", "")));
-                    return {make<Constant>(sbe::value::TypeTags::bsonRegex, val), true};
-                } else {
-                    auto [tag, val] = convertFrom(mongo::Value(mongo::BSONDBRef()));
-                    return {make<Constant>(sbe::value::TypeTags::bsonDBPointer, val), false};
-                }
-            case sbe::value::TypeTags::bsonDBPointer:
-                if constexpr (isMin) {
-                    auto [tag, val] = convertFrom(mongo::Value(mongo::BSONDBRef()));
-                    return {make<Constant>(sbe::value::TypeTags::bsonDBPointer, val), true};
-                } else {
-                    auto [tag, val] = sbe::value::makeCopyBsonJavascript(StringData(""));
-                    return {make<Constant>(sbe::value::TypeTags::bsonJavascript, val), false};
-                }
-            case sbe::value::TypeTags::bsonJavascript:
-                if constexpr (isMin) {
-                    auto [tag, val] = sbe::value::makeCopyBsonJavascript(StringData(""));
-                    return {make<Constant>(sbe::value::TypeTags::bsonJavascript, val), true};
-                } else {
-                    auto bsonCode = BSONCodeWScope();
-                    auto [tag, val] = convertFrom(mongo::Value(bsonCode));
-                    return {make<Constant>(sbe::value::TypeTags::bsonCodeWScope, val), false};
-                }
-            case sbe::value::TypeTags::bsonCodeWScope:
-                if constexpr (isMin) {
-                    auto bsonCode = BSONCodeWScope();
-                    auto [tag, val] = convertFrom(mongo::Value(bsonCode));
-                    return {make<Constant>(sbe::value::TypeTags::bsonCodeWScope, val), true};
-                } else {
-                    return {Constant::maxKey(), false};
-                }
-            default:
-                return {boost::none, false};
-        }
-        MONGO_UNREACHABLE;
-    }
-
     ABT generateFieldPath(const FieldPath& fieldPath, ABT initial) {
         return translateFieldPath(
             fieldPath,
@@ -638,7 +521,7 @@ private:
         switch (op) {
             case Operations::Lt:
             case Operations::Lte: {
-                auto&& [constant, inclusive] = getMinMaxBoundForType<true /*isMin*/>(tag);
+                auto&& [constant, inclusive] = getMinMaxBoundForType(true /*isMin*/, tag);
                 if (constant) {
                     maybeComposePath(result,
                                      make<PathCompare>(inclusive ? Operations::Gte : Operations::Gt,
@@ -656,7 +539,7 @@ private:
 
             case Operations::Gt:
             case Operations::Gte: {
-                auto&& [constant, inclusive] = getMinMaxBoundForType<false /*isMin*/>(tag);
+                auto&& [constant, inclusive] = getMinMaxBoundForType(false /*isMin*/, tag);
                 if (constant) {
                     maybeComposePath(result,
                                      make<PathCompare>(inclusive ? Operations::Lte : Operations::Lt,
