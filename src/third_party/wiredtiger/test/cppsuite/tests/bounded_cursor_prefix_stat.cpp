@@ -44,7 +44,7 @@ using namespace test_harness;
  *  - Using WiredTiger statistics to validate that the number of entries traversed is within
  * bounds of the search key.
  */
-class cursor_bound_02 : public test {
+class bounded_cursor_prefix_stat : public test {
     uint64_t keys_per_prefix = 0;
     uint64_t srchkey_len = 0;
     const std::string ALPHABET{"abcdefghijklmnopqrstuvwxyz"};
@@ -103,7 +103,7 @@ class cursor_bound_02 : public test {
     }
 
     public:
-    cursor_bound_02(const test_args &args) : test(args)
+    bounded_cursor_prefix_stat(const test_args &args) : test(args)
     {
         init_operation_tracker();
     }

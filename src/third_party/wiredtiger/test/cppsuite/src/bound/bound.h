@@ -28,6 +28,8 @@
 #pragma once
 #include <string>
 
+#include "src/storage/scoped_cursor.h"
+
 namespace test_harness {
 class bound {
     public:
@@ -42,6 +44,7 @@ class bound {
     bool get_inclusive() const;
 
     void clear();
+    void apply(scoped_cursor &cursor) const;
 
     private:
     std::string _key;

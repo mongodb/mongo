@@ -42,13 +42,13 @@ using namespace test_harness;
  *  - M threads will traverse the collections and ensure that the number of records in the
  * collections don't change.
  */
-class cursor_bound_04 : public test {
+class bounded_cursor_prefix_indices : public test {
     /* A 2D array consisted of a mapping between each collection and their inserted prefixes. */
     std::vector<std::vector<std::string>> prefixes_map;
     const std::string ALPHABET{"abcdefghijklmnopqrstuvwxyz"};
 
     public:
-    cursor_bound_04(const test_args &args) : test(args)
+    bounded_cursor_prefix_indices(const test_args &args) : test(args)
     {
         init_operation_tracker();
     }
