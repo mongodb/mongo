@@ -942,8 +942,8 @@ def _bind_validator(ctxt, validator):
     return ast_validator
 
 
-def _bind_condition(condition):
-    # type: (syntax.Condition) -> ast.Condition
+def _bind_condition(condition, condition_for):
+    # type: (syntax.Condition, str) -> ast.Condition
     """Bind a condition from the idl.syntax tree."""
 
     if not condition:
@@ -953,6 +953,10 @@ def _bind_condition(condition):
     ast_condition.expr = condition.expr
     ast_condition.constexpr = condition.constexpr
     ast_condition.preprocessor = condition.preprocessor
+
+    if condition.feature_flag:
+        assert condition_for == 'server_parameter'
+        ast_condition.feature_flag = condition.feature_flag
 
     return ast_condition
 
@@ -1374,7 +1378,7 @@ def _bind_server_parameter(ctxt, param):
     ast_param = ast.ServerParameter(param.file_name, param.line, param.column)
     ast_param.name = param.name
     ast_param.description = param.description
-    ast_param.condition = _bind_condition(param.condition)
+    ast_param.condition = _bind_condition(param.condition, condition_for='server_parameter')
     ast_param.redact = param.redact
     ast_param.test_only = param.test_only
     ast_param.deprecated_name = param.deprecated_name
@@ -1500,7 +1504,7 @@ def _bind_config_option(ctxt, globals_spec, option):
     node.arg_vartype = option.arg_vartype
     node.cpp_vartype = option.cpp_vartype
     node.cpp_varname = option.cpp_varname
-    node.condition = _bind_condition(option.condition)
+    node.condition = _bind_condition(option.condition, condition_for='config')
 
     node.requires = option.requires
     node.conflicts = option.conflicts

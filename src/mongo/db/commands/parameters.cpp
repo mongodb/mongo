@@ -240,7 +240,7 @@ public:
 
         const ServerParameter::Map& m = ServerParameterSet::getNodeParameterSet()->getMap();
         for (ServerParameter::Map::const_iterator i = m.begin(); i != m.end(); ++i) {
-            if (all || cmdObj.hasElement(i->first.c_str())) {
+            if (i->second->isEnabled() && (all || cmdObj.hasElement(i->first.c_str()))) {
                 if (options.getShowDetails()) {
                     BSONObjBuilder detailBob(result.subobjStart(i->second->name()));
                     i->second->append(opCtx, &detailBob, "value", boost::none);
@@ -321,6 +321,12 @@ public:
                     str::stream() << "attempted to set unrecognized parameter [" << parameterName
                                   << "], use help:true to see options ",
                     foundParameter != parameterMap.end());
+
+            // Is the parameter disabled?
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "Server parameter: '" << foundParameter->second->name()
+                                  << "' is disabled",
+                    foundParameter->second->isEnabled());
 
             // Make sure we are allowed to change this parameter
             uassert(ErrorCodes::IllegalOperation,

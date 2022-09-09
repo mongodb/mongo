@@ -92,6 +92,10 @@ feature_flags:
         cpp_varname: gFeatureFlagClusterWideConfigM2
         default: true
         version: 6.1
+    featureFlagClusterWideToaster:
+        description: Feature flag for testing use of feature flags with CW server params
+        cpp_varname: gFeatureFlagClusterWideToaster
+        default: false
 
 server_parameters:
     testIntClusterParameter:
@@ -114,3 +118,12 @@ server_parameters:
         cpp_vartype: TestBoolClusterParameterStorage
         cpp_varname: boolStorage
         test_only: true
+
+    cwspTestNeedsFeatureFlagClusterWideToaster:
+        description: "Server Parameter gated on featureFlagClusterWideToaster"
+        set_at: cluster
+        cpp_varname: gCWSPTestFeatureFlagClusterWideToaster
+        cpp_vartype: TestIntClusterParameterStorage
+        test_only: true
+        condition:
+            feature_flag: featureFlagClusterWideToaster

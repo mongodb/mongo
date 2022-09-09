@@ -54,6 +54,10 @@ bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
     StringData parameterName = cmdParamObj.firstElement().fieldName();
     ServerParameter* serverParameter = _sps->get(parameterName);
 
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "Server parameter: '" << serverParameter->name() << "' is disabled",
+            serverParameter->isEnabled());
+
     auto [query, update] = normalizeParameter(
         opCtx, cmdParamObj, paramTime, serverParameter, parameterName, cmd.getDbName().tenantId());
 
@@ -79,6 +83,10 @@ std::pair<BSONObj, BSONObj> SetClusterParameterInvocation::normalizeParameter(
     uassert(ErrorCodes::IllegalOperation,
             "Cluster parameter value must be an object",
             BSONType::Object == commandElement.type());
+
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << "Server parameter: '" << sp->name() << "' is disabled",
+            sp->isEnabled());
 
     Timestamp clusterTime = paramTime ? *paramTime : _dbService.getUpdateClusterTime(opCtx);
 

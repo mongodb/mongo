@@ -46,3 +46,14 @@ feature_flags:
       default: true
       # The version should match GenericFCV::kLastLTS in the generated 'releases.h' file.
       version: $ver_str(last_lts)
+
+server_parameters:
+    spTestNeedsFeatureFlagToaster:
+      description: "Server Parameter gated on featureFlagToaster"
+      set_at: runtime
+      cpp_varname: gSPTestFeatureFlagToaster
+      cpp_vartype: bool
+      test_only: true
+      default: false
+      condition:
+        feature_flag: featureFlagToaster

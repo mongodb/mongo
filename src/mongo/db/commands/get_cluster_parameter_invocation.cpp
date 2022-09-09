@@ -77,7 +77,7 @@ GetClusterParameterInvocation::retrieveRequestedParameters(
                                   ServerParameter* sp = clusterParameters->get(strParameterName);
                                   uassert(ErrorCodes::BadValue,
                                           str::stream() << "Server parameter: '" << strParameterName
-                                                        << "' is currently disabled",
+                                                        << "' is disabled",
                                           sp->isEnabled());
                                   makeBSON(sp);
                               }
@@ -95,7 +95,7 @@ GetClusterParameterInvocation::retrieveRequestedParameters(
                                   uassert(ErrorCodes::BadValue,
                                           str::stream()
                                               << "Server parameter: '" << requestedParameterName
-                                              << "' is currently disabled'",
+                                              << "' is disabled'",
                                           sp->isEnabled());
                                   makeBSON(sp);
                               }

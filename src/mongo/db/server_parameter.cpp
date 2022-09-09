@@ -31,6 +31,7 @@
 
 #include <fmt/format.h>
 
+#include "mongo/db/feature_flag.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/static_immortal.h"
 
@@ -74,6 +75,20 @@ ServerParameterSet* ServerParameterSet::getNodeParameterSet() {
         return sps;
     }();
     return &*obj;
+}
+
+bool ServerParameter::featureFlagIsDisabled() const {
+    if (!_featureFlag) {
+        return false;
+    }
+
+    if (!serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+        // Minor race-condition at startup.
+        // Pretend it's not enabled until we know for certain that it is.
+        return true;
+    }
+
+    return !_featureFlag->isEnabled(serverGlobalParams.featureCompatibility);
 }
 
 ServerParameterSet* ServerParameterSet::getClusterParameterSet() {

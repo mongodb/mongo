@@ -79,6 +79,8 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
+    ], LIBDEPS_PRIVATE=[
+        'server_options_core',
     ])
 
 #

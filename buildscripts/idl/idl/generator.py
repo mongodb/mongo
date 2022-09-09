@@ -2504,6 +2504,15 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     if param.test_only:
                         self._writer.write_line('scp_%d->setTestOnly();' % (param_no))
 
+                    if param.condition and param.condition.feature_flag:
+                        ffs = [sp for sp in params if sp.name == param.condition.feature_flag]
+                        if len(ffs) == 0:
+                            raise ValueError("Unable to find feature flag named %s" %
+                                             (param.condition.feature_flag))
+                        assert len(ffs) == 1
+                        self._writer.write_line(
+                            'scp_%d->setFeatureFlag(&%s);' % (param_no, ffs[0].cpp_varname))
+
                     self._gen_server_parameter_deprecated_aliases(param_no, param)
                 self.write_empty_line()
 

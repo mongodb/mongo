@@ -302,6 +302,7 @@ def _parse_condition(ctxt, node):
             "preprocessor": _RuleDesc("scalar"),
             "constexpr": _RuleDesc("scalar"),
             "expr": _RuleDesc("scalar"),
+            "feature_flag": _RuleDesc("scalar"),
         })
 
     return condition
