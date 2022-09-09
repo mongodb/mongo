@@ -462,15 +462,15 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const cha
      * actually zero in a newer, currently running checkpoint, because then they must have always
      * been zero.)
      *
-     * This scheme relies on the fact we take steps to make sure that the checkpoint wall clock time
-     * does not run backward, and that successive checkpoints are never given the same wall clock
-     * time. Note that we use the write generation to ignore wall clock times from previous database
-     * opens (all such are treated as 0) -- anything from a previous database open can't have been
-     * produced by a currently running checkpoint and can be presumed to match. This is done so we
-     * don't get in trouble if the system clock moves backwards between runs, and also to avoid
-     * possible issues if the checkpoint clock runs forward. (See notes about that in txn_ckpt.c.)
-     * Furthermore, this avoids any confusion potentially caused by older versions not including the
-     * checkpoint time in the snapshot and timestamp metadata.
+     * This scheme relies on the fact that the checkpoint wall clock time always moves forward. Each
+     * checkpoint is given a wall clock time at least one second greater than the previous
+     * checkpoint. Before recovery, we load the time of the last successful checkpoint in the
+     * previous database so we can ensure checkpoint times increase across restarts. This avoids
+     * trouble if the system clock moves backwards between runs, and also avoids possible issues if
+     * the checkpoint clock runs forward. (See comment about that in
+     * __txn_checkpoint_establish_time().) When reading from a previous database, the checkpoint
+     * time in the snapshot and timestamp metadata default to zero if not present, avoiding
+     * confusion caused by older versions that don't include these values.
      *
      * Also note that only the exact name "WiredTigerCheckpoint" needs to be resolved. Requests to
      * open specific versions, such as "WiredTigerCheckpoint.6", must be looked up like named
@@ -580,10 +580,7 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const cha
              * collection of checkpoint cursors they opened on different files all came from the
              * same global checkpoint or not. This is the same problem as checking if the history
              * store checkpoint and data store checkpoint match, so the wall time is the right thing
-             * to use for it. Note that it will be 0 for all checkpoints from before this run;
-             * however, it is impossible to open the same checkpoint name twice and get two
-             * different checkpoints from before the current database run, since the newer one must
-             * have just been created.
+             * to use for it.
              */
             ckpt_snapshot->ckpt_id = snapshot_time;
         }
