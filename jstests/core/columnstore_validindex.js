@@ -3,8 +3,8 @@
  * @tags: [
  *   # Uses index building in background.
  *   requires_background_index,
- *   # Columnstore indexes are new in 6.1.
- *   requires_fcv_61,
+ *   # Columnstore indexes are new in 6.2.
+ *   requires_fcv_62,
  *   uses_column_store_index,
  * ]
  */

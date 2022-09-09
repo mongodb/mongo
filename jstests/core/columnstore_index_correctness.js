@@ -1,8 +1,8 @@
 /**
  * Testing of just the query layer's integration for columnar index.
  * @tags: [
- *   # columnstore indexes are new in 6.1.
- *   requires_fcv_61,
+ *   # columnstore indexes are new in 6.2.
+ *   requires_fcv_62,
  *   # Runs explain on an aggregate command which is only compatible with readConcern local.
  *   assumes_read_concern_unchanged,
  *   uses_column_store_index,

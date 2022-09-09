@@ -3,8 +3,8 @@
  * might be pushed down into the column scan stage.
  *
  * @tags: [
- *   # columnstore indexes are new in 6.1.
- *   requires_fcv_61,
+ *   # columnstore indexes are new in 6.2.
+ *   requires_fcv_62,
  *   # Runs explain on an aggregate command which is only compatible with readConcern local.
  *   assumes_read_concern_unchanged,
  *   # TODO SERVER-66925 We could potentially need to resume an index build in the event of a

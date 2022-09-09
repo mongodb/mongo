@@ -6,8 +6,8 @@
  *   does_not_support_stepdowns,
  *   # Cannot run aggregate with explain in a transaction.
  *   does_not_support_transactions,
- *   # columnstore indexes are new in 6.1.
- *   requires_fcv_61,
+ *   # columnstore indexes are new in 6.2.
+ *   requires_fcv_62,
  *   uses_column_store_index,
  * ]
  */
