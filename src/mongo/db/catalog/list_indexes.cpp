@@ -76,81 +76,79 @@ std::list<BSONObj> listIndexesInLock(OperationContext* opCtx,
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &hangBeforeListIndexes, opCtx, "hangBeforeListIndexes", []() {}, nss);
 
-    return writeConflictRetry(opCtx, "listIndexes", nss.ns(), [&] {
-        std::vector<std::string> indexNames;
-        std::list<BSONObj> indexSpecs;
-        collection->getAllIndexes(&indexNames);
+    std::vector<std::string> indexNames;
+    std::list<BSONObj> indexSpecs;
+    collection->getAllIndexes(&indexNames);
 
-        if (collection->isClustered() && !collection->ns().isTimeseriesBucketsCollection()) {
-            BSONObj collation;
-            if (auto collator = collection->getDefaultCollator()) {
-                collation = collator->getSpec().toBSON();
-            }
-            auto clusteredSpec = clustered_util::formatClusterKeyForListIndexes(
-                collection->getClusteredInfo().value(), collation);
-            if (additionalInclude == ListIndexesInclude::IndexBuildInfo) {
-                indexSpecs.push_back(BSON("spec"_sd << clusteredSpec));
-            } else {
-                indexSpecs.push_back(clusteredSpec);
-            }
+    if (collection->isClustered() && !collection->ns().isTimeseriesBucketsCollection()) {
+        BSONObj collation;
+        if (auto collator = collection->getDefaultCollator()) {
+            collation = collator->getSpec().toBSON();
         }
-        for (size_t i = 0; i < indexNames.size(); i++) {
-            auto spec = collection->getIndexSpec(indexNames[i]);
-            auto durableBuildUUID = collection->getIndexBuildUUID(indexNames[i]);
-            // The durable catalog will not have a build UUID for the given index name if it was
-            // not being built with two-phase -- in this case we have no relevant index build info
-            bool inProgressInformationExists =
-                !collection->isIndexReady(indexNames[i]) && durableBuildUUID;
-            switch (additionalInclude) {
-                case ListIndexesInclude::Nothing:
+        auto clusteredSpec = clustered_util::formatClusterKeyForListIndexes(
+            collection->getClusteredInfo().value(), collation);
+        if (additionalInclude == ListIndexesInclude::IndexBuildInfo) {
+            indexSpecs.push_back(BSON("spec"_sd << clusteredSpec));
+        } else {
+            indexSpecs.push_back(clusteredSpec);
+        }
+    }
+    for (size_t i = 0; i < indexNames.size(); i++) {
+        auto spec = collection->getIndexSpec(indexNames[i]);
+        auto durableBuildUUID = collection->getIndexBuildUUID(indexNames[i]);
+        // The durable catalog will not have a build UUID for the given index name if it was
+        // not being built with two-phase -- in this case we have no relevant index build info
+        bool inProgressInformationExists =
+            !collection->isIndexReady(indexNames[i]) && durableBuildUUID;
+        switch (additionalInclude) {
+            case ListIndexesInclude::Nothing:
+                indexSpecs.push_back(spec);
+                break;
+            case ListIndexesInclude::BuildUUID:
+                if (inProgressInformationExists) {
+                    indexSpecs.push_back(
+                        BSON("spec"_sd << spec << "buildUUID"_sd << *durableBuildUUID));
+                } else {
                     indexSpecs.push_back(spec);
-                    break;
-                case ListIndexesInclude::BuildUUID:
-                    if (inProgressInformationExists) {
-                        indexSpecs.push_back(
-                            BSON("spec"_sd << spec << "buildUUID"_sd << *durableBuildUUID));
-                    } else {
-                        indexSpecs.push_back(spec);
-                    }
-                    break;
-                case ListIndexesInclude::IndexBuildInfo:
-                    if (inProgressInformationExists) {
-                        // Constructs a sub-document "indexBuildInfo" in the following
-                        // format with sample values:
-                        //
-                        // indexBuildInfo: {
-                        //     buildUUID: UUID("00836550-d10e-4ec8-84df-cb5166bc085b"),
-                        //     method: "Hybrid",
-                        //     phase: 1,
-                        //     phaseStr: "collection scan",
-                        //     opid: 654,
-                        //     resumable: true,
-                        //     replicationState: {
-                        //         state: "In progress"
-                        //     }
-                        // }
-                        //
-                        // The information here is gathered by querying the various index build
-                        // classes accessible through the IndexBuildCoordinator interface. The
-                        // example above is intended to provide a general idea of the information
-                        // gathered for an in-progress index build and is subject to change.
+                }
+                break;
+            case ListIndexesInclude::IndexBuildInfo:
+                if (inProgressInformationExists) {
+                    // Constructs a sub-document "indexBuildInfo" in the following
+                    // format with sample values:
+                    //
+                    // indexBuildInfo: {
+                    //     buildUUID: UUID("00836550-d10e-4ec8-84df-cb5166bc085b"),
+                    //     method: "Hybrid",
+                    //     phase: 1,
+                    //     phaseStr: "collection scan",
+                    //     opid: 654,
+                    //     resumable: true,
+                    //     replicationState: {
+                    //         state: "In progress"
+                    //     }
+                    // }
+                    //
+                    // The information here is gathered by querying the various index build
+                    // classes accessible through the IndexBuildCoordinator interface. The
+                    // example above is intended to provide a general idea of the information
+                    // gathered for an in-progress index build and is subject to change.
 
-                        BSONObjBuilder builder;
-                        durableBuildUUID->appendToBuilder(&builder, "buildUUID"_sd);
-                        IndexBuildsCoordinator::get(opCtx)->appendBuildInfo(*durableBuildUUID,
-                                                                            &builder);
-                        indexSpecs.push_back(
-                            BSON("spec"_sd << spec << "indexBuildInfo"_sd << builder.obj()));
-                    } else {
-                        indexSpecs.push_back(BSON("spec"_sd << spec));
-                    }
-                    break;
-                default:
-                    MONGO_UNREACHABLE;
-            }
+                    BSONObjBuilder builder;
+                    durableBuildUUID->appendToBuilder(&builder, "buildUUID"_sd);
+                    IndexBuildsCoordinator::get(opCtx)->appendBuildInfo(*durableBuildUUID,
+                                                                        &builder);
+                    indexSpecs.push_back(
+                        BSON("spec"_sd << spec << "indexBuildInfo"_sd << builder.obj()));
+                } else {
+                    indexSpecs.push_back(BSON("spec"_sd << spec));
+                }
+                break;
+            default:
+                MONGO_UNREACHABLE;
         }
-        return indexSpecs;
-    });
+    }
+    return indexSpecs;
 }
 std::list<BSONObj> listIndexesEmptyListIfMissing(OperationContext* opCtx,
                                                  const NamespaceStringOrUUID& nss,
