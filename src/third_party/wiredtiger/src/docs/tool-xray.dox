@@ -8,16 +8,39 @@ functions and their timestamps. This article explains how to instrument
 WiredTiger, collect the XRay traces, and analyze them.  As an example, we will
 show how to trace \c wtperf.
 
-## Step 1: Configure and compile WiredTiger with XRay instrumentation
+## Step 1: Install LLVM and graphviz
+
+LLVM and graphviz packages are needed to build and run \c llvm-xray command inside
+the wtperf_xray.sh script.
+
+@code
+$ sudo apt-get install llvm
+$ sudo apt-get install graphviz
+@endcode
+
+LLVM needs to be version 10 or higher. Check the version like this:
+
+@code
+$ llvm-config -version
+@endcode
+
+If your distribution's default \c llvm-config isn't from the 10 or higher series,
+you'll need to move one with a major version of 10 or higher into the \c $PATH
+such that it gets invoked instead.
+
+The \c llvm-config command line tool is used to supply the required compiler
+and linker flags to build programs such like \c xray_to_optrack on top of LLVM.
+
+## Step 2: Configure and compile WiredTiger with XRay instrumentation
 
 @code
 $ mkdir build
 $ cd build
-$ cmake -DCMAKE_C_FLAGS=-fxray-instrument -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCLANG_C_VERSION="8" -DCLANG_CXX_VERSION="8"  ../.
-$ make
+$ cmake -DCMAKE_C_FLAGS=-fxray-instrument -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCLANG_C_VERSION="10" -DCLANG_CXX_VERSION="10" -G Ninja ../.
+$ ninja
 @endcode
 
-## Step 2: Run wtperf
+## Step 3: Run wtperf
 
 Use the script \c wtperf_xray.sh to launch \c wtperf from the directory
 containing the \c wtperf binary. The first argument to the script must be the
@@ -56,8 +79,8 @@ its behavior:
 - \c XRAY_BINARY: The binary to use to inspect the XRay log. The script defaults
 to using \c llvm-xray however, if you compiled with a particular \c clang
 version, you should use the corresponding \c llvm-xray version. For example, if
-you selected \c clang-8 like the configuration above, you should set
-\c XRAY_BINARY to \c llvm-xray-8.
+you selected \c clang-10 like the configuration above, you should set
+\c XRAY_BINARY to \c llvm-xray-10.
 
 - \c FLAME_GRAPH_PATH: As part of the script's analysis phase, it can optionally
 produce a FlameGraph. The \c FLAME_GRAPH_PATH variable must be set to your copy
@@ -80,37 +103,15 @@ XRay log and the \c wtperf binary that we used to generate it.
 $ cp <wtperf> <xray_log> .
 @endcode
 
-## Step 2: Install LLVM
+## Step 2: Configure and build WiredTiger with LLVM flags
 
-The \c xray_to_optrack utility requires LLVM in order to parse the XRay log
-file. So we'll need to install LLVM via our package manager.
-
-@code
-$ sudo apt install llvm
-@endcode
-
-LLVM needs to be version 8 or higher. Check the version like this:
-
-@code
-$ llvm-config -version
-@endcode
-
-If your distribution's default \c llvm-config isn't from the 8 series, you'll
-need to move one with a major version of 8 into the \c $PATH such that it gets
-invoked instead.
-
-The \c llvm-config command line tool is used to supply the required compiler
-and linker flags to build programs such like \c xray_to_optrack on top of LLVM.
-
-## Step 3: Configure and build WiredTiger with LLVM flags
-
-Supply the \c -DENABLE_LLVM flag to your configuration to build anything with a
-dependency to LLVM.
+Supply \c -DENABLE_LLVM=1 to your configuration and have a clang toolchain installed
+in order to build.
 
 @code
 $ cd build
-$ cmake -DENABLE_LLVM=1 -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCLANG_C_VERSION="8" -DCLANG_CXX_VERSION="8" ../.
-$ make
+$ cmake -DENABLE_LLVM=1 -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/clang.cmake -DCLANG_C_VERSION="10" -DCLANG_CXX_VERSION="10" -G Ninja ../.
+$ ninja
 @endcode
 
 Take care NOT to customize \c CC or \c CXX. Customizing either of these
@@ -118,7 +119,7 @@ variables will cause C++ programs such as \c workgen or \c xray_to_optrack to be
 skipped since we can't reliably link object files emitted by C and C++ compilers
 unless they are the system's default \c cc and \c c++.
 
-## Step 4: Process the traces
+## Step 3: Process the traces
 
 To process the traces, use the \c xray_to_optrack tool in the \c
 tools/xray_to_optrack directory.

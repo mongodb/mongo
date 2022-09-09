@@ -376,6 +376,7 @@ getter
 gid
 github
 gnuplot
+graphviz
 hb
 hotbackup
 href

@@ -96,7 +96,7 @@ symbolize_func_id(uint32_t func_id, const std::string &instr_map,
         ss << "Found function id \"" << func_id << "\" without a corresponding address";
         return make_error(ss.str());
     }
-    auto res = symbolizer.symbolizeCode(instr_map, iter->second);
+    auto res = symbolizer.symbolizeCode(instr_map, {iter->second, llvm::object::SectionedAddress::UndefSection});
     if (!res)
         return res.takeError();
     if (res->FunctionName == "<invalid>") {
