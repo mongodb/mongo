@@ -111,6 +111,11 @@ ProjectionNameOrderedSet convertToOrderedSet(ProjectionNameSet unordered);
 void combineLimitSkipProperties(properties::LimitSkipRequirement& aboveProp,
                                 const properties::LimitSkipRequirement& belowProp);
 
+properties::LogicalProps createInitialScanProps(const ProjectionName& projectionName,
+                                                const std::string& scanDefName,
+                                                GroupIdType groupId = -1,
+                                                properties::DistributionSet distributions = {});
+
 /**
  * Used to track references originating from a set of physical properties.
  */

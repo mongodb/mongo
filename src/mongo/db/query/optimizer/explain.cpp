@@ -731,9 +731,14 @@ public:
     ExplainPrinter transport(const ValueScanNode& node, ExplainPrinter bindResult) {
         ExplainPrinter valuePrinter = generate(node.getValueArray());
 
+        // Specifically not printing optional logical properties here. They can be displayed with
+        // the properties explain.
         ExplainPrinter printer("ValueScan");
         maybePrintProps(printer, node);
-        printer.separator(" [")
+        printer.separator(" [");
+        printBooleanFlag(printer, "hasRID", node.getHasRID());
+        printer.fieldName("hasRID")
+            .print(node.getHasRID())
             .fieldName("arraySize")
             .print(node.getArraySize())
             .separator("]")

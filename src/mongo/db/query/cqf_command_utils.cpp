@@ -752,7 +752,7 @@ bool isEligibleForBonsai(const CanonicalQuery& cq,
         walker.walk(projExecutor.get());
     }
 
-    return eligible && cq.useCqfIfEligible();
+    return eligible;
 }
 
 }  // namespace mongo

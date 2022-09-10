@@ -404,6 +404,8 @@ public:
     bool operator==(const IndexingAvailability& other) const;
 
     GroupIdType getScanGroupId() const;
+    void setScanGroupId(GroupIdType scanGroupId);
+
     const ProjectionName& getScanProjection() const;
     const std::string& getScanDefName() const;
 
@@ -414,7 +416,7 @@ public:
     void setEqPredsOnly(bool value);
 
 private:
-    const GroupIdType _scanGroupId;
+    GroupIdType _scanGroupId;
     const ProjectionName _scanProjection;
     const std::string _scanDefName;
 

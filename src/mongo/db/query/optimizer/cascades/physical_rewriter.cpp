@@ -106,12 +106,14 @@ private:
 };
 
 PhysicalRewriter::PhysicalRewriter(Memo& memo,
+                                   const GroupIdType rootGroupId,
                                    const QueryHints& hints,
                                    const RIDProjectionsMap& ridProjections,
                                    const CostingInterface& costDerivation,
                                    const PathToIntervalFn& pathToInterval,
                                    std::unique_ptr<LogicalRewriter>& logicalRewriter)
     : _memo(memo),
+      _rootGroupId(rootGroupId),
       _costDerivation(costDerivation),
       _hints(hints),
       _ridProjections(ridProjections),
@@ -339,7 +341,7 @@ PhysicalRewriter::OptimizeGroupResult PhysicalRewriter::optimizeGroup(const Grou
         : physicalNodes.addOptimizationResult(physProps, costLimit);
 
     // Enforcement rewrites run just once, and are independent of the logical nodes.
-    if (hasProperty<ProjectionRequirement>(bestResult._physProps)) {
+    if (groupId != _rootGroupId) {
         // Verify properties can be enforced and add enforcers if necessary.
         addEnforcers(groupId,
                      _memo.getMetadata(),

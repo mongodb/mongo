@@ -93,6 +93,19 @@ void combineLimitSkipProperties(properties::LimitSkipRequirement& aboveProp,
     aboveProp = {newLimit, newSkip};
 }
 
+properties::LogicalProps createInitialScanProps(const ProjectionName& projectionName,
+                                                const std::string& scanDefName,
+                                                const GroupIdType groupId,
+                                                properties::DistributionSet distributions) {
+    return makeLogicalProps(properties::IndexingAvailability(groupId,
+                                                             projectionName,
+                                                             scanDefName,
+                                                             true /*eqPredsOnly*/,
+                                                             {} /*satisfiedPartialIndexes*/),
+                            properties::CollectionAvailability({scanDefName}),
+                            properties::DistributionAvailability(std::move(distributions)));
+}
+
 /**
  * Used to track references originating from a set of properties.
  */

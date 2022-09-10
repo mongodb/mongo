@@ -299,6 +299,10 @@ GroupIdType IndexingAvailability::getScanGroupId() const {
     return _scanGroupId;
 }
 
+void IndexingAvailability::setScanGroupId(const GroupIdType scanGroupId) {
+    _scanGroupId = scanGroupId;
+}
+
 const ProjectionName& IndexingAvailability::getScanProjection() const {
     return _scanProjection;
 }

@@ -201,8 +201,13 @@ bool OptPhaseManager::runMemoPhysicalRewrite(const OptPhase phase,
                     IndexingRequirement(IndexReqTarget::Complete, true /*dedupRID*/, rootGroupId));
     }
 
-    PhysicalRewriter rewriter(
-        _memo, _hints, _ridProjections, *_costDerivation, _pathToInterval, logicalRewriter);
+    PhysicalRewriter rewriter(_memo,
+                              rootGroupId,
+                              _hints,
+                              _ridProjections,
+                              *_costDerivation,
+                              _pathToInterval,
+                              logicalRewriter);
 
     auto optGroupResult =
         rewriter.optimizeGroup(rootGroupId, std::move(physProps), _prefixId, CostType::kInfinity);

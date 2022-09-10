@@ -89,15 +89,18 @@ private:
 
 class SBENodeLowering {
 public:
+    // TODO: SERVER-69540. Consider avoiding a mutable slotMap argument here.
     SBENodeLowering(const VariableEnvironment& env,
                     SlotVarMap& slotMap,
+                    boost::optional<sbe::value::SlotId>& ridSlot,
                     sbe::value::SlotIdGenerator& ids,
                     const Metadata& metadata,
                     const NodeToGroupPropsMap& nodeToGroupPropsMap,
                     const RIDProjectionsMap& ridProjections,
-                    const bool randomScan = false)
+                    const bool randomScan)
         : _env(env),
           _slotMap(slotMap),
+          _ridSlot(ridSlot),
           _slotIdGenerator(ids),
           _metadata(metadata),
           _nodeToGroupPropsMap(nodeToGroupPropsMap),
@@ -191,6 +194,7 @@ private:
 
     const VariableEnvironment& _env;
     SlotVarMap& _slotMap;
+    boost::optional<sbe::value::SlotId>& _ridSlot;
     sbe::value::SlotIdGenerator& _slotIdGenerator;
 
     const Metadata& _metadata;

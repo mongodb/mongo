@@ -53,6 +53,7 @@ public:
     };
 
     PhysicalRewriter(Memo& memo,
+                     GroupIdType rootGroupid,
                      const QueryHints& hints,
                      const RIDProjectionsMap& ridProjections,
                      const CostingInterface& costDerivation,
@@ -85,6 +86,7 @@ private:
 
     // We don't own any of this.
     Memo& _memo;
+    const GroupIdType _rootGroupId;
     const CostingInterface& _costDerivation;
     const QueryHints& _hints;
     const RIDProjectionsMap& _ridProjections;

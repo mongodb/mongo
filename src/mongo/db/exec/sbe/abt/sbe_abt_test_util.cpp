@@ -70,11 +70,16 @@ ABT createValueArray(const std::vector<std::string>& jsonVector) {
     const auto [tag, val] = sbe::value::makeNewArray();
     auto outerArrayPtr = sbe::value::getArrayView(val);
 
-    for (const std::string& s : jsonVector) {
+    // TODO: SERVER-69566. Use makeArray.
+    for (size_t i = 0; i < jsonVector.size(); i++) {
         const auto [tag1, val1] = sbe::value::makeNewArray();
         auto innerArrayPtr = sbe::value::getArrayView(val1);
 
-        const BSONObj& bsonObj = fromjson(s);
+        // Add record id.
+        const auto [recordTag, recordVal] = sbe::value::makeNewRecordId(i);
+        innerArrayPtr->push_back(recordTag, recordVal);
+
+        const BSONObj& bsonObj = fromjson(jsonVector.at(i));
         const auto [tag2, val2] =
             sbe::value::copyValue(sbe::value::TypeTags::bsonObject,
                                   sbe::value::bitcastFrom<const char*>(bsonObj.objdata()));
@@ -94,15 +99,17 @@ std::vector<BSONObj> runSBEAST(OperationContext* opCtx,
 
     auto pipeline = parsePipeline(pipelineStr, NamespaceString("test"), opCtx);
 
-    ABT tree = createValueArray(jsonVector);
+    ABT valueArray = createValueArray(jsonVector);
 
     const ProjectionName scanProjName = prefixId.getNextId("scan");
-    tree = translatePipelineToABT(
-        metadata,
-        *pipeline.get(),
-        scanProjName,
-        make<ValueScanNode>(ProjectionNameVector{scanProjName}, std::move(tree)),
-        prefixId);
+    ABT tree = translatePipelineToABT(metadata,
+                                      *pipeline.get(),
+                                      scanProjName,
+                                      make<ValueScanNode>(ProjectionNameVector{scanProjName},
+                                                          boost::none,
+                                                          std::move(valueArray),
+                                                          true /*hasRID*/),
+                                      prefixId);
 
     OPTIMIZER_DEBUG_LOG(
         6264807, 5, "SBE translated ABT", "explain"_attr = ExplainGenerator::explainV2(tree));
@@ -115,16 +122,21 @@ std::vector<BSONObj> runSBEAST(OperationContext* opCtx,
         6264808, 5, "SBE optimized ABT", "explain"_attr = ExplainGenerator::explainV2(tree));
 
     SlotVarMap map;
+    boost::optional<sbe::value::SlotId> ridSlot;
     sbe::value::SlotIdGenerator ids;
 
     auto env = VariableEnvironment::build(tree);
     SBENodeLowering g{env,
                       map,
+                      ridSlot,
                       ids,
                       phaseManager.getMetadata(),
                       phaseManager.getNodeToGroupPropsMap(),
-                      phaseManager.getRIDProjections()};
+                      phaseManager.getRIDProjections(),
+                      false /*randomScan*/};
     auto sbePlan = g.optimize(tree);
+    ASSERT_EQ(1, map.size());
+    tassert(6624260, "Unexpected rid slot", !ridSlot);
     uassert(6624249, "Cannot optimize SBE plan", sbePlan != nullptr);
 
     sbe::CompileCtx ctx(std::make_unique<sbe::RuntimeEnvironment>());

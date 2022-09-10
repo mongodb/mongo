@@ -159,7 +159,9 @@ public:
     }
 
     size_t transport(const ValueScanNode& node, size_t bindResult) {
-        return computeHashSeq<46>(std::hash<size_t>()(node.getArraySize()),
+        // Specifically not hashing props here. Those are compared in the equality operator.
+        return computeHashSeq<46>(std::hash<bool>()(node.getHasRID()),
+                                  std::hash<size_t>()(node.getArraySize()),
                                   ABTHashGenerator::generate(node.getValueArray()),
                                   bindResult);
     }

@@ -30,6 +30,7 @@
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/exec/sbe/abt/sbe_abt_test_util.h"
 #include "mongo/db/pipeline/abt/document_source_visitor.h"
+#include "mongo/db/query/optimizer/cascades/cost_derivation.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
@@ -350,26 +351,31 @@ TEST_F(NodeSBE, Lower1) {
 
     const auto [tag, val] = sbe::value::makeNewArray();
     {
-        // Create an array of array with one empty document.
+        // Create an array of array with one RecordId and one empty document.
         auto outerArrayPtr = sbe::value::getArrayView(val);
 
         const auto [tag1, val1] = sbe::value::makeNewArray();
         auto innerArrayPtr = sbe::value::getArrayView(val1);
+
+        const auto [recordTag, recordVal] = sbe::value::makeNewRecordId(0);
+        innerArrayPtr->push_back(recordTag, recordVal);
 
         const auto [tag2, val2] = sbe::value::makeNewObject();
         innerArrayPtr->push_back(tag2, val2);
 
         outerArrayPtr->push_back(tag1, val1);
     }
-    ABT tree = make<Constant>(tag, val);
+    ABT valueArray = make<Constant>(tag, val);
 
     const ProjectionName scanProjName = prefixId.getNextId("scan");
-    tree = translatePipelineToABT(
-        metadata,
-        *pipeline.get(),
-        scanProjName,
-        make<ValueScanNode>(ProjectionNameVector{scanProjName}, std::move(tree)),
-        prefixId);
+    ABT tree = translatePipelineToABT(metadata,
+                                      *pipeline.get(),
+                                      scanProjName,
+                                      make<ValueScanNode>(ProjectionNameVector{scanProjName},
+                                                          boost::none,
+                                                          std::move(valueArray),
+                                                          true /*hasRID*/),
+                                      prefixId);
 
     OptPhaseManager phaseManager(
         OptPhaseManager::getAllRewritesSet(), prefixId, {{}}, DebugInfo::kDefaultForTests);
@@ -377,16 +383,20 @@ TEST_F(NodeSBE, Lower1) {
     ASSERT_TRUE(phaseManager.optimize(tree));
     auto env = VariableEnvironment::build(tree);
     SlotVarMap map;
+    boost::optional<sbe::value::SlotId> ridSlot;
     sbe::value::SlotIdGenerator ids;
 
     SBENodeLowering g{env,
                       map,
+                      ridSlot,
                       ids,
                       phaseManager.getMetadata(),
                       phaseManager.getNodeToGroupPropsMap(),
-                      phaseManager.getRIDProjections()};
-
+                      phaseManager.getRIDProjections(),
+                      false /*randomScan*/};
     auto sbePlan = g.optimize(tree);
+    ASSERT_EQ(1, map.size());
+    ASSERT_FALSE(ridSlot);
 
     auto opCtx = makeOperationContext();
 
@@ -408,6 +418,112 @@ TEST_F(NodeSBE, Lower1) {
         std::cout << "\n";
     };
     sbePlan->close();
+}
+
+TEST_F(NodeSBE, RequireRID) {
+    PrefixId prefixId;
+    Metadata metadata{{}};
+
+    OperationContextNoop noop;
+    auto pipeline = parsePipeline("[{$match: {a: 2}}]", NamespaceString("test"), &noop);
+
+    const ProjectionName scanProjName = prefixId.getNextId("scan");
+
+    const auto [tag, val] = sbe::value::makeNewArray();
+    {
+        // Create an array of 10 arrays, each inner array consisting of a RecordId at the first
+        // position, followed by a document with the field "a" containing sequential integers from 0
+        // to 9.
+        auto outerArrayPtr = sbe::value::getArrayView(val);
+        for (size_t i = 0; i < 10; i++) {
+            const auto [tag1, val1] = sbe::value::makeNewArray();
+            auto innerArrayPtr = sbe::value::getArrayView(val1);
+
+            const auto [recordTag, recordVal] = sbe::value::makeNewRecordId(i);
+            innerArrayPtr->push_back(recordTag, recordVal);
+
+            const auto [tag2, val2] = sbe::value::makeNewObject();
+            auto objPtr = sbe::value::getObjectView(val2);
+            objPtr->push_back("a", sbe::value::TypeTags::NumberInt32, i);
+
+            innerArrayPtr->push_back(tag2, val2);
+            outerArrayPtr->push_back(tag1, val1);
+        }
+    }
+    ABT valueArray = make<Constant>(tag, val);
+
+    ABT tree =
+        translatePipelineToABT(metadata,
+                               *pipeline.get(),
+                               scanProjName,
+                               make<ValueScanNode>(ProjectionNameVector{scanProjName},
+                                                   createInitialScanProps(scanProjName, "test"),
+                                                   std::move(valueArray),
+                                                   true /*hasRID*/),
+                               prefixId);
+
+    OptPhaseManager phaseManager(OptPhaseManager::getAllRewritesSet(),
+                                 prefixId,
+                                 true /*requireRID*/,
+                                 {{{"test", ScanDefinition{{}, {}}}}},
+                                 std::make_unique<HeuristicCE>(),
+                                 std::make_unique<DefaultCosting>(),
+                                 {} /*pathToInterval*/,
+                                 DebugInfo::kDefaultForTests);
+
+    ASSERT_TRUE(phaseManager.optimize(tree));
+    auto env = VariableEnvironment::build(tree);
+
+    SlotVarMap map;
+    boost::optional<sbe::value::SlotId> ridSlot;
+    sbe::value::SlotIdGenerator ids;
+
+    SBENodeLowering g{env,
+                      map,
+                      ridSlot,
+                      ids,
+                      phaseManager.getMetadata(),
+                      phaseManager.getNodeToGroupPropsMap(),
+                      phaseManager.getRIDProjections(),
+                      false /*randomScan*/};
+    auto sbePlan = g.optimize(tree);
+    ASSERT_EQ(1, map.size());
+    ASSERT_TRUE(ridSlot);
+
+    auto opCtx = makeOperationContext();
+
+    sbe::CompileCtx ctx(std::make_unique<sbe::RuntimeEnvironment>());
+    sbePlan->prepare(ctx);
+
+    std::vector<sbe::value::SlotAccessor*> accessors;
+    for (auto& [name, slot] : map) {
+        accessors.emplace_back(sbePlan->getAccessor(ctx, slot));
+    }
+    accessors.emplace_back(sbePlan->getAccessor(ctx, *ridSlot));
+
+    sbePlan->attachToOperationContext(opCtx.get());
+    sbePlan->open(false);
+
+    size_t resultSize = 0;
+    while (sbePlan->getNext() != sbe::PlanState::IS_EOF) {
+        resultSize++;
+
+        // Assert we have one result, and it is equal to {a: 2} with rid = RecordId(2).
+        const auto [resultTag, resultVal] = accessors.at(0)->getViewOfValue();
+        ASSERT_EQ(sbe::value::TypeTags::Object, resultTag);
+        const auto objPtr = sbe::value::getObjectView(resultVal);
+        ASSERT_EQ(1, objPtr->size());
+        const auto [fieldTag, fieldVal] = objPtr->getField("a");
+        ASSERT_EQ(sbe::value::TypeTags::NumberInt32, fieldTag);
+        ASSERT_EQ(2, fieldVal);
+
+        const auto [ridTag, ridVal] = accessors.at(1)->getViewOfValue();
+        ASSERT_EQ(sbe::value::TypeTags::RecordId, ridTag);
+        ASSERT_EQ(2, sbe::value::getRecordIdView(ridVal)->getLong());
+    };
+    sbePlan->close();
+
+    ASSERT_EQ(1, resultSize);
 }
 
 }  // namespace

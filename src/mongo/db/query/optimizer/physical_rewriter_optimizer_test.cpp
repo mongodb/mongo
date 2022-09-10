@@ -4729,12 +4729,14 @@ TEST(PhysRewriter, RequireRID) {
     ASSERT_TRUE(phaseManager.optimize(optimized));
     ASSERT_EQ(2, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
-    // Make sure the Scan node returns rid.
+    // Make sure the Scan node returns rid, and the Root node refers to it.
     ASSERT_EXPLAIN_V2(
         "Root []\n"
         "|   |   projections: \n"
+        "|   |       rid_0\n"
         "|   |       root\n"
         "|   RefBlock: \n"
+        "|       Variable [rid_0]\n"
         "|       Variable [root]\n"
         "Filter []\n"
         "|   EvalFilter []\n"

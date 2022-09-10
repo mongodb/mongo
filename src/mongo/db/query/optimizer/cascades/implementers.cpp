@@ -167,11 +167,23 @@ public:
             return;
         }
 
-        NodeCEMap nodeCEMap;
-        ABT physNode = make<CoScanNode>();
         const auto& requiredProjections =
             getPropertyConst<ProjectionRequirement>(_physProps).getProjections();
 
+        ProjectionName ridProjName;
+        bool needsRID = false;
+        if (hasProperty<IndexingAvailability>(_logicalProps)) {
+            ridProjName = _ridProjections.at(
+                getPropertyConst<IndexingAvailability>(_logicalProps).getScanDefName());
+            needsRID = requiredProjections.find(ridProjName).second;
+        }
+        if (needsRID && !node.getHasRID()) {
+            // We cannot provide RID.
+            return;
+        }
+
+        NodeCEMap nodeCEMap;
+        ABT physNode = make<CoScanNode>();
         if (node.getArraySize() == 0) {
             nodeCEMap.emplace(physNode.cast<Node>(), 0.0);
 
@@ -179,9 +191,16 @@ public:
                 make<LimitSkipNode>(properties::LimitSkipRequirement{0, 0}, std::move(physNode));
             nodeCEMap.emplace(physNode.cast<Node>(), 0.0);
 
-            for (const ProjectionName& projectionName : requiredProjections.getVector()) {
-                physNode =
-                    make<EvaluationNode>(projectionName, Constant::nothing(), std::move(physNode));
+            for (const ProjectionName& boundProjName : node.binder().names()) {
+                if (requiredProjections.find(boundProjName).second) {
+                    physNode = make<EvaluationNode>(
+                        boundProjName, Constant::nothing(), std::move(physNode));
+                    nodeCEMap.emplace(physNode.cast<Node>(), 0.0);
+                }
+            }
+            if (needsRID) {
+                physNode = make<EvaluationNode>(
+                    std::move(ridProjName), Constant::nothing(), std::move(physNode));
                 nodeCEMap.emplace(physNode.cast<Node>(), 0.0);
             }
         } else {
@@ -202,24 +221,32 @@ public:
                                         _prefixId.getNextId("valueScanPid"),
                                         false /*retainNonArrays*/,
                                         std::move(physNode));
-            nodeCEMap.emplace(physNode.cast<Node>(), node.getArraySize());
+            nodeCEMap.emplace(physNode.cast<Node>(), 1.0);
 
-            /**
-             * Iterate over the bound projections here as opposed to the required projections, since
-             * the array elements are ordered accordingly.
-             */
+            const auto getElementFn = [&valueScanProj](const size_t index) {
+                return make<FunctionCall>(
+                    "getElement", makeSeq(make<Variable>(valueScanProj), Constant::int32(index)));
+            };
+
+            // Iterate over the bound projections here as opposed to the required projections, since
+            // the array elements are ordered accordingly. Skip over the first element (this is the
+            // row id).
             const ProjectionNameVector& boundProjNames = node.binder().names();
             for (size_t i = 0; i < boundProjNames.size(); i++) {
                 const ProjectionName& boundProjName = boundProjNames.at(i);
                 if (requiredProjections.find(boundProjName).second) {
-                    physNode = make<EvaluationNode>(
-                        boundProjName,
-                        make<FunctionCall>(
-                            "getElement",
-                            makeSeq(make<Variable>(valueScanProj), Constant::int32(i))),
-                        std::move(physNode));
+                    physNode = make<EvaluationNode>(boundProjName,
+                                                    getElementFn(i + (node.getHasRID() ? 1 : 0)),
+                                                    std::move(physNode));
                     nodeCEMap.emplace(physNode.cast<Node>(), node.getArraySize());
                 }
+            }
+
+            if (needsRID) {
+                // Obtain row id from first element of the array.
+                physNode = make<EvaluationNode>(
+                    std::move(ridProjName), getElementFn(0), std::move(physNode));
+                nodeCEMap.emplace(physNode.cast<Node>(), node.getArraySize());
             }
         }
 
@@ -1163,18 +1190,20 @@ public:
     void operator()(const ABT& n, const RootNode& node) {
         PhysProps newProps = _physProps;
 
+        ABT rootNode = make<Blackhole>();
         if (hasProperty<ProjectionRequirement>(newProps)) {
             auto& projections = getProperty<ProjectionRequirement>(newProps).getProjections();
             for (const auto& projName : node.getProperty().getProjections().getVector()) {
                 projections.emplace_back(projName);
             }
+            rootNode = make<RootNode>(projections, n.cast<RootNode>()->getChild());
         } else {
             setPropertyOverwrite<ProjectionRequirement>(newProps, node.getProperty());
+            rootNode = n;
         }
 
         getProperty<DistributionRequirement>(newProps).setDisableExchanges(false);
 
-        ABT rootNode = n;
         optimizeChild<RootNode, PhysicalRewriteType::Root>(
             _queue, kDefaultPriority, std::move(rootNode), std::move(newProps));
     }

@@ -121,17 +121,25 @@ bool PhysicalScanNode::useParallelScan() const {
     return _useParallelScan;
 }
 
-ValueScanNode::ValueScanNode(ProjectionNameVector projections)
-    : ValueScanNode(std::move(projections), Constant::emptyArray()) {}
+ValueScanNode::ValueScanNode(ProjectionNameVector projections,
+                             boost::optional<properties::LogicalProps> props)
+    : ValueScanNode(
+          std::move(projections), std::move(props), Constant::emptyArray(), false /*hasRID*/) {}
 
-ValueScanNode::ValueScanNode(ProjectionNameVector projections, ABT valueArray)
-    : Base(buildSimpleBinder(std::move(projections))), _valueArray(std::move(valueArray)) {
+ValueScanNode::ValueScanNode(ProjectionNameVector projections,
+                             boost::optional<properties::LogicalProps> props,
+                             ABT valueArray,
+                             const bool hasRID)
+    : Base(buildSimpleBinder(std::move(projections))),
+      _props(std::move(props)),
+      _valueArray(std::move(valueArray)),
+      _hasRID(hasRID) {
     const auto constPtr = _valueArray.cast<Constant>();
-    tassert(6624081, "ValueScan must be intialized with a constant", constPtr != nullptr);
+    tassert(6624081, "ValueScan must be initialized with a constant", constPtr != nullptr);
 
     const auto [tag, val] = constPtr->get();
     tassert(
-        6624082, "ValueScan must be intialized with an array", tag == sbe::value::TypeTags::Array);
+        6624082, "ValueScan must be initialized with an array", tag == sbe::value::TypeTags::Array);
 
     const auto arr = sbe::value::getArrayView(val);
     _arraySize = arr->size();
@@ -139,18 +147,26 @@ ValueScanNode::ValueScanNode(ProjectionNameVector projections, ABT valueArray)
     for (size_t i = 0; i < _arraySize; i++) {
         const auto [tag1, val1] = arr->getAt(i);
         tassert(6624083,
-                "ValueScan must be intialized with an array",
+                "ValueScan must be initialized with an array",
                 tag1 == sbe::value::TypeTags::Array);
-        const size_t innerSize = sbe::value::getArrayView(val1)->size();
+
+        const auto innerArray = sbe::value::getArrayView(val1);
         tassert(6624084,
-                "Element of array must have one entry per projection",
-                innerSize == projectionCount);
+                "Unexpected number of elements in inner array",
+                innerArray->size() == projectionCount + (_hasRID ? 1 : 0));
+        tassert(6624177,
+                "First element must be a RecordId",
+                !_hasRID || innerArray->getAt(0).first == sbe::value::TypeTags::RecordId);
     }
 }
 
 bool ValueScanNode::operator==(const ValueScanNode& other) const {
-    return binder() == other.binder() && _arraySize == other._arraySize &&
-        _valueArray == other._valueArray;
+    return binder() == other.binder() && _props == other._props && _arraySize == other._arraySize &&
+        _valueArray == other._valueArray && _hasRID == other._hasRID;
+}
+
+const boost::optional<properties::LogicalProps>& ValueScanNode::getProps() const {
+    return _props;
 }
 
 const ABT& ValueScanNode::getValueArray() const {
@@ -159,6 +175,10 @@ const ABT& ValueScanNode::getValueArray() const {
 
 size_t ValueScanNode::getArraySize() const {
     return _arraySize;
+}
+
+bool ValueScanNode::getHasRID() const {
+    return _hasRID;
 }
 
 CoScanNode::CoScanNode() : Base() {}

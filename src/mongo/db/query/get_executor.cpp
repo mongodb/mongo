@@ -1437,7 +1437,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
         sbe::isQuerySbeCompatible(&mainColl, canonicalQuery.get(), plannerParams.options));
 
     if (isEligibleForBonsai(*canonicalQuery, opCtx, mainColl)) {
-        return getSBEExecutorViaCascadesOptimizer(mainColl, std::move(canonicalQuery));
+        return getSBEExecutorViaCascadesOptimizer(mainColl,
+                                                  std::move(canonicalQuery),
+                                                  plannerParams.options &
+                                                      QueryPlannerParams::PRESERVE_RECORD_ID);
     }
 
     // Use SBE if 'canonicalQuery' is SBE compatible.

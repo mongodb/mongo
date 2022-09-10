@@ -233,14 +233,6 @@ public:
         return _sbeCompatible;
     }
 
-    void setUseCqfIfEligible(bool useCqfIfEligible) {
-        _useCqfIfEligible = useCqfIfEligible;
-    }
-
-    bool useCqfIfEligible() const {
-        return _useCqfIfEligible;
-    }
-
     bool isParameterized() const {
         return !_inputParamIdToExpressionMap.empty();
     }
@@ -317,15 +309,6 @@ private:
 
     // True if this query can be executed by the SBE.
     bool _sbeCompatible = false;
-
-    // If true, indicates that we should use CQF if this query is eligible (see the
-    // isEligibleForBonsai() function for eligiblitly requirements).
-    // If false, indicates that we shouldn't use CQF even if this query is eligible.
-    // Warning: This field is used soley as a workaround for SERVER-69102. It is intended to be
-    // temporary and will be removed once SERVER-69102 is fixed. Do not introduce new uses or
-    // dependencies on this field.
-    // TODO SERVER-69102: Delete this field.
-    bool _useCqfIfEligible = true;
 
     // A map from assigned InputParamId's to parameterised MatchExpression's.
     std::vector<const MatchExpression*> _inputParamIdToExpressionMap;

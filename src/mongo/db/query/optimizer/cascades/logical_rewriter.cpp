@@ -334,7 +334,7 @@ static ABT createEmptyValueScanNode(const RewriteContext& ctx) {
         getPropertyConst<ProjectionAvailability>(ctx.getAboveLogicalProps()).getProjections();
     ProjectionNameVector projNameVector;
     projNameVector.insert(projNameVector.begin(), projNameSet.cbegin(), projNameSet.cend());
-    return make<ValueScanNode>(std::move(projNameVector));
+    return make<ValueScanNode>(std::move(projNameVector), ctx.getAboveLogicalProps());
 }
 
 static void addEmptyValueScanNode(RewriteContext& ctx) {
@@ -683,7 +683,7 @@ static void convertFilterToSargableNode(ABT::reference_type node,
         return;
     }
 
-    // Remove any partial schema requirments which do not constrain their input
+    // Remove any partial schema requirements which do not constrain their input.
     for (auto it = conversion->_reqMap.cbegin(); it != conversion->_reqMap.cend();) {
         uassert(6624111,
                 "Filter partial schema requirement must contain a variable name.",
@@ -966,7 +966,9 @@ struct ExploreConvert<SargableNode> {
         const LogicalProps& props = ctx.getAboveLogicalProps();
         const auto& indexingAvailability = getPropertyConst<IndexingAvailability>(props);
         const GroupIdType scanGroupId = indexingAvailability.getScanGroupId();
-        if (sargableNode.getChild().cast<MemoLogicalDelegatorNode>()->getGroupId() != scanGroupId) {
+        if (sargableNode.getChild().cast<MemoLogicalDelegatorNode>()->getGroupId() != scanGroupId ||
+            !ctx.getMemo().getGroup(scanGroupId)._logicalNodes.at(0).is<ScanNode>()) {
+            // We are not sitting above a ScanNode.
             lowerSargableNode(sargableNode, ctx);
             return;
         }

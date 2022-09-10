@@ -227,15 +227,18 @@ private:
 
         auto env = VariableEnvironment::build(abtTree);
         SlotVarMap slotMap;
+        boost::optional<sbe::value::SlotId> ridSlot;
         sbe::value::SlotIdGenerator ids;
         SBENodeLowering g{env,
                           slotMap,
+                          ridSlot,
                           ids,
                           _phaseManager.getMetadata(),
                           _phaseManager.getNodeToGroupPropsMap(),
                           _phaseManager.getRIDProjections(),
                           true /*randomScan*/};
         auto sbePlan = g.optimize(abtTree);
+        tassert(6624261, "Unexpected rid slot", !ridSlot);
 
         // TODO: return errors instead of exceptions?
         uassert(6624244, "Lowering failed", sbePlan != nullptr);

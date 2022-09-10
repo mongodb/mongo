@@ -335,7 +335,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::generateInternal(const ABT& n) 
 std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const RootNode& n,
                                                       const ABT& child,
                                                       const ABT& refs) {
-
+    using namespace properties;
     auto input = generateInternal(child);
 
     auto output = refs.cast<References>();
@@ -350,8 +350,24 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const RootNode& n,
         }
     }
 
-    _slotMap = finalMap;
+    if (const auto& props = _nodeToGroupPropsMap.at(&n);
+        hasProperty<ProjectionRequirement>(props._physicalProps) &&
+        hasProperty<IndexingAvailability>(props._logicalProps)) {
+        // If we required rid on the Root node, populate ridSlot.
+        const std::string& scanDefName =
+            getPropertyConst<IndexingAvailability>(props._logicalProps).getScanDefName();
+        const ProjectionName& ridProjName = _ridProjections.at(scanDefName);
 
+        const auto& projections =
+            getPropertyConst<ProjectionRequirement>(props._physicalProps).getProjections();
+        if (projections.find(ridProjName).second) {
+            // Deliver the ridSlot separate from the slotMap.
+            _ridSlot = _slotMap.at(ridProjName);
+            finalMap.erase(ridProjName);
+        }
+    }
+
+    std::swap(_slotMap, finalMap);
     return input;
 }
 
@@ -640,12 +656,12 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const BinaryJoinNode& n,
     auto expr = SBEExpressionLowering{_env, _slotMap}.optimize(filter);
 
     auto outerProjects =
-        convertRequiredProjectionsToSlots(leftChildProps, true /*addRIDProjection*/);
+        convertRequiredProjectionsToSlots(leftChildProps, false /*removeRIDProjection*/);
 
     const auto& rightChildProps = _nodeToGroupPropsMap.at(n.getRightChild().cast<Node>());
 
     auto innerProjects =
-        convertRequiredProjectionsToSlots(rightChildProps, false /*addRIDProjection*/);
+        convertRequiredProjectionsToSlots(rightChildProps, true /*removeRIDProjection*/);
 
     sbe::JoinType joinType = [&]() {
         switch (n.getJoinType()) {
@@ -765,14 +781,17 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const UnionNode& n,
     for (const ABT& child : children) {
         // Use a fresh map to prevent same projections for every child being overwritten.
         SlotVarMap localMap;
+        boost::optional<sbe::value::SlotId> localRIDSlot;
         SBENodeLowering localLowering(_env,
                                       localMap,
+                                      localRIDSlot,
                                       _slotIdGenerator,
                                       _metadata,
                                       _nodeToGroupPropsMap,
                                       _ridProjections,
                                       _randomScan);
         auto loweredChild = localLowering.optimize(child);
+        tassert(6624258, "Unexpected rid slot", !localRIDSlot);
 
         if (children.size() == 1) {
             // Union with one child is used to restrict projections. Do not place a union stage.

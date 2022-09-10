@@ -312,10 +312,10 @@ public:
         std::string scanDefName = source->getFromNs().coll().toString();
         const ProjectionName& scanProjName = _ctx.getNextId("scan");
 
-        PrefixId prefixId;
         ABT pipelineABT = _metadata._scanDefs.at(scanDefName).exists()
             ? make<ScanNode>(scanProjName, scanDefName)
-            : make<ValueScanNode>(ProjectionNameVector{scanProjName});
+            : make<ValueScanNode>(ProjectionNameVector{scanProjName},
+                                  createInitialScanProps(scanProjName, scanDefName));
 
         const ProjectionName& localIdProjName = _ctx.getNextId("localId");
         auto entry = _ctx.getNode();
@@ -504,10 +504,12 @@ public:
         std::string scanDefName = involvedNss.coll().toString();
         const ProjectionName& scanProjName = _ctx.getNextId("scan");
 
-        PrefixId prefixId;
         ABT initialNode = _metadata._scanDefs.at(scanDefName).exists()
             ? make<ScanNode>(scanProjName, scanDefName)
-            : make<ValueScanNode>(ProjectionNameVector{scanProjName});
+            : make<ValueScanNode>(ProjectionNameVector{scanProjName},
+                                  createInitialScanProps(scanProjName, scanDefName));
+
+        PrefixId prefixId;
         ABT pipelineABT = translatePipelineToABT(
             _metadata, pipeline, scanProjName, std::move(initialNode), prefixId);
 

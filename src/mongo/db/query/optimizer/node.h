@@ -152,19 +152,24 @@ private:
  * Logical ValueScanNode.
  *
  * It originates a set of projections each with a fixed sequence of values, which is encoded as an
- * array.
+ * array. Each array element has as many entries as the number of projections plus one. If are
+ * providing a row id, the first one must be of type RecordId.
  */
 class ValueScanNode final : public Operator<1>, public ExclusivelyLogicalNode {
     using Base = Operator<1>;
 
 public:
-    ValueScanNode(ProjectionNameVector projections);
+    ValueScanNode(ProjectionNameVector projections,
+                  boost::optional<properties::LogicalProps> props);
 
     /**
      * Each element of 'valueArray' is an array itself and must have one entry corresponding to
      * each of 'projections'.
      */
-    ValueScanNode(ProjectionNameVector projections, ABT valueArray);
+    ValueScanNode(ProjectionNameVector projections,
+                  boost::optional<properties::LogicalProps> props,
+                  ABT valueArray,
+                  bool hasRID);
 
     bool operator==(const ValueScanNode& other) const;
 
@@ -177,9 +182,19 @@ public:
     const ABT& getValueArray() const;
     size_t getArraySize() const;
 
+    const boost::optional<properties::LogicalProps>& getProps() const;
+
+    bool getHasRID() const;
+
 private:
+    // Optional logical properties. Used as a seed during logical proeprties derivation.
+    const boost::optional<properties::LogicalProps> _props;
+
     const ABT _valueArray;
     size_t _arraySize;
+
+    // Indicates if the valueArray provides a column with RecordId elements.
+    const bool _hasRID;
 };
 
 /**

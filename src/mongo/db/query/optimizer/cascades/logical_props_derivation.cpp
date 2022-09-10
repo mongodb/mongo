@@ -138,23 +138,28 @@ public:
                                          distributions);
         }
 
-        return maybeUpdateNodePropsMap(
-            node,
-            makeLogicalProps(IndexingAvailability(_groupId,
-                                                  node.getProjectionName(),
-                                                  node.getScanDefName(),
-                                                  true /*eqPredsOnly*/,
-                                                  {} /*satisfiedPartialIndexes*/),
-                             CollectionAvailability({node.getScanDefName()}),
-                             DistributionAvailability(std::move(distributions))));
+        return maybeUpdateNodePropsMap(node,
+                                       createInitialScanProps(node.getProjectionName(),
+                                                              node.getScanDefName(),
+                                                              _groupId,
+                                                              std::move(distributions)));
     }
 
     LogicalProps transport(const ValueScanNode& node, LogicalProps /*bindResult*/) {
-        // We do not originate indexing availability, and have empty collection availability with
-        // Centralized + Replicated distribution availability. During physical optimization we
-        // accept optimization under any distribution.
-        LogicalProps result =
-            makeLogicalProps(CollectionAvailability{{}}, DistributionAvailability{{}});
+        LogicalProps result;
+        if (const auto& props = node.getProps(); props) {
+            result = *props;
+            if (hasProperty<IndexingAvailability>(result)) {
+                // Update the group to our current one.
+                getProperty<IndexingAvailability>(result).setScanGroupId(_groupId);
+            }
+        } else {
+            // We do not originate indexing availability, and have empty collection availability
+            // with Centralized + Replicated distribution availability. During physical optimization
+            // we accept optimization under any distribution.
+            result = makeLogicalProps(CollectionAvailability{{}}, DistributionAvailability{{}});
+        }
+
         addCentralizedAndRoundRobinDistributions(result);
         return maybeUpdateNodePropsMap(node, std::move(result));
     }

@@ -256,7 +256,8 @@ static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> optimizeAndCreateExe
     boost::intrusive_ptr<ExpressionContext> expCtx,
     const NamespaceString& nss,
     const CollectionPtr& collection,
-    std::unique_ptr<CanonicalQuery> cq) {
+    std::unique_ptr<CanonicalQuery> cq,
+    const bool requireRID) {
 
     const bool optimizationResult = phaseManager.optimize(abt);
     uassert(6624252, "Optimization failed", optimizationResult);
@@ -286,13 +287,17 @@ static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> optimizeAndCreateExe
     auto env = VariableEnvironment::build(abt);
     SlotVarMap slotMap;
     sbe::value::SlotIdGenerator ids;
+    boost::optional<sbe::value::SlotId> ridSlot;
     SBENodeLowering g{env,
                       slotMap,
+                      ridSlot,
                       ids,
                       phaseManager.getMetadata(),
                       phaseManager.getNodeToGroupPropsMap(),
-                      phaseManager.getRIDProjections()};
+                      phaseManager.getRIDProjections(),
+                      false /*randomScan*/};
     auto sbePlan = g.optimize(abt);
+    tassert(6624262, "Unexpected rid slot", !requireRID || ridSlot);
 
     uassert(6624253, "Lowering failed: did not produce a plan.", sbePlan != nullptr);
     uassert(6624254, "Lowering failed: did not produce any output slots.", !slotMap.empty());
@@ -304,6 +309,9 @@ static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> optimizeAndCreateExe
 
     stage_builder::PlanStageData data{std::make_unique<sbe::RuntimeEnvironment>()};
     data.outputs.set(stage_builder::PlanStageSlots::kResult, slotMap.begin()->second);
+    if (requireRID) {
+        data.outputs.set(stage_builder::PlanStageSlots::kRecordId, *ridSlot);
+    }
 
     sbePlan->attachToOperationContext(opCtx);
     if (expCtx->explain || expCtx->mayDbProfile) {
@@ -474,7 +482,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
     const CollectionPtr& collection,
     const boost::optional<BSONObj>& indexHint,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
-    std::unique_ptr<CanonicalQuery> canonicalQuery) {
+    std::unique_ptr<CanonicalQuery> canonicalQuery,
+    const bool requireRID) {
 
     // Ensure that either pipeline or canonicalQuery is set.
     tassert(624070,
@@ -511,8 +520,10 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
                                      queryHints,
                                      prefixId);
 
-    ABT abt = collectionExists ? make<ScanNode>(scanProjName, scanDefName)
-                               : make<ValueScanNode>(ProjectionNameVector{scanProjName});
+    ABT abt = collectionExists
+        ? make<ScanNode>(scanProjName, scanDefName)
+        : make<ValueScanNode>(ProjectionNameVector{scanProjName},
+                              createInitialScanProps(scanProjName, scanDefName));
 
     if (pipeline) {
         abt = translatePipelineToABT(metadata, *pipeline, scanProjName, std::move(abt), prefixId);
@@ -549,7 +560,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
         OptPhaseManager phaseManager{
             OptPhaseManager::getAllRewritesSet(),
             prefixId,
-            false /*requireRID*/,
+            requireRID,
             std::move(metadata),
             std::make_unique<CESamplingTransport>(opCtx, phaseManagerForSampling, numRecords),
             std::make_unique<DefaultCosting>(),
@@ -563,7 +574,8 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
                                          expCtx,
                                          nss,
                                          collection,
-                                         std::move(canonicalQuery));
+                                         std::move(canonicalQuery),
+                                         requireRID);
 
     } else if (internalQueryCardinalityEstimatorMode == ce::kHistogram &&
                ce::CollectionStatistics::hasCollectionStatistics(nss)) {
@@ -571,7 +583,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
         auto ceDerivation = std::make_unique<CEHistogramTransport>(stats);
         OptPhaseManager phaseManager{OptPhaseManager::getAllRewritesSet(),
                                      prefixId,
-                                     false /*requireRID*/,
+                                     requireRID,
                                      std::move(metadata),
                                      std::move(ceDerivation),
                                      std::make_unique<DefaultCosting>(),
@@ -585,12 +597,13 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
                                          expCtx,
                                          nss,
                                          collection,
-                                         std::move(canonicalQuery));
+                                         std::move(canonicalQuery),
+                                         requireRID);
     }
     // Default to using heuristics.
     OptPhaseManager phaseManager{OptPhaseManager::getAllRewritesSet(),
                                  prefixId,
-                                 false /*requireRID*/,
+                                 requireRID,
                                  std::move(metadata),
                                  std::make_unique<HeuristicCE>(),
                                  std::make_unique<DefaultCosting>(),
@@ -598,12 +611,18 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
                                  DebugInfo::kDefaultForProd,
                                  std::move(queryHints)};
 
-    return optimizeAndCreateExecutor(
-        phaseManager, std::move(abt), opCtx, expCtx, nss, collection, std::move(canonicalQuery));
+    return optimizeAndCreateExecutor(phaseManager,
+                                     std::move(abt),
+                                     opCtx,
+                                     expCtx,
+                                     nss,
+                                     collection,
+                                     std::move(canonicalQuery),
+                                     requireRID);
 }
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOptimizer(
-    const CollectionPtr& collection, std::unique_ptr<CanonicalQuery> query) {
+    const CollectionPtr& collection, std::unique_ptr<CanonicalQuery> query, const bool requireRID) {
 
     boost::optional<BSONObj> indexHint = query->getFindCommandRequest().getHint().isEmpty()
         ? boost::none
@@ -614,8 +633,14 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
     auto expCtx = query->getExpCtx();
     auto nss = query->nss();
 
-    return getSBEExecutorViaCascadesOptimizer(
-        opCtx, expCtx, nss, collection, indexHint, nullptr /* pipeline */, std::move(query));
+    return getSBEExecutorViaCascadesOptimizer(opCtx,
+                                              expCtx,
+                                              nss,
+                                              collection,
+                                              indexHint,
+                                              nullptr /* pipeline */,
+                                              std::move(query),
+                                              requireRID);
 }
 
 }  // namespace mongo
