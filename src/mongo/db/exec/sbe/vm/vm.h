@@ -570,6 +570,7 @@ enum class Builtin : uint8_t {
     toLower,
     coerceToString,
     concat,
+    concatArrays,
     acos,
     acosh,
     asin,
@@ -1145,6 +1146,7 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinTanh(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinRound(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinConcat(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinConcatArrays(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinIsMember(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCollIsMember(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinIndexOfBytes(ArityType arity);

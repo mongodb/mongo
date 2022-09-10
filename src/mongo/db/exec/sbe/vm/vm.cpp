@@ -3254,6 +3254,29 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcat(ArityType
     return {true, strTag, strValue};
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcatArrays(ArityType arity) {
+    auto [resTag, resVal] = value::makeNewArray();
+    value::ValueGuard resGuard{resTag, resVal};
+    auto resView = value::getArrayView(resVal);
+
+    for (ArityType idx = 0; idx < arity; ++idx) {
+        auto [_, tag, val] = getFromStack(idx);
+        if (!value::isArray(tag)) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+
+        for (auto ae = value::ArrayEnumerator{tag, val}; !ae.atEnd(); ae.advance()) {
+            auto [elTag, elVal] = ae.getViewOfValue();
+            auto [copyTag, copyVal] = value::copyValue(elTag, elVal);
+            resView->push_back(copyTag, copyVal);
+        }
+    }
+
+    resGuard.reset();
+
+    return {true, resTag, resVal};
+}
+
 std::pair<value::TypeTags, value::Value> ByteCode::genericIsMember(value::TypeTags lhsTag,
                                                                    value::Value lhsVal,
                                                                    value::TypeTags rhsTag,
@@ -4695,6 +4718,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinRound(arity);
         case Builtin::concat:
             return builtinConcat(arity);
+        case Builtin::concatArrays:
+            return builtinConcatArrays(arity);
         case Builtin::isMember:
             return builtinIsMember(arity);
         case Builtin::collIsMember:

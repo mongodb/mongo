@@ -1126,99 +1126,46 @@ public:
             return;
         }
 
-        sbe::EExpression::Vector nullChecks;
-        std::vector<EvalStage> unionBranches;
-        std::vector<sbe::value::SlotVector> unionInputSlots;
-        sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projections;
+        auto binds = sbe::makeEs();
+        for (size_t i = 0; i < numChildren; ++i) {
+            binds.emplace_back(_context->popExpr());
+        }
+        std::reverse(binds.begin(), binds.end());
 
-        nullChecks.reserve(numChildren);
-        unionBranches.reserve(numChildren);
-        unionInputSlots.reserve(numChildren);
-        for (size_t idx = 0; idx < numChildren; ++idx) {
-            auto outputSlot = _context->state.slotId();
-            projections.emplace(outputSlot, _context->popExpr());
-            unionBranches.emplace_back();
-            unionInputSlots.emplace_back(sbe::makeSV(outputSlot));
-            nullChecks.emplace_back(generateNullOrMissing(outputSlot));
+        auto frameId = _context->state.frameId();
+        auto args = sbe::makeEs();
+
+        std::unique_ptr<sbe::EExpression> checkArgsForNull;
+        for (size_t i = 0; i < numChildren; ++i) {
+            sbe::EVariable argRef(frameId, i);
+            args.emplace_back(argRef.clone());
+
+            checkArgsForNull = checkArgsForNull ? makeBinaryOp(sbe::EPrimBinary::logicOr,
+                                                               std::move(checkArgsForNull),
+                                                               generateNullOrMissing(argRef))
+                                                : generateNullOrMissing(argRef);
         }
 
-        // Build a project to capture our child expressions.
-        std::reverse(std::begin(unionInputSlots), std::end(unionInputSlots));
-        auto project = makeProject(
-            _context->extractCurrentEvalStage(), std::move(projections), _context->planNodeId);
+        auto nullOrFailExpr =
+            sbe::makeE<sbe::EIf>(std::move(checkArgsForNull),
+                                 makeConstant(sbe::value::TypeTags::Null, 0),
+                                 sbe::makeE<sbe::EFail>(ErrorCodes::Error{5153400},
+                                                        "$concatArrays only supports arrays"));
 
-        // Build a union stage to consolidate array input branches into a stream.
-        auto unionOutputSlot = _context->state.slotId();
-        auto unionStage = makeUnion(std::move(unionBranches),
-                                    std::move(unionInputSlots),
-                                    sbe::makeSV(unionOutputSlot),
-                                    _context->planNodeId);
+        auto resultExpr = makeLocalBind(
+            _context->state.frameIdGenerator,
+            [&](sbe::EVariable concatArraysRef) {
+                // We optimize for the case where all of the args are arrays. If concatArrays()
+                // returns Nothing, then we deal with checking if any of the args are null and
+                // either returning null or raising an error.
+                return sbe::makeE<sbe::EIf>(makeFunction("exists", concatArraysRef.clone()),
+                                            concatArraysRef.clone(),
+                                            std::move(nullOrFailExpr));
+            },
+            sbe::makeE<sbe::EFunction>("concatArrays"_sd, std::move(args)));
 
-        auto collatorSlot = _context->state.data->env->getSlotIfExists("collator"_sd);
-
-        // Build a filter that will throw an 'EFail' if any element coming from the union is NOT
-        // an array.
-        auto filter = makeFilter<false, false>(
-            std::move(unionStage),
-            makeBinaryOp(sbe::EPrimBinary::logicOr,
-                         makeFunction("isArray", makeVariable(unionOutputSlot)),
-                         sbe::makeE<sbe::EFail>(ErrorCodes::Error{5153400},
-                                                "$concatArrays only supports arrays")),
-            _context->planNodeId);
-
-        // Build subtree to handle nulls. If an input is null, return null. Otherwise, unwind the
-        // input and concatenate it into an array using addToArray.
-        auto unwindEvalStage =
-            makeUnwind(std::move(filter), _context->state.slotIdGenerator, _context->planNodeId);
-        auto unwindSlot = unwindEvalStage.getOutSlots().front();
-
-        // Create a group stage to append all streamed elements into one array. This is the final
-        // output when the input consists entirely of arrays.
-        auto finalAddToArrayExpr = makeFunction("addToArray", makeVariable(unwindSlot));
-        auto finalGroupSlot = _context->state.slotId();
-        auto finalGroupStage =
-            makeHashAgg(std::move(unwindEvalStage),
-                        sbe::makeSV(),
-                        sbe::makeEM(finalGroupSlot, std::move(finalAddToArrayExpr)),
-                        collatorSlot,
-                        _context->state.allowDiskUse,
-                        _context->planNodeId);
-
-        // Returns true if any of our input expressions return null.
-        using iter_t = sbe::EExpression::Vector::iterator;
-        auto checkPartsForNull = std::accumulate(
-            std::move_iterator<iter_t>(nullChecks.begin() + 1),
-            std::move_iterator<iter_t>(nullChecks.end()),
-            std::move(nullChecks.front()),
-            [](auto&& acc, auto&& b) {
-                return makeBinaryOp(sbe::EPrimBinary::logicOr, std::move(acc), std::move(b));
-            });
-
-        // Create a branch stage to select between the branch that produces one null if any elements
-        // in the original input were null or missing, or otherwise select the branch that unwinds
-        // and concatenates elements into the output array.
-        auto [nullSlot, nullStage] = [&] {
-            auto outputSlot = _context->state.slotId();
-            auto nullEvalStage = makeProject(
-                {}, _context->planNodeId, outputSlot, makeConstant(sbe::value::TypeTags::Null, 0));
-            return std::make_pair(outputSlot, std::move(nullEvalStage));
-        }();
-
-        auto branchSlot = _context->state.slotId();
-        auto branchNullEvalStage = makeBranch(std::move(nullStage),
-                                              std::move(finalGroupStage),
-                                              std::move(checkPartsForNull),
-                                              sbe::makeSV(nullSlot),
-                                              sbe::makeSV(finalGroupSlot),
-                                              sbe::makeSV(branchSlot),
-                                              _context->planNodeId);
-
-        // Create nlj to connect outer project with inner branch that handles null input.
-        _context->pushExpr(branchSlot,
-                           makeLoopJoin(std::move(project),
-                                        std::move(branchNullEvalStage),
-                                        _context->planNodeId,
-                                        _context->getLexicalEnvironment()));
+        _context->pushExpr(
+            sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(resultExpr)));
     }
     void visit(const ExpressionCond* expr) final {
         visitConditionalExpression(expr);
@@ -2602,13 +2549,7 @@ public:
             exprs[--i] = makeConstant(rit->first);
         }
 
-        auto fieldSlot{_context->state.slotIdGenerator->generate()};
-        auto stage = makeProject(_context->extractCurrentEvalStage(),
-                                 _context->planNodeId,
-                                 fieldSlot,
-                                 sbe::makeE<sbe::EFunction>("newObj"_sd, std::move(exprs)));
-
-        _context->pushExpr(fieldSlot, std::move(stage));
+        _context->pushExpr(sbe::makeE<sbe::EFunction>("newObj"_sd, std::move(exprs)));
     }
     void visit(const ExpressionOr* expr) final {
         visitMultiBranchLogicExpression(expr, sbe::EPrimBinary::logicOr);
