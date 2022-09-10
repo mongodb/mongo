@@ -318,5 +318,40 @@ TEST(IndexKeyValidateTest, Background) {
         nullptr, fromjson("{key: {a: 1}, name: 'index', background: []}")));
 }
 
+TEST(IndexKeyValidateTest, RemoveUnkownFieldsFromIndexSpecs) {
+    ASSERT(fromjson("{key: {a: 1}, name: 'index'}")
+               .binaryEqual(index_key_validate::removeUnknownFields(
+                   NamespaceString("coll"),
+                   fromjson("{key: {a: 1}, name: 'index', safe: true, force: true}"))));
+}
+
+TEST(IndexKeyValidateTest, RepairIndexSpecs) {
+    ASSERT(fromjson("{key: {a: 1}, name: 'index'}")
+               .binaryEqual(index_key_validate::repairIndexSpec(
+                   NamespaceString("coll"),
+                   fromjson("{key: {a: 1}, name: 'index', safe: true, force: true}"))));
+
+    ASSERT(fromjson("{key: {a: 1}, name: 'index', sparse: true}")
+               .binaryEqual(index_key_validate::repairIndexSpec(
+                   NamespaceString("coll"),
+                   fromjson("{key: {a: 1}, name: 'index', sparse: 'true'}"))));
+
+    ASSERT(fromjson("{key: {a: 1}, name: 'index', background: true}")
+               .binaryEqual(index_key_validate::repairIndexSpec(
+                   NamespaceString("coll"),
+                   fromjson("{key: {a: 1}, name: 'index', background: '1'}"))));
+
+    ASSERT(fromjson("{key: {a: 1}, name: 'index', sparse: true, background: true}")
+               .binaryEqual(index_key_validate::repairIndexSpec(
+                   NamespaceString("coll"),
+                   fromjson("{key: {a: 1}, name: 'index', sparse: 'true', background: '1'}"))));
+
+    ASSERT(fromjson("{key: {a: 1}, name: 'index', sparse: true, background: true}")
+               .binaryEqual(index_key_validate::repairIndexSpec(
+                   NamespaceString("coll"),
+                   fromjson("{key: {a: 1}, name: 'index', sparse: 'true', background: '1', safe: "
+                            "true, force: true}"))));
+}
+
 }  // namespace
 }  // namespace mongo
