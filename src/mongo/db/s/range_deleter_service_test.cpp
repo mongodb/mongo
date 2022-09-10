@@ -31,7 +31,6 @@
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/operation_sharding_state.h"
 
 namespace mongo {
@@ -586,61 +585,6 @@ TEST_F(RangeDeleterServiceTest,
     auto overlappingRangeFutureWhenDisabled = rds->getOverlappingRangeDeletionsFuture(
         uuidCollA, taskWithOngoingQueries->getTask().getRange());
     ASSERT(overlappingRangeFutureWhenDisabled.isReady());
-}
-
-TEST_F(RangeDeleterServiceTest, RescheduleRangeDeletionTasksOnStepUp) {
-    PseudoRandom random(SecureRandom().nextInt64());
-    auto rds = RangeDeleterService::get(opCtx);
-
-    // Trigger step-down
-    rds->onStepDown();
-
-    // Random number of range deletion documents to generate (minimum 1, maximum 20).
-    int nRangeDeletionTasks = random.nextInt32(20) + 1;
-
-    PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-
-    // Generate and persist range deleter tasks (some pending, some non-pending, some non-pending &&
-    // processing)
-    int nPending = 0, nNonPending = 0, nNonPendingAndProcessing = 0;
-    int minBound = 0;
-    for (int i = 0; i < nRangeDeletionTasks; i++) {
-        auto rangeDeletionTask = createRangeDeletionTask(
-            uuidCollA, BSON("a" << minBound), BSON("a" << minBound + 10), CleanWhenEnum::kDelayed);
-        minBound += 10;
-
-        auto rand = random.nextInt32() % 3;
-        if (rand == 0) {
-            // Pending range deletion task
-            rangeDeletionTask.setPending(true);
-            nPending++;
-        } else if (rand == 1) {
-            // Non-pending range deletion task
-            rangeDeletionTask.setPending(false);
-            nNonPending++;
-        } else if (rand == 2) {
-            // Non-pending and processing range deletion task
-            rangeDeletionTask.setPending(false);
-            rangeDeletionTask.setProcessing(true);
-            nNonPendingAndProcessing++;
-        }
-
-        store.add(opCtx, rangeDeletionTask);
-    }
-
-    // Trigger step-up
-    rds->onStepUpComplete(opCtx, 0L);
-
-    // Check that all non-pending tasks are being rescheduled
-    while (true) {
-        try {
-            ASSERT_EQ(nNonPending + nNonPendingAndProcessing,
-                      rds->getNumRangeDeletionTasksForCollection(uuidCollA));
-            break;
-        } catch (const ExceptionFor<ErrorCodes::NotYetInitialized>&) {
-            // Retry as long as range deletion tasks are being resubmitted
-        }
-    }
 }
 
 }  // namespace mongo
