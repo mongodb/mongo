@@ -369,8 +369,7 @@ bool ColumnScanStage::checkFilter(CellView cell, size_t filterIndex, const PathV
         // for other locations in this function when the predicate is evaluated immediately after
         // setting the slot.
         auto [tag, val] = translatedCell.nextValue();
-        auto [tagCopy, valCopy] = sbe::value::copyValue(tag, val);
-        _filterInputAccessors[filterIndex].reset(true /*owned*/, tagCopy, valCopy);
+        _filterInputAccessors[filterIndex].reset(tag, val);
         return _bytecode.runPredicate(_filterExprsCode[filterIndex].get());
     } else {
         ArrInfoReader arrInfoReader{translatedCell.arrInfo};
@@ -410,9 +409,7 @@ bool ColumnScanStage::checkFilter(CellView cell, size_t filterIndex, const PathV
                     for (size_t i = 0; i < repeats + 1; i++) {
                         auto [tag, val] = translatedCell.nextValue();
                         if (depth == 0) {
-                            auto [tagCopy, valCopy] = sbe::value::copyValue(tag, val);
-                            _filterInputAccessors[filterIndex].reset(
-                                true /*owned*/, tagCopy, valCopy);
+                            _filterInputAccessors[filterIndex].reset(tag, val);
                             if (_bytecode.runPredicate(_filterExprsCode[filterIndex].get())) {
                                 return true;
                             }
@@ -448,8 +445,7 @@ bool ColumnScanStage::checkFilter(CellView cell, size_t filterIndex, const PathV
             // the value iterator if the values are too deep.
             while (translatedCell.moreValues()) {
                 auto [tag, val] = translatedCell.nextValue();
-                auto [tagCopy, valCopy] = sbe::value::copyValue(tag, val);
-                _filterInputAccessors[filterIndex].reset(true /*owned*/, tagCopy, valCopy);
+                _filterInputAccessors[filterIndex].reset(tag, val);
                 if (_bytecode.runPredicate(_filterExprsCode[filterIndex].get())) {
                     return true;
                 }

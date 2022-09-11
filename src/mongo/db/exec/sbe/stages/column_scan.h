@@ -275,7 +275,7 @@ private:
     std::unique_ptr<value::OwnedValueAccessor> _reconstructedRecordAccessor;
     std::unique_ptr<value::OwnedValueAccessor> _recordIdAccessor;
     std::unique_ptr<value::OwnedValueAccessor> _rowStoreAccessor;
-    std::vector<value::OwnedValueAccessor> _filterInputAccessors;
+    std::vector<value::ViewOfValueAccessor> _filterInputAccessors;
     value::SlotAccessorMap _filterInputAccessorsMap;
 
     vm::ByteCode _bytecode;
