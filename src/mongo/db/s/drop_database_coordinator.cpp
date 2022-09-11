@@ -89,10 +89,10 @@ public:
         // directly
         DatabaseName databaseName(boost::none, _dbName);
         Lock::DBLock dbLock(_opCtx, databaseName, MODE_X);
-        auto dss = DatabaseShardingState::get(_opCtx, _dbName);
-        auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(_opCtx, dss);
-        dss->enterCriticalSectionCatchUpPhase(_opCtx, dssLock, _reason);
-        dss->enterCriticalSectionCommitPhase(_opCtx, dssLock, _reason);
+        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
+            _opCtx, databaseName, DSSAcquisitionMode::kExclusive);
+        scopedDss->enterCriticalSectionCatchUpPhase(_opCtx, _reason);
+        scopedDss->enterCriticalSectionCommitPhase(_opCtx, _reason);
     }
 
     ~ScopedDatabaseCriticalSection() {
@@ -101,8 +101,9 @@ public:
         // directly
         DatabaseName databaseName(boost::none, _dbName);
         Lock::DBLock dbLock(_opCtx, databaseName, MODE_X);
-        auto dss = DatabaseShardingState::get(_opCtx, _dbName);
-        dss->exitCriticalSection(_opCtx, _reason);
+        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
+            _opCtx, databaseName, DSSAcquisitionMode::kExclusive);
+        scopedDss->exitCriticalSection(_opCtx, _reason);
     }
 
 private:

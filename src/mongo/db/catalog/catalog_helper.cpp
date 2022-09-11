@@ -46,17 +46,14 @@ void assertMatchingDbVersion(OperationContext* opCtx, const StringData& dbName) 
     }
 
     {
-        const auto dss = DatabaseShardingState::getSharedForLockFreeReads(opCtx, dbName);
-        auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss.get());
-
-        const auto critSecSignal = dss->getCriticalSectionSignal(
+        auto scopedDss = DatabaseShardingState::acquire(opCtx, dbName, DSSAcquisitionMode::kShared);
+        const auto critSecSignal = scopedDss->getCriticalSectionSignal(
             opCtx->lockState()->isWriteLocked() ? ShardingMigrationCriticalSection::kWrite
-                                                : ShardingMigrationCriticalSection::kRead,
-            dssLock);
+                                                : ShardingMigrationCriticalSection::kRead);
         uassert(
             StaleDbRoutingVersion(dbName.toString(), *receivedVersion, boost::none, critSecSignal),
             str::stream() << "The critical section for the database " << dbName
-                          << " is acquired with reason: " << dss->getCriticalSectionReason(dssLock),
+                          << " is acquired with reason: " << scopedDss->getCriticalSectionReason(),
             !critSecSignal);
     }
 

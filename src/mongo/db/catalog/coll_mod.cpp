@@ -27,13 +27,9 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/catalog/coll_mod.h"
 
 #include <boost/optional.hpp>
-#include <memory>
 
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/coll_mod_index.h"
@@ -67,30 +63,25 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-
 namespace mongo {
-
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangAfterDatabaseLock);
 MONGO_FAIL_POINT_DEFINE(hangAfterCollModIndexUniqueFullIndexScan);
 MONGO_FAIL_POINT_DEFINE(hangAfterCollModIndexUniqueReleaseIXLock);
 
-void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const& nss) {
-    auto dss = DatabaseShardingState::get(opCtx, nss.db().toString());
-    if (!dss) {
-        return;
-    }
-
-    auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
+void assertNoMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const& nss) {
     try {
-        const auto collDesc =
-            CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx);
-        if (!collDesc.isSharded()) {
-            auto mpsm = dss->getMovePrimarySourceManager(dssLock);
+        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
+            opCtx, nss.dbName(), DSSAcquisitionMode::kShared);
 
-            if (mpsm) {
-                LOGV2(4945200, "assertMovePrimaryInProgress", "namespace"_attr = nss.toString());
+        auto css = CollectionShardingState::get(opCtx, nss);
+        auto collDesc = css->getCollectionDescription(opCtx);
+        collDesc.throwIfReshardingInProgress(nss);
+
+        if (!collDesc.isSharded()) {
+            if (scopedDss->isMovePrimaryInProgress()) {
+                LOGV2(4945200, "assertNoMovePrimaryInProgress", "namespace"_attr = nss.toString());
 
                 uasserted(ErrorCodes::MovePrimaryInProgress,
                           "movePrimary is in progress for namespace " + nss.toString());
@@ -746,13 +737,9 @@ Status _collModInternal(OperationContext* opCtx,
     // This can kill all cursors so don't allow running it while a background operation is in
     // progress.
     if (coll) {
-        assertMovePrimaryInProgress(opCtx, nss);
+        assertNoMovePrimaryInProgress(opCtx, nss);
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(coll->uuid());
-        CollectionShardingState::get(opCtx, nss)
-            ->getCollectionDescription(opCtx)
-            .throwIfReshardingInProgress(nss);
     }
-
 
     // If db/collection/view does not exist, short circuit and return.
     if (!db || (!coll && !view)) {

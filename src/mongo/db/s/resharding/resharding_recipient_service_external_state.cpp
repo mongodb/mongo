@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
 
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/write_concern_options.h"
@@ -41,7 +41,6 @@
 #include "mongo/s/stale_shard_version_helpers.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
-
 
 namespace mongo {
 

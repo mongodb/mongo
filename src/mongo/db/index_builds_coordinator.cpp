@@ -27,9 +27,10 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/index_builds_coordinator.h"
 
+#include <boost/filesystem/operations.hpp>
+#include <boost/iterator/transform_iterator.hpp>
 #include <fmt/format.h>
 
 #include "mongo/db/catalog/clustered_collection_util.h"
@@ -67,11 +68,7 @@
 #include "mongo/util/scoped_counter.h"
 #include "mongo/util/str.h"
 
-#include <boost/filesystem/operations.hpp>
-#include <boost/iterator/transform_iterator.hpp>
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
-
 
 namespace mongo {
 

@@ -79,7 +79,7 @@ bool isMigratingWithCSRLock(CollectionShardingRuntime* csr,
     return cloner && cloner->isDocumentInMigratingChunk(docToDelete);
 }
 
-void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const& nss) {
+void assertNoMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const& nss) {
     if (!nss.isNormalCollection() && nss.coll() != "system.views" &&
         !nss.isTimeseriesBucketsCollection()) {
         return;
@@ -88,16 +88,11 @@ void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const&
     // TODO SERVER-58222: evaluate whether this is safe or whether acquiring the lock can block.
     AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
     Lock::DBLock dblock(opCtx, nss.dbName(), MODE_IS);
-    auto dss = DatabaseShardingState::get(opCtx, nss.db().toString());
-    if (!dss) {
-        return;
-    }
 
-    auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
-    auto mpsm = dss->getMovePrimarySourceManager(dssLock);
-
-    if (mpsm) {
-        LOGV2(4908600, "assertMovePrimaryInProgress", "namespace"_attr = nss.toString());
+    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
+        opCtx, nss.dbName(), DSSAcquisitionMode::kShared);
+    if (scopedDss->isMovePrimaryInProgress()) {
+        LOGV2(4908600, "assertNoMovePrimaryInProgress", "namespace"_attr = nss.toString());
 
         uasserted(ErrorCodes::MovePrimaryInProgress,
                   "movePrimary is in progress for namespace " + nss.toString());
@@ -139,7 +134,7 @@ void OpObserverShardingImpl::shardObserveInsertOp(OperationContext* opCtx,
 
     auto metadata = csr->getCurrentMetadataIfKnown();
     if (!metadata || !metadata->isSharded()) {
-        assertMovePrimaryInProgress(opCtx, nss);
+        assertNoMovePrimaryInProgress(opCtx, nss);
         return;
     }
 
@@ -176,7 +171,7 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
 
     auto metadata = csr->getCurrentMetadataIfKnown();
     if (!metadata || !metadata->isSharded()) {
-        assertMovePrimaryInProgress(opCtx, nss);
+        assertNoMovePrimaryInProgress(opCtx, nss);
         return;
     }
 
@@ -212,7 +207,7 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
 
     auto metadata = csr->getCurrentMetadataIfKnown();
     if (!metadata || !metadata->isSharded()) {
-        assertMovePrimaryInProgress(opCtx, nss);
+        assertNoMovePrimaryInProgress(opCtx, nss);
         return;
     }
 

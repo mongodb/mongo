@@ -26,23 +26,19 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
 #pragma once
 
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/repl/primary_only_service.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
-#include "mongo/db/s/sharding_state_lock.h"
-#include "mongo/db/shard_id.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_manager.h"

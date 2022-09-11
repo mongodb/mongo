@@ -34,6 +34,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state_recovery.h"
@@ -104,10 +105,9 @@ Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
         AutoGetDb autoDb(opCtx, getNss().dbName(), MODE_X);
         invariant(autoDb.ensureDbExists(opCtx), getNss().toString());
 
-        auto dss = DatabaseShardingState::get(opCtx, getNss().toString());
-        auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
-
-        dss->setMovePrimarySourceManager(opCtx, this, dssLock);
+        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
+            opCtx, getNss().dbName(), DSSAcquisitionMode::kExclusive);
+        scopedDss->setMovePrimarySourceManager(opCtx, this);
     }
 
     _state = kCloning;
@@ -173,11 +173,11 @@ Status MovePrimarySourceManager::enterCriticalSection(OperationContext* opCtx) {
                                     << " was dropped during the movePrimary operation.");
         }
 
-        auto dss = DatabaseShardingState::get(opCtx, getNss().toString());
-        auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
+        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
+            opCtx, getNss().dbName(), DSSAcquisitionMode::kExclusive);
 
         // IMPORTANT: After this line, the critical section is in place and needs to be signaled
-        dss->enterCriticalSectionCatchUpPhase(opCtx, dssLock, _critSecReason);
+        scopedDss->enterCriticalSectionCatchUpPhase(opCtx, _critSecReason);
     }
 
     _state = kCriticalSection;
@@ -224,12 +224,12 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
                                     << " was dropped during the movePrimary operation.");
         }
 
-        auto dss = DatabaseShardingState::get(opCtx, getNss().toString());
-        auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
+        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
+            opCtx, getNss().dbName(), DSSAcquisitionMode::kExclusive);
 
         // Read operations must begin to wait on the critical section just before we send the
         // commit operation to the config server
-        dss->enterCriticalSectionCommitPhase(opCtx, dssLock, _critSecReason);
+        scopedDss->enterCriticalSectionCommitPhase(opCtx, _critSecReason);
 
         expectedDbVersion = DatabaseHolder::get(opCtx)->getDbVersion(opCtx, _dbname);
     }
@@ -505,12 +505,13 @@ void MovePrimarySourceManager::_cleanup(OperationContext* opCtx) {
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());
         AutoGetDb autoDb(opCtx, getNss().dbName(), MODE_IX);
 
-        auto dss = DatabaseShardingState::get(opCtx, getNss().db());
-        dss->clearMovePrimarySourceManager(opCtx);
-        DatabaseHolder::get(opCtx)->clearDbInfo(opCtx,
-                                                DatabaseName(boost::none, getNss().toString()));
+        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
+            opCtx, getNss().dbName(), DSSAcquisitionMode::kExclusive);
+        scopedDss->clearMovePrimarySourceManager(opCtx);
+        DatabaseHolder::get(opCtx)->clearDbInfo(opCtx, getNss().dbName());
+
         // Leave the critical section if we're still registered.
-        dss->exitCriticalSection(opCtx, _critSecReason);
+        scopedDss->exitCriticalSection(opCtx, _critSecReason);
     }
 
     if (_state == kCriticalSection || _state == kCloneCompleted) {

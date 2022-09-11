@@ -27,21 +27,15 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/database_sharding_state.h"
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/database_version.h"
-#include "mongo/s/stale_exception.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 namespace {
@@ -55,7 +49,7 @@ public:
 
     DatabaseShardingStateMap() {}
 
-    std::shared_ptr<DatabaseShardingState> getOrCreate(const StringData dbName) {
+    DatabaseShardingState* getOrCreate(const DatabaseName& dbName) {
         stdx::lock_guard<Latch> lg(_mutex);
 
         auto it = _databases.find(dbName);
@@ -66,13 +60,13 @@ public:
             it = std::move(inserted.first);
         }
 
-        return it->second;
+        return it->second.get();
     }
 
 private:
-    using DatabasesMap = StringMap<std::shared_ptr<DatabaseShardingState>>;
-
     Mutex _mutex = MONGO_MAKE_LATCH("DatabaseShardingStateMap::_mutex");
+
+    using DatabasesMap = stdx::unordered_map<DatabaseName, std::unique_ptr<DatabaseShardingState>>;
     DatabasesMap _databases;
 };
 
@@ -81,54 +75,55 @@ const ServiceContext::Decoration<DatabaseShardingStateMap> DatabaseShardingState
 
 }  // namespace
 
-DatabaseShardingState::DatabaseShardingState(const StringData dbName)
-    : _dbName(dbName.toString()) {}
+DatabaseShardingState::ScopedDatabaseShardingState::ScopedDatabaseShardingState(
+    OperationContext* opCtx, const DatabaseName& dbName, LockMode mode)
+    : _lock(nullptr, opCtx->lockState(), ResourceId(RESOURCE_MUTEX, dbName), mode),
+      _dss(DatabaseShardingStateMap::get(opCtx->getServiceContext()).getOrCreate(dbName)) {}
 
-DatabaseShardingState* DatabaseShardingState::get(OperationContext* opCtx,
-                                                  const StringData dbName) {
-    // db lock must be held to have a reference to the database sharding state
-    // TODO SERVER-63706 Use dbName directly
-    dassert(opCtx->lockState()->isDbLockedForMode(DatabaseName(boost::none, dbName), MODE_IS));
-
-    auto& databasesMap = DatabaseShardingStateMap::get(opCtx->getServiceContext());
-    return databasesMap.getOrCreate(dbName).get();
+DatabaseShardingState::ScopedDatabaseShardingState::ScopedDatabaseShardingState(
+    ScopedDatabaseShardingState&& other)
+    : _lock(std::move(other._lock)), _dss(other._dss) {
+    other._dss = nullptr;
 }
 
-std::shared_ptr<DatabaseShardingState> DatabaseShardingState::getSharedForLockFreeReads(
-    OperationContext* opCtx, const StringData dbName) {
-    auto& databasesMap = DatabaseShardingStateMap::get(opCtx->getServiceContext());
-    return databasesMap.getOrCreate(dbName);
+DatabaseShardingState::ScopedDatabaseShardingState::~ScopedDatabaseShardingState() = default;
+
+DatabaseShardingState::DatabaseShardingState(const DatabaseName& dbName) : _dbName(dbName) {}
+
+DatabaseShardingState::ScopedDatabaseShardingState DatabaseShardingState::assertDbLockedAndAcquire(
+    OperationContext* opCtx, const DatabaseName& dbName, DSSAcquisitionMode mode) {
+    dassert(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IS));
+
+    return acquire(opCtx, dbName, mode);
+}
+
+DatabaseShardingState::ScopedDatabaseShardingState DatabaseShardingState::acquire(
+    OperationContext* opCtx, const DatabaseName& dbName, DSSAcquisitionMode mode) {
+    return ScopedDatabaseShardingState(
+        opCtx, dbName, mode == DSSAcquisitionMode::kShared ? MODE_IS : MODE_X);
 }
 
 void DatabaseShardingState::enterCriticalSectionCatchUpPhase(OperationContext* opCtx,
-                                                             DSSLock& dssLock,
                                                              const BSONObj& reason) {
-    invariant(opCtx->lockState()->isDbLockedForMode(DatabaseName(boost::none, _dbName), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_X));
     _critSec.enterCriticalSectionCatchUpPhase(reason);
 
-    cancelDbMetadataRefresh(dssLock);
+    cancelDbMetadataRefresh();
 }
 
 void DatabaseShardingState::enterCriticalSectionCommitPhase(OperationContext* opCtx,
-                                                            DSSLock&,
                                                             const BSONObj& reason) {
-    invariant(opCtx->lockState()->isDbLockedForMode(DatabaseName(boost::none, _dbName), MODE_X));
+    invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_X));
     _critSec.enterCriticalSectionCommitPhase(reason);
 }
 
 void DatabaseShardingState::exitCriticalSection(OperationContext* opCtx, const BSONObj& reason) {
-    const auto dssLock = DSSLock::lockExclusive(opCtx, this);
     _critSec.exitCriticalSection(reason);
 }
 
-MovePrimarySourceManager* DatabaseShardingState::getMovePrimarySourceManager(DSSLock&) {
-    return _sourceMgr;
-}
-
 void DatabaseShardingState::setMovePrimarySourceManager(OperationContext* opCtx,
-                                                        MovePrimarySourceManager* sourceMgr,
-                                                        DSSLock&) {
-    invariant(opCtx->lockState()->isDbLockedForMode(DatabaseName(boost::none, _dbName), MODE_X));
+                                                        MovePrimarySourceManager* sourceMgr) {
+    invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_X));
     invariant(sourceMgr);
     invariant(!_sourceMgr);
 
@@ -136,29 +131,26 @@ void DatabaseShardingState::setMovePrimarySourceManager(OperationContext* opCtx,
 }
 
 void DatabaseShardingState::clearMovePrimarySourceManager(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isDbLockedForMode(DatabaseName(boost::none, _dbName), MODE_IX));
-    const auto dssLock = DSSLock::lockExclusive(opCtx, this);
+    invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_IX));
     _sourceMgr = nullptr;
 }
 
 void DatabaseShardingState::setDbMetadataRefreshFuture(SharedSemiFuture<void> future,
-                                                       CancellationSource cancellationSource,
-                                                       const DSSLock&) {
+                                                       CancellationSource cancellationSource) {
     invariant(!_dbMetadataRefresh);
     _dbMetadataRefresh.emplace(std::move(future), std::move(cancellationSource));
 }
 
-boost::optional<SharedSemiFuture<void>> DatabaseShardingState::getDbMetadataRefreshFuture(
-    const DSSLock&) const {
+boost::optional<SharedSemiFuture<void>> DatabaseShardingState::getDbMetadataRefreshFuture() const {
     return _dbMetadataRefresh ? boost::optional<SharedSemiFuture<void>>(_dbMetadataRefresh->future)
                               : boost::none;
 }
 
-void DatabaseShardingState::resetDbMetadataRefreshFuture(const DSSLock&) {
+void DatabaseShardingState::resetDbMetadataRefreshFuture() {
     _dbMetadataRefresh = boost::none;
 }
 
-void DatabaseShardingState::cancelDbMetadataRefresh(const DSSLock&) {
+void DatabaseShardingState::cancelDbMetadataRefresh() {
     if (_dbMetadataRefresh) {
         _dbMetadataRefresh->cancellationSource.cancel();
     }

@@ -35,6 +35,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_progress_gen.h"
 #include "mongo/db/s/resharding/resharding_recipient_service_external_state.h"
 #include "mongo/db/s/resharding/resharding_util.h"

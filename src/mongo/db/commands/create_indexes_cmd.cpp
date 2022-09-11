@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include <string>
 #include <vector>
 
@@ -77,10 +74,9 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
-
 namespace mongo {
-
 namespace {
+
 // This failpoint simulates a WriteConflictException during createIndexes where the collection is
 // implicitly created.
 MONGO_FAIL_POINT_DEFINE(createIndexesWriteConflict);
@@ -313,25 +309,20 @@ bool indexesAlreadyExist(OperationContext* opCtx,
     return true;
 }
 
-/**
- * Checks database sharding state. Throws exception on error.
- */
-void checkDatabaseShardingState(OperationContext* opCtx, const NamespaceString& ns) {
-    auto dss = DatabaseShardingState::get(opCtx, ns.db());
-    auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
-
-    Lock::CollectionLock collLock(opCtx, ns, MODE_IS);
+void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceString& nss) {
     try {
-        const auto collDesc =
-            CollectionShardingState::get(opCtx, ns)->getCollectionDescription(opCtx);
-        if (!collDesc.isSharded()) {
-            auto mpsm = dss->getMovePrimarySourceManager(dssLock);
+        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
+            opCtx, nss.dbName(), DSSAcquisitionMode::kShared);
 
-            if (mpsm) {
-                LOGV2(4909200, "assertMovePrimaryInProgress", "namespace"_attr = ns.toString());
+        Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
+
+        auto collDesc = CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx);
+        if (!collDesc.isSharded()) {
+            if (scopedDss->isMovePrimaryInProgress()) {
+                LOGV2(4909200, "assertNoMovePrimaryInProgress", "namespace"_attr = nss.toString());
 
                 uasserted(ErrorCodes::MovePrimaryInProgress,
-                          "movePrimary is in progress for namespace " + ns.toString());
+                          "movePrimary is in progress for namespace " + nss.toString());
             }
         }
     } catch (const DBException& ex) {
@@ -492,8 +483,8 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
     CreateIndexesReply reply;
     {
         AutoGetDb autoDb(opCtx, ns.db(), MODE_IX);
+        assertNoMovePrimaryInProgress(opCtx, ns);
 
-        checkDatabaseShardingState(opCtx, ns);
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
             uasserted(ErrorCodes::NotWritablePrimary,
                       str::stream() << "Not primary while creating indexes in " << ns.ns());

@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/catalog/drop_indexes.h"
 
 #include <boost/algorithm/string/join.hpp>
@@ -54,7 +51,6 @@
 #include "mongo/util/overloaded_visitor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 
 namespace mongo {
 namespace {
@@ -366,21 +362,21 @@ void dropReadyIndexes(OperationContext* opCtx,
     }
 }
 
-void assertMovePrimaryInProgress(OperationContext* opCtx, const NamespaceString& ns) {
-    auto dss = DatabaseShardingState::get(opCtx, ns.db());
-    auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
-
+void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceString& nss) {
     try {
-        const auto collDesc =
-            CollectionShardingState::get(opCtx, ns)->getCollectionDescription(opCtx);
-        if (!collDesc.isSharded()) {
-            auto mpsm = dss->getMovePrimarySourceManager(dssLock);
+        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
+            opCtx, nss.dbName(), DSSAcquisitionMode::kShared);
 
-            if (mpsm) {
-                LOGV2(4976500, "assertMovePrimaryInProgress", "namespace"_attr = ns.toString());
+        auto css = CollectionShardingState::get(opCtx, nss);
+        auto collDesc = css->getCollectionDescription(opCtx);
+        collDesc.throwIfReshardingInProgress(nss);
+
+        if (!collDesc.isSharded()) {
+            if (scopedDss->isMovePrimaryInProgress()) {
+                LOGV2(4976500, "assertNoMovePrimaryInProgress", "namespace"_attr = nss.toString());
 
                 uasserted(ErrorCodes::MovePrimaryInProgress,
-                          "movePrimary is in progress for namespace " + ns.toString());
+                          "movePrimary is in progress for namespace " + nss.toString());
             }
         }
     } catch (const DBException& ex) {
@@ -492,10 +488,7 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
         }
 
         if (!abortAgain) {
-            assertMovePrimaryInProgress(opCtx, collNs);
-            CollectionShardingState::get(opCtx, collNs)
-                ->getCollectionDescription(opCtx)
-                .throwIfReshardingInProgress(collNs);
+            assertNoMovePrimaryInProgress(opCtx, collNs);
             break;
         }
     }

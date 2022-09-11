@@ -112,18 +112,11 @@ Status validateDBNameForWindows(StringData dbname) {
     return Status::OK();
 }
 
-void assertMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const& nss) {
-    invariant(opCtx->lockState()->isDbLockedForMode(nss.dbName(), MODE_IS));
-    auto dss = DatabaseShardingState::get(opCtx, nss.dbName().toStringWithTenantId());
-    if (!dss) {
-        return;
-    }
-
-    auto dssLock = DatabaseShardingState::DSSLock::lockShared(opCtx, dss);
-    auto mpsm = dss->getMovePrimarySourceManager(dssLock);
-
-    if (mpsm) {
-        LOGV2(4909100, "assertMovePrimaryInProgress", "namespace"_attr = nss.toString());
+void assertNoMovePrimaryInProgress(OperationContext* opCtx, NamespaceString const& nss) {
+    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
+        opCtx, nss.dbName(), DSSAcquisitionMode::kShared);
+    if (scopedDss->isMovePrimaryInProgress()) {
+        LOGV2(4909100, "assertNoMovePrimaryInProgress", "namespace"_attr = nss.toString());
 
         uasserted(ErrorCodes::MovePrimaryInProgress,
                   "movePrimary is in progress for namespace " + nss.toString());
@@ -666,7 +659,7 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
         return Status(ErrorCodes::NamespaceNotFound, "collection not found to rename");
     }
 
-    assertMovePrimaryInProgress(opCtx, fromNss);
+    assertNoMovePrimaryInProgress(opCtx, fromNss);
 
     LOGV2(20319,
           "renameCollection: renaming collection {collToRename_uuid} from {fromNss} to {toNss}",
@@ -827,7 +820,7 @@ Collection* DatabaseImpl::createCollection(OperationContext* opCtx,
         });
 
     _checkCanCreateCollection(opCtx, nss, optionsWithUUID);
-    assertMovePrimaryInProgress(opCtx, nss);
+    assertNoMovePrimaryInProgress(opCtx, nss);
     audit::logCreateCollection(opCtx->getClient(), nss);
 
     LOGV2(20320,

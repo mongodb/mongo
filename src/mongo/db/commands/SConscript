@@ -309,7 +309,7 @@ env.Library(
         "analyze_cmd.cpp",
         "count_cmd.cpp",
         "create_command.cpp",
-        "create_indexes.cpp",
+        "create_indexes_cmd.cpp",
         "current_op.cpp",
         "dbcommands.cpp",
         "distinct.cpp",

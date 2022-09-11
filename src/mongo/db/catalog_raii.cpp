@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/catalog_raii.h"
 
 #include "mongo/db/catalog/catalog_helper.h"
@@ -44,13 +41,11 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-
-MONGO_FAIL_POINT_DEFINE(hangBeforeAutoGetCollectionLockFreeShardedStateAccess);
-
 namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(setAutoGetCollectionWait);
+MONGO_FAIL_POINT_DEFINE(hangBeforeAutoGetCollectionLockFreeShardedStateAccess);
 
 /**
  * Performs some sanity checks on the collection and database.

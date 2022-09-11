@@ -415,12 +415,14 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
             // block.
             AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
 
-            AutoGetDb autoDb(opCtx, DatabaseName(boost::none, db), MODE_X);
-            DatabaseHolder::get(opCtx)->clearDbInfo(opCtx, DatabaseName(boost::none, db));
+            DatabaseName dbName(boost::none, db);
 
-            auto* dss = DatabaseShardingState::get(opCtx, db);
-            const auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
-            dss->cancelDbMetadataRefresh(dssLock);
+            AutoGetDb autoDb(opCtx, dbName, MODE_X);
+            DatabaseHolder::get(opCtx)->clearDbInfo(opCtx, dbName);
+
+            auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
+                opCtx, dbName, DSSAcquisitionMode::kExclusive);
+            scopedDss->cancelDbMetadataRefresh();
         }
     }
 
@@ -532,12 +534,14 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
         // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can block.
         AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
 
-        AutoGetDb autoDb(opCtx, DatabaseName(boost::none, deletedDatabase), MODE_X);
-        DatabaseHolder::get(opCtx)->clearDbInfo(opCtx, DatabaseName(boost::none, deletedDatabase));
+        DatabaseName dbName(boost::none, deletedDatabase);
 
-        auto* dss = DatabaseShardingState::get(opCtx, deletedDatabase);
-        const auto dssLock = DatabaseShardingState::DSSLock::lockExclusive(opCtx, dss);
-        dss->cancelDbMetadataRefresh(dssLock);
+        AutoGetDb autoDb(opCtx, dbName, MODE_X);
+        DatabaseHolder::get(opCtx)->clearDbInfo(opCtx, dbName);
+
+        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
+            opCtx, dbName, DSSAcquisitionMode::kExclusive);
+        scopedDss->cancelDbMetadataRefresh();
     }
 
     if (nss == NamespaceString::kServerConfigurationNamespace) {

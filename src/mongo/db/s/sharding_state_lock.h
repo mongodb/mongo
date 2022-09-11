@@ -41,7 +41,6 @@ namespace mongo {
  */
 template <class ShardingState>
 class ShardingStateLock {
-
 public:
     /**
      * Locks the sharding state object with the sharding state object's ResourceMutex in MODE_IS.

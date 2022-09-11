@@ -27,14 +27,12 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 
 #include <fmt/format.h>
 
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
@@ -44,7 +42,6 @@
 #include "mongo/stdx/unordered_set.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
-
 
 namespace mongo {
 namespace resharding {
