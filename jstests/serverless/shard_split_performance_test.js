@@ -7,12 +7,6 @@
 load("jstests/serverless/libs/basic_serverless_test.js");
 load("jstests/replsets/rslib.js");
 
-const kBlockStart = "Entering 'blocking' state.";
-const kReconfig = "Applying the split config";
-const kWaitForRecipients = "Waiting for recipient to accept the split.";
-const kEndMsg = "Shard split decision reached";
-const kMoveChunkLog = "ctx\":\"MoveChunk\",\"msg\":\"Exiting commit critical section";
-
 function runOneMoveChunk() {
     'use strict';
 
@@ -39,6 +33,7 @@ function runOneMoveChunk() {
     assert.commandWorked(mongos.adminCommand({moveChunk: ns, find: keyDoc, to: shard1}));
     assert.eq(shard1, mongos.getDB('config').chunks.findOne({_id: chunkId}).shard);
 
+    const kMoveChunkLog = "ctx\":\"MoveChunk\",\"msg\":\"Exiting commit critical section";
     const moveMsg = checkLog.getLogMessage(st.shard0, kMoveChunkLog);
     assert(moveMsg);
 
@@ -80,22 +75,58 @@ function runOneSplit() {
     test.removeRecipientNodesFromDonor();
     assertMigrationState(test.donor.getPrimary(), operation.migrationId, "committed");
 
-    const blockTS = extractTs(checkLog.getLogMessage(primary, kBlockStart));
-    const reconfigTS = extractTs(checkLog.getLogMessage(primary, kReconfig));
-    const waitForRecipientsTS = extractTs(checkLog.getLogMessage(primary, kWaitForRecipients));
-    const endTS = extractTs(checkLog.getLogMessage(primary, kEndMsg));
+    const kEnterBlockingState = "Entering 'blocking' state.";
+    const kWaitingForCatchup = "Waiting for recipient nodes to reach block timestamp.";
+    const kApplyingSplitConfig = "Applying the split config.";
+    const kTriggeringRecipientElection =
+        "Triggering an election after recipient has accepted the split.";
+    const kWaitForMajorityWrite = "Waiting for majority commit on recipient primary";
+    const kCommitted = "Entering 'committed' state.";
+    const kDecisionReached = "Shard split decision reached";
 
-    const blockDurationMs = endTS - blockTS;
-    const waitForRecipientsDurationMs = endTS - waitForRecipientsTS;
-    const reconfigDurationMs = endTS - reconfigTS;
+    const report = {
+        // shard split critical section:
+        //  - wait to abort index builds
+        waitToAbortIndexBuilds: extractTs(checkLog.getLogMessage(primary, kWaitingForCatchup)) -
+            extractTs(checkLog.getLogMessage(primary, kEnterBlockingState)),
+        //  - wait for recipient nodes to catch up with blockTimestamp
+        waitForRecipientCatchup: extractTs(checkLog.getLogMessage(primary, kApplyingSplitConfig)) -
+            extractTs(checkLog.getLogMessage(primary, kWaitingForCatchup)),
+        //  - wait for split acceptance
+        waitForSplitAcceptance:
+            extractTs(checkLog.getLogMessage(primary, kTriggeringRecipientElection)) -
+            extractTs(checkLog.getLogMessage(primary, kApplyingSplitConfig)),
+        //  - wait for recipient primary to step up
+        waitForRecipientStepUp: extractTs(checkLog.getLogMessage(primary, kWaitForMajorityWrite)) -
+            extractTs(checkLog.getLogMessage(primary, kTriggeringRecipientElection)),
+        //  - wait for recipient to majority commit write
+        waitForRecipientMajorityWrite: extractTs(checkLog.getLogMessage(primary, kCommitted)) -
+            extractTs(checkLog.getLogMessage(primary, kWaitForMajorityWrite)),
+        //  - total duration
+        totalDuration: extractTs(checkLog.getLogMessage(primary, kDecisionReached)) -
+            extractTs(checkLog.getLogMessage(primary, kEnterBlockingState)),
+        totalDurationWithoutCatchup: extractTs(checkLog.getLogMessage(primary, kDecisionReached)) -
+            extractTs(checkLog.getLogMessage(primary, kApplyingSplitConfig)),
+    };
 
-    const splitResult = {blockDurationMs, reconfigDurationMs, waitForRecipientsDurationMs};
+    jsTestLog(`Shard split performance report: ${tojson(report)}`);
 
-    jsTestLog(`Performance result of shard split: ${tojson(splitResult)}`);
-    const maximumReconfigDuration = 500;
-    assert.lt(reconfigDurationMs,
-              maximumReconfigDuration,
-              `The reconfig critical section of split must be below ${maximumReconfigDuration}ms`);
+    // Validate using metrics from log output
+    const maxCriticalSectionDurationWithoutCatchup = 500;
+    assert.lt(report.totalDurationWithoutCatchup,
+              maxCriticalSectionDurationWithoutCatchup,
+              `The total duration without recipient catchup must be less than ${
+                  maxCriticalSectionDurationWithoutCatchup}ms`);
+
+    // Validate using reported values in serverStatus
+    const donorPrimary = test.donor.getPrimary();
+    const serverStatus = assert.commandWorked(donorPrimary.adminCommand({serverStatus: 1}));
+    const splitStats = serverStatus.shardSplits;
+    assert.eq(splitStats.totalCommitted, 1);
+    assert.lt(splitStats.totalCommittedDurationWithoutCatchupMillis,
+              maxCriticalSectionDurationWithoutCatchup,
+              `The total duration without recipient catchup must be less than ${
+                  maxCriticalSectionDurationWithoutCatchup}ms`);
 
     test.stop();
 }
