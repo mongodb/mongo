@@ -260,8 +260,8 @@ env.Library(
 env.Library(
     target='collection_index_usage_tracker',
     source=[
+        'aggregated_index_usage_tracker.cpp',
         'collection_index_usage_tracker.cpp',
-        'global_index_usage_tracker.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/server_status_core',

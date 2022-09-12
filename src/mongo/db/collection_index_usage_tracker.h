@@ -33,7 +33,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/global_index_usage_tracker.h"
+#include "mongo/db/aggregated_index_usage_tracker.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/string_map.h"
@@ -114,7 +114,7 @@ public:
      * Does not take ownership of 'clockSource'. 'clockSource' must refer to a non-null clock
      * source that is valid for the lifetime of the constructed CollectionIndexUsageTracker.
      */
-    explicit CollectionIndexUsageTracker(GlobalIndexUsageTracker* globalTracker,
+    explicit CollectionIndexUsageTracker(AggregatedIndexUsageTracker* aggregatedIndexUsageTracker,
                                          ClockSource* clockSource);
 
     /**
@@ -177,9 +177,9 @@ private:
     // be set.
     ClockSource* _clockSource;
 
-    // All CollectionIndexUsageTrackers also update the GlobalIndexUsageTracker to report global
-    // index statistics for the server.
-    GlobalIndexUsageTracker* _globalIndexUsageTracker;
+    // All CollectionIndexUsageTrackers also update the AggregatedIndexUsageTracker to report
+    // globally aggregated index statistics for the server.
+    AggregatedIndexUsageTracker* _aggregatedIndexUsageTracker;
 
     AtomicWord<unsigned long long> _collectionScans{0};
     AtomicWord<unsigned long long> _collectionScansNonTailable{0};

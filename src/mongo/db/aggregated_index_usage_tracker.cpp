@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/global_index_usage_tracker.h"
+#include "mongo/db/aggregated_index_usage_tracker.h"
 
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/service_context.h"
@@ -73,8 +73,8 @@ std::map<std::string, IndexFeatureStats> makeFeatureMap() {
     return map;
 };
 
-const auto getGlobalIndexUsageTracker =
-    ServiceContext::declareDecoration<GlobalIndexUsageTracker>();
+const auto getAggregatedIndexUsageTracker =
+    ServiceContext::declareDecoration<AggregatedIndexUsageTracker>();
 }  // namespace
 
 
@@ -101,34 +101,35 @@ IndexFeatures IndexFeatures::make(const IndexDescriptor* desc, bool internal) {
     return features;
 }
 
-GlobalIndexUsageTracker::GlobalIndexUsageTracker() : _indexFeatureToStats(makeFeatureMap()) {}
+AggregatedIndexUsageTracker::AggregatedIndexUsageTracker()
+    : _indexFeatureToStats(makeFeatureMap()) {}
 
-GlobalIndexUsageTracker* GlobalIndexUsageTracker::get(ServiceContext* svcCtx) {
-    return &getGlobalIndexUsageTracker(svcCtx);
+AggregatedIndexUsageTracker* AggregatedIndexUsageTracker::get(ServiceContext* svcCtx) {
+    return &getAggregatedIndexUsageTracker(svcCtx);
 }
 
-void GlobalIndexUsageTracker::onAccess(const IndexFeatures& features) const {
+void AggregatedIndexUsageTracker::onAccess(const IndexFeatures& features) const {
     if (!features.internal) {
         _updateStatsForEachFeature(features, [](auto stats) { stats->accesses.fetchAndAdd(1); });
     }
 }
 
-void GlobalIndexUsageTracker::onRegister(const IndexFeatures& features) const {
+void AggregatedIndexUsageTracker::onRegister(const IndexFeatures& features) const {
     if (!features.internal) {
         _updateStatsForEachFeature(features, [](auto stats) { stats->count.fetchAndAdd(1); });
         _count.fetchAndAdd(1);
     }
 }
 
-void GlobalIndexUsageTracker::onUnregister(const IndexFeatures& features) const {
+void AggregatedIndexUsageTracker::onUnregister(const IndexFeatures& features) const {
     if (!features.internal) {
         _updateStatsForEachFeature(features, [](auto stats) { stats->count.fetchAndAdd(-1); });
         _count.fetchAndAdd(-1);
     }
 }
 
-void GlobalIndexUsageTracker::_updateStatsForEachFeature(const IndexFeatures& features,
-                                                         UpdateFn&& update) const {
+void AggregatedIndexUsageTracker::_updateStatsForEachFeature(const IndexFeatures& features,
+                                                             UpdateFn&& update) const {
     // Aggregate _id indexes separately so they do not get included with the other features.
     if (features.id) {
         update(&_indexFeatureToStats.at(kId));
@@ -190,13 +191,13 @@ void GlobalIndexUsageTracker::_updateStatsForEachFeature(const IndexFeatures& fe
     }
 }
 
-void GlobalIndexUsageTracker::forEachFeature(OnFeatureFn&& onFeature) const {
+void AggregatedIndexUsageTracker::forEachFeature(OnFeatureFn&& onFeature) const {
     for (auto& [key, value] : _indexFeatureToStats) {
         onFeature(key, value);
     }
 }
 
-long long GlobalIndexUsageTracker::getCount() const {
+long long AggregatedIndexUsageTracker::getCount() const {
     return _count.load();
 }
 
@@ -212,7 +213,7 @@ public:
 
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
-        auto globalFeatures = GlobalIndexUsageTracker::get(opCtx->getServiceContext());
+        auto globalFeatures = AggregatedIndexUsageTracker::get(opCtx->getServiceContext());
 
         BSONObjBuilder builder;
         builder.append("count", globalFeatures->getCount());

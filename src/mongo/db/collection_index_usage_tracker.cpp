@@ -47,10 +47,10 @@ CounterMetric collectionScansNonTailableCounter("queryExecutor.collectionScans.n
 }  // namespace
 
 CollectionIndexUsageTracker::CollectionIndexUsageTracker(
-    GlobalIndexUsageTracker* globalIndexUsageTracker, ClockSource* clockSource)
+    AggregatedIndexUsageTracker* aggregatedIndexUsageTracker, ClockSource* clockSource)
     : _indexUsageStatsMap(std::make_shared<CollectionIndexUsageMap>()),
       _clockSource(clockSource),
-      _globalIndexUsageTracker(globalIndexUsageTracker) {
+      _aggregatedIndexUsageTracker(aggregatedIndexUsageTracker) {
     invariant(_clockSource);
 }
 
@@ -67,7 +67,7 @@ void CollectionIndexUsageTracker::recordIndexAccess(StringData indexName) {
         return;
     }
 
-    _globalIndexUsageTracker->onAccess(it->second->features);
+    _aggregatedIndexUsageTracker->onAccess(it->second->features);
 
     // Increment the index usage atomic counter.
     it->second->accesses.fetchAndAdd(1);
@@ -100,7 +100,7 @@ void CollectionIndexUsageTracker::registerIndex(StringData indexName,
         indexName, make_intrusive<IndexUsageStats>(_clockSource->now(), indexKey, features));
     invariant(inserted.second);
 
-    _globalIndexUsageTracker->onRegister(inserted.first->second->features);
+    _aggregatedIndexUsageTracker->onRegister(inserted.first->second->features);
 
     // Swap the modified map into place atomically.
     atomic_store(&_indexUsageStatsMap, std::move(mapCopy));
@@ -115,7 +115,7 @@ void CollectionIndexUsageTracker::unregisterIndex(StringData indexName) {
 
     auto it = mapCopy->find(indexName);
     if (it != mapCopy->end()) {
-        _globalIndexUsageTracker->onUnregister(it->second->features);
+        _aggregatedIndexUsageTracker->onUnregister(it->second->features);
 
         // Remove the map entry.
         mapCopy->erase(it);

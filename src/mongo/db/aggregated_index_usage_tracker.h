@@ -41,12 +41,12 @@ class ServiceContext;
 /**
  * IndexFeatures describes an anonymized set of features about a single index. For example, an index
  * can be both compound and unique, and this set of flags would be used to track that information so
- * that we can provide aggregated details in the GlobalIndexUsageTracker.
+ * that we can provide aggregated details in the AggregatedIndexUsageTracker.
  */
 struct IndexFeatures {
     /**
      * Create an IndexFeatures structure. If 'internal' is true, the statistics for this index and
-     * its features should not be tracked and aggregated by the GlobalIndexUsageTracker.
+     * its features should not be tracked and aggregated by the AggregatedIndexUsageTracker.
      */
     static IndexFeatures make(const IndexDescriptor* desc, bool internal);
 
@@ -74,14 +74,14 @@ struct IndexFeatureStats {
 };
 
 /**
- * GlobalIndexUsageTracker aggregates usage metrics about features used by indexes. Ignores indexes
- * on internal databases.
+ * AggregatedIndexUsageTracker aggregates usage metrics about features used by indexes. Ignores
+ * indexes on internal databases.
  */
-class GlobalIndexUsageTracker {
+class AggregatedIndexUsageTracker {
 public:
-    static GlobalIndexUsageTracker* get(ServiceContext* svcCtx);
+    static AggregatedIndexUsageTracker* get(ServiceContext* svcCtx);
 
-    GlobalIndexUsageTracker();
+    AggregatedIndexUsageTracker();
 
     /**
      * Updates counters for features used by an index when the index has been accessed.
