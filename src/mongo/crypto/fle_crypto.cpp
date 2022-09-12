@@ -2886,13 +2886,24 @@ BSONObj EDCServerCollection::generateUpdateToRemoveTags(
                 str::stream() << "Field'" << field.fieldPathName
                               << "' in not a supported encrypted type: "
                               << EncryptedBinDataType_serializer(localEncryptedTypeBinding),
-                encryptedTypeBinding == EncryptedBinDataType::kFLE2EqualityIndexedValue);
+                encryptedTypeBinding == EncryptedBinDataType::kFLE2EqualityIndexedValue ||
+                    encryptedTypeBinding == EncryptedBinDataType::kFLE2RangeIndexedValue);
 
-        auto ieev = uassertStatusOK(FLE2IndexedEqualityEncryptedValue::decryptAndParse(
-            token.second.serverEncryptionToken, subCdr));
-        auto tag = EDCServerCollection::generateTag(ieev);
+        if (encryptedTypeBinding == EncryptedBinDataType::kFLE2RangeIndexedValue) {
+            auto range = uassertStatusOK(FLE2IndexedRangeEncryptedValue::decryptAndParse(
+                token.second.serverEncryptionToken, subCdr));
 
-        tags.push_back({tag});
+            for (size_t i = 0; i < range.counters.size(); i++) {
+                auto tag = EDCServerCollection::generateTag(range.tokens[i], range.counters[i]);
+                tags.push_back({tag});
+            }
+        } else {
+            auto ieev = uassertStatusOK(FLE2IndexedEqualityEncryptedValue::decryptAndParse(
+                token.second.serverEncryptionToken, subCdr));
+            auto tag = EDCServerCollection::generateTag(ieev);
+
+            tags.push_back({tag});
+        }
     }
 
     // Build { $pull : {__safeContent__ : {$in : [tag..] } } }
