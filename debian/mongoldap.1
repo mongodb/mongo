@@ -1,6 +1,8 @@
 .TH mongoldap 1
 .SH MONGOLDAP
+\fIMongoDB Enterprise\f1
 .SH SYNOPSIS
+.PP
 Starting in version 3.4, MongoDB Enterprise provides
 \fBmongoldap\f1\f1 for testing MongoDB\(aqs LDAP \fBconfiguration
 options\f1 against a running LDAP server or set
@@ -174,6 +176,18 @@ configuration files are valid, the output might be as follows:
   [OK] Successfully acquired the following roles:
   ...
 .EE
+.SH BEHAVIOR
+.PP
+Starting in MonogoDB 5.1, \fBmongoldap\f1 supports prefixing LDAP
+server with \fBsrv:\f1 and \fBsrv_raw:\f1\&.
+.PP
+If your connection string specifies \fB"srv:<DNS_NAME>"\f1, \fBmongoldap\f1
+verifies that \fB"_ldap._tcp.gc._msdcs.<DNS_NAME>"\f1 exists for SRV to
+support Active Directory. If not found, it verifies
+\fB"_ldap._tcp.<DNS_NAME>"\f1 exists for SRV. If an SRV record cannot be
+found, \fBmongoldap\f1 warns you to use \fB"srv_raw:<DNS_NAME>"\f1 instead.
+\fBmongoldap\f1 does the reverse check for \fB"srv_raw:<DNS_NAME>"\f1 by
+checking for \fB"_ldap._tcp.<DNS NAME>"\f1\&.
 .SH OPTIONS
 .PP
 \fBmongoldap \-\-config\f1, \fBmongoldap \-f\f1
@@ -235,6 +249,8 @@ If unset, \fBmongoldap\f1\f1 cannot use \fBLDAP authentication or authorization\
 \fBmongoldap \-\-ldapQueryUser\f1
 .RS
 .PP
+\fIAvailable in MongoDB Enterprise only.\f1
+.PP
 The identity with which \fBmongoldap\f1\f1 binds as, when connecting to or
 performing queries on an LDAP server.
 .PP
@@ -260,22 +276,27 @@ instead of \fB\-\-ldapQueryUser\f1\f1 and \fB\-\-ldapQueryPassword\f1\f1\&. You 
 both \fB\-\-ldapQueryUser\f1\f1 and \fB\-\-ldapBindWithOSDefaults\f1\f1 at the same time.
 .RE
 .PP
-\fBmongoldap \-\-ldapQueryPassword\f1
-.RS
+\fIAvailable in MongoDB Enterprise only.\f1
 .PP
 The password used to bind to an LDAP server when using
 \fB\-\-ldapQueryUser\f1\f1\&. You must use \fB\-\-ldapQueryPassword\f1\f1 with
 \fB\-\-ldapQueryUser\f1\f1\&.
 .PP
-If unset, \fBmongoldap\f1\f1 will not attempt to bind to the LDAP server.
+If not set, \fBmongoldap\f1\f1 does not attempt to bind to the LDAP server.
 .PP
-This setting can be configured on a running \fBmongoldap\f1\f1 using
+You can configure this setting on a running \fBmongoldap\f1\f1 using
 \fBsetParameter\f1\f1\&.
 .PP
+Starting in MongoDB 4.4, the \fBldapQueryPassword\f1
+\fBsetParameter\f1\f1 command accepts either a string or
+an array of strings. If \fBldapQueryPassword\f1 is set to an array, MongoDB tries
+each password in order until one succeeds. Use a password array to roll over the
+LDAP account password without downtime.
+.PP
 Windows MongoDB deployments can use \fB\-\-ldapBindWithOSDefaults\f1\f1
-instead of \fB\-\-ldapQueryPassword\f1\f1 and \fB\-\-ldapQueryPassword\f1\f1\&. You cannot specify
-both \fB\-\-ldapQueryPassword\f1\f1 and \fB\-\-ldapBindWithOSDefaults\f1\f1 at the same time.
-.RE
+instead of \fB\-\-ldapQueryUser\f1\f1 and \fB\-\-ldapQueryPassword\f1\f1\&.
+You cannot specify both \fB\-\-ldapQueryPassword\f1\f1 and
+\fB\-\-ldapBindWithOSDefaults\f1\f1 at the same time.
 .PP
 \fBmongoldap \-\-ldapBindWithOSDefaults\f1
 .RS
@@ -305,6 +326,8 @@ Use \fB\-\-ldapBindWithOSDefaults\f1\f1 to replace \fB\-\-ldapQueryUser\f1\f1 an
 .RS
 .PP
 \fIDefault\f1: simple
+.PP
+\fIAvailable in MongoDB Enterprise only.\f1
 .PP
 The method \fBmongoldap\f1\f1 uses to authenticate to an LDAP
 server. Use with \fB\-\-ldapQueryUser\f1\f1 and \fB\-\-ldapQueryPassword\f1\f1 to connect to the LDAP server.
@@ -344,6 +367,8 @@ using \fBDIGEST\-MD5\f1 mechanism.
 .RS
 .PP
 \fIDefault\f1: DIGEST\-MD5
+.PP
+\fIAvailable in MongoDB Enterprise only.\f1
 .PP
 A comma\-separated list of SASL mechanisms \fBmongoldap\f1\f1 can
 use when authenticating to the LDAP server. The \fBmongoldap\f1\f1 and the
@@ -416,6 +441,8 @@ For Windows, please see the Windows SASL documentation (https://msdn.microsoft.c
 .PP
 \fIDefault\f1: tls
 .PP
+\fIAvailable in MongoDB Enterprise only.\f1
+.PP
 By default, \fBmongoldap\f1\f1 creates a TLS/SSL secured connection to the LDAP
 server.
 .PP
@@ -444,6 +471,8 @@ credentials between \fBmongoldap\f1\f1 and the LDAP server.
 .PP
 \fIDefault\f1: 10000
 .PP
+\fIAvailable in MongoDB Enterprise only.\f1
+.PP
 The amount of time in milliseconds \fBmongoldap\f1\f1 should wait for an LDAP server
 to respond to a request.
 .PP
@@ -458,6 +487,8 @@ This setting can be configured on a running \fBmongoldap\f1\f1 using
 .PP
 \fBmongoldap \-\-ldapUserToDNMapping\f1
 .RS
+.PP
+\fIAvailable in MongoDB Enterprise only.\f1
 .PP
 Maps the username provided to \fBmongoldap\f1\f1 for authentication to a LDAP
 Distinguished Name (DN). You may need to use \fB\-\-ldapUserToDNMapping\f1\f1 to transform a
@@ -622,6 +653,8 @@ This setting can be configured on a running \fBmongoldap\f1\f1 using the
 .PP
 \fBmongoldap \-\-ldapAuthzQueryTemplate\f1
 .RS
+.PP
+\fIAvailable in MongoDB Enterprise only.\f1
 .PP
 A relative LDAP query URL formatted conforming to RFC4515 (https://tools.ietf.org/search/rfc4515) and RFC4516 (https://tools.ietf.org/html/rfc4516) that \fBmongoldap\f1\f1 executes to obtain
 the LDAP groups to which the authenticated user belongs to. The query is
