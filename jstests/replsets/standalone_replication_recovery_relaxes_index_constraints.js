@@ -57,6 +57,11 @@ node = rst.restart(node, {
     noReplSet: true,
     setParameter: {recoverFromOplogAsStandalone: true, logComponentVerbosity: logLevel}
 });
+
+// Verify that the 'config.system.indexBuilds' collection is empty after recovering from the oplog
+// in standalone mode.
+assert.eq(0, node.getCollection("config.system.indexBuilds").count());
+
 reconnect(node);
 
 rst.stopSet();
