@@ -128,9 +128,20 @@ public:
         BSONElement maxSizeBytesElem = jsobj["maxChunkSizeBytes"];
         // Use maxChunkSize if present otherwise maxChunkSizeBytes
         if (maxSizeElem.isNumber()) {
-            maxChunkSizeBytes = maxSizeElem.numberLong() * 1 << 20;
+            long long maxChunkSizeMB = maxSizeElem.safeNumberLong();
+            // Check before converting to bytes to avoid overflow errors.
+            if (maxChunkSizeMB < 1 || maxChunkSizeMB > 1024) {
+                errmsg = "The specified max chunk size must lie within the range [1MB, 1024MB]";
+                return false;
+            }
+
+            maxChunkSizeBytes = maxChunkSizeMB << 20;
         } else if (maxSizeBytesElem.isNumber()) {
-            maxChunkSizeBytes = maxSizeBytesElem.numberLong();
+            maxChunkSizeBytes = maxSizeBytesElem.safeNumberLong();
+            if (*maxChunkSizeBytes < 1024 * 1024 || *maxChunkSizeBytes > 1024 * 1024 * 1024) {
+                errmsg = "The specified max chunk size must lie within the range [1MB, 1024MB]";
+                return false;
+            }
         }
 
         auto statusWithSplitKeys = splitVector(opCtx,
