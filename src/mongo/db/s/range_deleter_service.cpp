@@ -110,6 +110,21 @@ void RangeDeleterService::onStepDown() {
     _state.store(kDown);
 }
 
+void RangeDeleterService::onShutdown() {
+    if (!feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
+        return;
+    }
+
+    auto lock = _acquireMutexUnconditionally();
+
+    if (_executor) {
+        _executor->shutdown();
+        _executor->join();
+    }
+
+    _state.store(kDown);
+}
+
 BSONObj RangeDeleterService::dumpState() {
     auto lock = _acquireMutexUnconditionally();
 

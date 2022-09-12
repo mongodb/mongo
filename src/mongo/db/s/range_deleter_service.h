@@ -144,6 +144,7 @@ public:
     /* ReplicaSetAwareServiceShardSvr implemented methods */
     void onStepUpComplete(OperationContext* opCtx, long long term) override;
     void onStepDown() override;
+    void onShutdown() override;
 
     /*
      * Returns the RangeDeleterService state with the following schema:
@@ -164,7 +165,6 @@ private:
     void onStartup(OperationContext* opCtx) override final{};
     void onInitialDataAvailable(OperationContext* opCtx,
                                 bool isMajorityDataAvailable) override final {}
-    void onShutdown() override final {}
     void onStepUpBegin(OperationContext* opCtx, long long term) override final {}
     void onBecomeArbiter() override final {}
 };

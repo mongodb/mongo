@@ -71,6 +71,7 @@ void RangeDeleterServiceTest::setUp() {
 
 void RangeDeleterServiceTest::tearDown() {
     RangeDeleterService::get(opCtx)->onStepDown();
+    RangeDeleterService::get(opCtx)->onShutdown();
     ShardServerTestFixture::tearDown();
 }
 
