@@ -152,6 +152,9 @@ public:
     static void reset(Client* client) noexcept;
 
     ServiceExecutorContext() = default;
+    /** Test only */
+    explicit ServiceExecutorContext(std::function<ServiceExecutor*()> getServiceExecutorForTest)
+        : _getServiceExecutorForTest(getServiceExecutorForTest) {}
     ServiceExecutorContext(const ServiceExecutorContext&) = delete;
     ServiceExecutorContext& operator=(const ServiceExecutorContext&) = delete;
     ServiceExecutorContext(ServiceExecutorContext&&) = delete;
@@ -195,6 +198,9 @@ private:
     bool _useDedicatedThread = true;
     bool _canUseReserved = false;
     bool _hasUsedSynchronous = false;
+
+    /** For tests to override the behavior of `getServiceExecutor()`. */
+    std::function<ServiceExecutor*()> _getServiceExecutorForTest;
 };
 
 /**

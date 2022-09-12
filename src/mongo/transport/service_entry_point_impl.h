@@ -81,6 +81,11 @@ public:
     /** `onClientDisconnect` calls this before doing anything else. */
     virtual void derivedOnClientDisconnect(Client* client) {}
 
+protected:
+    /** Imbue the new Client with a ServiceExecutorContext. */
+    virtual void configureServiceExecutorContext(ServiceContext::UniqueClient& client,
+                                                 bool isPrivilegedSession);
+
 private:
     class Sessions;
 

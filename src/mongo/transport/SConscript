@@ -246,3 +246,16 @@ tlEnvTest.CppIntegrationTest(
         'transport_layer_egress_init',
     ],
 )
+
+env.Benchmark(
+    target='session_workflow_bm',
+    source=[
+        'session_workflow_bm.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        'service_entry_point',
+        'service_executor',
+        'transport_layer_mock',
+    ],
+)

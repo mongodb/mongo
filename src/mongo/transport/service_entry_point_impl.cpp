@@ -281,6 +281,15 @@ Status ServiceEntryPointImpl::start() {
     return Status::OK();
 }
 
+void ServiceEntryPointImpl::configureServiceExecutorContext(ServiceContext::UniqueClient& client,
+                                                            bool isPrivilegedSession) {
+    auto seCtx = std::make_unique<transport::ServiceExecutorContext>();
+    seCtx->setUseDedicatedThread(transport::gInitialUseDedicatedThread);
+    seCtx->setCanUseReserved(isPrivilegedSession);
+    stdx::lock_guard lk(*client);
+    transport::ServiceExecutorContext::set(&*client, std::move(seCtx));
+}
+
 void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
     invariant(session);
     // Setup the restriction environment on the Session, if the Session has local/remote Sockaddrs
@@ -311,14 +320,7 @@ void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
             return;
         }
 
-        // Imbue the new Client with a ServiceExecutorContext.
-        {
-            auto seCtx = std::make_unique<transport::ServiceExecutorContext>();
-            seCtx->setUseDedicatedThread(transport::gInitialUseDedicatedThread);
-            seCtx->setCanUseReserved(isPrivilegedSession);
-            stdx::lock_guard lk(*client);
-            transport::ServiceExecutorContext::set(&*client, std::move(seCtx));
-        }
+        configureServiceExecutorContext(client, isPrivilegedSession);
 
         workflow = transport::SessionWorkflow::make(std::move(client));
         auto iter = sync.insert(workflow);

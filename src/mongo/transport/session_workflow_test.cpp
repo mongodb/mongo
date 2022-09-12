@@ -54,6 +54,7 @@
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_utils.h"
 #include "mongo/transport/session_workflow.h"
+#include "mongo/transport/session_workflow_test_util.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -68,21 +69,6 @@
 namespace mongo {
 namespace transport {
 namespace {
-
-/** Scope guard to set and restore an object value. */
-template <typename T>
-class ScopedValueOverride {
-public:
-    ScopedValueOverride(T& target, T v)
-        : _target{target}, _saved{std::exchange(_target, std::move(v))} {}
-    ~ScopedValueOverride() {
-        _target = std::move(_saved);
-    }
-
-private:
-    T& _target;
-    T _saved;
-};
 
 const Status kClosedSessionError{ErrorCodes::SocketException, "Session is closed"};
 const Status kNetworkError{ErrorCodes::HostUnreachable, "Someone is unreachable"};
@@ -257,77 +243,6 @@ struct StateResult {
 
     ResultValue result;
     SessionState state;
-};
-
-class CallbackMockSession : public MockSessionBase {
-public:
-    TransportLayer* getTransportLayer() const override {
-        return getTransportLayerCb();
-    }
-
-    void end() override {
-        endCb();
-    }
-
-    bool isConnected() override {
-        return isConnectedCb();
-    }
-
-    Status waitForData() noexcept override {
-        return waitForDataCb();
-    }
-
-    StatusWith<Message> sourceMessage() noexcept override {
-        return sourceMessageCb();
-    }
-
-    Status sinkMessage(Message message) noexcept override {
-        return sinkMessageCb(message);
-    }
-
-    Future<void> asyncWaitForData() noexcept override {
-        return asyncWaitForDataCb();
-    }
-
-    Future<Message> asyncSourceMessage(const BatonHandle& handle) noexcept override {
-        return asyncSourceMessageCb(handle);
-    }
-
-    Future<void> asyncSinkMessage(Message message, const BatonHandle& handle) noexcept override {
-        return asyncSinkMessageCb(message, handle);
-    }
-
-    std::function<TransportLayer*(void)> getTransportLayerCb;
-    std::function<void(void)> endCb;
-    std::function<bool(void)> isConnectedCb;
-    std::function<Status(void)> waitForDataCb;
-    std::function<StatusWith<Message>(void)> sourceMessageCb;
-    std::function<Status(Message)> sinkMessageCb;
-    std::function<Future<void>(void)> asyncWaitForDataCb;
-    std::function<Future<Message>(const BatonHandle&)> asyncSourceMessageCb;
-    std::function<Future<void>(Message, const BatonHandle&)> asyncSinkMessageCb;
-};
-
-class MockServiceEntryPoint : public ServiceEntryPointImpl {
-public:
-    explicit MockServiceEntryPoint(ServiceContext* svcCtx) : ServiceEntryPointImpl(svcCtx) {}
-
-    Future<DbResponse> handleRequest(OperationContext* opCtx,
-                                     const Message& request) noexcept override {
-        return handleRequestCb(opCtx, request);
-    }
-
-    void onEndSession(const transport::SessionHandle& handle) override {
-        onEndSessionCb(handle);
-    }
-
-    void derivedOnClientDisconnect(Client* client) override {
-        derivedOnClientDisconnectCb(client);
-    }
-
-    std::function<Future<DbResponse>(OperationContext*, const Message&)> handleRequestCb;
-    std::function<void(const transport::SessionHandle)> onEndSessionCb;
-    std::function<void(Client*)> derivedOnClientDisconnectCb;
 };
 
 /**

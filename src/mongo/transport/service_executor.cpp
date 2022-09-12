@@ -145,6 +145,10 @@ void ServiceExecutorContext::setCanUseReserved(bool canUseReserved) noexcept {
 
 ServiceExecutor* ServiceExecutorContext::getServiceExecutor() noexcept {
     invariant(_client);
+
+    if (_getServiceExecutorForTest)
+        return _getServiceExecutorForTest();
+
     if (!_useDedicatedThread)
         return ServiceExecutorFixed::get(_client->getServiceContext());
 
