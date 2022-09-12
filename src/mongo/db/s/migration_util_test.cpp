@@ -344,11 +344,11 @@ TEST_F(MigrationUtilsTest, TestUpdateNumberOfOrphans) {
     auto rangeDeletionDoc = createDeletionTask(opCtx, kTestNss, collectionUuid, 0, 10);
     store.add(opCtx, rangeDeletionDoc);
 
-    migrationutil::persistUpdatedNumOrphans(opCtx, rangeDeletionDoc.getId(), collectionUuid, 5);
+    migrationutil::persistUpdatedNumOrphans(opCtx, collectionUuid, rangeDeletionDoc.getRange(), 5);
     rangeDeletionDoc.setNumOrphanDocs(5);
     ASSERT_EQ(store.count(opCtx, rangeDeletionDoc.toBSON().removeField("timestamp")), 1);
 
-    migrationutil::persistUpdatedNumOrphans(opCtx, rangeDeletionDoc.getId(), collectionUuid, -5);
+    migrationutil::persistUpdatedNumOrphans(opCtx, collectionUuid, rangeDeletionDoc.getRange(), -5);
     rangeDeletionDoc.setNumOrphanDocs(0);
     ASSERT_EQ(store.count(opCtx, rangeDeletionDoc.toBSON().removeField("timestamp")), 1);
 }
@@ -499,7 +499,8 @@ TEST_F(SubmitRangeDeletionTaskTest,
 
     store.add(opCtx, deletionTask);
     ASSERT_EQ(store.count(opCtx), 1);
-    migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
+    migrationutil::markAsReadyRangeDeletionTaskLocally(
+        opCtx, deletionTask.getCollectionUuid(), deletionTask.getRange());
 
     // Make the refresh triggered by submitting the task return an empty result when loading the
     // database.
@@ -525,7 +526,8 @@ TEST_F(SubmitRangeDeletionTaskTest, FailsAndDeletesTaskIfNamespaceIsUnshardedEve
 
     store.add(opCtx, deletionTask);
     ASSERT_EQ(store.count(opCtx), 1);
-    migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
+    migrationutil::markAsReadyRangeDeletionTaskLocally(
+        opCtx, deletionTask.getCollectionUuid(), deletionTask.getRange());
 
     // Make the refresh triggered by submitting the task return an empty result when loading the
     // collection so it is considered unsharded.
@@ -553,7 +555,8 @@ TEST_F(SubmitRangeDeletionTaskTest,
 
     store.add(opCtx, deletionTask);
     ASSERT_EQ(store.count(opCtx), 1);
-    migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
+    migrationutil::markAsReadyRangeDeletionTaskLocally(
+        opCtx, deletionTask.getCollectionUuid(), deletionTask.getRange());
 
     // Mock an empty result for the task's collection and force a refresh so the node believes the
     // collection is unsharded.
@@ -582,7 +585,8 @@ TEST_F(SubmitRangeDeletionTaskTest, SucceedsIfFilteringMetadataUUIDMatchesTaskUU
 
     store.add(opCtx, deletionTask);
     ASSERT_EQ(store.count(opCtx), 1);
-    migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
+    migrationutil::markAsReadyRangeDeletionTaskLocally(
+        opCtx, deletionTask.getCollectionUuid(), deletionTask.getRange());
 
     // Force a metadata refresh with the task's UUID before the task is submitted.
     auto coll = makeCollectionType(collectionUUID, kEpoch, kDefaultTimestamp);
@@ -610,7 +614,8 @@ TEST_F(
 
     store.add(opCtx, deletionTask);
     ASSERT_EQ(store.count(opCtx), 1);
-    migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
+    migrationutil::markAsReadyRangeDeletionTaskLocally(
+        opCtx, deletionTask.getCollectionUuid(), deletionTask.getRange());
 
     // Make the refresh triggered by submitting the task return a UUID that matches the task's UUID.
     auto coll = makeCollectionType(collectionUUID, kEpoch, kDefaultTimestamp);
@@ -646,7 +651,8 @@ TEST_F(SubmitRangeDeletionTaskTest,
 
     store.add(opCtx, deletionTask);
     ASSERT_EQ(store.count(opCtx), 1);
-    migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
+    migrationutil::markAsReadyRangeDeletionTaskLocally(
+        opCtx, deletionTask.getCollectionUuid(), deletionTask.getRange());
 
     // Make the refresh triggered by submitting the task return a UUID that matches the task's UUID.
     auto matchingColl = makeCollectionType(collectionUUID, kEpoch, kDefaultTimestamp);
@@ -673,7 +679,8 @@ TEST_F(SubmitRangeDeletionTaskTest,
 
     store.add(opCtx, deletionTask);
     ASSERT_EQ(store.count(opCtx), 1);
-    migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, deletionTask.getId());
+    migrationutil::markAsReadyRangeDeletionTaskLocally(
+        opCtx, deletionTask.getCollectionUuid(), deletionTask.getRange());
 
     // Make the refresh triggered by submitting the task return an arbitrary UUID.
     const auto otherEpoch = OID::gen();

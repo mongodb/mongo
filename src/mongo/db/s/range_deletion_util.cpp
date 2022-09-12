@@ -217,7 +217,9 @@ auto withTemporaryOperationContext(Callable&& callable, const NamespaceString& n
     return callable(opCtx);
 }
 
-void ensureRangeDeletionTaskStillExists(OperationContext* opCtx, const UUID& migrationId) {
+void ensureRangeDeletionTaskStillExists(OperationContext* opCtx,
+                                        const UUID& collectionUuid,
+                                        const ChunkRange& range) {
     // While at this point we are guaranteed for our operation context to be killed if there is a
     // step-up or stepdown, it is still possible that a stepdown and a subsequent step-up happened
     // prior to acquiring the global IX lock. The range deletion task document prevents a moveChunk
@@ -228,14 +230,16 @@ void ensureRangeDeletionTaskStillExists(OperationContext* opCtx, const UUID& mig
     // relies on the executor only having a single thread and that thread being solely responsible
     // for deleting the range deletion task document.
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    auto count = store.count(opCtx,
-                             BSON(RangeDeletionTask::kIdFieldName
-                                  << migrationId << RangeDeletionTask::kPendingFieldName
-                                  << BSON("$exists" << false)));
-    invariant(count == 0 || count == 1, "found duplicate range deletion tasks");
+    const auto query =
+        BSON(RangeDeletionTask::kCollectionUuidFieldName
+             << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey
+             << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey
+             << range.getMax() << RangeDeletionTask::kPendingFieldName << BSON("$exists" << false));
+    auto count = store.count(opCtx, query);
+
     uassert(ErrorCodes::RangeDeletionAbandonedBecauseTaskDocumentDoesNotExist,
             "Range deletion task no longer exists",
-            count == 1);
+            count > 0);
 
     // We are now guaranteed that either (a) the range deletion task document will continue to exist
     // for the lifetime of this operation context, or (b) this operation context will be killed if
@@ -243,9 +247,16 @@ void ensureRangeDeletionTaskStillExists(OperationContext* opCtx, const UUID& mig
     // holding any locks.
 }
 
-void markRangeDeletionTaskAsProcessing(OperationContext* opCtx, const UUID& migrationId) {
+void markRangeDeletionTaskAsProcessing(OperationContext* opCtx,
+                                       const UUID& collectionUuid,
+                                       const ChunkRange& range) {
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    auto query = BSON(RangeDeletionTask::kIdFieldName << migrationId);
+    const auto query =
+        BSON(RangeDeletionTask::kCollectionUuidFieldName
+             << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey
+             << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey
+             << range.getMax() << RangeDeletionTask::kPendingFieldName << BSON("$exists" << false));
+
     static const auto update =
         BSON("$set" << BSON(RangeDeletionTask::kProcessingFieldName
                             << true << RangeDeletionTask::kWhenToCleanFieldName
@@ -267,24 +278,30 @@ ExecutorFuture<void> deleteRangeInBatchesWithExecutor(
     const NamespaceString& nss,
     const UUID& collectionUuid,
     const BSONObj& keyPattern,
-    const ChunkRange& range,
-    const UUID& migrationId) {
+    const ChunkRange& range) {
     return ExecutorFuture<void>(executor).then([=] {
         return withTemporaryOperationContext(
             [=](OperationContext* opCtx) {
-                return deleteRangeInBatches(
-                    opCtx, nss.db(), collectionUuid, keyPattern, range, migrationId);
+                return deleteRangeInBatches(opCtx, nss.db(), collectionUuid, keyPattern, range);
             },
             nss);
     });
 }
 
-void removePersistentRangeDeletionTask(const NamespaceString& nss, UUID migrationId) {
+void removePersistentRangeDeletionTask(const NamespaceString& nss,
+                                       const UUID& collectionUuid,
+                                       const ChunkRange& range) {
     withTemporaryOperationContext(
         [&](OperationContext* opCtx) {
             PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
 
-            store.remove(opCtx, BSON(RangeDeletionTask::kIdFieldName << migrationId));
+            auto overlappingRangeQuery = BSON(
+                RangeDeletionTask::kCollectionUuidFieldName
+                << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey
+                << GTE << range.getMin()
+                << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey << LTE
+                << range.getMax());
+            store.remove(opCtx, overlappingRangeQuery);
         },
         nss);
 }
@@ -336,8 +353,7 @@ Status deleteRangeInBatches(OperationContext* opCtx,
                             const DatabaseName& dbName,
                             const UUID& collectionUuid,
                             const BSONObj& keyPattern,
-                            const ChunkRange& range,
-                            const UUID& migrationId) {
+                            const ChunkRange& range) {
     bool allDocsRemoved = false;
     // Delete all batches in this range unless a stepdown error occurs. Do not yield the
     // executor to ensure that this range is fully deleted before another range is
@@ -351,9 +367,9 @@ Status deleteRangeInBatches(OperationContext* opCtx,
 
             Milliseconds delayBetweenBatches(rangeDeleterBatchDelayMS.load());
 
-            ensureRangeDeletionTaskStillExists(opCtx, migrationId);
+            ensureRangeDeletionTaskStillExists(opCtx, collectionUuid, range);
 
-            markRangeDeletionTaskAsProcessing(opCtx, migrationId);
+            markRangeDeletionTaskAsProcessing(opCtx, collectionUuid, range);
 
             int numDeleted;
             const auto nss = [&]() {
@@ -386,8 +402,7 @@ Status deleteRangeInBatches(OperationContext* opCtx,
                 }
             }();
 
-            migrationutil::persistUpdatedNumOrphans(
-                opCtx, migrationId, collectionUuid, -numDeleted);
+            migrationutil::persistUpdatedNumOrphans(opCtx, collectionUuid, range, -numDeleted);
 
             if (MONGO_unlikely(hangAfterDoingDeletion.shouldFail())) {
                 hangAfterDoingDeletion.pauseWhileSet(opCtx);
@@ -484,7 +499,6 @@ SharedSemiFuture<void> removeDocumentsInRange(
     const UUID& collectionUuid,
     const BSONObj& keyPattern,
     const ChunkRange& range,
-    const UUID& migrationId,
     Seconds delayForActiveQueriesOnSecondariesToComplete) {
     return std::move(waitForActiveQueriesToComplete)
         .thenRunOn(executor)
@@ -507,7 +521,7 @@ SharedSemiFuture<void> removeDocumentsInRange(
                         "range"_attr = redact(range.toString()));
 
             return deleteRangeInBatchesWithExecutor(
-                       executor, nss, collectionUuid, keyPattern, range, migrationId)
+                       executor, nss, collectionUuid, keyPattern, range)
                 .onCompletion([=](Status s) {
                     if (!s.isOK() &&
                         s.code() !=
@@ -560,7 +574,7 @@ SharedSemiFuture<void> removeDocumentsInRange(
             }
 
             try {
-                removePersistentRangeDeletionTask(nss, migrationId);
+                removePersistentRangeDeletionTask(nss, collectionUuid, range);
             } catch (const DBException& e) {
                 LOGV2_ERROR(23770,
                             "Failed to delete range deletion task for range {range} in collection "

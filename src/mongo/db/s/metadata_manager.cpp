@@ -263,7 +263,6 @@ void MetadataManager::append(BSONObjBuilder* builder) const {
 }
 
 SharedSemiFuture<void> MetadataManager::cleanUpRange(ChunkRange const& range,
-                                                     const UUID& migrationId,
                                                      bool shouldDelayBeforeDeletion) {
     stdx::lock_guard<Latch> lg(_managerLock);
     invariant(!_metadata.empty());
@@ -295,7 +294,6 @@ SharedSemiFuture<void> MetadataManager::cleanUpRange(ChunkRange const& range,
         return _submitRangeForDeletion(lg,
                                        overlapMetadata->onDestructionPromise.getFuture().semi(),
                                        range,
-                                       migrationId,
                                        delayForActiveQueriesOnSecondariesToComplete);
     } else {
         // No running queries can depend on this range, so queue it for deletion immediately.
@@ -306,11 +304,8 @@ SharedSemiFuture<void> MetadataManager::cleanUpRange(ChunkRange const& range,
                       "namespace"_attr = _nss.ns(),
                       "range"_attr = redact(range.toString()));
 
-        return _submitRangeForDeletion(lg,
-                                       SemiFuture<void>::makeReady(),
-                                       range,
-                                       migrationId,
-                                       delayForActiveQueriesOnSecondariesToComplete);
+        return _submitRangeForDeletion(
+            lg, SemiFuture<void>::makeReady(), range, delayForActiveQueriesOnSecondariesToComplete);
     }
 }
 
@@ -375,7 +370,6 @@ SharedSemiFuture<void> MetadataManager::_submitRangeForDeletion(
     const WithLock&,
     SemiFuture<void> waitForActiveQueriesToComplete,
     const ChunkRange& range,
-    const UUID& migrationId,
     Seconds delayForActiveQueriesOnSecondariesToComplete) {
     auto cleanupComplete = [&]() {
         const auto collUUID = _metadata.back()->metadata->getChunkManager()->getUUID();
@@ -391,7 +385,6 @@ SharedSemiFuture<void> MetadataManager::_submitRangeForDeletion(
                                       collUUID,
                                       _metadata.back()->metadata->getKeyPattern().getOwned(),
                                       range,
-                                      migrationId,
                                       delayForActiveQueriesOnSecondariesToComplete);
     }();
 

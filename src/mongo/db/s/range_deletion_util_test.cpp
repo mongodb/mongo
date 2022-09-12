@@ -193,7 +193,7 @@ RangeDeletionTask insertRangeDeletionTask(OperationContext* opCtx,
     store.add(opCtx, t);
 
     // Document should be in the store.
-    ASSERT_EQUALS(countDocsInConfigRangeDeletions(store, opCtx), 1);
+    ASSERT_GTE(countDocsInConfigRangeDeletions(store, opCtx), 1);
 
     auto query = BSON(RangeDeletionTask::kIdFieldName << migrationId);
     t.setPending(boost::none);
@@ -227,7 +227,6 @@ TEST_F(RangeDeleterTest,
                                uuid(),
                                kShardKeyPattern,
                                range,
-                               task.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     cleanupComplete.get();
@@ -256,7 +255,6 @@ TEST_F(RangeDeleterTest,
                                uuid(),
                                kShardKeyPattern,
                                range,
-                               task.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     cleanupComplete.get();
@@ -287,7 +285,6 @@ TEST_F(RangeDeleterTest,
                                uuid(),
                                kShardKeyPattern,
                                range,
-                               task.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     cleanupComplete.get();
@@ -319,7 +316,6 @@ TEST_F(RangeDeleterTest,
                                uuid(),
                                kShardKeyPattern,
                                range,
-                               task.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     cleanupComplete.get();
@@ -334,6 +330,8 @@ TEST_F(RangeDeleterTest,
 
     setFilteringMetadataWithUUID(uuid());
     auto task = insertRangeDeletionTask(_opCtx, uuid(), range, numDocsToInsert);
+    const auto collUuidWrongTaks = UUID::gen();
+    auto wrongTask = insertRangeDeletionTask(_opCtx, collUuidWrongTaks, range, numDocsToInsert);
     DBDirectClient dbclient(_opCtx);
     for (auto i = 0; i < numDocsToInsert; ++i) {
         dbclient.insert(kNss.toString(), BSON(kShardKey << i));
@@ -345,10 +343,9 @@ TEST_F(RangeDeleterTest,
                                std::move(queriesComplete),
                                kNss,
                                // Use a different UUID from the collection UUID.
-                               UUID::gen(),
+                               collUuidWrongTaks,
                                kShardKeyPattern,
                                range,
-                               task.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
 
@@ -360,17 +357,19 @@ TEST_F(RangeDeleterTest,
 
 TEST_F(RangeDeleterTest, RemoveDocumentsInRangeThrowsErrorWhenCollectionDoesNotExist) {
     auto queriesComplete = SemiFuture<void>::makeReady();
+    const auto notExistingNss = NamespaceString("someFake.namespace");
+    const auto notExistingCollectionUUID = UUID::gen();
     const auto range = ChunkRange(BSON(kShardKey << 0), BSON(kShardKey << 10));
-    auto task = insertRangeDeletionTask(_opCtx, uuid(), range, 0);
+    auto task =
+        insertRangeDeletionTask(_opCtx, notExistingNss, notExistingCollectionUUID, range, 0);
 
     auto cleanupComplete =
         removeDocumentsInRange(executor(),
                                std::move(queriesComplete),
-                               NamespaceString("someFake", "namespace"),
-                               UUID::gen(),
+                               notExistingNss,
+                               notExistingCollectionUUID,
                                kShardKeyPattern,
                                ChunkRange(BSON(kShardKey << 0), BSON(kShardKey << 10)),
-                               task.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
 
@@ -413,7 +412,6 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeLeavesDocumentsWhenTaskDocumentDo
                                uuid(),
                                kShardKeyPattern,
                                range,
-                               UUID::gen(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
     cleanupComplete.get();
@@ -463,7 +461,6 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeWaitsForReplicationAfterDeletingS
                                uuid(),
                                kShardKeyPattern,
                                range,
-                               t.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     cleanupComplete.get();
@@ -513,7 +510,6 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeWaitsForReplicationOnlyOnceAfterS
                                uuid(),
                                kShardKeyPattern,
                                range,
-                               t.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
     cleanupComplete.get();
@@ -559,7 +555,6 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeDoesNotWaitForReplicationIfErrorD
                                uuid(),
                                kShardKeyPattern,
                                range,
-                               t.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     ASSERT_THROWS_CODE(cleanupComplete.get(), DBException, ErrorCodes::PrimarySteppedDown);
@@ -589,7 +584,6 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRetriesOnWriteConflictException) 
                                uuid(),
                                kShardKeyPattern,
                                range,
-                               t.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
     cleanupComplete.get();
@@ -620,7 +614,6 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRetriesOnUnexpectedError) {
                                uuid(),
                                kShardKeyPattern,
                                range,
-                               t.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
     cleanupComplete.get();
@@ -661,7 +654,6 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRespectsDelayInBetweenBatches) {
                                uuid(),
                                kShardKeyPattern,
                                range,
-                               task.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
     cleanupComplete.get();
@@ -693,7 +685,6 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRespectsOrphanCleanupDelay) {
                                                   uuid(),
                                                   kShardKeyPattern,
                                                   range,
-                                                  task.getId(),
                                                   orphanCleanupDelay);
 
     // A best-effort check that cleanup has not completed without advancing the clock.
@@ -731,7 +722,6 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeRemovesRangeDeletionTaskOnSuccess
                                uuid(),
                                kShardKeyPattern,
                                range,
-                               t.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
     cleanupComplete.get();
@@ -745,23 +735,21 @@ TEST_F(RangeDeleterTest,
     const ChunkRange range(BSON(kShardKey << 0), BSON(kShardKey << 10));
     auto queriesComplete = SemiFuture<void>::makeReady();
 
-    auto fakeUuid = UUID::gen();
-
-    setFilteringMetadataWithUUID(fakeUuid);
     DBDirectClient dbclient(_opCtx);
     dbclient.insert(kNss.toString(), BSON(kShardKey << 5));
 
     // Insert range deletion task for this collection and range.
     auto t = insertRangeDeletionTask(_opCtx, uuid(), range);
 
+    dbclient.dropCollection(kNss.toString());
+
     auto cleanupComplete =
         removeDocumentsInRange(executor(),
                                std::move(queriesComplete),
                                kNss,
-                               fakeUuid,
+                               uuid(),
                                kShardKeyPattern,
                                range,
-                               t.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
     ASSERT_THROWS_CODE(cleanupComplete.get(),
@@ -798,7 +786,6 @@ TEST_F(RangeDeleterTest,
                                uuid(),
                                kShardKeyPattern,
                                range,
-                               t.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
     ASSERT_THROWS_CODE(cleanupComplete.get(), DBException, ErrorCodes::PrimarySteppedDown);
@@ -829,7 +816,6 @@ DEATH_TEST_F(RangeDeleterTest, RemoveDocumentsInRangeCrashesIfInputFutureHasErro
                                uuid(),
                                kShardKeyPattern,
                                range,
-                               t.getId(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete */);
 
 
@@ -850,7 +836,6 @@ TEST_F(RangeDeleterTest, RemoveDocumentsInRangeDoesNotCrashWhenShardKeyIndexDoes
                                uuid(),
                                BSON("x" << 1) /* shard key pattern */,
                                ChunkRange(BSON("x" << 0), BSON("x" << 10)),
-                               UUID::gen(),
                                Seconds(0) /* delayForActiveQueriesOnSecondariesToComplete*/);
 
     // Range deleter will keep on retrying when it encounters non-stepdown errors. Make it run

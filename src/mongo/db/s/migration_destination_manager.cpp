@@ -1380,7 +1380,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                     }
 
                     migrationutil::persistUpdatedNumOrphans(
-                        opCtx, _migrationId.value(), *_collectionUuid, batchNumCloned);
+                        opCtx, *_collectionUuid, ChunkRange(_min, _max), batchNumCloned);
 
                     {
                         stdx::lock_guard<Latch> statsLock(_mutex);
@@ -1828,7 +1828,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
 
     if (changeInOrphans != 0) {
         migrationutil::persistUpdatedNumOrphans(
-            opCtx, _migrationId.value(), *_collectionUuid, changeInOrphans);
+            opCtx, *_collectionUuid, ChunkRange(_min, _max), changeInOrphans);
     }
     return didAnything;
 }

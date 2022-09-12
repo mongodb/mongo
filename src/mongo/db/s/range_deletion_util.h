@@ -61,7 +61,6 @@ SharedSemiFuture<void> removeDocumentsInRange(
     const UUID& collectionUuid,
     const BSONObj& keyPattern,
     const ChunkRange& range,
-    const UUID& migrationId,
     Seconds delayForActiveQueriesOnSecondariesToComplete);
 
 /**
@@ -72,8 +71,7 @@ Status deleteRangeInBatches(OperationContext* opCtx,
                             const DatabaseName& dbName,
                             const UUID& collectionUuid,
                             const BSONObj& keyPattern,
-                            const ChunkRange& range,
-                            const UUID& migrationId);
+                            const ChunkRange& range);
 
 /**
  * - Retrieves source collection's persistent range deletion tasks from `config.rangeDeletions`

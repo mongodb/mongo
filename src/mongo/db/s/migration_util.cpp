@@ -300,6 +300,14 @@ void ensureChunkVersionIsGreaterThan(OperationContext* opCtx,
     }
 }
 
+BSONObj getQueryFilterForRangeDeletionTask(const UUID& collectionUuid, const ChunkRange& range) {
+    return BSON(RangeDeletionTask::kCollectionUuidFieldName
+                << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey
+                << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey
+                << range.getMax());
+}
+
+
 }  // namespace
 
 std::shared_ptr<executor::ThreadPoolTaskExecutor> getMigrationUtilExecutor(
@@ -418,18 +426,16 @@ ExecutorFuture<void> cleanUpRange(ServiceContext* serviceContext,
                                    deletionTaskUuidMatchesFilteringMetadataUuid(
                                        opCtx, optCollDescr, deletionTask));
 
-                           LOGV2(22026,
+                           LOGV2(6955500,
                                  "Submitting range deletion task",
-                                 "deletionTask"_attr = redact(deletionTask.toBSON()),
-                                 "migrationId"_attr = deletionTask.getId());
+                                 "deletionTask"_attr = redact(deletionTask.toBSON()));
 
                            const auto whenToClean =
                                deletionTask.getWhenToClean() == CleanWhenEnum::kNow
                                ? CollectionShardingRuntime::kNow
                                : CollectionShardingRuntime::kDelayed;
 
-                           return csr->cleanUpRange(
-                               deletionTask.getRange(), deletionTask.getId(), whenToClean);
+                           return csr->cleanUpRange(deletionTask.getRange(), whenToClean);
                        }
                    }
 
@@ -506,8 +512,10 @@ ExecutorFuture<void> submitRangeDeletionTask(OperationContext* opCtx,
                   "migrationId"_attr = deletionTask.getId());
 
             if (status == ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist) {
-                deleteRangeDeletionTaskLocally(
-                    opCtx, deletionTask.getId(), ShardingCatalogClient::kLocalWriteConcern);
+                deleteRangeDeletionTaskLocally(opCtx,
+                                               deletionTask.getCollectionUuid(),
+                                               deletionTask.getRange(),
+                                               ShardingCatalogClient::kLocalWriteConcern);
             }
 
             // Note, we use onError and make it return its input status, because ExecutorFuture does
@@ -615,10 +623,10 @@ void persistRangeDeletionTaskLocally(OperationContext* opCtx,
 }
 
 void persistUpdatedNumOrphans(OperationContext* opCtx,
-                              const UUID& migrationId,
                               const UUID& collectionUuid,
+                              const ChunkRange& range,
                               long long changeInOrphans) {
-    BSONObj query = BSON("_id" << migrationId);
+    const auto query = getQueryFilterForRangeDeletionTask(collectionUuid, range);
     try {
         PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
         ScopedRangeDeleterLock rangeDeleterLock(opCtx, collectionUuid);
@@ -785,10 +793,11 @@ void persistAbortDecision(OperationContext* opCtx,
 
 void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                         const ShardId& recipientId,
-                                        const UUID& migrationId) {
+                                        const UUID& collectionUuid,
+                                        const ChunkRange& range) {
+    const auto queryFilter = getQueryFilterForRangeDeletionTask(collectionUuid, range);
     write_ops::DeleteCommandRequest deleteOp(NamespaceString::kRangeDeletionNamespace);
-    write_ops::DeleteOpEntry query(BSON(RangeDeletionTask::kIdFieldName << migrationId),
-                                   false /*multi*/);
+    write_ops::DeleteOpEntry query(queryFilter, false /*multi*/);
     deleteOp.setDeletes({query});
 
     hangInDeleteRangeDeletionOnRecipientInterruptible.pauseWhileSet(opCtx);
@@ -807,10 +816,12 @@ void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
 }
 
 void deleteRangeDeletionTaskLocally(OperationContext* opCtx,
-                                    const UUID& deletionTaskId,
+                                    const UUID& collectionUuid,
+                                    const ChunkRange& range,
                                     const WriteConcernOptions& writeConcern) {
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    store.remove(opCtx, BSON(RangeDeletionTask::kIdFieldName << deletionTaskId), writeConcern);
+    const auto query = getQueryFilterForRangeDeletionTask(collectionUuid, range);
+    store.remove(opCtx, query, writeConcern);
 
     if (hangInDeleteRangeDeletionLocallyThenSimulateErrorUninterruptible.shouldFail()) {
         hangInDeleteRangeDeletionLocallyThenSimulateErrorUninterruptible.pauseWhileSet(opCtx);
@@ -821,9 +832,10 @@ void deleteRangeDeletionTaskLocally(OperationContext* opCtx,
 
 void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                              const ShardId& recipientId,
-                                             const UUID& migrationId) {
+                                             const UUID& collectionUuid,
+                                             const ChunkRange& range) {
     write_ops::UpdateCommandRequest updateOp(NamespaceString::kRangeDeletionNamespace);
-    auto queryFilter = BSON(RangeDeletionTask::kIdFieldName << migrationId);
+    const auto queryFilter = getQueryFilterForRangeDeletionTask(collectionUuid, range);
     auto updateModification =
         write_ops::UpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(
             BSON("$unset" << BSON(RangeDeletionTask::kPendingFieldName << ""))));
@@ -844,7 +856,8 @@ void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                 LOGV2_DEBUG(4620232,
                             1,
                             "Failed to mark range deletion task on recipient shard as ready",
-                            "migrationId"_attr = migrationId,
+                            "collectionUuid"_attr = collectionUuid,
+                            "range"_attr = range,
                             "error"_attr = exShardNotFound);
                 return;
             }
@@ -887,9 +900,15 @@ void advanceTransactionOnRecipient(OperationContext* opCtx,
     }
 }
 
-void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& migrationId) {
+void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx,
+                                         const UUID& collectionUuid,
+                                         const ChunkRange& range) {
     PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
-    auto query = BSON(RangeDeletionTask::kIdFieldName << migrationId);
+    const auto query =
+        BSON(RangeDeletionTask::kCollectionUuidFieldName
+             << collectionUuid << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMinKey
+             << range.getMin() << RangeDeletionTask::kRangeFieldName + "." + ChunkRange::kMaxKey
+             << range.getMax());
     auto update = BSON("$unset" << BSON(RangeDeletionTask::kPendingFieldName << ""));
 
     hangInReadyRangeDeletionLocallyInterruptible.pauseWhileSet(opCtx);
@@ -1036,8 +1055,9 @@ void recoverMigrationCoordinations(OperationContext* opCtx,
                           "coordinatorDocumentUUID"_attr = doc.getCollectionUuid());
                 }
 
-                deleteRangeDeletionTaskOnRecipient(opCtx, doc.getRecipientShardId(), doc.getId());
-                deleteRangeDeletionTaskLocally(opCtx, doc.getId());
+                deleteRangeDeletionTaskOnRecipient(
+                    opCtx, doc.getRecipientShardId(), doc.getCollectionUuid(), doc.getRange());
+                deleteRangeDeletionTaskLocally(opCtx, doc.getCollectionUuid(), doc.getRange());
                 coordinator.forgetMigration(opCtx);
                 setFilteringMetadata();
                 return true;

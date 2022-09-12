@@ -142,8 +142,8 @@ void persistRangeDeletionTaskLocally(OperationContext* opCtx,
  * write concern.
  */
 void persistUpdatedNumOrphans(OperationContext* opCtx,
-                              const UUID& migrationId,
                               const UUID& collectionUuid,
+                              const ChunkRange& range,
                               long long changeInOrphans);
 
 /**
@@ -172,7 +172,8 @@ void persistAbortDecision(OperationContext* opCtx,
  */
 void deleteRangeDeletionTaskLocally(
     OperationContext* opCtx,
-    const UUID& deletionTaskId,
+    const UUID& collectionUuid,
+    const ChunkRange& range,
     const WriteConcernOptions& writeConcern = WriteConcerns::kMajorityWriteConcernShardingTimeout);
 
 /**
@@ -181,7 +182,8 @@ void deleteRangeDeletionTaskLocally(
  */
 void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                         const ShardId& recipientId,
-                                        const UUID& migrationId);
+                                        const UUID& collectionUuid,
+                                        const ChunkRange& range);
 
 /**
  * Advances the optime for the current transaction by performing a write operation as a retryable
@@ -197,7 +199,9 @@ void advanceTransactionOnRecipient(OperationContext* opCtx,
  * config.rangeDeletions and waits for majority write concern. This marks the range as ready for
  * deletion.
  */
-void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& migrationId);
+void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx,
+                                         const UUID& collectionUuid,
+                                         const ChunkRange& range);
 
 
 /**
@@ -207,7 +211,8 @@ void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx, const UUID& mi
  */
 void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                              const ShardId& recipientId,
-                                             const UUID& migrationId);
+                                             const UUID& collectionUuid,
+                                             const ChunkRange& range);
 
 /**
  * Submits an asynchronous task to scan config.migrationCoordinators and drive each unfinished

@@ -487,8 +487,7 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
     const ChunkRange range = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY));
     const auto task = insertRangeDeletionTask(opCtx, kTestNss, uuid(), range, 0);
 
-    auto cleanupComplete =
-        csr().cleanUpRange(range, task.getId(), CollectionShardingRuntime::CleanWhen::kNow);
+    auto cleanupComplete = csr().cleanUpRange(range, CollectionShardingRuntime::CleanWhen::kNow);
 
     opCtx->setDeadlineAfterNowBy(Milliseconds(100), ErrorCodes::MaxTimeMSExpired);
     auto status =
@@ -513,10 +512,10 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
     const auto task2 = insertRangeDeletionTask(opCtx, kTestNss, uuid(), range2, 0);
 
     auto cleanupCompleteFirst =
-        csr().cleanUpRange(range1, task1.getId(), CollectionShardingRuntime::CleanWhen::kNow);
+        csr().cleanUpRange(range1, CollectionShardingRuntime::CleanWhen::kNow);
 
     auto cleanupCompleteSecond =
-        csr().cleanUpRange(range2, task2.getId(), CollectionShardingRuntime::CleanWhen::kNow);
+        csr().cleanUpRange(range2, CollectionShardingRuntime::CleanWhen::kNow);
 
     auto status = CollectionShardingRuntime::waitForClean(
         opCtx,
@@ -542,8 +541,7 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
     const ChunkRange range = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY));
     const auto task = insertRangeDeletionTask(opCtx, kTestNss, uuid(), range, 0);
 
-    auto cleanupComplete =
-        csr().cleanUpRange(range, task.getId(), CollectionShardingRuntime::CleanWhen::kNow);
+    auto cleanupComplete = csr().cleanUpRange(range, CollectionShardingRuntime::CleanWhen::kNow);
 
     auto status =
         CollectionShardingRuntime::waitForClean(opCtx, kTestNss, uuid(), range, Date_t::max());
@@ -594,8 +592,7 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
     const auto task = insertRangeDeletionTask(opCtx, kTestNss, uuid(), range, 0);
 
     // Schedule range deletion that will hang due to `suspendRangeDeletion` failpoint
-    auto cleanupComplete =
-        csr().cleanUpRange(range, task.getId(), CollectionShardingRuntime::CleanWhen::kNow);
+    auto cleanupComplete = csr().cleanUpRange(range, CollectionShardingRuntime::CleanWhen::kNow);
 
     // Clear and set again filtering metadata
     csr().clearFilteringMetadata(opCtx);

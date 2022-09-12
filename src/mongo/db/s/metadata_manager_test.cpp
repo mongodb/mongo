@@ -221,7 +221,7 @@ TEST_F(MetadataManagerTest, TrackOrphanedDataCleanupBlocksOnScheduledRangeDeleti
     // Enable fail point to suspendRangeDeletion.
     globalFailPointRegistry().find("suspendRangeDeletion")->setMode(FailPoint::alwaysOn);
 
-    auto notifn1 = _manager->cleanUpRange(cr1, task.getId(), false /*delayBeforeDeleting*/);
+    auto notifn1 = _manager->cleanUpRange(cr1, false /*delayBeforeDeleting*/);
     ASSERT_FALSE(notifn1.isReady());
     ASSERT_EQ(_manager->numberOfRangesToClean(), 1UL);
 
@@ -251,7 +251,7 @@ TEST_F(MetadataManagerTest, CleanupNotificationsAreSignaledWhenMetadataManagerIs
     _manager->setFilteringMetadata(
         cloneMetadataMinusChunk(_manager->getActiveMetadata(boost::none)->get(), rangeToClean));
 
-    auto notif = _manager->cleanUpRange(rangeToClean, task.getId(), false /*delayBeforeDeleting*/);
+    auto notif = _manager->cleanUpRange(rangeToClean, false /*delayBeforeDeleting*/);
     ASSERT(!notif.isReady());
 
     auto optNotif = _manager->trackOrphanedDataCleanup(rangeToClean);
@@ -336,7 +336,7 @@ TEST_F(MetadataManagerTest, RangesToCleanMembership) {
     // Enable fail point to suspendRangeDeletion.
     globalFailPointRegistry().find("suspendRangeDeletion")->setMode(FailPoint::alwaysOn);
 
-    auto notifn = _manager->cleanUpRange(cr, task.getId(), false /*delayBeforeDeleting*/);
+    auto notifn = _manager->cleanUpRange(cr, false /*delayBeforeDeleting*/);
     ASSERT(!notifn.isReady());
     ASSERT_EQ(1UL, _manager->numberOfRangesToClean());
 

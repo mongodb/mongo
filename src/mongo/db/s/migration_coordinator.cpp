@@ -216,21 +216,24 @@ SemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient(
 
     if (numOrphans > 0) {
         migrationutil::persistUpdatedNumOrphans(
-            opCtx, _migrationInfo.getId(), _migrationInfo.getCollectionUuid(), numOrphans);
+            opCtx, _migrationInfo.getCollectionUuid(), _migrationInfo.getRange(), numOrphans);
     }
 
     LOGV2_DEBUG(23896,
                 2,
                 "Deleting range deletion task on recipient",
                 "migrationId"_attr = _migrationInfo.getId());
-    migrationutil::deleteRangeDeletionTaskOnRecipient(
-        opCtx, _migrationInfo.getRecipientShardId(), _migrationInfo.getId());
+    migrationutil::deleteRangeDeletionTaskOnRecipient(opCtx,
+                                                      _migrationInfo.getRecipientShardId(),
+                                                      _migrationInfo.getCollectionUuid(),
+                                                      _migrationInfo.getRange());
 
     LOGV2_DEBUG(23897,
                 2,
                 "Marking range deletion task on donor as ready for processing",
                 "migrationId"_attr = _migrationInfo.getId());
-    migrationutil::markAsReadyRangeDeletionTaskLocally(opCtx, _migrationInfo.getId());
+    migrationutil::markAsReadyRangeDeletionTaskLocally(
+        opCtx, _migrationInfo.getCollectionUuid(), _migrationInfo.getRange());
 
     // At this point the decision cannot be changed and will be recovered in the event of a
     // failover, so it is safe to schedule the deletion task after updating the persisted state.
@@ -266,7 +269,8 @@ void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* 
                 2,
                 "Deleting range deletion task on donor",
                 "migrationId"_attr = _migrationInfo.getId());
-    migrationutil::deleteRangeDeletionTaskLocally(opCtx, _migrationInfo.getId());
+    migrationutil::deleteRangeDeletionTaskLocally(
+        opCtx, _migrationInfo.getCollectionUuid(), _migrationInfo.getRange());
 
     try {
         LOGV2_DEBUG(23900,
@@ -300,8 +304,10 @@ void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* 
                 2,
                 "Marking range deletion task on recipient as ready for processing",
                 "migrationId"_attr = _migrationInfo.getId());
-    migrationutil::markAsReadyRangeDeletionTaskOnRecipient(
-        opCtx, _migrationInfo.getRecipientShardId(), _migrationInfo.getId());
+    migrationutil::markAsReadyRangeDeletionTaskOnRecipient(opCtx,
+                                                           _migrationInfo.getRecipientShardId(),
+                                                           _migrationInfo.getCollectionUuid(),
+                                                           _migrationInfo.getRange());
 }
 
 void MigrationCoordinator::forgetMigration(OperationContext* opCtx) {

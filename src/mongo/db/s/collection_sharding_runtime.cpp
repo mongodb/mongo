@@ -252,11 +252,10 @@ void CollectionShardingRuntime::clearFilteringMetadata(OperationContext* opCtx) 
 }
 
 SharedSemiFuture<void> CollectionShardingRuntime::cleanUpRange(ChunkRange const& range,
-                                                               const UUID& migrationId,
                                                                CleanWhen when) {
     stdx::lock_guard lk(_metadataManagerLock);
     invariant(_metadataType == MetadataType::kSharded);
-    return _metadataManager->cleanUpRange(range, migrationId, when == kDelayed);
+    return _metadataManager->cleanUpRange(range, when == kDelayed);
 }
 
 Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,

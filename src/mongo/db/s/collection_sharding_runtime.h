@@ -169,9 +169,7 @@ public:
      * succeeds, waitForClean can be called to ensure no other deletions are pending for the range.
      */
     enum CleanWhen { kNow, kDelayed };
-    SharedSemiFuture<void> cleanUpRange(ChunkRange const& range,
-                                        const UUID& migrationId,
-                                        CleanWhen when);
+    SharedSemiFuture<void> cleanUpRange(ChunkRange const& range, CleanWhen when);
 
     /**
      * Waits for all ranges deletion tasks with UUID 'collectionUuid' overlapping range
