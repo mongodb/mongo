@@ -43,7 +43,7 @@ class test_cursor_bound15(bound_base):
         ('no eviction', dict(eviction=False)),
     ]
 
-    scenarios = make_scenarios(key_format_values)
+    scenarios = make_scenarios(key_format_values, eviction)
     
     def check_key(self, key):
         if self.key_format == 'u':
