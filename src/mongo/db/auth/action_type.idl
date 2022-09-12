@@ -45,6 +45,7 @@ enums:
         values:
            addShard :  "addShard"
            advanceClusterTime :  "advanceClusterTime"
+           allCollectionStats: "allCollectionStats"
            analyze :  "analyze"
            anyAction :  "anyAction"         # Special ActionType that represents *all* actions
            appendOplogNote :  "appendOplogNote"
@@ -168,6 +169,7 @@ enums:
            setParameter :  "setParameter"
            setUserWriteBlockMode: "setUserWriteBlockMode"
            shardCollection :  "shardCollection"  # ID only
+           shardedDataDistribution : "shardedDataDistribution"
            shardingState :  "shardingState"
            shutdown :  "shutdown"
            splitChunk :  "splitChunk"

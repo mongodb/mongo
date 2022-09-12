@@ -42,6 +42,29 @@ namespace DocumentSourceShardedDataDistribution {
 
 static constexpr StringData kStageName = "$shardedDataDistribution"_sd;
 
+class LiteParsed final : public LiteParsedDocumentSource {
+public:
+    static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss, const BSONElement& spec) {
+        return std::make_unique<LiteParsed>(spec.fieldName());
+    }
+
+    explicit LiteParsed(std::string parseTimeName)
+        : LiteParsedDocumentSource(std::move(parseTimeName)) {}
+
+    stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
+        return {NamespaceString::kConfigsvrCollectionsNamespace};
+    }
+
+    PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const final {
+        return {
+            Privilege(ResourcePattern::forClusterResource(), ActionType::shardedDataDistribution)};
+    }
+
+    bool isInitialSource() const final {
+        return true;
+    }
+};
+
 static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx);
 

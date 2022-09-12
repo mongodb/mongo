@@ -244,6 +244,8 @@ roles:
                   - useUUID
                   - inprog
                   - shardingState
+                  - allCollectionStats
+                  - shardedDataDistribution
             - matchType: any_normal
               actions: &clusterMonitorRoleDatabaseActions
                   - collStats

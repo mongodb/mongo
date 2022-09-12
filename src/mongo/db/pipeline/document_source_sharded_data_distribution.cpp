@@ -46,7 +46,7 @@ using boost::intrusive_ptr;
 using std::list;
 
 REGISTER_DOCUMENT_SOURCE(shardedDataDistribution,
-                         LiteParsedDocumentSourceDefault::parse,
+                         DocumentSourceShardedDataDistribution::LiteParsed::parse,
                          DocumentSourceShardedDataDistribution::createFromBson,
                          AllowedWithApiStrict::kAlways);
 
@@ -62,12 +62,6 @@ list<intrusive_ptr<DocumentSource>> DocumentSourceShardedDataDistribution::creat
     uassert(6789102,
             "The $shardedDataDistribution stage must be run on the admin database",
             expCtx->ns.isAdminDB() && expCtx->ns.isCollectionlessAggregateNS());
-
-    // Add 'config.collections' as a resolved namespace
-    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
-    resolvedNamespaces[NamespaceString::kConfigsvrCollectionsNamespace.coll()] = {
-        NamespaceString::kConfigsvrCollectionsNamespace, std::vector<BSONObj>{}};
-    expCtx->setResolvedNamespaces(resolvedNamespaces);
 
     static const BSONObj kAllCollStatsObj =
         fromjson("{$_internalAllCollectionStats: {stats: {storageStats: {}}}}}");

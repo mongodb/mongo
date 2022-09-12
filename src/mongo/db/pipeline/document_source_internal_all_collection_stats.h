@@ -68,7 +68,10 @@ public:
         }
 
         PrivilegeVector requiredPrivileges(bool isMongos,
-                                           bool bypassDocumentValidation) const final;
+                                           bool bypassDocumentValidation) const final {
+            return {
+                Privilege(ResourcePattern::forClusterResource(), ActionType::allCollectionStats)};
+        }
 
         bool isInitialSource() const final {
             return true;

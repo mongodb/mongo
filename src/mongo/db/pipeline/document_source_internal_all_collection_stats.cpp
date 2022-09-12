@@ -43,15 +43,7 @@ DocumentSourceInternalAllCollectionStats::DocumentSourceInternalAllCollectionSta
 REGISTER_DOCUMENT_SOURCE(_internalAllCollectionStats,
                          DocumentSourceInternalAllCollectionStats::LiteParsed::parse,
                          DocumentSourceInternalAllCollectionStats::createFromBsonInternal,
-                         AllowedWithApiStrict::kAlways);
-
-PrivilegeVector DocumentSourceInternalAllCollectionStats::LiteParsed::requiredPrivileges(
-    bool isMongos, bool bypassDocumentValidation) const {
-
-    // TODO: SERVER-68249
-
-    return PrivilegeVector{Privilege(ResourcePattern::forAnyNormalResource(), ActionType::find)};
-}
+                         AllowedWithApiStrict::kInternal);
 
 DocumentSource::GetNextResult DocumentSourceInternalAllCollectionStats::doGetNext() {
     if (!_catalogDocs) {
