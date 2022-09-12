@@ -46,6 +46,7 @@ namespace mongo::transport {
 MONGO_FAIL_POINT_DEFINE(transportLayerASIOshortOpportunisticReadWrite);
 MONGO_FAIL_POINT_DEFINE(transportLayerASIOSessionPauseBeforeSetSocketOption);
 MONGO_FAIL_POINT_DEFINE(transportLayerASIOBlockBeforeOpportunisticRead);
+MONGO_FAIL_POINT_DEFINE(transportLayerASIOBlockBeforeAddSession);
 
 namespace {
 
@@ -583,6 +584,7 @@ Future<void> TransportLayerASIO::ASIOSession::opportunisticRead(
             return makeCanceledStatus();
         if (auto networkingBaton = baton ? baton->networking() : nullptr;
             networkingBaton && networkingBaton->canWait()) {
+            transportLayerASIOBlockBeforeAddSession.pauseWhileSet();
             return networkingBaton->addSession(*this, NetworkingBaton::Type::In)
                 .onError([](Status error) {
                     if (ErrorCodes::isShutdownError(error)) {
@@ -658,9 +660,10 @@ Future<void> TransportLayerASIO::ASIOSession::opportunisticWrite(Stream& stream,
             return makeCanceledStatus();
         if (auto networkingBaton = baton ? baton->networking() : nullptr;
             networkingBaton && networkingBaton->canWait()) {
+            transportLayerASIOBlockBeforeAddSession.pauseWhileSet();
             return networkingBaton->addSession(*this, NetworkingBaton::Type::Out)
                 .onError([](Status error) {
-                    if (ErrorCodes::isCancellationError(error)) {
+                    if (ErrorCodes::isShutdownError(error)) {
                         // If the baton has detached, it will cancel its polling. We catch that
                         // error here and return Status::OK so that we invoke
                         // opportunisticWrite() again and switch to asio::async_write() below.
