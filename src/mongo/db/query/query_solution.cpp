@@ -1613,6 +1613,12 @@ void EqLookupNode::appendToString(str::stream* ss, int indent) const {
     *ss << "foreignField = " << joinFieldForeign.fullPath() << "\n";
     addIndent(ss, indent + 1);
     *ss << "lookupStrategy = " << serializeLookupStrategy(lookupStrategy) << "\n";
+    if (idxEntry) {
+        addIndent(ss, indent + 1);
+        *ss << "indexName = " << idxEntry->identifier.catalogName << "\n";
+        addIndent(ss, indent + 1);
+        *ss << "indexKeyPattern = " << idxEntry->keyPattern << "\n";
+    }
     addCommon(ss, indent);
     addIndent(ss, indent + 1);
     *ss << "Child:" << '\n';
