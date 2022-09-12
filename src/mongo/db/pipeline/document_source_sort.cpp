@@ -487,6 +487,10 @@ intrusive_ptr<DocumentSourceSort> DocumentSourceSort::parseBoundedSort(
     BSONElement key = args["sortKey"];
     uassert(6369904, "$_internalBoundedSort sortKey must be an object", key.type() == Object);
 
+    // Empty sort pattern is not allowed for the bounded sort.
+    uassert(6900501,
+            "$_internalBoundedSort stage must have at least one sort key",
+            !key.embeddedObject().isEmpty());
     SortPattern pat{key.embeddedObject(), expCtx};
 
     {
