@@ -115,14 +115,14 @@ const std::string kDefaultMongoURL = "mongodb://"s + kDefaultMongoHost + ":"s + 
 // level. The server is responsible for rejecting usages of new features if its
 // featureCompatibilityVersion is lower.
 MONGO_INITIALIZER_WITH_PREREQUISITES(SetFeatureCompatibilityVersionLatest,
-                                     ("EndStartupOptionSetup"))
+                                     ("EndStartupOptionStorage"))
 // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
 (InitializerContext* context) {
     mongo::serverGlobalParams.mutableFeatureCompatibility.setVersion(
         ServerGlobalParams::FeatureCompatibility::kLatest);
 }
 
-MONGO_INITIALIZER_WITH_PREREQUISITES(WireSpec, ("EndStartupOptionSetup"))(InitializerContext*) {
+MONGO_INITIALIZER_WITH_PREREQUISITES(WireSpec, ("EndStartupOptionHandling"))(InitializerContext*) {
     WireSpec::instance().initialize(WireSpec::Specification{});
 }
 
