@@ -20,8 +20,8 @@ Starting in version 4.0, MongoDB disables support for TLS 1.0
 encryption on systems where TLS 1.1+ is available. For
 more details, see \fBDisable TLS 1.0\f1\&.
 .IP \(bu 2
-Starting in MongoDB 4.0, the \fBmongos\f1\f1 binary will crash when
-attempting to connect to \fBmongod\f1\f1 instances whose
+The \fBmongos\f1\f1 binary will crash when attempting to connect
+to \fBmongod\f1\f1 instances whose
 \fBfeature compatibility version (fCV)\f1 is greater than
 that of the \fBmongos\f1\f1\&. For example, you cannot connect
 a MongoDB 4.0 version \fBmongos\f1\f1 to a 4.2
@@ -191,10 +191,15 @@ link\-local IPv6 address (https://en.wikipedia.org/wiki/Link\-local_address#IPv6
 zone index (https://en.wikipedia.org/wiki/IPv6_address#Scoped_literal_IPv6_addresses_(with_zone_index))
 to that address (i.e. \fBfe80::<address>%<adapter\-name>\f1).
 .PP
-When possible, use a logical DNS hostname instead of an ip address,
-particularly when configuring replica set members or sharded cluster
-members. The use of logical DNS hostnames avoids configuration
-changes due to ip address changes.
+To avoid configuration updates due to IP address changes, use DNS
+hostnames instead of IP addresses. It is particularly important to
+use a DNS hostname instead of an IP address when configuring replica
+set members or sharded cluster members.
+.PP
+Use hostnames instead of IP addresses to configure clusters across a
+split network horizon. Starting in MongoDB 5.0, nodes that are only
+configured with an IP address will fail startup validation and will
+not start.
 .PP
 Before binding to a non\-localhost (e.g. publicly accessible)
 IP address, ensure you have secured your cluster from unauthorized
@@ -348,6 +353,8 @@ If you specify \fBreopen\f1, you must also use \fB\-\-logappend\f1\f1\&.
 .PP
 \fBmongos \-\-redactClientLogData\f1
 .RS
+.PP
+\fIAvailable in MongoDB Enterprise only.\f1
 .PP
 A \fBmongos\f1\f1 running with \fB\-\-redactClientLogData\f1\f1 redacts any message accompanying a given
 log event before logging. This prevents the \fBmongos\f1\f1 from writing
@@ -726,7 +733,7 @@ port of different members of the replica set.
 Specifies the ping time, in milliseconds, that \fBmongos\f1\f1 uses
 to determine which secondary replica set members to pass read
 operations from clients. The default value of \fB15\f1 corresponds to
-the default value in all of the client drivers (https://docs.mongodb.com/drivers/)\&.
+the default value in all of the client drivers (https://www.mongodb.com/docs/drivers/)\&.
 .PP
 When \fBmongos\f1\f1 receives a request that permits reads to
 \fBsecondary\f1 members, the \fBmongos\f1\f1 will:
@@ -1773,6 +1780,43 @@ available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-e
 .RE
 .SS AUDIT OPTIONS
 .PP
+\fBmongos \-\-auditCompressionMode\f1
+.RS
+.PP
+Specifies the compression mode for \fBaudit log encryption\f1\&. You must also enable audit log
+encryption using either \fB\-\-auditEncryptionKeyUID\f1\f1 or
+\fB\-\-auditLocalKeyFile\f1\f1\&.
+.PP
+\fB\-\-auditCompressionMode\f1\f1 can be set to one of these values:
+.RS
+.IP \(bu 2
+.RS
+.IP \(bu 4
+Value
+.IP \(bu 4
+Description
+.RE
+.IP \(bu 2
+.RS
+.IP \(bu 4
+\fBzstd\f1
+.IP \(bu 4
+Use the \fBzstd\f1 algorithm to compress the audit log.
+.RE
+.IP \(bu 2
+.RS
+.IP \(bu 4
+\fBnone\f1 \fI(default)\f1
+.IP \(bu 4
+Do not compress the audit log.
+.RE
+.RE
+.PP
+Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)\&.
+MongoDB Enterprise and Atlas have different configuration
+requirements.
+.RE
+.PP
 \fBmongos \-\-auditDestination\f1
 .RS
 .PP
@@ -1823,6 +1867,20 @@ Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-e
 and MongoDB Atlas (https://cloud.mongodb.com/user#/atlas/login)\&.
 .RE
 .PP
+\fBmongos \-\-auditEncryptionKeyUID\f1
+.RS
+.PP
+Specifies the unique identifier of the Key Management
+Interoperability Protocol (KMIP) key for \fBaudit log encryption\f1\&.
+.PP
+You cannot use \fB\-\-auditEncryptionKeyUID\f1\f1 and
+\fB\-\-auditLocalKeyFile\f1\f1 together.
+.PP
+Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)\&.
+MongoDB Enterprise and Atlas have different configuration
+requirements.
+.RE
+.PP
 \fBmongos \-\-auditFormat\f1
 .RS
 .PP
@@ -1859,6 +1917,25 @@ performance more than printing to a file in BSON format.
 .PP
 Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)
 and MongoDB Atlas (https://cloud.mongodb.com/user#/atlas/login)\&.
+.RE
+.PP
+\fBmongos \-\-auditLocalKeyFile\f1
+.RS
+.PP
+Specifies the path and file name for a local audit key file for
+\fBaudit log encryption\f1\&.
+.PP
+Only use \fB\-\-auditLocalKeyFile\f1\f1 for testing because the key is
+not secured. To secure the key, use
+\fB\-\-auditEncryptionKeyUID\f1\f1 and an external Key
+Management Interoperability Protocol (KMIP) server.
+.PP
+You cannot use \fB\-\-auditLocalKeyFile\f1\f1 and
+\fB\-\-auditEncryptionKeyUID\f1\f1 together.
+.PP
+Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)\&.
+MongoDB Enterprise and Atlas have different configuration
+requirements.
 .RE
 .PP
 \fBmongos \-\-auditPath\f1
@@ -1934,6 +2011,8 @@ only and not the profiler since profiling is not available on
 \fBmongos \-\-ldapServers\f1
 .RS
 .PP
+\fIAvailable in MongoDB Enterprise only.\f1
+.PP
 The LDAP server against which the \fBmongos\f1\f1 authenticates users or
 determines what actions a user is authorized to perform on a given
 database. If the LDAP server specified has any replicated instances,
@@ -1974,6 +2053,8 @@ server is unavailable.
 \fBmongos \-\-ldapQueryUser\f1
 .RS
 .PP
+\fIAvailable in MongoDB Enterprise only.\f1
+.PP
 The identity with which \fBmongos\f1\f1 binds as, when connecting to or
 performing queries on an LDAP server.
 .PP
@@ -2001,6 +2082,8 @@ both \fB\-\-ldapQueryUser\f1\f1 and \fB\-\-ldapBindWithOSDefaults\f1\f1 at the s
 .PP
 \fBmongos \-\-ldapQueryPassword\f1
 .RS
+.PP
+\fIAvailable in MongoDB Enterprise only.\f1
 .PP
 The password used to bind to an LDAP server when using
 \fB\-\-ldapQueryUser\f1\f1\&. You must use \fB\-\-ldapQueryPassword\f1\f1 with
@@ -2045,6 +2128,8 @@ Use \fB\-\-ldapBindWithOSDefaults\f1\f1 to replace \fB\-\-ldapQueryUser\f1\f1 an
 .PP
 \fIDefault\f1: simple
 .PP
+\fIAvailable in MongoDB Enterprise only.\f1
+.PP
 The method \fBmongos\f1\f1 uses to authenticate to an LDAP server.
 Use with \fB\-\-ldapQueryUser\f1\f1 and \fB\-\-ldapQueryPassword\f1\f1 to
 connect to the LDAP server.
@@ -2066,6 +2151,8 @@ using \fBDIGEST\-MD5\f1 mechanism.
 .RS
 .PP
 \fIDefault\f1: DIGEST\-MD5
+.PP
+\fIAvailable in MongoDB Enterprise only.\f1
 .PP
 A comma\-separated list of SASL mechanisms \fBmongos\f1\f1 can
 use when authenticating to the LDAP server. The \fBmongos\f1\f1 and the
@@ -2138,6 +2225,8 @@ For Windows, please see the Windows SASL documentation (https://msdn.microsoft.c
 .PP
 \fIDefault\f1: tls
 .PP
+\fIAvailable in MongoDB Enterprise only.\f1
+.PP
 By default, \fBmongos\f1\f1 creates a TLS/SSL secured connection to the LDAP
 server.
 .PP
@@ -2166,6 +2255,8 @@ credentials between \fBmongos\f1\f1 and the LDAP server.
 .PP
 \fIDefault\f1: 10000
 .PP
+\fIAvailable in MongoDB Enterprise only.\f1
+.PP
 The amount of time in milliseconds \fBmongos\f1\f1 should wait for an LDAP server
 to respond to a request.
 .PP
@@ -2180,6 +2271,8 @@ This setting can be configured on a running \fBmongos\f1\f1 using
 .PP
 \fBmongos \-\-ldapUserToDNMapping\f1
 .RS
+.PP
+\fIAvailable in MongoDB Enterprise only.\f1
 .PP
 Maps the username provided to \fBmongos\f1\f1 for authentication to a LDAP
 Distinguished Name (DN). You may need to use \fB\-\-ldapUserToDNMapping\f1\f1 to transform a
