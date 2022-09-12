@@ -127,12 +127,20 @@ public:
         BSONElement maxSizeElem = jsobj["maxChunkSize"];
         if (maxSizeElem.isNumber()) {
             maxChunkSize = maxSizeElem.numberLong();
+            if (*maxChunkSize < 1 || *maxChunkSize > 1024) {
+                errmsg = "The specified max chunk size must lie within the range [1MB, 1024MB]";
+                return false;
+            }
         }
 
         boost::optional<long long> maxChunkSizeBytes;
         maxSizeElem = jsobj["maxChunkSizeBytes"];
         if (maxSizeElem.isNumber()) {
             maxChunkSizeBytes = maxSizeElem.numberLong();
+            if (*maxChunkSizeBytes < 1024 * 1024 || *maxChunkSizeBytes > 1024 * 1024 * 1024) {
+                errmsg = "The specified max chunk size must lie within the range [1MB, 1024MB]";
+                return false;
+            }
         }
 
         auto statusWithSplitKeys = splitVector(opCtx,
