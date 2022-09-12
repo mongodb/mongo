@@ -87,6 +87,9 @@ bool OplogCapMaintainerThread::_deleteExcessDocuments() {
                     "Caught an InterruptedDueToStorageChange exception, "
                     "but this thread can safely continue",
                     "error"_attr = e.toStatus());
+    } catch (const ExceptionFor<ErrorCodes::InterruptedAtShutdown>&) {
+        // TODO (SERVER-69496): Remove the ErrorCodes::InterruptedAtShutdown catch block.
+        return false;
     } catch (const DBException& ex) {
         if (opCtx->isKillPending()) {
             return false;
