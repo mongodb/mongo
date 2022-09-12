@@ -1071,6 +1071,31 @@ TEST_F(BatonASIOLinuxTest, CancelAsyncOperationsInterruptsOngoingOperations) {
                        ErrorCodes::CallbackCanceled);
 }
 
+TEST_F(BatonASIOLinuxTest, AsyncOpsMakeProgressWhenSessionAddedToDetachedBaton) {
+    Notification<void> ready;
+    auto opCtx = client().makeOperationContext();
+
+    JoinThread thread([&] {
+        auto session = client().session();
+        auto baton = opCtx->getBaton();
+        ready.get();
+        session->asyncSourceMessage(baton).ignoreValue().getAsync([session](Status) {
+            // Capturing `session` is necessary as parts of this continuation run at fixture
+            // destruction.
+        });
+    });
+
+    FailPointEnableBlock fp("transportLayerASIOBlockBeforeAddSession");
+    ready.set();
+    waitForTimesEntered(fp, 1);
+
+    // Destroying the `opCtx` results in detaching the baton. At this point, the thread running
+    // `asyncSourceMessage` has acquired the mutex that orders asynchronous operations (i.e.,
+    // `asyncOpMutex`) and is blocked by `fp`. Once we return from this function, that thread is
+    // unblocked and will run `Baton::addSession` on a detached baton.
+    opCtx.reset();
+}
+
 #endif  // __linux__
 
 }  // namespace

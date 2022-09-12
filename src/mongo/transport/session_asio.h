@@ -315,8 +315,11 @@ private:
      *   operation.
      * - Holding the mutex while canceling asynchronous operations guarantees no operation can start
      *   while cancellation is in progress.
+     *
+     * Opportunistic read and write are implemented as recursive future continuations, so we may
+     * recursively acquire the mutex when the future is readied inline.
      */
-    stdx::mutex _asyncOpMutex;  // NOLINT
+    stdx::recursive_mutex _asyncOpMutex;  // NOLINT
 };
 
 }  // namespace mongo::transport
