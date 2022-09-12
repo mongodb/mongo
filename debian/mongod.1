@@ -19,6 +19,10 @@ more details, see \fBDisable TLS 1.0\f1\&.
 .SH OPTIONS
 .RS
 .IP \(bu 2
+MongoDB removes the \fB\-\-cpu\f1 command\-line option.
+.RE
+.RS
+.IP \(bu 2
 MongoDB removes the \fB\-\-serviceExecutor\f1 command\-line option and the
 corresponding \fBnet.serviceExecutor\f1 configuration option.
 .RE
@@ -194,10 +198,15 @@ link\-local IPv6 address (https://en.wikipedia.org/wiki/Link\-local_address#IPv6
 zone index (https://en.wikipedia.org/wiki/IPv6_address#Scoped_literal_IPv6_addresses_(with_zone_index))
 to that address (i.e. \fBfe80::<address>%<adapter\-name>\f1).
 .PP
-When possible, use a logical DNS hostname instead of an ip address,
-particularly when configuring replica set members or sharded cluster
-members. The use of logical DNS hostnames avoids configuration
-changes due to ip address changes.
+To avoid configuration updates due to IP address changes, use DNS
+hostnames instead of IP addresses. It is particularly important to
+use a DNS hostname instead of an IP address when configuring replica
+set members or sharded cluster members.
+.PP
+Use hostnames instead of IP addresses to configure clusters across a
+split network horizon. Starting in MongoDB 5.0, nodes that are only
+configured with an IP address will fail startup validation and will
+not start.
 .PP
 Before binding to a non\-localhost (e.g. publicly accessible)
 IP address, ensure you have secured your cluster from unauthorized
@@ -677,13 +686,6 @@ connect to the \fBmongod\f1\f1 using the appropriate \fBuser\f1
 prior to restarting \fBmongod\f1\f1 without \fB\-\-transitionToAuth\f1\f1\&.
 .RE
 .PP
-\fBmongod \-\-cpu\f1
-.RS
-.PP
-Forces the \fBmongod\f1\f1 process to report the percentage of CPU time in
-write lock, every four seconds.
-.RE
-.PP
 \fBmongod \-\-sysinfo\f1
 .RS
 .PP
@@ -720,6 +722,8 @@ For additional ways to shut down, see also \fBStop mongod\f1 Processes\f1\&.
 .PP
 \fBmongod \-\-redactClientLogData\f1
 .RS
+.PP
+\fIAvailable in MongoDB Enterprise only.\f1
 .PP
 A \fBmongod\f1\f1 running with \fB\-\-redactClientLogData\f1\f1 redacts any message accompanying a given
 log event before logging. This prevents the \fBmongod\f1\f1 from writing
@@ -935,6 +939,8 @@ For the corresponding configuration file setting, see
 \fBmongod \-\-ldapServers\f1
 .RS
 .PP
+\fIAvailable in MongoDB Enterprise only.\f1
+.PP
 The LDAP server against which the \fBmongod\f1\f1 authenticates users or
 determines what actions a user is authorized to perform on a given
 database. If the LDAP server specified has any replicated instances,
@@ -975,6 +981,8 @@ server is unavailable.
 \fBmongod \-\-ldapQueryUser\f1
 .RS
 .PP
+\fIAvailable in MongoDB Enterprise only.\f1
+.PP
 The identity with which \fBmongod\f1\f1 binds as, when connecting to or
 performing queries on an LDAP server.
 .PP
@@ -1000,28 +1008,27 @@ instead of \fB\-\-ldapQueryUser\f1\f1 and \fB\-\-ldapQueryPassword\f1\f1\&. You 
 both \fB\-\-ldapQueryUser\f1\f1 and \fB\-\-ldapBindWithOSDefaults\f1\f1 at the same time.
 .RE
 .PP
-\fBmongod \-\-ldapQueryPassword\f1
-.RS
+\fIAvailable in MongoDB Enterprise only.\f1
 .PP
 The password used to bind to an LDAP server when using
 \fB\-\-ldapQueryUser\f1\f1\&. You must use \fB\-\-ldapQueryPassword\f1\f1 with
 \fB\-\-ldapQueryUser\f1\f1\&.
 .PP
-If unset, \fBmongod\f1\f1 will not attempt to bind to the LDAP server.
+If not set, \fBmongod\f1\f1 does not attempt to bind to the LDAP server.
 .PP
-This setting can be configured on a running \fBmongod\f1\f1 using
+You can configure this setting on a running \fBmongod\f1\f1 using
 \fBsetParameter\f1\f1\&.
 .PP
 Starting in MongoDB 4.4, the \fBldapQueryPassword\f1
 \fBsetParameter\f1\f1 command accepts either a string or
-an array of strings. If set to an array, each password is tried
-until one succeeds. This can be used to perform a rollover of the
-LDAP account password without downtime for MongoDB.
+an array of strings. If \fBldapQueryPassword\f1 is set to an array, MongoDB tries
+each password in order until one succeeds. Use a password array to roll over the
+LDAP account password without downtime.
 .PP
 Windows MongoDB deployments can use \fB\-\-ldapBindWithOSDefaults\f1\f1
-instead of \fB\-\-ldapQueryPassword\f1\f1 and \fB\-\-ldapQueryPassword\f1\f1\&. You cannot specify
-both \fB\-\-ldapQueryPassword\f1\f1 and \fB\-\-ldapBindWithOSDefaults\f1\f1 at the same time.
-.RE
+instead of \fB\-\-ldapQueryUser\f1\f1 and \fB\-\-ldapQueryPassword\f1\f1\&.
+You cannot specify both \fB\-\-ldapQueryPassword\f1\f1 and
+\fB\-\-ldapBindWithOSDefaults\f1\f1 at the same time.
 .PP
 \fBmongod \-\-ldapBindWithOSDefaults\f1
 .RS
@@ -1052,6 +1059,8 @@ Use \fB\-\-ldapBindWithOSDefaults\f1\f1 to replace \fB\-\-ldapQueryUser\f1\f1 an
 .PP
 \fIDefault\f1: simple
 .PP
+\fIAvailable in MongoDB Enterprise only.\f1
+.PP
 The method \fBmongod\f1\f1 uses to authenticate to an LDAP server.
 Use with \fB\-\-ldapQueryUser\f1\f1 and \fB\-\-ldapQueryPassword\f1\f1 to
 connect to the LDAP server.
@@ -1073,6 +1082,8 @@ using \fBDIGEST\-MD5\f1 mechanism.
 .RS
 .PP
 \fIDefault\f1: DIGEST\-MD5
+.PP
+\fIAvailable in MongoDB Enterprise only.\f1
 .PP
 A comma\-separated list of SASL mechanisms \fBmongod\f1\f1 can
 use when authenticating to the LDAP server. The \fBmongod\f1\f1 and the
@@ -1145,6 +1156,8 @@ For Windows, please see the Windows SASL documentation (https://msdn.microsoft.c
 .PP
 \fIDefault\f1: tls
 .PP
+\fIAvailable in MongoDB Enterprise only.\f1
+.PP
 By default, \fBmongod\f1\f1 creates a TLS/SSL secured connection to the LDAP
 server.
 .PP
@@ -1173,6 +1186,8 @@ credentials between \fBmongod\f1\f1 and the LDAP server.
 .PP
 \fIDefault\f1: 10000
 .PP
+\fIAvailable in MongoDB Enterprise only.\f1
+.PP
 The amount of time in milliseconds \fBmongod\f1\f1 should wait for an LDAP server
 to respond to a request.
 .PP
@@ -1187,6 +1202,8 @@ This setting can be configured on a running \fBmongod\f1\f1 using
 .PP
 \fBmongod \-\-ldapUserToDNMapping\f1
 .RS
+.PP
+\fIAvailable in MongoDB Enterprise only.\f1
 .PP
 Maps the username provided to \fBmongod\f1\f1 for authentication to a LDAP
 Distinguished Name (DN). You may need to use \fB\-\-ldapUserToDNMapping\f1\f1 to transform a
@@ -1352,6 +1369,8 @@ This setting can be configured on a running \fBmongod\f1\f1 using the
 \fBmongod \-\-ldapAuthzQueryTemplate\f1
 .RS
 .PP
+\fIAvailable in MongoDB Enterprise only.\f1
+.PP
 A relative LDAP query URL formatted conforming to RFC4515 (https://tools.ietf.org/search/rfc4515) and RFC4516 (https://tools.ietf.org/html/rfc4516) that \fBmongod\f1\f1 executes to obtain
 the LDAP groups to which the authenticated user belongs to. The query is
 relative to the host or hosts specified in \fB\-\-ldapServers\f1\f1\&.
@@ -1459,7 +1478,7 @@ To specify the \fBWiredTiger Storage Engine\f1\&.
 .IP \(bu 4
 To specify the \fBIn\-Memory Storage Engine\f1\&.
 .IP
-Available in MongoDB Enterprise only.
+\fIAvailable in MongoDB Enterprise only.\f1
 .RE
 .RE
 .PP
@@ -2015,10 +2034,18 @@ and is always set to \fBtrue\f1\&. In earlier versions of MongoDB,
 \fB\-\-enableMajorityReadConcern\f1\f1 was configurable.
 .PP
 If you are using a three\-member primary\-secondary\-arbiter (PSA)
-architecture, the write concern \fB"majority"\f1\f1 can cause
-performance issues if a secondary is unavailable or lagging. See
-\fBMitigate Performance Issues with PSA Replica Set\f1 for advice on how to mitigate these
-issues.
+architecture, consider the following:
+.RS
+.IP \(bu 2
+The write concern \fB"majority"\f1\f1 can cause
+performance issues if a secondary is unavailable or lagging. For
+advice on how to mitigate these issues, see
+\fBMitigate Performance Issues with PSA Replica Set\f1\&.
+.IP \(bu 2
+If you are using a global default \fB"majority"\f1\f1
+and the write concern is less than the size of the majority,
+your queries may return stale (not fully replicated) data.
+.RE
 .RE
 .SS SHARDED CLUSTER OPTIONS
 .PP
@@ -3331,7 +3358,17 @@ This is the default profiler level.
 \fB1\f1
 .IP \(bu 4
 The profiler collects data for operations that take longer
-than the value of \fBslowms\f1\&.
+than the value of \fBslowms\f1 or that match a \fBfilter\f1\&.
+.IP
+When a filter is set:
+.RS
+.IP \(bu 6
+The \fBslowms\f1 and \fBsampleRate\f1 options are not used for
+profiling.
+.IP \(bu 6
+The profiler only captures operations that match the
+\fBfilter\f1\&.
+.RE
 .RE
 .IP \(bu 2
 .RS
@@ -3361,9 +3398,7 @@ that run for longer than this threshold are considered \fIslow\f1\&.
 .PP
 When \fBlogLevel\f1\f1 is set to \fB0\f1, MongoDB records \fIslow\f1
 operations to the diagnostic log at a rate determined by
-\fBslowOpSampleRate\f1\f1\&. Starting in MongoDB
-4.2, the secondaries of replica sets log \fBall oplog entry messages
-that take longer than the slow operation threshold to apply\f1 regardless of the sample rate.
+\fBslowOpSampleRate\f1\f1\&.
 .PP
 At higher \fBlogLevel\f1\f1 settings, all operations appear in
 the diagnostic log regardless of their latency with the following
@@ -3394,6 +3429,43 @@ For \fBmongod\f1\f1 instances, \fB\-\-slowOpSampleRate\f1\f1 affects the
 diagnostic log and, if enabled, the profiler.
 .RE
 .SS AUDIT OPTIONS
+.PP
+\fBmongod \-\-auditCompressionMode\f1
+.RS
+.PP
+Specifies the compression mode for \fBaudit log encryption\f1\&. You must also enable audit log
+encryption using either \fB\-\-auditEncryptionKeyUID\f1\f1 or
+\fB\-\-auditLocalKeyFile\f1\f1\&.
+.PP
+\fB\-\-auditCompressionMode\f1\f1 can be set to one of these values:
+.RS
+.IP \(bu 2
+.RS
+.IP \(bu 4
+Value
+.IP \(bu 4
+Description
+.RE
+.IP \(bu 2
+.RS
+.IP \(bu 4
+\fBzstd\f1
+.IP \(bu 4
+Use the \fBzstd\f1 algorithm to compress the audit log.
+.RE
+.IP \(bu 2
+.RS
+.IP \(bu 4
+\fBnone\f1 \fI(default)\f1
+.IP \(bu 4
+Do not compress the audit log.
+.RE
+.RE
+.PP
+Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)\&.
+MongoDB Enterprise and Atlas have different configuration
+requirements.
+.RE
 .PP
 \fBmongod \-\-auditDestination\f1
 .RS
@@ -3445,6 +3517,20 @@ Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-e
 and MongoDB Atlas (https://cloud.mongodb.com/user#/atlas/login)\&.
 .RE
 .PP
+\fBmongod \-\-auditEncryptionKeyUID\f1
+.RS
+.PP
+Specifies the unique identifier of the Key Management
+Interoperability Protocol (KMIP) key for \fBaudit log encryption\f1\&.
+.PP
+You cannot use \fB\-\-auditEncryptionKeyUID\f1\f1 and
+\fB\-\-auditLocalKeyFile\f1\f1 together.
+.PP
+Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)\&.
+MongoDB Enterprise and Atlas have different configuration
+requirements.
+.RE
+.PP
 \fBmongod \-\-auditFormat\f1
 .RS
 .PP
@@ -3483,6 +3569,25 @@ Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-e
 and MongoDB Atlas (https://cloud.mongodb.com/user#/atlas/login)\&.
 .RE
 .PP
+\fBmongod \-\-auditLocalKeyFile\f1
+.RS
+.PP
+Specifies the path and file name for a local audit key file for
+\fBaudit log encryption\f1\&.
+.PP
+Only use \fB\-\-auditLocalKeyFile\f1\f1 for testing because the key is
+not secured. To secure the key, use
+\fB\-\-auditEncryptionKeyUID\f1\f1 and an external Key
+Management Interoperability Protocol (KMIP) server.
+.PP
+You cannot use \fB\-\-auditLocalKeyFile\f1\f1 and
+\fB\-\-auditEncryptionKeyUID\f1\f1 together.
+.PP
+Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)\&.
+MongoDB Enterprise and Atlas have different configuration
+requirements.
+.RE
+.PP
 \fBmongod \-\-auditPath\f1
 .RS
 .PP
@@ -3516,6 +3621,37 @@ the configuration file.
 .PP
 Available only in MongoDB Enterprise (http://www.mongodb.com/products/mongodb\-enterprise\-advanced?tck=docs_server)
 and MongoDB Atlas (https://cloud.mongodb.com/user#/atlas/login)\&.
+.RE
+.SS SNMP OPTIONS
+.PP
+MongoDB Enterprise on macOS does \fInot\f1 include support for SNMP due
+to SERVER\-29352 (https://jira.mongodb.org/browse/SERVER\-29352)\&.
+.PP
+\fBmongod \-\-snmp\-disabled\f1
+.RS
+.PP
+Disables SNMP access to \fBmongod\f1\f1\&. The option is incompatible
+with \fB\-\-snmp\-subagent\f1\f1 and \fB\-\-snmp\-master\f1\f1\&.
+.RE
+.PP
+\fBmongod \-\-snmp\-subagent\f1
+.RS
+.PP
+Runs SNMP as a subagent. The option is incompatible with \fB\-\-snmp\-disabled\f1\f1\&.
+.RE
+.PP
+\fBmongod \-\-snmp\-master\f1
+.RS
+.PP
+Runs SNMP as a master. The option is incompatible with \fB\-\-snmp\-disabled\f1\f1\&.
+.RE
+.RS
+.IP \(bu 2
+\fBMonitor MongoDB With SNMP on Linux\f1
+.IP \(bu 2
+\fBMonitor MongoDB Windows with SNMP\f1
+.IP \(bu 2
+\fBTroubleshoot SNMP\f1
 .RE
 .SS INMEMORY OPTIONS
 .PP
@@ -3792,8 +3928,36 @@ KMIP server.
 .PP
 Starting in 4.0, on macOS or Windows, you can use a certificate
 from the operating system\(aqs secure store instead of a PEM key
-file. See \fB\-\-kmipClientCertificateSelector\f1\f1\&. When using the secure store, you do not
-need to, but can, also specify the \fB\-\-kmipServerCAFile\f1\f1\&.
+file. See \fB\-\-kmipClientCertificateSelector\f1\f1\&. When using the secure
+store, you do not need to, but can, also specify the \fB\-\-kmipServerCAFile\f1\f1\&.
+.RE
+.PP
+\fBmongod \-\-kmipActivateKeys\f1
+.RS
+.PP
+\fIDefault\f1: true
+.PP
+Activates all newly created KMIP keys upon creation and then periodically
+checks those keys are in an active state.
+.PP
+When \fB\-\-kmipActivateKeys\f1 is \fBtrue\f1 and you have existing keys on a
+KMIP server, the key must be activated first or the \fBmongod\f1\f1 node
+will fail to start.
+.PP
+If the key being used by the mongod transitions into a non\-active state,
+the \fBmongod\f1\f1 node will shut down unless \fBkmipActivateKeys\f1 is
+false. To ensure you have an active key, rotate the KMIP master key by
+using \fB\-\-kmipRotateMasterKey\f1\f1\&.
+.RE
+.PP
+\fBmongod \-\-kmipKeyStatePollingSeconds\f1
+.RS
+.PP
+\fIDefault\f1: 900 seconds
+.PP
+Frequency in seconds at which mongod polls the KMIP server for active keys.
+.PP
+To disable disable polling, set the value to \fB\-1\f1\&.
 .RE
 .PP
 \fBmongod \-\-eseDatabaseKeyRollover\f1
