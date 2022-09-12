@@ -188,6 +188,12 @@ void removeIndexBuildEntryAfterCommitOrAbort(OperationContext* opCtx,
         return;
     }
 
+    if (replCoord->getSettings().shouldRecoverFromOplogAsStandalone()) {
+        // Writes to the 'config.system.indexBuilds' collection are replicated and the index entry
+        // will be removed when the delete oplog entry is replayed at a later time.
+        return;
+    }
+
     auto status = indexbuildentryhelpers::removeIndexBuildEntry(
         opCtx, indexBuildEntryCollection, replState.buildUUID);
     if (!status.isOK()) {
