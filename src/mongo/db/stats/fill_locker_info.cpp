@@ -27,12 +27,17 @@
  *    it in the license file.
  */
 
+
 #include "mongo/db/stats/fill_locker_info.h"
 
 #include <algorithm>
 
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 
 namespace mongo {
 
@@ -43,14 +48,29 @@ void fillLockerInfo(const Locker::LockerInfo& lockerInfo, BSONObjBuilder& infoBu
 
     // Only add the last lock of each type, and use the largest mode encountered. Each type of
     // global resource is reported as its own type.
-    LockMode modeForType[static_cast<uint8_t>(ResourceGlobalId::kNumIds) + ResourceTypesCount - 1] =
+    constexpr auto totalResourceTypesCount =
+        static_cast<uint8_t>(ResourceGlobalId::kNumIds) + ResourceTypesCount;
+    LockMode modeForType[totalResourceTypesCount - 1] =
         {};  // default initialize to zero (min value)
     for (size_t i = 0; i < locksSize; i++) {
         const Locker::OneLock& lock = lockerInfo.locks[i];
         const ResourceType lockType = lock.resourceId.getType();
+
         auto index = lockType == RESOURCE_GLOBAL
             ? lock.resourceId.getHashId()
             : static_cast<uint8_t>(ResourceGlobalId::kNumIds) + lockType - 1;
+
+        // Note: The value returned by getHashId() for a RESOURCE_GLOBAL lock is equivalent to the
+        // lock's ResourceGlobalId enum value and should always be less than
+        // ResourceGlobalId::kNumIds.
+        // Enforce that the computed 'index' for the resource's type is be within the expected
+        // bounds.
+        invariant(
+            index < totalResourceTypesCount,
+            str::stream() << "Invalid index used to fill locker statistics -  index:  " << index
+                          << ", totalResourceTypesCount: " << totalResourceTypesCount
+                          << ", (lockType == RESOURCE_GLOBAL): " << (lockType == RESOURCE_GLOBAL));
+
         const LockMode lockMode = std::max(lock.mode, modeForType[index]);
 
         // Check that lockerInfo is sorted on resource type
