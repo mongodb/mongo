@@ -189,8 +189,9 @@ void removeIndexBuildEntryAfterCommitOrAbort(OperationContext* opCtx,
     }
 
     if (replCoord->getSettings().shouldRecoverFromOplogAsStandalone()) {
-        // TODO SERVER-60753: Remove this mixed-mode write.
-        opCtx->recoveryUnit()->allowUntimestampedWrite();
+        // Writes to the 'config.system.indexBuilds' collection are replicated and the index entry
+        // will be removed when the delete oplog entry is replayed at a later time.
+        return;
     }
 
     auto status = indexbuildentryhelpers::removeIndexBuildEntry(
