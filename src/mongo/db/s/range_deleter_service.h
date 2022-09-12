@@ -92,6 +92,9 @@ private:
 
     AtomicWord<State> _state{kDown};
 
+    // ONLY FOR TESTING: variable notified when the state changes to "up"
+    stdx::condition_variable _rangeDeleterServiceUpCondVar_FOR_TESTING;
+
     /* Acquire mutex only if service is up (for "user" operation) */
     [[nodiscard]] stdx::unique_lock<Latch> _acquireMutexFailIfServiceNotUp() {
         stdx::unique_lock<Latch> lg(_mutex_DO_NOT_USE_DIRECTLY);
@@ -120,7 +123,8 @@ public:
      */
     SharedSemiFuture<void> registerTask(
         const RangeDeletionTask& rdt,
-        SemiFuture<void>&& waitForActiveQueriesToComplete = SemiFuture<void>::makeReady());
+        SemiFuture<void>&& waitForActiveQueriesToComplete = SemiFuture<void>::makeReady(),
+        bool fromResubmitOnStepUp = false);
 
     /*
      * Deregister a task from the range deleter service.
@@ -157,9 +161,18 @@ public:
      */
     long long totalNumOfRegisteredTasks();
 
+    /* ONLY FOR TESTING: wait for the state to become "up" */
+    void _waitForRangeDeleterServiceUp_FOR_TESTING() {
+        stdx::unique_lock<Latch> lg(_mutex_DO_NOT_USE_DIRECTLY);
+        if (_state.load() != kUp) {
+            _rangeDeleterServiceUpCondVar_FOR_TESTING.wait(lg,
+                                                           [&]() { return _state.load() == kUp; });
+        }
+    }
+
 private:
     /* Asynchronously register range deletions on the service. To be called on on step-up */
-    void _recoverRangeDeletionsOnStepUp();
+    void _recoverRangeDeletionsOnStepUp(OperationContext* opCtx);
 
     /* ReplicaSetAwareServiceShardSvr "empty implemented" methods */
     void onStartup(OperationContext* opCtx) override final{};

@@ -148,6 +148,9 @@ public:
     /**
      * Called after the node has transitioned out of PRIMARY. Usually this is into SECONDARY, but it
      * could also be into ROLLBACK or REMOVED.
+     *
+     * NB: also called when SECONDARY nodes transition to ROLLBACK, hence it should never be assumed
+     * that `onStepUp` hooks have been invoked at least once before this method is invoked.
      */
     virtual void onStepDown() = 0;
 
