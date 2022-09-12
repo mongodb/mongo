@@ -1675,7 +1675,7 @@ extern int __wt_verify_ckpt_unload(WT_SESSION_IMPL *session, WT_BLOCK *block)
 extern int __wt_verify_dsk(WT_SESSION_IMPL *session, const char *tag, WT_ITEM *buf)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_verify_dsk_image(WT_SESSION_IMPL *session, const char *tag,
-  const WT_PAGE_HEADER *dsk, size_t size, WT_ADDR *addr, bool empty_page_ok)
+  const WT_PAGE_HEADER *dsk, size_t size, WT_ADDR *addr, uint32_t verify_flags)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int64_t __wt_log_slot_release(WT_MYSLOT *myslot, int64_t size)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));

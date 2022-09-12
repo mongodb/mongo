@@ -2194,8 +2194,8 @@ copy_image:
      */
     WT_ASSERT(session,
       verify_image == false ||
-        __wt_verify_dsk_image(
-          session, "[reconcile-image]", chunk->image.data, 0, &multi->addr, true) == 0);
+        __wt_verify_dsk_image(session, "[reconcile-image]", chunk->image.data, 0, &multi->addr,
+          WT_VRFY_DISK_EMPTY_PAGE_OK) == 0);
 #endif
     /*
      * If re-instantiating this page in memory (either because eviction wants to, or because we

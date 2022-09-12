@@ -367,6 +367,8 @@ struct __wt_update_vector;
 typedef struct __wt_update_vector WT_UPDATE_VECTOR;
 struct __wt_verbose_multi_category;
 typedef struct __wt_verbose_multi_category WT_VERBOSE_MULTI_CATEGORY;
+struct __wt_verify_info;
+typedef struct __wt_verify_info WT_VERIFY_INFO;
 struct __wt_version;
 typedef struct __wt_version WT_VERSION;
 union __wt_lsn;
