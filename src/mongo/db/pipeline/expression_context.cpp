@@ -49,12 +49,13 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      std::shared_ptr<MongoProcessInterface> processInterface,
                                      StringMap<ResolvedNamespace> resolvedNamespaces,
                                      boost::optional<UUID> collUUID,
-                                     bool mayDbProfile)
+                                     bool mayDbProfile,
+                                     bool allowDiskUseByDefault)
     : ExpressionContext(opCtx,
                         request.getExplain(),
                         request.getFromMongos(),
                         request.getNeedsMerge(),
-                        request.getAllowDiskUse(),
+                        request.getAllowDiskUse().value_or(allowDiskUseByDefault),
                         request.getBypassDocumentValidation().value_or(false),
                         request.getIsMapReduceCommand(),
                         request.getNamespace(),
@@ -71,6 +72,7 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
         // 'jsHeapLimitMB' limit.
         jsHeapLimitMB = boost::none;
     }
+    forPerShardCursor = request.getPassthroughToShard().has_value();
 }
 
 ExpressionContext::ExpressionContext(
@@ -92,7 +94,8 @@ ExpressionContext::ExpressionContext(
     : explain(explain),
       fromMongos(fromMongos),
       needsMerge(needsMerge),
-      allowDiskUse(allowDiskUse),
+      allowDiskUse(allowDiskUse &&
+                   !(opCtx && opCtx->readOnly())),  // Disallow disk use if in read-only mode.
       bypassDocumentValidation(bypassDocumentValidation),
       ns(ns),
       uuid(std::move(collUUID)),

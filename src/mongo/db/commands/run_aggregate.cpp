@@ -443,15 +443,10 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
                               MongoProcessInterface::create(opCtx),
                               uassertStatusOK(resolveInvolvedNamespaces(opCtx, request)),
                               uuid,
-                              CurOp::get(opCtx)->dbProfileLevel() > 0);
+                              CurOp::get(opCtx)->dbProfileLevel() > 0,
+                              allowDiskUseByDefault.load());
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     expCtx->collationMatchesDefault = collationMatchesDefault;
-    expCtx->forPerShardCursor = request.getPassthroughToShard().has_value();
-    expCtx->allowDiskUse = request.getAllowDiskUse().value_or(allowDiskUseByDefault.load());
-    if (opCtx->readOnly()) {
-        // Disallow disk use if in read-only mode.
-        expCtx->allowDiskUse = false;
-    }
 
     // If the request explicitly specified NOT to use v2 resume tokens for change streams, set this
     // on the expCtx. This can happen if a the request originated from 6.0 mongos, or in test mode.

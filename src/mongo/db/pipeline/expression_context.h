@@ -123,7 +123,8 @@ public:
                       std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
                       StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces,
                       boost::optional<UUID> collUUID,
-                      bool mayDbProfile = true);
+                      bool mayDbProfile = true,
+                      bool allowDiskUseByDefault = false);
 
     /**
      * Constructs an ExpressionContext to be used for Pipeline parsing and evaluation. This version

@@ -142,10 +142,6 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
         findCommand.getLet(),                    // let
         CurOp::get(opCtx)->dbProfileLevel() > 0  // mayDbProfile
     );
-    if (opCtx->readOnly()) {
-        // Disallow disk use if in read-only mode.
-        expCtx->allowDiskUse = false;
-    }
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     expCtx->startExpressionCounters();
 
