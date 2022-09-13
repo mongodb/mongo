@@ -14,6 +14,7 @@
  *    # passthrough suites automatically retry operations on TenantMigrationAborted errors.
  *    tenant_migration_incompatible,
  *    does_not_support_repeated_reads,
+ *    requires_fcv_62,
  * ]
  */
 
@@ -125,8 +126,20 @@ for (i = 0; i < numRecords; i++) {
 }
 lastTop = assertTopDiffEq(testColl, lastTop, "commands", numRecords);
 
+// aggregate
+assert.eq(0, testColl.aggregate([]).itcount());  // All records were just deleted.
+assertTopDiffEq(testColl, lastTop, "commands", 1);
+lastTop = assertTopDiffEq(testColl, lastTop, "readLock", 1);
+
 // getIndexes
-assert.eq(1, testColl.getIndexes().length);
+const indexes = testColl.getIndexes();
+assert.eq(1, indexes.length);
+assertTopDiffEq(testColl, lastTop, "commands", 1);
+lastTop = assertTopDiffEq(testColl, lastTop, "readLock", 1);
+
+// aggregate with $indexStats
+const expectedIndexStatsCount = indexes[0].clustered ? 0 : 1;
+assert.eq(expectedIndexStatsCount, testColl.aggregate([{$indexStats: {}}]).itcount());
 assertTopDiffEq(testColl, lastTop, "commands", 1);
 lastTop = assertTopDiffEq(testColl, lastTop, "readLock", 1);
 
