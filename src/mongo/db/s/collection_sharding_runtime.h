@@ -121,6 +121,11 @@ public:
     void clearFilteringMetadata(OperationContext* opCtx);
 
     /**
+     * Calls to clearFilteringMetadata + clears the _metadataManager object.
+     */
+    void clearFilteringMetadataForDroppedCollection(OperationContext* opCtx);
+
+    /**
      * Methods to control the collection's critical section. Methods listed below must be called
      * with both the collection lock and CSRLock held in exclusive mode.
      *
@@ -257,6 +262,11 @@ private:
         OperationContext* opCtx,
         const boost::optional<mongo::LogicalTime>& atClusterTime,
         bool supportNonVersionedOperations = false);
+
+    /**
+     * Auxiliary function used to implement the different flavours of clearFilteringMetadata.
+     */
+    void _clearFilteringMetadata(OperationContext* opCtx, bool clearFilteringMetadata);
 
     // The service context under which this instance runs
     ServiceContext* const _serviceContext;

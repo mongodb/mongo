@@ -83,8 +83,10 @@ bool isStandaloneOrPrimary(OperationContext* opCtx) {
  */
 class CollectionVersionLogOpHandler final : public RecoveryUnit::Change {
 public:
-    CollectionVersionLogOpHandler(OperationContext* opCtx, const NamespaceString& nss)
-        : _opCtx(opCtx), _nss(nss) {}
+    CollectionVersionLogOpHandler(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  bool droppingCollection)
+        : _opCtx(opCtx), _nss(nss), _droppingCollection(droppingCollection) {}
 
     void commit(boost::optional<Timestamp>) override {
         invariant(_opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_IX));
@@ -94,7 +96,11 @@ public:
         // Force subsequent uses of the namespace to refresh the filtering metadata so they can
         // synchronize with any work happening on the primary (e.g., migration critical section).
         UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
-        CollectionShardingRuntime::get(_opCtx, _nss)->clearFilteringMetadata(_opCtx);
+        if (_droppingCollection)
+            CollectionShardingRuntime::get(_opCtx, _nss)
+                ->clearFilteringMetadataForDroppedCollection(_opCtx);
+        else
+            CollectionShardingRuntime::get(_opCtx, _nss)->clearFilteringMetadata(_opCtx);
     }
 
     void rollback() override {}
@@ -102,6 +108,7 @@ public:
 private:
     OperationContext* _opCtx;
     const NamespaceString _nss;
+    const bool _droppingCollection;
 };
 
 /**
@@ -155,8 +162,8 @@ void onConfigDeleteInvalidateCachedCollectionMetadataAndNotify(OperationContext*
     AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
     AutoGetCollection autoColl(opCtx, deletedNss, MODE_IX);
 
-    opCtx->recoveryUnit()->registerChange(
-        std::make_unique<CollectionVersionLogOpHandler>(opCtx, deletedNss));
+    opCtx->recoveryUnit()->registerChange(std::make_unique<CollectionVersionLogOpHandler>(
+        opCtx, deletedNss, /* droppingCollection */ true));
 }
 
 /**
@@ -375,8 +382,8 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, updatedNss, MODE_IX);
         if (refreshingFieldNewVal.isBoolean() && !refreshingFieldNewVal.boolean()) {
-            opCtx->recoveryUnit()->registerChange(
-                std::make_unique<CollectionVersionLogOpHandler>(opCtx, updatedNss));
+            opCtx->recoveryUnit()->registerChange(std::make_unique<CollectionVersionLogOpHandler>(
+                opCtx, updatedNss, /* droppingCollection */ false));
         }
 
         if (enterCriticalSectionFieldNewVal.ok()) {

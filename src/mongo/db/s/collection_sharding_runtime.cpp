@@ -234,7 +234,8 @@ void CollectionShardingRuntime::setFilteringMetadata_withLock(OperationContext* 
     }
 }
 
-void CollectionShardingRuntime::clearFilteringMetadata(OperationContext* opCtx) {
+void CollectionShardingRuntime::_clearFilteringMetadata(OperationContext* opCtx,
+                                                        bool clearMetadataManager) {
     const auto csrLock = CSRLock::lockExclusive(opCtx, this);
     if (_shardVersionInRecoverOrRefresh) {
         _shardVersionInRecoverOrRefresh->cancellationSource.cancel();
@@ -246,9 +247,21 @@ void CollectionShardingRuntime::clearFilteringMetadata(OperationContext* opCtx) 
                     1,
                     "Clearing metadata for collection {namespace}",
                     "Clearing collection metadata",
-                    "namespace"_attr = _nss);
+                    "namespace"_attr = _nss,
+                    "clearMetadataManager"_attr = clearMetadataManager);
         _metadataType = MetadataType::kUnknown;
+        if (clearMetadataManager)
+            _metadataManager.reset();
     }
+}
+
+void CollectionShardingRuntime::clearFilteringMetadata(OperationContext* opCtx) {
+    _clearFilteringMetadata(opCtx, /* clearMetadataManager */ false);
+}
+
+void CollectionShardingRuntime::clearFilteringMetadataForDroppedCollection(
+    OperationContext* opCtx) {
+    _clearFilteringMetadata(opCtx, /* clearMetadataManager */ true);
 }
 
 SharedSemiFuture<void> CollectionShardingRuntime::cleanUpRange(ChunkRange const& range,
