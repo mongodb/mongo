@@ -57,6 +57,7 @@ include:
 - filename: etc/evergreen_yml_components/variants/task_generation.yml
 - filename: etc/evergreen_yml_components/variants/sanitizer.yml
 - filename: etc/evergreen_yml_components/variants/in_memory.yml
+- filename: etc/evergreen_yml_components/variants/ninja.yml
 
 variables:
 - &libfuzzertests
@@ -936,21 +937,6 @@ buildvariants:
 #      distros:
 #        - windows-vsCurrent-xlarge
 
-- name: enterprise-windows-ninja
-  display_name: "Ninja Build: Enterprise Windows"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
-  expansions:
-    compile_flags: --ssl MONGO_DISTMOD=windows CPPPATH="c:/sasl/include" LIBPATH="c:/sasl/lib" -j$(bc <<< "$(grep -c '^processor' /proc/cpuinfo) / 1.5")  --win-version-min=win10
-  tasks:
-  - name: compile_ninja_next_TG
-    distros:
-    - windows-vsCurrent-large
-  - name: compile_ninja_TG
-    distros:
-    - windows-vsCurrent-large
-
 - name: enterprise-windows-cxx20-debug-experimental
   display_name: "~ Enterprise Windows C++20 DEBUG"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
@@ -1069,20 +1055,6 @@ buildvariants:
   - name: .stitch
   - name: unittest_shell_hang_analyzer_gen
   - name: generate_buildid_to_debug_symbols_mapping
-
-- name: macos-enterprise-ninja
-  display_name: "Ninja Build: macOS Enterprise"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
-  run_on:
-  - macos-1100
-  expansions:
-    compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
-    compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
-  tasks:
-  - name: compile_ninja_next_TG
-  - name: compile_ninja_TG
 
 - name: enterprise-macos-rosetta-2
   display_name: "Enterprise macOS Via Rosetta 2"
@@ -1382,52 +1354,6 @@ buildvariants:
   expansions:
     <<: *enterprise-rhel-80-64-bit-dynamic-required-expansions
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic --use-glibcxx-debug --dbg=on --allocator=system
-
-- name: ubuntu1804-ninja-build-profiles
-  display_name: "Ninja Build Profiles: Ubuntu 18.04"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
-  run_on:
-  - ubuntu1804-small
-  stepback: false
-  expansions:
-    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804 -j$(grep -c ^processor /proc/cpuinfo)
-    repo_edition: enterprise
-    has_packages: false
-  tasks:
-  - name: compile_ninja_default_profile_TG
-    distros:
-    - ubuntu1804-xlarge
-  - name: compile_ninja_opt_profile_TG
-    distros:
-    - ubuntu1804-xlarge
-  - name: compile_ninja_san_profile_TG
-    distros:
-    - ubuntu1804-xlarge
-  - name: compile_ninja_fast_profile_TG
-    distros:
-    - ubuntu1804-xlarge
-
-- name: enterprise-rhel-80-64-bit-dynamic-required-ninja
-  display_name: "Ninja Build: Enterprise RHEL 8.0"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
-  run_on:
-  - rhel80-small
-  stepback: false
-  expansions:
-    compile_flags: --ssl --ocsp-stapling=off MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
-    repo_edition: enterprise
-    has_packages: false
-  tasks:
-  - name: compile_ninja_next_TG
-    distros:
-    - rhel80-xlarge
-  - name: compile_ninja_TG
-    distros:
-    - rhel80-xlarge
 
 - &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required-template
   name: enterprise-rhel-80-64-bit-dynamic-all-feature-flags-required
