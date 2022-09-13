@@ -464,8 +464,8 @@ let viewsCommandTests = {
             skipSharded: true,
         }
     ],
+
     repairCursor: {skip: wasRemovedInBinaryVersion44},
-    repairDatabase: {skip: isUnrelated},
     repairShardedCollectionChunksHistory: {
         command: {repairShardedCollectionChunksHistory: "test.view"},
         skipStandalone: true,
