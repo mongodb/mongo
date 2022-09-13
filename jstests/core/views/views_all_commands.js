@@ -555,7 +555,6 @@ let viewsCommandTests = {
             skipSharded: true,
         }
     ],
-    repairDatabase: {skip: isUnrelated},
     repairShardedCollectionChunksHistory: {
         command: {repairShardedCollectionChunksHistory: "test.view"},
         skipStandalone: true,

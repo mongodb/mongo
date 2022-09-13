@@ -606,7 +606,6 @@ let testCases = {
         checkReadConcern: false,
         checkWriteConcern: true,
     },
-    repairDatabase: {skip: "does not accept read or write concern"},
     repairShardedCollectionChunksHistory: {skip: "does not accept read or write concern"},
     replSetAbortPrimaryCatchUp: {skip: "does not accept read or write concern"},
     replSetFreeze: {skip: "does not accept read or write concern"},

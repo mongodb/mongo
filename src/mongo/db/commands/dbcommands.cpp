@@ -173,43 +173,6 @@ public:
     };
 } cmdDropDatabase;
 
-class CmdRepairDatabase final : public TypedCommand<CmdRepairDatabase> {
-public:
-    using Request = RepairDatabaseCommand;
-
-    class Invocation final : public InvocationBase {
-    public:
-        using InvocationBase::InvocationBase;
-
-        bool supportsWriteConcern() const final {
-            return false;
-        }
-
-        NamespaceString ns() const final {
-            return NamespaceString(request().getDbName());
-        }
-
-        void doCheckAuthorization(OperationContext* opCtx) const final {}
-
-        void typedRun(OperationContext*) {
-            uasserted(ErrorCodes::CommandNotFound, Request::kCommandDescription);
-        }
-    };
-
-    std::string help() const final {
-        return Request::kCommandDescription.toString();
-    }
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
-        return AllowedOnSecondary::kAlways;
-    }
-
-    bool maintenanceMode() const final {
-        return false;
-    }
-
-} cmdRepairDatabase;
-
 /* drop collection */
 class CmdDrop : public DropCmdVersion1Gen<CmdDrop> {
 public:

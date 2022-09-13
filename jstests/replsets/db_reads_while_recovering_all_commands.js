@@ -328,7 +328,6 @@ const allCommands = {
     refreshSessions: {skip: isNotAUserDataRead},
     reIndex: {skip: isNotAUserDataRead},
     renameCollection: {skip: isPrimaryOnly},
-    repairDatabase: {skip: isNotAUserDataRead},
     repairShardedCollectionChunksHistory: {skip: isPrimaryOnly},
     replSetAbortPrimaryCatchUp: {skip: isNotAUserDataRead},
     replSetFreeze: {skip: isNotAUserDataRead},
