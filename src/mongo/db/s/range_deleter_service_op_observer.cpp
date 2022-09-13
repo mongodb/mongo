@@ -29,7 +29,9 @@
 
 #include "mongo/db/s/range_deleter_service_op_observer.h"
 
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
@@ -38,6 +40,27 @@ namespace mongo {
 namespace {
 // Small hack used to be able to retrieve the full removed document in the `onDelete` method
 const auto deletedDocumentDecoration = OperationContext::declareDecoration<BSONObj>();
+void registerTaskWithOngoingQueriesOnOpLogEntryCommit(OperationContext* opCtx,
+                                                      const RangeDeletionTask& rdt) {
+
+    opCtx->recoveryUnit()->onCommit([opCtx, rdt](boost::optional<Timestamp>) {
+        try {
+            AutoGetCollection autoColl(opCtx, rdt.getNss(), MODE_IS);
+            auto waitForActiveQueriesToComplete =
+                CollectionShardingRuntime::get(opCtx, rdt.getNss())
+                    ->getOngoingQueriesCompletionFuture(rdt.getCollectionUuid(), rdt.getRange())
+                    .semi();
+            (void)RangeDeleterService::get(opCtx)->registerTask(
+                rdt, std::move(waitForActiveQueriesToComplete));
+        } catch (const DBException& ex) {
+            dassert(ex.code() == ErrorCodes::NotYetInitialized,
+                    str::stream() << "No error different from `NotYetInitialized` is expected "
+                                     "to be propagated to the range deleter observer. Got error: "
+                                  << ex.toStatus());
+        }
+    });
+}
+
 }  // namespace
 
 RangeDeleterServiceOpObserver::RangeDeleterServiceOpObserver() = default;
@@ -53,15 +76,7 @@ void RangeDeleterServiceOpObserver::onInserts(OperationContext* opCtx,
             auto deletionTask = RangeDeletionTask::parse(
                 IDLParserContext("RangeDeleterServiceOpObserver"), it->doc);
             if (!deletionTask.getPending() || !*(deletionTask.getPending())) {
-                try {
-                    (void)RangeDeleterService::get(opCtx)->registerTask(deletionTask);
-                } catch (const DBException& ex) {
-                    dassert(ex.code() == ErrorCodes::NotYetInitialized,
-                            str::stream()
-                                << "No error different from `NotYetInitialized` is expected "
-                                   "to be propagated to the range deleter observer. Got error: "
-                                << ex.toStatus());
-                }
+                registerTaskWithOngoingQueriesOnOpLogEntryCommit(opCtx, deletionTask);
             }
         }
     }
@@ -85,15 +100,7 @@ void RangeDeleterServiceOpObserver::onUpdate(OperationContext* opCtx,
         if (pendingFieldIsRemoved || pendingFieldUpdatedToFalse) {
             auto deletionTask = RangeDeletionTask::parse(
                 IDLParserContext("RangeDeleterServiceOpObserver"), args.updateArgs->updatedDoc);
-            try {
-                (void)RangeDeleterService::get(opCtx)->registerTask(deletionTask);
-            } catch (const DBException& ex) {
-                dassert(ex.code() == ErrorCodes::NotYetInitialized,
-                        str::stream()
-                            << "No error different from `NotYetInitialized` is expected "
-                               "to be propagated to the range deleter observer. Got error: "
-                            << ex.toStatus());
-            }
+            registerTaskWithOngoingQueriesOnOpLogEntryCommit(opCtx, deletionTask);
         }
     }
 }

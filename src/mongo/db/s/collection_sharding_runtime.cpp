@@ -329,6 +329,17 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
+SharedSemiFuture<void> CollectionShardingRuntime::getOngoingQueriesCompletionFuture(
+    const UUID& collectionUuid, ChunkRange const& range) {
+    stdx::lock_guard lk(_metadataManagerLock);
+
+    if (!_metadataManager || _metadataManager->getCollectionUuid() != collectionUuid) {
+        return SemiFuture<void>::makeReady().share();
+    }
+    return _metadataManager->getOngoingQueriesCompletionFuture(range);
+}
+
+
 std::shared_ptr<ScopedCollectionDescription::Impl>
 CollectionShardingRuntime::_getCurrentMetadataIfKnown(
     const boost::optional<LogicalTime>& atClusterTime) {

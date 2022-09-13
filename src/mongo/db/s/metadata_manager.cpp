@@ -341,6 +341,16 @@ boost::optional<SharedSemiFuture<void>> MetadataManager::trackOrphanedDataCleanu
     return boost::none;
 }
 
+SharedSemiFuture<void> MetadataManager::getOngoingQueriesCompletionFuture(ChunkRange const& range) {
+    stdx::lock_guard<Latch> lg(_managerLock);
+
+    auto* const overlapMetadata = _findNewestOverlappingMetadata(lg, range);
+    if (!overlapMetadata) {
+        return SemiFuture<void>::makeReady().share();
+    }
+    return overlapMetadata->onDestructionPromise.getFuture();
+}
+
 auto MetadataManager::_findNewestOverlappingMetadata(WithLock, ChunkRange const& range)
     -> CollectionMetadataTracker* {
     invariant(!_metadata.empty());

@@ -149,6 +149,11 @@ public:
     boost::optional<SharedSemiFuture<void>> trackOrphanedDataCleanup(
         ChunkRange const& orphans) const;
 
+    /**
+     * Returns a future marked as ready when all the ongoing queries retaining the range complete
+     */
+    SharedSemiFuture<void> getOngoingQueriesCompletionFuture(ChunkRange const& range);
+
 private:
     // Management of the _metadata list is implemented in RangePreserver
     friend class RangePreserver;

@@ -187,6 +187,12 @@ public:
                                ChunkRange orphanRange,
                                Date_t deadline);
 
+    /**
+     * Returns a future marked as ready when all the ongoing queries retaining the range complete
+     */
+    SharedSemiFuture<void> getOngoingQueriesCompletionFuture(const UUID& collectionUuid,
+                                                             ChunkRange const& range);
+
     std::uint64_t getNumMetadataManagerChanges_forTest() {
         return _numMetadataManagerChanges;
     }
