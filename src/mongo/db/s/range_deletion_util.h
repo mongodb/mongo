@@ -31,7 +31,6 @@
 #include <boost/optional.hpp>
 #include <list>
 
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/executor/task_executor.h"

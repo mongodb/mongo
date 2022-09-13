@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
 #include <benchmark/benchmark.h>
 
 #include "mongo/base/init.h"
@@ -36,9 +35,6 @@
 #include "mongo/db/storage/recovery_unit_noop.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/unittest/unittest.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 namespace mongo {
 namespace {
@@ -81,11 +77,11 @@ public:
      */
     void makeKClientsWithLockers(int k) {
         clients.reserve(k);
+
         for (int i = 0; i < k; ++i) {
             auto client = getGlobalServiceContext()->makeClient(str::stream()
                                                                 << "test client for thread " << i);
             auto opCtx = client->makeOperationContext();
-            locker[i] = std::make_unique<LockerImpl>(opCtx->getServiceContext());
             clients.emplace_back(std::move(client), std::move(opCtx));
         }
     }
@@ -93,7 +89,6 @@ public:
 protected:
     std::vector<std::pair<ServiceContext::UniqueClient, ServiceContext::UniqueOperationContext>>
         clients;
-    std::array<std::unique_ptr<LockerImpl>, kMaxPerfThreads> locker;
 };
 
 BENCHMARK_DEFINE_F(DConcurrencyTest, BM_StdMutex)(benchmark::State& state) {
@@ -116,7 +111,7 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_ResourceMutexShared)(benchmark::State& s
     static Lock::ResourceMutex mtx("testMutex");
 
     for (auto keepRunning : state) {
-        Lock::SharedLock lk(locker[state.thread_index].get(), mtx);
+        Lock::SharedLock lk(clients[state.thread_index].second.get(), mtx);
     }
 }
 
@@ -128,7 +123,7 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_ResourceMutexExclusive)(benchmark::State
     static Lock::ResourceMutex mtx("testMutex");
 
     for (auto keepRunning : state) {
-        Lock::ExclusiveLock lk(locker[state.thread_index].get(), mtx);
+        Lock::ExclusiveLock lk(clients[state.thread_index].second.get(), mtx);
     }
 }
 

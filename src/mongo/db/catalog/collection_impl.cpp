@@ -788,8 +788,7 @@ void CollectionImpl::deleteDocument(OperationContext* opCtx,
     }
 
     if (needsCappedLock()) {
-        Lock::ResourceLock heldUntilEndOfWUOW{
-            opCtx->lockState(), ResourceId(RESOURCE_METADATA, _ns), MODE_X};
+        Lock::ResourceLock heldUntilEndOfWUOW{opCtx, ResourceId(RESOURCE_METADATA, _ns), MODE_X};
     }
 
     std::vector<OplogSlot> oplogSlots;
@@ -889,8 +888,7 @@ RecordId CollectionImpl::updateDocument(OperationContext* opCtx,
     invariant(newDoc.isOwned());
 
     if (needsCappedLock()) {
-        Lock::ResourceLock heldUntilEndOfWUOW{
-            opCtx->lockState(), ResourceId(RESOURCE_METADATA, _ns), MODE_X};
+        Lock::ResourceLock heldUntilEndOfWUOW{opCtx, ResourceId(RESOURCE_METADATA, _ns), MODE_X};
     }
 
     SnapshotId sid = opCtx->recoveryUnit()->getSnapshotId();

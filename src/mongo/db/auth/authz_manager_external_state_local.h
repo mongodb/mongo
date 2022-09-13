@@ -37,7 +37,6 @@
 #include "mongo/db/auth/builtin_roles.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/platform/mutex.h"

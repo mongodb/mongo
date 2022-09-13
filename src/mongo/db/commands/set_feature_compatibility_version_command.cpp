@@ -291,7 +291,7 @@ public:
         opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
         // Only allow one instance of setFeatureCompatibilityVersion to run at a time.
-        Lock::ExclusiveLock setFCVCommandLock(opCtx->lockState(), commandMutex);
+        Lock::ExclusiveLock setFCVCommandLock(opCtx, commandMutex);
 
         auto request = SetFeatureCompatibilityVersion::parse(
             IDLParserContext("setFeatureCompatibilityVersion"), cmdObj);
@@ -520,8 +520,7 @@ private:
             //     upgrading to the latest FCV and act accordingly.
             //   - The global IX/X locked operation began prior to the FCV change, is acting on that
             //     assumption and will finish before upgrade procedures begin right after this.
-            Lock::ResourceLock lk(
-                opCtx, opCtx->lockState(), resourceIdFeatureCompatibilityVersion, MODE_S);
+            Lock::ResourceLock lk(opCtx, resourceIdFeatureCompatibilityVersion, MODE_S);
         }
 
         // This helper function is for any user collections uasserts, creations, or deletions that
@@ -821,8 +820,7 @@ private:
             //     upgrading to the latest FCV and act accordingly.
             //   - The global IX/X locked operation began prior to the FCV change, is acting on that
             //     assumption and will finish before upgrade procedures begin right after this.
-            Lock::ResourceLock lk(
-                opCtx, opCtx->lockState(), resourceIdFeatureCompatibilityVersion, MODE_S);
+            Lock::ResourceLock lk(opCtx, resourceIdFeatureCompatibilityVersion, MODE_S);
         }
 
         uassert(ErrorCodes::Error(549181),

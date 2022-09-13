@@ -32,11 +32,9 @@
 #include <boost/shared_array.hpp>
 #include <map>
 
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
-
 
 namespace mongo {
 

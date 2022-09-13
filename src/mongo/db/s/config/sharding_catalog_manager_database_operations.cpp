@@ -251,7 +251,7 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
                                                const DatabaseVersion& expectedDbVersion,
                                                const ShardId& toShard) {
     // Hold the shard lock until the entire commit finishes to serialize with removeShard.
-    Lock::SharedLock shardLock(opCtx->lockState(), _kShardMembershipLock);
+    Lock::SharedLock shardLock(opCtx, _kShardMembershipLock);
 
     const auto updateOp = [&] {
         const auto query = [&] {

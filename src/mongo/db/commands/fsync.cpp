@@ -156,7 +156,7 @@ public:
             return true;
         }
 
-        Lock::ExclusiveLock lk(opCtx->lockState(), commandMutex);
+        Lock::ExclusiveLock lk(opCtx, commandMutex);
 
         const auto lockCountAtStart = getLockCount();
         invariant(lockCountAtStart > 0 || !_lockThread);
@@ -305,7 +305,7 @@ public:
              BSONObjBuilder& result) override {
         LOGV2(20465, "command: unlock requested");
 
-        Lock::ExclusiveLock lk(opCtx->lockState(), commandMutex);
+        Lock::ExclusiveLock lk(opCtx, commandMutex);
 
         stdx::unique_lock<Latch> stateLock(fsyncCmd.lockStateMutex);
 

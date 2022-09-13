@@ -65,7 +65,7 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
             !ShardingState::get(opCtx)->enabled());
 
     // Only allow one instance of compactStructuredEncryptionData to run at a time.
-    Lock::ExclusiveLock fleCompactCommandLock(opCtx->lockState(), commandMutex);
+    Lock::ExclusiveLock fleCompactCommandLock(opCtx, commandMutex);
 
     const auto& edcNss = request.getNamespace();
 

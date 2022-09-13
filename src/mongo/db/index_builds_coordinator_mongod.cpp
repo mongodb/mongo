@@ -458,7 +458,7 @@ Status IndexBuildsCoordinatorMongod::voteCommitIndexBuild(OperationContext* opCt
         // commit quorum is disabled, do not record their entry into the commit ready nodes.
         // If we fail to retrieve the persisted commit quorum, the index build might be in the
         // middle of tearing down.
-        Lock::SharedLock commitQuorumLk(opCtx->lockState(), replState->commitQuorumLock.value());
+        Lock::SharedLock commitQuorumLk(opCtx, *replState->commitQuorumLock);
         auto commitQuorum =
             uassertStatusOK(indexbuildentryhelpers::getCommitQuorum(opCtx, buildUUID));
         if (commitQuorum.numNodes == CommitQuorumOptions::kDisabled) {
@@ -500,7 +500,7 @@ void IndexBuildsCoordinatorMongod::_signalIfCommitQuorumIsSatisfied(
 
     // Acquire the commitQuorumLk in shared mode to make sure commit quorum value did not change
     // after reading it from config.system.indexBuilds collection.
-    Lock::SharedLock commitQuorumLk(opCtx->lockState(), replState->commitQuorumLock.value());
+    Lock::SharedLock commitQuorumLk(opCtx, *replState->commitQuorumLock);
 
     // Read the index builds entry from config.system.indexBuilds collection.
     auto swIndexBuildEntry =
@@ -547,7 +547,7 @@ bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(
 
     // Acquire the commitQuorumLk in shared mode to make sure commit quorum value did not change
     // after reading it from config.system.indexBuilds collection.
-    Lock::SharedLock commitQuorumLk(opCtx->lockState(), replState->commitQuorumLock.value());
+    Lock::SharedLock commitQuorumLk(opCtx, *replState->commitQuorumLock);
 
     // Read the commit quorum value from config.system.indexBuilds collection.
     auto commitQuorum = uassertStatusOKWithContext(
@@ -875,7 +875,7 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
     // About to update the commit quorum value on-disk. So, take the lock in exclusive mode to
     // prevent readers from reading the commit quorum value and making decision on commit quorum
     // satisfied with the stale read commit quorum value.
-    Lock::ExclusiveLock commitQuorumLk(opCtx->lockState(), replState->commitQuorumLock.value());
+    Lock::ExclusiveLock commitQuorumLk(opCtx, *replState->commitQuorumLock);
     {
         if (auto action = replState->getNextActionNoWait()) {
             return Status(ErrorCodes::CommandFailed,

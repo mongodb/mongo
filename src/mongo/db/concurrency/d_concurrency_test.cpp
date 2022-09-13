@@ -28,7 +28,6 @@
  */
 
 #include <functional>
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -190,9 +189,7 @@ TEST_F(DConcurrencyTestFixture,
 TEST_F(DConcurrencyTestFixture, ResourceMutex) {
     Lock::ResourceMutex mtx("testMutex");
     auto opCtx = makeOperationContext();
-    LockerImpl locker1(opCtx->getServiceContext());
-    LockerImpl locker2(opCtx->getServiceContext());
-    LockerImpl locker3(opCtx->getServiceContext());
+    auto clients = makeKClientsWithLockers(3);
 
     struct State {
         void check(int n) {
@@ -213,53 +210,56 @@ TEST_F(DConcurrencyTestFixture, ResourceMutex) {
     } state;
 
     stdx::thread t1([&]() {
+        boost::optional<Lock::SharedLock> lk;
+
         // Step 0: Single thread acquires shared lock
         state.waitFor(0);
-        Lock::SharedLock lk(&locker1, mtx);
-        ASSERT(lk.isLocked());
+        lk.emplace(clients[0].second.get(), mtx);
         state.finish(0);
 
         // Step 4: Wait for t2 to regain its shared lock
         {
             state.waitFor(4);
-            state.waitFor([&locker2]() { return locker2.getWaitingResource().isValid(); });
+            state.waitFor([locker1 = clients[1].second->lockState()]() {
+                return locker1->getWaitingResource().isValid();
+            });
             state.finish(4);
         }
 
         // Step 5: After t2 becomes blocked, unlock, yielding the mutex to t3
-        lk.unlock();
-        ASSERT(!lk.isLocked());
+        lk.reset();
     });
     stdx::thread t2([&]() {
+        boost::optional<Lock::SharedLock> lk;
+
         // Step 1: Two threads acquire shared lock
         state.waitFor(1);
-        Lock::SharedLock lk(&locker2, mtx);
-        ASSERT(lk.isLocked());
+        lk.emplace(clients[1].second.get(), mtx);
         state.finish(1);
 
         // Step 2: Wait for t3 to attempt the exclusive lock
-        state.waitFor([&locker3]() { return locker3.getWaitingResource().isValid(); });
+        state.waitFor([locker2 = clients[2].second->lockState()]() {
+            return locker2->getWaitingResource().isValid();
+        });
         state.finish(2);
 
         // Step 3: Yield shared lock
-        lk.unlock();
-        ASSERT(!lk.isLocked());
+        lk.reset();
         state.finish(3);
 
         // Step 4: Try to regain the shared lock // transfers control to t1
-        lk.lock(nullptr, MODE_IS);
+        lk.emplace(clients[1].second.get(), mtx);
 
-        // Step 6: CHeck we actually got back the shared lock
-        ASSERT(lk.isLocked());
+        // Step 6: Check we actually got back the shared lock
         state.check(6);
     });
     stdx::thread t3([&]() {
         // Step 2: Third thread attempts to acquire exclusive lock
         state.waitFor(2);
-        Lock::ExclusiveLock lk(&locker3, mtx);  // transfers control to t2
 
         // Step 5: Actually get the exclusive lock
-        ASSERT(lk.isLocked());
+        Lock::ExclusiveLock lk(clients[2].second.get(),
+                               mtx);  // transfers control to t2
         state.finish(5);
     });
     t1.join();
@@ -461,7 +461,7 @@ TEST_F(DConcurrencyTestFixture, GlobalLockX_Timeout) {
 TEST_F(DConcurrencyTestFixture, RSTLmodeX_Timeout) {
     auto clients = makeKClientsWithLockers(2);
     Lock::ResourceLock rstl(
-        clients[0].second.get()->lockState(), resourceIdReplicationStateTransitionLock, MODE_X);
+        clients[0].second.get(), resourceIdReplicationStateTransitionLock, MODE_X);
     ASSERT_EQ(
         clients[0].second.get()->lockState()->getLockMode(resourceIdReplicationStateTransitionLock),
         MODE_X);
@@ -482,7 +482,7 @@ TEST_F(DConcurrencyTestFixture, RSTLmodeX_Timeout) {
 
 TEST_F(DConcurrencyTestFixture, PBWMmodeX_Timeout) {
     auto clients = makeKClientsWithLockers(2);
-    Lock::ParallelBatchWriterMode pbwm(clients[0].second.get()->lockState());
+    Lock::ParallelBatchWriterMode pbwm(clients[0].second.get());
     ASSERT_EQ(clients[0].second.get()->lockState()->getLockMode(resourceIdParallelBatchWriterMode),
               MODE_X);
 
@@ -773,7 +773,7 @@ TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsInterruptibleBlockedOnRSTL) {
 
     // The main thread takes an exclusive lock, causing the spawned thread to wait when it attempts
     // to acquire a conflicting lock.
-    Lock::ResourceLock rstl(opCtx1->lockState(), resourceIdReplicationStateTransitionLock, MODE_X);
+    Lock::ResourceLock rstl(opCtx1, resourceIdReplicationStateTransitionLock, MODE_X);
 
     auto result = runTaskAndKill(opCtx2, [&]() {
         // Killing the lock wait should throw an exception.
@@ -840,7 +840,7 @@ TEST_F(DConcurrencyTestFixture,
 
     // The main thread takes an exclusive lock, causing the spawned thread to wait when it attempts
     // to acquire a conflicting lock.
-    Lock::ResourceLock rstl(opCtx1->lockState(), resourceIdReplicationStateTransitionLock, MODE_X);
+    Lock::ResourceLock rstl(opCtx1, resourceIdReplicationStateTransitionLock, MODE_X);
     // Acquire this later to confirm that it stays unlocked.
     boost::optional<Lock::GlobalLock> g2 = boost::none;
 
@@ -900,7 +900,7 @@ TEST_F(DConcurrencyTestFixture, SetMaxLockTimeoutMillisAndNotUsingInterruptBehav
     auto opCtx2 = clients[1].second.get();
 
     // Take the exclusive lock with the first caller.
-    Lock::ResourceLock rstl(opCtx1->lockState(), resourceIdReplicationStateTransitionLock, MODE_X);
+    Lock::ResourceLock rstl(opCtx1, resourceIdReplicationStateTransitionLock, MODE_X);
 
     // Set a max timeout on the second caller that will override provided lock request deadlines.
     // Then requesting a lock with Date_t::max() should cause a LockTimeout error to be thrown
@@ -945,7 +945,7 @@ TEST_F(DConcurrencyTestFixture,
     auto opCtx2 = clients[1].second.get();
 
     // Take the exclusive lock with the first caller.
-    Lock::ResourceLock rstl(opCtx1->lockState(), resourceIdReplicationStateTransitionLock, MODE_X);
+    Lock::ResourceLock rstl(opCtx1, resourceIdReplicationStateTransitionLock, MODE_X);
 
     // Set a max timeout on the second caller that will override provided lock request deadlines.
     // Then requesting a lock with Date_t::max() should cause a LockTimeout error to be thrown.
@@ -2336,15 +2336,13 @@ TEST_F(DConcurrencyTestFixture, PBWMRespectsMaxTimeMS) {
     auto clientOpCtxPairs = makeKClientsWithLockers(2);
 
     auto opCtx1 = clientOpCtxPairs[0].second.get();
-    Lock::ResourceLock pbwm1(
-        opCtx1, opCtx1->lockState(), resourceIdParallelBatchWriterMode, MODE_X);
+    Lock::ResourceLock pbwm1(opCtx1, resourceIdParallelBatchWriterMode, MODE_X);
 
     auto opCtx2 = clientOpCtxPairs[1].second.get();
     opCtx2->setDeadlineAfterNowBy(Seconds{1}, ErrorCodes::ExceededTimeLimit);
-    ASSERT_THROWS_CODE(
-        Lock::ResourceLock(opCtx2, opCtx2->lockState(), resourceIdParallelBatchWriterMode, MODE_X),
-        AssertionException,
-        ErrorCodes::ExceededTimeLimit);
+    ASSERT_THROWS_CODE(Lock::ResourceLock(opCtx2, resourceIdParallelBatchWriterMode, MODE_X),
+                       AssertionException,
+                       ErrorCodes::ExceededTimeLimit);
 }
 
 TEST_F(DConcurrencyTestFixture, DifferentTenantsTakeDBLockOnConflictingNamespaceOk) {

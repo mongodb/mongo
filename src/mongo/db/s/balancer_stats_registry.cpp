@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/s/balancer_stats_registry.h"
 
 #include "mongo/db/dbdirectclient.h"
@@ -40,7 +39,6 @@
 #include "mongo/s/sharding_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 namespace {
@@ -73,7 +71,7 @@ ScopedRangeDeleterLock::ScopedRangeDeleterLock(OperationContext* opCtx, const UU
     : _configLock(opCtx, DatabaseName(boost::none, NamespaceString::kConfigDb), MODE_IX),
       _rangeDeletionLock(opCtx, NamespaceString::kRangeDeletionNamespace, MODE_IX),
       _collectionUuidLock(Lock::ResourceLock(
-          opCtx->lockState(),
+          opCtx,
           ResourceId(RESOURCE_MUTEX, "RangeDeleterCollLock::" + collectionUuid.toString()),
           MODE_X)) {}
 

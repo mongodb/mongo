@@ -913,8 +913,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_initializeStateDoc(
         .then([this, self = shared_from_this(), stateDoc = _stateDoc] {
             auto opCtx = cc().makeOperationContext();
             {
-                Lock::ExclusiveLock stateDocInsertLock(
-                    opCtx.get(), opCtx->lockState(), _recipientService->_stateDocInsertMutex);
+                Lock::ExclusiveLock stateDocInsertLock(opCtx.get(),
+                                                       _recipientService->_stateDocInsertMutex);
                 uassertStatusOK(
                     tenantMigrationRecipientEntryHelpers::insertStateDoc(opCtx.get(), stateDoc));
             }

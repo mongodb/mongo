@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/bson/bsonobjbuilder.h"
 #include <boost/container/small_vector.hpp>
 #include <boost/container/static_vector.hpp>
 #include <queue>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/ops/single_write_result_gen.h"

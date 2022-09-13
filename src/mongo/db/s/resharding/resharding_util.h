@@ -43,7 +43,6 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/resharding/common_types_gen.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 namespace resharding {
@@ -298,6 +297,7 @@ boost::optional<Milliseconds> estimateRemainingRecipientTime(bool applyingBegan,
                                                              int64_t oplogEntriesApplied,
                                                              int64_t oplogEntriesFetched,
                                                              Milliseconds timeSpentApplying);
+
 /**
  * Looks up the StateMachine by namespace of the collection being resharded. If it does not exist,
  * returns boost::none.
@@ -322,5 +322,4 @@ std::vector<std::shared_ptr<Instance>> getReshardingStateMachines(OperationConte
 }
 
 }  // namespace resharding
-
 }  // namespace mongo

@@ -585,7 +585,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
 
     // Only one addShard operation can be in progress at a time.
-    Lock::ExclusiveLock lk(opCtx->lockState(), _kShardMembershipLock);
+    Lock::ExclusiveLock lk(opCtx, _kShardMembershipLock);
 
     // Check if this shard has already been added (can happen in the case of a retry after a network
     // error, for example) and thus this addShard request should be considered a no-op.
@@ -804,7 +804,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
 
     const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
-    Lock::ExclusiveLock shardLock(opCtx->lockState(), _kShardMembershipLock);
+    Lock::ExclusiveLock shardLock(opCtx, _kShardMembershipLock);
 
     auto findShardResponse = uassertStatusOK(
         configShard->exhaustiveFindOnConfig(opCtx,
@@ -955,7 +955,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
 }
 
 Lock::SharedLock ShardingCatalogManager::enterStableTopologyRegion(OperationContext* opCtx) {
-    return Lock::SharedLock(opCtx->lockState(), _kShardMembershipLock);
+    return Lock::SharedLock(opCtx, _kShardMembershipLock);
 }
 
 void ShardingCatalogManager::appendConnectionStats(executor::ConnectionPoolStats* stats) {

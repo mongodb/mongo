@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/dbtests/framework.h"
 
 #include <string>
@@ -40,7 +37,6 @@
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/database_holder_impl.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_access_method_factory_impl.h"
 #include "mongo/db/index_builds_coordinator_mongod.h"
@@ -64,7 +60,6 @@
 #include "mongo/util/version.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
-
 
 namespace mongo {
 namespace dbtests {

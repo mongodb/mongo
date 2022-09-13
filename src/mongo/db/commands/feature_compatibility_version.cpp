@@ -528,7 +528,7 @@ void FeatureCompatibilityVersion::fassertInitializedAfterStartup(OperationContex
 
 Lock::ExclusiveLock FeatureCompatibilityVersion::enterFCVChangeRegion(OperationContext* opCtx) {
     invariant(!opCtx->lockState()->isLocked());
-    return Lock::ExclusiveLock(opCtx->lockState(), fcvDocumentLock);
+    return Lock::ExclusiveLock(opCtx, fcvDocumentLock);
 }
 
 void FeatureCompatibilityVersion::advanceLastFCVUpdateTimestamp(Timestamp fcvUpdateTimestamp) {
@@ -595,7 +595,7 @@ FixedFCVRegion::FixedFCVRegion(OperationContext* opCtx)
     : _lk([&] {
           invariant(!opCtx->lockState()->isLocked());
           invariant(!opCtx->lockState()->isRSTLLocked());
-          return Lock::SharedLock(opCtx->lockState(), fcvDocumentLock);
+          return Lock::SharedLock(opCtx, fcvDocumentLock);
       }()) {}
 
 FixedFCVRegion::~FixedFCVRegion() = default;

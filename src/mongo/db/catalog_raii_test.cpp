@@ -30,7 +30,6 @@
 #include "mongo/db/catalog/database_holder_mock.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
@@ -404,8 +403,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionLockFreeCompatibleWithDatabaseEx
 }
 
 TEST_F(CatalogRAIITestFixture, AutoGetCollectionLockFreeCompatibleWithRSTLExclusiveLock) {
-    Lock::ResourceLock rstl(
-        client1.second->lockState(), resourceIdReplicationStateTransitionLock, MODE_X);
+    Lock::ResourceLock rstl(client1.second.get(), resourceIdReplicationStateTransitionLock, MODE_X);
     ASSERT(client1.second->lockState()->isRSTLExclusive());
 
     AutoGetCollectionLockFree coll(

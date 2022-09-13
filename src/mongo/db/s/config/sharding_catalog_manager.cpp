@@ -498,7 +498,7 @@ Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationC
                                                                       const BSONObj& cmdObj) {
 
     // No shards should be added until we have forwarded featureCompatibilityVersion to all shards.
-    Lock::SharedLock lk(opCtx->lockState(), _kShardMembershipLock);
+    Lock::SharedLock lk(opCtx, _kShardMembershipLock);
 
     // We do a direct read of the shards collection with local readConcern so no shards are missed,
     // but don't go through the ShardRegistry to prevent it from caching data that may be rolled

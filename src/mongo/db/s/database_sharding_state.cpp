@@ -77,7 +77,7 @@ const ServiceContext::Decoration<DatabaseShardingStateMap> DatabaseShardingState
 
 DatabaseShardingState::ScopedDatabaseShardingState::ScopedDatabaseShardingState(
     OperationContext* opCtx, const DatabaseName& dbName, LockMode mode)
-    : _lock(nullptr, opCtx->lockState(), ResourceId(RESOURCE_MUTEX, dbName), mode),
+    : _lock(opCtx->lockState(), ResourceId(RESOURCE_MUTEX, dbName), mode),
       _dss(DatabaseShardingStateMap::get(opCtx->getServiceContext()).getOrCreate(dbName)) {}
 
 DatabaseShardingState::ScopedDatabaseShardingState::ScopedDatabaseShardingState(

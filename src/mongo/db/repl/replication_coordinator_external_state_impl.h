@@ -31,7 +31,6 @@
 
 #include <deque>
 
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/repl/bgsync.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/replication_coordinator_external_state.h"
@@ -43,8 +42,6 @@
 #include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
-class ServiceContext;
-
 namespace repl {
 
 class DropPendingCollectionReaper;

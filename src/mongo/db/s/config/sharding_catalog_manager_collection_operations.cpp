@@ -297,8 +297,8 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
 
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
     // strictly monotonously increasing collection versions
-    Lock::ExclusiveLock chunkLk(opCtx, opCtx->lockState(), _kChunkOpLock);
-    Lock::ExclusiveLock zoneLk(opCtx, opCtx->lockState(), _kZoneOpLock);
+    Lock::ExclusiveLock chunkLk(opCtx, _kChunkOpLock);
+    Lock::ExclusiveLock zoneLk(opCtx, _kZoneOpLock);
 
     struct RefineTimers {
         Timer executionTimer;
@@ -546,7 +546,7 @@ void ShardingCatalogManager::configureCollectionBalancing(
     {
         // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
         // migrations
-        Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
+        Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
         withTransaction(opCtx,
                         CollectionType::ConfigNS,
@@ -592,7 +592,7 @@ void ShardingCatalogManager::applyLegacyConfigurationToSessionsCollection(Operat
     auto updateStmt = BSON("$unset" << BSON(CollectionType::kMaxChunkSizeBytesFieldName << 0));
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
     // migrations
-    Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
+    Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
     withTransaction(opCtx,
                     CollectionType::ConfigNS,
@@ -641,8 +641,8 @@ void ShardingCatalogManager::renameShardedMetadata(
     boost::optional<CollectionType> optFromCollType) {
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
     // strictly monotonously increasing collection versions
-    Lock::ExclusiveLock chunkLk(opCtx, opCtx->lockState(), _kChunkOpLock);
-    Lock::ExclusiveLock zoneLk(opCtx, opCtx->lockState(), _kZoneOpLock);
+    Lock::ExclusiveLock chunkLk(opCtx, _kChunkOpLock);
+    Lock::ExclusiveLock zoneLk(opCtx, _kZoneOpLock);
 
     std::string logMsg = str::stream() << from << " to " << to;
     if (optFromCollType) {

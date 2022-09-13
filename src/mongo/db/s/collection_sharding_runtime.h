@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/metadata_manager.h"

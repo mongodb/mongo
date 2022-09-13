@@ -241,8 +241,8 @@ TEST_F(PersistentTaskQueueTest, TestWakeupOnEmptyQueue) {
     auto opCtx = operationContext();
     PersistentTaskQueue<TestTask> q(opCtx, kNss);
 
-    auto result = stdx::async(stdx::launch::async, [&q] {
-        ThreadClient tc("RangeDeletionService", getGlobalServiceContext());
+    auto result = stdx::async(stdx::launch::async, [this, &q] {
+        ThreadClient tc("TestWakeupOnEmptyQueue", getServiceContext());
         auto opCtx = tc->makeOperationContext();
 
         stdx::this_thread::sleep_for(stdx::chrono::milliseconds(500));
@@ -261,8 +261,8 @@ TEST_F(PersistentTaskQueueTest, TestInterruptedWhileWaitingOnCV) {
 
     unittest::Barrier barrier(2);
 
-    auto result = stdx::async(stdx::launch::async, [opCtx, &q, &barrier] {
-        ThreadClient tc("RangeDeletionService", getGlobalServiceContext());
+    auto result = stdx::async(stdx::launch::async, [this, &q, &barrier] {
+        ThreadClient tc("TestInterruptedWhileWaitingOnCV", getServiceContext());
         auto opCtx = tc->makeOperationContext();
 
         barrier.countDownAndWait();
@@ -285,8 +285,8 @@ TEST_F(PersistentTaskQueueTest, TestKilledOperationContextWhileWaitingOnCV) {
 
     unittest::Barrier barrier(2);
 
-    auto result = stdx::async(stdx::launch::async, [opCtx, &q, &barrier] {
-        ThreadClient tc("RangeDeletionService", getGlobalServiceContext());
+    auto result = stdx::async(stdx::launch::async, [this, &q, &barrier] {
+        ThreadClient tc("TestKilledOperationContextWhileWaitingOnCV", getServiceContext());
         {
             stdx::lock_guard<Client> lk(*tc.get());
             tc->setSystemOperationKillableByStepdown(lk);

@@ -36,7 +36,6 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/repl/delayable_timeout_callback.h"
 #include "mongo/db/repl/initial_syncer.h"

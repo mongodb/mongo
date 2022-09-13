@@ -41,7 +41,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/json.h"
 #include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/profile_filter.h"
@@ -60,11 +59,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
-
 namespace mongo {
-
-using std::string;
-
 namespace {
 
 auto& oplogGetMoreStats = makeServerStatusMetric<TimerStats>("repl.network.oplogGetMoresProcessed");
@@ -1623,7 +1618,7 @@ void OpDebug::AdditiveMetrics::incrementPrepareReadConflicts(long long n) {
     prepareReadConflicts.fetchAndAdd(n);
 }
 
-string OpDebug::AdditiveMetrics::report() const {
+std::string OpDebug::AdditiveMetrics::report() const {
     StringBuilder s;
 
     OPDEBUG_TOSTRING_HELP_OPTIONAL("keysExamined", keysExamined);

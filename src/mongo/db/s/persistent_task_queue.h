@@ -120,8 +120,6 @@ PersistentTaskQueue<T>::PersistentTaskQueue(OperationContext* opCtx, NamespaceSt
 
 template <typename T>
 TaskId PersistentTaskQueue<T>::push(OperationContext* opCtx, const T& t) {
-    DBDirectClient dbClient(opCtx);
-
     TaskId recordId = 0;
     BSONObjBuilder builder;
 
@@ -134,6 +132,7 @@ TaskId PersistentTaskQueue<T>::push(OperationContext* opCtx, const T& t) {
         builder.append("_id", recordId);
         builder.append("task", t.toBSON());
 
+        DBDirectClient dbClient(opCtx);
         auto response = write_ops::checkWriteErrors(
             dbClient.insert(write_ops::InsertCommandRequest(_storageNss, {builder.obj()})));
         _count++;
@@ -171,13 +170,12 @@ TaskId PersistentTaskQueue<T>::pop(OperationContext* opCtx) {
 
 template <typename T>
 const typename BlockingTaskQueue<T>::Record& PersistentTaskQueue<T>::peek(OperationContext* opCtx) {
-    DBDirectClient client(opCtx);
-
     Lock::ExclusiveLock lock(opCtx->lockState(), _mutex);
 
     opCtx->waitForConditionOrInterrupt(_cv, lock, [this] { return _count > 0 || _closed; });
     uassert(ErrorCodes::Interrupted, "Task queue was closed", !_closed);
 
+    DBDirectClient client(opCtx);
     _currentFront = _loadNextRecord(client);
     uassert(ErrorCodes::InternalError, "Task queue is in an invalid state.", _currentFront);
 
@@ -195,6 +193,7 @@ void PersistentTaskQueue<T>::close(OperationContext* opCtx) {
 template <typename T>
 size_t PersistentTaskQueue<T>::size(OperationContext* opCtx) const {
     Lock::ExclusiveLock lock(opCtx->lockState(), _mutex);
+
     return _count;
 }
 

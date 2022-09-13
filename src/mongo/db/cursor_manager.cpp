@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/cursor_manager.h"
-
-#include <memory>
 
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/init.h"
@@ -38,8 +35,6 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_server_params.h"
@@ -56,7 +51,6 @@
 #include "mongo/util/exit.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
 
 namespace mongo {
 

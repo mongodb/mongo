@@ -135,8 +135,7 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
 
     try {
         if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
-            _pbwm.emplace(
-                opCtx, opCtx->lockState(), resourceIdParallelBatchWriterMode, MODE_IS, deadline);
+            _pbwm.emplace(opCtx, resourceIdParallelBatchWriterMode, MODE_IS, deadline);
         }
         ScopeGuard unlockPBWM([this] {
             if (_opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
@@ -146,7 +145,6 @@ Lock::GlobalLock::GlobalLock(OperationContext* opCtx,
 
         if (_opCtx->lockState()->shouldConflictWithSetFeatureCompatibilityVersion()) {
             _fcvLock.emplace(_opCtx,
-                             opCtx->lockState(),
                              resourceIdFeatureCompatibilityVersion,
                              isSharedLockMode(lockMode) ? MODE_IS : MODE_IX,
                              deadline);
@@ -247,24 +245,6 @@ Lock::DBLock::~DBLock() {
     }
 }
 
-void Lock::DBLock::relockWithMode(LockMode newMode) {
-    // 2PL would delay the unlocking
-    invariant(!_opCtx->lockState()->inAWriteUnitOfWork());
-
-    // Not allowed to change global intent, so check when going from shared to exclusive.
-    if (isSharedLockMode(_mode) && !isSharedLockMode(newMode))
-        invariant(_opCtx->lockState()->isWriteLocked());
-
-    _opCtx->lockState()->unlock(_id);
-    _mode = newMode;
-
-    // Verify we still have at least the Global resource locked.
-    invariant(_opCtx->lockState()->isLocked());
-
-    _opCtx->lockState()->lock(_opCtx, _id, _mode);
-    _result = LOCK_OK;
-}
-
 Lock::CollectionLock::CollectionLock(OperationContext* opCtx,
                                      const NamespaceStringOrUUID& nssOrUUID,
                                      LockMode mode,
@@ -321,19 +301,27 @@ Lock::CollectionLock::~CollectionLock() {
         _opCtx->lockState()->unlock(_id);
 }
 
-Lock::ParallelBatchWriterMode::ParallelBatchWriterMode(Locker* lockState)
-    : _pbwm(lockState, resourceIdParallelBatchWriterMode, MODE_X),
-      _shouldNotConflictBlock(lockState) {}
+Lock::ParallelBatchWriterMode::ParallelBatchWriterMode(OperationContext* opCtx)
+    : _pbwm(opCtx, resourceIdParallelBatchWriterMode, MODE_X),
+      _shouldNotConflictBlock(opCtx->lockState()) {}
 
-void Lock::ResourceLock::lock(OperationContext* opCtx, LockMode mode, Date_t deadline) {
+void Lock::ResourceLock::_lock(LockMode mode, Date_t deadline) {
     invariant(_result == LOCK_INVALID);
-    _locker->lock(opCtx, _rid, mode, deadline);
+    if (_opCtx)
+        _opCtx->lockState()->lock(_opCtx, _rid, mode, deadline);
+    else
+        _locker->lock(_rid, mode, deadline);
+
     _result = LOCK_OK;
 }
 
-void Lock::ResourceLock::unlock() {
-    if (_result == LOCK_OK) {
-        _locker->unlock(_rid);
+void Lock::ResourceLock::_unlock() {
+    if (_isLocked()) {
+        if (_opCtx)
+            _opCtx->lockState()->unlock(_rid);
+        else
+            _locker->unlock(_rid);
+
         _result = LOCK_INVALID;
     }
 }

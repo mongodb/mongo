@@ -502,7 +502,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
 
     // Stop all readers until we're done. This also prevents doc-locking engines from deleting old
     // entries from the oplog until we finish writing.
-    Lock::ParallelBatchWriterMode pbwm(opCtx->lockState());
+    Lock::ParallelBatchWriterMode pbwm(opCtx);
 
     invariant(_replCoord);
     if (_replCoord->getApplierState() == ReplicationCoordinator::ApplierState::Stopped) {

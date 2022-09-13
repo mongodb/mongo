@@ -39,7 +39,6 @@
 
 #include "mongo/bson/ordering.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage/backup_block.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/kv/kv_engine.h"

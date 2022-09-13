@@ -45,12 +45,6 @@
 #include "mongo/db/service_context.h"
 
 namespace mongo {
-
-class Collection;
-class CollectionPtr;
-struct CollectionOptions;
-class OperationContext;
-
 namespace repl {
 
 struct TimestampedBSONObj {

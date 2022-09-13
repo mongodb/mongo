@@ -213,7 +213,7 @@ Status checkForTimeseriesTimeFieldKeyRange(const ChunkRange& range, StringData t
 Status ShardingCatalogManager::addShardToZone(OperationContext* opCtx,
                                               const std::string& shardName,
                                               const std::string& zoneName) {
-    Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kZoneOpLock);
+    Lock::ExclusiveLock lk(opCtx, _kZoneOpLock);
 
     auto updateStatus = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
         opCtx,
@@ -238,7 +238,7 @@ Status ShardingCatalogManager::addShardToZone(OperationContext* opCtx,
 Status ShardingCatalogManager::removeShardFromZone(OperationContext* opCtx,
                                                    const std::string& shardName,
                                                    const std::string& zoneName) {
-    Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kZoneOpLock);
+    Lock::ExclusiveLock lk(opCtx, _kZoneOpLock);
 
     auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     const NamespaceString shardNS(NamespaceString::kConfigsvrShardsNamespace);
@@ -316,7 +316,7 @@ void ShardingCatalogManager::assignKeyRangeToZone(OperationContext* opCtx,
 
     auto configServer = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
-    Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kZoneOpLock);
+    Lock::ExclusiveLock lk(opCtx, _kZoneOpLock);
 
     auto zoneDoc = uassertStatusOK(configServer->exhaustiveFindOnConfig(
                                        opCtx,
@@ -375,7 +375,7 @@ void ShardingCatalogManager::removeKeyRangeFromZone(OperationContext* opCtx,
                                                     const ChunkRange& givenRange) {
     auto configServer = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
-    Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kZoneOpLock);
+    Lock::ExclusiveLock lk(opCtx, _kZoneOpLock);
 
     ChunkRange actualRange = givenRange;
     KeyPattern keyPattern;

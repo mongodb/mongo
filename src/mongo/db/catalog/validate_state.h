@@ -33,7 +33,6 @@
 #include "mongo/db/catalog/collection_validation.h"
 #include "mongo/db/catalog/throttle_cursor.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/record_store.h"
@@ -41,10 +40,6 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo {
-
-class Database;
-class IndexCatalogEntry;
-
 namespace CollectionValidation {
 
 /**

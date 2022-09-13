@@ -41,7 +41,6 @@
 #include "mongo/client/authenticate.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_write_path.h"
-#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/cloner_gen.h"

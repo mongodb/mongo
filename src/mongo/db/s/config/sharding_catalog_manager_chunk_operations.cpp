@@ -625,7 +625,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
 
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
     // strictly monotonously increasing collection versions
-    Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
+    Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto findCollResponse = uassertStatusOK(
@@ -848,7 +848,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunksMerge(
 
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
     // strictly monotonously increasing collection versions
-    Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
+    Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
     // 1. Retrieve the initial collection version info to build up the logging info.
     auto collVersion = uassertStatusOK(getCollectionVersion(opCtx, nss));
@@ -997,7 +997,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
     opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
     // Must hold the shard lock until the entire commit finishes to serialize with removeShard.
-    Lock::SharedLock shardLock(opCtx->lockState(), _kShardMembershipLock);
+    Lock::SharedLock shardLock(opCtx, _kShardMembershipLock);
 
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto shardResult = uassertStatusOK(
@@ -1019,7 +1019,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
 
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
     // strictly monotonously increasing collection versions
-    Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
+    Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
     auto findCollResponse = uassertStatusOK(
         configShard->exhaustiveFindOnConfig(opCtx,
@@ -1290,7 +1290,7 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
 
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
     // migrations.
-    Lock::ExclusiveLock lk(opCtx->lockState(), _kChunkOpLock);
+    Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     const auto coll = [&] {
@@ -1426,7 +1426,7 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
 
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
     // strictly monotonously increasing collection versions
-    Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
+    Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
     auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto findCollResponse = uassertStatusOK(
@@ -1547,7 +1547,7 @@ void ShardingCatalogManager::ensureChunkVersionIsGreaterThan(OperationContext* o
 
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
     // strictly monotonously increasing collection versions
-    Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
+    Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
     ScopeGuard earlyReturnBeforeDoingWriteGuard([&] {
         // Ensure waiting for writeConcern of the data read.
@@ -1748,7 +1748,7 @@ void ShardingCatalogManager::bumpMultipleCollectionVersionsAndChangeMetadataInTx
 
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
     // migrations
-    Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
+    Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
     withTransaction(
         opCtx,
@@ -1792,7 +1792,7 @@ void ShardingCatalogManager::splitOrMarkJumbo(OperationContext* opCtx,
             // means that a subsequent incremental refresh will not see it. However, it is being
             // marked in memory through the call to 'markAsJumbo' above so subsequent balancer
             // iterations will not consider it for migration.
-            Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
+            Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
             const auto findCollResponse = uassertStatusOK(configShard->exhaustiveFindOnConfig(
                 opCtx,
@@ -1857,7 +1857,7 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
 
         // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
         // migrations
-        Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
+        Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
         const auto cm = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
@@ -1934,7 +1934,7 @@ void ShardingCatalogManager::setChunkEstimatedSize(OperationContext* opCtx,
 
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
     // strictly monotonously increasing collection versions
-    Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
+    Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
     const auto chunkQuery = BSON(ChunkType::collectionUUID()
                                  << chunk.getCollectionUUID() << ChunkType::min(chunk.getMin())
@@ -1959,7 +1959,7 @@ void ShardingCatalogManager::setChunkEstimatedSize(OperationContext* opCtx,
 bool ShardingCatalogManager::clearChunkEstimatedSize(OperationContext* opCtx, const UUID& uuid) {
     // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk splits, merges, and
     // migrations
-    Lock::ExclusiveLock lk(opCtx, opCtx->lockState(), _kChunkOpLock);
+    Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
     const auto query = BSON(ChunkType::collectionUUID() << uuid);
     const auto update = BSON("$unset" << BSON(ChunkType::estimatedSizeBytes() << ""));
