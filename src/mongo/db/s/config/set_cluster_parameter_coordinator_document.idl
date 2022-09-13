@@ -58,6 +58,10 @@ structs:
             parameter:
                 type: object_owned
                 description: "Parameter to be set in the cluster"
+            tenantId:
+                type: tenant_id
+                description: "Tenant ID associated with parameter to be set"
+                optional: true
             clusterParameterTime:
                 type: timestamp
                 description: "Timestamp determined at the beginning that determines the parameter time."

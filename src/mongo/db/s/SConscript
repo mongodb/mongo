@@ -718,6 +718,7 @@ env.CppUnitTest(
         'balancer/migration_test_fixture.cpp',
         'balancer/type_migration_test.cpp',
         'config_server_op_observer_test.cpp',
+        'config/configsvr_coordinator_service_test.cpp',
         'config/index_on_config_test.cpp',
         'config/initial_split_policy_test.cpp',
         'config/sharding_catalog_manager_add_shard_test.cpp',
@@ -751,6 +752,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/pipeline/document_source_mock',
         '$BUILD_DIR/mongo/db/read_write_concern_defaults_mock',
         '$BUILD_DIR/mongo/db/repl/primary_only_service',
+        '$BUILD_DIR/mongo/db/repl/primary_only_service_test_fixture',
         '$BUILD_DIR/mongo/db/repl/replication_info',
         '$BUILD_DIR/mongo/db/repl/wait_for_majority_service',
         '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
@@ -759,6 +761,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/transaction/transaction_api',
         '$BUILD_DIR/mongo/util/version_impl',
         'config_server_test_fixture',
+        'sharding_commands_d',
     ],
 )
 
