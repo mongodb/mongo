@@ -248,6 +248,14 @@ last-continuous:
       test_file: jstests/sharding/append_oplog_note_mongos.js
     - ticket: SERVER-68115
       test_file: jstests/core/elemmatch_index.js
+    - ticket: SERVER-69348
+      test_file: jstests/core/views/views_all_commands.js
+    - ticket: SERVER-69348
+      test_file: jstests/replsets/db_reads_while_recovering_all_commands.js
+    - ticket: SERVER-69348
+      test_file: jstests/replsets/tenant_migration_concurrent_writes_on_donor_util.js
+    - ticket: SERVER-69348
+      test_file: jstests/sharding/read_write_concern_defaults_application.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
@@ -629,6 +637,14 @@ last-lts:
       test_file: jstests/sharding/append_oplog_note_mongos.js
     - ticket: SERVER-68115
       test_file: jstests/core/elemmatch_index.js
+    - ticket: SERVER-69348
+      test_file: jstests/core/views/views_all_commands.js
+    - ticket: SERVER-69348
+      test_file: jstests/replsets/db_reads_while_recovering_all_commands.js
+    - ticket: SERVER-69348
+      test_file: jstests/replsets/tenant_migration_concurrent_writes_on_donor_util.js
+    - ticket: SERVER-69348
+      test_file: jstests/sharding/read_write_concern_defaults_application.js
 
   # Tests that should only be excluded from particular suites should be listed under that suite.
   suites:
