@@ -428,7 +428,6 @@ let viewsCommandTests = {
         }
     ],
     repairCursor: {command: {repairCursor: "view"}, expectFailure: true},
-    repairDatabase: {skip: isUnrelated},
     repairShardedCollectionChunksHistory: {
         command: {repairShardedCollectionChunksHistory: "test.view"},
         skipStandalone: true,

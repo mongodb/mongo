@@ -592,7 +592,6 @@ TEST_F(MongodbCAPITest, RunListCommands) {
         "refreshSessions",
         "renameCollection",
         "repairCursor",
-        "repairDatabase",
         "resetError",
         "serverStatus",
         "setParameter",
@@ -602,6 +601,7 @@ TEST_F(MongodbCAPITest, RunListCommands) {
         "validate",
         "waitForFailPoint",
     };
+
     std::sort(whitelist.begin(), whitelist.end());
 
     mongo::BSONObj listCommandsObj = mongo::fromjson("{ listCommands: 1 }");
