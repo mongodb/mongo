@@ -53,6 +53,9 @@ structs:
             description: "Queryable Encryption max counter"
             type: long
             cpp_name: maxCounter
+            validator:
+              gte: 0
+              lt: 10000
 
     InternalFleBetweenStruct:
         description: "Struct for $_internalFleBetween"

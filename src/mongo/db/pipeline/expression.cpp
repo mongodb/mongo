@@ -3797,7 +3797,6 @@ intrusive_ptr<Expression> ExpressionInternalFLEEqual::parse(ExpressionContext* c
 
 
     auto cf = fleEq.getMaxCounter();
-    uassert(6762903, "Contention factor must be between 0 and 10000", cf >= 0 && cf < 10000);
 
     return new ExpressionInternalFLEEqual(
         expCtx, std::move(fieldExpr), serverTokenPair.second, cf, edcTokenPair.second);
