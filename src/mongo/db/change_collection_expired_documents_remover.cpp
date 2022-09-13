@@ -68,6 +68,13 @@ boost::optional<int64_t> getExpireAfterSeconds(boost::optional<TenantId> tid) {
 }
 
 void removeExpiredDocuments(Client* client) {
+    // TODO SERVER-66717 Remove this logic from this method. Due to the delay in the feature flag
+    // activation it was placed here. The remover job should ultimately be initialized at the mongod
+    // startup when launched in serverless mode.
+    if (!ChangeStreamChangeCollectionManager::isChangeCollectionsModeActive()) {
+        return;
+    }
+
     hangBeforeRemovingExpiredChanges.pauseWhileSet();
 
     try {
@@ -123,7 +130,14 @@ void removeExpiredDocuments(Client* client) {
             maxStartWallTime =
                 std::max(maxStartWallTime, purgingJobMetadata->firstDocWallTimeMillis);
         }
-        changeCollectionManager.getPurgingJobStats().maxStartWallTimeMillis.store(maxStartWallTime);
+
+        // The purging job metadata will be 'boost::none' if none of the change collections have
+        // more than one oplog entry, as such the 'maxStartWallTimeMillis' will be zero. Avoid
+        // reporting 0 as 'maxStartWallTimeMillis'.
+        if (maxStartWallTime > 0) {
+            changeCollectionManager.getPurgingJobStats().maxStartWallTimeMillis.store(
+                maxStartWallTime);
+        }
 
         const auto jobDurationMillis = clock->now() - currentWallTime;
         if (removedCount > 0) {
@@ -187,19 +201,11 @@ private:
 }  // namespace
 
 void startChangeCollectionExpiredDocumentsRemover(ServiceContext* serviceContext) {
-    if (!ChangeStreamChangeCollectionManager::isChangeCollectionsModeActive()) {
-        return;
-    }
-
     LOGV2(6663507, "Starting the ChangeCollectionExpiredChangeRemover");
     ChangeCollectionExpiredDocumentsRemover::start(serviceContext);
 }
 
 void shutdownChangeCollectionExpiredDocumentsRemover(ServiceContext* serviceContext) {
-    if (!ChangeStreamChangeCollectionManager::isChangeCollectionsModeActive()) {
-        return;
-    }
-
     LOGV2(6663508, "Shutting down the ChangeCollectionExpiredChangeRemover");
     ChangeCollectionExpiredDocumentsRemover::shutdown(serviceContext);
 }
