@@ -319,10 +319,23 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                 service->promoteRecoverableCriticalSectionToBlockAlsoReads(
                     opCtx, toNss(), reason, ShardingCatalogClient::kLocalWriteConcern);
 
-                // Clear the filtering metadata to safely create new range deletion tasks: the
-                // submission will serialize on the renamed collection's metadata refresh.
-                clearFilteringMetadata(opCtx, fromNss());
-                clearFilteringMetadata(opCtx, toNss());
+                // Clear the filtering metadata before releasing the critical section (it will be
+                // recovered the next time is accessed) and to safely create new range deletion
+                // tasks (the submission will serialize on the renamed collection's metadata
+                // refresh).
+                {
+                    Lock::DBLock dbLock(opCtx, fromNss().db(), MODE_IX);
+                    Lock::CollectionLock collLock(opCtx, fromNss(), MODE_IX);
+                    auto* csr = CollectionShardingRuntime::get(opCtx, fromNss());
+                    csr->clearFilteringMetadataForDroppedCollection(opCtx);
+                }
+
+                {
+                    Lock::DBLock dbLock(opCtx, toNss().db(), MODE_IX);
+                    Lock::CollectionLock collLock(opCtx, toNss(), MODE_IX);
+                    auto* csr = CollectionShardingRuntime::get(opCtx, toNss());
+                    csr->clearFilteringMetadata(opCtx);
+                }
 
                 snapshotRangeDeletionsForRename(opCtx, fromNss(), toNss());
             }))
