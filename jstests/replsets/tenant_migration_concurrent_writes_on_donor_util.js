@@ -711,7 +711,6 @@ TenantMigrationConcurrentWriteUtil.testCases = {
             assert(!collectionExists(db, collName + "Renamed"));
         }
     },
-    repairDatabase: {skip: isDeprecated},
     replSetAbortPrimaryCatchUp: {skip: isNotRunOnUserDatabase},
     replSetFreeze: {skip: isNotRunOnUserDatabase},
     replSetGetConfig: {skip: isNotRunOnUserDatabase},
