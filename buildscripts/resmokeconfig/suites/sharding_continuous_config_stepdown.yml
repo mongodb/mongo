@@ -201,6 +201,8 @@ selector:
   # Runs commands directly on the config server primary and is not robust to the primary changing.
   - jstests/sharding/read_write_concern_defaults_commands_api.js
   - jstests/sharding/read_write_concern_defaults_propagation.js
+  - jstests/sharding/live_shard_startup_recovery_config_server.js
+  - jstests/sharding/live_shard_logical_initial_sync_config_server.js
 
   # On stepdown there is not gurantee that changelog entries have been inserted [SERVER-45655]
   - jstests/sharding/refine_collection_shard_key_changelog.js
