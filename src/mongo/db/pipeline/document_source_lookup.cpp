@@ -474,6 +474,10 @@ DocumentSource::GetNextResult DocumentSourceLookUp::doGetNext() {
     }
 
     accumulatePipelinePlanSummaryStats(*pipeline, _stats.planSummaryStats);
+
+    // Check if pipeline uses disk.
+    _stats.planSummaryStats.usedDisk = _stats.planSummaryStats.usedDisk || pipeline->usedDisk();
+
     MutableDocument output(std::move(inputDoc));
     output.setNestedField(_as, Value(std::move(results)));
     return output.freeze();
