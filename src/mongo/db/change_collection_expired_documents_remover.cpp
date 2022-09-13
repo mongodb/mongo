@@ -63,8 +63,11 @@ std::vector<boost::optional<TenantId>> getAllTenants() {
 }
 
 boost::optional<int64_t> getExpireAfterSeconds(boost::optional<TenantId> tid) {
-    // TODO SERVER-65950 Fetch 'expiredAfterSeconds' per tenant basis.
-    return {gChangeStreamsClusterParameter.getExpireAfterSeconds()};
+    auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
+    auto* changeStreamsParam =
+        clusterParameters->get<ClusterParameterWithStorage<ChangeStreamsClusterParameterStorage>>(
+            "changeStreams");
+    return changeStreamsParam->getValue(tid).getExpireAfterSeconds();
 }
 
 void removeExpiredDocuments(Client* client) {

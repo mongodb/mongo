@@ -327,8 +327,7 @@ TEST(IDLServerParameterWithStorage, RAIIServerParameterController) {
 TEST(IDLServerParameterWithStorage, CSPStorageTest) {
     // Retrieve the cluster IDLServerParameterWithStorage.
     auto* clusterParam =
-        dynamic_cast<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
-                                                   test::ChangeStreamOptionsClusterParam>*>(
+        dynamic_cast<ClusterParameterWithStorage<test::ChangeStreamOptionsClusterParam>*>(
             getClusterServerParameter("changeStreamOptions"));
 
     // Check that current value is the default value.
@@ -360,14 +359,16 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
     ASSERT_EQ(test::count, 1);
 
     // Append to BSONObj and verify that expected fields are present.
-    BSONObjBuilder b;
-    clusterParam->append(nullptr, &b, clusterParam->name(), boost::none);
-    auto obj = b.obj();
-    ASSERT_EQ(obj.nFields(), 4);
-    ASSERT_EQ(obj["_id"_sd].String(), "changeStreamOptions");
-    ASSERT_EQ(obj["preAndPostImages"_sd].Obj()["expireAfterSeconds"].Long(), 40);
-    ASSERT_EQ(obj["testStringField"_sd].String(), "testString");
-    ASSERT_EQ(obj["clusterParameterTime"_sd].timestamp(), updateTime.asTimestamp());
+    {
+        BSONObjBuilder b;
+        clusterParam->append(nullptr, &b, clusterParam->name(), boost::none);
+        auto obj = b.obj();
+        ASSERT_EQ(obj.nFields(), 4);
+        ASSERT_EQ(obj["_id"_sd].String(), "changeStreamOptions");
+        ASSERT_EQ(obj["preAndPostImages"_sd].Obj()["expireAfterSeconds"].Long(), 40);
+        ASSERT_EQ(obj["testStringField"_sd].String(), "testString");
+        ASSERT_EQ(obj["clusterParameterTime"_sd].timestamp(), updateTime.asTimestamp());
+    }
 
     // setFromString should fail for cluster server parameters.
     ASSERT_NOT_OK(clusterParam->setFromString("", boost::none));
@@ -417,6 +418,65 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
     ASSERT_EQ(retrievedParam.getTestStringField(), "default");
     ASSERT_EQ(clusterParam->getClusterParameterTime(boost::none), LogicalTime::kUninitialized);
     ASSERT_EQ(test::count, 3);
+
+    // Different tenants should access separate sets of cluster parameters.
+    auto tenant1 = TenantId(OID("1234567890abcdef12345678"));
+    auto tenant2 = TenantId(OID("1234567890abcdef12345679"));
+
+    // New tenants should start w/ the defaults.
+    auto retrievedParam1 = clusterParam->getValue(tenant1);
+    auto retrievedParam2 = clusterParam->getValue(tenant2);
+    ASSERT_EQ(retrievedParam1.getPreAndPostImages().getExpireAfterSeconds(), 35);
+    ASSERT_EQ(retrievedParam2.getPreAndPostImages().getExpireAfterSeconds(), 35);
+
+    // Setting for one tenant should not change any other tenants.
+    ASSERT_OK(clusterParam->ServerParameter::set(newDefaultParam.toBSON(), tenant1));
+    retrievedParam = clusterParam->getValue(boost::none);
+    retrievedParam1 = clusterParam->getValue(tenant1);
+    retrievedParam2 = clusterParam->getValue(tenant2);
+    ASSERT_EQ(retrievedParam.getPreAndPostImages().getExpireAfterSeconds(), 35);
+    ASSERT_EQ(retrievedParam1.getPreAndPostImages().getExpireAfterSeconds(), 45);
+    ASSERT_EQ(retrievedParam2.getPreAndPostImages().getExpireAfterSeconds(), 35);
+
+    updatedPrePostImgs.setExpireAfterSeconds(40);
+    updatedParam.setPreAndPostImages(updatedPrePostImgs);
+    ASSERT_OK(clusterParam->ServerParameter::set(updatedParam.toBSON(), boost::none));
+    retrievedParam = clusterParam->getValue(boost::none);
+    retrievedParam1 = clusterParam->getValue(tenant1);
+    retrievedParam2 = clusterParam->getValue(tenant2);
+    ASSERT_EQ(retrievedParam.getPreAndPostImages().getExpireAfterSeconds(), 40);
+    ASSERT_EQ(retrievedParam1.getPreAndPostImages().getExpireAfterSeconds(), 45);
+    ASSERT_EQ(retrievedParam2.getPreAndPostImages().getExpireAfterSeconds(), 35);
+
+    // Resetting one tenant should not change any other tenants.
+    ASSERT_OK(clusterParam->reset(tenant1));
+    retrievedParam = clusterParam->getValue(boost::none);
+    retrievedParam1 = clusterParam->getValue(tenant1);
+    retrievedParam2 = clusterParam->getValue(tenant2);
+    ASSERT_EQ(retrievedParam.getPreAndPostImages().getExpireAfterSeconds(), 40);
+    ASSERT_EQ(retrievedParam1.getPreAndPostImages().getExpireAfterSeconds(), 35);
+    ASSERT_EQ(retrievedParam2.getPreAndPostImages().getExpireAfterSeconds(), 35);
+
+    // Append should append only the tenant specified.
+    ASSERT_OK(clusterParam->ServerParameter::set(newDefaultParam.toBSON(), tenant2));
+    {
+        BSONObjBuilder b;
+        clusterParam->append(nullptr, &b, clusterParam->name(), boost::none);
+        auto obj = b.obj();
+        ASSERT_EQ(obj["preAndPostImages"_sd].Obj()["expireAfterSeconds"].Long(), 40);
+    }
+    {
+        BSONObjBuilder b;
+        clusterParam->append(nullptr, &b, clusterParam->name(), tenant1);
+        auto obj = b.obj();
+        ASSERT_EQ(obj["preAndPostImages"_sd].Obj()["expireAfterSeconds"].Long(), 35);
+    }
+    {
+        BSONObjBuilder b;
+        clusterParam->append(nullptr, &b, clusterParam->name(), tenant2);
+        auto obj = b.obj();
+        ASSERT_EQ(obj["preAndPostImages"_sd].Obj()["expireAfterSeconds"].Long(), 45);
+    }
 }
 
 }  // namespace

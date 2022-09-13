@@ -44,6 +44,8 @@ namespace mongo {
 namespace {
 using namespace cluster_server_parameter_test_util;
 
+typedef ClusterParameterWithStorage<ClusterServerParameterTest> ClusterTestParameter;
+
 class ClusterServerParameterInitializerTest : public ClusterServerParameterTestBase {
 public:
     void setUp() final {
@@ -89,9 +91,7 @@ protected:
 TEST_F(ClusterServerParameterInitializerTest, OnInitialSync) {
     // Retrieve the in-memory test cluster server parameter and ensure it's set to the default
     // value.
-    auto* sp = ServerParameterSet::getClusterParameterSet()
-                   ->get<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
-                                                       ClusterServerParameterTest>>(kCSPTest);
+    auto* sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
     ASSERT(sp != nullptr);
     ClusterServerParameterTest cspTest = sp->getValue(boost::none);
     ASSERT_EQ(cspTest.getIntValue(), kDefaultIntValue);
@@ -100,9 +100,7 @@ TEST_F(ClusterServerParameterInitializerTest, OnInitialSync) {
     // Indicate that data is available at the end of initial sync and check that the in-memory data
     // is updated.
     doInitialSync();
-    sp = ServerParameterSet::getClusterParameterSet()
-             ->get<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
-                                                 ClusterServerParameterTest>>(kCSPTest);
+    sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
     ASSERT(sp != nullptr);
     cspTest = sp->getValue(boost::none);
     ASSERT_EQ(cspTest.getIntValue(), kInitialIntValue);
@@ -111,9 +109,7 @@ TEST_F(ClusterServerParameterInitializerTest, OnInitialSync) {
 
 TEST_F(ClusterServerParameterInitializerTest, OnStartupRecovery) {
     // Retrieve the test cluster server parameter and ensure it's set to the default value.
-    auto* sp = ServerParameterSet::getClusterParameterSet()
-                   ->get<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
-                                                       ClusterServerParameterTest>>(kCSPTest);
+    auto* sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
     ASSERT(sp != nullptr);
     ClusterServerParameterTest cspTest = sp->getValue(boost::none);
     ASSERT_EQ(cspTest.getIntValue(), kDefaultIntValue);
@@ -122,9 +118,7 @@ TEST_F(ClusterServerParameterInitializerTest, OnStartupRecovery) {
     // Indicate that data is available at the end of startup recovery and check that the in-memory
     // data is updated.
     doStartupRecovery();
-    sp = ServerParameterSet::getClusterParameterSet()
-             ->get<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
-                                                 ClusterServerParameterTest>>(kCSPTest);
+    sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
     ASSERT(sp != nullptr);
     cspTest = sp->getValue(boost::none);
     ASSERT_EQ(cspTest.getIntValue(), kInitialIntValue);

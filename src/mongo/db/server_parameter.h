@@ -91,6 +91,9 @@ enum class ServerParameterType {
 class ServerParameterSet;
 class OperationContext;
 
+template <typename U>
+using TenantIdMap = std::map<boost::optional<TenantId>, U>;
+
 class ServerParameter {
 public:
     using Map = std::map<std::string, ServerParameter*>;

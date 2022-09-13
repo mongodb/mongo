@@ -63,9 +63,6 @@ constexpr bool hasClusterServerParameter = stdx::is_detected_v<HasClusterServerP
 
 namespace idl_server_parameter_detail {
 
-template <typename U>
-using TenantIdMap = std::map<boost::optional<TenantId>, U>;
-
 // Predicate rules for bounds conditions
 
 struct GT {
@@ -308,8 +305,8 @@ private:
 public:
     using element_type = typename SW::type;
 
-    // TODO SERVER-68017 Tenant aware parameters are currently unsupported.
-    static_assert(!SW::isTenantAware);
+    // Cluster parameters must be tenant-aware.
+    static_assert(SW::isTenantAware || paramType != SPT::kClusterWide);
 
     // Compile-time assertion to ensure that IDL-defined in-memory storage for CSPs are
     // chained to the ClusterServerParameter base type.
@@ -528,6 +525,10 @@ private:
     std::function<onUpdate_t> _onUpdate;
     std::once_flag _setDefaultOnce;
 };
+
+template <typename Storage>
+using ClusterParameterWithStorage =
+    IDLServerParameterWithStorage<ServerParameterType::kClusterWide, TenantIdMap<Storage>>;
 
 // MSVC has trouble resolving T=decltype(param) through the above class template.
 // Avoid that by using this proxy factory to infer storage type.

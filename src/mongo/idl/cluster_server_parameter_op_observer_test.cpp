@@ -45,6 +45,8 @@ const std::vector<NamespaceString> kIgnoredNamespaces = {
     NamespaceString("local"_sd, "clusterParameters"_sd),
     NamespaceString("test"_sd, "foo"_sd)};
 
+typedef ClusterParameterWithStorage<ClusterServerParameterTest> ClusterTestParameter;
+
 class ClusterServerParameterOpObserverTest : public ClusterServerParameterTestBase {
 public:
     void setUp() override {
@@ -128,9 +130,8 @@ public:
     // Asserts that the parameter state does not change for this action.
     template <typename F>
     void assertIgnored(const NamespaceString& nss, F fn) {
-        auto* sp = ServerParameterSet::getClusterParameterSet()
-                       ->get<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
-                                                           ClusterServerParameterTest>>(kCSPTest);
+        auto* sp =
+            ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
         ASSERT(sp != nullptr);
 
         const auto initialCPTime = sp->getClusterParameterTime(boost::none);
@@ -151,9 +152,8 @@ public:
         upsert(doc);
         doInserts(NamespaceString::kClusterParametersNamespace, {doc});
 
-        auto* sp = ServerParameterSet::getClusterParameterSet()
-                       ->get<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
-                                                           ClusterServerParameterTest>>(kCSPTest);
+        auto* sp =
+            ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
         ASSERT(sp != nullptr);
 
         ClusterServerParameterTest cspTest = sp->getValue(boost::none);
@@ -183,9 +183,7 @@ protected:
 };
 
 TEST_F(ClusterServerParameterOpObserverTest, OnInsertRecord) {
-    auto* sp = ServerParameterSet::getClusterParameterSet()
-                   ->get<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
-                                                       ClusterServerParameterTest>>(kCSPTest);
+    auto* sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
     ASSERT(sp != nullptr);
 
     // Single record insert.
@@ -251,9 +249,7 @@ TEST_F(ClusterServerParameterOpObserverTest, OnInsertRecord) {
 
 TEST_F(ClusterServerParameterOpObserverTest, OnUpdateRecord) {
     initializeState();
-    auto* sp = ServerParameterSet::getClusterParameterSet()
-                   ->get<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
-                                                       ClusterServerParameterTest>>(kCSPTest);
+    auto* sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
     ASSERT(sp != nullptr);
 
     // Single record update.
@@ -283,9 +279,7 @@ TEST_F(ClusterServerParameterOpObserverTest, OnUpdateRecord) {
 }
 
 TEST_F(ClusterServerParameterOpObserverTest, onDeleteRecord) {
-    auto* sp = ServerParameterSet::getClusterParameterSet()
-                   ->get<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
-                                                       ClusterServerParameterTest>>(kCSPTest);
+    auto* sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
     ASSERT(sp != nullptr);
 
     const auto initialDoc = initializeState();
@@ -328,9 +322,7 @@ TEST_F(ClusterServerParameterOpObserverTest, onDropDatabase) {
     // Actually drop the config DB.
     doDropDatabase(kConfigDB);
 
-    auto* sp = ServerParameterSet::getClusterParameterSet()
-                   ->get<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
-                                                       ClusterServerParameterTest>>(kCSPTest);
+    auto* sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
     ASSERT(sp != nullptr);
 
     ClusterServerParameterTest cspTest = sp->getValue(boost::none);
@@ -346,9 +338,7 @@ TEST_F(ClusterServerParameterOpObserverTest, onRenameCollection) {
     assertIgnoredOtherNamespaces([&](const auto& nss) { doRenameCollection(nss, kTestFoo); });
     assertIgnoredOtherNamespaces([&](const auto& nss) { doRenameCollection(kTestFoo, nss); });
 
-    auto* sp = ServerParameterSet::getClusterParameterSet()
-                   ->get<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
-                                                       ClusterServerParameterTest>>(kCSPTest);
+    auto* sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
     ASSERT(sp != nullptr);
 
     // These renames "work" despite not mutating durable state
@@ -374,9 +364,7 @@ TEST_F(ClusterServerParameterOpObserverTest, onImportCollection) {
     // Import ignorable collections.
     assertIgnoredOtherNamespaces([&](const auto& nss) { doImportCollection(nss); });
 
-    auto* sp = ServerParameterSet::getClusterParameterSet()
-                   ->get<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
-                                                       ClusterServerParameterTest>>(kCSPTest);
+    auto* sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
     ASSERT(sp != nullptr);
 
     // Import the collection (rescan).
@@ -396,9 +384,7 @@ TEST_F(ClusterServerParameterOpObserverTest, onReplicationRollback) {
     // Import ignorable collections.
     assertIgnoredOtherNamespaces([&](const auto& nss) { doImportCollection(nss); });
 
-    auto* sp = ServerParameterSet::getClusterParameterSet()
-                   ->get<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
-                                                       ClusterServerParameterTest>>(kCSPTest);
+    auto* sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
     ASSERT(sp != nullptr);
 
     // Trigger rollback of ignorable namespaces.

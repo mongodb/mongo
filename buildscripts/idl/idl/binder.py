@@ -1311,7 +1311,10 @@ def _bind_server_parameter_with_storage(ctxt, ast_param, param):
             ctxt.add_server_parameter_invalid_attr(param, field, 'bound')
             return None
 
-    ast_param.cpp_vartype = param.cpp_vartype
+    if param.set_at == ['cluster']:
+        ast_param.cpp_vartype = f'TenantIdMap<{param.cpp_vartype}>'
+    else:
+        ast_param.cpp_vartype = param.cpp_vartype
     ast_param.cpp_varname = param.cpp_varname
     ast_param.on_update = param.on_update
 
