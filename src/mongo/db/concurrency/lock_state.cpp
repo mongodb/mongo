@@ -856,7 +856,8 @@ LockResult LockerImpl::_lockBegin(OperationContext* opCtx, ResourceId resId, Loc
     dassert(!getWaitingResource().isValid());
 
     // Operations which are holding open an oplog hole cannot block when acquiring locks.
-    if (opCtx && !shouldAllowLockAcquisitionOnTimestampedUnitOfWork()) {
+    if (opCtx && !shouldAllowLockAcquisitionOnTimestampedUnitOfWork() &&
+        resId.getType() != RESOURCE_METADATA && resId.getType() != RESOURCE_MUTEX) {
         invariant(!opCtx->recoveryUnit()->isTimestamped(),
                   str::stream()
                       << "Operation holding open an oplog hole tried to acquire locks. ResourceId: "
@@ -944,7 +945,8 @@ void LockerImpl::_lockComplete(OperationContext* opCtx,
     // Operations which are holding open an oplog hole cannot block when acquiring locks. Lock
     // requests entering this function have been queued up and will be granted the lock as soon as
     // the lock is released, which is a blocking operation.
-    if (opCtx && !shouldAllowLockAcquisitionOnTimestampedUnitOfWork()) {
+    if (opCtx && !shouldAllowLockAcquisitionOnTimestampedUnitOfWork() &&
+        resId.getType() != RESOURCE_METADATA && resId.getType() != RESOURCE_MUTEX) {
         invariant(!opCtx->recoveryUnit()->isTimestamped(),
                   str::stream()
                       << "Operation holding open an oplog hole tried to acquire locks. ResourceId: "
