@@ -38,3 +38,5 @@ server_parameters:
     cpp_vartype: "AtomicWord<int>"
     cpp_varname: "taskExecutorPoolSize"
     default: 1
+    condition: 
+      preprocessor: '!defined(__linux__)'

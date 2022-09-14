@@ -97,8 +97,8 @@
     ];
     const specificParametersMongosOnly = [
         {
-            name: "taskExecutorPoolSize",
-            result: {value: 1, settableAtRuntime: true, settableAtStartup: true}
+            name: "activeFaultDurationSecs",
+            result: {value: 120, settableAtRuntime: true, settableAtStartup: true}
         },
         {
             name: "userCacheInvalidationIntervalSecs",

@@ -40,6 +40,11 @@ namespace mongo {
 namespace executor {
 
 size_t TaskExecutorPool::getSuggestedPoolSize() {
+#if (defined __linux__)
+    // Always use a pool of size 1 on Linux machines running mongo v4.2 and higher.
+    // Changing it past the default value can cause performance regressions.
+    return 1;
+#else
     auto poolSize = taskExecutorPoolSize.load();
     if (poolSize > 0) {
         return poolSize;
@@ -50,6 +55,7 @@ size_t TaskExecutorPool::getSuggestedPoolSize() {
 
     // Never suggest a number outside the range [4, 64].
     return std::max<size_t>(4U, std::min<size_t>(64U, numCores));
+#endif  //__linux__
 }
 
 void TaskExecutorPool::startup() {
