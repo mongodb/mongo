@@ -38,12 +38,9 @@ namespace {
 
 using namespace sbe;
 
-const std::pair<value::TypeTags, value::Value> makeInt64Value(const int v) {
-    return std::make_pair(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(v));
-};
-
 double estimateIntValCard(const ScalarHistogram& hist, const int v, const EstimationType type) {
-    const auto [tag, val] = makeInt64Value(v);
+    const auto [tag, val] =
+        std::make_pair(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(v));
     return estimate(hist, tag, val, type).card;
 };
 
