@@ -3237,15 +3237,17 @@ buildvariants:
   - name: .audit .patch_build
   - name: .sasl .patch_build
   - name: .encrypt .patch_build
+  - name: external_auth
+  - name: external_auth_aws
   - name: .lint
   - name: lint_fuzzer_sanity_patch
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
       - rhel80-xlarge
 # Disable unittests for now since they're not aware of feature flags.
-#  - name: compile_test_and_package_parallel_unittest_stream_TG
-#    distros:
-#      - rhel80-xlarge
+# - name: compile_test_and_package_parallel_unittest_stream_TG
+#   distros:
+#     - rhel80-xlarge
 #  - name: compile_test_and_package_parallel_dbtest_stream_TG
 #    distros:
 #      - rhel80-xlarge
