@@ -26,13 +26,6 @@ coll.drop();
 
 let globalIdCounter = 0;
 
-function assertCommandWorkedOrFailedWithCode(cmdRes, code) {
-    if (!cmdRes.ok) {
-        assert.assertFailedWithCode(cmdRes, code);
-    }
-    assert.commandWorked(cmdRes);
-}
-
 // Tests that when 'projection' is applied to 'input', we get 'expectedOutput'.
 // Tests that this remains true if indexes are added, or if we use aggregation instead of find.
 function testInputOutput(
@@ -47,15 +40,15 @@ function testInputOutput(
         () =>
             tojson(coll.find({_id: input._id}, projection).limit(1).hint({$natural: 1}).explain()));
     for (let indexSpec of interestingIndexes) {
-        assertCommandWorkedOrFailedWithCode(coll.createIndex(indexSpec),
-                                            ErrorCodes.IndexAlreadyExists);
+        assert.commandWorkedOrFailedWithCode(coll.createIndex(indexSpec),
+                                             ErrorCodes.IndexAlreadyExists);
         assert.docEq(coll.find({_id: input._id}, projection).hint(indexSpec).toArray()[0],
                      expectedOutput);
     }
     if (columnstoreEnabled && !excludeColumnStore) {
         const columnStore = {"$**": "columnstore"};
-        assertCommandWorkedOrFailedWithCode(coll.createIndex(columnStore),
-                                            ErrorCodes.IndexAlreadyExists);
+        assert.commandWorkedOrFailedWithCode(coll.createIndex(columnStore),
+                                             ErrorCodes.IndexAlreadyExists);
         assert.docEq(coll.find({_id: input._id}, projection).hint(columnStore).toArray()[0],
                      expectedOutput,
                      () => tojson(coll.find({_id: input._id}, projection)
