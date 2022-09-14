@@ -867,6 +867,13 @@ buildvariants:
     expansions:
       mongodb_setup: microbenchmarks_standalone-classic-query-engine
 
+  - <<: *linux-wt-standalone
+    name: linux-wt-standalone-sbe
+    display_name: Standalone Linux inMemory (SBE)
+    cron: "0 0 * * 4" # 00:00 on Thursday
+    expansions:
+      mongodb_setup: microbenchmarks_standalone-sbe
+
   - <<: *linux-wt-repl
     name: linux-wt-repl-all-feature-flags
     display_name: 1-Node ReplSet Linux inMemory (all feature flags)

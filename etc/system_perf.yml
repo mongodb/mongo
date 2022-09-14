@@ -1257,6 +1257,22 @@ buildvariants:
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
 
+  - name: linux-standalone-sbe
+    display_name: Linux Standalone (SBE)
+    cron: "0 0 * * 4" # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup: standalone-sbe
+      infrastructure_provisioning: single
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks: *classic_engine_tasks
+
   - name: linux-1-node-replSet-classic-query-engine
     display_name: Linux 1-Node ReplSet (Classic Query Engine)
     cron: "0 0 * * 4" # 00:00 on Thursday
@@ -1271,9 +1287,27 @@ buildvariants:
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon2
-    tasks:
+    tasks: &classic_engine_1nodereplset_tasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
       - name: linkbench
       - name: linkbench2
+
+  - name: linux-1-node-replSet-sbe
+    display_name: Linux 1-Node ReplSet (SBE)
+    cron: "0 0 * * 4" # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup: single-replica-sbe
+      infrastructure_provisioning: single
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks: *classic_engine_1nodereplset_tasks
 
   - name: linux-1-node-replSet-all-feature-flags
     display_name: Linux 1-Node ReplSet (all feature flags)
