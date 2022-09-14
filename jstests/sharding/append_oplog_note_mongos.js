@@ -41,11 +41,6 @@ assert(res.hasOwnProperty("raw"), res);
 appendOplogNoteFailpoint.wait();
 appendOplogNoteFailpoint.off();
 
-// Force a database refresh on the sharding side so that the corresponding config.cache.databases
-// entry is already in the oplog before we start issuing successful appendOplogNote commands.
-assert.commandWorked(shardOnePrimary.adminCommand({_flushDatabaseCacheUpdates: "config"}));
-assert.commandWorked(shardTwoPrimary.adminCommand({_flushDatabaseCacheUpdates: "config"}));
-
 // Test that a successful 'appendOplogNote' command performs a no-op write and advances the
 // $clusterTime.
 const shardOneBefore =
