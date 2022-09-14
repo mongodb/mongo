@@ -59,8 +59,17 @@ ABT translateCanonicalQueryToABT(const Metadata& metadata,
         translateProjection(ctx, scanProjName, canonicalQuery.getExpCtx(), proj);
     }
 
-    // TODO SERVER-68692: Support limit.
-    // TODO SERVER-68693: Support skip.
+    auto skipAmount = canonicalQuery.getFindCommandRequest().getSkip();
+    auto limitAmount = canonicalQuery.getFindCommandRequest().getLimit();
+
+    if (limitAmount || skipAmount) {
+        ctx.setNode<LimitSkipNode>(
+            std::move(ctx.getNode()._rootProjection),
+            properties::LimitSkipRequirement(
+                limitAmount.value_or(properties::LimitSkipRequirement::kMaxVal),
+                skipAmount.value_or(0)),
+            std::move(ctx.getNode()._node));
+    }
 
     return make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{
                               std::move(ctx.getNode()._rootProjection)}},
