@@ -168,6 +168,22 @@ private:
     TicketHolder* _holder;
 };
 
+// Mocks an operation submitting for ticket admission.
+struct MockAdmission {
+    MockAdmission(std::string name,
+                  ServiceContext* serviceContext,
+                  AdmissionContext::Priority priority) {
+        client = serviceContext->makeClient(name);
+        opCtx = client->makeOperationContext();
+        admCtx.setPriority(priority);
+    }
+
+    AdmissionContext admCtx;
+    ServiceContext::UniqueClient client;
+    ServiceContext::UniqueOperationContext opCtx;
+    boost::optional<Ticket> ticket;
+};
+
 template <class H>
 void resizeTest(OperationContext* opCtx) {
     // Verify that resize operations don't alter metrics outside of those linked to the number of
@@ -209,7 +225,6 @@ void resizeTest(OperationContext* opCtx) {
     ASSERT_EQ(stats["out"], 0);
     ASSERT_EQ(stats["available"], 10);
     ASSERT_EQ(stats["totalTickets"], 10);
-    ASSERT_EQ(stats["totalTimeProcessingMicros"], 200);
 
     holder->resize(1);
     newStats = stats.getNonTicketStats();
@@ -237,65 +252,72 @@ TEST_F(TicketHolderTest, PriorityTwoQueuedOperations) {
     {
         // Allocate the only available ticket. Priority is irrelevant when there are tickets
         // available.
-        AdmissionContext admCtx;
-        admCtx.setPriority(AdmissionContext::Priority::kLow);
-        boost::optional<Ticket> ticket =
-            holder.waitForTicket(_opCtx.get(), &admCtx, TicketHolder::WaitMode::kInterruptible);
-        ASSERT(ticket);
+        MockAdmission initialAdmission(
+            "initialAdmission", this->getServiceContext(), AdmissionContext::Priority::kLow);
+        initialAdmission.ticket = holder.waitForTicket(initialAdmission.opCtx.get(),
+                                                       &initialAdmission.admCtx,
+                                                       TicketHolder::WaitMode::kInterruptible);
+        ASSERT(initialAdmission.ticket);
 
-        // Create a client corresponding to a low priority operation that will queue.
-        boost::optional<Ticket> ticketLowPriority;
-        auto clientLowPriority = this->getServiceContext()->makeClient("clientLowPriority");
-        auto opCtxLowPriority = clientLowPriority->makeOperationContext();
-        // Each ticket is assigned with a pointer to an AdmissionContext. The AdmissionContext must
-        // survive the lifetime of the ticket.
-        AdmissionContext admCtxLowPriority;
-        admCtxLowPriority.setPriority(AdmissionContext::Priority::kLow);
-
+        MockAdmission lowPriorityAdmission(
+            "lowPriority", this->getServiceContext(), AdmissionContext::Priority::kLow);
         stdx::thread lowPriorityThread([&]() {
-            ticketLowPriority = holder.waitForTicket(opCtxLowPriority.get(),
-                                                     &admCtxLowPriority,
-                                                     TicketHolder::WaitMode::kUninterruptible);
+            lowPriorityAdmission.ticket =
+                holder.waitForTicket(lowPriorityAdmission.opCtx.get(),
+                                     &lowPriorityAdmission.admCtx,
+                                     TicketHolder::WaitMode::kUninterruptible);
         });
 
-        // Create a client corresponding to a normal priority operation that will queue.
-        boost::optional<Ticket> ticketNormalPriority;
-        auto clientNormalPriority = this->getServiceContext()->makeClient("clientNormalPriority");
-        auto opCtxNormalPriority = clientNormalPriority->makeOperationContext();
-        // Each ticket is assigned with a pointer to an AdmissionContext. The AdmissionContext must
-        // survive the lifetime of the ticket.
-        AdmissionContext admCtxNormalPriority;
-        admCtxNormalPriority.setPriority(AdmissionContext::Priority::kNormal);
-
+        MockAdmission normalPriorityAdmission(
+            "normalPriority", this->getServiceContext(), AdmissionContext::Priority::kNormal);
         stdx::thread normalPriorityThread([&]() {
-            ticketNormalPriority = holder.waitForTicket(opCtxNormalPriority.get(),
-                                                        &admCtxNormalPriority,
-                                                        TicketHolder::WaitMode::kUninterruptible);
+            normalPriorityAdmission.ticket =
+                holder.waitForTicket(normalPriorityAdmission.opCtx.get(),
+                                     &normalPriorityAdmission.admCtx,
+                                     TicketHolder::WaitMode::kUninterruptible);
         });
 
         // Wait for the threads to to queue for a ticket.
         while (holder.queued() < 2) {
         }
 
-        ASSERT_EQ(stats["queueLength"], 2);
-        ticket.reset();
+        initialAdmission.ticket.reset();
 
         // Normal priority thread takes the ticket.
         normalPriorityThread.join();
-        ASSERT_TRUE(ticketNormalPriority);
-        ASSERT_EQ(stats["removedFromQueue"], 1);
-        ticketNormalPriority.reset();
+        ASSERT_TRUE(normalPriorityAdmission.ticket);
+        normalPriorityAdmission.ticket.reset();
 
         // Low priority thread takes the ticket.
         lowPriorityThread.join();
-        ASSERT_TRUE(ticketLowPriority);
-        ASSERT_EQ(stats["removedFromQueue"], 2);
-        ticketLowPriority.reset();
+        ASSERT_TRUE(lowPriorityAdmission.ticket);
+        lowPriorityAdmission.ticket.reset();
     }
 
-    ASSERT_EQ(stats["addedToQueue"], 2);
-    ASSERT_EQ(stats["removedFromQueue"], 2);
-    ASSERT_EQ(stats["queueLength"], 0);
+    ASSERT_EQ(stats["out"], 0);
+    ASSERT_EQ(stats["available"], 1);
+    ASSERT_EQ(stats["totalTickets"], 1);
+
+    auto currentStats = stats.getStats();
+    auto lowPriorityStats = currentStats.getObjectField("lowPriority");
+    ASSERT_EQ(lowPriorityStats.getIntField("addedToQueue"), 1);
+    ASSERT_EQ(lowPriorityStats.getIntField("removedFromQueue"), 1);
+    ASSERT_EQ(lowPriorityStats.getIntField("queueLength"), 0);
+    ASSERT_EQ(lowPriorityStats.getIntField("startedProcessing"), 2);
+    ASSERT_EQ(lowPriorityStats.getIntField("processing"), 0);
+    ASSERT_EQ(lowPriorityStats.getIntField("finishedProcessing"), 2);
+    ASSERT_EQ(lowPriorityStats.getIntField("newAdmissions"), 2);
+    ASSERT_EQ(lowPriorityStats.getIntField("canceled"), 0);
+
+    auto normalPriorityStats = currentStats.getObjectField("normalPriority");
+    ASSERT_EQ(normalPriorityStats.getIntField("addedToQueue"), 1);
+    ASSERT_EQ(normalPriorityStats.getIntField("removedFromQueue"), 1);
+    ASSERT_EQ(normalPriorityStats.getIntField("queueLength"), 0);
+    ASSERT_EQ(normalPriorityStats.getIntField("startedProcessing"), 1);
+    ASSERT_EQ(normalPriorityStats.getIntField("processing"), 0);
+    ASSERT_EQ(normalPriorityStats.getIntField("finishedProcessing"), 1);
+    ASSERT_EQ(normalPriorityStats.getIntField("newAdmissions"), 1);
+    ASSERT_EQ(normalPriorityStats.getIntField("canceled"), 0);
 }
 
 TEST_F(TicketHolderTest, PriorityTwoNormalOneLowQueuedOperations) {
@@ -307,67 +329,51 @@ TEST_F(TicketHolderTest, PriorityTwoNormalOneLowQueuedOperations) {
     {
         // Allocate the only available ticket. Priority is irrelevant when there are tickets
         // available.
-        AdmissionContext admCtx;
-        admCtx.setPriority(AdmissionContext::Priority::kLow);
-        boost::optional<Ticket> ticket =
-            holder.waitForTicket(_opCtx.get(), &admCtx, TicketHolder::WaitMode::kInterruptible);
-        ASSERT(ticket);
+        MockAdmission initialAdmission(
+            "initialAdmission", this->getServiceContext(), AdmissionContext::Priority::kLow);
+        initialAdmission.ticket = holder.waitForTicket(initialAdmission.opCtx.get(),
+                                                       &initialAdmission.admCtx,
+                                                       TicketHolder::WaitMode::kInterruptible);
+        ASSERT(initialAdmission.ticket);
 
-        // Create a client corresponding to a low priority operation that will queue.
-        boost::optional<Ticket> ticketLowPriority;
-        auto clientLowPriority = this->getServiceContext()->makeClient("clientLowPriority");
-        auto opCtxLowPriority = clientLowPriority->makeOperationContext();
-        // Each ticket is assigned with a pointer to an AdmissionContext. The AdmissionContext must
-        // survive the lifetime of the ticket.
-        AdmissionContext admCtxLowPriority;
-        admCtxLowPriority.setPriority(AdmissionContext::Priority::kLow);
-
+        MockAdmission lowPriorityAdmission(
+            "lowPriority", this->getServiceContext(), AdmissionContext::Priority::kLow);
         stdx::thread lowPriorityThread([&]() {
-            ticketLowPriority = holder.waitForTicket(opCtxLowPriority.get(),
-                                                     &admCtxLowPriority,
-                                                     TicketHolder::WaitMode::kUninterruptible);
+            lowPriorityAdmission.ticket =
+                holder.waitForTicket(lowPriorityAdmission.opCtx.get(),
+                                     &lowPriorityAdmission.admCtx,
+                                     TicketHolder::WaitMode::kUninterruptible);
         });
 
-        // Create a client corresponding to a normal priority operation that will queue.
-        boost::optional<Ticket> ticketNormal1Priority;
-        auto clientNormal1Priority = this->getServiceContext()->makeClient("clientNormal1Priority");
-        auto opCtxNormal1Priority = clientNormal1Priority->makeOperationContext();
-        // Each ticket is assigned with a pointer to an AdmissionContext. The AdmissionContext must
-        // survive the lifetime of the ticket.
-        AdmissionContext admCtxNormal1Priority;
-        admCtxNormal1Priority.setPriority(AdmissionContext::Priority::kNormal);
 
+        MockAdmission normal1PriorityAdmission(
+            "normal1Priority", this->getServiceContext(), AdmissionContext::Priority::kNormal);
         stdx::thread normal1PriorityThread([&]() {
-            ticketNormal1Priority = holder.waitForTicket(opCtxNormal1Priority.get(),
-                                                         &admCtxNormal1Priority,
-                                                         TicketHolder::WaitMode::kUninterruptible);
+            normal1PriorityAdmission.ticket =
+                holder.waitForTicket(normal1PriorityAdmission.opCtx.get(),
+                                     &normal1PriorityAdmission.admCtx,
+                                     TicketHolder::WaitMode::kUninterruptible);
         });
+
 
         // Wait for threads on the queue
         while (holder.queued() < 2) {
         }
 
         // Release the ticket.
-        ticket.reset();
+        initialAdmission.ticket.reset();
 
         // Normal priority thread takes the ticket
         normal1PriorityThread.join();
-        ASSERT_TRUE(ticketNormal1Priority);
-        ASSERT_EQ(stats["removedFromQueue"], 1);
+        ASSERT_TRUE(normal1PriorityAdmission.ticket);
 
-        // Create a client corresponding to a second normal priority operation that will be
-        // prioritized over the queued low priority operation.
-        boost::optional<Ticket> ticketNormal2Priority;
-        auto clientNormal2Priority = this->getServiceContext()->makeClient("clientNormal2Priority");
-        auto opCtxNormal2Priority = clientNormal2Priority->makeOperationContext();
-        // Each ticket is assigned with a pointer to an AdmissionContext. The AdmissionContext must
-        // survive the lifetime of the ticket.
-        AdmissionContext admCtxNormal2Priority;
-        admCtxNormal2Priority.setPriority(AdmissionContext::Priority::kNormal);
+        MockAdmission normal2PriorityAdmission(
+            "normal2Priority", this->getServiceContext(), AdmissionContext::Priority::kNormal);
         stdx::thread normal2PriorityThread([&]() {
-            ticketNormal2Priority = holder.waitForTicket(opCtxNormal2Priority.get(),
-                                                         &admCtxNormal2Priority,
-                                                         TicketHolder::WaitMode::kUninterruptible);
+            normal2PriorityAdmission.ticket =
+                holder.waitForTicket(normal2PriorityAdmission.opCtx.get(),
+                                     &normal2PriorityAdmission.admCtx,
+                                     TicketHolder::WaitMode::kUninterruptible);
         });
 
         // Wait for the new thread on the queue.
@@ -375,23 +381,213 @@ TEST_F(TicketHolderTest, PriorityTwoNormalOneLowQueuedOperations) {
         }
 
         // Release the ticket.
-        ticketNormal1Priority.reset();
+        normal1PriorityAdmission.ticket.reset();
 
         // The other normal priority thread takes the ticket.
         normal2PriorityThread.join();
-        ASSERT_TRUE(ticketNormal2Priority);
-        ASSERT_EQ(stats["removedFromQueue"], 2);
-        ticketNormal2Priority.reset();
+        ASSERT_TRUE(normal2PriorityAdmission.ticket);
+        normal2PriorityAdmission.ticket.reset();
 
         // Low priority thread takes the ticket.
         lowPriorityThread.join();
-        ASSERT_TRUE(ticketLowPriority);
-        ASSERT_EQ(stats["removedFromQueue"], 3);
-        ticketLowPriority.reset();
+        ASSERT_TRUE(lowPriorityAdmission.ticket);
+        lowPriorityAdmission.ticket.reset();
     }
-    ASSERT_EQ(stats["addedToQueue"], 3);
-    ASSERT_EQ(stats["removedFromQueue"], 3);
-    ASSERT_EQ(stats["queueLength"], 0);
+
+    ASSERT_EQ(stats["out"], 0);
+    ASSERT_EQ(stats["available"], 1);
+    ASSERT_EQ(stats["totalTickets"], 1);
+
+    auto currentStats = stats.getStats();
+    auto lowPriorityStats = currentStats.getObjectField("lowPriority");
+    ASSERT_EQ(lowPriorityStats.getIntField("addedToQueue"), 1);
+    ASSERT_EQ(lowPriorityStats.getIntField("removedFromQueue"), 1);
+    ASSERT_EQ(lowPriorityStats.getIntField("queueLength"), 0);
+    ASSERT_EQ(lowPriorityStats.getIntField("startedProcessing"), 2);
+    ASSERT_EQ(lowPriorityStats.getIntField("processing"), 0);
+    ASSERT_EQ(lowPriorityStats.getIntField("finishedProcessing"), 2);
+
+    auto normalPriorityStats = currentStats.getObjectField("normalPriority");
+    ASSERT_EQ(normalPriorityStats.getIntField("addedToQueue"), 2);
+    ASSERT_EQ(normalPriorityStats.getIntField("removedFromQueue"), 2);
+    ASSERT_EQ(normalPriorityStats.getIntField("queueLength"), 0);
+    ASSERT_EQ(normalPriorityStats.getIntField("startedProcessing"), 2);
+    ASSERT_EQ(normalPriorityStats.getIntField("processing"), 0);
+    ASSERT_EQ(normalPriorityStats.getIntField("finishedProcessing"), 2);
 }
 
+TEST_F(TicketHolderTest, PriorityBasicMetrics) {
+    ServiceContext serviceContext;
+    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+    auto tickSource = dynamic_cast<TickSourceMock<Microseconds>*>(serviceContext.getTickSource());
+    PriorityTicketHolder holder(1, &serviceContext);
+    Stats stats(&holder);
+
+    MockAdmission lowPriorityAdmission(
+        "lowPriorityAdmission", this->getServiceContext(), AdmissionContext::Priority::kLow);
+    lowPriorityAdmission.ticket = holder.waitForTicket(lowPriorityAdmission.opCtx.get(),
+                                                       &lowPriorityAdmission.admCtx,
+                                                       TicketHolder::WaitMode::kInterruptible);
+
+    unittest::Barrier barrierAcquiredTicket(2);
+    unittest::Barrier barrierReleaseTicket(2);
+
+    stdx::thread waiting([&]() {
+        // The ticket assigned to this admission is tied to the scope of the thread. Once the thread
+        // joins, the ticket is released back to the TicketHolder.
+        MockAdmission normalPriorityAdmission(
+            "normalPriority", this->getServiceContext(), AdmissionContext::Priority::kNormal);
+
+        normalPriorityAdmission.ticket =
+            holder.waitForTicket(normalPriorityAdmission.opCtx.get(),
+                                 &normalPriorityAdmission.admCtx,
+                                 TicketHolder::WaitMode::kUninterruptible);
+        barrierAcquiredTicket.countDownAndWait();
+        barrierReleaseTicket.countDownAndWait();
+    });
+
+    while (holder.queued() == 0) {
+        // Wait for thread to start waiting.
+    }
+
+    {
+        // Test that the metrics eventually converge to the following set of values. There can be
+        // cases where the values are incorrect for brief periods of time due to optimistic
+        // concurrency.
+        auto deadline = Date_t::now() + Milliseconds{100};
+        while (true) {
+            try {
+                // ASSERT_EQ(stats["out"], 1);
+                ASSERT_EQ(stats["available"], 0);
+                // ASSERT_EQ(stats["addedToQueue"], 1);
+                // ASSERT_EQ(stats["queueLength"], 1);
+                break;
+            } catch (...) {
+                if (Date_t::now() > deadline) {
+                    throw;
+                }
+                // Sleep to allow other threads to process and converge the metrics.
+                stdx::this_thread::sleep_for(Milliseconds{1}.toSystemDuration());
+            }
+        }
+    }
+    tickSource->advance(Microseconds(100));
+    lowPriorityAdmission.ticket.reset();
+
+    while (holder.queued() > 0) {
+        // Wait for thread to take ticket.
+    }
+
+    barrierAcquiredTicket.countDownAndWait();
+    tickSource->advance(Microseconds(200));
+    barrierReleaseTicket.countDownAndWait();
+
+    waiting.join();
+    ASSERT_EQ(lowPriorityAdmission.admCtx.getAdmissions(), 1);
+
+    ASSERT_EQ(stats["out"], 0);
+    ASSERT_EQ(stats["available"], 1);
+    ASSERT_EQ(stats["totalTickets"], 1);
+
+    auto currentStats = stats.getStats();
+    auto lowPriorityStats = currentStats.getObjectField("lowPriority");
+    ASSERT_EQ(lowPriorityStats.getIntField("addedToQueue"), 0);
+    ASSERT_EQ(lowPriorityStats.getIntField("removedFromQueue"), 0);
+    ASSERT_EQ(lowPriorityStats.getIntField("queueLength"), 0);
+    ASSERT_EQ(lowPriorityStats.getIntField("startedProcessing"), 1);
+    ASSERT_EQ(lowPriorityStats.getIntField("processing"), 0);
+    ASSERT_EQ(lowPriorityStats.getIntField("finishedProcessing"), 1);
+    ASSERT_EQ(lowPriorityStats.getIntField("totalTimeProcessingMicros"), 100);
+    ASSERT_EQ(lowPriorityStats.getIntField("totalTimeQueuedMicros"), 0);
+    ASSERT_EQ(lowPriorityStats.getIntField("newAdmissions"), 1);
+    ASSERT_EQ(lowPriorityStats.getIntField("canceled"), 0);
+
+    auto normalPriorityStats = currentStats.getObjectField("normalPriority");
+    ASSERT_EQ(normalPriorityStats.getIntField("addedToQueue"), 1);
+    ASSERT_EQ(normalPriorityStats.getIntField("removedFromQueue"), 1);
+    ASSERT_EQ(normalPriorityStats.getIntField("queueLength"), 0);
+    ASSERT_EQ(normalPriorityStats.getIntField("startedProcessing"), 1);
+    ASSERT_EQ(normalPriorityStats.getIntField("processing"), 0);
+    ASSERT_EQ(normalPriorityStats.getIntField("finishedProcessing"), 1);
+    ASSERT_EQ(normalPriorityStats.getIntField("totalTimeProcessingMicros"), 200);
+    ASSERT_EQ(normalPriorityStats.getIntField("totalTimeQueuedMicros"), 100);
+    ASSERT_EQ(normalPriorityStats.getIntField("newAdmissions"), 1);
+    ASSERT_EQ(normalPriorityStats.getIntField("canceled"), 0);
+
+    // Retake ticket.
+    holder.waitForTicket(
+        _opCtx.get(), &lowPriorityAdmission.admCtx, TicketHolder::WaitMode::kInterruptible);
+
+    ASSERT_EQ(lowPriorityAdmission.admCtx.getAdmissions(), 2);
+
+    currentStats = stats.getStats();
+    lowPriorityStats = currentStats.getObjectField("lowPriority");
+    ASSERT_EQ(lowPriorityStats.getIntField("newAdmissions"), 1);
+
+    normalPriorityStats = currentStats.getObjectField("normalPriority");
+    ASSERT_EQ(normalPriorityStats.getIntField("newAdmissions"), 1);
+}
+
+TEST_F(TicketHolderTest, PriorityCanceled) {
+    ServiceContext serviceContext;
+    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+    auto tickSource = dynamic_cast<TickSourceMock<Microseconds>*>(serviceContext.getTickSource());
+    PriorityTicketHolder holder(1, &serviceContext);
+    Stats stats(&holder);
+    {
+        MockAdmission lowPriorityAdmission(
+            "lowPriorityAdmission", this->getServiceContext(), AdmissionContext::Priority::kLow);
+        lowPriorityAdmission.ticket = holder.waitForTicket(lowPriorityAdmission.opCtx.get(),
+                                                           &lowPriorityAdmission.admCtx,
+                                                           TicketHolder::WaitMode::kInterruptible);
+        stdx::thread waiting([&]() {
+            MockAdmission normalPriorityAdmission(
+                "normalPriority", this->getServiceContext(), AdmissionContext::Priority::kNormal);
+
+            auto deadline = Date_t::now() + Milliseconds(100);
+            normalPriorityAdmission.ticket =
+                holder.waitForTicketUntil(normalPriorityAdmission.opCtx.get(),
+                                          &normalPriorityAdmission.admCtx,
+                                          deadline,
+                                          TicketHolder::WaitMode::kInterruptible);
+            ASSERT_FALSE(normalPriorityAdmission.ticket);
+        });
+
+        while (holder.queued() == 0) {
+            // Wait for thread to take ticket.
+        }
+
+        tickSource->advance(Microseconds(100));
+        waiting.join();
+    }
+
+    ASSERT_EQ(stats["out"], 0);
+    ASSERT_EQ(stats["available"], 1);
+    ASSERT_EQ(stats["totalTickets"], 1);
+
+    auto currentStats = stats.getStats();
+    auto lowPriorityStats = currentStats.getObjectField("lowPriority");
+    ASSERT_EQ(lowPriorityStats.getIntField("addedToQueue"), 0);
+    ASSERT_EQ(lowPriorityStats.getIntField("removedFromQueue"), 0);
+    ASSERT_EQ(lowPriorityStats.getIntField("queueLength"), 0);
+    ASSERT_EQ(lowPriorityStats.getIntField("startedProcessing"), 1);
+    ASSERT_EQ(lowPriorityStats.getIntField("processing"), 0);
+    ASSERT_EQ(lowPriorityStats.getIntField("finishedProcessing"), 1);
+    ASSERT_EQ(lowPriorityStats.getIntField("totalTimeProcessingMicros"), 100);
+    ASSERT_EQ(lowPriorityStats.getIntField("totalTimeQueuedMicros"), 0);
+    ASSERT_EQ(lowPriorityStats.getIntField("newAdmissions"), 1);
+    ASSERT_EQ(lowPriorityStats.getIntField("canceled"), 0);
+
+    auto normalPriorityStats = currentStats.getObjectField("normalPriority");
+    ASSERT_EQ(normalPriorityStats.getIntField("addedToQueue"), 1);
+    ASSERT_EQ(normalPriorityStats.getIntField("removedFromQueue"), 1);
+    ASSERT_EQ(normalPriorityStats.getIntField("queueLength"), 0);
+    ASSERT_EQ(normalPriorityStats.getIntField("startedProcessing"), 0);
+    ASSERT_EQ(normalPriorityStats.getIntField("processing"), 0);
+    ASSERT_EQ(normalPriorityStats.getIntField("finishedProcessing"), 0);
+    ASSERT_EQ(normalPriorityStats.getIntField("totalTimeProcessingMicros"), 0);
+    ASSERT_EQ(normalPriorityStats.getIntField("totalTimeQueuedMicros"), 100);
+    ASSERT_EQ(normalPriorityStats.getIntField("newAdmissions"), 0);
+    ASSERT_EQ(normalPriorityStats.getIntField("canceled"), 1);
+}
 }  // namespace

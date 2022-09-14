@@ -146,28 +146,16 @@ void TicketHolderWithQueueingStats::appendStats(BSONObjBuilder& b) const {
     b.append("out", used());
     b.append("available", available());
     b.append("totalTickets", outof());
-    auto removed = _totalRemovedQueue.loadRelaxed();
-    auto added = _totalAddedQueue.loadRelaxed();
-    b.append("addedToQueue", added);
-    b.append("removedFromQueue", removed);
-    b.append("queueLength", std::max(static_cast<int>(added - removed), 0));
-    auto finished = _totalFinishedProcessing.loadRelaxed();
-    auto started = _totalStartedProcessing.loadRelaxed();
-    b.append("startedProcessing", started);
-    b.append("processing", std::max(static_cast<int>(started - finished), 0));
-    b.append("finishedProcessing", finished);
-    b.append("totalTimeProcessingMicros", _totalTimeProcessingMicros.loadRelaxed());
-    b.append("canceled", _totalCanceled.loadRelaxed());
-    b.append("newAdmissions", _totalNewAdmissions.loadRelaxed());
     _appendImplStats(b);
 }
 
 void TicketHolderWithQueueingStats::_release(AdmissionContext* admCtx) noexcept {
-    _totalFinishedProcessing.fetchAndAddRelaxed(1);
+    auto& queueStats = _getQueueStatsToUse(admCtx);
+    queueStats.totalFinishedProcessing.fetchAndAddRelaxed(1);
     auto startTime = admCtx->getStartProcessingTime();
     auto tickSource = _serviceContext->getTickSource();
     auto delta = tickSource->spanTo<Microseconds>(startTime, tickSource->getTicks());
-    _totalTimeProcessingMicros.fetchAndAddRelaxed(delta.count());
+    queueStats.totalTimeProcessingMicros.fetchAndAddRelaxed(delta.count());
     _releaseQueue(admCtx);
 }
 
@@ -185,11 +173,12 @@ boost::optional<Ticket> TicketHolderWithQueueingStats::tryAcquire(AdmissionConte
     auto ticket = _tryAcquireImpl(admCtx);
     // Track statistics.
     if (ticket) {
+        auto& queueStats = _getQueueStatsToUse(admCtx);
         if (admCtx->getAdmissions() == 0) {
-            _totalNewAdmissions.fetchAndAddRelaxed(1);
+            queueStats.totalNewAdmissions.fetchAndAddRelaxed(1);
         }
         admCtx->start(_serviceContext->getTickSource());
-        _totalStartedProcessing.fetchAndAddRelaxed(1);
+        queueStats.totalStartedProcessing.fetchAndAddRelaxed(1);
     }
     return ticket;
 }
@@ -206,15 +195,23 @@ boost::optional<Ticket> TicketHolderWithQueueingStats::waitForTicketUntil(Operat
         return ticket;
     }
 
-    // Track statistics
+    auto& queueStats = _getQueueStatsToUse(admCtx);
+    auto tickSource = _serviceContext->getTickSource();
+    auto currentWaitTime = tickSource->getTicks();
+    auto updateQueuedTime = [&]() {
+        auto oldWaitTime = std::exchange(currentWaitTime, tickSource->getTicks());
+        auto waitDelta = tickSource->spanTo<Microseconds>(oldWaitTime, currentWaitTime).count();
+        queueStats.totalTimeQueuedMicros.fetchAndAddRelaxed(waitDelta);
+    };
+    queueStats.totalAddedQueue.fetchAndAddRelaxed(1);
+    ON_BLOCK_EXIT([&] {
+        updateQueuedTime();
+        queueStats.totalRemovedQueue.fetchAndAddRelaxed(1);
+    });
 
-    _totalAddedQueue.fetchAndAddRelaxed(1);
-    ON_BLOCK_EXIT([&] { _totalRemovedQueue.fetchAndAddRelaxed(1); });
-
-    // Enqueue.
     ScopeGuard cancelWait([&] {
         // Update statistics.
-        _totalCanceled.fetchAndAddRelaxed(1);
+        queueStats.totalCanceled.fetchAndAddRelaxed(1);
     });
 
     auto ticket = _waitForTicketUntilImpl(opCtx, admCtx, until, waitMode);
@@ -222,17 +219,32 @@ boost::optional<Ticket> TicketHolderWithQueueingStats::waitForTicketUntil(Operat
     if (ticket) {
         cancelWait.dismiss();
         if (admCtx->getAdmissions() == 0) {
-            _totalNewAdmissions.fetchAndAddRelaxed(1);
+            queueStats.totalNewAdmissions.fetchAndAddRelaxed(1);
         }
         admCtx->start(_serviceContext->getTickSource());
-        _totalStartedProcessing.fetchAndAddRelaxed(1);
+        queueStats.totalStartedProcessing.fetchAndAddRelaxed(1);
         return ticket;
     } else {
         return boost::none;
     }
 }
 
-
+void SemaphoreTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
+    auto removed = _semaphoreStats.totalRemovedQueue.loadRelaxed();
+    auto added = _semaphoreStats.totalAddedQueue.loadRelaxed();
+    b.append("addedToQueue", added);
+    b.append("removedFromQueue", removed);
+    b.append("queueLength", std::max(static_cast<int>(added - removed), 0));
+    auto finished = _semaphoreStats.totalFinishedProcessing.loadRelaxed();
+    auto started = _semaphoreStats.totalStartedProcessing.loadRelaxed();
+    b.append("startedProcessing", started);
+    b.append("processing", std::max(static_cast<int>(started - finished), 0));
+    b.append("finishedProcessing", finished);
+    b.append("totalTimeProcessingMicros", _semaphoreStats.totalTimeProcessingMicros.loadRelaxed());
+    b.append("canceled", _semaphoreStats.totalCanceled.loadRelaxed());
+    b.append("newAdmissions", _semaphoreStats.totalNewAdmissions.loadRelaxed());
+    b.append("totalTimeQueuedMicros", _semaphoreStats.totalTimeQueuedMicros.loadRelaxed());
+}
 #if defined(__linux__)
 namespace {
 
@@ -287,18 +299,6 @@ boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(Operation
                                                                        AdmissionContext* admCtx,
                                                                        Date_t until,
                                                                        WaitMode waitMode) {
-
-    auto tickSource = _serviceContext->getTickSource();
-    // Track statistics
-    auto currentWaitTime = tickSource->getTicks();
-    auto updateQueuedTime = [&]() {
-        auto oldWaitTime = std::exchange(currentWaitTime, tickSource->getTicks());
-        auto waitDelta = tickSource->spanTo<Microseconds>(oldWaitTime, currentWaitTime).count();
-        _totalTimeQueuedMicros.fetchAndAddRelaxed(waitDelta);
-    };
-
-    ON_BLOCK_EXIT(updateQueuedTime);
-
     const Milliseconds intervalMs(500);
     struct timespec ts;
 
@@ -325,8 +325,6 @@ boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(Operation
         // It is possible to unset 'errno' after a call to checkForInterrupt().
         if (waitMode == WaitMode::kInterruptible)
             opCtx->checkForInterrupt();
-
-        updateQueuedTime();
     }
     return Ticket{this, admCtx};
 }
@@ -435,10 +433,6 @@ void SemaphoreTicketHolder::_resize(int newSize, int oldSize) noexcept {
 }
 #endif
 
-void SemaphoreTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
-    b.append("totalTimeQueuedMicros", _totalTimeQueuedMicros.loadRelaxed());
-}
-
 SchedulingTicketHolder::SchedulingTicketHolder(int numTickets,
                                                unsigned int numQueues,
                                                ServiceContext* serviceContext)
@@ -463,7 +457,6 @@ int SchedulingTicketHolder::queued() const {
 
 void SchedulingTicketHolder::_releaseQueue(AdmissionContext* admCtx) noexcept {
     invariant(admCtx);
-
     // The idea behind the release mechanism consists of a consistent view of queued elements
     // waiting for a ticket and many threads releasing tickets simultaneously. The releasers will
     // proceed to attempt to dequeue an element by seeing if there are threads not woken and waking
@@ -509,7 +502,7 @@ boost::optional<Ticket> SchedulingTicketHolder::_waitForTicketUntilImpl(Operatio
                                                                         WaitMode waitMode) {
     invariant(admCtx);
 
-    auto& queue = _getQueueToUse(opCtx, admCtx);
+    auto& queue = _getQueueToUse(admCtx);
 
     bool assigned;
     {
@@ -617,8 +610,44 @@ void PriorityTicketHolder::_dequeueWaitingThread() {
     }
 }
 
+void PriorityTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
+    {
+        BSONObjBuilder bbb(b.subobjStart("lowPriority"));
+        auto& queueStats =
+            _queues[static_cast<unsigned int>(QueueType::LowPriorityQueue)].getStats();
+        _appendPriorityStats(bbb, queueStats);
+        bbb.done();
+    }
+    {
+        BSONObjBuilder bbb(b.subobjStart("normalPriority"));
+        auto& queueStats =
+            _queues[static_cast<unsigned int>(QueueType::NormalPriorityQueue)].getStats();
+        _appendPriorityStats(bbb, queueStats);
+        bbb.done();
+    }
+}
+
+void PriorityTicketHolder::_appendPriorityStats(BSONObjBuilder& b, const QueueStats& stats) const {
+    auto removed = stats.totalRemovedQueue.loadRelaxed();
+    auto added = stats.totalAddedQueue.loadRelaxed();
+
+    b.append("addedToQueue", added);
+    b.append("removedFromQueue", removed);
+    b.append("queueLength", std::max(static_cast<int>(added - removed), 0));
+
+    auto finished = stats.totalFinishedProcessing.loadRelaxed();
+    auto started = stats.totalStartedProcessing.loadRelaxed();
+    b.append("startedProcessing", started);
+    b.append("processing", std::max(static_cast<int>(started - finished), 0));
+    b.append("finishedProcessing", finished);
+    b.append("totalTimeProcessingMicros", stats.totalTimeProcessingMicros.loadRelaxed());
+    b.append("canceled", stats.totalCanceled.loadRelaxed());
+    b.append("newAdmissions", stats.totalNewAdmissions.loadRelaxed());
+    b.append("totalTimeQueuedMicros", stats.totalTimeQueuedMicros.loadRelaxed());
+}
+
 SchedulingTicketHolder::Queue& PriorityTicketHolder::_getQueueToUse(
-    OperationContext* opCtx, const AdmissionContext* admCtx) {
+    const AdmissionContext* admCtx) noexcept {
     auto priority = admCtx->getPriority();
     switch (priority) {
         case AdmissionContext::Priority::kLow:
@@ -628,5 +657,10 @@ SchedulingTicketHolder::Queue& PriorityTicketHolder::_getQueueToUse(
         default:
             MONGO_UNREACHABLE;
     }
+}
+
+TicketHolderWithQueueingStats::QueueStats& PriorityTicketHolder::_getQueueStatsToUse(
+    const AdmissionContext* admCtx) noexcept {
+    return _getQueueToUse(admCtx).getStatsToUse();
 }
 }  // namespace mongo
