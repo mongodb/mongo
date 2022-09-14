@@ -62,6 +62,10 @@ void onDbVersionMismatch(OperationContext* opCtx,
     invariant(!opCtx->getClient()->isInDirectClient());
     invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
+    tassert(ErrorCodes::IllegalOperation,
+            "Can't check version of {} database"_format(dbName),
+            dbName != NamespaceString::kAdminDb && dbName != NamespaceString::kConfigDb);
+
     {
         // Take the DBLock directly rather than using AutoGetDb, to prevent a recursive call into
         // checkDbVersion().

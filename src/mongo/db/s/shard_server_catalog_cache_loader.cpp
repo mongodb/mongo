@@ -472,6 +472,14 @@ SemiFuture<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::getChunksS
 }
 
 SemiFuture<DatabaseType> ShardServerCatalogCacheLoader::getDatabase(StringData dbName) {
+    // The admin and config database have fixed metadata that does not need to be refreshed.
+    if (dbName == NamespaceString::kAdminDb || dbName == NamespaceString::kConfigDb) {
+        auto dbMetadata =
+            DatabaseType(dbName.toString(), ShardId::kConfigServerId, DatabaseVersion::makeFixed());
+        dbMetadata.setSharded(true);
+        return dbMetadata;
+    }
+
     const auto [isPrimary, term] = [&] {
         stdx::lock_guard<Latch> lock(_mutex);
         return std::make_tuple(_role == ReplicaSetRole::Primary, _term);
