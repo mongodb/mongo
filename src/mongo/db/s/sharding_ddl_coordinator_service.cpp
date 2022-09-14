@@ -77,6 +77,8 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
         case DDLCoordinatorTypeEnum::kRenameCollection:
             return std::make_shared<RenameCollectionCoordinator>(service, std::move(initialState));
         case DDLCoordinatorTypeEnum::kCreateCollection:
+        // TODO SERVER-68008 Remove the Pre61Compatible case once 7.0 becomes last LTS
+        case DDLCoordinatorTypeEnum::kCreateCollectionPre61Compatible:
             return std::make_shared<CreateCollectionCoordinator>(service, std::move(initialState));
             break;
         case DDLCoordinatorTypeEnum::kRefineCollectionShardKey:

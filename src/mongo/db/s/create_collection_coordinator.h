@@ -51,7 +51,7 @@ public:
           _request(_doc.getCreateCollectionRequest()),
           _critSecReason(BSON("command"
                               << "createCollection"
-                              << "ns" << nss().toString())) {}
+                              << "ns" << originalNss().toString())) {}
 
     ~CreateCollectionCoordinator() = default;
 
@@ -71,7 +71,7 @@ public:
     }
 
 protected:
-    const mongo::CreateCollectionRequest _request;
+    const NamespaceString& nss() const override;
 
 private:
     StringData serializePhase(const Phase& phase) const override {
@@ -86,25 +86,36 @@ private:
      */
     void _checkCommandArguments(OperationContext* opCtx);
 
-    /**
-     * Checks that the collection has UUID matching the collectionUUID parameter, if provided.
-     */
-    void _checkCollectionUUIDMismatch(OperationContext* opCtx) const;
+    boost::optional<CreateCollectionResponse> _checkIfCollectionAlreadyShardedWithSameOptions(
+        OperationContext* opCtx);
+
+    TranslatedRequestParams _translateRequestParameters(OperationContext* opCtx);
+
+    // TODO SERVER-68008 Remove once 7.0 becomes last LTS; when the function appears in if clauses,
+    // modify the code assuming that a "false" value gets returned
+    bool _timeseriesNssResolvedByCommandHandler() const;
+
+    void _acquireCriticalSections(OperationContext* opCtx);
+
+    void _promoteCriticalSectionsToBlockReads(OperationContext* opCtx) const;
+
+    void _releaseCriticalSections(OperationContext* opCtx);
 
     /**
      * Ensures the collection is created locally and has the appropiate shard index.
      */
-    void _createCollectionAndIndexes(OperationContext* opCtx);
+    void _createCollectionAndIndexes(OperationContext* opCtx,
+                                     const ShardKeyPattern& shardKeyPattern);
 
     /**
      * Creates the appropiate split policy.
      */
-    void _createPolicy(OperationContext* opCtx);
+    void _createPolicy(OperationContext* opCtx, const ShardKeyPattern& shardKeyPattern);
 
     /**
      * Given the appropiate split policy, create the initial chunks.
      */
-    void _createChunks(OperationContext* opCtx);
+    void _createChunks(OperationContext* opCtx, const ShardKeyPattern& shardKeyPattern);
 
     /**
      * If the optimized path can be taken, ensure the collection is already created in all the
@@ -130,11 +141,9 @@ private:
      */
     void _logEndCreateCollection(OperationContext* opCtx);
 
-    const BSONObj _critSecReason;
+    mongo::CreateCollectionRequest _request;
 
-    // The shard key of the collection, static for the duration of the coordinator and reflects the
-    // original command
-    boost::optional<ShardKeyPattern> _shardKeyPattern;
+    const BSONObj _critSecReason;
 
     // Set on successful completion of the coordinator
     boost::optional<CreateCollectionResponse> _result;
@@ -142,7 +151,6 @@ private:
     // The fields below are only populated if the coordinator enters in the branch where the
     // collection is not already sharded (i.e., they will not be present on early return)
 
-    boost::optional<BSONObj> _collationBSON;
     boost::optional<UUID> _collectionUUID;
 
     std::unique_ptr<InitialSplitPolicy> _splitPolicy;

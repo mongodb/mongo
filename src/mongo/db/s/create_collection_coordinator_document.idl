@@ -43,9 +43,28 @@ enums:
         type: string
         values:
             kUnset: "unset"
+            kTranslateRequest: "translateRequest"
             kCommit: "commit"
 
 structs:
+    TranslatedRequestParams:
+        description: "Subset of CreateCollectionRequest fields that may get overridden once the kTranslateRequest phase gets executed"
+        generate_comparison_operators: false
+        strict: false
+        fields:
+            nss:
+                type: namespacestring
+                description: "The namespace that will be used by the DDL while accessing the Sharding Catalog"
+                optional: false
+            keyPattern:
+                type: KeyPattern
+                description: "The shard key that will be used by the DDL while accessing the Sharding Catalog"
+                optional: false
+            collation:
+                type: object_owned
+                description: "Collation value from the targeted unsharded collection if this exists; otherwise, simple-collation"
+                optional: false
+
     CreateCollectionCoordinatorDocument:
         description: "Object with neccessary fields to create a collection"
         generate_comparison_operators: false
@@ -58,3 +77,11 @@ structs:
                 type: CreateCollectionCoordinatorPhase
                 description: "Coordinator phase."
                 default: kUnset
+            translatedRequestParams:
+                type: TranslatedRequestParams
+                description: "The field is populated only once the kTranslateRequest phase is completed"
+                optional: true
+            # TODO SERVER-68084 remove the following field
+            disregardCriticalSectionOnOriginalNss:
+                type: optionalBool
+                description: "When set to true, the DDL operation is being performed without acquiring a critical section over the NSS specified by the user."
