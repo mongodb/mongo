@@ -136,7 +136,7 @@ function TenantMigrationTest({
         nodeOptions["setParameter"] = setParameterOpts;
 
         const rstName = `${name}_${(isDonor ? "donor" : "recipient")}`;
-        const rst = new ReplSetTest({name: rstName, nodes, nodeOptions});
+        const rst = new ReplSetTest({name: rstName, nodes, serverless: true, nodeOptions});
         rst.startSet();
         if (initiateRstWithHighElectionTimeout) {
             rst.initiateWithHighElectionTimeout();
@@ -231,6 +231,7 @@ function TenantMigrationTest({
     this.runDonorStartMigration = function({
         migrationIdString,
         tenantId,
+        protocol,
         recipientConnectionString = recipientRst.getURL(),
         readPreference = {mode: "primary"},
         donorCertificateForRecipient = migrationCertificates.donorCertificateForRecipient,
@@ -251,6 +252,7 @@ function TenantMigrationTest({
             readPreference,
             donorCertificateForRecipient,
             recipientCertificateForDonor,
+            protocol
         };
 
         const stateRes = TenantMigrationUtil.runTenantMigrationCommand(cmdObj, this.getDonorRst(), {

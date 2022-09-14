@@ -8,6 +8,7 @@
  *   incompatible_with_macos,
  *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
+ *   requires_fcv_62,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
@@ -20,6 +21,7 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
+const {ServerlessLockType, getServerlessOperationLock} = TenantMigrationUtil;
 
 const donorRst = new ReplSetTest({
     nodes: 1,
@@ -70,7 +72,8 @@ donorRst.startSet({
 
 donorPrimary = donorRst.getPrimary();
 const configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);
-const donorDoc = configDonorsColl.findOne({tenantId: kTenantId});
+assert.lte(configDonorsColl.count(), 1);
+const donorDoc = configDonorsColl.findOne();
 if (donorDoc) {
     switch (donorDoc.state) {
         case TenantMigrationTest.DonorState.kAbortingIndexBuilds:
@@ -131,6 +134,13 @@ if (donorDoc) {
         default:
             throw new Error(`Invalid state "${state}" from donor doc.`);
     }
+}
+
+const activeServerlessLock = getServerlessOperationLock(donorPrimary);
+if (donorDoc && !donorDoc.expireAt) {
+    assert.eq(activeServerlessLock, ServerlessLockType.TenantMigrationDonor);
+} else {
+    assert.eq(activeServerlessLock, null);
 }
 
 tenantMigrationTest.stop();

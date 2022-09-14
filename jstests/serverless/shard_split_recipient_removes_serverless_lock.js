@@ -1,11 +1,14 @@
 /*
- * Test that tenant access blockers are removed when applying the recipient config
+ * Test the serverless operation lock is released from recipients when the state document is
+ * removed.
  *
- * @tags: [requires_fcv_52, featureFlagShardSplit, serverless]
+ * @tags: [requires_fcv_62, featureFlagShardSplit, serverless]
  */
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/serverless/libs/basic_serverless_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
+const {ServerlessLockType, getServerlessOperationLock} = TenantMigrationUtil;
 
 (function() {
 "use strict";
@@ -26,27 +29,20 @@ const operation = test.createSplitOperation(tenantIds);
 
 const donorAfterBlockingFailpoint =
     configureFailPoint(donorPrimary.getDB("admin"), "pauseShardSplitAfterBlocking");
-test.recipientNodes.forEach(
-    node => configureFailPoint(node.getDB("admin"), "skipShardSplitRecipientCleanup"));
 
 const commitOp = operation.commitAsync();
 donorAfterBlockingFailpoint.wait();
 
-jsTestLog("Asserting recipient nodes have installed access blockers");
-assert.soon(() => test.recipientNodes.every(node => {
-    const accessBlockers = BasicServerlessTest.getTenantMigrationAccessBlocker({node});
-    return tenantIds.every(tenantId => accessBlockers && accessBlockers.hasOwnProperty(tenantId) &&
-                               !!accessBlockers[tenantId].donor);
-}));
+jsTestLog("Asserting recipient nodes have installed the serverless lock");
+assert.soon(() => test.recipientNodes.every(node => getServerlessOperationLock(node) ===
+                                                ServerlessLockType.ShardSplitDonor));
 donorAfterBlockingFailpoint.off();
 
 commitOp.join();
 assert.commandWorked(commitOp.returnData());
 
-jsTestLog("Asserting recipient nodes have removed access blockers");
-assert.soon(() => test.recipientNodes.every(node => {
-    return BasicServerlessTest.getTenantMigrationAccessBlocker({node}) == null;
-}));
+jsTestLog("Asserting the serverless exclusion lock has been released");
+assert.soon(() => test.recipientNodes.every(node => getServerlessOperationLock(node) == null));
 
 test.stop();
 })();

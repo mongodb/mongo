@@ -85,7 +85,7 @@ void TenantMigrationAccessBlockerRegistry::add(StringData tenantId,
     if (it != _tenantMigrationAccessBlockers.end()) {
         auto existingMtab = it->second.getAccessBlocker(mtabType);
         if (existingMtab) {
-            tasserted(ErrorCodes::ConflictingOperationInProgress,
+            uasserted(ErrorCodes::ConflictingServerlessOperation,
                       str::stream() << "This node is already a "
                                     << (mtabType == MtabType::kDonor ? "donor" : "recipient")
                                     << " for tenantId \"" << tenantId << "\" with migrationId \""
@@ -117,7 +117,7 @@ void TenantMigrationAccessBlockerRegistry::addShardMergeDonorAccessBlocker(
         _tenantMigrationAccessBlockers.begin(),
         _tenantMigrationAccessBlockers.end(),
         [](const auto& pair) { return pair.second.getAccessBlocker(MtabType::kDonor).get(); });
-    tassert(6114105,
+    uassert(ErrorCodes::ConflictingServerlessOperation,
             str::stream() << "Adding shard merge donor blocker when this node has another donor "
                              "blocker with migrationId \""
                           << foundAccessBlocker->second.getAccessBlocker(MtabType::kDonor)

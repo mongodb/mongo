@@ -4,6 +4,9 @@ selector:
   roots:
   - jstests/serverless/*.js
   - jstests/serverless/change_streams/**/*.js
+  exclude_files:
+  # TODO(SERVER-69676): Remove this excluded file once the test runtime is reasonable.
+  - jstests/serverless/serverless_reject_multiple_ops.js
 
 executor:
   config:

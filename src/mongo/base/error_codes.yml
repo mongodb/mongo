@@ -490,7 +490,7 @@ error_codes:
     - {code: 378, name: NonConformantBSON, categories: [ValidationError]}
     - {code: 379, name: DatabaseMetadataRefreshCanceled, categories: [InternalOnly]}
     - {code: 380, name: RequestAlreadyFulfilled}
-
+    - {code: 381, name: ConflictingServerlessOperation}
 
     # Error codes 4000-8999 are reserved.
 

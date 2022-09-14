@@ -49,6 +49,7 @@
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/serverless/serverless_operation_lock_registry.h"
 #include "mongo/db/serverless/shard_split_donor_op_observer.h"
 #include "mongo/db/serverless/shard_split_donor_service.h"
 #include "mongo/db/serverless/shard_split_state_machine_gen.h"
@@ -511,6 +512,11 @@ TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) 
     waitForReplSetStepUp(Status(ErrorCodes::OK, ""));
     waitForRecipientPrimaryMajorityWrite();
 
+    // Verify the serverless lock has been acquired for split.
+    auto& registry = ServerlessOperationLockRegistry::get(opCtx->getServiceContext());
+    ASSERT_EQ(*registry.getActiveOperationType_forTest(),
+              ServerlessOperationLockRegistry::LockType::kShardSplit);
+
     auto result = serviceInstance->decisionFuture().get();
     ASSERT_TRUE(hasActiveSplitForTenants(opCtx.get(), _tenantIds));
     ASSERT(!result.abortReason);
@@ -520,8 +526,32 @@ TEST_F(ShardSplitDonorServiceTest, BasicShardSplitDonorServiceInstanceCreation) 
     auto completionFuture = serviceInstance->completionFuture();
     completionFuture.wait();
 
+    // The lock has been released.
+    ASSERT_FALSE(registry.getActiveOperationType_forTest());
+
     ASSERT_OK(serviceInstance->completionFuture().getNoThrow());
     ASSERT_TRUE(serviceInstance->isGarbageCollectable());
+}
+
+TEST_F(ShardSplitDonorServiceTest, ShardSplitFailsWhenLockIsHeld) {
+    auto opCtx = makeOperationContext();
+    test::shard_split::reconfigToAddRecipientNodes(
+        getServiceContext(), _recipientTagName, _replSet.getHosts(), _recipientSet.getHosts());
+
+    auto& registry = ServerlessOperationLockRegistry::get(opCtx->getServiceContext());
+    registry.acquireLock(ServerlessOperationLockRegistry::LockType::kTenantRecipient, UUID::gen());
+
+    // Create and start the instance.
+    auto serviceInstance = ShardSplitDonorService::DonorStateMachine::getOrCreate(
+        opCtx.get(), _service, defaultStateDocument().toBSON());
+    ASSERT(serviceInstance.get());
+
+    auto decisionFuture = serviceInstance->decisionFuture();
+
+    auto result = decisionFuture.get();
+    ASSERT_EQ(result.state, ShardSplitDonorStateEnum::kAborted);
+    ASSERT(result.abortReason);
+    ASSERT_EQ(result.abortReason->code(), ErrorCodes::ConflictingServerlessOperation);
 }
 
 TEST_F(ShardSplitDonorServiceTest, ReplSetStepUpRetryable) {
@@ -1014,6 +1044,10 @@ public:
         stateDocument.setBlockOpTime(repl::OpTime(Timestamp(1, 1), 1));
         stateDocument.setState(ShardSplitDonorStateEnum::kBlocking);
         stateDocument.setRecipientConnectionString(ConnectionString::forLocal());
+
+        ServerlessOperationLockRegistry::get(getServiceContext())
+            .acquireLock(ServerlessOperationLockRegistry::LockType::kShardSplit,
+                         stateDocument.getId());
 
         return stateDocument;
     }
