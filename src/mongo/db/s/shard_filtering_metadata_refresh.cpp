@@ -67,6 +67,10 @@ void onDbVersionMismatch(OperationContext* opCtx,
 
     invariant(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
+    tassert(ErrorCodes::IllegalOperation,
+            "Can't check version of {} database"_format(dbName),
+            dbName != NamespaceString::kAdminDb && dbName != NamespaceString::kConfigDb);
+
     if (serverDbVersion) {
         // Do not reorder these two statements! if the comparison is done through epochs, the
         // construction order matters: we are pessimistically assuming that the client version
