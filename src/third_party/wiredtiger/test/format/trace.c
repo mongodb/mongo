@@ -30,8 +30,6 @@
 
 #define TRACE_CONFIG_CMD(cmd, flag)        \
     if ((p = strstr(copy, cmd)) != NULL) { \
-        if (strcmp(cmd, "all") == 0)       \
-            all = true;                    \
         FLD_SET(g.trace_flags, flag);      \
         memset(p, ' ', strlen(cmd));       \
         continue;                          \
@@ -45,10 +43,9 @@ void
 trace_config(const char *config)
 {
     char *copy, *p;
-    bool all;
 
     copy = dstrdup(config);
-    for (all = false;;) {
+    for (;;) {
         TRACE_CONFIG_CMD("all", TRACE_ALL);
         TRACE_CONFIG_CMD("bulk", TRACE_BULK);
         TRACE_CONFIG_CMD("cursor", TRACE_CURSOR);
@@ -66,13 +63,6 @@ trace_config(const char *config)
             continue;
         }
         break;
-    }
-    if (all) {
-        FLD_SET(g.trace_flags, TRACE_BULK);
-        FLD_SET(g.trace_flags, TRACE_CURSOR);
-        FLD_SET(g.trace_flags, TRACE_READ);
-        FLD_SET(g.trace_flags, TRACE_TIMESTAMP);
-        FLD_SET(g.trace_flags, TRACE_TXN);
     }
 
     for (p = copy; *p != '\0'; ++p)
