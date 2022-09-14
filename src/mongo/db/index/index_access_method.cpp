@@ -1144,6 +1144,16 @@ Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
             *keysInsertedOut += inserted;
         }
     } else {
+        // Ensure that our snapshot is compatible with the index's minimum visibile snapshot.
+        const auto minVisibleTimestamp = _indexCatalogEntry->getMinimumVisibleSnapshot();
+        const auto readTimestamp =
+            opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx).value_or(
+                opCtx->recoveryUnit()->getCatalogConflictingTimestamp());
+        if (minVisibleTimestamp && !readTimestamp.isNull() &&
+            readTimestamp < *minVisibleTimestamp) {
+            throw WriteConflictException();
+        }
+
         int64_t numInserted = 0;
         status = insertKeysAndUpdateMultikeyPaths(
             opCtx,
@@ -1205,6 +1215,14 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
     // details.
     options.dupsAllowed = options.dupsAllowed || !_indexCatalogEntry->isReady(opCtx) ||
         (checkRecordId == CheckRecordId::On);
+
+    // Ensure that our snapshot is compatible with the index's minimum visibile snapshot.
+    const auto minVisibleTimestamp = _indexCatalogEntry->getMinimumVisibleSnapshot();
+    const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx).value_or(
+        opCtx->recoveryUnit()->getCatalogConflictingTimestamp());
+    if (minVisibleTimestamp && !readTimestamp.isNull() && readTimestamp < *minVisibleTimestamp) {
+        throw WriteConflictException();
+    }
 
     int64_t removed = 0;
     Status status = removeKeys(opCtx, keys, options, &removed);
