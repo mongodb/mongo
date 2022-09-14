@@ -63,10 +63,10 @@ assert(adminDb.auth('admin', 'pwd'));
 
     // Check that we will cannot run findAndModify on the doc when the tenantId is passed as the
     // prefix.
-    // TODO SERVER-68187 Uncomment out the below call to findAndModify.
-    /*fad = assert.commandWorked(mongod.getDB(kTenant + '_myDb0').runCommand(
-        {findAndModify: "myColl0", query: {b: 1}, update: {$inc: {b: 10}}}));
-    assert.eq(null, fad.value);*/
+    fad = assert.commandWorked(
+        mongod.getDB(kTenant + '_myDb0')
+            .runCommand({findAndModify: "myColl0", query: {b: 1}, update: {$inc: {b: 10}}}));
+    assert.eq(null, fad.value);
 }
 
 MongoRunner.stopMongod(mongod);
