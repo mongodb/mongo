@@ -132,14 +132,12 @@ assertTopDiffEq(testColl, lastTop, "commands", 1);
 lastTop = assertTopDiffEq(testColl, lastTop, "readLock", 1);
 
 // getIndexes
-const indexes = testColl.getIndexes();
-assert.eq(1, indexes.length);
+assert.eq(1, testColl.getIndexes().length);
 assertTopDiffEq(testColl, lastTop, "commands", 1);
 lastTop = assertTopDiffEq(testColl, lastTop, "readLock", 1);
 
 // aggregate with $indexStats
-const expectedIndexStatsCount = indexes[0].clustered ? 0 : 1;
-assert.eq(expectedIndexStatsCount, testColl.aggregate([{$indexStats: {}}]).itcount());
+assert.doesNotThrow(() => testColl.aggregate([{$indexStats: {}}]).itcount());
 assertTopDiffEq(testColl, lastTop, "commands", 1);
 lastTop = assertTopDiffEq(testColl, lastTop, "readLock", 1);
 

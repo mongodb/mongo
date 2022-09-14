@@ -6,9 +6,6 @@ selector:
   - jstests/fle2/**/*.js
   - src/mongo/db/modules/*/jstests/fle2/*.js
   exclude_files:
-  # TODO SERVER-67363 $indexStats double-increments top counters, which makes our overriden
-  # 'getIndexes()' implementation (based on $indexStats) visible to the test.
-  - jstests/core/top.js
   # TODO SERVER-68339 UBSAN has spurious warnings for column store indexes' encoding of large
   # doubles.
   - jstests/core/index_bounds_number_edge_cases.js
