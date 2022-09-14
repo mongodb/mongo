@@ -63,7 +63,7 @@ BSONObj makeStatsPath(StringData path,
                       boost::optional<std::list<BSONObj>> scalarHistogram,
                       boost::optional<BSONObj> arrayHistogram) {
     BSONObjBuilder statsBuilder;
-    statsBuilder.append("path", path);
+    statsBuilder.append("_id", path);
     statsBuilder.append("documents", documents);
     if (documentsSampled) {
         statsBuilder.append("documentsSampled", *documentsSampled);

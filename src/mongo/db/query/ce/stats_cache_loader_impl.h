@@ -40,8 +40,8 @@ using namespace mongo::ce;
 
 class StatsCacheLoaderImpl : public StatsCacheLoader {
 public:
-    SemiFuture<CollectionStatistics> getStats(OperationContext* opCtx,
-                                              const NamespaceString& nss) override;
+    SemiFuture<StatsCacheVal> getStats(OperationContext* opCtx,
+                                       const StatsPathString& statsPath) override;
 };
 
 }  // namespace mongo

@@ -82,7 +82,7 @@ counts"
     StatsPath:
         description: "Serialized representation of data statistics for a key path"
         fields:
-            path:
+            _id:
                 type: string
             documents:
                 type: long

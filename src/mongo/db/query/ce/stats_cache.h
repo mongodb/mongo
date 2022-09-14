@@ -40,7 +40,7 @@ namespace mongo {
 
 using namespace mongo::ce;
 
-using StatsCacheType = ReadThroughCache<NamespaceString, CollectionStatistics>;
+using StatsCacheType = ReadThroughCache<StatsPathString, StatsCacheVal>;
 using StatsCacheValueHandle = StatsCacheType::ValueHandle;
 
 /**
@@ -83,7 +83,7 @@ private:
      * Reads collection stats from the underlying storage if its not found in the in memory cache.
      */
     LookupResult _lookupStats(OperationContext* opCtx,
-                              const NamespaceString& nss,
+                              const StatsPathString& statsPath,
                               const ValueHandle& stats);
 
     Mutex _mutex = MONGO_MAKE_LATCH("StatsCache::_mutex");

@@ -30,7 +30,7 @@
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 
 #include "mongo/db/query/ce/ce_histogram.h"
-#include "mongo/db/query/ce/collection_statistics.h"
+#include "mongo/db/query/ce/collection_statistics_impl.h"
 #include "mongo/db/query/ce/histogram_estimation.h"
 
 #include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
@@ -79,7 +79,7 @@ std::string serializePath(const optimizer::ABT& path) {
 
 class CEHistogramTransportImpl {
 public:
-    CEHistogramTransportImpl(const ce::CollectionStatistics& stats)
+    CEHistogramTransportImpl(std::shared_ptr<ce::CollectionStatistics> stats)
         : _heuristicCE(), _stats(stats) {}
 
     ~CEHistogramTransportImpl() {}
@@ -89,7 +89,7 @@ public:
                      const Memo& memo,
                      const LogicalProps& logicalProps,
                      CEType /*bindResult*/) {
-        return _stats.getCardinality();
+        return _stats->getCardinality();
     }
 
     CEType transport(const ABT& n,
@@ -110,7 +110,7 @@ public:
             auto path = serializePath(key._path.ref());
 
             // Fallback to heuristic if no histogram.
-            auto histogram = _stats.getHistogram(path);
+            auto histogram = _stats->getHistogram(path);
             if (!histogram) {
                 // For now, because of the structure of SargableNode and the implementation of
                 // HeuristicCE, we can't combine heuristic & histogram estimates. In this case,
@@ -133,7 +133,7 @@ public:
                     // We have to convert the cardinality to a selectivity. The histogram returns
                     // the cardinality for the entire collection; however, fewer records may be
                     // expected at the SargableNode.
-                    conjSelectivities.push_back(cardinality / _stats.getCardinality());
+                    conjSelectivities.push_back(cardinality / _stats->getCardinality());
                 }
 
                 auto backoff = ce::conjExponentialBackoff(std::move(conjSelectivities));
@@ -176,10 +176,10 @@ public:
 
 private:
     HeuristicCE _heuristicCE;
-    const ce::CollectionStatistics& _stats;
+    std::shared_ptr<ce::CollectionStatistics> _stats;
 };
 
-CEHistogramTransport::CEHistogramTransport(const ce::CollectionStatistics& stats)
+CEHistogramTransport::CEHistogramTransport(std::shared_ptr<ce::CollectionStatistics> stats)
     : _impl(std::make_unique<CEHistogramTransportImpl>(stats)) {}
 
 CEHistogramTransport::~CEHistogramTransport() {}

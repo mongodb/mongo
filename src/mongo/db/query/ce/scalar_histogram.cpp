@@ -28,6 +28,8 @@
  */
 
 #include "mongo/db/query/ce/scalar_histogram.h"
+#include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/values/value.h"
 
 namespace mongo::ce {
 
@@ -56,6 +58,20 @@ std::string Bucket::toString() const {
 }
 
 ScalarHistogram::ScalarHistogram() : ScalarHistogram({}, {}) {}
+
+ScalarHistogram::ScalarHistogram(std::vector<StatsBucket> buckets) {
+
+    for (auto bucket : buckets) {
+        Bucket b(bucket.getBoundaryCount(),
+                 bucket.getRangeCount(),
+                 bucket.getCumulativeCount(),
+                 bucket.getRangeDistincts(),
+                 bucket.getCumulativeDistincts());
+        _buckets.push_back(std::move(b));
+        auto value = sbe::bson::convertFrom<1>(bucket.getUpperBoundary().getElement());
+        _bounds.push_back(value.first, value.second);
+    }
+}
 
 ScalarHistogram::ScalarHistogram(value::Array bounds, std::vector<Bucket> buckets)
     : _bounds(std::move(bounds)), _buckets(std::move(buckets)) {

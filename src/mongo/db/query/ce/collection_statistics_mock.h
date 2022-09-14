@@ -31,24 +31,34 @@
 
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/ce/collection_statistics.h"
-#include "mongo/db/query/ce/stats_cache_loader.h"
-#include "mongo/stdx/thread.h"
 
-namespace mongo {
+namespace mongo::ce {
 
-using namespace mongo::ce;
-
-class StatsCacheLoaderMock : public StatsCacheLoader {
+class CollectionStatisticsMock : public CollectionStatistics {
 public:
-    SemiFuture<StatsCacheVal> getStats(OperationContext* opCtx,
-                                       const StatsPathString& statsPath) override;
+    CollectionStatisticsMock(double cardinality);
 
-    void setStatsReturnValueForTest(StatusWith<StatsCacheVal> swStats);
+    /**
+     * Returns the cardinality of the given collection.
+     */
+    double getCardinality() const override;
 
-    static const Status kInternalErrorStatus;
+    /**
+     * Adds a histogram along the given path.
+     */
+    void addHistogram(const std::string& path,
+                      std::shared_ptr<ArrayHistogram> histogram) const override;
+
+    /**
+     * Returns the histogram for the given field path, or nullptr if none exists.
+     */
+    const ArrayHistogram* getHistogram(const std::string& path) const override;
+
+    ~CollectionStatisticsMock() = default;
 
 private:
-    StatusWith<StatsCacheVal> _swStatsReturnValueForTest{kInternalErrorStatus};
+    double _cardinality;
+    mutable Histograms _histograms;
 };
 
-}  // namespace mongo
+}  // namespace mongo::ce

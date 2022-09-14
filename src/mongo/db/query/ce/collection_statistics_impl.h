@@ -27,37 +27,41 @@
  *    it in the license file.
  */
 
+#pragma once
+
+#include "mongo/db/query/ce/array_histogram.h"
 #include "mongo/db/query/ce/collection_statistics.h"
-#include "mongo/util/assert_util.h"
 
 namespace mongo::ce {
 
-bool CollectionStatistics::hasCollectionStatistics(const NamespaceString& nss) {
-    return false;  // TODO: actually check if we have statistics for 'nss' here.
-}
+using Histograms = std::map<std::string, std::shared_ptr<ArrayHistogram>>;
 
-const CollectionStatistics& CollectionStatistics::getCollectionStatistics(
-    const NamespaceString& nss) {
-    MONGO_UNIMPLEMENTED;  // TODO: actually get statistics here.
-}
+class CollectionStatisticsImpl : public CollectionStatistics {
+public:
+    CollectionStatisticsImpl(double cardinality, const NamespaceString& nss);
 
-CollectionStatistics::CollectionStatistics(double cardinality)
-    : _cardinality{cardinality}, _histograms{} {};
+    /**
+     * Returns the cardinality of the given collection.
+     */
+    double getCardinality() const override;
 
-double CollectionStatistics::getCardinality() const {
-    return _cardinality;
-}
+    /**
+     * Returns the histogram for the given field path, or nullptr if none exists.
+     */
+    const ArrayHistogram* getHistogram(const std::string& path) const override;
 
-void CollectionStatistics::addHistogram(const std::string& path,
-                                        std::unique_ptr<ArrayHistogram> histogram) {
-    _histograms[path] = std::move(histogram);
-}
+    /**
+     * Adds a histogram along the given path.
+     */
+    void addHistogram(const std::string& path,
+                      std::shared_ptr<ArrayHistogram> histogram) const override;
 
-const ArrayHistogram* CollectionStatistics::getHistogram(const std::string& path) const {
-    if (auto mapIt = _histograms.find(path); mapIt != _histograms.end()) {
-        return mapIt->second.get();
-    }
-    return nullptr;
-}
+    ~CollectionStatisticsImpl() = default;
+
+private:
+    double _cardinality;
+    mutable Histograms _histograms;
+    const NamespaceString _nss;
+};
 
 }  // namespace mongo::ce

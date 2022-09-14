@@ -53,22 +53,23 @@ StatsCache::StatsCache(ServiceContext* service,
                        std::unique_ptr<StatsCacheLoader> cacheLoader,
                        ThreadPoolInterface& threadPool,
                        int size)
-    : ReadThroughCache(_mutex,
-                       service,
-                       threadPool,
-                       [this](OperationContext* opCtx,
-                              const NamespaceString& nss,
-                              const ValueHandle& stats) { return _lookupStats(opCtx, nss, stats); },
-                       size),
+    : ReadThroughCache(
+          _mutex,
+          service,
+          threadPool,
+          [this](OperationContext* opCtx,
+                 const StatsPathString& statsPath,
+                 const ValueHandle& stats) { return _lookupStats(opCtx, statsPath, stats); },
+          size),
       _statsCacheLoader(std::move(cacheLoader)) {}
 
 StatsCache::LookupResult StatsCache::_lookupStats(OperationContext* opCtx,
-                                                  const NamespaceString& nss,
+                                                  const StatsPathString& statsPath,
                                                   const StatsCacheValueHandle& stats) {
 
     try {
         invariant(_statsCacheLoader);
-        auto newStats = _statsCacheLoader->getStats(opCtx, nss).get();
+        auto newStats = _statsCacheLoader->getStats(opCtx, statsPath).get();
         return LookupResult(std::move(newStats));
     } catch (const DBException& ex) {
         if (ex.code() == ErrorCodes::NamespaceNotFound) {

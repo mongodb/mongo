@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/ce/ce_histogram.h"
 #include "mongo/db/query/ce/ce_test_utils.h"
+#include "mongo/db/query/ce/collection_statistics_mock.h"
 #include "mongo/db/query/ce/histogram_estimation.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
@@ -40,18 +41,23 @@ namespace {
 using namespace optimizer;
 using namespace cascades;
 
+std::string collName("test");
+
 class CEHistogramTester : public CETester {
 public:
-    CEHistogramTester(std::string collName, double numRecords, const CollectionStatistics& stats)
+    CEHistogramTester(std::string collName,
+                      double numRecords,
+                      std::shared_ptr<CollectionStatistics> stats)
         : CETester(collName, numRecords), _stats{stats} {}
 
 protected:
     std::unique_ptr<CEInterface> getCETransport() const override {
+        // making a copy of CollecitonStatistics to override
         return std::make_unique<CEHistogramTransport>(_stats);
     }
 
 private:
-    const CollectionStatistics& _stats;
+    std::shared_ptr<CollectionStatistics> _stats;
 };
 
 struct TestBucket {
@@ -96,19 +102,18 @@ std::unique_ptr<ArrayHistogram> getHistogramFromData(std::vector<TestBucket> tes
 }
 
 TEST(CEHistogramTest, AssertSmallMaxDiffHistogramEstimatesAtomicPredicates) {
-    const auto collName = "test";
     const auto collCardinality = 8;
 
-    CollectionStatistics collStats(collCardinality);
+    std::shared_ptr<CollectionStatistics> collStats(new CollectionStatisticsMock(collCardinality));
 
     // Construct a histogram with two buckets: one for 3 ints equal to 1, another for 5 strings
     // equal to "ing".
     const std::string& str = "ing";
-    collStats.addHistogram("a",
-                           getHistogramFromData({
-                               {Value(1), 3 /* frequency */},
-                               {Value(str), 5 /* frequency */},
-                           }));
+    collStats->addHistogram("a",
+                            getHistogramFromData({
+                                {Value(1), 3 /* frequency */},
+                                {Value(str), 5 /* frequency */},
+                            }));
 
     CEHistogramTester t(collName, collCardinality, collStats);
 
@@ -155,25 +160,24 @@ TEST(CEHistogramTest, AssertSmallMaxDiffHistogramEstimatesAtomicPredicates) {
 }
 
 TEST(CEHistogramTest, AssertSmallHistogramEstimatesComplexPredicates) {
-    const auto collName = "test";
     const auto collCardinality = 9;
 
-    CollectionStatistics collStats(collCardinality);
+    std::shared_ptr<CollectionStatistics> collStats(new CollectionStatisticsMock(collCardinality));
 
     // Construct a histogram with three int buckets for field 'a'.
-    collStats.addHistogram("a",
-                           getHistogramFromData({
-                               {Value(1), 3 /* frequency */},
-                               {Value(2), 5 /* frequency */},
-                               {Value(3), 1 /* frequency */},
-                           }));
+    collStats->addHistogram("a",
+                            getHistogramFromData({
+                                {Value(1), 3 /* frequency */},
+                                {Value(2), 5 /* frequency */},
+                                {Value(3), 1 /* frequency */},
+                            }));
 
     // Construct a histogram with two int buckets for field 'b'.
-    collStats.addHistogram("b",
-                           getHistogramFromData({
-                               {Value(22), 3 /* frequency */},
-                               {Value(33), 6 /* frequency */},
-                           }));
+    collStats->addHistogram("b",
+                            getHistogramFromData({
+                                {Value(22), 3 /* frequency */},
+                                {Value(33), 6 /* frequency */},
+                            }));
 
     CEHistogramTester t(collName, collCardinality, collStats);
 
@@ -207,11 +211,10 @@ TEST(CEHistogramTest, AssertSmallHistogramEstimatesComplexPredicates) {
 }
 
 TEST(CEHistogramTest, SanityTestEmptyHistogram) {
-    const auto collName = "test";
     const auto collCardinality = 0;
 
-    CollectionStatistics collStats(collCardinality);
-    collStats.addHistogram("empty", std::make_unique<ArrayHistogram>());
+    std::shared_ptr<CollectionStatistics> collStats(new CollectionStatisticsMock(collCardinality));
+    collStats->addHistogram("empty", std::make_unique<ArrayHistogram>());
     CEHistogramTester t(collName, collCardinality, collStats);
 
     ASSERT_MATCH_CE(t, "{empty: {$eq: 1.0}}", 0.0);
@@ -221,17 +224,16 @@ TEST(CEHistogramTest, SanityTestEmptyHistogram) {
 }
 
 TEST(CEHistogramTest, AssertOneBucketOneIntHistogram) {
-    const auto collName = "test";
     const auto collCardinality = 50;
 
-    CollectionStatistics collStats(collCardinality);
+    std::shared_ptr<CollectionStatistics> collStats(new CollectionStatisticsMock(collCardinality));
 
     // Create a histogram with a single bucket that contains exactly one int (42) with a frequency
     // of 50 (equal to the collection cardinality).
-    collStats.addHistogram("soloInt",
-                           getHistogramFromData({
-                               {Value(42), collCardinality /* frequency */},
-                           }));
+    collStats->addHistogram("soloInt",
+                            getHistogramFromData({
+                                {Value(42), collCardinality /* frequency */},
+                            }));
 
     CEHistogramTester t(collName, collCardinality, collStats);
 
@@ -280,12 +282,11 @@ TEST(CEHistogramTest, AssertOneBucketOneIntHistogram) {
 }
 
 TEST(CEHistogramTest, AssertOneBoundIntRangeHistogram) {
-    const auto collName = "test";
     const auto collCardinality = 51;
 
-    CollectionStatistics collStats(collCardinality);
+    std::shared_ptr<CollectionStatistics> collStats(new CollectionStatisticsMock(collCardinality));
 
-    collStats.addHistogram(
+    collStats->addHistogram(
         "intRange",
         getHistogramFromData({
             {Value(10), 5 /* frequency */},
@@ -383,21 +384,20 @@ TEST(CEHistogramTest, AssertOneBoundIntRangeHistogram) {
 }
 
 TEST(CEHistogramTest, TestHistogramOnNestedPaths) {
-    const auto collName = "test";
     const auto collCardinality = 50;
 
-    CollectionStatistics collStats(collCardinality);
+    std::shared_ptr<CollectionStatistics> collStats(new CollectionStatisticsMock(collCardinality));
 
     // Create a histogram with a single bucket that contains exactly one int (42) with a frequency
     // of 50 (equal to the collection cardinality).
-    collStats.addHistogram("path",
-                           getHistogramFromData({
-                               {Value(42), collCardinality /* frequency */},
-                           }));
-    collStats.addHistogram("a.histogram.path",
-                           getHistogramFromData({
-                               {Value(42), collCardinality /* frequency */},
-                           }));
+    collStats->addHistogram("path",
+                            getHistogramFromData({
+                                {Value(42), collCardinality /* frequency */},
+                            }));
+    collStats->addHistogram("a.histogram.path",
+                            getHistogramFromData({
+                                {Value(42), collCardinality /* frequency */},
+                            }));
 
     CEHistogramTester t(collName, collCardinality, collStats);
 

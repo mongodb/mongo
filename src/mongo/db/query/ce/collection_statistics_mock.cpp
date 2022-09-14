@@ -27,28 +27,27 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/query/ce/collection_statistics_mock.h"
 
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/query/ce/collection_statistics.h"
-#include "mongo/db/query/ce/stats_cache_loader.h"
-#include "mongo/stdx/thread.h"
+namespace mongo::ce {
 
-namespace mongo {
+CollectionStatisticsMock::CollectionStatisticsMock(double cardinality)
+    : _cardinality{cardinality}, _histograms{} {};
 
-using namespace mongo::ce;
+double CollectionStatisticsMock::getCardinality() const {
+    return _cardinality;
+}
 
-class StatsCacheLoaderMock : public StatsCacheLoader {
-public:
-    SemiFuture<StatsCacheVal> getStats(OperationContext* opCtx,
-                                       const StatsPathString& statsPath) override;
+void CollectionStatisticsMock::addHistogram(const std::string& path,
+                                            std::shared_ptr<ArrayHistogram> histogram) const {
+    _histograms[path] = histogram;
+}
 
-    void setStatsReturnValueForTest(StatusWith<StatsCacheVal> swStats);
+const ArrayHistogram* CollectionStatisticsMock::getHistogram(const std::string& path) const {
+    if (auto mapIt = _histograms.find(path); mapIt != _histograms.end()) {
+        return mapIt->second.get();
+    }
+    return nullptr;
+}
 
-    static const Status kInternalErrorStatus;
-
-private:
-    StatusWith<StatsCacheVal> _swStatsReturnValueForTest{kInternalErrorStatus};
-};
-
-}  // namespace mongo
+}  // namespace mongo::ce

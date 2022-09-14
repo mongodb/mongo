@@ -39,38 +39,22 @@ using Histograms = std::map<std::string, std::shared_ptr<ArrayHistogram>>;
 class CollectionStatistics {
 public:
     /**
-     * Returns whether collection statistics for a collection with namespace 'nss' are available.
-     */
-    static bool hasCollectionStatistics(const NamespaceString& nss);
-
-    /**
-     * Retrieves the collection statistics for a collection with namespace 'nss'.
-     *
-     * Note: Must check hasCollectionStatistics(nss) first, as this will throw if statistics are
-     * unavailable for 'nss'.
-     */
-    static const CollectionStatistics& getCollectionStatistics(const NamespaceString& nss);
-
-    CollectionStatistics(double cardinality);
-
-    /**
      * Returns the cardinality of the given collection.
      */
-    double getCardinality() const;
-
-    /**
-     * Adds a histogram along the given path.
-     */
-    void addHistogram(const std::string& path, std::unique_ptr<ArrayHistogram> histogram);
+    virtual double getCardinality() const = 0;
 
     /**
      * Returns the histogram for the given field path, or nullptr if none exists.
      */
-    const ArrayHistogram* getHistogram(const std::string& path) const;
+    virtual const ArrayHistogram* getHistogram(const std::string& path) const = 0;
 
-private:
-    double _cardinality;
-    Histograms _histograms;
+    /**
+     * Adds a histogram along the given path.
+     */
+    virtual void addHistogram(const std::string& path,
+                              std::shared_ptr<ArrayHistogram> histogram) const = 0;
+
+    virtual ~CollectionStatistics() = default;
 };
 
 }  // namespace mongo::ce

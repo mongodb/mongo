@@ -37,7 +37,7 @@
 #include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/query/ce/ce_histogram.h"
 #include "mongo/db/query/ce/ce_sampling.h"
-#include "mongo/db/query/ce/collection_statistics.h"
+#include "mongo/db/query/ce/collection_statistics_impl.h"
 #include "mongo/db/query/ce_mode_parameter.h"
 #include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
@@ -577,10 +577,10 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
                                          std::move(canonicalQuery),
                                          requireRID);
 
-    } else if (internalQueryCardinalityEstimatorMode == ce::kHistogram &&
-               ce::CollectionStatistics::hasCollectionStatistics(nss)) {
-        const auto& stats = ce::CollectionStatistics::getCollectionStatistics(nss);
-        auto ceDerivation = std::make_unique<CEHistogramTransport>(stats);
+    } else if (internalQueryCardinalityEstimatorMode == ce::kHistogram) {
+        auto ceDerivation =
+            std::make_unique<CEHistogramTransport>(std::shared_ptr<ce::CollectionStatistics>(
+                new ce::CollectionStatisticsImpl(numRecords, nss)));
         OptPhaseManager phaseManager{OptPhaseManager::getAllRewritesSet(),
                                      prefixId,
                                      requireRID,

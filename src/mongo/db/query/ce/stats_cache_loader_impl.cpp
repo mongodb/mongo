@@ -34,21 +34,25 @@
 
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/ce/collection_statistics.h"
+#include "mongo/db/query/ce/stats_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
 
 namespace mongo {
 
 
-SemiFuture<CollectionStatistics> StatsCacheLoaderImpl::getStats(OperationContext* opCtx,
-                                                                const NamespaceString& nss) {
+SemiFuture<StatsCacheVal> StatsCacheLoaderImpl::getStats(OperationContext* opCtx,
+                                                         const StatsPathString& statsPath) {
 
-    std::string statsColl(kStatsPrefix + "." + nss.ns());
+    std::string statsColl(kStatsPrefix + "." + statsPath.first.coll());
 
-    NamespaceString statsNss(kStatsDb, statsColl);
+    NamespaceString statsNss(statsPath.first.db(), statsColl);
     DBDirectClient client(opCtx);
+
+    auto pathFilter = BSON("path" << statsPath.second);
+
     FindCommandRequest findRequest{statsNss};
+    // findRequest.setFilter(pathFilter);
     BSONObj result;
 
     try {
@@ -56,19 +60,32 @@ SemiFuture<CollectionStatistics> StatsCacheLoaderImpl::getStats(OperationContext
 
         if (!cursor) {
             uasserted(ErrorCodes::OperationFailed,
-                      str::stream() << "Failed to establish a cursor for reading " << nss.ns()
-                                    << " from local storage");
+                      str::stream()
+                          << "Failed to establish a cursor for reading " << statsPath.first.ns()
+                          << ",  path " << statsPath.second << " from local storage");
         }
 
-        std::vector<BSONObj> histograms;
-        while (cursor->more()) {
+        if (cursor->more()) {
+            IDLParserContext ctx("StatsPath");
             BSONObj document = cursor->nextSafe().getOwned();
-            histograms.push_back(std::move(document));
+            auto parsedStats = StatsPath::parse(ctx, document);
+            if (auto parsedHistogram = parsedStats.getScalarHistogram()) {
+                ScalarHistogram scalar(*parsedHistogram);
+                std::map<sbe::value::TypeTags, size_t> typeCounts;
+                // TODO: translate type strings to sbe TypeTags
+                StatsCacheVal statsPtr(
+                    new ArrayHistogram(std::move(scalar), std::move(typeCounts)));
+                return makeReadyFutureWith([this, statsPtr] { return statsPtr; }).semi();
+            } else {
+                uasserted(ErrorCodes::NamespaceNotFound,
+                          str::stream() << "Stats is empty for " << statsNss.ns() << ",  path "
+                                        << statsPath.second);
+            }
         }
 
-        // TODO: SERVER-69238, parse histograms BSONs.
-        CollectionStatistics stats{0};
-        return makeReadyFutureWith([this, stats] { return stats; }).semi();
+        uasserted(ErrorCodes::NamespaceNotFound,
+                  str::stream() << "Stats does not exists for " << statsNss.ns() << ",  path "
+                                << statsPath.second);
     } catch (const DBException& ex) {
         uassertStatusOK(ex.toStatus());
     }

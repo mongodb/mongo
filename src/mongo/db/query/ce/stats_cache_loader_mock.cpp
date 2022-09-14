@@ -41,13 +41,13 @@ namespace mongo {
 const Status StatsCacheLoaderMock::kInternalErrorStatus = {
     ErrorCodes::InternalError, "Stats cache loader received unexpected request"};
 
-SemiFuture<CollectionStatistics> StatsCacheLoaderMock::getStats(OperationContext* opCtx,
-                                                                const NamespaceString& nss) {
+SemiFuture<StatsCacheVal> StatsCacheLoaderMock::getStats(OperationContext* opCtx,
+                                                         const StatsPathString& statsPath) {
 
     return makeReadyFutureWith([this] { return _swStatsReturnValueForTest; }).semi();
 }
 
-void StatsCacheLoaderMock::setStatsReturnValueForTest(StatusWith<CollectionStatistics> swStats) {
+void StatsCacheLoaderMock::setStatsReturnValueForTest(StatusWith<StatsCacheVal> swStats) {
     _swStatsReturnValueForTest = std::move(swStats);
 }
 }  // namespace mongo

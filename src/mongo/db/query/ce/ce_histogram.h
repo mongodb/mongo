@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/query/ce/collection_statistics.h"
+#include "mongo/db/query/ce/collection_statistics_impl.h"
 #include "mongo/db/query/optimizer/cascades/interfaces.h"
 
 namespace mongo::optimizer::cascades {
@@ -38,7 +38,7 @@ class CEHistogramTransportImpl;
 
 class CEHistogramTransport : public CEInterface {
 public:
-    CEHistogramTransport(const ce::CollectionStatistics& stats);
+    CEHistogramTransport(std::shared_ptr<ce::CollectionStatistics> stats);
     ~CEHistogramTransport();
 
     CEType deriveCE(const Memo& memo,

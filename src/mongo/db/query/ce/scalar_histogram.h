@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/ce/stats_gen.h"
 
 namespace mongo::ce {
 
@@ -75,6 +76,7 @@ struct Bucket {
 class ScalarHistogram {
 public:
     ScalarHistogram();
+    ScalarHistogram(std::vector<StatsBucket> histogram);
     ScalarHistogram(sbe::value::Array bounds, std::vector<Bucket> buckets);
 
     std::string toString() const;

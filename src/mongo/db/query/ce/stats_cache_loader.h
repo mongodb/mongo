@@ -30,12 +30,15 @@
 #pragma once
 
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/query/ce/collection_statistics.h"
+#include "mongo/db/query/ce/array_histogram.h"
 #include "mongo/stdx/thread.h"
 
 namespace mongo {
 
 using namespace mongo::ce;
+
+using StatsPathString = std::pair<NamespaceString, std::string>;
+using StatsCacheVal = std::shared_ptr<ArrayHistogram>;
 
 class StatsCacheLoader {
 public:
@@ -45,15 +48,14 @@ public:
      * If for some reason the asynchronous fetch operation cannot be dispatched (for example on
      * shutdown), throws a DBException.
      */
-    virtual SemiFuture<CollectionStatistics> getStats(OperationContext* opCtx,
-                                                      const NamespaceString& nss) = 0;
+    virtual SemiFuture<StatsCacheVal> getStats(OperationContext* opCtx,
+                                               const StatsPathString& statsPath) = 0;
 
-    virtual void setStatsReturnValueForTest(StatusWith<CollectionStatistics> swStats){};
+    virtual void setStatsReturnValueForTest(StatusWith<StatsCacheVal> swStats){};
 
     virtual ~StatsCacheLoader() {}
 
-    static constexpr StringData kStatsDb = "system"_sd;
-    static constexpr StringData kStatsPrefix = "statistics"_sd;
+    static constexpr StringData kStatsPrefix = "system.statistics"_sd;
 };
 
 }  // namespace mongo

@@ -10,7 +10,7 @@ env.Library(
         'array_histogram.cpp',
         'ce_histogram.cpp',
         'ce_sampling.cpp',
-        'collection_statistics.cpp',
+        'collection_statistics_impl.cpp',
         'histogram_estimation.cpp',
         'scalar_histogram.cpp',
         'stats_cache.cpp',
@@ -20,6 +20,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_abt',
         '$BUILD_DIR/mongo/db/query/optimizer/optimizer',
+        'stats_serialization',
     ],
 )
 
@@ -56,6 +57,7 @@ env.CppUnitTest(
     target="ce_histogram_test",
     source=[
         "ce_histogram_test.cpp",
+        "collection_statistics_mock.cpp",
     ],
     LIBDEPS=[
         'ce_test_utils',

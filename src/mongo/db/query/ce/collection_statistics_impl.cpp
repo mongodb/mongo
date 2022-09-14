@@ -27,28 +27,41 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/query/ce/collection_statistics_impl.h"
+#include "mongo/db/client.h"
+#include "mongo/db/query/ce/stats_cache.h"
 
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/query/ce/collection_statistics.h"
-#include "mongo/db/query/ce/stats_cache_loader.h"
-#include "mongo/stdx/thread.h"
+namespace mongo::ce {
 
-namespace mongo {
+CollectionStatisticsImpl::CollectionStatisticsImpl(double cardinality, const NamespaceString& nss)
+    : _cardinality{cardinality}, _histograms{}, _nss{nss} {};
 
-using namespace mongo::ce;
+double CollectionStatisticsImpl::getCardinality() const {
+    return _cardinality;
+}
 
-class StatsCacheLoaderMock : public StatsCacheLoader {
-public:
-    SemiFuture<StatsCacheVal> getStats(OperationContext* opCtx,
-                                       const StatsPathString& statsPath) override;
+void CollectionStatisticsImpl::addHistogram(const std::string& path,
+                                            std::shared_ptr<ArrayHistogram> histogram) const {
+    _histograms[path] = histogram;
+}
 
-    void setStatsReturnValueForTest(StatusWith<StatsCacheVal> swStats);
+const ArrayHistogram* CollectionStatisticsImpl::getHistogram(const std::string& path) const {
+    if (auto mapIt = _histograms.find(path); mapIt != _histograms.end()) {
+        return mapIt->second.get();
+    } else {
+        uassert(8423368, "no current client", Client::getCurrent());
+        auto opCtx = Client::getCurrent()->getOperationContext();
+        uassert(8423367, "no operation context", opCtx);
+        StatsCache& cache = StatsCache::get(opCtx);
+        auto handle = cache.acquire(opCtx, std::make_pair(_nss, path));
+        if (!handle) {
+            return nullptr;
+        }
 
-    static const Status kInternalErrorStatus;
+        auto histogram = *(handle.get());
+        addHistogram(path, histogram);
+        return histogram.get();
+    }
+}
 
-private:
-    StatusWith<StatsCacheVal> _swStatsReturnValueForTest{kInternalErrorStatus};
-};
-
-}  // namespace mongo
+}  // namespace mongo::ce
