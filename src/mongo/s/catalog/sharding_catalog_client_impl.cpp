@@ -40,6 +40,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/document_source_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/repl/optime.h"
@@ -322,72 +323,24 @@ AggregateCommandRequest makeCollectionAndIndexesAggregation(OperationContext* op
     // 2. Retrieve config.csrs.indexes entries with the same uuid as the one from the
     // config.collections document.
     //
-    // The $lookup stages get the config.csrs.indexes. The $lookup is
-    // immediately followed by $unwind to take advantage of the $lookup + $unwind coalescence
-    // optimization which avoids creating large intermediate documents.
-    //
-    // This $unionWith stage will produce one result document for each config.csrs.indexes document.
-    //
-    // Note that we must not make any assumption on where the document produced by stage 1 will be
-    // placed in the response in relation with the documents produced by stage 2. The
-    // config.collections document produced in stage 1 could be interleaved between the
-    // config.csrs.indexes documents produced by stage 2.
+    // The $lookup stage gets the config.csrs.indexes documents and puts them in a field called
+    // "indexes" in the document produced during stage 1.
     //
     // {
-    //     $unionWith: {
-    //         coll: "collections",
-    //         pipeline: [
-    //             { $match: { _id: <nss> } },
-    //             {
-    //                 $lookup: {
-    //                     from: "csrs.indexes",
-    //                     as: "indexes",
-    //                     let: { local_uuid: "$uuid" },
-    //                     pipeline: [
-    //                         {
-    //                             $match: {
-    //                                 $expr: {
-    //                                     $eq: ["$collectionUUID", "$$local_uuid"],
-    //                                 },
-    //                             }
-    //                         },
-    //                     ]
-    //                 }
-    //             },
-    //             {
-    //                 $unwind: {
-    //                     path: "$indexes"
-    //                 }
-    //             },
-    //             {
-    //                 $project: { _id: false, indexes: true }
-    //             },
-    //         ]
-    //     }
+    //      $lookup: {
+    //          from: "csrs.indexes",
+    //          as: "indexes",
+    //          localField: "uuid",
+    //          foreignField: "collectionUUID"
+    //      }
     // }
-    const auto letExpr = Doc{{"local_uuid", "$" + CollectionType::kUuidFieldName}};
+    const Doc lookupPipeline{{"from", NamespaceString::kConfigsvrIndexCatalogNamespace.coll()},
+                             {"as", "indexes"_sd},
+                             {"localField", CollectionType::kUuidFieldName},
+                             {"foreignField", IndexCatalogType::kCollectionUUIDFieldName}};
 
-    const auto uuidExpr =
-        Arr{Value{"$" + IndexCatalogType::kCollectionUUIDFieldName}, Value{"$$local_uuid"_sd}};
-
-    constexpr auto indexesLookupOutputFieldName = "indexes"_sd;
-
-    const Doc lookupPipeline{
-        {"from", NamespaceString::kConfigsvrIndexCatalogNamespace.coll()},
-        {"as", indexesLookupOutputFieldName},
-        {"let", letExpr},
-        {"pipeline", Arr{Value{Doc{{"$match", Doc{{"$expr", Doc{{"$eq", uuidExpr}}}}}}}}}};
-
-    Doc unionWithPipeline{
-        {"coll", CollectionType::ConfigNS.coll()},
-        {"pipeline",
-         Arr{Value{Doc{{"$match", Doc{{CollectionType::kNssFieldName, nss.toString()}}}}},
-             Value{Doc{{"$lookup", lookupPipeline}}},
-             Value{Doc{{"$unwind", Doc{{"path", "$" + indexesLookupOutputFieldName}}}}},
-             Value{Doc{{"$project", Doc{{"_id", false}, {indexesLookupOutputFieldName, true}}}}}}}};
-
-    stages.emplace_back(DocumentSourceUnionWith::createFromBson(
-        Doc{{"$unionWith", unionWithPipeline}}.toBson().firstElement(), expCtx));
+    stages.emplace_back(DocumentSourceLookUp::createFromBson(
+        Doc{{"$lookup", lookupPipeline}}.toBson().firstElement(), expCtx));
 
     auto pipeline = Pipeline::create(std::move(stages), expCtx);
     auto serializedPipeline = pipeline->serializeToBson();
@@ -839,20 +792,19 @@ ShardingCatalogClientImpl::getCollectionAndGlobalIndexes(OperationContext* opCtx
             str::stream() << "Collection " << nss.ns() << " not found",
             !aggResult.empty());
 
+    uassert(6958800,
+            str::stream() << "More than one collection for ns " << nss.ns() << " found",
+            aggResult.size() == 1);
+
     boost::optional<CollectionType> coll;
     std::vector<IndexCatalogType> indexes;
-    indexes.reserve(aggResult.size() - 1);
-    {
-        for (const auto& elem : aggResult) {
-            const auto indexElem = elem.getField("indexes");
-            if (!indexElem) {
-                coll.emplace(elem);
-            } else {
-                indexes.emplace_back(
-                    IndexCatalogType::parse(IDLParserContext("IndexCatalogType"), indexElem.Obj()));
-            }
-        }
-        uassert(6924000, "'collections' document not found in aggregation response", coll);
+
+    auto elem = aggResult[0];
+    coll.emplace(elem);
+    const auto indexList = elem.getField("indexes");
+    for (const auto index : indexList.Array()) {
+        indexes.emplace_back(
+            IndexCatalogType::parse(IDLParserContext("IndexCatalogType"), index.Obj()));
     }
 
     return {std::move(*coll), std::move(indexes)};
