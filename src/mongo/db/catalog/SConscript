@@ -621,19 +621,6 @@ env.Library(
     ],
 )
 
-env.Library(
-    target='derived_metadata',
-    source=[
-        'derived_metadata_collection_count.cpp',
-        'derived_metadata_collection_controller.cpp',
-        'derived_metadata_controller.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/service_context',
-    ],
-)
-
 if wiredtiger:
     env.CppUnitTest(
         target='db_catalog_test',
@@ -641,7 +628,6 @@ if wiredtiger:
             'capped_utils_test.cpp',
             'catalog_control_test.cpp',
             'collection_catalog_test.cpp',
-            'derived_metadata_test.cpp',
             'collection_options_test.cpp',
             'collection_test.cpp',
             'collection_validation_test.cpp',
@@ -698,7 +684,6 @@ if wiredtiger:
             'collection_validation',
             'commit_quorum_options',
             'database_holder',
-            'derived_metadata',
             'index_build_block',
             'index_build_entry_idl',
             'index_builds_manager',
