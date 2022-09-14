@@ -1059,16 +1059,34 @@ public:
         invariant(WiredTigerRecoveryUnit::get(_opCtx)->getSession() == _cursor->getSession());
 
         if (!_eof) {
+            // When using search_near, WiredTiger will traverse over deleted keys until it finds its
+            // first non-deleted key. This can make it costly to search for a key that we just
+            // deleted if there are many deleted values (e.g. TTL deletes). We never want to see a
+            // key that comes logically before the last key we returned. Thus, we improve
+            // performance by setting a bound to indicate to WiredTiger to only consider returning
+            // keys that are relevant to us. The cursor bound is by default inclusive of the key
+            // being searched for so search_near is able to return that key if it exists and avoid
+            // looking logically before the last key we returned.
+            WT_CURSOR* c = _cursor->get();
+            const WiredTigerItem searchKey(_key.getBuffer(), _key.getSize());
+            setKey(c, searchKey.Get());
+            if (_forward) {
+                c->bound(c, "bound=lower");
+            } else {
+                c->bound(c, "bound=upper");
+            }
+
             // Standard (non-unique) indices *do* include the record id in their KeyStrings. This
             // means that restoring to the same key with a new record id will return false, and we
             // will *not* skip the key with the new record id.
             //
             // Unique indexes can have both kinds of KeyStrings, ie with or without the record id.
             // Restore for unique indexes gets handled separately in it's own implementation.
-            _lastMoveSkippedKey = !seekWTCursor(_key.getValueCopy());
+            _lastMoveSkippedKey = !seekWTCursorInternal(searchKey, /*bounded*/ true);
             LOGV2_TRACE_CURSOR(20099,
                                "restore _lastMoveSkippedKey: {lastMoveSkippedKey}",
                                "lastMoveSkippedKey"_attr = _lastMoveSkippedKey);
+            c->bound(c, "action=clear");
         }
     }
 
@@ -1161,9 +1179,15 @@ protected:
 
         WT_CURSOR* c = _cursor->get();
 
-        int cmp = -1;
         const WiredTigerItem searchKey(query.getBuffer(), query.getSize());
         setKey(c, searchKey.Get());
+        return seekWTCursorInternal(searchKey, /*bounded*/ false);
+    }
+
+    bool seekWTCursorInternal(const WiredTigerItem searchKey, bool bounded) {
+
+        int cmp = -1;
+        WT_CURSOR* c = _cursor->get();
 
         int ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->search_near(c, &cmp); });
         if (ret == WT_NOTFOUND) {
@@ -1192,39 +1216,44 @@ protected:
             return true;
         }
 
-        // Make sure we land on a matching key (after/before for forward/reverse).
-        // If this operation is ignoring prepared updates and search_near() lands on a key that
-        // compares lower than the search key (for a forward cursor), calling next() is not
-        // guaranteed to return a key that compares greater than the search key. This is because
-        // ignoring prepare conflicts does not provide snapshot isolation and the call to next()
-        // may land on a newly-committed prepared entry. We must advance our cursor until we find a
-        // key that compares greater than the search key. The same principle applies to reverse
-        // cursors. See SERVER-56839.
-        const bool enforcingPrepareConflicts =
-            _opCtx->recoveryUnit()->getPrepareConflictBehavior() ==
-            PrepareConflictBehavior::kEnforce;
-        WT_ITEM curKey;
-        while (_forward ? cmp < 0 : cmp > 0) {
-            advanceWTCursor();
-            if (_cursorAtEof) {
-                break;
-            }
+        if (bounded) {
+            dassert(_forward ? cmp >= 0 : cmp <= 0);
+        } else {
+            // Make sure we land on a matching key (after/before for forward/reverse).
+            // If this operation is ignoring prepared updates and search_near() lands on a key that
+            // compares lower than the search key (for a forward cursor), calling next() is not
+            // guaranteed to return a key that compares greater than the search key. This is because
+            // ignoring prepare conflicts does not provide snapshot isolation and the call to next()
+            // may land on a newly-committed prepared entry. We must advance our cursor until we
+            // find a key that compares greater than the search key. The same principle applies to
+            // reverse cursors. See SERVER-56839.
+            const bool enforcingPrepareConflicts =
+                _opCtx->recoveryUnit()->getPrepareConflictBehavior() ==
+                PrepareConflictBehavior::kEnforce;
+            WT_ITEM curKey;
+            while (_forward ? cmp < 0 : cmp > 0) {
+                advanceWTCursor();
+                if (_cursorAtEof) {
+                    break;
+                }
 
-            if (!kDebugBuild && enforcingPrepareConflicts) {
-                break;
-            }
+                if (!kDebugBuild && enforcingPrepareConflicts) {
+                    break;
+                }
 
-            getKey(c, &curKey);
-            cmp = std::memcmp(curKey.data, searchKey.data, std::min(searchKey.size, curKey.size));
+                getKey(c, &curKey);
+                cmp =
+                    std::memcmp(curKey.data, searchKey.data, std::min(searchKey.size, curKey.size));
 
-            LOGV2_TRACE_CURSOR(5683900, "cmp after advance: {cmp}", "cmp"_attr = cmp);
+                LOGV2_TRACE_CURSOR(5683900, "cmp after advance: {cmp}", "cmp"_attr = cmp);
 
-            if (enforcingPrepareConflicts) {
-                // If we are enforcing prepare conflicts, calling next() or prev() must always give
-                // us a key that compares, respectively, greater than or less than our search key.
-                // An exact match is also possible in the case of _id indexes, because the recordid
-                // is not a part of the key.
-                dassert(_forward ? cmp >= 0 : cmp <= 0);
+                if (enforcingPrepareConflicts) {
+                    // If we are enforcing prepare conflicts, calling next() or prev() must always
+                    // give us a key that compares, respectively, greater than or less than our
+                    // search key. An exact match is also possible in the case of _id indexes,
+                    // because the recordid is not a part of the key.
+                    dassert(_forward ? cmp >= 0 : cmp <= 0);
+                }
             }
         }
 
