@@ -116,7 +116,8 @@ class test_jsondump01(wttest.WiredTigerTestCase, suite_subprocess):
         data = tables[uri][1]["data"]
         d = data[24]
         if 'column5' in d:
-            self.assertEqual(d['column5'], '25: abcde')
+            self.assertEqual(d['column2'], '52: abcdefghijklmnopqrstuvw')
+            self.assertEqual(d['column3'], 52)
         else:
             self.assertEqual(d['value0'], '25: abcdefghijklmnopqrstuvwxyz')
 

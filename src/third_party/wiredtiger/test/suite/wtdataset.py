@@ -286,10 +286,16 @@ class ComplexDataSet(BaseDataSet):
     # A value suitable for checking the value returned by a cursor, as
     # cursor.get_value() returns a list.
     def comparable_value(self, i):
-        return [str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],
-                i,
-                str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%23],
-                str(i) + ': abcdefghijklmnopqrstuvwxyz'[0:i%18]]
+        # Most of these columns are the keys for indices.  To make sure our indices
+        # are ordered in a different order than the main btree, we'll reverse some
+        # decimal strings to produce the column values.
+        reversed = str(i)[::-1]
+        reversed18 = str(i*18)[::-1]
+        reversed23 = str(i*23)[::-1]
+        return [reversed + ': abcdefghijklmnopqrstuvwxyz'[0:i%26],    # column2
+                int(reversed),                                        # column3
+                reversed23 + ': abcdefghijklmnopqrstuvwxyz'[0:i%23],  # column4
+                reversed18 + ': abcdefghijklmnopqrstuvwxyz'[0:i%18]]  # column5
 
     # A value suitable for assigning to a cursor, as cursor.set_value() expects
     # a tuple when it is used with a single argument and the value is composite.
