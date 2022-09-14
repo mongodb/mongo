@@ -3945,6 +3945,7 @@ buildvariants:
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
       LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
+      LD_PRELOAD=$WT_TOPDIR/TCMALLOC_LIB/lib/libtcmalloc.so
     CMAKE_PREFIX_PATH: -DCMAKE_PREFIX_PATH="$(pwd)/TCMALLOC_LIB"
     CMAKE_INSTALL_PREFIX: -DCMAKE_INSTALL_PREFIX=$(pwd)/cmake_build/LOCAL_INSTALL
     python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
@@ -4008,7 +4009,7 @@ buildvariants:
       LSAN_OPTIONS="print_suppressions=0:suppressions=$WT_TOPDIR/test/evergreen/asan_leaks.supp"
       ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
       TESTUTIL_BYPASS_ASAN=1
-      LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so
+      LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so:$WT_TOPDIR/TCMALLOC_LIB/lib/libtcmalloc.so
       PATH=/opt/mongodbtoolchain/v4/bin:$PATH
       LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
   tasks:
@@ -4078,11 +4079,11 @@ buildvariants:
     make_command: ninja
     test_env_vars:
       UBSAN_OPTIONS="detect_leaks=1:disable_coredump=0:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer:abort_on_error=1:print_stacktrace=1"
-      LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so
       PATH=/opt/mongodbtoolchain/v3/bin:$PATH
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
       LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
+      LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so:$WT_TOPDIR/TCMALLOC_LIB/lib/libtcmalloc.so
   tasks:
     - name: clang-analyzer
     - name: compile
@@ -4108,6 +4109,11 @@ buildvariants:
     python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: ninja
+    test_env_vars:
+      WT_TOPDIR=$(git rev-parse --show-toplevel)
+      WT_BUILDDIR=$WT_TOPDIR/cmake_build
+      LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
+      LD_PRELOAD=$WT_TOPDIR/TCMALLOC_LIB/lib/libtcmalloc.so
   tasks:
     - name: ".pull_request_compilers"
 
@@ -4119,11 +4125,11 @@ buildvariants:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: ninja
     test_env_vars:
-      LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so
       PATH=/opt/mongodbtoolchain/v3/bin:$PATH
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
       LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
+      LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so:$WT_TOPDIR/TCMALLOC_LIB/lib/libtcmalloc.so
     CMAKE_PREFIX_PATH: -DCMAKE_PREFIX_PATH="$(pwd)/TCMALLOC_LIB"
     CMAKE_INSTALL_PREFIX: -DCMAKE_INSTALL_PREFIX=$(pwd)/cmake_build/LOCAL_INSTALL
     python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
@@ -4153,7 +4159,7 @@ buildvariants:
       PATH=/opt/mongodbtoolchain/v3/bin:$PATH
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
-      LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libeatmydata.so:$WT_TOPDIR/TCMALLOC_LIB/lib/libtcmalloc.so.4
+      LD_PRELOAD=/usr/lib/aarch64-linux-gnu/libeatmydata.so:$WT_TOPDIR/TCMALLOC_LIB/lib/libtcmalloc.so
       LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
     CMAKE_PREFIX_PATH: -DCMAKE_PREFIX_PATH="$(pwd)/TCMALLOC_LIB"
     CMAKE_INSTALL_PREFIX: -DCMAKE_INSTALL_PREFIX=$(pwd)/cmake_build/LOCAL_INSTALL
@@ -4243,6 +4249,7 @@ buildvariants:
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
       LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
+      LD_PRELOAD=$WT_TOPDIR/TCMALLOC_LIB/lib/libtcmalloc.so
     upload_source_dir: mongo-tests/largescale/many-collection-artifacts
     upload_filename: many-collection.tgz
   tasks:
@@ -4259,6 +4266,7 @@ buildvariants:
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
       LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
+      LD_PRELOAD=$WT_TOPDIR/TCMALLOC_LIB/lib/libtcmalloc.so
     cmake_generator: Ninja
     make_command: ninja
     CMAKE_PREFIX_PATH: -DCMAKE_PREFIX_PATH="$(pwd)/TCMALLOC_LIB"
@@ -4301,11 +4309,11 @@ buildvariants:
   - ubuntu2004-test
   expansions:
     test_env_vars:
-      LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so
       PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+      LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
-      LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
+      LD_LIBRARY_PATH=$WT_BUILDDIR
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: ninja
     cmake_generator: Ninja
@@ -4324,11 +4332,11 @@ buildvariants:
   - rhel80-test
   expansions:
     test_env_vars:
-      LD_PRELOAD=/usr/local/lib/libeatmydata.so
       PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+      LD_PRELOAD=/usr/local/lib/libeatmydata.so
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
-      LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
+      LD_LIBRARY_PATH=$WT_BUILDDIR
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     cmake_generator: "Unix Makefiles"
     make_command: make
@@ -4363,11 +4371,11 @@ buildvariants:
   - ubuntu2004-test
   expansions:
     test_env_vars:
-      LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so
       PATH=/opt/mongodbtoolchain/v3/bin:$PATH
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
-      LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
+      LD_LIBRARY_PATH=$WT_BUILDDIR
+      LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so
     make_command: ninja
     cmake_generator: Ninja
     CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v3_gcc.cmake
