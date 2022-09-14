@@ -222,10 +222,11 @@ ExecutorFuture<void> CoordinatorCommitMonitor::_makeFuture() const {
         .then([this, anchor = shared_from_this()](RemainingOperationTimes remainingTimes) {
             // If remainingTimes.max (or remainingTimes.min) is Milliseconds::max, then use -1 so
             // that the scale of the y-axis is still useful when looking at FTDC metrics.
-            _metrics->setCoordinatorHighEstimateRemainingTimeMillis(
-                remainingTimes.max == Milliseconds::max() ? Milliseconds(-1) : remainingTimes.max);
-            _metrics->setCoordinatorLowEstimateRemainingTimeMillis(
-                remainingTimes.min == Milliseconds::max() ? Milliseconds(-1) : remainingTimes.min);
+            auto clampIfMax = [](Milliseconds t) {
+                return t != Milliseconds::max() ? t : Milliseconds(-1);
+            };
+            _metrics->setCoordinatorHighEstimateRemainingTimeMillis(clampIfMax(remainingTimes.max));
+            _metrics->setCoordinatorLowEstimateRemainingTimeMillis(clampIfMax(remainingTimes.min));
 
             // Check if all recipient shards are within the commit threshold.
             if (remainingTimes.max <= _threshold)
