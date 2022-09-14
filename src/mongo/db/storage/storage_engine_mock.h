@@ -100,7 +100,7 @@ public:
         OperationContext* opCtx, StringData ident) final {
         return {};
     }
-    void cleanShutdown() final {}
+    void cleanShutdown(ServiceContext* svcCtx) final {}
     SnapshotManager* getSnapshotManager() const final {
         return nullptr;
     }

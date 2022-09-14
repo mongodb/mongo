@@ -569,7 +569,7 @@ public:
     }
 
     void tearDown() {
-        _storageEngine->cleanShutdown();
+        _storageEngine->cleanShutdown(getServiceContext());
         _storageEngine.reset();
 
         ServiceContextTest::tearDown();

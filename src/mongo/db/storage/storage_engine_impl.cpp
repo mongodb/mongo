@@ -406,8 +406,9 @@ void StorageEngineImpl::closeCatalog(OperationContext* opCtx) {
         _dumpCatalog(opCtx);
     }
 
-    CollectionCatalog::write(
-        opCtx, [&](CollectionCatalog& catalog) { catalog.deregisterAllCollectionsAndViews(); });
+    CollectionCatalog::write(opCtx, [opCtx](CollectionCatalog& catalog) {
+        catalog.deregisterAllCollectionsAndViews(opCtx->getServiceContext());
+    });
 
     _catalog.reset();
     _catalogRecordStore.reset();
@@ -791,14 +792,14 @@ std::string StorageEngineImpl::getFilesystemPathForDb(const DatabaseName& dbName
     return _catalog->getFilesystemPathForDb(dbName.toString());
 }
 
-void StorageEngineImpl::cleanShutdown() {
+void StorageEngineImpl::cleanShutdown(ServiceContext* svcCtx) {
     if (_timestampMonitor) {
         _timestampMonitor->clearListeners();
     }
 
-    CollectionCatalog::write(getGlobalServiceContext(), [](CollectionCatalog& catalog) {
+    CollectionCatalog::write(svcCtx, [svcCtx](CollectionCatalog& catalog) {
         catalog.onCloseCatalog();
-        catalog.deregisterAllCollectionsAndViews();
+        catalog.deregisterAllCollectionsAndViews(svcCtx);
     });
 
     _catalog.reset();

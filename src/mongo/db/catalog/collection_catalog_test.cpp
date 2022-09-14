@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/resource_catalog.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -165,124 +166,6 @@ protected:
     std::map<std::string, std::map<UUID, CollectionPtr>> dbMap;
 };
 
-class CollectionCatalogResourceMapTest : public unittest::Test {
-public:
-    void setUp() {
-        // The first and second collection namespaces map to the same ResourceId.
-        firstCollection = NamespaceString(boost::none, "1661880728");
-        secondCollection = NamespaceString(boost::none, "1626936312");
-
-        firstResourceId = ResourceId(RESOURCE_COLLECTION, firstCollection);
-        secondResourceId = ResourceId(RESOURCE_COLLECTION, secondCollection);
-        ASSERT_EQ(firstResourceId, secondResourceId);
-
-        thirdCollection = NamespaceString(boost::none, "2930102946");
-        thirdResourceId = ResourceId(RESOURCE_COLLECTION, thirdCollection);
-        ASSERT_NE(firstResourceId, thirdResourceId);
-    }
-
-protected:
-    NamespaceString firstCollection;
-    ResourceId firstResourceId;
-
-    NamespaceString secondCollection;
-    ResourceId secondResourceId;
-
-    NamespaceString thirdCollection;
-    ResourceId thirdResourceId;
-
-    CollectionCatalog catalog;
-};
-
-TEST_F(CollectionCatalogResourceMapTest, EmptyTest) {
-    boost::optional<std::string> resource = catalog.lookupResourceName(firstResourceId);
-    ASSERT_EQ(boost::none, resource);
-
-    catalog.removeResource(secondResourceId, secondCollection);
-    resource = catalog.lookupResourceName(secondResourceId);
-    ASSERT_EQ(boost::none, resource);
-}
-
-TEST_F(CollectionCatalogResourceMapTest, InsertTest) {
-    catalog.addResource(firstResourceId, firstCollection);
-    boost::optional<std::string> resource = catalog.lookupResourceName(thirdResourceId);
-    ASSERT_EQ(boost::none, resource);
-
-    catalog.addResource(thirdResourceId, thirdCollection);
-
-    resource = catalog.lookupResourceName(firstResourceId);
-    ASSERT_EQ(firstCollection.toStringWithTenantId(), *resource);
-
-    resource = catalog.lookupResourceName(thirdResourceId);
-    ASSERT_EQ(thirdCollection.toStringWithTenantId(), resource);
-}
-
-TEST_F(CollectionCatalogResourceMapTest, RemoveTest) {
-    catalog.addResource(firstResourceId, firstCollection);
-    catalog.addResource(thirdResourceId, thirdCollection);
-
-    // This fails to remove the resource because of an invalid namespace.
-    catalog.removeResource(firstResourceId, NamespaceString(boost::none, "BadNamespace"));
-    boost::optional<std::string> resource = catalog.lookupResourceName(firstResourceId);
-    ASSERT_EQ(firstCollection.toStringWithTenantId(), *resource);
-
-    catalog.removeResource(firstResourceId, firstCollection);
-    catalog.removeResource(firstResourceId, firstCollection);
-    catalog.removeResource(thirdResourceId, thirdCollection);
-
-    resource = catalog.lookupResourceName(firstResourceId);
-    ASSERT_EQ(boost::none, resource);
-
-    resource = catalog.lookupResourceName(thirdResourceId);
-    ASSERT_EQ(boost::none, resource);
-}
-
-TEST_F(CollectionCatalogResourceMapTest, CollisionTest) {
-    // firstCollection and secondCollection map to the same ResourceId.
-    catalog.addResource(firstResourceId, firstCollection);
-    catalog.addResource(secondResourceId, secondCollection);
-
-    // Looking up the namespace on a ResourceId while it has a collision should
-    // return the empty string.
-    boost::optional<std::string> resource = catalog.lookupResourceName(firstResourceId);
-    ASSERT_EQ(boost::none, resource);
-
-    resource = catalog.lookupResourceName(secondResourceId);
-    ASSERT_EQ(boost::none, resource);
-
-    // We remove a namespace, resolving the collision.
-    catalog.removeResource(firstResourceId, firstCollection);
-    resource = catalog.lookupResourceName(secondResourceId);
-    ASSERT_EQ(secondCollection.toStringWithTenantId(), *resource);
-
-    // Adding the same namespace twice does not create a collision.
-    catalog.addResource(secondResourceId, secondCollection);
-    resource = catalog.lookupResourceName(secondResourceId);
-    ASSERT_EQ(secondCollection.toStringWithTenantId(), *resource);
-
-    // The map should function normally for entries without collisions.
-    catalog.addResource(firstResourceId, firstCollection);
-    resource = catalog.lookupResourceName(secondResourceId);
-    ASSERT_EQ(boost::none, resource);
-
-    catalog.addResource(thirdResourceId, thirdCollection);
-    resource = catalog.lookupResourceName(thirdResourceId);
-    ASSERT_EQ(thirdCollection.toStringWithTenantId(), *resource);
-
-    catalog.removeResource(thirdResourceId, thirdCollection);
-    resource = catalog.lookupResourceName(thirdResourceId);
-    ASSERT_EQ(boost::none, resource);
-
-    catalog.removeResource(firstResourceId, firstCollection);
-    catalog.removeResource(secondResourceId, secondCollection);
-
-    resource = catalog.lookupResourceName(firstResourceId);
-    ASSERT_EQ(boost::none, resource);
-
-    resource = catalog.lookupResourceName(secondResourceId);
-    ASSERT_EQ(boost::none, resource);
-}
-
 class CollectionCatalogResourceTest : public ServiceContextMongoDTest {
 public:
     void setUp() {
@@ -305,7 +188,7 @@ public:
             auto collName = coll->ns();
             ResourceId rid(RESOURCE_COLLECTION, collName);
 
-            ASSERT_NE(catalog.lookupResourceName(rid), boost::none);
+            ASSERT_NE(ResourceCatalog::get(getServiceContext()).name(rid), boost::none);
             numEntries++;
         }
         ASSERT_EQ(5, numEntries);
@@ -344,23 +227,23 @@ protected:
 };
 
 TEST_F(CollectionCatalogResourceTest, RemoveAllResources) {
-    catalog.deregisterAllCollectionsAndViews();
+    catalog.deregisterAllCollectionsAndViews(getServiceContext());
 
     const DatabaseName dbName = DatabaseName(boost::none, "resourceDb");
     auto rid = ResourceId(RESOURCE_DATABASE, dbName);
-    ASSERT_EQ(boost::none, catalog.lookupResourceName(rid));
+    ASSERT_EQ(boost::none, ResourceCatalog::get(getServiceContext()).name(rid));
 
     for (int i = 0; i < 5; i++) {
         NamespaceString nss("resourceDb", "coll" + std::to_string(i));
         rid = ResourceId(RESOURCE_COLLECTION, nss);
-        ASSERT_EQ(boost::none, catalog.lookupResourceName((rid)));
+        ASSERT_EQ(boost::none, ResourceCatalog::get(getServiceContext()).name(rid));
     }
 }
 
 TEST_F(CollectionCatalogResourceTest, LookupDatabaseResource) {
     const DatabaseName dbName = DatabaseName(boost::none, "resourceDb");
     auto rid = ResourceId(RESOURCE_DATABASE, dbName);
-    boost::optional<std::string> ridStr = catalog.lookupResourceName(rid);
+    auto ridStr = ResourceCatalog::get(getServiceContext()).name(rid);
 
     ASSERT(ridStr);
     ASSERT(ridStr->find(dbName.toStringWithTenantId()) != std::string::npos);
@@ -369,13 +252,13 @@ TEST_F(CollectionCatalogResourceTest, LookupDatabaseResource) {
 TEST_F(CollectionCatalogResourceTest, LookupMissingDatabaseResource) {
     const DatabaseName dbName = DatabaseName(boost::none, "missingDb");
     auto rid = ResourceId(RESOURCE_DATABASE, dbName);
-    ASSERT(!catalog.lookupResourceName(rid));
+    ASSERT(!ResourceCatalog::get(getServiceContext()).name(rid));
 }
 
 TEST_F(CollectionCatalogResourceTest, LookupCollectionResource) {
     const NamespaceString collNs = NamespaceString(boost::none, "resourceDb.coll1");
     auto rid = ResourceId(RESOURCE_COLLECTION, collNs);
-    boost::optional<std::string> ridStr = catalog.lookupResourceName(rid);
+    auto ridStr = ResourceCatalog::get(getServiceContext()).name(rid);
 
     ASSERT(ridStr);
     ASSERT(ridStr->find(collNs.toStringWithTenantId()) != std::string::npos);
@@ -384,7 +267,7 @@ TEST_F(CollectionCatalogResourceTest, LookupCollectionResource) {
 TEST_F(CollectionCatalogResourceTest, LookupMissingCollectionResource) {
     const NamespaceString nss = NamespaceString(boost::none, "resourceDb.coll5");
     auto rid = ResourceId(RESOURCE_COLLECTION, nss);
-    ASSERT(!catalog.lookupResourceName(rid));
+    ASSERT(!ResourceCatalog::get(getServiceContext()).name(rid));
 }
 
 TEST_F(CollectionCatalogResourceTest, RemoveCollection) {
@@ -392,7 +275,7 @@ TEST_F(CollectionCatalogResourceTest, RemoveCollection) {
     auto coll = catalog.lookupCollectionByNamespace(opCtx.get(), NamespaceString(collNs));
     catalog.deregisterCollection(opCtx.get(), coll->uuid(), /*isDropPending=*/false);
     auto rid = ResourceId(RESOURCE_COLLECTION, collNs);
-    ASSERT(!catalog.lookupResourceName(rid));
+    ASSERT(!ResourceCatalog::get(getServiceContext()).name(rid));
 }
 
 // Create an iterator over the CollectionCatalog and assert that all collections are present.
@@ -610,11 +493,6 @@ TEST_F(CollectionCatalogTest, CollectionCatalogEpoch) {
     ASSERT_EQ(originalEpoch + 1, incrementedEpoch);
 }
 
-DEATH_TEST_F(CollectionCatalogResourceTest, AddInvalidResourceType, "invariant") {
-    auto rid = ResourceId(RESOURCE_GLOBAL, 0);
-    catalog.addResource(rid, NamespaceString(boost::none, ""));
-}
-
 TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {
     NamespaceString aColl("dbA", "collA");
     NamespaceString b1Coll("dbB", "collB1");
@@ -645,7 +523,7 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {
                                          DatabaseName(boost::none, "testdb")};
     ASSERT(catalog.getAllDbNames() == dbNames);
 
-    catalog.deregisterAllCollectionsAndViews();
+    catalog.deregisterAllCollectionsAndViews(getServiceContext());
 }
 
 // Test setting and fetching the profile level for a database.
@@ -739,7 +617,7 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNamesWithUncommitt
     std::vector<DatabaseName> dbList = {DatabaseName(boost::none, "testdb")};
     ASSERT(catalog.getAllDbNames() == dbList);
 
-    catalog.deregisterAllCollectionsAndViews();
+    catalog.deregisterAllCollectionsAndViews(getServiceContext());
 }
 
 class ForEachCollectionFromDbTest : public CatalogTestFixture {
@@ -915,7 +793,7 @@ public:
         CollectionOptions options;
         options.uuid.emplace(UUID::gen());
 
-        auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+        auto storageEngine = getServiceContext()->getStorageEngine();
         std::pair<RecordId, std::unique_ptr<RecordStore>> catalogIdRecordStorePair =
             uassertStatusOK(storageEngine->getCatalog()->createCollection(
                 opCtx, nss, options, /*allocateDefaultSpace=*/true));

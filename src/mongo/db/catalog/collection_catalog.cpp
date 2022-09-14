@@ -35,6 +35,7 @@
 #include "mongo/db/catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/resource_catalog.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -153,16 +154,14 @@ public:
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kRenamedCollection: {
-                    writeJobs.push_back(
-                        [& from = entry.nss, &to = entry.renameTo](CollectionCatalog& catalog) {
-                            catalog._collections.erase(from);
+                    writeJobs.push_back([opCtx = _opCtx, &from = entry.nss, &to = entry.renameTo](
+                                            CollectionCatalog& catalog) {
+                        catalog._collections.erase(from);
 
-                            ResourceId oldRid = ResourceId(RESOURCE_COLLECTION, from);
-                            ResourceId newRid = ResourceId(RESOURCE_COLLECTION, to);
-
-                            catalog.removeResource(oldRid, from);
-                            catalog.addResource(newRid, to);
-                        });
+                        auto& resourceCatalog = ResourceCatalog::get(opCtx->getServiceContext());
+                        resourceCatalog.remove({RESOURCE_COLLECTION, from}, from);
+                        resourceCatalog.add({RESOURCE_COLLECTION, to}, to);
+                    });
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kDroppedCollection: {
@@ -215,18 +214,20 @@ public:
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kAddViewResource: {
-                    writeJobs.push_back([& viewName = entry.nss](CollectionCatalog& catalog) {
-                        auto viewRid = ResourceId(RESOURCE_COLLECTION, viewName);
-                        catalog.addResource(viewRid, viewName);
-                        catalog.deregisterUncommittedView(viewName);
-                    });
+                    writeJobs.push_back(
+                        [opCtx = _opCtx, &viewName = entry.nss](CollectionCatalog& catalog) {
+                            ResourceCatalog::get(opCtx->getServiceContext())
+                                .add({RESOURCE_COLLECTION, viewName}, viewName);
+                            catalog.deregisterUncommittedView(viewName);
+                        });
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kRemoveViewResource: {
-                    writeJobs.push_back([& viewName = entry.nss](CollectionCatalog& catalog) {
-                        auto viewRid = ResourceId(RESOURCE_COLLECTION, viewName);
-                        catalog.removeResource(viewRid, viewName);
-                    });
+                    writeJobs.push_back(
+                        [opCtx = _opCtx, &viewName = entry.nss](CollectionCatalog& catalog) {
+                            ResourceCatalog::get(opCtx->getServiceContext())
+                                .remove({RESOURCE_COLLECTION, viewName}, viewName);
+                        });
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kDroppedIndex: {
@@ -857,8 +858,7 @@ void CollectionCatalog::onOpenDatabase(OperationContext* opCtx,
 
 void CollectionCatalog::onCloseDatabase(OperationContext* opCtx, DatabaseName dbName) {
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
-    auto rid = ResourceId(RESOURCE_DATABASE, dbName);
-    removeResource(rid, dbName);
+    ResourceCatalog::get(opCtx->getServiceContext()).remove({RESOURCE_DATABASE, dbName}, dbName);
     _viewsForDatabase.erase(dbName);
 }
 
@@ -1344,11 +1344,9 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
 
     invariant(static_cast<size_t>(_stats.internal + _stats.userCollections) == _collections.size());
 
-    auto dbRid = ResourceId(RESOURCE_DATABASE, nss.dbName());
-    addResource(dbRid, nss.dbName());
-
-    auto collRid = ResourceId(RESOURCE_COLLECTION, nss);
-    addResource(collRid, nss);
+    auto& resourceCatalog = ResourceCatalog::get(opCtx->getServiceContext());
+    resourceCatalog.add({RESOURCE_DATABASE, nss.dbName()}, nss.dbName());
+    resourceCatalog.add({RESOURCE_COLLECTION, nss}, nss);
 }
 
 std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(OperationContext* opCtx,
@@ -1396,8 +1394,7 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(OperationCon
 
     coll->onDeregisterFromCatalog(opCtx);
 
-    auto collRid = ResourceId(RESOURCE_COLLECTION, ns);
-    removeResource(collRid, ns);
+    ResourceCatalog::get(opCtx->getServiceContext()).remove({RESOURCE_COLLECTION, ns}, ns);
 
     return coll;
 }
@@ -1453,7 +1450,7 @@ void CollectionCatalog::_ensureNamespaceDoesNotExist(OperationContext* opCtx,
     }
 }
 
-void CollectionCatalog::deregisterAllCollectionsAndViews() {
+void CollectionCatalog::deregisterAllCollectionsAndViews(ServiceContext* svcCtx) {
     LOGV2(20282, "Deregistering all the collections");
     for (auto& entry : _catalog) {
         auto uuid = entry.first;
@@ -1472,7 +1469,7 @@ void CollectionCatalog::deregisterAllCollectionsAndViews() {
     _dropPendingIndex.clear();
     _stats = {};
 
-    _resourceInformation.clear();
+    ResourceCatalog::get(svcCtx).clear();
 }
 
 void CollectionCatalog::clearViews(OperationContext* opCtx, const DatabaseName& dbName) const {
@@ -1543,77 +1540,6 @@ CollectionCatalog::iterator CollectionCatalog::begin(OperationContext* opCtx,
 
 CollectionCatalog::iterator CollectionCatalog::end(OperationContext* opCtx) const {
     return iterator(opCtx, _orderedCollections.end(), *this);
-}
-
-boost::optional<std::string> CollectionCatalog::lookupResourceName(const ResourceId& rid) const {
-    invariant(rid.getType() == RESOURCE_DATABASE || rid.getType() == RESOURCE_COLLECTION);
-
-    auto search = _resourceInformation.find(rid);
-    if (search == _resourceInformation.end()) {
-        return boost::none;
-    }
-
-    const std::set<std::string>& namespaces = search->second;
-
-    // When there are multiple namespaces mapped to the same ResourceId, return boost::none as the
-    // ResourceId does not identify a single namespace.
-    if (namespaces.size() > 1) {
-        return boost::none;
-    }
-
-    return *namespaces.begin();
-}
-
-
-void CollectionCatalog::_removeResource(const ResourceId& rid, const std::string& entry) {
-    auto search = _resourceInformation.find(rid);
-    if (search == _resourceInformation.end()) {
-        return;
-    }
-
-    std::set<std::string>& namespaces = search->second;
-    namespaces.erase(entry);
-
-    // Remove the map entry if this is the last namespace in the set for the ResourceId.
-    if (namespaces.size() == 0) {
-        _resourceInformation.erase(search);
-    }
-}
-
-void CollectionCatalog::removeResource(const ResourceId& rid, const NamespaceString& nss) {
-    invariant(rid.getType() == RESOURCE_COLLECTION);
-    _removeResource(rid, nss.toStringWithTenantId());
-}
-
-void CollectionCatalog::removeResource(const ResourceId& rid, const DatabaseName& dbName) {
-    invariant(rid.getType() == RESOURCE_DATABASE);
-    _removeResource(rid, dbName.toStringWithTenantId());
-}
-
-void CollectionCatalog::_addResource(const ResourceId& rid, const std::string& entry) {
-    auto search = _resourceInformation.find(rid);
-    if (search == _resourceInformation.end()) {
-        std::set<std::string> newSet = {entry};
-        _resourceInformation.insert(std::make_pair(rid, newSet));
-        return;
-    }
-
-    std::set<std::string>& namespaces = search->second;
-    if (namespaces.count(entry) > 0) {
-        return;
-    }
-
-    namespaces.insert(entry);
-}
-
-void CollectionCatalog::addResource(const ResourceId& rid, const NamespaceString& nss) {
-    invariant(rid.getType() == RESOURCE_COLLECTION);
-    _addResource(rid, nss.toStringWithTenantId());
-}
-
-void CollectionCatalog::addResource(const ResourceId& rid, const DatabaseName& dbName) {
-    invariant(rid.getType() == RESOURCE_DATABASE);
-    _addResource(rid, dbName.toStringWithTenantId());
 }
 
 void CollectionCatalog::invariantHasExclusiveAccessToCollection(OperationContext* opCtx,

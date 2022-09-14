@@ -42,7 +42,7 @@
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/resource_catalog.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -526,7 +526,7 @@ TEST_F(ViewCatalogFixture, LookupRIDExistingView) {
     ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
 
     auto resourceID = ResourceId(RESOURCE_COLLECTION, NamespaceString(boost::none, "db.view"));
-    ASSERT(getCatalog()->lookupResourceName(resourceID).value() == "db.view");
+    ASSERT_EQ(ResourceCatalog::get(getServiceContext()).name(resourceID), std::string{"db.view"});
 }
 
 TEST_F(ViewCatalogFixture, LookupRIDExistingViewRollback) {
@@ -549,7 +549,7 @@ TEST_F(ViewCatalogFixture, LookupRIDExistingViewRollback) {
                                            view_catalog_helpers::validatePipeline));
     }
     auto resourceID = ResourceId(RESOURCE_COLLECTION, NamespaceString(boost::none, "db.view"));
-    ASSERT(!getCatalog()->lookupResourceName(resourceID));
+    ASSERT(!ResourceCatalog::get(getServiceContext()).name(resourceID));
 }
 
 TEST_F(ViewCatalogFixture, LookupRIDAfterDrop) {
@@ -560,7 +560,7 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterDrop) {
     ASSERT_OK(dropView(operationContext(), viewName));
 
     auto resourceID = ResourceId(RESOURCE_COLLECTION, NamespaceString(boost::none, "db.view"));
-    ASSERT(!getCatalog()->lookupResourceName(resourceID));
+    ASSERT(!ResourceCatalog::get(getServiceContext()).name(resourceID));
 }
 
 TEST_F(ViewCatalogFixture, LookupRIDAfterDropRollback) {
@@ -572,7 +572,8 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterDropRollback) {
         WriteUnitOfWork wunit(operationContext());
         ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
         wunit.commit();
-        ASSERT(getCatalog()->lookupResourceName(resourceID).value() == viewName.ns());
+        ASSERT_EQ(ResourceCatalog::get(getServiceContext()).name(resourceID).value(),
+                  viewName.ns());
     }
 
     {
@@ -588,7 +589,7 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterDropRollback) {
         // Do not commit, rollback.
     }
     // Make sure drop was rolled back and view is still in catalog.
-    ASSERT(getCatalog()->lookupResourceName(resourceID).value() == viewName.ns());
+    ASSERT_EQ(ResourceCatalog::get(getServiceContext()).name(resourceID), viewName.ns());
 }
 
 TEST_F(ViewCatalogFixture, LookupRIDAfterModify) {
@@ -598,7 +599,7 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterModify) {
     auto resourceID = ResourceId(RESOURCE_COLLECTION, NamespaceString(boost::none, "db.view"));
     ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
     ASSERT_OK(modifyView(operationContext(), viewName, viewOn, emptyPipeline));
-    ASSERT(getCatalog()->lookupResourceName(resourceID).value() == viewName.ns());
+    ASSERT_EQ(ResourceCatalog::get(getServiceContext()).name(resourceID), viewName.ns());
 }
 
 TEST_F(ViewCatalogFixture, LookupRIDAfterModifyRollback) {
@@ -610,7 +611,7 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterModifyRollback) {
         WriteUnitOfWork wunit(operationContext());
         ASSERT_OK(createView(operationContext(), viewName, viewOn, emptyPipeline, emptyCollation));
         wunit.commit();
-        ASSERT(getCatalog()->lookupResourceName(resourceID).value() == viewName.ns());
+        ASSERT_EQ(ResourceCatalog::get(getServiceContext()).name(resourceID), viewName.ns());
     }
 
     {
@@ -627,11 +628,11 @@ TEST_F(ViewCatalogFixture, LookupRIDAfterModifyRollback) {
                                            viewOn,
                                            emptyPipeline,
                                            view_catalog_helpers::validatePipeline));
-        ASSERT(getCatalog()->lookupResourceName(resourceID).value() == viewName.ns());
+        ASSERT_EQ(ResourceCatalog::get(getServiceContext()).name(resourceID), viewName.ns());
         // Do not commit, rollback.
     }
     // Make sure view resource is still available after rollback.
-    ASSERT(getCatalog()->lookupResourceName(resourceID).value() == viewName.ns());
+    ASSERT_EQ(ResourceCatalog::get(getServiceContext()).name(resourceID), viewName.ns());
 }
 
 TEST_F(ViewCatalogFixture, CreateViewThenDropAndLookup) {

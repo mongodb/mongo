@@ -53,6 +53,7 @@ env.Library(
         'lock_state.cpp',
         'lock_stats.cpp',
         'replication_state_transition_lock_guard.cpp',
+        'resource_catalog.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/service_context',
@@ -64,7 +65,6 @@ env.Library(
         'lock_manager_defs',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/concurrency/flow_control_ticketholder',
         '$BUILD_DIR/mongo/db/server_base',
     ],
@@ -98,6 +98,7 @@ env.CppUnitTest(
         'lock_manager_test.cpp',
         'lock_state_test.cpp',
         'lock_stats_test.cpp',
+        'resource_catalog_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',

@@ -313,7 +313,7 @@ public:
     /**
      * Deregister all the collection objects and view namespaces.
      */
-    void deregisterAllCollectionsAndViews();
+    void deregisterAllCollectionsAndViews(ServiceContext* svcCtx);
 
     /**
      * Adds the index entry to the drop pending state in the catalog.
@@ -566,33 +566,6 @@ public:
     iterator end(OperationContext* opCtx) const;
 
     /**
-     * Lookup the name of a resource by its ResourceId. If there are multiple namespaces mapped to
-     * the same ResourceId entry, we return the boost::none for those namespaces until there is only
-     * one namespace in the set. If the ResourceId is not found, boost::none is returned.
-     */
-    boost::optional<std::string> lookupResourceName(const ResourceId& rid) const;
-
-    /**
-     * Removes an existing ResourceId 'rid' with namespace 'nss' from the map.
-     */
-    void removeResource(const ResourceId& rid, const NamespaceString& nss);
-
-    /**
-     * Removes an existing ResourceId 'rid' with database name 'dbName' from the map.
-     */
-    void removeResource(const ResourceId& rid, const DatabaseName& dbName);
-
-    /**
-     * Inserts a new ResourceId 'rid' into the map with namespace 'nss'.
-     */
-    void addResource(const ResourceId& rid, const NamespaceString& nss);
-
-    /**
-     * Inserts a new ResourceId 'rid' into the map with database name 'dbName'.
-     */
-    void addResource(const ResourceId& rid, const DatabaseName& dbName);
-
-    /**
      * Ensures we have a MODE_X lock on a collection or MODE_IX lock for newly created collections.
      */
     static void invariantHasExclusiveAccessToCollection(OperationContext* opCtx,
@@ -639,16 +612,6 @@ private:
      * instance.
      */
     bool _alreadyClonedForBatchedWriter(const std::shared_ptr<Collection>& collection) const;
-
-    /**
-     * Inserts a new ResourceId 'rid' into the map with namespace 'entry'.
-     */
-    void _addResource(const ResourceId& rid, const std::string& entry);
-
-    /**
-     * Removes an existing ResourceId 'rid' with namespace 'entry' from the map.
-     */
-    void _removeResource(const ResourceId& rid, const std::string& entry);
 
     /**
      * Throws 'WriteConflictException' if given namespace is already registered with the catalog, as
@@ -704,9 +667,6 @@ private:
     // A thread must hold the global exclusive lock to write to this variable, and must hold the
     // global lock in at least MODE_IS to read it.
     uint64_t _epoch = 0;
-
-    // Mapping from ResourceId to a set of strings that contains collection and database namespaces.
-    std::map<ResourceId, std::set<std::string>> _resourceInformation;
 
     /**
      * Contains non-default database profile settings. New collections, current collections and

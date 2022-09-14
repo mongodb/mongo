@@ -293,6 +293,7 @@ env.Library(
         'views_for_database.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/profile_filter',
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
