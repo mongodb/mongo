@@ -128,7 +128,8 @@ bool joinShardVersionOperation(OperationContext* opCtx,
             try {
                 inRecoverOrRefresh->get(opCtx);
             } catch (const ExceptionFor<ErrorCodes::ShardVersionRefreshCanceled>&) {
-                // The ongoing refresh has finished, although it was interrupted.
+                // The ongoing refresh has finished, although it was canceled by a
+                // 'clearFilteringMetadata'.
             }
         }
 
@@ -225,8 +226,7 @@ SharedSemiFuture<void> recoverRefreshShardVersion(ServiceContext* serviceContext
             if (cancellationToken.isCanceled() &&
                 (status.isOK() || status == ErrorCodes::Interrupted)) {
                 uasserted(ErrorCodes::ShardVersionRefreshCanceled,
-                          "Shard version refresh canceled by an interruption, probably due to a "
-                          "'clearFilteringMetadata'");
+                          "Shard version refresh canceled by a 'clearFilteringMetadata'");
             }
             return status;
         })

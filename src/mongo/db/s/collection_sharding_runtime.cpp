@@ -157,10 +157,6 @@ void CollectionShardingRuntime::checkShardVersionOrThrow(OperationContext* opCtx
 void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(const CSRLock&,
                                                                  const BSONObj& reason) {
     _critSec.enterCriticalSectionCatchUpPhase(reason);
-
-    if (_shardVersionInRecoverOrRefresh) {
-        _shardVersionInRecoverOrRefresh->cancellationSource.cancel();
-    }
 }
 
 void CollectionShardingRuntime::enterCriticalSectionCommitPhase(const CSRLock&,
