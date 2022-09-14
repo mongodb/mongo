@@ -115,6 +115,17 @@ bool skipHedgeResult(const Status& status) {
         ErrorCodes::isNetworkTimeoutError(status) || ErrorCodes::isStaleShardVersionError(status);
 }
 
+template <typename IA, typename IB, typename F>
+int compareTransformed(IA a1, IA a2, IB b1, IB b2, F&& f) {
+    for (;; ++a1, ++b1)
+        if (a1 == a2)
+            return b1 == b2 ? 0 : -1;
+        else if (b1 == b2)
+            return 1;
+        else if (int r = f(*a1) - f(*b1))
+            return r;
+}
+
 }  // namespace
 
 /**
@@ -572,15 +583,12 @@ Status NetworkInterfaceTL::startCommand(const TaskExecutor::CallbackHandle& cbHa
 
     bool targetHostsInAlphabeticalOrder =
         MONGO_unlikely(networkInterfaceSendRequestsToTargetHostsInAlphabeticalOrder.shouldFail(
-            [request](const BSONObj&) { return request.options.isHedgeEnabled; }));
+            [&](const BSONObj&) { return request.options.isHedgeEnabled; }));
 
     if (targetHostsInAlphabeticalOrder) {
-        // Sort the target hosts by host names.
-        std::sort(request.target.begin(),
-                  request.target.end(),
-                  [](const HostAndPort& target1, const HostAndPort& target2) {
-                      return target1.toString() < target2.toString();
-                  });
+        std::sort(request.target.begin(), request.target.end(), [](auto&& a, auto&& b) {
+            return detail::orderByLowerHostThenPort(a, b);
+        });
     }
 
     if ((request.target.size() > 1) && !request.options.isHedgeEnabled &&
@@ -1387,5 +1395,17 @@ void NetworkInterfaceTL::dropConnections(const HostAndPort& hostAndPort) {
     _pool->dropConnections(hostAndPort);
 }
 
+namespace detail {
+
+bool orderByLowerHostThenPort(const HostAndPort& a, const HostAndPort& b) {
+    const auto& ah = a.host();
+    const auto& bh = b.host();
+    if (int r = compareTransformed(
+            ah.begin(), ah.end(), bh.begin(), bh.end(), [](auto&& c) { return ctype::toLower(c); }))
+        return r < 0;
+    return a.port() < b.port();
+}
+
+}  // namespace detail
 }  // namespace executor
 }  // namespace mongo

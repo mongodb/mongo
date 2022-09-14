@@ -395,5 +395,11 @@ private:
     bool _isExecutorRunnable = false;
 };
 
+namespace detail {
+
+/** Order HostAndPorts by their lowercased hostnames then port number */
+bool orderByLowerHostThenPort(const HostAndPort& a, const HostAndPort& b);
+
+}  // namespace detail
 }  // namespace executor
 }  // namespace mongo
