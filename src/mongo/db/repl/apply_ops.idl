@@ -64,9 +64,10 @@ structs:
                 cpp_name: preCondition
                 type: array<object>
                 optional: true
-                description: "applyOps supports checking the documents of existing collections
-                              before proceeding to execute the given operations. This flag is set to
-                              true if the 'preCondition' option is provided."
+                description: "No longer supported, but kept here to improve the error message
+                              returned to the client. In older versions, applyOps used to support
+                              checking the documents of existing collections before proceeding to
+                              execute the given operations."
 
             prepare:
                 type: bool

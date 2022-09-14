@@ -33,7 +33,6 @@
 #include <utility>
 
 #include "mongo/bson/util/builder.h"
-#include "mongo/client/client_deprecated.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/client/global_conn_pool.h"

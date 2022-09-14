@@ -381,34 +381,6 @@ var authCommandsLib = {
           ]
         },
         {
-          testname: "applyOps_precondition",
-          command: {
-              applyOps: [{"op": "n", "ns": "", "o": {}}],
-              preCondition: [{ns: firstDbName + ".x", q: {x: 5}, res: []}]
-          },
-          skipSharded: true,
-          setup: function(db) {
-              assert.writeOK(db.getSiblingDB(firstDbName).x.save({}));
-          },
-          teardown: function(db) {
-              db.getSiblingDB(firstDbName).x.drop();
-          },
-          testcases: [
-              {
-                runOnDb: adminDbName,
-                privileges: [
-                    {resource: {db: firstDbName, collection: "x"}, actions: ["find"]},
-                    {
-                      resource: {cluster: true},
-                      actions: ["appendOplogNote"],
-                      removeWhenTestingAuthzFailure: false
-                    },
-                    {resource: {cluster: true}, actions: ["applyOps"]},
-                ],
-              },
-          ]
-        },
-        {
           testname: "applyOps_c_create",
           command: {
               applyOps: [{

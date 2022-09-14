@@ -9,11 +9,10 @@
  *   requires_replication,
  *   # Tenant migrations don't support applyOps.
  *   tenant_migration_incompatible,
- *   # This test will fail on a mixed 6.1/6.0 cluster because a 6.0 node can successfully apply
- *   # a $v: 1 oplog entry, but a 6.1 node cannot successfully replicate it. This isn't an issue
- *   # because applyOps is an internal command, so users aren't expected to manually insert $v: 1
- *   # entries into the oplog.
- *   requires_fcv_61,
+ *   # As of 6.2, the 'preCondition' option is no longer supported by the applyOps command. The fact
+ *   # that 'preCondition' is rejected is validated by this test, so it cannot run against nodes
+ *   # older than 6.2.
+ *   requires_fcv_62,
  * ]
  */
 
@@ -288,69 +287,47 @@ assert.eq(o, t.findOne(), "Document doesn't match expected");
 assert.eq(true, res.results[0], "Bad result value for valid update");
 assert.eq(true, res.results[1], "Bad result value for valid update");
 
-// preCondition fully matches
-res = db.runCommand({
+// Verify that the 'preCondition' option is no longer supported.
+assert.commandFailedWithCode(db.runCommand({
     applyOps: [
         {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 20}}}},
         {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 21}}}}
     ],
     preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 19}}]
-});
-
-// The use of preCondition requires applyOps to run atomically. Therefore, it is incompatible
-// with {allowAtomic: false}.
-assert.commandFailedWithCode(
-    db.runCommand({
-        applyOps: [{op: 'u', ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 22}}}}],
-        preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 21}}],
-        allowAtomic: false,
-    }),
-    ErrorCodes.InvalidOptions,
-    'applyOps should fail when preCondition is present and atomicAllowed is false.');
-
+}),
+                             6711600);
+assert.commandFailedWithCode(db.runCommand({
+    applyOps: [
+        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 20}}}},
+        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 21}}}}
+    ],
+    preCondition: []
+}),
+                             6711600);
+// Expect the same error code when 'allowAtomic' is false, or with operations that include commands.
+assert.commandFailedWithCode(db.runCommand({
+    applyOps: [
+        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 20}}}},
+        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 21}}}}
+    ],
+    preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 19}}],
+    allowAtomic: false
+}),
+                             6711600);
 // The use of preCondition is also incompatible with operations that include commands.
-assert.commandFailedWithCode(
-    db.runCommand({
-        applyOps: [{op: 'c', ns: t.getCollection('$cmd').getFullName(), o: {applyOps: []}}],
-        preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 21}}],
-    }),
-    ErrorCodes.InvalidOptions,
-    'applyOps should fail when preCondition is present and operations includes commands.');
+assert.commandFailedWithCode(db.runCommand({
+    applyOps: [{op: 'c', ns: t.getCollection('$cmd').getFullName(), o: {applyOps: []}}],
+    preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 21}}],
+}),
+                             6711600);
 
-o.x++;
-o.x++;
-
-assert.eq(1, t.find().count(), "Updates increased number of documents");
-assert.eq(o, t.findOne(), "Document doesn't match expected");
-assert.eq(true, res.results[0], "Bad result value for valid update");
-assert.eq(true, res.results[1], "Bad result value for valid update");
-
-// preCondition doesn't match ns
-res = db.runCommand({
-    applyOps: [
-        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 22}}}},
-        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 23}}}}
-    ],
-    preCondition: [{ns: "foo.otherName", q: {_id: 5}, res: {x: 21}}]
-});
-
-assert.eq(o, t.findOne(), "preCondition didn't match, but ops were still applied");
-
-// preCondition doesn't match query
-res = db.runCommand({
-    applyOps: [
-        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 22}}}},
-        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 23}}}}
-    ],
-    preCondition: [{ns: t.getFullName(), q: {_id: 5}, res: {x: 19}}]
-});
-
-assert.eq(o, t.findOne(), "preCondition didn't match, but ops were still applied");
+// No ops should have been applied for the error cases above.
+assert.eq(o, t.findOne());
 
 res = db.runCommand({
     applyOps: [
-        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 22}}}},
-        {op: "u", ns: t.getFullName(), o2: {_id: 6}, o: {$v: 2, diff: {u: {x: 23}}}}
+        {op: "u", ns: t.getFullName(), o2: {_id: 5}, o: {$v: 2, diff: {u: {x: 20}}}},
+        {op: "u", ns: t.getFullName(), o2: {_id: 6}, o: {$v: 2, diff: {u: {x: 21}}}}
     ]
 });
 
@@ -367,7 +344,7 @@ res = db.runCommand({
         {
             op: "i",
             ns: t.getFullName(),
-            o: {_id: 7, x: 24},
+            o: {_id: 7, x: 22},
             lsid: lsid,
             txnNumber: NumberLong(1),
             stmtId: NumberInt(0)
@@ -376,7 +353,7 @@ res = db.runCommand({
             op: "u",
             ns: t.getFullName(),
             o2: {_id: 8},
-            o: {$v: 2, diff: {u: {x: 25}}},
+            o: {$v: 2, diff: {u: {x: 23}}},
             lsid: lsid,
             txnNumber: NumberLong(1),
             stmtId: NumberInt(1)

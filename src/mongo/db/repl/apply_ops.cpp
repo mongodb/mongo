@@ -30,10 +30,8 @@
 #include "mongo/db/repl/apply_ops.h"
 
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/client/client_deprecated.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -44,7 +42,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/matcher/matcher.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -60,7 +57,6 @@
 namespace mongo {
 namespace repl {
 
-constexpr StringData ApplyOps::kPreconditionFieldName;
 constexpr StringData ApplyOps::kOplogApplicationModeFieldName;
 
 namespace {
@@ -276,58 +272,6 @@ Status _applyOps(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status _checkPrecondition(OperationContext* opCtx,
-                          const std::vector<BSONObj>& preConditions,
-                          BSONObjBuilder* result) {
-    invariant(opCtx->lockState()->isW());
-
-    for (const auto& preCondition : preConditions) {
-        if (preCondition["ns"].type() != BSONType::String) {
-            return {ErrorCodes::InvalidNamespace,
-                    str::stream() << "ns in preCondition must be a string, but found type: "
-                                  << typeName(preCondition["ns"].type())};
-        }
-        const NamespaceString nss(preCondition["ns"].valueStringData());
-        if (!nss.isValid()) {
-            return {ErrorCodes::InvalidNamespace, "invalid ns: " + nss.ns()};
-        }
-
-        DBDirectClient db(opCtx);
-        // The preconditions come in "q: {{query: {...}, orderby: ..., etc.}}" format. This format
-        // is no longer used either internally or over the wire in other contexts. We are using a
-        // legacy API from 'client_deprecated' in order to parse this format and convert it into the
-        // corresponding find command.
-        FindCommandRequest findCmd{nss};
-        client_deprecated::initFindFromLegacyOptions(preCondition["q"].Obj(), 0, &findCmd);
-        BSONObj realres = db.findOne(std::move(findCmd));
-
-        // Get collection default collation.
-        auto databaseHolder = DatabaseHolder::get(opCtx);
-        auto database = databaseHolder->getDb(opCtx, nss.dbName());
-        if (!database) {
-            return {ErrorCodes::NamespaceNotFound, "database in ns does not exist: " + nss.ns()};
-        }
-        CollectionPtr collection =
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss);
-        if (!collection) {
-            return {ErrorCodes::NamespaceNotFound, "collection in ns does not exist: " + nss.ns()};
-        }
-        const CollatorInterface* collator = collection->getDefaultCollator();
-
-        // applyOps does not allow any extensions, such as $text, $where, $geoNear, $near,
-        // $nearSphere, or $expr.
-        boost::intrusive_ptr<ExpressionContext> expCtx(
-            new ExpressionContext(opCtx, CollatorInterface::cloneCollator(collator), nss));
-        Matcher matcher(preCondition["res"].Obj(), std::move(expCtx));
-        if (!matcher.matches(realres)) {
-            result->append("got", realres);
-            result->append("whatFailed", preCondition);
-            return {ErrorCodes::BadValue, "preCondition failed"};
-        }
-    }
-
-    return Status::OK();
-}
 }  // namespace
 
 Status applyApplyOpsOplogEntry(OperationContext* opCtx,
@@ -359,9 +303,9 @@ Status applyOps(OperationContext* opCtx,
     uassert(31056, "applyOps command can't have 'partialTxn' field.", !info.getPartialTxn());
     uassert(31240, "applyOps command can't have 'count' field.", !info.getCount());
 
-    // There's one case where we are allowed to take the database lock instead of the global
-    // lock - no preconditions; only CRUD ops; and non-atomic mode.
-    if (!info.getPreCondition() && info.areOpsCrudOnly() && !info.getAllowAtomic()) {
+    // There's one case where we are allowed to take the database lock instead of the global lock --
+    // only CRUD ops and non-atomic mode.
+    if (info.areOpsCrudOnly() && !info.getAllowAtomic()) {
         // TODO SERVER-62880 Once the dbName is of type DatabaseName, pass it directly to the DBlock
         DatabaseName databaseName(boost::none, dbName);
         dbWriteLock.emplace(opCtx, databaseName, MODE_IX);
@@ -376,14 +320,6 @@ Status applyOps(OperationContext* opCtx,
     if (userInitiatedWritesAndNotPrimary)
         return Status(ErrorCodes::NotWritablePrimary,
                       str::stream() << "Not primary while applying ops to database " << dbName);
-
-    if (auto preCondition = info.getPreCondition()) {
-        invariant(info.isAtomic());
-        auto status = _checkPrecondition(opCtx, *preCondition, result);
-        if (!status.isOK()) {
-            return status;
-        }
-    }
 
     LOGV2_DEBUG(5854600,
                 2,

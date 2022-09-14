@@ -96,14 +96,9 @@ ApplyOpsCommandInfo::ApplyOpsCommandInfo(const BSONObj& applyOpCmd)
     : _areOpsCrudOnly(_parseAreOpsCrudOnly(applyOpCmd)) {
     parseProtected(IDLParserContext("applyOps"), applyOpCmd);
 
-    if (getPreCondition()) {
-        uassert(ErrorCodes::InvalidOptions,
-                "Cannot use preCondition with {allowAtomic: false}",
-                getAllowAtomic());
-        uassert(ErrorCodes::InvalidOptions,
-                "Cannot use preCondition when operations include commands.",
-                areOpsCrudOnly());
-    }
+    uassert(6711600,
+            "applyOps command no longer supports the 'preCondition' option",
+            !getPreCondition());
 }
 
 // static

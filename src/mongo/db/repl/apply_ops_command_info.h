@@ -43,7 +43,6 @@ class OperationContext;
 namespace repl {
 class ApplyOps {
 public:
-    static constexpr StringData kPreconditionFieldName = "preCondition"_sd;
     static constexpr StringData kOplogApplicationModeFieldName = "oplogApplicationMode"_sd;
 
     /**

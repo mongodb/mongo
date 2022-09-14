@@ -199,8 +199,7 @@ public:
     }
 
     std::string help() const override {
-        return "internal (sharding)\n{ applyOps : [ ] , preCondition : [ { ns : ... , q : ... , "
-               "res : ... } ] }";
+        return "internal command to apply oplog entries\n{ applyOps : [ ] }";
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,

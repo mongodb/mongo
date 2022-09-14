@@ -172,7 +172,6 @@ clientDriverEnv.Library(
     target='clientdriver_minimal',
     source=[
         'client_api_version_parameters.idl',
-        'client_deprecated.cpp',
         'dbclient_base.cpp',
         'dbclient_cursor.cpp',
         'index_spec.cpp',

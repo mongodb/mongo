@@ -258,21 +258,6 @@ Status OplogApplicationChecks::checkAuthForCommand(OperationContext* opCtx,
         }
     }
 
-    BSONElement preconditions = cmdObj["preCondition"];
-    if (!preconditions.eoo()) {
-        for (const BSONElement& precondition : preconditions.Array()) {
-            checkBSONType(BSONType::Object, precondition);
-            BSONElement nsElem = precondition.Obj()["ns"];
-            checkBSONType(BSONType::String, nsElem);
-            NamespaceString nss(nsElem.checkAndGetStringData());
-
-            if (!authSession->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forExactNamespace(nss), ActionType::find)) {
-                return Status(ErrorCodes::Unauthorized, "Unauthorized to check precondition");
-            }
-        }
-    }
-
     return Status::OK();
 }
 

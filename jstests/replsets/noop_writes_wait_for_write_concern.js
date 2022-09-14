@@ -64,23 +64,6 @@ commands.push({
     }
 });
 
-// 'applyOps' where the preCondition fails.
-commands.push({
-    req: {
-        applyOps: [{op: "i", ns: coll.getFullName(), o: {_id: 2}}],
-        preCondition: [{ns: coll.getFullName(), q: {_id: 99}, res: {_id: 99}}]
-    },
-    setupFunc: function() {
-        assert.commandWorked(coll.insert({_id: 1}));
-    },
-    confirmFunc: function(res) {
-        assert.commandFailed(res,
-                             "The applyOps command was expected to fail, but instead succeeded.");
-        assert.eq(
-            res.errmsg, "preCondition failed", "The applyOps command failed for the wrong reason.");
-    }
-});
-
 // 'update' where the document to update does not exist.
 commands.push({
     req: {update: collName, updates: [{q: {a: 1}, u: {b: 2}}]},
