@@ -30,6 +30,7 @@
 #pragma once
 
 #include <array>
+#include <boost/multiprecision/cpp_int.hpp>
 #include <boost/optional.hpp>
 #include <cstdint>
 #include <string>
@@ -1320,7 +1321,26 @@ struct OSTType_Double {
 OSTType_Double getTypeInfoDouble(double value,
                                  boost::optional<double> min,
                                  boost::optional<double> max);
+/**
+ * Describe the encoding of an BSON Decimal (i.e. IEEE 754 Decimal128)
+ *
+ * NOTE: It is not a mistake that a decimal is encoded as uint128.
+ */
 
+struct OSTType_Decimal128 {
+    OSTType_Decimal128(boost::multiprecision::uint128_t v,
+                       boost::multiprecision::uint128_t minP,
+                       boost::multiprecision::uint128_t maxP)
+        : value(v), min(minP), max(maxP) {}
+
+    boost::multiprecision::uint128_t value;
+    boost::multiprecision::uint128_t min;
+    boost::multiprecision::uint128_t max;
+};
+
+OSTType_Decimal128 getTypeInfoDecimal128(Decimal128 value,
+                                         boost::optional<Decimal128> min,
+                                         boost::optional<Decimal128> max);
 
 struct FLEFindEdgeTokenSet {
     EDCDerivedFromDataToken edc;
@@ -1368,6 +1388,10 @@ std::unique_ptr<Edges> getEdgesDouble(double value,
                                       boost::optional<double> max,
                                       int sparsity);
 
+std::unique_ptr<Edges> getEdgesDecimal128(Decimal128 value,
+                                          boost::optional<Decimal128> min,
+                                          boost::optional<Decimal128> max,
+                                          int sparsity);
 /**
  * Mincover calculator
  */
@@ -1390,6 +1414,11 @@ std::vector<std::string> minCoverDouble(double rangeMin,
                                         boost::optional<double> max,
                                         int sparsity);
 
+std::vector<std::string> minCoverDecimal128(Decimal128 rangeMin,
+                                            Decimal128 rangeMax,
+                                            boost::optional<Decimal128> min,
+                                            boost::optional<Decimal128> max,
+                                            int sparsity);
 /**
  * Utility functions manipulating buffers.
  */

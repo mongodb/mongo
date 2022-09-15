@@ -30,6 +30,7 @@
 #include "mongo/crypto/fle_crypto.h"
 
 #include <algorithm>
+#include <boost/multiprecision/cpp_int.hpp>
 #include <cmath>
 #include <cstdint>
 #include <functional>
@@ -71,6 +72,7 @@
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
@@ -134,6 +136,9 @@ constexpr auto kDollarIn = "$in";
 constexpr auto kEncryptedFields = "encryptedFields";
 
 constexpr size_t kHmacKeyOffset = 64;
+
+constexpr boost::multiprecision::uint128_t k1(1);
+constexpr boost::multiprecision::int128_t k10(10);
 
 #ifdef FLE2_DEBUG_STATE_COLLECTIONS
 constexpr auto kDebugId = "_debug_id";
@@ -1435,6 +1440,43 @@ T decryptAndParseIndexedValue(ConstDataRange cdr, FLEKeyVault* keyVault) {
         FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(indexKey.key);
 
     return uassertStatusOK(T::decryptAndParse(serverDataToken, cdr));
+}
+
+/**
+ * Return the first bit set in a integer. 1 indexed.
+ */
+template <typename T>
+int getFirstBitSet(T v) {
+    return 64 - countLeadingZeros64(v);
+}
+
+template <>
+int getFirstBitSet<boost::multiprecision::uint128_t>(const boost::multiprecision::uint128_t v) {
+    return boost::multiprecision::msb(v) + 1;
+}
+
+template <typename T>
+std::string toBinaryString(T v) {
+    static_assert(std::numeric_limits<T>::is_integer);
+    static_assert(!std::numeric_limits<T>::is_signed);
+
+    auto length = std::numeric_limits<T>::digits;
+    std::string str(length, '0');
+
+    const T kOne(1);
+
+    for (size_t i = length; i > 0; i--) {
+        T mask = kOne << (i - 1);
+        if (v & mask) {
+            str[length - i] = '1';
+        }
+    }
+
+    return str;
+}
+
+boost::multiprecision::int128_t exp10(int x) {
+    return pow(k10, x);
 }
 
 }  // namespace
@@ -3363,6 +3405,98 @@ OSTType_Double getTypeInfoDouble(double value,
     return {uv, 0, std::numeric_limits<uint64_t>::max()};
 }
 
+// For full algorithm see SERVER-68542
+OSTType_Decimal128 getTypeInfoDecimal128(Decimal128 value,
+                                         boost::optional<Decimal128> min,
+                                         boost::optional<Decimal128> max) {
+    uassert(6854201,
+            "Must specify both a lower and upper bound or no bounds.",
+            min.has_value() == max.has_value());
+
+    uassert(6854202,
+            "Infinity and Nan Decimal128 values are not supported.",
+            !value.isInfinite() && !value.isNaN());
+
+    if (min.has_value()) {
+        uassert(6854203,
+                "The minimum value must be less than the maximum value",
+                min.value() < max.value());
+
+        uassert(6854204,
+                "Value must be greater than or equal to the minimum value and less than or equal "
+                "to the maximum value",
+                value >= min.value() && value <= max.value());
+    }
+
+    bool isNegative = value.isNegative();
+    int32_t scale = value.getBiasedExponent() - Decimal128::kExponentBias;
+    int64_t highCoefficent = value.getCoefficientHigh();
+    int64_t lowCoefficient = value.getCoefficientLow();
+
+// use int128_t where possible on gcc/clang
+#ifdef __SIZEOF_INT128__
+    __int128 cMax1 = 0x1ed09bead87c0;
+    cMax1 <<= 64;
+    cMax1 |= 0x378d8e63ffffffff;
+    const boost::multiprecision::uint128_t cMax(cMax1);
+    if (kDebugBuild) {
+        const boost::multiprecision::uint128_t cMaxStr("9999999999999999999999999999999999");
+        dassert(cMaxStr == cMax);
+    }
+#else
+    boost::multiprecision::uint128_t cMax("9999999999999999999999999999999999");
+#endif
+    const int64_t eMin = -6176;
+
+    boost::multiprecision::int128_t unscaledValue(highCoefficent);
+    unscaledValue <<= 64;
+    unscaledValue += lowCoefficient;
+
+    int64_t rho = 0;
+    auto stepValue = unscaledValue;
+
+    bool flag = true;
+    if (unscaledValue == 0) {
+        flag = false;
+    }
+
+    while (flag != false) {
+        if (stepValue > cMax) {
+            flag = false;
+            rho = rho - 1;
+            stepValue /= k10;
+        } else {
+            rho = rho + 1;
+            stepValue *= k10;
+        }
+    }
+
+    boost::multiprecision::uint128_t mapping = 0;
+    auto part2 = k1 << 127;
+
+    if (unscaledValue == 0) {
+        mapping = part2;
+    } else if (rho <= scale - eMin) {
+        auto part1 = stepValue + (cMax * (scale - eMin - rho));
+        if (isNegative) {
+            part1 = -part1;
+        }
+
+        mapping = static_cast<boost::multiprecision::uint128_t>(part1 + part2);
+
+    } else {
+        auto part1 = exp10(scale - eMin) * unscaledValue;
+        if (isNegative) {
+            part1 = -part1;
+        }
+
+        mapping = static_cast<boost::multiprecision::uint128_t>(part1 + part2);
+    }
+
+    return {mapping, 0, std::numeric_limits<boost::multiprecision::uint128_t>::max()};
+}
+
+
 EncryptedPredicateEvaluator::EncryptedPredicateEvaluator(ConstDataRange serverToken,
                                                          int64_t contentionFactor,
                                                          std::vector<ConstDataRange> edcTokens)
@@ -3404,15 +3538,15 @@ std::vector<StringData> Edges::get() {
 
 template <typename T>
 std::unique_ptr<Edges> getEdgesT(T value, T min, T max, int sparsity) {
-    static_assert(std::is_unsigned<T>::value);
+    static_assert(!std::numeric_limits<T>::is_signed);
     static_assert(std::numeric_limits<T>::is_integer);
 
     constexpr size_t bits = std::numeric_limits<T>::digits;
 
     dassert(0 == min);
 
-    size_t maxlen = 64 - countLeadingZeros64(max);
-    std::string valueBin = std::bitset<bits>(value).to_string();
+    size_t maxlen = getFirstBitSet(max);
+    std::string valueBin = toBinaryString(value);
     std::string valueBinTrimmed = valueBin.substr(bits - maxlen, maxlen);
     return std::make_unique<Edges>(valueBinTrimmed, sparsity);
 }
@@ -3441,6 +3575,15 @@ std::unique_ptr<Edges> getEdgesDouble(double value,
     return getEdgesT(aost.value, aost.min, aost.max, sparsity);
 }
 
+std::unique_ptr<Edges> getEdgesDecimal128(Decimal128 value,
+                                          boost::optional<Decimal128> min,
+                                          boost::optional<Decimal128> max,
+                                          int sparsity) {
+    auto aost = getTypeInfoDecimal128(value, min, max);
+    return getEdgesT(aost.value, aost.min, aost.max, sparsity);
+}
+
+
 template <typename T>
 class MinCoverGenerator {
 public:
@@ -3456,8 +3599,8 @@ private:
         : _rangeMin(rangeMin),
           _rangeMax(rangeMax),
           _sparsity(sparsity),
-          _maxlen(64 - countLeadingZeros64(max)) {
-        static_assert(std::is_unsigned<T>::value);
+          _maxlen(getFirstBitSet(max)) {
+        static_assert(!std::numeric_limits<T>::is_signed);
         static_assert(std::numeric_limits<T>::is_integer);
         uassert(6860001, "Min must be less than max for range search", rangeMin <= rangeMax);
         dassert(rangeMin >= 0 && rangeMax <= max);
@@ -3494,7 +3637,7 @@ private:
         if (maskedBits == _maxlen) {
             return "root";
         }
-        std::string valueBin = std::bitset<bits>(start >> maskedBits).to_string();
+        std::string valueBin = toBinaryString(start >> maskedBits);
         return valueBin.substr(bits - _maxlen + maskedBits, _maxlen - maskedBits);
     }
 
@@ -3564,6 +3707,18 @@ std::vector<std::string> minCoverDouble(double rangeMin,
                                         int sparsity) {
     auto a = getTypeInfoDouble(rangeMin, min, max);
     auto b = getTypeInfoDouble(rangeMax, min, max);
+    dassert(a.min == b.min);
+    dassert(a.max == b.max);
+    return minCover(a.value, b.value, a.min, a.max, sparsity);
+}
+
+std::vector<std::string> minCoverDecimal128(Decimal128 rangeMin,
+                                            Decimal128 rangeMax,
+                                            boost::optional<Decimal128> min,
+                                            boost::optional<Decimal128> max,
+                                            int sparsity) {
+    auto a = getTypeInfoDecimal128(rangeMin, min, max);
+    auto b = getTypeInfoDecimal128(rangeMax, min, max);
     dassert(a.min == b.min);
     dassert(a.max == b.max);
     return minCover(a.value, b.value, a.min, a.max, sparsity);

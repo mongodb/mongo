@@ -46,7 +46,6 @@
 #include "mongo/bson/json.h"
 #include "mongo/config.h"
 #include "mongo/crypto/fle_crypto.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -148,12 +147,22 @@ TEST(EdgeCalcTest, Double_TestVectors) {
     }
 }
 
+
+TEST(EdgeCalcTest, Decimal128_TestVectors) {
+    std::vector<EdgeCalcTestVector<Decimal128>> testVectors = {
+#include "test_vectors/edges_decimal128.cstruct"
+    };
+    for (const auto& testVector : testVectors) {
+        ASSERT_TRUE(testVector.validate());
+    }
+}
+
 template <typename T>
 struct MinCoverTestVector {
     T rangeMin, rangeMax;
     T min, max;
     int sparsity;
-    const char* expect;
+    std::string expect;
 
     bool validate(
         std::function<std::vector<std::string>(T, T, boost::optional<T>, boost::optional<T>, int)>
@@ -211,6 +220,15 @@ TEST(MinCoverCalcTest, Double_TestVectors) {
     };
     for (const auto& testVector : testVectors) {
         ASSERT_TRUE(testVector.validate(minCoverDouble));
+    }
+}
+
+TEST(MinCoverCalcTest, Decimal128_TestVectors) {
+    MinCoverTestVector<Decimal128> testVectors[] = {
+#include "test_vectors/mincover_decimal128.cstruct"
+    };
+    for (const auto& testVector : testVectors) {
+        ASSERT_TRUE(testVector.validate(minCoverDecimal128));
     }
 }
 
