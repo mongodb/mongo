@@ -168,6 +168,7 @@ env.Library(
         'request_types/balancer_collection_status.idl',
         'request_types/cleanup_reshard_collection.idl',
         'request_types/clone_catalog_data.idl',
+        'request_types/cluster_commands_without_shard_key.idl',
         'request_types/commit_reshard_collection.idl',
         'request_types/configure_collection_balancing.idl',
         'request_types/drop_collection_if_uuid_not_matching.idl',

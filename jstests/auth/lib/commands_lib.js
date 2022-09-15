@@ -223,6 +223,31 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "_clusterQueryWithoutShardKey",
+          command: {_clusterQueryWithoutShardKey: 1, writeCmd: {}, stmtId: NumberInt(1)},
+          skipUnlessSharded: true,
+          skipTest: (conn) => {
+              return !TestData.setParameters.featureFlagUpdateOneWithoutShardKey;
+          },
+          testcases: [
+              {
+                  runOnDb: adminDbName,
+                  roles: {__system: 1},
+                  privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+              },
+              {
+                  runOnDb: firstDbName,
+                  roles: {__system: 1},
+                  privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+              },
+              {
+                  runOnDb: secondDbName,
+                  roles: {__system: 1},
+                  privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+              }
+          ]
+        },
+        {
           testname: "_configsvrAbortReshardCollection",
           command: {_configsvrAbortReshardCollection: "test.x"},
           skipSharded: true,

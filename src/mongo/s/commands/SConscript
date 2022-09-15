@@ -76,6 +76,7 @@ env.Library(
         'cluster_pipeline_cmd_s.cpp',
         'cluster_plan_cache_clear_cmd.cpp',
         'cluster_profile_cmd.cpp',
+        'cluster_query_without_shard_key_cmd.cpp',
         'cluster_refine_collection_shard_key_cmd.cpp',
         'cluster_rename_collection_cmd.cpp',
         'cluster_repair_sharded_collection_chunks_history_cmd.cpp',

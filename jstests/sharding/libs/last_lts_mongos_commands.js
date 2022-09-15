@@ -14,6 +14,7 @@ const commandsRemovedFromMongosSinceLastLTS = [
 // listCommands output of a last LTS version mongos. We will allow these commands to have a test
 // defined without always existing on the mongos being used.
 const commandsAddedToMongosSinceLastLTS = [
+    "_clusterQueryWithoutShardKey",
     "abortReshardCollection",
     "analyze",
     "analyzeShardKey",  // TODO (SERVER-68977): Remove upgrade/downgrade for PM-1858.

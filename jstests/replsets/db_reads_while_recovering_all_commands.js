@@ -25,6 +25,7 @@ const isPrimaryOnly = "primary only";
 const allCommands = {
     _addShard: {skip: isPrimaryOnly},
     _cloneCollectionOptionsFromPrimaryShard: {skip: isPrimaryOnly},
+    _clusterQueryWithoutShardKey: {skip: isAnInternalCommand},
     _configsvrAbortReshardCollection: {skip: isPrimaryOnly},
     _configsvrAddShard: {skip: isPrimaryOnly},
     _configsvrAddShardToZone: {skip: isPrimaryOnly},
