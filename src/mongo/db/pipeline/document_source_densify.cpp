@@ -152,7 +152,7 @@ list<intrusive_ptr<DocumentSource>> createFromBsonInternal(
     list<FieldPath> partitions;
     if (spec.getPartitionByFields()) {
         auto partitionFields = (*spec.getPartitionByFields());
-        for (auto partitionField : partitionFields)
+        for (auto& partitionField : partitionFields)
             partitions.push_back(FieldPath(partitionField));
     }
 

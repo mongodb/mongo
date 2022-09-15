@@ -233,7 +233,7 @@ bool RewriteExpr::_canRewriteComparison(
     const auto& operandList = expression->getOperandList();
     bool hasFieldPath = false;
 
-    for (auto operand : operandList) {
+    for (auto& operand : operandList) {
         if (auto exprFieldPath = dynamic_cast<ExpressionFieldPath*>(operand.get())) {
             if (exprFieldPath->isVariableReference() || exprFieldPath->isROOT()) {
                 // Rather than a local document field path, this field path refers to either a

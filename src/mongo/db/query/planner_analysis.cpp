@@ -753,7 +753,7 @@ void QueryPlannerAnalysis::analyzeGeo(const QueryPlannerParams& params,
             continue;
         }
 
-        for (auto elt : indexEntry.keyPattern) {
+        for (auto& elt : indexEntry.keyPattern) {
             if (elt.type() == BSONType::String && elt.String() == "2dsphere") {
                 twoDSphereFields.insert(elt.fieldName());
             }

@@ -141,7 +141,7 @@ MatcherTypeSet getMatcherTypeSet(const CNode& argument) {
             a.payload);
     };
     if (auto children = stdx::get_if<CNode::ArrayChildren>(&argument.payload)) {
-        for (auto child : (*children)) {
+        for (const auto& child : (*children)) {
             add_individual_to_type_set(child);
         }
     } else {

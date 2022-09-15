@@ -276,7 +276,7 @@ Status ClearFilters::clear(OperationContext* opCtx,
     // removePlanCacheEntriesByPlanCacheCommandKeys() function with the key from the index filter
     // entry.
     stdx::unordered_set<uint32_t> planCacheCommandKeys;
-    for (auto entry : entries) {
+    for (const auto& entry : entries) {
         // Create canonical query.
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         findCommand->setFilter(entry.query);

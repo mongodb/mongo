@@ -941,7 +941,7 @@ bool DocumentSourceInternalUnpackBucket::optimizeLastpoint(Pipeline::SourceConta
     auto isSortValidForGroup = [&](AccumulatorDocumentsNeeded targetAccum) {
         bool firstpointTimeIsAscending =
             (targetAccum == AccumulatorDocumentsNeeded::kFirstDocument);
-        for (auto entry : sortStage->getSortKeyPattern()) {
+        for (const auto& entry : sortStage->getSortKeyPattern()) {
             auto isTimeField = entry.fieldPath->fullPath() == timeField;
             if (isTimeField && (entry.isAscending == firstpointTimeIsAscending)) {
                 // This is a first-point query, which is disallowed.
