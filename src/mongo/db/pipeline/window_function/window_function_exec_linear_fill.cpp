@@ -29,30 +29,35 @@
 
 #include "mongo/db/pipeline/window_function/window_function_exec_linear_fill.h"
 
+namespace mongo {
 namespace {
-mongo::Value interpolate(
-    mongo::Value x1, mongo::Value y1, mongo::Value x2, mongo::Value y2, mongo::Value xCoord) {
-    // Given two known points (x1, y1) and (x2, y2) and a value x that lies between those two
-    // points, we solve (or fill) for y with the following formula: y = y1 + (x - x1) * ((y2 -
-    // y1)/(x2 - x1))
-    return uassertStatusOK(mongo::ExpressionSubtract::apply(y2, y1).andThen([&](auto&& numerator) {
-        return mongo::ExpressionSubtract::apply(x2, x1).andThen([&](auto&& denominator) {
-            return mongo::ExpressionDivide::apply(numerator, denominator)
-                .andThen([&](auto&& quotient) {
-                    return mongo::ExpressionSubtract::apply(xCoord, x1)
-                        .andThen([&](auto&& difference) {
-                            return mongo::ExpressionMultiply::apply(quotient, difference)
-                                .andThen([&](auto&& product) {
-                                    return mongo::ExpressionAdd::apply(y1, product);
-                                });
-                        });
-                });
-        });
-    }));
+namespace value_arithmetic_operators {
+template <typename Op>
+Value applyExpressionOp(const Value& a, const Value& b) {
+    return uassertStatusOK(Op::apply(a, b));
+}
+Value operator+(const Value& a, const Value& b) {
+    return applyExpressionOp<ExpressionAdd>(a, b);
+}
+Value operator-(const Value& a, const Value& b) {
+    return applyExpressionOp<ExpressionSubtract>(a, b);
+}
+Value operator*(const Value& a, const Value& b) {
+    return applyExpressionOp<ExpressionMultiply>(a, b);
+}
+Value operator/(const Value& a, const Value& b) {
+    return applyExpressionOp<ExpressionDivide>(a, b);
+}
+}  // namespace value_arithmetic_operators
+
+// Given two known points (x1, y1) and (x2, y2) and a value x that lies between those two
+// points, we solve (or fill) for y with the following formula: y = y1 + (x - x1) * ((y2 -
+// y1)/(x2 - x1))
+Value interpolate(Value x1, Value y1, Value x2, Value y2, Value x) {
+    using namespace value_arithmetic_operators;
+    return y1 + (x - x1) * ((y2 - y1) / (x2 - x1));
 }
 }  // namespace
-
-namespace mongo {
 
 boost::optional<Value> WindowFunctionExecLinearFill::evaluateInput(const Document& doc) {
     Value fillFieldValue = _input->evaluate(doc, &_input->getExpressionContext()->variables);
