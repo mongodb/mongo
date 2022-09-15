@@ -1342,10 +1342,15 @@ void WiredTigerKVEngine::syncSizeInfo(bool sync) const {
     if (!_sizeStorer)
         return;
 
-    try {
-        _sizeStorer->flush(sync);
-    } catch (const WriteConflictException&) {
-        // ignore, we'll try again later.
+    while (true) {
+        try {
+            return _sizeStorer->flush(sync);
+        } catch (const WriteConflictException&) {
+            if (!sync) {
+                // ignore, we'll try again later.
+                return;
+            }
+        }
     }
 }
 

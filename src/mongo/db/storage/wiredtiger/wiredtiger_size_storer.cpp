@@ -34,6 +34,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
@@ -178,8 +179,9 @@ void WiredTigerSizeStorer::flush(bool syncToDisk) {
                 // One of the code paths calling this function is when a session is checked back
                 // into the session cache. This could involve read-only operations which don't
                 // except write conflicts. If WiredTiger returns WT_ROLLBACK during the flush, we
-                // skip flushing.
-                return;
+                // return an exception here and let the caller decide whether to ignore it or retry
+                // flushing.
+                throwWriteConflictException("Size storer flush received a rollback.");
             }
             invariantWTOK(ret, cursor->session);
         }
