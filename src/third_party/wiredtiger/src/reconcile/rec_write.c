@@ -620,6 +620,9 @@ __rec_init(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags, WT_SALVAGE_COO
     r->supd_next = 0;
     r->supd_memsize = 0;
 
+    /* The list of updates to be deleted from the history store. */
+    r->delete_hs_upd_next = 0;
+
     /* The list of pages we've written. */
     r->multi = NULL;
     r->multi_next = 0;
@@ -772,6 +775,7 @@ __rec_destroy(WT_SESSION_IMPL *session, void *reconcilep)
     __wt_buf_free(session, &r->chunk_B.image);
 
     __wt_free(session, r->supd);
+    __wt_free(session, r->delete_hs_upd);
 
     __wt_rec_dictionary_free(session, r);
 
@@ -2665,6 +2669,12 @@ __rec_hs_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
       "Attempting to write updates from the history store or metadata file into the history store");
     /* Flag as unused for non diagnostic builds. */
     WT_UNUSED(btree);
+
+    /*
+     * Delete the updates left in the history store by prepared rollback first before moving updates
+     * to the history store.
+     */
+    WT_ERR(__wt_hs_delete_updates(session, r));
 
     /* Check if there's work to do. */
     for (multi = r->multi, i = 0; i < r->multi_next; ++multi, ++i)
