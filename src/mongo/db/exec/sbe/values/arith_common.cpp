@@ -215,12 +215,12 @@ std::tuple<bool, value::TypeTags, value::Value> genericArithmeticOp(value::TypeT
                     break;
                 }
                 case TypeTags::NumberDecimal: {
-                    using limits = std::numeric_limits<int64_t>;
                     auto decimalRhs = numericCast<Decimal128>(rhsTag, rhsValue);
-                    if (decimalRhs.isGreaterEqual(Decimal128{limits::min()}) &&
-                        decimalRhs.isLess(Decimal128{limits::max()}) &&
-                        !Op::doOperation(
-                            bitcastTo<int64_t>(lhsValue), decimalRhs.toLong(), result)) {
+
+                    std::uint32_t signalingFlags = Decimal128::SignalingFlag::kNoFlag;
+                    std::int64_t longRhs = decimalRhs.toLong(&signalingFlags);
+                    if (signalingFlags == Decimal128::SignalingFlag::kNoFlag &&
+                        !Op::doOperation(bitcastTo<int64_t>(lhsValue), longRhs, result)) {
                         return {false, value::TypeTags::Date, value::bitcastFrom<int64_t>(result)};
                     }
                     break;

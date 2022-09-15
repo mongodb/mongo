@@ -34,6 +34,7 @@
 
 #include <algorithm>
 #include <boost/algorithm/string.hpp>
+#include <cstdint>
 #include <cstdio>
 #include <utility>
 #include <vector>
@@ -417,7 +418,7 @@ public:
     }
 
 private:
-    // Convert current value into date.
+    // Convert 'valToAdd' into the data type used for dates (long long) and add it to 'longTotal'.
     void addToDateValue(Value valToAdd) {
         switch (valToAdd.getType()) {
             case NumberInt:
@@ -441,10 +442,17 @@ private:
                 }
                 break;
             }
-            case NumberDecimal:
-                // Decimal dates are not checked for overflow.
-                longTotal += valToAdd.coerceToDecimal().toLong();
+            case NumberDecimal: {
+                Decimal128 decimalToAdd = valToAdd.coerceToDecimal();
+
+                std::uint32_t signalingFlags = Decimal128::SignalingFlag::kNoFlag;
+                std::int64_t longToAdd = decimalToAdd.toLong(&signalingFlags);
+                if (signalingFlags != Decimal128::SignalingFlag::kNoFlag ||
+                    overflow::add(longTotal, longToAdd, &longTotal)) {
+                    uasserted(ErrorCodes::Overflow, "date overflow in $add");
+                }
                 break;
+            }
             default:
                 MONGO_UNREACHABLE;
         }

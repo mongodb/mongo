@@ -355,8 +355,8 @@ public:
      * This set of functions converts a Decimal128 to a certain integer type with a
      * given rounding mode.
      *
-     * Each function is overloaded to provide an optional signalingFlags output parameter
-     * that can be set to one of the Decimal128::SignalingFlag enumerators:
+     * Each function is overloaded to provide an optional signalingFlags input-output parameter that
+     * will be bitwise ORed with one of the following Decimal128::SignalingFlag enumerators:
      * kNoFlag, kInvalid
      *
      * Note: The signaling flags for these functions only signal
@@ -376,8 +376,8 @@ public:
      * given rounding mode. The signaling flags for these functions will also signal
      * inexact computation.
      *
-     * Each function is overloaded to provide an optional signalingFlags output parameter
-     * that can be set to one of the Decimal128::SignalingFlag enumerators:
+     * Each function is overloaded to provide an optional signalingFlags input-output parameter that
+     * will be bitwise ORed with one of the following Decimal128::SignalingFlag enumerators:
      * kNoFlag, kInexact, kInvalid
      */
     std::int32_t toIntExact(RoundingMode roundMode = kRoundTiesToEven) const;
@@ -394,8 +394,8 @@ public:
      * These functions convert decimals to doubles and have the ability to signal
      * inexact, underflow, overflow, and invalid operation.
      *
-     * This function is overloaded to provide an optional signalingFlags output parameter
-     * that can be set to one of the Decimal128::SignalingFlag enumerators:
+     * Each function is overloaded to provide an optional signalingFlags input-output parameter that
+     * will be bitwise ORed with one of the following Decimal128::SignalingFlag enumerators:
      * kNoFlag, kInexact, kUnderflow, kOverflow, kInvalid
      */
     double toDouble(RoundingMode roundMode = kRoundTiesToEven) const;
@@ -443,8 +443,8 @@ public:
      * is performed using the supplied rounding mode (defaulting to kRoundTiesToEven).
      * NaNs and infinities are handled according to the IEEE 754-2008 specification.
      *
-     * Each function is overloaded to provide an optional signalingFlags output parameter
-     * that can be set to one of the Decimal128::SignalingFlag enumerators:
+     * Each function is overloaded to provide an optional signalingFlags input-output parameter that
+     * will be bitwise ORed with one of the following Decimal128::SignalingFlag enumerators:
      * kNoFlag, kInexact, kUnderflow, kOverflow, kInvalid
      *
      * The divide operation may also set signalingFlags to kDivideByZero

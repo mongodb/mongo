@@ -1,6 +1,4 @@
 // Test $add with date
-// TODO SERVER-68544: to remove this tag after fix.
-// @tags: [do_not_wrap_aggregations_in_facets]
 (function() {
 "use strict";
 
@@ -12,7 +10,7 @@ coll.drop();
 
 function getResultOfExpression(expr) {
     const resultArray = coll.aggregate({$project: {computed: expr}}).toArray();
-    assert.eq(1, resultArray.length);
+    assert.eq(1, resultArray.length, "ERROR from " + tojson(expr));
     return resultArray[0].computed;
 }
 
@@ -92,22 +90,12 @@ assert.throwsWithCode(
     () => getResultOfExpression({$add: ["$int64Val", "$dateVal", "$overflowDouble"]}),
     ErrorCodes.Overflow);
 
-// TODO SERVER-68544: classic and sbe have different behavior now, should update after fix.
-if (isSBEEnabled) {
-    // An overflow into the domain of Decimal128 results in an overflow exception.
-    assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", "$overflowDecimal"]}),
-                          ErrorCodes.Overflow);
-    assert.throwsWithCode(
-        () => getResultOfExpression({$add: ["$int64Val", "$dateVal", "$overflowDecimal"]}),
-        ErrorCodes.Overflow);
-} else {
-    // One quirk of date addition semantics is that an overflow into the domain of Decimal128 is not
-    // fatal and instead results in an invalid "NaN" Date value.
-    const nanDate = new Date("");
-    assert.eq(nanDate, getResultOfExpression({$add: ["$dateVal", "$overflowDecimal"]}));
-    assert.eq(nanDate,
-              getResultOfExpression({$add: ["$int64Val", "$dateVal", "$overflowDecimal"]}));
-}
+// An overflow into the domain of Decimal128 results in an overflow exception.
+assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", "$overflowDecimal"]}),
+                      ErrorCodes.Overflow);
+assert.throwsWithCode(
+    () => getResultOfExpression({$add: ["$int64Val", "$dateVal", "$overflowDecimal"]}),
+    ErrorCodes.Overflow);
 assert.throwsWithCode(
     () => getResultOfExpression({$add: ["$dateVal", "$overflowDouble", "$overflowDecimal"]}),
     ErrorCodes.Overflow);
@@ -119,19 +107,11 @@ assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", "$nanDoubl
 assert.throwsWithCode(() => getResultOfExpression({$add: ["$nanDouble", "$dateVal"]}),
                       ErrorCodes.Overflow);
 
-// Adding a Decimal128-typed NaN to a date value.
-// TODO SERVER-68544: classic and sbe have different behavior now, should update after fix.
-if (isSBEEnabled) {
-    // An NaN Decimal128 added to date results in an overflow exception.
-    assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", "$nanDecimal"]}),
-                          ErrorCodes.Overflow);
-    assert.throwsWithCode(() => getResultOfExpression({$add: ["$nanDecimal", "$dateVal"]}),
-                          ErrorCodes.Overflow);
-} else {
-    const nanDate = new Date("");
-    assert.eq(nanDate, getResultOfExpression({$add: ["$dateVal", "$nanDecimal"]}));
-    assert.eq(nanDate, getResultOfExpression({$add: ["$nanDecimal", "$dateVal"]}));
-}
+// An NaN Decimal128 added to date results in an overflow exception.
+assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", "$nanDecimal"]}),
+                      ErrorCodes.Overflow);
+assert.throwsWithCode(() => getResultOfExpression({$add: ["$nanDecimal", "$dateVal"]}),
+                      ErrorCodes.Overflow);
 
 // Addition with a date, a double-typed NaN, and a third value.
 assert.throwsWithCode(() => getResultOfExpression({$add: ["$dateVal", "$doubleVal", "$nanDouble"]}),
