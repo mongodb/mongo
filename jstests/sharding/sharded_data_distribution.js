@@ -117,6 +117,57 @@ const response = assert.commandFailedWithCode(
 assert.neq(-1, response.errmsg.indexOf("$shardedDataDistribution"), response.errmsg);
 assert.neq(-1, response.errmsg.indexOf("admin database"), response.errmsg);
 
+// Test $shardedDataDistribution followed by a $match stage on the 'ns'.
+assert.eq(1, adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {ns: ns1}}]).itcount());
+assert.eq(2,
+          adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {ns: {$in: [ns1, ns2]}}}])
+              .itcount());
+assert.eq(0,
+          adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {ns: 'test.IDoNotExist'}}])
+              .itcount());
+
+// Test $shardedDataDistribution followed by a $match stage on the 'ns' and something else.
+assert.eq(
+    1,
+    adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {ns: ns1, shards: {$size: 2}}}])
+        .itcount());
+assert.eq(
+    0,
+    adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {ns: ns1, shards: {$size: 50}}}])
+        .itcount());
+
+// Test $shardedDataDistribution followed by a $match stage on the 'ns' and other match stages.
+assert.eq(
+    1,
+    adminDb
+        .aggregate(
+            [{$shardedDataDistribution: {}}, {$match: {ns: ns1}}, {$match: {shards: {$size: 2}}}])
+        .itcount());
+assert.eq(
+    0,
+    adminDb
+        .aggregate(
+            [{$shardedDataDistribution: {}}, {$match: {ns: ns1}}, {$match: {shards: {$size: 50}}}])
+        .itcount());
+assert.eq(1,
+          adminDb
+              .aggregate([
+                  {$shardedDataDistribution: {}},
+                  {$match: {ns: /^test/}},
+                  {$match: {shards: {$size: 2}}},
+                  {$match: {ns: /foo$/}},
+              ])
+              .itcount());
+
+// Test $shardedDataDistribution followed by a $match stage unrelated to 'ns'.
+assert.eq(
+    0,
+    adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {shards: {$size: 50}}}]).itcount());
+
+assert.neq(
+    0,
+    adminDb.aggregate([{$shardedDataDistribution: {}}, {$match: {shards: {$size: 2}}}]).itcount());
+
 st.stop();
 
 // Test that verifies the behavior in unsharded deployments

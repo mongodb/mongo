@@ -32,6 +32,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_coll_stats.h"
 #include "mongo/db/pipeline/document_source_internal_all_collection_stats_gen.h"
+#include "mongo/db/pipeline/document_source_match.h"
 
 namespace mongo {
 
@@ -106,6 +107,13 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBsonInternal(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
+    Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
+                                                     Pipeline::SourceContainer* container) final;
+
+    void serializeToArray(
+        std::vector<Value>& array,
+        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+
 private:
     GetNextResult doGetNext() final;
 
@@ -113,5 +121,9 @@ private:
     // options.
     DocumentSourceInternalAllCollectionStatsSpec _internalAllCollectionStatsSpec;
     boost::optional<std::deque<BSONObj>> _catalogDocs;
+
+    // A $match stage can be absorbed in order to avoid unnecessarily computing the stats for
+    // collections that do not match that predicate.
+    boost::intrusive_ptr<DocumentSourceMatch> _absorbedMatch;
 };
 }  // namespace mongo

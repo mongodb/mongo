@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_internal_all_collection_stats.h"
 
-
 namespace mongo {
 
 using boost::intrusive_ptr;
@@ -55,6 +54,13 @@ DocumentSource::GetNextResult DocumentSourceInternalAllCollectionStats::doGetNex
         NamespaceString nss(obj["ns"].String());
 
         _catalogDocs->pop_front();
+
+        // Avoid computing stats for collections that do not match the absorbed filter on the 'ns'
+        // field.
+        if (_absorbedMatch && !_absorbedMatch->getMatchExpression()->matchesBSON(std::move(obj))) {
+            continue;
+        }
+
         try {
             return {Document{DocumentSourceCollStats::makeStatsForNs(
                 pExpCtx, nss, _internalAllCollectionStatsSpec.getStats().get())}};
@@ -65,6 +71,66 @@ DocumentSource::GetNextResult DocumentSourceInternalAllCollectionStats::doGetNex
     }
 
     return GetNextResult::makeEOF();
+}
+
+Pipeline::SourceContainer::iterator DocumentSourceInternalAllCollectionStats::doOptimizeAt(
+    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
+    invariant(*itr == this);
+
+    if (std::next(itr) == container->end()) {
+        return container->end();
+    }
+
+    // Attempt to internalize any predicates of a $match upon the "ns" field.
+    auto nextMatch = dynamic_cast<DocumentSourceMatch*>((*std::next(itr)).get());
+
+    if (!nextMatch) {
+        return std::next(itr);
+    }
+
+    auto splitMatch = std::move(*nextMatch).splitSourceBy({"ns"}, {});
+    invariant(splitMatch.first || splitMatch.second);
+
+    // Remove the original $match.
+    container->erase(std::next(itr));
+
+    // Absorb the part of $match that is dependant on 'ns'
+    if (splitMatch.second) {
+        if (!_absorbedMatch) {
+            _absorbedMatch = std::move(splitMatch.second);
+        } else {
+            // We have already absorbed a $match. We need to join it with splitMatch.second.
+            _absorbedMatch->joinMatchWith(std::move(splitMatch.second));
+        }
+    }
+
+    // splitMatch.first is independent of 'ns'. Put it back on the pipeline.
+    if (splitMatch.first) {
+        container->insert(std::next(itr), std::move(splitMatch.first));
+        return std::next(itr);
+    } else {
+        // There may be further optimization between this stage and the new neighbor, so we return
+        // an iterator pointing to ourself.
+        return itr;
+    }
+}
+
+void DocumentSourceInternalAllCollectionStats::serializeToArray(
+    std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
+    if (explain) {
+        BSONObjBuilder bob;
+        _internalAllCollectionStatsSpec.serialize(&bob);
+        if (_absorbedMatch) {
+            bob.append("match", _absorbedMatch->getQuery());
+        }
+        auto doc = Document{{getSourceName(), bob.obj()}};
+        array.push_back(Value(doc));
+    } else {
+        array.push_back(serialize(explain));
+        if (_absorbedMatch) {
+            _absorbedMatch->serializeToArray(array);
+        }
+    }
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceInternalAllCollectionStats::createFromBsonInternal(
