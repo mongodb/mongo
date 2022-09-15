@@ -174,9 +174,7 @@ std::vector<std::shared_ptr<ReplIndexBuildState>> ActiveIndexBuilds::_filterInde
 void ActiveIndexBuilds::awaitNoBgOpInProgForDb(OperationContext* opCtx,
                                                const DatabaseName& dbName) {
     stdx::unique_lock<Latch> lk(_mutex);
-    auto indexBuildFilter = [dbName](const auto& replState) {
-        return dbName.toStringWithTenantId() == replState.dbName;
-    };
+    auto indexBuildFilter = [dbName](const auto& replState) { return dbName == replState.dbName; };
     auto pred = [&, this]() {
         auto dbIndexBuilds = _filterIndexBuilds_inlock(lk, indexBuildFilter);
         return dbIndexBuilds.empty();

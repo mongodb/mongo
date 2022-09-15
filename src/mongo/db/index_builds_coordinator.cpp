@@ -630,7 +630,7 @@ Status IndexBuildsCoordinator::_startIndexBuildForRecovery(OperationContext* opC
         }
 
         auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
-            buildUUID, collection->uuid(), nss.dbName().toStringWithTenantId(), specs, protocol);
+            buildUUID, collection->uuid(), nss.dbName(), specs, protocol);
 
         Status status = activeIndexBuilds.registerIndexBuild(replIndexBuildState);
         if (!status.isOK()) {
@@ -714,7 +714,7 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
 
     auto protocol = IndexBuildProtocol::kTwoPhase;
     auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
-        buildUUID, collection->uuid(), dbName.toStringWithTenantId(), specs, protocol);
+        buildUUID, collection->uuid(), dbName, specs, protocol);
 
     Status status = activeIndexBuilds.registerIndexBuild(replIndexBuildState);
     if (!status.isOK()) {
@@ -778,9 +778,7 @@ void IndexBuildsCoordinator::abortDatabaseIndexBuilds(OperationContext* opCtx,
           "reason"_attr = reason);
 
     auto builds = [&]() -> std::vector<std::shared_ptr<ReplIndexBuildState>> {
-        auto indexBuildFilter = [=](const auto& replState) {
-            return dbName.toStringWithTenantId() == replState.dbName;
-        };
+        auto indexBuildFilter = [=](const auto& replState) { return dbName == replState.dbName; };
         return activeIndexBuilds.filterIndexBuilds(indexBuildFilter);
     }();
     for (auto replState : builds) {
@@ -809,7 +807,8 @@ void IndexBuildsCoordinator::abortTenantIndexBuilds(OperationContext* opCtx,
         auto indexBuildFilter = [=](const auto& replState) {
             // Abort *all* index builds at the start of shard merge.
             return protocol == MigrationProtocolEnum::kShardMerge ||
-                repl::ClonerUtils::isDatabaseForTenant(replState.dbName, tenantId);
+                repl::ClonerUtils::isDatabaseForTenant(replState.dbName.toStringWithTenantId(),
+                                                       tenantId);
         };
         return activeIndexBuilds.filterIndexBuilds(indexBuildFilter);
     }();
@@ -1244,10 +1243,7 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
         LOGV2(4656010, "Attempting to abort index build", "buildUUID"_attr = replState->buildUUID);
 
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-        // TODO SERVER-67437 Once ReplIndexBuildState holds DatabaseName, use dbName directly for
-        // lock
-        DatabaseName dbName(boost::none, replState->dbName);
-        Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+        Lock::DBLock dbLock(opCtx, replState->dbName, MODE_IX);
 
         if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
             // Unlock RSTL to avoid deadlocks with prepare conflicts and state transitions caused by
@@ -1652,9 +1648,7 @@ bool IndexBuildsCoordinator::noIndexBuildInProgress() const {
 }
 
 int IndexBuildsCoordinator::numInProgForDb(const DatabaseName& dbName) const {
-    auto indexBuildFilter = [dbName](const auto& replState) {
-        return dbName.toStringWithTenantId() == replState.dbName;
-    };
+    auto indexBuildFilter = [dbName](const auto& replState) { return dbName == replState.dbName; };
     auto dbIndexBuilds = activeIndexBuilds.filterIndexBuilds(indexBuildFilter);
     return int(dbIndexBuilds.size());
 }
@@ -1704,7 +1698,7 @@ void IndexBuildsCoordinator::assertNoIndexBuildInProgForCollection(
 void IndexBuildsCoordinator::assertNoBgOpInProgForDb(const DatabaseName& dbName) const {
     boost::optional<UUID> firstIndexBuildUUID;
     auto indexBuilds = activeIndexBuilds.filterIndexBuilds([&](const auto& replState) {
-        auto isIndexBuildForCollection = (dbName.toStringWithTenantId() == replState.dbName);
+        auto isIndexBuildForCollection = (dbName == replState.dbName);
         if (isIndexBuildForCollection && !firstIndexBuildUUID) {
             firstIndexBuildUUID = replState.buildUUID;
         };
@@ -1978,7 +1972,7 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
     }
 
     auto replIndexBuildState = std::make_shared<ReplIndexBuildState>(
-        buildUUID, collectionUUID, dbName.toStringWithTenantId(), filteredSpecs, protocol);
+        buildUUID, collectionUUID, dbName, filteredSpecs, protocol);
     replIndexBuildState->stats.numIndexesBefore = getNumIndexesTotal(opCtx, collection.get());
 
     auto status = activeIndexBuilds.registerIndexBuild(replIndexBuildState);
@@ -2247,10 +2241,7 @@ void IndexBuildsCoordinator::_cleanUpSinglePhaseAfterFailure(
     runOnAlternateContext(
         opCtx, "self-abort", [this, replState, status](OperationContext* abortCtx) {
             ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(abortCtx->lockState());
-            // TODO SERVER-67437 Once ReplIndexBuildState holds DatabaseName, use dbName directly
-            // for lock
-            DatabaseName dbName(boost::none, replState->dbName);
-            Lock::DBLock dbLock(abortCtx, dbName, MODE_IX);
+            Lock::DBLock dbLock(abortCtx, replState->dbName, MODE_IX);
 
             // Unlock RSTL to avoid deadlocks with prepare conflicts and state transitions caused by
             // taking a strong collection lock. See SERVER-42621.
@@ -2284,10 +2275,7 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterFailure(
 
             // Take RSTL (implicitly by DBLock) to observe and prevent replication state from
             // changing.
-            // TODO SSERVER-67437 Once ReplIndexBuildState holds DatabaseName, use dbName directly
-            // for lock
-            DatabaseName dbName(boost::none, replState->dbName);
-            Lock::DBLock dbLock(abortCtx, dbName, MODE_IX);
+            Lock::DBLock dbLock(abortCtx, replState->dbName, MODE_IX);
 
             // Index builds may not fail on secondaries. If a primary replicated an abortIndexBuild
             // oplog entry, then this index build would have received an IndexBuildAborted error
@@ -2564,10 +2552,7 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
         // if it waited.
         _awaitLastOpTimeBeforeInterceptorsMajorityCommitted(opCtx, replState);
 
-        // TODO SERVER-67437 Once ReplIndexBuildState holds DatabaseName, use dbName directly for
-        // lock
-        DatabaseName dbName(boost::none, replState->dbName);
-        Lock::DBLock autoDb(opCtx, dbName, MODE_IX);
+        Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
         Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_IX);
 
@@ -2586,10 +2571,7 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
 void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     {
-        // TODO SERVER-67437 Once ReplIndexBuildState holds DatabaseName, use dbName directly for
-        // lock
-        DatabaseName dbName(boost::none, replState->dbName);
-        Lock::DBLock autoDb(opCtx, dbName, MODE_IX);
+        Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
         Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_IX);
 
@@ -2630,10 +2612,7 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
     // Perform the first drain while holding an intent lock.
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     {
-        // TODO SERVER-67437 Once ReplIndexBuildState holds DatabaseName, use dbName directly for
-        // lock
-        DatabaseName dbName(boost::none, replState->dbName);
-        Lock::DBLock autoDb(opCtx, dbName, MODE_IX);
+        Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
         Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_IX);
 
         uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
@@ -2658,10 +2637,7 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesBlockingWrites(
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     // Perform the second drain while stopping writes on the collection.
     {
-        // TODO SERVER-67437 Once ReplIndexBuildState holds DatabaseName, use dbName directly for
-        // lock
-        DatabaseName dbName(boost::none, replState->dbName);
-        Lock::DBLock autoDb(opCtx, dbName, MODE_IX);
+        Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
 
         // Unlock RSTL to avoid deadlocks with prepare conflicts and state transitions. See
         // SERVER-42621.
@@ -2697,10 +2673,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
         hangIndexBuildBeforeCommit.pauseWhileSet();
     }
 
-    // TODO SERVER-67437 Once ReplIndexBuildState holds DatabaseName, use dbName directly for
-    // lock
-    DatabaseName dbName(boost::none, replState->dbName);
-    AutoGetDb autoDb(opCtx, dbName, MODE_IX);
+    AutoGetDb autoDb(opCtx, replState->dbName, MODE_IX);
 
     // Unlock RSTL to avoid deadlocks with prepare conflicts and state transitions caused by waiting
     // for a a strong collection lock. See SERVER-42621.

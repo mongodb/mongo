@@ -131,7 +131,7 @@ void IndexBuildState::appendBuildInfo(BSONObjBuilder* builder) const {
 
 ReplIndexBuildState::ReplIndexBuildState(const UUID& indexBuildUUID,
                                          const UUID& collUUID,
-                                         const std::string& dbName,
+                                         const DatabaseName& dbName,
                                          const std::vector<BSONObj>& specs,
                                          IndexBuildProtocol protocol)
     : buildUUID(indexBuildUUID),
@@ -348,7 +348,8 @@ ReplIndexBuildState::TryAbortResult ReplIndexBuildState::tryAbort(OperationConte
                                         opCtx->recoveryUnit()->getCommitTimestamp());
     auto skipCheck = _shouldSkipIndexBuildStateTransitionCheck(opCtx);
     Status abortStatus = signalAction == IndexBuildAction::kTenantMigrationAbort
-        ? tenant_migration_access_blocker::checkIfCanBuildIndex(opCtx, dbName)
+        ? tenant_migration_access_blocker::checkIfCanBuildIndex(opCtx,
+                                                                dbName.toStringWithTenantId())
         : Status(ErrorCodes::IndexBuildAborted, reason);
     invariant(!abortStatus.isOK());
     _indexBuildState.setState(IndexBuildState::kAborted, skipCheck, abortTimestamp, abortStatus);

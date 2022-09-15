@@ -239,7 +239,7 @@ class ReplIndexBuildState {
 public:
     ReplIndexBuildState(const UUID& indexBuildUUID,
                         const UUID& collUUID,
-                        const std::string& dbName,
+                        const DatabaseName& dbName,
                         const std::vector<BSONObj>& specs,
                         IndexBuildProtocol protocol);
 
@@ -388,7 +388,7 @@ public:
 
     // Identifies the database containing the index being built. Unlike collections, databases
     // cannot be renamed.
-    const std::string dbName;
+    const DatabaseName dbName;
 
     // The names of the indexes being built.
     const std::vector<std::string> indexNames;
