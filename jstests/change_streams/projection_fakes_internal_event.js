@@ -114,7 +114,10 @@ function assertChangeStreamBehaviour(projection, expectedEvents, expectedErrorCo
                                     }
                                 ])
                                 .toArray();
-        assert.eq(openCursors.length, numShards, openCursors);
+        assert.eq(openCursors.length,
+                  numShards,
+                  // Dump all the running operations for better debuggability.
+                  () => tojson(adminDB.aggregate([{$currentOp: {idleCursors: true}}]).toArray()));
     }
 
     // Close the change stream when we are done.
