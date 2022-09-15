@@ -276,9 +276,9 @@ void MigrationSourceManager::startClone() {
         AutoGetCollection autoColl(_opCtx,
                                    nss(),
                                    replEnabled ? MODE_IX : MODE_X,
-                                   AutoGetCollectionViewMode::kViewsForbidden,
-                                   _opCtx->getServiceContext()->getPreciseClockSource()->now() +
-                                       Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
+                                   AutoGetCollection::Options{}.deadline(
+                                       _opCtx->getServiceContext()->getPreciseClockSource()->now() +
+                                       Milliseconds(migrationLockAcquisitionMaxWaitMS.load())));
 
         auto* const csr = CollectionShardingRuntime::get(_opCtx, nss());
         const auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);

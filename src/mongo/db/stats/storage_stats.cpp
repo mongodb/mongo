@@ -81,7 +81,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
     try {
         autoColl.emplace(opCtx,
                          collNss,
-                         AutoGetCollectionViewMode::kViewsForbidden,
+                         auto_get_collection::ViewMode::kViewsForbidden,
                          waitForLock ? Date_t::max() : Date_t::now());
     } catch (const ExceptionFor<ErrorCodes::LockTimeout>& ex) {
         return failed(ex);

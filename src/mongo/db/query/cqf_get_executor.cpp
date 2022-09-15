@@ -353,7 +353,7 @@ static void populateAdditionalScanDefs(
     for (const auto& involvedNss : involvedCollections) {
         // TODO handle views?
         AutoGetCollectionForReadCommandMaybeLockFree ctx(
-            opCtx, involvedNss, AutoGetCollectionViewMode::kViewsForbidden);
+            opCtx, involvedNss, auto_get_collection::ViewMode::kViewsForbidden);
         const CollectionPtr& collection = ctx ? ctx.getCollection() : CollectionPtr::null;
         const bool collectionExists = collection != nullptr;
         const std::string uuidStr =

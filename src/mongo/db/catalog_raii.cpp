@@ -195,13 +195,15 @@ Database* AutoGetDb::ensureDbExists(OperationContext* opCtx) {
     return _db;
 }
 
-AutoGetCollection::AutoGetCollection(
-    OperationContext* opCtx,
-    const NamespaceStringOrUUID& nsOrUUID,
-    LockMode modeColl,
-    AutoGetCollectionViewMode viewMode,
-    Date_t deadline,
-    const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs) {
+AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
+                                     const NamespaceStringOrUUID& nsOrUUID,
+                                     LockMode modeColl,
+                                     Options options) {
+
+    auto& viewMode = options._viewMode;
+    auto& deadline = options._deadline;
+    auto& secondaryNssOrUUIDs = options._secondaryNssOrUUIDs;
+
     invariant(!opCtx->isLockFreeReadsOp());
 
     // Acquire the global/RSTL and all the database locks (may or may not be multiple
@@ -284,12 +286,12 @@ AutoGetCollection::AutoGetCollection(
         uassert(ErrorCodes::CommandNotSupportedOnView,
                 str::stream() << "Taking " << _resolvedNss.ns()
                               << " lock for timeseries is not allowed",
-                viewMode == AutoGetCollectionViewMode::kViewsPermitted || !_view->timeseries());
+                viewMode == auto_get_collection::ViewMode::kViewsPermitted || !_view->timeseries());
 
         uassert(ErrorCodes::CommandNotSupportedOnView,
                 str::stream() << "Namespace " << _resolvedNss.ns()
                               << " is a view, not a collection",
-                viewMode == AutoGetCollectionViewMode::kViewsPermitted);
+                viewMode == auto_get_collection::ViewMode::kViewsPermitted);
 
         uassert(StaleConfigInfo(_resolvedNss,
                                 *receivedShardVersion,
@@ -357,11 +359,15 @@ Collection* AutoGetCollection::getWritableCollection(OperationContext* opCtx) {
 AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
                                                      const NamespaceStringOrUUID& nsOrUUID,
                                                      RestoreFromYieldFn restoreFromYield,
-                                                     AutoGetCollectionViewMode viewMode,
-                                                     Date_t deadline)
+                                                     Options options)
     : _lockFreeReadsBlock(opCtx),
-      _globalLock(
-          opCtx, MODE_IS, deadline, Lock::InterruptBehavior::kThrow, true /* skipRSTLLock */) {
+      _globalLock(opCtx,
+                  MODE_IS,
+                  options._deadline,
+                  Lock::InterruptBehavior::kThrow,
+                  true /* skipRSTLLock */) {
+
+    auto& viewMode = options._viewMode;
 
     // Wait for a configured amount of time after acquiring locks if the failpoint is enabled
     setAutoGetCollectionWait.execute(
@@ -409,13 +415,14 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
     }
 
     _view = catalog->lookupView(opCtx, _resolvedNss);
-    uassert(
-        ErrorCodes::CommandNotSupportedOnView,
-        str::stream() << "Taking " << _resolvedNss.ns() << " lock for timeseries is not allowed",
-        !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted || !_view->timeseries());
+    uassert(ErrorCodes::CommandNotSupportedOnView,
+            str::stream() << "Taking " << _resolvedNss.ns()
+                          << " lock for timeseries is not allowed",
+            !_view || viewMode == auto_get_collection::ViewMode::kViewsPermitted ||
+                !_view->timeseries());
     uassert(ErrorCodes::CommandNotSupportedOnView,
             str::stream() << "Namespace " << _resolvedNss.ns() << " is a view, not a collection",
-            !_view || viewMode == AutoGetCollectionViewMode::kViewsPermitted);
+            !_view || viewMode == auto_get_collection::ViewMode::kViewsPermitted);
     if (_view) {
         // We are about to succeed setup as a view. No LockFree state was setup so do not mark the
         // OperationContext as LFR.
@@ -427,7 +434,7 @@ AutoGetCollectionMaybeLockFree::AutoGetCollectionMaybeLockFree(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nsOrUUID,
     LockMode modeColl,
-    AutoGetCollectionViewMode viewMode,
+    auto_get_collection::ViewMode viewMode,
     Date_t deadline) {
     if (opCtx->isLockFreeReadsOp()) {
         _autoGetLockFree.emplace(
@@ -438,10 +445,12 @@ AutoGetCollectionMaybeLockFree::AutoGetCollectionMaybeLockFree(
                             "This is a nested lock helper and there was an attempt to "
                             "yield locks, which should be impossible");
             },
-            viewMode,
-            deadline);
+            AutoGetCollectionLockFree::Options{}.viewMode(viewMode).deadline(deadline));
     } else {
-        _autoGet.emplace(opCtx, nsOrUUID, modeColl, viewMode, deadline);
+        _autoGet.emplace(opCtx,
+                         nsOrUUID,
+                         modeColl,
+                         AutoGetCollection::Options{}.viewMode(viewMode).deadline(deadline));
     }
 }
 
@@ -591,8 +600,7 @@ AutoGetChangeCollection::AutoGetChangeCollection(OperationContext* opCtx,
     _coll.emplace(opCtx,
                   NamespaceString::makeChangeCollectionNSS(tenantId),
                   mode == AccessMode::kRead ? MODE_IS : MODE_IX,
-                  AutoGetCollectionViewMode::kViewsForbidden,
-                  deadline);
+                  AutoGetCollection::Options{}.deadline(deadline));
 }
 
 const Collection* AutoGetChangeCollection::operator->() const {

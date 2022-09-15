@@ -700,7 +700,11 @@ Status _collModInternal(OperationContext* opCtx,
             return cmd.getIndex() && cmd.getIndex()->getUnique().value_or(false) && !mode;
         });
 
-    AutoGetCollection coll(opCtx, nsOrUUID, MODE_X, AutoGetCollectionViewMode::kViewsPermitted);
+    AutoGetCollection coll(
+        opCtx,
+        nsOrUUID,
+        MODE_X,
+        AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
     auto nss = coll.getNss();
     StringData dbName = nss.db();
     Lock::CollectionLock systemViewsLock(

@@ -191,8 +191,11 @@ public:
             auto apiVersion = APIParameters::get(opCtx).getAPIVersion().value_or("");
 
             // We permit views here so that user requested views can be allowed.
-            AutoGetCollection collection(
-                opCtx, coll, LockMode::MODE_IS, AutoGetCollectionViewMode::kViewsPermitted);
+            AutoGetCollection collection(opCtx,
+                                         coll,
+                                         LockMode::MODE_IS,
+                                         AutoGetCollection::Options{}.viewMode(
+                                             auto_get_collection::ViewMode::kViewsPermitted));
 
             // If it view, just do the validations for view.
             if (auto viewDef = collection.getView()) {

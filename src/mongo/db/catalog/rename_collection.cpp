@@ -958,7 +958,9 @@ Status renameCollectionForApplyOps(OperationContext* opCtx,
     // Take global IX lock explicitly to avoid upgrading from IS later
     Lock::GlobalLock globalLock(opCtx, MODE_IX);
     AutoGetCollectionForRead sourceColl(
-        opCtx, sourceNss, AutoGetCollectionViewMode::kViewsPermitted);
+        opCtx,
+        sourceNss,
+        AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
 
     if (sourceNss.isDropPendingNamespace() || !sourceColl) {
         boost::optional<NamespaceString> dropTargetNss;

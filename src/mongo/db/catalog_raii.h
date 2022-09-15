@@ -90,7 +90,36 @@ private:
     std::vector<Lock::DBLock> _secondaryDbLocks;
 };
 
-enum class AutoGetCollectionViewMode { kViewsPermitted, kViewsForbidden };
+namespace auto_get_collection {
+enum class ViewMode { kViewsPermitted, kViewsForbidden };
+
+template <typename T>
+struct OptionsBase {
+    T viewMode(ViewMode viewMode) {
+        _viewMode = viewMode;
+        return std::move(*static_cast<T*>(this));
+    }
+
+    T deadline(Date_t deadline) {
+        _deadline = std::move(deadline);
+        return std::move(*static_cast<T*>(this));
+    }
+
+    ViewMode _viewMode = ViewMode::kViewsForbidden;
+    Date_t _deadline = Date_t::max();
+};
+
+struct Options : OptionsBase<Options> {};
+struct OptionsWithSecondaryCollections : OptionsBase<OptionsWithSecondaryCollections> {
+    OptionsWithSecondaryCollections secondaryNssOrUUIDs(
+        std::vector<NamespaceStringOrUUID> secondaryNssOrUUIDs) {
+        _secondaryNssOrUUIDs = std::move(secondaryNssOrUUIDs);
+        return std::move(*this);
+    }
+
+    std::vector<NamespaceStringOrUUID> _secondaryNssOrUUIDs;
+};
+}  // namespace auto_get_collection
 
 /**
  * RAII-style class, which acquires global, database, and collection locks according to the chart
@@ -113,6 +142,8 @@ class AutoGetCollection {
     AutoGetCollection& operator=(const AutoGetCollection&) = delete;
 
 public:
+    using Options = auto_get_collection::OptionsWithSecondaryCollections;
+
     /**
      * Collection locks are also acquired for any 'secondaryNssOrUUIDs' namespaces provided.
      * Collection locks are acquired in ascending ResourceId(RESOURCE_COLLECTION, nss) order to
@@ -123,13 +154,10 @@ public:
      * 'nsOrUUID' to be duplicated in 'secondaryNssOrUUIDs', or 'secondaryNssOrUUIDs' to contain
      * duplicates.
      */
-    AutoGetCollection(
-        OperationContext* opCtx,
-        const NamespaceStringOrUUID& nsOrUUID,
-        LockMode modeColl,
-        AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
-        Date_t deadline = Date_t::max(),
-        const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs = {});
+    AutoGetCollection(OperationContext* opCtx,
+                      const NamespaceStringOrUUID& nsOrUUID,
+                      LockMode modeColl,
+                      Options options = {});
 
     explicit operator bool() const {
         return static_cast<bool>(getCollection());
@@ -233,16 +261,16 @@ public:
     using RestoreFromYieldFn =
         std::function<void(std::shared_ptr<const Collection>&, OperationContext*, UUID)>;
 
+    using Options = auto_get_collection::Options;
+
     /**
      * Used by AutoGetCollectionForReadLockFree where it provides implementation for restore after
      * yield.
      */
-    AutoGetCollectionLockFree(
-        OperationContext* opCtx,
-        const NamespaceStringOrUUID& nsOrUUID,
-        RestoreFromYieldFn restoreFromYield,
-        AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
-        Date_t deadline = Date_t::max());
+    AutoGetCollectionLockFree(OperationContext* opCtx,
+                              const NamespaceStringOrUUID& nsOrUUID,
+                              RestoreFromYieldFn restoreFromYield,
+                              Options options = {});
 
     explicit operator bool() const {
         // Use the CollectionPtr because it is updated if it yields whereas _collection is not until
@@ -324,7 +352,7 @@ public:
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nsOrUUID,
         LockMode modeColl,
-        AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
+        auto_get_collection::ViewMode viewMode = auto_get_collection::ViewMode::kViewsForbidden,
         Date_t deadline = Date_t::max());
 
 private:

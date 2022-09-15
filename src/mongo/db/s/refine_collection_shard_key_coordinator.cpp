@@ -118,8 +118,11 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                 getForwardableOpMetadata().setOn(opCtx);
 
                 {
-                    AutoGetCollection coll{
-                        opCtx, nss(), MODE_IS, AutoGetCollectionViewMode::kViewsPermitted};
+                    AutoGetCollection coll{opCtx,
+                                           nss(),
+                                           MODE_IS,
+                                           AutoGetCollection::Options{}.viewMode(
+                                               auto_get_collection::ViewMode::kViewsPermitted)};
                     checkCollectionUUIDMismatch(opCtx, nss(), *coll, _request.getCollectionUUID());
                 }
 

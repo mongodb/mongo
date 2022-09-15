@@ -145,22 +145,22 @@ Status ReshardingOplogApplicationRules::applyOperation(OperationContext* opCtx,
         try {
             WriteUnitOfWork wuow(opCtx);
 
-            AutoGetCollection autoCollOutput(opCtx,
-                                             _outputNss,
-                                             MODE_IX,
-                                             AutoGetCollectionViewMode::kViewsForbidden,
-                                             getDeadline(opCtx));
+            AutoGetCollection autoCollOutput(
+                opCtx,
+                _outputNss,
+                MODE_IX,
+                AutoGetCollection::Options{}.deadline(getDeadline(opCtx)));
             uassert(
                 ErrorCodes::NamespaceNotFound,
                 str::stream() << "Failed to apply op during resharding due to missing collection "
                               << _outputNss.ns(),
                 autoCollOutput);
 
-            AutoGetCollection autoCollStash(opCtx,
-                                            _myStashNss,
-                                            MODE_IX,
-                                            AutoGetCollectionViewMode::kViewsForbidden,
-                                            getDeadline(opCtx));
+            AutoGetCollection autoCollStash(
+                opCtx,
+                _myStashNss,
+                MODE_IX,
+                AutoGetCollection::Options{}.deadline(getDeadline(opCtx)));
             uassert(
                 ErrorCodes::NamespaceNotFound,
                 str::stream() << "Failed to apply op during resharding due to missing collection "
@@ -451,11 +451,8 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(OperationContext* opCt
     // single replica set transaction that is executed if we apply rule #4, so we therefore must run
     // 'findByIdAndNoopUpdate' as a part of the single replica set transaction.
     runWithTransaction(opCtx, _outputNss, [this, idQuery](OperationContext* opCtx) {
-        AutoGetCollection autoCollOutput(opCtx,
-                                         _outputNss,
-                                         MODE_IX,
-                                         AutoGetCollectionViewMode::kViewsForbidden,
-                                         getDeadline(opCtx));
+        AutoGetCollection autoCollOutput(
+            opCtx, _outputNss, MODE_IX, AutoGetCollection::Options{}.deadline(getDeadline(opCtx)));
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "Failed to apply op during resharding due to missing collection "
                               << _outputNss.ns(),
@@ -500,11 +497,8 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(OperationContext* opCt
                 continue;
             }
 
-            AutoGetCollection autoCollStash(opCtx,
-                                            coll,
-                                            MODE_IX,
-                                            AutoGetCollectionViewMode::kViewsForbidden,
-                                            getDeadline(opCtx));
+            AutoGetCollection autoCollStash(
+                opCtx, coll, MODE_IX, AutoGetCollection::Options{}.deadline(getDeadline(opCtx)));
             uassert(
                 ErrorCodes::NamespaceNotFound,
                 str::stream() << "Failed to apply op during resharding due to missing collection "

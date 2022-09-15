@@ -517,9 +517,8 @@ public:
                 // cursor's executor when constructing 'readLock'.
                 readLock.emplace(opCtx,
                                  cursorPin->getExecutor()->nss(),
-                                 AutoGetCollectionViewMode::kViewsForbidden,
-                                 Date_t::max(),
-                                 cursorPin->getExecutor()->getSecondaryNamespaces());
+                                 AutoGetCollection::Options{}.secondaryNssOrUUIDs(
+                                     cursorPin->getExecutor()->getSecondaryNamespaces()));
 
                 statsTracker.emplace(
                     opCtx,

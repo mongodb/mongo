@@ -147,8 +147,11 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                                 (!_doc.getExpectedSourceUUID() && !_doc.getExpectedTargetUUID()));
 
                     {
-                        AutoGetCollection coll{
-                            opCtx, fromNss, MODE_IS, AutoGetCollectionViewMode::kViewsPermitted};
+                        AutoGetCollection coll{opCtx,
+                                               fromNss,
+                                               MODE_IS,
+                                               AutoGetCollection::Options{}.viewMode(
+                                                   auto_get_collection::ViewMode::kViewsPermitted)};
                         checkCollectionUUIDMismatch(
                             opCtx, fromNss, *coll, _doc.getExpectedSourceUUID());
 

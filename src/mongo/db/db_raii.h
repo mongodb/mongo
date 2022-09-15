@@ -143,16 +143,14 @@ class EmplaceAutoGetCollectionForRead {
 public:
     EmplaceAutoGetCollectionForRead(OperationContext* opCtx,
                                     const NamespaceStringOrUUID& nsOrUUID,
-                                    AutoGetCollectionViewMode viewMode,
-                                    Date_t deadline,
-                                    const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs);
+                                    AutoGetCollection::Options options = {});
 
     void emplace(boost::optional<AutoGetCollection>& autoColl) const;
 
 private:
     OperationContext* _opCtx;
     const NamespaceStringOrUUID& _nsOrUUID;
-    AutoGetCollectionViewMode _viewMode;
+    auto_get_collection::ViewMode _viewMode;
     Date_t _deadline;
     LockMode _collectionLockMode;
     const std::vector<NamespaceStringOrUUID> _secondaryNssOrUUIDs;
@@ -177,12 +175,9 @@ private:
 class AutoGetCollectionForRead
     : public AutoGetCollectionForReadBase<AutoGetCollection, EmplaceAutoGetCollectionForRead> {
 public:
-    AutoGetCollectionForRead(
-        OperationContext* opCtx,
-        const NamespaceStringOrUUID& nsOrUUID,
-        AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
-        Date_t deadline = Date_t::max(),
-        const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs = {});
+    AutoGetCollectionForRead(OperationContext* opCtx,
+                             const NamespaceStringOrUUID& nsOrUUID,
+                             AutoGetCollection::Options = {});
 
     /**
      * Indicates whether any namespace in 'secondaryNssOrUUIDs' is a view or sharded.
@@ -205,12 +200,9 @@ private:
  */
 class AutoGetCollectionForReadLockFree {
 public:
-    AutoGetCollectionForReadLockFree(
-        OperationContext* opCtx,
-        const NamespaceStringOrUUID& nsOrUUID,
-        AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
-        Date_t deadline = Date_t::max(),
-        const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs = {});
+    AutoGetCollectionForReadLockFree(OperationContext* opCtx,
+                                     const NamespaceStringOrUUID& nsOrUUID,
+                                     AutoGetCollection::Options = {});
 
     explicit operator bool() const {
         return static_cast<bool>(getCollection());
@@ -254,7 +246,7 @@ private:
         EmplaceHelper(OperationContext* opCtx,
                       CollectionCatalogStasher& catalogStasher,
                       const NamespaceStringOrUUID& nsOrUUID,
-                      AutoGetCollectionViewMode viewMode,
+                      auto_get_collection::ViewMode viewMode,
                       Date_t deadline,
                       bool isLockFreeReadSubOperation);
 
@@ -264,7 +256,7 @@ private:
         OperationContext* _opCtx;
         CollectionCatalogStasher& _catalogStasher;
         const NamespaceStringOrUUID& _nsOrUUID;
-        AutoGetCollectionViewMode _viewMode;
+        auto_get_collection::ViewMode _viewMode;
         Date_t _deadline;
 
         // Set to true if the lock helper using this EmplaceHelper is nested under another lock-free
@@ -289,12 +281,9 @@ private:
  */
 class AutoGetCollectionForReadMaybeLockFree {
 public:
-    AutoGetCollectionForReadMaybeLockFree(
-        OperationContext* opCtx,
-        const NamespaceStringOrUUID& nsOrUUID,
-        AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
-        Date_t deadline = Date_t::max(),
-        const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs = {});
+    AutoGetCollectionForReadMaybeLockFree(OperationContext* opCtx,
+                                          const NamespaceStringOrUUID& nsOrUUID,
+                                          AutoGetCollection::Options options = {});
 
     /**
      * Passthrough functions to either _autoGet or _autoGetLockFree.
@@ -332,7 +321,7 @@ public:
     AutoGetCollectionForReadCommandBase(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nsOrUUID,
-        AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
+        auto_get_collection::ViewMode viewMode = auto_get_collection::ViewMode::kViewsForbidden,
         Date_t deadline = Date_t::max(),
         AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
         const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs = {});
@@ -380,7 +369,7 @@ public:
     AutoGetCollectionForReadCommand(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nsOrUUID,
-        AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
+        auto_get_collection::ViewMode viewMode = auto_get_collection::ViewMode::kViewsForbidden,
         Date_t deadline = Date_t::max(),
         AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
         const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs = {})
@@ -396,7 +385,7 @@ public:
     AutoGetCollectionForReadCommandLockFree(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nsOrUUID,
-        AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
+        auto_get_collection::ViewMode viewMode = auto_get_collection::ViewMode::kViewsForbidden,
         Date_t deadline = Date_t::max(),
         AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
         const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs = {});
@@ -444,7 +433,7 @@ public:
     AutoGetCollectionForReadCommandMaybeLockFree(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nsOrUUID,
-        AutoGetCollectionViewMode viewMode = AutoGetCollectionViewMode::kViewsForbidden,
+        auto_get_collection::ViewMode viewMode = auto_get_collection::ViewMode::kViewsForbidden,
         Date_t deadline = Date_t::max(),
         AutoStatsTracker::LogMode logMode = AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
         const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs = {});

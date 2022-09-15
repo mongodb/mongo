@@ -416,7 +416,11 @@ Status _createTimeseries(OperationContext* opCtx,
         return ret;
 
     ret = writeConflictRetry(opCtx, "create", ns.ns(), [&]() -> Status {
-        AutoGetCollection autoColl(opCtx, ns, MODE_IX, AutoGetCollectionViewMode::kViewsPermitted);
+        AutoGetCollection autoColl(
+            opCtx,
+            ns,
+            MODE_IX,
+            AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
         Lock::CollectionLock systemDotViewsLock(
             opCtx,
             NamespaceString(ns.db(), NamespaceString::kSystemDotViewsCollectionName),

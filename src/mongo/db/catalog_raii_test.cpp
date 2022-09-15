@@ -130,11 +130,11 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionCollLockDeadline) {
     ASSERT(client1.second->lockState()->isCollectionLockedForMode(nss, MODE_X));
     failsWithLockTimeout(
         [&] {
-            AutoGetCollection coll(client2.second.get(),
-                                   nss,
-                                   MODE_X,
-                                   AutoGetCollectionViewMode::kViewsForbidden,
-                                   Date_t::now() + timeoutMs);
+            AutoGetCollection coll(
+                client2.second.get(),
+                nss,
+                MODE_X,
+                AutoGetCollection::Options{}.deadline(Date_t::now() + timeoutMs));
         },
         timeoutMs);
 }
@@ -144,11 +144,11 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionDBLockDeadline) {
     ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
     failsWithLockTimeout(
         [&] {
-            AutoGetCollection coll(client2.second.get(),
-                                   nss,
-                                   MODE_X,
-                                   AutoGetCollectionViewMode::kViewsForbidden,
-                                   Date_t::now() + timeoutMs);
+            AutoGetCollection coll(
+                client2.second.get(),
+                nss,
+                MODE_X,
+                AutoGetCollection::Options{}.deadline(Date_t::now() + timeoutMs));
         },
         timeoutMs);
 }
@@ -158,11 +158,11 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionGlobalLockDeadline) {
     ASSERT(client1.second->lockState()->isLocked());
     failsWithLockTimeout(
         [&] {
-            AutoGetCollection coll(client2.second.get(),
-                                   nss,
-                                   MODE_X,
-                                   AutoGetCollectionViewMode::kViewsForbidden,
-                                   Date_t::now() + timeoutMs);
+            AutoGetCollection coll(
+                client2.second.get(),
+                nss,
+                MODE_X,
+                AutoGetCollection::Options{}.deadline(Date_t::now() + timeoutMs));
         },
         timeoutMs);
 }
@@ -178,8 +178,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionDeadlineNow) {
             AutoGetCollection coll(client2.second.get(),
                                    nss,
                                    MODE_X,
-                                   AutoGetCollectionViewMode::kViewsForbidden,
-                                   Date_t::now());
+                                   AutoGetCollection::Options{}.deadline(Date_t::now()));
         },
         Milliseconds(0));
 }
@@ -192,11 +191,8 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionDeadlineMin) {
 
     failsWithLockTimeout(
         [&] {
-            AutoGetCollection coll(client2.second.get(),
-                                   nss,
-                                   MODE_X,
-                                   AutoGetCollectionViewMode::kViewsForbidden,
-                                   Date_t());
+            AutoGetCollection coll(
+                client2.second.get(), nss, MODE_X, AutoGetCollection::Options{}.deadline(Date_t()));
         },
         Milliseconds(0));
 }
@@ -207,11 +203,11 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionNotCompatibleWithRSTLExclusiveLo
 
     failsWithLockTimeout(
         [&] {
-            AutoGetCollection coll(client2.second.get(),
-                                   nss,
-                                   MODE_IX,
-                                   AutoGetCollectionViewMode::kViewsForbidden,
-                                   Date_t::now() + timeoutMs);
+            AutoGetCollection coll(
+                client2.second.get(),
+                nss,
+                MODE_IX,
+                AutoGetCollection::Options{}.deadline(Date_t::now() + timeoutMs));
         },
         timeoutMs);
 }
@@ -234,9 +230,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionSecondaryNamespacesSingleDb) {
     autoGetColl.emplace(opCtx1,
                         nss,
                         MODE_IS,
-                        AutoGetCollectionViewMode::kViewsForbidden,
-                        Date_t::max(),
-                        secondaryNamespaces);
+                        AutoGetCollection::Options{}.secondaryNssOrUUIDs(secondaryNamespaces));
 
     ASSERT(opCtx1->lockState()->isRSTLLocked());
     ASSERT(opCtx1->lockState()->isReadLocked());  // Global lock check
@@ -272,9 +266,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionMultiNamespacesMODEIX) {
     autoGetColl.emplace(opCtx1,
                         nss,
                         MODE_IX,
-                        AutoGetCollectionViewMode::kViewsForbidden,
-                        Date_t::max(),
-                        secondaryNamespaces);
+                        AutoGetCollection::Options{}.secondaryNssOrUUIDs(secondaryNamespaces));
 
     ASSERT(opCtx1->lockState()->isRSTLLocked());
     ASSERT(opCtx1->lockState()->isWriteLocked());  // Global lock check
@@ -337,9 +329,9 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionMultiNssCollLockDeadline) {
             AutoGetCollection coll(client2.second.get(),
                                    nss,
                                    MODE_IS,
-                                   AutoGetCollectionViewMode::kViewsForbidden,
-                                   Date_t::now() + timeoutMs,
-                                   secondaryNamespacesConflict);
+                                   AutoGetCollection::Options{}
+                                       .deadline(Date_t::now() + timeoutMs)
+                                       .secondaryNssOrUUIDs(secondaryNamespacesConflict));
         },
         timeoutMs);
 
@@ -350,19 +342,18 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionMultiNssCollLockDeadline) {
         AutoGetCollection collNoConflict(client2.second.get(),
                                          nss,
                                          MODE_IS,
-                                         AutoGetCollectionViewMode::kViewsForbidden,
-                                         Date_t::now() + timeoutMs,
-                                         secondaryNamespacesNoConflict);
+                                         AutoGetCollection::Options{}
+                                             .deadline(Date_t::now() + timeoutMs)
+                                             .secondaryNssOrUUIDs(secondaryNamespacesNoConflict));
     }
 
     // Now without the MODE_X lock on kSecondaryNss1, should work fine.
     autoGetCollWithXLock.reset();
-    AutoGetCollection coll(client2.second.get(),
-                           nss,
-                           MODE_IS,
-                           AutoGetCollectionViewMode::kViewsForbidden,
-                           Date_t::max(),
-                           secondaryNamespacesConflict);
+    AutoGetCollection coll(
+        client2.second.get(),
+        nss,
+        MODE_IS,
+        AutoGetCollection::Options{}.secondaryNssOrUUIDs(secondaryNamespacesConflict));
 }
 
 TEST_F(CatalogRAIITestFixture, AutoGetCollectionLockFreeGlobalLockDeadline) {
@@ -374,8 +365,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionLockFreeGlobalLockDeadline) {
                 client2.second.get(),
                 nss,
                 [](std::shared_ptr<const Collection>&, OperationContext*, UUID) {},
-                AutoGetCollectionViewMode::kViewsForbidden,
-                Date_t::now() + timeoutMs);
+                AutoGetCollectionLockFree::Options{}.deadline(Date_t::now() + timeoutMs));
         },
         timeoutMs);
 }

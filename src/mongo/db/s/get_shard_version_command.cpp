@@ -92,7 +92,11 @@ public:
             "configServer",
             Grid::get(opCtx)->shardRegistry()->getConfigServerConnectionString().toString());
 
-        AutoGetCollection autoColl(opCtx, nss, MODE_IS, AutoGetCollectionViewMode::kViewsPermitted);
+        AutoGetCollection autoColl(
+            opCtx,
+            nss,
+            MODE_IS,
+            AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
         auto* const csr = CollectionShardingRuntime::get(opCtx, nss);
 
         const auto optMetadata = csr->getCurrentMetadataIfKnown();

@@ -507,9 +507,9 @@ CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx,
     AutoGetCollection autoColl(_opCtx,
                                _nss,
                                MODE_S,
-                               AutoGetCollectionViewMode::kViewsForbidden,
-                               _opCtx->getServiceContext()->getPreciseClockSource()->now() +
-                                   Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
+                               AutoGetCollection::Options{}.deadline(
+                                   _opCtx->getServiceContext()->getPreciseClockSource()->now() +
+                                   Milliseconds(migrationLockAcquisitionMaxWaitMS.load())));
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
     auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
     invariant(csr->getCurrentMetadataIfKnown());
@@ -528,9 +528,9 @@ void CollectionCriticalSection::enterCommitPhase() {
     AutoGetCollection autoColl(_opCtx,
                                _nss,
                                MODE_X,
-                               AutoGetCollectionViewMode::kViewsForbidden,
-                               _opCtx->getServiceContext()->getPreciseClockSource()->now() +
-                                   Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
+                               AutoGetCollection::Options{}.deadline(
+                                   _opCtx->getServiceContext()->getPreciseClockSource()->now() +
+                                   Milliseconds(migrationLockAcquisitionMaxWaitMS.load())));
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
     auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
     invariant(csr->getCurrentMetadataIfKnown());

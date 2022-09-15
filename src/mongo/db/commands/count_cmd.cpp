@@ -156,7 +156,7 @@ public:
         boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
         ctx.emplace(opCtx,
                     CommandHelpers::parseNsCollectionRequired(dbName, cmdObj),
-                    AutoGetCollectionViewMode::kViewsPermitted);
+                    auto_get_collection::ViewMode::kViewsPermitted);
         const auto nss = ctx->getNss();
 
         CountCommandRequest request(NamespaceStringOrUUID(NamespaceString{}));
@@ -237,7 +237,7 @@ public:
         boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
         ctx.emplace(opCtx,
                     CommandHelpers::parseNsOrUUID(dbName, cmdObj),
-                    AutoGetCollectionViewMode::kViewsPermitted);
+                    auto_get_collection::ViewMode::kViewsPermitted);
         const auto& nss = ctx->getNss();
 
         CurOpFailpointHelpers::waitWhileFailPointEnabled(

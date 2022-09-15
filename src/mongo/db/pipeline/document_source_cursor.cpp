@@ -144,11 +144,10 @@ void DocumentSourceCursor::loadBatch() {
     tassert(5565800,
             "Expected PlanExecutor to use an external lock policy",
             _exec->lockPolicy() == PlanExecutor::LockPolicy::kLockExternally);
-    autoColl.emplace(pExpCtx->opCtx,
-                     _exec->nss(),
-                     AutoGetCollectionViewMode::kViewsForbidden,
-                     Date_t::max(),
-                     _exec->getSecondaryNamespaces());
+    autoColl.emplace(
+        pExpCtx->opCtx,
+        _exec->nss(),
+        AutoGetCollection::Options{}.secondaryNssOrUUIDs(_exec->getSecondaryNamespaces()));
     uassertStatusOK(repl::ReplicationCoordinator::get(pExpCtx->opCtx)
                         ->checkCanServeReadsFor(pExpCtx->opCtx, _exec->nss(), true));
 
@@ -227,11 +226,10 @@ Value DocumentSourceCursor::serialize(boost::optional<ExplainOptions::Verbosity>
     {
         auto opCtx = pExpCtx->opCtx;
         auto secondaryNssList = _exec->getSecondaryNamespaces();
-        AutoGetCollectionForReadMaybeLockFree readLock(opCtx,
-                                                       _exec->nss(),
-                                                       AutoGetCollectionViewMode::kViewsForbidden,
-                                                       Date_t::max(),
-                                                       secondaryNssList);
+        AutoGetCollectionForReadMaybeLockFree readLock(
+            opCtx,
+            _exec->nss(),
+            AutoGetCollection::Options{}.secondaryNssOrUUIDs(secondaryNssList));
         MultipleCollectionAccessor collections(opCtx,
                                                &readLock.getCollection(),
                                                readLock.getNss(),

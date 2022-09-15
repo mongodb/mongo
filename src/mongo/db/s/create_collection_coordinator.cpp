@@ -126,7 +126,7 @@ BSONObj resolveCollationForUserQueries(OperationContext* opCtx,
                 !requestedCollator);
     }
 
-    AutoGetCollection autoColl(opCtx, nss, MODE_IS, AutoGetCollectionViewMode::kViewsForbidden);
+    AutoGetCollection autoColl(opCtx, nss, MODE_IS);
 
     const auto actualCollator = [&]() -> const CollatorInterface* {
         const auto& coll = autoColl.getCollection();
@@ -926,8 +926,11 @@ void CreateCollectionCoordinator::_createCollectionAndIndexes(
             ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
                 opCtx, originalNss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
             _doc.setDisregardCriticalSectionOnOriginalNss(true);
-            viewLock.emplace(
-                opCtx, originalNss(), LockMode::MODE_X, AutoGetCollectionViewMode::kViewsPermitted);
+            viewLock.emplace(opCtx,
+                             originalNss(),
+                             LockMode::MODE_X,
+                             AutoGetCollection::Options{}.viewMode(
+                                 auto_get_collection::ViewMode::kViewsPermitted));
             // Once the exclusive access has been reacquired, ensure that no data race occurred.
             auto catalog = CollectionCatalog::get(opCtx);
             if (catalog->lookupView(opCtx, originalNss()) ||

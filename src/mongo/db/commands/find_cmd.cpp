@@ -288,7 +288,7 @@ public:
             boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
             ctx.emplace(opCtx,
                         CommandHelpers::parseNsCollectionRequired(_dbName, _request.body),
-                        AutoGetCollectionViewMode::kViewsPermitted);
+                        auto_get_collection::ViewMode::kViewsPermitted);
             const auto nss = ctx->getNss();
 
             // Going forward this operation must never ignore interrupt signals while waiting for
@@ -473,7 +473,7 @@ public:
             boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
             ctx.emplace(opCtx,
                         CommandHelpers::parseNsOrUUID(_dbName, _request.body),
-                        AutoGetCollectionViewMode::kViewsPermitted);
+                        auto_get_collection::ViewMode::kViewsPermitted);
             const auto& nss = ctx->getNss();
 
             // Going forward this operation must never ignore interrupt signals while waiting for

@@ -235,7 +235,11 @@ bool validateShardKeyIndexExistsOrCreateIfPossible(OperationContext* opCtx,
 void validateShardKeyIsNotEncrypted(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     const ShardKeyPattern& shardKeyPattern) {
-    AutoGetCollection collection(opCtx, nss, MODE_IS, AutoGetCollectionViewMode::kViewsPermitted);
+    AutoGetCollection collection(
+        opCtx,
+        nss,
+        MODE_IS,
+        AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
     if (!collection || collection.getView()) {
         return;
     }

@@ -116,10 +116,10 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadCollLockDeadline) {
     ASSERT(client1.second->lockState()->isCollectionLockedForMode(nss, MODE_X));
     failsWithLockTimeout(
         [&] {
-            AutoGetCollectionForRead acfr(client2.second.get(),
-                                          nss,
-                                          AutoGetCollectionViewMode::kViewsForbidden,
-                                          Date_t::now() + timeoutMs);
+            AutoGetCollectionForRead acfr(
+                client2.second.get(),
+                nss,
+                AutoGetCollection::Options{}.deadline(Date_t::now() + timeoutMs));
         },
         timeoutMs);
 }
@@ -129,10 +129,10 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadDBLockDeadline) {
     ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
     failsWithLockTimeout(
         [&] {
-            AutoGetCollectionForRead coll(client2.second.get(),
-                                          nss,
-                                          AutoGetCollectionViewMode::kViewsForbidden,
-                                          Date_t::now() + timeoutMs);
+            AutoGetCollectionForRead coll(
+                client2.second.get(),
+                nss,
+                AutoGetCollection::Options{}.deadline(Date_t::now() + timeoutMs));
         },
         timeoutMs);
 }
@@ -142,10 +142,10 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadGlobalLockDeadline) {
     ASSERT(client1.second->lockState()->isLocked());
     failsWithLockTimeout(
         [&] {
-            AutoGetCollectionForRead coll(client2.second.get(),
-                                          nss,
-                                          AutoGetCollectionViewMode::kViewsForbidden,
-                                          Date_t::now() + timeoutMs);
+            AutoGetCollectionForRead coll(
+                client2.second.get(),
+                nss,
+                AutoGetCollection::Options{}.deadline(Date_t::now() + timeoutMs));
         },
         timeoutMs);
 }
@@ -158,10 +158,8 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadDeadlineNow) {
 
     failsWithLockTimeout(
         [&] {
-            AutoGetCollectionForRead coll(client2.second.get(),
-                                          nss,
-                                          AutoGetCollectionViewMode::kViewsForbidden,
-                                          Date_t::now());
+            AutoGetCollectionForRead coll(
+                client2.second.get(), nss, AutoGetCollection::Options{}.deadline(Date_t::now()));
         },
         Milliseconds(0));
 }
@@ -175,7 +173,7 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadDeadlineMin) {
     failsWithLockTimeout(
         [&] {
             AutoGetCollectionForRead coll(
-                client2.second.get(), nss, AutoGetCollectionViewMode::kViewsForbidden, Date_t());
+                client2.second.get(), nss, AutoGetCollection::Options{}.deadline(Date_t()));
         },
         Milliseconds(0));
 }

@@ -617,32 +617,32 @@ AutoGetCollectionForReadBase<AutoGetCollectionType, EmplaceAutoCollFunc>::
 EmplaceAutoGetCollectionForRead::EmplaceAutoGetCollectionForRead(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nsOrUUID,
-    AutoGetCollectionViewMode viewMode,
-    Date_t deadline,
-    const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs)
+    AutoGetCollection::Options options)
     : _opCtx(opCtx),
       _nsOrUUID(nsOrUUID),
-      _viewMode(viewMode),
-      _deadline(deadline),
-      _secondaryNssOrUUIDs(secondaryNssOrUUIDs) {
+      _viewMode(options._viewMode),
+      _deadline(options._deadline),
+      _secondaryNssOrUUIDs(std::move(options._secondaryNssOrUUIDs)) {
     // Multi-document transactions need MODE_IX locks, otherwise MODE_IS.
     _collectionLockMode = getLockModeForQuery(opCtx, nsOrUUID.nss());
 }
 
 void EmplaceAutoGetCollectionForRead::emplace(boost::optional<AutoGetCollection>& autoColl) const {
     autoColl.emplace(
-        _opCtx, _nsOrUUID, _collectionLockMode, _viewMode, _deadline, _secondaryNssOrUUIDs);
+        _opCtx,
+        _nsOrUUID,
+        _collectionLockMode,
+        AutoGetCollection::Options{}.viewMode(_viewMode).deadline(_deadline).secondaryNssOrUUIDs(
+            _secondaryNssOrUUIDs));
 }
 
-AutoGetCollectionForRead::AutoGetCollectionForRead(
-    OperationContext* opCtx,
-    const NamespaceStringOrUUID& nsOrUUID,
-    AutoGetCollectionViewMode viewMode,
-    Date_t deadline,
-    const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs)
+AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
+                                                   const NamespaceStringOrUUID& nsOrUUID,
+                                                   AutoGetCollection::Options options)
     : AutoGetCollectionForReadBase(opCtx,
-                                   EmplaceAutoGetCollectionForRead(
-                                       opCtx, nsOrUUID, viewMode, deadline, secondaryNssOrUUIDs)) {
+                                   EmplaceAutoGetCollectionForRead(opCtx, nsOrUUID, options)) {
+    auto& secondaryNssOrUUIDs = options._secondaryNssOrUUIDs;
+
     // All relevant locks are held. Check secondary collections and verify they are valid for
     // use.
     if (getCollection() && !secondaryNssOrUUIDs.empty()) {
@@ -658,7 +658,7 @@ AutoGetCollectionForReadLockFree::EmplaceHelper::EmplaceHelper(
     OperationContext* opCtx,
     CollectionCatalogStasher& catalogStasher,
     const NamespaceStringOrUUID& nsOrUUID,
-    AutoGetCollectionViewMode viewMode,
+    auto_get_collection::ViewMode viewMode,
     Date_t deadline,
     bool isLockFreeReadSubOperation)
     : _opCtx(opCtx),
@@ -718,16 +718,13 @@ void AutoGetCollectionForReadLockFree::EmplaceHelper::emplace(
                     // behavior for the primary collection.
                 });
         },
-        _viewMode,
-        _deadline);
+        AutoGetCollectionLockFree::Options{}.viewMode(_viewMode).deadline(_deadline));
 }
 
 AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nsOrUUID,
-    AutoGetCollectionViewMode viewMode,
-    Date_t deadline,
-    const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs)
+    AutoGetCollection::Options options)
     : _catalogStash(opCtx) {
     bool isLockFreeReadSubOperation = opCtx->isLockFreeReadsOp();
 
@@ -736,6 +733,10 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
     // used across lock=free reads must be consistent.
     invariant(supportsLockFreeRead(opCtx) &&
               (!opCtx->recoveryUnit()->isActive() || isLockFreeReadSubOperation));
+
+    auto& viewMode = options._viewMode;
+    auto& deadline = options._deadline;
+    auto& secondaryNssOrUUIDs = options._secondaryNssOrUUIDs;
 
     EmplaceHelper emplaceFunc(
         opCtx, _catalogStash, nsOrUUID, viewMode, deadline, isLockFreeReadSubOperation);
@@ -764,13 +765,12 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
 AutoGetCollectionForReadMaybeLockFree::AutoGetCollectionForReadMaybeLockFree(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nsOrUUID,
-    AutoGetCollectionViewMode viewMode,
-    Date_t deadline,
-    const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs) {
+    AutoGetCollection::Options options) {
+
     if (supportsLockFreeRead(opCtx)) {
-        _autoGetLockFree.emplace(opCtx, nsOrUUID, viewMode, deadline, secondaryNssOrUUIDs);
+        _autoGetLockFree.emplace(opCtx, nsOrUUID, std::move(options));
     } else {
-        _autoGet.emplace(opCtx, nsOrUUID, viewMode, deadline, secondaryNssOrUUIDs);
+        _autoGet.emplace(opCtx, nsOrUUID, std::move(options));
     }
 }
 
@@ -811,11 +811,15 @@ AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
     AutoGetCollectionForReadCommandBase(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nsOrUUID,
-        AutoGetCollectionViewMode viewMode,
+        auto_get_collection::ViewMode viewMode,
         Date_t deadline,
         AutoStatsTracker::LogMode logMode,
         const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs)
-    : _autoCollForRead(opCtx, nsOrUUID, viewMode, deadline, secondaryNssOrUUIDs),
+    : _autoCollForRead(
+          opCtx,
+          nsOrUUID,
+          AutoGetCollection::Options{}.viewMode(viewMode).deadline(deadline).secondaryNssOrUUIDs(
+              secondaryNssOrUUIDs)),
       _statsTracker(opCtx,
                     _autoCollForRead.getNss(),
                     Top::LockType::ReadLocked,
@@ -842,7 +846,7 @@ AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadType>::
 AutoGetCollectionForReadCommandLockFree::AutoGetCollectionForReadCommandLockFree(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nsOrUUID,
-    AutoGetCollectionViewMode viewMode,
+    auto_get_collection::ViewMode viewMode,
     Date_t deadline,
     AutoStatsTracker::LogMode logMode,
     const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs) {
@@ -912,7 +916,7 @@ OldClientContext::OldClientContext(OperationContext* opCtx,
 AutoGetCollectionForReadCommandMaybeLockFree::AutoGetCollectionForReadCommandMaybeLockFree(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nsOrUUID,
-    AutoGetCollectionViewMode viewMode,
+    auto_get_collection::ViewMode viewMode,
     Date_t deadline,
     AutoStatsTracker::LogMode logMode,
     const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs) {

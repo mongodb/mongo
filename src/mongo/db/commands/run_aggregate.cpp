@@ -709,7 +709,7 @@ Status runAggregate(OperationContext* opCtx,
     // must never hold open storage cursors while ignoring interrupt.
     InterruptibleLockGuard interruptibleLockAcquisition(opCtx->lockState());
 
-    auto initContext = [&](AutoGetCollectionViewMode m) -> void {
+    auto initContext = [&](auto_get_collection::ViewMode m) -> void {
         ctx.emplace(opCtx,
                     nss,
                     m,
@@ -822,7 +822,7 @@ Status runAggregate(OperationContext* opCtx,
             collatorToUseMatchesDefault = match;
 
             // Obtain collection locks on the execution namespace; that is, the oplog.
-            initContext(AutoGetCollectionViewMode::kViewsForbidden);
+            initContext(auto_get_collection::ViewMode::kViewsForbidden);
         } else if (nss.isCollectionlessAggregateNS() && pipelineInvolvedNamespaces.empty()) {
             uassert(4928901,
                     str::stream() << AggregateCommandRequest::kCollectionUUIDFieldName
@@ -844,7 +844,7 @@ Status runAggregate(OperationContext* opCtx,
                     ctx == boost::none);
         } else {
             // This is a regular aggregation. Lock the collection or view.
-            initContext(AutoGetCollectionViewMode::kViewsPermitted);
+            initContext(auto_get_collection::ViewMode::kViewsPermitted);
             auto [collator, match] =
                 PipelineD::resolveCollator(opCtx,
                                            request.getCollation().get_value_or(BSONObj()),
