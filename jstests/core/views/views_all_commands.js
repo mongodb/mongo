@@ -99,9 +99,6 @@ let viewsCommandTests = {
     _configsvrCommitMovePrimary:
         {skip: isAnInternalCommand},  // Can be removed once 6.0 is last LTS
     _configsvrCommitReshardCollection: {skip: isAnInternalCommand},
-    _configsvrConfigureAutoSplit: {
-        skip: isAnInternalCommand
-    },  // TODO SERVER-62374: remove this once 5.3 becomes last continuos release
     _configsvrConfigureCollectionBalancing: {skip: isAnInternalCommand},
     _configsvrCreateDatabase: {skip: isAnInternalCommand},
     _configsvrDropIndexCatalogEntry: {skip: isAnInternalCommand},
@@ -263,9 +260,6 @@ let viewsCommandTests = {
     compact: {command: {compact: "view", force: true}, expectFailure: true, skipSharded: true},
     compactStructuredEncryptionData: {skip: isUnrelated},
     configureFailPoint: {skip: isUnrelated},
-    configureCollectionAutoSplitter: {
-        skip: isUnrelated
-    },  // TODO SERVER-62374: remove this once 5.3 becomes last continuos release
     configureCollectionBalancing: {skip: isUnrelated},
     configureQueryAnalyzer: {
         command: {configureQueryAnalyzer: "test.view", mode: "full", sampleRate: 1},

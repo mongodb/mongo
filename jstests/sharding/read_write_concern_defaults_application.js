@@ -95,9 +95,6 @@ let testCases = {
     _configsvrCommitIndex: {skip: "internal command"},
     _configsvrCommitMovePrimary: {skip: "internal command"},  // Can be removed once 6.0 is last LTS
     _configsvrCommitReshardCollection: {skip: "internal command"},
-    _configsvrConfigureAutoSplit: {
-        skip: "internal command"
-    },  // TODO SERVER-62374: remove this once 5.3 becomes last continuos release
     _configsvrConfigureCollectionBalancing: {skip: "internal command"},
     _configsvrCreateDatabase: {skip: "internal command"},
     _configsvrDropIndexCatalogEntry: {skip: "internal command"},
@@ -294,9 +291,6 @@ let testCases = {
     },
     compact: {skip: "does not accept read or write concern"},
     compactStructuredEncryptionData: {skip: "does not accept read or write concern"},
-    configureCollectionAutoSplitter: {
-        skip: "does not accept read or write concern"
-    },  // TODO SERVER-62374: remove this once 5.3 becomes last continuos release
     configureCollectionBalancing: {skip: "does not accept read or write concern"},
     configureFailPoint: {skip: "does not accept read or write concern"},
     configureQueryAnalyzer: {skip: "does not accept read or write concern"},

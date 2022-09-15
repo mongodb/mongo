@@ -52,9 +52,6 @@ let testCases = {
     _configsvrCommitChunkMigration: {skip: "primary only"},
     _configsvrCommitChunkSplit: {skip: "primary only"},
     _configsvrCommitIndex: {skip: "primary only"},
-    _configureCollectionAutoSplitter: {
-        skip: "primary only"
-    },  // TODO SERVER-62374: remove this once 5.3 becomes last continuos release
     _configsvrConfigureCollectionBalancing: {skip: "primary only"},
     _configsvrDropIndexCatalogEntry: {skip: "primary only"},
     _configsvrMoveChunk: {skip: "primary only"},
@@ -135,9 +132,6 @@ let testCases = {
     commitTransaction: {skip: "primary only"},
     compact: {skip: "does not return user data"},
     compactStructuredEncryptionData: {skip: "does not return user data"},
-    configureCollectionAutoSplitter: {
-        skip: "does not return user data"
-    },  // TODO SERVER-62374: remove this once 5.3 becomes last continuos release
     configureCollectionBalancing: {skip: "does not return user data"},
     configureFailPoint: {skip: "does not return user data"},
     configureQueryAnalyzer: {skip: "does not return user data"},

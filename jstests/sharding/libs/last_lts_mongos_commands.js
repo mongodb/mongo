@@ -5,9 +5,8 @@
 // test defined without always existing on the servers being used.
 const commandsRemovedFromMongosSinceLastLTS = [
     "repairShardedCollectionChunksHistory",
-    "configureCollectionAutoSplitter",  // TODO SERVER-62374: remove this once 5.3 becomes
-                                        // last-continuos
-    "availableQueryOptions",            // TODO SERVER-67689: remove this once 7.0 becomes last-lts
+    // last-continuos
+    "availableQueryOptions",  // TODO SERVER-67689: remove this once 7.0 becomes last-lts
 
 ];
 // These commands were added in mongos since the last LTS version, so will not appear in the
