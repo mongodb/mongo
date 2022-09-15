@@ -69,7 +69,7 @@ platforms:
       username: ec2-user
   - name: suse12-x86-64
     driver:
-      image_id: ami-043eebeabcc4e3d35
+      image_id: ami-0b97110ce9fc52361
     transport:
       username: ec2-user
   - name: suse15-x86-64
