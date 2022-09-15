@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#pragma once
 
 #include <vector>
 
@@ -48,14 +48,17 @@
 #include "mongo/util/timer.h"
 
 namespace mongo {
-namespace {
 
-class ClusterCountCmd : public ErrmsgCommandDeprecated {
+/**
+ * Implements the find command on mongos.
+ */
+template <typename Impl>
+class ClusterCountCmdBase final : public ErrmsgCommandDeprecated {
 public:
-    ClusterCountCmd() : ErrmsgCommandDeprecated("count") {}
+    ClusterCountCmdBase() : ErrmsgCommandDeprecated(Impl::kName) {}
 
     const std::set<std::string>& apiVersions() const {
-        return kApiVersions1;
+        return Impl::getApiVersions();
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
@@ -85,6 +88,7 @@ public:
         ActionSet actions;
         actions.addAction(ActionType::find);
         out->push_back(Privilege(parseResourcePattern(dbname, cmdObj), actions));
+        Impl::addRequiredPrivileges(dbname, cmdObj, out);
     }
 
     bool errmsgRun(OperationContext* opCtx,
@@ -92,6 +96,8 @@ public:
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
+        Impl::checkCanRunHere(opCtx);
+
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
         const NamespaceString nss(parseNs({boost::none, dbname}, cmdObj));
         uassert(ErrorCodes::InvalidNamespace,
@@ -195,6 +201,8 @@ public:
                    const OpMsgRequest& request,
                    ExplainOptions::Verbosity verbosity,
                    rpc::ReplyBuilderInterface* result) const override {
+        Impl::checkCanRunHere(opCtx);
+
         const BSONObj& cmdObj = request.body;
 
         CountCommandRequest countRequest(NamespaceStringOrUUID(NamespaceString{}));
@@ -259,8 +267,8 @@ public:
                 APIParameters::get(opCtx).getAPIStrict().value_or(false));
 
             auto bodyBuilder = result->getBodyBuilder();
-            // An empty PrivilegeVector is acceptable because these privileges are only checked on
-            // getMore and explain will not open a cursor.
+            // An empty PrivilegeVector is acceptable because these privileges are only checked
+            // on getMore and explain will not open a cursor.
             return ClusterAggregate::retryOnViewError(opCtx,
                                                       aggRequestOnView,
                                                       *ex.extraInfo<ResolvedView>(),
@@ -305,8 +313,6 @@ private:
 
         return num;
     }
+};
 
-} clusterCountCmd;
-
-}  // namespace
 }  // namespace mongo

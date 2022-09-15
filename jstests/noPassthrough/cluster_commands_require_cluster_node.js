@@ -18,6 +18,7 @@ const clusterCommandsCases = [
     {cmd: {clusterAbortTransaction: 1}, expectedErr: ErrorCodes.InvalidOptions},
     {cmd: {clusterAggregate: kCollName, pipeline: [{$match: {}}], cursor: {}}},
     {cmd: {clusterCommitTransaction: 1}, expectedErr: ErrorCodes.InvalidOptions},
+    {cmd: {clusterCount: "x"}},
     {cmd: {clusterDelete: kCollName, deletes: [{q: {}, limit: 1}]}},
     {cmd: {clusterFind: kCollName}},
     {

@@ -18,6 +18,7 @@ const commandsAddedToMongodSinceLastLTS = [
     "clusterAbortTransaction",
     "clusterAggregate",
     "clusterCommitTransaction",
+    "clusterCount",
     "clusterDelete",
     "clusterFind",
     "clusterGetMore",

@@ -3076,6 +3076,21 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "clusterCount",
+          command: {clusterCount: "x"},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}, {resource: {db: firstDbName, collection: "x"}, actions: ["find"]}],
+                // clusterCount is only supported on a shardsvr mongod so this test case is expected
+                // to fail when it runs against a standalone mongod.
+                expectFail: true,
+              },
+          ]
+        },
+        {
           testname: "count",
           command: {count: "x"},
           testcases: [
