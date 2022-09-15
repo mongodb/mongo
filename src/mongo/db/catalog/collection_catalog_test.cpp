@@ -523,7 +523,7 @@ TEST_F(CollectionCatalogTest, RenameCollection) {
 TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsOldNSSIfDropped) {
     {
         Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
-        catalog.onCloseCatalog(opCtx.get());
+        catalog.onCloseCatalog();
     }
 
     catalog.deregisterCollection(opCtx.get(), colUUID, /*isDropPending=*/false);
@@ -532,7 +532,7 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsOldNSSIfDrop
 
     {
         Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
-        catalog.onOpenCatalog(opCtx.get());
+        catalog.onOpenCatalog();
     }
 
     ASSERT_EQUALS(catalog.lookupNSSByUUID(opCtx.get(), colUUID), boost::none);
@@ -547,7 +547,7 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsNewlyCreated
     // Ensure that looking up non-existing UUIDs doesn't affect later registration of those UUIDs.
     {
         Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
-        catalog.onCloseCatalog(opCtx.get());
+        catalog.onCloseCatalog();
     }
 
     ASSERT(catalog.lookupCollectionByUUID(opCtx.get(), newUUID) == nullptr);
@@ -559,7 +559,7 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsNewlyCreated
     // Ensure that collection still exists after opening the catalog again.
     {
         Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
-        catalog.onOpenCatalog(opCtx.get());
+        catalog.onOpenCatalog();
     }
 
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), newUUID), newCol);
@@ -573,7 +573,7 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsFreshestNSS)
 
     {
         Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
-        catalog.onCloseCatalog(opCtx.get());
+        catalog.onCloseCatalog();
     }
 
     catalog.deregisterCollection(opCtx.get(), colUUID, /*isDropPending=*/false);
@@ -586,7 +586,7 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsFreshestNSS)
     // Ensure that collection still exists after opening the catalog again.
     {
         Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
-        catalog.onOpenCatalog(opCtx.get());
+        catalog.onOpenCatalog();
     }
 
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), colUUID), newCol);
@@ -599,8 +599,8 @@ TEST_F(CollectionCatalogTest, CollectionCatalogEpoch) {
 
     {
         Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
-        catalog.onCloseCatalog(opCtx.get());
-        catalog.onOpenCatalog(opCtx.get());
+        catalog.onCloseCatalog();
+        catalog.onOpenCatalog();
     }
 
     auto incrementedEpoch = catalog.getEpoch();
