@@ -1317,7 +1317,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                     str::stream() << "Sort path map for '" << part.fieldPath->fullPath()
                                   << "' returned an index '" << slotPos
                                   << "' that is out of bounds",
-                    slotPos >= 0 && slotPos < sortIndexKeySlots.size());
+                    slotPos < sortIndexKeySlots.size());
 
             orderBy.push_back(sortIndexKeySlots[slotPos]);
         }
