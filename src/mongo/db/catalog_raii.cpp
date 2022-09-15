@@ -161,12 +161,12 @@ AutoGetOrCreateDb::AutoGetOrCreateDb(OperationContext* opCtx,
 
 ConcealCollectionCatalogChangesBlock::ConcealCollectionCatalogChangesBlock(OperationContext* opCtx)
     : _opCtx(opCtx) {
-    CollectionCatalog::get(_opCtx).onCloseCatalog(_opCtx);
+    CollectionCatalog::get(_opCtx).onCloseCatalog();
 }
 
 ConcealCollectionCatalogChangesBlock::~ConcealCollectionCatalogChangesBlock() {
     invariant(_opCtx);
-    CollectionCatalog::get(_opCtx).onOpenCatalog(_opCtx);
+    CollectionCatalog::get(_opCtx).onOpenCatalog();
 }
 
 ReadSourceScope::ReadSourceScope(OperationContext* opCtx,

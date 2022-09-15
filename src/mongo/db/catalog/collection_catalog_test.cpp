@@ -528,11 +528,11 @@ TEST_F(CollectionCatalogTest, RenameCollection) {
 }
 
 TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsOldNSSIfDropped) {
-    catalog.onCloseCatalog(&opCtx);
+    catalog.onCloseCatalog();
     catalog.deregisterCollection(colUUID);
     ASSERT(catalog.lookupCollectionByUUID(&opCtx, colUUID) == nullptr);
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(&opCtx, colUUID), nss);
-    catalog.onOpenCatalog(&opCtx);
+    catalog.onOpenCatalog();
     ASSERT_EQUALS(catalog.lookupNSSByUUID(&opCtx, colUUID), boost::none);
 }
 
@@ -543,7 +543,7 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsNewlyCreated
     auto newCol = newCollUnique.get();
 
     // Ensure that looking up non-existing UUIDs doesn't affect later registration of those UUIDs.
-    catalog.onCloseCatalog(&opCtx);
+    catalog.onCloseCatalog();
     ASSERT(catalog.lookupCollectionByUUID(&opCtx, newUUID) == nullptr);
     ASSERT_EQUALS(catalog.lookupNSSByUUID(&opCtx, newUUID), boost::none);
     catalog.registerCollection(newUUID, &newCollUnique);
@@ -551,7 +551,7 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsNewlyCreated
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(&opCtx, colUUID), nss);
 
     // Ensure that collection still exists after opening the catalog again.
-    catalog.onOpenCatalog(&opCtx);
+    catalog.onOpenCatalog();
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(&opCtx, newUUID), newCol);
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(&opCtx, colUUID), nss);
 }
@@ -561,7 +561,7 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsFreshestNSS)
     std::unique_ptr<Collection> newCollUnique = std::make_unique<CollectionMock>(newNss);
     auto newCol = newCollUnique.get();
 
-    catalog.onCloseCatalog(&opCtx);
+    catalog.onCloseCatalog();
     catalog.deregisterCollection(colUUID);
     ASSERT(catalog.lookupCollectionByUUID(&opCtx, colUUID) == nullptr);
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(&opCtx, colUUID), nss);
@@ -570,7 +570,7 @@ TEST_F(CollectionCatalogTest, LookupNSSByUUIDForClosedCatalogReturnsFreshestNSS)
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(&opCtx, colUUID), newNss);
 
     // Ensure that collection still exists after opening the catalog again.
-    catalog.onOpenCatalog(&opCtx);
+    catalog.onOpenCatalog();
     ASSERT_EQUALS(catalog.lookupCollectionByUUID(&opCtx, colUUID), newCol);
     ASSERT_EQUALS(*catalog.lookupNSSByUUID(&opCtx, colUUID), newNss);
 }

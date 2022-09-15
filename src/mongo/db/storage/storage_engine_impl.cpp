@@ -591,6 +591,7 @@ void StorageEngineImpl::cleanShutdown() {
         _timestampMonitor->removeListener(&_minOfCheckpointAndOldestTimestampListener);
     }
 
+    CollectionCatalog::get(getGlobalServiceContext()).onCloseCatalog();
     CollectionCatalog::get(getGlobalServiceContext()).deregisterAllCollections();
 
     _catalog.reset();

@@ -85,13 +85,12 @@ MinVisibleTimestampMap closeCatalog(OperationContext* opCtx) {
     }
 
     // Need to mark the CollectionCatalog as open if we our closeAll fails, dismissed if successful.
-    auto reopenOnFailure =
-        makeGuard([opCtx] { CollectionCatalog::get(opCtx).onOpenCatalog(opCtx); });
+    auto reopenOnFailure = makeGuard([opCtx] { CollectionCatalog::get(opCtx).onOpenCatalog(); });
     // Closing CollectionCatalog: only lookupNSSByUUID will fall back to using pre-closing state to
     // allow authorization for currently unknown UUIDs. This is needed because authorization needs
     // to work before acquiring locks, and might otherwise spuriously regard a UUID as unknown
     // while reloading the catalog.
-    CollectionCatalog::get(opCtx).onCloseCatalog(opCtx);
+    CollectionCatalog::get(opCtx).onCloseCatalog();
     LOGV2_DEBUG(20270, 1, "closeCatalog: closing collection catalog");
 
     // Close all databases.
@@ -206,7 +205,7 @@ void openCatalog(OperationContext* opCtx, const MinVisibleTimestampMap& minVisib
 
     // Opening CollectionCatalog: The collection catalog is now in sync with the storage engine
     // catalog. Clear the pre-closing state.
-    CollectionCatalog::get(opCtx).onOpenCatalog(opCtx);
+    CollectionCatalog::get(opCtx).onOpenCatalog();
     opCtx->getServiceContext()->incrementCatalogGeneration();
     LOGV2(20278, "openCatalog: finished reloading collection catalog");
 }
