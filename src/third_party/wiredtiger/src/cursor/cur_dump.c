@@ -323,6 +323,19 @@ __curdump_set_value(WT_CURSOR *cursor, ...)
         return (child->op(child));                 \
     }
 
+/*
+ * __curdump_bound --
+ *     WT_CURSOR::bound for dump cursors.
+ */
+static int
+__curdump_bound(WT_CURSOR *cursor, const char *config)
+{
+    WT_CURSOR_DUMP *cdump;
+
+    cdump = (WT_CURSOR_DUMP *)cursor;
+    return (cdump->child->bound(cdump->child, config));
+}
+
 WT_CURDUMP_PASS(next)
 WT_CURDUMP_PASS(prev)
 WT_CURDUMP_PASS(reset)
@@ -397,7 +410,7 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
       __wt_cursor_notsup,                           /* reserve */
       __wt_cursor_config_notsup,                    /* reconfigure */
       __wt_cursor_notsup,                           /* largest_key */
-      __wt_cursor_config_notsup,                    /* bound */
+      __curdump_bound,                              /* bound */
       __wt_cursor_notsup,                           /* cache */
       __wt_cursor_reopen_notsup,                    /* reopen */
       __wt_cursor_checkpoint_id,                    /* checkpoint ID */
