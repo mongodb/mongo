@@ -44,47 +44,6 @@ double estimateIntValCard(const ScalarHistogram& hist, const int v, const Estima
     return estimate(hist, tag, val, type).card;
 };
 
-struct BucketData {
-    Value _v;
-    double _equalFreq;
-    double _rangeFreq;
-    double _ndv;
-
-    BucketData(Value v, double equalFreq, double rangeFreq, double ndv)
-        : _v(v), _equalFreq(equalFreq), _rangeFreq(rangeFreq), _ndv(ndv) {}
-    BucketData(const std::string& v, double equalFreq, double rangeFreq, double ndv)
-        : BucketData(Value(v), equalFreq, rangeFreq, ndv) {}
-    BucketData(int v, double equalFreq, double rangeFreq, double ndv)
-        : BucketData(Value(v), equalFreq, rangeFreq, ndv) {}
-};
-
-ScalarHistogram createHistogram(const std::vector<BucketData>& data) {
-    sbe::value::Array array;
-    for (const auto& item : data) {
-        const auto [tag, val] = stage_builder::makeValue(item._v);
-        array.push_back(tag, val);
-    }
-
-    value::Array bounds;
-    std::vector<Bucket> buckets;
-
-    double cumulativeFreq = 0.0;
-    double cumulativeNDV = 0.0;
-
-    for (size_t i = 0; i < data.size(); i++) {
-        const auto [tag, val] = array.getAt(i);
-        bounds.push_back(tag, val);
-
-        const auto& item = data.at(i);
-        cumulativeFreq += item._equalFreq + item._rangeFreq;
-        cumulativeNDV += item._ndv + 1.0;
-        buckets.emplace_back(
-            item._equalFreq, item._rangeFreq, cumulativeFreq, item._ndv, cumulativeNDV);
-    }
-
-    return {std::move(bounds), std::move(buckets)};
-}
-
 TEST(EstimatorTest, ManualHistogram) {
     std::vector<BucketData> data{{0, 1.0, 1.0, 1.0},
                                  {10, 1.0, 10.0, 5.0},
@@ -391,29 +350,29 @@ TEST(EstimatorTest, UniformIntArrayOnlyEstimate) {
     value::TypeTags highTag = value::TypeTags::NumberInt64;
     value::Value highVal = 600;
 
-    // Test interpolation for query: [{$match: {a: {$gt: 500, $lt: 600}}}].
+    // Test interpolation for query: [{$match: {a: {$elemMatch: {$gt: 500, $lt: 600}}}}].
     double expectedCard =
         estimateCardRange(arrHist, false, false, lowTag, lowVal, false, highTag, highVal);
-    ASSERT_APPROX_EQUAL(8.63, expectedCard, 0.1);
+    ASSERT_APPROX_EQUAL(27.0, expectedCard, 0.1);  // actual 21.
 
-    // Test interpolation for query: [{$match: {a: {$elemMatch: {$gt: 500, $lt: 600}}}}].
-    // Note: this should be the same as above, since we have no scalars.
+    // Test interpolation for query: [{$match: {a: {$gt: 500, $lt: 600}}}].
+    // Note: although there are no scalars, the estimate is different than the
+    // above since we use different formulas.
     expectedCard = estimateCardRange(arrHist, true, false, lowTag, lowVal, false, highTag, highVal);
-    ASSERT_APPROX_EQUAL(8.63, expectedCard, 0.1);
+    ASSERT_APPROX_EQUAL(92.0, expectedCard, 0.1);  // actual 92.
 
     // Query at the end of the domain: more precise estimates from ArrayMin, ArrayMax histograms.
     lowVal = 10;
     highVal = 110;
 
-    // Test interpolation for query: [{$match: {a: {$gt: 10, $lt: 110}}}].
+    // Test interpolation for query: [{$match: {a: {$elemMatch: {$gt: 10, $lt: 110}}}}].
     expectedCard =
         estimateCardRange(arrHist, false, false, lowTag, lowVal, false, highTag, highVal);
-    ASSERT_APPROX_EQUAL(24.1, expectedCard, 0.1);
+    ASSERT_APPROX_EQUAL(24.1, expectedCard, 0.1);  // actual 29.
 
-    // Test interpolation for query: [{$match: {a: {$elemMatch: {$gt: 500, $lt: 600}}}}].
-    // Note: this should be the same as above, since we have no scalars.
+    // Test interpolation for query: [{$match: {a: {$gt: 10, $lt: 110}}}].
     expectedCard = estimateCardRange(arrHist, true, false, lowTag, lowVal, false, highTag, highVal);
-    ASSERT_APPROX_EQUAL(24.1, expectedCard, 0.1);
+    ASSERT_APPROX_EQUAL(27.8, expectedCard, 0.1);  // actual 31.
 }
 
 TEST(EstimatorTest, UniformIntMixedArrayEstimate) {
@@ -465,12 +424,12 @@ TEST(EstimatorTest, UniformIntMixedArrayEstimate) {
     // Test interpolation for query: [{$match: {a: {$gt: 500, $lt: 550}}}].
     double expectedCard =
         estimateCardRange(arrHist, true, false, lowTag, lowVal, false, highTag, highVal);
-    ASSERT_APPROX_EQUAL(9.8, expectedCard, 0.1);  // Actual: 94.
+    ASSERT_APPROX_EQUAL(90.9, expectedCard, 0.1);  // Actual: 94.
 
     // Test interpolation for query: [{$match: {a: {$elemMatch: {$gt: 500, $lt: 550}}}}].
     expectedCard =
         estimateCardRange(arrHist, false, false, lowTag, lowVal, false, highTag, highVal);
-    ASSERT_APPROX_EQUAL(5.6, expectedCard, 0.1);  // Actual: 8.
+    ASSERT_APPROX_EQUAL(11.0, expectedCard, 0.1);  // Actual: 8.
 }
 
 }  // namespace

@@ -32,6 +32,7 @@
 #include <cstddef>
 #include <sys/types.h>
 
+#include "mongo/db/query/ce/scalar_histogram.h"
 #include "mongo/db/query/optimizer/cascades/interfaces.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 
@@ -49,6 +50,7 @@ class CEInterface;
 namespace ce {
 
 using namespace optimizer;
+using namespace sbe;
 
 // Enable this flag to log all estimates, and let all tests pass.
 constexpr bool kCETestLogOnly = false;
@@ -127,6 +129,25 @@ private:
     opt::unordered_map<std::string, IndexDefinition> _indexes;
     mutable PrefixId _prefixId;
 };
+
+/**
+ * Test utility for helping with creation of manual histograms in the unit tests.
+ */
+struct BucketData {
+    Value _v;
+    double _equalFreq;
+    double _rangeFreq;
+    double _ndv;
+
+    BucketData(Value v, double equalFreq, double rangeFreq, double ndv)
+        : _v(v), _equalFreq(equalFreq), _rangeFreq(rangeFreq), _ndv(ndv) {}
+    BucketData(const std::string& v, double equalFreq, double rangeFreq, double ndv)
+        : BucketData(Value(v), equalFreq, rangeFreq, ndv) {}
+    BucketData(int v, double equalFreq, double rangeFreq, double ndv)
+        : BucketData(Value(v), equalFreq, rangeFreq, ndv) {}
+};
+
+ScalarHistogram createHistogram(const std::vector<BucketData>& data);
 
 }  // namespace ce
 }  // namespace mongo

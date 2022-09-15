@@ -85,6 +85,16 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
+    target="ce_array_data_test",
+    source=[
+        "ce_array_data_test.cpp",
+    ],
+    LIBDEPS=[
+        'ce_test_utils',
+    ],
+)
+
+env.CppUnitTest(
     target='stats_cache_loader_test',
     source=[
         'stats_cache_loader_test.cpp',

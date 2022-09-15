@@ -266,6 +266,29 @@ static EstimationResult estimateRange(const ScalarHistogram& histogram,
     return highEstimate - lowEstimate;
 }
 
+/**
+ * Compute an estimate for range query on array data with formula:
+ * Card(ArrayMin(a < valHigh)) - Card(ArrayMax(a < valLow))
+ */
+static EstimationResult estimateRangeQueryOnArray(const ScalarHistogram& histogramAmin,
+                                                  const ScalarHistogram& histogramAmax,
+                                                  bool lowInclusive,
+                                                  value::TypeTags tagLow,
+                                                  value::Value valLow,
+                                                  bool highInclusive,
+                                                  value::TypeTags tagHigh,
+                                                  value::Value valHigh) {
+    const EstimationType highType =
+        highInclusive ? EstimationType::kLessOrEqual : EstimationType::kLess;
+    const EstimationResult highEstimate = estimate(histogramAmin, tagHigh, valHigh, highType);
+
+    const EstimationType lowType =
+        lowInclusive ? EstimationType::kLess : EstimationType::kLessOrEqual;
+    const EstimationResult lowEstimate = estimate(histogramAmax, tagLow, valLow, lowType);
+
+    return highEstimate - lowEstimate;
+}
+
 double estimateCardRange(const ArrayHistogram& ah,
                          bool includeScalar,
                          /* Define lower bound. */
@@ -275,7 +298,8 @@ double estimateCardRange(const ArrayHistogram& ah,
                          /* Define upper bound. */
                          bool highInclusive,
                          value::TypeTags tagHigh,
-                         value::Value valHigh) {
+                         value::Value valHigh,
+                         EstimationAlgo estimationAlgo) {
     uassert(6695701,
             "Low bound must not be higher than high",
             compareValues3w(tagLow, valLow, tagHigh, valHigh) <= 0);
@@ -287,16 +311,57 @@ double estimateCardRange(const ArrayHistogram& ah,
 
     double result = 0.0;
     if (ah.isArray()) {
-        const auto arrayMinEst = estRange(ah.getArrayMin());
-        const auto arrayMaxEst = estRange(ah.getArrayMax());
-        const auto arrayUniqueEst = estRange(ah.getArrayUnique());
 
-        // TODO: should we consider diving by sqrt(ndv) or just by ndv?
-        const double arrayUniqueDensity = (arrayUniqueEst.ndv == 0.0)
-            ? 0.0
-            : (arrayUniqueEst.card / std::sqrt(arrayUniqueEst.ndv));
+        if (includeScalar) {
+            // Range query on array data.
+            const EstimationResult rangeCardOnArray = estimateRangeQueryOnArray(ah.getArrayMin(),
+                                                                                ah.getArrayMax(),
+                                                                                lowInclusive,
+                                                                                tagLow,
+                                                                                valLow,
+                                                                                highInclusive,
+                                                                                tagHigh,
+                                                                                valHigh);
+            result += rangeCardOnArray.card;
+        } else {
+            // $elemMatch query on array data.
+            const auto arrayMinEst = estRange(ah.getArrayMin());
+            const auto arrayMaxEst = estRange(ah.getArrayMax());
+            const auto arrayUniqueEst = estRange(ah.getArrayUnique());
 
-        result = std::max(std::max(arrayMinEst.card, arrayMaxEst.card), arrayUniqueDensity);
+            const double totalArrayCount = getTotals(ah.getArrayMin()).card;
+            uassert(
+                6715101, "Array histograms should contain at least one array", totalArrayCount > 0);
+            switch (estimationAlgo) {
+                case EstimationAlgo::HistogramV1: {
+                    const double arrayUniqueDensity = (arrayUniqueEst.ndv == 0.0)
+                        ? 0.0
+                        : (arrayUniqueEst.card / std::sqrt(arrayUniqueEst.ndv));
+                    result =
+                        std::max(std::max(arrayMinEst.card, arrayMaxEst.card), arrayUniqueDensity);
+                    break;
+                }
+                case EstimationAlgo::HistogramV2: {
+                    const double avgArraySize =
+                        getTotals(ah.getArrayUnique()).card / totalArrayCount;
+                    const double adjustedUniqueCard = (avgArraySize == 0.0)
+                        ? 0.0
+                        : std::min(arrayUniqueEst.card / pow(avgArraySize, 0.2), totalArrayCount);
+                    result =
+                        std::max(std::max(arrayMinEst.card, arrayMaxEst.card), adjustedUniqueCard);
+                    break;
+                }
+                case EstimationAlgo::HistogramV3: {
+                    const double adjustedUniqueCard =
+                        0.85 * std::min(arrayUniqueEst.card, totalArrayCount);
+                    result =
+                        std::max(std::max(arrayMinEst.card, arrayMaxEst.card), adjustedUniqueCard);
+                    break;
+                }
+                default:
+                    MONGO_UNREACHABLE;
+            }
+        }
     }
 
     if (includeScalar) {

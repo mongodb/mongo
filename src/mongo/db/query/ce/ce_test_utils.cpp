@@ -37,6 +37,7 @@
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::ce {
@@ -136,4 +137,30 @@ optimizer::CEType CETester::getCE(ABT& abt) const {
     return outCard;
 }
 
+ScalarHistogram createHistogram(const std::vector<BucketData>& data) {
+    sbe::value::Array array;
+    for (const auto& item : data) {
+        const auto [tag, val] = stage_builder::makeValue(item._v);
+        array.push_back(tag, val);
+    }
+
+    value::Array bounds;
+    std::vector<Bucket> buckets;
+
+    double cumulativeFreq = 0.0;
+    double cumulativeNDV = 0.0;
+
+    for (size_t i = 0; i < data.size(); i++) {
+        const auto [tag, val] = array.getAt(i);
+        bounds.push_back(tag, val);
+
+        const auto& item = data.at(i);
+        cumulativeFreq += item._equalFreq + item._rangeFreq;
+        cumulativeNDV += item._ndv + 1.0;
+        buckets.emplace_back(
+            item._equalFreq, item._rangeFreq, cumulativeFreq, item._ndv, cumulativeNDV);
+    }
+
+    return {std::move(bounds), std::move(buckets)};
+}
 }  // namespace mongo::ce

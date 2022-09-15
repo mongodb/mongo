@@ -36,6 +36,7 @@
 namespace mongo::ce {
 
 enum class EstimationType { kEqual, kLess, kLessOrEqual, kGreater, kGreaterOrEqual };
+enum class EstimationAlgo { HistogramV1, HistogramV2, HistogramV3 };
 
 const stdx::unordered_map<EstimationType, std::string> estimationTypeName = {
     {EstimationType::kEqual, "eq"},
@@ -95,6 +96,7 @@ double estimateCardRange(const ArrayHistogram& ah,
                          /* Define upper bound. */
                          bool highInclusive,
                          sbe::value::TypeTags tagHigh,
-                         sbe::value::Value valHigh);
+                         sbe::value::Value valHigh,
+                         EstimationAlgo estAlgo = EstimationAlgo::HistogramV2);
 
 }  // namespace mongo::ce
