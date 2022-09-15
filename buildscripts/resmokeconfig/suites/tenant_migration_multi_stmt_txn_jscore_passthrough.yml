@@ -282,8 +282,6 @@ executor:
             # Tests in this suite only read from primaries and only one node is electable, so causal
             # consistency is not required to read your own writes.
             causalConsistency: false
-          # TODO SERVER-67860: remove the ignoreShardMergeFeatureFlag
-          ignoreShardMergeFeatureFlag: true # overrides the featureFlagShardMerge
   hooks:
   - class: ContinuousTenantMigration
     shell_options:

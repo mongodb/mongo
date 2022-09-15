@@ -5402,6 +5402,15 @@ tasks:
       use_large_distro: "true"
       fallback_num_sub_suites: 10
 
+# TODO(SERVER-57896): Add "serverless" tag to shard merge passthrough when no longer feature flagged
+- <<: *gen_task_template
+  name: shard_merge_jscore_passthrough_gen
+  tags: ["shard_merge"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      use_large_distro: "true"
+
 - <<: *gen_task_template
   name: tenant_migration_jscore_passthrough_gen
   tags: ["serverless"]

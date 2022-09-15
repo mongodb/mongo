@@ -1486,6 +1486,7 @@ buildvariants:
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: .shard_split
+  - name: .shard_merge
 # Disabling as the following tests are not aware of feature flags.
 #  - name: server_discovery_and_monitoring_json_test_TG
 #    distros:
@@ -2279,6 +2280,7 @@ buildvariants:
   - name: .watchdog
   - name: .stitch
   - name: .shard_split
+  - name: .shard_merge
 # Disabling the following tests as they are not aware of feature flags.
 #  - name: .benchmarks - building benchmarks is also disabled
 #  - name: unittest_shell_hang_analyzer_gen
@@ -2440,6 +2442,7 @@ buildvariants:
   - name: .updatefuzzer
   - name: watchdog_wiredtiger
   - name: .shard_split
+  - name: .shard_merge
 # Disabling the following tests as they are not aware of feature flags.
 #  - name: .benchmarks - building benchmarks is also disabled
 #  - name: server_discovery_and_monitoring_json_test_TG

@@ -13,22 +13,9 @@ selector:
   roots:
   - jstests/core/**/*.js
   exclude_files:
+  - jstests/core/txns/**/*.js
   # Skip any tests that run with auth explicitly.
   - jstests/core/*[aA]uth*.js
-  # This test uses `benchRun` which spawns connections which do not inherit the causal session.
-  - jstests/core/benchrun_pipeline_updates.js
-
-  #
-  # Denylists from session_jscore_passthrough.yml
-  #
-
-  # These test run commands using legacy queries, which are not supported on sessions.
-  - jstests/core/comment_field.js
-  - jstests/core/exhaust.js
-
-  # Unacknowledged writes prohibited in an explicit session.
-  - jstests/core/crud_api.js
-  - jstests/core/batch_write_command_w0.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
@@ -48,25 +35,12 @@ selector:
   - requires_emptycapped
   # Multi-updates that conflict with tenant migration are not retried by inject_tenant_prefix.js.
   - requires_multi_updates
-  ##
-  # The next tag corresponds to the special error thrown by the set_read_preference_secondary.js
-  # override when it refuses to replace the readPreference of a particular command. Above each tag
-  # are the message(s) that cause the tag to be warranted.
-  ##
-  # "Cowardly refusing to override read preference of command: ..."
-  # "Cowardly refusing to run test with overridden read preference when it reads from a
-  #  non-replicated collection: ..."
-  - assumes_read_preference_unchanged
-  - does_not_support_causal_consistency
-  - requires_collstats
   # Full validation can cause ongoing queries to fail. This can affect the tenant migration
   # process.
   - uses_full_validation
   - tenant_migration_incompatible
-  - uses_transactions
-  # Parallel shell is not causally consistent because it uses a different session.
-  - uses_parallel_shell
   - requires_timeseries # Tenant migration not supported
+  - requires_fastcount
 
 executor:
   archive:
@@ -80,19 +54,24 @@ executor:
       eval: >-
         testingReplication = true;
         load('jstests/libs/override_methods/inject_tenant_prefix.js');
-        load('jstests/libs/override_methods/enable_causal_consistency.js');
-        load('jstests/libs/override_methods/enable_sessions.js');
         jsTest.authenticate(db.getMongo());
       global_vars:
         TestData: &TestData
+          # TODO SERVER-69034 : replace tenantId with tenantIds.
           tenantId: "tenantMigrationTenantId"
           auth: true
           authMechanism: SCRAM-SHA-256
           keyFile: *keyFile
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true
+          # TODO SERVER-68643 No longer needed when we only use shard merge protocol.
+          useLocalDBForDBCheck: true
+          # Shard Merge does not support fastcount. When we call CheckTenantMigrationDBHash after
+          # each migration we would potentially fail when enforcing using the fast count during that
+          # process.
+          skipEnforceFastCountOnValidate: true
   hooks:
-  - class: ContinuousTenantMigration
+  - class: ContinuousShardMerge
     shell_options:
       global_vars:
         TestData:
@@ -116,7 +95,7 @@ executor:
   - class: CleanEveryN
     n: 20
   fixture:
-    class: TenantMigrationFixture
+    class: ShardMergeFixture
     common_mongod_options:
       set_parameters:
         enableTestCommands: 1
@@ -127,13 +106,7 @@ executor:
             mode: alwaysOn
             data:
               blockTimeMS: 250
-        # Disable some cluster time validation optimizations to get more consistent coverage of
-        # gossiping cluster times across tenant migrations.
-        failpoint.alwaysValidateClientsClusterTime:
-            mode: alwaysOn
-        failpoint.externalClientsNeverAuthorizedToAdvanceLogicalClock:
-            mode: alwaysOn
-        # To avoid routing commands in each test incorrectly, the ContinuousTenantMigration hook
+        # To avoid routing commands in each test incorrectly, the ContinuousShardMerge hook
         # only runs donorForgetMigration against the donor of each migration when it is safe to do
         # so. Therefore, the garbage collection delay doesn't need to be large.
         tenantMigrationGarbageCollectionDelayMS: 1
@@ -141,11 +114,13 @@ executor:
         # Tenant migrations is not currently compatible with implicitly replicated retryable
         # findAndModify images.
         storeFindAndModifyImagesInSideCollection: false
+        minSnapshotHistoryWindowInSeconds: 30
       tlsMode: allowTLS
       tlsCAFile: jstests/libs/ca.pem
       tlsAllowInvalidHostnames: ''
       auth: ''
       keyFile: *keyFile
+      syncdelay: 1
     per_mongod_options:
       # Each entry is for a different replica set's extra mongod options.
       - tlsCertificateKeyFile: jstests/libs/rs0.pem

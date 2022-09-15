@@ -62,8 +62,6 @@ executor:
           keyFile: *keyFile
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true
-          # TODO SERVER-66147: remove the ignoreShardMergeFeatureFlag
-          ignoreShardMergeFeatureFlag: true # overrides the featureFlagShardMerge
   hooks:
   - class: ContinuousTenantMigration
     shell_options:

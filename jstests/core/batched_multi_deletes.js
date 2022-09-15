@@ -26,7 +26,7 @@ function populateAndMassDelete(queryPredicate) {
     coll.drop();
     assert.commandWorked(coll.insertMany([...Array(collCount).keys()].map(x => ({_id: x, a: x}))));
 
-    assert.eq(collCount, coll.count());
+    assert.eq(collCount, coll.countDocuments({}));
 
     // Verify the delete will involve the BATCHED_DELETE stage.
     const expl = testDB.runCommand({
@@ -46,7 +46,7 @@ function populateAndMassDelete(queryPredicate) {
     }
 
     // Execute and verify the deletion.
-    assert.eq(collCount, coll.count());
+    assert.eq(collCount, coll.countDocuments({}));
     assert.commandWorked(coll.deleteMany(queryPredicate));
     assert.eq(null, coll.findOne());
 }

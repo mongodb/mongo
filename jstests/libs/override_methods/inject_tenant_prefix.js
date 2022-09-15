@@ -18,6 +18,10 @@ const originalCloseMethod = Mongo.prototype.close;
 // multiple internal routing connections for the lifetime of the test execution.
 const initialConn = db.getMongo();
 
+const testTenantMigrationDB = "testTenantMigration";
+// For shard merge we need to use the local DB that is not blocked by tenant access blockers.
+const localDB = "local";
+
 /**
  * Asserts that the provided connection is an internal routing connection, not the top-level proxy
  * connection. The proxy connection also has an internal routing connection, so it is excluded from
@@ -166,6 +170,20 @@ function removeTenantIdFromString(string) {
     }
 
     return string.replace(new RegExp(`${TestData.tenantId}_`, 'g'), "");
+}
+
+/**
+ * @returns Whether we are currently running a shard merge passthrough.
+ */
+function isShardMergePassthrough(conn) {
+    const flagDoc = assert.commandWorked(
+        originalRunCommand.apply(conn, ["admin", {getParameter: 1, featureFlagShardMerge: 1}, 0]));
+    const fcvDoc = assert.commandWorked(assert.commandWorked(originalRunCommand.apply(
+        conn, ["admin", {getParameter: 1, featureCompatibilityVersion: 1}, 0])));
+    return flagDoc.hasOwnProperty("featureFlagShardMerge") && flagDoc.featureFlagShardMerge.value &&
+        MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version,
+                                       flagDoc.featureFlagShardMerge.version) >= 0 &&
+        TestData.useLocalDBForDBCheck;
 }
 
 /**
@@ -436,8 +454,15 @@ function convertServerConnectionStringToURI(input) {
  */
 function getOperationStateDocument(conn) {
     const collection = isShardSplitPassthrough() ? "shardSplitDonors" : "tenantMigrationDonors";
-    const filter =
-        isShardSplitPassthrough() ? {tenantIds: TestData.tenantIds} : {tenantId: TestData.tenantId};
+    let filter = {tenantId: TestData.tenantId};
+    if (isShardSplitPassthrough()) {
+        filter = {tenantIds: TestData.tenantIds};
+    } else if (isShardMergePassthrough(conn)) {
+        // TODO (SERVER-68643) No longer require to check for shard merge since shard merge will be
+        // the only protocol left.
+        filter = {};
+    }
+
     const findRes = assert.commandWorked(
         originalRunCommand.apply(conn, ["config", {find: collection, filter}, 0]));
     const docs = findRes.cursor.firstBatch;
@@ -455,15 +480,16 @@ function getOperationStateDocument(conn) {
 
 /**
  * Marks the outgoing tenant migration or shard split operation as having caused the shell to
- * reroute commands by inserting a document for it into the testTenantMigration.rerouted collection.
+ * reroute commands by inserting a document for it into the testTenantMigration.rerouted collection
+ * or local.rerouted collection for the shard merge protocol.
  */
 function recordRerouteDueToTenantMigration(conn, migrationStateDoc) {
     assertRoutingConnection(conn);
-
+    const dbToCheck = TestData.useLocalDBForDBCheck ? localDB : testTenantMigrationDB;
     while (true) {
         try {
             const res = originalRunCommand.apply(conn, [
-                "testTenantMigration",
+                dbToCheck,
                 {
                     insert: "rerouted",
                     documents: [{_id: migrationStateDoc._id}],
@@ -639,9 +665,10 @@ function runCommandRetryOnTenantMigrationErrors(
                 // After getting a TenantMigrationCommitted error, wait for the python test fixture
                 // to do a dbhash check on the donor and recipient primaries before we retry the
                 // command on the recipient.
+                const dbToCheck = TestData.useLocalDBForDBCheck ? localDB : testTenantMigrationDB;
                 assert.soon(() => {
                     let findRes = assert.commandWorked(originalRunCommand.apply(donorConnection, [
-                        "testTenantMigration",
+                        dbToCheck,
                         {
                             find: "dbhashCheck",
                             filter: {_id: migrationStateDoc._id},
