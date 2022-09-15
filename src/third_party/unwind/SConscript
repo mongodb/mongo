@@ -100,6 +100,8 @@ env.Append(
 
 if env.ToolchainIs('clang'):
     env.Append(CCFLAGS=['-Wno-header-guard'])
+    if env['TARGET_ARCH'] == 'aarch64':
+        env.Append(CCFLAGS=['-Wno-absolute-value'])
 
 env.Append(
     CPPPATH=[
