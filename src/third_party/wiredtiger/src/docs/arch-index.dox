@@ -145,6 +145,7 @@ of the documentation.
     - @ref arch-timestamp
     - @ref arch-snapshot
     - @ref arch-rts
+    - @ref arch-fast-truncate
 
 - @subpage arch-toc-data-org
     - @ref arch-schema
@@ -212,6 +213,10 @@ the transaction started.
 @subpage arch-rts
 - Rollback the database to a stable state by removing data that is beyond the
 stable timestamp.
+
+@subpage arch-fast-truncate
+- Delete whole pages at once without reading them, and handling of
+such pages.
 
 */
 

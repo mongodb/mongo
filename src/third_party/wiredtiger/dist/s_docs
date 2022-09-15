@@ -90,8 +90,23 @@ spellchk()
 	type aspell > /dev/null 2>&1 || return
 
 	(cd ../src/docs &&
-	# Separate quoted newlines "line\nline" so "nline" is not reported.
-	sed -e 's/\("[^"]*\)\\n\([^"]*"\)/\1 \2/' -e 's/[@\\]sic  *\([^ ]*\) //g' *.dox | \
+	# - Separate quoted newlines "line\nline" so "nline" is not reported.
+	# - Specifically ignore anything tagged @sic.
+	# - Specifically hide certain valid uses of the strings "curprev",
+	#   "curnext", "dsk", and "vrfy" so we can refer to the source files
+	#   and their function names in the architecture docs without making
+	#   "vrfy" and "dsk" legal spelling words.
+	sed \
+		-e 's/\("[^"]*\)\\n\([^"]*"\)/\1 \2/' \
+		-e 's/[@\\]sic  *\([^ ]*\) //g' \
+		-e 's/bt_curnext\.c/filename.c/g' \
+		-e 's/bt_curprev\.c/filename.c/g' \
+		-e 's/bt_vrfy\.c/filename.c/g' \
+		-e 's/bt_vrfy_dsk\.c/filename.c/g' \
+		-e 's/__verify_dsk_/__verify_disk_/g' \
+		-e 's/__wt_dsk_/__wt_disk_/g' \
+		-e 's/__wt_verify_dsk/__wt_verify_disk/g' \
+	   *.dox | tee yogbert | \
 	aspell --encoding=iso-8859-1 --lang=en_US --personal=./spell.ok list) |
 	sort -u > $t
 	test -s $t && {

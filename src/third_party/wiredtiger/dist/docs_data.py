@@ -59,6 +59,15 @@ arch_doc_pages = [
         ['WT_EVICT_ENTRY', 'WT_EVICT_QUEUE'],
         ['src/include/cache.h',
          'src/evict/']),
+    ArchDocPage('arch-fast-truncate',
+        ['WT_PAGE_DELETED'],
+        # It would be nice to have this link to the list of places at the bottom of the page
+        # (since there are a _lot_ of places in the tree that truncate support appears) but
+        # s_docs only accepts source files here. The choices seem to be listing them all
+        # (which loses the fact that bt_delete.c is the main place because it is required to
+        # be sorted into the middle of the list) or just listing bt_delete.c, and the latter
+        # seems like the better choice given the constraints.
+        ['src/btree/bt_delete.c']),
     ArchDocPage('arch-fs-os',
         ['WT_FILE_HANDLE', 'WT_FILE_SYSTEM'],
         ['src/include/os.h', 'src/include/os_fhandle_inline.h',
