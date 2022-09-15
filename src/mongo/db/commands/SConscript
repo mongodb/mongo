@@ -354,6 +354,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/multi_index_block',
         '$BUILD_DIR/mongo/db/change_stream_change_collection_manager',
         '$BUILD_DIR/mongo/db/change_stream_pre_images_collection_manager',
+        '$BUILD_DIR/mongo/db/change_stream_serverless_helpers',
         '$BUILD_DIR/mongo/db/command_can_run_here',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',

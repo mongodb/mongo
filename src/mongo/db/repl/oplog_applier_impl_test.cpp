@@ -481,10 +481,10 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToRecordChangeStreamPreImages) {
         WriteUnitOfWork wuow{_opCtx.get()};
         ChangeStreamPreImageId preImageId{*(options.uuid), op.getOpTime().getTimestamp(), 0};
         BSONObj preImageDocumentKey = BSON("_id" << preImageId.toBSON());
-        auto preImageLoadResult =
-            getStorageInterface()->deleteById(_opCtx.get(),
-                                              NamespaceString::kChangeStreamPreImagesNamespace,
-                                              preImageDocumentKey.firstElement());
+        auto preImageLoadResult = getStorageInterface()->deleteById(
+            _opCtx.get(),
+            NamespaceString::makePreImageCollectionNSS(boost::none),
+            preImageDocumentKey.firstElement());
         repl::getNextOpTime(_opCtx.get());
         wuow.commit();
 

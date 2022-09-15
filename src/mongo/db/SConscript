@@ -511,7 +511,9 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/change_stream_change_collection_manager',
         '$BUILD_DIR/mongo/db/change_stream_pre_images_collection_manager',
+        '$BUILD_DIR/mongo/db/change_stream_serverless_helpers',
         '$BUILD_DIR/mongo/db/change_stream_state',
+        '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/repl/primary_only_service',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
@@ -524,6 +526,21 @@ env.Library(
 )
 
 env.Library(
+    target='change_stream_serverless_helpers',
+    source=[
+        'change_stream_serverless_helpers.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/collection',
+        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
+        '$BUILD_DIR/mongo/db/query/query_knobs',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/server_options',
+        '$BUILD_DIR/mongo/idl/feature_flag',
+    ],
+)
+
+env.Library(
     target='change_stream_change_collection_manager',
     source=[
         'change_stream_change_collection_manager.cpp',
@@ -532,9 +549,10 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
         '$BUILD_DIR/mongo/db/catalog/collection_crud',
-        '$BUILD_DIR/mongo/db/change_stream_pre_images_collection_manager',
+        '$BUILD_DIR/mongo/db/change_stream_serverless_helpers',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/dbhelpers',
+        '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/db/service_context',
     ],
 )
@@ -546,6 +564,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/change_stream_change_collection_manager',
+        '$BUILD_DIR/mongo/db/change_stream_serverless_helpers',
         '$BUILD_DIR/mongo/db/change_streams_cluster_parameter',
         '$BUILD_DIR/mongo/db/query_exec',
         '$BUILD_DIR/mongo/util/periodic_runner',
@@ -2515,6 +2534,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
             '$BUILD_DIR/mongo/db/change_collection_expired_change_remover',
             '$BUILD_DIR/mongo/db/change_stream_change_collection_manager',
+            '$BUILD_DIR/mongo/db/change_stream_serverless_helpers',
             '$BUILD_DIR/mongo/db/change_streams_cluster_parameter',
             '$BUILD_DIR/mongo/db/commands/create_command',
             '$BUILD_DIR/mongo/db/mongohasher',

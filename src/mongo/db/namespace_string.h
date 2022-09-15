@@ -82,7 +82,10 @@ public:
     // Name for the system.js collection
     static constexpr StringData kSystemDotJavascriptCollectionName = "system.js"_sd;
 
-    // Name for the change stream change collection.
+    // Name of the pre-images collection.
+    static constexpr StringData kPreImagesCollectionName = "system.preimages"_sd;
+
+    // Name of the change stream change collection.
     static constexpr StringData kChangeCollectionName = "system.change_collection"_sd;
 
     // Names of privilege document collections
@@ -170,9 +173,6 @@ public:
 
     // Namespace for storing the last replica set election vote.
     static const NamespaceString kLastVoteNamespace;
-
-    // Namespace for change stream pre-images collection.
-    static const NamespaceString kChangeStreamPreImagesNamespace;
 
     // Namespace for index build entries.
     static const NamespaceString kIndexBuildEntryNamespace;

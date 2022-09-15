@@ -225,7 +225,7 @@ protected:
         reset(opCtx, NamespaceString::kRsOplogNamespace);
         reset(opCtx, NamespaceString::kSessionTransactionsTableNamespace);
         reset(opCtx, NamespaceString::kConfigImagesNamespace);
-        reset(opCtx, NamespaceString::kChangeStreamPreImagesNamespace);
+        reset(opCtx, NamespaceString::makePreImageCollectionNSS(boost::none));
     }
 
     // Assert that the oplog has the expected number of entries, and return them
@@ -288,7 +288,7 @@ protected:
     bool didWriteDeletedDocToPreImagesCollection(OperationContext* opCtx,
                                                  const ChangeStreamPreImageId preImageId) {
         AutoGetCollection preImagesCollection(
-            opCtx, NamespaceString::kChangeStreamPreImagesNamespace, MODE_IS);
+            opCtx, NamespaceString::makePreImageCollectionNSS(boost::none), LockMode::MODE_IS);
         const auto preImage = Helpers::findOneForTesting(
             opCtx, preImagesCollection.getCollection(), BSON("_id" << preImageId.toBSON()), false);
         return !preImage.isEmpty();
@@ -323,7 +323,7 @@ protected:
                                                  const ChangeStreamPreImageId& preImageId,
                                                  BSONObj* container) {
         AutoGetCollection preImagesCollection(
-            opCtx, NamespaceString::kChangeStreamPreImagesNamespace, MODE_IS);
+            opCtx, NamespaceString::makePreImageCollectionNSS(boost::none), LockMode::MODE_IS);
         *container = Helpers::findOneForTesting(opCtx,
                                                 preImagesCollection.getCollection(),
                                                 BSON("_id" << preImageId.toBSON()))

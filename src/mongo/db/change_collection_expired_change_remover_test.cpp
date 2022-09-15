@@ -35,6 +35,7 @@
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
+#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor.h"
@@ -54,7 +55,8 @@ namespace mongo {
 class ChangeCollectionExpiredChangeRemoverTest : public CatalogTestFixture {
 protected:
     ChangeCollectionExpiredChangeRemoverTest()
-        : CatalogTestFixture(Options{}.useMockClock(true)), _tenantId(OID::gen()) {
+        : CatalogTestFixture(Options{}.useMockClock(true)),
+          _tenantId(change_stream_serverless_helpers::getTenantIdForTesting()) {
         ChangeStreamChangeCollectionManager::create(getServiceContext());
     }
 
@@ -67,7 +69,7 @@ protected:
     }
 
     void insertDocumentToChangeCollection(OperationContext* opCtx,
-                                          boost::optional<TenantId> tenantId,
+                                          const TenantId& tenantId,
                                           const BSONObj& obj) {
         const auto wallTime = now();
         Timestamp timestamp{wallTime};
@@ -78,6 +80,7 @@ protected:
         oplogEntry.setNss(NamespaceString::makeChangeCollectionNSS(tenantId));
         oplogEntry.setObject(obj);
         oplogEntry.setWallClockTime(wallTime);
+
         auto oplogEntryBson = oplogEntry.toBSON();
 
         RecordData recordData{oplogEntryBson.objdata(), oplogEntryBson.objsize()};
@@ -112,8 +115,7 @@ protected:
         return entries;
     }
 
-    void dropAndRecreateChangeCollection(OperationContext* opCtx,
-                                         boost::optional<TenantId> tenantId) {
+    void dropAndRecreateChangeCollection(OperationContext* opCtx, const TenantId& tenantId) {
         auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx);
         changeCollectionManager.dropChangeCollection(opCtx, tenantId);
         changeCollectionManager.createChangeCollection(opCtx, tenantId);
@@ -136,11 +138,13 @@ protected:
             opCtx, &*changeCollection, maxRecordIdBound);
     }
 
-    const boost::optional<TenantId> _tenantId;
+    const TenantId _tenantId;
+    boost::optional<ChangeStreamChangeCollectionManager> _changeCollectionManager;
+
     RAIIServerParameterControllerForTest featureFlagController{"featureFlagServerlessChangeStreams",
                                                                true};
-
-    boost::optional<ChangeStreamChangeCollectionManager> _changeCollectionManager;
+    RAIIServerParameterControllerForTest queryKnobController{
+        "internalChangeStreamUseTenantIdForTesting", true};
 };
 
 // Tests that the last expired focument retrieved is the expected one.

@@ -58,11 +58,11 @@ server_parameters:
     cpp_varname: gChangeStreamsClusterParameter
     validator:
       callback: validateChangeStreamsClusterParameter
-  changeCollectionRemoverJobSleepSeconds:
+  changeCollectionExpiredDocumentsRemoverJobSleepSeconds:
     description: "Specifies the number of seconds for which the periodic change collection remover job will sleep between each cycle."
     set_at: [ startup ]
     cpp_vartype: AtomicWord<int>
-    cpp_varname: "gChangeCollectionRemoverJobSleepSeconds"
+    cpp_varname: "gChangeCollectionExpiredDocumentsRemoverJobSleepSeconds"
     validator:
       gte: 1
     default: 10

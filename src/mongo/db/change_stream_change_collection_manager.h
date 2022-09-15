@@ -113,34 +113,19 @@ public:
     static ChangeStreamChangeCollectionManager& get(OperationContext* opCtx);
 
     /**
-     * Returns true if the server is configured such that change collections can be used to record
-     * oplog entries; ie, we are running in a Serverless context. Returns false otherwise.
-     */
-    static bool isChangeCollectionsModeActive();
-
-    /**
-     * Returns true if the change collection is present for the specified tenant, false otherwise.
-     */
-    bool hasChangeCollection(OperationContext* opCtx, boost::optional<TenantId> tenantId) const;
-
-    /**
      * Returns true if the change stream is enabled for the provided tenant, false otherwise.
      */
     bool isChangeStreamEnabled(OperationContext* opCtx, boost::optional<TenantId> tenantId) const;
 
     /**
      * Creates a change collection for the specified tenant, if it doesn't exist.
-     *
-     * TODO: SERVER-65950 make tenantId field mandatory.
      */
-    void createChangeCollection(OperationContext* opCtx, boost::optional<TenantId> tenantId);
+    void createChangeCollection(OperationContext* opCtx, const TenantId& tenantId);
 
     /**
      * Deletes the change collection for the specified tenant, if it already exist.
-     *
-     * TODO: SERVER-65950 make tenantId field mandatory.
      */
-    void dropChangeCollection(OperationContext* opCtx, boost::optional<TenantId> tenantId);
+    void dropChangeCollection(OperationContext* opCtx, const TenantId& tenantId);
 
     /**
      * Inserts documents to change collections. The parameter 'oplogRecords' is a vector of oplog
@@ -152,8 +137,6 @@ public:
      *
      * Failure in insertion to any change collection will result in a fatal exception and will bring
      * down the node.
-     *
-     * TODO: SERVER-65950 make tenantId field mandatory.
      */
     void insertDocumentsToChangeCollection(OperationContext* opCtx,
                                            const std::vector<Record>& oplogRecords,

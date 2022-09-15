@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/change_stream_change_collection_manager.h"
+#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/commands/server_status.h"
 
 namespace mongo {
@@ -49,7 +50,7 @@ public:
                        const BSONElement& configElement,
                        BSONObjBuilder* result) const override {
         // Append the section only when running in serverless.
-        if (!ChangeStreamChangeCollectionManager::isChangeCollectionsModeActive()) {
+        if (!change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
             return;
         }
 

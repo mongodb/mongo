@@ -45,6 +45,7 @@
 #include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
+#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/rwc_defaults_commands_gen.h"
@@ -541,7 +542,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
     });
 
     // Create the pre-images collection if it doesn't exist yet in the non-serverless environment.
-    if (!ChangeStreamChangeCollectionManager::isChangeCollectionsModeActive()) {
+    if (!change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
         ChangeStreamPreImagesCollectionManager::createPreImagesCollection(
             opCtx, boost::none /* tenantId */);
     }

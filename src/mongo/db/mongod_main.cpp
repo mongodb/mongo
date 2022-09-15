@@ -349,7 +349,7 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
         }
     }
 
-    // TODO SERVER-65950 create 'SetChangeStreamStateCoordinatorService' only in the serverless.
+    // TODO SERVER-66717 create 'SetChangeStreamStateCoordinatorService' only in the serverless.
     services.push_back(std::make_unique<SetChangeStreamStateCoordinatorService>(serviceContext));
 
     for (auto& service : services) {
@@ -790,6 +790,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         repl::ReplicationCoordinator::modeNone;
     if (!isStandalone) {
         startChangeStreamExpiredPreImagesRemover(serviceContext);
+        // TODO SERVER-66717 Start 'startChangeCollectionExpiredDocumentsRemover' only in the
+        // serverless.
         startChangeCollectionExpiredDocumentsRemover(serviceContext);
     }
 
@@ -1561,7 +1563,7 @@ int mongod_main(int argc, char* argv[]) {
     ReadWriteConcernDefaults::create(service, readWriteConcernDefaultsCacheLookupMongoD);
     ChangeStreamOptionsManager::create(service);
 
-    // TODO SERVER-65950 create 'ChangeStreamChangeCollectionManager' only in the serverless.
+    // TODO SERVER-66717 Create 'ChangeStreamChangeCollectionManager' only in the serverless.
     ChangeStreamChangeCollectionManager::create(service);
 
 #if defined(_WIN32)

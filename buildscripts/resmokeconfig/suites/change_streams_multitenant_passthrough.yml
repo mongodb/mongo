@@ -30,7 +30,10 @@ executor:
           enableMajorityReadConcern: ''
       # Enable causal consistency for change streams suites using 1 node replica sets. See
       # change_streams.yml for detailed explanation.
-      #TODO SERVER-67267 load 'inject_tenant_prefix.js'.
+      # TODO SERVER-67267 Load 'inject_tenant_prefix.js', add 'multitenancySupport',
+      #                   'featureFlagMongoStore' and 'featureFlagRequireTenantID' flags. The
+      #                   'inject_tenant_prefix' should also be called for the
+      #                   'enable_change_stream.py' file.
       eval: >-
         var testingReplication = true;
         load('jstests/libs/override_methods/set_read_and_write_concerns.js');
@@ -52,6 +55,8 @@ executor:
       set_parameters:
         enableTestCommands: 1
         featureFlagServerlessChangeStreams: true
+        internalChangeStreamUseTenantIdForTesting: true
         failpoint.assertChangeStreamNssCollection:
           "{'mode': 'alwaysOn', 'data': {'collectionName': 'system.change_collection'}}"
-    num_nodes: 2
+    # TODO SERVER-69115 Set number of nodes to 2 after oplog application is working properly.
+    num_nodes: 1

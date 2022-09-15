@@ -120,9 +120,11 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamAddPreImage::doGetNext()
 boost::optional<Document> DocumentSourceChangeStreamAddPreImage::lookupPreImage(
     boost::intrusive_ptr<ExpressionContext> pExpCtx, const Document& preImageId) {
     // Look up the pre-image document on the local node by id.
+    // TODO SERVER-66642 Consider using internal test-tenant id if applicable.
+    const auto tenantId = pExpCtx->ns.tenantId();
     auto lookedUpDoc = pExpCtx->mongoProcessInterface->lookupSingleDocumentLocally(
         pExpCtx,
-        NamespaceString::kChangeStreamPreImagesNamespace,
+        NamespaceString::makePreImageCollectionNSS(tenantId),
         Document{{ChangeStreamPreImage::kIdFieldName, preImageId}});
 
     // Return boost::none to signify that we failed to find the pre-image.

@@ -30,8 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/change_stream_change_collection_manager.h"
-#include "mongo/db/change_stream_pre_images_collection_manager.h"
+#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/change_stream_state_gen.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/set_change_stream_state_coordinator.h"
@@ -40,7 +39,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
-
 namespace {
 
 /**
@@ -67,6 +65,10 @@ public:
                "    enabled:  enable or disable the change stream";
     }
 
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
     class Invocation final : public InvocationBase {
     public:
         using InvocationBase::InvocationBase;
@@ -74,18 +76,19 @@ public:
         void typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::CommandNotSupported,
                     str::stream() << SetChangeStreamStateCommandRequest::kCommandName
-                                  << " is only supported in the serverless",
-                    ChangeStreamChangeCollectionManager::isChangeCollectionsModeActive());
+                                  << " command is only supported in serverless",
+                    change_stream_serverless_helpers::isChangeCollectionsModeActive());
 
-            // TODO SERVER-65950 use provided '$tenant' only and add 'uassert that tenant must be
-            // present. Remove 'getDollarTenant()' and fetch tenant from dbName().
-            const std::string tenantId = request().getDollarTenant()
-                ? request().getDollarTenant()->toString()
-                : TenantId::kSystemTenantId.toString();
+            const auto tenantId =
+                change_stream_serverless_helpers::resolveTenantId(request().getDbName().tenantId());
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << SetChangeStreamStateCommandRequest::kCommandName
+                                  << " command must be provided with a tenant id",
+                    tenantId);
 
             // Prepare the payload for the 'SetChangeStreamStateCoordinator'.
             SetChangeStreamStateCoordinatorId coordinatorId;
-            coordinatorId.setTenantId({TenantId{OID(tenantId)}});
+            coordinatorId.setTenantId(tenantId);
             SetChangeStreamStateCoordinatorDocument coordinatorDoc{
                 coordinatorId, request().getChangeStreamStateParameters().toBSON()};
 
@@ -134,6 +137,10 @@ public:
                "    {getChangeStreamState: 1}";
     }
 
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
     class Invocation final : public InvocationBase {
     public:
         using InvocationBase::InvocationBase;
@@ -141,17 +148,20 @@ public:
         auto typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::CommandNotSupported,
                     str::stream() << GetChangeStreamStateCommandRequest::kCommandName
-                                  << " is only supported in the serverless",
-                    ChangeStreamChangeCollectionManager::isChangeCollectionsModeActive());
+                                  << " command is only supported in serverless",
+                    change_stream_serverless_helpers::isChangeCollectionsModeActive());
 
-            // TODO SERVER-65950 use provided '$tenant' only and add 'uassert that tenant must be
-            // present.
-            boost::optional<TenantId> tenantId = boost::none;
+            const auto tenantId =
+                change_stream_serverless_helpers::resolveTenantId(request().getDbName().tenantId());
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << GetChangeStreamStateCommandRequest::kCommandName
+                                  << " command must be provided with a tenant id",
+                    tenantId);
+
 
             // Set the change stream enablement state in the 'reply' object.
-            auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx);
             GetChangeStreamStateCommandRequest::Reply reply{
-                changeCollectionManager.isChangeStreamEnabled(opCtx, tenantId)};
+                change_stream_serverless_helpers::isChangeStreamEnabled(opCtx, *tenantId)};
 
             return reply;
         }

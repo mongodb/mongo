@@ -1,9 +1,8 @@
 // Tests that replaying the oplog entries during the startup recovery also writes to the change
 // collection.
 // @tags: [
-//   featureFlagServerlessChangeStreams,
-//   multiversion_incompatible,
-//   featureFlagMongoStore,
+//   requires_fcv_62,
+//   __TEMPORARILY_DISABLED__
 // ]
 
 (function() {
@@ -14,10 +13,16 @@ load("jstests/serverless/libs/change_collection_util.js");  // For verifyChangeC
 
 const replSetTest = new ReplSetTest({nodes: 1});
 
-// TODO SERVER-67267 add 'featureFlagServerlessChangeStreams', 'multitenancySupport' and
-// 'serverless' flags and remove 'failpoint.forceEnableChangeCollectionsMode'.
-replSetTest.startSet(
-    {setParameter: "failpoint.forceEnableChangeCollectionsMode=" + tojson({mode: "alwaysOn"})});
+// TODO SERVER-67267 Add 'serverless' flag.
+// TODO SERVER-69115 Add 'featureFlagRequireTenantID' flag and remove '__TEMPORARILY_DISABLED__'
+// tag and replace 'ReplSetTest' with 'ChangeStreamMultitenantReplicaSetTest'.
+replSetTest.startSet({
+    setParameter: {
+        featureFlagServerlessChangeStreams: true,
+        multitenancySupport: true,
+        featureFlagMongoStore: true
+    }
+});
 
 replSetTest.initiate();
 
@@ -84,7 +89,11 @@ MongoRunner.stopMongod(standalone, null, {noCleanData: true, skipValidation: tru
 // Start the replica set primary with the same db path.
 replSetTest.start(primary, {
     noCleanData: true,
-    setParameter: "failpoint.forceEnableChangeCollectionsMode=" + tojson({mode: "alwaysOn"})
+    setParameter: {
+        featureFlagServerlessChangeStreams: true,
+        multitenancySupport: true,
+        featureFlagMongoStore: true
+    }
 });
 
 primary = replSetTest.getPrimary();
@@ -105,6 +114,7 @@ assert(endTimestamp !== undefined);
 
 // Verify that the oplog and the change collection entries between the ['startTimestamp',
 // 'endTimestamp'] window are exactly same and in the same order.
+// TODO SERVER-69115 Pass the tenant id to the 'verifyChangeCollectionEntries'.
 verifyChangeCollectionEntries(primary, startTimestamp, endTimestamp);
 
 replSetTest.stopSet();

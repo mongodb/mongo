@@ -57,6 +57,7 @@
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
+#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/client.h"
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/commands.h"
@@ -390,7 +391,7 @@ void _logOpsInner(OperationContext* opCtx,
     }
 
     // Insert the oplog records to the respective tenants change collections.
-    if (ChangeStreamChangeCollectionManager::isChangeCollectionsModeActive()) {
+    if (change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
         ChangeStreamChangeCollectionManager::get(opCtx).insertDocumentsToChangeCollection(
             opCtx, *records, timestamps);
     }

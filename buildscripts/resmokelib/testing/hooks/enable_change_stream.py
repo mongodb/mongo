@@ -48,7 +48,7 @@ class EnableChangeStream(interface.Hook):
 
     @staticmethod
     def _set_change_stream_state(connection, enabled):
-        # TODO SERVER-65950 create change collection for the tenant.
+        # TODO SERVER-67267 Enable command overrides to use security token.
         client = connection.get_primary().mongo_client()
         client.get_database("admin").command({"setChangeStreamState": 1, "enabled": enabled})
 

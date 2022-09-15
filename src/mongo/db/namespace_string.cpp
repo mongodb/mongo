@@ -111,8 +111,6 @@ const NamespaceString NamespaceString::kSystemReplSetNamespace(NamespaceString::
                                                                "system.replset");
 const NamespaceString NamespaceString::kLastVoteNamespace(NamespaceString::kLocalDb,
                                                           "replset.election");
-const NamespaceString NamespaceString::kChangeStreamPreImagesNamespace(NamespaceString::kConfigDb,
-                                                                       "system.preimages");
 const NamespaceString NamespaceString::kIndexBuildEntryNamespace(NamespaceString::kConfigDb,
                                                                  "system.indexBuilds");
 const NamespaceString NamespaceString::kRangeDeletionNamespace(NamespaceString::kConfigDb,
@@ -338,8 +336,7 @@ NamespaceString NamespaceString::makeCollectionlessAggregateNSS(const DatabaseNa
 
 NamespaceString NamespaceString::makeChangeCollectionNSS(
     const boost::optional<TenantId>& tenantId) {
-    // TODO: SERVER-65950 create namespace for a particular tenant.
-    return NamespaceString{NamespaceString::kConfigDb, NamespaceString::kChangeCollectionName};
+    return NamespaceString{tenantId, kConfigDb, kChangeCollectionName};
 }
 
 NamespaceString NamespaceString::makeGlobalIndexNSS(const UUID& id) {
@@ -350,8 +347,7 @@ NamespaceString NamespaceString::makeGlobalIndexNSS(const UUID& id) {
 
 NamespaceString NamespaceString::makePreImageCollectionNSS(
     const boost::optional<TenantId>& tenantId) {
-    return tenantId ? NamespaceString(tenantId, kConfigDb, "system.preimages")
-                    : kChangeStreamPreImagesNamespace;
+    return NamespaceString{tenantId, kConfigDb, kPreImagesCollectionName};
 }
 
 std::string NamespaceString::getSisterNS(StringData local) const {
@@ -469,11 +465,11 @@ bool NamespaceString::isTimeseriesBucketsCollection() const {
 }
 
 bool NamespaceString::isChangeStreamPreImagesCollection() const {
-    return ns() == kChangeStreamPreImagesNamespace.ns();
+    return _dbName.db() == kConfigDb && coll() == kPreImagesCollectionName;
 }
 
 bool NamespaceString::isChangeCollection() const {
-    return db() == kConfigDb && coll() == kChangeCollectionName;
+    return _dbName.db() == kConfigDb && coll() == kChangeCollectionName;
 }
 
 bool NamespaceString::isConfigImagesCollection() const {

@@ -160,11 +160,15 @@ function removeChangeCollectionDoc(authDb) {
 const replSetTest =
     new ReplSetTest({name: "shard", nodes: 1, useHostName: true, waitForKeys: false});
 
-// TODO SERVER-67267: Add 'featureFlagServerlessChangeStreams', 'multitenancySupport' and
-// 'serverless' flags and remove 'failpoint.forceEnableChangeCollectionsMode'.
+// TODO SERVER-67267: Add 'serverless' flags.
 replSetTest.startSet({
     keyFile: keyFile,
-    setParameter: {"failpoint.forceEnableChangeCollectionsMode": tojson({mode: "alwaysOn"})}
+    setParameter: {
+        featureFlagServerlessChangeStreams: true,
+        multitenancySupport: true,
+        featureFlagMongoStore: true,
+        internalChangeStreamUseTenantIdForTesting: true,
+    }
 });
 replSetTest.initiate();
 const primary = replSetTest.getPrimary();

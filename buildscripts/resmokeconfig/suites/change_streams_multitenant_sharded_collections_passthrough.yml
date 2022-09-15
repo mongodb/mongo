@@ -63,7 +63,7 @@ executor:
     shard_options:
       mongod_options:
         set_parameters:
-          # TODO SERVER-67267 check if the feature flag can be removed.
-          failpoint.forceEnableChangeCollectionsMode: "{mode: 'alwaysOn'}"
+          featureFlagServerlessChangeStreams: true
+          internalChangeStreamUseTenantIdForTesting: true
           failpoint.assertChangeStreamNssCollection:
             "{'mode': 'alwaysOn', 'data': {'collectionName': 'system.change_collection'}}"

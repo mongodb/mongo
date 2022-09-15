@@ -35,7 +35,9 @@
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_options_manager.h"
+#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker.h"
@@ -47,7 +49,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -118,7 +119,8 @@ void ChangeStreamPreImagesCollectionManager::createPreImagesCollection(
         opCtx, preImagesCollectionNamespace, preImagesCollectionOptions, BSONObj());
     uassert(status.code(),
             str::stream() << "Failed to create the pre-images collection: "
-                          << preImagesCollectionNamespace.coll() << causedBy(status.reason()),
+                          << preImagesCollectionNamespace.toStringWithTenantId()
+                          << causedBy(status.reason()),
             status.isOK() || status.code() == ErrorCodes::NamespaceExists);
 }
 
@@ -133,7 +135,8 @@ void ChangeStreamPreImagesCollectionManager::dropPreImagesCollection(
                        DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
     uassert(status.code(),
             str::stream() << "Failed to drop the pre-images collection: "
-                          << preImagesCollectionNamespace.coll() << causedBy(status.reason()),
+                          << preImagesCollectionNamespace.toStringWithTenantId()
+                          << causedBy(status.reason()),
             status.isOK() || status.code() == ErrorCodes::NamespaceNotFound);
 }
 
@@ -148,11 +151,13 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
                           << preImage.getId().getApplyOpsIndex(),
             preImage.getId().getApplyOpsIndex() >= 0);
 
+    // TODO SERVER-66642 Consider using internal test-tenant id if applicable.
+    const auto preImagesCollectionNamespace = NamespaceString::makePreImageCollectionNSS(tenantId);
+
     // This lock acquisition can block on a stronger lock held by another operation modifying
     // the pre-images collection. There are no known cases where an operation holding an
     // exclusive lock on the pre-images collection also waits for oplog visibility.
     AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
-    const auto preImagesCollectionNamespace = NamespaceString::makePreImageCollectionNSS(tenantId);
     AutoGetCollection preImagesCollectionRaii(
         opCtx, preImagesCollectionNamespace, LockMode::MODE_IX);
     auto& changeStreamPreImagesCollection = preImagesCollectionRaii.getCollection();
@@ -171,13 +176,6 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
                           << preImage.getId().toBSON().toString(),
             insertionStatus != ErrorCodes::DuplicateKey);
     uassertStatusOK(insertionStatus);
-}
-
-bool ChangeStreamPreImagesCollectionManager::hasPreImagesCollection(
-    OperationContext* opCtx, boost::optional<TenantId> tenantId) {
-    auto catalog = CollectionCatalog::get(opCtx);
-    return static_cast<bool>(catalog->lookupCollectionByNamespace(
-        opCtx, NamespaceString::makePreImageCollectionNSS(tenantId)));
 }
 
 namespace {
@@ -408,8 +406,9 @@ void deleteExpiredChangeStreamPreImages(Client* client, Date_t currentTimeForTim
 
         // Acquire intent-exclusive lock on the pre-images collection. Early exit if the collection
         // doesn't exist.
+        // TODO SERVER-66642 Account for multitenancy.
         AutoGetCollection autoColl(
-            opCtx.get(), NamespaceString::kChangeStreamPreImagesNamespace, MODE_IX);
+            opCtx.get(), NamespaceString::makePreImageCollectionNSS(boost::none), MODE_IX);
         const auto& preImagesColl = autoColl.getCollection();
         if (!preImagesColl) {
             return;
@@ -436,11 +435,12 @@ void deleteExpiredChangeStreamPreImages(Client* client, Date_t currentTimeForTim
             change_stream_pre_image_helpers::getPreImageExpirationTime(
                 opCtx.get(), currentTimeForTimeBasedExpiration));
 
+        // TODO SERVER-66642 Account for multitenancy.
         for (const auto& collectionRange : expiredPreImages) {
             writeConflictRetry(
                 opCtx.get(),
                 "ChangeStreamExpiredPreImagesRemover",
-                NamespaceString::kChangeStreamPreImagesNamespace.ns(),
+                NamespaceString::makePreImageCollectionNSS(boost::none).ns(),
                 [&] {
                     auto params = std::make_unique<DeleteStageParams>();
                     params->isMulti = true;

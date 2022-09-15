@@ -29,20 +29,43 @@
 
 #pragma once
 
-#include "mongo/db/service_context.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/operation_context.h"
+#include "mongo/db/tenant_id.h"
 
 namespace mongo {
+namespace change_stream_serverless_helpers {
+
+using TenantSet = stdx::unordered_set<TenantId, TenantId::Hasher>;
 
 /**
- * Starts a periodic background job to remove expired documents from change collections. The job
- * will run every 'changeCollectionExpiredDocumentsRemoverJobSleepSeconds' as defined in the cluster
- * parameter.
+ * Returns true if the server is configured such that change collections can be used to record
+ * oplog entries; ie, we are running in a Serverless context. Returns false otherwise.
  */
-void startChangeCollectionExpiredDocumentsRemover(ServiceContext* serviceContext);
+bool isChangeCollectionsModeActive();
 
 /**
- * Stops the periodic background job that removes expired documents from change collections.
+ * Returns true if the change stream is enabled for the provided tenant, false otherwise.
  */
-void shutdownChangeCollectionExpiredDocumentsRemover(ServiceContext* serviceContext);
+bool isChangeStreamEnabled(OperationContext* opCtx, const TenantId& tenantId);
 
+/**
+ * Returns an internal tenant id that will be used for testing purposes. This tenant id will not
+ * conflict with any other tenant id.
+ */
+const TenantId& getTenantIdForTesting();
+
+/**
+ * If the provided 'tenantId' is missing and 'internalChangeStreamUseTenantIdForTesting' is true,
+ * returns a special 'TenantId' for testing purposes. Otherwise, returns the provided 'tenantId'.
+ */
+boost::optional<TenantId> resolveTenantId(boost::optional<TenantId> tenantId);
+
+/**
+ * Returns the list of the tenants associated with a 'config' database.
+ */
+TenantSet getConfigDbTenants(OperationContext* opCtx);
+
+}  // namespace change_stream_serverless_helpers
 }  // namespace mongo

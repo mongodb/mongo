@@ -1544,7 +1544,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
         return (ns.isLocal() || ns.isConfigDotCacheDotChunks() ||
                 ns.isReshardingLocalOplogBufferCollection() ||
                 ns == NamespaceString::kConfigImagesNamespace ||
-                ns == NamespaceString::kChangeStreamPreImagesNamespace);
+                ns.isChangeStreamPreImagesCollection());
     };
 
     if (shardTargetingPolicy == ShardTargetingPolicy::kNotAllowed ||

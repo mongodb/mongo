@@ -89,13 +89,6 @@ public:
                                const ChangeStreamPreImage& preImage);
 
     /**
-     * Returns true if the pre-images collection exists, false otherwise. If 'tenantId' is provided
-     * then the pre-images collection associated with that tenant will be checked for existence,
-     * otherwise the default pre-images collection will be checked.
-     */
-    static bool hasPreImagesCollection(OperationContext* opCtx, boost::optional<TenantId> tenantId);
-
-    /**
      * Scans the system pre-images collection and deletes the expired pre-images from it.
      */
     static void performExpiredChangeStreamPreImagesRemovalPass(Client* client);

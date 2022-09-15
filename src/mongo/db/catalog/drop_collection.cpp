@@ -233,7 +233,7 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
     if (dropIfUUIDNotMatching && collectionUUID == *dropIfUUIDNotMatching) {
         return Status::OK();
     }
-    const NamespaceStringOrUUID dbAndUUID{coll->ns().db().toString(), coll->uuid()};
+    const NamespaceStringOrUUID dbAndUUID{coll->ns().dbName(), coll->uuid()};
     const int numIndexes = coll->getIndexCatalog()->numIndexesTotal(opCtx);
 
     while (true) {
@@ -254,7 +254,7 @@ Status _abortIndexBuildsAndDrop(OperationContext* opCtx,
                                                          << collectionUUID << ") is being dropped");
 
         // Take an exclusive lock to finish the collection drop.
-        optionalAutoDb.emplace(opCtx, startingNss.db(), MODE_IX);
+        optionalAutoDb.emplace(opCtx, startingNss.dbName(), MODE_IX);
         collLock.emplace(opCtx, dbAndUUID, MODE_X);
 
         // Abandon the snapshot as the index catalog will compare the in-memory state to the

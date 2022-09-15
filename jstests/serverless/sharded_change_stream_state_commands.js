@@ -9,11 +9,7 @@
 
 const shardingTest = new ShardingTest({
     shards: 2,
-    other: {
-        configOptions: {
-            setParameter: {"failpoint.forceEnableChangeCollectionsMode": tojson({mode: "alwaysOn"})}
-        }
-    }
+    other: {configOptions: {setParameter: {featureFlagServerlessChangeStreams: true}}}
 });
 
 // TODO SERVER-68341 Implement tests for mongoQ and ensure that the change collection is not enabled

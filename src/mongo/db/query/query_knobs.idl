@@ -906,6 +906,15 @@ server_parameters:
     default:
         expr: false
 
+  # TODO SERVER-68341 Remove this query knob after tenancy is supported in the sharded cluster.
+  internalChangeStreamUseTenantIdForTesting:
+    description: "If true, then change streams will operate upon an internal tenant id for testing
+                  purposes if the actual tenant is not provided."
+    set_at: [ startup ]
+    cpp_varname: "internalChangeStreamUseTenantIdForTesting"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

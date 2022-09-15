@@ -66,6 +66,10 @@ public:
         return "Set cluster parameter on replica set or node";
     }
 
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
     class Invocation final : public InvocationBase {
     public:
         using InvocationBase::InvocationBase;

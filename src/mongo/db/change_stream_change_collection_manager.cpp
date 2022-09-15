@@ -38,7 +38,7 @@
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/change_stream_pre_images_collection_manager.h"
+#include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
@@ -46,27 +46,14 @@
 #include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
-
-// Sharded clusters do not support serverless mode at present, but this failpoint allows us to
-// nonetheless test the behaviour of change collections in a sharded environment.
-MONGO_FAIL_POINT_DEFINE(forceEnableChangeCollectionsMode);
-
 namespace {
 const auto getChangeCollectionManager =
     ServiceContext::declareDecoration<boost::optional<ChangeStreamChangeCollectionManager>>();
-
-/**
- * Returns the list of all tenant ids in the replica set.
- * TODO SERVER-61822 Provide the real implementation after 'listDatabasesForAllTenants' is
- * available.
- */
-std::vector<boost::optional<TenantId>> getAllTenants() {
-    return {boost::none};
-}
 
 /**
  * Creates a Document object from the supplied oplog entry, performs necessary modifications to it
@@ -88,13 +75,15 @@ class ChangeCollectionsWriter {
 public:
     explicit ChangeCollectionsWriter(const AutoGetChangeCollection::AccessMode& accessMode)
         : _accessMode{accessMode} {}
+
     /**
      * Adds the insert statement for the provided tenant that will be written to the change
      * collection when the 'write()' method is called.
      */
-    void add(const TenantId& tenantId, InsertStatement insertStatement) {
-        if (_shouldAddEntry(insertStatement)) {
-            _tenantStatementsMap[tenantId].push_back(std::move(insertStatement));
+    void add(InsertStatement insertStatement) {
+        if (auto tenantId = _extractTenantId(insertStatement);
+            tenantId && _shouldAddEntry(insertStatement)) {
+            _tenantStatementsMap[*tenantId].push_back(std::move(insertStatement));
         }
     }
 
@@ -104,14 +93,12 @@ public:
      */
     Status write(OperationContext* opCtx, OpDebug* opDebug) {
         for (auto&& [tenantId, insertStatements] : _tenantStatementsMap) {
-            AutoGetChangeCollection tenantChangeCollection(
-                opCtx, _accessMode, boost::none /* tenantId */);
+            AutoGetChangeCollection tenantChangeCollection(opCtx, _accessMode, tenantId);
 
             // The change collection does not exist for a particular tenant because either the
             // change collection is not enabled or is in the process of enablement. Ignore this
             // insert for now.
-            // TODO: SERVER-65950 move this check before inserting to the map
-            // 'tenantToInsertStatements'.
+            // TODO SERVER-67170 Move this check before inserting to the map.
             if (!tenantChangeCollection) {
                 continue;
             }
@@ -127,9 +114,9 @@ public:
                                                                  false /* fromMigrate */);
             if (!status.isOK()) {
                 return Status(status.code(),
-                              str::stream()
-                                  << "Write to change collection: " << tenantChangeCollection->ns()
-                                  << "failed, reason: " << status.reason());
+                              str::stream() << "Write to change collection: "
+                                            << tenantChangeCollection->ns().toStringWithTenantId()
+                                            << "failed, reason: " << status.reason());
             }
         }
 
@@ -137,12 +124,31 @@ public:
     }
 
 private:
+    boost::optional<TenantId> _extractTenantId(const InsertStatement& insertStatement) {
+        // Parse the oplog entry to fetch the tenant id from 'tid' field. The oplog entry will not
+        // written to the change collection if 'tid' field is missing.
+        auto& oplogDoc = insertStatement.doc;
+        if (auto tidFieldElem = oplogDoc.getField(repl::OplogEntry::kTidFieldName)) {
+            return TenantId{Value(tidFieldElem).getOid()};
+        }
+
+        if (MONGO_unlikely(internalChangeStreamUseTenantIdForTesting.load())) {
+            return change_stream_serverless_helpers::getTenantIdForTesting();
+        }
+
+        return boost::none;
+    }
+
     bool _shouldAddEntry(const InsertStatement& insertStatement) {
         auto& oplogDoc = insertStatement.doc;
 
-        // TODO SERVER-65950 retreive tenant from the oplog.
         // TODO SERVER-67170 avoid inspecting the oplog BSON object.
         if (auto nssFieldElem = oplogDoc[repl::OplogEntry::kNssFieldName]) {
+            // Avoid writing entry with empty 'ns' field, for eg. 'periodic noop' entry.
+            if (nssFieldElem.String().empty()) {
+                return false;
+            }
+
             if (nssFieldElem.String() == "config.$cmd"_sd) {
                 if (auto objectFieldElem = oplogDoc[repl::OplogEntry::kObjectFieldName]) {
                     // The oplog entry might be a drop command on the change collection. Check if
@@ -225,40 +231,8 @@ void ChangeStreamChangeCollectionManager::create(ServiceContext* service) {
     getChangeCollectionManager(service).emplace(service);
 }
 
-bool ChangeStreamChangeCollectionManager::isChangeCollectionsModeActive() {
-    // A change collection must not be enabled on the config server.
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        return false;
-    }
-
-    // If the force fail point is enabled then declare the change collection mode as active.
-    if (MONGO_unlikely(forceEnableChangeCollectionsMode.shouldFail())) {
-        return true;
-    }
-
-    // TODO SERVER-67267 guard with 'multitenancySupport' and 'isServerless' flag.
-    return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        feature_flags::gFeatureFlagServerlessChangeStreams.isEnabled(
-            serverGlobalParams.featureCompatibility);
-}
-
-bool ChangeStreamChangeCollectionManager::hasChangeCollection(
-    OperationContext* opCtx, boost::optional<TenantId> tenantId) const {
-    auto catalog = CollectionCatalog::get(opCtx);
-    return static_cast<bool>(catalog->lookupCollectionByNamespace(
-        opCtx, NamespaceString::makeChangeCollectionNSS(tenantId)));
-}
-
-bool ChangeStreamChangeCollectionManager::isChangeStreamEnabled(
-    OperationContext* opCtx, boost::optional<TenantId> tenantId) const {
-    // A change stream in the serverless is declared as enabled if both the change collection and
-    // the pre-images collection exist for the provided tenant.
-    return isChangeCollectionsModeActive() && hasChangeCollection(opCtx, tenantId) &&
-        ChangeStreamPreImagesCollectionManager::hasPreImagesCollection(opCtx, tenantId);
-}
-
-void ChangeStreamChangeCollectionManager::createChangeCollection(
-    OperationContext* opCtx, boost::optional<TenantId> tenantId) {
+void ChangeStreamChangeCollectionManager::createChangeCollection(OperationContext* opCtx,
+                                                                 const TenantId& tenantId) {
     // Make the change collection clustered by '_id'. The '_id' field will have the same value as
     // the 'ts' field of the oplog.
     CollectionOptions changeCollectionOptions;
@@ -268,13 +242,13 @@ void ChangeStreamChangeCollectionManager::createChangeCollection(
 
     const auto status = createCollection(opCtx, changeCollNss, changeCollectionOptions, BSONObj());
     uassert(status.code(),
-            str::stream() << "Failed to create change collection: " << changeCollNss
-                          << causedBy(status.reason()),
+            str::stream() << "Failed to create change collection: "
+                          << changeCollNss.toStringWithTenantId() << causedBy(status.reason()),
             status.isOK() || status.code() == ErrorCodes::NamespaceExists);
 }
 
 void ChangeStreamChangeCollectionManager::dropChangeCollection(OperationContext* opCtx,
-                                                               boost::optional<TenantId> tenantId) {
+                                                               const TenantId& tenantId) {
     DropReply dropReply;
     const auto changeCollNss = NamespaceString::makeChangeCollectionNSS(tenantId);
 
@@ -284,8 +258,8 @@ void ChangeStreamChangeCollectionManager::dropChangeCollection(OperationContext*
                        &dropReply,
                        DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
     uassert(status.code(),
-            str::stream() << "Failed to drop change collection: " << changeCollNss
-                          << causedBy(status.reason()),
+            str::stream() << "Failed to drop change collection: "
+                          << changeCollNss.toStringWithTenantId() << causedBy(status.reason()),
             status.isOK() || status.code() == ErrorCodes::NamespaceNotFound);
 }
 
@@ -310,9 +284,7 @@ void ChangeStreamChangeCollectionManager::insertDocumentsToChangeCollection(
         // tenant.
         auto changeCollDoc = createChangeCollectionEntryFromOplog(record.data.toBson());
 
-        // TODO SERVER-65950 replace 'TenantId::kSystemTenantId' with the tenant id.
         changeCollectionsWriter.add(
-            TenantId::kSystemTenantId,
             InsertStatement{std::move(changeCollDoc), ts, repl::OpTime::kUninitializedTerm});
     }
 
@@ -352,11 +324,8 @@ Status ChangeStreamChangeCollectionManager::insertDocumentsToChangeCollection(
 
         auto changeCollDoc = createChangeCollectionEntryFromOplog(oplogDoc);
 
-        // TODO SERVER-65950 replace 'TenantId::kSystemTenantId' with the tenant id.
-        changeCollectionsWriter.add(TenantId::kSystemTenantId,
-                                    InsertStatement{std::move(changeCollDoc),
-                                                    oplogSlot.getTimestamp(),
-                                                    oplogSlot.getTerm()});
+        changeCollectionsWriter.add(InsertStatement{
+            std::move(changeCollDoc), oplogSlot.getTimestamp(), oplogSlot.getTerm()});
     }
 
     // Write documents to change collections.

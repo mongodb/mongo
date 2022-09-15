@@ -22,20 +22,13 @@ ReplSetTest = function(opts) {
 
         let setParameter = {};
 
-        // The 'setParameter' that should be merged with 'newOpts' for the sharded-cluster and the
-        // replica-set.
-        if (newOptions.hasOwnProperty("shardsvr")) {
-            setParameter = {
-                // TODO SERVER-67267 check if 'forceEnableChangeCollectionsMode' can be removed.
-                "failpoint.forceEnableChangeCollectionsMode": tojson({mode: "alwaysOn"}),
-                "failpoint.assertChangeStreamNssCollection": fpAssertChangeStreamNssColl
-            };
-        } else if (!newOptions.hasOwnProperty("configsvr")) {
-            // This is the case for the replica-set. A change collection does not exist in the
-            // config server.
+        // A change collection does not exist in the config server, do not set any change collection
+        // related parameter.
+        if (!newOptions.hasOwnProperty("configsvr")) {
             setParameter = {
                 featureFlagServerlessChangeStreams: true,
-                "failpoint.assertChangeStreamNssCollection": fpAssertChangeStreamNssColl
+                internalChangeStreamUseTenantIdForTesting: true,
+                "failpoint.assertChangeStreamNssCollection": fpAssertChangeStreamNssColl,
             };
         }
 

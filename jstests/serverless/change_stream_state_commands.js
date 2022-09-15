@@ -1,24 +1,25 @@
 // Test that the 'setChangeStreamState' and 'getChangeStreamState' commands work as expected in the
 // multi-tenant replica sets environment for various cases.
 // @tags: [
-//   featureFlagMongoStore,
-//   requires_fcv_61,
+//   requires_fcv_62,
+//   __TEMPORARILY_DISABLED__
 // ]
 (function() {
 "use strict";
 
-load("jstests/libs/fail_point_util.js");                    // For configureFailPoint.
-load("jstests/serverless/libs/change_collection_util.js");  // For verifyChangeCollectionEntries.
-load('jstests/libs/parallel_shell_helpers.js');             // For funWithArgs.
+load("jstests/libs/fail_point_util.js");         // For configureFailPoint.
+load('jstests/libs/parallel_shell_helpers.js');  // For funWithArgs.
 
 const replSetTest = new ReplSetTest({nodes: 2});
 
-// TODO SERVER-67267 Add 'featureFlagServerlessChangeStreams' and 'serverless' flags and remove
-// 'failpoint.forceEnableChangeCollectionsMode'.
+// TODO SERVER-67267 Add 'serverless' flag.
+// TODO SERVER-68947 Add 'featureFlagRequireTenantID' flag.
+// TODO SERVER-69115 Remove '__TEMPORARILY_DISABLED__'
 replSetTest.startSet({
     setParameter: {
-        "failpoint.forceEnableChangeCollectionsMode": tojson({mode: "alwaysOn"}),
-        multitenancySupport: true
+        featureFlagServerlessChangeStreams: true,
+        multitenancySupport: true,
+        featureFlagMongoStore: true
     }
 });
 

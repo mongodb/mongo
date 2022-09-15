@@ -5,34 +5,44 @@
 (function() {
 'use strict';
 
-load("jstests/libs/fail_point_util.js");
+// For verifyGetDiagnosticData.
 load('jstests/libs/ftdc.js');
+// For ChangeStreamMultitenantReplicaSetTest.
+load("jstests/serverless/libs/change_collection_util.js");
 
-const kExpiredChangeRemovalJobSleepSeconds = 5;
+const kExpiredChangeRemovalJobSleepSeconds = 1;
 const kExpireAfterSeconds = 1;
 
-const rst = new ReplSetTest({nodes: 1});
-rst.startSet({
-    setParameter: {
-        featureFlagServerlessChangeStreams: 1,
-        changeCollectionRemoverJobSleepSeconds: kExpiredChangeRemovalJobSleepSeconds,
-    }
+const replicaSet = new ChangeStreamMultitenantReplicaSetTest({
+    nodes: 1,
+    changeCollectionExpiredDocumentsRemoverJobSleepSeconds: kExpiredChangeRemovalJobSleepSeconds
 });
-rst.initiate();
 
-const primary = rst.getPrimary();
+const primary = replicaSet.getPrimary();
 const adminDb = primary.getDB('admin');
-const testDb = primary.getDB(jsTestName());
-const changeCollection = primary.getDB("config").system.change_collection;
+
+// Hard code the tenant id such that the tenant can be identified deterministically.
+const tenantId = ObjectId("6303b6bb84305d2266d0b779");
+
+// Connection to the replica set primary that are stamped with their respective tenant ids.
+const tenantConn =
+    ChangeStreamMultitenantReplicaSetTest.getTenantConnection(primary.host, tenantId);
+
+const testDb = tenantConn.getDB(jsTestName());
 
 // Enable change streams to ensure the creation of change collections if run in serverless mode.
-assert.commandWorked(adminDb.runCommand({setChangeStreamState: 1, enabled: true}));
+assert.commandWorked(
+    tenantConn.getDB("admin").runCommand({setChangeStreamState: 1, enabled: true}));
+
+const changeCollection = tenantConn.getDB("config").system.change_collection;
+
 assert.soon(() => {
     // Ensure that server status diagnostics is collecting change collection statistics.
     const serverStatusDiagnostics = verifyGetDiagnosticData(adminDb).serverStatus;
     return serverStatusDiagnostics.hasOwnProperty('changeCollections') &&
         serverStatusDiagnostics.changeCollections.hasOwnProperty('purgingJob');
 });
+
 const diagnosticsBeforeTestCollInsertions =
     verifyGetDiagnosticData(adminDb).serverStatus.changeCollections.purgingJob;
 
@@ -53,6 +63,7 @@ const estimatedToBeRemovedDocsSize = changeCollection.find()
 assert.gt(estimatedToBeRemovedDocsSize, 0);
 
 // Set the 'expireAfterSeconds' to 'kExpireAfterSeconds'.
+// TODO SERVER-69511 Use 'tenantConn' instead of 'primary' to set the 'expireAfterSeconds'.
 assert.commandWorked(adminDb.runCommand(
     {setClusterParameter: {changeStreams: {expireAfterSeconds: kExpireAfterSeconds}}}));
 
@@ -71,7 +82,7 @@ assert.soon(() => {
         diagnosticsBeforeTestCollInsertions.totalPass &&
         diagnosticsAfterTestCollInsertions.scannedCollections >
         diagnosticsBeforeTestCollInsertions.scannedCollections &&
-        diagnosticsAfterTestCollInsertions.bytesDeleted >
+        diagnosticsAfterTestCollInsertions.bytesDeleted >=
         diagnosticsBeforeTestCollInsertions.bytesDeleted + estimatedToBeRemovedDocsSize &&
         diagnosticsAfterTestCollInsertions.docsDeleted >
         diagnosticsBeforeTestCollInsertions.docsDeleted + numberOfDocuments - 1 &&
@@ -81,5 +92,5 @@ assert.soon(() => {
         diagnosticsBeforeTestCollInsertions.timeElapsedMillis;
 });
 
-rst.stopSet();
+replicaSet.stopSet();
 }());

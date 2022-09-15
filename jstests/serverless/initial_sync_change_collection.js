@@ -2,9 +2,8 @@
 // and when the initial sync has completed the change collection and oplog entries are exactly same
 // in the new secondary.
 // @tags: [
-//   featureFlagServerlessChangeStreams,
-//   featureFlagMongoStore,
-//   requires_fcv_61,
+//   requires_fcv_62,
+//   __TEMPORARILY_DISABLED__
 // ]
 //
 (function() {
@@ -15,10 +14,16 @@ load("jstests/serverless/libs/change_collection_util.js");  // For verifyChangeC
 
 const replSetTest = new ReplSetTest({nodes: 1});
 
-// TODO SERVER-67267 add 'featureFlagServerlessChangeStreams', 'multitenancySupport' and
-// 'serverless' flags and remove 'failpoint.forceEnableChangeCollectionsMode'.
-replSetTest.startSet(
-    {setParameter: "failpoint.forceEnableChangeCollectionsMode=" + tojson({mode: "alwaysOn"})});
+// TODO SERVER-67267 Add 'serverless' flag.
+// TODO SERVER-69115 Add 'featureFlagRequireTenantID' flag and remove '__TEMPORARILY_DISABLED__'
+// tag and replace 'ReplSetTest' with 'ChangeStreamMultitenantReplicaSetTest'.
+replSetTest.startSet({
+    setParameter: {
+        featureFlagServerlessChangeStreams: true,
+        multitenancySupport: true,
+        featureFlagMongoStore: true
+    }
+});
 
 replSetTest.initiate();
 
@@ -44,7 +49,9 @@ const secondary = replSetTest.add({
     setParameter: {
         // Hang after the data cloning phase is completed.
         "failpoint.initialSyncHangAfterDataCloning": tojson({mode: "alwaysOn"}),
-        "failpoint.forceEnableChangeCollectionsMode": tojson({mode: "alwaysOn"})
+        featureFlagServerlessChangeStreams: true,
+        multitenancySupport: true,
+        featureFlagMongoStore: true
     }
 });
 
