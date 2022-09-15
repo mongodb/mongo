@@ -586,16 +586,17 @@ void CollectionCatalog::onCloseDatabase(OperationContext* opCtx, std::string dbN
     removeResource(rid, dbName);
 }
 
-void CollectionCatalog::onCloseCatalog(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isW());
-    invariant(!_shadowCatalog);
+void CollectionCatalog::onCloseCatalog() {
+    if (_shadowCatalog) {
+        return;
+    }
+
     _shadowCatalog.emplace();
     for (auto& entry : _catalog)
         _shadowCatalog->insert({entry.first, entry.second->ns()});
 }
 
-void CollectionCatalog::onOpenCatalog(OperationContext* opCtx) {
-    invariant(opCtx->lockState()->isW());
+void CollectionCatalog::onOpenCatalog() {
     invariant(_shadowCatalog);
     _shadowCatalog.reset();
     ++_epoch;
