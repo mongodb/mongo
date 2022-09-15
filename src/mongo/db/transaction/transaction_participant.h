@@ -51,6 +51,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/transaction/transaction_metrics_observer.h"
+#include "mongo/db/transaction/transaction_operations.h"
 #include "mongo/idl/mutable_observer_registry.h"
 #include "mongo/logv2/attribute_storage.h"
 #include "mongo/stdx/unordered_map.h"
@@ -754,11 +755,11 @@ public:
         }
 
         std::vector<repl::ReplOperation> getTransactionOperationsForTest() const {
-            return p().transactionOperations;
+            return p().transactionOperations.getOperationsForTest();
         }
 
         size_t getNumberOfPrePostImagesToWriteForTest() const {
-            return p().numberOfPrePostImagesToWrite;
+            return p().transactionOperations.getNumberOfPrePostImagesToWrite();
         }
 
         const Locker* getTxnResourceStashLockerForTest() const {
@@ -1153,18 +1154,7 @@ private:
 
         // Holds oplog data for operations which have been applied in the current multi-document
         // transaction.
-        std::vector<repl::ReplOperation> transactionOperations;
-
-        // Holds stmtIds for operations which have been applied in the current multi-document
-        // transaction.
-        stdx::unordered_set<StmtId> transactionStmtIds;
-
-        // Total size in bytes of all operations within the _transactionOperations vector.
-        size_t transactionOperationBytes{0};
-
-        // Number of operations that have pre-images or post-images to be written to noop oplog
-        // entries or the image collection.
-        size_t numberOfPrePostImagesToWrite{0};
+        TransactionOperations transactionOperations;
 
         // The autocommit setting of this transaction. Should always be false for multi-statement
         // transaction. Currently only needed for diagnostics reporting.
