@@ -465,7 +465,7 @@ bool DocumentSourceInternalUnpackBucket::pushDownComputedMetaProjection(
     if (std::next(itr) == container->end()) {
         return nextStageWasRemoved;
     }
-    if (!_bucketUnpacker.bucketSpec().metaField) {
+    if (!_bucketUnpacker.bucketSpec().metaField || !_bucketUnpacker.includeMetaField()) {
         return nextStageWasRemoved;
     }
 

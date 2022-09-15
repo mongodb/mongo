@@ -118,5 +118,10 @@ pipeline = [{$addFields: {a: "$x", b: "$a"}}, {$project: {_id: 0}}];
 tsDoc = tsColl.aggregate(pipeline).toArray();
 regDoc = regColl.aggregate(pipeline).toArray();
 assert.docEq(tsDoc, regDoc);
+
+pipeline = [{$project: {a: 1, _id: 0}}, {$project: {newMeta: "$x"}}];
+tsDoc = tsColl.aggregate(pipeline).toArray();
+regDoc = regColl.aggregate(pipeline).toArray();
+assert.docEq(tsDoc, regDoc);
 })();
 })();

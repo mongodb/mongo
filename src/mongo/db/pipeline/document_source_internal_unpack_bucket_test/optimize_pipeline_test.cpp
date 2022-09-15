@@ -724,6 +724,55 @@ TEST_F(OptimizePipeline, InternalizeProjectAndPushdownAddFields) {
                       serialized[1]);
 }
 
+TEST_F(OptimizePipeline, DoNotSwapAddFieldsIfDependencyIsExcluded) {
+    {
+        auto unpackSpecObj = fromjson(
+            "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta', "
+            "bucketMaxSpanSeconds: 3600}}");
+        auto projectSpecObj = fromjson("{$project: {x: true, _id: false}}");
+        auto addFieldsSpec = fromjson("{$addFields: {newMeta: '$myMeta'}}");
+
+        auto pipeline =
+            Pipeline::parse(makeVector(unpackSpecObj, projectSpecObj, addFieldsSpec), getExpCtx());
+
+        pipeline->optimizePipeline();
+
+        // We should internalize the $project but _not_ push down the $addFields because it's field
+        // dependency has been excluded. Theoretically we could remove the $addFields for this
+        // trivial except but not always.
+        auto serialized = pipeline->serializeToBson();
+        ASSERT_EQ(2u, serialized.size());
+        ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['x'], timeField: 'time', "
+                                   "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
+                          serialized[0]);
+        ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {newMeta: '$myMeta'}}"), serialized[1]);
+    }
+
+    // Similar test except the dependency is on an excluded non-meta field.
+    {
+        auto unpackSpecObj = fromjson(
+            "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta', "
+            "bucketMaxSpanSeconds: 3600}}");
+        auto projectSpecObj = fromjson("{$project: {x: true, _id: false}}");
+        auto addFieldsSpec = fromjson("{$addFields: {newMeta: '$excluded'}}");
+
+        auto pipeline =
+            Pipeline::parse(makeVector(unpackSpecObj, projectSpecObj, addFieldsSpec), getExpCtx());
+
+        pipeline->optimizePipeline();
+
+        // We should internalize the $project but _not_ push down the $addFields because it's field
+        // dependency has been excluded. Theoretically we could remove the $addFields for this
+        // trivial except but not always.
+        auto serialized = pipeline->serializeToBson();
+        ASSERT_EQ(2u, serialized.size());
+        ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['x'], timeField: 'time', "
+                                   "metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
+                          serialized[0]);
+        ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {newMeta: '$excluded'}}"), serialized[1]);
+    }
+}
+
 TEST_F(OptimizePipeline, PushdownSortAndAddFields) {
     auto unpackSpecObj = fromjson(
         "{$_internalUnpackBucket: { exclude: [], timeField: 'time', metaField: 'myMeta', "
