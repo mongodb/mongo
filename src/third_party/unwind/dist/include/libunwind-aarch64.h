@@ -37,11 +37,7 @@ extern "C" {
 #include <stdalign.h>
 
 #ifndef UNW_EMPTY_STRUCT
-#  ifdef __GNUC__
-#    define UNW_EMPTY_STRUCT
-#  else
-#    define UNW_EMPTY_STRUCT uint8_t unused;
-#  endif
+#  define UNW_EMPTY_STRUCT uint8_t unused;
 #endif
 
 #define UNW_TARGET      aarch64
