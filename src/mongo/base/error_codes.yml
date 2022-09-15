@@ -492,6 +492,8 @@ error_codes:
     - {code: 380, name: RequestAlreadyFulfilled}
     - {code: 381, name: ConflictingServerlessOperation}
 
+    - {code: 382, name: RemoteCommandExecutionError, extra: RemoteCommandExecutionErrorInfo, categories: [InternalOnly]}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

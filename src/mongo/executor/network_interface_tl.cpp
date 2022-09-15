@@ -41,6 +41,7 @@
 #include "mongo/executor/network_interface_tl_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/hedge_options_util.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/net/socket_utils.h"
@@ -102,19 +103,6 @@ bool catchingInvoke(F&& f, EH&& eh, StringData hint) {
     }
 }
 
-/**
- * We ignore a subset of errors that may occur while running hedged operations (e.g., maxTimeMS
- * expiration), as the operation may safely succeed despite their failure. For example, a network
- * timeout error indicates the remote host experienced a timeout while running a remote-command as
- * part of executing the hedged operation. This is by no means an indication that the operation has
- * failed, as other hedged operations may still succeed.
- * TODO SERVER-68704 will include other error categories that are safe to ignore.
- */
-bool skipHedgeResult(const Status& status) {
-    return status == ErrorCodes::MaxTimeMSExpired || status == ErrorCodes::StaleDbVersion ||
-        ErrorCodes::isNetworkTimeoutError(status) || ErrorCodes::isStaleShardVersionError(status);
-}
-
 template <typename IA, typename IB, typename F>
 int compareTransformed(IA a1, IA a2, IB b1, IB b2, F&& f) {
     for (;; ++a1, ++b1)
@@ -125,7 +113,6 @@ int compareTransformed(IA a1, IA a2, IB b1, IB b2, F&& f) {
         else if (int r = f(*a1) - f(*b1))
             return r;
 }
-
 }  // namespace
 
 /**
@@ -949,7 +936,7 @@ void NetworkInterfaceTL::RequestState::resolve(Future<RemoteCommandResponse> fut
             returnConnection(status);
 
             const auto commandStatus = getStatusFromCommandResult(response.data);
-            if (isHedge && skipHedgeResult(commandStatus)) {
+            if (isHedge && isIgnorableAsHedgeResult(commandStatus)) {
                 LOGV2_DEBUG(4660701,
                             2,
                             "Hedged request returned status",

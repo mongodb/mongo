@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/executor/remote_command_response.h"
-#include "mongo/executor/remote_command_retry_policy.h"
-#include "mongo/executor/remote_command_runner.h"
-#include "mongo/executor/remote_command_runner_test_fixture.h"
-#include "mongo/executor/remote_command_targeter.h"
-
 #include "mongo/bson/oid.h"
 #include "mongo/db/repl/hello_gen.h"
 #include "mongo/executor/network_test_env.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/remote_command_retry_policy.h"
+#include "mongo/executor/remote_command_runner.h"
+#include "mongo/executor/remote_command_runner_error_info.h"
+#include "mongo/executor/remote_command_runner_test_fixture.h"
+#include "mongo/executor/remote_command_targeter.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -97,7 +97,17 @@ TEST_F(RemoteCommandRunnerTestFixture, LocalError) {
         return Status(ErrorCodes::NetworkTimeout, "mock");
     });
 
-    ASSERT_THROWS_CODE(resultFuture.get(), DBException, ErrorCodes::NetworkTimeout);
+    auto error = resultFuture.getNoThrow().getStatus();
+
+    // The error returned by our API should always be RemoteCommandExecutionError
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+    // Make sure we can extract the extra error info
+    auto extraInfo = error.extraInfo<RemoteCommandExecutionErrorInfo>();
+    ASSERT(extraInfo);
+    // Make sure the extra info indicates the error was local, and that the
+    // local error (which is just a Status) has the correct code.
+    ASSERT(extraInfo->isLocal());
+    ASSERT_EQ(extraInfo->asLocal().code(), ErrorCodes::NetworkTimeout);
 }
 
 /*
@@ -119,7 +129,19 @@ TEST_F(RemoteCommandRunnerTestFixture, RemoteError) {
         return createErrorResponse(Status(ErrorCodes::BadValue, "mock"));
     });
 
-    ASSERT_THROWS_CODE(resultFuture.get(), DBException, ErrorCodes::BadValue);
+    auto error = resultFuture.getNoThrow().getStatus();
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+
+    auto extraInfo = error.extraInfo<RemoteCommandExecutionErrorInfo>();
+    ASSERT(extraInfo);
+
+    ASSERT(extraInfo->isRemote());
+    auto remoteError = extraInfo->asRemote();
+    ASSERT_EQ(remoteError.getRemoteCommandResult(), Status(ErrorCodes::BadValue, "mock"));
+
+    // No write concern or write errors expected
+    ASSERT_EQ(remoteError.getRemoteCommandWriteConcernError(), Status::OK());
+    ASSERT_EQ(remoteError.getRemoteCommandFirstWriteError(), Status::OK());
 }
 
 /*
@@ -146,7 +168,20 @@ TEST_F(RemoteCommandRunnerTestFixture, WriteConcernError) {
         return resWithWriteConcernError;
     });
 
-    ASSERT_THROWS_CODE(resultFuture.get(), DBException, ErrorCodes::WriteConcernFailed);
+    auto error = resultFuture.getNoThrow().getStatus();
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+
+    auto extraInfo = error.extraInfo<RemoteCommandExecutionErrorInfo>();
+    ASSERT(extraInfo);
+
+    ASSERT(extraInfo->isRemote());
+    auto remoteError = extraInfo->asRemote();
+    ASSERT_EQ(remoteError.getRemoteCommandWriteConcernError(),
+              Status(ErrorCodes::WriteConcernFailed, "mock"));
+
+    // No top-level command or write errors expected
+    ASSERT_EQ(remoteError.getRemoteCommandFirstWriteError(), Status::OK());
+    ASSERT_EQ(remoteError.getRemoteCommandResult(), Status::OK());
 }
 
 /*
@@ -173,8 +208,22 @@ TEST_F(RemoteCommandRunnerTestFixture, WriteError) {
 
         return resWithWriteError;
     });
+    auto error = resultFuture.getNoThrow().getStatus();
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
 
-    ASSERT_THROWS_CODE(resultFuture.get(), DBException, ErrorCodes::DocumentValidationFailure);
+    auto extraInfo = error.extraInfo<RemoteCommandExecutionErrorInfo>();
+    ASSERT(extraInfo);
+
+    ASSERT(extraInfo->isRemote());
+    auto remoteError = extraInfo->asRemote();
+    ASSERT_EQ(remoteError.getRemoteCommandFirstWriteError(),
+              Status(ErrorCodes::DocumentValidationFailure,
+                     "Document failed validation",
+                     BSON("errInfo" << writeErrorExtraInfo)));
+
+    // No top-level command or write errors expected
+    ASSERT_EQ(remoteError.getRemoteCommandWriteConcernError(), Status::OK());
+    ASSERT_EQ(remoteError.getRemoteCommandResult(), Status::OK());
 }
 
 /*

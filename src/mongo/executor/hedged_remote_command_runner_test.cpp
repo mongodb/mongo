@@ -141,6 +141,11 @@ TEST_F(HedgedCommandRunnerTest, FindHedgeRequestTwoHosts) {
 
     RemoteCommandRunnerResponse<CursorInitialReply> res = resultFuture.get();
 
+    auto network = getNetworkInterfaceMock();
+    network->enterNetwork();
+    network->runReadyNetworkOperations();
+    network->exitNetwork();
+
     auto counters = getNetworkInterfaceCounters();
     ASSERT_EQ(counters.succeeded, 1);
     ASSERT_EQ(counters.canceled, 1);
@@ -170,6 +175,11 @@ TEST_F(HedgedCommandRunnerTest, FindHedgeRequestThreeHosts) {
     });
 
     RemoteCommandRunnerResponse<CursorInitialReply> res = resultFuture.get();
+
+    auto network = getNetworkInterfaceMock();
+    network->enterNetwork();
+    network->runReadyNetworkOperations();
+    network->exitNetwork();
 
     auto counters = getNetworkInterfaceCounters();
     ASSERT_EQ(counters.succeeded, 1);
@@ -263,11 +273,16 @@ TEST_F(HedgedCommandRunnerTest, FirstCommandFailsWithSignificantError) {
         return Status(ErrorCodes::NetworkTimeout, "mock");
     });
 
+    auto network = getNetworkInterfaceMock();
+    network->enterNetwork();
+    network->runReadyNetworkOperations();
+    network->exitNetwork();
+
     auto counters = getNetworkInterfaceCounters();
     ASSERT_EQ(counters.failed, 1);
     ASSERT_EQ(counters.canceled, 1);
 
-    ASSERT_THROWS_CODE(resultFuture.get(), DBException, ErrorCodes::NetworkTimeout);
+    ASSERT_THROWS_CODE(resultFuture.get(), DBException, ErrorCodes::RemoteCommandExecutionError);
 }
 
 /**
@@ -292,19 +307,19 @@ TEST_F(HedgedCommandRunnerTest, BothCommandsFailWithSkippableError) {
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["find"]);
-        return Status(ErrorCodes::MaxTimeMSExpired, "mock");
+        return createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock"));
     });
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["find"]);
-        return Status(ErrorCodes::MaxTimeMSExpired, "mock");
+        return createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock"));
     });
 
     auto counters = getNetworkInterfaceCounters();
-    ASSERT_EQ(counters.failed, 2);
+    ASSERT_EQ(counters.sent, 2);
     ASSERT_EQ(counters.canceled, 0);
 
-    ASSERT_THROWS_CODE(resultFuture.get(), DBException, ErrorCodes::MaxTimeMSExpired);
+    ASSERT_THROWS_CODE(resultFuture.get(), DBException, ErrorCodes::RemoteCommandExecutionError);
 }
 
 TEST_F(HedgedCommandRunnerTest, AllCommandsFailWithSkippableError) {
@@ -324,7 +339,7 @@ TEST_F(HedgedCommandRunnerTest, AllCommandsFailWithSkippableError) {
                                         CancellationToken::uncancelable());
 
     auto network = getNetworkInterfaceMock();
-    auto now = getNetworkInterfaceMock()->now();
+    auto now = network->now();
     network->enterNetwork();
 
     NetworkInterfaceMock::NetworkOperationIterator noi1 = network->getNextReadyRequest();
@@ -335,25 +350,42 @@ TEST_F(HedgedCommandRunnerTest, AllCommandsFailWithSkippableError) {
     auto secondRequest = (*noi2).getRequestOnAny();
     auto thirdRequest = (*noi3).getRequestOnAny();
 
+    auto remoteMaxTimeMSError = RemoteCommandResponse{
+        createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)};
     if (firstRequest.target[0] == kThreeHosts[0]) {
-        network->scheduleErrorResponse(
-            noi1, now + Milliseconds(1000), Status(ErrorCodes::MaxTimeMSExpired, "mock"));
+        network->scheduleResponse(
+            noi1,
+            now + Milliseconds(1000),
+            {createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)});
     } else {
-        network->scheduleErrorResponse(noi1, Status(ErrorCodes::MaxTimeMSExpired, "mock"));
+        network->scheduleResponse(
+            noi1,
+            now,
+            {createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)});
     }
 
     if (secondRequest.target[0] == kThreeHosts[0]) {
-        network->scheduleErrorResponse(
-            noi2, now + Milliseconds(1000), Status(ErrorCodes::MaxTimeMSExpired, "mock"));
+        network->scheduleResponse(
+            noi2,
+            now + Milliseconds(1000),
+            {createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)});
     } else {
-        network->scheduleErrorResponse(noi2, Status(ErrorCodes::MaxTimeMSExpired, "mock"));
+        network->scheduleResponse(
+            noi2,
+            now,
+            {createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)});
     }
 
     if (thirdRequest.target[0] == kThreeHosts[0]) {
-        network->scheduleErrorResponse(
-            noi3, now + Milliseconds(1000), Status(ErrorCodes::MaxTimeMSExpired, "mock"));
+        network->scheduleResponse(
+            noi3,
+            now + Milliseconds(1000),
+            {createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)});
     } else {
-        network->scheduleErrorResponse(noi3, Status(ErrorCodes::MaxTimeMSExpired, "mock"));
+        network->scheduleResponse(
+            noi3,
+            now,
+            {createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)});
     }
 
     network->runUntil(now + Milliseconds(1500));
@@ -361,10 +393,10 @@ TEST_F(HedgedCommandRunnerTest, AllCommandsFailWithSkippableError) {
     auto counters = network->getCounters();
     network->exitNetwork();
 
-    ASSERT_EQ(counters.failed, 3);
+    ASSERT_EQ(counters.succeeded, 3);
     ASSERT_EQ(counters.canceled, 0);
 
-    ASSERT_THROWS_CODE(resultFuture.get(), DBException, ErrorCodes::MaxTimeMSExpired);
+    ASSERT_THROWS_CODE(resultFuture.get(), DBException, ErrorCodes::RemoteCommandExecutionError);
 }
 
 /**
@@ -407,7 +439,10 @@ TEST_F(HedgedCommandRunnerTest, FirstCommandFailsWithSkippableErrorNextSucceeds)
     if (firstRequest.target[0] == kThreeHosts[0]) {
         network->scheduleSuccessfulResponse(noi1, now + Milliseconds(1000), successResponse);
     } else {
-        network->scheduleErrorResponse(noi1, Status(ErrorCodes::MaxTimeMSExpired, "mock"));
+        network->scheduleResponse(
+            noi1,
+            now,
+            {createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)});
     }
 
     // if the second request is the authoritative one, send a delayed success response
@@ -415,7 +450,10 @@ TEST_F(HedgedCommandRunnerTest, FirstCommandFailsWithSkippableErrorNextSucceeds)
     if (secondRequest.target[0] == kThreeHosts[0]) {
         network->scheduleSuccessfulResponse(noi2, now + Milliseconds(1000), successResponse);
     } else {
-        network->scheduleErrorResponse(noi2, Status(ErrorCodes::MaxTimeMSExpired, "mock"));
+        network->scheduleResponse(
+            noi2,
+            now,
+            {createErrorResponse(Status(ErrorCodes::MaxTimeMSExpired, "mock")), Milliseconds(1)});
     }
 
     network->runUntil(now + Milliseconds(1500));
@@ -423,8 +461,7 @@ TEST_F(HedgedCommandRunnerTest, FirstCommandFailsWithSkippableErrorNextSucceeds)
     auto counters = network->getCounters();
     network->exitNetwork();
 
-    ASSERT_EQ(counters.failed, 1);
-    ASSERT_EQ(counters.succeeded, 1);
+    ASSERT_EQ(counters.succeeded, 2);
     ASSERT_EQ(counters.canceled, 0);
 
     ASSERT_EQ(resultFuture.get().response.getCursor()->getNs(),

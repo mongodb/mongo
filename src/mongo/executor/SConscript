@@ -246,6 +246,16 @@ env.Library(
 )
 
 env.Library(
+    target='remote_command_runner_error_info',
+    source=[
+        'remote_command_runner_error_info.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
     target='remote_command_runner',
     source=[
         'remote_command_runner.cpp',
@@ -255,6 +265,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/rpc/command_status',
         'remote_command',
+        'remote_command_runner_error_info',
         'task_executor_interface',
     ],
 )

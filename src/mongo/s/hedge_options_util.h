@@ -45,4 +45,19 @@ namespace mongo {
 void extractHedgeOptions(const BSONObj& cmdObj,
                          const ReadPreferenceSetting& readPref,
                          executor::RemoteCommandRequestOnAny::Options& options);
+
+/**
+ * We ignore a subset of errors that may occur while running hedged operations (e.g., maxTimeMS
+ * expiration), as the operation may safely succeed despite their failure. For example, a network
+ * timeout error indicates the remote host experienced a timeout while running a remote-command as
+ * part of executing the hedged operation. This is by no means an indication that the operation has
+ * failed, as other hedged operations may still succeed. This function returns 'true' if we should
+ * ignore this error as a response to a hedged operation, and allow other hedges of the operation to
+ * possibly succeed.
+ * TODO SERVER-68704 will include other error categories that are safe to ignore.
+ */
+inline bool isIgnorableAsHedgeResult(const Status& status) {
+    return status == ErrorCodes::MaxTimeMSExpired || status == ErrorCodes::StaleDbVersion ||
+        ErrorCodes::isNetworkTimeoutError(status) || ErrorCodes::isStaleShardVersionError(status);
+}
 }  // namespace mongo

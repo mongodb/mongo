@@ -37,9 +37,11 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/remote_command_runner.h"
+#include "mongo/executor/remote_command_runner_error_info.h"
 #include "mongo/executor/remote_command_targeter.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/hedge_options_util.h"
 #include "mongo/s/mongos_server_parameters_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
@@ -155,27 +157,34 @@ SemiFuture<RemoteCommandRunnerResponse<typename CommandType::Reply>> doHedgedReq
              * the future with index 0, which we treat as the "authoritative" request. This is the
              * codepath followed when we are not hedging or there is only 1 target provided.
              */
-            return whenAnyThat(std::move(requests),
-                               [](StatusWith<SingleResponse> response, size_t index) {
-                                   Status commandStatus = response.getStatus();
-                                   if (index == 0) {
-                                       return true;
-                                   }
+            return whenAnyThat(
+                std::move(requests), [](StatusWith<SingleResponse> response, size_t index) {
+                    Status commandStatus = response.getStatus();
 
-                                   if (commandStatus == ErrorCodes::MaxTimeMSExpired ||
-                                       commandStatus == ErrorCodes::StaleDbVersion ||
-                                       ErrorCodes::isStaleShardVersionError(commandStatus)) {
-                                       return false;
-                                   }
-                                   return true;
-                               });
+                    if (index == 0) {
+                        return true;
+                    }
+                    if (commandStatus.code() == Status::OK()) {
+                        return true;
+                    }
+
+                    // TODO SERVER-69592 Account for interior executor shutdown
+                    invariant(commandStatus.code() == ErrorCodes::RemoteCommandExecutionError);
+                    boost::optional<Status> remoteErr;
+                    auto extraInfo = commandStatus.extraInfo<RemoteCommandExecutionErrorInfo>();
+                    if (extraInfo->isRemote()) {
+                        remoteErr = extraInfo->asRemote().getRemoteCommandResult();
+                    }
+
+                    if (remoteErr && isIgnorableAsHedgeResult(*remoteErr)) {
+                        return false;
+                    }
+                    return true;
+                });
         })
         .onCompletion([hedgeCancellationToken](StatusWith<SingleResponse> result) mutable {
             // TODO SERVER-68101 add retry logic
-            // TODO SERVER-68555 add extra error handling info
-
             hedgeCancellationToken.cancel();
-
             return result;
         })
         .semi();

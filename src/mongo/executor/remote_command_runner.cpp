@@ -30,6 +30,7 @@
 #include "mongo/executor/remote_command_runner.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_runner_error_info.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
@@ -38,6 +39,14 @@
 namespace mongo::executor::remote_command_runner {
 namespace detail {
 namespace {
+Status makeErrorIfNeeded(TaskExecutor::ResponseOnAnyStatus r) {
+    if (r.status.isOK() && getStatusFromCommandResult(r.data).isOK() &&
+        getWriteConcernStatusFromCommandResult(r.data).isOK() &&
+        getFirstWriteErrorStatusFromCommandResult(r.data).isOK()) {
+        return Status::OK();
+    }
+    return {RemoteCommandExecutionErrorInfo(r), "Remote command execution failed"};
+}
 const auto getRCRImpl = ServiceContext::declareDecoration<std::unique_ptr<RemoteCommandRunner>>();
 }  // namespace
 
@@ -65,14 +74,16 @@ public:
                     targets, dbName.toString(), cmdBSON, rpc::makeEmptyMetadata(), opCtx);
                 return exec->scheduleRemoteCommandOnAny(executorRequest, token);
             })
-            .then([&, exec = std::move(exec)](RemoteCommandOnAnyResponse r) {
-                // Ensure the command didn't have a local error, or any remote errors, preferring
-                // to propogate ok: 0 errors over writeConcern errors over write errors.
-                iassert(r.status);
-                iassert(getStatusFromCommandResult(r.data));
-                iassert(getWriteConcernStatusFromCommandResult(r.data));
-                iassert(getFirstWriteErrorStatusFromCommandResult(r.data));
-
+            .onError([](Status s) -> StatusWith<TaskExecutor::ResponseOnAnyStatus> {
+                // If there was a scheduling error or other local error before the
+                // command was accepted by the executor.
+                return Status{RemoteCommandExecutionErrorInfo(s),
+                              "Remote command execution failed"};
+            })
+            .then([](TaskExecutor::ResponseOnAnyStatus r) {
+                // TODO SERVER-69592 account for interior executor shutdown
+                auto s = makeErrorIfNeeded(r);
+                uassertStatusOK(s);
                 return RemoteCommandInternalResponse{r.data, r.target.get()};
             });
     }

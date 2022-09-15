@@ -160,7 +160,6 @@ void NetworkInterfaceMock::_interruptWithResponse_inlock(const CallbackHandle& c
     if (!noi->isFinished()) {
         // We've effectively observed the NetworkOperation.
         noi->markAsProcessing();
-        _counters.canceled++;
         _scheduleResponse_inlock(noi, _now_inlock(), response);
     }
 }
@@ -604,13 +603,6 @@ void NetworkInterfaceMock::_runReadyNetworkOperations_inlock(stdx::unique_lock<s
               "request"_attr = noi->getRequest(),
               "response"_attr = response.response);
 
-        _counters.sent++;
-        if (response.response.status.isOK()) {
-            _counters.succeeded++;
-        } else {
-            _counters.failed++;
-        }
-
         if (_metadataHook) {
             _metadataHook
                 ->readReplyMetadata(noi->getRequest().opCtx,
@@ -619,8 +611,27 @@ void NetworkInterfaceMock::_runReadyNetworkOperations_inlock(stdx::unique_lock<s
                 .transitional_ignore();
         }
 
-        noi->processResponse(std::move(response));
-
+        // The NetworkInterface can recieve multiple responses for a particular request (e.g.
+        // cancellation and a 'true' scheduled response). But each request can only have one logical
+        // response. This choice of the one logical response is mediated by the _isFinished field of
+        // the NetworkOperation; whichever response sets this first via
+        // NetworkOperation::processResponse wins. NetworkOperation::processResponse returns `true`
+        // if the given response was accepted by the NetworkOperation as its sole logical response.
+        //
+        // We care about this here because we only want to increment the counters for operations
+        // succeeded/failed for the responses that are actually used,
+        Status localResponseStatus = response.response.status;
+        bool noiUsedThisResponse = noi->processResponse(std::move(response));
+        if (noiUsedThisResponse) {
+            _counters.sent++;
+            if (localResponseStatus.isOK()) {
+                _counters.succeeded++;
+            } else if (ErrorCodes::isCancellationError(localResponseStatus)) {
+                _counters.canceled++;
+            } else {
+                _counters.failed++;
+            }
+        }
         lk->lock();
     }
     invariant(_currentlyRunning == kNetworkThread);
