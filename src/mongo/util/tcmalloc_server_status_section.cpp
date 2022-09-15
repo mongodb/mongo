@@ -119,7 +119,9 @@ public:
                 MallocExtension::instance()->GetNumericProperty("tcmalloc.thread_cache_free_bytes",
                                                                 &thread)) {
                 sub.appendNumber("total_free_bytes",
-                                 static_cast<long long>(central + transfer + thread));
+                                 static_cast<long long>(central) +
+                                     static_cast<long long>(transfer) +
+                                     static_cast<long long>(thread));
             }
             appendNumericPropertyIfAvailable(
                 sub, "central_cache_free_bytes", "tcmalloc.central_cache_free_bytes");

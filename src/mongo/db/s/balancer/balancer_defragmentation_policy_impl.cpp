@@ -336,8 +336,8 @@ public:
             rangesToMerge += pendingActions.rangesToMerge.size();
             rangesWithoutDataSize += pendingActions.rangesWithoutDataSize.size();
         }
-        auto remainingChunksToProcess =
-            static_cast<long long>(_outstandingActions + rangesToMerge + rangesWithoutDataSize);
+        auto remainingChunksToProcess = static_cast<long long>(_outstandingActions) +
+            static_cast<long long>(rangesToMerge) + static_cast<long long>(rangesWithoutDataSize);
 
         return BSON(kRemainingChunksToProcess << remainingChunksToProcess);
     }
@@ -1129,7 +1129,8 @@ public:
         for (const auto& [_, unmergedRanges] : _unmergedRangesByShard) {
             rangesToMerge += unmergedRanges.size();
         }
-        auto remainingRangesToProcess = static_cast<long long>(_outstandingActions + rangesToMerge);
+        auto remainingRangesToProcess =
+            static_cast<long long>(_outstandingActions) + static_cast<long long>(rangesToMerge);
 
         return BSON(kRemainingChunksToProcess << remainingRangesToProcess);
     }
@@ -1343,8 +1344,8 @@ public:
             rangesToFindSplitPoints += pendingActions.rangesToFindSplitPoints.size();
             rangesToSplit += pendingActions.rangesToSplit.size();
         }
-        auto remainingChunksToProcess =
-            static_cast<long long>(_outstandingActions + rangesToFindSplitPoints + rangesToSplit);
+        auto remainingChunksToProcess = static_cast<long long>(_outstandingActions) +
+            static_cast<long long>(rangesToFindSplitPoints) + static_cast<long long>(rangesToSplit);
         return BSON(kRemainingChunksToProcess << remainingChunksToProcess);
     }
 

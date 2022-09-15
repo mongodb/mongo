@@ -237,7 +237,8 @@ TEST_F(OplogApplierTest, GetNextApplierBatchChecksBatchLimitsForSizeOfOperations
     _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
 
     // Set batch limits so that only the first two operations can fit into the first batch.
-    _limits.bytes = std::size_t(srcOps[0].getRawObjSizeBytes() + srcOps[1].getRawObjSizeBytes());
+    _limits.bytes =
+        std::size_t(srcOps[0].getRawObjSizeBytes()) + std::size_t(srcOps[1].getRawObjSizeBytes());
 
     // First batch: [insert, insert]
     auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));

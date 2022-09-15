@@ -1319,7 +1319,7 @@ void SortedFileWriter<Key, Value>::writeChunk() {
     snappy::Compress(outBuffer, size, &compressed);
     verify(compressed.size() <= size_t(std::numeric_limits<int32_t>::max()));
 
-    const bool shouldCompress = compressed.size() < size_t(_buffer.len() / 10 * 9);
+    const bool shouldCompress = compressed.size() < (size_t(_buffer.len()) / 10 * 9);
     if (shouldCompress) {
         size = compressed.size();
         outBuffer = const_cast<char*>(compressed.data());
