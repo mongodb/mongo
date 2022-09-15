@@ -474,14 +474,14 @@ public:
      *
      * Must be called with the global lock acquired in exclusive mode.
      */
-    void onCloseCatalog(OperationContext* opCtx);
+    void onCloseCatalog();
 
     /**
      * Puts the catalog back in open state, removing the pre-close state. See onCloseCatalog.
      *
      * Must be called with the global lock acquired in exclusive mode.
      */
-    void onOpenCatalog(OperationContext* opCtx);
+    void onOpenCatalog();
 
     /**
      * The epoch is incremented whenever the catalog is closed and re-opened.
