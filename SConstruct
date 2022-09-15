@@ -2478,6 +2478,15 @@ for suboption in get_option('experimental-runtime-hardening'):
     elif suboption.startswith('+'):
         selected_experimental_runtime_hardenings.add(suboption[1:])
 
+# Disable floating-point contractions such as forming of fused multiply-add operations.
+if env.ToolchainIs('clang', 'gcc'):
+    env.Append(CCFLAGS=["-ffp-contract=off"])
+else:
+    # msvc defaults to /fp:precise. Visual Studio 2022 does not emit floating-point contractions
+    # with /fp:precise, but previous versions can. Disable contractions altogether by using
+    # /fp:strict.
+    env.Append(CCFLAGS=["/fp:strict"])
+
 if env.TargetOSIs('linux'):
     env.Append(LIBS=["m"])
     if not env.TargetOSIs('android'):
