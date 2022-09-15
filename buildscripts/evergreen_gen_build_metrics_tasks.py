@@ -17,7 +17,7 @@ def main():
     def create_build_metric_task_steps(task_build_flags, task_targets):
 
         evg_flags = f"--debug=time,count,memory VARIANT_DIR=metrics BUILD_METRICS_EVG_TASK_ID={os.environ['task_id']} BUILD_METRICS_EVG_BUILD_VARIANT={os.environ['build_variant']}"
-        cache_flags = "--cache=all --cache-dir=$PWD/scons-cache --cache-signature-mode=validate"
+        cache_flags = "--cache-dir=$PWD/scons-cache --cache-signature-mode=validate"
 
         scons_task_steps = [
             f"{evg_flags} --build-metrics=build_metrics.json",
@@ -40,17 +40,23 @@ def main():
 
     #############################
     if sys.platform == 'win32':
-        targets = "install-all-meta"
-        build_flags = ""
+        targets = "install-all-meta-but-not-unittests"
+        build_flags = '--cache=nolinked'
 
         tasks['windows_tasks'].append(
             Task("build_metrics_msvc", create_build_metric_task_steps(build_flags, targets)))
 
     ##############################
     elif sys.platform == 'darwin':
+
         for link_model in ['dynamic', 'static']:
-            targets = "install-all-meta" + " generate-libdeps-graph" if link_model == 'dynamic' else ""
-            build_flags = f"--link-model={link_model} --force-macos-dynamic-link"
+            if link_model == 'dynamic':
+                targets = "install-all-meta generate-libdeps-graph"
+            else:
+                targets = "install-all-meta-but-not-unittests"
+
+            build_flags = f"--link-model={link_model} --force-macos-dynamic-link" + (
+                ' --cache=nolinked' if link_model == 'static' else "")
 
             tasks['macos_tasks'].append(
                 Task(f"build_metrics_xcode_{link_model}",
@@ -63,8 +69,13 @@ def main():
             for compiler in ['gcc']:
                 for link_model in ['dynamic', 'static']:
 
-                    targets = "install-all-meta" + " generate-libdeps-graph" if link_model == 'dynamic' else ""
-                    build_flags = f"BUILD_METRICS_BLOATY=/opt/mongodbtoolchain/v4/bin/bloaty --variables-files=etc/scons/mongodbtoolchain_{toolchain}_{compiler}.vars --link-model={link_model}"
+                    if link_model == 'dynamic':
+                        targets = "install-all-meta generate-libdeps-graph"
+                    else:
+                        targets = "install-all-meta-but-not-unittests"
+
+                    build_flags = f"BUILD_METRICS_BLOATY=/opt/mongodbtoolchain/v4/bin/bloaty --variables-files=etc/scons/mongodbtoolchain_{toolchain}_{compiler}.vars --link-model={link_model}" + (
+                        ' --cache=nolinked' if link_model == 'static' else "")
 
                     tasks['linux_tasks'].append(
                         Task(f"build_metrics_{toolchain}_{compiler}_{link_model}",

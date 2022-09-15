@@ -1900,6 +1900,7 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo)
     repo_edition: enterprise
     large_distro_name: rhel80-large
+    num_scons_link_jobs_available: 0.1
   tasks:
   - name: build_metrics_gen_TG
 
@@ -1912,6 +1913,7 @@ buildvariants:
   run_on:
   - macos-1100
   expansions:
+    num_scons_link_jobs_available: 0.1
     compile_env: DEVELOPER_DIR=/Applications/Xcode13.app
     compile_flags: --ssl -j$(sysctl -n hw.logicalcpu) --libc++ --variables-files=etc/scons/xcode_macosx.vars
   tasks:
@@ -1924,6 +1926,7 @@ buildvariants:
   run_on:
   - windows-vsCurrent-small
   expansions:
+    num_scons_link_jobs_available: 0.1
     compile_flags: CPPPATH="c:/sasl/include" LIBPATH="c:/sasl/lib" -j$(( $(grep -c ^processor /proc/cpuinfo) / 2 )) --win-version-min=win10
     python: '/cygdrive/c/python/python37/python.exe'
   tasks:

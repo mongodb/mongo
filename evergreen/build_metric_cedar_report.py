@@ -66,6 +66,11 @@ with open(clean_build_metrics_json) as f:
     cedar_report.append(single_metric_test("Total Build time", "seconds", build_metrics['scons_metrics']['time']['total']))
     cedar_report.append(single_metric_test("Total Build output size", "MBs", build_metrics['artifact_metrics']['total_artifact_size'] / 1024.0 / 1024.0))
 
+    try:
+        cedar_report.append(single_metric_test("Transitive Libdeps Edges", "edges", build_metrics['libdeps_metrics']['TRANS_EDGE']))
+    except KeyError:
+        pass
+
     mongod_metrics = None
     for artifact in build_metrics['artifact_metrics']['artifacts']:
         if artifact['name'] == 'build/metrics/mongo/db/mongod':
