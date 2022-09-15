@@ -41,7 +41,7 @@ class test_util15(wttest.WiredTigerTestCase, suite_subprocess):
         """
         params = 'key_format=S,value_format=S'
         self.session.create('table:' + self.tablename, params)
-        self.assertTrue(os.path.exists(self.tablename + ".wt"))
+        self.assertTrue(self.tableExists(self.tablename))
 
         """
         Alter access pattern and confirm

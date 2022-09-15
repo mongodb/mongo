@@ -1907,6 +1907,17 @@ tasks:
       - func: "unit test"
         vars:
           unit_test_args: -v 2 -R cursor13 join02 join07 schema03 timestamp22
+
+  - name: unit-test-hook-tiered
+    tags: ["python"]
+    depends_on:
+    - name: compile
+    commands:
+      - func: "fetch artifacts"
+      - func: "unit test"
+        vars:
+          unit_test_args: --hook tiered
+
   # Break out Python unit tests into multiple buckets/tasks.  We have a fixed number of buckets,
   # and we use the -b option of the test/suite/run.py script to split up the tests.
 
@@ -3963,6 +3974,7 @@ buildvariants:
     - name: checkpoint-filetypes-test
     - name: unit-test-zstd
     - name: unit-test-random-seed
+    - name: unit-test-hook-tiered
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
     - name: compile-wtperf

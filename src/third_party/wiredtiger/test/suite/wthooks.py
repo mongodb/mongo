@@ -37,7 +37,7 @@ from __future__ import print_function
 
 from importlib import import_module
 from abc import ABC, abstractmethod
-import wiredtiger
+import wiredtiger, os
 
 # Three kinds of hooks available:
 HOOK_REPLACE = 1     # replace the call with the hook function
@@ -82,6 +82,14 @@ def tty(message):
 #      A hook function that replaces an API function will have the same args as the function
 #      it replaces (but there is a trick to give it additional context if needed -
 #      see session_create_replace in hook_demo.py).
+#
+#  Hook Platform API:
+#      A set of utility functions used by WiredTigerTestCase or other parts of the test framework
+#      that may differ according to platform.  Rather than have hook specific implementations in the
+#      test framework, the "platform API" is implemented by any hook that wants to override it.
+#      Currently the hook specific implementation is all or nothing, in the future we may allow
+#      subsets of the hook platform API to be implemented.
+
 
 # For every API function altered, there is one of these objects
 # stashed in the <class>._<api_name>_hooks attribute.
@@ -135,6 +143,7 @@ def hooked_function(self, orig_func, hook_info_name, *args):
 class WiredTigerHookManager(object):
     def __init__(self, hooknames = []):
         self.hooks = []
+        self.platform_api = None
         names_seen = []
         for name in hooknames:
             # The hooks are indicated as "somename=arg" or simply "somename".
@@ -159,8 +168,20 @@ class WiredTigerHookManager(object):
             except:
                 print('Cannot import hook: ' + name + ', check file ' + modname + '.py')
                 raise
+        self.hook_names = tuple(names_seen)
         for hook in self.hooks:
             hook.setup_hooks()
+            api = hook.get_platform_api()   # can return None
+            if api:
+                # We currently don't allow multiple platforms to create their own API,
+                # but this could be relaxed. Imagine that hooks implement subsets of the
+                # API. We could create an ordered list, and try each platform_api in turn.
+                if self.platform_api:
+                    raise Exception('Running multiple hooks, each with their own platform API, ' +
+                                    'is not implemented')
+                self.platform_api = api
+        if self.platform_api == None:
+            self.platform_api = DefaultPlatformAPI()
 
     def add_hook(self, clazz, method_name, hook_type, hook_func):
         if not hasattr(clazz, method_name):
@@ -219,6 +240,12 @@ class WiredTigerHookManager(object):
             tests = hook.filter_tests(tests)
         return tests
 
+    def get_hook_names(self):
+        return self.hook_names
+
+    def get_platform_api(self):
+        return self.platform_api
+
 class HookCreatorProxy(object):
     def __init__(self, hookmgr, clazz):
         self.hookmgr = hookmgr
@@ -256,3 +283,27 @@ class WiredTigerHookCreator(ABC):
     def setup_hooks(self):
         """Set up all hooks using add_*_hook methods."""
         return
+
+class WiredTigerHookPlatformAPI(ABC):
+    @abstractmethod
+    def tableExists(self, name):
+        """Return boolean if local files exist for the table with the given base name"""
+        pass
+
+    @abstractmethod
+    def initialFileName(self, uri):
+        """The first local backing file name created for this URI."""
+        pass
+
+class DefaultPlatformAPI(WiredTigerHookPlatformAPI):
+    def tableExists(self, name):
+        tablename = name + ".wt"
+        return os.path.exists(tablename)
+
+    def initialFileName(self, uri):
+        if uri.startswith('table:'):
+            return uri[6:] + '.wt'
+        elif uri.startswith('file:'):
+            return uri[5:]
+        else:
+            raise Exception('bad uri')

@@ -228,6 +228,12 @@ class suite_subprocess:
         outfilename=None, errfilename=None, closeconn=True,
         reopensession=True, failure=False):
 
+        # FIXME-WT-9808:
+        # The tiered hook silently interjects tiered configuration and extensions,
+        # these are not yet dealt with when running the external 'wt' process.
+        if 'tiered' in self.hook_names:
+            self.skipTest("runWt is not yet supported with tiering")
+
         # Close the connection to guarantee everything is flushed, and that
         # we can open it from another process.
         if closeconn:

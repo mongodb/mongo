@@ -43,6 +43,8 @@ class test_bug006(wttest.WiredTigerTestCase):
     ])
 
     def test_bug006(self):
+        if 'tiered' in self.hook_names:
+            self.skipTest("negative tests for session APIs like drop do not work in tiered storage")
         uri = self.uri + self.name
         self.session.create(uri, 'value_format=S,key_format=S')
         cursor = self.session.open_cursor(uri, None)

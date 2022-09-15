@@ -42,8 +42,36 @@ except ImportError:
     import unittest
 
 from contextlib import contextmanager
-import errno, glob, os, re, shutil, sys, time, traceback
+import errno, glob, os, re, shutil, sys, threading, time, traceback
 import wiredtiger, wtscenario, wthooks
+
+# Use as "with timeout(seconds): ....". Argument of 0 means no timeout,
+# and only available (with non-zero argument) on Unix systems.
+class timeout(object):
+    def __init__(self, seconds=0):
+        self.seconds = seconds
+        self.prev_handler = None
+
+    def signal_handler(self, signum, frame):
+        raise(TimeoutError('time for test exceeded {} seconds'.format(self.seconds)))
+
+    def __enter__(self):
+        if self.seconds != 0:
+            try:
+                import signal     # This will fail on non-Unix systems.
+                self.prev_handler = signal.signal(signal.SIGALRM, self.signal_handler)
+                signal.alarm(self.seconds)
+            except Exception as e:
+                raise Exception('The --timeout option is not available on this system: ' + str(e))
+
+    def __exit__(self, typ, value, traceback):
+        if self.seconds != 0:
+            try:
+                import signal     # This will fail on non-Unix systems.
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, self.prev_handler)
+            except Exception as e:
+                raise Exception('The --timeout option is not available on this system: ' + str(e))
 
 def shortenWithEllipsis(s, maxlen):
     if len(s) > maxlen:
@@ -185,6 +213,11 @@ class WiredTigerTestCase(unittest.TestCase):
     _printOnceSeen = {}
     _ttyDescriptor = None   # set this early, to allow tty() to be called any time.
 
+    # We store the current test case in thread local storage.  There are
+    # certain odd cases where this is useful, like hooks, where we don't
+    # have any notion of the current test case.
+    _threadLocal = threading.local()
+
     # rollbacks_allowed can be overridden to permit more or fewer retries on rollback errors.
     # We retry tests that get rollback errors in a way that is mostly invisible.
     # There is a visible difference in that the rollback error's stack trace is recorded
@@ -211,7 +244,7 @@ class WiredTigerTestCase(unittest.TestCase):
     def globalSetup(preserveFiles = False, removeAtStart = True, useTimestamp = False,
                     gdbSub = False, lldbSub = False, verbose = 1, builddir = None, dirarg = None,
                     longtest = False, zstdtest = False, ignoreStdout = False, seedw = 0, seedz = 0, 
-                    hookmgr = None, ss_random_prefix = 0):
+                    hookmgr = None, ss_random_prefix = 0, timeout = 0):
         WiredTigerTestCase._preserveFiles = preserveFiles
         d = 'WT_TEST' if dirarg == None else dirarg
         if useTimestamp:
@@ -241,9 +274,11 @@ class WiredTigerTestCase(unittest.TestCase):
         WiredTigerTestCase._ss_random_prefix = ss_random_prefix
         WiredTigerTestCase._retriesAfterRollback = 0
         WiredTigerTestCase._testsRun = 0
+        WiredTigerTestCase._timeout = timeout
         if hookmgr == None:
             hookmgr = wthooks.WiredTigerHookManager()
         WiredTigerTestCase._hookmgr = hookmgr
+        WiredTigerTestCase.hook_names = hookmgr.get_hook_names()
         if seedw != 0 and seedz != 0:
             WiredTigerTestCase._randomseed = True
             WiredTigerTestCase._seeds = [seedw, seedz]
@@ -262,6 +297,10 @@ class WiredTigerTestCase(unittest.TestCase):
         if totalTestsRun > 0 and totalRetries / totalTestsRun > 0.01 and totalRetries >= 3:
             raise Exception('Retries from WT_ROLLBACK in test suite: {}/{}, see {} for stack traces'.format(
                 totalRetries, totalTestsRun, WiredTigerTestCase._resultFileName))
+
+    @staticmethod
+    def currentTestCase():
+        return getattr(WiredTigerTestCase._threadLocal, 'currentTestCase', None)
 
     def fdSetUp(self):
         self.captureout = CapturedFd('stdout.txt', 'standard output')
@@ -283,6 +322,20 @@ class WiredTigerTestCase(unittest.TestCase):
         self.skipped = False
         if not self._globalSetup:
             WiredTigerTestCase.globalSetup()
+        self.platform_api = WiredTigerTestCase._hookmgr.get_platform_api()
+
+    # Platform specific functions (may be overridden by hooks):
+
+    # Return true if file(s) for the table with the given base name exist in the file system.
+    # This may have a different implementation when running under certain hooks.
+    def tableExists(self, name):
+        return self.platform_api.tableExists(name)
+
+    # The first filename for this URI.  In the tiered storage
+    # world, this makes a difference, every flush tier creates a
+    # This may have a different implementation when running under certain hooks.
+    def initialFileName(self, name):
+        return self.platform_api.initialFileName(name)
 
     def __str__(self):
         # when running with scenarios, if the number_scenarios() method
@@ -325,8 +378,9 @@ class WiredTigerTestCase(unittest.TestCase):
         WiredTigerTestCase._testsRun += 1
         while not finished and rollbacksAllowed >= 0:
             try:
-                method()
-                finished = True
+                with timeout(WiredTigerTestCase._timeout):
+                    method()
+                    finished = True
             except wiredtiger.WiredTigerRollbackError:
                 WiredTigerTestCase._retriesAfterRollback += 1
                 self.prexception(sys.exc_info())
@@ -515,6 +569,7 @@ class WiredTigerTestCase(unittest.TestCase):
             self.prhead('started in ' + self.testdir, True)
         # tearDown needs connections list, set it here in case the open fails.
         self._connections = []
+        self._failed = None   # set to True/False during teardown.
         self.origcwd = os.getcwd()
         shutil.rmtree(self.testdir, ignore_errors=True)
         if os.path.exists(self.testdir):
@@ -524,6 +579,7 @@ class WiredTigerTestCase(unittest.TestCase):
         with open('testname.txt', 'w+') as namefile:
             namefile.write(str(self) + '\n')
         self.fdSetUp()
+        self._threadLocal.currentTestCase = self
         # tearDown needs a conn field, set it here in case the open fails.
         self.conn = None
         try:
@@ -576,7 +632,8 @@ class WiredTigerTestCase(unittest.TestCase):
         failure = self.list2reason(result, 'failures')
         exc_failure = (sys.exc_info() != (None, None, None))
 
-        passed = not error and not failure and not exc_failure
+        self._failed = error or failure or exc_failure
+        passed = not self._failed
 
         # Download the files from the S3 bucket for tiered tests if the test fails or preserve is
         # turned on.
@@ -618,6 +675,8 @@ class WiredTigerTestCase(unittest.TestCase):
         else:
             self.pr('preserving directory ' + self.testdir)
 
+        self._threadLocal.currentTestCase = None
+
         elapsed = time.time() - self.starttime
         if elapsed > 0.001 and WiredTigerTestCase._verbose >= 2:
             print("%s: %.2f seconds" % (str(self), elapsed))
@@ -627,6 +686,11 @@ class WiredTigerTestCase(unittest.TestCase):
             self.pr('preserving directory ' + self.testdir)
         if WiredTigerTestCase._verbose > 2:
             self.prhead('TEST COMPLETED')
+
+    # Returns None if testcase is running.  If during (or after) tearDown,
+    # will return True or False depending if the test case failed.
+    def failed(self):
+        return self._failed
 
     def backup(self, backup_dir, session=None):
         if session is None:
