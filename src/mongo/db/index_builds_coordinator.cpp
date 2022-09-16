@@ -66,6 +66,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scoped_counter.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -2380,11 +2381,46 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
                     "error"_attr = status);
         fassertFailedNoTrace(5642402);
     }
+
+    // WARNING: Do not add new exemptions to this assertion! If this assertion is failing, an
+    // exception escaped during this index build. The solution should not be to add an exemption for
+    // that exception. We should instead address the problem by preventing that exception from being
+    // thrown in the first place.
+    //
+    // Simultaneous index builds are not resilient to arbitrary exceptions being thrown. Secondaries
+    // will only abort when the primary replicates an abortIndexBuild oplog entry, and primaries
+    // should only abort when they can guarantee the node will not step down.
+    //
+    // At this point, an exception was thrown, we released our locks, and our index build state is
+    // not resumable. If we were primary when the exception was thrown, we are no longer guaranteed
+    // to be primary at this point. If we were never primary or are no longer primary, we will
+    // fatally assert. If we are still primary, we can hope to quickly re-acquire our locks and
+    // abort the index build without issue. We will always fatally assert in debug builds.
+    //
+    // Solutions to fixing this failing assertion may include:
+    // * Suppress the errors during the index build and re-check the assertions that lead to the
+    //   error at commit time once we have acquired all of the appropriate locks in
+    //   _insertKeysFromSideTablesAndCommit().
+    // * Explicitly abort the index build with abortIndexBuildByBuildUUID() before performing an
+    //   operation that causes the index build to throw an error.
     // TODO (SERVER-69264): Remove ErrorCodes::CannotCreateIndex.
     // TODO (SERVER-69496): Remove ErrorCodes::InterruptedAtShutdown.
-    invariant(opCtx->isKillPending() || status.code() == ErrorCodes::CannotCreateIndex ||
-                  status.code() == ErrorCodes::InterruptedAtShutdown,
-              str::stream() << "Unexpected error code during index build cleanup: " << status);
+    if (!opCtx->isKillPending() && status.code() != ErrorCodes::CannotCreateIndex &&
+        status.code() != ErrorCodes::InterruptedAtShutdown) {
+        if (TestingProctor::instance().isEnabled()) {
+            LOGV2_FATAL(
+                6967700, "Unexpected error code during index build cleanup", "error"_attr = status);
+        } else {
+            // Note: Even if we don't fatally assert, if the node has stepped-down from being
+            // primary, then we will still crash shortly after this. As a secondary, index builds
+            // must succeed, and if we are in this path, the index build failed without being
+            // explicitly aborted by the primary. Only if we're lucky enough to still be primary
+            // will we abort the index build without any nodes crashing.
+            LOGV2_WARNING(
+                6967701, "Unexpected error code during index build cleanup", "error"_attr = status);
+        }
+    }
+
     if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
         _cleanUpSinglePhaseAfterFailure(opCtx, collection, replState, indexBuildOptions, status);
     } else {
