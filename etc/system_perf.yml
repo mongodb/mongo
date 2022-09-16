@@ -974,7 +974,7 @@ tasks:
           test_control: "initialsync-logkeeper"
           mongodb_setup: "initialsync-logkeeper-short"
           # Logkeeper dataset with FCV set to 6.0
-          mongodb_dataset: "https://s3-us-west-2.amazonaws.com/dsi-donot-remove/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-6.0.tgz"
+          mongodb_dataset: "https://dsi-donot-remove.s3-us-west-2.amazonaws.com/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-6.1.tgz"
 
   - name: initialsync-logkeeper-short-fcbis
     priority: 5
@@ -984,7 +984,7 @@ tasks:
           test_control: "initialsync-logkeeper"
           mongodb_setup: "initialsync-logkeeper-short-fcbis"
           # Logkeeper dataset with FCV set to 6.0
-          mongodb_dataset: "https://s3-us-west-2.amazonaws.com/dsi-donot-remove/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-6.0.tgz"
+          mongodb_dataset: "https://dsi-donot-remove.s3-us-west-2.amazonaws.com/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-6.1.tgz"
 
   - name: initialsync-logkeeper
     priority: 5
@@ -1016,7 +1016,7 @@ tasks:
           test_control: "initialsync-logkeeper-short-s3-update"
           mongodb_setup: "initialsync-logkeeper-short-s3-update"
           # Update this to Logkeeper dataset with FCV set to latest after each LTS release.
-          mongodb_dataset: "https://s3-us-west-2.amazonaws.com/dsi-donot-remove/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-6.0.tgz"
+          mongodb_dataset: "https://dsi-donot-remove.s3-us-west-2.amazonaws.com/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-6.1.tgz"
 
   - name: initialsync-logkeeper-snapshot-update
     priority: 5
@@ -2120,7 +2120,7 @@ buildvariants:
       mongodb_setup: initialsync-logkeeper
       infrastructure_provisioning: initialsync-logkeeper
       # EBS logkeeper snapshot with FCV set to 6.0
-      snapshotId: snap-0306dce35f030ebec
+      snapshotId: snap-0716ed59d18225693
       platform: linux
       authentication: disabled
       storageEngine: wiredTiger
@@ -2144,7 +2144,7 @@ buildvariants:
   #    mongodb_setup: initialsync-logkeeper-snapshot-update
   #    infrastructure_provisioning: initialsync-logkeeper-snapshot-update
   #    # Update this to latest snapshot after each LTS release.
-  #    snapshotId: snap-0306dce35f030ebec
+  #    snapshotId: snap-0716ed59d18225693
   #    platform: linux
   #    authentication: disabled
   #    storageEngine: wiredTiger
