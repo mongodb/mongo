@@ -30,6 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <memory>
+
 #include "mongo/client/async_client.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/client.h"
@@ -117,10 +119,10 @@ TEST(TransportLayerASIO, ShortReadsAndWritesWork) {
         thread.join();
     });
 
-    ConnectionMetrics metrics{sc->getFastClockSource()};
+    auto metrics = std::make_shared<ConnectionMetrics>(sc->getFastClockSource());
     AsyncDBClient::Handle handle =
         AsyncDBClient::connect(
-            server, transport::kGlobalSSLMode, sc, reactor, Milliseconds::max(), &metrics)
+            server, transport::kGlobalSSLMode, sc, reactor, Milliseconds::max(), metrics)
             .get();
 
     handle->initWireVersion(__FILE__, nullptr).get();
@@ -153,9 +155,9 @@ TEST(TransportLayerASIO, asyncConnectTimeoutCleansUpSocket) {
     });
 
     FailPointEnableBlock fp("transportLayerASIOasyncConnectTimesOut");
-    ConnectionMetrics metrics{sc->getFastClockSource()};
+    auto metrics = std::make_shared<ConnectionMetrics>(sc->getFastClockSource());
     auto client = AsyncDBClient::connect(
-                      server, transport::kGlobalSSLMode, sc, reactor, Milliseconds{500}, &metrics)
+                      server, transport::kGlobalSSLMode, sc, reactor, Milliseconds{500}, metrics)
                       .getNoThrow();
     ASSERT_EQ(client.getStatus(), ErrorCodes::NetworkTimeout);
 }
@@ -173,10 +175,10 @@ TEST(TransportLayerASIO, exhaustIsMasterShouldReceiveMultipleReplies) {
         thread.join();
     });
 
-    ConnectionMetrics metrics{sc->getFastClockSource()};
+    auto metrics = std::make_shared<ConnectionMetrics>(sc->getFastClockSource());
     AsyncDBClient::Handle handle =
         AsyncDBClient::connect(
-            server, transport::kGlobalSSLMode, sc, reactor, Milliseconds::max(), &metrics)
+            server, transport::kGlobalSSLMode, sc, reactor, Milliseconds::max(), metrics)
             .get();
 
     handle->initWireVersion(__FILE__, nullptr).get();
@@ -257,17 +259,17 @@ TEST(TransportLayerASIO, exhaustIsMasterShouldStopOnFailure) {
         thread.join();
     });
 
-    ConnectionMetrics masterMetrics{sc->getFastClockSource()};
+    auto masterMetrics = std::make_shared<ConnectionMetrics>(sc->getFastClockSource());
     AsyncDBClient::Handle isMasterHandle =
         AsyncDBClient::connect(
-            server, transport::kGlobalSSLMode, sc, reactor, Milliseconds::max(), &masterMetrics)
+            server, transport::kGlobalSSLMode, sc, reactor, Milliseconds::max(), masterMetrics)
             .get();
     isMasterHandle->initWireVersion(__FILE__, nullptr).get();
 
-    ConnectionMetrics failpointMetrics{sc->getFastClockSource()};
+    auto failpointMetrics = std::make_shared<ConnectionMetrics>(sc->getFastClockSource());
     AsyncDBClient::Handle failpointHandle =
         AsyncDBClient::connect(
-            server, transport::kGlobalSSLMode, sc, reactor, Milliseconds::max(), &failpointMetrics)
+            server, transport::kGlobalSSLMode, sc, reactor, Milliseconds::max(), failpointMetrics)
             .get();
     failpointHandle->initWireVersion(__FILE__, nullptr).get();
 

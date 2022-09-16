@@ -61,7 +61,7 @@ public:
         ServiceContext* context,
         transport::ReactorHandle reactor,
         Milliseconds timeout,
-        ConnectionMetrics* connectionMetrics,  // must remain valid until the future is ready
+        std::shared_ptr<ConnectionMetrics> connectionMetrics,
         std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext = nullptr);
 
     Future<executor::RemoteCommandResponse> runCommandRequest(

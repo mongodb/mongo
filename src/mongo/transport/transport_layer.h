@@ -99,7 +99,7 @@ public:
         ConnectSSLMode sslMode,
         const ReactorHandle& reactor,
         Milliseconds timeout,
-        ConnectionMetrics* connectionMetrics,  // must remain valid until the future is ready
+        std::shared_ptr<ConnectionMetrics> connectionMetrics,
         std::shared_ptr<const SSLConnectionContext> transientSSLContext) = 0;
 
     /**
