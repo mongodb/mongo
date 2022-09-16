@@ -1,2 +1,3 @@
 src/mongo/gotools/*
 *.tpl.js
+jstests/third_party/**/*.js
