@@ -34,6 +34,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
+    - "mongo/db/pipeline/value.idl"
 
 enums:
     GlobalIndexClonerState:
@@ -54,6 +55,10 @@ structs:
             state:
                 type: GlobalIndexClonerState
                 description: "The current state of cloner."
+            lastProcessedId:
+                type: Value
+                description: "Contains the _id value of the last cloned document."
+                optional: true
 
     GlobalIndexClonerDoc:
         description: "Document containing the state and specs of global index cloning operation."

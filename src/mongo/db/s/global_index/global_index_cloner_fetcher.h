@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -57,6 +58,12 @@ public:
      * Returns boost::none if there are no documents left.
      */
     virtual boost::optional<FetchedEntry> getNext(OperationContext* opCtx) = 0;
+
+    /**
+     * Sets the id that can be used to resume previous progress. resumeId must include the _id
+     * field.
+     */
+    virtual void setResumeId(Value resumeId) = 0;
 };
 
 /**
@@ -79,6 +86,8 @@ public:
      */
     std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(OperationContext* opCtx);
 
+    void setResumeId(Value resumeId) override;
+
 private:
     std::unique_ptr<Pipeline, PipelineDeleter> _restartPipeline(OperationContext* opCtx);
     std::unique_ptr<Pipeline, PipelineDeleter> _targetAggregationRequest(const Pipeline& pipeline);
@@ -91,6 +100,8 @@ private:
     const Timestamp _minFetchTimestamp;
     const KeyPattern _sourceShardKeyPattern;
     const KeyPattern _globalIndexKeyPattern;
+
+    Value _resumeId;
 
     std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
 };

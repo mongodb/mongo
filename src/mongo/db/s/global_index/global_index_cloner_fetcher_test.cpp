@@ -467,6 +467,72 @@ TEST_F(GlobalIndexClonerFetcherTest, CanFetchDocumentsWithDottedIdInShardKey) {
     ASSERT_FALSE(pipeline->getNext());
 }
 
+TEST_F(GlobalIndexClonerFetcherTest, FetcherShouldSkipDocsIfResumeIdIsSet) {
+    const KeyPattern sourceShardKeyPattern(BSON("sKey" << 1));
+    const KeyPattern globalIndexPattern(BSON("uniq" << 1));
+
+    ShardKeyPattern sk{globalIndexPattern};
+    std::deque<DocumentSource::GetNextResult> configData{
+        Doc(fromjson("{_id: {uniq: {$minKey: 1}}, max: {uniq: {$maxKey: 1}}, shard: 'shardA'}"))};
+    getCatalogCacheMock()->setChunkManagerReturnValue(createChunkManager(sk, configData));
+
+    GlobalIndexClonerFetcher fetcher(
+        ns(), collUUID(), indexUUID(), shardA(), {}, sourceShardKeyPattern, globalIndexPattern);
+
+    std::deque<DocumentSource::GetNextResult> mockResults;
+    const auto kRequiresEscapingBSON = BSON("$ne" << 4);
+    mockResults.emplace_back(Doc(BSON("_id" << 1 << "sKey" << 1 << "uniq" << 1)));
+    mockResults.emplace_back(Doc(BSON("_id" << 2 << "sKey" << 2 << "uniq" << 2)));
+    mockResults.emplace_back(Doc(BSON("_id"
+                                      << "3"
+                                      << "sKey" << 3 << "uniq" << 3)));
+    mockResults.emplace_back(
+        Doc(BSON("_id" << kRequiresEscapingBSON << "sKey" << 4 << "uniq" << 4)));
+
+    fetcher.setResumeId(Value(kRequiresEscapingBSON));
+    auto pipeline = fetcher.makePipeline(operationContext());
+
+    {
+        auto mockSource = DocumentSourceMock::createForTest(mockResults, pipeline->getContext());
+        pipeline->addInitialSource(mockSource);
+
+        auto next = pipeline->getNext();
+        ASSERT_TRUE(next);
+        ASSERT_BSONOBJ_EQ(fromjson("{_id: {uniq: 4}, documentKey: {_id: {$ne: 4}, sKey: 4}}"),
+                          next->toBson());
+
+        ASSERT_FALSE(pipeline->getNext());
+    }
+
+    // Test that resumeId can be set and overrides old setting.
+
+    fetcher.setResumeId(Value(2));
+    pipeline = fetcher.makePipeline(operationContext());
+
+    {
+        auto mockSource = DocumentSourceMock::createForTest(mockResults, pipeline->getContext());
+        pipeline->addInitialSource(mockSource);
+
+        auto next = pipeline->getNext();
+        ASSERT_TRUE(next);
+        ASSERT_BSONOBJ_EQ(fromjson("{_id: {uniq: 2}, documentKey: {_id: 2, sKey: 2}}"),
+                          next->toBson());
+
+        next = pipeline->getNext();
+        ASSERT_TRUE(next);
+        ASSERT_BSONOBJ_EQ(fromjson("{_id: {uniq: 3}, documentKey: {_id: \"3\", sKey: 3}}"),
+                          next->toBson());
+
+        next = pipeline->getNext();
+        ASSERT_TRUE(next);
+        ASSERT_BSONOBJ_EQ(fromjson("{_id: {uniq: 4}, documentKey: {_id: {$ne: 4}, sKey: 4}}"),
+                          next->toBson());
+
+
+        ASSERT_FALSE(pipeline->getNext());
+    }
+}
+
 }  // namespace
 }  // namespace global_index
 }  // namespace mongo

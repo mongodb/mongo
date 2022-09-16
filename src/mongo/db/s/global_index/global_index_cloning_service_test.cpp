@@ -114,24 +114,92 @@ private:
     const ShardId _someDonorId{"otherShardId"};
 };
 
-class MockGlobalIndexClonerFetcher : public GlobalIndexClonerFetcherInterface {
+class Fault {
 public:
-    void setResultList(std::list<FetchedEntry> newResults) {
-        _docs = std::move(newResults);
-    }
+    Fault(Status error, int triggerCount = 1)
+        : _error(std::move(error)), _remainingTriggerCount(triggerCount) {}
 
-    boost::optional<FetchedEntry> getNext(OperationContext* opCtx) override {
-        if (_docs.empty()) {
-            return boost::none;
+    void throwIfEnabled() {
+        if (_remainingTriggerCount == 0 || _remainingTriggerCount-- == 0) {
+            return;
         }
 
-        auto ret = _docs.front();
-        _docs.pop_front();
-        return ret;
+        uassertStatusOK(_error);
     }
 
 private:
-    std::list<FetchedEntry> _docs;
+    const Status _error;
+    int _remainingTriggerCount{0};
+};
+
+template <typename T>
+struct FaultOrData {
+public:
+    FaultOrData(T data) : _data(std::move(data)) {}
+    FaultOrData(Fault fault) : _fault(std::move(fault)) {}
+
+    boost::optional<T> getData() {
+        if (_fault) {
+            _fault->throwIfEnabled();
+        }
+
+        return _data;
+    }
+
+private:
+    boost::optional<T> _data;
+    boost::optional<Fault> _fault;
+};
+
+std::shared_ptr<FaultOrData<GlobalIndexClonerFetcherInterface::FetchedEntry>> mockFetchedEntry(
+    const BSONObj& docKey, const BSONObj& indexKey) {
+    return std::make_shared<FaultOrData<GlobalIndexClonerFetcherInterface::FetchedEntry>>(
+        GlobalIndexClonerFetcherInterface::FetchedEntry(docKey, indexKey));
+}
+
+std::shared_ptr<FaultOrData<GlobalIndexClonerFetcherInterface::FetchedEntry>> mockError(
+    Status error) {
+    return std::make_shared<FaultOrData<GlobalIndexClonerFetcherInterface::FetchedEntry>>(error);
+}
+
+using MockedResults =
+    std::list<std::shared_ptr<FaultOrData<GlobalIndexClonerFetcherInterface::FetchedEntry>>>;
+
+class MockGlobalIndexClonerFetcher : public GlobalIndexClonerFetcherInterface {
+public:
+    explicit MockGlobalIndexClonerFetcher(std::shared_ptr<Value> resumeId) : _resumeId(resumeId) {}
+
+    void setResultList(MockedResults newResults) {
+        _mockedResults = std::move(newResults);
+    }
+
+    boost::optional<FetchedEntry> getNext(OperationContext* opCtx) override {
+        boost::optional<FetchedEntry> ret;
+
+        while (!_mockedResults.empty() && !ret) {
+            auto next = _mockedResults.front();
+
+            if (auto actualData = next->getData()) {
+                Value idValue(actualData->documentKey["_id"]);
+                ValueComparator comparator;
+                if (comparator.evaluate(idValue >= *_resumeId)) {
+                    ret = actualData;
+                }
+            }
+
+            _mockedResults.pop_front();
+        }
+
+        return ret;
+    }
+
+    void setResumeId(Value resumeId) override {
+        *_resumeId = std::move(resumeId);
+    }
+
+private:
+    MockedResults _mockedResults;
+    std::shared_ptr<Value> _resumeId;
 };
 
 class GlobalIndexCloningFetcherFactoryForTest : public GlobalIndexClonerFetcherFactoryInterface {
@@ -186,8 +254,17 @@ using GlobalIndexStateMachine = GlobalIndexCloningServiceForTest::CloningStateMa
 
 class GlobalIndexClonerServiceTest : public repl::PrimaryOnlyServiceMongoDTest {
 public:
+    const int kDefaultMockId = 10;
+
+    GlobalIndexClonerServiceTest() {
+        _lastSetResumeId = std::make_shared<Value>();
+        _mockFetcher = std::make_unique<MockGlobalIndexClonerFetcher>(_lastSetResumeId);
+        _fetcherCopyForVerification = std::make_unique<MockGlobalIndexClonerFetcher>(*_mockFetcher);
+    }
+
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
-        return std::make_unique<GlobalIndexCloningServiceForTest>(serviceContext, &_mockFetcher);
+        return std::make_unique<GlobalIndexCloningServiceForTest>(serviceContext,
+                                                                  _mockFetcher.get());
     }
 
     void setUp() override {
@@ -224,9 +301,9 @@ public:
         // Session cache is needed otherwise client session info will ignored.
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
 
-        std::list<GlobalIndexClonerFetcherInterface::FetchedEntry> fetcherResults;
-        fetcherResults.push_front(
-            {BSON("_id" << 10 << kSourceShardKey << 20), BSON(_indexKey << 30)});
+        MockedResults fetcherResults;
+        fetcherResults.push_front(mockFetchedEntry(
+            BSON("_id" << kDefaultMockId << kSourceShardKey << 20), BSON(_indexKey << 30)));
         replaceFetcherResultList(std::move(fetcherResults));
 
         CreateGlobalIndex createGlobalIndex(_indexCollectionUUID);
@@ -236,10 +313,16 @@ public:
         ASSERT(success) << "createGlobalIndex cmd failed with result: " << cmdResult;
     }
 
+    /**
+     * Checks that the contents of the global index output collection matches with the results
+     * stored in the mocked results.
+     *
+     * Note: this can trigger the fault in the mock structure if it is still enabled.
+     */
     void checkIndexCollection(OperationContext* opCtx) {
         DBDirectClient client(opCtx);
 
-        MockGlobalIndexClonerFetcher fetcherCopy(_fetcherCopyForVerification);
+        MockGlobalIndexClonerFetcher fetcherCopy(*_fetcherCopyForVerification);
         while (auto next = fetcherCopy.getNext(opCtx)) {
             FindCommandRequest query(NamespaceString::makeGlobalIndexNSS(_indexCollectionUUID));
             query.setFilter(BSON("_id" << next->documentKey));
@@ -258,7 +341,7 @@ public:
                                     _indexName,
                                     _indexSpec,
                                     {},
-                                    GlobalIndexClonerStateEnum::kUnused);
+                                    {GlobalIndexClonerStateEnum::kUnused});
     }
 
     bool doesCollectionExist(OperationContext* opCtx, const NamespaceString& nss) {
@@ -282,17 +365,19 @@ public:
         return _stateTransitionController.get();
     }
 
-    void replaceFetcherResultList(
-        std::list<GlobalIndexClonerFetcherInterface::FetchedEntry> newResults) {
-        _mockFetcher.setResultList(std::move(newResults));
-        _fetcherCopyForVerification = _mockFetcher;
+    void replaceFetcherResultList(MockedResults newResults) {
+        _mockFetcher->setResultList(std::move(newResults));
+        _fetcherCopyForVerification = std::make_unique<MockGlobalIndexClonerFetcher>(*_mockFetcher);
     }
 
     StringData indexKey() const {
         return _indexKey;
     }
 
-private:
+    Value getLastSetResumeId() {
+        return *_lastSetResumeId;
+    }
+
     std::string dumpOutputColl(OperationContext* opCtx) {
         DBDirectClient client(opCtx);
         FindCommandRequest query(NamespaceString::makeGlobalIndexNSS(_indexCollectionUUID));
@@ -313,6 +398,13 @@ private:
         return outputStr.str();
     }
 
+    void checkExpectedEntries(OperationContext* opCtx, int count) {
+        DBDirectClient client(opCtx);
+        ASSERT_EQ(count, client.count(NamespaceString::makeGlobalIndexNSS(_indexCollectionUUID)))
+            << dumpOutputColl(opCtx);
+    }
+
+private:
     const UUID _indexCollectionUUID{UUID::gen()};
     const UUID _collectionUUID{UUID::gen()};
     const std::string _indexName{"global_x_1"};
@@ -322,8 +414,12 @@ private:
     ReadWriteConcernDefaultsLookupMock _lookupMock;
     std::shared_ptr<StateTransitionController> _stateTransitionController;
 
-    MockGlobalIndexClonerFetcher _mockFetcher;
-    MockGlobalIndexClonerFetcher _fetcherCopyForVerification;
+    // This is a shared_ptr to make sure that this will be available when the primary only service
+    // instance outlives this test fixture (usually happens when assertion occurs).
+    std::shared_ptr<Value> _lastSetResumeId;
+
+    std::unique_ptr<MockGlobalIndexClonerFetcher> _mockFetcher;
+    std::unique_ptr<MockGlobalIndexClonerFetcher> _fetcherCopyForVerification;
 };
 
 MONGO_INITIALIZER_GENERAL(EnableFeatureFlagGlobalIndexes,
@@ -345,6 +441,9 @@ TEST_F(GlobalIndexClonerServiceTest, CloneInsertsToGlobalIndexCollection) {
     cloner->getReadyToCommitFuture().get();
     cloner->cleanup();
     future.get();
+
+    auto resumeId = getLastSetResumeId();
+    ASSERT_EQ(kDefaultMockId, resumeId.getInt());
 
     ASSERT_TRUE(doesCollectionExist(rawOpCtx, skipIdNss(doc.getNss(), doc.getIndexName())));
     checkIndexCollection(rawOpCtx);
@@ -410,7 +509,7 @@ TEST_F(GlobalIndexClonerServiceTest, ShouldBeSafeToRetryOnStepDown) {
 }
 
 TEST_F(GlobalIndexClonerServiceTest, ShouldBeAbleToConsumeMultipleBatchesWorthofDocs) {
-    std::list<GlobalIndexClonerFetcherInterface::FetchedEntry> fetcherResults;
+    MockedResults fetcherResults;
 
     RAIIServerParameterControllerForTest batchSizeForTest(
         "globalIndexClonerServiceFetchBatchMaxSizeBytes", 50);
@@ -418,8 +517,9 @@ TEST_F(GlobalIndexClonerServiceTest, ShouldBeAbleToConsumeMultipleBatchesWorthof
 
     // Populate enough to have more than one batch worth of documents.
     for (int x = 0; x < 4; x++) {
-        fetcherResults.push_front({BSON("_id" << x << kSourceShardKey << x),
-                                   BSON(indexKey() << (std::to_string(x) + padding))});
+        fetcherResults.push_front(
+            mockFetchedEntry(BSON("_id" << x << kSourceShardKey << x),
+                             BSON(indexKey() << (std::to_string(x) + padding))));
     }
     replaceFetcherResultList(std::move(fetcherResults));
 
@@ -481,6 +581,75 @@ TEST_F(GlobalIndexClonerServiceTest, CleanupBeforeReadyResultsInAbort) {
 
         stateTransitionsGuard.unset(nextState);
     }
+}
+
+TEST_F(GlobalIndexClonerServiceTest, ResumeIdShouldBeRestoredOnStepUp) {
+    auto opCtx = makeOperationContext();
+    auto rawOpCtx = opCtx.get();
+
+    auto doc = makeStateDocument();
+    auto mutableState = doc.getMutableState();
+    mutableState.setState(GlobalIndexClonerStateEnum::kCloning);
+    mutableState.setLastProcessedId(Value(3));
+    doc.setMutableState(mutableState);
+
+    DBDirectClient client(rawOpCtx);
+    write_ops::InsertCommandRequest stateDocInsert(NamespaceString::kGlobalIndexClonerNamespace);
+    stateDocInsert.setDocuments({doc.toBSON()});
+    auto insertResult = client.insert(stateDocInsert);
+    ASSERT_FALSE(insertResult.getWriteErrors()) << insertResult.toBSON();
+
+    MockedResults fetcherResults;
+    for (int x = 0; x < 4; x++) {
+        fetcherResults.push_front(mockFetchedEntry(BSON("_id" << x << kSourceShardKey << x),
+                                                   BSON(indexKey() << std::to_string(x))));
+    }
+    replaceFetcherResultList(std::move(fetcherResults));
+
+    stepDown();
+    stepUp(rawOpCtx);
+
+    auto cloner = *GlobalIndexStateMachine::lookup(rawOpCtx, _service, extractInstanceId(doc));
+    ASSERT_TRUE(cloner);
+
+    cloner->getReadyToCommitFuture().get();
+    cloner->cleanup();
+    cloner->getCompletionFuture().get();
+
+    checkExpectedEntries(rawOpCtx, 1);
+}
+
+TEST_F(GlobalIndexClonerServiceTest, ClonerShouldAutoRetryOnNetworkError) {
+    const int kTotalResponses = 3;
+    const int kFaultPosition = 1;
+
+    replaceFetcherResultList([&] {
+        MockedResults fetcherResults;
+        for (int x = 0; x < kTotalResponses; x++) {
+            if (x == kFaultPosition) {
+                fetcherResults.push_front(
+                    mockError(Status(ErrorCodes::SocketException, "simulated network error")));
+            } else {
+                fetcherResults.push_front(mockFetchedEntry(BSON("_id" << x << kSourceShardKey << x),
+                                                           BSON(indexKey() << std::to_string(x))));
+            }
+        }
+
+        return fetcherResults;
+    }());
+
+    auto doc = makeStateDocument();
+    auto opCtx = makeOperationContext();
+    auto rawOpCtx = opCtx.get();
+
+    auto cloner = GlobalIndexStateMachine::getOrCreate(rawOpCtx, _service, doc.toBSON());
+    auto future = cloner->getCompletionFuture();
+    cloner->getReadyToCommitFuture().get();
+    cloner->cleanup();
+    future.get();
+
+    ASSERT_TRUE(doesCollectionExist(rawOpCtx, skipIdNss(doc.getNss(), doc.getIndexName())));
+    checkIndexCollection(rawOpCtx);
 }
 
 }  // namespace

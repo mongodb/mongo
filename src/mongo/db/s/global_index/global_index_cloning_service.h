@@ -184,8 +184,13 @@ private:
     void _ensureCollection(OperationContext* opCtx, const NamespaceString& nss);
 
     GlobalIndexClonerStateEnum _getState() const;
-    GlobalIndexClonerMutableState _getMutableState() const;
     GlobalIndexClonerDoc _makeClonerDoc() const;
+
+    /**
+     * Update the in-memory and persistent state document's mutable state.
+     */
+    void _updateMutableState(OperationContext* opCtx,
+                             GlobalIndexClonerMutableState newMutableState);
 
     /**********************************************************************************
      * Thread safety legend
@@ -236,6 +241,7 @@ private:
     bool _hasMoreToFetch{true};  // (NC)
 
     std::queue<GlobalIndexClonerFetcher::FetchedEntry> _fetchedDocs;  // (NC)
+    Value _lastProcessedIdSinceStepUp;                                // (NC)
 
     SharedPromise<void> _completionPromise;                      // (TS)
     SharedPromise<void> _readyToCommitPromise;                   // (TS)

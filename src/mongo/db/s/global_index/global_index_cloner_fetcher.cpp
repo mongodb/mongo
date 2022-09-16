@@ -34,6 +34,7 @@
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -113,14 +114,28 @@ BSONObj buildInitialReplaceRootForCloner(const KeyPattern& globalIndexKeyPattern
     return replaceRootBuilder.obj();
 }
 
+/**
+ * Returns a BSONObj with the format:
+ *
+ * {
+ *   $expr: {$gte: ["$_id", {$literal: <resumeIdElement>}]}
+ * }
+ */
+BSONObj buildResumeFilter(const Value& resumeId) {
+    return BSON("$expr" << BSON("$gte" << BSON_ARRAY("$_id" << BSON("$literal" << resumeId))));
+}
+
 Pipeline::SourceContainer buildPipelineForCloner(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ShardId& myShardId,
     const KeyPattern& globalIndexKeyPattern,
-    const KeyPattern& sourceShardKeyPattern) {
+    const KeyPattern& sourceShardKeyPattern,
+    const Value& resumeId) {
     Pipeline::SourceContainer stages;
 
-    // TODO: SERVER-67564 Add matcher for resumability
+    if (!resumeId.missing()) {
+        stages.emplace_back(DocumentSourceMatch::create(buildResumeFilter(resumeId), expCtx));
+    }
 
     stages.emplace_back(DocumentSourceSort::create(expCtx, BSON("_id" << 1)));
 
@@ -198,8 +213,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> GlobalIndexClonerFetcher::makePipelin
     resolvedNamespaces[_nss.coll()] = {_nss, std::vector<BSONObj>{}};
 
     auto expCtx = makeExpressionContext(opCtx, _nss, _collUUID);
-    auto pipelineStages =
-        buildPipelineForCloner(expCtx, _myShardId, _globalIndexKeyPattern, _sourceShardKeyPattern);
+    auto pipelineStages = buildPipelineForCloner(
+        expCtx, _myShardId, _globalIndexKeyPattern, _sourceShardKeyPattern, _resumeId);
 
     return Pipeline::create(std::move(pipelineStages), std::move(expCtx));
 }
@@ -251,6 +266,10 @@ std::unique_ptr<Pipeline, PipelineDeleter> GlobalIndexClonerFetcher::_restartPip
     pipeline->detachFromOperationContext();
     pipeline.get_deleter().dismissDisposal();
     return pipeline;
+}
+
+void GlobalIndexClonerFetcher::setResumeId(Value resumeId) {
+    _resumeId = std::move(resumeId);
 }
 
 }  // namespace global_index

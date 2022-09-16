@@ -231,6 +231,9 @@ void GlobalIndexCloningService::CloningStateMachine::_init(
                                      _minFetchTimestamp,
                                      routingInfo.getShardKeyPattern().getKeyPattern(),
                                      indexKeyPattern.getOwned());
+    if (auto id = _mutableState.getLastProcessedId()) {
+        _fetcher->setResumeId(*id);
+    }
 }
 
 ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_runUntilDoneCloning(
@@ -337,22 +340,9 @@ GlobalIndexCloningService::CloningStateMachine::_transitionToReadyToCommit(
         ->withAutomaticRetry([this, executor](auto& cancelableFactory) {
             auto opCtx = cancelableFactory.makeOperationContext(Client::getCurrent());
 
-            PersistentTaskStore<GlobalIndexClonerDoc> store(_cloningService->getStateDocumentsNS());
-
-            auto mutableState = _getMutableState();
+            auto mutableState = _mutableState;
             mutableState.setState(GlobalIndexClonerStateEnum::kReadyToCommit);
-
-            BSONObj update(BSON("$set" << BSON(GlobalIndexClonerDoc::kMutableStateFieldName
-                                               << mutableState.toBSON())));
-            store.update(
-                opCtx.get(),
-                BSON(GlobalIndexClonerDoc::kIndexCollectionUUIDFieldName << _indexCollectionUUID),
-                update);
-
-            {
-                stdx::unique_lock lk(_mutex);
-                _mutableState = mutableState;
-            }
+            _updateMutableState(opCtx.get(), std::move(mutableState));
 
             return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
         })
@@ -419,10 +409,31 @@ ExecutorFuture<void> GlobalIndexCloningService::CloningStateMachine::_processBat
                    cancelableOpCtxFactory.makeOperationContext(Client::getCurrent());
                _inserter->processDoc(cancelableOpCtx.get(), next.indexKeyValues, next.documentKey);
 
+               _lastProcessedIdSinceStepUp = Value(next.documentKey["_id"]);
+               _fetcher->setResumeId(_lastProcessedIdSinceStepUp);
+
                _fetchedDocs.pop();
            })
         .until([this](const Status& status) { return !status.isOK() || _fetchedDocs.empty(); })
-        .on(**executor, cancelToken);
+        .on(**executor, cancelToken)
+        .then([this, executor, cancelToken] {
+            if (_lastProcessedIdSinceStepUp.missing()) {
+                return ExecutorFuture<void>(**executor);
+            }
+
+            return _retryingCancelableOpCtxFactory
+                ->withAutomaticRetry([this, executor](auto& cancelableFactory) {
+                    auto opCtx = cancelableFactory.makeOperationContext(Client::getCurrent());
+
+                    auto mutableState = _mutableState;
+                    mutableState.setLastProcessedId(_lastProcessedIdSinceStepUp);
+                    _updateMutableState(opCtx.get(), std::move(mutableState));
+                })
+                .onTransientError([](const Status& status) {})
+                .onUnrecoverableError([](const Status& status) {})
+                .until<Status>([](const Status& status) { return status.isOK(); })
+                .on(**executor, cancelToken);
+        });
 }
 
 void GlobalIndexCloningService::CloningStateMachine::_ensureCollection(OperationContext* opCtx,
@@ -467,14 +478,7 @@ void GlobalIndexCloningService::CloningStateMachine::cleanup() {
 }
 
 GlobalIndexClonerStateEnum GlobalIndexCloningService::CloningStateMachine::_getState() const {
-    stdx::unique_lock lk(_mutex);
     return _mutableState.getState();
-}
-
-GlobalIndexClonerMutableState GlobalIndexCloningService::CloningStateMachine::_getMutableState()
-    const {
-    stdx::unique_lock lk(_mutex);
-    return _mutableState;
 }
 
 GlobalIndexClonerDoc GlobalIndexCloningService::CloningStateMachine::_makeClonerDoc() const {
@@ -492,6 +496,17 @@ GlobalIndexClonerDoc GlobalIndexCloningService::CloningStateMachine::_makeCloner
     }
 
     return clonerDoc;
+}
+
+void GlobalIndexCloningService::CloningStateMachine::_updateMutableState(
+    OperationContext* opCtx, GlobalIndexClonerMutableState newMutableState) {
+    PersistentTaskStore<GlobalIndexClonerDoc> store(_cloningService->getStateDocumentsNS());
+    BSONObj update(BSON(
+        "$set" << BSON(GlobalIndexClonerDoc::kMutableStateFieldName << newMutableState.toBSON())));
+    store.update(opCtx,
+                 BSON(GlobalIndexClonerDoc::kIndexCollectionUUIDFieldName << _indexCollectionUUID),
+                 update);
+    _mutableState = std::move(newMutableState);
 }
 
 }  // namespace global_index
