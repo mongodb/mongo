@@ -1259,7 +1259,7 @@ buildvariants:
 
   - name: linux-standalone-sbe
     display_name: Linux Standalone (SBE)
-    cron: "0 0 * * 4" # 00:00 on Thursday
+    cron: "0 0 * * *" # Run it every day for now to get a stable baseline and then change it back to 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: standalone-sbe
@@ -1295,7 +1295,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-sbe
     display_name: Linux 1-Node ReplSet (SBE)
-    cron: "0 0 * * 4" # 00:00 on Thursday
+    cron: "0 0 * * *" # Run it every day for now to get a stable baseline and then change it back to 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-sbe
