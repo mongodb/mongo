@@ -90,6 +90,27 @@ private:
     std::vector<Lock::DBLock> _secondaryDbLocks;
 };
 
+/**
+ * Light wrapper around Lock::CollectionLock which allows acquiring the lock based on UUID rather
+ * than namespace.
+ *
+ * The lock manager manages resources based on namespace and does not have a concept of UUIDs, so
+ * there must be some additional concurrency checks around resolving the UUID to a namespace and
+ * then subsequently acquiring the lock.
+ */
+class CollectionNamespaceOrUUIDLock {
+public:
+    CollectionNamespaceOrUUIDLock(OperationContext* opCtx,
+                                  const NamespaceStringOrUUID& nsOrUUID,
+                                  LockMode mode,
+                                  Date_t deadline = Date_t::max());
+
+    CollectionNamespaceOrUUIDLock(CollectionNamespaceOrUUIDLock&& other) = default;
+
+private:
+    Lock::CollectionLock _lock;
+};
+
 namespace auto_get_collection {
 enum class ViewMode { kViewsPermitted, kViewsForbidden };
 
@@ -224,7 +245,7 @@ protected:
     // Ordering matters, the _collLocks should destruct before the _autoGetDb releases the
     // rstl/global/database locks.
     boost::optional<AutoGetDb> _autoDb;
-    std::vector<Lock::CollectionLock> _collLocks;
+    std::vector<CollectionNamespaceOrUUIDLock> _collLocks;
 
     CollectionPtr _coll = nullptr;
     std::shared_ptr<const ViewDefinition> _view;

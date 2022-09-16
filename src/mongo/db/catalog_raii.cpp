@@ -122,7 +122,7 @@ void acquireCollectionLocksInResourceIdOrder(
     LockMode modeColl,
     Date_t deadline,
     const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs,
-    std::vector<Lock::CollectionLock>* collLocks) {
+    std::vector<CollectionNamespaceOrUUIDLock>* collLocks) {
     invariant(collLocks->empty());
     auto catalog = CollectionCatalog::get(opCtx);
 
@@ -194,6 +194,32 @@ Database* AutoGetDb::ensureDbExists(OperationContext* opCtx) {
 
     return _db;
 }
+
+CollectionNamespaceOrUUIDLock::CollectionNamespaceOrUUIDLock(OperationContext* opCtx,
+                                                             const NamespaceStringOrUUID& nsOrUUID,
+                                                             LockMode mode,
+                                                             Date_t deadline)
+    : _lock([opCtx, &nsOrUUID, mode, deadline] {
+          if (auto& ns = nsOrUUID.nss()) {
+              return Lock::CollectionLock{opCtx, *ns, mode, deadline};
+          }
+
+          auto resolveNs = [opCtx, &nsOrUUID] {
+              return CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
+          };
+
+          // We cannot be sure that the namespace we lock matches the UUID given because we resolve
+          // the namespace from the UUID without the safety of a lock. Therefore, we will continue
+          // to re-lock until the namespace we resolve from the UUID before and after taking the
+          // lock is the same.
+          while (true) {
+              auto ns = resolveNs();
+              Lock::CollectionLock lock{opCtx, ns, mode, deadline};
+              if (ns == resolveNs()) {
+                  return lock;
+              }
+          }
+      }()) {}
 
 AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                                      const NamespaceStringOrUUID& nsOrUUID,

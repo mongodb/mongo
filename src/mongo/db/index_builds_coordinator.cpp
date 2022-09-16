@@ -668,7 +668,7 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
     }
 
     Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
-    Lock::CollectionLock collLock(opCtx, nssOrUuid, MODE_X);
+    CollectionNamespaceOrUUIDLock collLock(opCtx, nssOrUuid, MODE_X);
 
     CollectionWriter collection(opCtx, resumeInfo.getCollectionUUID());
     invariant(collection);
@@ -1251,7 +1251,7 @@ bool IndexBuildsCoordinator::abortIndexBuildByBuildUUID(OperationContext* opCtx,
             // taking a strong collection lock. See SERVER-42621.
             unlockRSTL(opCtx);
         }
-        Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_X);
+        CollectionNamespaceOrUUIDLock collLock(opCtx, dbAndUUID, MODE_X);
         AutoGetCollection indexBuildEntryColl(
             opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
 
@@ -1892,7 +1892,7 @@ Status IndexBuildsCoordinator::_setUpIndexBuildForTwoPhaseRecovery(
     // case when an index builds is restarted during recovery.
 
     Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
-    Lock::CollectionLock collLock(opCtx, nssOrUuid, MODE_X);
+    CollectionNamespaceOrUUIDLock collLock(opCtx, nssOrUuid, MODE_X);
     auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, collectionUUID);
     invariant(collection);
     const auto& nss = collection->ns();
@@ -2249,7 +2249,7 @@ void IndexBuildsCoordinator::_cleanUpSinglePhaseAfterFailure(
             unlockRSTL(abortCtx);
 
             const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-            Lock::CollectionLock collLock(abortCtx, dbAndUUID, MODE_X);
+            CollectionNamespaceOrUUIDLock collLock(abortCtx, dbAndUUID, MODE_X);
             AutoGetCollection indexBuildEntryColl(
                 abortCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
             _completeSelfAbort(abortCtx, replState, *indexBuildEntryColl, status);
@@ -2289,7 +2289,7 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterFailure(
                                                          << "; Database: " << replState->dbName));
             }
 
-            Lock::CollectionLock collLock(abortCtx, dbAndUUID, MODE_X);
+            CollectionNamespaceOrUUIDLock collLock(abortCtx, dbAndUUID, MODE_X);
             AutoGetCollection indexBuildEntryColl(
                 abortCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
             _completeSelfAbort(abortCtx, replState, *indexBuildEntryColl, status);
@@ -2590,7 +2590,7 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
 
         Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-        Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_IX);
+        CollectionNamespaceOrUUIDLock collLock(opCtx, dbAndUUID, MODE_IX);
 
         auto collection = _setUpForScanCollectionAndInsertSortedKeysIntoIndex(opCtx, replState);
 
@@ -2609,7 +2609,7 @@ void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
     {
         Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-        Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_IX);
+        CollectionNamespaceOrUUIDLock collLock(opCtx, dbAndUUID, MODE_IX);
 
         auto collection = _setUpForScanCollectionAndInsertSortedKeysIntoIndex(opCtx, replState);
         uassertStatusOK(_indexBuildsManager.resumeBuildingIndexFromBulkLoadPhase(
@@ -2649,7 +2649,7 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesWithoutBlockingWrites(
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
     {
         Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
-        Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_IX);
+        CollectionNamespaceOrUUIDLock collLock(opCtx, dbAndUUID, MODE_IX);
 
         uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
             opCtx,
@@ -2678,7 +2678,7 @@ void IndexBuildsCoordinator::_insertKeysFromSideTablesBlockingWrites(
         // Unlock RSTL to avoid deadlocks with prepare conflicts and state transitions. See
         // SERVER-42621.
         unlockRSTL(opCtx);
-        Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_S);
+        CollectionNamespaceOrUUIDLock collLock(opCtx, dbAndUUID, MODE_S);
 
         uassertStatusOK(_indexBuildsManager.drainBackgroundWrites(
             opCtx,
@@ -2717,7 +2717,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
 
     // Need to return the collection lock back to exclusive mode to complete the index build.
     const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-    Lock::CollectionLock collLock(opCtx, dbAndUUID, MODE_X);
+    CollectionNamespaceOrUUIDLock collLock(opCtx, dbAndUUID, MODE_X);
     AutoGetCollection indexBuildEntryColl(
         opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
 

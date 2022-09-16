@@ -37,8 +37,6 @@
 
 namespace mongo {
 
-class NamespaceStringOrUUID;
-
 class Lock {
 public:
     /**
@@ -350,7 +348,7 @@ public:
 
     public:
         CollectionLock(OperationContext* opCtx,
-                       const NamespaceStringOrUUID& nssOrUUID,
+                       const NamespaceString& ns,
                        LockMode mode,
                        Date_t deadline = Date_t::max());
 

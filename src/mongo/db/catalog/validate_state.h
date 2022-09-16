@@ -237,7 +237,7 @@ private:
     boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock> _noPBWM;
     boost::optional<Lock::GlobalLock> _globalLock;
     boost::optional<AutoGetDb> _databaseLock;
-    boost::optional<Lock::CollectionLock> _collectionLock;
+    boost::optional<CollectionNamespaceOrUUIDLock> _collectionLock;
 
     Database* _database;
     CollectionPtr _collection;
