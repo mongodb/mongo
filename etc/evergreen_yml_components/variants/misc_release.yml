@@ -1443,7 +1443,7 @@ buildvariants:
   - name: .stitch
   - name: test_packages
     distros:
-    - ubuntu2204-package
+    - ubuntu2004-package
   - name: .publish
     distros:
     - ubuntu2204-small
@@ -1609,7 +1609,7 @@ buildvariants:
   - name: sharding_auth_gen
   - name: test_packages
     distros:
-    - ubuntu2204-package
+    - ubuntu2004-package
   - name: .publish
     distros:
     - ubuntu2204-small

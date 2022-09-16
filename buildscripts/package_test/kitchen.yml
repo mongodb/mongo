@@ -130,6 +130,7 @@ platforms:
   - name: ubuntu2204-x86-64
     driver:
       image_id: ami-051dcca84f1edfff1
+      user_data: ubuntu-user-data.sh
     transport:
       username: ubuntu
 
