@@ -418,19 +418,23 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 }
             }
         })
-        .then(_executePhase(Phase::kTranslateRequest,
-                            [this, anchor = shared_from_this()] {
-                                auto opCtxHolder = cc().makeOperationContext();
-                                auto* opCtx = opCtxHolder.get();
-                                getForwardableOpMetadata().setOn(opCtx);
-                                _logStartCreateCollection(opCtx);
+        .then([this, anchor = shared_from_this()] {
+            if (_timeseriesNssResolvedByCommandHandler()) {
+                return;
+            }
+            _executePhase(Phase::kTranslateRequest, [this, anchor = shared_from_this()] {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+                getForwardableOpMetadata().setOn(opCtx);
+                _logStartCreateCollection(opCtx);
 
-                                // Enter the critical sections before patching the user request to
-                                // avoid data races with concurrenct creation of unsharded
-                                // collections referencing the same namespace(s).
-                                _acquireCriticalSections(opCtx);
-                                _doc.setTranslatedRequestParams(_translateRequestParameters(opCtx));
-                            }))
+                // Enter the critical sections before patching the user request to
+                // avoid data races with concurrenct creation of unsharded
+                // collections referencing the same namespace(s).
+                _acquireCriticalSections(opCtx);
+                _doc.setTranslatedRequestParams(_translateRequestParameters(opCtx));
+            })();
+        })
         .then(_executePhase(
             Phase::kCommit,
             [this, executor = executor, token, anchor = shared_from_this()] {
@@ -449,6 +453,13 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     _updateSession(opCtx);
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
                         opCtx, getCurrentSession(), **executor);
+                }
+
+                if (_timeseriesNssResolvedByCommandHandler()) {
+                    // execute the logic of the kTranslateRequest phase now.
+                    _logStartCreateCollection(opCtx);
+                    _acquireCriticalSections(opCtx);
+                    _doc.setTranslatedRequestParams(_translateRequestParameters(opCtx));
                 }
 
                 // Check if the collection was already sharded by a past request

@@ -60,6 +60,11 @@ feature_flags:
     cpp_varname: feature_flags::gCollModCoordinatorV3
     default: true
     version: 6.1
+  featureFlagCreateCollectionCoordinatorV3:
+    description: "Feature for enabling new createCollection coordinator v3"
+    cpp_varname: feature_flags::gCreateCollectionCoordinatorV3
+    default: true
+    version: 6.2
   featureFlagHistoricalPlacementShardingCatalog:
     description: "Feature flag for enabling the storage and access to historical placement data at shards granularity through the Sharding Catalog"
     cpp_varname: feature_flags::gHistoricalPlacementShardingCatalog

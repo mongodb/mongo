@@ -145,10 +145,11 @@ public:
                     request().getShardKey());
 
             const auto createCollectionCoordinator = [&] {
+                FixedFCVRegion fcvRegion(opCtx);
                 auto nssToForward = ns();
                 auto requestToForward = request().getCreateCollectionRequest();
                 auto coordinatorType = DDLCoordinatorTypeEnum::kCreateCollection;
-                if (!feature_flags::gImplicitDDLTimeseriesNssTranslation.isEnabled(
+                if (!feature_flags::gCreateCollectionCoordinatorV3.isEnabled(
                         serverGlobalParams.featureCompatibility)) {
                     translateToTimeseriesCollection(opCtx, &nssToForward, &requestToForward);
                     coordinatorType = DDLCoordinatorTypeEnum::kCreateCollectionPre61Compatible;
