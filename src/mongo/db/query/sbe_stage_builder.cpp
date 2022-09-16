@@ -2189,44 +2189,104 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
 namespace {
 template <typename F>
-struct FieldPathVisitor : public SelectiveConstExpressionVisitorBase {
+struct FieldPathAndCondPreVisitor : public SelectiveConstExpressionVisitorBase {
     // To avoid overloaded-virtual warnings.
     using SelectiveConstExpressionVisitorBase::visit;
 
-    FieldPathVisitor(const F& fn) : _fn(fn) {}
+    FieldPathAndCondPreVisitor(const F& fn, int32_t& nestedCondLevel)
+        : _fn(fn), _nestedCondLevel(nestedCondLevel) {}
 
     void visit(const ExpressionFieldPath* expr) final {
-        _fn(expr);
+        _fn(expr, _nestedCondLevel);
+    }
+
+    void visit(const ExpressionCond* expr) final {
+        ++_nestedCondLevel;
+    }
+
+    void visit(const ExpressionSwitch* expr) final {
+        ++_nestedCondLevel;
+    }
+
+    void visit(const ExpressionIfNull* expr) final {
+        ++_nestedCondLevel;
+    }
+
+    void visit(const ExpressionAnd* expr) final {
+        ++_nestedCondLevel;
+    }
+
+    void visit(const ExpressionOr* expr) final {
+        ++_nestedCondLevel;
     }
 
     F _fn;
+    // Tracks the number of conditional expressions like $cond or $ifNull that are above us in the
+    // tree.
+    int32_t& _nestedCondLevel;
+};
+
+struct CondPostVisitor : public SelectiveConstExpressionVisitorBase {
+    // To avoid overloaded-virtual warnings.
+    using SelectiveConstExpressionVisitorBase::visit;
+
+    CondPostVisitor(int32_t& nestedCondLevel) : _nestedCondLevel(nestedCondLevel) {}
+
+    void visit(const ExpressionCond* expr) final {
+        --_nestedCondLevel;
+    }
+
+    void visit(const ExpressionSwitch* expr) final {
+        --_nestedCondLevel;
+    }
+
+    void visit(const ExpressionIfNull* expr) final {
+        --_nestedCondLevel;
+    }
+
+    void visit(const ExpressionAnd* expr) final {
+        --_nestedCondLevel;
+    }
+
+    void visit(const ExpressionOr* expr) final {
+        --_nestedCondLevel;
+    }
+
+    int32_t& _nestedCondLevel;
 };
 
 /**
  * Walks through the 'expr' expression tree and whenever finds an 'ExpressionFieldPath', calls
  * the 'fn' function. Type requirement for 'fn' is it must have a const 'ExpressionFieldPath'
- * pointer parameter.
+ * pointer parameter and 'nestedCondLevel' parameter.
  */
 template <typename F>
 void walkAndActOnFieldPaths(Expression* expr, const F& fn) {
-    FieldPathVisitor<F> visitor(fn);
-    ExpressionWalker walker(&visitor, nullptr /*inVisitor*/, nullptr /*postVisitor*/);
+    int32_t nestedCondLevel = 0;
+    FieldPathAndCondPreVisitor<F> preVisitor(fn, nestedCondLevel);
+    CondPostVisitor postVisitor(nestedCondLevel);
+    ExpressionWalker walker(&preVisitor, nullptr /*inVisitor*/, &postVisitor);
     expression_walker::walk(expr, &walker);
 }
 
 /**
  * Checks whether all field paths in 'idExpr' and all accumulator expressions are top-level ones.
  */
-bool checkAllFieldPathsAreTopLevel(const boost::intrusive_ptr<Expression>& idExpr,
-                                   const std::vector<AccumulationStatement>& accStmts) {
-    auto areAllTopLevelFields = true;
+bool areAllFieldPathsOptimizable(const boost::intrusive_ptr<Expression>& idExpr,
+                                 const std::vector<AccumulationStatement>& accStmts) {
+    auto areFieldPathsOptimizable = true;
 
-    auto checkFieldPath = [&](const ExpressionFieldPath* fieldExpr) {
+    auto checkFieldPath = [&](const ExpressionFieldPath* fieldExpr, int32_t nestedCondLevel) {
         // We optimize neither a field path for the top-level document itself (getPathLength() == 1)
         // nor a field path that refers to a variable. We can optimize only top-level fields
         // (getPathLength() == 2).
-        if (fieldExpr->getFieldPath().getPathLength() != 2 || fieldExpr->isVariableReference()) {
-            areAllTopLevelFields = false;
+        //
+        // The 'nestedCondLevel' being > 0 means that a field path is refered to below conditional
+        // expressions at the parent $group node, when we cannot optimize field path access and
+        // therefore, cannot avoid materialization.
+        if (nestedCondLevel > 0 || fieldExpr->getFieldPath().getPathLength() != 2 ||
+            fieldExpr->isVariableReference()) {
+            areFieldPathsOptimizable = false;
             return;
         }
     };
@@ -2239,7 +2299,7 @@ bool checkAllFieldPathsAreTopLevel(const boost::intrusive_ptr<Expression>& idExp
         walkAndActOnFieldPaths(accStmt.expr.argument.get(), checkFieldPath);
     }
 
-    return areAllTopLevelFields;
+    return areFieldPathsOptimizable;
 }
 
 /**
@@ -2265,7 +2325,7 @@ EvalStage optimizeFieldPaths(StageBuilderState& state,
     auto searchInChildOutputs = !optionalRootSlot.has_value();
     auto retEvalStage = std::move(childEvalStage);
 
-    walkAndActOnFieldPaths(expr.get(), [&](const ExpressionFieldPath* fieldExpr) {
+    walkAndActOnFieldPaths(expr.get(), [&](const ExpressionFieldPath* fieldExpr, int32_t) {
         // We optimize neither a field path for the top-level document itself nor a field path that
         // refers to a variable instead of calling getField().
         if (fieldExpr->getFieldPath().getPathLength() == 1 || fieldExpr->isVariableReference()) {
@@ -2552,10 +2612,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     const auto& accStmts = groupNode->accumulators;
     auto childStageType = childNode->getType();
 
-    auto areAllTopLevelFields = checkAllFieldPathsAreTopLevel(idExpr, accStmts);
-
     auto childReqs = reqs.copy();
-    if (childStageType == StageType::STAGE_GROUP && areAllTopLevelFields) {
+    if (childStageType == StageType::STAGE_GROUP && areAllFieldPathsOptimizable(idExpr, accStmts)) {
         // Does not ask the GROUP child for the result slot to avoid unnecessary materialization if
         // all fields are top-level fields. See the end of this function. For example, GROUP - GROUP
         // - COLLSCAN case.
