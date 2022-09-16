@@ -1,18 +1,36 @@
 (function() {
 "use strict";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
-if (!checkCascadesOptimizerEnabled(db)) {
-    jsTestLog("Skipping test because the optimizer is not enabled");
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+
+const conn = MongoRunner.runMongod({setParameter: {featureFlagCommonQueryFramework: true}});
+assert.neq(null, conn, "mongod was unable to start up");
+
+const db = conn.getDB(jsTestName());
+
+if (checkSBEEnabled(db, ["featureFlagSbeFull"], true)) {
+    jsTestLog("Skipping the test because it doesn't work in Full SBE...");
+    MongoRunner.stopMongod(conn);
     return;
 }
 
-const coll = db.cqf_analyze;
-coll.drop();
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
 
-assert.commandWorked(coll.insert({a: [1, 2, 4, 4, 5, 6, {b: 1}]}));
+const coll = db.cqf_analyze;
+const syscoll = db.system.statistics.cqf_analyze;
+
+const setup = () => {
+    coll.drop();
+    syscoll.drop();
+
+    assert.commandWorked(coll.insert({a: [1, 2, 4, 4, 5, 6, {b: 10}, {b: 7}, {b: 1}]}));
+    assert.commandWorked(coll.insert({a: [1, 2, 4, 4, 5, 6, {b: 5}]}));
+};
 
 let res = null;
+
+setup();
 
 (function validateNamespace() {
     res = db.runCommand({analyze: ""});
@@ -46,10 +64,12 @@ let res = null;
     res = db.runCommand({analyze: system_profile.getName()});
     assert.commandFailedWithCode(res, 6799702);
 
-    // Correct error thrown under cqf flag
+    // Works correctly when there's a normal collection.
     res = db.runCommand({analyze: coll.getName()});
-    assert.commandFailedWithCode(res, ErrorCodes.NotImplemented);
+    assert.commandWorked(res);
 })();
+
+setup();
 
 (function validateKey() {
     res = db.runCommand({analyze: coll.getName(), key: ""});
@@ -64,9 +84,28 @@ let res = null;
     res = db.runCommand({analyze: coll.getName(), key: "a.0.b"});
     assert.commandFailedWithCode(res, 6799704);
 
-    res = db.runCommand({analyze: coll.getName(), key: "a.b"});
-    assert.commandFailedWithCode(res, ErrorCodes.NotImplemented);
+    const testAnalayzeValidKey = (keyPath, docs) => {
+        coll.drop();
+        syscoll.drop();
+
+        // Populate with documents.
+        coll.insertMany(docs);
+
+        // Check the stats collection is created, data is inserted, and the index is created.
+        const key = keyPath.join('.');
+        res = db.runCommand({analyze: coll.getName(), key: key});
+        assert.commandWorked(res);
+        assert.eq(syscoll.find({_id: key}).count(), 1);
+    };
+    // Single document single path component.
+    testAnalayzeValidKey(["a"], [{a: 1}]);
+    // Single document complex path component.
+    testAnalayzeValidKey(["a", "b"], [{a: {b: 1}}]);
+    // Multiple documents, values missing.
+    testAnalayzeValidKey(["a"], [{a: 1}, {b: 1}, {a: 2}]);
 })();
+
+setup();
 
 (function validateSampleRateAndSize() {
     res = db.runCommand({analyze: coll.getName(), key: "a.b", sampleRate: 0.1, sampleSize: 1000});
@@ -82,7 +121,7 @@ let res = null;
     assert.commandFailedWithCode(res, 51024);
 
     res = db.runCommand({analyze: coll.getName(), key: "a.b", sampleRate: null});
-    assert.commandFailedWithCode(res, ErrorCodes.NotImplemented);
+    assert.commandWorked(res);
 
     res = db.runCommand({analyze: coll.getName(), sampleSize: 123});
     assert.commandFailedWithCode(res, 6799706);
@@ -94,7 +133,7 @@ let res = null;
     assert.commandFailedWithCode(res, 51024);
 
     res = db.runCommand({analyze: coll.getName(), key: "a.b", sampleSize: null});
-    assert.commandFailedWithCode(res, ErrorCodes.NotImplemented);
+    assert.commandWorked(res);
 })();
 
 // Test API Strict
@@ -103,5 +142,7 @@ assert.commandFailedWithCode(res, ErrorCodes.APIStrictError);
 
 // Test write concern
 res = db.runCommand({analyze: coll.getName(), writeConcern: {w: 1}});
-assert.commandFailedWithCode(res, ErrorCodes.NotImplemented);
+assert.commandWorked(res);
+
+MongoRunner.stopMongod(conn);
 }());

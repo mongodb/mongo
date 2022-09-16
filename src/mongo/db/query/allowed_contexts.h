@@ -61,6 +61,14 @@ enum class AllowedWithClientType {
     kInternal,
 };
 
+// Helper function to get whether a client is internal.
+bool isInternalClient(const Client* client);
+
+// Use to assert that a feature is allowed only if it is used internally.
+void assertAllowedInternalIfRequired(const OperationContext* opCtx,
+                                     StringData operatorName,
+                                     AllowedWithClientType allowedWithClientType);
+
 /**
  * Asserts that the API parameters in 'apiParameters' are compatible with the restrictions on
  * 'operatorName' given by 'allowedWithApiStrict' and 'allowedWithClientType'. If the operator is

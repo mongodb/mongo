@@ -40,6 +40,7 @@
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/variable_validation.h"
+#include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/logv2/log.h"
 
@@ -428,9 +429,11 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
             "{} cannot be used in a transaction"_format(kStageName),
             !expCtx->opCtx->inMultiDocumentTransaction());
 
-    uassert(31319,
-            "Cannot {} to special collection: {}"_format(kStageName, outputNs.coll()),
-            !outputNs.isSystem());
+    uassert(
+        31319,
+        "Cannot {} to special collection: {}"_format(kStageName, outputNs.coll()),
+        !outputNs.isSystem() ||
+            (outputNs.isSystemStatsCollection() && isInternalClient(expCtx->opCtx->getClient())));
 
     uassert(31320,
             "Cannot {} to internal database: {}"_format(kStageName, outputNs.db()),

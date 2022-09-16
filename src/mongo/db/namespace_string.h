@@ -85,7 +85,10 @@ public:
     // Name of the pre-images collection.
     static constexpr StringData kPreImagesCollectionName = "system.preimages"_sd;
 
-    // Name of the change stream change collection.
+    // Prefix for the collection storing collection statistics.
+    static constexpr StringData kStatisticsCollectionPrefix = "system.statistics."_sd;
+
+    // Name for the change stream change collection.
     static constexpr StringData kChangeCollectionName = "system.change_collection"_sd;
 
     // Names of privilege document collections
@@ -547,6 +550,11 @@ public:
      * Returns true if the namespace is an oplog or a change collection, false otherwise.
      */
     bool isOplogOrChangeCollection() const;
+
+    /**
+     * Returns true if the namespace is a system.statistics collection, false otherwise.
+     */
+    bool isSystemStatsCollection() const;
 
     /**
      * Returns the time-series buckets namespace for this view.

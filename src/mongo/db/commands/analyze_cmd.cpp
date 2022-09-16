@@ -29,15 +29,63 @@
 
 #include <string>
 
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/analyze_cmd.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/analyze_command_gen.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 
 namespace mongo {
 namespace {
+
+StatusWith<BSONObj> analyzeCommandAsAggregationCommand(OperationContext* opCtx,
+                                                       StringData db,
+                                                       StringData collection,
+                                                       StringData keyPath) {
+    // Build a pipeline that accomplishes the analyze request. The building code constructs a
+    // pipeline that looks like this, assuming the analyze is on the key "a.b.c"
+    //
+    //      [
+    //          { $project: { val : {$_internalFindAllValuesAtPath: "a.b.c" } } },
+    //          { $group: {
+    //              _id: "a.b.c",
+    //              statistics: { $_internalConstructStats: "$$ROOT" }
+    //          },
+    //          { $project: { key: "$_id" } },
+    //          { $merge: {
+    //              into: "system.statistics." + collection,
+    //              on: "key",
+    //              whenMatched: "replace",
+    //              whenNotMatched: "insert" }
+    //          }
+    //      ]
+    return BSON(
+        "aggregate"
+        << collection << "pipeline"
+        << BSON_ARRAY(
+               BSON("$project" << BSON("val" << BSON("$_internalFindAllValuesAtPath" << keyPath)
+                                             << "key" << keyPath))
+               << BSON("$group" << BSON("_id" << keyPath << "statistics"
+                                              << BSON("$_internalConstructStats"
+                                                      << "$$ROOT")))
+               << BSON("$merge" << BSON(
+                           "into" << std::string(str::stream()
+                                                 << NamespaceString::kStatisticsCollectionPrefix
+                                                 << collection)
+                                  << "on"
+                                  << "_id"
+                                  << "whenMatched"
+                                  << "replace"
+                                  << "whenNotMatched"
+                                  << "insert")))
+        << "cursor" << BSONObj());
+}
 
 class CmdAnalyze final : public TypedCommand<CmdAnalyze> {
 public:
@@ -68,25 +116,45 @@ public:
         }
 
         void typedRun(OperationContext* opCtx) {
+            uassert(6660400,
+                    "Analyze command requires common query framework feature flag to be enabled",
+                    serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+                        feature_flags::gFeatureFlagCommonQueryFramework.isEnabled(
+                            serverGlobalParams.featureCompatibility));
+
             const auto& cmd = request();
             const NamespaceString& nss = ns();
 
             // Validate collection
-            // Namespace exists
-            AutoGetCollectionForReadMaybeLockFree autoColl(opCtx, nss);
-            const auto& collection = autoColl.getCollection();
-            uassert(6799700, str::stream() << "Couldn't find collection " << nss.ns(), collection);
+            {
+                AutoGetCollectionForReadMaybeLockFree autoColl(opCtx, nss);
+                const auto& collection = autoColl.getCollection();
 
-            // Namespace cannot be capped collection
-            const bool isCapped = collection->isCapped();
-            uassert(6799701, "Analyze command is not supported on capped collections", !isCapped);
+                // Namespace exists
+                uassert(
+                    6799700, str::stream() << "Couldn't find collection " << nss.ns(), collection);
 
-            // Namespace is normal or clustered collection
-            const bool isNormalColl = nss.isNormalCollection();
-            const bool isClusteredColl = collection->isClustered();
-            uassert(6799702,
-                    str::stream() << nss.toString() << " is not a normal or clustered collection",
-                    isNormalColl || isClusteredColl);
+                // Namespace cannot be capped collection
+                const bool isCapped = collection->isCapped();
+                uassert(6799701,
+                        str::stream() << "Analyze command is not supported on capped collections",
+                        !isCapped);
+
+                // Namespace is normal or clustered collection
+                const bool isNormalColl = nss.isNormalCollection();
+                const bool isClusteredColl = collection->isClustered();
+                uassert(6799702,
+                        str::stream()
+                            << nss.toString() << " is not a normal or clustered collection",
+                        isNormalColl || isClusteredColl);
+            }
+
+            // Sample rate and sample size can't both be present
+            auto sampleRate = cmd.getSampleRate();
+            auto sampleSize = cmd.getSampleSize();
+            uassert(6799705,
+                    "Only one of sample rate and sample size may be present",
+                    !sampleRate || !sampleSize);
 
             // Validate key
             auto key = cmd.getKey();
@@ -106,27 +174,34 @@ public:
                         str::stream() << "Key path contains numeric component "
                                       << keyFieldRef.getPart(*(numericPathComponents.begin())),
                         numericPathComponents.empty());
-            }
 
-            // Sample rate and sample size can't both be present
-            auto sampleRate = cmd.getSampleRate();
-            auto sampleSize = cmd.getSampleSize();
-            uassert(6799705,
-                    "Only one of sample rate and sample size may be present",
-                    !sampleRate || !sampleSize);
+                // We need to perform this operation with internal permissions.
+                const bool wasInternalClient = isInternalClient(opCtx->getClient());
+                if (!wasInternalClient) {
+                    opCtx->getClient()->session()->setTags(transport::Session::kInternalClient);
+                }
 
-            if (sampleSize || sampleRate) {
+                DBDirectClient client(opCtx);
+
+                // Run Aggregate
+                BSONObj analyzeResult;
+                client.runCommand(
+                    nss.db().toString(),
+                    analyzeCommandAsAggregationCommand(opCtx, nss.db(), nss.coll(), key->toString())
+                        .getValue(),
+                    analyzeResult);
+
+                // We must reset the internal flag.
+                if (!wasInternalClient) {
+                    opCtx->getClient()->session()->unsetTags(transport::Session::kInternalClient);
+                }
+
+                uassertStatusOK(getStatusFromCommandResult(analyzeResult));
+
+            } else if (sampleSize || sampleRate) {
                 uassert(
                     6799706, "It is illegal to pass sampleRate or sampleSize without a key", key);
             }
-
-            uassert(6660400,
-                    "Analyze command requires common query framework feature flag to be enabled",
-                    serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-                        feature_flags::gFeatureFlagCommonQueryFramework.isEnabled(
-                            serverGlobalParams.featureCompatibility));
-
-            uasserted(ErrorCodes::NotImplemented, "Analyze command not yet implemented");
         }
 
     private:
@@ -139,7 +214,6 @@ public:
                     authzSession->isAuthorizedForActionsOnNamespace(ns, ActionType::analyze));
         }
     };
-
 } cmdAnalyze;
 
 }  // namespace

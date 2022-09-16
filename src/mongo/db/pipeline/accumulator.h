@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/platform/basic.h"
 
 #include <boost/intrusive_ptr.hpp>
@@ -224,6 +225,31 @@ public:
 private:
     bool _haveFirst;
     Value _first;
+};
+
+class AccumulatorInternalConstructStats final : public AccumulatorState {
+public:
+    static constexpr auto kName = "$_internalConstructStats"_sd;
+
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+
+    explicit AccumulatorInternalConstructStats(ExpressionContext* expCtx);
+
+    void processInternal(const Value& input, bool merging) final;
+    Value getValue(bool toBeMerged) final;
+    void reset() final;
+
+    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
+
+    bool isCommutative() const final {
+        return true;
+    }
+
+private:
+    MutableDocument _output;
+    std::string _key;
 };
 
 class AccumulatorLast final : public AccumulatorState {

@@ -417,7 +417,7 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
             nss.isTemporaryReshardingCollection() || nss.isTimeseriesBucketsCollection() ||
             nss.isChangeStreamPreImagesCollection() ||
             nss == NamespaceString::kConfigsvrRestoreNamespace || nss.isChangeCollection() ||
-            nss.isSystemDotJavascript();
+            nss.isSystemDotJavascript() || nss.isSystemStatsCollection();
     };
 
     if (nss.isSystem()) {

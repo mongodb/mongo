@@ -285,6 +285,10 @@ bool NamespaceString::isLegalClientSystemNS(
         return true;
     }
 
+    if (isSystemStatsCollection()) {
+        return true;
+    }
+
     return false;
 }
 
@@ -488,6 +492,10 @@ bool NamespaceString::isFLE2StateCollection() const {
 
 bool NamespaceString::isOplogOrChangeCollection() const {
     return isOplog() || isChangeCollection();
+}
+
+bool NamespaceString::isSystemStatsCollection() const {
+    return coll().startsWith(kStatisticsCollectionPrefix);
 }
 
 NamespaceString NamespaceString::makeTimeseriesBucketsNamespace() const {
