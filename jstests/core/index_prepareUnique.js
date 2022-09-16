@@ -1,8 +1,7 @@
 /**
- * Tests that the createIndex command accepts a prepareUnique field and works accordingly
- * then.
+ * Tests that the createIndex command accepts a prepareUnique field and works accordingly.
  *
- * @tags: [requires_fcv_53]
+ * @tags: [assumes_no_implicit_collection_creation_after_drop]
  */
 (function() {
 "use strict";

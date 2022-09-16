@@ -545,12 +545,12 @@ BSONObj ShardKeyPattern::extractShardKeyFromQuery(const CanonicalQuery& query) c
     return keyBuilder.obj();
 }
 
-bool ShardKeyPattern::isUniqueIndexCompatible(const BSONObj& uniqueIndexPattern) const {
-    if (!uniqueIndexPattern.isEmpty() && uniqueIndexPattern.firstElementFieldName() == kIdField) {
+bool ShardKeyPattern::isIndexUniquenessCompatible(const BSONObj& indexPattern) const {
+    if (!indexPattern.isEmpty() && indexPattern.firstElementFieldName() == kIdField) {
         return true;
     }
 
-    return _keyPattern.toBSON().isFieldNamePrefixOf(uniqueIndexPattern);
+    return _keyPattern.toBSON().isFieldNamePrefixOf(indexPattern);
 }
 
 BoundList ShardKeyPattern::flattenBounds(const IndexBounds& indexBounds) const {
