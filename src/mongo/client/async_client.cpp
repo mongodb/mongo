@@ -67,7 +67,7 @@ Future<AsyncDBClient::Handle> AsyncDBClient::connect(
     ServiceContext* const context,
     transport::ReactorHandle reactor,
     Milliseconds timeout,
-    ConnectionMetrics* connectionMetrics,
+    std::shared_ptr<ConnectionMetrics> connectionMetrics,
     std::shared_ptr<const transport::SSLConnectionContext> transientSSLContext) {
     auto tl = context->getTransportLayer();
     return tl
