@@ -414,21 +414,25 @@ ExecutorFuture<void> cleanUpRange(ServiceContext* serviceContext,
                auto opCtx = uniqueOpCtx.get();
                opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-               const NamespaceString& nss = deletionTask.getNss();
+               const auto dbName = deletionTask.getNss().dbName();
+               const auto collectionUuid = deletionTask.getCollectionUuid();
 
                while (true) {
-                   {
+                   boost::optional<NamespaceString> optNss;
+                   try {
                        // Holding the locks while enqueueing the task protects against possible
                        // concurrent cleanups of the filtering metadata, that be serialized
-                       AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-                       auto csr = CollectionShardingRuntime::get(opCtx, nss);
+                       AutoGetCollection autoColl(
+                           opCtx, NamespaceStringOrUUID{dbName, collectionUuid}, MODE_IS);
+                       optNss.emplace(autoColl.getNss());
+                       auto csr = CollectionShardingRuntime::get(opCtx, *optNss);
                        auto csrLock = CollectionShardingRuntime::CSRLock::lockShared(opCtx, csr);
                        auto optCollDescr = csr->getCurrentMetadataIfKnown();
 
                        if (optCollDescr) {
                            uassert(ErrorCodes::
                                        RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist,
-                                   str::stream() << "Filtering metadata for " << nss
+                                   str::stream() << "Filtering metadata for " << *optNss
                                                  << (optCollDescr->isSharded()
                                                          ? " has UUID that does not match UUID of "
                                                            "the deletion task"
@@ -447,9 +451,16 @@ ExecutorFuture<void> cleanUpRange(ServiceContext* serviceContext,
 
                            return csr->cleanUpRange(deletionTask.getRange(), whenToClean);
                        }
+                   } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                       uasserted(
+                           ErrorCodes::RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist,
+                           str::stream() << "Collection has been dropped since enqueuing this "
+                                            "range deletion task: "
+                                         << deletionTask.toBSON());
                    }
 
-                   refreshFilteringMetadataUntilSuccess(opCtx, nss);
+
+                   refreshFilteringMetadataUntilSuccess(opCtx, *optNss);
                }
            })
         .until([](Status status) mutable {
