@@ -728,9 +728,26 @@ std::shared_ptr<Collection> CollectionCatalog::openCollection(OperationContext* 
 
         std::shared_ptr<Collection> collToReturn = Collection::Factory::get(opCtx)->make(
             opCtx, entry.nss, entry.catalogId, metadata, /*rs=*/nullptr);
-        collToReturn->initFromExisting(
+        Status status = collToReturn->initFromExisting(
             opCtx, latestColl ? latestColl : dropPendingColl, readTimestamp);
+        if (!status.isOK()) {
+            LOGV2_DEBUG(
+                6857100, 1, "Failed to instantiate collection", "reason"_attr = status.reason());
+            return nullptr;
+        }
         return collToReturn;
+    }
+
+    // The ident is expired, but it still may not have been dropped by the reaper. Try to mark it as
+    // in use.
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    auto newIdent = storageEngine->markIdentInUse(entry.ident);
+    if (!newIdent) {
+        LOGV2_DEBUG(6857101,
+                    1,
+                    "Collection ident is being dropped or is already dropped",
+                    "ident"_attr = entry.ident);
+        return nullptr;
     }
 
     // Instantiate a new collection without any shared state.
@@ -745,9 +762,19 @@ std::shared_ptr<Collection> CollectionCatalog::openCollection(OperationContext* 
     std::unique_ptr<RecordStore> rs =
         opCtx->getServiceContext()->getStorageEngine()->getEngine()->getRecordStore(
             opCtx, entry.nss, entry.ident, collectionOptions);
+
+    // Set the ident to the one returned by the ident reaper. This is to prevent the ident from
+    // being dropping prematurely.
+    rs->setIdent(std::move(newIdent));
+
     std::shared_ptr<Collection> collToReturn = Collection::Factory::get(opCtx)->make(
         opCtx, entry.nss, entry.catalogId, metadata, std::move(rs));
-    collToReturn->init(opCtx);
+    Status status = collToReturn->initFromExisting(opCtx, /*collection=*/nullptr, readTimestamp);
+    if (!status.isOK()) {
+        LOGV2_DEBUG(
+            6857102, 1, "Failed to instantiate collection", "reason"_attr = status.reason());
+        return nullptr;
+    }
     return collToReturn;
 }
 

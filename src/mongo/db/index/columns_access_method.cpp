@@ -387,7 +387,12 @@ std::unique_ptr<IndexAccessMethod::BulkBuilder> ColumnStoreAccessMethod::initiat
                      : std::make_unique<BulkBuilder>(this, maxMemoryUsageBytes, dbName);
 }
 
-Ident* ColumnStoreAccessMethod::getIdentPtr() const {
-    return _store.get();
+std::shared_ptr<Ident> ColumnStoreAccessMethod::getSharedIdent() const {
+    return _store->getSharedIdent();
 }
+
+void ColumnStoreAccessMethod::setIdent(std::shared_ptr<Ident> ident) {
+    _store->setIdent(std::move(ident));
+}
+
 }  // namespace mongo

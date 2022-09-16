@@ -454,6 +454,20 @@ public:
                                      DropIdentCallback&& onDrop = nullptr) = 0;
 
     /**
+     * Drops all unreferenced drop-pending idents with drop timestamps before 'ts', as well as all
+     * unreferenced idents with Timestamp::min() drop timestamps (untimestamped on standalones).
+     */
+    virtual void dropIdentsOlderThan(OperationContext* opCtx, const Timestamp& ts) = 0;
+
+    /**
+     * Marks the ident as in use and prevents the reaper from dropping the ident.
+     *
+     * Returns nullptr if the ident is not known to the reaper, is already being dropped, or is
+     * already dropped.
+     */
+    virtual std::shared_ptr<Ident> markIdentInUse(const std::string& ident) = 0;
+
+    /**
      * Starts the timestamp monitor. This periodically drops idents queued by addDropPendingIdent,
      * and removes historical ident entries no longer necessary.
      */

@@ -106,7 +106,7 @@ public:
 
     virtual Status dropIdent(RecoveryUnit* ru,
                              StringData ident,
-                             StorageEngine::DropIdentCallback&& onDrop) {
+                             const StorageEngine::DropIdentCallback& onDrop) {
         return Status::OK();
     }
 

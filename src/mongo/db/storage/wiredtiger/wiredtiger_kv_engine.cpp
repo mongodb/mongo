@@ -1813,7 +1813,7 @@ Status WiredTigerKVEngine::alterMetadata(StringData uri, StringData config) {
 
 Status WiredTigerKVEngine::dropIdent(RecoveryUnit* ru,
                                      StringData ident,
-                                     StorageEngine::DropIdentCallback&& onDrop) {
+                                     const StorageEngine::DropIdentCallback& onDrop) {
     string uri = _uri(ident);
 
     WiredTigerRecoveryUnit* wtRu = checked_cast<WiredTigerRecoveryUnit*>(ru);

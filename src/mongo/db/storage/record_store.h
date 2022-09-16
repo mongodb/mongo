@@ -280,7 +280,7 @@ private:
  * This class must be thread-safe. In addition, for storage engines implementing the KVEngine some
  * methods must be thread safe, see DurableCatalog.
  */
-class RecordStore : public Ident {
+class RecordStore {
     RecordStore(const RecordStore&) = delete;
     RecordStore& operator=(const RecordStore&) = delete;
 
@@ -303,6 +303,18 @@ public:
 
     bool isTemp() const {
         return ns().size() == 0;
+    }
+
+    std::shared_ptr<Ident> getSharedIdent() const {
+        return _ident;
+    }
+
+    const std::string& getIdent() const {
+        return _ident->getIdent();
+    }
+
+    void setIdent(std::shared_ptr<Ident> newIdent) {
+        _ident = std::move(newIdent);
     }
 
     /**
@@ -720,6 +732,8 @@ protected:
     }
 
     virtual void waitForAllEarlierOplogWritesToBeVisibleImpl(OperationContext* opCtx) const = 0;
+
+    std::shared_ptr<Ident> _ident;
 
     std::string _ns;
 

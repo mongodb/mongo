@@ -613,8 +613,12 @@ Status SortedDataIndexAccessMethod::compact(OperationContext* opCtx) {
     return this->_newInterface->compact(opCtx);
 }
 
-Ident* SortedDataIndexAccessMethod::getIdentPtr() const {
-    return this->_newInterface.get();
+std::shared_ptr<Ident> SortedDataIndexAccessMethod::getSharedIdent() const {
+    return this->_newInterface->getSharedIdent();
+}
+
+void SortedDataIndexAccessMethod::setIdent(std::shared_ptr<Ident> newIdent) {
+    this->_newInterface->setIdent(std::move(newIdent));
 }
 
 void IndexAccessMethod::BulkBuilder::countNewBuildInStats() {

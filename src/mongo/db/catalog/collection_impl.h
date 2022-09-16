@@ -73,9 +73,9 @@ public:
     SharedCollectionDecorations* getSharedDecorations() const final;
 
     void init(OperationContext* opCtx) final;
-    void initFromExisting(OperationContext* opCtx,
-                          std::shared_ptr<Collection> collection,
-                          Timestamp readTimestamp) final;
+    Status initFromExisting(OperationContext* opCtx,
+                            std::shared_ptr<Collection> collection,
+                            Timestamp readTimestamp) final;
     bool isInitialized() const final;
     bool isCommitted() const final;
     void setCommitted(bool val) final;
@@ -107,9 +107,11 @@ public:
     }
 
     std::shared_ptr<Ident> getSharedIdent() const final {
-        // Use shared_ptr's aliasing constructor so we can keep all shared state in a single
-        // reference counted object
-        return {_shared, _shared->_recordStore.get()};
+        return _shared->_recordStore->getSharedIdent();
+    }
+
+    void setIdent(std::shared_ptr<Ident> newIdent) final {
+        _shared->_recordStore->setIdent(std::move(newIdent));
     }
 
     BSONObj getValidatorDoc() const final {

@@ -66,6 +66,12 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    Status initFromExisting(OperationContext* opCtx,
+                            std::shared_ptr<Collection> collection,
+                            Timestamp readTimestamp) {
+        MONGO_UNREACHABLE;
+    }
+
     RecordId getCatalogId() const {
         return _catalogId;
     }
@@ -95,6 +101,9 @@ public:
     }
     std::shared_ptr<Ident> getSharedIdent() const {
         return std::make_shared<Ident>(_nss.toString());
+    }
+    void setIdent(std::shared_ptr<Ident> newIdent) {
+        MONGO_UNREACHABLE;
     }
 
     BSONObj getValidatorDoc() const {

@@ -56,7 +56,7 @@ struct CellViewForPath {
     CellView value;
 };
 
-class ColumnStore : public Ident {
+class ColumnStore {
 protected:
     class Cursor;
 
@@ -260,7 +260,7 @@ public:
     };
 
 
-    ColumnStore(StringData ident) : Ident(ident) {}
+    ColumnStore(StringData ident) : _ident(std::make_shared<Ident>(ident)) {}
     virtual ~ColumnStore() = default;
 
     //
@@ -352,6 +352,13 @@ public:
         return path.substr(0, lastDot);
     }
 
+    std::shared_ptr<Ident> getSharedIdent() const {
+        return _ident;
+    }
+
+    void setIdent(std::shared_ptr<Ident> newIdent) {
+        _ident = std::move(newIdent);
+    }
 
 protected:
     class Cursor {
@@ -371,6 +378,8 @@ protected:
         virtual void detachFromOperationContext() = 0;
         virtual void reattachToOperationContext(OperationContext* opCtx) = 0;
     };
+
+    std::shared_ptr<Ident> _ident;
 };
 
 struct SplitCellView {

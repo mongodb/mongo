@@ -210,10 +210,6 @@ public:
     /**
      * Returns the collection instance representative of 'entry' at the provided read timestamp.
      *
-     * TODO SERVER-68571:
-     * - If the data files have already been removed, return nullptr.
-     * - Update the drop pending map ident token when not initialized from shared state.
-     *
      * TODO SERVER-68265:
      * - Use NamespaceString instead of DurableCatalog::Entry.
      * - Remove DurableCatalog dependency.

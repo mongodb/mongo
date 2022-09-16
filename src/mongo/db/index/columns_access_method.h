@@ -106,7 +106,9 @@ public:
         const boost::optional<IndexStateInfo>& stateInfo,
         StringData dbName) final;
 
-    Ident* getIdentPtr() const final;
+    std::shared_ptr<Ident> getSharedIdent() const final;
+
+    void setIdent(std::shared_ptr<Ident> ident) final;
 
     const ColumnStore* storage() const {
         return _store.get();

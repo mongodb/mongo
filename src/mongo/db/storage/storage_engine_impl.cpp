@@ -1177,6 +1177,14 @@ void StorageEngineImpl::addDropPendingIdent(const Timestamp& dropTimestamp,
     _dropPendingIdentReaper.addDropPendingIdent(dropTimestamp, ident, std::move(onDrop));
 }
 
+void StorageEngineImpl::dropIdentsOlderThan(OperationContext* opCtx, const Timestamp& ts) {
+    _dropPendingIdentReaper.dropIdentsOlderThan(opCtx, ts);
+}
+
+std::shared_ptr<Ident> StorageEngineImpl::markIdentInUse(const std::string& ident) {
+    return _dropPendingIdentReaper.markIdentInUse(ident);
+}
+
 void StorageEngineImpl::checkpoint() {
     _engine->checkpoint();
 }

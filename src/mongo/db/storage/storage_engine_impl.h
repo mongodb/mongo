@@ -318,6 +318,10 @@ public:
                              std::shared_ptr<Ident> ident,
                              DropIdentCallback&& onDrop) override;
 
+    void dropIdentsOlderThan(OperationContext* opCtx, const Timestamp& ts) override;
+
+    std::shared_ptr<Ident> markIdentInUse(const std::string& ident) override;
+
     void startTimestampMonitor() override;
 
     void checkpoint() override;

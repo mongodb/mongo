@@ -164,7 +164,15 @@ public:
      */
     virtual Status compact(OperationContext* opCtx) = 0;
 
-    virtual Ident* getIdentPtr() const = 0;
+    /**
+     * Fetches the Ident for this index.
+     */
+    virtual std::shared_ptr<Ident> getSharedIdent() const = 0;
+
+    /**
+     * Sets the Ident for this index.
+     */
+    virtual void setIdent(std::shared_ptr<Ident> newIdent) = 0;
 
     //
     // Bulk operations support
@@ -549,7 +557,9 @@ public:
 
     Status compact(OperationContext* opCtx) final;
 
-    Ident* getIdentPtr() const final;
+    std::shared_ptr<Ident> getSharedIdent() const final;
+
+    void setIdent(std::shared_ptr<Ident> newIdent) final;
 
     std::unique_ptr<BulkBuilder> initiateBulk(size_t maxMemoryUsageBytes,
                                               const boost::optional<IndexStateInfo>& stateInfo,

@@ -944,6 +944,11 @@ public:
         CollectionWriter collection(opCtx, nss);
 
         WriteUnitOfWork wuow(opCtx);
+
+        // Add the collection ident to the drop-pending reaper.
+        opCtx->getServiceContext()->getStorageEngine()->addDropPendingIdent(
+            timestamp, collection->getRecordStore()->getSharedIdent());
+
         CollectionCatalog::get(opCtx)->dropCollection(
             opCtx, collection.getWritableCollection(opCtx), /*isDropPending=*/true);
         wuow.commit();
@@ -994,6 +999,8 @@ public:
         IndexCatalog* indexCatalog = writableCollection->getIndexCatalog();
         auto indexDescriptor =
             indexCatalog->findIndexByName(opCtx, indexName, IndexCatalog::InclusionPolicy::kReady);
+
+        // This also adds the index ident to the drop-pending reaper.
         ASSERT_OK(indexCatalog->dropIndex(opCtx, writableCollection, indexDescriptor));
 
         wuow.commit();
@@ -1367,6 +1374,331 @@ TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionUsingDropPendingCollecti
 
     // Ensure the idents are shared between the opened collection and the drop pending collection.
     ASSERT_EQ(coll->getSharedIdent(), openedColl->getSharedIdent());
+}
+
+TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionWithReaper) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString nss("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp dropCollectionTs = Timestamp(20, 20);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    DurableCatalog::Entry entry = getEntry(opCtx.get(), nss);
+
+    // Maintain a shared_ptr so that the reaper cannot drop the collection ident.
+    std::shared_ptr<const Collection> coll =
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespaceForRead(opCtx.get(), nss);
+    ASSERT(coll);
+
+    // Mark the collection as drop pending. The dropToken in the ident reaper is not expired as we
+    // still have a reference.
+    dropCollection(opCtx.get(), nss, dropCollectionTs);
+
+    {
+        ASSERT_EQ(1, storageEngine->getDropPendingIdents().size());
+        ASSERT_EQ(coll->getRecordStore()->getSharedIdent()->getIdent(),
+                  *storageEngine->getDropPendingIdents().begin());
+
+        // Ident is not expired and should not be removed.
+        storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
+
+        ASSERT_EQ(1, storageEngine->getDropPendingIdents().size());
+        ASSERT_EQ(coll->getRecordStore()->getSharedIdent()->getIdent(),
+                  *storageEngine->getDropPendingIdents().begin());
+    }
+
+    std::shared_ptr<Collection> openedColl = openCollection(opCtx.get(), entry, createCollectionTs);
+    ASSERT(openedColl);
+    ASSERT_EQ(coll->getSharedIdent(), openedColl->getSharedIdent());
+
+    // The ident is now expired and should be removed the next time the ident reaper runs.
+    coll.reset();
+    openedColl.reset();
+
+    storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
+    ASSERT_EQ(0, storageEngine->getDropPendingIdents().size());
+
+    // Now we fail to open the collection as the ident has been removed.
+    OneOffRead oor(opCtx.get(), createCollectionTs);
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+    ASSERT(!CollectionCatalog::get(opCtx.get())
+                ->openCollection(opCtx.get(), entry, createCollectionTs));
+}
+
+TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionWithReaper) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString nss("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp dropCollectionTs = Timestamp(20, 20);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    DurableCatalog::Entry entry = getEntry(opCtx.get(), nss);
+
+    // Make the collection drop pending. The dropToken in the ident reaper is now expired as we
+    // don't maintain any references to the collection.
+    dropCollection(opCtx.get(), nss, dropCollectionTs);
+
+    {
+        // Open the collection, which marks the ident as in use before running the ident reaper.
+        OneOffRead oor(opCtx.get(), createCollectionTs);
+
+        std::shared_ptr<Collection> openedColl =
+            openCollection(opCtx.get(), entry, createCollectionTs);
+        ASSERT(openedColl);
+
+        ASSERT_EQ(1, storageEngine->getDropPendingIdents().size());
+        ASSERT_EQ(openedColl->getRecordStore()->getSharedIdent()->getIdent(),
+                  *storageEngine->getDropPendingIdents().begin());
+
+        // Ident is marked as in use and it should not be removed.
+        storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
+
+        ASSERT_EQ(1, storageEngine->getDropPendingIdents().size());
+        ASSERT_EQ(openedColl->getRecordStore()->getSharedIdent()->getIdent(),
+                  *storageEngine->getDropPendingIdents().begin());
+    }
+
+    {
+        // Run the ident reaper before opening the collection.
+        ASSERT_EQ(1, storageEngine->getDropPendingIdents().size());
+
+        // The dropToken is expired as the ident is no longer in use.
+        storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
+
+        ASSERT_EQ(0, storageEngine->getDropPendingIdents().size());
+
+        // Now we fail to open the collection as the ident has been removed.
+        OneOffRead oor(opCtx.get(), createCollectionTs);
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+        ASSERT(!CollectionCatalog::get(opCtx.get())
+                    ->openCollection(opCtx.get(), entry, createCollectionTs));
+    }
+}
+
+TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionAndIndexesWithReaper) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString nss("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createIndexTs = Timestamp(20, 20);
+    const Timestamp dropXIndexTs = Timestamp(30, 30);
+    const Timestamp dropYIndexTs = Timestamp(40, 40);
+    const Timestamp dropCollectionTs = Timestamp(50, 50);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createIndexTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "y_1"
+                         << "key" << BSON("y" << 1)),
+                createIndexTs);
+
+    DurableCatalog::Entry entry = getEntry(opCtx.get(), nss);
+
+    // Perform index drops at different timestamps. By not maintaining shared_ptrs to the these
+    // indexes, their idents are expired.
+    dropIndex(opCtx.get(), nss, "x_1", dropXIndexTs);
+    dropIndex(opCtx.get(), nss, "y_1", dropYIndexTs);
+
+    // Maintain a shared_ptr to the collection so that the reaper cannot drop the collection ident.
+    std::shared_ptr<const Collection> coll =
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespaceForRead(opCtx.get(), nss);
+    ASSERT(coll);
+
+    dropCollection(opCtx.get(), nss, dropCollectionTs);
+
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    ASSERT_EQ(3, storageEngine->getDropPendingIdents().size());
+
+    {
+        // Open the collection using shared state before any index drops.
+        OneOffRead oor(opCtx.get(), createIndexTs);
+
+        std::shared_ptr<Collection> openedColl = openCollection(opCtx.get(), entry, createIndexTs);
+        ASSERT(openedColl);
+        ASSERT_EQ(openedColl->getSharedIdent(), coll->getSharedIdent());
+        ASSERT_EQ(2, openedColl->getIndexCatalog()->numIndexesTotal(opCtx.get()));
+
+        // All idents are marked as in use and none should be removed.
+        storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
+        ASSERT_EQ(3, storageEngine->getDropPendingIdents().size());
+    }
+
+    {
+        // Open the collection using shared state after a single index was dropped.
+        OneOffRead oor(opCtx.get(), dropXIndexTs);
+
+        std::shared_ptr<Collection> openedColl = openCollection(opCtx.get(), entry, dropXIndexTs);
+        ASSERT(openedColl);
+        ASSERT_EQ(openedColl->getSharedIdent(), coll->getSharedIdent());
+        ASSERT_EQ(1, openedColl->getIndexCatalog()->numIndexesTotal(opCtx.get()));
+
+        std::vector<std::string> indexNames;
+        openedColl->getAllIndexes(&indexNames);
+        ASSERT_EQ(1, indexNames.size());
+        ASSERT_EQ("y_1", indexNames.front());
+
+        // Only the collection and 'y' index idents are marked as in use. The 'x' index ident will
+        // be removed.
+        storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
+        ASSERT_EQ(2, storageEngine->getDropPendingIdents().size());
+    }
+
+    {
+        // Open the collection using shared state before any indexes were created.
+        OneOffRead oor(opCtx.get(), createCollectionTs);
+
+        std::shared_ptr<Collection> openedColl =
+            openCollection(opCtx.get(), entry, createCollectionTs);
+        ASSERT(openedColl);
+        ASSERT_EQ(openedColl->getSharedIdent(), coll->getSharedIdent());
+        ASSERT_EQ(0, openedColl->getIndexCatalog()->numIndexesTotal(opCtx.get()));
+    }
+
+    {
+        // Try to open the collection using shared state when both indexes were present. This should
+        // fail as the ident for index 'x' was already removed.
+        OneOffRead oor(opCtx.get(), createIndexTs);
+
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+        ASSERT(!CollectionCatalog::get(opCtx.get())
+                    ->openCollection(opCtx.get(), entry, createIndexTs));
+
+        ASSERT_EQ(2, storageEngine->getDropPendingIdents().size());
+    }
+
+    {
+        // Drop all remaining idents.
+        coll.reset();
+
+        storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
+        ASSERT_EQ(0, storageEngine->getDropPendingIdents().size());
+
+        // All idents are removed so opening the collection before any indexes were created should
+        // fail.
+        OneOffRead oor(opCtx.get(), createCollectionTs);
+
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+        ASSERT(!CollectionCatalog::get(opCtx.get())
+                    ->openCollection(opCtx.get(), entry, createCollectionTs));
+    }
+}
+
+TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionAndIndexesWithReaper) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString nss("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createIndexTs = Timestamp(20, 20);
+    const Timestamp dropXIndexTs = Timestamp(30, 30);
+    const Timestamp dropYIndexTs = Timestamp(40, 40);
+    const Timestamp dropCollectionTs = Timestamp(50, 50);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createIndexTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "y_1"
+                         << "key" << BSON("y" << 1)),
+                createIndexTs);
+
+    DurableCatalog::Entry entry = getEntry(opCtx.get(), nss);
+
+    // Perform drops at different timestamps. By not maintaining shared_ptrs to the these, their
+    // idents are expired.
+    dropIndex(opCtx.get(), nss, "x_1", dropXIndexTs);
+    dropIndex(opCtx.get(), nss, "y_1", dropYIndexTs);
+    dropCollection(opCtx.get(), nss, dropCollectionTs);
+
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    ASSERT_EQ(3, storageEngine->getDropPendingIdents().size());
+
+    {
+        // Open the collection before any index drops.
+        OneOffRead oor(opCtx.get(), createIndexTs);
+
+        std::shared_ptr<Collection> openedColl = openCollection(opCtx.get(), entry, createIndexTs);
+        ASSERT(openedColl);
+        ASSERT_EQ(2, openedColl->getIndexCatalog()->numIndexesTotal(opCtx.get()));
+
+        // All idents are marked as in use and none should be removed.
+        storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
+        ASSERT_EQ(3, storageEngine->getDropPendingIdents().size());
+    }
+
+    {
+        // Open the collection after the 'x' index was dropped.
+        OneOffRead oor(opCtx.get(), dropXIndexTs);
+
+        std::shared_ptr<Collection> openedColl = openCollection(opCtx.get(), entry, dropXIndexTs);
+        ASSERT(openedColl);
+        ASSERT_EQ(1, openedColl->getIndexCatalog()->numIndexesTotal(opCtx.get()));
+
+        std::vector<std::string> indexNames;
+        openedColl->getAllIndexes(&indexNames);
+        ASSERT_EQ(1, indexNames.size());
+        ASSERT_EQ("y_1", indexNames.front());
+
+        // The 'x' index ident will be removed.
+        storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
+        ASSERT_EQ(2, storageEngine->getDropPendingIdents().size());
+    }
+
+    {
+        // Open the collection before any indexes were created.
+        OneOffRead oor(opCtx.get(), createCollectionTs);
+
+        std::shared_ptr<Collection> openedColl =
+            openCollection(opCtx.get(), entry, createCollectionTs);
+        ASSERT(openedColl);
+        ASSERT_EQ(0, openedColl->getIndexCatalog()->numIndexesTotal(opCtx.get()));
+    }
+
+    {
+        // Try to open the collection before any index drops. Because the 'x' index ident is already
+        // dropped, this should fail.
+        OneOffRead oor(opCtx.get(), createIndexTs);
+
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+        ASSERT(!CollectionCatalog::get(opCtx.get())
+                    ->openCollection(opCtx.get(), entry, createIndexTs));
+
+        ASSERT_EQ(2, storageEngine->getDropPendingIdents().size());
+    }
+
+    {
+        // Drop all remaining idents and try to open the collection. This should fail.
+        storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
+        ASSERT_EQ(0, storageEngine->getDropPendingIdents().size());
+
+        OneOffRead oor(opCtx.get(), createCollectionTs);
+
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+        ASSERT(!CollectionCatalog::get(opCtx.get())
+                    ->openCollection(opCtx.get(), entry, createCollectionTs));
+    }
 }
 
 }  // namespace

@@ -52,7 +52,7 @@ struct IndexValidateResults;
  * queries. The actual implementation is up to the storage engine. All the storage engines must
  * support an index key size up to the maximum document size.
  */
-class SortedDataInterface : public Ident {
+class SortedDataInterface {
 public:
     /**
      * Constructs a SortedDataInterface. The rsKeyFormat is the RecordId key format of the related
@@ -62,7 +62,7 @@ public:
                         KeyString::Version keyStringVersion,
                         Ordering ordering,
                         KeyFormat rsKeyFormat)
-        : Ident(ident.toString()),
+        : _ident(std::make_shared<Ident>(ident.toString())),
           _keyStringVersion(keyStringVersion),
           _ordering(ordering),
           _rsKeyFormat(rsKeyFormat) {}
@@ -204,6 +204,14 @@ public:
      */
     KeyFormat rsKeyFormat() const {
         return _rsKeyFormat;
+    }
+
+    std::shared_ptr<Ident> getSharedIdent() const {
+        return _ident;
+    }
+
+    void setIdent(std::shared_ptr<Ident> newIdent) {
+        _ident = std::move(newIdent);
     }
 
     /**
@@ -398,6 +406,8 @@ public:
                                                    RecordId rid) = 0;
 
 protected:
+    std::shared_ptr<Ident> _ident;
+
     const KeyString::Version _keyStringVersion;
     const Ordering _ordering;
     const KeyFormat _rsKeyFormat;

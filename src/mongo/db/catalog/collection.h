@@ -220,10 +220,12 @@ public:
     /**
      * Initializes a collection representative at the provided read timestamp using the shared state
      * from an already existing, later collection.
+     *
+     * Returns the SnapshotTooOld error if the underlying data files have already been removed.
      */
-    virtual void initFromExisting(OperationContext* opCtx,
-                                  std::shared_ptr<Collection> collection,
-                                  Timestamp readTimestamp) {}
+    virtual Status initFromExisting(OperationContext* opCtx,
+                                    std::shared_ptr<Collection> collection,
+                                    Timestamp readTimestamp) = 0;
 
     virtual bool isCommitted() const {
         return true;
@@ -263,6 +265,11 @@ public:
      * Fetches the Ident for this collection.
      */
     virtual std::shared_ptr<Ident> getSharedIdent() const = 0;
+
+    /**
+     * Sets the Ident for this collection.
+     */
+    virtual void setIdent(std::shared_ptr<Ident> newIdent) = 0;
 
     virtual BSONObj getValidatorDoc() const = 0;
 

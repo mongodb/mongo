@@ -197,7 +197,7 @@ public:
 
     Status dropIdent(RecoveryUnit* ru,
                      StringData ident,
-                     StorageEngine::DropIdentCallback&& onDrop = nullptr) override;
+                     const StorageEngine::DropIdentCallback& onDrop = nullptr) override;
 
     void dropIdentForImport(OperationContext* opCtx, StringData ident) override;
 

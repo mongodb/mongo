@@ -258,6 +258,19 @@ bool doesMinMaxHaveMixedSchemaData(const BSONObj& min, const BSONObj& max) {
     return false;
 }
 
+bool isIndexCompatible(std::shared_ptr<IndexCatalogEntry> index, Timestamp readTimestamp) {
+    if (!index) {
+        return false;
+    }
+
+    boost::optional<Timestamp> minVisibleSnapshot = index->getMinimumVisibleSnapshot();
+    if (!minVisibleSnapshot) {
+        // Index is valid in all snapshots.
+        return true;
+    }
+    return readTimestamp >= *minVisibleSnapshot;
+}
+
 }  // namespace
 
 CollectionImpl::SharedState::SharedState(CollectionImpl* collection,
@@ -368,17 +381,19 @@ void CollectionImpl::init(OperationContext* opCtx) {
     _initialized = true;
 }
 
-void CollectionImpl::initFromExisting(OperationContext* opCtx,
-                                      std::shared_ptr<Collection> collection,
-                                      Timestamp readTimestamp) {
+Status CollectionImpl::initFromExisting(OperationContext* opCtx,
+                                        std::shared_ptr<Collection> collection,
+                                        Timestamp readTimestamp) {
     LOGV2_DEBUG(
         6825402, 1, "Initializing collection using shared state", logAttrs(collection->ns()));
 
     // We are per definition committed if we initialize from an existing collection.
     _cachedCommitted = true;
 
-    // Use the shared state from the existing collection.
-    _shared = static_cast<CollectionImpl*>(collection.get())->_shared;
+    if (collection) {
+        // Use the shared state from the existing collection.
+        _shared = static_cast<CollectionImpl*>(collection.get())->_shared;
+    }
 
     // When initializing a collection from an earlier point-in-time, we don't know when the last DDL
     // operation took place at that point-in-time. We conservatively set the minimum valid snapshot
@@ -388,52 +403,73 @@ void CollectionImpl::initFromExisting(OperationContext* opCtx,
 
     _initCommon(opCtx);
 
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    stdx::unordered_map<std::string, std::shared_ptr<Ident>> sharedIdents;
+
     // Determine which indexes from the existing collection can be shared with this newly
     // initialized collection. The remaining indexes will be initialized by the IndexCatalog.
     IndexCatalogEntryContainer preexistingIndexes;
     for (const auto& index : _metadata->indexes) {
         // First check the index catalog of the existing collection for the index entry.
-        std::shared_ptr<IndexCatalogEntry> entry = [&]() -> std::shared_ptr<IndexCatalogEntry> {
+        auto latestEntry = [&]() -> std::shared_ptr<IndexCatalogEntry> {
+            if (!collection)
+                return nullptr;
+
             auto desc =
                 collection->getIndexCatalog()->findIndexByName(opCtx, index.nameStringData());
             if (!desc)
                 return nullptr;
-
-            auto entry = collection->getIndexCatalog()->getEntryShared(desc);
-            if (!entry->getMinimumVisibleSnapshot())
-                // Index is valid in all snapshots.
-                return entry;
-            return readTimestamp < *entry->getMinimumVisibleSnapshot() ? nullptr : entry;
+            return collection->getIndexCatalog()->getEntryShared(desc);
         }();
 
-        if (entry) {
-            preexistingIndexes.add(std::move(entry));
+        if (isIndexCompatible(latestEntry, readTimestamp)) {
+            preexistingIndexes.add(std::move(latestEntry));
             continue;
         }
+
+        const std::string indexName = index.nameStringData().toString();
+        const std::string ident =
+            DurableCatalog::get(opCtx)->getIndexIdent(opCtx, _catalogId, index.nameStringData());
 
         // Next check the CollectionCatalog for a compatible drop pending index.
-        entry = [&]() -> std::shared_ptr<IndexCatalogEntry> {
-            const std::string ident = DurableCatalog::get(opCtx)->getIndexIdent(
-                opCtx, _catalogId, index.nameStringData());
-            auto entry = CollectionCatalog::get(opCtx)->findDropPendingIndex(ident);
-            if (!entry)
-                return nullptr;
-
-            if (!entry->getMinimumVisibleSnapshot())
-                // Index is valid in all snapshots.
-                return entry;
-            return readTimestamp < *entry->getMinimumVisibleSnapshot() ? nullptr : entry;
-        }();
-
-        if (entry) {
-            preexistingIndexes.add(std::move(entry));
+        auto dropPendingEntry = CollectionCatalog::get(opCtx)->findDropPendingIndex(ident);
+        if (isIndexCompatible(dropPendingEntry, readTimestamp)) {
+            preexistingIndexes.add(std::move(dropPendingEntry));
             continue;
         }
+
+        // The index entries are incompatible with the read timestamp, but we need to use the same
+        // shared ident to prevent the reaper from dropping idents prematurely.
+        if (latestEntry || dropPendingEntry) {
+            sharedIdents.emplace(indexName,
+                                 latestEntry ? latestEntry->getSharedIdent()
+                                             : dropPendingEntry->getSharedIdent());
+            continue;
+        }
+
+        // The index ident is expired, but it could still be drop pending. Mark it as in use if
+        // possible.
+        auto newIdent = storageEngine->markIdentInUse(ident);
+        if (!newIdent) {
+            return {ErrorCodes::SnapshotTooOld,
+                    str::stream() << "Index ident " << ident
+                                  << " is being dropped or is already dropped."};
+        }
+        sharedIdents.emplace(indexName, newIdent);
     }
 
     uassertStatusOK(
         getIndexCatalog()->initFromExisting(opCtx, this, preexistingIndexes, readTimestamp));
+
+    // Update the idents for the newly initialized indexes.
+    for (const auto& sharedIdent : sharedIdents) {
+        auto desc = getIndexCatalog()->findIndexByName(opCtx, sharedIdent.first);
+        auto entry = getIndexCatalog()->getEntryShared(desc);
+        entry->setIdent(sharedIdent.second);
+    }
+
     _initialized = true;
+    return Status::OK();
 }
 
 void CollectionImpl::_initCommon(OperationContext* opCtx) {

@@ -164,7 +164,7 @@ public:
      */
     virtual Status dropIdent(RecoveryUnit* ru,
                              StringData ident,
-                             StorageEngine::DropIdentCallback&& onDrop = nullptr) = 0;
+                             const StorageEngine::DropIdentCallback& onDrop = nullptr) = 0;
 
     /**
      * Removes any knowledge of the ident from the storage engines metadata without removing the
