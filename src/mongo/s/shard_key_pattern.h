@@ -274,36 +274,37 @@ public:
     BSONObj extractShardKeyFromQuery(const CanonicalQuery& query) const;
 
     /**
-     * Returns true if the shard key pattern can ensure that the unique index pattern is
-     * respected across all shards.
+     * Returns true if the shard key pattern can ensure that the index uniqueness is respected
+     * across all shards.
      *
      * Primarily this just checks whether the shard key pattern field names are equal to or a
-     * prefix of the unique index pattern field names.  Since documents with the same fields in
-     * the shard key pattern are guaranteed to go to the same shard, and all documents must
-     * contain the full shard key, a unique index with a shard key pattern prefix can be sure
-     * when resolving duplicates that documents on other shards will have different shard keys,
-     * and so are not duplicates.
+     * prefix of the 'unique' or 'prepareUnique' index pattern field names. Since documents with the
+     * same fields in the shard key pattern are guaranteed to go to the same shard, and all
+     * documents must contain the full shard key, an index with {unique: true} or {prepareUnique:
+     * true} and a shard key pattern prefix can be sure when resolving duplicates that documents on
+     * other shards will have different shard keys, and so are not duplicates.
      *
      * Hashed shard key patterns are similar to ordinary patterns in that they guarantee similar
      * shard keys go to the same shard.
      *
      * Examples:
-     *     shard key {a : 1} is compatible with a unique index on {_id : 1}
-     *     shard key {a : 1} is compatible with a unique index on {a : 1 , b : 1}
-     *     shard key {a : 1} is compatible with a unique index on {a : -1 , b : 1 }
-     *     shard key {a : "hashed"} is compatible with a unique index on {a : 1}
-     *     shard key {a : 1} is not compatible with a unique index on {b : 1}
-     *     shard key {a : "hashed" , b : 1 } is not compatible with unique index on { b : 1 }
+     *     shard key {a : 1} is compatible with a unique/prepareUnique index on {_id : 1}
+     *     shard key {a : 1} is compatible with a unique/prepareUnique index on {a : 1, b : 1}
+     *     shard key {a : 1} is compatible with a unique/prepareUnique index on {a : -1, b : 1}
+     *     shard key {a : "hashed"} is compatible with a unique/prepareUnique index on {a : 1}
+     *     shard key {a : 1} is not compatible with a unique/prepareUnique index on {b : 1}
+     *     shard key {a : "hashed", b : 1} is not compatible with unique/prepareUnique index on
+     *     {b : 1}
      *
      * All unique index patterns starting with _id are assumed to be enforceable by the fact
      * that _ids must be unique, and so all unique _id prefixed indexes are compatible with
      * any shard key pattern.
      *
-     * NOTE: We assume 'uniqueIndexPattern' is a valid unique index pattern - a pattern like
-     * { k : "hashed" } is not capable of being a unique index and is an invalid argument to
-     * this method.
+     * NOTE: We assume 'indexPattern' is a valid unique/prepareUnique index pattern - a pattern like
+     * { k : "hashed" } is not capable of being a unique/prepareUnique index and is an invalid
+     * argument to this method.
      */
-    bool isUniqueIndexCompatible(const BSONObj& uniqueIndexPattern) const;
+    bool isIndexUniquenessCompatible(const BSONObj& indexPattern) const;
 
     /**
      * Return an ordered list of bounds generated using this KeyPattern and the
