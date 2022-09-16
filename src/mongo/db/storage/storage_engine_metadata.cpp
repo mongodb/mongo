@@ -207,7 +207,7 @@ Status StorageEngineMetadata::read() {
         if (!storageEngineOptionsElement.isABSONObj()) {
             return Status(ErrorCodes::FailedToParse,
                           str::stream()
-                              << "The 'storage.options' field in metadata must be a string: "
+                              << "The 'storage.options' field in metadata must be an object: "
                               << storageEngineOptionsElement.toString());
         }
         setStorageEngineOptions(storageEngineOptionsElement.Obj());
