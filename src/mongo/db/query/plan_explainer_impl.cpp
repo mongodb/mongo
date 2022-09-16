@@ -48,6 +48,7 @@
 #include "mongo/db/exec/trial_stage.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/util/assert_util.h"
@@ -680,11 +681,9 @@ void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
             getDocsExamined(stages[i]->stageType(), stages[i]->getSpecificStats());
 
         if (isSortStageType(stages[i]->stageType())) {
-            statsOut->hasSortStage = true;
-
             auto sortStage = static_cast<const SortStage*>(stages[i]);
             auto sortStats = static_cast<const SortStats*>(sortStage->getSpecificStats());
-            statsOut->usedDisk = sortStats->spills > 0;
+            PlanSummaryStatsVisitor(*statsOut).visit(sortStats);
         }
 
         if (STAGE_IXSCAN == stages[i]->stageType()) {

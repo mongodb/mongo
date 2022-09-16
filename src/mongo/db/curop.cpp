@@ -1439,6 +1439,9 @@ void OpDebug::setPlanSummaryMetrics(const PlanSummaryStats& planSummaryStats) {
     additiveMetrics.docsExamined = planSummaryStats.totalDocsExamined;
     hasSortStage = planSummaryStats.hasSortStage;
     usedDisk = planSummaryStats.usedDisk;
+    sortSpills = planSummaryStats.sortSpills;
+    sortTotalDataSizeBytes = planSummaryStats.sortTotalDataSizeBytes;
+    keysSorted = planSummaryStats.keysSorted;
     fromMultiPlanner = planSummaryStats.fromMultiPlanner;
     replanReason = planSummaryStats.replanReason;
 }

@@ -242,7 +242,10 @@ public:
 
     bool hasSortStage{false};  // true if the query plan involves an in-memory sort
 
-    bool usedDisk{false};  // true if the given query used disk
+    bool usedDisk{false};              // true if the given query used disk
+    long long sortSpills{0};           // The total number of spills to disk from sort stages
+    size_t sortTotalDataSizeBytes{0};  // The amount of data we've sorted in bytes
+    long long keysSorted{0};           // The number of keys that we've sorted.
 
     // True if the plan came from the multi-planner (not from the plan cache and not a query with a
     // single solution).

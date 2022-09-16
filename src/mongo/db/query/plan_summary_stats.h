@@ -91,6 +91,15 @@ struct PlanSummaryStats {
     // Did this plan use disk space?
     bool usedDisk = false;
 
+    // The total number of spills to disk from sort stages
+    long long sortSpills = 0;
+
+    // The amount of data we've sorted in bytes
+    size_t sortTotalDataSizeBytes = 0;
+
+    // The number of keys that we've sorted.
+    long long keysSorted = 0;
+
     // Did this plan failed during execution?
     bool planFailed = false;
 

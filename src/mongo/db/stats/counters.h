@@ -388,6 +388,26 @@ public:
 };
 extern LookupPushdownCounters lookupPushdownCounters;
 
+class SortCounters {
+public:
+    SortCounters() = default;
+
+    void incrementSortCounters(const OpDebug& debug) {
+        sortSpillsCounter.increment(debug.sortSpills);
+        sortTotalBytesCounter.increment(debug.sortTotalDataSizeBytes);
+        sortTotalKeysCounter.increment(debug.keysSorted);
+    }
+
+    // Counters tracking sort stats across all engines
+    // The total number of spills to disk from sort stages
+    CounterMetric sortSpillsCounter{"query.sort.spillToDisk"};
+    // The number of keys that we've sorted.
+    CounterMetric sortTotalKeysCounter{"query.sort.totalKeysSorted"};
+    // The amount of data we've sorted in bytes
+    CounterMetric sortTotalBytesCounter{"query.sort.totalBytesSorted"};
+};
+extern SortCounters sortCounters;
+
 /**
  * Generic class for counters of expressions inside various MQL statements.
  */

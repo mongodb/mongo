@@ -69,7 +69,7 @@ void recordCurOpMetrics(OperationContext* opCtx) {
         writeConflictsCounter.increment(n);
 
     lookupPushdownCounters.incrementLookupCounters(CurOp::get(opCtx)->debug());
-
+    sortCounters.incrementSortCounters(debug);
     queryFrameworkCounters.incrementQueryEngineCounters(CurOp::get(opCtx));
 }
 
