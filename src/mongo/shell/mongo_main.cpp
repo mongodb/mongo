@@ -1134,10 +1134,10 @@ int mongo_main(int argc, char* argv[]) {
                 {
                     std::string cmd = linePtr;
                     std::string::size_type firstSpace;
-                    if ((firstSpace = cmd.find(" ")) != std::string::npos)
+                    if ((firstSpace = cmd.find(' ')) != std::string::npos)
                         cmd = cmd.substr(0, firstSpace);
 
-                    if (cmd.find("\"") == std::string::npos) {
+                    if (cmd.find('\"') == std::string::npos) {
                         try {
                             lastLineSuccessful = scope->exec(
                                 std::string("__iscmd__ = shellHelper[\"") + cmd + "\"];",

@@ -959,7 +959,7 @@ bool hasErrField(const BSONObj& o) {
 
 /** @return the database name portion of an ns string */
 string nsGetDB(const string& ns) {
-    string::size_type pos = ns.find(".");
+    string::size_type pos = ns.find('.');
     if (pos == string::npos)
         return ns;
 
@@ -968,7 +968,7 @@ string nsGetDB(const string& ns) {
 
 /** @return the collection name portion of an ns string */
 string nsGetCollection(const string& ns) {
-    string::size_type pos = ns.find(".");
+    string::size_type pos = ns.find('.');
     if (pos == string::npos)
         return "";
 

@@ -150,7 +150,7 @@ auto benchRunConfigCreateConnectionImplRegistration = MONGO_WEAK_FUNCTION_REGIST
 
 // helper functions for isBalanced
 bool isUseCmd(std::string code) {
-    size_t first_space = code.find(" ");
+    size_t first_space = code.find(' ');
     if (first_space)
         code = code.substr(0, first_space);
     return code == "use";

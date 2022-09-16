@@ -42,7 +42,7 @@ namespace {
 std::string replaceEscapeChars(std::string str) {
     size_t tildaLoc = 0;
     // Search the string for any '~', and replace it if it is part of '~1'.
-    while ((tildaLoc = str.find("~", tildaLoc)) != std::string::npos) {
+    while ((tildaLoc = str.find('~', tildaLoc)) != std::string::npos) {
         uassert(51063,
                 "JSONPointer cannot contain unescaped ~ character",
                 str.length() > tildaLoc + 1 &&
@@ -72,7 +72,7 @@ JSONPointer::JSONPointer(std::string ptr) {
     size_t startOfKeyIndex = 1;
     size_t nextSlashIndex = 0;
     std::string key;
-    while ((nextSlashIndex = ptr.find("/", startOfKeyIndex)) != std::string::npos) {
+    while ((nextSlashIndex = ptr.find('/', startOfKeyIndex)) != std::string::npos) {
         key = ptr.substr(startOfKeyIndex, nextSlashIndex - startOfKeyIndex);
         key = replaceEscapeChars(std::move(key));
         _parsed.push_back(std::move(key));

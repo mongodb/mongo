@@ -105,8 +105,8 @@ StatusWith<std::string> StartupWarningsMongod::readTransparentHugePagesParameter
                                                << ((ifs.eof()) ? "EOF" : errorMessage(ec)));
         }
 
-        std::string::size_type posBegin = line.find("[");
-        std::string::size_type posEnd = line.find("]");
+        std::string::size_type posBegin = line.find('[');
+        std::string::size_type posEnd = line.find(']');
         if (posBegin == string::npos || posEnd == string::npos || posBegin >= posEnd) {
             return StatusWith<std::string>(ErrorCodes::FailedToParse,
                                            str::stream() << "cannot parse line: '" << line << "'");

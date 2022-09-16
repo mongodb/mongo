@@ -150,8 +150,8 @@ void ShardingTestFixtureCommon::expectConfigCollectionInsert(const HostAndPort& 
 
         // Handle changeId specially because there's no way to know what OID was generated
         std::string changeId = actualChangeLog.getChangeId();
-        size_t firstDash = changeId.find("-");
-        size_t lastDash = changeId.rfind("-");
+        size_t firstDash = changeId.find('-');
+        size_t lastDash = changeId.rfind('-');
 
         const std::string serverPiece = changeId.substr(0, firstDash);
         const std::string timePiece = changeId.substr(firstDash + 1, lastDash - firstDash - 1);

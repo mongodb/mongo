@@ -234,7 +234,7 @@ TEST(StackTrace, PosixFormat) {
 std::vector<std::string> splitLines(std::string in) {
     std::vector<std::string> lines;
     while (true) {
-        auto pos = in.find("\n");
+        auto pos = in.find('\n');
         if (pos == std::string::npos) {
             break;
         } else {

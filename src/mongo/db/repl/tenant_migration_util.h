@@ -60,7 +60,7 @@ namespace tenant_migration_util {
 inline Status validateDatabasePrefix(const std::string& tenantId) {
     const bool isPrefixSupported =
         kUnsupportedTenantIds.find(tenantId) == kUnsupportedTenantIds.end() &&
-        tenantId.find("_") == std::string::npos;
+        tenantId.find('_') == std::string::npos;
 
     return isPrefixSupported
         ? Status::OK()

@@ -49,7 +49,7 @@ ServerStatusMetric::ServerStatusMetric(std::string name)
     : _name(std::move(name)), _leafName(_parseLeafName(_name)) {}
 
 std::string ServerStatusMetric::_parseLeafName(const std::string& name) {
-    size_t idx = name.rfind(".");
+    size_t idx = name.rfind('.');
     if (idx == std::string::npos)
         return name;
     return name.substr(idx + 1);
