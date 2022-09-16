@@ -8,7 +8,12 @@
 (function() {
 'use strict';
 
-const st = new ShardingTest({shards: 1});
+const st = new ShardingTest({
+    shards: 1,
+    other: {
+        configOptions: {setParameter: {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000}}
+    }
+});
 const mongos = st.s0;
 const db = mongos.getDB(jsTestName());
 const coll = db['coll'];
