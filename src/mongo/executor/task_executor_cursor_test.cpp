@@ -211,6 +211,50 @@ TEST_F(TaskExecutorCursorFixture, MultipleCursorsSingleBatchSucceeds) {
     ASSERT_FALSE(secondCursor.getNext(opCtx.get()));
 }
 
+/**
+ * The operation context under which we send the original cursor-establishing command
+ * can be destructed before getNext is called with new opCtx. Ensure that 'child'
+ * TaskExecutorCursors created from the original TEC's multi-cursor-response can safely
+ * operate if this happens/don't try and use the now-destroyed operation context.
+ * See SERVER-69702 for context
+ */
+TEST_F(TaskExecutorCursorFixture, ChildTaskExecutorCursorsAreSafeIfOriginalOpCtxDestructed) {
+    auto lsid = makeLogicalSessionIdForTest();
+    opCtx->setLogicalSessionId(lsid);
+    const auto aggCmd = BSON("aggregate"
+                             << "test"
+                             << "pipeline" << BSON_ARRAY(BSON("returnMultipleCursors" << true)));
+    RemoteCommandRequest rcr(HostAndPort("localhost"), "test", aggCmd, opCtx.get());
+    TaskExecutorCursor tec(&getExecutor(), rcr);
+    auto expected = BSON("aggregate"
+                         << "test"
+                         << "pipeline" << BSON_ARRAY(BSON("returnMultipleCursors" << true))
+                         << "lsid" << lsid.toBSON());
+    ASSERT_BSONOBJ_EQ(expected, scheduleSuccessfulMultiCursorResponse("firstBatch", 1, 2, {0, 0}));
+    // Before calling getNext (and therefore spawning child TECs), destroy the opCtx
+    // we used to send the initial query and make a new one.
+    opCtx.reset();
+    opCtx = client->makeOperationContext();
+    opCtx->setLogicalSessionId(lsid);
+    // Use the new opCtx to call getNext. The child TECs should not attempt to read from the
+    // now dead original opCtx.
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 1);
+
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 2);
+
+    ASSERT_FALSE(tec.getNext(opCtx.get()));
+
+    auto cursorVec = tec.releaseAdditionalCursors();
+    ASSERT_EQUALS(cursorVec.size(), 1);
+    auto secondCursor = std::move(cursorVec[0]);
+
+    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).value()["x"].Int(), 2);
+    ASSERT_EQUALS(secondCursor.getNext(opCtx.get()).value()["x"].Int(), 4);
+    ASSERT_FALSE(hasReadyRequests());
+
+    ASSERT_FALSE(secondCursor.getNext(opCtx.get()));
+}
+
 TEST_F(TaskExecutorCursorFixture, MultipleCursorsGetMoreWorks) {
     const auto aggCmd = BSON("aggregate"
                              << "test"

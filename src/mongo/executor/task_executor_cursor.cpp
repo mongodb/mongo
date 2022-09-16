@@ -245,10 +245,12 @@ void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
     _processResponse(opCtx, std::move(cr));
     // If we have more responses, build them into cursors then hold them until a caller accesses
     // them. Skip the first response, we used it to populate this cursor.
+    // Ensure we update the RCR we give to each 'child cursor' with the current opCtx.
+    auto freshRcr = _createRequest(opCtx, _rcr.cmdObj);
     for (unsigned int i = 1; i < cursorResponses.size(); ++i) {
         _additionalCursors.emplace_back(_executor,
                                         uassertStatusOK(std::move(cursorResponses[i])),
-                                        _rcr,
+                                        freshRcr,
                                         TaskExecutorCursor::Options());
     }
 }
