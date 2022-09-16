@@ -183,7 +183,8 @@ void deleteRangeDeletionTaskLocally(
 void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                         const ShardId& recipientId,
                                         const UUID& collectionUuid,
-                                        const ChunkRange& range);
+                                        const ChunkRange& range,
+                                        const UUID& migrationId);
 
 /**
  * Advances the optime for the current transaction by performing a write operation as a retryable
@@ -212,7 +213,8 @@ void markAsReadyRangeDeletionTaskLocally(OperationContext* opCtx,
 void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                              const ShardId& recipientId,
                                              const UUID& collectionUuid,
-                                             const ChunkRange& range);
+                                             const ChunkRange& range,
+                                             const UUID& migrationId);
 
 /**
  * Submits an asynchronous task to scan config.migrationCoordinators and drive each unfinished

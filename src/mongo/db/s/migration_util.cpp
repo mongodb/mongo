@@ -307,6 +307,16 @@ BSONObj getQueryFilterForRangeDeletionTask(const UUID& collectionUuid, const Chu
                 << range.getMax());
 }
 
+// Add `migrationId` to the query filter in order to be resilient to delayed network retries: only
+// relying on collection's UUID and range may lead to undesired updates/deletes on tasks created by
+// future migrations.
+BSONObj getQueryFilterForRangeDeletionTaskOnRecipient(const UUID& collectionUuid,
+                                                      const ChunkRange& range,
+                                                      const UUID& migrationId) {
+    return getQueryFilterForRangeDeletionTask(collectionUuid, range)
+        .addFields(BSON(RangeDeletionTask::kIdFieldName << migrationId));
+}
+
 
 }  // namespace
 
@@ -794,8 +804,10 @@ void persistAbortDecision(OperationContext* opCtx,
 void deleteRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                         const ShardId& recipientId,
                                         const UUID& collectionUuid,
-                                        const ChunkRange& range) {
-    const auto queryFilter = getQueryFilterForRangeDeletionTask(collectionUuid, range);
+                                        const ChunkRange& range,
+                                        const UUID& migrationId) {
+    const auto queryFilter =
+        getQueryFilterForRangeDeletionTaskOnRecipient(collectionUuid, range, migrationId);
     write_ops::DeleteCommandRequest deleteOp(NamespaceString::kRangeDeletionNamespace);
     write_ops::DeleteOpEntry query(queryFilter, false /*multi*/);
     deleteOp.setDeletes({query});
@@ -833,12 +845,16 @@ void deleteRangeDeletionTaskLocally(OperationContext* opCtx,
 void markAsReadyRangeDeletionTaskOnRecipient(OperationContext* opCtx,
                                              const ShardId& recipientId,
                                              const UUID& collectionUuid,
-                                             const ChunkRange& range) {
+                                             const ChunkRange& range,
+                                             const UUID& migrationId) {
     write_ops::UpdateCommandRequest updateOp(NamespaceString::kRangeDeletionNamespace);
-    const auto queryFilter = getQueryFilterForRangeDeletionTask(collectionUuid, range);
+    const auto queryFilter =
+        getQueryFilterForRangeDeletionTaskOnRecipient(collectionUuid, range, migrationId);
     auto updateModification =
         write_ops::UpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(
-            BSON("$unset" << BSON(RangeDeletionTask::kPendingFieldName << ""))));
+            BSON("$unset" << BSON(RangeDeletionTask::kPendingFieldName << "") << "$set"
+                          << BSON(RangeDeletionTask::kWhenToCleanFieldName
+                                  << CleanWhen_serializer(CleanWhenEnum::kNow)))));
     write_ops::UpdateOpEntry updateEntry(queryFilter, updateModification);
     updateEntry.setMulti(false);
     updateEntry.setUpsert(false);
@@ -1055,8 +1071,11 @@ void recoverMigrationCoordinations(OperationContext* opCtx,
                           "coordinatorDocumentUUID"_attr = doc.getCollectionUuid());
                 }
 
-                deleteRangeDeletionTaskOnRecipient(
-                    opCtx, doc.getRecipientShardId(), doc.getCollectionUuid(), doc.getRange());
+                deleteRangeDeletionTaskOnRecipient(opCtx,
+                                                   doc.getRecipientShardId(),
+                                                   doc.getCollectionUuid(),
+                                                   doc.getRange(),
+                                                   doc.getId());
                 deleteRangeDeletionTaskLocally(opCtx, doc.getCollectionUuid(), doc.getRange());
                 coordinator.forgetMigration(opCtx);
                 setFilteringMetadata();

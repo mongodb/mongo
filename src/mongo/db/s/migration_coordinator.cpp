@@ -226,7 +226,8 @@ SemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient(
     migrationutil::deleteRangeDeletionTaskOnRecipient(opCtx,
                                                       _migrationInfo.getRecipientShardId(),
                                                       _migrationInfo.getCollectionUuid(),
-                                                      _migrationInfo.getRange());
+                                                      _migrationInfo.getRange(),
+                                                      _migrationInfo.getId());
 
     LOGV2_DEBUG(23897,
                 2,
@@ -307,7 +308,8 @@ void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* 
     migrationutil::markAsReadyRangeDeletionTaskOnRecipient(opCtx,
                                                            _migrationInfo.getRecipientShardId(),
                                                            _migrationInfo.getCollectionUuid(),
-                                                           _migrationInfo.getRange());
+                                                           _migrationInfo.getRange(),
+                                                           _migrationInfo.getId());
 }
 
 void MigrationCoordinator::forgetMigration(OperationContext* opCtx) {
