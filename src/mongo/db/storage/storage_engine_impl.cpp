@@ -617,7 +617,15 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
         const auto& toRemove = it;
         LOGV2(22251, "Dropping unknown ident", "ident"_attr = toRemove);
         WriteUnitOfWork wuow(opCtx);
-        fassert(40591, _engine->dropIdent(opCtx->recoveryUnit(), toRemove));
+        Status status = _engine->dropIdent(opCtx->recoveryUnit(), toRemove);
+        if (!status.isOK()) {
+            // This function is called during startup recovery or after rollback to stable is
+            // finished. At these points there should be no concurrent operations accessing these
+            // idents as the exclusive global lock is held. If this fails, it signifies that there's
+            // an operation holding an open data handle on the ident.
+            opCtx->getServiceContext()->getStorageEngine()->dump();
+            fassert(40591, status);
+        }
         wuow.commit();
     }
 
