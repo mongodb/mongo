@@ -689,6 +689,14 @@ bool VariableEnvironment::hasFreeVariables() const {
     return !_info->freeVars.empty();
 }
 
+opt::unordered_set<std::string> VariableEnvironment::freeVariableNames() const {
+    opt::unordered_set<std::string> freeVarNames;
+    for (auto&& [name, vars] : _info->freeVars) {
+        freeVarNames.insert(name);
+    }
+    return freeVarNames;
+}
+
 size_t VariableEnvironment::freeOccurences(const std::string& variable) const {
     auto it = _info->freeVars.find(variable);
     if (it == _info->freeVars.end()) {

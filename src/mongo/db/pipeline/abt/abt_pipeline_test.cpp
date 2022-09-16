@@ -196,13 +196,11 @@ TEST(ABTTranslate, MatchWithOrConvertedToIn) {
     Metadata metadata = {
         {{scanDefName,
           ScanDefinition{{}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}}}}}};
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase},
-                                 prefixId,
-                                 metadata,
-                                 DebugInfo::kDefaultForTests);
+    OptPhaseManager phaseManager(
+        {OptPhase::MemoSubstitutionPhase}, prefixId, metadata, DebugInfo::kDefaultForTests);
 
-    ASSERT_TRUE(phaseManager.optimize(orTranslated));
-    ASSERT_TRUE(phaseManager.optimize(inTranslated));
+    phaseManager.optimize(orTranslated);
+    phaseManager.optimize(inTranslated);
 
     // Both pipelines are able to use a SargableNode with a disjunction of point intervals.
     ASSERT_EXPLAIN_V2(
@@ -292,17 +290,17 @@ TEST(ABTTranslate, ProjectRetain) {
     ABT translated = translatePipeline(
         metadata, "[{$project: {a: 1, b: 1}}, {$match: {a: 2}}]", scanDefName, prefixId);
 
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::ConstEvalPre,
-                                  OptPhaseManager::OptPhase::PathFuse,
-                                  OptPhaseManager::OptPhase::MemoSubstitutionPhase,
-                                  OptPhaseManager::OptPhase::MemoExplorationPhase,
-                                  OptPhaseManager::OptPhase::MemoImplementationPhase},
+    OptPhaseManager phaseManager({OptPhase::ConstEvalPre,
+                                  OptPhase::PathFuse,
+                                  OptPhase::MemoSubstitutionPhase,
+                                  OptPhase::MemoExplorationPhase,
+                                  OptPhase::MemoImplementationPhase},
                                  prefixId,
                                  metadata,
                                  DebugInfo::kDefaultForTests);
 
     ABT optimized = translated;
-    ASSERT_TRUE(phaseManager.optimize(optimized));
+    phaseManager.optimize(optimized);
 
     // Observe the Filter can be reordered against the Eval node.
     ASSERT_EXPLAIN_V2(
@@ -635,15 +633,15 @@ TEST(ABTTranslate, MatchBasic) {
         "            Source []\n",
         translated);
 
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase,
-                                  OptPhaseManager::OptPhase::MemoExplorationPhase,
-                                  OptPhaseManager::OptPhase::MemoImplementationPhase},
+    OptPhaseManager phaseManager({OptPhase::MemoSubstitutionPhase,
+                                  OptPhase::MemoExplorationPhase,
+                                  OptPhase::MemoImplementationPhase},
                                  prefixId,
                                  {{{scanDefName, ScanDefinition{{}, {}}}}},
                                  DebugInfo::kDefaultForTests);
 
     ABT optimized = translated;
-    ASSERT_TRUE(phaseManager.optimize(optimized));
+    phaseManager.optimize(optimized);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -905,13 +903,13 @@ TEST(ABTTranslate, ExprFilter) {
 
     PrefixId prefixId;
     std::string scanDefName = "collection";
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::ConstEvalPre},
+    OptPhaseManager phaseManager({OptPhase::ConstEvalPre},
                                  prefixId,
                                  {{{scanDefName, ScanDefinition{{}, {}}}}},
                                  DebugInfo::kDefaultForTests);
 
     ABT optimized = translated;
-    ASSERT_TRUE(phaseManager.optimize(optimized));
+    phaseManager.optimize(optimized);
 
     // Make sure we have a single array constant for (1, 2, 'str', ...).
     ASSERT_EXPLAIN_V2(
@@ -1064,16 +1062,16 @@ TEST(ABTTranslate, GroupLocalGlobal) {
     PrefixId prefixId;
     std::string scanDefName = "collection";
     OptPhaseManager phaseManager(
-        {OptPhaseManager::OptPhase::MemoSubstitutionPhase,
-         OptPhaseManager::OptPhase::MemoExplorationPhase,
-         OptPhaseManager::OptPhase::MemoImplementationPhase},
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
         prefixId,
         {{{scanDefName, ScanDefinition{{}, {}, {DistributionType::UnknownPartitioning}}}},
          5 /*numberOfPartitions*/},
         DebugInfo::kDefaultForTests);
 
     ABT optimized = std::move(translated);
-    ASSERT_TRUE(phaseManager.optimize(optimized));
+    phaseManager.optimize(optimized);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -1318,7 +1316,7 @@ TEST(ABTTranslate, UnwindSort) {
                                  DebugInfo::kDefaultForTests);
 
     ABT optimized = translated;
-    ASSERT_TRUE(phaseManager.optimize(optimized));
+    phaseManager.optimize(optimized);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -1373,9 +1371,9 @@ TEST(ABTTranslate, MatchIndex) {
           ScanDefinition{{}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}}}}}};
     ABT translated = translatePipeline(metadata, "[{$match: {'a': 10}}]", scanDefName, prefixId);
 
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase,
-                                  OptPhaseManager::OptPhase::MemoExplorationPhase,
-                                  OptPhaseManager::OptPhase::MemoImplementationPhase},
+    OptPhaseManager phaseManager({OptPhase::MemoSubstitutionPhase,
+                                  OptPhase::MemoExplorationPhase,
+                                  OptPhase::MemoImplementationPhase},
                                  prefixId,
                                  metadata,
                                  DebugInfo::kDefaultForTests);
@@ -1400,7 +1398,7 @@ TEST(ABTTranslate, MatchIndex) {
         translated);
 
     ABT optimized = std::move(translated);
-    ASSERT_TRUE(phaseManager.optimize(optimized));
+    phaseManager.optimize(optimized);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -1442,17 +1440,17 @@ TEST(ABTTranslate, MatchIndexCovered) {
     ABT translated = translatePipeline(
         metadata, "[{$project: {_id: 0, a: 1}}, {$match: {'a': 10}}]", scanDefName, prefixId);
 
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::ConstEvalPre,
-                                  OptPhaseManager::OptPhase::PathFuse,
-                                  OptPhaseManager::OptPhase::MemoSubstitutionPhase,
-                                  OptPhaseManager::OptPhase::MemoExplorationPhase,
-                                  OptPhaseManager::OptPhase::MemoImplementationPhase},
+    OptPhaseManager phaseManager({OptPhase::ConstEvalPre,
+                                  OptPhase::PathFuse,
+                                  OptPhase::MemoSubstitutionPhase,
+                                  OptPhase::MemoExplorationPhase,
+                                  OptPhase::MemoImplementationPhase},
                                  prefixId,
                                  metadata,
                                  DebugInfo::kDefaultForTests);
 
     ABT optimized = std::move(translated);
-    ASSERT_TRUE(phaseManager.optimize(optimized));
+    phaseManager.optimize(optimized);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -1490,17 +1488,17 @@ TEST(ABTTranslate, MatchIndexCovered1) {
     ABT translated = translatePipeline(
         metadata, "[{$match: {'a': 10}}, {$project: {_id: 0, a: 1}}]", scanDefName, prefixId);
 
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::ConstEvalPre,
-                                  OptPhaseManager::OptPhase::PathFuse,
-                                  OptPhaseManager::OptPhase::MemoSubstitutionPhase,
-                                  OptPhaseManager::OptPhase::MemoExplorationPhase,
-                                  OptPhaseManager::OptPhase::MemoImplementationPhase},
+    OptPhaseManager phaseManager({OptPhase::ConstEvalPre,
+                                  OptPhase::PathFuse,
+                                  OptPhase::MemoSubstitutionPhase,
+                                  OptPhase::MemoExplorationPhase,
+                                  OptPhase::MemoImplementationPhase},
                                  prefixId,
                                  metadata,
                                  DebugInfo::kDefaultForTests);
 
     ABT optimized = std::move(translated);
-    ASSERT_TRUE(phaseManager.optimize(optimized));
+    phaseManager.optimize(optimized);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -1541,17 +1539,17 @@ TEST(ABTTranslate, MatchIndexCovered2) {
                                        scanDefName,
                                        prefixId);
 
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::ConstEvalPre,
-                                  OptPhaseManager::OptPhase::PathFuse,
-                                  OptPhaseManager::OptPhase::MemoSubstitutionPhase,
-                                  OptPhaseManager::OptPhase::MemoExplorationPhase,
-                                  OptPhaseManager::OptPhase::MemoImplementationPhase},
+    OptPhaseManager phaseManager({OptPhase::ConstEvalPre,
+                                  OptPhase::PathFuse,
+                                  OptPhase::MemoSubstitutionPhase,
+                                  OptPhase::MemoExplorationPhase,
+                                  OptPhase::MemoImplementationPhase},
                                  prefixId,
                                  metadata,
                                  DebugInfo::kDefaultForTests);
 
     ABT optimized = std::move(translated);
-    ASSERT_TRUE(phaseManager.optimize(optimized));
+    phaseManager.optimize(optimized);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -1594,17 +1592,17 @@ TEST(ABTTranslate, MatchIndexCovered3) {
         scanDefName,
         prefixId);
 
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::ConstEvalPre,
-                                  OptPhaseManager::OptPhase::PathFuse,
-                                  OptPhaseManager::OptPhase::MemoSubstitutionPhase,
-                                  OptPhaseManager::OptPhase::MemoExplorationPhase,
-                                  OptPhaseManager::OptPhase::MemoImplementationPhase},
+    OptPhaseManager phaseManager({OptPhase::ConstEvalPre,
+                                  OptPhase::PathFuse,
+                                  OptPhase::MemoSubstitutionPhase,
+                                  OptPhase::MemoExplorationPhase,
+                                  OptPhase::MemoImplementationPhase},
                                  prefixId,
                                  metadata,
                                  DebugInfo::kDefaultForTests);
 
     ABT optimized = std::move(translated);
-    ASSERT_TRUE(phaseManager.optimize(optimized));
+    phaseManager.optimize(optimized);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -1660,17 +1658,17 @@ TEST(ABTTranslate, MatchIndexCovered4) {
         scanDefName,
         prefixId);
 
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::ConstEvalPre,
-                                  OptPhaseManager::OptPhase::PathFuse,
-                                  OptPhaseManager::OptPhase::MemoSubstitutionPhase,
-                                  OptPhaseManager::OptPhase::MemoExplorationPhase,
-                                  OptPhaseManager::OptPhase::MemoImplementationPhase},
+    OptPhaseManager phaseManager({OptPhase::ConstEvalPre,
+                                  OptPhase::PathFuse,
+                                  OptPhase::MemoSubstitutionPhase,
+                                  OptPhase::MemoExplorationPhase,
+                                  OptPhase::MemoImplementationPhase},
                                  prefixId,
                                  metadata,
                                  DebugInfo::kDefaultForTests);
 
     ABT optimized = std::move(translated);
-    ASSERT_TRUE(phaseManager.optimize(optimized));
+    phaseManager.optimize(optimized);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -1717,9 +1715,9 @@ TEST(ABTTranslate, MatchSortIndex) {
     ABT translated = translatePipeline(
         metadata, "[{$match: {'a': 10}}, {$sort: {'a': 1}}]", scanDefName, prefixId);
 
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase,
-                                  OptPhaseManager::OptPhase::MemoExplorationPhase,
-                                  OptPhaseManager::OptPhase::MemoImplementationPhase},
+    OptPhaseManager phaseManager({OptPhase::MemoSubstitutionPhase,
+                                  OptPhase::MemoExplorationPhase,
+                                  OptPhase::MemoImplementationPhase},
                                  prefixId,
                                  metadata,
                                  DebugInfo::kDefaultForTests);
@@ -1756,7 +1754,7 @@ TEST(ABTTranslate, MatchSortIndex) {
         translated);
 
     ABT optimized = std::move(translated);
-    ASSERT_TRUE(phaseManager.optimize(optimized));
+    phaseManager.optimize(optimized);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -1832,16 +1830,16 @@ TEST(ABTTranslate, RangeIndex) {
         "            Source []\n",
         translated);
 
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase,
-                                  OptPhaseManager::OptPhase::MemoExplorationPhase,
-                                  OptPhaseManager::OptPhase::MemoImplementationPhase},
+    OptPhaseManager phaseManager({OptPhase::MemoSubstitutionPhase,
+                                  OptPhase::MemoExplorationPhase,
+                                  OptPhase::MemoImplementationPhase},
                                  prefixId,
                                  metadata,
                                  DebugInfo::kDefaultForTests);
 
     ABT optimized = std::move(translated);
     phaseManager.getHints()._disableScan = true;
-    ASSERT_TRUE(phaseManager.optimize(optimized));
+    phaseManager.optimize(optimized);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -1943,15 +1941,15 @@ TEST(ABTTranslate, Index1) {
             "            Source []\n",
             translated);
 
-        OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase,
-                                      OptPhaseManager::OptPhase::MemoExplorationPhase,
-                                      OptPhaseManager::OptPhase::MemoImplementationPhase},
+        OptPhaseManager phaseManager({OptPhase::MemoSubstitutionPhase,
+                                      OptPhase::MemoExplorationPhase,
+                                      OptPhase::MemoImplementationPhase},
                                      prefixId,
                                      metadata,
                                      DebugInfo::kDefaultForTests);
 
         ABT optimized = translated;
-        ASSERT_TRUE(phaseManager.optimize(optimized));
+        phaseManager.optimize(optimized);
 
         ASSERT_EXPLAIN_V2(
             "Root []\n"
@@ -2016,16 +2014,16 @@ TEST(ABTTranslate, Index1) {
             translated);
 
         // Demonstrate we can use an index over only one field.
-        OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase,
-                                      OptPhaseManager::OptPhase::MemoExplorationPhase,
-                                      OptPhaseManager::OptPhase::MemoImplementationPhase,
-                                      OptPhaseManager::OptPhase::ConstEvalPost},
+        OptPhaseManager phaseManager({OptPhase::MemoSubstitutionPhase,
+                                      OptPhase::MemoExplorationPhase,
+                                      OptPhase::MemoImplementationPhase,
+                                      OptPhase::ConstEvalPost},
                                      prefixId,
                                      metadata,
                                      DebugInfo::kDefaultForTests);
 
         ABT optimized = translated;
-        ASSERT_TRUE(phaseManager.optimize(optimized));
+        phaseManager.optimize(optimized);
 
         ASSERT_EXPLAIN_V2(
             "Root []\n"
@@ -2138,7 +2136,7 @@ TEST(ABTTranslate, GroupEvalNoInline) {
                                  DebugInfo::kDefaultForTests);
 
     ABT optimized = translated;
-    ASSERT_TRUE(phaseManager.optimize(optimized));
+    phaseManager.optimize(optimized);
 
     // Verify that "b" is not inlined in the group expression, but is coming from the physical scan.
     ASSERT_EXPLAIN_V2(
@@ -2280,15 +2278,15 @@ TEST(ABTTranslate, Union) {
         translated);
 
     OptPhaseManager phaseManager(
-        {OptPhaseManager::OptPhase::MemoSubstitutionPhase,
-         OptPhaseManager::OptPhase::MemoExplorationPhase,
-         OptPhaseManager::OptPhase::MemoImplementationPhase},
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
         prefixId,
         {{{scanDefA, ScanDefinition{{}, {}}}, {scanDefB, ScanDefinition{{}, {}}}}},
         DebugInfo::kDefaultForTests);
 
     ABT optimized = translated;
-    ASSERT_TRUE(phaseManager.optimize(optimized));
+    phaseManager.optimize(optimized);
 
     // Note that the optimized ABT will show the filter push-down.
     ASSERT_EXPLAIN_V2(
@@ -2367,7 +2365,7 @@ TEST(ABTTranslate, PartialIndex) {
         OptPhaseManager::getAllRewritesSet(), prefixId, metadata, DebugInfo::kDefaultForTests);
 
     ABT optimized = translated;
-    ASSERT_TRUE(phaseManager.optimize(optimized));
+    phaseManager.optimize(optimized);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -2438,7 +2436,7 @@ TEST(ABTTranslate, PartialIndexNegative) {
         OptPhaseManager::getAllRewritesSet(), prefixId, metadata, DebugInfo::kDefaultForTests);
 
     ABT optimized = translated;
-    ASSERT_TRUE(phaseManager.optimize(optimized));
+    phaseManager.optimize(optimized);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -2484,9 +2482,9 @@ TEST(ABTTranslate, CommonExpressionElimination) {
                           prefixId);
 
     OptPhaseManager phaseManager(
-        {OptPhaseManager::OptPhase::ConstEvalPre}, prefixId, metadata, DebugInfo::kDefaultForTests);
+        {OptPhase::ConstEvalPre}, prefixId, metadata, DebugInfo::kDefaultForTests);
 
-    ASSERT_TRUE(phaseManager.optimize(rootNode));
+    phaseManager.optimize(rootNode);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -2538,17 +2536,17 @@ TEST(ABTTranslate, GroupByDependency) {
                           "test",
                           prefixId);
 
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::ConstEvalPre,
-                                  OptPhaseManager::OptPhase::PathFuse,
-                                  OptPhaseManager::OptPhase::MemoSubstitutionPhase,
-                                  OptPhaseManager::OptPhase::MemoExplorationPhase,
-                                  OptPhaseManager::OptPhase::MemoImplementationPhase},
+    OptPhaseManager phaseManager({OptPhase::ConstEvalPre,
+                                  OptPhase::PathFuse,
+                                  OptPhase::MemoSubstitutionPhase,
+                                  OptPhase::MemoExplorationPhase,
+                                  OptPhase::MemoImplementationPhase},
                                  prefixId,
                                  metadata,
                                  DebugInfo::kDefaultForTests);
 
     ABT optimized = translated;
-    ASSERT_TRUE(phaseManager.optimize(optimized));
+    phaseManager.optimize(optimized);
 
     // Demonstrate that "c" is set to the array size (not the array itself coming from the group).
     ASSERT_EXPLAIN_V2(
@@ -2627,7 +2625,7 @@ TEST(ABTTranslate, DoubleElemMatch) {
         "test",
         prefixId);
 
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase},
+    OptPhaseManager phaseManager({OptPhase::MemoSubstitutionPhase},
                                  prefixId,
                                  false /*requireRID*/,
                                  metadata,
@@ -2637,7 +2635,7 @@ TEST(ABTTranslate, DoubleElemMatch) {
                                  DebugInfo::kDefaultForTests);
 
     ABT optimized = translated;
-    ASSERT_TRUE(phaseManager.optimize(optimized));
+    phaseManager.optimize(optimized);
 
     // Demonstrate we get a single Sargable node which encodes both predicates.
     ASSERT_EXPLAIN_V2(

@@ -45,29 +45,32 @@ using namespace cascades;
  * elimination. Second the logical and physical reordering rewrites are applied using the memo.
  * Third the final transport rewritesd are applied.
  */
+
+#define OPT_PHASE(F)                                                                               \
+    /* ConstEval performs the following rewrites: constant folding, inlining, and dead code        \
+     * elimination. */                                                                             \
+    F(ConstEvalPre)                                                                                \
+    F(PathFuse)                                                                                    \
+                                                                                                   \
+    /* Memo phases below perform Cascades-style optimization. Reorder and transform nodes. Convert \
+     * Filter and Eval nodes to SargableNodes, and possibly merge them.*/                          \
+    F(MemoSubstitutionPhase)                                                                       \
+    /* Performs Local-global and rewrites to enable index intersection. If there is an             \
+     * implementation phase, it runs integrated with the top-down optimization. If there is no     \
+     * implementation phase, it runs standalone.*/                                                 \
+    F(MemoExplorationPhase)                                                                        \
+    /* Implementation and enforcement rules. */                                                    \
+    F(MemoImplementationPhase)                                                                     \
+                                                                                                   \
+    F(PathLower)                                                                                   \
+    F(ConstEvalPost)
+
+MAKE_PRINTABLE_ENUM(OptPhase, OPT_PHASE);
+MAKE_PRINTABLE_ENUM_STRING_ARRAY(OptPhaseEnum, OptPhase, OPT_PHASE);
+#undef OPT_PHASE
+
 class OptPhaseManager {
 public:
-    enum class OptPhase {
-        //  ConstEval performs the following rewrites: constant folding, inlining, and dead code
-        //  elimination.
-        ConstEvalPre,
-        PathFuse,
-
-        // Memo phases below perform Cascades-style optimization.
-        // Reorder and transform nodes. Convert Filter and Eval nodes to SargableNodes, and possibly
-        // merge them.
-        MemoSubstitutionPhase,
-        // Performs Local-global and rewrites to enable index intersection.
-        // If there is an implementation phase, it runs integrated with the top-down optimization.
-        // If there is no implementation phase, it runs standalone.
-        MemoExplorationPhase,
-        // Implementation and enforcement rules.
-        MemoImplementationPhase,
-
-        PathLower,
-        ConstEvalPost
-    };
-
     using PhaseSet = opt::unordered_set<OptPhase>;
 
     OptPhaseManager(PhaseSet phaseSet,
@@ -93,9 +96,9 @@ public:
 
     /**
      * Optimization modifies the input argument.
-     * Return result is true for successful optimization and false for failure.
+     * If there is a failure, program will tassert.
      */
-    bool optimize(ABT& input);
+    void optimize(ABT& input);
 
     static const PhaseSet& getAllRewritesSet();
 
@@ -121,16 +124,16 @@ private:
     bool hasPhase(OptPhase phase) const;
 
     template <OptPhase phase, class C>
-    bool runStructuralPhase(C instance, VariableEnvironment& env, ABT& input);
+    void runStructuralPhase(C instance, VariableEnvironment& env, ABT& input);
 
     /**
      * Run two structural phases until mutual fixpoint.
      * We assume we can construct from the types by initializing with env.
      */
     template <const OptPhase phase1, const OptPhase phase2, class C1, class C2>
-    bool runStructuralPhases(C1 instance1, C2 instance2, VariableEnvironment& env, ABT& input);
+    void runStructuralPhases(C1 instance1, C2 instance2, VariableEnvironment& env, ABT& input);
 
-    bool runMemoLogicalRewrite(OptPhase phase,
+    void runMemoLogicalRewrite(OptPhase phase,
                                VariableEnvironment& env,
                                const LogicalRewriter::RewriteSet& rewriteSet,
                                GroupIdType& rootGroupId,
@@ -138,13 +141,13 @@ private:
                                std::unique_ptr<LogicalRewriter>& logicalRewriter,
                                ABT& input);
 
-    bool runMemoPhysicalRewrite(OptPhase phase,
+    void runMemoPhysicalRewrite(OptPhase phase,
                                 VariableEnvironment& env,
                                 GroupIdType rootGroupId,
                                 std::unique_ptr<LogicalRewriter>& logicalRewriter,
                                 ABT& input);
 
-    bool runMemoRewritePhases(VariableEnvironment& env, ABT& input);
+    void runMemoRewritePhases(VariableEnvironment& env, ABT& input);
 
 
     static PhaseSet _allRewrites;

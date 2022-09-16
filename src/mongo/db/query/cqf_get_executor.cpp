@@ -259,8 +259,7 @@ static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> optimizeAndCreateExe
     std::unique_ptr<CanonicalQuery> cq,
     const bool requireRID) {
 
-    const bool optimizationResult = phaseManager.optimize(abt);
-    uassert(6624252, "Optimization failed", optimizationResult);
+    phaseManager.optimize(abt);
 
     {
         const auto& memo = phaseManager.getMemo();

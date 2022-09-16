@@ -58,12 +58,11 @@ constexpr bool kCETestLogOnly = false;
 const double kMaxCEError = 0.01;
 const CEType kInvalidCardinality = -1.0;
 
-const OptPhaseManager::PhaseSet kDefaultCETestPhaseSet{
-    OptPhaseManager::OptPhase::MemoSubstitutionPhase,
-    OptPhaseManager::OptPhase::MemoExplorationPhase,
-    OptPhaseManager::OptPhase::MemoImplementationPhase};
+const OptPhaseManager::PhaseSet kDefaultCETestPhaseSet{OptPhase::MemoSubstitutionPhase,
+                                                       OptPhase::MemoExplorationPhase,
+                                                       OptPhase::MemoImplementationPhase};
 
-const OptPhaseManager::PhaseSet kOnlySubPhaseSet{OptPhaseManager::OptPhase::MemoSubstitutionPhase};
+const OptPhaseManager::PhaseSet kOnlySubPhaseSet{OptPhase::MemoSubstitutionPhase};
 
 const OptPhaseManager::PhaseSet kNoOptPhaseSet{};
 

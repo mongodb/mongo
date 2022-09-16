@@ -45,8 +45,10 @@ using namespace properties;
 
 class SamplingPlanExtractor {
 public:
-    SamplingPlanExtractor(const Memo& memo, const size_t sampleSize)
-        : _memo(memo), _sampleSize(sampleSize) {}
+    SamplingPlanExtractor(const Memo& memo,
+                          const OptPhaseManager& phaseManager,
+                          const size_t sampleSize)
+        : _memo(memo), _sampleSize(sampleSize), _phaseManager(phaseManager) {}
 
     void transport(ABT& n, const MemoLogicalDelegatorNode& node) {
         n = extract(_memo.getGroup(node.getGroupId())._logicalNodes.at(0));
@@ -70,9 +72,20 @@ public:
         // Keep Eval nodes.
     }
 
-    void transport(ABT& n, const SargableNode& /*node*/, ABT& childResult, ABT& refs, ABT& binds) {
-        // Skip over sargable nodes.
-        n = childResult;
+    void transport(ABT& n, const SargableNode& node, ABT& childResult, ABT& refs, ABT& binds) {
+        ABT result = childResult;
+        // Retain only output bindings without applying filters.
+        for (const auto& [key, req] : node.getReqMap()) {
+            if (req.hasBoundProjectionName()) {
+                lowerPartialSchemaRequirement(
+                    key,
+                    PartialSchemaRequirement{req.getBoundProjectionName(),
+                                             IntervalReqExpr::makeSingularDNF()},
+                    result,
+                    _phaseManager.getPathToInterval());
+            }
+        }
+        std::swap(n, result);
     }
 
     void transport(ABT& n, const CollationNode& /*node*/, ABT& childResult, ABT& refs) {
@@ -95,6 +108,7 @@ public:
 private:
     const Memo& _memo;
     const size_t _sampleSize;
+    const OptPhaseManager& _phaseManager;
 };
 
 class CESamplingTransportImpl {
@@ -119,7 +133,7 @@ public:
             return _heuristicCE.deriveCE(memo, logicalProps, n.ref());
         }
 
-        SamplingPlanExtractor planExtractor(memo, _sampleSize);
+        SamplingPlanExtractor planExtractor(memo, _phaseManager, _sampleSize);
         // Create a plan with all eval nodes so far and the filter last.
         ABT abtTree = make<FilterNode>(node.getFilter(), planExtractor.extract(n));
 
@@ -137,7 +151,7 @@ public:
             return _heuristicCE.deriveCE(memo, logicalProps, n.ref());
         }
 
-        SamplingPlanExtractor planExtractor(memo, _sampleSize);
+        SamplingPlanExtractor planExtractor(memo, _phaseManager, _sampleSize);
         ABT extracted = planExtractor.extract(n);
 
         // Estimate individual requirements separately by potentially re-using cached results.
@@ -147,7 +161,12 @@ public:
         for (const auto& [key, req] : node.getReqMap()) {
             if (!isIntervalReqFullyOpenDNF(req.getIntervals())) {
                 ABT lowered = extracted;
-                lowerPartialSchemaRequirement(key, req, lowered, _phaseManager.getPathToInterval());
+                // Lower requirement without an output binding.
+                lowerPartialSchemaRequirement(
+                    key,
+                    PartialSchemaRequirement{"" /*boundProjectionName*/, req.getIntervals()},
+                    lowered,
+                    _phaseManager.getPathToInterval());
                 uassert(6624243, "Expected a filter node", lowered.is<FilterNode>());
                 result = estimateFilterCE(memo, logicalProps, n, std::move(lowered), result);
             }
@@ -221,9 +240,7 @@ private:
                             "Estimate selectivity ABT",
                             "explain"_attr = ExplainGenerator::explainV2(abtTree));
 
-        if (!_phaseManager.optimize(abtTree)) {
-            return {false, {}};
-        }
+        _phaseManager.optimize(abtTree);
 
         auto env = VariableEnvironment::build(abtTree);
         SlotVarMap slotMap;

@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
@@ -39,7 +40,6 @@
 
 namespace mongo::optimizer {
 namespace {
-
 
 Constant* constEval(ABT& tree) {
     auto env = VariableEnvironment::build(tree);
@@ -743,7 +743,6 @@ TEST(Explain, ExplainV2Compact) {
         "            Source []\n",
         evalNode);
 }
-
 
 }  // namespace
 }  // namespace mongo::optimizer

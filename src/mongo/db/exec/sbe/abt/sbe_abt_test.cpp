@@ -380,7 +380,7 @@ TEST_F(NodeSBE, Lower1) {
     OptPhaseManager phaseManager(
         OptPhaseManager::getAllRewritesSet(), prefixId, {{}}, DebugInfo::kDefaultForTests);
 
-    ASSERT_TRUE(phaseManager.optimize(tree));
+    phaseManager.optimize(tree);
     auto env = VariableEnvironment::build(tree);
     SlotVarMap map;
     boost::optional<sbe::value::SlotId> ridSlot;
@@ -471,7 +471,7 @@ TEST_F(NodeSBE, RequireRID) {
                                  {} /*pathToInterval*/,
                                  DebugInfo::kDefaultForTests);
 
-    ASSERT_TRUE(phaseManager.optimize(tree));
+    phaseManager.optimize(tree);
     auto env = VariableEnvironment::build(tree);
 
     SlotVarMap map;

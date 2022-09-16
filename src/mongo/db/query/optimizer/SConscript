@@ -72,6 +72,7 @@ env.CppUnitTest(
         "reference_tracker_test.cpp",
         "rewrites/path_optimizer_test.cpp",
         "interval_intersection_test.cpp",
+        "optimizer_failure_test.cpp",
     ],
     LIBDEPS=[
         "optimizer",

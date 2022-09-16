@@ -71,12 +71,12 @@ TEST(LogicalRewriter, RootNodeMerge) {
         "            Source []\n",
         rootNode);
 
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase},
+    OptPhaseManager phaseManager({OptPhase::MemoSubstitutionPhase},
                                  prefixId,
                                  {{{"test", {{}, {}}}}},
                                  DebugInfo::kDefaultForTests);
     ABT rewritten = std::move(rootNode);
-    ASSERT_TRUE(phaseManager.optimize(rewritten));
+    phaseManager.optimize(rewritten);
 
     ASSERT_EXPLAIN(
         "Root []\n"
@@ -285,12 +285,12 @@ TEST(LogicalRewriter, FilterProjectRewrite) {
         "              Source []\n",
         rootNode);
 
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase},
+    OptPhaseManager phaseManager({OptPhase::MemoSubstitutionPhase},
                                  prefixId,
                                  {{{"test", {{}, {}}}}},
                                  DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
-    ASSERT_TRUE(phaseManager.optimize(latest));
+    phaseManager.optimize(latest);
 
     ASSERT_EXPLAIN(
         "Root []\n"
@@ -396,12 +396,12 @@ TEST(LogicalRewriter, FilterProjectComplexRewrite) {
         "            Source []\n",
         rootNode);
 
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase},
+    OptPhaseManager phaseManager({OptPhase::MemoSubstitutionPhase},
                                  prefixId,
                                  {{{"test", {{}, {}}}}},
                                  DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
-    ASSERT_TRUE(phaseManager.optimize(latest));
+    phaseManager.optimize(latest);
 
     // Note: this assert depends on the order on which we consider rewrites.
     ASSERT_EXPLAIN_V2(
@@ -474,12 +474,12 @@ TEST(LogicalRewriter, FilterProjectGroupRewrite) {
     ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"c"}},
                                   std::move(filterANode));
 
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase},
+    OptPhaseManager phaseManager({OptPhase::MemoSubstitutionPhase},
                                  prefixId,
                                  {{{"test", {{}, {}}}}},
                                  DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
-    ASSERT_TRUE(phaseManager.optimize(latest));
+    phaseManager.optimize(latest);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -544,12 +544,12 @@ TEST(LogicalRewriter, FilterProjectUnwindRewrite) {
     ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"a", "b"}},
                                   std::move(filterBNode));
 
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase},
+    OptPhaseManager phaseManager({OptPhase::MemoSubstitutionPhase},
                                  prefixId,
                                  {{{"test", {{}, {}}}}},
                                  DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
-    ASSERT_TRUE(phaseManager.optimize(latest));
+    phaseManager.optimize(latest);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -615,12 +615,12 @@ TEST(LogicalRewriter, FilterProjectExchangeRewrite) {
     ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"a", "b"}},
                                   std::move(filterANode));
 
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase},
+    OptPhaseManager phaseManager({OptPhase::MemoSubstitutionPhase},
                                  prefixId,
                                  {{{"test", {{}, {}}}}},
                                  DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
-    ASSERT_TRUE(phaseManager.optimize(latest));
+    phaseManager.optimize(latest);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -687,12 +687,12 @@ TEST(LogicalRewriter, UnwindCollationRewrite) {
     ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"a", "b"}},
                                   std::move(unwindNode));
 
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase},
+    OptPhaseManager phaseManager({OptPhase::MemoSubstitutionPhase},
                                  prefixId,
                                  {{{"test", {{}, {}}}}},
                                  DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
-    ASSERT_TRUE(phaseManager.optimize(latest));
+    phaseManager.optimize(latest);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -799,12 +799,11 @@ TEST(LogicalRewriter, FilterUnionReorderSingleProjection) {
         "            Source []\n",
         latest);
 
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase,
-                                  OptPhaseManager::OptPhase::MemoExplorationPhase},
+    OptPhaseManager phaseManager({OptPhase::MemoSubstitutionPhase, OptPhase::MemoExplorationPhase},
                                  prefixId,
                                  {{{"test1", {{}, {}}}, {"test2", {{}, {}}}}},
                                  DebugInfo::kDefaultForTests);
-    ASSERT_TRUE(phaseManager.optimize(latest));
+    phaseManager.optimize(latest);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -963,12 +962,11 @@ TEST(LogicalRewriter, MultipleFilterUnionReorder) {
         "            Source []\n",
         latest);
 
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase,
-                                  OptPhaseManager::OptPhase::MemoExplorationPhase},
+    OptPhaseManager phaseManager({OptPhase::MemoSubstitutionPhase, OptPhase::MemoExplorationPhase},
                                  prefixId,
                                  {{{"test1", {{}, {}}}, {"test2", {{}, {}}}}},
                                  DebugInfo::kDefaultForTests);
-    ASSERT_TRUE(phaseManager.optimize(latest));
+    phaseManager.optimize(latest);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -1067,7 +1065,7 @@ TEST(LogicalRewriter, FilterUnionUnionPushdown) {
     ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"ptest"}},
                                   std::move(filter));
 
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase},
+    OptPhaseManager phaseManager({OptPhase::MemoSubstitutionPhase},
                                  prefixId,
                                  {{{"test1", {{}, {}}}, {"test2", {{}, {}}}, {"test3", {{}, {}}}}},
                                  DebugInfo::kDefaultForTests);
@@ -1108,7 +1106,7 @@ TEST(LogicalRewriter, FilterUnionUnionPushdown) {
         "            Source []\n",
         latest);
 
-    ASSERT_TRUE(phaseManager.optimize(latest));
+    phaseManager.optimize(latest);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -1209,14 +1207,13 @@ TEST(LogicalRewriter, UnionPreservesCommonLogicalProps) {
 
     // Run the reordering rewrite such that the scan produces a hash partition.
     PrefixId prefixId;
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase,
-                                  OptPhaseManager::OptPhase::MemoExplorationPhase},
+    OptPhaseManager phaseManager({OptPhase::MemoSubstitutionPhase, OptPhase::MemoExplorationPhase},
                                  prefixId,
                                  metadata,
                                  DebugInfo::kDefaultForTests);
 
     ABT optimized = rootNode;
-    ASSERT_TRUE(phaseManager.optimize(optimized));
+    phaseManager.optimize(optimized);
 
     ASSERT_EXPLAIN_MEMO(
         "Memo: \n"
@@ -1426,13 +1423,12 @@ TEST(LogicalRewriter, SargableCE) {
 
     PrefixId prefixId;
     ABT rootNode = sargableCETestSetup();
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase,
-                                  OptPhaseManager::OptPhase::MemoExplorationPhase},
+    OptPhaseManager phaseManager({OptPhase::MemoSubstitutionPhase, OptPhase::MemoExplorationPhase},
                                  prefixId,
                                  {{{"test", {{}, {}}}}},
                                  DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
-    ASSERT_TRUE(phaseManager.optimize(latest));
+    phaseManager.optimize(latest);
 
     // Displays SargableNode-specific per-key estimates.
     ASSERT_EXPLAIN_MEMO(
@@ -1535,12 +1531,12 @@ TEST(LogicalRewriter, RemoveNoopFilter) {
     ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"ptest"}},
                                   std::move(filterANode));
 
-    OptPhaseManager phaseManager({OptPhaseManager::OptPhase::MemoSubstitutionPhase},
+    OptPhaseManager phaseManager({OptPhase::MemoSubstitutionPhase},
                                  prefixId,
                                  {{{"test", {{}, {}}}}},
                                  DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
-    ASSERT_TRUE(phaseManager.optimize(latest));
+    phaseManager.optimize(latest);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"

@@ -118,6 +118,8 @@ public:
 
     bool hasFreeVariables() const;
 
+    opt::unordered_set<std::string> freeVariableNames() const;
+
     /**
      * Returns the number of places in the ABT where there is a free Variable with name 'variable'.
      */

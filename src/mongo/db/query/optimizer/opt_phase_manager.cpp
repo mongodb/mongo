@@ -32,6 +32,7 @@
 #include "mongo/db/query/optimizer/cascades/ce_heuristic.h"
 #include "mongo/db/query/optimizer/cascades/cost_derivation.h"
 #include "mongo/db/query/optimizer/cascades/logical_props_derivation.h"
+#include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/rewrites/path.h"
 #include "mongo/db/query/optimizer/rewrites/path_lower.h"
@@ -92,39 +93,42 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
     }
 }
 
-template <OptPhaseManager::OptPhase phase, class C>
-bool OptPhaseManager::runStructuralPhase(C instance, VariableEnvironment& env, ABT& input) {
+template <OptPhase phase, class C>
+void OptPhaseManager::runStructuralPhase(C instance, VariableEnvironment& env, ABT& input) {
     if (!hasPhase(phase)) {
-        return true;
+        return;
     }
 
     for (int iterationCount = 0; instance.optimize(input); iterationCount++) {
-        if (_debugInfo.exceedsIterationLimit(iterationCount)) {
-            // Iteration limit exceeded.
-            return false;
-        }
+        tassert(6808708,
+                str::stream() << "Iteration limit exceeded while running the following phase: "
+                              << OptPhaseEnum::toString[static_cast<int>(phase)] << ".",
+                !_debugInfo.exceedsIterationLimit(iterationCount));
     }
 
-    return !env.hasFreeVariables();
+    tassert(6808709, "Environment has free variables.", !env.hasFreeVariables());
 }
 
-template <OptPhaseManager::OptPhase phase1, OptPhaseManager::OptPhase phase2, class C1, class C2>
-bool OptPhaseManager::runStructuralPhases(C1 instance1,
+template <OptPhase phase1, OptPhase phase2, class C1, class C2>
+void OptPhaseManager::runStructuralPhases(C1 instance1,
                                           C2 instance2,
                                           VariableEnvironment& env,
                                           ABT& input) {
     const bool hasPhase1 = hasPhase(phase1);
     const bool hasPhase2 = hasPhase(phase2);
     if (!hasPhase1 && !hasPhase2) {
-        return true;
+        return;
     }
 
     bool changed = true;
     for (int iterationCount = 0; changed; iterationCount++) {
-        if (_debugInfo.exceedsIterationLimit(iterationCount)) {
-            // Iteration limit exceeded.
-            return false;
-        }
+        // Iteration limit exceeded.
+        tassert(6808700,
+                str::stream() << "Iteration limit exceeded while running the following phases: "
+                              << OptPhaseEnum::toString[static_cast<int>(phase1)] << ", "
+                              << OptPhaseEnum::toString[static_cast<int>(phase2)] << ".",
+                !_debugInfo.exceedsIterationLimit(iterationCount));
+
 
         changed = false;
         if (hasPhase1) {
@@ -135,10 +139,10 @@ bool OptPhaseManager::runStructuralPhases(C1 instance1,
         }
     }
 
-    return !env.hasFreeVariables();
+    tassert(6808701, "Environment has free variables.", !env.hasFreeVariables());
 }
 
-bool OptPhaseManager::runMemoLogicalRewrite(const OptPhase phase,
+void OptPhaseManager::runMemoLogicalRewrite(const OptPhase phase,
                                             VariableEnvironment& env,
                                             const LogicalRewriter::RewriteSet& rewriteSet,
                                             GroupIdType& rootGroupId,
@@ -146,28 +150,28 @@ bool OptPhaseManager::runMemoLogicalRewrite(const OptPhase phase,
                                             std::unique_ptr<LogicalRewriter>& logicalRewriter,
                                             ABT& input) {
     if (!hasPhase(phase)) {
-        return true;
+        return;
     }
 
     _memo.clear();
     const bool useHeuristicCE = phase == OptPhase::MemoSubstitutionPhase;
     logicalRewriter = std::make_unique<LogicalRewriter>(
         _memo, _prefixId, rewriteSet, _hints, _pathToInterval, useHeuristicCE);
+
     rootGroupId = logicalRewriter->addRootNode(input);
 
     if (runStandalone) {
-        if (!logicalRewriter->rewriteToFixPoint()) {
-            return false;
-        }
+        const bool fixPointRewritten = logicalRewriter->rewriteToFixPoint();
+        tassert(6808702, "Logical writer failed to rewrite fix point.", fixPointRewritten);
 
         input = extractLatestPlan(_memo, rootGroupId);
         env.rebuild(input);
     }
 
-    return !env.hasFreeVariables();
+    tassert(6808703, "Environment has free variables.", !env.hasFreeVariables());
 }
 
-bool OptPhaseManager::runMemoPhysicalRewrite(const OptPhase phase,
+void OptPhaseManager::runMemoPhysicalRewrite(const OptPhase phase,
                                              VariableEnvironment& env,
                                              const GroupIdType rootGroupId,
                                              std::unique_ptr<LogicalRewriter>& logicalRewriter,
@@ -175,22 +179,20 @@ bool OptPhaseManager::runMemoPhysicalRewrite(const OptPhase phase,
     using namespace properties;
 
     if (!hasPhase(phase)) {
-        return true;
-    }
-    if (rootGroupId < 0) {
-        // Nothing inserted in the memo. Logical rewrites did not run?
-        return false;
+        return;
     }
 
+    tassert(6808704,
+            "Nothing is inserted in the memo, logical rewrites may not have ran.",
+            rootGroupId >= 0);
     // By default we require centralized result.
     // Also by default we do not require projections: the Root node will add those.
     PhysProps physProps = makePhysProps(DistributionRequirement(DistributionType::Centralized));
     if (_requireRID) {
         const auto& rootLogicalProps = _memo.getGroup(rootGroupId)._logicalProperties;
-        if (!hasProperty<IndexingAvailability>(rootLogicalProps)) {
-            // We cannot obtain rid for this query.
-            return false;
-        }
+        tassert(6808705,
+                "We cannot optain rid for this query.",
+                hasProperty<IndexingAvailability>(rootLogicalProps));
 
         const auto& scanDefName =
             getPropertyConst<IndexingAvailability>(rootLogicalProps).getScanDefName();
@@ -211,78 +213,79 @@ bool OptPhaseManager::runMemoPhysicalRewrite(const OptPhase phase,
 
     auto optGroupResult =
         rewriter.optimizeGroup(rootGroupId, std::move(physProps), _prefixId, CostType::kInfinity);
-    if (!optGroupResult._success) {
-        return false;
-    }
+
+    tassert(6808706, "Optimization group result failed.", optGroupResult._success);
 
     _physicalNodeId = {rootGroupId, optGroupResult._index};
     std::tie(input, _nodeToGroupPropsMap) = extractPhysicalPlan(_physicalNodeId, _metadata, _memo);
 
     env.rebuild(input);
-    return !env.hasFreeVariables();
+
+    tassert(6808707, "Environment has free variables.", !env.hasFreeVariables());
 }
 
-bool OptPhaseManager::runMemoRewritePhases(VariableEnvironment& env, ABT& input) {
+void OptPhaseManager::runMemoRewritePhases(VariableEnvironment& env, ABT& input) {
     GroupIdType rootGroupId = -1;
     std::unique_ptr<LogicalRewriter> logicalRewriter;
 
-    if (!runMemoLogicalRewrite(OptPhase::MemoSubstitutionPhase,
-                               env,
-                               LogicalRewriter::getSubstitutionSet(),
-                               rootGroupId,
-                               true /*runStandalone*/,
-                               logicalRewriter,
-                               input)) {
-        return false;
-    }
+    runMemoLogicalRewrite(OptPhase::MemoSubstitutionPhase,
+                          env,
+                          LogicalRewriter::getSubstitutionSet(),
+                          rootGroupId,
+                          true /*runStandalone*/,
+                          logicalRewriter,
+                          input);
 
-    if (!runMemoLogicalRewrite(OptPhase::MemoExplorationPhase,
-                               env,
-                               LogicalRewriter::getExplorationSet(),
-                               rootGroupId,
-                               !hasPhase(OptPhase::MemoImplementationPhase),
-                               logicalRewriter,
-                               input)) {
-        return false;
-    }
+    runMemoLogicalRewrite(OptPhase::MemoExplorationPhase,
+                          env,
+                          LogicalRewriter::getExplorationSet(),
+                          rootGroupId,
+                          !hasPhase(OptPhase::MemoImplementationPhase),
+                          logicalRewriter,
+                          input);
 
-    if (!runMemoPhysicalRewrite(
-            OptPhase::MemoImplementationPhase, env, rootGroupId, logicalRewriter, input)) {
-        return false;
-    }
 
-    return true;
+    runMemoPhysicalRewrite(
+        OptPhase::MemoImplementationPhase, env, rootGroupId, logicalRewriter, input);
 }
 
-bool OptPhaseManager::optimize(ABT& input) {
+void OptPhaseManager::optimize(ABT& input) {
     VariableEnvironment env = VariableEnvironment::build(input);
+
+    std::string freeVariables = "";
     if (env.hasFreeVariables()) {
-        return false;
+        bool first = true;
+        for (auto& name : env.freeVariableNames()) {
+            if (first) {
+                first = false;
+            } else {
+                freeVariables += ", ";
+            }
+            freeVariables += name;
+        }
     }
+
+    tassert(6808711,
+            "Environment has the following free variables: " + freeVariables + ".",
+            !env.hasFreeVariables());
 
     const auto sargableCheckFn = [this](const ABT& expr) {
         return convertExprToPartialSchemaReq(expr, false /*isFilterContext*/, _pathToInterval)
             .has_value();
     };
-    if (!runStructuralPhases<OptPhase::ConstEvalPre, OptPhase::PathFuse, ConstEval, PathFusion>(
-            ConstEval{env, sargableCheckFn}, PathFusion{env}, env, input)) {
-        return false;
-    }
 
-    if (!runMemoRewritePhases(env, input)) {
-        return false;
-    }
+    runStructuralPhases<OptPhase::ConstEvalPre, OptPhase::PathFuse, ConstEval, PathFusion>(
+        ConstEval{env, sargableCheckFn}, PathFusion{env}, env, input);
 
-    if (!runStructuralPhase<OptPhase::PathLower, PathLowering>(
-            PathLowering{_prefixId, env}, env, input)) {
-        return false;
-    }
+    runMemoRewritePhases(env, input);
+
+    runStructuralPhase<OptPhase::PathLower, PathLowering>(PathLowering{_prefixId, env}, env, input);
 
     ProjectionNameSet erasedProjNames;
-    if (!runStructuralPhase<OptPhase::ConstEvalPost, ConstEval>(
-            ConstEval{env, {} /*disableInline*/, &erasedProjNames}, env, input)) {
-        return false;
-    }
+
+    runStructuralPhase<OptPhase::ConstEvalPost, ConstEval>(
+        ConstEval{env, {} /*disableInline*/, &erasedProjNames}, env, input);
+
     if (!erasedProjNames.empty()) {
         // If we have erased some eval nodes, make sure to delete the corresponding projection names
         // from the node property map.
@@ -299,11 +302,7 @@ bool OptPhaseManager::optimize(ABT& input) {
     }
 
     env.rebuild(input);
-    if (env.hasFreeVariables()) {
-        return false;
-    }
-
-    return true;
+    tassert(6808710, "Environment has free variables.", !env.hasFreeVariables());
 }
 
 bool OptPhaseManager::hasPhase(const OptPhase phase) const {

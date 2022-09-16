@@ -79,7 +79,7 @@ optimizer::CEType CETester::getCE(ABT& abt) const {
                                  defaultConvertPathToInterval,
                                  DebugInfo::kDefaultForTests};
 
-    ASSERT_TRUE(phaseManager.optimize(abt));
+    phaseManager.optimize(abt);
 
     const auto& memo = phaseManager.getMemo();
     if constexpr (kCETestLogOnly) {

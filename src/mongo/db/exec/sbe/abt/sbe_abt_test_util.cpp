@@ -116,7 +116,7 @@ std::vector<BSONObj> runSBEAST(OperationContext* opCtx,
 
     OptPhaseManager phaseManager(
         OptPhaseManager::getAllRewritesSet(), prefixId, {{}}, DebugInfo::kDefaultForTests);
-    ASSERT_TRUE(phaseManager.optimize(tree));
+    phaseManager.optimize(tree);
 
     OPTIMIZER_DEBUG_LOG(
         6264808, 5, "SBE optimized ABT", "explain"_attr = ExplainGenerator::explainV2(tree));
