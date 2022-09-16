@@ -5,7 +5,6 @@
  * @tags: [
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
- *   requires_fcv_62,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
@@ -20,7 +19,6 @@ load("jstests/libs/uuid_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/write_concern_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
-const {ServerlessLockType, getServerlessOperationLock} = TenantMigrationUtil;
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
@@ -49,7 +47,6 @@ const migrationOpts = {
     migrationIdString: extractUUIDFromObject(UUID()),
     tenantId: kTenantId
 };
-
 assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
 // We must wait for the migration to have finished replicating the recipient keys on the donor set
 // before starting initial sync, otherwise the migration will hang while waiting for initial sync to
@@ -86,8 +83,7 @@ donorRst.awaitReplication();
 stopServerReplication(initialSyncNode);
 
 let configDonorsColl = initialSyncNode.getCollection(TenantMigrationTest.kConfigDonorsNS);
-assert.lte(configDonorsColl.count(), 1);
-let donorDoc = configDonorsColl.findOne();
+let donorDoc = configDonorsColl.findOne({tenantId: kTenantId});
 if (donorDoc) {
     jsTestLog("Initial sync completed while migration was in state: " + donorDoc.state);
     switch (donorDoc.state) {
@@ -150,13 +146,6 @@ if (donorDoc) {
         default:
             throw new Error(`Invalid state "${state}" from donor doc.`);
     }
-}
-
-const activeServerlessLock = getServerlessOperationLock(initialSyncNode);
-if (donorDoc && !donorDoc.expireAt) {
-    assert.eq(activeServerlessLock, ServerlessLockType.TenantMigrationDonor);
-} else {
-    assert.eq(activeServerlessLock, null);
 }
 
 if (fp) {

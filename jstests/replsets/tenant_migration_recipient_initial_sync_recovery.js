@@ -6,7 +6,6 @@
  *   incompatible_with_macos,
  *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
- *   requires_fcv_62,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
@@ -20,7 +19,6 @@ load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/libs/write_concern_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
-const {ServerlessLockType, getServerlessOperationLock} = TenantMigrationUtil;
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
@@ -61,8 +59,7 @@ recipientRst.awaitReplication();
 stopServerReplication(initialSyncNode);
 
 const configRecipientsColl = initialSyncNode.getCollection(TenantMigrationTest.kConfigRecipientsNS);
-assert.lte(configRecipientsColl.count(), 1);
-const recipientDoc = configRecipientsColl.findOne();
+const recipientDoc = configRecipientsColl.findOne({tenantId: kTenantId});
 if (recipientDoc) {
     switch (recipientDoc.state) {
         case TenantMigrationTest.RecipientState.kStarted:
@@ -98,13 +95,6 @@ if (recipientDoc) {
         default:
             throw new Error(`Invalid state "${state}" from recipient doc.`);
     }
-}
-
-const activeServerlessLock = getServerlessOperationLock(initialSyncNode);
-if (recipientDoc && !recipientDoc.expireAt) {
-    assert.eq(activeServerlessLock, ServerlessLockType.TenantMigrationRecipient);
-} else {
-    assert.eq(activeServerlessLock, null);
 }
 
 restartServerReplication(initialSyncNode);

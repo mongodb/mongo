@@ -1005,14 +1005,7 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
 
                return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
            })
-        .until([&](StatusWith<repl::OpTime> swOpTime) {
-            if (swOpTime.getStatus().code() == ErrorCodes::ConflictingServerlessOperation) {
-                stdx::lock_guard<Latch> lg(_mutex);
-
-                uassertStatusOK(swOpTime);
-            }
-            return swOpTime.getStatus().isOK();
-        })
+        .until([](StatusWith<repl::OpTime> swOpTime) { return swOpTime.getStatus().isOK(); })
         .withBackoffBetweenIterations(kExponentialBackoff)
         .on(**executor, token);
 }
@@ -1101,11 +1094,6 @@ ShardSplitDonorService::DonorStateMachine::_handleErrorOrEnterAbortedState(
               "Entering 'aborted' state.",
               "id"_attr = _migrationId,
               "abortReason"_attr = _abortReason.value());
-
-        if (_abortReason->code() == ErrorCodes::ConflictingServerlessOperation) {
-            return ExecutorFuture(**executor,
-                                  DurableState{ShardSplitDonorStateEnum::kAborted, _abortReason});
-        }
     }
 
     return ExecutorFuture<void>(**executor)
@@ -1125,8 +1113,7 @@ ExecutorFuture<void>
 ShardSplitDonorService::DonorStateMachine::_waitForForgetCmdThenMarkGarbageCollectable(
     const ScopedTaskExecutorPtr& executor, const CancellationToken& primaryToken) {
     stdx::lock_guard<Latch> lg(_mutex);
-    if (_stateDoc.getExpireAt() ||
-        (_abortReason && _abortReason->code() == ErrorCodes::ConflictingServerlessOperation)) {
+    if (_stateDoc.getExpireAt()) {
         return ExecutorFuture(**executor);
     }
 

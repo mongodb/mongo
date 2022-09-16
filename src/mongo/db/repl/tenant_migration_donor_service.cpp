@@ -515,12 +515,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_insertState
 
                return repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
            })
-        .until([&](StatusWith<repl::OpTime> swOpTime) {
-            if (swOpTime.getStatus().code() == ErrorCodes::ConflictingServerlessOperation) {
-                uassertStatusOK(swOpTime);
-            }
-            return swOpTime.getStatus().isOK();
-        })
+        .until([](StatusWith<repl::OpTime> swOpTime) { return swOpTime.getStatus().isOK(); })
         .withBackoffBetweenIterations(kExponentialBackoff)
         .on(**executor, token);
 }

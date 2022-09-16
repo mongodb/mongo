@@ -58,7 +58,6 @@
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/server_recovery.h"
-#include "mongo/db/serverless/serverless_operation_lock_registry.h"
 #include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
@@ -652,7 +651,6 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
     _correctRecordStoreCounts(opCtx);
 
     tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx);
-    ServerlessOperationLockRegistry::recoverLocks(opCtx);
 
     // Reconstruct prepared transactions after counts have been adjusted. Since prepared
     // transactions were aborted (i.e. the in-memory counts were rolled-back) before computing

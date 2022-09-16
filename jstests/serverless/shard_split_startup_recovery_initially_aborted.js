@@ -1,9 +1,7 @@
 /**
- * Starts a shard split through `abortShardSplit` and assert that no tenant access blockers are
+ * Starts a shard split througt `abortShardSplit` and assert that no tenant access blockers are
  * recovered since we do not recover access blockers for aborted split marked garbage collectable.
- * Also verifies the serverless operation lock is not acquired when starting a split in aborted
- * state.
- * @tags: [requires_fcv_62, featureFlagShardSplit]
+ * @tags: [requires_fcv_52, featureFlagShardSplit]
  */
 
 load("jstests/libs/fail_point_util.js");                         // for "configureFailPoint"
@@ -11,7 +9,6 @@ load('jstests/libs/parallel_shell_helpers.js');                  // for "startPa
 load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // for "setParameter"
 load("jstests/serverless/libs/basic_serverless_test.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
-const {getServerlessOperationLock} = TenantMigrationUtil;
 
 (function() {
 "use strict";
@@ -61,9 +58,6 @@ tenantIds.every(tenantId => {
     assert.isnull(BasicServerlessTest.getTenantMigrationAccessBlocker(
         {node: donorPrimary, tenantId: tenantId}));
 });
-
-// We do not acquire the lock for document marked for garbage collection
-assert.eq(getServerlessOperationLock(donorPrimary), null);
 
 test.stop();
 })();

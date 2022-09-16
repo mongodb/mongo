@@ -1,5 +1,5 @@
 /*
- * Test that tenant access blockers are removed when applying the recipient config
+ * Test that tenant access blockers are removed from recipients when applying the recipient config.
  *
  * @tags: [requires_fcv_52, featureFlagShardSplit, serverless]
  */

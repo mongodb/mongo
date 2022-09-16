@@ -34,7 +34,6 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
-#include "mongo/db/serverless/serverless_operation_lock_registry.h"
 #include "mongo/db/serverless/shard_split_donor_op_observer.h"
 #include "mongo/db/serverless/shard_split_state_machine_gen.h"
 #include "mongo/db/serverless/shard_split_test_utils.h"
@@ -447,13 +446,7 @@ TEST_F(ShardSplitDonorOpObserverTest, SetExpireAtForAbortedRemoveBlockers) {
         ASSERT_FALSE(mtab);
     };
 
-    ServerlessOperationLockRegistry::get(_opCtx->getServiceContext())
-        .acquireLock(ServerlessOperationLockRegistry::LockType::kShardSplit, _uuid);
-
     runUpdateTestCase(stateDocument, _tenantIds, mtabVerifier);
-
-    ASSERT_FALSE(ServerlessOperationLockRegistry::get(_opCtx->getServiceContext())
-                     .getActiveOperationType_forTest());
 }
 
 TEST_F(ShardSplitDonorOpObserverTest, DeleteAbortedDocumentDoesNotRemoveBlockers) {

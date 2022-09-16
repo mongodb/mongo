@@ -31,7 +31,6 @@
 
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
-#include "mongo/db/serverless/serverless_operation_lock_registry.h"
 #include "mongo/db/serverless/shard_split_donor_op_observer.h"
 #include "mongo/db/serverless/shard_split_state_machine_gen.h"
 #include "mongo/db/serverless/shard_split_utils.h"
@@ -49,8 +48,6 @@ bool isPrimary(const OperationContext* opCtx) {
 
 const auto tenantIdsToDeleteDecoration =
     OperationContext::declareDecoration<boost::optional<std::vector<std::string>>>();
-const auto shardSplitIdToDeleteDecoration =
-    OperationContext::declareDecoration<boost::optional<UUID>>();
 
 ShardSplitDonorDocument parseAndValidateDonorDocument(const BSONObj& doc) {
     auto donorStateDoc = ShardSplitDonorDocument::parse(IDLParserContext("donorStateDoc"), doc);
@@ -149,9 +146,6 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
     invariant(donorStateDoc.getTenantIds());
     invariant(donorStateDoc.getRecipientConnectionString());
 
-    ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
-        .acquireLock(ServerlessOperationLockRegistry::LockType::kShardSplit, donorStateDoc.getId());
-
     auto tenantIds = *donorStateDoc.getTenantIds();
     for (const auto& tenantId : tenantIds) {
         auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(opCtx->getServiceContext(),
@@ -163,13 +157,11 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
     if (isPrimary(opCtx)) {
         // onRollback is not registered on secondaries since secondaries should not fail to
         // apply the write.
-        opCtx->recoveryUnit()->onRollback([opCtx, tenantIds, id = donorStateDoc.getId()] {
+        opCtx->recoveryUnit()->onRollback([opCtx, tenantIds] {
             for (const auto& tenantId : tenantIds) {
                 TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                     .remove(tenantId, TenantMigrationAccessBlocker::BlockerType::kDonor);
             }
-            ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
-                .releaseLock(ServerlessOperationLockRegistry::LockType::kShardSplit, id);
         });
     }
 }
@@ -259,10 +251,6 @@ public:
 
     void commit(boost::optional<Timestamp>) override {
         if (_donorStateDoc.getExpireAt()) {
-            ServerlessOperationLockRegistry::get(_opCtx->getServiceContext())
-                .releaseLock(ServerlessOperationLockRegistry::LockType::kShardSplit,
-                             _donorStateDoc.getId());
-
             if (_donorStateDoc.getTenantIds()) {
                 auto tenantIds = _donorStateDoc.getTenantIds().value();
                 for (auto&& tenantId : tenantIds) {
@@ -390,13 +378,12 @@ void ShardSplitDonorOpObserver::aboutToDelete(OperationContext* opCtx,
     }
 
     auto donorStateDoc = parseAndValidateDonorDocument(doc);
-    const bool shouldRemoveOnRecipient =
-        serverless::shouldRemoveStateDocumentOnRecipient(opCtx, donorStateDoc);
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "cannot delete a donor's state document " << doc
                           << " since it has not been marked as garbage collectable and is not a"
                           << " recipient garbage collectable.",
-            donorStateDoc.getExpireAt() || shouldRemoveOnRecipient);
+            donorStateDoc.getExpireAt() ||
+                serverless::shouldRemoveStateDocumentOnRecipient(opCtx, donorStateDoc));
 
     // To support back-to-back split retries, when a split is aborted, we remove its
     // TenantMigrationDonorAccessBlockers as soon as its donor state doc is marked as garbage
@@ -411,10 +398,6 @@ void ShardSplitDonorOpObserver::aboutToDelete(OperationContext* opCtx,
         }
 
         tenantIdsToDeleteDecoration(opCtx) = boost::make_optional(result);
-    }
-
-    if (shouldRemoveOnRecipient) {
-        shardSplitIdToDeleteDecoration(opCtx) = boost::make_optional(donorStateDoc.getId());
     }
 }
 
@@ -438,12 +421,6 @@ void ShardSplitDonorOpObserver::onDelete(OperationContext* opCtx,
         for (auto&& tenantId : *tenantIdsToDeleteDecoration(opCtx)) {
             registry.remove(tenantId, TenantMigrationAccessBlocker::BlockerType::kDonor);
         }
-
-        const auto idToDelete = shardSplitIdToDeleteDecoration(opCtx);
-        if (idToDelete) {
-            ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
-                .releaseLock(ServerlessOperationLockRegistry::LockType::kShardSplit, *idToDelete);
-        }
     });
 }
 
@@ -456,9 +433,6 @@ repl::OpTime ShardSplitDonorOpObserver::onDropCollection(OperationContext* opCtx
         opCtx->recoveryUnit()->onCommit([opCtx](boost::optional<Timestamp>) {
             TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                 .removeAll(TenantMigrationAccessBlocker::BlockerType::kDonor);
-
-            ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
-                .onDropStateCollection(ServerlessOperationLockRegistry::LockType::kShardSplit);
         });
     }
 

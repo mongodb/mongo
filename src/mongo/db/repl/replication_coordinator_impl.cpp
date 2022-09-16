@@ -88,7 +88,6 @@
 #include "mongo/db/repl/update_position_args.h"
 #include "mongo/db/repl/vote_requester.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/serverless/serverless_operation_lock_registry.h"
 #include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/shutdown_in_progress_quiesce_info.h"
@@ -535,7 +534,6 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
     }
 
     tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx);
-    ServerlessOperationLockRegistry::recoverLocks(opCtx);
     LOGV2(4280506, "Reconstructing prepared transactions");
     reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kRecovering);
 

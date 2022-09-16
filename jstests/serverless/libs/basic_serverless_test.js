@@ -41,45 +41,6 @@ const runCommitSplitThreadWrapper = function(rstArgs,
         donorRst, commitShardSplitCmdObj, retryOnRetryableErrors, enableDonorStartMigrationFsync);
 };
 
-/*
- *  Wait for state document garbage collection by polling for when the document has been removed
- * from the 'shardSplitDonors' namespace, and all access blockers have been removed.
- * @param {migrationId} id that was used for the commitShardSplit command.
- * @param {tenantIds} tenant ids of the shard split.
- */
-const waitForGarbageCollectionForSplit = function(donorNodes, migrationId, tenantIds) {
-    jsTestLog("Wait for garbage collection");
-    assert.soon(() => donorNodes.every(node => {
-        const donorDocumentDeleted =
-            node.getCollection(BasicServerlessTest.kConfigSplitDonorsNS).count({
-                _id: migrationId
-            }) === 0;
-        const allAccessBlockersRemoved = tenantIds.every(
-            id => BasicServerlessTest.getTenantMigrationAccessBlocker({node, id}) == null);
-
-        const result = donorDocumentDeleted && allAccessBlockersRemoved;
-        if (!result) {
-            const status = [];
-            if (!donorDocumentDeleted) {
-                status.push(`donor document to be deleted (docCount=${
-                    node.getCollection(BasicServerlessTest.kConfigSplitDonorsNS).count({
-                        _id: migrationId
-                    })})`);
-            }
-
-            if (!allAccessBlockersRemoved) {
-                const tenantsWithBlockers = tenantIds.filter(
-                    id => BasicServerlessTest.getTenantMigrationAccessBlocker({node, id}) != null);
-                status.push(`access blockers to be removed (${tenantsWithBlockers})`);
-            }
-        }
-        return donorDocumentDeleted && allAccessBlockersRemoved;
-    }),
-                "tenant access blockers weren't removed",
-                60 * 1000,
-                1 * 1000);
-};
-
 const runShardSplitCommand = function(
     replicaSet, cmdObj, retryOnRetryableErrors, enableDonorStartMigrationFsync) {
     let res;
@@ -394,7 +355,38 @@ class BasicServerlessTest {
      * @param {tenantIds} tenant ids of the shard split.
      */
     waitForGarbageCollection(migrationId, tenantIds) {
-        return waitForGarbageCollectionForSplit(this.donor.nodes, migrationId, tenantIds);
+        jsTestLog("Wait for garbage collection");
+        const donorNodes = this.donor.nodes;
+        assert.soon(() => donorNodes.every(node => {
+            const donorDocumentDeleted =
+                node.getCollection(BasicServerlessTest.kConfigSplitDonorsNS).count({
+                    _id: migrationId
+                }) === 0;
+            const allAccessBlockersRemoved = tenantIds.every(
+                id => BasicServerlessTest.getTenantMigrationAccessBlocker({node, id}) == null);
+
+            const result = donorDocumentDeleted && allAccessBlockersRemoved;
+            if (!result) {
+                const status = [];
+                if (!donorDocumentDeleted) {
+                    status.push(`donor document to be deleted (docCount=${
+                        node.getCollection(BasicServerlessTest.kConfigSplitDonorsNS).count({
+                            _id: migrationId
+                        })})`);
+                }
+
+                if (!allAccessBlockersRemoved) {
+                    const tenantsWithBlockers =
+                        tenantIds.filter(id => BasicServerlessTest.getTenantMigrationAccessBlocker(
+                                                   {node, id}) != null);
+                    status.push(`access blockers to be removed (${tenantsWithBlockers})`);
+                }
+            }
+            return donorDocumentDeleted && allAccessBlockersRemoved;
+        }),
+                    "tenant access blockers weren't removed",
+                    60 * 1000,
+                    1 * 1000);
     }
 
     /**

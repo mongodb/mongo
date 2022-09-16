@@ -34,7 +34,6 @@
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/tenant_migration_donor_op_observer.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
-#include "mongo/db/serverless/serverless_operation_lock_registry.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
@@ -55,10 +54,6 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
                                        const TenantMigrationDonorDocument& donorStateDoc) {
     invariant(donorStateDoc.getState() == TenantMigrationDonorStateEnum::kAbortingIndexBuilds);
 
-    ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
-        .acquireLock(ServerlessOperationLockRegistry::LockType::kTenantDonor,
-                     donorStateDoc.getId());
-
     auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(opCtx->getServiceContext(),
                                                                     donorStateDoc.getId());
     if (donorStateDoc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations) ==
@@ -74,9 +69,6 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
                 TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                     .remove(donorStateDoc.getTenantId(),
                             TenantMigrationAccessBlocker::BlockerType::kDonor);
-                ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
-                    .releaseLock(ServerlessOperationLockRegistry::LockType::kTenantDonor,
-                                 donorStateDoc.getId());
             });
         }
     } else {
@@ -93,9 +85,6 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
             opCtx->recoveryUnit()->onRollback([opCtx, donorStateDoc] {
                 TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                     .removeShardMergeDonorAccessBlocker(donorStateDoc.getId());
-                ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
-                    .releaseLock(ServerlessOperationLockRegistry::LockType::kTenantDonor,
-                                 donorStateDoc.getId());
             });
         }
     }
@@ -167,10 +156,6 @@ public:
 
     void commit(boost::optional<Timestamp>) override {
         if (_donorStateDoc.getExpireAt()) {
-            ServerlessOperationLockRegistry::get(_opCtx->getServiceContext())
-                .releaseLock(ServerlessOperationLockRegistry::LockType::kTenantDonor,
-                             _donorStateDoc.getId());
-
             auto mtab = tenant_migration_access_blocker::getTenantMigrationDonorAccessBlocker(
                 _opCtx->getServiceContext(), _donorStateDoc.getTenantId());
 
@@ -354,9 +339,6 @@ repl::OpTime TenantMigrationDonorOpObserver::onDropCollection(OperationContext* 
         opCtx->recoveryUnit()->onCommit([opCtx](boost::optional<Timestamp>) {
             TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                 .removeAll(TenantMigrationAccessBlocker::BlockerType::kDonor);
-
-            ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
-                .onDropStateCollection(ServerlessOperationLockRegistry::LockType::kTenantDonor);
         });
     }
     return {};

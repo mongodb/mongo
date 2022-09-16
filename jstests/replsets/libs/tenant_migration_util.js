@@ -262,19 +262,6 @@ var TenantMigrationUtil = (function() {
         return res;
     }
 
-    const ServerlessLockType = {
-        ShardSplitDonor: 'shard split donor',
-        TenantMigrationDonor: 'tenant migration donor',
-        TenantMigrationRecipient: 'tenant migration recipient'
-    };
-
-    /**
-     * Return the active serverless operation lock, if one is acquired.
-     */
-    function getServerlessOperationLock(node) {
-        return assert.commandWorked(node.adminCommand({serverStatus: 1})).serverless.operationLock;
-    }
-
     /**
      * Returns the TenantMigrationAccessBlocker serverStatus output for the multi-tenant migration
      * or shard merge for the given node.
@@ -574,8 +561,6 @@ var TenantMigrationUtil = (function() {
         makeMigrationCertificatesForTest,
         makeX509OptionsForTest,
         isMigrationCompleted,
-        ServerlessLockType,
-        getServerlessOperationLock,
         getTenantMigrationAccessBlocker,
         getTenantMigrationAccessBlockers,
         getNumBlockedReads,
